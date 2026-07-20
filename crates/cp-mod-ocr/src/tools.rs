@@ -121,7 +121,7 @@ fn execute_ocr(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     });
 
-    if let Err(e) = &(handle) {
+    if let Err(e) = handle.as_ref() {
         return err(tool, format!("Failed to spawn OCR worker thread: {e}"));
     }
 

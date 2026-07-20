@@ -137,11 +137,12 @@ fn build_extensions(info: &cp_mod_search::types::SearchOverlayInfo) -> Vec<Searc
     let bar_max_width: u64 = 28;
     info.top_extensions
         .iter()
-        .map(|(ext, count)| {
+        .map(|entry| {
+            let (ext, count) = (&entry.0, entry.1);
             let bar_len = count.saturating_mul(bar_max_width).checked_div(max_count).unwrap_or(0);
             let bar_usize = usize::try_from(bar_len).unwrap_or(0).max(1);
             let pct = if total_files > 0 { count.saturating_mul(100).checked_div(total_files).unwrap_or(0) } else { 0 };
-            SearchExtension { name: ext.clone(), count: *count, bar_width: bar_usize, pct }
+            SearchExtension { name: ext.clone(), count, bar_width: bar_usize, pct }
         })
         .collect()
 }
@@ -205,15 +206,19 @@ fn build_tasks(info: &cp_mod_search::types::SearchOverlayInfo) -> Vec<SearchTask
 
 /// Build top-recomputed file entries from overlay info.
 fn build_recomputed(info: &cp_mod_search::types::SearchOverlayInfo) -> Vec<SearchRecomputed> {
-    info.top_recomputed.iter().map(|(p, c)| SearchRecomputed { path: truncate_path(p, 46), count: *c }).collect()
+    info.top_recomputed
+        .iter()
+        .map(|entry| SearchRecomputed { path: truncate_path(&entry.0, 46), count: entry.1 })
+        .collect()
 }
 
 /// Build recently-sent file entries from overlay info.
 fn build_recently_sent(info: &cp_mod_search::types::SearchOverlayInfo) -> Vec<SearchRecentFile> {
     info.recently_sent
         .iter()
-        .map(|(p, ts_ms)| {
-            let ago = if *ts_ms > 0 { format_ago(*ts_ms) } else { "?".to_owned() };
+        .map(|entry| {
+            let (p, ts_ms) = (&entry.0, entry.1);
+            let ago = if ts_ms > 0 { format_ago(ts_ms) } else { "?".to_owned() };
             SearchRecentFile { path: truncate_path(p, 42), ago }
         })
         .collect()

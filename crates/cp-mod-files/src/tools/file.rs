@@ -8,12 +8,12 @@ use cp_base::tools::{ToolResult, ToolUse};
 pub(crate) fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("file_open");
     // Accept both a single string and an array of strings
-    let paths: Vec<String> = match tool.input.get("path") {
-        Some(serde_json::Value::String(s)) => vec![s.clone()],
-        Some(serde_json::Value::Array(arr)) => arr.iter().filter_map(|v| v.as_str().map(String::from)).collect(),
-        _ => {
-            return ToolResult::new(tool.id.clone(), "Missing 'path' parameter".to_owned(), true);
-        }
+    let paths: Vec<String> = if let Some(s) = tool.input.get("path").and_then(serde_json::Value::as_str) {
+        vec![s.to_owned()]
+    } else if let Some(arr) = tool.input.get("path").and_then(serde_json::Value::as_array) {
+        arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()
+    } else {
+        return ToolResult::new(tool.id.clone(), "Missing 'path' parameter".to_owned(), true);
     };
 
     if paths.is_empty() {

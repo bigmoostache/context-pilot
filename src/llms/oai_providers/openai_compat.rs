@@ -156,7 +156,7 @@ pub(crate) fn build_messages(
 /// Push the leading system message (system prompt + optional provider suffix).
 fn push_system_message(out: &mut Vec<OaiMessage>, opts: &BuildOptions) {
     let mut system_content = opts.system_prompt.clone().unwrap_or_else(|| library::default_agent_content().to_owned());
-    if let Some(suffix) = &(opts.system_suffix) {
+    if let Some(suffix) = opts.system_suffix.as_ref() {
         system_content.push_str("\n\n");
         system_content.push_str(suffix);
     }
@@ -170,7 +170,7 @@ fn push_system_message(out: &mut Vec<OaiMessage>, opts: &BuildOptions) {
 
 /// Push the cleaner-mode extra-context user message, when present.
 fn push_extra_context(out: &mut Vec<OaiMessage>, opts: &BuildOptions) {
-    if let Some(ctx) = &(opts.extra_context) {
+    if let Some(ctx) = opts.extra_context.as_ref() {
         let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace("{context}", ctx);
         out.push(OaiMessage { role: "user".to_owned(), content: Some(msg), tool_calls: None, tool_call_id: None });
     }
@@ -179,12 +179,12 @@ fn push_extra_context(out: &mut Vec<OaiMessage>, opts: &BuildOptions) {
 /// Emit one `tool` message per `ToolResult` block in an assistant `ApiMessage`.
 fn push_api_tool_results(out: &mut Vec<OaiMessage>, msg: &super::super::ApiMessage) {
     for block in &msg.content {
-        if let super::super::ContentBlock::ToolResult { tool_use_id, content } = block {
+        if let Some((tool_use_id, content)) = block.tool_result() {
             out.push(OaiMessage {
                 role: "tool".to_owned(),
-                content: Some(content.clone()),
+                content: Some(content.to_owned()),
                 tool_calls: None,
-                tool_call_id: Some(tool_use_id.clone()),
+                tool_call_id: Some(tool_use_id.to_owned()),
             });
         }
     }
@@ -192,29 +192,21 @@ fn push_api_tool_results(out: &mut Vec<OaiMessage>, msg: &super::super::ApiMessa
 
 /// Emit an assistant message carrying text + `tool_calls` from an `ApiMessage`.
 fn push_api_tool_calls(out: &mut Vec<OaiMessage>, msg: &super::super::ApiMessage) {
-    let text_parts: Vec<&str> = msg
-        .content
-        .iter()
-        .filter_map(|b| if let super::super::ContentBlock::Text { text } = b { Some(text.as_str()) } else { None })
-        .collect();
+    let text_parts: Vec<&str> = msg.content.iter().filter_map(super::super::ContentBlock::text).collect();
     let text = if text_parts.is_empty() { None } else { Some(text_parts.join("\n")) };
 
     let calls: Vec<OaiToolCall> = msg
         .content
         .iter()
         .filter_map(|b| {
-            if let super::super::ContentBlock::ToolUse { id, name, input } = b {
-                Some(OaiToolCall {
-                    id: id.clone(),
-                    call_type: "function".to_owned(),
-                    function: OaiFunction {
-                        name: name.clone(),
-                        arguments: serde_json::to_string(input).unwrap_or_default(),
-                    },
-                })
-            } else {
-                None
-            }
+            b.tool_use().map(|(id, name, input)| OaiToolCall {
+                id: id.to_owned(),
+                call_type: "function".to_owned(),
+                function: OaiFunction {
+                    name: name.to_owned(),
+                    arguments: serde_json::to_string(input).unwrap_or_default(),
+                },
+            })
         })
         .collect();
 
@@ -228,12 +220,7 @@ fn push_api_tool_calls(out: &mut Vec<OaiMessage>, msg: &super::super::ApiMessage
 
 /// Emit a pure-text message (no tool blocks) from an `ApiMessage`, if non-empty.
 fn push_api_plain_text(out: &mut Vec<OaiMessage>, msg: &super::super::ApiMessage) {
-    let text: String = msg
-        .content
-        .iter()
-        .filter_map(|b| if let super::super::ContentBlock::Text { text } = b { Some(text.as_str()) } else { None })
-        .collect::<Vec<_>>()
-        .join("\n");
+    let text: String = msg.content.iter().filter_map(super::super::ContentBlock::text).collect::<Vec<_>>().join("\n");
     if !text.is_empty() {
         out.push(OaiMessage { role: msg.role.clone(), content: Some(text), tool_calls: None, tool_call_id: None });
     }

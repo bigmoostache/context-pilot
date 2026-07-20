@@ -297,11 +297,7 @@ pub(crate) struct CcJsonResult {
 /// of only the tagged block. The `panel_footer` sentinel is excluded.
 fn message_panel_id(msg: &ApiMessage) -> Option<String> {
     msg.content.iter().find_map(|block| {
-        let raw = match block {
-            ContentBlock::ToolUse { id, .. } => id,
-            ContentBlock::ToolResult { tool_use_id, .. } => tool_use_id,
-            ContentBlock::Text { .. } => return None,
-        };
+        let raw = block.tool_use().map(|t| t.0).or_else(|| block.tool_result().map(|r| r.0))?;
         raw.strip_prefix("panel_").filter(|id| *id != "footer").map(str::to_owned)
     })
 }
@@ -337,22 +333,22 @@ pub(crate) fn api_messages_to_cc_json(api_messages: &[ApiMessage], engine_json: 
             .enumerate()
             .map(|(blk_idx, block)| {
                 let should_tag = plan.positions.contains(&(msg_idx, blk_idx));
-                match block {
-                    ContentBlock::Text { text } => {
+                cp_base::deref_match!(block, {
+                    ContentBlock::Text { ref text } => {
                         let mut obj = serde_json::json!({"type": "text", "text": text});
                         if should_tag && let Some(o) = obj.as_object_mut() {
                             let _prev = o.insert("cache_control".to_owned(), serde_json::json!({"type": "ephemeral"}));
                         }
                         obj
                     }
-                    ContentBlock::ToolUse { id, name, input } => {
+                    ContentBlock::ToolUse { ref id, ref name, ref input } => {
                         let mut obj = serde_json::json!({"type": "tool_use", "id": id, "name": name, "input": input});
                         if should_tag && let Some(o) = obj.as_object_mut() {
                             let _prev = o.insert("cache_control".to_owned(), serde_json::json!({"type": "ephemeral"}));
                         }
                         obj
                     }
-                    ContentBlock::ToolResult { tool_use_id, content } => {
+                    ContentBlock::ToolResult { ref tool_use_id, ref content } => {
                         let mut obj =
                             serde_json::json!({"type": "tool_result", "tool_use_id": tool_use_id, "content": content});
                         if should_tag && let Some(o) = obj.as_object_mut() {
@@ -360,7 +356,7 @@ pub(crate) fn api_messages_to_cc_json(api_messages: &[ApiMessage], engine_json: 
                         }
                         obj
                     }
-                }
+                })
             })
             .collect();
 
@@ -373,8 +369,8 @@ pub(crate) fn api_messages_to_cc_json(api_messages: &[ApiMessage], engine_json: 
     // Map each breakpoint block back to the panel it landed on (in prompt order,
     // deduped) — persisted next turn for the freeze pass's free-region widening.
     let mut bp_panel_ids: Vec<String> = Vec::new();
-    for (msg_idx, _blk_idx) in &plan.positions {
-        if let Some(id) = api_messages.get(*msg_idx).and_then(message_panel_id)
+    for &(msg_idx, _blk_idx) in &plan.positions {
+        if let Some(id) = api_messages.get(msg_idx).and_then(message_panel_id)
             && !bp_panel_ids.contains(&id)
         {
             bp_panel_ids.push(id);
@@ -454,12 +450,12 @@ pub(crate) mod error {
 
     impl fmt::Display for LlmError {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            match self {
-                Self::Auth(msg) => write!(f, "Auth error: {msg}"),
-                Self::Network(msg) => write!(f, "Network error: {msg}"),
-                Self::Api { status, body } => write!(f, "API error {status}: {body}"),
-                Self::StreamRead(msg) => write!(f, "Stream read error: {msg}"),
-            }
+            cp_base::deref_match!(self, {
+                Self::Auth(ref msg) => write!(f, "Auth error: {msg}"),
+                Self::Network(ref msg) => write!(f, "Network error: {msg}"),
+                Self::Api { status, ref body } => write!(f, "API error {status}: {body}"),
+                Self::StreamRead(ref msg) => write!(f, "Stream read error: {msg}"),
+            })
         }
     }
 

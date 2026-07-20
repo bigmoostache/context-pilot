@@ -38,7 +38,7 @@ fn redact_token(output: &str, token: &str) -> String {
 pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("gh_exec");
     // Check for GitHub token
-    let token = match &GithubState::get(state).github_token {
+    let token = match GithubState::get(state).github_token.as_ref() {
         Some(t) => t.clone(),
         None => {
             return ToolResult::new(

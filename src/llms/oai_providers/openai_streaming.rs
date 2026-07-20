@@ -115,14 +115,14 @@ impl ToolCallAccumulator {
         let idx = call.index.unwrap_or(0);
         let entry = self.calls.entry(idx).or_insert_with(|| (String::new(), String::new(), String::new()));
 
-        if let Some(id) = &(call.id) {
+        if let Some(id) = call.id.as_ref() {
             entry.0.clone_from(id);
         }
-        if let Some(func) = &(call.function) {
-            if let Some(name) = &(func.name) {
+        if let Some(func) = call.function.as_ref() {
+            if let Some(name) = func.name.as_ref() {
                 entry.1.clone_from(name);
             }
-            if let Some(args) = &(func.arguments) {
+            if let Some(args) = func.arguments.as_ref() {
                 entry.2.push_str(args);
             }
         }
@@ -230,7 +230,7 @@ fn process_choice(
     if let Some(delta) = choice.delta {
         emit_delta_events(delta, tx, tool_acc);
     }
-    if let Some(reason) = &(choice.finish_reason) {
+    if let Some(reason) = choice.finish_reason.as_ref() {
         acc.stop_reason = Some(normalize_stop_reason(reason));
         for tool_use in tool_acc.drain() {
             let _r = tx.send(StreamEvent::ToolUse(tool_use));

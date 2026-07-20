@@ -72,7 +72,7 @@ impl LlmClient for MiniMaxClient {
         };
 
         // Append tool results if present
-        if let Some(results) = &request.tool_results {
+        if let Some(results) = request.tool_results.as_ref() {
             let tool_result_blocks: Vec<ContentBlock> = results
                 .iter()
                 .map(|r: &crate::infra::tools::ToolResult| ContentBlock::ToolResult {
@@ -84,8 +84,8 @@ impl LlmClient for MiniMaxClient {
         }
 
         // Handle system prompt
-        let system_prompt = if let Some(prompt) = &(request.system_prompt) {
-            if let Some(context) = &(request.extra_context) {
+        let system_prompt = if let Some(prompt) = request.system_prompt.as_ref() {
+            if let Some(context) = request.extra_context.as_ref() {
                 let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace(concat!("{", "context", "}"), context);
                 api_messages
                     .push(ApiMessage { role: "user".to_owned(), content: vec![ContentBlock::Text { text: msg }] });

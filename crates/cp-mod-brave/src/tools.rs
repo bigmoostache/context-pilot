@@ -92,7 +92,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
 
                 // Build panel content as YAML
                 let mut panel_content = String::new();
-                if let Some(rich) = &rich_data {
+                if let Some(rich) = rich_data.as_ref() {
                     panel_content.push_str("# Rich Results\n\n");
                     if let Ok(yaml) = serde_yaml::to_string(rich) {
                         panel_content.push_str(&yaml);

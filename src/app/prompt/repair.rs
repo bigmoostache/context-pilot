@@ -22,20 +22,12 @@ const MISSING_TOOL_RESULT: &str = "(no result recorded \u{2014} tool call was in
 
 /// Collect the `tool_use` ids carried by a message, in order.
 fn tool_use_ids_of(msg: &ApiMessage) -> Vec<String> {
-    msg.content
-        .iter()
-        .filter_map(|b| if let ContentBlock::ToolUse { id, .. } = b { Some(id.clone()) } else { None })
-        .collect()
+    msg.content.iter().filter_map(|b| b.tool_use().map(|t| t.0.to_owned())).collect()
 }
 
 /// Collect the `tool_result` ids carried by a message, in order.
 fn tool_result_ids_of(msg: &ApiMessage) -> Vec<String> {
-    msg.content
-        .iter()
-        .filter_map(
-            |b| if let ContentBlock::ToolResult { tool_use_id, .. } = b { Some(tool_use_id.clone()) } else { None },
-        )
-        .collect()
+    msg.content.iter().filter_map(|b| b.tool_result().map(|r| r.0.to_owned())).collect()
 }
 
 /// Build a single synthetic placeholder `tool_result` for an orphaned `tool_use` id.
@@ -115,15 +107,9 @@ fn drop_stray_results(messages: &mut [ApiMessage]) {
         if msg.role != "user" {
             continue;
         }
-        let has_stray = msg
-            .content
-            .iter()
-            .any(|b| matches!(b, ContentBlock::ToolResult { tool_use_id, .. } if !prior_ids.contains(tool_use_id)));
+        let has_stray = msg.content.iter().any(|b| b.tool_result().is_some_and(|r| !prior_ids.contains(r.0)));
         if has_stray {
-            msg.content.retain(|b| match b {
-                ContentBlock::ToolResult { tool_use_id, .. } => prior_ids.contains(tool_use_id),
-                ContentBlock::Text { .. } | ContentBlock::ToolUse { .. } => true,
-            });
+            msg.content.retain(|b| b.tool_result().is_none_or(|r| prior_ids.contains(r.0)));
         }
     }
 }
@@ -155,7 +141,7 @@ mod tests {
 
     /// True if the message carries a text block equal to `needle`.
     fn has_text(msg: &ApiMessage, needle: &str) -> bool {
-        msg.content.iter().any(|b| matches!(b, ContentBlock::Text { text } if text == needle))
+        msg.content.iter().any(|b| b.text() == Some(needle))
     }
 
     #[test]
@@ -206,11 +192,8 @@ mod tests {
         assert_eq!(msgs.len(), before.len());
         assert_eq!(msgs.get(1).map(result_ids), Some(vec!["A".to_owned(), "B".to_owned()]));
         // No placeholder content injected.
-        let has_placeholder = msgs.get(1).map(|m| {
-            m.content
-                .iter()
-                .any(|b| matches!(b, ContentBlock::ToolResult { content, .. } if content == MISSING_TOOL_RESULT))
-        });
+        let has_placeholder =
+            msgs.get(1).map(|m| m.content.iter().any(|b| b.tool_result().is_some_and(|r| r.1 == MISSING_TOOL_RESULT)));
         assert_eq!(has_placeholder, Some(false));
     }
 
@@ -228,11 +211,7 @@ mod tests {
     fn placeholder_uses_missing_result_content() {
         let mut msgs = vec![asst(vec![tu("A")]), user(vec![text("x")])];
         repair_tool_pairing(&mut msgs);
-        let injected = msgs.get(1).and_then(|m| {
-            m.content.iter().find_map(|b| {
-                if let ContentBlock::ToolResult { content, .. } = b { Some(content.clone()) } else { None }
-            })
-        });
+        let injected = msgs.get(1).and_then(|m| m.content.iter().find_map(|b| b.tool_result().map(|r| r.1.to_owned())));
         assert_eq!(injected.as_deref(), Some(MISSING_TOOL_RESULT));
     }
 }

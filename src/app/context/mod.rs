@@ -117,7 +117,7 @@ pub(super) fn prepare_stream_context(
     let full_freeze = cond.freeze_order() && state.frozen_context_snapshot.is_some();
     let meta = FreezeMeta { cond, prompt_prefix_tokens };
 
-    if let (true, Some(snapshot)) = (full_freeze, &state.frozen_context_snapshot) {
+    if let (true, Some(snapshot)) = (full_freeze, state.frozen_context_snapshot.as_ref()) {
         // ═══ FULL FREEZE: replay exact previous prompt ═══════════════════════
         let snapshot = snapshot.clone();
         freeze_pass::apply_full_freeze(state, &mut context_items, &snapshot, meta);
@@ -198,7 +198,7 @@ fn build_reverie_panel_content(state: &State, rev: &ReverieContext) -> String {
         content.push('\n');
     }
     if let Some(rev_state) = state.reveries.get(&rev.agent_id)
-        && let Some(ctx) = &rev_state.context
+        && let Some(ctx) = rev_state.context.as_ref()
     {
         content.push_str("\n## Additional Context\n");
         content.push_str(ctx);

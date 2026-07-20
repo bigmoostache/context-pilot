@@ -107,10 +107,10 @@ fn handle_block_delta(delta: StreamDelta, tx: &Sender<StreamEvent>, st: &mut Sse
         }
         Some("input_json_delta") => {
             if let Some(json) = delta.partial_json
-                && let Some((_, name, input)) = st.current_tool.as_mut()
+                && let Some(tool) = st.current_tool.as_mut()
             {
-                input.push_str(&json);
-                let _r = tx.send(StreamEvent::ToolProgress { name: name.clone(), input_so_far: input.clone() });
+                tool.2.push_str(&json);
+                let _r = tx.send(StreamEvent::ToolProgress { name: tool.1.clone(), input_so_far: tool.2.clone() });
             }
         }
         _ => {}
@@ -133,12 +133,12 @@ const fn handle_message_start(msg_body: StreamMessageBody, st: &mut SseState) {
 
 /// Fold a `message_delta` event (stop reason + running token usage) into `st`.
 fn handle_message_delta(event: &StreamMessage, st: &mut SseState) {
-    if let Some(delta) = &event.delta
-        && let Some(reason) = &delta.stop_reason
+    if let Some(delta) = event.delta.as_ref()
+        && let Some(reason) = delta.stop_reason.as_ref()
     {
         st.stop_reason = Some(reason.clone());
     }
-    if let Some(usage) = &event.usage {
+    if let Some(usage) = event.usage.as_ref() {
         if let Some(inp) = usage.input {
             st.input_tokens = inp;
         }
@@ -231,12 +231,10 @@ fn build_read_error(e: &std::io::Error, ctx: &ReadErrorCtx<'_>) -> String {
         root_cause = format!("{s}");
         source = std::error::Error::source(s);
     }
-    let tool_ctx = match ctx.current_tool {
-        Some((id, name, partial)) => {
-            format!("In-flight tool: {} (id={}), partial input: {} bytes", name, id, partial.len())
-        }
-        None => "No tool in progress".to_owned(),
-    };
+    let tool_ctx = ctx.current_tool.map_or_else(
+        || "No tool in progress".to_owned(),
+        |tool| format!("In-flight tool: {} (id={}), partial input: {} bytes", tool.1, tool.0, tool.2.len()),
+    );
     let recent = if ctx.last_lines.is_empty() { "(no lines read)".to_owned() } else { ctx.last_lines.join("\n") };
     format!(
         "{}\n\

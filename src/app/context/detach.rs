@@ -154,7 +154,7 @@ fn push_history_chunk(state: &mut crate::state::State, boundary: usize) -> bool 
     // Remove detached messages from state and disk.
     let removed: Vec<Message> = state.messages.drain(..boundary).collect();
     for msg in &removed {
-        if let Some(uid) = &msg.uid {
+        if let Some(uid) = msg.uid.as_ref() {
             crate::state::persistence::delete_message(uid);
         }
     }

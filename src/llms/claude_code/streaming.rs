@@ -43,10 +43,10 @@ fn handle_block_delta(delta: super::stream_types::StreamDelta, tx: &Sender<Strea
         }
         Some("input_json_delta") => {
             if let Some(json) = delta.partial_json
-                && let Some((_, name, input)) = st.current_tool.as_mut()
+                && let Some(tool) = st.current_tool.as_mut()
             {
-                input.push_str(&json);
-                let _r = tx.send(StreamEvent::ToolProgress { name: name.clone(), input_so_far: input.clone() });
+                tool.2.push_str(&json);
+                let _r = tx.send(StreamEvent::ToolProgress { name: tool.1.clone(), input_so_far: tool.2.clone() });
             }
         }
         _ => {}
@@ -70,12 +70,12 @@ fn handle_message_start(event: StreamMessage, st: &mut CcStreamTotals) {
 
 /// Fold a `message_delta` event (stop reason + running token usage) into `st`.
 fn handle_message_delta(event: &StreamMessage, st: &mut CcStreamTotals) {
-    if let Some(delta) = &event.delta
-        && let Some(reason) = &delta.stop_reason
+    if let Some(delta) = event.delta.as_ref()
+        && let Some(reason) = delta.stop_reason.as_ref()
     {
         st.stop_reason = Some(reason.clone());
     }
-    if let Some(usage) = &event.usage {
+    if let Some(usage) = event.usage.as_ref() {
         if let Some(inp) = usage.input {
             st.input_tokens = inp;
         }

@@ -35,7 +35,7 @@ pub(super) fn fire_edit_callbacks(
 ) {
     // Only collect files from SUCCESSFUL Edit/Write tools (skip failed ones).
     let successful_tools: Vec<_> =
-        tools.iter().zip(tool_results.iter()).filter(|(_, r)| !r.is_error).map(|(t, _)| t.clone()).collect();
+        tools.iter().zip(tool_results.iter()).filter(|entry| !entry.1.is_error).map(|(t, _)| t.clone()).collect();
     let changed_files = callback_trigger::collect_changed_files(&successful_tools);
     if changed_files.is_empty() {
         return;

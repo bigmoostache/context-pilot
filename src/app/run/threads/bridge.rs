@@ -100,7 +100,7 @@ fn accept_commands(state: &mut State) -> Option<Vec<Command>> {
     let bs = state.ext_mut::<BridgeState>();
 
     // Split borrows: &boot (for listener + oplog) and &mut intake.
-    let (Some(boot), Some(intake)) = (&bs.boot, &mut bs.intake) else {
+    let (Some(boot), Some(intake)) = (bs.boot.as_ref(), bs.intake.as_mut()) else {
         return None;
     };
 

@@ -29,7 +29,7 @@ fn write_index_stats(out: &mut String, overlay: &SearchIndexOverlay) {
             overlay.index.disk_used, overlay.index.disk_total, overlay.index.docs_display,
         )
         .unwrap_or(());
-        if let Some(avg) = &(overlay.index.avg_chunk) {
+        if let Some(avg) = overlay.index.avg_chunk.as_ref() {
             writeln!(out, "Avg chunk  {avg}").unwrap_or(());
         }
         out.push('\n');
@@ -58,7 +58,7 @@ fn write_extensions_splitter(out: &mut String, overlay: &SearchIndexOverlay) {
         }
     }
 
-    if let Some(sp) = &(overlay.splitter) {
+    if let Some(sp) = overlay.splitter.as_ref() {
         writeln!(
             out,
             "\n── Splitter ──\nTree-sitter  {} chunks ({}%)\nFallback     {} chunks ({}%)",
@@ -71,7 +71,7 @@ fn write_extensions_splitter(out: &mut String, overlay: &SearchIndexOverlay) {
 /// Write the embeddings block.
 fn write_embeddings(out: &mut String, overlay: &SearchIndexOverlay) {
     use std::fmt::Write as _;
-    let Some(emb) = &(overlay.embeddings) else {
+    let Some(emb) = overlay.embeddings.as_ref() else {
         return;
     };
     out.push_str("\n\u{2500}\u{2500} Embeddings \u{2500}\u{2500}\n");

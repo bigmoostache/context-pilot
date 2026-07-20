@@ -224,15 +224,15 @@ fn compute_accumulated_hashes(api_messages: &[ApiMessage]) -> Vec<BlockInfo> {
 
     for (msg_idx, msg) in api_messages.iter().enumerate() {
         for (blk_idx, block) in msg.content.iter().enumerate() {
-            let hash_repr = match block {
-                super::super::ContentBlock::Text { text } => text.clone(),
-                super::super::ContentBlock::ToolUse { id, name, input } => {
+            let hash_repr = cp_base::deref_match!(block, {
+                super::super::ContentBlock::Text { ref text } => text.clone(),
+                super::super::ContentBlock::ToolUse { ref id, ref name, ref input } => {
                     format!("tool_use:{id}:{name}:{}", serde_json::to_string(input).unwrap_or_default())
                 }
-                super::super::ContentBlock::ToolResult { tool_use_id, content } => {
+                super::super::ContentBlock::ToolResult { ref tool_use_id, ref content } => {
                     format!("tool_result:{tool_use_id}:{content}")
                 }
-            };
+            });
 
             let token_count = cp_base::state::context::estimate_tokens(&hash_repr);
             cumulative_tokens = cumulative_tokens.saturating_add(token_count);

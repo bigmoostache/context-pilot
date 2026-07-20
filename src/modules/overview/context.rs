@@ -18,10 +18,10 @@ pub(crate) fn estimate_tool_definitions_tokens(state: &State) -> usize {
         total = total.saturating_add(estimate_tokens(&tool.description));
         for param in &tool.params {
             total = total.saturating_add(estimate_tokens(&param.name));
-            if let Some(desc) = &param.description {
+            if let Some(desc) = param.description.as_ref() {
                 total = total.saturating_add(estimate_tokens(desc));
             }
-            if let Some(vals) = &param.enum_values {
+            if let Some(vals) = param.enum_values.as_ref() {
                 for v in vals {
                     total = total.saturating_add(estimate_tokens(v));
                 }

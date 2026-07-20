@@ -706,7 +706,13 @@ needless_bitwise_bool = "forbid"
 needless_bool = "forbid"
 needless_bool_assign = "forbid"
 needless_borrow = "forbid"
-needless_borrowed_reference = "forbid"
+# cp-oplog's ref_match! macro (cp-oplog/src/lib.rs) matches a borrowed enum with
+# explicit &-patterns + ref bindings — the only pattern_type_mismatch-clean form
+# for a non-Copy field behind a shared ref. Its all-ref arms then trip
+# needless_borrowed_reference, which is mutually exclusive with pattern_type_mismatch
+# and ref_patterns. Downgraded from forbid to deny so the macro's single
+# #[expect(...)] chokepoint compiles; every other borrowed-ref pattern still errors.
+needless_borrowed_reference = "deny"
 needless_borrows_for_generic_args = "forbid"
 needless_character_iteration = "forbid"
 needless_collect = "forbid"
@@ -784,6 +790,7 @@ partialeq_to_none = "forbid"
 path_buf_push_overwrite = "forbid"
 path_ends_with_ext = "forbid"
 pathbuf_init_then_push = "forbid"
+pattern_type_mismatch = "forbid"
 permissions_set_readonly_false = "forbid"
 pointer_format = "forbid"
 pointers_in_nomem_asm_block = "forbid"
@@ -842,7 +849,13 @@ ref_as_ptr = "forbid"
 ref_binding_to_reference = "forbid"
 ref_option = "forbid"
 ref_option_ref = "forbid"
-ref_patterns = "forbid"
+# deref_match! macro (cp-base/src/lib.rs) is the sole audited site allowed to
+# use `ref` bindings: clippy::pattern_type_mismatch (forbid) mandates them when
+# destructuring non-Copy fields out of a shared reference, and forbid cannot be
+# overridden by #[expect]. Downgraded to deny so the single macro-internal
+# #[expect(clippy::ref_patterns)] chokepoint compiles; every other `ref` use
+# still errors.
+ref_patterns = "deny"
 regex_creation_in_loops = "forbid"
 renamed_function_params = "forbid"
 repeat_once = "forbid"

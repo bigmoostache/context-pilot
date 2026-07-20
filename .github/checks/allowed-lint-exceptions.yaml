@@ -15,6 +15,63 @@
 # annotation from the source code.
 
 exceptions:
+  # ── deref_match! macro: sole ref-pattern chokepoint ─────────────────
+
+  - path: "crates/cp-base/src/lib.rs"
+    match: "clippy::pattern_type_mismatch mandates ref bindings when destructuring non-Copy fields out of a shared reference; the two restriction lints are mutually exclusive, so the deref-plus-ref form is funneled through this one macro"
+    reason: >
+      The deref_match! macro is the single audited site allowed to use `ref`
+      bindings. clippy::pattern_type_mismatch (forbid) rejects matching a variant
+      pattern against a &Enum via match ergonomics; its mandated fix is to
+      dereference the scrutinee (match *place) and bind non-Copy fields with ref.
+      But clippy::ref_patterns rejects ref. The two restriction lints are mutually
+      exclusive for destructuring a non-Copy field out of a shared reference, so
+      every such site (Display/Debug/Error impls with String/Box/Vec fields)
+      routes through this macro — the single #[expect(clippy::ref_patterns)]
+      covers all expansions workspace-wide.
+    strategy: >
+      Irreducible — the two forbid-level restriction lints are mutually exclusive
+      by design; a single chokepoint macro is the minimal honest resolution.
+
+  - path: "crates/cp-vault/src/types.rs"
+    match: "cp-vault is foundational (cannot depend on cp-base's deref_match! macro)"
+    reason: >
+      VaultError's Display impl matches *self and binds the non-Copy String
+      payloads (MissingKey/Io/Network) with ref. clippy::pattern_type_mismatch
+      (forbid) mandates the deref-plus-ref form; clippy::ref_patterns is mutually
+      exclusive with it. cp-vault sits below cp-base in the crate graph and cannot
+      use the deref_match! macro, so the fmt fn carries its own #[expect].
+    strategy: >
+      Irreducible — the two restriction lints are mutually exclusive and this
+      foundational crate cannot reach the shared macro chokepoint.
+
+  - path: "crates/cp-wire/src/framing.rs"
+    match: "cp-wire is foundational (cannot depend on cp-base's deref_match! macro)"
+    reason: >
+      FrameError's Display impl matches *self and binds the non-Copy String
+      payloads (DeserializeError/SerializeError) with ref. clippy::pattern_type_mismatch
+      (forbid) mandates the deref-plus-ref form; clippy::ref_patterns is mutually
+      exclusive with it. cp-wire sits below cp-base in the crate graph and cannot
+      use the deref_match! macro, so the fmt fn carries its own #[expect].
+    strategy: >
+      Irreducible — the two restriction lints are mutually exclusive and this
+      foundational crate cannot reach the shared macro chokepoint.
+
+  - path: "crates/cp-oplog/src/lib.rs"
+    match: "cp-oplog is foundational (only cp_wire + std); clippy::pattern_type_mismatch mandates explicit &-patterns with ref bindings for a read-only match over a borrowed enum and the two restriction lints are mutually exclusive, so every such site funnels through this one local macro"
+    reason: >
+      The ref_match! macro is cp-oplog's local ref-pattern chokepoint. Its sites
+      (Error Display, replay fold_entry, replay_fast Checkpoint) all read non-Copy
+      fields (io::Error/FrameError/Snapshot/thread_id) out of a borrowed enum;
+      clippy::pattern_type_mismatch (forbid) mandates explicit &-patterns with ref
+      bindings, and clippy::ref_patterns is mutually exclusive with it. cp-oplog
+      depends only on cp_wire + std and cannot reach cp-base's deref_match!, so
+      every such site routes through this one macro — the single
+      #[expect(clippy::ref_patterns)] covers all expansions.
+    strategy: >
+      Irreducible — the two restriction lints are mutually exclusive and this
+      foundational crate cannot reach the shared macro chokepoint.
+
   # ── cast.rs: Safe numeric casting infrastructure ─────────────────
 
   - path: "crates/cp-base/src/cast/mod.rs"

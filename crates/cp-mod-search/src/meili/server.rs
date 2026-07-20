@@ -412,7 +412,8 @@ pub(crate) fn cleanup_orphan_indexes(port: u16, master_key: &str) {
         return;
     };
 
-    for (proj_path, hash) in &orphans {
+    for entry in &orphans {
+        let (proj_path, hash) = (&entry.0, &entry.1);
         let files_uid = format!("cp_{hash}_files");
         let logs_uid = format!("cp_{hash}_logs");
 

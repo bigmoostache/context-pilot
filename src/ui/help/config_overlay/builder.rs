@@ -32,10 +32,10 @@ pub(crate) fn build_config_overlay(state: &State) -> ConfigOverlay {
 
     let providers = provider_list
         .iter()
-        .map(|(p, key, name)| ConfigProvider {
-            key: (*key).into(),
-            name: (*name).into(),
-            selected: state.llm_provider == *p,
+        .map(|entry| ConfigProvider {
+            key: entry.1.into(),
+            name: entry.2.into(),
+            selected: state.llm_provider == entry.0,
         })
         .collect();
 

@@ -57,9 +57,9 @@ pub(crate) fn check_and_trigger_trap(state: &mut State) -> Option<String> {
         return None;
     }
 
-    panels.sort_by_key(|(_, ms)| *ms);
+    panels.sort_by_key(|entry| entry.1);
 
-    let all_ids: Vec<String> = panels.iter().map(|(id, _)| id.clone()).collect();
+    let all_ids: Vec<String> = panels.iter().map(|entry| entry.0.clone()).collect();
     let optional_ids: Vec<String> = all_ids.iter().rev().take(OPTIONAL_KEEP).cloned().collect();
 
     // Activate trap

@@ -213,14 +213,14 @@ fn deduplicate(batch: Vec<IndexerCmd>) -> Vec<IndexerCmd> {
     let mut has_scan_complete = false;
 
     for cmd in batch {
-        match &cmd {
-            IndexerCmd::IndexFile(p) | IndexerCmd::DeleteFile(p) => {
+        cp_base::deref_match!(&cmd, {
+            IndexerCmd::IndexFile(ref p) | IndexerCmd::DeleteFile(ref p) => {
                 let _prev = latest.insert(p.clone(), cmd);
             }
             IndexerCmd::ScanComplete => {
                 has_scan_complete = true;
             }
-        }
+        });
     }
 
     let mut result: Vec<IndexerCmd> = latest.into_values().collect();

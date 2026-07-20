@@ -5748,3 +5748,214 @@ index 7ef31ff8..c978f487 100644
  non_canonical_partial_ord_impl = "forbid"
  non_minimal_cfg = "forbid"
 # --- End entry #45 ---
+46:eb2768b731e52edac49d2507417a0a34e7fc5080e0de7974343402cc4927a821:fa6970938a9d26f642c5c2c176ded6f00fdfc401e0e697c12d3567d0bbfbab6a:a47cfef6d91e04e449c86a7b1ec6bcf3f085f3a4797d647bb37c79e403e4a26d
+# --- Diff for entry #46 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index c978f487..ba102df8 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -784,6 +784,7 @@ partialeq_to_none = "forbid"
+ path_buf_push_overwrite = "forbid"
+ path_ends_with_ext = "forbid"
+ pathbuf_init_then_push = "forbid"
++pattern_type_mismatch = "forbid"
+ permissions_set_readonly_false = "forbid"
+ pointer_format = "forbid"
+ pointers_in_nomem_asm_block = "forbid"
+@@ -842,7 +843,13 @@ ref_as_ptr = "forbid"
+ ref_binding_to_reference = "forbid"
+ ref_option = "forbid"
+ ref_option_ref = "forbid"
+-ref_patterns = "forbid"
++# deref_match! macro (cp-base/src/lib.rs) is the sole audited site allowed to
++# use `ref` bindings: clippy::pattern_type_mismatch (forbid) mandates them when
++# destructuring non-Copy fields out of a shared reference, and forbid cannot be
++# overridden by #[expect]. Downgraded to deny so the single macro-internal
++# #[expect(clippy::ref_patterns)] chokepoint compiles; every other `ref` use
++# still errors.
++ref_patterns = "deny"
+ regex_creation_in_loops = "forbid"
+ renamed_function_params = "forbid"
+ repeat_once = "forbid"
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 3489ba00..1996939f 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -15,6 +15,63 @@
+ # annotation from the source code.
+ 
+ exceptions:
++  # ── deref_match! macro: sole ref-pattern chokepoint ─────────────────
++
++  - path: "crates/cp-base/src/lib.rs"
++    match: "clippy::pattern_type_mismatch mandates ref bindings when destructuring non-Copy fields out of a shared reference; the two restriction lints are mutually exclusive, so the deref-plus-ref form is funneled through this one macro"
++    reason: >
++      The deref_match! macro is the single audited site allowed to use `ref`
++      bindings. clippy::pattern_type_mismatch (forbid) rejects matching a variant
++      pattern against a &Enum via match ergonomics; its mandated fix is to
++      dereference the scrutinee (match *place) and bind non-Copy fields with ref.
++      But clippy::ref_patterns rejects ref. The two restriction lints are mutually
++      exclusive for destructuring a non-Copy field out of a shared reference, so
++      every such site (Display/Debug/Error impls with String/Box/Vec fields)
++      routes through this macro — the single #[expect(clippy::ref_patterns)]
++      covers all expansions workspace-wide.
++    strategy: >
++      Irreducible — the two forbid-level restriction lints are mutually exclusive
++      by design; a single chokepoint macro is the minimal honest resolution.
++
++  - path: "crates/cp-vault/src/types.rs"
++    match: "cp-vault is foundational (cannot depend on cp-base's deref_match! macro)"
++    reason: >
++      VaultError's Display impl matches *self and binds the non-Copy String
++      payloads (MissingKey/Io/Network) with ref. clippy::pattern_type_mismatch
++      (forbid) mandates the deref-plus-ref form; clippy::ref_patterns is mutually
++      exclusive with it. cp-vault sits below cp-base in the crate graph and cannot
++      use the deref_match! macro, so the fmt fn carries its own #[expect].
++    strategy: >
++      Irreducible — the two restriction lints are mutually exclusive and this
++      foundational crate cannot reach the shared macro chokepoint.
++
++  - path: "crates/cp-wire/src/framing.rs"
++    match: "cp-wire is foundational (cannot depend on cp-base's deref_match! macro)"
++    reason: >
++      FrameError's Display impl matches *self and binds the non-Copy String
++      payloads (DeserializeError/SerializeError) with ref. clippy::pattern_type_mismatch
++      (forbid) mandates the deref-plus-ref form; clippy::ref_patterns is mutually
++      exclusive with it. cp-wire sits below cp-base in the crate graph and cannot
++      use the deref_match! macro, so the fmt fn carries its own #[expect].
++    strategy: >
++      Irreducible — the two restriction lints are mutually exclusive and this
++      foundational crate cannot reach the shared macro chokepoint.
++
++  - path: "crates/cp-oplog/src/lib.rs"
++    match: "cp-oplog is foundational (only cp_wire + std); clippy::pattern_type_mismatch mandates explicit &-patterns with ref bindings for a read-only match over a borrowed enum and the two restriction lints are mutually exclusive, so every such site funnels through this one local macro"
++    reason: >
++      The ref_match! macro is cp-oplog's local ref-pattern chokepoint. Its sites
++      (Error Display, replay fold_entry, replay_fast Checkpoint) all read non-Copy
++      fields (io::Error/FrameError/Snapshot/thread_id) out of a borrowed enum;
++      clippy::pattern_type_mismatch (forbid) mandates explicit &-patterns with ref
++      bindings, and clippy::ref_patterns is mutually exclusive with it. cp-oplog
++      depends only on cp_wire + std and cannot reach cp-base's deref_match!, so
++      every such site routes through this one macro — the single
++      #[expect(clippy::ref_patterns)] covers all expansions.
++    strategy: >
++      Irreducible — the two restriction lints are mutually exclusive and this
++      foundational crate cannot reach the shared macro chokepoint.
++
+   # ── cast.rs: Safe numeric casting infrastructure ─────────────────
+ 
+   - path: "crates/cp-base/src/cast/mod.rs"
+# --- End entry #46 ---
+47:a47cfef6d91e04e449c86a7b1ec6bcf3f085f3a4797d647bb37c79e403e4a26d:922a75f006e321b2ccaf595bb1830223321e9132529844f391bd27b8ed1a870b:26bead20924d59b86dfa04e963a0af36e40444236cbc209a6835f341a02f904a
+# --- Diff for entry #47 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index c978f487..2efa8642 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -706,7 +706,13 @@ needless_bitwise_bool = "forbid"
+ needless_bool = "forbid"
+ needless_bool_assign = "forbid"
+ needless_borrow = "forbid"
+-needless_borrowed_reference = "forbid"
++# cp-oplog's ref_match! macro (cp-oplog/src/lib.rs) matches a borrowed enum with
++# explicit &-patterns + ref bindings — the only pattern_type_mismatch-clean form
++# for a non-Copy field behind a shared ref. Its all-ref arms then trip
++# needless_borrowed_reference, which is mutually exclusive with pattern_type_mismatch
++# and ref_patterns. Downgraded from forbid to deny so the macro's single
++# #[expect(...)] chokepoint compiles; every other borrowed-ref pattern still errors.
++needless_borrowed_reference = "deny"
+ needless_borrows_for_generic_args = "forbid"
+ needless_character_iteration = "forbid"
+ needless_collect = "forbid"
+@@ -784,6 +790,7 @@ partialeq_to_none = "forbid"
+ path_buf_push_overwrite = "forbid"
+ path_ends_with_ext = "forbid"
+ pathbuf_init_then_push = "forbid"
++pattern_type_mismatch = "forbid"
+ permissions_set_readonly_false = "forbid"
+ pointer_format = "forbid"
+ pointers_in_nomem_asm_block = "forbid"
+@@ -842,7 +849,13 @@ ref_as_ptr = "forbid"
+ ref_binding_to_reference = "forbid"
+ ref_option = "forbid"
+ ref_option_ref = "forbid"
+-ref_patterns = "forbid"
++# deref_match! macro (cp-base/src/lib.rs) is the sole audited site allowed to
++# use `ref` bindings: clippy::pattern_type_mismatch (forbid) mandates them when
++# destructuring non-Copy fields out of a shared reference, and forbid cannot be
++# overridden by #[expect]. Downgraded to deny so the single macro-internal
++# #[expect(clippy::ref_patterns)] chokepoint compiles; every other `ref` use
++# still errors.
++ref_patterns = "deny"
+ regex_creation_in_loops = "forbid"
+ renamed_function_params = "forbid"
+ repeat_once = "forbid"
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 3489ba00..1996939f 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -15,6 +15,63 @@
+ # annotation from the source code.
+ 
+ exceptions:
++  # ── deref_match! macro: sole ref-pattern chokepoint ─────────────────
++
++  - path: "crates/cp-base/src/lib.rs"
++    match: "clippy::pattern_type_mismatch mandates ref bindings when destructuring non-Copy fields out of a shared reference; the two restriction lints are mutually exclusive, so the deref-plus-ref form is funneled through this one macro"
++    reason: >
++      The deref_match! macro is the single audited site allowed to use `ref`
++      bindings. clippy::pattern_type_mismatch (forbid) rejects matching a variant
++      pattern against a &Enum via match ergonomics; its mandated fix is to
++      dereference the scrutinee (match *place) and bind non-Copy fields with ref.
++      But clippy::ref_patterns rejects ref. The two restriction lints are mutually
++      exclusive for destructuring a non-Copy field out of a shared reference, so
++      every such site (Display/Debug/Error impls with String/Box/Vec fields)
++      routes through this macro — the single #[expect(clippy::ref_patterns)]
++      covers all expansions workspace-wide.
++    strategy: >
++      Irreducible — the two forbid-level restriction lints are mutually exclusive
++      by design; a single chokepoint macro is the minimal honest resolution.
++
++  - path: "crates/cp-vault/src/types.rs"
++    match: "cp-vault is foundational (cannot depend on cp-base's deref_match! macro)"
++    reason: >
++      VaultError's Display impl matches *self and binds the non-Copy String
++      payloads (MissingKey/Io/Network) with ref. clippy::pattern_type_mismatch
++      (forbid) mandates the deref-plus-ref form; clippy::ref_patterns is mutually
++      exclusive with it. cp-vault sits below cp-base in the crate graph and cannot
++      use the deref_match! macro, so the fmt fn carries its own #[expect].
++    strategy: >
++      Irreducible — the two restriction lints are mutually exclusive and this
++      foundational crate cannot reach the shared macro chokepoint.
++
++  - path: "crates/cp-wire/src/framing.rs"
++    match: "cp-wire is foundational (cannot depend on cp-base's deref_match! macro)"
++    reason: >
++      FrameError's Display impl matches *self and binds the non-Copy String
++      payloads (DeserializeError/SerializeError) with ref. clippy::pattern_type_mismatch
++      (forbid) mandates the deref-plus-ref form; clippy::ref_patterns is mutually
++      exclusive with it. cp-wire sits below cp-base in the crate graph and cannot
++      use the deref_match! macro, so the fmt fn carries its own #[expect].
++    strategy: >
++      Irreducible — the two restriction lints are mutually exclusive and this
++      foundational crate cannot reach the shared macro chokepoint.
++
++  - path: "crates/cp-oplog/src/lib.rs"
++    match: "cp-oplog is foundational (only cp_wire + std); clippy::pattern_type_mismatch mandates explicit &-patterns with ref bindings for a read-only match over a borrowed enum and the two restriction lints are mutually exclusive, so every such site funnels through this one local macro"
++    reason: >
++      The ref_match! macro is cp-oplog's local ref-pattern chokepoint. Its sites
++      (Error Display, replay fold_entry, replay_fast Checkpoint) all read non-Copy
++      fields (io::Error/FrameError/Snapshot/thread_id) out of a borrowed enum;
++      clippy::pattern_type_mismatch (forbid) mandates explicit &-patterns with ref
++      bindings, and clippy::ref_patterns is mutually exclusive with it. cp-oplog
++      depends only on cp_wire + std and cannot reach cp-base's deref_match!, so
++      every such site routes through this one macro — the single
++      #[expect(clippy::ref_patterns)] covers all expansions.
++    strategy: >
++      Irreducible — the two restriction lints are mutually exclusive and this
++      foundational crate cannot reach the shared macro chokepoint.
++
+   # ── cast.rs: Safe numeric casting infrastructure ─────────────────
+ 
+   - path: "crates/cp-base/src/cast/mod.rs"
+# --- End entry #47 ---

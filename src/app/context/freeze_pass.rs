@@ -112,7 +112,7 @@ fn freeze_one_panel(state: &mut State, item: &mut ContextItem, cond: FreezeCondi
     let panel = crate::app::panels::get_panel(&entry.context_type);
     let decision = cond.freeze_panel(broken, entry.freeze_count, panel.max_freezes());
     if decision == FreezeDecision::Freeze
-        && let Some(frozen) = &entry.emitted.context
+        && let Some(frozen) = entry.emitted.context.as_ref()
     {
         *item = frozen.clone();
         entry.freeze_count = entry.freeze_count.saturating_add(1);
@@ -206,7 +206,7 @@ pub(super) fn run_panel_freeze_pass(state: &mut State, context_items: &mut [Cont
 /// hit/miss and accrue its dollar cost onto `panel_total_cost`.
 fn apply_panel_cache_costs(state: &mut State, new_hash_list: &[String], hit_price: f32, miss_price: f32) {
     let prefix_len =
-        new_hash_list.iter().zip(state.previous_panel_hash_list.iter()).take_while(|(a, b)| a == b).count();
+        new_hash_list.iter().zip(state.previous_panel_hash_list.iter()).take_while(|entry| entry.0 == entry.1).count();
     for (i, entry_str) in new_hash_list.iter().enumerate() {
         let panel_id = entry_str.split(':').next().unwrap_or("");
         let is_hit = i < prefix_len;
@@ -233,10 +233,8 @@ fn classify_break_kind(
     }
     let current_ids: std::collections::HashSet<&str> =
         context_items.iter().filter(|item| item.id != "chat").map(|item| item.id.as_str()).collect();
-    if let Some((_gone_id, gone_type)) =
-        state.previous_panel_id_types.iter().find(|(id, _)| !current_ids.contains(id.as_str()))
-    {
-        culprit.kind = Some(gone_type.clone());
+    if let Some(entry) = state.previous_panel_id_types.iter().find(|entry| !current_ids.contains(entry.0.as_str())) {
+        culprit.kind = Some(entry.1.clone());
         CacheBreakKind::PanelDisappeared
     } else {
         CacheBreakKind::NoBreak

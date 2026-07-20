@@ -41,7 +41,7 @@ pub(crate) mod render_panel {
             .style(base_style)
             .title(Span::styled(format!(" {} ", panel_content.title), Style::default().fg(theme::accent()).bold()));
 
-        if let Some(bottom) = &(panel_content.refreshed_ago) {
+        if let Some(bottom) = panel_content.refreshed_ago.as_ref() {
             block = block.title_bottom(Span::styled(format!(" {bottom} "), Style::default().fg(theme::text_muted())));
         }
 
@@ -154,29 +154,25 @@ pub(crate) fn blocks_to_lines(blocks: &[cp_render::Block]) -> Vec<Line<'static>>
 
 /// Render a single block into one or more lines.
 fn render_block(block: &cp_render::Block, lines: &mut Vec<Line<'static>>) {
-    match block {
-        cp_render::Block::Line(spans) | cp_render::Block::Header(spans) => {
+    use cp_render::Block as B;
+    match block.clone() {
+        B::Line(spans) | B::Header(spans) => {
             lines.push(Line::from(spans.iter().map(ir_span_to_ratatui).collect::<Vec<_>>()));
         }
-        cp_render::Block::Table { columns, rows } => {
-            render_table(columns, rows, lines);
-        }
-        cp_render::Block::ProgressBar { segments, label } => {
-            render_progress_bar(segments, label.as_deref(), lines);
-        }
-        cp_render::Block::Tree(nodes) => {
-            for node in nodes {
+        B::Table { columns, rows } => render_table(&columns, &rows, lines),
+        B::ProgressBar { segments, label } => render_progress_bar(&segments, label.as_deref(), lines),
+        B::Tree(nodes) => {
+            for node in &nodes {
                 render_tree_node(node, 0, lines);
             }
         }
-        cp_render::Block::Separator => {
-            lines.push(Line::from(Span::styled(
-                "\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}",
-                semantic_to_style(Semantic::Border),
-            )));
-        }
-        cp_render::Block::KeyValue(pairs) => {
-            for (key, value) in pairs {
+        B::Separator => lines.push(Line::from(Span::styled(
+            "\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}",
+            semantic_to_style(Semantic::Border),
+        ))),
+        B::KeyValue(pairs) => {
+            for pair in &pairs {
+                let (key, value) = (&pair.0, &pair.1);
                 let mut spans: Vec<Span<'static>> = key.iter().map(ir_span_to_ratatui).collect();
                 spans.push(Span::raw("  "));
                 spans.extend(value.iter().map(ir_span_to_ratatui));
@@ -184,9 +180,7 @@ fn render_block(block: &cp_render::Block, lines: &mut Vec<Line<'static>>) {
             }
         }
         // Empty, and any future block variants — render as empty line.
-        cp_render::Block::Empty | _ => {
-            lines.push(Line::from(""));
-        }
+        B::Empty | _ => lines.push(Line::from("")),
     }
 }
 

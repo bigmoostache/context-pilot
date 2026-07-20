@@ -304,8 +304,8 @@ pub(crate) fn cleanup_old_hash_keys() {
     // Detect if any key looks like a hex hash (16+ hex chars, not a plausible callback name)
     let old_entries: Vec<YamlCallbackEntry> = map
         .iter()
-        .filter(|(k, _)| k.len() >= 16 && k.chars().all(|c| c.is_ascii_hexdigit()))
-        .map(|(_, v)| v.clone())
+        .filter(|entry| entry.0.len() >= 16 && entry.0.chars().all(|c| c.is_ascii_hexdigit()))
+        .map(|entry| entry.1.clone())
         .collect();
 
     if old_entries.is_empty() {

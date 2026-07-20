@@ -344,7 +344,8 @@ impl PerfMetrics {
 
         let mut op_snapshots: Vec<OpSnapshot> = raw_ops
             .iter()
-            .map(|(name, total_us, recent)| {
+            .map(|entry| {
+                let (name, total_us, recent) = (entry.0, entry.1, &entry.2);
                 let count = recent.len();
 
                 // Calculate mean
@@ -370,7 +371,7 @@ impl PerfMetrics {
 
                 OpSnapshot {
                     name,
-                    total_ms: float_math::div_u64(*total_us, 1000.0f64),
+                    total_ms: float_math::div_u64(total_us, 1000.0f64),
                     mean_ms: float_math::div(mean_us, 1000.0f64),
                     std_ms: float_math::div(std_us, 1000.0f64),
                 }

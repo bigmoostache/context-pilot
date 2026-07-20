@@ -249,7 +249,7 @@ impl SessionHandle {
             "command": command,
             "log_path": log_path_str,
         });
-        if let Some(dir) = &cwd
+        if let Some(dir) = cwd.as_ref()
             && let Some(obj) = req.as_object_mut()
         {
             let _prev = obj.insert("cwd".to_owned(), serde_json::Value::String(dir.clone()));

@@ -347,10 +347,7 @@ fn commit_batch(writer: &mut OplogWriter, batch: Vec<Job>) -> bool {
     for (ack, buffered) in acks {
         // The rev is durable only if the group sync succeeded; a sync failure
         // overrides any per-record success.
-        let final_result = match &sync_result {
-            Ok(()) => buffered,
-            Err(e) => Err(e.to_string()),
-        };
+        let final_result = if let Err(e) = sync_result.as_ref() { Err(e.to_string()) } else { buffered };
         let _ignored = ack.send(final_result);
     }
     shutdown

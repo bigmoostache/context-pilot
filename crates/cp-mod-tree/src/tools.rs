@@ -295,16 +295,16 @@ pub(crate) fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolR
         describe_one(state, desc_obj, cwd.as_ref(), &mut tally);
     }
 
-    let DescribeTally { added, updated, removed, auto_closed, errors } = &tally;
+    let DescribeTally { added, updated, removed, auto_closed, errors } = tally;
 
     let mut result = Vec::new();
-    push_label(&mut result, "Added", added, ", ");
-    push_label(&mut result, "Updated", updated, ", ");
-    push_label(&mut result, "Removed", removed, ", ");
-    push_label(&mut result, "Auto-closed panels", auto_closed, ", ");
-    push_label(&mut result, "Errors", errors, "; ");
+    push_label(&mut result, "Added", &added, ", ");
+    push_label(&mut result, "Updated", &updated, ", ");
+    push_label(&mut result, "Removed", &removed, ", ");
+    push_label(&mut result, "Auto-closed panels", &auto_closed, ", ");
+    push_label(&mut result, "Errors", &errors, "; ");
 
-    sync_descriptions_to_yaml(state, added, updated, removed);
+    sync_descriptions_to_yaml(state, &added, &updated, &removed);
 
     // Invalidate tree cache to trigger refresh
     if !added.is_empty() || !updated.is_empty() || !removed.is_empty() {
@@ -378,7 +378,7 @@ pub fn list_dir_entries(
             }
 
             // Apply gitignore filter
-            if let Some(gi) = &gitignore
+            if let Some(gi) = gitignore.as_ref()
                 && gi.matched(&path, is_dir).is_ignore()
             {
                 return None;

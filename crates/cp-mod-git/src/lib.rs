@@ -37,7 +37,7 @@ fn current_branch() -> Option<String> {
 /// Binary files (`-`/`-` counts) yield 0/0.
 fn parse_numstat_line(line: &str) -> Option<(i32, i32, String)> {
     let parts: Vec<&str> = line.split('\t').collect();
-    let [add_str, del_str, path_str, ..] = parts.as_slice() else {
+    let (Some(add_str), Some(del_str), Some(path_str)) = (parts.first(), parts.get(1), parts.get(2)) else {
         return None;
     };
     let additions = add_str.parse::<i32>().unwrap_or(0i32);
@@ -280,7 +280,7 @@ impl Module for GitModule {
             return None;
         }
         let mut output = String::new();
-        if let Some(branch) = &gs.branch {
+        if let Some(branch) = gs.branch.as_ref() {
             let _r = write!(output, "\nGit Branch: {branch}\n");
         }
         if gs.file_changes.is_empty() {
@@ -395,9 +395,9 @@ fn cap_overview_output(output: &mut String) {
     let kb_left = output.len().saturating_sub(GIT_OVERVIEW_CAP_BYTES).div_ceil(1024);
     let cut = output
         .char_indices()
-        .take_while(|(i, _)| *i <= GIT_OVERVIEW_CAP_BYTES)
-        .filter(|(_, c)| *c == '\n')
-        .map(|(i, _)| i)
+        .take_while(|entry| entry.0 <= GIT_OVERVIEW_CAP_BYTES)
+        .filter(|entry| entry.1 == '\n')
+        .map(|entry| entry.0)
         .last()
         .unwrap_or(0);
     output.truncate(cut);

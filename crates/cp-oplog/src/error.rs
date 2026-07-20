@@ -34,10 +34,10 @@ pub enum Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Io(e) => write!(f, "oplog I/O error: {e}"),
-            Self::Frame(e) => write!(f, "oplog framing error: {e}"),
-        }
+        crate::ref_match!(self, {
+            &Self::Io(ref e) => write!(f, "oplog I/O error: {e}"),
+            &Self::Frame(ref e) => write!(f, "oplog framing error: {e}"),
+        })
     }
 }
 

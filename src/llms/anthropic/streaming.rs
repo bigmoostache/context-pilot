@@ -88,10 +88,10 @@ fn handle_block_delta(delta: StreamDelta, tx: &Sender<StreamEvent>, st: &mut Ant
         }
         Some("input_json_delta") => {
             if let Some(json) = delta.partial_json
-                && let Some((_, name, input)) = st.current_tool.as_mut()
+                && let Some(tool) = st.current_tool.as_mut()
             {
-                input.push_str(&json);
-                let _r = tx.send(StreamEvent::ToolProgress { name: name.clone(), input_so_far: input.clone() });
+                tool.2.push_str(&json);
+                let _r = tx.send(StreamEvent::ToolProgress { name: tool.1.clone(), input_so_far: tool.2.clone() });
             }
         }
         _ => {}
@@ -100,12 +100,12 @@ fn handle_block_delta(delta: StreamDelta, tx: &Sender<StreamEvent>, st: &mut Ant
 
 /// Fold a `message_delta` event (stop reason + terminal token usage) into `st`.
 fn handle_message_delta(event: &StreamMessage, st: &mut AnthTotals) {
-    if let Some(delta) = &event.delta
-        && let Some(reason) = &delta.stop_reason
+    if let Some(delta) = event.delta.as_ref()
+        && let Some(reason) = delta.stop_reason.as_ref()
     {
         st.stop_reason = Some(reason.clone());
     }
-    if let Some(usage) = &event.usage {
+    if let Some(usage) = event.usage.as_ref() {
         if let Some(inp) = usage.input_tokens {
             st.input_tokens = inp;
         }
@@ -197,7 +197,7 @@ struct ReadErrorCtx<'ctx> {
 fn build_read_error(e: &std::io::Error, ctx: &ReadErrorCtx<'_>) -> String {
     let tool_ctx = ctx.current_tool.map_or_else(
         || "No tool in progress".to_owned(),
-        |(id, name, partial)| format!("In-flight tool: {} (id={}), partial: {} bytes", name, id, partial.len()),
+        |tool| format!("In-flight tool: {} (id={}), partial: {} bytes", tool.1, tool.0, tool.2.len()),
     );
     let recent = if ctx.last_lines.is_empty() { "(no lines read)".to_owned() } else { ctx.last_lines.join("\n") };
     format!(

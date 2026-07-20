@@ -131,7 +131,7 @@ impl LlmClient for DeepSeekClient {
             oai_messages.into_iter().map(|m| DsMessage::from_oai(m, is_reasoner)).collect();
 
         // Add tool results if present
-        if let Some(results) = &request.tool_results {
+        if let Some(results) = request.tool_results.as_ref() {
             for result in results {
                 ds_messages.push(DsMessage {
                     role: "tool".to_owned(),

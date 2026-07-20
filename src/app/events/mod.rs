@@ -26,16 +26,16 @@ enum Dispatch {
 ///
 /// Returns `None` for Ctrl+Q (quit signal), `Some(Action)` for everything else.
 pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
-    match event {
-        Event::Key(key) => Some(handle_key_event(key, state)?),
-        // Bracketed paste: store in buffer, insert placeholder sentinel.
-        // Normalize line endings: terminals may send \r\n or \r instead of \n.
-        Event::Paste(text) => {
-            let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
-            Some(Action::PasteText(normalized))
-        }
-        Event::FocusGained | Event::FocusLost | Event::Mouse(_) | Event::Resize(_, _) => Some(Action::None),
+    if let &Event::Key(key) = event {
+        return handle_key_event(&key, state);
     }
+    // Bracketed paste: store in buffer, insert placeholder sentinel.
+    // Normalize line endings: terminals may send \r\n or \r instead of \n.
+    if let Event::Paste(text) = event.clone() {
+        let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+        return Some(Action::PasteText(normalized));
+    }
+    Some(Action::None)
 }
 
 /// Handle a key event through the staged pipeline. `None` = quit.

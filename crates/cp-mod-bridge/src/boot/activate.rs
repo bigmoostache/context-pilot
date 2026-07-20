@@ -171,7 +171,7 @@ pub(crate) fn publish_frame(state: &mut State, kind: StreamKind) {
         kind,
     };
 
-    if let Some(tee) = &bs.tee {
+    if let Some(tee) = bs.tee.as_ref() {
         let _outcome = tee.publish(frame);
     }
 }

@@ -41,7 +41,7 @@ fn build_module_data_maps(state: &State) -> ModuleDataMaps {
         }
     }
     // Cache optimization engine (survives reloads via worker state)
-    if let Some(json) = &state.cache_engine_json
+    if let Some(json) = state.cache_engine_json.as_ref()
         && let Ok(val) = serde_json::from_str::<serde_json::Value>(json)
     {
         let _r = worker_modules.insert("cache_engine".to_owned(), val);
@@ -76,7 +76,7 @@ fn build_panel_write_ops(
         if ctx.context_type.as_str() == Kind::SYSTEM || ctx.context_type.as_str() == Kind::LIBRARY {
             continue;
         }
-        let Some(uid) = &ctx.uid else { continue };
+        let Some(uid) = ctx.uid.as_ref() else { continue };
         let _r = known_uids.insert(String::clone(uid));
         let panel_data = PanelData::new(uid.clone(), ctx.context_type.clone(), ctx.name.clone())
             .with_metrics(ctx.token_count, ctx.last_refresh_ms)
@@ -99,7 +99,7 @@ fn build_history_message_ops(state: &State, messages_dir: &std::path::Path) -> V
     let mut writes = Vec::new();
     for ctx in &state.context {
         if ctx.context_type.as_str() == Kind::CONVERSATION_HISTORY
-            && let Some(msgs) = &ctx.history_messages
+            && let Some(msgs) = ctx.history_messages.as_ref()
         {
             for msg in msgs {
                 let file_id = msg.uid.as_ref().unwrap_or(&msg.id);
@@ -145,7 +145,7 @@ fn build_panel_uid_maps(state: &State) -> PanelUidMaps {
         let dominated = (ctx.context_type.is_fixed() || ctx.context_type.as_str() == Kind::CONVERSATION)
             && ctx.context_type.as_str() != Kind::SYSTEM
             && ctx.context_type.as_str() != Kind::LIBRARY;
-        if dominated && let Some(uid) = &ctx.uid {
+        if dominated && let Some(uid) = ctx.uid.as_ref() {
             let _r = important_uids.insert(ctx.context_type.clone(), String::clone(uid));
         }
     }

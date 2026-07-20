@@ -22,7 +22,7 @@ pub enum ThreadStatus {
 
 impl std::fmt::Display for ThreadStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
+        match *self {
             Self::MyTurn => write!(f, "MY_TURN"),
             Self::TheirTurn => write!(f, "THEIR_TURN"),
         }
@@ -45,7 +45,7 @@ pub enum ThreadAuthor {
 
 impl std::fmt::Display for ThreadAuthor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
+        match *self {
             Self::User => write!(f, "user"),
             Self::Assistant => write!(f, "assistant"),
         }
@@ -235,7 +235,7 @@ impl ThreadsState {
     /// visible list.
     #[must_use]
     pub fn visible_indices(&self, archived: bool) -> Vec<usize> {
-        self.threads.iter().enumerate().filter(|(_, t)| t.archived == archived).map(|(i, _)| i).collect()
+        self.threads.iter().enumerate().filter(|entry| entry.1.archived == archived).map(|entry| entry.0).collect()
     }
 }
 

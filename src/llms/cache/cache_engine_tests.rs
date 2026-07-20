@@ -138,7 +138,7 @@ fn beacon_placed_after_frontier() {
 
     let plan = engine.compute_breakpoints(&msgs);
     // Beacon at 0-indexed position 30 → msg_idx 30
-    let has_beacon_near_30 = plan.positions.iter().any(|(msg_idx, _)| *msg_idx >= 28 && *msg_idx <= 32);
+    let has_beacon_near_30 = plan.positions.iter().any(|entry| entry.0 >= 28 && entry.0 <= 32);
     assert!(has_beacon_near_30, "expected beacon near position 30, got {:?}", plan.positions);
 }
 
@@ -149,7 +149,7 @@ fn no_frontier_beacon_at_tail() {
 
     let plan = engine.compute_breakpoints(&msgs);
     // With no frontier, beacon goes to last block (idx 9)
-    let has_tail = plan.positions.iter().any(|(msg_idx, _)| *msg_idx >= 7);
+    let has_tail = plan.positions.iter().any(|entry| entry.0 >= 7);
     assert!(has_tail, "expected beacon near tail, got {:?}", plan.positions);
 }
 
@@ -206,7 +206,7 @@ fn optimizer_spreads_bps() {
 
     // BPs should not all be clustered in the same region
     if plan.positions.len() >= 3 {
-        let mut msg_indices: Vec<usize> = plan.positions.iter().map(|(m, _)| *m).collect();
+        let mut msg_indices: Vec<usize> = plan.positions.iter().map(|entry| entry.0).collect();
         msg_indices.sort_unstable();
         let last = msg_indices.last().copied().unwrap_or(0);
         let first = msg_indices.first().copied().unwrap_or(0);
@@ -249,7 +249,7 @@ fn full_pipeline_with_frontier() {
     assert_eq!(plan.alive_count, 1);
 
     // Beacon should be around block 40 (20 + LOOKBACK_WINDOW)
-    let has_near_40 = plan.positions.iter().any(|(msg_idx, _)| *msg_idx >= 35 && *msg_idx <= 45);
+    let has_near_40 = plan.positions.iter().any(|entry| entry.0 >= 35 && entry.0 <= 45);
     assert!(has_near_40, "expected a BP near block 40, got {:?}", plan.positions);
 }
 

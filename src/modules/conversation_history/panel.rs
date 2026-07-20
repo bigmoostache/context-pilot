@@ -96,7 +96,7 @@ impl Panel for ConversationHistoryPanel {
         };
 
         // Prefer rendering from history_messages (structured message data)
-        if let Some(msgs) = &(ctx.history_messages) {
+        if let Some(msgs) = ctx.history_messages.as_ref() {
             let mut blocks = Vec::new();
             for msg in msgs {
                 blocks.extend(render_message_blocks(msg));
@@ -110,7 +110,7 @@ impl Panel for ConversationHistoryPanel {
         }
 
         // Fallback: plain-text rendering from cached_content
-        if let Some(content) = &ctx.cached_content {
+        if let Some(content) = ctx.cached_content.as_ref() {
             return content
                 .lines()
                 .map(|line| cp_render::Block::Line(vec![cp_render::Span::muted(line.to_owned())]))

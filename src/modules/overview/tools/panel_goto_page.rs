@@ -54,7 +54,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     ctx.current_page = page.saturating_sub(1).to_usize();
 
     // Recompute token_count for the new page
-    if let Some(content) = &ctx.cached_content {
+    if let Some(content) = ctx.cached_content.as_ref() {
         let page_content = paginate_content(content, ctx.current_page, ctx.total_pages, &ctx.page_descriptions);
         ctx.token_count = estimate_tokens(&page_content);
     }

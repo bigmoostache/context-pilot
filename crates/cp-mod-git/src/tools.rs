@@ -90,7 +90,7 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
         let elapsed_ms = start.elapsed().as_millis();
 
         // Clean up temp askpass script
-        if let Some(path) = &(askpass_tempfile) {
+        if let Some(path) = askpass_tempfile.as_ref() {
             drop(std::fs::remove_file(path));
         }
 

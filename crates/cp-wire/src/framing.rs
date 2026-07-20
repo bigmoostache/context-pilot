@@ -103,8 +103,12 @@ pub enum FrameError {
 }
 
 impl fmt::Display for FrameError {
+    #[expect(
+        clippy::ref_patterns,
+        reason = "clippy::pattern_type_mismatch mandates dereferencing the &self scrutinee and binding the non-Copy String payloads (DeserializeError/SerializeError) with ref; the two restriction lints are mutually exclusive and cp-wire is foundational (cannot depend on cp-base's deref_match! macro)"
+    )]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
+        match *self {
             Self::Incomplete => f.write_str("incomplete frame (truncated)"),
             Self::PayloadTooLarge(n) => {
                 write!(f, "payload length {n} exceeds {MAX_PAYLOAD_SIZE}-byte limit")
@@ -112,8 +116,8 @@ impl fmt::Display for FrameError {
             Self::CrcMismatch { expected, actual } => {
                 write!(f, "CRC mismatch: header {expected:#010x}, computed {actual:#010x}")
             }
-            Self::DeserializeError(msg) => write!(f, "deserialize: {msg}"),
-            Self::SerializeError(msg) => write!(f, "serialize: {msg}"),
+            Self::DeserializeError(ref msg) => write!(f, "deserialize: {msg}"),
+            Self::SerializeError(ref msg) => write!(f, "serialize: {msg}"),
         }
     }
 }

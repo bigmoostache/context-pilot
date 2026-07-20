@@ -56,11 +56,15 @@ pub enum VaultError {
 }
 
 impl fmt::Display for VaultError {
+    #[expect(
+        clippy::ref_patterns,
+        reason = "clippy::pattern_type_mismatch mandates dereferencing the &self scrutinee and binding the non-Copy String payloads with ref; the two restriction lints are mutually exclusive and cp-vault is foundational (cannot depend on cp-base's deref_match! macro)"
+    )]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::MissingKey(key) => write!(f, "credential not configured: {key}"),
-            Self::Io(msg) => write!(f, "vault I/O error: {msg}"),
-            Self::Network(msg) => write!(f, "vault network error: {msg}"),
+        match *self {
+            Self::MissingKey(ref key) => write!(f, "credential not configured: {key}"),
+            Self::Io(ref msg) => write!(f, "vault I/O error: {msg}"),
+            Self::Network(ref msg) => write!(f, "vault network error: {msg}"),
         }
     }
 }

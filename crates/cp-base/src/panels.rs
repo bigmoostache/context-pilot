@@ -103,17 +103,49 @@ pub enum CacheUpdate {
     },
 }
 
+impl CacheUpdate {
+    /// Context id of an [`Unchanged`](Self::Unchanged) update, else `None`.
+    #[must_use]
+    pub const fn unchanged_context_id(&self) -> Option<&str> {
+        crate::deref_match!(self, {
+            Self::Unchanged { ref context_id } => Some(context_id.as_str()),
+            Self::Content { .. } => None,
+            Self::ModuleSpecific { .. } => None,
+        })
+    }
+
+    /// Context id of a [`Content`](Self::Content) update, else `None`.
+    #[must_use]
+    pub const fn content_context_id(&self) -> Option<&str> {
+        crate::deref_match!(self, {
+            Self::Content { ref context_id, .. } => Some(context_id.as_str()),
+            Self::Unchanged { .. } => None,
+            Self::ModuleSpecific { .. } => None,
+        })
+    }
+
+    /// Context type of a [`ModuleSpecific`](Self::ModuleSpecific) update, else `None`.
+    #[must_use]
+    pub const fn module_specific_type(&self) -> Option<&Kind> {
+        crate::deref_match!(self, {
+            Self::ModuleSpecific { ref context_type, .. } => Some(context_type),
+            Self::Content { .. } => None,
+            Self::Unchanged { .. } => None,
+        })
+    }
+}
+
 impl fmt::Debug for CacheUpdate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Content { context_id, token_count, .. } => {
-                f.debug_struct("Content").field("context_id", context_id).field("token_count", token_count).finish()
+        crate::deref_match!(self, {
+            Self::Content { ref context_id, token_count, .. } => {
+                f.debug_struct("Content").field("context_id", context_id).field("token_count", &token_count).finish()
             }
-            Self::Unchanged { context_id } => f.debug_struct("Unchanged").field("context_id", context_id).finish(),
-            Self::ModuleSpecific { context_type, .. } => {
+            Self::Unchanged { ref context_id } => f.debug_struct("Unchanged").field("context_id", context_id).finish(),
+            Self::ModuleSpecific { ref context_type, .. } => {
                 f.debug_struct("ModuleSpecific").field("context_type", context_type).finish()
             }
-        }
+        })
     }
 }
 

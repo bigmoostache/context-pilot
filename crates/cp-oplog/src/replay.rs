@@ -69,54 +69,54 @@ pub struct Recovered {
 /// The `rev` is taken from `entry`, so the seen-set records the exact `rev` at
 /// which each command's effect first committed.
 pub(crate) fn fold_entry(state: &mut Recovered, entry: &OpEntry) {
-    match &entry.kind {
-        OpEntryKind::Checkpoint { snapshot } => {
+    crate::ref_match!(&entry.kind, {
+        &OpEntryKind::Checkpoint { ref snapshot } => {
             state.heads.clone_from(&snapshot.heads);
             state.seen.clone_from(&snapshot.seen);
             state.roster.clone_from(&snapshot.roster);
         }
-        OpEntryKind::MessageCreated { thread_id, head, .. } => {
-            state.heads.set_thread_head(thread_id, *head);
+        &OpEntryKind::MessageCreated { ref thread_id, head, .. } => {
+            state.heads.set_thread_head(thread_id, head);
             RosterThread::fold_message(&mut state.roster, thread_id, entry.timestamp_ms);
         }
-        OpEntryKind::CommandEffect { dedup_token, .. } | OpEntryKind::SeenMark { dedup_token } => {
+        &OpEntryKind::CommandEffect { ref dedup_token, .. } | &OpEntryKind::SeenMark { ref dedup_token } => {
             state.seen.mark(dedup_token, entry.rev);
         }
-        OpEntryKind::ThreadCreated { thread_id, name, status, timestamp_ms } => {
+        &OpEntryKind::ThreadCreated { ref thread_id, ref name, status, timestamp_ms } => {
             RosterThread::fold_created(
                 &mut state.roster,
-                cp_wire::types::snapshot::ThreadCreation::new(thread_id, name, *status, *timestamp_ms),
+                cp_wire::types::snapshot::ThreadCreation::new(thread_id, name, status, timestamp_ms),
             );
         }
-        OpEntryKind::ThreadArchived { thread_id } => {
+        &OpEntryKind::ThreadArchived { ref thread_id } => {
             RosterThread::fold_archived(&mut state.roster, thread_id, true);
         }
-        OpEntryKind::ThreadRestored { thread_id } => {
+        &OpEntryKind::ThreadRestored { ref thread_id } => {
             RosterThread::fold_archived(&mut state.roster, thread_id, false);
         }
-        OpEntryKind::ThreadPaused { thread_id } => {
+        &OpEntryKind::ThreadPaused { ref thread_id } => {
             RosterThread::fold_paused(&mut state.roster, thread_id, true);
         }
-        OpEntryKind::ThreadResumed { thread_id } => {
+        &OpEntryKind::ThreadResumed { ref thread_id } => {
             RosterThread::fold_paused(&mut state.roster, thread_id, false);
         }
-        OpEntryKind::ThreadDeleted { thread_id } => {
+        &OpEntryKind::ThreadDeleted { ref thread_id } => {
             RosterThread::fold_deleted(&mut state.roster, thread_id);
         }
-        OpEntryKind::ThreadStatusChanged { thread_id, status } => {
-            RosterThread::fold_status(&mut state.roster, thread_id, *status);
+        &OpEntryKind::ThreadStatusChanged { ref thread_id, status } => {
+            RosterThread::fold_status(&mut state.roster, thread_id, status);
         }
         // Phase, lifecycle, cost, focus, and message-delete carry no
         // head/seen/roster state; an `Unknown` variant from a newer schema is
         // ignored (forward-compat).
-        OpEntryKind::PhaseTransition { .. }
-        | OpEntryKind::Lifecycle { .. }
-        | OpEntryKind::CostAggregate { .. }
-        | OpEntryKind::ContextUsage { .. }
-        | OpEntryKind::ThreadFocusChanged { .. }
-        | OpEntryKind::MessageDeleted { .. }
-        | OpEntryKind::Unknown => {}
-    }
+        &OpEntryKind::PhaseTransition { .. }
+        | &OpEntryKind::Lifecycle { .. }
+        | &OpEntryKind::CostAggregate { .. }
+        | &OpEntryKind::ContextUsage { .. }
+        | &OpEntryKind::ThreadFocusChanged { .. }
+        | &OpEntryKind::MessageDeleted { .. }
+        | &OpEntryKind::Unknown => {}
+    });
 }
 
 /// Replay the oplog in `dir`, returning its highest durable `rev` and heads.
@@ -155,22 +155,24 @@ fn replay_fast(dir: &Path, indices: &[u64]) -> OplogResult<Option<Recovered>> {
             // Empty or torn-at-zero segment: try the next-older one.
             continue;
         };
-        if let OpEntryKind::Checkpoint { snapshot } = &first.kind {
-            let mut state = Recovered {
-                rev_head: Some(first.rev),
-                heads: snapshot.heads.clone(),
-                seen: snapshot.seen.clone(),
-                roster: snapshot.roster.clone(),
-            };
-            for entry in scan.entries.iter().skip(1) {
-                fold_entry(&mut state, entry);
-                state.rev_head = Some(entry.rev);
+        crate::ref_match!(&first.kind, {
+            &OpEntryKind::Checkpoint { ref snapshot } => {
+                let mut state = Recovered {
+                    rev_head: Some(first.rev),
+                    heads: snapshot.heads.clone(),
+                    seen: snapshot.seen.clone(),
+                    roster: snapshot.roster.clone(),
+                };
+                for entry in scan.entries.iter().skip(1) {
+                    fold_entry(&mut state, entry);
+                    state.rev_head = Some(entry.rev);
+                }
+                return Ok(Some(state));
             }
-            return Ok(Some(state));
-        }
-        // Newest non-empty segment has records but no leading checkpoint
-        // (only seg-0, by construction): the full fold handles it correctly.
-        return Ok(None);
+            // Newest non-empty segment has records but no leading checkpoint
+            // (only seg-0, by construction): the full fold handles it correctly.
+            _ => return Ok(None),
+        });
     }
     Ok(None)
 }

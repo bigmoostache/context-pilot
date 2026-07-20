@@ -158,7 +158,7 @@ fn load_logs_chunked() -> (Vec<LogEntry>, usize) {
                 Some((idx, path))
             })
             .collect();
-        chunk_files.sort_by_key(|(idx, _)| *idx);
+        chunk_files.sort_by_key(|entry| entry.0);
 
         for (_, path) in chunk_files {
             if let Ok(content) = fs::read_to_string(&path)

@@ -250,11 +250,9 @@ impl DatalabClient {
             match poll_status {
                 "complete" => {
                     let field = mode.response_field();
-                    let text = match body.get(field) {
-                        Some(serde_json::Value::String(s)) => s.clone(),
-                        Some(other) => other.to_string(),
-                        None => String::new(),
-                    };
+                    let text = body
+                        .get(field)
+                        .map_or_else(String::new, |v| v.as_str().map_or_else(|| v.to_string(), ToOwned::to_owned));
                     return Ok(text);
                 }
                 "error" | "failed" => {

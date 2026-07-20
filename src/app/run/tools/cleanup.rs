@@ -13,7 +13,7 @@ use crate::app::App;
 /// Create a console panel for a watcher result's deferred `create_panel`, and
 /// append a "→ see {panel}" pointer to the result description. No-op when absent.
 fn create_console_panel_for(app: &mut App, result: &mut cp_base::state::watchers::carriers::WatcherResult) {
-    let Some(dp) = &(result.create_panel) else { return };
+    let Some(dp) = result.create_panel.as_ref() else { return };
     let panel_id = app.state.next_available_context_id();
     let uid = format!("UID_{}_P", app.state.global_next_uid);
     app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
@@ -30,7 +30,7 @@ fn create_console_panel_for(app: &mut App, result: &mut cp_base::state::watchers
     ctx.set_meta("console_description", &dp.description);
     ctx.set_meta("callback_id", &dp.callback_id);
     ctx.set_meta("callback_name", &dp.callback_name);
-    if let Some(dir) = &(dp.cwd) {
+    if let Some(dir) = dp.cwd.as_ref() {
         ctx.set_meta("console_cwd", dir);
     }
     app.state.context.push(ctx);
@@ -43,7 +43,7 @@ fn create_console_panel_for(app: &mut App, result: &mut cp_base::state::watchers
 /// Create a generic dyn panel for a watcher result's deferred `create_dyn_panel`,
 /// substituting the panel-ID placeholder in the description. No-op when absent.
 fn create_dyn_panel_for(app: &mut App, result: &mut cp_base::state::watchers::carriers::WatcherResult) {
-    let Some(dp) = &(result.create_dyn_panel) else { return };
+    let Some(dp) = result.create_dyn_panel.as_ref() else { return };
     let panel_id = app.state.next_available_context_id();
     let uid = format!("UID_{}_P", app.state.global_next_uid);
     app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
@@ -55,10 +55,11 @@ fn create_dyn_panel_for(app: &mut App, result: &mut cp_base::state::watchers::ca
         true,
     );
     ctx.uid = Some(uid);
-    for (key, value) in &dp.metadata {
+    for entry in &dp.metadata {
+        let (key, value) = (&entry.0, &entry.1);
         ctx.set_meta(key, value);
     }
-    if let Some(content) = &(dp.content) {
+    if let Some(content) = dp.content.as_ref() {
         ctx.cached_content = Some(content.clone());
         ctx.token_count = cp_base::state::context::estimate_tokens(content);
         ctx.full_token_count = ctx.token_count;
@@ -77,7 +78,7 @@ fn cleanup_inline_sessions(
     async_res: &[cp_base::state::watchers::carriers::WatcherResult],
 ) {
     for result in blocking.iter().chain(async_res.iter()) {
-        let Some(name) = &(result.kill_session) else { continue };
+        let Some(name) = result.kill_session.as_ref() else { continue };
         let log_path = {
             let cs = cp_mod_console::types::ConsoleState::get(&app.state);
             cs.sessions.get(name).map(|h| h.log_path.clone()).unwrap_or_default()
@@ -101,7 +102,7 @@ fn process_async_completions(app: &mut App, async_results: &mut [cp_base::state:
         create_dyn_panel_for(app, result);
         // Auto-close panels for watchers that request it
         if result.close_panel
-            && let Some(panel_id) = &result.panel_id
+            && let Some(panel_id) = result.panel_id.as_ref()
         {
             if let Some(ctx) = app.state.context.iter().find(|c| c.id == *panel_id)
                 && let Some(name) = ctx.get_meta::<String>("console_name")

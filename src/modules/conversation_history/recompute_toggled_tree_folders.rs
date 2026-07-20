@@ -57,7 +57,7 @@ pub(crate) fn recompute_tree_folders(state: &mut State) {
         if ctx.context_type.as_str() != Kind::CONVERSATION_HISTORY {
             continue;
         }
-        if let Some(msgs) = &(ctx.history_messages) {
+        if let Some(msgs) = ctx.history_messages.as_ref() {
             collect_opened_folders_from_messages(msgs, &mut folders);
         }
     }

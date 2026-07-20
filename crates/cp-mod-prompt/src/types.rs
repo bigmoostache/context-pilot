@@ -20,7 +20,7 @@ pub enum PromptType {
 
 impl std::fmt::Display for PromptType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
+        match *self {
             Self::Agent => write!(f, "agent"),
             Self::Skill => write!(f, "skill"),
             Self::Command => write!(f, "command"),

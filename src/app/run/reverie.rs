@@ -18,7 +18,7 @@ pub(super) fn maybe_start_reverie_stream(app: &mut App) {
         .state
         .reveries
         .iter()
-        .filter(|(agent_id, r)| r.is_streaming && !app.reverie_streams.contains_key(*agent_id))
+        .filter(|entry| entry.1.is_streaming && !app.reverie_streams.contains_key(entry.0))
         .map(|(agent_id, _)| agent_id.clone())
         .collect();
 
@@ -115,8 +115,12 @@ fn destroy_reverie_on_error(app: &mut App, agent_id: &str, err: &str) {
 pub(super) fn handle_reverie_tools(app: &mut App) {
     let _fg = cp_base::flame!("reverie_tools");
     // Collect agent_ids that have pending tools
-    let agent_ids: Vec<String> =
-        app.reverie_streams.iter().filter(|(_, s)| !s.pending_tools.is_empty()).map(|(id, _)| id.clone()).collect();
+    let agent_ids: Vec<String> = app
+        .reverie_streams
+        .iter()
+        .filter(|entry| !entry.1.pending_tools.is_empty())
+        .map(|(id, _)| id.clone())
+        .collect();
 
     for agent_id in agent_ids {
         // Take pending tools from the stream state
@@ -287,7 +291,7 @@ fn restream_reverie_if_alive(app: &mut App, agent_id: &str, tool_results: &[crat
 pub(super) fn check_reverie_end_turn(app: &mut App) {
     // Collect agent_ids of reveries that have stopped streaming
     let stopped: Vec<String> =
-        app.state.reveries.iter().filter(|(_, r)| !r.is_streaming).map(|(id, _)| id.clone()).collect();
+        app.state.reveries.iter().filter(|entry| !entry.1.is_streaming).map(|(id, _)| id.clone()).collect();
 
     for agent_id in stopped {
         let report_called = app.reverie_streams.get(&agent_id).is_some_and(|s| s.report_called);

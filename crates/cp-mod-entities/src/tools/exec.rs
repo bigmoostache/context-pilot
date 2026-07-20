@@ -78,7 +78,7 @@ pub(super) fn execute_dml(conn: &Connection, sql: &str) -> Result<String, String
     let result = execute_dml_stmts(conn, &stmts);
 
     if needs_implicit_tx {
-        match &result {
+        match result.as_ref() {
             Ok(_) => conn.execute_batch("COMMIT").map_err(|e| format!("{e}"))?,
             Err(_) => {
                 let _rb = conn.execute_batch("ROLLBACK");
@@ -177,7 +177,7 @@ fn query_to_markdown(conn: &Connection, sql: &str, state: &State) -> Result<Stri
         let info = cache.tables.iter().find(|t| t.name.eq_ignore_ascii_case(&tbl))?;
         Some((info.name.clone(), info.row_count))
     });
-    let hint = enrichment.as_ref().map(|(name, count)| (name.as_str(), *count));
+    let hint = enrichment.as_ref().map(|entry| (entry.0.as_str(), entry.1));
     format::query_to_markdown(conn, sql, hint)
 }
 

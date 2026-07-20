@@ -63,7 +63,7 @@ fn render_normal(frame: &mut Frame<'_>, sidebar: &Sidebar, area: Rect) {
     let mut lines: Vec<Line<'_>> = Vec::new();
 
     // Token bar in rounded border box (above entries)
-    if let Some(tb) = &(sidebar.token_bar) {
+    if let Some(tb) = sidebar.token_bar.as_ref() {
         render_token_bar_box(&mut lines, tb, cw);
     }
 
@@ -79,13 +79,13 @@ fn render_normal(frame: &mut Frame<'_>, sidebar: &Sidebar, area: Rect) {
     render_dynamic_entries(&mut lines, &dynamic_entries, cw);
 
     // PR card
-    if let Some(pr) = &(sidebar.pr_card) {
+    if let Some(pr) = sidebar.pr_card.as_ref() {
         lines.push(Line::from(""));
         render_pr_card(&mut lines, pr, cw);
     }
 
     // Token stats (rendered with rounded border)
-    if let Some(stats) = &(sidebar.token_stats) {
+    if let Some(stats) = sidebar.token_stats.as_ref() {
         lines.push(Line::from(""));
         render_token_stats(&mut lines, stats, cw);
     }
@@ -381,7 +381,7 @@ fn render_pr_card(lines: &mut Vec<Line<'static>>, pr: &cp_render::frame::PrCard,
         detail_spans.push(Span::styled(format!("+{}", pr.additions), Style::default().fg(theme::success())));
         detail_spans.push(Span::styled(format!(" -{}", pr.deletions), Style::default().fg(theme::error())));
     }
-    if let Some(review) = &(pr.review_status) {
+    if let Some(review) = pr.review_status.as_ref() {
         let (icon, color) = match review.as_str() {
             "APPROVED" => (" \u{2713}", theme::success()),
             "CHANGES_REQUESTED" => (" \u{2717}", theme::error()),
@@ -390,7 +390,7 @@ fn render_pr_card(lines: &mut Vec<Line<'static>>, pr: &cp_render::frame::PrCard,
         };
         detail_spans.push(Span::styled(icon, Style::default().fg(color)));
     }
-    if let Some(checks) = &(pr.checks_status) {
+    if let Some(checks) = pr.checks_status.as_ref() {
         let (icon, color) = match checks.as_str() {
             "passing" => (" \u{25cf}", theme::success()),
             "failing" => (" \u{25cf}", theme::error()),

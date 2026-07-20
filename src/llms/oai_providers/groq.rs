@@ -95,7 +95,7 @@ impl LlmClient for GroqClient {
         );
 
         // Add tool results if present
-        if let Some(results) = &request.tool_results {
+        if let Some(results) = request.tool_results.as_ref() {
             for result in results {
                 messages.push(OaiMessage {
                     role: "tool".to_owned(),

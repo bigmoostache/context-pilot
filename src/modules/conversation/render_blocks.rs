@@ -62,14 +62,7 @@ fn render_tool_call_blocks(msg: &Message, viewport_width: u16) -> Vec<Block> {
         let param_ctx = ParamCtx { prefix: &param_prefix, wrap_width };
         if let Some(obj) = tool_use.input.as_object() {
             for (key, val) in obj {
-                let val_str = match val {
-                    serde_json::Value::String(s) => s.clone(),
-                    serde_json::Value::Null
-                    | serde_json::Value::Bool(_)
-                    | serde_json::Value::Number(_)
-                    | serde_json::Value::Array(_)
-                    | serde_json::Value::Object(_) => val.to_string(),
-                };
+                let val_str = val.as_str().map_or_else(|| val.to_string(), str::to_owned);
                 render_param_blocks(&mut blocks, &param_ctx, key, &val_str);
             }
         }
@@ -141,15 +134,13 @@ impl ResultLineCtx<'_> {
 fn flatten_visualizer_blocks(blocks: &mut Vec<Block>, vis_blocks: &[Block], ctx: &ResultLineCtx<'_>) {
     let mut is_first = true;
     for vis_block in vis_blocks {
-        match vis_block {
+        match vis_block.clone() {
             Block::Line(spans) => {
                 let mut full = ctx.lead(&mut is_first);
-                full.extend(spans.clone());
+                full.extend(spans);
                 blocks.push(Block::line(full));
             }
-            Block::Empty => {
-                blocks.push(Block::line(ctx.lead(&mut is_first)));
-            }
+            Block::Empty => blocks.push(Block::line(ctx.lead(&mut is_first))),
             Block::Header(_)
             | Block::Table { .. }
             | Block::ProgressBar { .. }

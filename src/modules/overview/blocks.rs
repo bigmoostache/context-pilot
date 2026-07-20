@@ -125,7 +125,7 @@ pub(super) fn git_blocks(state: &State) -> Vec<Block> {
     out.push(Block::Empty);
 
     // Branch name
-    if let Some(branch) = &gs.branch {
+    if let Some(branch) = gs.branch.as_ref() {
         let branch_semantic = if branch.starts_with("detached:") { Semantic::Warning } else { Semantic::Accent };
         out.push(Block::line(vec![
             Span::muted(" Branch: ".to_owned()),

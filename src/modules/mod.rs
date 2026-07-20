@@ -85,12 +85,12 @@ pub(crate) fn all_fixed_panel_defaults() -> Vec<FixedPanelDefault> {
         .iter()
         .filter_map(|ct_str| {
             let ct = Kind::new(ct_str);
-            lookup.get(&ct).map(|(mid, is_core, name, cache_dep)| FixedPanelDefault {
-                module_id: mid,
-                is_core: *is_core,
+            lookup.get(&ct).map(|entry| FixedPanelDefault {
+                module_id: entry.0,
+                is_core: entry.1,
                 context_type: ct,
-                display_name: name,
-                cache_deprecated: *cache_dep,
+                display_name: entry.2,
+                cache_deprecated: entry.3,
             })
         })
         .collect()

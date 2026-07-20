@@ -136,11 +136,11 @@ pub mod flame {
                 let mut stack = s.borrow_mut();
 
                 // Self-time = total minus accumulated children time.
-                let children_us = stack.last().map_or(0, |(_, c)| *c);
+                let children_us = stack.last().map_or(0, |entry| entry.1);
                 let self_us = total_us.saturating_sub(children_us);
 
                 // Build the folded stack path: "parent;child;grandchild".
-                let folded: String = stack.iter().map(|(name, _)| name.as_str()).collect::<Vec<_>>().join(";");
+                let folded: String = stack.iter().map(|entry| entry.0.as_str()).collect::<Vec<_>>().join(";");
 
                 // Only emit if there's meaningful self-time (>0 µs).
                 if self_us > 0 {
@@ -151,8 +151,8 @@ pub mod flame {
                 drop(stack.pop());
 
                 // Propagate total time to the parent's children accumulator.
-                if let Some((_, parent_children)) = stack.last_mut() {
-                    *parent_children = parent_children.saturating_add(total_us);
+                if let Some(entry) = stack.last_mut() {
+                    entry.1 = entry.1.saturating_add(total_us);
                 }
             });
         }
@@ -175,6 +175,38 @@ macro_rules! flame {
     ($name:expr) => {
         $crate::flame::Guard::new($name)
     };
+}
+
+/// Match a shared reference by dereferencing the place, funneling the one
+/// `ref`-binding suppression the workspace needs into a single audited site.
+///
+/// `clippy::pattern_type_mismatch` (forbid) rejects matching a variant pattern
+/// against a `&Enum` via match ergonomics; its mandated fix is to dereference
+/// the scrutinee (`match *place`) and bind non-`Copy` fields with `ref`. But
+/// `clippy::ref_patterns` (also forbid) rejects `ref`. The two restriction
+/// lints are mutually exclusive for destructuring a non-`Copy` field out of a
+/// shared reference, so every such site routes through this macro — the single
+/// ref-pattern suppression inside it covers all expansions.
+///
+/// Enums whose matched fields are all `Copy` (or fieldless) need no `ref` and
+/// should use a plain `match *place` instead — this macro is only for the
+/// irreducible non-`Copy` case.
+///
+/// ```ignore
+/// deref_match!(self, {
+///     Self::Named(ref s) => write!(f, "{s}"),
+///     Self::Count(n)     => write!(f, "{n}"),
+/// })
+/// ```
+#[macro_export]
+macro_rules! deref_match {
+    ($place:expr, { $($arm:tt)* }) => {{
+        #[expect(
+            clippy::ref_patterns,
+            reason = "clippy::pattern_type_mismatch mandates ref bindings when destructuring non-Copy fields out of a shared reference; the two restriction lints are mutually exclusive, so the deref-plus-ref form is funneled through this one macro"
+        )]
+        match *$place { $($arm)* }
+    }};
 }
 
 /// Module trait: tools, panels, lifecycle hooks for pluggable functionality.
@@ -234,7 +266,7 @@ mod tests {
             ("todo", include_str!("../../../yamls/tools/todo.yaml")),
             ("tree", include_str!("../../../yamls/tools/tree.yaml")),
         ];
-        for (name, content) in &yamls {
+        for &(name, content) in &yamls {
             // Panics with a clear message if schema doesn't match ToolTexts
             drop(
                 serde_yaml::from_str::<ToolTexts>(content)

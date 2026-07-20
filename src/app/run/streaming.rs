@@ -146,7 +146,7 @@ pub(super) fn process_typewriter(app: &mut App) {
 
 /// Poll for completed API-key validation results and store them in state.
 pub(super) fn process_api_check_results(app: &mut App) {
-    if let Some(rx) = &app.api_check_rx
+    if let Some(rx) = app.api_check_rx.as_ref()
         && let Ok(result) = rx.try_recv()
     {
         app.state.flags.lifecycle.api_check_in_progress = false;
@@ -185,31 +185,24 @@ pub(super) fn finalize_stream(app: &mut App) {
         return;
     }
 
-    if let Some((
-        input_tokens,
-        output_tokens,
-        cache_hit_tokens,
-        cache_miss_tokens,
-        stop_reason,
-        bp_hashes,
-        bp_panel_ids,
-        alive_count,
-        alive_positions_permille,
-    )) = &app.pending_done
-        && app.typewriter.pending_chars.is_empty()
-        && app.pending_tools.is_empty()
+    let ready = app.typewriter.pending_chars.is_empty() && app.pending_tools.is_empty();
+    if ready
+        && let Some((
+            input_tokens,
+            output_tokens,
+            cache_hit_tokens,
+            cache_miss_tokens,
+            stop_reason,
+            bp_hashes,
+            bp_panel_ids,
+            alive_count,
+            alive_positions_permille,
+        )) = app.pending_done.take()
     {
         app.state.flags.ui.dirty = true;
-        let stop_reason = stop_reason.clone();
         match apply_action(
             &mut app.state,
-            Action::StreamDone {
-                input_tokens: *input_tokens,
-                output_tokens: *output_tokens,
-                cache_hit_tokens: *cache_hit_tokens,
-                cache_miss_tokens: *cache_miss_tokens,
-                stop_reason,
-            },
+            Action::StreamDone { input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason },
         ) {
             ActionResult::SaveMessage(id) => {
                 if let Some(msg) = app.state.messages.iter().find(|m| m.id == id) {
@@ -245,16 +238,16 @@ pub(super) fn finalize_stream(app: &mut App) {
                 crate::llms::cache::cache_engine::CacheEngine::from_json,
             );
             engine.prune(now_ms);
-            engine.record_breakpoints(bp_hashes, now_ms);
-            app.state.tick_alive_breakpoints = *alive_count;
-            app.state.tick_alive_bp_positions = alive_positions_permille.clone();
+            engine.record_breakpoints(&bp_hashes, now_ms);
+            app.state.tick_alive_breakpoints = alive_count;
+            app.state.tick_alive_bp_positions = alive_positions_permille;
             app.state.cache_engine_json = Some(engine.to_json());
         }
 
         // Record which panels carried a breakpoint this turn — the freeze pass
         // reads it next turn to widen the free-to-update region back to the last
         // alive breakpoint before the culprit (BP-anchored free region).
-        app.state.previous_breakpoint_panel_ids = bp_panel_ids.clone();
+        app.state.previous_breakpoint_panel_ids = bp_panel_ids;
 
         app.typewriter.reset();
         app.pending_done = None;

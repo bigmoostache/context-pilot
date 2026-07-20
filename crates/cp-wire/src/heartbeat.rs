@@ -114,7 +114,7 @@ pub enum Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
+        match *self {
             Self::BadBootId => write!(f, "boot_id must be exactly {BOOT_ID_LEN} ASCII bytes"),
             Self::BadLength(n) => {
                 write!(f, "heartbeat must be exactly {HEARTBEAT_LEN} bytes, got {n}")

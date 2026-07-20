@@ -84,7 +84,7 @@ fn find_closest_match(haystack: &str, needle: &str) -> Option<(usize, String)> {
         let norm_line = line.trim_end();
 
         // Simple similarity: count matching characters
-        let score = first_needle_line.chars().zip(norm_line.chars()).filter(|(a, b)| a == b).count();
+        let score = first_needle_line.chars().zip(norm_line.chars()).filter(|entry| entry.0 == entry.1).count();
 
         // Also check if it contains the trimmed needle line
         let contains_score = if norm_line.contains(first_needle_line.trim()) { first_needle_line.len() } else { 0 };
@@ -218,7 +218,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
     writeln!(llm_msg, "Edited '{path_str}': ~{lines_changed} lines changed").unwrap_or(());
     // Sail ho! Tell the LLM its panel already has the fresh cargo aboard
-    if let Some(pid) = &(panel_ref) {
+    if let Some(pid) = panel_ref.as_ref() {
         writeln!(
             llm_msg,
             "Panel {pid} has been UPDATED and now shows the current file content — do NOT expect to see stale content there."

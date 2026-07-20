@@ -221,7 +221,7 @@ impl Panel for EntityResultPanel {
             return vec![Block::styled_text("No entity result panel".into(), Semantic::Muted)];
         };
 
-        let Some(content) = &ctx.cached_content else {
+        let Some(content) = ctx.cached_content.as_ref() else {
             return vec![Block::Line(vec![Span::muted("Loading...".into()).italic()])];
         };
 

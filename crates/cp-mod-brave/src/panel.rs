@@ -107,7 +107,7 @@ impl Panel for Results {
             return vec![Block::styled_text(" No brave result panel".into(), Semantic::Muted)];
         };
 
-        let Some(content) = &ctx.cached_content else {
+        let Some(content) = ctx.cached_content.as_ref() else {
             return vec![Block::Line(vec![S::muted(" Loading...".into()).italic()])];
         };
 

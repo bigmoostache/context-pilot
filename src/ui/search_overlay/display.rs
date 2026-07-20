@@ -73,7 +73,7 @@ fn push_database_section(lines: &mut Vec<Line<'static>>, o: &SearchIndexOverlay)
         Span::styled("Docs  ", Style::default().fg(theme::text_muted())),
         Span::styled(o.index.docs_display.clone(), Style::default().fg(theme::text())),
     ]));
-    if let Some(avg) = &(o.index.avg_chunk) {
+    if let Some(avg) = o.index.avg_chunk.as_ref() {
         lines.push(Line::from(vec![
             Span::raw("  Avg chunk  "),
             Span::styled(avg.clone(), Style::default().fg(theme::text())),
@@ -125,7 +125,7 @@ fn build_right_display(o: &SearchIndexOverlay) -> Vec<Line<'static>> {
 
 /// Push the Splitter section (tree-sitter vs fallback chunk counts) when present.
 fn push_splitter_section(lines: &mut Vec<Line<'static>>, o: &SearchIndexOverlay) {
-    let Some(sp) = &(o.splitter) else { return };
+    let Some(sp) = o.splitter.as_ref() else { return };
     lines.push(Line::from(""));
     lines.push(section_header("Splitter"));
     lines.push(Line::from(vec![
@@ -143,7 +143,7 @@ fn push_splitter_section(lines: &mut Vec<Line<'static>>, o: &SearchIndexOverlay)
 /// Push the Embeddings section (model, vectors, coverage, logs) when present.
 fn push_embeddings_section(lines: &mut Vec<Line<'static>>, o: &SearchIndexOverlay) {
     let sem = crate::ui::ir::semantic_to_style;
-    let Some(emb) = &(o.embeddings) else { return };
+    let Some(emb) = o.embeddings.as_ref() else { return };
     lines.push(Line::from(""));
     lines.push(section_header("Embeddings"));
     if !emb.model.is_empty() {

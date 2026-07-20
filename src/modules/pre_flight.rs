@@ -126,7 +126,7 @@ fn validate_schema(input: &serde_json::Value, params: &[ToolParam], result: &mut
             }
 
             // Enum check
-            if let Some(enum_vals) = &param.enum_values
+            if let Some(enum_vals) = param.enum_values.as_ref()
                 && let Some(s) = val.as_str()
                 && !enum_vals.iter().any(|e: &String| e == s)
             {
@@ -147,19 +147,19 @@ fn validate_schema(input: &serde_json::Value, params: &[ToolParam], result: &mut
 /// Lenient for arrays: a single value matching the inner type is accepted
 /// (common LLM mistake — sending `"path": "foo.rs"` instead of `"path": ["foo.rs"]`).
 fn check_type(value: &serde_json::Value, expected: &ParamType) -> bool {
-    match expected {
+    cp_base::deref_match!(expected, {
         ParamType::String => value.is_string(),
         ParamType::Integer => value.is_i64() || value.is_u64(),
         ParamType::Number => value.is_number(),
         ParamType::Boolean => value.is_boolean(),
-        ParamType::Array(inner) => value.is_array() || check_type(value, inner),
+        ParamType::Array(ref inner) => value.is_array() || check_type(value, inner),
         ParamType::Object(_) => value.is_object(),
-    }
+    })
 }
 
 /// Human-readable name for a `ParamType`.
 const fn type_name(pt: &ParamType) -> &'static str {
-    match pt {
+    match *pt {
         ParamType::String => "string",
         ParamType::Integer => "integer",
         ParamType::Number => "number",
@@ -171,7 +171,7 @@ const fn type_name(pt: &ParamType) -> &'static str {
 
 /// Human-readable name for a JSON value type.
 const fn json_type_name(val: &serde_json::Value) -> &'static str {
-    match val {
+    match *val {
         serde_json::Value::Null => "null",
         serde_json::Value::Bool(_) => "boolean",
         serde_json::Value::Number(_) => "number",

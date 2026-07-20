@@ -113,7 +113,7 @@ impl Panel for EntitiesPanel {
 
 /// Build the text sent to the LLM as context for the Entities panel.
 fn build_context_text(es: &EntitiesState) -> String {
-    let Some(cache) = &es.schema_cache else {
+    let Some(cache) = es.schema_cache.as_ref() else {
         return "Entity Database (empty)\n\nNo entity tables yet. Use entity_sql to create your schema.".to_owned();
     };
 
@@ -153,7 +153,7 @@ fn build_context_text(es: &EntitiesState) -> String {
         }
 
         // Sample data (3 rows, 50 char truncation, skip >10 columns)
-        if let Some(c) = &(conn) {
+        if let Some(c) = conn.as_ref() {
             let samples = db::sample_rows(c, &table.name, 3);
             if !samples.is_empty() {
                 for row in &samples {
@@ -205,7 +205,7 @@ fn table_blocks(table: &crate::types::TableInfo) -> Vec<Block> {
 
 /// Blocks for a populated database.
 fn populated_blocks(es: &EntitiesState) -> Vec<Block> {
-    let Some(cache) = &es.schema_cache else {
+    let Some(cache) = es.schema_cache.as_ref() else {
         return vec![Block::text("Entity Database (loading...)".to_owned())];
     };
 

@@ -13,7 +13,7 @@ use crate::types::CallbackState;
 /// Append the open-editor sub-view (warning banner + script body) to the
 /// markdown `lines`, if the editor is open for a known callback.
 fn append_editor_markdown(lines: &mut Vec<String>, cs: &CallbackState) {
-    let Some(editor_name) = &cs.editor_open else {
+    let Some(editor_name) = cs.editor_open.as_ref() else {
         return;
     };
     let Some(def) = cs.definitions.iter().find(|d| d.name == *editor_name) else {
@@ -125,7 +125,7 @@ fn definitions_table(cs: &CallbackState) -> cp_render::Block {
 /// `blocks`, if the editor is open for a known callback.
 fn append_editor_blocks(blocks: &mut Vec<cp_render::Block>, cs: &CallbackState) {
     use cp_render::{Block, Semantic, Span as S};
-    let Some(editor_name) = &cs.editor_open else {
+    let Some(editor_name) = cs.editor_open.as_ref() else {
         return;
     };
     let Some(def) = cs.definitions.iter().find(|d| d.name == *editor_name) else {

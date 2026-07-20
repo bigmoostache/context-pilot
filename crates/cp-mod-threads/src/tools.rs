@@ -335,7 +335,7 @@ fn write_message(output: &mut String, msg: &ThreadMessage, now_ms: u64) {
     } else {
         _ = writeln!(output, "      text: \"{}\"", yaml_escape(content));
     }
-    if let Some(fp) = &msg.file_path {
+    if let Some(fp) = msg.file_path.as_ref() {
         _ = writeln!(output, "      file: \"{}\"", yaml_escape(fp));
     }
 }

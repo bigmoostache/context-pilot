@@ -50,7 +50,7 @@ pub(crate) fn render_perf_overlay_from_ir(frame: &mut Frame<'_>, area: Rect, per
     ]));
 
     // Meilisearch process stats
-    if let Some(meili) = &(perf.meili) {
+    if let Some(meili) = perf.meili.as_ref() {
         lines.push(Line::from(vec![
             Span::styled(format!(" Meili CPU: {:.1}%", meili.cpu_pct), semantic_to_style(meili.cpu_semantic)),
             Span::styled(format!("  RAM: {:.1} MB", meili.memory_mb), semantic_to_style(Semantic::Muted)),

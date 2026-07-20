@@ -55,12 +55,10 @@ pub(super) fn build_stream_read_error(ctx: &StreamErrorContext<'_>) -> String {
         root_cause = format!("{s}");
         source = std::error::Error::source(s);
     }
-    let tool_ctx = match ctx.current_tool {
-        Some((id, name, partial)) => {
-            format!("In-flight tool: {} (id={}), partial input: {} bytes", name, id, partial.len())
-        }
-        None => "No tool in progress".to_owned(),
-    };
+    let tool_ctx = ctx.current_tool.map_or_else(
+        || "No tool in progress".to_owned(),
+        |tool| format!("In-flight tool: {} (id={}), partial input: {} bytes", tool.1, tool.0, tool.2.len()),
+    );
     let recent = if ctx.last_lines.is_empty() { "(no lines read)".to_owned() } else { ctx.last_lines.join("\n") };
     format!(
         "{}\n\

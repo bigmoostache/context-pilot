@@ -10,7 +10,7 @@ pub fn ensure_default_agent(state: &mut State) {
     let default_id = library::default_agent_id();
 
     let ps_mut = PromptState::get_mut(state);
-    if let Some(active_id) = &ps_mut.active_agent_id {
+    if let Some(active_id) = ps_mut.active_agent_id.as_ref() {
         if !agents.iter().any(|a| a.id == *active_id) {
             ps_mut.active_agent_id = Some(default_id.to_owned());
         }
@@ -25,7 +25,7 @@ pub fn ensure_default_agent(state: &mut State) {
 pub fn get_active_agent_content(state: &State) -> String {
     let ps = PromptState::get(state);
     let agents = crate::storage::load_prompts_for(PromptType::Agent);
-    if let Some(active_id) = &ps.active_agent_id
+    if let Some(active_id) = ps.active_agent_id.as_ref()
         && let Some(agent) = agents.iter().find(|a| &a.id == active_id)
     {
         return agent.content.clone();

@@ -40,6 +40,33 @@
 //! GC grace rule, and the off-loop group-commit service with asymmetric
 //! backpressure. The bridge body store arrives in a later phase.
 
+/// Match a shared reference with explicit `&` patterns, funneling this crate's
+/// `ref`-binding suppression into a single audited site.
+///
+/// `clippy::pattern_type_mismatch` (forbid) rejects matching a variant pattern
+/// against a `&Enum` via match ergonomics. The mandated fix is to write
+/// explicit `&Variant { ref field }` patterns — but binding a non-`Copy` field
+/// out of the reference then needs `ref`, which `clippy::ref_patterns` (deny)
+/// rejects. The two restriction lints are mutually exclusive for a read-only
+/// match over a borrowed enum. cp-oplog is foundational (depends only on
+/// `cp_wire` + std) and cannot reach cp-base's `deref_match!`, so every such
+/// site routes through this local macro — its single ref-pattern suppression
+/// covers all expansions.
+///
+/// The scrutinee is matched as-is (no deref); the caller supplies `&`-prefixed
+/// patterns with `ref` on the non-`Copy` bindings.
+#[macro_export]
+macro_rules! ref_match {
+    ($place:expr, { $($arm:tt)* }) => {{
+        #[expect(
+            clippy::ref_patterns,
+            clippy::needless_borrowed_reference,
+            reason = "cp-oplog is foundational (only cp_wire + std); clippy::pattern_type_mismatch mandates explicit &-patterns with ref bindings for a read-only match over a borrowed enum and the two restriction lints are mutually exclusive, so every such site funnels through this one local macro"
+        )]
+        match $place { $($arm)* }
+    }};
+}
+
 pub mod append;
 pub mod compact;
 pub mod error;

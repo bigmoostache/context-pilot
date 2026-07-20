@@ -122,7 +122,7 @@ pub(crate) fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolRes
 
     // Signal to the event loop that a reverie should be started.
     // Sentinel format: REVERIE_START:<agent_id>\n<context_or_empty>\n<human_readable_msg>
-    let msg = match &context {
+    let msg = match context.as_deref() {
         Some(c) if !c.is_empty() => format!(
             "Context optimizer activated with directive: \"{c}\". It will run in the background and report when done."
         ),

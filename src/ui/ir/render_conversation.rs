@@ -107,10 +107,17 @@ pub(crate) fn render_autocomplete_if_active(
     content_area: Rect,
     overlays: &[cp_render::conversation::Overlay],
 ) {
-    let Some(ac) = overlays
-        .iter()
-        .find_map(|o| if let cp_render::conversation::Overlay::Autocomplete(a) = o { Some(a) } else { None })
-    else {
+    let Some(ac) = overlays.iter().find_map(|o| {
+        cp_base::deref_match!(o, {
+            cp_render::conversation::Overlay::Autocomplete(ref a) => Some(a),
+            cp_render::conversation::Overlay::QuestionForm(_)
+            | cp_render::conversation::Overlay::Perf(_)
+            | cp_render::conversation::Overlay::Config(_)
+            | cp_render::conversation::Overlay::CommandPalette(_)
+            | cp_render::conversation::Overlay::SearchIndex(_)
+            | _ => None,
+        })
+    }) else {
         return;
     };
     super::super::help::input::render_autocomplete_popup(frame, ac, content_area);

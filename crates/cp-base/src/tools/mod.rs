@@ -153,26 +153,26 @@ pub enum ParamType {
 impl ParamType {
     /// Emit the JSON Schema representation (recursive for nested types).
     fn to_json_schema(&self) -> Value {
-        match self {
+        crate::deref_match!(self, {
             Self::String => json!({"type": "string"}),
             Self::Integer => json!({"type": "integer"}),
             Self::Number => json!({"type": "number"}),
             Self::Boolean => json!({"type": "boolean"}),
-            Self::Array(inner) => json!({
+            Self::Array(ref inner) => json!({
                 "type": "array",
                 "items": inner.to_json_schema()
             }),
-            Self::Object(params) => {
+            Self::Object(ref params) => {
                 let mut properties = serde_json::Map::new();
                 let mut required = Vec::new();
                 for param in params {
                     let mut schema = param.param_type.to_json_schema();
-                    if let Some(desc) = &param.description
+                    if let Some(desc) = param.description.as_ref()
                         && let Some(obj) = schema.as_object_mut()
                     {
                         drop(obj.insert("description".to_owned(), json!(desc)));
                     }
-                    if let Some(enum_vals) = &param.enum_values
+                    if let Some(enum_vals) = param.enum_values.as_ref()
                         && let Some(obj) = schema.as_object_mut()
                     {
                         drop(obj.insert("enum".to_owned(), json!(enum_vals)));
@@ -188,7 +188,7 @@ impl ParamType {
                     "required": required
                 })
             }
-        }
+        })
     }
 }
 
@@ -306,12 +306,12 @@ impl ToolDefinition {
 
         for param in &self.params {
             let mut schema = param.param_type.to_json_schema();
-            if let Some(desc) = &param.description
+            if let Some(desc) = param.description.as_ref()
                 && let Some(obj) = schema.as_object_mut()
             {
                 drop(obj.insert("description".to_owned(), json!(desc)));
             }
-            if let Some(enum_vals) = &param.enum_values
+            if let Some(enum_vals) = param.enum_values.as_ref()
                 && let Some(obj) = schema.as_object_mut()
             {
                 drop(obj.insert("enum".to_owned(), json!(enum_vals)));

@@ -68,17 +68,17 @@ pub(crate) const CRAWL_MAX_POLLS: u32 = 60;
 
 /// Append the `## Metadata` section (title / description / URL) when present.
 fn push_scrape_metadata(content: &mut String, data: &crate::types::ScrapeData) {
-    let Some(meta) = &(data.metadata) else {
+    let Some(meta) = data.metadata.as_ref() else {
         return;
     };
     content.push_str("## Metadata\n\n");
-    if let Some(t) = &(meta.title) {
+    if let Some(t) = meta.title.as_ref() {
         let _r = writeln!(content, "**Title:** {t}");
     }
-    if let Some(d) = &(meta.description) {
+    if let Some(d) = meta.description.as_ref() {
         let _r = writeln!(content, "**Description:** {d}");
     }
-    if let Some(u) = &(meta.source_url) {
+    if let Some(u) = meta.source_url.as_ref() {
         let _r = writeln!(content, "**URL:** {u}");
     }
     content.push('\n');
@@ -88,12 +88,12 @@ fn push_scrape_metadata(content: &mut String, data: &crate::types::ScrapeData) {
 fn build_scrape_panel_content(data: &crate::types::ScrapeData) -> String {
     let mut content = String::new();
     push_scrape_metadata(&mut content, data);
-    if let Some(md) = &(data.markdown) {
+    if let Some(md) = data.markdown.as_ref() {
         content.push_str("## Content\n\n");
         content.push_str(md);
         content.push_str("\n\n");
     }
-    if let Some(links) = &data.links
+    if let Some(links) = data.links.as_ref()
         && !links.is_empty()
     {
         content.push_str("## Links\n\n");
@@ -180,16 +180,16 @@ fn build_search_results_content(results: &[crate::types::SearchResult]) -> Strin
         let page_title = result.title.as_deref().unwrap_or("untitled");
         let page_url = result.url.as_deref().unwrap_or("unknown");
         let _r1 = write!(content, "## Result {} — {} ({})\n\n", i.saturating_add(1), page_title, page_url);
-        if let Some(md) = &(result.markdown) {
+        if let Some(md) = result.markdown.as_ref() {
             content.push_str(md);
             content.push_str("\n\n");
-        } else if let Some(desc) = &(result.description) {
+        } else if let Some(desc) = result.description.as_ref() {
             content.push_str(desc);
             content.push_str("\n\n");
         } else {
             // Neither markdown nor description present — nothing to append.
         }
-        if let Some(links) = &result.links
+        if let Some(links) = result.links.as_ref()
             && !links.is_empty()
         {
             content.push_str("**Links:**\n");

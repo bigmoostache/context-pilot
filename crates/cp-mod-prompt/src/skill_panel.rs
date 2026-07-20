@@ -85,7 +85,7 @@ impl Panel for SkillPanel {
             .context
             .iter()
             .enumerate()
-            .filter(|(_, c)| c.context_type == Kind::new(Kind::SKILL))
+            .filter(|entry| entry.1.context_type == Kind::new(Kind::SKILL))
             .filter_map(|(idx, c)| c.get_meta_str("skill_prompt_id").map(|sid| (sid.to_owned(), idx)))
             .collect();
 
@@ -95,11 +95,13 @@ impl Panel for SkillPanel {
         // Update cached content for each loaded skill
         let updates: Vec<(usize, String, usize)> = skills
             .iter()
-            .filter_map(|(skill_id, idx)| {
+            .filter_map(|entry| {
+                let skill_id = &entry.0;
+                let idx = entry.1;
                 all_skills.iter().find(|s| s.id == *skill_id).map(|skill| {
                     let content = format!("[{}] {}\n\n{}", skill.id, skill.name, skill.content);
                     let tokens = estimate_tokens(&content);
-                    (*idx, content, tokens)
+                    (idx, content, tokens)
                 })
             })
             .collect();
@@ -120,7 +122,7 @@ impl Panel for SkillPanel {
         let mut items = Vec::new();
         for ctx in &state.context {
             if ctx.context_type == Kind::new(Kind::SKILL)
-                && let Some(content) = &ctx.cached_content
+                && let Some(content) = ctx.cached_content.as_ref()
             {
                 items.push(ContextItem::new(&ctx.id, &ctx.name, content.clone(), ctx.last_refresh_ms));
             }

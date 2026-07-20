@@ -174,7 +174,7 @@ impl LlmClient for ClaudeCodeApiKeyClient {
             };
 
         // Handle cleaner mode extra context
-        if let Some(context) = &(request.extra_context) {
+        if let Some(context) = request.extra_context.as_ref() {
             let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace(concat!("{", "context", "}"), context);
             json_messages.push(serde_json::json!({
                 "role": "user",
@@ -183,7 +183,7 @@ impl LlmClient for ClaudeCodeApiKeyClient {
         }
 
         // Add pending tool results
-        if let Some(results) = &request.tool_results {
+        if let Some(results) = request.tool_results.as_ref() {
             let tool_results: Vec<Value> = results
                 .iter()
                 .map(|r: &crate::infra::tools::ToolResult| {

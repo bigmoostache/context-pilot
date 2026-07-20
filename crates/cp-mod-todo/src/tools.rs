@@ -34,7 +34,7 @@ fn create_one_todo(todo_value: &serde_json::Value, state: &mut State) -> Result<
 
     // Validate parent exists if specified.
     let ts = TodoState::get(state);
-    if let Some(pid) = &parent_id
+    if let Some(pid) = parent_id.as_ref()
         && !ts.todos.iter().any(|t| t.id == *pid)
     {
         let available: Vec<&str> = ts.todos.iter().map(|t| t.id.as_str()).collect();
@@ -238,17 +238,17 @@ fn apply_field_updates(t: &mut TodoItem, update_value: &serde_json::Value, paren
         desc.clone_into(&mut t.description);
         changes.push("description");
     }
-    match parent {
+    cp_base::deref_match!(parent, {
         ParentUpdate::Unchanged => {}
         ParentUpdate::Detach => {
             t.parent_id = None;
             changes.push("parent");
         }
-        ParentUpdate::Reparent(pid) => {
+        ParentUpdate::Reparent(ref pid) => {
             t.parent_id = Some(pid.clone());
             changes.push("parent");
         }
-    }
+    });
     if let Some(status) = update_value.get("status").and_then(|v| v.as_str()).and_then(|s| s.parse::<TodoStatus>().ok())
     {
         t.status = status;
@@ -268,7 +268,7 @@ fn propagate_in_progress(updates: &[serde_json::Value], state: &mut State) -> Ve
         {
             let ts = TodoState::get_mut(state);
             let mut current_id = ts.todos.iter().find(|t| t.id == id).and_then(|t| t.parent_id.clone());
-            while let Some(pid) = &current_id {
+            while let Some(pid) = current_id.as_ref() {
                 let Some(parent) = ts.todos.iter_mut().find(|t| t.id == *pid) else {
                     break;
                 };

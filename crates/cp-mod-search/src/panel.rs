@@ -99,7 +99,7 @@ impl Panel for SearchResultPanel {
             return vec![Block::styled_text(" No search result panel".into(), Semantic::Muted)];
         };
 
-        let Some(content) = &ctx.cached_content else {
+        let Some(content) = ctx.cached_content.as_ref() else {
             return vec![Block::Line(vec![Span::muted(" Loading...".into()).italic()])];
         };
 
@@ -269,7 +269,7 @@ pub(crate) fn format_results(query: &str, output: &SearchOutput<'_>, hide_conten
 fn build_chunk_value(chunk: &SearchResult, hide_contents: bool) -> serde_json::Value {
     let mut obj = serde_json::Map::new();
     drop(obj.insert("type".into(), serde_json::Value::String(chunk.chunk_type.as_deref().unwrap_or("raw").to_owned())));
-    if let Some(name) = &chunk.chunk_name
+    if let Some(name) = chunk.chunk_name.as_ref()
         && !name.is_empty()
     {
         drop(obj.insert("name".into(), serde_json::Value::String(name.clone())));
@@ -292,13 +292,13 @@ fn build_chunk_value(chunk: &SearchResult, hide_contents: bool) -> serde_json::V
 /// Build a JSON value for a single log result.
 fn build_log_value(r: &SearchResult, hide_contents: bool) -> serde_json::Value {
     let mut obj = serde_json::Map::new();
-    if let Some(id) = &(r.log_id) {
+    if let Some(id) = r.log_id.as_ref() {
         drop(obj.insert("id".into(), serde_json::Value::String(id.clone())));
     }
-    if let Some(dt) = &(r.datetime) {
+    if let Some(dt) = r.datetime.as_ref() {
         drop(obj.insert("datetime".into(), serde_json::Value::String(dt.clone())));
     }
-    if let Some(imp) = &(r.importance) {
+    if let Some(imp) = r.importance.as_ref() {
         drop(obj.insert("importance".into(), serde_json::Value::String(imp.clone())));
     }
     if let Some(score) = r.ranking_score {

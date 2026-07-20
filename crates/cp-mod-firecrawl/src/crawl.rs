@@ -121,7 +121,7 @@ fn write_crawl_output(url: &str, output: &std::path::Path, status: crate::types:
         let title = page.metadata.as_ref().and_then(|m| m.title.as_deref()).unwrap_or("untitled");
         let page_url = page.metadata.as_ref().and_then(|m| m.source_url.as_deref()).unwrap_or("unknown");
         writeln!(md, "## Page {} — {} ({})\n", i.saturating_add(1), title, page_url).unwrap_or(());
-        if let Some(content) = &(page.markdown) {
+        if let Some(content) = page.markdown.as_ref() {
             md.push_str(content);
             md.push_str("\n\n");
         }

@@ -63,7 +63,7 @@ impl App {
     /// Mutates `Suggestions` and state.input directly.
     pub(super) fn handle_autocomplete_event(&mut self, event: &event::Event) {
         use crossterm::event::{KeyCode, KeyModifiers};
-        let event::Event::Key(key) = event else { return };
+        let &event::Event::Key(key) = event else { return };
 
         let Some(ac) = self.state.get_ext_mut::<cp_base::state::autocomplete::Suggestions>() else { return };
 
@@ -234,7 +234,7 @@ impl App {
     pub(super) fn handle_palette_event(&mut self, event: &event::Event) -> Option<Action> {
         use crossterm::event::{KeyCode, KeyModifiers};
 
-        let event::Event::Key(key) = event else {
+        let &event::Event::Key(key) = event else {
             return Some(Action::None);
         };
 

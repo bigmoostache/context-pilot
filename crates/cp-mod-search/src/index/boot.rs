@@ -103,7 +103,7 @@ pub(crate) fn spawn_indexer_pipeline(
         }
     };
 
-    if let Some(tx) = &indexer_tx {
+    if let Some(tx) = indexer_tx.as_ref() {
         inject_reconcile_delta(tx, project_path, reconcile_plan);
     }
 

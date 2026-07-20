@@ -73,10 +73,12 @@ fn build_virtual_content(disk_content: &str, canonical_path: &str, state: &State
 /// already open in context.
 fn preflight_open(tool: &ToolUse, state: &State) -> Verdict {
     let mut pf = Verdict::new();
-    let paths: Vec<String> = match tool.input.get("path") {
-        Some(serde_json::Value::String(s)) => vec![s.clone()],
-        Some(serde_json::Value::Array(arr)) => arr.iter().filter_map(|v| v.as_str().map(String::from)).collect(),
-        _ => return pf,
+    let paths: Vec<String> = if let Some(s) = tool.input.get("path").and_then(serde_json::Value::as_str) {
+        vec![s.to_owned()]
+    } else if let Some(arr) = tool.input.get("path").and_then(serde_json::Value::as_array) {
+        arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()
+    } else {
+        return pf;
     };
     for path in &paths {
         let p = std::path::Path::new(path);

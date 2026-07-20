@@ -126,7 +126,7 @@ where
         let _r = tx.send(result);
     });
 
-    if let Err(e) = &handle {
+    if let Err(e) = handle.as_ref() {
         // Thread spawn failed — return error synchronously
         return ToolResult {
             tool_use_id: tool.id.clone(),

@@ -87,7 +87,7 @@ fn build_reverie_seed(state: &State, agent_id: &str, tool_restrictions: &str) ->
 
     // Additional context (directive from optimize_context tool)
     if let Some(rev_state) = state.reveries.get(agent_id)
-        && let Some(ctx) = &rev_state.context
+        && let Some(ctx) = rev_state.context.as_ref()
     {
         seed.push_str("\n## Directive\n");
         seed.push_str(ctx);

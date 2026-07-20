@@ -43,7 +43,7 @@ fn push_retry_loading(spans: &mut Vec<Span<'static>>, status: &StatusBar, spin: 
 
 /// Stop-reason + agent + skill cards.
 fn push_stop_agent_skills(spans: &mut Vec<Span<'static>>, status: &StatusBar, base: Style) {
-    if let Some(sr) = &(status.stop_reason) {
+    if let Some(sr) = status.stop_reason.as_ref() {
         let label = sr.reason.to_uppercase();
         let style = if sr.semantic == Semantic::Error {
             Style::default().fg(theme::bg_base()).bg(theme::error()).bold()
@@ -52,7 +52,7 @@ fn push_stop_agent_skills(spans: &mut Vec<Span<'static>>, status: &StatusBar, ba
         };
         push_card(spans, format!(" {label} "), style, base);
     }
-    if let Some(agent) = &(status.agent) {
+    if let Some(agent) = status.agent.as_ref() {
         push_card(
             spans,
             format!(" 🤖 {} ", agent.name),
@@ -72,7 +72,7 @@ fn push_stop_agent_skills(spans: &mut Vec<Span<'static>>, status: &StatusBar, ba
 
 /// Git branch + additions/deletions/net changes.
 fn push_git(spans: &mut Vec<Span<'static>>, status: &StatusBar, base: Style) {
-    let Some(git) = &(status.git) else {
+    let Some(git) = status.git.as_ref() else {
         return;
     };
     push_card(spans, format!(" {} ", git.branch), Style::default().fg(theme::card_text()).bg(theme::accent()), base);
@@ -94,7 +94,7 @@ fn push_git(spans: &mut Vec<Span<'static>>, status: &StatusBar, base: Style) {
 
 /// Auto-continue + reverie + queue + think cards.
 fn push_activity_cards(spans: &mut Vec<Span<'static>>, status: &StatusBar, spin: &str, base: Style) {
-    if let Some(ac) = &(status.auto_continue) {
+    if let Some(ac) = status.auto_continue.as_ref() {
         let (icon, bg_color) = if ac.max.is_some() {
             (normalize_icon("\u{1f501}"), theme::warning())
         } else {
@@ -113,7 +113,7 @@ fn push_activity_cards(spans: &mut Vec<Span<'static>>, status: &StatusBar, spin:
         );
     }
 
-    if let Some(queue) = &(status.queue) {
+    if let Some(queue) = status.queue.as_ref() {
         push_card(
             spans,
             format!(" ⏳ Queue ({}) ", queue.count),
@@ -122,7 +122,7 @@ fn push_activity_cards(spans: &mut Vec<Span<'static>>, status: &StatusBar, spin:
         );
     }
 
-    if let Some(think) = &(status.think) {
+    if let Some(think) = status.think.as_ref() {
         push_card(
             spans,
             format!(" 🧠 Think ({}) ", think.balance),

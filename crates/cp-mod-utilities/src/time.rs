@@ -379,7 +379,7 @@ fn parse_tz_suffix(tz_part: &str) -> Option<i32> {
         return Some(0);
     }
 
-    let sign: i32 = match tz.as_bytes().first()? {
+    let sign: i32 = match tz.as_bytes().first().copied()? {
         b'+' => 1,
         b'-' => -1,
         _ => return None,
@@ -415,7 +415,7 @@ fn parse_tz_offset(s: &str) -> Option<i32> {
     if s.len() < 5 {
         return None;
     }
-    let sign: i32 = match s.as_bytes().first()? {
+    let sign: i32 = match s.as_bytes().first().copied()? {
         b'+' => 1,
         b'-' => -1,
         _ => return None,

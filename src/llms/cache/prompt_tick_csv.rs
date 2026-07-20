@@ -25,16 +25,16 @@ fn rolling_cleanup_csvs(dir: &std::path::Path) {
 
 /// Classify one content block into `(block_type, context, raw_text)` for the CSV.
 fn block_to_row<'blk>(block: &'blk ContentBlock, role: &str) -> (&'static str, String, &'blk str) {
-    match block {
-        ContentBlock::Text { text } => ("text", classify_text_context(text, role), text.as_str()),
-        ContentBlock::ToolUse { id, name, .. } => {
+    cp_base::deref_match!(block, {
+        ContentBlock::Text { ref text } => ("text", classify_text_context(text, role), text.as_str()),
+        ContentBlock::ToolUse { ref id, ref name, .. } => {
             let ctx = if name == "dynamic_panel" { format!("panel_call:{id}") } else { format!("tool_use:{name}") };
             ("tool_use", ctx, name.as_str())
         }
-        ContentBlock::ToolResult { tool_use_id, content } => {
+        ContentBlock::ToolResult { ref tool_use_id, ref content } => {
             ("tool_result", tool_result_context(tool_use_id, content), content.as_str())
         }
-    }
+    })
 }
 
 /// Build the context label for a `ToolResult` block (panel-aware).

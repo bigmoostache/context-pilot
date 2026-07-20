@@ -28,7 +28,7 @@ pub(super) fn schedule_initial_cache_refreshes(app: &mut App) {
         .context
         .iter()
         .enumerate()
-        .filter(|(_, ctx)| ctx.context_type.is_fixed())
+        .filter(|entry| entry.1.context_type.is_fixed())
         .filter_map(|(i, ctx)| {
             let panel = crate::app::panels::get_panel(&ctx.context_type);
             panel.build_cache_request(ctx, &app.state).map(|req| (i, req))
@@ -50,8 +50,8 @@ pub(super) fn process_cache_updates(app: &mut App, cache_rx: &Receiver<CacheUpda
 /// Apply an `Unchanged` cache update: clear the in-flight + deprecated flags.
 /// Returns `true` when the update was of this kind (caller should skip on).
 fn apply_unchanged_update(state: &mut State, update: &CacheUpdate) -> bool {
-    let CacheUpdate::Unchanged { context_id } = update else { return false };
-    if let Some(ctx) = state.context.iter_mut().find(|c| c.id == *context_id) {
+    let Some(context_id) = update.unchanged_context_id() else { return false };
+    if let Some(ctx) = state.context.iter_mut().find(|c| c.id == context_id) {
         ctx.cache_in_flight = false;
         ctx.cache_deprecated = false;
     }
@@ -61,8 +61,8 @@ fn apply_unchanged_update(state: &mut State, update: &CacheUpdate) -> bool {
 /// Apply a `ModuleSpecific` cache update (matched by context type). On a type
 /// mismatch, hands the update back via `Err` for the `Content` path.
 fn apply_module_specific_update(state: &mut State, update: CacheUpdate) -> Result<(), CacheUpdate> {
-    let CacheUpdate::ModuleSpecific { context_type, .. } = &update else { return Err(update) };
-    let Some(idx) = state.context.iter().position(|c| c.context_type == *context_type) else { return Ok(()) };
+    let Some(context_type) = update.module_specific_type().cloned() else { return Err(update) };
+    let Some(idx) = state.context.iter().position(|c| c.context_type == context_type) else { return Ok(()) };
     let mut ctx = state.context.remove(idx);
     let panel = crate::app::panels::get_panel(&ctx.context_type);
     let _changed = panel.apply_cache_update(update, &mut ctx, state);
@@ -74,8 +74,8 @@ fn apply_module_specific_update(state: &mut State, update: CacheUpdate) -> Resul
 
 /// Apply a `Content` cache update (matched by context id).
 fn apply_content_update(state: &mut State, update: CacheUpdate) {
-    let CacheUpdate::Content { context_id, .. } = &update else { return };
-    let Some(idx) = state.context.iter().position(|c| c.id == *context_id) else { return };
+    let Some(context_id) = update.content_context_id() else { return };
+    let Some(idx) = state.context.iter().position(|c| c.id == context_id) else { return };
     let mut ctx = state.context.remove(idx);
     let panel = crate::app::panels::get_panel(&ctx.context_type);
     // apply_cache_update calls update_if_changed which sets last_refresh_ms on change
@@ -126,10 +126,10 @@ fn collect_invalidations(app: &mut App, events: &[WatchEvent]) -> (Vec<usize>, V
     let mut refresh_indices = Vec::new();
     let mut rewatch_paths: Vec<String> = Vec::new();
     for event in events {
-        let (path, is_dir_event) = match event {
-            WatchEvent::FileChanged(p) => (p, false),
-            WatchEvent::DirChanged(p) => (p, true),
-        };
+        let (path, is_dir_event) = cp_base::deref_match!(event, {
+            WatchEvent::FileChanged(ref p) => (p, false),
+            WatchEvent::DirChanged(ref p) => (p, true),
+        });
         refresh_indices.extend(invalidate_matching_panels(app, path, is_dir_event));
         if !is_dir_event {
             rewatch_paths.push(path.clone());
@@ -162,7 +162,7 @@ fn dispatch_refresh_requests(app: &mut App, mut refresh_indices: Vec<usize>) {
 /// Third pass: re-watch files to pick up new inodes after atomic rename
 /// (editors like vim/vscode save via rename, invalidating the inotify watch).
 fn rewatch_changed_files(app: &mut App, rewatch_paths: Vec<String>) {
-    if let Some(watcher) = &mut app.file_watcher {
+    if let Some(watcher) = app.file_watcher.as_mut() {
         for path in rewatch_paths {
             let _r = watcher.rewatch_file(&path);
         }
@@ -175,7 +175,7 @@ pub(super) fn process_watcher_events(app: &mut App) {
     let _fg = cp_base::flame!("watcher_events");
     // Collect events (immutable borrow on file_watcher released after this block)
     let events = {
-        let Some(watcher) = &app.file_watcher else { return };
+        let Some(watcher) = app.file_watcher.as_ref() else { return };
         watcher.poll_events()
     };
     if events.is_empty() {
@@ -332,7 +332,7 @@ fn remove_stale_watches(
     wanted_files: &std::collections::BTreeSet<String>,
     wanted_dirs: &std::collections::BTreeSet<String>,
 ) {
-    let Some(watcher) = &mut app.file_watcher else { return };
+    let Some(watcher) = app.file_watcher.as_mut() else { return };
     let stale_files: Vec<String> =
         app.watched_file_paths.iter().filter(|p| !wanted_files.contains(*p)).cloned().collect();
     for path in &stale_files {
@@ -348,7 +348,7 @@ fn remove_stale_watches(
 
 /// Add file watches for newly-wanted files not already watched.
 fn add_file_watches(app: &mut App, wanted_files: std::collections::BTreeSet<String>) {
-    let Some(watcher) = &mut app.file_watcher else { return };
+    let Some(watcher) = app.file_watcher.as_mut() else { return };
     for path in wanted_files {
         if !app.watched_file_paths.contains(&path) && watcher.watch_file(&path).is_ok() {
             let _r = app.watched_file_paths.insert(path);
@@ -360,7 +360,7 @@ fn add_file_watches(app: &mut App, wanted_files: std::collections::BTreeSet<Stri
 /// (re-scans module specs since recursion isn't captured in the wanted set).
 fn add_dir_watches(app: &mut App) {
     use cp_base::panels::WatchSpec;
-    let Some(watcher) = &mut app.file_watcher else { return };
+    let Some(watcher) = app.file_watcher.as_mut() else { return };
     for module in &crate::modules::all_modules() {
         for spec in module.watch_paths(&app.state) {
             match spec {

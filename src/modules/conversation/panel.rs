@@ -75,7 +75,7 @@ impl ConversationPanel {
         }
 
         // Hash streaming tool state (invalidate when tool preview changes)
-        if let Some(st) = &(state.streaming_tool) {
+        if let Some(st) = state.streaming_tool.as_ref() {
             std::hash::Hash::hash(&st.name, &mut hasher);
             std::hash::Hash::hash(&st.input_so_far, &mut hasher);
         }
@@ -96,7 +96,7 @@ impl ConversationPanel {
         history_panels.sort_by_key(|c| c.last_refresh_ms);
 
         for ctx in &history_panels {
-            let Some(msgs) = &ctx.history_messages else { continue };
+            let Some(msgs) = ctx.history_messages.as_ref() else { continue };
             // Separator header
             blocks.push(Block::line(vec![
                 cp_render::Span::styled(format!("── {} ──", ctx.name), cp_render::Semantic::Muted).bold(),
@@ -225,7 +225,7 @@ impl ConversationPanel {
         }
 
         // Streaming tool preview (between messages and input)
-        if let Some(streaming_tool) = &(state.streaming_tool) {
+        if let Some(streaming_tool) = state.streaming_tool.as_ref() {
             blocks.extend(render_blocks::render_streaming_tool_blocks(
                 &streaming_tool.name,
                 &streaming_tool.input_so_far,
@@ -245,7 +245,7 @@ impl ConversationPanel {
         let full_hash = Self::compute_full_content_hash(state, viewport_width);
 
         // Check full content cache first - if valid, return immediately
-        if let Some(cached) = &state.full_content_cache
+        if let Some(cached) = state.full_content_cache.as_ref()
             && cached.content_hash == full_hash
         {
             return cached.blocks.to_vec();

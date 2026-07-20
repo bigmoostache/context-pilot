@@ -143,7 +143,7 @@ impl Panel for TreePanel {
         // Find tree context and use cached content
         for ctx in &state.context {
             if ctx.context_type.as_str() == Kind::TREE {
-                if let Some(content) = &ctx.cached_content
+                if let Some(content) = ctx.cached_content.as_ref()
                     && !content.is_empty()
                 {
                     let output = paginate_content(content, ctx.current_page, ctx.total_pages, &ctx.page_descriptions);

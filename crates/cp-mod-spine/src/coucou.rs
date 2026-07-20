@@ -43,7 +43,7 @@ impl CoucouData {
     /// Convert into a live `CoucouWatcher` and register in `WatcherRegistry`.
     pub(crate) fn into_watcher(self) -> CoucouWatcher {
         let recurrence_suffix = self.recurrence_label.as_deref().map_or(String::new(), |r| format!(" [{r}]"));
-        let desc = if let Some(tid) = &self.thread_id {
+        let desc = if let Some(tid) = self.thread_id.as_ref() {
             format!("🔔 Coucou (thread {tid}): \"{}\"{recurrence_suffix}", self.message)
         } else {
             format!("🔔 Coucou: \"{}\"{recurrence_suffix}", self.message)

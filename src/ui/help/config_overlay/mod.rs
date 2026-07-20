@@ -139,11 +139,11 @@ fn render_toggles_section(lines: &mut Vec<Line<'_>>, config: &ConfigOverlay) {
             Span::styled(toggle.value_display.clone(), Style::default().fg(color).bold()),
         ];
 
-        if let Some((k1, k2)) = &toggle.adjust_keys {
+        if let Some(keys) = toggle.adjust_keys.as_ref() {
             spans.push(Span::styled("  (press ", Style::default().fg(theme::text_muted())));
-            spans.push(Span::styled(k1.clone(), Style::default().fg(theme::warning())));
+            spans.push(Span::styled(keys.0.clone(), Style::default().fg(theme::warning())));
             spans.push(Span::styled("/", Style::default().fg(theme::text_muted())));
-            spans.push(Span::styled(k2.clone(), Style::default().fg(theme::warning())));
+            spans.push(Span::styled(keys.1.clone(), Style::default().fg(theme::warning())));
             spans.push(Span::styled(" to adjust)", Style::default().fg(theme::text_muted())));
         } else if !toggle.key_hint.is_empty() {
             spans.push(Span::styled("  (press ", Style::default().fg(theme::text_muted())));

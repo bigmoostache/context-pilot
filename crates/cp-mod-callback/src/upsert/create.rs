@@ -133,7 +133,7 @@ fn create_success_message(final_id: &str, params: &CreateParams) -> String {
         pattern = params.pattern,
         blocking = params.blocking,
     );
-    if let Some(sm) = &params.success_message {
+    if let Some(sm) = params.success_message.as_ref() {
         let _r = write!(msg, "\n  Success message: {sm}");
     }
     if let Some(t) = params.timeout_secs {
@@ -231,7 +231,7 @@ fn has_singular_env_var(script: &str) -> bool {
     while let Some(pos) = script.get(start..).unwrap_or("").find(needle) {
         let abs_pos = start.saturating_add(pos).saturating_add(needle.len());
         // If the next char is 'S' or 's', this is actually $CP_CHANGED_FILES — skip it
-        match script.as_bytes().get(abs_pos) {
+        match script.as_bytes().get(abs_pos).copied() {
             Some(b'S' | b's') => {
                 start = abs_pos;
             }

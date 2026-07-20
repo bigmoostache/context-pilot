@@ -94,7 +94,7 @@ impl ClaudeCodeV2Client {
             };
 
         // Cleaner mode extra context
-        if let Some(context) = &(request.extra_context) {
+        if let Some(context) = request.extra_context.as_ref() {
             let msg = cp_base::config::INJECTIONS
                 .providers
                 .cleaner_mode
@@ -107,7 +107,7 @@ impl ClaudeCodeV2Client {
         }
 
         // Pending tool results
-        if let Some(results) = &request.tool_results {
+        if let Some(results) = request.tool_results.as_ref() {
             let tool_results: Vec<Value> = results
                 .iter()
                 .map(|r| {

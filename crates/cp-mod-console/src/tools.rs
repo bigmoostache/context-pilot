@@ -112,10 +112,10 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     ctx.set_meta("console_name", &session_key);
     ctx.set_meta("console_command", &command);
     ctx.set_meta("console_status", &handle.get_status().label());
-    if let Some(desc) = &description {
+    if let Some(desc) = description.as_ref() {
         ctx.set_meta("console_description", desc);
     }
-    if let Some(dir) = &cwd {
+    if let Some(dir) = cwd.as_ref() {
         ctx.set_meta("console_cwd", dir);
     }
     state.context.push(ctx);

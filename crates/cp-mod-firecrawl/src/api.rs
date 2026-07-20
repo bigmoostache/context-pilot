@@ -111,7 +111,7 @@ impl FirecrawlClient {
             "formats": p.formats,
         });
 
-        if let (Some(country), Some(langs)) = (&p.country, &p.languages)
+        if let (Some(country), Some(langs)) = (p.country.as_ref(), p.languages.as_ref())
             && let Some(obj) = body.as_object_mut()
         {
             drop(obj.insert(
@@ -144,7 +144,7 @@ impl FirecrawlClient {
             if !p.sources.is_empty() {
                 drop(obj.insert("sources".into(), serde_json::json!(p.sources)));
             }
-            if let Some(cats) = &(p.categories) {
+            if let Some(cats) = p.categories.as_ref() {
                 drop(obj.insert("categories".into(), serde_json::json!(cats)));
             }
             if let Some(tbs) = p.tbs {
@@ -174,7 +174,7 @@ impl FirecrawlClient {
             if let Some(search) = p.search {
                 drop(obj.insert("search".into(), serde_json::json!(search)));
             }
-            if let (Some(country), Some(langs)) = (&p.country, &p.languages) {
+            if let (Some(country), Some(langs)) = (p.country.as_ref(), p.languages.as_ref()) {
                 drop(obj.insert(
                     "location".into(),
                     serde_json::json!({
@@ -207,10 +207,10 @@ impl FirecrawlClient {
             if let Some(depth) = p.max_depth {
                 drop(obj.insert("maxDepth".into(), serde_json::json!(depth)));
             }
-            if let Some(paths) = &(p.include_paths) {
+            if let Some(paths) = p.include_paths.as_ref() {
                 drop(obj.insert("includePaths".into(), serde_json::json!(paths)));
             }
-            if let Some(paths) = &(p.exclude_paths) {
+            if let Some(paths) = p.exclude_paths.as_ref() {
                 drop(obj.insert("excludePaths".into(), serde_json::json!(paths)));
             }
         }
