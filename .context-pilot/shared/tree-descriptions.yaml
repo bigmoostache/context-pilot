@@ -9414,6 +9414,10 @@
   path: web/src/lib/api/finder.ts
   description: Finder filesystem REST endpoints (SDK). 12 SDK + 2 manual (rawUrl/downloadFile irreducible). T298 uploadUnique. Re-exports FinderNode/FsPreview/SheetData/ConversationMsg from generated.
   last_edited_ms: 1782466343606
+78e8303b5a06ca44:
+  path: web/src/mobile-components/shell/widgets/UserMenu.tsx
+  description: 'Mobile UserMenu twin — near-full-width menu sheet (vs 268px popover), py-2.5 rows, active: feedback. Keeps AvatarMark export (path parity). Identity resolution identical, mobile ui/dropdown-menu token.'
+  last_edited_ms: 1784666918517
 78e9918ec952ba76:
   path: web/src/components/panels/cockpit/PanelFrame.tsx
   description: 'Shared cockpit panel shell: accent icon + name + subtitle + token/cost chip header, scrolling body. Exports PanelFrame, PanelSection, ImportanceDot, Chip, and InspectionUnavailable (role=note honest empty-state for derived-state panels the read-only web inspection plane structurally can''t serve).'
@@ -18190,6 +18194,10 @@ eba1bdf62952589c:
   path: web/eslint.config.ts
   description: Frontend ESLint flat config — the Rust-parity strict stack (branch web-lint), built as a RATCHET (P0→P13, one plugin group per phase, each landing at error). Migrated from eslint.config.js in P0. globalIgnores dist + src/lib/api/generated/**. P0 baseline = js.recommended + tseslint.recommended + reactHooks classic pair (rules-of-hooks:error, exhaustive-deps:warn) + reactRefresh.vite (allowConstantExport, ui/** exempt). Grows toward ~1100-1400 active rules.
   last_edited_ms: 1783350174179
+ebc99d0b88248e8f:
+  path: web/src/mobile-components/shell/widgets/AgentSwitcher.tsx
+  description: 'Mobile AgentSwitcher twin — h-10 tap trigger (vs desktop h-8 pill), full-width dropdown sheet min(20rem,100vw-gutter), py-2.5 rows, active: press. Selection/sort/create logic identical, mobile ui/dropdown-menu token.'
+  last_edited_ms: 1784666918295
 ebcb3608c38e0892:
   path: .github/checks/check-lint-exceptions.sh
   description: 'Lint exception registry enforcement: orphan + ambiguity + stowaway detection'
@@ -18866,6 +18874,10 @@ f4073f6d2cafea84:
   path: crates/cp-base/Cargo.toml
   description: 'Base crate deps: cp-render, cp-mod-utilities, ratatui, crossterm, serde, serde_json, serde_yaml, unicode-width, log.'
   last_edited_ms: 1780565428696
+f407622a5f195179:
+  path: web/src/mobile-components/shell/widgets/ProfileModal.tsx
+  description: Mobile ProfileModal twin — full-screen sheet (w-screen h-screen vs 540x88vh), 16px inputs (iOS focus-zoom), 44px touch controls. Name/email/password/sessions RBAC logic identical, mobile ui/dialog token.
+  last_edited_ms: 1784666918428
 f443597431fc2e8e:
   path: src/llms/minimax/mod.rs
   description: MiniMax provider — Anthropic-compatible API via Token Plan. SSE streaming identical to Anthropic protocol. MINIMAX_API_KEY auth.
