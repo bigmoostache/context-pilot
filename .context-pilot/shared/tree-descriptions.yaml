@@ -9922,6 +9922,10 @@
   path: crates/cp-mod-threads/src/tools.rs
   description: 'Thread tool handlers. execute_send/execute_read/build_panel_content. T353: execute_send AUTO-UNARCHIVES archived threads. build_panel_content shows paused:true for paused threads (T371). Archived threads filtered out of LLM-facing context. YAML-structured output (T372). MAX caps on content/file-path/questions/panel-messages.'
   last_edited_ms: 0
+7e2d17cbf7412750:
+  path: web/src/mobile-components/ui/dropdown-menu.tsx
+  description: Mobile DropdownMenu twin. Every actionable row >=44px tap (min-h-11, py-2.5), popup widened (min-w-48). Kept anchored (Base UI Positioner), not re-sheeted, preserving focus-return + keyboard nav. All sub/checkbox/radio subcomponents touch-sized.
+  last_edited_ms: 1784669584561
 7e366dbc9974613f:
   path: web/src/lib/query/reducers.ts
   description: 'SSE delta reducers: applyThreadDelta/applyAgentDelta fold into cache; mergeThreadLogs reconciles poll+delta (T123/T360). Conditional spreads for exactOptional (P1).'
@@ -13826,6 +13830,10 @@ b038ae8f5f7d5e95:
   path: src/app/reverie/trigger.rs
   description: check_threshold_trigger() (auto-fire cleaner on token breach), start_manual_reverie() (per-agent guards)
   last_edited_ms: 0
+b04385eb7c2e4366:
+  path: web/src/mobile-components/ui/popover.tsx
+  description: Mobile Popover twin. Viewport width clamp (max-w-[calc(100vw-1rem)]) so wide popover never clips off phone edge; stays anchored (contextual). Same portal/focus/openOnHover.
+  last_edited_ms: 1784669584651
 b046c48f6f19946f:
   path: src/modules/questions/think.rs
   description: ThinkState (count/threshold/next_notification_at), execute() increments counter + encouraging status
@@ -18514,6 +18522,10 @@ ee1ab742c49426b6:
   path: crates/cp-mod-callback/src/firing.rs
   description: Callback firing. fire_callback() spawns script via console server, registers CallbackWatcher, dedup via kill_existing_callback. fire_one() fan-out takes FanOut<'fan> struct (A2 args-bundle). fire_async/blocking_callbacks batch dispatch. Exit 0/7 kill_session, !=0/timeout deferred panel.
   last_edited_ms: 0
+ee1f899bba169317:
+  path: web/src/mobile-components/ui/tooltip.tsx
+  description: Mobile Tooltip twin. Viewport width clamp (max-w-[calc(100vw-2rem)] vs desktop max-w-xs). Inert on touch (no hover); the clamp prevents a long tip overflowing a narrow phone.
+  last_edited_ms: 1784669584740
 ee247b4125f27a31:
   path: web/src/lib/api/index.ts
   description: 'REST API client barrel. SDK layer: 28 endpoints via generated SDK. Re-exports ./auth+./finder+./body+./envKeys (env-keys.ts renamed envKeys.ts in web-lint P5 filename-case).'
@@ -18986,6 +18998,10 @@ f3a95a7b2fca8def:
   path: crates/cp-mod-bridge/src/lib.rs
   description: 'BridgeModule: init_state activates Boot when CP_BRIDGE=1, binds tee.sock + spawns Tee, creates Intake from oplog replay, opens content-addressed body Store under oplog dir, sets command listener non-blocking. on_stream_chunk→Token frames, on_stream_stop→PhaseHint(Idle). BridgeState{boot,tee,intake,tee_seq,last_phase,last_cost_usd,store,thread_msg_counts,msg_memo_seeded} in TypeMap — last_phase/last_cost_usd memo the vitals chokepoint; store+thread_msg_counts+msg_memo_seeded back the message-emit chokepoint (I13 body staging + per-thread observe-on-change diff, seeded no-emit at boot to skip backlog replay). is_global, no tools/panels.'
   last_edited_ms: 1781796503292
+f3b52aa27b151660:
+  path: web/src/mobile-components/ui/dialog.tsx
+  description: Mobile Dialog twin. Centered spring card -> bottom-anchored sheet (fixed inset-x-0 bottom-0, rounded-t-2xl, max-h-90vh scroll, safe-area pb, slide-up translate). Consumers overriding full-screen still win (twMerge last). Same Base UI portal/focus/scroll-lock/Esc.
+  last_edited_ms: 1784669584462
 f3e69efe71987a54:
   path: web/package.json
   description: 'Live web app (Vite 8 + React 19 + TS 6 + Tailwind v4 + Base UI + shadcn). Scripts: dev (vite :5175), build (tsc -b + vite build), lint, preview. @playwright/test for e2e. The live demaquetted app (sibling ui/ is the frozen maquette).'
