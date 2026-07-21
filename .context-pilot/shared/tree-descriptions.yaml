@@ -6038,6 +6038,10 @@
   path: crates/cp-mod-tree/src/render.rs
   description: Read-only tree-string rendering (directory walk), split from tools.rs for line budget. generate_tree_string + normalize_path. TreeContext/TreeNode/Row structs. build_tree_new via render_dir/render_file.
   last_edited_ms: 0
+4d7bad028da98d73:
+  path: web/src/mobile-components/finder/ContextMenu.tsx
+  description: 'Mobile Finder context menu twin: cursor-anchored popup -> bottom action sheet (long-press, x/y ignored), full-width >=44px rows, no shortcut hints, active-press not hover, grabber+scrim. Outside-press via mousedown-ref (no onClick-div a11y violation). ItemMenu/EmptyMenu/Row/Separator.'
+  last_edited_ms: 1784668796122
 4d7f8376a5e1da5f:
   path: crates/cp-mod-files/src/tools/diff.rs
   description: 'Diff algorithm: LCS-based unified diff. generate_unified_diff() emits +/-/context lines. compute_diff() walks LCS pairs via drain_deletes/drain_inserts helpers (A2 split). lcs() backtracks over lcs_lengths() DP table (A2 split). O(m*n) space, fine for file edits.'
@@ -12298,6 +12302,10 @@
   path: crates/cp-mod-chat/src/bootstrap.rs
   description: First-run bootstrap for Tuwunel. Creates directory layout, generates homeserver.toml, bridge registrations. project_post_start() registers bot account + default room.
   last_edited_ms: 0
+9d4fbc071e077a39:
+  path: web/src/mobile-components/finder/internal/FinderOverlays.tsx
+  description: 'Mobile Finder overlays twin: compact status bar, long-press ContextMenu (bottom action sheet) wiring, transient toast. External-drag upload overlay DROPPED (no file-drag gesture on touch; uploads via menu Upload + file picker).'
+  last_edited_ms: 1784668796348
 9d531a5d22f56426:
   path: crates/cp-base/src/state/data/message.rs
   description: 'Message + MsgKind/MsgStatus enums #[expect(exhaustive_enums)] A4. ToolUseRecord/ToolResultRecord (tldr). format_messages_to_chunk.'
@@ -18594,6 +18602,10 @@ eed406fdf675154d:
   path: src/app/context/freeze_pass.rs
   description: Per-panel freeze pass (extracted from context/mod.rs, A2). apply_full_freeze/run_panel_freeze_pass/freeze_one_panel/fold_one_panel/apply_panel_cache_costs/classify_break_kind/save_panel_id_types/record_freeze_telemetry + FreezeMeta/FreezeCulprit/PanelEmit/PassAcc/FoldCtx/TelemetryParts.
   last_edited_ms: 1784495886100
+eee15d2a033c1d19:
+  path: web/src/mobile-components/finder/QuickLookSheet.tsx
+  description: 'Mobile Quick Look drawer twin: desktop right-side Sheet -> bottom Sheet h-90vh (iOS Files idiom), @/mobile-components/ui/sheet token. Renders FinderPreview. Shared by mobile Finder + threads file-upload chip.'
+  last_edited_ms: 1784668796259
 ef0729aa90244126:
   path: crates/cp-oplog/tests/crash_replay.rs
   description: 'Phase 9 (X776) MILESTONE M0 crash-replay harness. Unix-only (#![cfg(unix)]). Self-re-exec pattern: env-gated #[test] crash_child_entrypoint re-runs the test binary as a child via current_exe(); parent/child handshake through a fdatasync''d marker file (libtest stdout is noisy). V1 v1_real_sigkill_leaves_a_clean_replayable_oplog: child spams durable MessageCreated appends, parent kill()s (real SIGKILL), fresh process replay() never errors + every announced-durable rev survives + torn tail truncated (announce-after-durable K9 across real crash). V2 v2_journalled_command_is_exactly_once_after_deadman_reexec: child journals CommandEffect then dies, fresh process recovers seen-set token, duplicate SeenMark delivery folds to no-op (exactly-once across process boundary). V12 v12_barrier_is_pending_the_body_store: asserts body_gc_eligible rule, explicit placeholder until body store lands Phase 14. 4 tests green.'
