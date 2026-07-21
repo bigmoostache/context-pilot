@@ -1,22 +1,14 @@
 import { kindOf } from "@/components/finder/support/kind"
 import type { FinderNode } from "@/lib/types"
+// `UploadedFile` + `buildUploadMessage` now live in the shared `@/lib` layer so
+// the mobile thread tree can consume the same upload logic without importing
+// back into `@/components/…` (mirror leak-guard, design-mobile.md §3.2). Kept
+// re-exported here for back-compat with existing `./fileUpload/helpers`
+// importers — one source of truth, zero call-site churn.
+export { buildUploadMessage } from "@/lib/live/threadUpload"
+export type { UploadedFile } from "@/lib/live/threadUpload"
 
-/**
- * One file attached to a thread via the chat composer. The composer uploads the
- * file to the realm's `.uploads/` and embeds these fields into the user message
- * as a ` ```file-upload ` YAML block (one block per file); the conversation view
- * parses the blocks back out and renders each as a clickable `FileUploadChip`.
- */
-export interface UploadedFile {
-  /** realm-relative stored path, e.g. `.uploads/report (1).pdf` */
-  path: string
-  /** stored filename */
-  name: string
-  /** byte count */
-  size: number
-  /** provenance note, e.g. `uploaded by user at 2026-…` */
-  note: string
-}
+import type { UploadedFile } from "@/lib/live/threadUpload"
 
 /**
  * A `/command` offered as a composer suggestion bubble (T348/T350). `command`
@@ -34,29 +26,6 @@ export interface CommandSuggestion {
   /** the prompt body the `/command` expands to; seeded into the composer on
    *  click. Falls back to the bare `command` literal when absent. */
   body?: string | undefined
-}
-
-/**
- * Compose a user message body carrying one ` ```file-upload ` YAML block per
- * uploaded file. The conversation renderer ({@link splitMessageSegments})
- * extracts these blocks and turns them into clickable preview chips rendered
- * **inline at the block's position**; the agent reads the same YAML as plain
- * context, so it knows which files were attached.
- */
-export function buildUploadMessage(files: UploadedFile[]): string {
-  return files
-    .map((f) =>
-      [
-        "```file-upload",
-        "file:",
-        `  path: ${f.path}`,
-        `  name: ${f.name}`,
-        `  size: ${f.size}`,
-        `  note: ${f.note}`,
-        "```",
-      ].join("\n"),
-    )
-    .join("\n\n")
 }
 
 const BLOCK_RE = /```file-upload\n([\s\S]*?)```/g
