@@ -817,4 +817,23 @@ export default defineConfig([
       "@typescript-eslint/no-restricted-imports": "off",
     },
   },
+  {
+    // ── The mobile component tree (`src/mobile-components/**`) is an EXACT
+    //    structural mirror of `src/components/**`, so its top folder keeps the
+    //    user-mandated kebab name `mobile-components` (the hyphen the
+    //    camel/pascal filename-case calibration flags) — it is not ours to
+    //    rename without breaking the mirror contract. Its files are also
+    //    scaffold-GENERATED re-export stubs (`export { default } from
+    //    "@/components/..."`) carrying the `@generated mobile-mirror stub`
+    //    marker; react-refresh purity can't be verified across a re-export and
+    //    is irrelevant for generated code (the vendored-shadcn `ui/**`
+    //    rationale). Both off here only; every rule that catches real leaks
+    //    (no `@/components` specifier, the mirror lint) stays at error.
+    //    Registered in allowed-eslint-exceptions.yaml. ──
+    files: ["src/mobile-components/**/*.{ts,tsx}"],
+    rules: {
+      "unicorn/filename-case": "off",
+      "react-refresh/only-export-components": "off",
+    },
+  },
 ])

@@ -7019,3 +7019,102 @@ index 74fe336e..c037044e 100644
 -      Irreducible — the bundle must be literal-constructible cross-crate; a 7-arg constructor
 -      trips too_many_arguments. The exhaustive carrier is the honest shape.
 # --- End entry #71 ---
+72:556049103727608f0095ad57774a64ac4262d2dd4d1183764f3942f7fd099859:9e5fc6d0617a1cabb0bd0cc3e83ddfdaf3908cfa3a8d52260f16f9477ab49d65:889d79aa36a101df6cc195455dae6906a3e54a431f7ef3369159a575a849816f
+# --- Diff for entry #72 ---
+diff --git a/web/knip.json b/web/knip.json
+index 86e0030e..84e2a55c 100644
+--- a/web/knip.json
++++ b/web/knip.json
+@@ -2,7 +2,7 @@
+   "$schema": "https://unpkg.com/knip@5/schema.json",
+   "entry": ["e2e/**/*.{ts,tsx}"],
+   "project": ["src/**/*.{ts,tsx}"],
+-  "ignore": ["src/lib/api/generated/**", "src/components/ui/**"],
++  "ignore": ["src/lib/api/generated/**", "src/components/ui/**", "src/mobile-components/ui/**"],
+   "ignoreDependencies": ["tw-animate-css", "@fontsource/ibm-plex-mono"],
+   "ignoreExportsUsedInFile": true
+ }
+# --- End entry #72 ---
+73:889d79aa36a101df6cc195455dae6906a3e54a431f7ef3369159a575a849816f:472f61c43d4a9ba31906f9dfcf6c2d08d62ed671d19699e1b5fdd4c32739ce40:638b07b48e1f965bf2e693470878637f2c4bf411f751f6706cf9ee47d612e523
+# --- Diff for entry #73 ---
+diff --git a/web/eslint.config.ts b/web/eslint.config.ts
+index db7ab3a7..29a16f0b 100644
+--- a/web/eslint.config.ts
++++ b/web/eslint.config.ts
+@@ -817,4 +817,23 @@ export default defineConfig([
+       "@typescript-eslint/no-restricted-imports": "off",
+     },
+   },
++  {
++    // ── The mobile component tree (`src/mobile-components/**`) is an EXACT
++    //    structural mirror of `src/components/**`, so its top folder keeps the
++    //    user-mandated kebab name `mobile-components` (the hyphen the
++    //    camel/pascal filename-case calibration flags) — it is not ours to
++    //    rename without breaking the mirror contract. Its files are also
++    //    scaffold-GENERATED re-export stubs (`export { default } from
++    //    "@/components/..."`) carrying the `@generated mobile-mirror stub`
++    //    marker; react-refresh purity can't be verified across a re-export and
++    //    is irrelevant for generated code (the vendored-shadcn `ui/**`
++    //    rationale). Both off here only; every rule that catches real leaks
++    //    (no `@/components` specifier, the mirror lint) stays at error.
++    //    Registered in allowed-eslint-exceptions.yaml. ──
++    files: ["src/mobile-components/**/*.{ts,tsx}"],
++    rules: {
++      "unicorn/filename-case": "off",
++      "react-refresh/only-export-components": "off",
++    },
++  },
+ ])
+diff --git a/web/knip.json b/web/knip.json
+index 86e0030e..d53471d1 100644
+--- a/web/knip.json
++++ b/web/knip.json
+@@ -1,6 +1,6 @@
+ {
+   "$schema": "https://unpkg.com/knip@5/schema.json",
+-  "entry": ["e2e/**/*.{ts,tsx}"],
++  "entry": ["e2e/**/*.{ts,tsx}", "src/mobile-components/Root.tsx"],
+   "project": ["src/**/*.{ts,tsx}"],
+   "ignore": ["src/lib/api/generated/**", "src/components/ui/**"],
+   "ignoreDependencies": ["tw-animate-css", "@fontsource/ibm-plex-mono"],
+diff --git a/.github/checks/allowed-eslint-exceptions.yaml b/.github/checks/allowed-eslint-exceptions.yaml
+index 6948f723..3e2fbffa 100644
+--- a/.github/checks/allowed-eslint-exceptions.yaml
++++ b/.github/checks/allowed-eslint-exceptions.yaml
+@@ -434,6 +434,35 @@ exceptions:
+       Irreducible: a wrapper layer must import the thing it wraps. The guard is
+       already as narrow as possible (this one folder, value imports only).
+ 
++  # ── Mobile mirror tree — kebab folder name + generated re-export stubs ─────
++  - path: "web/src/mobile-components/**"
++    rule: "unicorn/filename-case"
++    reason: >
++      The mobile component tree is an EXACT structural mirror of
++      src/components/** (user requirement), so its root folder keeps the
++      user-mandated kebab name `mobile-components` — the hyphen the tree-wide
++      camel/pascal filename-case calibration flags. Renaming it would break the
++      mirror contract the check-mobile-mirror lint enforces. The twin of the
++      openapi-ts.config.ts hyphenated-filename exception; scoped to this tree
++      only, every other path stays at error.
++    strategy: >
++      Irreducible while the mirror must match the kebab `components` sibling
++      byte-for-byte at the path level.
++
++  - path: "web/src/mobile-components/**"
++    rule: "react-refresh/only-export-components"
++    reason: >
++      The mobile twins are scaffold-GENERATED re-export stubs (`export
++      { default } from "@/components/..."`) carrying the `@generated
++      mobile-mirror stub` marker. react-refresh purity cannot be verified across
++      a re-export and is irrelevant for generated code — the exact analog of the
++      vendored-shadcn `components/ui/**` react-refresh exemption. Scoped to this
++      tree; the leak guard and mirror-parity lint stay at error, so a divergent
++      hand-authored mobile file is still fully checked for real defects.
++    strategy: >
++      Re-evaluate if divergent mobile files ever become hand-authored
++      component-only modules the rule can verify.
++
+   # ── P10c better-tailwindcss — line-wrapping owned by Prettier ─────────────
+   - path: "web/src/**/*.{ts,tsx}"
+     rule: "better-tailwindcss/enforce-consistent-line-wrapping"
+# --- End entry #73 ---

@@ -434,6 +434,35 @@ exceptions:
       Irreducible: a wrapper layer must import the thing it wraps. The guard is
       already as narrow as possible (this one folder, value imports only).
 
+  # ── Mobile mirror tree — kebab folder name + generated re-export stubs ─────
+  - path: "web/src/mobile-components/**"
+    rule: "unicorn/filename-case"
+    reason: >
+      The mobile component tree is an EXACT structural mirror of
+      src/components/** (user requirement), so its root folder keeps the
+      user-mandated kebab name `mobile-components` — the hyphen the tree-wide
+      camel/pascal filename-case calibration flags. Renaming it would break the
+      mirror contract the check-mobile-mirror lint enforces. The twin of the
+      openapi-ts.config.ts hyphenated-filename exception; scoped to this tree
+      only, every other path stays at error.
+    strategy: >
+      Irreducible while the mirror must match the kebab `components` sibling
+      byte-for-byte at the path level.
+
+  - path: "web/src/mobile-components/**"
+    rule: "react-refresh/only-export-components"
+    reason: >
+      The mobile twins are scaffold-GENERATED re-export stubs (`export
+      { default } from "@/components/..."`) carrying the `@generated
+      mobile-mirror stub` marker. react-refresh purity cannot be verified across
+      a re-export and is irrelevant for generated code — the exact analog of the
+      vendored-shadcn `components/ui/**` react-refresh exemption. Scoped to this
+      tree; the leak guard and mirror-parity lint stay at error, so a divergent
+      hand-authored mobile file is still fully checked for real defects.
+    strategy: >
+      Re-evaluate if divergent mobile files ever become hand-authored
+      component-only modules the rule can verify.
+
   # ── P10c better-tailwindcss — line-wrapping owned by Prettier ─────────────
   - path: "web/src/**/*.{ts,tsx}"
     rule: "better-tailwindcss/enforce-consistent-line-wrapping"
