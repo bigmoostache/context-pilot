@@ -14,7 +14,9 @@
     "type-coverage": "type-coverage --project tsconfig.app.json",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "mirror:scaffold": "node scripts/scaffold-mobile-mirror.mjs",
+    "mirror:check": "node scripts/scaffold-mobile-mirror.mjs --check"
   },
   "typeCoverage": {
     "strict": true,

@@ -7118,3 +7118,21 @@ index 6948f723..3e2fbffa 100644
    - path: "web/src/**/*.{ts,tsx}"
      rule: "better-tailwindcss/enforce-consistent-line-wrapping"
 # --- End entry #73 ---
+74:638b07b48e1f965bf2e693470878637f2c4bf411f751f6706cf9ee47d612e523:33456aa3ca7db5a94764b609945b0523cb6040a5349a92c220a530175b3e94ac:66c67ccb95e6610386f21f29e56011b2362afc32302158c480ceb9c218c07245
+# --- Diff for entry #74 ---
+diff --git a/web/knip.json b/web/knip.json
+index d53471d1..5582a624 100644
+--- a/web/knip.json
++++ b/web/knip.json
+@@ -1,8 +1,8 @@
+ {
+   "$schema": "https://unpkg.com/knip@5/schema.json",
+-  "entry": ["e2e/**/*.{ts,tsx}", "src/mobile-components/Root.tsx"],
++  "entry": ["e2e/**/*.{ts,tsx}"],
+   "project": ["src/**/*.{ts,tsx}"],
+-  "ignore": ["src/lib/api/generated/**", "src/components/ui/**"],
++  "ignore": ["src/lib/api/generated/**", "src/components/ui/**", "src/mobile-components/**"],
+   "ignoreDependencies": ["tw-animate-css", "@fontsource/ibm-plex-mono"],
+   "ignoreExportsUsedInFile": true
+ }
+# --- End entry #74 ---

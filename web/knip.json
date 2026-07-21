@@ -1,8 +1,8 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "entry": ["e2e/**/*.{ts,tsx}", "src/mobile-components/Root.tsx"],
+  "entry": ["e2e/**/*.{ts,tsx}"],
   "project": ["src/**/*.{ts,tsx}"],
-  "ignore": ["src/lib/api/generated/**", "src/components/ui/**"],
+  "ignore": ["src/lib/api/generated/**", "src/components/ui/**", "src/mobile-components/**"],
   "ignoreDependencies": ["tw-animate-css", "@fontsource/ibm-plex-mono"],
   "ignoreExportsUsedInFile": true
 }
