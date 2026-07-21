@@ -119,3 +119,8 @@ jobs:
       # stack is provisioned (see TODO(playwright) in the script).
       - name: TS tests
         run: .github/checks/check-ts-tests.sh --ci
+
+      # mobile-components EXACT structural mirror of components: path parity +
+      # leak guard + scaffold drift (needs node — lives in the Frontend job).
+      - name: Mobile mirror
+        run: .github/checks/check-mobile-mirror.sh

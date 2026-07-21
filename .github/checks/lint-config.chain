@@ -7136,3 +7136,125 @@ index d53471d1..5582a624 100644
    "ignoreExportsUsedInFile": true
  }
 # --- End entry #74 ---
+75:66c67ccb95e6610386f21f29e56011b2362afc32302158c480ceb9c218c07245:fe9a8610ce326527d14db86c5bfee104bd90fae91256a3fe34974112bd9f1c2a:9be9f74877a8e3b89ddc4dcef7f42f2dbbceb925163e2e2fdefe93328b926abf
+# --- Diff for entry #75 ---
+diff --git a/.github/checks/protected-files.yaml b/.github/checks/protected-files.yaml
+index 4339ee4a..abd0b43b 100644
+--- a/.github/checks/protected-files.yaml
++++ b/.github/checks/protected-files.yaml
+@@ -125,3 +125,9 @@
+ # equal both sides. Locking it keeps that single source of truth tamper-evident.
+ - path: .github/checks/check-web-deadcode.sh
+   whole_file: true
++# The mobile-mirror lint (path parity + leak guard + scaffold drift). Invoked by
++# the CI Frontend job AND the mobile-mirror blocking callback. It is the sole
++# enforcement of the EXACT components ⇄ mobile-components mirror contract, so
++# locking it keeps that guarantee tamper-evident.
++- path: .github/checks/check-mobile-mirror.sh
++  whole_file: true
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index c0f05146..1688d741 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -119,3 +119,8 @@ jobs:
+       # stack is provisioned (see TODO(playwright) in the script).
+       - name: TS tests
+         run: .github/checks/check-ts-tests.sh --ci
++
++      # mobile-components EXACT structural mirror of components: path parity +
++      # leak guard + scaffold drift (needs node — lives in the Frontend job).
++      - name: Mobile mirror
++        run: .github/checks/check-mobile-mirror.sh
+diff --git a/.context-pilot/shared/callbacks.yaml b/.context-pilot/shared/callbacks.yaml
+index b60ff199..5e186a7b 100644
+--- a/.context-pilot/shared/callbacks.yaml
++++ b/.context-pilot/shared/callbacks.yaml
+@@ -18,6 +18,16 @@ api-contract-ts:
+   is_global: true
+   script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-api-contract.sh" --callback
+   last_edited_ms: 1783511056446
++mobile-mirror:
++  name: mobile-mirror
++  description: Mobile-mirror parity + leak guard (invariants 1+2, no drift regen) on web/src edits
++  pattern: web/src/**
++  blocking: true
++  timeout_secs: 30
++  success_message: Mobile mirror OK ✓
++  is_global: true
++  script_content: exec .github/checks/check-mobile-mirror.sh $CP_CHANGED_FILES
++  last_edited_ms: 1784633228156
+ rust-lints:
+   name: rust-lints
+   description: Rust-lints family (fmt, clippy -D warnings, cargo check, lint-exception registry, vault-bypass)
+# --- End entry #75 ---
+76:9be9f74877a8e3b89ddc4dcef7f42f2dbbceb925163e2e2fdefe93328b926abf:9e110a9c8b680a3a503fefe5f5255692a104611fbbcb1a64fabcb4f17ac8cd97:356423888b412e425b8c8a522e09d29897309e1058215f38853c9a7b78873965
+# --- Diff for entry #76 ---
+diff --git a/.github/checks/protected-files.yaml b/.github/checks/protected-files.yaml
+index 4339ee4a..abd0b43b 100644
+--- a/.github/checks/protected-files.yaml
++++ b/.github/checks/protected-files.yaml
+@@ -125,3 +125,9 @@
+ # equal both sides. Locking it keeps that single source of truth tamper-evident.
+ - path: .github/checks/check-web-deadcode.sh
+   whole_file: true
++# The mobile-mirror lint (path parity + leak guard + scaffold drift). Invoked by
++# the CI Frontend job AND the mobile-mirror blocking callback. It is the sole
++# enforcement of the EXACT components ⇄ mobile-components mirror contract, so
++# locking it keeps that guarantee tamper-evident.
++- path: .github/checks/check-mobile-mirror.sh
++  whole_file: true
+diff --git a/.github/checks/check-structure.sh b/.github/checks/check-structure.sh
+index c87c70fc..c424f085 100755
+--- a/.github/checks/check-structure.sh
++++ b/.github/checks/check-structure.sh
+@@ -74,9 +74,14 @@ done < <(find . -mindepth 1 -type d \
+ WEB_SRC="$ROOT/web/src"
+ EXEMPT_UI="$WEB_SRC/components/ui"
+ EXEMPT_GEN="$WEB_SRC/lib/api/generated"
++# The mobile mirror's ui/ twin is a byte-for-byte mirror of the vendored shadcn
++# ui/ (same 20-file shape), so it inherits the same folder-cap exemption — the
++# scaffold cannot re-group it without breaking the EXACT parity contract.
++EXEMPT_MOBILE_UI="$WEB_SRC/mobile-components/ui"
+ web_exempt() {
+   case "$1" in
+-    "$EXEMPT_UI" | "$EXEMPT_UI"/* | "$EXEMPT_GEN" | "$EXEMPT_GEN"/*) return 0 ;;
++    "$EXEMPT_UI" | "$EXEMPT_UI"/* | "$EXEMPT_GEN" | "$EXEMPT_GEN"/* \
++      | "$EXEMPT_MOBILE_UI" | "$EXEMPT_MOBILE_UI"/*) return 0 ;;
+     *) return 1 ;;
+   esac
+ }
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index c0f05146..1688d741 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -119,3 +119,8 @@ jobs:
+       # stack is provisioned (see TODO(playwright) in the script).
+       - name: TS tests
+         run: .github/checks/check-ts-tests.sh --ci
++
++      # mobile-components EXACT structural mirror of components: path parity +
++      # leak guard + scaffold drift (needs node — lives in the Frontend job).
++      - name: Mobile mirror
++        run: .github/checks/check-mobile-mirror.sh
+diff --git a/.context-pilot/shared/callbacks.yaml b/.context-pilot/shared/callbacks.yaml
+index b60ff199..5e186a7b 100644
+--- a/.context-pilot/shared/callbacks.yaml
++++ b/.context-pilot/shared/callbacks.yaml
+@@ -18,6 +18,16 @@ api-contract-ts:
+   is_global: true
+   script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-api-contract.sh" --callback
+   last_edited_ms: 1783511056446
++mobile-mirror:
++  name: mobile-mirror
++  description: Mobile-mirror parity + leak guard (invariants 1+2, no drift regen) on web/src edits
++  pattern: web/src/**
++  blocking: true
++  timeout_secs: 30
++  success_message: Mobile mirror OK ✓
++  is_global: true
++  script_content: exec .github/checks/check-mobile-mirror.sh $CP_CHANGED_FILES
++  last_edited_ms: 1784633228156
+ rust-lints:
+   name: rust-lints
+   description: Rust-lints family (fmt, clippy -D warnings, cargo check, lint-exception registry, vault-bypass)
+# --- End entry #76 ---

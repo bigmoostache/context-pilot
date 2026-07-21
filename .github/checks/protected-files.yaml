@@ -125,3 +125,9 @@
 # equal both sides. Locking it keeps that single source of truth tamper-evident.
 - path: .github/checks/check-web-deadcode.sh
   whole_file: true
+# The mobile-mirror lint (path parity + leak guard + scaffold drift). Invoked by
+# the CI Frontend job AND the mobile-mirror blocking callback. It is the sole
+# enforcement of the EXACT components ⇄ mobile-components mirror contract, so
+# locking it keeps that guarantee tamper-evident.
+- path: .github/checks/check-mobile-mirror.sh
+  whole_file: true

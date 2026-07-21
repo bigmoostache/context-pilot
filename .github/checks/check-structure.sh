@@ -74,9 +74,14 @@ done < <(find . -mindepth 1 -type d \
 WEB_SRC="$ROOT/web/src"
 EXEMPT_UI="$WEB_SRC/components/ui"
 EXEMPT_GEN="$WEB_SRC/lib/api/generated"
+# The mobile mirror's ui/ twin is a byte-for-byte mirror of the vendored shadcn
+# ui/ (same 20-file shape), so it inherits the same folder-cap exemption — the
+# scaffold cannot re-group it without breaking the EXACT parity contract.
+EXEMPT_MOBILE_UI="$WEB_SRC/mobile-components/ui"
 web_exempt() {
   case "$1" in
-    "$EXEMPT_UI" | "$EXEMPT_UI"/* | "$EXEMPT_GEN" | "$EXEMPT_GEN"/*) return 0 ;;
+    "$EXEMPT_UI" | "$EXEMPT_UI"/* | "$EXEMPT_GEN" | "$EXEMPT_GEN"/* \
+      | "$EXEMPT_MOBILE_UI" | "$EXEMPT_MOBILE_UI"/*) return 0 ;;
     *) return 1 ;;
   esac
 }

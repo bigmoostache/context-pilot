@@ -18,6 +18,16 @@ api-contract-ts:
   is_global: true
   script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-api-contract.sh" --callback
   last_edited_ms: 1783511056446
+mobile-mirror:
+  name: mobile-mirror
+  description: Mobile-mirror parity + leak guard (invariants 1+2, no drift regen) on web/src edits
+  pattern: web/src/**
+  blocking: true
+  timeout_secs: 30
+  success_message: Mobile mirror OK ✓
+  is_global: true
+  script_content: exec .github/checks/check-mobile-mirror.sh $CP_CHANGED_FILES
+  last_edited_ms: 1784633228156
 rust-lints:
   name: rust-lints
   description: Rust-lints family (fmt, clippy -D warnings, cargo check, lint-exception registry, vault-bypass)
