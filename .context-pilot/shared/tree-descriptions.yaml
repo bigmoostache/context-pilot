@@ -15534,6 +15534,10 @@ c577fd87e0690b02:
   path: crates/cp-orchestrator/tests/common/mod.rs
   description: 'Phase 30 shared test harness (a tests/ submodule, NOT an auto-run integration binary, no #[test]). Hand-rolled dependency-free blocking HTTP/1.1 client + SSE reader over raw TcpStream: request/get/post_json (Connection: close, read-to-EOF, status+body parse) + sse_collect(addr,path,headers,want,deadline)->(status,Vec<SseEvent>) (200ms read-timeout poll loop, parses id:/event:/data: blocks split by blank line, ignores comment/keepalive). SseEvent{id:Option<u64>,event,data}. Proves real tiny_http server bytes round-trip on the wire without an async HTTP stack. pub(crate) visibility (unreachable_pub in test crate).'
   last_edited_ms: 1781679569012
+c584999f1faac023:
+  path: web/src/mobile-components/conversation/Message.tsx
+  description: Mobile message renderer twin. Wider bubbles (user 85%, assistant/tool 92%) for phone width, always-readable copy/delete actions (opacity-70 + active-press, no hover). Same 3 renderers + inline file-upload chip splicing; MessageFileChip + splitMessageSegments from @/mobile-components/threads/fileUpload (leak guard).
+  last_edited_ms: 1784669340235
 c58540d39bf4e2e7:
   path: crates/cp-orchestrator/tests/fleet_soak.rs
   description: Phase 9.4 (X869) multi-agent soak + fleet-scale fault-matrix slice (2 tests). 16 agents concurrent contended workloads, gap-free+isolated projections. Flooded reordered subscriber coalesces then reconciles.
