@@ -1010,6 +1010,10 @@
   path: ui/src/components/shell/TopBar.tsx
   description: macOS title bar. App mark (Home)→fleet. At fleet altitude no agent selected → 'Mission control' caption (switcher + branch/cost hidden); inside an agent shows AgentSwitcher + per-agent segmented switcher Threads·Cockpit·Finder + branch+cost. Far-right Settings gear opens ConfigModal (always-mounted, controlled open). ThemeToggle.
   last_edited_ms: 1781524763692
+0cea40883be52574:
+  path: web/src/mobile-components/auth/AgentAclSection.tsx
+  description: Mobile per-agent ACL twin (embedded in mobile AgentModal). Hover-revealed actions -> always-visible, py-2.5 touch rows, 16px grant-form selects, single-column. Same list/grant/revoke/toggle-role hooks.
+  last_edited_ms: 1784669172642
 0d254e205ae95b23:
   path: .context-pilot/scripts/rust-check.sh
   description: 'CB4 callback script. Runs 3 checks on every .rs edit: (1) cargo fmt --check, (2) cargo check -D warnings, (3) cargo clippy --all-targets -D warnings. Matches CI ci.yml steps. Fmt check added T462 (was missing since June 5 consolidation).'
@@ -3598,6 +3602,10 @@
   path: web/src/components/shell/TopBar.tsx
   description: 'Slim macOS-style title bar (T321 trimmed): app mark→fleet, agent switcher, per-agent view tabs (Threads/Finder/Cockpit/Costs), agent-config gear, UsageButton, account UserMenu. Costs tab dev-mode only with BarChart3 icon.'
   last_edited_ms: 1782919968592
+2d75d8da19f7fbf2:
+  path: web/src/mobile-components/auth/UsersDialog.tsx
+  description: Mobile admin users dialog twin. Centered 520px dialog -> full-screen sheet (h-screen w-screen rounded-none), 2-col create form -> single column, @/mobile-components/ui/dialog token, always-visible row actions (no hover), 16px inputs. Same list/create/delete/force-logout hooks.
+  last_edited_ms: 1784669172505
 2d7e540182272b0b:
   path: crates/cp-orchestrator/src/services/auth/store.rs
   description: AuthStore — SQLite-backed auth CRUD. Schema init (users/sessions/agent_acl), Argon2id hashing, token/UUID generation. User CRUD, session lifecycle (create/validate/revoke with lazy sweep). ACL ops extracted to sibling acl.rs.
@@ -4586,6 +4594,10 @@
   path: crates/cp-orchestrator/src/services/auth/types.rs
   description: 'Auth domain types: AuthError, UserRole (admin/user, serde lowercase), AgentRole (agent-admin/agent-user, serde kebab-case), User (pub, serde skip password_hash), Session, AclEntry. row_to_user helper.'
   last_edited_ms: 1782237717396
+3adf1dea8d883b06:
+  path: web/src/mobile-components/auth/Onboarding.tsx
+  description: Mobile onboarding twin. Full-width card, py-3 finish button, 16px error text. Same updateSettings(onboarding_completed) flip + fire-and-forget onComplete.
+  last_edited_ms: 1784669172031
 3aed888cf400f15c:
   path: crates/cp-mod-console/src/lib.rs
   description: 'Console module. 5 tools. Dynamic console panels. init: find/create Unix socket server. save/load: session reconnection + orphan cleanup. Leaks stdin on save to prevent EOF. Tool visualizer for colored output.'
@@ -5802,6 +5814,10 @@
   path: Cargo.toml
   description: 'Workspace root. 26 crate members. Binary ''tui''. Edition 2024. [workspace.lints] strict config (~980 forbid). T586: adding ref_patterns forbid + prior safe-lint forbids.'
   last_edited_ms: 1784477018873
+4a5e71536614801f:
+  path: web/src/mobile-components/auth/LoginPage.tsx
+  description: Mobile login/bootstrap-register twin. Full-width centered card, 16px inputs (text-base kills iOS focus-zoom), py-3 >=44px touch controls. Same bootstrapped-driven two modes + submit logic as desktop.
+  last_edited_ms: 1784669171899
 4a67be5cdffd875b:
   path: src/ui/helpers.rs
   description: 'Shared UI helpers. A6: format_number K/M/B + typewriter speed math routed via float_math. truncate_string, wrap_text, spinner, syntect IR highlight (LRU), TypewriterBuffer.'
@@ -9390,6 +9406,10 @@
   path: crates/cp-mod-entities/src/tools.rs
   description: SQL execution engine. classify() (SELECT/DML/DDL/CTE), split_statements() with string literal awareness. execute() dispatches to execute_select/dml/ddl. Error enrichment with Levenshtein fuzzy matching. Markdown table formatting, 50-row inline cap, RETURNING support.
   last_edited_ms: 0
+783ce15f205ada26:
+  path: web/src/mobile-components/auth/ForcePasswordChange.tsx
+  description: Mobile force-password-change twin. Full-width card, Field subcomponent 16px inputs (iOS zoom kill), py-3 button. Byte-identical rotate + refreshMe logic.
+  last_edited_ms: 1784669172120
 783e9e9356e450e8:
   path: web/src/components/finder/preview/sourcedPdfPreview.tsx
   description: 'Integrated Finder preview for .sourced_pdf bundles — true split-view cross-reference auditor. Left: target PDF via pdf.js with colored subject highlights. Right: actual source document (PDF rendered with arrow highlight, or Excel value card with sheet/cell locator). RefStrip compact detail bar. NavBar with ref type badges + concordance %. PdfPage shared (highlightValueId for source side). 456 lines.'
@@ -16710,6 +16730,10 @@ d52f0fa22e6df4bc:
   path: web/src/components/ui/button.tsx
   description: Button with CVA variant system (default/outline/secondary/ghost/destructive/link × 8 sizes incl icon variants). Base UI primitive, group/button data-slot.
   last_edited_ms: 0
+d52f6659db01178a:
+  path: web/src/mobile-components/auth/DayZeroSetup.tsx
+  description: Mobile day-0 provisioning twin. 2-phase wizard (identity/trust), 16px Field inputs, py-3 buttons. Same POST /api/it/identity + CA fingerprint poll logic.
+  last_edited_ms: 1784669172288
 d531e3fcb3c03ea3:
   path: crates/cp-mod-files/src/lib.rs
   description: Files module Open/Edit/Write. build_virtual_content replays queue edits, preflight 4-way disk/virtual matrix, visualize_diff.
