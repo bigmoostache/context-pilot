@@ -3154,6 +3154,10 @@
   path: web/src/lib/api/generated/client/types.gen.ts
   description: 'Client type definitions: Config, RequestOptions, RequestResult (generic over ThrowOnError + ResponseStyle), ClientOptions, Client interface with HTTP method fns + interceptors + SSE. TDataShape for SDK Options. ResponseStyle = ''data'' | ''fields''.'
   last_edited_ms: 1782425020319
+28be6f57510a2cb4:
+  path: web/src/mobile-components/threads/forms/FormWidget.tsx
+  description: Mobile FormWidget twin — routes mobile FormFields (its only fork). Draft persistence, two-click incomplete-submit gate, locked receipt — all byte-identical to desktop.
+  last_edited_ms: 1784666643805
 28c29389a8dc6858:
   path: src/modules/conversation_history/recompute_toggled_tree_folders.rs
   description: Rebuilds tree open_folders set from (1) ancestor folders of open file panels, (2) explicitly opened folders from current + remaining history conversations, (3) root. Called after Close_conversation_history. 5 unit tests.
@@ -3470,6 +3474,10 @@
   path: web/src/components/finder/ContextMenu.tsx
   description: 'Finder right-click menu, two variants on pos.node presence. ITEM menu: Open, Pin (folders), Rename, Duplicate, Download, Move to Trash. EMPTY-SPACE menu (T279): New Folder, Upload, Select All, Toggle Quick Look, Refresh. T305: tag color-swatch row removed (dropped feature) + onTag prop/Tag/TAG_META/FinderTag imports gone. On-screen clamping; closes on outside-click/Esc.'
   last_edited_ms: 0
+2c31a6191592988b:
+  path: web/src/switch/useIsMobile.ts
+  description: Device-switch hook — matchMedia '(max-width:768px),(pointer:coarse)', switch-once at first paint (frozen, no live-resize remount), SSR-safe. Drives the one App.tsx tree chooser.
+  last_edited_ms: 1784666644510
 2c3938985a889203:
   path: web/src/lib/types.ts
   description: Maquette domain types. FinderNode gained count?:number (backend folder child count). ThreadDetail.lastActivityMs now optional (mock fallback lacks it; sort tolerates undefined via ?? 0). User/Agent/Finder/Thread/Library/Usage/cockpit types.
@@ -3538,6 +3546,10 @@
   path: .git/index
   description: Git index (binary). Not source.
   last_edited_ms: 0
+2cff2e4fe8fd81af:
+  path: web/src/mobile-components/shell/config/ItPane.tsx
+  description: Mobile ItPane twin — 16px text inputs (iOS zoom), touch buttons, hover->active. Identity re-issue + CA download + fingerprint poll shared @/lib/api.
+  last_edited_ms: 1784666643365
 2d01e83651c04e90:
   path: crates/cp-mod-search/src/types.rs
   description: Core types + config constants. SearchPersistData (recompute tracking + task_signals ring), SearchState (SharedRadarCache Arc<Mutex> + T295 watchdog:Option<WatchdogHandle> — dropped on reload to stop the old meili supervisor), Chunk, SearchResult, SearchMetrics, SearchOverlayInfo (meili_cpu_pct/memory_bytes), MeiliLiveStats, IndexerCmd, WatcherHandle(RecommendedWatcher). logs_index_settings.
@@ -4102,6 +4114,10 @@
   path: crates/cp-orchestrator/src/services/agent_meta.rs
   description: 'Per-agent cosmetic metadata services. NameOverrides (T328): custom display names via agent-names.json. AvatarStore (T338): profile pictures via avatars/{id}.{ext}, magic-byte content-type sniffing, MAX_AVATAR_BYTES 2MiB. Both merged from former names.rs + avatars.rs.'
   last_edited_ms: 0
+351e1e6eae68f3c6:
+  path: docs/design-mobile.md
+  description: Mobile mirror + switch design doc (v3). §3 architecture (mirror token, stub+ancestor-promotion), §5 3-invariant lint, §11 second-order hardening (import-graph divergence-closure, AST rewrite, hoisted lazy). P0-P4 rollout done; folder-by-folder recode in progress.
+  last_edited_ms: 1784666643981
 352e9ad84f0cac0b:
   path: crates/cp-orchestrator/src/transport/rest/backend.rs
   description: Backend shared state struct + impl. Holds view/breaker/hub/tickets/inspect/agents_dir/dirty/supervisor/retired/names/avatars/auth/session_ttl/releases/pkce_session(T451). Accessor methods + for_test.
@@ -4662,6 +4678,10 @@
   path: crates/cp-mod-prompt/src/skill_panel.rs
   description: Skill panel UI. Markdown-rendered content via cp_render::markdown::to_blocks(). Title/refresh/context methods. refresh() syncs cached_content for all loaded skills.
   last_edited_ms: 0
+3c9f7e6eefbd3fa7:
+  path: web/src/components/shell/config/UpdatePane.tsx
+  description: Desktop Update pane (O5.2). Version+channel, auto/manual/paused mode, maintenance window, apply-progress poll. All server-persisted /api/update/*. Mobile twin exists.
+  last_edited_ms: 1784666643452
 3ca186c76b317822:
   path: ui/src/App.tsx
   description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Mounts <TooltipProvider delay=350 closeDelay=80> (T25) around the shell so all <Tip> tooltips share one delay. Fleet → FleetShell (Agents⇄Prompts). Cockpit → CockpitView. threads/finder per-agent (Finder keyed by agent.id). openAgent switches agent→threads. newAgent() sets view=fleet + createAgent flag → FleetShell openCreate.
@@ -5290,6 +5310,10 @@
   path: ui/src/components/conversation/InputBar.tsx
   description: 'Mock input bar: blinking caret, key hints (send/cycle-view/file). Non-functional (design only).'
   last_edited_ms: 0
+440177ec22b74a81:
+  path: web/src/mobile-components/shell/config/SecretsPane.tsx
+  description: 'Mobile SecretsPane twin — 16px key input (iOS zoom), active: touch buttons. Swaps LoginFlow to @/mobile-components/shell/widgets/UsageButton token. Mutations shared @/lib/api.'
+  last_edited_ms: 1784666643277
 4402085b8fdfd09b:
   path: crates/cp-render/src/markdown.rs
   description: Markdown->IR parser. to_blocks/parse_line/parse_inline flat dispatcher over handle_code/handle_marker/handle_link + take_code/take_bold/take_link + LinkParse enum (A2). Table parsing split_table_row/is_separator_row/parse_alignment/parse_table.
@@ -7138,6 +7162,10 @@
   path: crates/cp-orchestrator/src/services/avatars.rs
   description: 'Orchestrator-owned agent avatar store (T338). AvatarStore: HashMap<agent_id, content_type> + raw image files under <agents_dir>/agent-avatars/. Magic-byte sniffing (PNG/JPEG/GIF/WebP/BMP/ICO/SVG). 2MiB limit. Atomic persist (sidecar JSON map + file write). load/get/set/remove/has. Unit-tested roundtrip + oversize rejection.'
   last_edited_ms: 0
+5c9eba10e856114a:
+  path: web/src/lib/live/threadView.ts
+  description: Shared thread view orchestration (non-forked) — useThreadSelection (selection+localStorage+auto-select) + useThreadActions (archive/pause/delete/create/send/attach + notice). Zero component imports; both desktop+mobile ThreadsView consume.
+  last_edited_ms: 1784666645210
 5cab556dd0ad151a:
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints. Ctrl+C ''copied ✓'' flash (2s) via copied_flash_ms.'
@@ -7238,6 +7266,10 @@
   path: ui/src/components/agents/FleetDashboard.tsx
   description: 'Fleet welcome dashboard — landing surface of the Agents view. Greeting header + aggregate stat strip (agents/threads/working/waiting) + AgentCard grid (per-agent: status, branch, model, thread pills working/waiting, cost, Open/Manage) + New-agent card. Thread stats derived from threadDetails by agentId.'
   last_edited_ms: 1781515390685
+5e1b15b354b1f0f5:
+  path: web/src/mobile-components/threads/ThreadsView.tsx
+  description: Mobile ThreadsView twin — stack navigation (list screen then conversation screen + back) vs desktop master-detail. All selection/mutation logic from shared @/lib/live/threadView hooks.
+  last_edited_ms: 1784666645034
 5e36c0fec1d39e57:
   path: crates/cp-orchestrator/src/transport/auth/mod.rs
   description: 'Auth middleware + REST handlers. authenticate(): centralized Bearer gate (no-op when disabled, NFR-09). Public routes: login (FR-05), register (bootstrap FR-03 or admin-creates), auth/status, SSE (ticket-based), and agent avatar (T345 — loaded by plain <img src> which can''t send Bearer; non-sensitive profile pic, public-safe, also skips ACL since auth_user=None). Protected: logout, me, list/create/delete users, force-logout user (Phase 10). Re-exports ACL functions from acl.rs.'
@@ -8298,6 +8330,10 @@
   path: src/llms/cache/mod.rs
   description: 'Module declarations: cache_engine, cache_optimizer, density.'
   last_edited_ms: 0
+6bf3c65d7a0d4188:
+  path: web/src/mobile-components/threads/CreateCommandDialog.tsx
+  description: Mobile CreateCommandDialog twin — 16px fields (iOS zoom), mobile ui/dialog+input+textarea+button token. Live /slug preview + useCreateCommand mutation identical.
+  last_edited_ms: 1784666645297
 6bfc602e35e3fb91:
   path: ui/src/lib/account.tsx
   description: Shared account context (T30). AccountProvider holds the mutable `managedByCompany` flag (seeded from currentUser mock) + setManaged; useAccount() hook exposes {user, managed, setManaged}. Single source of truth so the ProfileModal account-type toggle drives BOTH the Profile account section AND the ConfigPanel API-key lock in sync. Mounted in App.tsx around the shell.
@@ -8806,6 +8842,10 @@
   path: crates/cp-mod-search/src/meili/watchdog.rs
   description: 'Meilisearch supervision (T295 self-heal): SpawnLock (machine-wide single-flight spawn guard = atomic create_new spawn.lock + steal-if-stale 30s, RAII removes on drop) + WatchdogHandle (per-agent supervisor thread, Mutex<stop:Sender,join> so it''s Sync; Drop signals+joins so a reload never stacks two). run() loop: every WATCHDOG_INTERVAL(5s) server::health_ok(port,key); on fail respawn() under SpawnLock (elected spawner calls ensure_server_running; losers defer LOCK_POLL then reconnect_ok); geometric backoff_for() base 2s→cap 60s on consecutive failures. Fixes Gap A (no supervision → dead meili stayed dead until reboot).'
   last_edited_ms: 0
+722bd9ca90106c7a:
+  path: web/src/mobile-components/threads/ThreadList.tsx
+  description: Mobile ThreadList twin — full-width (no sidebar rail), always-visible touch row actions (32px, no group-hover), archive/pause/delete. Filter/group/sort logic identical.
+  last_edited_ms: 1784666644335
 724772c85d80151d:
   path: web/src/lib/support/telemetry/index.ts
   description: Telemetry public surface. Wires the producers (web-vitals, LoAF, rAF stall monitor, Web-Worker heartbeat) into the shared store via idempotent initTelemetry() (called once from main.tsx). Exposes useTelemetry() read hook (useSyncExternalStore) + re-exports measure/measureAsync/TelemetryProfiler/reset + event types.
@@ -8910,6 +8950,10 @@
   path: web/src/components/threads/forms/FormWidget.tsx
   description: Interactive form widget rendered inline from ```form``` block. localStorage draft per form-id, fieldFilled client-side submit gate, LockedForm read-only view.
   last_edited_ms: 1784222584341
+73b6ab5e26741cfb:
+  path: web/src/components/threads/fileUpload/helpers.ts
+  description: Desktop fileUpload helpers — CommandSuggestion type, block-body parser (fields()→Map, single literal FIELD_RE), splitMessageSegments, uploadToNode (needs finder kindOf). Re-exports UploadedFile+buildUploadMessage from @/lib/live/threadUpload.
+  last_edited_ms: 1784666645385
 73c4d45dac7335bf:
   path: web/src/lib/query/sync.ts
   description: 'SSE→QueryClient delta bridge (push plane Leg-2 frontend) — the IMPERATIVE half (pure folds live in ./reducers, T357 split). Owns qk (query-key registry), ensureSync (idempotent per-agent SSE subscription), applyDelta (functional-updater setQueryData fold of threads+agent caches, rev high-water guard) and hydrateSpilledMessage (T357: a message_created delta with no inline_body but a head hash → fetchMessageBody → re-fold as synthetic inline delta via applyThreadDelta, so big messages appear live instead of waiting the 15s backstop poll; fetch-fail → invalidate). Re-exports applyThreadDelta/applyAgentDelta/mergeThreadLogs/OpEntry for existing consumers.'
@@ -9098,6 +9142,10 @@
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus, ThreadAuthor, ThreadMessage, Thread, ThreadQuestionForm (from_json with 50q x 100opt caps + field-length caps via cap_str, YAML-escaped other_text with \r), ThreadsState + FocusState with TypeMap accessors.'
   last_edited_ms: 0
+75806bc97a0b70b2:
+  path: web/src/components/Root.tsx
+  description: Desktop tree root — extracted from former App.tsx body. Provider-contract boundary + AppShell (view-router fleet/threads/finder/costs, TopBar+StatusBar, live vitals/SSE, disconnect overlay). Mirror twin of mobile Root.
+  last_edited_ms: 1784666644246
 758c6087049c485e:
   path: crates/cp-mod-search/src/panel.rs
   description: Search result panel + YAML formatter. format_results groups chunks by path + logs + entities. update_if_changed via let _changed (T586).
@@ -9254,6 +9302,10 @@
   path: ui/src/components/finder/FinderViews.tsx
   description: 'Finder main-area views. GridView/ListView/ColumnsView/GalleryView all render macOS <FileIcon kind ext size/> (T27) instead of lucide glyphs. Grid (icon-size slider + finder-pop stagger + TagDots + focus ring), List (zebra + sortable headers + tags), Columns (Miller + metadata preview pane w/ size-84 FileIcon), Gallery (hero size-132 + filmstrip; n.image still overrides w/ gradient thumb). TagDots export. ViewHandlers: onClick(node,{additive,range})/onOpen/onContext.'
   last_edited_ms: 1781597468890
+77acd55b45bc5cc3:
+  path: web/src/mobile-components/shell/SessionVitals.tsx
+  description: Mobile SessionVitals twin — single-column probe grid (drop desktop sm:grid-cols-2), touch Check button, hover->active. Probe/group/status logic identical, shared @/lib/api.
+  last_edited_ms: 1784666645122
 77b6cf5063ee30c6:
   path: web/src/lib/types.ts
   description: 'Maquette domain types. Agent carries live vitals: phase?(idle|streaming|tooling) + inputTokens?/outputTokens? + context occupancy contextUsed?/Threshold?/Budget? plus the cache split contextHit?/contextMiss? (hit+miss==used), all folded from SSE deltas (T297). hasAvatar? (T338). ContextPanel, ThreadDetail (log:ThreadMsg[] with auto flag), Finder/Library/Usage shapes.'
@@ -9442,6 +9494,10 @@
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
+79ed3e31b54afaf4:
+  path: web/src/components/shell/config/SecretsPane.tsx
+  description: Desktop Secrets pane (superadmin) — reveal/edit provider API keys + Claude OAuth login flow. GET/PUT /api/env-keys. Mobile twin exists.
+  last_edited_ms: 1784666644423
 79efcc14f32181e8:
   path: web/e2e/finder.spec.ts
   description: Phase 4 e2e finder (4 tests) over the live inspection plane (/api/agent/{id}/fs). Root listing == backend /fs (count+names); folders carry live child counts; double-click navigates + breadcrumb/Backspace returns to root; all four view modes (grid/list/columns/gallery) render. fs() helper fetches backend listing for ground truth.
@@ -9810,6 +9866,10 @@
   path: crates/cp-orchestrator/src/transport/inspect/finder/mutate.rs
   description: 'Finder writes: fs_upload/fs_write (X906 overwrite an existing confined file — markdown editor save-back)/fs_mkdir/fs_rename/fs_move/fs_trash (T285/T294 reversible trash into .context-pilot/trash, which inherits the existing .context-pilot gitignore so trashed entries are never committed; create_dir_all). All confined, never clobber. is_bare_name/rel_child/rel_sibling helpers.'
   last_edited_ms: 1782040519855
+7e5952fc39aa87e0:
+  path: web/src/mobile-components/threads/ThreadComposer.tsx
+  description: Mobile ThreadComposer twin — 16px textarea (kills iOS focus-zoom), 36px tap targets, safe-area-inset-bottom. Draft/keyboard/command-bubble logic byte-identical via useComposer.
+  last_edited_ms: 1784666644158
 7e62f9e449ec02ce:
   path: crates/cp-orchestrator/src/transport/inspect/vitals/mod.rs
   description: 'On-demand service-connectivity vitals endpoint (GET /api/agent/{id}/vitals). Real probes: orchestrator self, agent heartbeat+status, meilisearch TCP, console Unix socket, LLM provider TCP :443, + keychecks (5 authenticated key probes). Concurrent thread-per-probe with COLLECT_DEADLINE. Never fabricates green.'
@@ -10126,6 +10186,10 @@
   path: src/modules/overview/mod.rs
   description: OverviewModule (id='core', is_global) — owns the Statistics + Tools panels, core system tools (Close_panel/system_reload/tool_manage/panel_goto_page/module_toggle), and the GLOBAL config persistence in config.json modules.core. save/load_module_data serialize active_modules, dev_mode, llm_provider + EVERY provider's model enum + reverie/cleaning/budget + token/cost counters + disabled_tools. Close_panel pre_flight warns on stale [!]/missing tree descriptions, delegating the queue-introspection guard to tools::close_context::has_pending_tree_describe. Visualizers in visualizers.rs.
   last_edited_ms: 1782116675621
+826cd9c832e52b6d:
+  path: web/src/mobile-components/Root.tsx
+  description: Mobile tree root — real divergent twin (P4). Provider-contract boundary (mounts same Theme/Auth/Account/DevMode/Overlay/Tooltip). MobileShell + BottomTabBar (fleet/threads/finder) vs desktop top-tabs. Same cp-view/cp-agent localStorage.
+  last_edited_ms: 1784666643715
 82714412645aae02:
   path: src/app/context/freeze.rs
   description: 'Freeze policy: per-panel and ordering freeze decisions (queue, tempo, breath budget). T493 fix: tempo gated on frozen_context_snapshot.is_some() so telemetry only reports tempo=ON when the full-freeze path can actually protect the prompt.'
@@ -13718,6 +13782,10 @@ b0ef0be513a36e65:
   path: crates/cp-orchestrator/src/runtime.rs
   description: 'Runtime — env Config (port/agents_dir/budget/scan_interval) + driver loop with TWO decoupled cadences: slow scan_interval (2s) for registry scan + config.json mtime backstop (inspection-resource freshness signal → SSE invalidate; X863 comment precise) + tmp reap; fast TAIL_INTERVAL (100ms) for tail_all_agents (Tailer.poll → view.apply_batch → breaker.observe). serve() blocks on HTTP. Felt-latency path is oplog-tail-primary via the SSE producer''s OplogWaiter (inotify).'
   last_edited_ms: 1781821687524
+b115eff75bfa20be:
+  path: web/src/mobile-components/threads/forms/FormMessageRow.tsx
+  description: Mobile FormMessageRow twin — un-memoized form-bearing row. Routes mobile conversation/Message + FormWidget token. Parse helpers shared (./helpers stub).
+  last_edited_ms: 1784666643626
 b1189b476c1d49c1:
   path: crates/cp-mod-files/src/panel.rs
   description: 'File panel. Background cache system for file content with syntax highlighting (IR spans). Hash-based change detection. PANEL_MAX_LOAD_BYTES hard limit. Pagination. No cache_refresh_interval (watcher-based). T355: suicide() now reaps a panel whose backing file no longer exists on disk (manual delete / git branch switch) EVEN when it has loaded content — gated on (cached_content.is_none() || cache_deprecated) so an editor''s atomic save-via-rename (brief unlink) doesn''t nuke a live panel mid-save; previously the cached_content.is_some() early-return meant a loaded panel never auto-closed and lingered with stale content.'
@@ -13826,6 +13894,10 @@ b1ecf5b9a4c798df:
   path: increment.txt
   description: Throwaway test file for queue/preflight testing
   last_edited_ms: 0
+b1f2f291f51b3de0:
+  path: web/src/mobile-components/shell/config/UpdatePane.tsx
+  description: Mobile UpdatePane twin — full-width touch buttons (own row vs desktop inline), 16px time inputs (iOS zoom), hover->active. Update logic byte-identical, shared @/lib/api.
+  last_edited_ms: 1784666643189
 b1f377ed4ee6032b:
   path: crates/cp-render/src/overlay_ir.rs
   description: Search index overlay IR types (Ctrl+I). SearchIndexOverlay, SearchServer, SearchIndex, SearchExtension, SearchSplitter, SearchEmbeddings, SearchTask, SearchRecomputed, SearchRecentFile.
@@ -13838,6 +13910,10 @@ b20dd51814738fc5:
   path: crates/cp-orchestrator/src/transport/inspect/panels.rs
   description: 'Cockpit inspection-panel endpoints (in inspect/): memory/todos/spine/queue/scratchpad/tree/callbacks/usage/library/panel_list = tier-② disk reads reshaped to maquette JSON. PLUS tools/radar/entities = DERIVED-state endpoints that return their NORMAL EMPTY shape by design (200 [] / {anchors:[],results:[]}, NOT 404): the inspection plane structurally can''t rebuild them from tier-② files (tools catalog=compile-time module YAMLs in the agent binary; radar=live half-life log ranking; entities=open SQLite, on-disk db is 0 bytes) — agent_folder guard so an unknown id still 404s; frontend renders an honest ''unavailable over web inspection plane'' notice. Absolute crate::transport:: paths.'
   last_edited_ms: 0
+b2258ac556e46098:
+  path: web/src/mobile-components/shell/config/ConfigPanes.tsx
+  description: 'Mobile ConfigPanes twin — real (ancestor-promotion): routes mobile UpdatePane/SecretsPane/ItPane (relative) + mobile UsagePage (token). Touch tap padding on option/service/model-allowlist rows. Logic shared @/lib.'
+  last_edited_ms: 1784666643102
 b231eade562ea660:
   path: crates/cp-mod-tree/src/tools.rs
   description: Tree tools with flame. compute_file_hash FNV-1a. Toggle/describe/filter. @-autocomplete via list_dir_entries.
@@ -13998,6 +14074,10 @@ b410fc09231b32ca:
   path: crates/cp-oplog/src/service.rs
   description: 'Phase 8 (X775) GAP2: OplogService — off-loop group-commit thread + asymmetric backpressure. Durability::of(&kind) pure predicate: PhaseTransition|CostAggregate=BestEffort, all else (incl Unknown, conservative) =Durable. append_durable(kind)->rev blocks on bounded sync_channel (durability backpressure), awaits post-sync ack (announce-after-durable). append_best_effort(kind)->Submitted|Dropped via try_send (drop-on-full). Dedicated commit_loop drains a batch (≤MAX_BATCH 1024), append_buffered each, ONE sync, then releases durable acks (sync failure overrides per-record success). Drop+shutdown both join (final batch synced). ack channel carries Result<u64,String> (OplogError not Clone). 6 tests.'
   last_edited_ms: 1781623192162
+b415625ae9e6431f:
+  path: web/src/mobile-components/threads/fileUpload/index.tsx
+  description: Mobile fileUpload twin — MessageFileChip/FileUploadChip/ComposerBubbles. hover->active chips, 32px Show-in-Finder target, mobile finder/support token. Existence-check via useFs.
+  last_edited_ms: 1784666643539
 b41e9edd57e06bd2:
   path: src/ui/threads_view/mod.rs
   description: Threads view layout + thread list rendering. Two-pane layout (thread list | messages). Virtual '+ New Thread' entry. IR pipeline for list items (status dots, unread indicators, selection highlight). maybe_activate_thread_question() lazy question form init. truncate_str helper.
@@ -14214,6 +14294,10 @@ b65a24f620c916f9:
   path: web/package.json
   description: 'Frontend deps. scripts: dev/build(tsc -b && vite build)/lint/preview + P2 format/format:check (prettier). engines.node ''^22.16.0 || >=24.0.0'' (P7 n/no-unsupported-features: exact code-driven floor for import.meta.dirname — n credits the ^22.16 backport + >=24, the 23.x gap is dead). @tanstack/react-query, react 19.2, tailwindcss 4.3, shadcn, vite 8, playwright, full eslint ratchet plugin roster + prettier + web-vitals.'
   last_edited_ms: 0
+b66cc173e6faed4e:
+  path: web/src/mobile-components/shell/config/ConfigPanel.tsx
+  description: Mobile ConfigPanel twin — horizontal scrollable pill-tab strip replaces desktop 230px side rail, pane full-width below. Same category visibility gates. Routes ./ConfigPanes (mobile).
+  last_edited_ms: 1784666642906
 b689ff54e81da946:
   path: src/infra/tools.rs
   description: Re-exports cp_base::tools types. execute_tool() dispatches via module system. execute_reload_tui() sets reload flag + writes config.json.
@@ -15066,6 +15150,10 @@ c192ef13584f001b:
   path: yamls/tools/spine.yaml
   description: 'Spine tool YAML. 3 tools: notification_mark_processed, spine_configure (max_cost is burst/stream-based), coucou (timer/datetime scheduling).'
   last_edited_ms: 0
+c199240df48d04f8:
+  path: web/src/components/shell/config/ItPane.tsx
+  description: Desktop IT pane (admin+) — network identity (DNS/IP, re-issues CA leaf + reloads Caddy) + TLS trust (CA root download + SHA-256 fingerprint). /api/it/*. Mobile twin exists.
+  last_edited_ms: 1784666644598
 c1a6b191d4c73b8f:
   path: crates/cp-orchestrator/src/services/auth/mod.rs
   description: Auth service module hub — declares types, store, backup, helpers submodules. Orchestrator-level user/session/ACL backed by dedicated SQLite (design doc §5).
@@ -15122,6 +15210,10 @@ c2cacb90a94e5d24:
   path: crates/cp-mod-github/src/panel.rs
   description: 'GithubResultPanel: static gh command output panel (no auto-refresh). Token redaction, tab-delimited PR/issue table rendering. Refreshes only when explicitly dirtied by mutating commands.'
   last_edited_ms: 0
+c2cc7f5c4aa123e3:
+  path: web/src/mobile-components/threads/NewThreadDialog.tsx
+  description: Mobile NewThreadDialog twin — 16px title input (iOS zoom), taller touch controls, mobile ui/dialog token. Single-field create flow identical.
+  last_edited_ms: 1784666644947
 c2cf88c5f7477e1f:
   path: src/llms/oai_providers/groq.rs
   description: Groq client. OpenAI-compatible with built-in tools (browser_search, code_interpreter) for GPT-OSS models. API key from vault ("groq").
@@ -15988,8 +16080,8 @@ cdbafcc2b17c4fc5:
   last_edited_ms: 0
 cdbe10ceb3bf7a57:
   path: web/src/components/shell/SessionVitals.tsx
-  description: 'Service vitals as an EMBEDDABLE section (no Dialog chrome) — on-demand connectivity board only (T455: context-budget meter + figure chips removed). Rendered inside AgentModal manage mode right column. Backend probes prepended with 2 browser-only rows (frontend alive + round-trip). Grouped by category. Healthy rows quiet; degraded rows raise loud status chip.'
-  last_edited_ms: 0
+  description: Desktop SessionVitals — on-demand connectivity board (embeddable, no dialog chrome). Backend /api/agent/{id}/vitals + 2 browser-only rows prepended. Grouped by category. Mobile twin exists (single-col).
+  last_edited_ms: 1784666655881
 cdd1b6571eee0a05:
   path: crates/cp-mod-search/src/index/reconcile.rs
   description: Boot + hourly FS⇄index reconciliation. FilePrint (mtime,size) fingerprint, pure diff(), compute_plan/send_plan via IndexerCmd channel. mtime_ms() is the shared formula with index_one_file.
@@ -16886,6 +16978,10 @@ da5c21c4da6a7834:
   path: crates/cp-wire/src/types/command.rs
   description: Command envelope (id, seq, dedup_token) + Kind (SendMessage, CreateThread, ArchiveThread, RestoreThread, InterruptStream, Stop, Unknown).
   last_edited_ms: 1781617086655
+da5dcaaf9a5eae8a:
+  path: web/src/mobile-components/threads/forms/FormFields.tsx
+  description: Mobile FormFields twin — 8 field renderers, 16px SCALAR_INPUT, py-2.5 option rows (≥40px tap), mobile ui/calendar+popover token. Field logic byte-identical.
+  last_edited_ms: 1784666643893
 da64e012d7f22cc2:
   path: src/llms/claude_code/mod.rs
   description: Claude Code OAuth client. Token from macOS Keychain or ~/.claude/.credentials.json. Mimics claude-cli/2.1.37 headers. Cache breakpoint placement. Billing header injection. System reminder for validation. Debug helpers extracted to debug.rs.
@@ -17410,6 +17506,10 @@ e2be8400e7878d25:
   path: web/src/App.tsx
   description: 'Root shell. activeAgent = useAgentMeta(activeAgentId) (delta-folded per-agent meta) ?? fleetAgent (polled-fleet identity fallback) so the always-visible TopBar + StatusBar ride the push plane for phase/cost/tokens instead of the 15s fleet poll (T297). view/agent persisted to localStorage; effectiveView falls back to fleet when no live agent. T334: finderRevealPath state + showInFinder handler switch to finder view and pass revealPath to Finder for file reveal. T341: wrapped with AuthProvider + AuthGuard.'
   last_edited_ms: 1782241220490
+e2c10ccbca86bafe:
+  path: web/src/mobile-components/threads/ThreadConversation.tsx
+  description: Mobile ThreadConversation twin — single full-width column (no FileSidebar rail), no OS drag-drop. Memoized AutoRun/MessageRow, scroll-pin, forms plumbing all shared desktop behaviour.
+  last_edited_ms: 1784666644070
 e2c3fd78a28d00cd:
   path: ui/src/components/panels/cockpit/RadarPanel.tsx
   description: 'Cockpit Context Radar maquette: anchor signals + recency-weighted scored results with score meter, importance dot, timestamp. Reads mock radarAnchors/radarResults.'
@@ -17938,6 +18038,10 @@ e99d7f7da7dd2fba:
   path: .git/index
   description: Git index (binary). Not source.
   last_edited_ms: 0
+e9c2b3e80b92bb28:
+  path: web/src/mobile-components/shell/config/ConfigModal.tsx
+  description: Mobile ConfigModal twin — full-screen sheet (w-screen h-screen, no gutters) vs desktop centered 88vh×1100px. mobile ui/dialog token. Wraps mobile ConfigPanel.
+  last_edited_ms: 1784666643015
 e9d63dbe04b4ddb4:
   path: src/modules/conversation_history/recompute_toggled_tree_folders.rs
   description: 'Rebuilds tree open_folders after Close_conversation_history: ancestor folders of open file panels + explicitly-opened folders (collect_from_tool_use helper) from current + remaining history convos + root. 5 unit tests.'
@@ -18778,6 +18882,10 @@ f456dec19406f4fc:
   path: crates/cp-base/src/state/autocomplete.rs
   description: 'Completion/Suggestions structs #[non_exhaustive] A5 (in-crate built).'
   last_edited_ms: 0
+f47104775beba6eb:
+  path: web/src/lib/live/threadUpload.ts
+  description: Shared thread upload logic (non-forked) — UploadedFile type + buildUploadMessage (```file-upload``` YAML block composer). Extracted from desktop helpers so mobile consumes same logic without leak. Both trees import here.
+  last_edited_ms: 1784666644772
 f48f18e6e4e75e59:
   path: web/src/components/shell/costs/CostsView.tsx
   description: Cost Analysis dashboard page. Summary cards, culprit donut, cost timeline, cost/tool bars, two token distribution bars (panel-estimated before/culprit/after + API-reported hit/miss/output for comparison), Tool×Culprit cross-tab with heat-map. Both token bars filter on !noPanelBroken. Tempo/queue/no-break AND-filters. TanStack useQuery + fetchFsPreview 15s refetch.
@@ -19234,6 +19342,10 @@ f9f8bd0405f40c00:
   path: crates/cp-mod-firecrawl/src/tools.rs
   description: Firecrawl tools (scrape/search/map). A3 else_if fix at :201 (build_search_results_content). Async spawn, dyn panels, PANEL_WARNING.
   last_edited_ms: 0
+fa062fdfa58ca395:
+  path: web/src/components/threads/ThreadsView.tsx
+  description: Desktop ThreadsView — master-detail (list rail + conversation). Uses shared useThreadSelection+useThreadActions from @/lib/live/threadView. Mobile twin = stack nav.
+  last_edited_ms: 1784666645472
 fa07059c45a476ab:
   path: crates/cp-mod-memory/src/panel.rs
   description: Memory panel. Sorts by importance (critical→low). format_memories_for_context() YAML output for LLM. blocks() renders KeyValue with importance-colored labels. refresh() updates context entry. context() returns ContextItem. needs_cache=false.
@@ -19274,6 +19386,10 @@ fa529da3b0bb39c4:
   path: crates/cp-orchestrator/src/transport/inspect/metrics.rs
   description: '§19 observability metrics endpoints. agent_metrics + fleet_metrics build per-agent snapshot: durable cost-breaker state (tripped/spend/budget), stream health (subs/dropped/degraded), view-vs-oplog rev lag (oplog_head_rev read fresh outside the lock), phase+lifecycle. T346: fleet_metrics now takes auth_user and ACL-filters via auth::filter_fleet (mirrors fleet_meta — a regular user must not enumerate every agent''s id/cost/budget via the Usage page). Only figures the backend genuinely holds — latency histograms deliberately not synthesised.'
   last_edited_ms: 0
+fa639896f94b2d15:
+  path: web/src/mobile-components/shell/TopBar.tsx
+  description: Mobile TopBar twin — slim hamburger + centered title (lucide-only, leak-clean). First hand-authored divergent leaf (P4); desktop dense control cluster splits to BottomTabBar + drawer.
+  last_edited_ms: 1784666644685
 fa65263886edc2ea:
   path: src/app/actions/helpers.rs
   description: Action utils + switch_to_panel (scroll-preserving). clean_llm_id_prefix, parse_context_pattern, eject_cursor_from_sentinel. select_context/page_dynamic split panel_id_key/sorted_by_panel_id/next_dynamic_page (A2).
@@ -19434,6 +19550,10 @@ fbf8fe9fb44a116e:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search.
   last_edited_ms: 0
+fc082c693b657bce:
+  path: web/src/components/shell/config/ConfigModal.tsx
+  description: Desktop ConfigModal — portaled Base UI Dialog wrapping shared ConfigPanel (variant=dialog), centered 88vh×1100px. TopBar gear entry. Mobile twin = full-screen sheet.
+  last_edited_ms: 1784666644859
 fc0e3d283a7c238b:
   path: ui/src/components/finder/ContextMenu.tsx
   description: Right-click context menu (macOS action sheet). Open/Get Info/Rename/Duplicate/Download, macOS tag swatches, Move to Trash. Keeps on-screen, Esc/outside-click close. Decorative actions flash a toast.
