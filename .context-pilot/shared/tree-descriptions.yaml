@@ -666,6 +666,10 @@
   path: crates/cp-base/src/state/data/mod.rs
   description: 'Re-exports config/message/model_helpers. CacheBreakKind enum #[expect(exhaustive_enums)] A4 + TickTelemetry struct.'
   last_edited_ms: 1784496447703
+081b6923d928d640:
+  path: web/src/mobile-components/finder/preview/FinderPreview.tsx
+  description: Mobile Quick Look preview shell twin. Taller h-11 touch header, 40px IconBtn download/close. Kind routing (inlinePreview/livePreview/Body) byte-identical to desktop. "pane" variant hosted in mobile QuickLookSheet bottom sheet.
+  last_edited_ms: 1784668505854
 081e424b5a224a81:
   path: web/src/components/threads/ThreadList.tsx
   description: 'Left rail of threads view — ALWAYS OPEN. Working search filters by name+last-preview. Groups: Needs you/Active/Working in parallel. Per-row hover Archive/Restore. Footer Archived toggle. New Thread button.'
@@ -4034,6 +4038,10 @@
   path: crates/cp-oplog/src/replay.rs
   description: 'Oplog replay (GAP1/I5): Recovered{rev_head,heads,seen,roster}. fold_entry: Checkpoint=authoritative clone_from heads+seen+roster, MessageCreated=set_thread_head + RosterThread::fold_message, ThreadCreated/Archived/Restored/StatusChanged=RosterThread fold helpers (roster rebuilt from deltas), CommandEffect|SeenMark=seen.mark, others no-op. Fast-path reads only newest checkpoint-bearing segment; roster survives compaction because the checkpoint Snapshot carries it. Tests incl replay_rebuilds_roster_from_thread_deltas + roster_survives_compaction_via_checkpoint.'
   last_edited_ms: 0
+33f88ace12a6c65e:
+  path: web/src/mobile-components/finder/preview/previewParts.tsx
+  description: Mobile preview leaf renderers twin. 40px active-press IconBtn (vs 28px desktop hover), 12.5-13px text, py-2 folder rows. MarkdownPreview/TextPreview/FolderPreview/Generic/Empty.
+  last_edited_ms: 1784668506082
 3406a78fe2e3d147:
   path: crates/cp-base/src/config/yaml_sync.rs
   description: YamlSync engine. SyncEntry trait (yaml_key, last_edited_ms, set_last_edited_ms). Generic load/save/upsert/remove/populate/migrate/remove_where. BTreeMap-based, additive merge, latest-wins conflict resolution, .bak backup.
@@ -9962,6 +9970,10 @@
   path: ui/src/components/threads/QuestionForm.tsx
   description: 'Embedded thread question form (CP signature): single/multi-select options with interactive pick state, allowOther field, submit button. Cyan-accented, decorative but stateful.'
   last_edited_ms: 0
+7f5b944ec9a7c780:
+  path: web/src/mobile-components/finder/preview/SheetGrid.tsx
+  description: '@generated stub re-exporting desktop Univer SheetGrid. Engine handles touch natively; only cosmetic Save badge diverges, so no fork (M141 DRY).'
+  last_edited_ms: 1784668506170
 7f613d64aa418e28:
   path: web/src/lib/api/generated/sdk.gen.ts
   description: Auto-generated typed SDK functions from openapi.json. One function per REST endpoint (getApiFleetMeta, getApiAgentByIdThreads, postApiAuthLogin, etc). Uses @hey-api client runtime, NOT the manual request() wrapper.
@@ -17190,6 +17202,10 @@ dc9f4e77914b4f5c:
   path: crates/cp-mod-git/src/lib.rs
   description: 'Git module. 1 tool: git_execute. refresh_git_status() for overview (branch + numstat). Watches .git/ paths. watcher_immediate_refresh=false to prevent feedback. overview_context_section renders changes table — HARD-CAPPED at GIT_OVERVIEW_CAP_BYTES (8 KiB): a broken .gitignore mid-rebase can make git report thousands of files, ballooning the section to 1M+ tokens and wrecking context; beyond budget it truncates on a newline boundary + appends ''(Rest hidden, N kB left)''.'
   last_edited_ms: 1782291787377
+dcacc6ed6d035d9d:
+  path: web/src/mobile-components/finder/preview/livePreviews.tsx
+  description: Mobile live Finder previews twin. Touch-sized zoom/copy/save (36-40px active-press vs desktop hover), MarkdownEditor lazy import swapped to @/mobile-components twin (leak guard), SheetGrid stub lazy-load (Univer touch-native). dangerouslySetInnerHTML scope-off in eslint.config + registry.
+  last_edited_ms: 1784668505994
 dcb9ef498a7d8eef:
   path: crates/cp-mod-threads/src/panel.rs
   description: 'ThreadsPanel: thread list with [MY_TURN]/[THEIR_TURN] badges, last 5 messages per thread, message count. Context: MY_TURN threads with messages, THEIR_TURN summary only. max_freeze=3.'
