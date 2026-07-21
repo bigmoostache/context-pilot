@@ -1,7 +1,21 @@
 import { useState } from "react"
 
-/** Viewport width at/under which the mobile component tree is chosen. */
-const MOBILE_QUERY = "(max-width: 768px)"
+/**
+ * The media query that selects the mobile component tree — an OR of two signals
+ * (comma in a media query is a union):
+ *
+ *   • `(max-width: 768px)` — the CLASSIC responsive breakpoint (Bootstrap `md`,
+ *     Tailwind `md`). A narrow window — phone OR a dragged-narrow desktop — gets
+ *     the mobile tree, which is the conventional responsive intent.
+ *   • `(pointer: coarse)` — a touch-primary device (phone / tablet / foldable)
+ *     whose viewport happens to exceed 768px still gets the touch-optimised
+ *     tree. This is the robustness signal: width alone misclassifies a portrait
+ *     tablet, `pointer` catches it.
+ *
+ * Together they are the industry-standard "is this a small-or-touch device"
+ * probe — robust across form factors without over-reaching.
+ */
+const MOBILE_QUERY = "(max-width: 768px), (pointer: coarse)"
 
 /**
  * Resolve whether the mobile component tree should render — **once, at first
