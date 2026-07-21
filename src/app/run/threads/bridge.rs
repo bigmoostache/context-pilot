@@ -166,10 +166,12 @@ pub(super) fn emit_roster_delta(state: &State, kind: OpEntryKind) {
 /// [`StreamPhase`]: cp_base::state::flags::StreamPhase
 const fn wire_phase(phase: cp_base::state::flags::StreamPhase) -> Phase {
     use cp_base::state::flags::StreamPhase;
-    match phase {
-        StreamPhase::Receiving => Phase::Streaming,
-        StreamPhase::ExecutingTools => Phase::Tooling,
-        StreamPhase::Idle => Phase::Idle,
+    if matches!(phase, StreamPhase::Receiving) {
+        Phase::Streaming
+    } else if matches!(phase, StreamPhase::ExecutingTools) {
+        Phase::Tooling
+    } else {
+        Phase::Idle
     }
 }
 
@@ -267,10 +269,7 @@ pub(in crate::app::run) fn emit_vitals(app: &mut App) {
 /// convention actually in use across both planes is identity-by-name, and this
 /// helper is the single place that conversion lives.)
 pub(super) const fn wire_turn(status: ThreadStatus) -> ThreadTurn {
-    match status {
-        ThreadStatus::MyTurn => ThreadTurn::MyTurn,
-        ThreadStatus::TheirTurn => ThreadTurn::TheirTurn,
-    }
+    if matches!(status, ThreadStatus::MyTurn) { ThreadTurn::MyTurn } else { ThreadTurn::TheirTurn }
 }
 
 /// Emit a [`ThreadStatusChanged`](OpEntryKind::ThreadStatusChanged) the instant

@@ -38,7 +38,6 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Spine module: auto-continuation, notifications, guard rails, coucou timers.
 #[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
 pub struct SpineModule;
 
 impl Default for SpineModule {

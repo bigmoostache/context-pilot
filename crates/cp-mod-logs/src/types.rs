@@ -8,7 +8,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// Stored as chunked JSON in `.context-pilot/logs/`.  Indexed into
 /// Meilisearch by the search module's file watcher for full-text search.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct LogEntry {
     /// Log ID (L1, L2, ...).
     pub id: String,
@@ -53,7 +52,6 @@ impl LogEntry {
 
 /// Module-owned state for the Logs module
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct LogsState {
     /// All log entries, ordered by creation.
     pub logs: Vec<LogEntry>,

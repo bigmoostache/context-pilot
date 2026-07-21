@@ -18,7 +18,6 @@ use crate::types::CallbackState;
 
 /// Result of firing a callback, including dedup info.
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct FireResult {
     /// Console session key for the spawned script.
     pub session_key: String,
@@ -267,7 +266,6 @@ fn shell_escape(s: &str) -> String {
 /// On exit 0: returns `success_message` + log file path, kills session.
 /// On exit != 0: returns error output + deferred panel info for `tool_cleanup` to create.
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct CallbackWatcher {
     /// Unique watcher ID (e.g., "`callback_CB3_cb_42`").
     pub watcher_id: String,

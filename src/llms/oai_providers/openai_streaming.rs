@@ -378,9 +378,5 @@ pub(crate) fn oai_check_api(ep: &OaiEndpoint<'_>, model: &str, tokens_field: &st
     });
     let tools_ok = probe_ok(ep, &tools_body);
 
-    let mut r = super::super::ApiCheckResult::default();
-    r.auth_ok = true;
-    r.streaming_ok = streaming_ok;
-    r.tools_ok = tools_ok;
-    r
+    super::super::ApiCheckResult { auth_ok: true, streaming_ok, tools_ok, ..Default::default() }
 }

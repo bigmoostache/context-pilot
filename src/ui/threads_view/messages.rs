@@ -32,11 +32,10 @@ pub(super) fn render_message_area_with_input(frame: &mut Frame<'_>, state: &Stat
     let is_focused = focus.focused_thread_id.as_deref() == Some(thread.id.as_str());
     let (status_label, status_sem) = if is_focused {
         (" [FOCUSED]", Semantic::Accent)
+    } else if matches!(thread.status, ThreadStatus::MyTurn) {
+        (" [MY_TURN]", Semantic::Warning)
     } else {
-        match thread.status {
-            ThreadStatus::MyTurn => (" [MY_TURN]", Semantic::Warning),
-            ThreadStatus::TheirTurn => (" [THEIR_TURN]", Semantic::Success),
-        }
+        (" [THEIR_TURN]", Semantic::Success)
     };
 
     let title = ratatui::text::Line::from(vec![
@@ -183,10 +182,7 @@ fn auto_line(msg: &cp_mod_threads::types::ThreadMessage) -> String {
 
 /// Convert a `ThreadMessage` to a `Message` for the conversation IR renderer.
 fn thread_message_to_message(msg: &cp_mod_threads::types::ThreadMessage) -> Message {
-    let role = match msg.author {
-        ThreadAuthor::User => "user",
-        ThreadAuthor::Assistant => "assistant",
-    };
+    let role = if matches!(msg.author, ThreadAuthor::Assistant) { "assistant" } else { "user" };
     let content = msg.content.clone().unwrap_or_default();
 
     Message::new_text(String::new(), role, content).at(msg.timestamp)

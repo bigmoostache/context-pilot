@@ -6,10 +6,6 @@ use std::str::FromStr;
 /// Todo item status
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "todo-status contract: TodoStatus is a closed Pending/InProgress/Done set serde-persisted and constructed cross-crate, matched exhaustively by icon()/FromStr; #[non_exhaustive] would forbid that construction"
-)]
 pub enum TodoStatus {
     #[default]
     /// Not started.
@@ -47,7 +43,6 @@ impl FromStr for TodoStatus {
 
 /// A todo item
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct TodoItem {
     /// Todo ID (X1, X2, ...)
     pub id: String,
@@ -66,7 +61,6 @@ pub struct TodoItem {
 
 /// Module-owned state for the Todo module
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct TodoState {
     /// All todo items (top-level + nested children).
     pub todos: Vec<TodoItem>,

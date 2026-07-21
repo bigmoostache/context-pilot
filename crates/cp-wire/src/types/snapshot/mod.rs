@@ -140,46 +140,103 @@ impl<'src> ThreadCreation<'src> {
     }
 }
 
-/// The seven owned fields of a [`RosterThread`], bundled so
-/// [`RosterThread::new`] takes one argument rather than seven.
+/// Fluent builder for a [`RosterThread`].
 ///
-/// A cross-crate builder (the backend's test fixtures) constructs this by
-/// literal and hands it to [`RosterThread::new`]; it is deliberately
-/// exhaustive so that literal construction is allowed, unlike the
-/// `#[non_exhaustive]` [`RosterThread`] it feeds.
+/// The three identifying fields (`thread_id`, `name`, `status`) are required up
+/// front in [`RosterThread::builder`]; the four state fields default to their
+/// natural zero (`archived`/`paused` off, `last_activity_ms`/`msg_count` zero)
+/// and are overridden with the setters. This keeps [`RosterThread`]
+/// `#[non_exhaustive]` — cross-crate callers (backend test fixtures) build it
+/// through the builder instead of a forbidden literal — without a wide
+/// positional constructor tripping `too_many_arguments`.
+///
+/// Fields are private, so the builder itself never triggers `exhaustive_structs`.
 #[derive(Clone, Debug)]
-#[expect(
-    clippy::exhaustive_structs,
-    reason = "roster-entry init bundle: a flat 7-field carrier built by literal cross-crate (backend test fixtures) then consumed by RosterThread::new; #[non_exhaustive] would forbid that literal (the very E0639 this bundle exists to route around) and a 7-arg constructor trips too_many_arguments (threshold 4)"
-)]
-pub struct RosterEntryInit {
+pub struct RosterThreadBuilder {
     /// Thread identifier (e.g. `"T7"`).
-    pub thread_id: String,
+    thread_id: String,
     /// User-chosen thread label.
-    pub name: String,
+    name: String,
     /// Current turn ownership.
-    pub status: ThreadTurn,
+    status: ThreadTurn,
     /// Whether the thread is archived (soft-deleted).
-    pub archived: bool,
+    archived: bool,
     /// Whether the thread is paused (no idle `MY_TURN` notifications).
-    pub paused: bool,
+    paused: bool,
     /// Epoch-ms of the latest activity.
-    pub last_activity_ms: u64,
+    last_activity_ms: u64,
     /// Number of messages folded into this thread so far.
-    pub msg_count: u32,
+    msg_count: u32,
+}
+
+impl RosterThreadBuilder {
+    /// Mark the thread archived (soft-deleted). Default `false`.
+    #[must_use]
+    pub const fn archived(mut self, archived: bool) -> Self {
+        self.archived = archived;
+        self
+    }
+
+    /// Mark the thread paused (no idle `MY_TURN` notifications). Default `false`.
+    #[must_use]
+    pub const fn paused(mut self, paused: bool) -> Self {
+        self.paused = paused;
+        self
+    }
+
+    /// Set the epoch-ms of the latest activity. Default `0`.
+    #[must_use]
+    pub const fn last_activity_ms(mut self, last_activity_ms: u64) -> Self {
+        self.last_activity_ms = last_activity_ms;
+        self
+    }
+
+    /// Set the folded-message count. Default `0`.
+    #[must_use]
+    pub const fn msg_count(mut self, msg_count: u32) -> Self {
+        self.msg_count = msg_count;
+        self
+    }
+
+    /// Finalise into a [`RosterThread`]. Total (no fallible field), so it never
+    /// panics.
+    #[must_use]
+    pub fn build(self) -> RosterThread {
+        RosterThread {
+            thread_id: self.thread_id,
+            name: self.name,
+            status: self.status,
+            archived: self.archived,
+            paused: self.paused,
+            last_activity_ms: self.last_activity_ms,
+            msg_count: self.msg_count,
+        }
+    }
 }
 
 impl RosterThread {
-    /// Build a roster entry from a [`RosterEntryInit`] bundle.
+    /// Start building a roster entry from its three required identifying fields;
+    /// the four state fields default to zero until set on the returned
+    /// [`RosterThreadBuilder`].
     ///
-    /// A constructor keeps [`RosterThread`] `#[non_exhaustive]` across
-    /// cross-crate builders (backend test fixtures build entries with full
-    /// field control); the seven fields ride in the bundle so the signature
-    /// stays under the argument cap.
+    /// The builder is what lets [`RosterThread`] stay `#[non_exhaustive]`
+    /// (cross-crate fixtures cannot use a struct literal) without a
+    /// seven-argument constructor tripping `too_many_arguments`.
     #[must_use]
-    pub fn new(init: RosterEntryInit) -> Self {
-        let RosterEntryInit { thread_id, name, status, archived, paused, last_activity_ms, msg_count } = init;
-        Self { thread_id, name, status, archived, paused, last_activity_ms, msg_count }
+    pub fn builder<T, U>(thread_id: T, name: U, status: ThreadTurn) -> RosterThreadBuilder
+    where
+        T: Into<String>,
+        U: Into<String>,
+    {
+        RosterThreadBuilder {
+            thread_id: thread_id.into(),
+            name: name.into(),
+            status,
+            archived: false,
+            paused: false,
+            last_activity_ms: 0,
+            msg_count: 0,
+        }
     }
 
     /// Apply a `ThreadCreated` to a roster, **insert-or-update** so a duplicate

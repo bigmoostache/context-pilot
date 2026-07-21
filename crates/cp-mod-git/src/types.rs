@@ -4,10 +4,6 @@ use cp_base::state::runtime::State;
 
 /// Classification of how a file was changed in the working tree.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "git-change taxonomy: GitChangeType is a closed set constructed cross-crate by the status parser and matched exhaustively by the diff renderer; #[non_exhaustive] would forbid that construction"
-)]
 pub enum GitChangeType {
     /// Content modified.
     Modified,
@@ -21,9 +17,26 @@ pub enum GitChangeType {
     Renamed,
 }
 
+impl GitChangeType {
+    /// Single-letter status code for compact diff rendering (`M`/`A`/`U`/`D`/`R`).
+    ///
+    /// The exhaustive match lives here in the owning crate so downstream
+    /// renderers read the code via this accessor rather than matching the
+    /// variant set (which `#[non_exhaustive]` forbids cross-crate).
+    #[must_use]
+    pub const fn code(self) -> &'static str {
+        match self {
+            Self::Modified => "M",
+            Self::Added => "A",
+            Self::Untracked => "U",
+            Self::Deleted => "D",
+            Self::Renamed => "R",
+        }
+    }
+}
+
 /// A single file change with diff stats.
 #[derive(Debug, Clone)]
-#[non_exhaustive]
 pub struct GitFileChange {
     /// Relative file path.
     pub path: String,
@@ -39,7 +52,6 @@ pub struct GitFileChange {
 
 /// Live git repository state, refreshed on every cache tick.
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct GitState {
     /// Current branch name (None if detached HEAD).
     pub branch: Option<String>,
@@ -86,7 +98,6 @@ impl GitState {
 
 /// Payload for a git result panel cache refresh request.
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct GitResultRequest {
     /// Context element ID (e.g., "P12").
     pub context_id: String,

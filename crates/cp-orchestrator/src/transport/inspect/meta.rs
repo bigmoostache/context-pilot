@@ -358,6 +358,9 @@ fn phase_label(phase: cp_wire::types::Phase) -> &'static str {
         Phase::Idle => "idle",
         Phase::Streaming => "streaming",
         Phase::Tooling => "tooling",
+        // `Phase` is #[non_exhaustive]; a phase from a newer agent protocol
+        // folds to a neutral label rather than failing the build.
+        _ => "unknown",
     }
 }
 

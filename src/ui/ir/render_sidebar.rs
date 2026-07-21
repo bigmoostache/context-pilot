@@ -40,9 +40,8 @@ pub(super) fn padded(spans: Vec<Span<'static>>) -> Line<'static> {
 
 /// Render the sidebar region from its IR snapshot.
 pub(crate) fn render_sidebar_from_ir(frame: &mut Frame<'_>, sidebar: &Sidebar, area: Rect) {
-    match sidebar.mode {
-        SidebarMode::Normal => render_normal(frame, sidebar, area),
-        SidebarMode::Hidden => {}
+    if matches!(sidebar.mode, SidebarMode::Normal) {
+        render_normal(frame, sidebar, area);
     }
 }
 

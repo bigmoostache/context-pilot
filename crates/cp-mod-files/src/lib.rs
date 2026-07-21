@@ -186,7 +186,6 @@ fn preflight_write(tool: &ToolUse) -> Verdict {
 
 /// Files module: Open, Edit, Write tools for file manipulation.
 #[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
 pub struct FilesModule;
 
 impl Default for FilesModule {

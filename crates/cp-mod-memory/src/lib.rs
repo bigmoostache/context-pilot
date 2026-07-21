@@ -39,7 +39,6 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Memory module: persistent knowledge items across conversations.
 #[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
 pub struct MemoryModule;
 
 impl Default for MemoryModule {

@@ -11,7 +11,6 @@ use crate::state::{State, get_context_type_meta};
 use crate::ui::helpers::format_number as fmt_num;
 use cp_base::cast::Safe as _;
 use cp_base::cast::float_math;
-use cp_mod_git::types::GitChangeType;
 
 /// Progress-bar color for current occupancy relative to the cleaning threshold:
 /// error at/over threshold, warning within 10% below, else accent.
@@ -81,13 +80,7 @@ fn net_str(net: i32) -> String {
 /// Build one file-change table row (path with type char, +adds, -dels, net).
 fn git_file_row(file: &cp_mod_git::types::GitFileChange) -> Vec<Cell> {
     let net = file.additions.saturating_sub(file.deletions);
-    let type_char = match file.change_type {
-        GitChangeType::Added => "A",
-        GitChangeType::Untracked => "U",
-        GitChangeType::Deleted => "D",
-        GitChangeType::Modified => "M",
-        GitChangeType::Renamed => "R",
-    };
+    let type_char = file.change_type.code();
     let display_path = if file.path.len() > 38 {
         format!("{}...{}", type_char, file.path.get(file.path.len().saturating_sub(35)..).unwrap_or(""))
     } else {

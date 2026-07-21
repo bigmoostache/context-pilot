@@ -17,10 +17,6 @@ use std::io;
 
 /// An error raised while booting the agent-side bridge.
 #[derive(Debug)]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "bridge boot error taxonomy is a closed AlreadyRunning/Io set constructed within cp-mod-bridge and matched exhaustively by callers; #[non_exhaustive] would force cross-crate wildcard arms that the forbidden wildcard_enum_match_arm lint rejects"
-)]
 pub enum Error {
     /// Another live agent already holds the exclusive lock on this folder, so
     /// this instance must not run (single-process exclusion, design doc I1/D2).

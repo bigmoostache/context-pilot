@@ -21,10 +21,12 @@ impl ConversationPanel {
     /// Compute hash for message cache invalidation
     fn compute_message_hash(msg: &crate::state::Message, viewport_width: u16, dev_mode: bool) -> u64 {
         // Include all fields that affect rendering
-        let status_num = match msg.status {
-            MsgStatus::Full => 0u8,
-            MsgStatus::Deleted => 2,
-            MsgStatus::Detached => 3,
+        let status_num = if msg.status == MsgStatus::Full {
+            0u8
+        } else if msg.status == MsgStatus::Deleted {
+            2
+        } else {
+            3
         };
         let tool_uses_len = msg.tool_uses.len();
         let tool_results_len = msg.tool_results.len();

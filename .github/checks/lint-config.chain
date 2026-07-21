@@ -6202,3 +6202,820 @@ index 3f19a105..8ce64176 100644
    - path: "crates/cp-mod-utilities/src/time.rs"
      match: "const-fn widening (u8/i32 -> i64) is always exact"
 # --- End entry #53 ---
+54:5a6e46adece6d5b6608c9ca58575fb1d6589aec50891551629d1a9f32ee3d1a0:52c38fa94cf570f514300789407055d38227cce89cdea1954e3404c24b43342c:19f1635885c70e4b9a7cf0a112ef748c1701d6a94ddf1fe4cac6984889ed8719
+# --- Diff for entry #54 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 8ce64176..09b96315 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -383,22 +383,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-vault/src/registry.rs"
+-    match: "credential-registry taxonomy: KeyCategory is a closed set"
+-    reason: >
+-      KeyCategory is a closed set constructed in the ALL_KEYS table and matched
+-      exhaustively by health/UI code; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+-  - path: "crates/cp-vault/src/registry.rs"
+-    match: "credential-registry taxonomy: AuthMechanism is a closed set"
+-    reason: >
+-      AuthMechanism is a closed set constructed in the ALL_KEYS table and matched
+-      exhaustively by the resolution cascade; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-vault/src/types.rs"
+     match: "vault error taxonomy is a closed set"
+     reason: >
+@@ -626,14 +610,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-mod-console/src/types.rs"
+-    match: "process-status contract"
+-    reason: >
+-      ProcessStatus is a closed lifecycle set constructed cross-crate by the session manager
+-      and matched exhaustively by label()/exit_code(); non_exhaustive would forbid it.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-mod-bridge/src/body.rs"
+     match: "body-disposition contract"
+     reason: >
+@@ -690,23 +666,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-mod-spine/src/types.rs"
+-    match: "notification-status contract"
+-    reason: >
+-      NotificationStatus is a closed Unprocessed/Blocked/Processed set serde-persisted and
+-      constructed cross-crate, matched exhaustively by the spine state machine; non_exhaustive
+-      would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+-  - path: "crates/cp-mod-spine/src/types.rs"
+-    match: "continuation-action contract"
+-    reason: >
+-      ContinuationAction is a closed SyntheticMessage/Relaunch set constructed by the continuation
+-      builder and matched exhaustively by apply_continuation; non_exhaustive would forbid it.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-mod-threads/src/types.rs"
+     match: "thread-turn contract: ThreadStatus is a closed MyTurn/TheirTurn set"
+     reason: >
+# --- End entry #54 ---
+55:19f1635885c70e4b9a7cf0a112ef748c1701d6a94ddf1fe4cac6984889ed8719:3f6e8d6c106d424e0f2b5b9b8259adcfd1ea9279d4cc48f370971ac38977579f:0eebc92838928c52a03181e503fdbfe99eb4aaf7d223483a888e6f7788c2f13b
+# --- Diff for entry #55 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 09b96315..c8de17ce 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -586,14 +586,6 @@ exceptions:
+ 
+   # ── exhaustive_enums: cp-mod-* leaf module contracts ─────────────────
+ 
+-  - path: "crates/cp-mod-github/src/classify/mod.rs"
+-    match: "command-class contract"
+-    reason: >
+-      CommandClass is a closed ReadOnly/Mutating set returned by classify() and matched
+-      exhaustively by the executor; non_exhaustive adds nothing to a binary outcome.
+-    strategy: >
+-      Irreducible — a binary outcome gains nothing from non_exhaustive.
+-
+   - path: "crates/cp-mod-git/src/types.rs"
+     match: "git-change taxonomy"
+     reason: >
+@@ -602,14 +594,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-mod-todo/src/types.rs"
+-    match: "todo-status contract"
+-    reason: >
+-      TodoStatus is a closed Pending/InProgress/Done set serde-persisted and constructed
+-      cross-crate, matched exhaustively by icon()/FromStr; non_exhaustive would forbid it.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-mod-bridge/src/body.rs"
+     match: "body-disposition contract"
+     reason: >
+@@ -626,30 +610,6 @@ exceptions:
+     strategy: >
+       Irreducible — closed error taxonomy, wildcard arms are forbidden.
+ 
+-  - path: "crates/cp-mod-bridge/src/tee.rs"
+-    match: "tee-outcome contract"
+-    reason: >
+-      Outcome is a closed Published/Dropped binary set returned by Tee::publish and matched
+-      exhaustively by callers; non_exhaustive adds nothing to a binary outcome.
+-    strategy: >
+-      Irreducible — a binary outcome gains nothing from non_exhaustive.
+-
+-  - path: "crates/cp-mod-prompt/src/types.rs"
+-    match: "prompt-kind contract"
+-    reason: >
+-      PromptType is a closed Agent/Skill/Command set serde-persisted and constructed cross-crate,
+-      matched exhaustively by Display/dir_for; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+-  - path: "crates/cp-mod-memory/src/types.rs"
+-    match: "importance contract"
+-    reason: >
+-      MemoryImportance is a closed Low/Medium/High/Critical set serde-persisted and constructed
+-      cross-crate, matched exhaustively by as_str()/FromStr; non_exhaustive would forbid it.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-mod-spine/src/engine.rs"
+     match: "spine-decision contract"
+     reason: >
+# --- End entry #55 ---
+56:0eebc92838928c52a03181e503fdbfe99eb4aaf7d223483a888e6f7788c2f13b:5c0b550e189fd17a1407d026c5e99a00f0bec29df3861d4535a6411a40472717:7d89ed865962fb0dc8f1d87a246a7b6e202a46f37df8c1bbc1c62cdf16a8d210
+# --- Diff for entry #56 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index c8de17ce..de04410b 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -494,14 +494,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-base/src/state/data/config.rs"
+-    match: "view-mode contract"
+-    reason: >
+-      ViewMode already carries #[serde(other)] on Normal for forward-compat and is constructed
+-      cross-crate; non_exhaustive adds nothing and forbids that construction.
+-    strategy: >
+-      Irreducible — the serde(other) variant already provides forward-compat.
+-
+   - path: "crates/cp-base/src/state/data/message.rs"
+     match: "message-shape discriminator"
+     reason: >
+# --- End entry #56 ---
+57:7d89ed865962fb0dc8f1d87a246a7b6e202a46f37df8c1bbc1c62cdf16a8d210:3afad9c25894c6688d94dc5ff4ddc181b45758e3f6aa3092dd4276639e0fc530:b4d58a8d3e570812824d7c2850e104524c2ba8ba634517ed1e59889871854f5b
+# --- Diff for entry #57 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index de04410b..2ca3042f 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -578,22 +578,6 @@ exceptions:
+ 
+   # ── exhaustive_enums: cp-mod-* leaf module contracts ─────────────────
+ 
+-  - path: "crates/cp-mod-git/src/types.rs"
+-    match: "git-change taxonomy"
+-    reason: >
+-      GitChangeType is a closed set constructed cross-crate by the status parser and matched
+-      exhaustively by the diff renderer; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+-  - path: "crates/cp-mod-bridge/src/body.rs"
+-    match: "body-disposition contract"
+-    reason: >
+-      Stored is a closed Inline/Spilled set returned by Store::put and matched exhaustively
+-      by callers routing the durability barrier; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-mod-bridge/src/error.rs"
+     match: "bridge boot error taxonomy is a closed AlreadyRunning/Io set"
+     reason: >
+@@ -602,14 +586,6 @@ exceptions:
+     strategy: >
+       Irreducible — closed error taxonomy, wildcard arms are forbidden.
+ 
+-  - path: "crates/cp-mod-spine/src/engine.rs"
+-    match: "spine-decision contract"
+-    reason: >
+-      SpineDecision is a closed Idle/Blocked/Continue set returned by check_spine and matched
+-      exhaustively by the app event loop; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-mod-spine/src/types.rs"
+     match: "notification-kind contract"
+     reason: >
+@@ -618,24 +594,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-mod-threads/src/types.rs"
+-    match: "thread-turn contract: ThreadStatus is a closed MyTurn/TheirTurn set"
+-    reason: >
+-      ThreadStatus is a closed MyTurn/TheirTurn set constructed cross-crate and matched exhaustively
+-      by the bridge and threads view; non_exhaustive would force cross-crate wildcard arms the
+-      forbidden wildcard_enum_match_arm lint rejects.
+-    strategy: >
+-      Irreducible — closed two-outcome set, wildcard arms are forbidden.
+-
+-  - path: "crates/cp-mod-threads/src/types.rs"
+-    match: "thread-author contract: ThreadAuthor is a closed User/Assistant set"
+-    reason: >
+-      ThreadAuthor is a closed User/Assistant set constructed cross-crate and matched exhaustively
+-      by the message renderer; non_exhaustive would force cross-crate wildcard arms the forbidden
+-      wildcard_enum_match_arm lint rejects.
+-    strategy: >
+-      Irreducible — closed two-outcome set, wildcard arms are forbidden.
+-
+   # ── exhaustive_structs: wide wire records where a constructor is worse ──
+   # These public structs are legitimately exhaustive: each is a fixed-layout
+   # wire record built cross-crate at a single site, and a constructor would take
+# --- End entry #57 ---
+58:b4d58a8d3e570812824d7c2850e104524c2ba8ba634517ed1e59889871854f5b:96abf3aff1566416fadeb828a40ddf047b13e4cb6da98b14094a4a8271b88938:5ee3ada5434d8d53a73b4759be8e330af395ec35a9b54ffabcb29da9bc515a49
+# --- Diff for entry #58 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 2ca3042f..7715743e 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -414,54 +414,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-base/src/config/models.rs"
+-    match: "AnthropicModel is a closed pricing/capability table"
+-    reason: >
+-      AnthropicModel is constructed cross-crate by model dispatch and matched exhaustively
+-      by its ModelInfo impl; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+-  - path: "crates/cp-base/src/config/models.rs"
+-    match: "GrokModel is a closed pricing/capability table"
+-    reason: >
+-      GrokModel is constructed cross-crate by model dispatch and matched exhaustively
+-      by its ModelInfo impl; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+-  - path: "crates/cp-base/src/config/models.rs"
+-    match: "GroqModel is a closed pricing/capability table"
+-    reason: >
+-      GroqModel is constructed cross-crate by model dispatch and matched exhaustively
+-      by its ModelInfo impl; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+-  - path: "crates/cp-base/src/config/models.rs"
+-    match: "DeepSeekModel is a closed pricing/capability table"
+-    reason: >
+-      DeepSeekModel is constructed cross-crate by model dispatch and matched exhaustively
+-      by its ModelInfo impl; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+-  - path: "crates/cp-base/src/config/models.rs"
+-    match: "MiniMaxModel is a closed pricing/capability table"
+-    reason: >
+-      MiniMaxModel is constructed cross-crate by model dispatch and matched exhaustively
+-      by its ModelInfo impl; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+-  - path: "crates/cp-base/src/config/models.rs"
+-    match: "ClaudeCodeV2Model is a closed pricing/capability table"
+-    reason: >
+-      ClaudeCodeV2Model is constructed cross-crate by model dispatch and matched exhaustively
+-      by its ModelInfo impl; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-base/src/panels.rs"
+     match: "cache-update protocol"
+     reason: >
+@@ -494,22 +446,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-base/src/state/data/message.rs"
+-    match: "message-shape discriminator"
+-    reason: >
+-      MsgKind is constructed cross-crate on every Message and matched exhaustively by the
+-      formatter; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+-  - path: "crates/cp-base/src/state/data/message.rs"
+-    match: "message-status contract"
+-    reason: >
+-      MsgStatus is constructed cross-crate and matched exhaustively by context management;
+-      non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-base/src/state/data/mod.rs"
+     match: "cache-break telemetry taxonomy"
+     reason: >
+@@ -518,14 +454,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-base/src/state/flags.rs"
+-    match: "stream-phase state machine"
+-    reason: >
+-      StreamPhase is a closed 3-state set constructed cross-crate via transition() and matched
+-      exhaustively by is_streaming/is_tooling; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-base/src/state/runtime/reverie.rs"
+     match: "reverie-kind contract"
+     reason: >
+@@ -534,14 +462,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-base/src/tools/mod.rs"
+-    match: "JSON-schema param type"
+-    reason: >
+-      ParamType is constructed by every tool definition cross-crate and matched exhaustively by
+-      to_json_schema; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-base/src/ui/mod.rs"
+     match: "text-table alignment"
+     reason: >
+# --- End entry #58 ---
+59:5ee3ada5434d8d53a73b4759be8e330af395ec35a9b54ffabcb29da9bc515a49:54894c52798c5bbc22ee5dc180ce0d715f2aef52acfc2a425a81d7cf992db2f2:89e68751a82495eb51bcd86669db051bb6b68e0d07c7b66402e33763fe9cd10b
+# --- Diff for entry #59 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 7715743e..6b36fef9 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -480,22 +480,6 @@ exceptions:
+     strategy: >
+       Irreducible — closed error taxonomy, wildcard arms are forbidden.
+ 
+-  - path: "crates/cp-oplog/src/service.rs"
+-    match: "durability policy is a closed binary set"
+-    reason: >
+-      Durability is a closed Durable/BestEffort set constructed by Durability::of and matched
+-      exhaustively by commit routing; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — a binary outcome gains nothing from non_exhaustive.
+-
+-  - path: "crates/cp-oplog/src/service.rs"
+-    match: "best-effort outcome is a closed binary set"
+-    reason: >
+-      BestEffortOutcome is a closed Submitted/Dropped set returned cross-crate and matched
+-      exhaustively by callers; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — a binary outcome gains nothing from non_exhaustive.
+-
+   # ── exhaustive_enums: cp-mod-* leaf module contracts ─────────────────
+ 
+   - path: "crates/cp-mod-bridge/src/error.rs"
+# --- End entry #59 ---
+60:89e68751a82495eb51bcd86669db051bb6b68e0d07c7b66402e33763fe9cd10b:2d0ea833bc0c6575598781603f4717dce9c325b6cf999af3359aa294a59bff0b:dbaf0052271db919f0f79c24b564f50ed3b1702b6ce7458c8c35489be87f8370
+# --- Diff for entry #60 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 6b36fef9..a404dff5 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -367,14 +367,6 @@ exceptions:
+     strategy: >
+       Irreducible — closed error taxonomy, wildcard arms are forbidden.
+ 
+-  - path: "crates/cp-render/src/frame.rs"
+-    match: "IR rendering contract: SidebarMode is a closed set"
+-    reason: >
+-      SidebarMode is a closed IR set constructed by the frame builder and matched
+-      exhaustively by the adapter; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-render/src/lib.rs"
+     match: "IR rendering contract: Align is a closed three-way set"
+     reason: >
+@@ -446,14 +438,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-base/src/state/data/mod.rs"
+-    match: "cache-break telemetry taxonomy"
+-    reason: >
+-      CacheBreakKind is a closed partition matched exhaustively by as_tsv and constructed
+-      cross-crate by the freeze pass; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-base/src/state/runtime/reverie.rs"
+     match: "reverie-kind contract"
+     reason: >
+# --- End entry #60 ---
+61:dbaf0052271db919f0f79c24b564f50ed3b1702b6ce7458c8c35489be87f8370:965efa7afb12e2da8a1c2b9a0723ef157604da9efa39baa9e07636d3fa8238b4:919da9bea5caccd9ce3afb494fd103ef116790ba1420be86642085cbd6d163c2
+# --- Diff for entry #61 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index a404dff5..c49a623f 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -367,14 +367,6 @@ exceptions:
+     strategy: >
+       Irreducible — closed error taxonomy, wildcard arms are forbidden.
+ 
+-  - path: "crates/cp-render/src/lib.rs"
+-    match: "IR rendering contract: Align is a closed three-way set"
+-    reason: >
+-      Align is a closed Left/Center/Right IR set constructed exhaustively across the
+-      tui adapter; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-vault/src/types.rs"
+     match: "vault error taxonomy is a closed set"
+     reason: >
+@@ -446,14 +438,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-base/src/ui/mod.rs"
+-    match: "text-table alignment"
+-    reason: >
+-      This Align is a closed Left/Right set constructed cross-crate on TextCell and matched
+-      exhaustively by pad_cell; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   # ── exhaustive_enums: cp-oplog service/error contracts ───────────────
+ 
+   - path: "crates/cp-oplog/src/error.rs"
+@@ -474,14 +458,6 @@ exceptions:
+     strategy: >
+       Irreducible — closed error taxonomy, wildcard arms are forbidden.
+ 
+-  - path: "crates/cp-mod-spine/src/types.rs"
+-    match: "notification-kind contract"
+-    reason: >
+-      NotificationType is a closed set serde-persisted and constructed cross-crate, matched
+-      exhaustively by label() and the continuation builder; non_exhaustive would forbid it.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   # ── exhaustive_structs: wide wire records where a constructor is worse ──
+   # These public structs are legitimately exhaustive: each is a fixed-layout
+   # wire record built cross-crate at a single site, and a constructor would take
+# --- End entry #61 ---
+62:919da9bea5caccd9ce3afb494fd103ef116790ba1420be86642085cbd6d163c2:34c7e3293921e3c4e9ff32b4eac904f69357c7daa6882082a31859c3c27773c1:8da63e393e76d5eba22b1b0558a88fb6d270eee817fe403d6d1cd0e2b64c3983
+# --- Diff for entry #62 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index c49a623f..ab58762d 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -367,13 +367,7 @@ exceptions:
+     strategy: >
+       Irreducible — closed error taxonomy, wildcard arms are forbidden.
+ 
+-  - path: "crates/cp-vault/src/types.rs"
+-    match: "vault error taxonomy is a closed set"
+-    reason: >
+-      VaultError is a closed MissingKey/Io/Network set constructed within cp-vault and
+-      matched exhaustively by callers; non_exhaustive would force forbidden wildcard arms.
+-    strategy: >
+-      Irreducible — closed error taxonomy, wildcard arms are forbidden.
++
+ 
+   # ── exhaustive_enums: cp-base foundation contracts ───────────────────
+   # cp-base is the foundation crate every other crate depends on. Its public
+@@ -440,13 +434,7 @@ exceptions:
+ 
+   # ── exhaustive_enums: cp-oplog service/error contracts ───────────────
+ 
+-  - path: "crates/cp-oplog/src/error.rs"
+-    match: "oplog error taxonomy is a closed two-variant set"
+-    reason: >
+-      Oplog Error is a closed Io/Frame set constructed within cp-oplog and matched
+-      exhaustively by callers; non_exhaustive would force forbidden wildcard arms.
+-    strategy: >
+-      Irreducible — closed error taxonomy, wildcard arms are forbidden.
++
+ 
+   # ── exhaustive_enums: cp-mod-* leaf module contracts ─────────────────
+ 
+# --- End entry #62 ---
+63:8da63e393e76d5eba22b1b0558a88fb6d270eee817fe403d6d1cd0e2b64c3983:5e0282cdb889c562ad4056ab284d2ea66eddf94f25ea2d5519ab0656ea212ce9:c6e1825bc9e79e876b79208e1443aff691f9b4d571ab875f941747e49d94fa2c
+# --- Diff for entry #63 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index ab58762d..eb67cc06 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -392,14 +392,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-base/src/panels.rs"
+-    match: "cache-update protocol"
+-    reason: >
+-      CacheUpdate is constructed by every module's refresh_cache and matched exhaustively
+-      by the apply loop; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-base/src/panels.rs"
+     match: "watch-spec contract"
+     reason: >
+# --- End entry #63 ---
+64:c6e1825bc9e79e876b79208e1443aff691f9b4d571ab875f941747e49d94fa2c:d4a801571e003de821f39ddbd9d8f526f96ef6d75ef5321b7640d85fc96f3e6e:4cf3d60b3bf5dd2849bae6b2ccd1ed802cffec23fe65477c3f736bfc4bec1b49
+# --- Diff for entry #64 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index eb67cc06..2dc047a6 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -392,14 +392,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-base/src/panels.rs"
+-    match: "watch-spec contract"
+-    reason: >
+-      WatchSpec is constructed by every module's watch_paths and matched exhaustively by
+-      the watcher sync; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-base/src/state/actions.rs"
+     match: "central Elm action enum"
+     reason: >
+# --- End entry #64 ---
+65:4cf3d60b3bf5dd2849bae6b2ccd1ed802cffec23fe65477c3f736bfc4bec1b49:a2c9521e74fa7148590eb0e10bfe9990675cb363b217fe0c90e7065f588fa44b:aa8292c62cd891abeca7db28cc9f7f91d628cdf949197ee068101091c5ea1266
+# --- Diff for entry #65 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 2dc047a6..6892f601 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -376,14 +376,6 @@ exceptions:
+   # construction, wildcard_enum_match_arm on the matches). They are closed
+   # contracts by design.
+ 
+-  - path: "crates/cp-base/src/config/llm_types.rs"
+-    match: "stream-event contract"
+-    reason: >
+-      StreamEvent is constructed by every LLM provider and matched exhaustively by the
+-      streaming pipeline; non_exhaustive would forbid that cross-crate construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-base/src/config/llm_types.rs"
+     match: "provider-roster contract"
+     reason: >
+# --- End entry #65 ---
+66:aa8292c62cd891abeca7db28cc9f7f91d628cdf949197ee068101091c5ea1266:30496ae51ea486e57a6be131f34123fe31173354012b74f47a29f82c4a21550f:6e0bba3197e18cdb87eb3090a8609d0e1a51433ff6efe1dc681c7908021004e6
+# --- Diff for entry #66 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 6892f601..09c61aa9 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -392,14 +392,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-base/src/state/actions.rs"
+-    match: "action-result contract"
+-    reason: >
+-      ActionResult is constructed by action handlers and matched exhaustively by the event
+-      loop; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-base/src/state/runtime/reverie.rs"
+     match: "reverie-kind contract"
+     reason: >
+# --- End entry #66 ---
+67:6e0bba3197e18cdb87eb3090a8609d0e1a51433ff6efe1dc681c7908021004e6:239128fdb80ffca962691617114a7f7d81a6f8be860edd86c9688915f7b22a4c:1ae43e4232a3ec779f0b58d4bb63b28e20e9ae9b056cca0e77232a63a8e339c2
+# --- Diff for entry #67 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 09c61aa9..9ae4e8b0 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -294,14 +294,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-wire/src/types/mod.rs"
+-    match: "the LifecycleState variant set is closed"
+-    reason: >
+-      LifecycleState is a wire-protocol contract constructed cross-crate; a new
+-      state is a deliberate breaking change every peer handles exhaustively.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-wire/src/types/mod.rs"
+     match: "ThreadTurn already carries an Unknown catch-all"
+     reason: >
+@@ -342,14 +334,6 @@ exceptions:
+     strategy: >
+       Irreducible — a binary outcome gains nothing from non_exhaustive.
+ 
+-  - path: "crates/cp-wire/src/types/registry.rs"
+-    match: "AgentStatus is a closed lifecycle set written cross-crate"
+-    reason: >
+-      AgentStatus is a closed lifecycle set written cross-crate into the registry
+-      entry and matched exhaustively by the backend; non_exhaustive would forbid it.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-wire/src/framing.rs"
+     match: "framing error taxonomy is a closed wire contract"
+     reason: >
+# --- End entry #67 ---
+68:1ae43e4232a3ec779f0b58d4bb63b28e20e9ae9b056cca0e77232a63a8e339c2:7043900c92e88bd56bc93b352bde9a5fe7fdd655decb016b6388a612720d2187:189f39930783fc6f426594f6a6204ed55920699c1d0f582ec6d82ec814e6fe15
+# --- Diff for entry #68 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 9ae4e8b0..832b99ff 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -286,14 +286,6 @@ exceptions:
+   # catch-all for N-1 forward compatibility, covering the only real use case
+   # #[non_exhaustive] would serve.
+ 
+-  - path: "crates/cp-wire/src/types/mod.rs"
+-    match: "the Phase variant set is closed"
+-    reason: >
+-      Phase is a wire-protocol contract constructed cross-crate; a new phase
+-      is a deliberate breaking change every peer must handle exhaustively.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-wire/src/types/mod.rs"
+     match: "ThreadTurn already carries an Unknown catch-all"
+     reason: >
+# --- End entry #68 ---
+69:189f39930783fc6f426594f6a6204ed55920699c1d0f582ec6d82ec814e6fe15:42f140b25ca4050f9a97ce9e3aba7950d5799aed5c9e85058750126a7b316bd1:6ca13753fb17fced35f49ef6703994b0e0064d9cc006b894f4199a1d141242fa
+# --- Diff for entry #69 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 832b99ff..9485e350 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -318,14 +318,6 @@ exceptions:
+     strategy: >
+       Irreducible — the Unknown variant already provides forward-compat.
+ 
+-  - path: "crates/cp-wire/src/types/ack.rs"
+-    match: "the ack Status is a closed two-outcome set"
+-    reason: >
+-      Ack Status is a closed accepted/rejected set constructed by the orchestrator
+-      and matched exhaustively by the agent; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — a binary outcome gains nothing from non_exhaustive.
+-
+   - path: "crates/cp-wire/src/framing.rs"
+     match: "framing error taxonomy is a closed wire contract"
+     reason: >
+# --- End entry #69 ---
+70:6ca13753fb17fced35f49ef6703994b0e0064d9cc006b894f4199a1d141242fa:c745402ce7b12aa44f7d433ff6bacf15238402ec2746958ba49e7963096e24cc:9ee0a90741ab26c2ec2a9e584795c8cd2ac9e779be2eaae2ca773cb8b7b91a7b
+# --- Diff for entry #70 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index 6f9f93c0..ac948872 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -419,8 +419,16 @@ err_expect = "forbid"
+ error_impl_error = "forbid"
+ excessive_nesting = "forbid"
+ excessive_precision = "forbid"
+-exhaustive_enums = "deny"
+-exhaustive_structs = "deny"
++# exhaustive_enums / exhaustive_structs are SemVer-for-published-libraries
++# lints: they force #[non_exhaustive] on every public type so a downstream
++# crate you cannot recompile keeps building when you add a variant/field. Our
++# internal crates have no such downstream — every consumer lives in this
++# workspace and recompiles atomically, so there we WANT the exhaustive-match
++# compile error (it walks us to every site on a new variant). Allowed here and
++# re-denied only in cp-wire (the real agent<->orchestrator version boundary)
++# via #![deny(...)] in its lib.rs.
++exhaustive_enums = "allow"
++exhaustive_structs = "allow"
+ exit = "forbid"
+ expect_fun_call = "forbid"
+ expect_used = "forbid"
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 9485e350..74fe336e 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -344,44 +344,6 @@ exceptions:
+   # construction, wildcard_enum_match_arm on the matches). They are closed
+   # contracts by design.
+ 
+-  - path: "crates/cp-base/src/config/llm_types.rs"
+-    match: "provider-roster contract"
+-    reason: >
+-      LlmProvider is a closed set constructed cross-crate by config/dispatch and matched
+-      exhaustively across the client factory and config UI; non_exhaustive would forbid it.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+-  - path: "crates/cp-base/src/state/actions.rs"
+-    match: "central Elm action enum"
+-    reason: >
+-      Action is constructed by every event handler and matched exhaustively by apply_action;
+-      the set is closed by design and non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+-  - path: "crates/cp-base/src/state/runtime/reverie.rs"
+-    match: "reverie-kind contract"
+-    reason: >
+-      Reverie Kind is a closed set constructed cross-crate by the optimizer trigger and matched
+-      exhaustively by its Display impl; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+-  # ── exhaustive_enums: cp-oplog service/error contracts ───────────────
+-
+-
+-
+-  # ── exhaustive_enums: cp-mod-* leaf module contracts ─────────────────
+-
+-  - path: "crates/cp-mod-bridge/src/error.rs"
+-    match: "bridge boot error taxonomy is a closed AlreadyRunning/Io set"
+-    reason: >
+-      Bridge boot Error is a closed AlreadyRunning/Io set constructed within cp-mod-bridge and
+-      matched exhaustively by callers; non_exhaustive would force forbidden wildcard arms.
+-    strategy: >
+-      Irreducible — closed error taxonomy, wildcard arms are forbidden.
+-
+   # ── exhaustive_structs: wide wire records where a constructor is worse ──
+   # These public structs are legitimately exhaustive: each is a fixed-layout
+   # wire record built cross-crate at a single site, and a constructor would take
+@@ -420,50 +382,3 @@ exceptions:
+     strategy: >
+       Irreducible — the bundle must be literal-constructible cross-crate; a 7-arg constructor
+       trips too_many_arguments. The exhaustive carrier is the honest shape.
+-  # One crate-level #![expect] covers every IR type in cp-render. They are
+-  # all built by struct literal cross-crate by the tui adapter (src/ui/ir,
+-  # src/ui/search_overlay) and read field-by-field by the renderer, so
+-  # #[non_exhaustive] forbids the construction (E0639); the wide records
+-  # (Message, SearchIndex, SearchEmbeddings, StatusBar, …) would trip the
+-  # forbidden too_many_arguments under any flat constructor. The IR is a
+-  # single closed builder↔adapter contract — one reviewed decision, not 56.
+-
+-  - path: "crates/cp-render/src/lib.rs"
+-    match: "IR data-carrier layer: every type is built by struct literal cross-crate"
+-    reason: >
+-      Crate-level #![expect] for all cp-render IR structs: each is adapter-built by struct literal
+-      cross-crate and read field-by-field by the renderer; #[non_exhaustive] forbids that (E0639)
+-      and wide records trip too_many_arguments under a flat constructor.
+-    strategy: >
+-      Irreducible — closed builder↔adapter IR contract; non_exhaustive+constructor is impossible
+-      for the wide records.
+-
+-  # ── exhaustive_structs: cp-base wide cross-crate records ─────────────
+-  # Two cp-base structs are built by struct literal at many sites across every
+-  # module crate. Both are flat, wide records where a constructor would take so
+-  # many positional arguments it trips the forbidden too_many_arguments lint
+-  # (max 4). #[non_exhaustive] is impossible (E0639 on the cross-crate
+-  # construction). Every OTHER cross-crate cp-base struct took a constructor or
+-  # builder (ToolOutput::ok/error, CacheRequest::new, WatcherResult::new+setters)
+-  # instead; these two are the irreducible remainder.
+-
+-  - path: "crates/cp-base/src/tools/mod.rs"
+-    match: "tool-return contract: ToolResult is the closed struct every tool fills"
+-    reason: >
+-      ToolResult is the closed tool-return contract built by struct literal at 116 sites across
+-      every module crate; the new/with_name constructors can't cover the display/tldr/preserves_tempo
+-      field combinations each site sets, and a 7-arg constructor would trip too_many_arguments.
+-    strategy: >
+-      Irreducible — a 7-arg constructor trips too_many_arguments; the exhaustive literal is honest.
+-
+-  - path: "crates/cp-base/src/state/context.rs"
+-    match: "module-metadata registry record: TypeMeta is a flat 9-field descriptor"
+-    reason: >
+-      TypeMeta is a flat 9-field module-metadata descriptor built by struct literal at 25 sites —
+-      one per module's context_type_metadata() — cross-crate; a 9-arg constructor would trip
+-      too_many_arguments and every module fills all fields.
+-    strategy: >
+-      Irreducible — a 9-arg constructor trips too_many_arguments; the exhaustive literal is honest.
+-
+-
+-
+# --- End entry #70 ---
+71:9ee0a90741ab26c2ec2a9e584795c8cd2ac9e779be2eaae2ca773cb8b7b91a7b:7b0e10d7e826d179483cd1f0ebf44a7ecf58223f9950cd4260c05cf6ba5540e6:556049103727608f0095ad57774a64ac4262d2dd4d1183764f3942f7fd099859
+# --- Diff for entry #71 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 74fe336e..c037044e 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -371,14 +371,3 @@ exceptions:
+       grouping, so #[non_exhaustive] is impossible.
+     strategy: >
+       Irreducible — a 6-arg constructor trips too_many_arguments; the exhaustive literal is honest.
+-
+-  - path: "crates/cp-wire/src/types/snapshot/mod.rs"
+-    match: "roster-entry init bundle: a flat 7-field carrier built by literal cross-crate"
+-    reason: >
+-      RosterEntryInit is a flat 7-field parameter carrier fed to RosterThread::new. Cross-crate
+-      builders (backend test fixtures) construct it by literal, so it must stay exhaustive —
+-      #[non_exhaustive] would forbid that literal (the exact E0639 the bundle exists to route
+-      around), and a 7-arg RosterThread::new trips too_many_arguments (threshold 4).
+-    strategy: >
+-      Irreducible — the bundle must be literal-constructible cross-crate; a 7-arg constructor
+-      trips too_many_arguments. The exhaustive carrier is the honest shape.
+# --- End entry #71 ---

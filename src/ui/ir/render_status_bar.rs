@@ -181,6 +181,7 @@ fn badge_colors(semantic: Semantic, _spin: &str) -> (ratatui::style::Color, rata
         Semantic::AccentDim => (theme::card_text(), theme::accent_dim()),
         // Muted = READY, Default = fallback
         Semantic::Default
+        | Semantic::Accent
         | Semantic::Muted
         | Semantic::Active
         | Semantic::KeyHint
@@ -189,8 +190,7 @@ fn badge_colors(semantic: Semantic, _spin: &str) -> (ratatui::style::Color, rata
         | Semantic::DiffRemove
         | Semantic::Header
         | Semantic::Border
-        | Semantic::Bold
-        | _ => (theme::bg_base(), theme::text_muted()),
+        | Semantic::Bold => (theme::bg_base(), theme::text_muted()),
     }
 }
 

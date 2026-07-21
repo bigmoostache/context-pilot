@@ -5,10 +5,6 @@ use cp_base::state::runtime::State;
 /// Discriminator for the three kinds of prompt library entries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "prompt-kind contract: PromptType is a closed Agent/Skill/Command set serde-persisted and constructed cross-crate, matched exhaustively by Display/dir_for; #[non_exhaustive] would forbid that construction"
-)]
 pub enum PromptType {
     /// System prompt defining the AI's identity and behavior.
     Agent,
@@ -30,7 +26,6 @@ impl std::fmt::Display for PromptType {
 
 /// A prompt library entry (agent, skill, or command).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct PromptItem {
     /// Unique identifier (e.g., "pirate-coder", "brave-goggles").
     pub id: String,
@@ -50,7 +45,6 @@ pub struct PromptItem {
 /// Prompt content is loaded dynamically from disk — this only tracks
 /// active selections and loaded panels.
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct PromptState {
     /// Currently active agent ID (None = default).
     pub active_agent_id: Option<String>,

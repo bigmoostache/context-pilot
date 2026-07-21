@@ -401,25 +401,15 @@ b14e6817a83938b5:
   - operational
   last_edited_ms: 1784203006419
 b5af3513e41563ec:
-  tl_dr: 'A5-A13 DIRECTIVE (T588): lints are BEACONS. Max 5 #[expect] per step. No blanket-suppress. Commit AND push after each step. A5-A10 done+pushed. Next A11 shadow_reuse.'
+  tl_dr: 'T604 + FIGHT: exhaustive_enums/structs allow workspace-wide, re-denied only in cp-wire. FIGHT batch 1: 1 clean kill (RosterEntryInit removed via RosterThread builder). Registry 28 entries. Commits e3fdd855, 8787e8b6. Chain #71. Body has full triage.'
   contents: |-
-    T588 user directive, valid A5 through A13:
+    T604 (user-driven, supersedes the boss-hunt 81->36 enum-flip scoreboard): exhaustive_enums + exhaustive_structs are library-SemVer lints, WRONG as blanket workspace deny (internal crates recompile atomically with consumers, so E0004-on-add is a FEATURE not a break). RIGHT only for cp-wire (real agent/orchestrator version boundary, unknown variant/field at runtime).
 
-    Lints are beacons toward better code, NOT nuisances to suppress. Hard cap: 5 #[expect] per step. Commit AND push after each step (CI runs in background).
+    FINAL STATE: root Cargo.toml both lints deny->allow. cp-wire/src/lib.rs re-denies both via crate-level inner #![deny] attrs (before `pub mod framing;`). Stripped ~64 non_exhaustive tags OUTSIDE cp-wire (internal types back to compiler-checked exhaustive). Removed 7 exhaustive_* expect blocks + 7 yaml entries + TypeMeta + cp-render orphan yaml. Dropped downstream `_` wildcard arms boss-hunt had added for now-closed Semantic/Block/Overlay enums (unreachable_patterns + wildcard_in_or_patterns both forbid): ui/mod.rs x3 Overlay, render_conversation.rs Overlay, ui/ir/mod.rs Semantic+Block, render_blocks.rs Block, render_status_bar.rs badge Semantic (had to ADD Semantic::Accent when dropping `_`). Fixed field_reassign_with_default in oai_check_api (struct literal). cp-wire keeps 37 non_exhaustive + 9 expects.
 
-    Per-site buckets: (1) #[non_exhaustive]+constructor for in-crate-only construction; (2) add ::new/builder THEN non_exhaustive for cross-crate literal; (3) #[expect] last-resort (cap 5).
+    GOTCHA: registry check greps `#[expect(` / `#[non_exhaustive]` substrings even in COMMENTS — a doc comment mentioning the literal token trips 'unregistered lint exception'; reword prose. chain.sh takes --password FLAG not stdin. Commit e3fdd855, chain #70, we-dev.
 
-    A5 DONE+pushed f2fce464. exhaustive_structs=deny. Exactly 5 expects.
-    A6 float_arithmetic DONE+pushed. Chokepoint cast/float_math.rs. Chain #43. (watchdog.rs linux-cfg-gated regression later folded into A11 commit.)
-    A7 inline_modules DONE (chain #44). Structural, no gate.
-    A8 non_ascii_literal DONE (chain #45). ZERO expects, glyphs escaped \u{XXXX}.
-    A9 pattern_type_mismatch DONE+pushed c82ad408. forbid. ZERO NEW expects (4 pre-existing chokepoints). Chain #47.
-    A10 redundant_pub_crate DONE+pushed a4f052de. NOT RAISABLE — mutually exclusive with unreachable_pub=forbid. Kept default allow, DOCUMENTED in Cargo.toml. global_env_path pub(crate)->private. Chain #48.
-    A11 shadow_reuse DONE+pushed b3f1ebe8. shadow_reuse=deny. ZERO expects (pure naming). ~66 sites renamed workspace-wide (source->raw_*/commanded/*_opt/*_var, keep processed value under orig name). Root gate + workspace clippy both 0 'is shadowed'. Chain #49. watchdog A6 float regression folded in.
-
-    Now A12 single_call_fn (X1202): inline once-called fns OR assess anti-modular blocker. ~1075 sites est. NO autofix — inlining is contextual. Likely NOT raisable cleanly (would fight modular decomposition + 500-line caps). Assess feasibility first like A10.
-
-    GATE discipline: cargo clippy --all-targets from ROOT + cargo clippy --workspace for full census (per-crate deny aborts mask downstream). chain.sh via `printf 'Totordu1789\n' | ./chain.sh` (auto-updates). git push plain (-25308 keychain warning benign). npx needs export PATH=/opt/homebrew/bin:$PATH.
+    Boss-hunt r1-r21 history (824f6075...prior) still valid as context but enum-flip is retired as a goal.
   importance: critical
   labels:
   - T588
@@ -427,7 +417,7 @@ b5af3513e41563ec:
   - A5-A13
   - workflow
   - philosophy
-  last_edited_ms: 1784543710622
+  last_edited_ms: 1784576922310
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   importance: high

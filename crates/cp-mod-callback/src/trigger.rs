@@ -14,7 +14,6 @@ use crate::types::{CallbackDefinition, CallbackState};
 /// A callback that matched one or more changed files and is ready to fire.
 // Queue ID test marker — delete me later
 #[derive(Debug, Clone)]
-#[non_exhaustive]
 pub struct MatchedCallback {
     /// The callback definition
     pub definition: CallbackDefinition,
@@ -24,7 +23,6 @@ pub struct MatchedCallback {
 
 /// A changed file with optional `skip_callbacks` names from the tool that changed it.
 #[derive(Debug, Clone)]
-#[non_exhaustive]
 pub struct ChangedFile {
     /// Relative path to the changed file
     pub path: String,

@@ -4,7 +4,6 @@
 
 /// Result of a satisfied watcher condition.
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct WatcherResult {
     /// Human-readable description of what happened.
     pub description: String,
@@ -133,7 +132,6 @@ impl WatcherResult {
 
 /// Info needed to create a console panel after a watcher fires.
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct DeferredPanel {
     /// Console session key for reconnection.
     pub session_key: String,
@@ -201,7 +199,6 @@ impl DeferredPanel {
 /// (brave results, firecrawl results, search results, etc.).
 /// Used by async tool execution to create panels after HTTP/subprocess completion.
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct DynPanel {
     /// Context type string (e.g., `"brave_result"`, `"firecrawl_result"`).
     pub context_type: String,

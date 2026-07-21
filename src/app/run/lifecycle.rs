@@ -288,57 +288,72 @@ impl App {
 
     /// Dispatch an `Action` through `apply_action` and handle the resulting side-effects.
     fn handle_action(&mut self, action: Action, tx: &Sender<StreamEvent>) {
-        // Any action triggers a re-render
-        self.state.flags.ui.dirty = true;
-        match apply_action(&mut self.state, action) {
-            ActionResult::StopStream => {
-                self.typewriter.reset();
-                self.pending_done = None;
-                self.pending_tools.clear();
-
-                // Flush any pending blocking tool results as "interrupted" so their
-                // tool_use messages are properly paired with a tool_result.
-                // Without this, the orphaned tool_use causes API 400 errors on
-                // the next stream (tool_use without matching tool_result).
-                super::tools::cleanup::flush_pending_tool_results_as_interrupted(self);
-
-                // Pause auto-continuation when user explicitly cancels streaming.
-                // Without this, the spine would immediately relaunch a new stream
-                // (e.g., due to continue_until_todos_done), making the system
-                // uncontrollable — the user can never stop it with Esc. (#44)
-                // We set user_stopped instead of disabling continue_until_todos_done,
-                // so auto-continuation resumes when the user sends a new message.
-                // Notify all modules that the user stopped streaming
-                for module in crate::modules::all_modules() {
-                    module.on_stream_stop(&mut self.state);
-                }
-                self.state.touch_panel(Kind::SPINE);
-                if let Some(msg) = self.state.messages.last()
-                    && msg.role == "assistant"
-                {
-                    self.save_message_async(msg);
-                }
-                self.save_state_async();
-            }
-            ActionResult::Save => {
-                self.save_state_async();
-                // Check spine synchronously for responsive auto-continuation
-                self.check_spine(tx);
-            }
-            ActionResult::SaveMessage(id) => {
-                if let Some(msg) = self.state.messages.iter().find(|m| m.id == id) {
-                    self.save_message_async(msg);
-                }
-                self.save_state_async();
-            }
-            ActionResult::StartApiCheck => {
-                let (api_tx, api_rx) = std::sync::mpsc::channel();
-                self.api_check_rx = Some(api_rx);
-                crate::llms::start_api_check(self.state.llm_provider, self.state.current_model(), api_tx);
-                self.save_state_async();
-            }
-            ActionResult::Nothing => {}
+        self.state.flags.ui.dirty = true; // any action triggers a re-render
+        // `if let` (not an exhaustive match) so ActionResult stays #[non_exhaustive].
+        // SaveMessage is the only payload-bearing variant; the fieldless rest dispatch below.
+        let result = apply_action(&mut self.state, action);
+        if let ActionResult::SaveMessage(id) = result {
+            self.save_message_by_id(&id);
+        } else {
+            self.handle_fieldless_result(&result, tx);
         }
+    }
+
+    /// Handle the fieldless [`ActionResult`] variants (everything except
+    /// `SaveMessage`). The trailing `else` absorbs `Nothing` plus any future
+    /// `non_exhaustive` variant.
+    fn handle_fieldless_result(&mut self, result: &ActionResult, tx: &Sender<StreamEvent>) {
+        if matches!(result, ActionResult::StopStream) {
+            self.on_stop_stream();
+        } else if matches!(result, ActionResult::Save) {
+            self.save_state_async();
+            self.check_spine(tx); // synchronous for responsive auto-continuation
+        } else if matches!(result, ActionResult::StartApiCheck) {
+            self.start_api_check_now();
+        } else {
+            // Nothing + future non_exhaustive variants: no side-effect.
+        }
+    }
+
+    /// Persist the message with the given display `id` (if it still exists) plus
+    /// the full state — the `ActionResult::SaveMessage` side-effect.
+    fn save_message_by_id(&self, id: &str) {
+        if let Some(msg) = self.state.messages.iter().find(|m| m.id == id) {
+            self.save_message_async(msg);
+        }
+        self.save_state_async();
+    }
+
+    /// Kick off an async API connectivity check for the current provider/model and
+    /// persist — the `ActionResult::StartApiCheck` side-effect.
+    fn start_api_check_now(&mut self) {
+        let (api_tx, api_rx) = std::sync::mpsc::channel();
+        self.api_check_rx = Some(api_rx);
+        crate::llms::start_api_check(self.state.llm_provider, self.state.current_model(), api_tx);
+        self.save_state_async();
+    }
+
+    /// Side-effects of an [`ActionResult::StopStream`]: reset the typewriter, drop
+    /// pending work, flush orphaned blocking tool results as interrupted (so every
+    /// `tool_use` stays paired and the next stream avoids an API 400), notify modules,
+    /// persist. Esc's auto-continuation pause lives in `apply_action`'s `user_stopped`
+    /// flag — without it the spine would instantly relaunch a stream, making Esc
+    /// uncancellable (#44).
+    fn on_stop_stream(&mut self) {
+        self.typewriter.reset();
+        self.pending_done = None;
+        self.pending_tools.clear();
+        super::tools::cleanup::flush_pending_tool_results_as_interrupted(self);
+        for module in crate::modules::all_modules() {
+            module.on_stream_stop(&mut self.state);
+        }
+        self.state.touch_panel(Kind::SPINE);
+        if let Some(msg) = self.state.messages.last()
+            && msg.role == "assistant"
+        {
+            self.save_message_async(msg);
+        }
+        self.save_state_async();
     }
 
     /// Check the spine for auto-continuation decisions.
@@ -348,44 +363,46 @@ impl App {
         // Check if incomplete todos should trigger auto-continuation
         self.check_todo_continuation();
 
-        match check_spine(&mut self.state) {
-            SpineDecision::Idle => {}
-            SpineDecision::Blocked(reason) => {
-                // Guard rail blocked — notification already created by engine.
-                // Only mark dirty and save if this is a NEW block reason, to avoid
-                // burning CPU/disk on every tick (~125/sec) when persistently blocked.
-                if self.state.guard_rail_blocked.as_ref() != Some(&reason) {
-                    self.state.guard_rail_blocked = Some(reason);
-                    self.state.flags.ui.dirty = true;
-                    self.save_state_async();
-                }
+        // Idle is the implicit no-op tail — a non_exhaustive enum forbids a
+        // cross-crate exhaustive match, so the two actionable variants are
+        // handled via if-let and Idle simply falls through.
+        let decision = check_spine(&mut self.state);
+        if let SpineDecision::Blocked(reason) = decision {
+            // Guard rail blocked — notification already created by engine.
+            // Only mark dirty and save if this is a NEW block reason, to avoid
+            // burning CPU/disk on every tick (~125/sec) when persistently blocked.
+            if self.state.guard_rail_blocked.as_ref() != Some(&reason) {
+                self.state.guard_rail_blocked = Some(reason);
+                self.state.flags.ui.dirty = true;
+                self.save_state_async();
             }
-            SpineDecision::Continue(action) => {
-                // Auto-continuation fired — apply it and start streaming
-                self.state.guard_rail_blocked = None;
-                let should_stream = apply_continuation(&mut self.state, action);
-                if should_stream {
-                    // Auto-Read: if unfocused with a MY_TURN thread, inject a
-                    // synthetic Read tool call. When injected, the Read rides the
-                    // NORMAL tool pipeline (handle_tool_execution on the next
-                    // tick) — which executes it, breaks tempo, and drives the
-                    // follow-up stream via continue_streaming itself. So when it
-                    // injected we must NOT start a stream here, nor clear
-                    // pending_tools (that would wipe the injected Read).
-                    // Behaviourally identical to the LLM emitting a Read as its
-                    // first action (T322).
-                    if !super::threads::maybe_inject_auto_read(self) {
-                        self.typewriter.reset();
-                        self.pending_tools.clear();
-                        let ctx = prepare_stream_context(&mut self.state, false, None);
-                        let system_prompt = get_active_agent_content(&self.state);
-                        let params = build_stream_params(&self.state, ctx, Some(system_prompt));
-                        start_streaming(params, tx.clone());
-                    }
-                    self.save_state_async();
-                    self.state.flags.ui.dirty = true;
+        } else if let SpineDecision::Continue(action) = decision {
+            // Auto-continuation fired — apply it and start streaming
+            self.state.guard_rail_blocked = None;
+            let should_stream = apply_continuation(&mut self.state, action);
+            if should_stream {
+                // Auto-Read: if unfocused with a MY_TURN thread, inject a
+                // synthetic Read tool call. When injected, the Read rides the
+                // NORMAL tool pipeline (handle_tool_execution on the next
+                // tick) — which executes it, breaks tempo, and drives the
+                // follow-up stream via continue_streaming itself. So when it
+                // injected we must NOT start a stream here, nor clear
+                // pending_tools (that would wipe the injected Read).
+                // Behaviourally identical to the LLM emitting a Read as its
+                // first action (T322).
+                if !super::threads::maybe_inject_auto_read(self) {
+                    self.typewriter.reset();
+                    self.pending_tools.clear();
+                    let ctx = prepare_stream_context(&mut self.state, false, None);
+                    let system_prompt = get_active_agent_content(&self.state);
+                    let params = build_stream_params(&self.state, ctx, Some(system_prompt));
+                    start_streaming(params, tx.clone());
                 }
+                self.save_state_async();
+                self.state.flags.ui.dirty = true;
             }
+        } else {
+            // SpineDecision::Idle — no auto-continuation, nothing to do.
         }
     }
 
@@ -425,26 +442,16 @@ impl App {
         );
     }
 
-    /// Tick the dirty flag at 10fps **only while something on-screen is
-    /// actually animating**, so time-based spinners advance without pinning a
-    /// core when the agent is idle.
+    /// Tick the dirty flag at 10fps **only while something on-screen is actually
+    /// animating**, so time-based spinners advance without pinning a core when idle.
     ///
-    /// Previously this forced a full-frame redraw every 100ms unconditionally —
-    /// a permanent 10fps re-render of the entire UI (sidebar + content + status
-    /// bar IR rebuilt and diffed) that ran *forever*, even with nothing to
-    /// animate, and was a primary source of the "idle yet pinning CPU"
-    /// pathology (T309). The fix gates the forced redraw on
-    /// [`has_active_animation`](Self::has_active_animation): a genuinely idle
-    /// agent (READY badge, no loading panels, no running console) now produces
-    /// **zero** periodic renders and falls to ~0% CPU, while every animated
-    /// state (streaming/tooling, a timed-watcher WAITING badge, a loading
-    /// panel, a running console) still ticks at the full 10fps. Event-driven
-    /// redraws (input, stream chunks, cache updates, state mutations) are
-    /// untouched — they set `dirty` at their source — so the screen still
-    /// updates instantly on any real change.
-    ///
-    /// The 100ms throttle gates the *condition check itself* to 10Hz, so the
-    /// (cheap) animation scan never runs at the loop's full poll cadence.
+    /// Gated on [`has_active_animation`](Self::has_active_animation): a genuinely idle
+    /// agent produces **zero** periodic renders (~0% CPU), while any animated state
+    /// (streaming/tooling, a WAITING watcher badge, a loading panel, a running console)
+    /// ticks at the full 10fps. Event-driven redraws (input, chunks, cache, state
+    /// mutations) set `dirty` at their source, so real changes still render instantly.
+    /// This gating fixed the "idle yet pinning CPU" pathology (T309). The 100ms throttle
+    /// caps the (cheap) animation scan itself to 10Hz.
     fn update_spinner_animation(&mut self) {
         let now = now_ms();
         if now.saturating_sub(self.last_spinner_ms) < 100 {

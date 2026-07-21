@@ -123,9 +123,10 @@ const fn thread_status_style(thread: &cp_mod_threads::types::Thread, is_focused:
     if is_focused {
         return (Semantic::Accent, "[FOCUSED]");
     }
-    match thread.status {
-        ThreadStatus::MyTurn => (Semantic::Warning, "[MY_TURN]"),
-        ThreadStatus::TheirTurn => (Semantic::Success, "[THEIR_TURN]"),
+    if matches!(thread.status, ThreadStatus::MyTurn) {
+        (Semantic::Warning, "[MY_TURN]")
+    } else {
+        (Semantic::Success, "[THEIR_TURN]")
     }
 }
 

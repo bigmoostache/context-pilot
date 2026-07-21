@@ -11,7 +11,6 @@ use std::collections::HashMap;
 /// Prompt templates used when assembling context panels for LLM calls.
 /// Loaded from `yamls/prompts.yaml`.
 #[derive(Debug, Deserialize)]
-#[non_exhaustive]
 pub struct Prompts {
     /// Templates for panel header/footer/timestamp formatting.
     pub panel: PanelPrompts,
@@ -23,7 +22,6 @@ pub struct Prompts {
 /// Seed data for the prompt library: built-in agents, skills, and commands.
 /// Loaded from `yamls/library.yaml`.
 #[derive(Debug, Deserialize)]
-#[non_exhaustive]
 pub struct Library {
     /// ID of the agent used when none is explicitly selected.
     pub default_agent_id: String,
@@ -39,7 +37,6 @@ pub struct Library {
 
 /// A single built-in prompt library entry (agent, skill, or command).
 #[derive(Debug, Deserialize, Clone)]
-#[non_exhaustive]
 pub struct SeedEntry {
     /// Unique identifier (e.g., `"default"`, `"brave-goggles"`).
     pub id: String,
@@ -54,7 +51,6 @@ pub struct SeedEntry {
 /// Format strings for rendering context panels in the LLM prompt.
 /// Each panel is wrapped with a header, timestamp, and footer.
 #[derive(Debug, Deserialize)]
-#[non_exhaustive]
 pub struct PanelPrompts {
     /// Panel opening line (contains `{id}`, `{type}`, `{name}` placeholders).
     pub header: String,
@@ -75,7 +71,6 @@ pub struct PanelPrompts {
 /// LLM-facing behavioral text injected at runtime — not UI strings.
 /// Loaded from `yamls/injections.yaml`.
 #[derive(Debug, Deserialize)]
-#[non_exhaustive]
 pub struct Injections {
     /// Synthetic messages for the spine auto-continuation engine.
     pub spine: SpineInjections,
@@ -93,7 +88,6 @@ pub struct Injections {
 
 /// Synthetic user/assistant messages injected by the spine engine.
 #[derive(Debug, Deserialize)]
-#[non_exhaustive]
 pub struct SpineInjections {
     /// Injected when auto-continuation fires (tells LLM to keep going).
     pub auto_continuation: String,
@@ -109,7 +103,6 @@ pub struct SpineInjections {
 /// Warning banners rendered inside editor panels to prevent the LLM
 /// from treating edited content as instructions.
 #[derive(Debug, Deserialize)]
-#[non_exhaustive]
 pub struct EditorWarnings {
     /// Warnings for the callback script editor.
     pub callback: EditorWarningSet,
@@ -121,7 +114,6 @@ pub struct EditorWarnings {
 
 /// Warning lines for the callback editor panel.
 #[derive(Debug, Deserialize)]
-#[non_exhaustive]
 pub struct EditorWarningSet {
     /// Top banner identifying this as an editor view.
     pub banner: String,
@@ -133,7 +125,6 @@ pub struct EditorWarningSet {
 
 /// Warning lines for the prompt library editor panel.
 #[derive(Debug, Deserialize, Default)]
-#[non_exhaustive]
 pub struct PromptEditorWarningSet {
     /// Top banner identifying this as a prompt editor.
     pub banner: String,
@@ -148,7 +139,6 @@ pub struct PromptEditorWarningSet {
 /// Messages appended to tool results when a console command
 /// should have used a dedicated tool (git, gh).
 #[derive(Debug, Deserialize)]
-#[non_exhaustive]
 pub struct ConsoleGuardrails {
     /// Shown when `git` is run via console instead of `git_execute`.
     pub git: String,
@@ -162,7 +152,6 @@ use extras::behavioral;
 
 /// Provider-specific text injected during prompt assembly.
 #[derive(Debug, Deserialize)]
-#[non_exhaustive]
 pub struct ProviderInjections {
     /// System suffix appended in cleaner/reverie mode.
     pub cleaner_mode: String,
@@ -181,7 +170,6 @@ pub struct ProviderInjections {
 /// Configuration for reverie sub-agents (background context optimizer, cartographer).
 /// Loaded from `yamls/reverie.yaml`.
 #[derive(Debug, Deserialize)]
-#[non_exhaustive]
 pub struct Reverie {
     /// First user message that kicks off the reverie session.
     pub kickoff_message: String,
@@ -195,7 +183,6 @@ pub struct Reverie {
 
 /// Text blocks injected to constrain which tools a reverie agent can use.
 #[derive(Debug, Deserialize)]
-#[non_exhaustive]
 pub struct ReverieToolRestrictions {
     /// Prefix before the allowed-tool list.
     pub header: String,
@@ -207,7 +194,6 @@ pub struct ReverieToolRestrictions {
 
 /// Error messages returned when reverie operations fail.
 #[derive(Debug, Deserialize)]
-#[non_exhaustive]
 pub struct ReverieErrors {
     /// Returned when a reverie tries to call a forbidden tool.
     pub tool_not_available: String,
@@ -226,7 +212,6 @@ pub struct ReverieErrors {
 /// UI configuration — display strings, category labels.
 /// Loaded from `yamls/ui.yaml`.
 #[derive(Debug, Deserialize)]
-#[non_exhaustive]
 pub struct Ui {
     /// Display names for tool category groupings in the tools panel.
     pub tool_categories: ToolCategories,
@@ -235,7 +220,6 @@ pub struct Ui {
 /// Human-readable category labels shown in the tools overview panel.
 /// Each field is the display string for that tool group.
 #[derive(Debug, Deserialize)]
-#[non_exhaustive]
 pub struct ToolCategories {
     /// Label for file manipulation tools (Open, Edit, Write).
     pub file: String,
@@ -261,7 +245,6 @@ pub struct ToolCategories {
 
 /// Icons displayed next to messages in the conversation panel.
 #[derive(Debug, Deserialize, Clone)]
-#[non_exhaustive]
 pub struct MessageIcons {
     /// Icon for user messages.
     pub user: String,
@@ -279,7 +262,6 @@ pub struct MessageIcons {
 /// Keys match module `icon_ids` (e.g., "tree", "todo", "git").
 #[derive(Debug, Deserialize, Clone)]
 #[serde(transparent)]
-#[non_exhaustive]
 pub struct ContextIcons(pub HashMap<String, String>);
 
 impl ContextIcons {
@@ -292,7 +274,6 @@ impl ContextIcons {
 
 /// Icons indicating message lifecycle status (full, summarized, deleted).
 #[derive(Debug, Deserialize, Clone)]
-#[non_exhaustive]
 pub struct StatusIcons {
     /// Shown for messages included in full.
     pub full: String,
@@ -304,7 +285,6 @@ pub struct StatusIcons {
 
 /// Icons for todo item statuses.
 #[derive(Debug, Deserialize, Clone)]
-#[non_exhaustive]
 pub struct TodoIcons {
     /// Not yet started.
     pub pending: String,
@@ -317,7 +297,6 @@ pub struct TodoIcons {
 /// All available themes, keyed by theme ID.
 /// Loaded from `yamls/themes.yaml`.
 #[derive(Debug, Deserialize, Clone)]
-#[non_exhaustive]
 pub struct Themes {
     /// Map of theme ID → theme definition.
     pub themes: HashMap<String, Theme>,
@@ -325,7 +304,6 @@ pub struct Themes {
 
 /// A complete visual theme: icons, colors, and metadata.
 #[derive(Debug, Deserialize, Clone)]
-#[non_exhaustive]
 pub struct Theme {
     /// Human-readable theme name.
     pub name: String,
@@ -348,7 +326,6 @@ pub type RgbColor = [u8; 3];
 
 /// Color palette for a theme — all values are RGB triples.
 #[derive(Debug, Deserialize, Clone, Copy)]
-#[non_exhaustive]
 pub struct ThemeColors {
     /// Primary accent (selections, active elements).
     pub accent: RgbColor,

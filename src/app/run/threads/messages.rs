@@ -105,10 +105,7 @@ struct PendingMessage {
 /// question / file reference.
 fn build_pending(thread_id: &str, msg: &ThreadMessage, idx: usize) -> PendingMessage {
     let message_id = format!("{thread_id}-m{idx}");
-    let author = match msg.author {
-        ThreadAuthor::User => "user",
-        ThreadAuthor::Assistant => "assistant",
-    };
+    let author = if matches!(msg.author, ThreadAuthor::Assistant) { "assistant" } else { "user" };
     let body = serde_json::json!({
         "id": message_id,
         "author": author,
@@ -142,10 +139,7 @@ fn emit_one_message(state: &State, thread_id: &str, message_id: &str, body: &str
         }
     };
     let head = stored.hash();
-    let inline_body = match stored {
-        Stored::Inline { bytes, .. } => String::from_utf8(bytes).ok(),
-        Stored::Spilled { .. } => None,
-    };
+    let inline_body = if let Stored::Inline { bytes, .. } = stored { String::from_utf8(bytes).ok() } else { None };
     boot.oplog().submit_durable(OpEntryKind::MessageCreated {
         thread_id: thread_id.to_owned(),
         message_id: message_id.to_owned(),

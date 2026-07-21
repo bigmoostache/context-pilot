@@ -90,8 +90,7 @@ fn render_modal_overlays(frame: &mut Frame<'_>, area: Rect, overlays: &[cp_rende
             | cp_render::conversation::Overlay::Autocomplete(_)
             | cp_render::conversation::Overlay::Config(_)
             | cp_render::conversation::Overlay::CommandPalette(_)
-            | cp_render::conversation::Overlay::SearchIndex(_)
-            | _ => None,
+            | cp_render::conversation::Overlay::SearchIndex(_) => None,
         })
     }) {
         perf::render_perf_overlay_from_ir(frame, area, perf_overlay);
@@ -105,8 +104,7 @@ fn render_modal_overlays(frame: &mut Frame<'_>, area: Rect, overlays: &[cp_rende
             | cp_render::conversation::Overlay::Autocomplete(_)
             | cp_render::conversation::Overlay::Perf(_)
             | cp_render::conversation::Overlay::CommandPalette(_)
-            | cp_render::conversation::Overlay::SearchIndex(_)
-            | _ => None,
+            | cp_render::conversation::Overlay::SearchIndex(_) => None,
         })
     }) {
         help::config_overlay::render_config_overlay(frame, config_overlay, area);
@@ -120,8 +118,7 @@ fn render_modal_overlays(frame: &mut Frame<'_>, area: Rect, overlays: &[cp_rende
             | cp_render::conversation::Overlay::Autocomplete(_)
             | cp_render::conversation::Overlay::Perf(_)
             | cp_render::conversation::Overlay::Config(_)
-            | cp_render::conversation::Overlay::CommandPalette(_)
-            | _ => None,
+            | cp_render::conversation::Overlay::CommandPalette(_) => None,
         })
     }) {
         search_overlay::render_search_index_overlay(frame, search_overlay, area);

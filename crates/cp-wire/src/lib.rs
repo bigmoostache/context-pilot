@@ -20,6 +20,14 @@
 //! oplog entries, stream frames, heads, bodies, acks, and registry entries.
 //! *Phase 11:* the fixed-size [`heartbeat`] liveness record is added.
 
+// cp-wire is the ONE genuine version boundary: the agent and the orchestrator
+// can run different builds, so a newer peer really can send a variant/field an
+// older peer has never seen, at runtime. Re-enforce the two exhaustive lints
+// here (they are `allow` workspace-wide) so every public wire type must stay
+// open (non-exhaustive) or carry a registered lint allowance — real forward-compat.
+#![deny(clippy::exhaustive_enums)]
+#![deny(clippy::exhaustive_structs)]
+
 pub mod framing;
 pub mod heartbeat;
 pub mod types;

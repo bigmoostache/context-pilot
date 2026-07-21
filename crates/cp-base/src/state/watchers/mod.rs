@@ -125,7 +125,6 @@ pub trait Watcher: Send + Sync {
 /// Registry holding active watchers. Stored in State via `TypeMap`.
 /// Initialized by the spine module, accessed by any module that
 /// registers watchers.
-#[non_exhaustive]
 pub struct WatcherRegistry {
     /// Active watchers, polled each tick by the event loop.
     pub watchers: Vec<Box<dyn Watcher>>,

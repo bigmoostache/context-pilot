@@ -177,7 +177,6 @@ fn load_logs_chunked() -> (Vec<LogEntry>, usize) {
 
 /// Logs module: timestamped entries and conversation history management.
 #[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
 pub struct LogsModule;
 
 impl Default for LogsModule {

@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 
 /// A single queued tool call, waiting to be flushed.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct QueuedToolCall {
     /// Index in the queue (1-based, for display and undo)
     pub index: usize,
@@ -27,7 +26,6 @@ impl QueuedToolCall {
 
 /// Module state for the queue system.
 #[derive(Debug, Clone)]
-#[non_exhaustive]
 pub struct QueueState {
     /// Whether the queue is actively intercepting tool calls
     pub active: bool,

@@ -72,7 +72,6 @@ pub const DEFAULT_GC_GRACE: Duration = Duration::from_mins(1);
 
 /// The outcome of a [`compact`] pass.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-#[non_exhaustive]
 pub struct Report {
     /// How many whole segments were deleted.
     pub segments_removed: u64,

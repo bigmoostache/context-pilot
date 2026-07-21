@@ -33,7 +33,6 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Scratchpad module: temporary note cells for working data during a session.
 #[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
 pub struct ScratchpadModule;
 
 impl Default for ScratchpadModule {

@@ -189,7 +189,6 @@ where
 /// The process is owned by the console server.
 /// The TUI polls the log file for output into a `RingBuffer`.
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct SessionHandle {
     /// Unique session key (e.g., "`c_42`").
     pub name: String,
@@ -215,7 +214,6 @@ pub struct SessionHandle {
 
 /// Parameters for reconnecting to an existing server-managed session.
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct ReconnectMeta {
     /// Unique session key.
     pub name: String,

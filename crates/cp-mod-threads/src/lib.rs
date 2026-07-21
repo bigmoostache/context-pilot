@@ -36,7 +36,6 @@ use self::panel::ThreadsPanel;
 
 /// Threads module: parallel discussion and work topics with turn-based focus.
 #[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
 pub struct ThreadsModule;
 
 impl Default for ThreadsModule {

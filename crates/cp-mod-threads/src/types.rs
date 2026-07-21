@@ -8,10 +8,6 @@ use cp_base::state::runtime::State;
 
 /// Thread turn status — who needs to act next.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "thread-turn contract: ThreadStatus is a closed MyTurn/TheirTurn set constructed cross-crate and matched exhaustively by the bridge and threads view; #[non_exhaustive] would force cross-crate wildcard arms the forbidden wildcard_enum_match_arm lint rejects"
-)]
 pub enum ThreadStatus {
     /// The AI's turn — thread has user input awaiting response.
     MyTurn,
@@ -31,10 +27,6 @@ impl std::fmt::Display for ThreadStatus {
 
 /// Who authored a thread message.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "thread-author contract: ThreadAuthor is a closed User/Assistant set constructed cross-crate and matched exhaustively by the message renderer; #[non_exhaustive] would force cross-crate wildcard arms the forbidden wildcard_enum_match_arm lint rejects"
-)]
 pub enum ThreadAuthor {
     /// Message from the human user.
     #[default]
@@ -63,7 +55,6 @@ const fn default_true() -> bool {
 
 /// A single message within a thread.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct ThreadMessage {
     /// Who wrote this message.
     pub author: ThreadAuthor,
@@ -124,7 +115,6 @@ impl ThreadMessage {
 
 /// A parallel discussion/work topic thread.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct Thread {
     /// Short unique identifier (e.g. "T1", "T2").
     pub id: String,
@@ -171,7 +161,6 @@ impl Thread {
 
 /// Shared thread state, persisted via `save_module_data`.
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct ThreadsState {
     /// All active threads.
     pub threads: Vec<Thread>,
@@ -245,7 +234,6 @@ impl ThreadsState {
 
 /// Per-worker focus tracking for thread enforcement.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct FocusState {
     /// Which thread the AI is currently focused on (None = unfocused).
     pub focused_thread_id: Option<String>,

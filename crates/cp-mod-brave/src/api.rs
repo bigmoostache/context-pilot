@@ -11,7 +11,6 @@ const TIMEOUT_SECS: u64 = 10;
 
 /// Parameters for a Brave web search request.
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct SearchParams<'req> {
     /// Search query string.
     pub query: &'req str,
@@ -31,7 +30,6 @@ pub struct SearchParams<'req> {
 
 /// Parameters for a Brave LLM context request.
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct LLMContextParams<'req> {
     /// Search query string.
     pub query: &'req str,

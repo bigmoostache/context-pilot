@@ -22,7 +22,6 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// OCR module: document conversion via the Datalab cloud API.
 #[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
 pub struct OcrModule;
 
 impl Default for OcrModule {

@@ -11,7 +11,6 @@ use crate::tools::truncate_str;
 
 /// Serializable metadata for a console session (used for persistence across reloads).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct SessionMeta {
     /// OS process ID.
     pub pid: u32,
@@ -27,10 +26,6 @@ pub struct SessionMeta {
 
 /// Process lifecycle status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "process-status contract: ProcessStatus is a closed lifecycle set constructed cross-crate by the session manager and matched exhaustively by label()/exit_code(); #[non_exhaustive] would forbid that construction"
-)]
 pub enum ProcessStatus {
     /// Process is actively running.
     Running,
@@ -74,7 +69,6 @@ impl ProcessStatus {
 /// Module-owned state for the Console module.
 /// Stored in `State.module_data` via `TypeMap`.
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct ConsoleState {
     /// Active session handles, keyed by session name (e.g., "`c_42`").
     pub sessions: HashMap<String, SessionHandle>,
@@ -158,7 +152,6 @@ const EASY_BASH_INLINE_MAX_BYTES: usize = 8_000;
 
 /// A watcher that monitors a console session for a condition.
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct ConsoleWatcher {
     /// Unique ID for this watcher (e.g., "`console_c_42_exit`").
     pub watcher_id: String,

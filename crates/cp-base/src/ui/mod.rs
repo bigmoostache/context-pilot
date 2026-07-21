@@ -10,10 +10,6 @@ pub mod render_cache;
 
 /// Column alignment for table cells.
 #[derive(Debug, Clone, Copy, Default)]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "text-table alignment: this Align is a closed Left/Right set constructed cross-crate on TextCell and matched exhaustively by pad_cell; #[non_exhaustive] would forbid that construction"
-)]
 pub enum Align {
     #[default]
     /// Align text to the left, padding with trailing spaces.
@@ -24,7 +20,6 @@ pub enum Align {
 
 /// Simple text-cell for `render_table_text`. Style-free, just text + alignment.
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct TextCell {
     /// Display text content.
     pub text: String,

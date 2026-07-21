@@ -279,6 +279,9 @@ fn phase_label(phase: cp_wire::types::Phase) -> &'static str {
         cp_wire::types::Phase::Idle => "idle",
         cp_wire::types::Phase::Streaming => "streaming",
         cp_wire::types::Phase::Tooling => "tooling",
+        // `Phase` is #[non_exhaustive]; a phase from a newer agent protocol
+        // folds to a neutral label rather than failing the build.
+        _ => "unknown",
     }
 }
 
@@ -289,6 +292,9 @@ fn lifecycle_label(state: cp_wire::types::LifecycleState) -> &'static str {
         cp_wire::types::LifecycleState::Running => "running",
         cp_wire::types::LifecycleState::Stopping => "stopping",
         cp_wire::types::LifecycleState::Stopped => "stopped",
+        // `LifecycleState` is #[non_exhaustive]; a state from a newer agent
+        // protocol folds to a neutral label rather than failing the build.
+        _ => "unknown",
     }
 }
 

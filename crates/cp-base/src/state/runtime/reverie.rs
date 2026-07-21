@@ -7,10 +7,6 @@ use crate::state::data::message::Message;
 
 /// The kind of reverie running.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "reverie-kind contract: Kind is a closed set constructed cross-crate by the optimizer trigger and matched exhaustively by its Display impl; #[non_exhaustive] would forbid that construction"
-)]
 pub enum Kind {
     /// Context optimizer — reshapes context for relevance and budget.
     ContextOptimizer,
@@ -21,7 +17,6 @@ pub enum Kind {
 /// Lives as `Option<reverie::Session>` on the main `State` struct.
 /// Not persisted — discarded after each run (fresh start every time).
 #[derive(Debug, Clone)]
-#[non_exhaustive]
 pub struct Session {
     /// What kind of reverie this is.
     pub kind: Kind,

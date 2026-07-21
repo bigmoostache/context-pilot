@@ -8,10 +8,6 @@ use super::llm_types::ModelInfo;
 /// Anthropic model variants with per-model pricing and context limits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "model-roster contract: AnthropicModel is a closed pricing/capability table constructed cross-crate by model dispatch and matched exhaustively by its ModelInfo impl; #[non_exhaustive] would forbid that construction"
-)]
 pub enum AnthropicModel {
     /// Claude Opus 4.5 — highest capability, largest output window.
     #[default]
@@ -86,10 +82,6 @@ impl ModelInfo for AnthropicModel {
 /// xAI Grok model variants (fast models optimized for tool calling).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "model-roster contract: GrokModel is a closed pricing/capability table constructed cross-crate by model dispatch and matched exhaustively by its ModelInfo impl; #[non_exhaustive] would forbid that construction"
-)]
 pub enum GrokModel {
     /// Grok 4.1 Fast — latest iteration, 2M context.
     #[default]
@@ -150,10 +142,6 @@ impl ModelInfo for GrokModel {
 /// - Llama models: Custom tools only
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "model-roster contract: GroqModel is a closed pricing/capability table constructed cross-crate by model dispatch and matched exhaustively by its ModelInfo impl; #[non_exhaustive] would forbid that construction"
-)]
 pub enum GroqModel {
     /// GPT-OSS 120B — large, with built-in web search.
     #[default]
@@ -227,10 +215,6 @@ impl ModelInfo for GroqModel {
 /// aliases for V4 Flash.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "model-roster contract: DeepSeekModel is a closed pricing/capability table constructed cross-crate by model dispatch and matched exhaustively by its ModelInfo impl; #[non_exhaustive] would forbid that construction"
-)]
 pub enum DeepSeekModel {
     /// `DeepSeek` V4 Flash — fast and cheap, 1M context.
     #[default]
@@ -294,10 +278,6 @@ impl ModelInfo for DeepSeekModel {
 /// `MiniMax` model variants (Anthropic-compatible API via Token Plan).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "model-roster contract: MiniMaxModel is a closed pricing/capability table constructed cross-crate by model dispatch and matched exhaustively by its ModelInfo impl; #[non_exhaustive] would forbid that construction"
-)]
 pub enum MiniMaxModel {
     /// `MiniMax` M2.7 — flagship model, 204K context.
     #[default]
@@ -365,10 +345,6 @@ impl ModelInfo for MiniMaxModel {
 /// Claude Code V2 model variants (OAuth, updated request format).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "model-roster contract: ClaudeCodeV2Model is a closed pricing/capability table constructed cross-crate by model dispatch and matched exhaustively by its ModelInfo impl; #[non_exhaustive] would forbid that construction"
-)]
 pub enum ClaudeCodeV2Model {
     /// Claude Opus 4.8 — latest flagship model.
     #[default]

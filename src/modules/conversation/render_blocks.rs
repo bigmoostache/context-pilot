@@ -36,10 +36,12 @@ pub(crate) struct MessageBlockOpts {
 
 /// Render a single message to IR blocks.
 pub(crate) fn render_message_blocks(msg: &Message, opts: &MessageBlockOpts) -> Vec<Block> {
-    match msg.msg_type {
-        MsgKind::ToolCall => render_tool_call_blocks(msg, opts.viewport_width),
-        MsgKind::ToolResult => render_tool_result_blocks(msg, opts.viewport_width),
-        MsgKind::TextMessage => render_text_message_blocks(msg, opts),
+    if msg.msg_type == MsgKind::ToolCall {
+        render_tool_call_blocks(msg, opts.viewport_width)
+    } else if msg.msg_type == MsgKind::ToolResult {
+        render_tool_result_blocks(msg, opts.viewport_width)
+    } else {
+        render_text_message_blocks(msg, opts)
     }
 }
 
@@ -146,8 +148,7 @@ fn flatten_visualizer_blocks(blocks: &mut Vec<Block>, vis_blocks: &[Block], ctx:
             | Block::ProgressBar { .. }
             | Block::Tree(_)
             | Block::Separator
-            | Block::KeyValue(_)
-            | _ => {
+            | Block::KeyValue(_) => {
                 // Complex blocks (Table, Tree, …) — emit a bare icon line first
                 // (no current visualizer produces these), then pass through.
                 if is_first {
@@ -187,10 +188,7 @@ fn render_text_message_blocks(msg: &Message, opts: &MessageBlockOpts) -> Vec<Blo
         (icons::msg_assistant(), Semantic::AccentDim)
     };
 
-    let status_icon = match msg.status {
-        MsgStatus::Full => icons::status_full(),
-        MsgStatus::Deleted | MsgStatus::Detached => icons::status_deleted(),
-    };
+    let status_icon = if msg.status == MsgStatus::Full { icons::status_full() } else { icons::status_deleted() };
 
     let content = &msg.content;
     let prefix = format!("{role_icon}{status_icon}");

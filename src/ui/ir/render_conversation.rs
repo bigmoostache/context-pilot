@@ -114,8 +114,7 @@ pub(crate) fn render_autocomplete_if_active(
             | cp_render::conversation::Overlay::Perf(_)
             | cp_render::conversation::Overlay::Config(_)
             | cp_render::conversation::Overlay::CommandPalette(_)
-            | cp_render::conversation::Overlay::SearchIndex(_)
-            | _ => None,
+            | cp_render::conversation::Overlay::SearchIndex(_) => None,
         })
     }) else {
         return;

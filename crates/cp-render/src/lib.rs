@@ -28,10 +28,6 @@
 //! The IR is therefore legitimately exhaustive: it is one closed contract
 //! between the frame builder and its sole in-repo adapter, where adding a
 //! field is a deliberate change both sides update together.
-#![expect(
-    clippy::exhaustive_structs,
-    reason = "IR data-carrier layer: every type is built by struct literal cross-crate by the tui adapter and read field-by-field by the renderer; #[non_exhaustive] forbids that construction (E0639) and the wide records trip too_many_arguments under a flat constructor, so the exhaustive literal is the honest shape for this closed builder↔adapter contract"
-)]
 
 use serde::Serialize;
 
@@ -51,7 +47,6 @@ pub mod overlay_ir;
 /// The TUI adapter maps each variant to a concrete `ratatui::style::Style`.
 /// Web adapters map to CSS classes. This keeps the IR platform-agnostic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
-#[non_exhaustive]
 pub enum Semantic {
     /// Default foreground.
     Default,
@@ -215,10 +210,6 @@ impl Span {
 
 /// Horizontal alignment for table cells.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "IR rendering contract: Align is a closed three-way set (Left/Center/Right) constructed exhaustively across the tui adapter; #[non_exhaustive] would forbid that cross-crate construction"
-)]
 pub enum Align {
     /// Left-aligned (default).
     Left,
@@ -322,7 +313,6 @@ pub type KeyValuePair = (Vec<Span>, Vec<Span>);
 /// Panels return `Vec<Block>` from their `blocks()` method. The adapter
 /// converts each variant into platform-specific widgets.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[non_exhaustive]
 pub enum Block {
     /// A single line of styled spans.
     Line(Vec<Span>),

@@ -3,10 +3,6 @@ use serde::{Deserialize, Serialize};
 /// Discriminator for the three message shapes in a conversation.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "message-shape discriminator: MsgKind is constructed cross-crate on every Message and matched exhaustively by the formatter; the set is closed and #[non_exhaustive] would forbid that construction"
-)]
 pub enum MsgKind {
     /// Plain text (user or assistant).
     #[default]
@@ -20,10 +16,6 @@ pub enum MsgKind {
 /// Message status for context management
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "message-status contract: MsgStatus is constructed cross-crate and matched exhaustively by context management; the set is closed and #[non_exhaustive] would forbid that construction"
-)]
 pub enum MsgStatus {
     /// Included in full in the LLM prompt.
     #[default]
@@ -36,7 +28,6 @@ pub enum MsgStatus {
 
 /// Record of a single tool invocation inside a [`Message`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct ToolUseRecord {
     /// Unique tool-use ID assigned by the LLM.
     pub id: String,
@@ -56,7 +47,6 @@ impl ToolUseRecord {
 
 /// Record of a tool execution result inside a [`Message`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct ToolResultRecord {
     /// Correlates with [`ToolUseRecord::id`].
     pub tool_use_id: String,
@@ -114,7 +104,6 @@ impl ToolResultRecord {
 /// A single message in the conversation — user text, assistant text,
 /// tool call, or tool result. The atomic unit of the message history.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct Message {
     /// Display ID (e.g., U1, A1, T1 - for UI/LLM)
     pub id: String,

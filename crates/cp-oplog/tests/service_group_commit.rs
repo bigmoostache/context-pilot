@@ -142,9 +142,10 @@ fn best_effort_floods_drop_without_ever_blocking_the_submitter() {
     let mut dropped = 0u64;
     let mut submitted = 0u64;
     for _unused in 0..flood {
-        match service.append_best_effort(phase()) {
-            BestEffortOutcome::Submitted => submitted = submitted.wrapping_add(1),
-            BestEffortOutcome::Dropped => dropped = dropped.wrapping_add(1),
+        if matches!(service.append_best_effort(phase()), BestEffortOutcome::Submitted) {
+            submitted = submitted.wrapping_add(1);
+        } else {
+            dropped = dropped.wrapping_add(1);
         }
     }
     let elapsed = start.elapsed();
