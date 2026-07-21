@@ -323,6 +323,19 @@ exceptions:
       Re-evaluate if a JSX-native syntax highlighter (one that returns a React
       element tree instead of an HTML string) replaces highlight.js.
 
+  - path: "web/src/mobile-components/finder/preview/livePreviews.tsx"
+    rule: "@eslint-react/dom-no-dangerously-set-innerhtml"
+    reason: >
+      The mobile HighlightedCode twin renders the identical highlight.js per-line
+      output through the same dangerouslySetInnerHTML sink as its desktop sibling
+      (highlight.js ESCAPES the source and emits only class-tagged <span>s — no
+      user-controlled HTML). Injecting a pre-highlighted HTML fragment is the ONLY
+      way to show syntax colours; scoped off for this one mobile file + this one
+      rule, mirroring the desktop entry above. Every other rule stays at error.
+    strategy: >
+      Re-evaluate alongside the desktop entry when a JSX-native syntax
+      highlighter replaces highlight.js.
+
   # ── P7 import-x tsc-redundant / flat-config-idiom rules — off tree-wide ────
   - path: "web/**"
     rule: "import-x/default"

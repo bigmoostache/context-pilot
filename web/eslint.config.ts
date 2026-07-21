@@ -700,7 +700,14 @@ export default defineConfig([
     // (the config-level exception channel, registered in
     // allowed-eslint-exceptions.yaml — never an inline eslint-disable, which the
     // P4 anti-cheat layer forbids). Every other rule stays at error.
-    files: ["src/components/finder/preview/livePreviews.tsx"],
+    // The mobile twin (mobile-components/finder/preview/livePreviews.tsx) renders
+    // the identical highlight.js output through the same dangerouslySetInnerHTML
+    // sink (escaped source, class-tagged spans only), so it carries the same
+    // scoped exception.
+    files: [
+      "src/components/finder/preview/livePreviews.tsx",
+      "src/mobile-components/finder/preview/livePreviews.tsx",
+    ],
     rules: {
       "@eslint-react/dom-no-dangerously-set-innerhtml": "off",
     },

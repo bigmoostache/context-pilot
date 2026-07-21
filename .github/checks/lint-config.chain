@@ -7319,3 +7319,50 @@ index 3e2fbffa..5fe495ec 100644
    - path: "web/src/components/finder/preview/livePreviews.tsx"
      rule: "@eslint-react/dom-no-dangerously-set-innerhtml"
 # --- End entry #77 ---
+78:6cb590ac7fcf303981736e767ab48b8dee8b1f187363e96c68007a081a213bf9:5e704f2a3c5ebdfaaea19b664d9ef7a93c810ca621907590e9ca49e5f8057f21:dc3609f8d020d06905a6c759363c3a85a0048ca836cb3cabd8addc44208cb526
+# --- Diff for entry #78 ---
+diff --git a/web/eslint.config.ts b/web/eslint.config.ts
+index a9d8d373..daca7705 100644
+--- a/web/eslint.config.ts
++++ b/web/eslint.config.ts
+@@ -700,7 +700,14 @@ export default defineConfig([
+     // (the config-level exception channel, registered in
+     // allowed-eslint-exceptions.yaml — never an inline eslint-disable, which the
+     // P4 anti-cheat layer forbids). Every other rule stays at error.
+-    files: ["src/components/finder/preview/livePreviews.tsx"],
++    // The mobile twin (mobile-components/finder/preview/livePreviews.tsx) renders
++    // the identical highlight.js output through the same dangerouslySetInnerHTML
++    // sink (escaped source, class-tagged spans only), so it carries the same
++    // scoped exception.
++    files: [
++      "src/components/finder/preview/livePreviews.tsx",
++      "src/mobile-components/finder/preview/livePreviews.tsx",
++    ],
+     rules: {
+       "@eslint-react/dom-no-dangerously-set-innerhtml": "off",
+     },
+diff --git a/.github/checks/allowed-eslint-exceptions.yaml b/.github/checks/allowed-eslint-exceptions.yaml
+index 5fe495ec..6e3aaf35 100644
+--- a/.github/checks/allowed-eslint-exceptions.yaml
++++ b/.github/checks/allowed-eslint-exceptions.yaml
+@@ -323,6 +323,19 @@ exceptions:
+       Re-evaluate if a JSX-native syntax highlighter (one that returns a React
+       element tree instead of an HTML string) replaces highlight.js.
+ 
++  - path: "web/src/mobile-components/finder/preview/livePreviews.tsx"
++    rule: "@eslint-react/dom-no-dangerously-set-innerhtml"
++    reason: >
++      The mobile HighlightedCode twin renders the identical highlight.js per-line
++      output through the same dangerouslySetInnerHTML sink as its desktop sibling
++      (highlight.js ESCAPES the source and emits only class-tagged <span>s — no
++      user-controlled HTML). Injecting a pre-highlighted HTML fragment is the ONLY
++      way to show syntax colours; scoped off for this one mobile file + this one
++      rule, mirroring the desktop entry above. Every other rule stays at error.
++    strategy: >
++      Re-evaluate alongside the desktop entry when a JSX-native syntax
++      highlighter replaces highlight.js.
++
+   # ── P7 import-x tsc-redundant / flat-config-idiom rules — off tree-wide ────
+   - path: "web/**"
+     rule: "import-x/default"
+# --- End entry #78 ---
