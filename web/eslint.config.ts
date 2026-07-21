@@ -676,8 +676,15 @@ export default defineConfig([
     //
     // The role="application" surface lives in the Finder shell render (the P8
     // decomposition split Finder.tsx into Finder/{index,state,controller,shell,
-    // body}); every other rule stays at error.
-    files: ["src/components/finder/Finder/shell.tsx"],
+    // body}); every other rule stays at error. The mobile twin
+    // (mobile-components/finder/Finder/shell.tsx) keeps the same
+    // role="application" keyboard-widget surface verbatim (harmless on touch,
+    // still serves a paired hardware keyboard), so it carries the identical
+    // scoped exception.
+    files: [
+      "src/components/finder/Finder/shell.tsx",
+      "src/mobile-components/finder/Finder/shell.tsx",
+    ],
     rules: {
       "jsx-a11y/no-noninteractive-element-interactions": "off",
       "jsx-a11y/no-noninteractive-tabindex": "off",

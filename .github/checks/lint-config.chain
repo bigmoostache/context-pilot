@@ -7258,3 +7258,64 @@ index b60ff199..5e186a7b 100644
    name: rust-lints
    description: Rust-lints family (fmt, clippy -D warnings, cargo check, lint-exception registry, vault-bypass)
 # --- End entry #76 ---
+77:356423888b412e425b8c8a522e09d29897309e1058215f38853c9a7b78873965:914d1304906c47a373d1fac0598d1fbdfa767817a1f4f9d7e8aa561610c7b14a:6cb590ac7fcf303981736e767ab48b8dee8b1f187363e96c68007a081a213bf9
+# --- Diff for entry #77 ---
+diff --git a/web/eslint.config.ts b/web/eslint.config.ts
+index 29a16f0b..a9d8d373 100644
+--- a/web/eslint.config.ts
++++ b/web/eslint.config.ts
+@@ -676,8 +676,15 @@ export default defineConfig([
+     //
+     // The role="application" surface lives in the Finder shell render (the P8
+     // decomposition split Finder.tsx into Finder/{index,state,controller,shell,
+-    // body}); every other rule stays at error.
+-    files: ["src/components/finder/Finder/shell.tsx"],
++    // body}); every other rule stays at error. The mobile twin
++    // (mobile-components/finder/Finder/shell.tsx) keeps the same
++    // role="application" keyboard-widget surface verbatim (harmless on touch,
++    // still serves a paired hardware keyboard), so it carries the identical
++    // scoped exception.
++    files: [
++      "src/components/finder/Finder/shell.tsx",
++      "src/mobile-components/finder/Finder/shell.tsx",
++    ],
+     rules: {
+       "jsx-a11y/no-noninteractive-element-interactions": "off",
+       "jsx-a11y/no-noninteractive-tabindex": "off",
+diff --git a/.github/checks/allowed-eslint-exceptions.yaml b/.github/checks/allowed-eslint-exceptions.yaml
+index 3e2fbffa..5fe495ec 100644
+--- a/.github/checks/allowed-eslint-exceptions.yaml
++++ b/.github/checks/allowed-eslint-exceptions.yaml
+@@ -282,6 +282,31 @@ exceptions:
+       Re-evaluate alongside no-noninteractive-element-interactions if the
+       surface adopts genuine grid semantics or jsx-a11y recognises `application`.
+ 
++  # ── Mobile Finder shell twin — same role="application" keyboard surface ───
++  - path: "web/src/mobile-components/finder/Finder/shell.tsx"
++    rule: "jsx-a11y/no-noninteractive-element-interactions"
++    reason: >
++      The mobile Finder shell is a verbatim twin of the desktop
++      finder/Finder/shell.tsx role="application" keyboard-widget surface (kept
++      identical because it is harmless on touch and still serves a paired
++      hardware keyboard). It carries the same role="application" + onKeyDown, so
++      it inherits the identical jsx-a11y false-positive; scoped off for this one
++      mobile file + this one rule, exactly as its desktop sibling above.
++    strategy: >
++      Re-evaluate alongside the desktop entry if the surface is restructured
++      into genuine ARIA grid semantics or jsx-a11y recognises `application`.
++
++  - path: "web/src/mobile-components/finder/Finder/shell.tsx"
++    rule: "jsx-a11y/no-noninteractive-tabindex"
++    reason: >
++      Same mobile role="application" keyboard-widget twin surface — a focusable
++      region that captures keystrokes legitimately holds tabIndex={0}, which
++      jsx-a11y flags because it models `application` as non-interactive. Scoped
++      to this one mobile file, mirroring the desktop sibling entry.
++    strategy: >
++      Re-evaluate alongside no-noninteractive-element-interactions if the
++      surface adopts genuine grid semantics or jsx-a11y recognises `application`.
++
+   # ── P6 highlight.js code preview — dangerouslySetInnerHTML is irreducible ──
+   - path: "web/src/components/finder/preview/livePreviews.tsx"
+     rule: "@eslint-react/dom-no-dangerously-set-innerhtml"
+# --- End entry #77 ---

@@ -282,6 +282,31 @@ exceptions:
       Re-evaluate alongside no-noninteractive-element-interactions if the
       surface adopts genuine grid semantics or jsx-a11y recognises `application`.
 
+  # ── Mobile Finder shell twin — same role="application" keyboard surface ───
+  - path: "web/src/mobile-components/finder/Finder/shell.tsx"
+    rule: "jsx-a11y/no-noninteractive-element-interactions"
+    reason: >
+      The mobile Finder shell is a verbatim twin of the desktop
+      finder/Finder/shell.tsx role="application" keyboard-widget surface (kept
+      identical because it is harmless on touch and still serves a paired
+      hardware keyboard). It carries the same role="application" + onKeyDown, so
+      it inherits the identical jsx-a11y false-positive; scoped off for this one
+      mobile file + this one rule, exactly as its desktop sibling above.
+    strategy: >
+      Re-evaluate alongside the desktop entry if the surface is restructured
+      into genuine ARIA grid semantics or jsx-a11y recognises `application`.
+
+  - path: "web/src/mobile-components/finder/Finder/shell.tsx"
+    rule: "jsx-a11y/no-noninteractive-tabindex"
+    reason: >
+      Same mobile role="application" keyboard-widget twin surface — a focusable
+      region that captures keystrokes legitimately holds tabIndex={0}, which
+      jsx-a11y flags because it models `application` as non-interactive. Scoped
+      to this one mobile file, mirroring the desktop sibling entry.
+    strategy: >
+      Re-evaluate alongside no-noninteractive-element-interactions if the
+      surface adopts genuine grid semantics or jsx-a11y recognises `application`.
+
   # ── P6 highlight.js code preview — dangerouslySetInnerHTML is irreducible ──
   - path: "web/src/components/finder/preview/livePreviews.tsx"
     rule: "@eslint-react/dom-no-dangerously-set-innerhtml"

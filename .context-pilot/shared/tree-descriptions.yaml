@@ -1854,6 +1854,10 @@
   path: web/src/lib/types.ts
   description: 'Domain types barrel. Re-exports backend types from generated/types.gen. web-lint P1: ThreadQuestion ADDED to the `import type` block (was only re-exported, causing TS2304 when used in ThreadMsg redecl); ThreadMsg = Omit<GenThreadMsg,''ts''|''questions''> & { ts?, streaming?, questions?: ThreadQuestion[]|undefined }. Optional props widened to `| undefined` throughout for exactOptionalPropertyTypes.'
   last_edited_ms: 0
+17ad4df2496bf497:
+  path: web/src/mobile-components/agents/ModelPicker.tsx
+  description: Mobile ModelPicker twin — scrollable provider rail (no-scrollbar overflow-x-auto), py-3 touch model cards, hover->active. Two-level registry shape + empty-guard identical, pure @/lib. Shared by mobile AgentModal + config GeneralPane.
+  last_edited_ms: 1784667395178
 17c5e7704e6ade3b:
   path: web/src/components/ui/input.tsx
   description: Base UI input wrapper with cn() styling — ring/border/disabled/invalid states, md:text-sm, dark mode bg.
@@ -5410,6 +5414,10 @@
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: 'Frontend transport — REST + SSE over tiny_http (blocking, thread-per-conn). Backend shared state (view/breaker/hub/tickets/inspect/agents_dir/dirty_agents + supervisor:AgentSupervisor + agents_root + agent_binary) under one Mutex; Backend::new 4-arg, seeds supervisor allow-list from agent_binary. route_rest dispatches all /api routes incl POST /api/fleet/create→rest::create_agent + POST /api/agent/{id}/restart. handle_download serves file/folder-zip via inspect::finder::fs_download. cors_headers() sets Access-Control-Expose-Headers: Content-Disposition so cross-origin fetch() can read the server filename (else a folder zip saves as ''src'' not ''src.zip'' — T265). handle_stream redeems ticket then stream::run_stream.'
   last_edited_ms: 0
+450a6c061cc6ddbf:
+  path: web/src/mobile-components/agents/UsagePage.tsx
+  description: Mobile UsagePage twin — 3-up summary grid to single column, per-agent table wrapped overflow-x-auto, 16px filter select. Live fleet+metrics join + honest-grain notice identical, mobile ui/scroll-area+table token. Routed by mobile config GeneralPane (must be real).
+  last_edited_ms: 1784667395267
 4511bcbba1fad203:
   path: src/app/run/tools/watchdog.rs
   description: 'Interactive main-loop watchdog (T358) — PURELY OBSERVATIONAL wedge detector + auto-diagnostics, never terminates/signals (human at keyboard). Two cooperating detectors on the single-threaded TUI loop: (1) heartbeat — beat() stored at loop top each iteration; stale > WEDGE_STALL_MS(15s) ⇒ total wedge; (2) activity marker — mark(Step) before each loop phase (Step enum 0..12 Idle/Input/Bridge/ThreadsEmit/Stream/Cache/Watchers/Tools/Spine/Reverie/PanelRefresh/Render/Save); a step in flight > SLOW_STEP_MS(12s) ⇒ names the wedged culprit. spawn() launches a detached monitor_loop()->! polling every 2s; on a trip dump_diagnostic(&Wedge) writes .context-pilot/errors/watchdog-<ts>.log with CPU% (high=busy-loop, low=blocked/deadlock) + per-thread states (Linux /proc/self/task wchan) / macOS `sample` backtrace. beat/mark = AtomicU64/U8 Relaxed (~ns, zero happy-path cost). Episode-dedup via last heartbeat. CPU_SAMPLE_MS cfg-gated to linux.'
@@ -7066,6 +7074,10 @@
   path: README.md
   description: 'Project README — global ARCHITECTURE overview (rewritten from the old philosophy/marketing copy, T278). 10 sections + ASCII topology diagram: system overview (5 surfaces), the agent TUI (main loop/modules/panels/LLM providers/tier-② persistence), three-tier durability + push-vs-inspection planes, the orchestrator (registry/services/supervisor/transport routes), the bridge (CP_BRIDGE=1 boot sequence), the web frontend (TanStack Query + SSE push), sidecars (console server, Meilisearch, SQLite entities), the cp-wire protocol types, repo layout, engineering constraints (500-line/8-entry caps, lints, hash chain) + flame telemetry.'
   last_edited_ms: 0
+5b0b81ee54bff6dd:
+  path: web/src/mobile-components/agents/AgentModal/index.tsx
+  description: Mobile AgentModal index twin — desktop centered 460/1120px floating card becomes full-screen sheet (fixed inset-0, no max-width); body scrolls. Selection+mutation wiring shared via ./controller+./actions.
+  last_edited_ms: 1784667394913
 5b157b47b673feb2:
   path: .git/index
   description: Git index (binary). Not source.
@@ -8074,6 +8086,10 @@
   path: crates/cp-base/src/tools/mod.rs
   description: 'Tool system: ToolUse/ToolResult (display/tldr/preserves_tempo), ToolDefinition + YAML-driven ToolDefBuilder, ParamType recursive JSON Schema. RESERVED_PARAM_NAMES intent/verb.'
   last_edited_ms: 1784476429203
+68e9e8dc08e71326:
+  path: web/src/mobile-components/agents/AgentModal/parts.tsx
+  description: Mobile AgentModal parts twin — manage 2-col grid (form|vitals+ACL) stacks single column; 16px name input (iOS zoom), 36px close, safe-area footer. Header/Body/Footer + Controller identical, relative ../ModelPicker + ../../auth/../../shell resolve to mobile siblings.
+  last_edited_ms: 1784667395000
 68ed5a6c0fb77196:
   path: web/src/components/shell/costs/parse.ts
   description: 'TSV parser for cost-tracking.tsv. CostRow interface (16 fields incl culpritMaxFreezes), parseCostTsv(), aggregation helpers: computeSummary, culpritDistribution, costBreakdown, toolCostAttribution, culpritCostAttribution, maxFreezePerCulprit, crossTabToolCulprit (count matrix). buildMarkdownReport() serializes current filtered state as clean markdown tables.'
@@ -12946,6 +12962,10 @@ a5cefacdd6566669:
   path: crates/cp-orchestrator/src/registry/liveness.rs
   description: 'Pure liveness verdict: 3-factor (pid alive + fresh heartbeat + boot_id match). Liveness enum (Live/StalePid/StaleHeartbeat/BootIdMismatch) with is_live(). verdict() is pure (testable without sleeping). pid_alive via signal-0. 8 unit tests.'
   last_edited_ms: 0
+a5cf704f3cf6ef49:
+  path: web/src/mobile-components/agents/FleetDashboard.tsx
+  description: Mobile FleetDashboard twin — md:grid-cols-2 card grid collapses to single full-width column; hover->active press feedback; full-height tap targets. Selection/create/unretire + live-vitals logic identical, mobile ui/scroll-area token.
+  last_edited_ms: 1784667394784
 a5d638c214989600:
   path: src/app/run/mod.rs
   description: 'Sub-module declarations. 6 modules: input (constructor/autocomplete), lifecycle (main loop), reverie (sub-agent), streaming (LLM responses), tools (execution pipeline), watchers (file/GH).'
@@ -14478,6 +14498,10 @@ b8f64fa82adb3c74:
   path: web/src/lib/types.ts
   description: Domain types barrel. Re-exports backend types from generated/types.gen. Agent = Omit<GenAgent,'status'> & {accent, status:AgentStatus} (status widened). AgentStatus = GenAgent['status'] | 'waiting' (client-only restart status set by useRestartFlow, cleared by Lifecycle::Running). ThreadMsg/ThreadDetail Omit-widen for ts/questions/log. Optionals widened |undefined for exactOptionalPropertyTypes.
   last_edited_ms: 0
+b8fbbe662318528c:
+  path: web/src/mobile-components/agents/MarkdownEditor.tsx
+  description: Mobile MarkdownEditor twin — 36px toolbar buttons (from 28px), horizontally scrollable toolbar (no-scrollbar overflow-x-auto), 16px editor body. TipTap engine + extensions + markdown round-trip identical, mobile ./tableControls.
+  last_edited_ms: 1784667395088
 b90b5c9e13cafc94:
   path: src/app/actions/threads.rs
   description: Thread action handlers. Archive = SOFT-DELETE (archived=true) not remove; restore clears flag. archive_confirm is view-aware (archive in active view, restore in archived view). toggle_archived_view flips FocusState.viewing_archived. Select/archive_start resolve selection through visible_indices. Question form dispatch. Secondary action variants removed from exhaustive match.
@@ -15062,6 +15086,10 @@ c053425f2b1e3c58:
   path: web/src/components/shell/TopBar.tsx
   description: 'Slim macOS-style title bar (T321 trimmed): app mark→fleet, agent switcher, per-agent view tabs (Threads/Finder/Cockpit), agent-config gear, account UserMenu. Phase 10: UsersDialog state + onOpenUsers wired to UserMenu for admin user management.'
   last_edited_ms: 1782241802690
+c055364889541f0d:
+  path: web/src/mobile-components/agents/tableControls.tsx
+  description: 'Mobile tableControls twin — 24px grid-picker cells (from 18px), scrollable touch table context bar, active: press feedback. TableGridPicker + TableContextBar + editor.can() gating identical.'
+  last_edited_ms: 1784667395356
 c059a7ee0f8970bf:
   path: .github/workflows/release.yml
   description: 'Release workflow: triggered on push to releases branch. 5-target matrix (linux-x86_64, linux-aarch64, linux-aarch64-musl, macos-x86_64, macos-aarch64). Builds tui+cp-console-server, packages as tarballs, creates GitHub Release with softprops/action-gh-release.'
