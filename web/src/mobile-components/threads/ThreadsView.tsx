@@ -98,16 +98,23 @@ export function ThreadsView({
         />
       )}
 
-      {/* Fixed toggle — top-left of the view (below the shell TopBar). Sits under
-          the drawer scrim (lower z), so tapping it while the drawer is open lands
-          on the scrim and closes instead. */}
-      <button
-        onClick={() => setDrawerOpen(true)}
-        aria-label="Show threads"
-        className="card-shadow absolute top-2 left-2 z-30 flex size-9 items-center justify-center rounded-lg border border-border bg-card/95 text-foreground/80 backdrop-blur-sm transition-colors active:bg-muted"
-      >
-        <PanelLeft className="size-4.5" />
-      </button>
+      {/* Fixed toggle — pinned to the viewport top-left (there is no mobile
+          TopBar), so it never scrolls with the conversation beneath it. It sits
+          under the drawer scrim (lower z), so tapping it while the drawer is
+          open lands on the scrim and closes instead.
+
+          The button is wrapped in a slightly larger `backdrop-blur-md` pad so the
+          content directly under AND just around the button is blurred — the
+          button stays legible over any message text that scrolls beneath it. */}
+      <div className="fixed top-1.5 left-1.5 z-30 rounded-2xl p-1 backdrop-blur-md">
+        <button
+          onClick={() => setDrawerOpen(true)}
+          aria-label="Show threads"
+          className="card-shadow flex size-9 items-center justify-center rounded-lg border border-border bg-card/95 text-foreground/80 transition-colors active:bg-muted"
+        >
+          <PanelLeft className="size-4.5" />
+        </button>
+      </div>
 
       {/* Scrim — dims the conversation while the drawer is open; tapping it (or
           the toggle beneath it) closes the drawer. A <button> not a <div> so it
