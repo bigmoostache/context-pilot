@@ -297,16 +297,19 @@ function ThreadRow({
   const pulse = isFocused || t.status === "MY_TURN" || t.status === "ACTIVE"
 
   return (
+    // The WHOLE row is the tap target (not just the name text), so a tap
+    // anywhere on the row — padding included — selects the thread. onSelect
+    // closes the drawer on mobile, so a narrow inner hit-box was the reason a
+    // tap on the row's padding opened nothing / left the drawer open (T618).
+    // The RowActions buttons stopPropagation, so they never trigger a select.
     <div
+      {...clickable(() => onSelect(t.id))}
       className={cn(
-        "relative flex w-full flex-col gap-1 rounded-lg p-3 text-left transition-colors",
+        "relative flex w-full cursor-pointer flex-col gap-1 rounded-lg p-3 text-left transition-colors",
         selected ? "card-shadow bg-card" : "active:bg-muted/60",
       )}
     >
-      <div
-        {...clickable(() => onSelect(t.id))}
-        className="flex cursor-pointer flex-col gap-1 text-left"
-      >
+      <div className="flex flex-col gap-1 text-left">
         {/* line 1 — dot + name + time */}
         <div className="flex items-center gap-2">
           <span
