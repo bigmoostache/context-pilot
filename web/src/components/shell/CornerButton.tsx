@@ -93,10 +93,7 @@ export function CornerButton({
         />
         {/* the glyph is the animated element — the button itself stays put so
             the backdrop-blur pane doesn't re-rasterise mid-spring */}
-        <span
-          ref={glyphRef}
-          className="relative flex items-center justify-center [&>svg]:size-6"
-        >
+        <span ref={glyphRef} className="relative flex items-center justify-center [&>svg]:size-6">
           {children}
         </span>
       </button>

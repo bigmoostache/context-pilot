@@ -3,11 +3,7 @@ import { useMutation } from "@tanstack/react-query"
 import { Loader2, ExternalLink, CheckCircle2, XCircle, LogIn } from "lucide-react"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { Tip } from "@/components/ui/tip"
-import {
-  fetchClaudeTokenStatus,
-  startClaudeLogin,
-  completeClaudeLogin,
-} from "@/lib/api"
+import { fetchClaudeTokenStatus, startClaudeLogin, completeClaudeLogin } from "@/lib/api"
 import { useClaudeUsage } from "@/lib/live/useClaudeUsage"
 import { ClaudeUsageBody } from "@/components/agents/ClaudeUsagePage"
 

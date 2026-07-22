@@ -183,9 +183,7 @@ export function ThreadConversation({
   } else if (nonAuto.length !== prevCount) {
     // Grew on an already-seen thread (prevCount>0 skips the first paint) → the
     // last non-auto message is the one that just landed.
-    setFreshId(
-      prevCount > 0 && nonAuto.length > prevCount ? (nonAuto.at(-1)?.id ?? null) : null,
-    )
+    setFreshId(prevCount > 0 && nonAuto.length > prevCount ? (nonAuto.at(-1)?.id ?? null) : null)
     setPrevCount(nonAuto.length)
   }
 
@@ -213,8 +211,6 @@ export function ThreadConversation({
   // of dead space at the end of the scroll content — taller than the composer in
   // any resting state (+ the home-indicator safe area) — so the last real
   // message always clears it with no dependency on measurement timing.
-
-
 
   // Form derivations: answered-state lookup + submit handler (docs/forms.md §5).
   const { answersByForm, onFormSubmit } = useThreadForms(thread.log, agentId, thread.id)

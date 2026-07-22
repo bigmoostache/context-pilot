@@ -53,11 +53,7 @@ export function UserMenu({
         <AvatarMark user={u} initials={initialsOf(displayName)} className="size-8 text-[12px]" />
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent
-        className="w-[min(17rem,calc(100vw-1.5rem))]"
-        align="end"
-        sideOffset={8}
-      >
+      <DropdownMenuContent className="w-[min(17rem,calc(100vw-1.5rem))]" align="end" sideOffset={8}>
         {/* identity header — non-interactive (plain div: GroupLabel would
             require a Menu.Group ancestor and throws MenuGroupContext otherwise). */}
         <div className="flex items-center gap-2.5 p-2.5">

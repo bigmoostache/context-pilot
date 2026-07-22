@@ -139,11 +139,7 @@ export function ThreadList({
           onClick={() => onToggleArchived(!showArchived)}
           className="z-30"
         >
-          {showArchived ? (
-            <ArchiveRestore className="text-(--signal)" />
-          ) : (
-            <Archive />
-          )}
+          {showArchived ? <ArchiveRestore className="text-(--signal)" /> : <Archive />}
         </CornerButton>
       )}
 
@@ -248,9 +244,7 @@ function EmptyState({ hasQuery, showArchived }: { hasQuery: boolean; showArchive
     : showArchived
       ? "No archived threads."
       : "No conversations yet."
-  return (
-    <p className="px-4 py-16 text-center text-[14px] text-muted-foreground/55">{message}</p>
-  )
+  return <p className="px-4 py-16 text-center text-[14px] text-muted-foreground/55">{message}</p>
 }
 
 // ── row ──────────────────────────────────────────────────────────────
@@ -286,8 +280,7 @@ function ThreadRow({
   const preview = previewOf(t)
   // Bold the title when the agent owes this thread a turn (or it's focused /
   // unread) — a subtle emphasis on the rows that want attention.
-  const attention =
-    !archived && ((t.unread ?? 0) > 0 || t.status === "MY_TURN" || t.focused)
+  const attention = !archived && ((t.unread ?? 0) > 0 || t.status === "MY_TURN" || t.focused)
 
   return (
     <button

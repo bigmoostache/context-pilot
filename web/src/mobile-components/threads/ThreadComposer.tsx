@@ -5,7 +5,10 @@ import { measure } from "@/lib/support/telemetry"
 import { ArrowUp, Plus, Loader2, Clock, Pause } from "lucide-react"
 import type { ThreadStatus } from "@/lib/types"
 import { ComposerBubbles } from "@/mobile-components/threads/fileUpload"
-import type { UploadedFile, CommandSuggestion } from "@/mobile-components/threads/fileUpload/helpers"
+import type {
+  UploadedFile,
+  CommandSuggestion,
+} from "@/mobile-components/threads/fileUpload/helpers"
 import { FrostedBottomBar } from "@/mobile-components/shell/FrostedBottomBar"
 import { parseDraft } from "@/lib/support/threadMessages"
 

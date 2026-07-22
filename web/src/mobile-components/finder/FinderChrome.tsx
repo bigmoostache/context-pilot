@@ -56,7 +56,9 @@ export function FinderTabs({
             {...clickable(() => onSelect(t.id))}
             className={cn(
               "flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-[13px] transition-colors",
-              on ? "card-shadow bg-card text-foreground" : "text-muted-foreground active:bg-muted/60",
+              on
+                ? "card-shadow bg-card text-foreground"
+                : "text-muted-foreground active:bg-muted/60",
             )}
           >
             <FileIcon kind={t.kind} ext={extOf(t.label)} size={16} className="shrink-0" />
@@ -176,7 +178,9 @@ export function FinderToolbar({
                 aria-label={m}
                 className={cn(
                   "relative z-1 flex size-9 items-center justify-center rounded-md transition-colors",
-                  viewMode === m ? "text-(--signal)" : "text-muted-foreground active:text-foreground",
+                  viewMode === m
+                    ? "text-(--signal)"
+                    : "text-muted-foreground active:text-foreground",
                 )}
               >
                 <Icon className="size-4" />
@@ -197,7 +201,10 @@ export function FinderToolbar({
             className="w-full bg-transparent text-[16px] text-foreground outline-none placeholder:text-muted-foreground/50"
           />
           {query && (
-            <button onClick={() => onQuery("")} className="text-muted-foreground/50 active:text-foreground">
+            <button
+              onClick={() => onQuery("")}
+              className="text-muted-foreground/50 active:text-foreground"
+            >
               <X className="size-4" />
             </button>
           )}
@@ -213,7 +220,12 @@ export function FinderToolbar({
           <NavBtn icon={FolderPlus} onClick={onNewFolder} title="New folder" />
           <NavBtn icon={Upload} onClick={onUpload} title="Upload" />
           <NavBtn icon={Download} onClick={onDownload} title="Download" />
-          <SegBtn icon={SidebarIcon} on={previewOpen} onClick={onTogglePreview} title="Quick Look" />
+          <SegBtn
+            icon={SidebarIcon}
+            on={previewOpen}
+            onClick={onTogglePreview}
+            title="Quick Look"
+          />
         </>
       )}
     </div>
@@ -314,7 +326,9 @@ function SegBtn({
       aria-label={title}
       className={cn(
         "flex size-9 shrink-0 items-center justify-center rounded-md transition-colors",
-        on ? "bg-muted text-(--signal)" : "text-muted-foreground active:bg-muted/70 active:text-foreground",
+        on
+          ? "bg-muted text-(--signal)"
+          : "text-muted-foreground active:bg-muted/70 active:text-foreground",
       )}
     >
       <Icon className="size-4" />

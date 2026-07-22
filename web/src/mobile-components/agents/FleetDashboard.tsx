@@ -17,12 +17,7 @@ import { FrostedBottomBar } from "@/mobile-components/shell/FrostedBottomBar"
 import { CornerButton } from "@/mobile-components/shell/CornerButton"
 import { useElementHeight } from "@/lib/live/useElementHeight"
 import { accentVar, fmtCost, FLEET_MAX_W } from "@/lib/support/panelMeta"
-import {
-  useMetrics,
-  useRetireAgent,
-  useAgentMeta,
-  useCreateAgent,
-} from "@/lib/live"
+import { useMetrics, useRetireAgent, useAgentMeta, useCreateAgent } from "@/lib/live"
 import { avatarUrl } from "@/lib/api"
 import type { Agent, AgentStatus } from "@/lib/types"
 import { cn, prefersReducedMotion } from "@/lib/utils"
@@ -98,8 +93,7 @@ export function FleetDashboard({
           flash(`Spawning “${name}” in ${receipt.folder}`)
           setQuery("")
         },
-        onError: (err) =>
-          flash(err instanceof Error ? err.message : "Could not create the agent"),
+        onError: (err) => flash(err instanceof Error ? err.message : "Could not create the agent"),
       },
     )
   }
@@ -269,11 +263,7 @@ function FleetSearchBar({
           aria-label="Create agent"
           className="flex size-11 shrink-0 items-center justify-center rounded-full bg-(--interactive) text-(--primary-foreground) transition-[filter] active:brightness-110 disabled:opacity-60"
         >
-          {creating ? (
-            <Loader2 className="size-5 animate-spin" />
-          ) : (
-            <Plus className="size-5" />
-          )}
+          {creating ? <Loader2 className="size-5 animate-spin" /> : <Plus className="size-5" />}
         </button>
       )}
     </FrostedBottomBar>

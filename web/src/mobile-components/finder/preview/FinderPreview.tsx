@@ -47,7 +47,9 @@ export function FinderPreview({
 }) {
   const full = variant === "full"
   return (
-    <aside className={cn("flex min-h-0 flex-col bg-surface", full ? "min-w-0 flex-1" : "size-full")}>
+    <aside
+      className={cn("flex min-h-0 flex-col bg-surface", full ? "min-w-0 flex-1" : "size-full")}
+    >
       {!full && (
         <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
           <span className="text-[13px] font-semibold text-muted-foreground">Quick Look</span>

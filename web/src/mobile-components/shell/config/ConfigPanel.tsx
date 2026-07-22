@@ -63,7 +63,10 @@ export function ConfigPanel({ variant = "dialog" }: { variant?: "dialog" | "inli
                 )}
               >
                 <c.icon
-                  className={cn("size-[15px]", on ? "text-(--interactive)" : "text-muted-foreground/70")}
+                  className={cn(
+                    "size-[15px]",
+                    on ? "text-(--interactive)" : "text-muted-foreground/70",
+                  )}
                 />
                 <span className="whitespace-nowrap">{c.label}</span>
                 {c.count != null && (

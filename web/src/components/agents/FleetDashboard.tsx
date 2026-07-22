@@ -1,12 +1,5 @@
 import { useEffect, useState } from "react"
-import {
-  AlertTriangle,
-  Bot,
-  FolderGit2,
-  FolderPlus,
-  Rocket,
-  Settings2,
-} from "lucide-react"
+import { AlertTriangle, Bot, FolderGit2, FolderPlus, Rocket, Settings2 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { accentVar, fmtCost, FLEET_MAX_W } from "@/lib/support/panelMeta"
 import { useMetrics, useAgentMeta } from "@/lib/live"

@@ -15,7 +15,10 @@ import type { ChatMessage } from "@/lib/types"
 import { Markdown, type MarkdownVariant } from "@/lib/support/markdown"
 import { CopyButton } from "./CopyButton"
 import { MessageFileChip } from "@/mobile-components/threads/fileUpload"
-import { splitMessageSegments, type UploadedFile } from "@/mobile-components/threads/fileUpload/helpers"
+import {
+  splitMessageSegments,
+  type UploadedFile,
+} from "@/mobile-components/threads/fileUpload/helpers"
 import { cn, prefersReducedMotion } from "@/lib/utils"
 
 /**
@@ -43,7 +46,14 @@ interface MessageProps {
   fresh?: boolean | undefined
 }
 
-export function Message({ msg, agentId, onOpenFile, onShowInFinder, onDelete, fresh }: MessageProps) {
+export function Message({
+  msg,
+  agentId,
+  onOpenFile,
+  onShowInFinder,
+  onDelete,
+  fresh,
+}: MessageProps) {
   if (msg.role === "tool" && msg.tool) return <ToolMessage msg={msg} />
   if (msg.role === "user")
     return (
@@ -199,7 +209,14 @@ function UserMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete, fresh
   )
 }
 
-function AssistantMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete, fresh }: MessageProps) {
+function AssistantMessage({
+  msg,
+  agentId,
+  onOpenFile,
+  onShowInFinder,
+  onDelete,
+  fresh,
+}: MessageProps) {
   const bubbleRef = useBubblePop(fresh)
   return (
     <div className="rise flex flex-col gap-1.5 py-2">

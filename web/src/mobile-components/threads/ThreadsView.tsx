@@ -185,8 +185,7 @@ export function ThreadsView({
         aria-hidden={!drawerOpen}
         style={{ transform: "translateX(-100%)" }}
         className={
-          "fixed inset-0 z-50 flex flex-col bg-surface " +
-          (drawerOpen ? "" : "pointer-events-none")
+          "fixed inset-0 z-50 flex flex-col bg-surface " + (drawerOpen ? "" : "pointer-events-none")
         }
       >
         <ThreadList

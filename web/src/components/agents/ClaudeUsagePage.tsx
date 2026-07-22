@@ -107,8 +107,15 @@ function ClaudeTokenStatus({
  * an import cycle with `UsageButton`, where `LoginFlow` lives).
  */
 export function ClaudeUsageBody({ usage }: { usage: ClaudeUsage }) {
-  const { tokenStatus, usage: usageQuery, isValid, limits, refreshPending, refreshError, refresh } =
-    usage
+  const {
+    tokenStatus,
+    usage: usageQuery,
+    isValid,
+    limits,
+    refreshPending,
+    refreshError,
+    refresh,
+  } = usage
   const data = tokenStatus.data
 
   return (

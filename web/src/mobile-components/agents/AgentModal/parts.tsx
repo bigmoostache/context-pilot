@@ -1,11 +1,6 @@
 import { useEffect, useRef } from "react"
 import { animate, createSpring } from "animejs"
-import {
-  Archive,
-  Dices,
-  ImagePlus,
-  RefreshCw,
-} from "lucide-react"
+import { Archive, Dices, ImagePlus, RefreshCw } from "lucide-react"
 import type { Agent } from "@/lib/types"
 import { avatarUrl } from "@/lib/api"
 import { type ProviderDef } from "@/lib/support/models"
