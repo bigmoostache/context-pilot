@@ -132,6 +132,19 @@
   color-scheme: dark;
 }
 
+/* ─── DARK · mobile override ────────────────────────────────────────────
+   On a phone, dark mode reads more "pro" as a true black backdrop rather
+   than the desktop's warm charcoal (#222220). The `.mobile` class is set on
+   <html> by the mobile Root at first paint (it can't be a CSS media query:
+   the desktop/mobile split is a JS matchMedia probe — `(pointer: coarse)`
+   included — that a `max-width` query would desync from). Only --background
+   goes black; --surface / --card keep their charcoal so composer, cards and
+   the thread drawer still float visibly ABOVE the black base (depth intact,
+   not one flat black slab). */
+.dark.mobile {
+  --background: #000; /* true black app backdrop (phone) */
+}
+
 @layer base {
   * {
     @apply border-border;

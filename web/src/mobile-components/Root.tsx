@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 
 import { FleetDashboard } from "@/mobile-components/agents/FleetDashboard"
 import { ThreadsView } from "@/mobile-components/threads/ThreadsView"
@@ -32,6 +32,16 @@ import "@/App.css"
  * it is reachable, never bypassed by a stub.
  */
 function Root() {
+  // Tag <html> as the mobile tree so mobile-only theme overrides in index.css
+  // (`.dark.mobile` → true-black background) apply. This can't be a CSS media
+  // query: the desktop/mobile split is a frozen JS matchMedia probe (width OR
+  // `pointer: coarse`), which a `max-width` query would desync from. Cleared on
+  // unmount for safety, though the tree is chosen once per session.
+  useEffect(() => {
+    document.documentElement.classList.add("mobile")
+    return () => document.documentElement.classList.remove("mobile")
+  }, [])
+
   return (
     <ThemeProvider>
       <AuthProvider>
