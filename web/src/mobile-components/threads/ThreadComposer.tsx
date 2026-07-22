@@ -104,11 +104,14 @@ function useComposer(
     else localStorage.removeItem(draftKey)
   }
 
-  // Apply the saved caret/selection once the textarea has mounted (T304).
+  // Restore the saved caret/selection once the textarea has mounted (T304) —
+  // but do NOT focus. On mobile, focusing the composer when a thread opens pops
+  // the on-screen keyboard unbidden and yanks the view up (T622); the caret is
+  // only restored so that IF the user taps in, the cursor lands where they left
+  // off. Post-user-action focus (send, /command pick) is handled elsewhere.
   useEffect(() => {
     const el = textareaRef.current
     if (!el || !seed.text) return
-    el.focus()
     el.setSelectionRange(seed.selStart, seed.selEnd)
   }, [seed])
 
@@ -288,7 +291,6 @@ function ComposerInputRow({
       <div className="flex min-w-0 flex-1 items-end gap-1 rounded-[1.35rem] border border-border bg-card py-1 pr-1 pl-3.5 focus-within:border-(--signal)/60">
         <textarea
           ref={textareaRef}
-          autoFocus
           value={text}
           onChange={onChange}
           onSelect={onSelect}
