@@ -152,7 +152,7 @@ export function AgentModal({
           onRandomizeAvatar={actions.onRandomizeAvatar}
         />
 
-        <Section label="Name">
+        <Section label="Name" card>
           <NameField name={name} setName={setName} onSave={saveName} />
         </Section>
 

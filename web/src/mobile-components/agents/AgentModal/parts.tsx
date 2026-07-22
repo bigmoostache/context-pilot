@@ -92,23 +92,47 @@ export function AvatarHero({
   )
 }
 
-/** A titled settings section wrapper — a small uppercase label above its body,
- *  with consistent horizontal gutters. */
-export function Section({ label, children }: { label: string; children: React.ReactNode }) {
+/**
+ * A titled settings section — the iOS "Settings app" grouped-list idiom: a small
+ * muted label above a rounded inset container. When `card` is set the children
+ * are wrapped in that grouped container (rounded card, hairline row dividers via
+ * `divide-y`), so a stack of rows reads as one native group; otherwise the
+ * children render raw (for bodies that draw their own container, e.g. the model
+ * picker or the vitals board).
+ */
+export function Section({
+  label,
+  card,
+  children,
+}: {
+  label?: string
+  card?: boolean
+  children: React.ReactNode
+}) {
   return (
-    <section className="flex flex-col gap-2 px-4 py-3">
-      <span className="text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
-        {label}
-      </span>
-      {children}
+    <section className="px-4 py-2.5">
+      {label && (
+        <span className="mb-1.5 block px-1 text-[12.5px] font-medium text-muted-foreground/60">
+          {label}
+        </span>
+      )}
+      {card ? (
+        <div className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-card">
+          {children}
+        </div>
+      ) : (
+        children
+      )}
     </section>
   )
 }
 
 /**
- * Name field — 16px (defeats iOS focus-zoom), **auto-saves on blur** and on
- * Return. The caller's `onSave` no-ops when the value is unchanged/empty, so a
- * focus-in-focus-out without an edit costs nothing.
+ * Name field — a borderless full-width input **row** meant to sit inside a
+ * grouped {@link Section} card (the card supplies the container, so the row
+ * carries no border of its own — the native iOS list-row look). 16px text
+ * defeats iOS focus-zoom; auto-saves on blur and on Return via the caller's
+ * `onSave` (a no-op when unchanged/empty).
  */
 export function NameField({
   name,
@@ -120,20 +144,18 @@ export function NameField({
   onSave: () => void
 }) {
   return (
-    <div className="group flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-3 transition-colors focus-within:border-(--interactive)/70 focus-within:ring-2 focus-within:ring-(--interactive)/15">
-      <input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        onBlur={onSave}
-        onKeyDown={(e) => {
-          if (e.key !== "Enter") return
-          e.preventDefault()
-          e.currentTarget.blur()
-        }}
-        placeholder="agent name"
-        className="w-full bg-transparent text-[16px] font-medium text-foreground outline-none placeholder:font-normal placeholder:text-muted-foreground/45"
-      />
-    </div>
+    <input
+      value={name}
+      onChange={(e) => setName(e.target.value)}
+      onBlur={onSave}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter") return
+        e.preventDefault()
+        e.currentTarget.blur()
+      }}
+      placeholder="agent name"
+      className="w-full bg-transparent px-4 py-3.5 text-[16px] font-medium text-foreground outline-none placeholder:font-normal placeholder:text-muted-foreground/45"
+    />
   )
 }
 
@@ -162,9 +184,11 @@ export function VitalsBody({ agentId }: { agentId: string }) {
 }
 
 /**
- * Danger / lifecycle actions — Restart (kill + respawn the process from the
- * current binary) and Retire (stop the process, keep the folder, return to
- * origin). Full-width touch buttons, safe-area padded, with busy spinners.
+ * Lifecycle actions — the iOS Settings destructive-action idiom: a grouped card
+ * of full-width **rows** with centered text (a hairline divider between them),
+ * Restart in the normal tint and Retire in danger red. Restart kills + respawns
+ * the process from the current binary; Retire stops it, keeps the folder, and
+ * returns to origin. Busy states swap in a spinner.
  */
 export function DangerActions({
   restart,
@@ -180,23 +204,25 @@ export function DangerActions({
   busy: boolean
 }) {
   return (
-    <div className="mt-2 flex flex-col gap-2 px-4 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-      <button
-        onClick={restart}
-        disabled={busy}
-        className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-[14px] font-medium text-foreground/85 transition-colors active:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        <RefreshCw className={cn("size-4", restartBusy && "animate-spin")} />
-        {restartBusy ? "Restarting…" : "Restart agent"}
-      </button>
-      <button
-        onClick={retire}
-        disabled={busy}
-        className="flex items-center justify-center gap-2 rounded-xl border border-(--danger)/30 bg-(--danger)/10 px-4 py-3 text-[14px] font-medium text-(--danger) transition-colors active:bg-(--danger)/20 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        <Archive className={cn("size-4", retireBusy && "animate-pulse")} />
-        Retire agent
-      </button>
+    <div className="px-4 py-2.5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+      <div className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-card">
+        <button
+          onClick={restart}
+          disabled={busy}
+          className="flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[15px] font-medium text-foreground/90 transition-colors active:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          <RefreshCw className={cn("size-4", restartBusy && "animate-spin")} />
+          {restartBusy ? "Restarting…" : "Restart agent"}
+        </button>
+        <button
+          onClick={retire}
+          disabled={busy}
+          className="flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[15px] font-medium text-(--danger) transition-colors active:bg-(--danger)/10 disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          <Archive className={cn("size-4", retireBusy && "animate-pulse")} />
+          Retire agent
+        </button>
+      </div>
     </div>
   )
 }

@@ -10,14 +10,18 @@ import { cn } from "@/lib/utils"
 
 /**
  * Two-level provider + model picker — mobile twin of `components/agents/
- * ModelPicker`.
+ * ModelPicker`, rebuilt to feel iOS-native rather than a desktop transcription.
  *
- * Same registry, same two-level shape (provider rail above model cards), same
- * empty-guard. The fork is touch sizing: the provider pills and model cards grow
- * their tap padding (`py-2` / `py-3`), the provider rail scrolls horizontally
- * (`no-scrollbar overflow-x-auto`) instead of wrapping, and press feedback swaps
- * `hover:` for `active:`. Shared by the mobile AgentModal and the mobile config
- * GeneralPane.
+ * The old mobile version put providers in a **horizontal-scroll pill rail**
+ * (`overflow-x-auto no-scrollbar`) — providers off the right edge were invisible
+ * (no scrollbar hint) and the sideways scroll fought the page's vertical scroll.
+ * Now the providers **wrap** (`flex-wrap`) so every one is visible at once, and
+ * the models render as a **grouped inset list** (the iOS Settings idiom): a
+ * rounded card of full-width tap rows with hairline dividers and a trailing
+ * checkmark on the selected model — instead of the heavy bordered cards.
+ *
+ * Same registry, same two-level shape, same empty-guard. Shared by the mobile
+ * AgentModal (Agent Settings page) and the mobile config GeneralPane.
  */
 export function ModelPicker({
   providers,
@@ -36,20 +40,21 @@ export function ModelPicker({
   // empty case so the picker never dereferences an undefined provider.
   if (!activeProv) {
     return (
-      <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-[12.5px] text-muted-foreground">
+      <div className="rounded-2xl border border-border/60 bg-card px-4 py-3 text-[13px] text-muted-foreground">
         No models available.
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      {/* provider rail — horizontally scrollable on mobile */}
-      <div className="no-scrollbar flex gap-1.5 overflow-x-auto">
+    <div className="flex flex-col gap-2.5">
+      {/* Provider chips — WRAP (no horizontal scroll) so every provider is
+          visible at once, no hidden overflow. */}
+      <div className="flex flex-wrap gap-1.5">
         {providers.map((p) => {
           const on = p.id === activeProv.id
           return (
-            <ProviderPill
+            <ProviderChip
               key={p.id}
               prov={p}
               active={on}
@@ -62,26 +67,24 @@ export function ModelPicker({
         })}
       </div>
 
-      {/* model cards for the active provider */}
-      <div className="flex flex-col gap-2">
-        {activeProv.models.map((m, i) => {
-          const on = m.id === model
-          return (
-            <ModelCard
-              key={m.id}
-              model={m}
-              active={on}
-              delay={i * 40}
-              onClick={() => onChange(activeProv.id, m.id)}
-            />
-          )
-        })}
+      {/* Model list — an iOS grouped inset list: tap a row to select, checkmark
+          marks the active one. */}
+      <div className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-card">
+        {activeProv.models.map((m) => (
+          <ModelRow
+            key={m.id}
+            model={m}
+            active={m.id === model}
+            onClick={() => onChange(activeProv.id, m.id)}
+          />
+        ))}
       </div>
     </div>
   )
 }
 
-function ProviderPill({
+/** A provider selector chip — wraps in the provider row rather than scrolling. */
+function ProviderChip({
   prov,
   active,
   onClick,
@@ -95,7 +98,7 @@ function ProviderPill({
     <button
       onClick={onClick}
       className={cn(
-        "flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-medium transition-all",
+        "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-medium transition-all",
         active
           ? "bg-(--interactive)/15 text-(--interactive) ring-1 ring-(--interactive)/30"
           : "bg-muted/50 text-muted-foreground active:bg-muted active:text-foreground/80",
@@ -107,32 +110,32 @@ function ProviderPill({
   )
 }
 
-function ModelCard({
+/**
+ * One model as an iOS list row: leading provider glyph, model name + api-name
+ * subtitle, trailing price, and a checkmark when it's the selected model. The
+ * whole row is the tap target; the selected row carries a faint tint.
+ */
+function ModelRow({
   model: m,
   active,
-  delay,
   onClick,
 }: {
   model: ModelDef
   active: boolean
-  delay: number
   onClick: () => void
 }) {
   const Icon = m.icon
   return (
     <button
       onClick={onClick}
-      style={{ animationDelay: `${delay}ms` }}
       className={cn(
-        "opt-rise group flex items-center gap-3 rounded-xl border p-3 text-left transition-all",
-        active
-          ? "border-(--interactive) bg-(--interactive)/[0.07] ring-2 ring-(--interactive)/15"
-          : "border-border bg-card active:border-(--interactive)/40 active:bg-muted/30",
+        "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors",
+        active ? "bg-(--interactive)/6" : "active:bg-muted/40",
       )}
     >
       <span
         className={cn(
-          "flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors",
+          "flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors",
           active
             ? "bg-(--interactive)/15 text-(--interactive)"
             : "bg-muted/60 text-muted-foreground/70",
@@ -142,7 +145,7 @@ function ModelCard({
       </span>
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="flex items-center gap-2">
-          <span className="font-mono text-[13px] font-medium text-foreground/90">
+          <span className="font-mono text-[14px] font-medium text-foreground/90">
             {m.displayName}
           </span>
           {m.badge && (
@@ -156,16 +159,14 @@ function ModelCard({
       <span className="shrink-0 font-mono text-[10.5px] text-muted-foreground/65 tabular-nums">
         {priceTag(m)}
       </span>
-      <span
+      {/* Checkmark marks the selected model (the iOS radio-row convention). */}
+      <Check
         className={cn(
-          "flex size-5 shrink-0 items-center justify-center rounded-full border transition-all",
-          active
-            ? "border-(--interactive) bg-(--interactive) text-(--primary-foreground)"
-            : "border-border text-transparent",
+          "size-4 shrink-0 text-(--interactive) transition-opacity",
+          active ? "opacity-100" : "opacity-0",
         )}
-      >
-        <Check className="size-3" strokeWidth={3} />
-      </span>
+        strokeWidth={3}
+      />
     </button>
   )
 }
