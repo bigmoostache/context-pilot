@@ -1,3 +1,63 @@
+import { createElement, type ReactElement } from "react"
+import {
+  Activity,
+  AlignLeft,
+  Archive,
+  ArrowUp,
+  BookOpen,
+  Bot,
+  Boxes,
+  Braces,
+  Bug,
+  CheckCircle,
+  Clock,
+  Cog,
+  Copy,
+  Cpu,
+  Database,
+  Download,
+  Eye,
+  FileEdit,
+  Filter,
+  FlaskConical,
+  FolderOpen,
+  FolderPlus,
+  GitBranch,
+  GitCommit,
+  GitMerge,
+  Globe,
+  Hammer,
+  Hash,
+  Image,
+  Key,
+  Layers,
+  ListChecks,
+  Lock,
+  MapPin,
+  MessageSquare,
+  Move,
+  Network,
+  Package,
+  Pencil,
+  Play,
+  RefreshCw,
+  Rocket,
+  Save,
+  Search,
+  Send,
+  Settings,
+  ShieldCheck,
+  Sparkles,
+  Tag,
+  Trash2,
+  Unlock,
+  Upload,
+  Wand2,
+  Waypoints,
+  Wrench,
+  Zap,
+  type LucideIcon,
+} from "lucide-react"
 import type { ChatMessage, ThreadDetail, ThreadMsg } from "@/lib/types"
 
 /** Format a whole-second age as a compact "Xm ago" relative label. */
@@ -64,6 +124,170 @@ export function parseAutoLine(m: ThreadMsg): { verb: string; tool: string; inten
   const dashIdx = rest.indexOf(" — ")
   if (dashIdx === -1) return { verb, tool: rest, intent: "" }
   return { verb, tool: rest.slice(0, dashIdx), intent: rest.slice(dashIdx + 3) }
+}
+
+// ── verb → icon (T584) ────────────────────────────────────────────────
+//
+// Each auto tool-activity trace carries a one-word gerund `verb` (e.g.
+// "Reading", "Committing") minted by the agent for the call. The thread
+// timeline renders a semantically-matched icon in place of the tool name. This
+// is pure presentation (like a status→colour map), so it lives frontend-side —
+// no model, no embeddings: a curated dictionary keyed on the lowercased verb,
+// with a Levenshtein nearest-key fallback for any verb outside the table.
+//
+// Keys are lowercase; lookup lowercases the incoming verb. Values are
+// `lucide-react` icon components (already the app's icon library — zero new
+// dependency). Kept next to `parseAutoLine` (which extracts the verb) so the
+// parse-then-decorate pair stays co-located and shared by both UI twins.
+
+const VERB_ICONS: Record<string, LucideIcon> = {
+  // read / inspect
+  reading: BookOpen,
+  opening: FolderOpen,
+  inspecting: Eye,
+  checking: CheckCircle,
+  verifying: ShieldCheck,
+  comparing: Layers,
+  locating: MapPin,
+  counting: Hash,
+  tracing: Waypoints,
+  reviewing: Eye,
+  // search
+  searching: Search,
+  finding: Search,
+  filtering: Filter,
+  // edit / write
+  fixing: Wrench,
+  editing: FileEdit,
+  writing: Pencil,
+  formatting: AlignLeft,
+  silencing: Lock,
+  creating: FolderPlus,
+  renaming: Tag,
+  moving: Move,
+  deleting: Trash2,
+  // git
+  staging: Package,
+  committing: GitCommit,
+  pushing: ArrowUp,
+  pulling: Download,
+  merging: GitMerge,
+  branching: GitBranch,
+  basing: GitBranch,
+  fetching: Download,
+  stashing: Archive,
+  dropping: Trash2,
+  // run / build
+  running: Play,
+  building: Hammer,
+  compiling: Cog,
+  linting: Bug,
+  testing: FlaskConical,
+  waiting: Clock,
+  flushing: Zap,
+  starting: Play,
+  // think / plan
+  thinking: Sparkles,
+  planning: ListChecks,
+  scoping: ListChecks,
+  designing: Wand2,
+  // data / net
+  querying: Database,
+  saving: Save,
+  copying: Copy,
+  uploading: Upload,
+  downloading: Download,
+  importing: Download,
+  exporting: Upload,
+  // web
+  browsing: Globe,
+  scraping: Globe,
+  crawling: Network,
+  // comms
+  reporting: Send,
+  sending: Send,
+  messaging: MessageSquare,
+  // misc
+  configuring: Settings,
+  unlocking: Unlock,
+  authorizing: Key,
+  rendering: Image,
+  parsing: Braces,
+  refreshing: RefreshCw,
+  spawning: Cpu,
+  launching: Rocket,
+  scaffolding: Boxes,
+  monitoring: Activity,
+}
+
+/** Fallback icon when a verb has no dictionary entry and no close neighbour. */
+const DEFAULT_VERB_ICON: LucideIcon = Bot
+
+/** A verb that is fewer than this many edits from a known key still maps to it;
+ *  beyond it the guess is too weak to trust, so we fall back to the generic
+ *  icon rather than show a misleading one. */
+const MAX_FUZZY_DISTANCE = 3
+
+/**
+ * Levenshtein edit distance between two strings (classic two-row DP, O(a·b)
+ * time, O(b) space). Used only for the ≤~65-entry verb table on a single short
+ * word, so the cost is negligible; kept dependency-free.
+ */
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0
+  if (a.length === 0) return b.length
+  if (b.length === 0) return a.length
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i)
+  let curr = Array.from<number>({ length: b.length + 1 })
+  for (let i = 1; i <= a.length; i++) {
+    curr[0] = i
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      curr[j] = Math.min(
+        (prev[j] ?? 0) + 1, // deletion
+        (curr[j - 1] ?? 0) + 1, // insertion
+        (prev[j - 1] ?? 0) + cost, // substitution
+      )
+    }
+    ;[prev, curr] = [curr, prev]
+  }
+  return prev[b.length] ?? 0
+}
+
+/**
+ * Resolve a trace `verb` to its display icon: an exact dictionary hit when the
+ * verb is known, else the nearest key within {@link MAX_FUZZY_DISTANCE} edits
+ * (so "Committed"→"committing" style near-misses still land), else the generic
+ * fallback. Case-insensitive.
+ */
+export function iconForVerb(verb: string): LucideIcon {
+  const key = verb.trim().toLowerCase()
+  if (!key) return DEFAULT_VERB_ICON
+  const exact = VERB_ICONS[key]
+  if (exact) return exact
+  let best: LucideIcon = DEFAULT_VERB_ICON
+  let bestDist = MAX_FUZZY_DISTANCE + 1
+  for (const [dictKey, icon] of Object.entries(VERB_ICONS)) {
+    const dist = levenshtein(key, dictKey)
+    if (dist < bestDist) {
+      bestDist = dist
+      best = icon
+    }
+  }
+  return bestDist <= MAX_FUZZY_DISTANCE ? best : DEFAULT_VERB_ICON
+}
+
+/**
+ * Render the icon for a trace `verb` as a stable, module-scope component.
+ *
+ * Wraps {@link iconForVerb} so callers never bind its result to a capitalized
+ * local inside their own render (which `@eslint-react/static-components` reads
+ * as creating a component during render). Uses `createElement` rather than JSX
+ * so this stays a plain `.ts` module. `aria-label` carries the verb for screen
+ * readers now that the visible tool name is gone.
+ */
+export function VerbIcon({ verb, className }: { verb: string; className?: string }): ReactElement {
+  return createElement(iconForVerb(verb), { className, "aria-label": verb })
 }
 
 /**

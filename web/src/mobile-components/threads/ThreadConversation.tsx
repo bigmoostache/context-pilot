@@ -10,7 +10,7 @@ import { uploadToNode, type UploadedFile } from "@/mobile-components/threads/fil
 import { FormMessageRow } from "@/mobile-components/threads/forms/FormMessageRow"
 import { isFormMessage } from "@/mobile-components/threads/forms/helpers"
 import { useScrollPin, useThreadForms } from "@/mobile-components/threads/forms/useThreadForms"
-import { parseAutoLine, segmentLog, toChatMessage } from "@/lib/support/threadMessages"
+import { VerbIcon, parseAutoLine, segmentLog, toChatMessage } from "@/lib/support/threadMessages"
 import type { ThreadDetail, ThreadMsg } from "@/lib/types"
 
 /**
@@ -31,14 +31,13 @@ const AutoRun = memo(function AutoRun({ msgs }: { msgs: ThreadMsg[] }) {
           ⚙ {n} tool action{n === 1 ? "" : "s"}
         </span>
       </summary>
-      <div className="mt-1 grid grid-cols-[auto_auto_1fr] gap-x-3 gap-y-0.5 border-l border-border/60 pl-3 font-mono text-[11px]">
+      <div className="mt-1 grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1 border-l border-border/60 pl-3 font-mono text-[11px]">
         {msgs.map((m) => {
-          const { verb, tool, intent } = parseAutoLine(m)
+          const { verb, intent } = parseAutoLine(m)
           return (
             <Fragment key={m.id}>
-              <span className="text-(--interactive)">{verb}</span>
-              <span className="text-foreground/70">{tool}</span>
-              <span className="truncate text-muted-foreground/55">{intent}</span>
+              <VerbIcon verb={verb} className="size-3.5 text-(--interactive)" />
+              <span className="truncate text-muted-foreground/70">{intent}</span>
             </Fragment>
           )
         })}
