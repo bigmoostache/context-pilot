@@ -4,6 +4,7 @@ import { useLibrary, sendCommand } from "@/lib/live"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -206,28 +207,30 @@ function BehaviourChip({ agentId }: { agentId: string }) {
           <ChevronsUpDown className="size-3 opacity-60" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" side="top" className="min-w-44">
-          <DropdownMenuLabel>System prompt</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          {agentBehaviours.length === 0 ? (
-            <DropdownMenuItem disabled>No behaviours</DropdownMenuItem>
-          ) : (
-            agentBehaviours.map((item) => (
-              <DropdownMenuItem
-                key={item.id}
-                onClick={() => select(item.id)}
-                className={item.active ? "font-semibold text-foreground" : ""}
-              >
-                <span className="flex items-center gap-2">
-                  {item.active ? (
-                    <span className="size-1.5 rounded-full bg-(--ok)" />
-                  ) : (
-                    <span className="size-1.5" />
-                  )}
-                  {item.name}
-                </span>
-              </DropdownMenuItem>
-            ))
-          )}
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>System prompt</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {agentBehaviours.length === 0 ? (
+              <DropdownMenuItem disabled>No behaviours</DropdownMenuItem>
+            ) : (
+              agentBehaviours.map((item) => (
+                <DropdownMenuItem
+                  key={item.id}
+                  onClick={() => select(item.id)}
+                  className={item.active ? "font-semibold text-foreground" : ""}
+                >
+                  <span className="flex items-center gap-2">
+                    {item.active ? (
+                      <span className="size-1.5 rounded-full bg-(--ok)" />
+                    ) : (
+                      <span className="size-1.5" />
+                    )}
+                    {item.name}
+                  </span>
+                </DropdownMenuItem>
+              ))
+            )}
+          </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
     </>
