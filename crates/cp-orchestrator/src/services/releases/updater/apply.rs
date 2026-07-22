@@ -13,7 +13,10 @@
 //! 3. Healthy boot: the health-gated committer (`boot_commit_when_healthy`)
 //!    clears the binary markers, then [`promote_committed`] flips
 //!    `active_tag`/agent binary to the new tag (both binaries now point at the
-//!    same release — §5.5 step 5), drops the DB backup, records `success`.
+//!    same release — §5.5 step 5), repoints the served-SPA symlink at the tag's
+//!    bundled front (so the UI moves with the binaries), drops the DB backup,
+//!    records `success`. The front is swapped **only here**, post-health, so
+//!    the rollback paths never need to touch it.
 //! 4. Crash-looping boot: `boot_check` restores the `.bak` binary after the
 //!    tolerance; on the old binary's next boot [`boot_reconcile`] sees the
 //!    orphaned `pending-update.json`, **restores `auth.db`** from the backup
@@ -105,7 +108,8 @@ pub fn stage_apply(
 }
 
 /// Promote a committed update: flip `active_tag` + the agent binary to the
-/// staged tag, drop the DB backup, record `success`. Call **only after** the
+/// staged tag, repoint the served-SPA symlink (`CP_WEB_ROOT`) at the tag's
+/// bundled front, drop the DB backup, record `success`. Call **only after** the
 /// health-gated boot commit blessed the new binary.
 ///
 /// Returns the new agent binary path when an update was promoted, `None` when
@@ -125,6 +129,15 @@ pub fn promote_committed(store: &mut ReleaseStore, _auth_db_path: &Path) -> Resu
     // Both binaries move together (§5.5 step 5): the running orchestrator is
     // already the new tag; select() repoints the agent binary + active_tag.
     let agent_binary = store.select(&pending.to)?;
+
+    // Move the served frontend with the binaries so the SPA no longer lags an
+    // OTA (it used to stay on whatever the last Ansible deploy laid down).
+    // Non-fatal: the binaries are the source of truth; a failed symlink swap
+    // just leaves the previous SPA in place until the next successful update.
+    let web_symlink = std::env::var_os("CP_WEB_ROOT").map(PathBuf::from);
+    if let Err(e) = promote_web(store, &pending.to, web_symlink.as_deref()) {
+        eprintln!("updater: web promote failed — front stays on the previous SPA: {e}");
+    }
 
     if let Some(backup) = &pending.db_backup {
         let _rm = std::fs::remove_file(backup);
@@ -207,6 +220,81 @@ pub fn restart_self(install: &Path) {
         eprintln!("updater: exec of {} failed: {err}; exiting for supervisor respawn", install.display());
         std::process::exit(1);
     });
+}
+
+/// Atomically repoint the served-SPA symlink (`CP_WEB_ROOT`, i.e.
+/// `{cp_root}/web/current`) at this tag's bundled front (`releases/<tag>/web`),
+/// so the frontend moves with the binaries instead of lagging on whatever the
+/// last Ansible deploy laid down.
+///
+/// `web_symlink` is the `CP_WEB_ROOT` path (the caller passes
+/// `env::var_os("CP_WEB_ROOT")`). No-op when:
+/// * `web_symlink` is `None` — an API-only deployment with the SPA fronted by a
+///   separate web server (the orchestrator's historical mode);
+/// * the release ships no `web/` payload — an older or binary-only bundle: the
+///   served SPA is left exactly as it was rather than pointed at nothing.
+///
+/// Called from [`promote_committed`], i.e. **after** the new binary answered
+/// `/healthz` `200`. Because the swap only happens post-health, the rollback
+/// paths never touch the front — a failed update leaves `current` pointing at
+/// the previous SPA, so there is nothing to restore.
+///
+/// # Errors
+///
+/// Returns an error if the symlink swap itself fails; the caller treats this as
+/// non-fatal.
+pub(crate) fn promote_web(store: &ReleaseStore, tag: &str, web_symlink: Option<&Path>) -> Result<(), String> {
+    let Some(link) = web_symlink else {
+        return Ok(()); // API-only deployment — no SPA to promote
+    };
+    let target = store.dir().join(tag).join("web");
+    if !target.is_dir() || dir_is_empty(&target) {
+        return Ok(()); // binary-only bundle — keep serving the current SPA
+    }
+    swap_web_symlink(link, &target)
+}
+
+/// True when `dir` has no entries (or cannot be read).
+fn dir_is_empty(dir: &Path) -> bool {
+    std::fs::read_dir(dir).map(|mut e| e.next().is_none()).unwrap_or(true)
+}
+
+/// Point `link` at `target`: write a sibling temp symlink and `rename` it over
+/// `link`. Renaming onto an existing symlink is atomic — there is no instant
+/// where the served root is absent. A pre-existing **real directory** at `link`
+/// (a legacy deploy that copied the SPA in place instead of symlinking) is
+/// removed first so the rename can land.
+///
+/// # Errors
+///
+/// Returns an error if any filesystem step fails; `link` is left pointing where
+/// it did unless the final rename succeeds.
+#[cfg(unix)]
+fn swap_web_symlink(link: &Path, target: &Path) -> Result<(), String> {
+    use std::os::unix::fs::symlink;
+    let parent = link.parent().ok_or_else(|| format!("web symlink {} has no parent", link.display()))?;
+    std::fs::create_dir_all(parent).map_err(|e| format!("mkdir {}: {e}", parent.display()))?;
+
+    // Legacy layout guard: a real directory at `link` (old in-place deploy)
+    // must go before the rename — `rename(symlink, dir)` fails. A symlink is
+    // replaced by the rename itself, atomically.
+    let is_real_dir = link.symlink_metadata().map(|m| m.file_type().is_dir()).unwrap_or(false);
+    if is_real_dir {
+        std::fs::remove_dir_all(link).map_err(|e| format!("remove legacy web dir {}: {e}", link.display()))?;
+    }
+
+    let tmp = parent.join(".current.tmp");
+    let _rm = std::fs::remove_file(&tmp);
+    symlink(target, &tmp).map_err(|e| format!("symlink {} -> {}: {e}", tmp.display(), target.display()))?;
+    std::fs::rename(&tmp, link).map_err(|e| {
+        let _cleanup = std::fs::remove_file(&tmp);
+        format!("promote web symlink {} -> {}: {e}", link.display(), target.display())
+    })
+}
+
+#[cfg(not(unix))]
+fn swap_web_symlink(_link: &Path, _target: &Path) -> Result<(), String> {
+    Ok(()) // the appliance is Unix-only
 }
 
 /// Sibling backup path: `auth.db.bak-<oldtag>` (`§5.5` step 2).

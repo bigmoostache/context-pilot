@@ -16,9 +16,11 @@
 > Armbian/Debian 13 + **systemd**, and the apply model moved from
 > client-initiated to **automatic**:
 >
-> 1. **App-only auto-update.** Only `cp-console-server` + `cpilot` self-update.
->    OS, Caddy, Tailscale, the systemd unit and the updater itself are day-0 /
->    Ansible / break-glass (§5.7).
+> 1. **App-only auto-update.** Only the orchestrator + `cpilot` self-update,
+>    and the **served SPA moves with them** — on promote the updater repoints
+>    the `CP_WEB_ROOT` `web/current` symlink at the new tag's bundled
+>    `releases/<tag>/web` (fix/ota-front). OS, Caddy, Tailscale, the systemd unit
+>    and the updater itself are day-0 / Ansible / break-glass (§5.7).
 > 2. **Promotion = auto on tag `v*`.** Pushing a tag publishes the signed
 >    `stable` manifest in CI; tagging *is* the fleet release act.
 > 3. **Box default = `auto`, nightly window 03:00–05:00 box-local** —
@@ -341,10 +343,15 @@ binary embedding the new public key. This is the §5.7 escape hatch, not OTA.
 
 ### §5.7 — Out of scope (state it explicitly)
 
-The manifest governs **only** the app binaries (`cp-console-server` + `cpilot`). The
-wrapper, Caddy, Tailscale, the procd init script, and the OpenWrt OS (`sysupgrade`)
-are handled via day-0 / Ansible / break-glass. Rings/canary are **out of v1** (fleet
-too small to matter). Keeping these out prevents scope creep.
+The manifest governs the app binaries (the orchestrator + `cpilot`) **and the
+served SPA that ships alongside them** in the same tarball: on promote the
+updater atomically repoints the `CP_WEB_ROOT` `web/current` symlink at
+`releases/<tag>/web`, so the UI never lags the API across an OTA (fix/ota-front).
+The swap happens only after the new binary is health-blessed, so a rolled-back
+update leaves the front pointing at the previous SPA — no front rollback path is
+needed. Caddy, Tailscale, the systemd unit, and the host OS are still handled via
+day-0 / Ansible / break-glass. Rings/canary are **out of v1** (fleet too small to
+matter). Keeping these out prevents scope creep.
 
 ### §5.8 — The subtle trap: DB schema migrations
 

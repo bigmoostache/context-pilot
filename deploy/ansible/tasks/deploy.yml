@@ -45,12 +45,24 @@
     - { src: "{{ artifacts_dir }}/bundle/cpilot", dst: tui }
     - { src: "{{ artifacts_dir }}/caddy", dst: caddy }
 
-- name: Ship the SPA bundle (from the release bundle)
+- name: Ship the SPA bundle into web/baseline (from the release bundle)
+  # The served root is the `web/current` symlink (CP_WEB_ROOT); day-0 it points
+  # at this baseline. The OTA updater atomically repoints `current` at the
+  # active release's own `releases/<tag>/web`, so the front moves with the
+  # binaries. A redeploy re-lays baseline AND resets current -> baseline below,
+  # matching the freshly-shipped SPA to the freshly-shipped binaries.
   ansible.builtin.copy:
     src: "{{ artifacts_dir }}/bundle/web/"
-    dest: "{{ cp_root }}/web/"
+    dest: "{{ cp_root }}/web/baseline/"
     mode: "0644"
     directory_mode: "0755"
+
+- name: Point web/current at the baseline SPA (OTA repoints it thereafter)
+  ansible.builtin.file:
+    src: baseline
+    dest: "{{ cp_root }}/web/current"
+    state: link
+    force: true
 
 - name: Install the systemd units (templated with cp_root)
   ansible.builtin.template:
