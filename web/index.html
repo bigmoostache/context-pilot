@@ -44,21 +44,24 @@
          standalone home-screen app: these meta tags make it launch fullscreen
          with NO Safari chrome.
 
-         Status-bar style is `black` (opaque), NOT `black-translucent` (T643):
-         on iOS 26 standalone, the black-translucent + viewport-fit=cover combo
-         is field-confirmed (r/PWA study, public test site) to shrink the web
-         view short of the physical bottom — a permanent ~34px dead "chin" band
-         at the home indicator that keyboard cycles aggravate. With a
-         NON-translucent style the web view's bottom touches the true bottom of
-         the screen. Tradeoff: content starts BELOW the status bar instead of
-         flowing under the clock (env(safe-area-inset-top) resolves to 0, so the
-         views' top padding degrades harmlessly). `black` matches the mobile
-         true-black dark background (.dark.mobile) so the bar reads as part of
-         the app. iOS caches this config AT Add-to-Home-Screen time — changing
-         it requires deleting and re-adding the home-screen icon. -->
+         Status-bar style is `black-translucent` (T643 both-ends recipe): the
+         web view extends UNDER the status bar (top edge at the true screen
+         top), so the app is edge-to-edge at the TOP — the clock/battery float
+         as a translucent overlay and content pads clear of them via
+         env(safe-area-inset-top) while the background still fills that region.
+         The BOTTOM chin gap that this combo (black-translucent +
+         viewport-fit=cover) is infamous for is NOT caused by black-translucent
+         itself — it is caused by sizing the fill with `100dvh`/`height:100%`,
+         which resolve to the safe-area-shrunk viewport in standalone WebKit.
+         The mobile shell instead uses `100vh` when standalone (see
+         `.mobile-shell` in index.css), the large viewport that reaches the TRUE
+         bottom — so the app fills BOTH ends. (Apple ships no current iOS-26
+         guidance on this; the recipe is the r/PWA field study.) iOS caches this
+         config AT Add-to-Home-Screen time — changing it requires deleting and
+         re-adding the home-screen icon. -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Context Pilot" />
     <title>Context·Pilot — Cockpit</title>
     <!-- Set the theme class before first paint to avoid a light→dark flash

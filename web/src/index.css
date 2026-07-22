@@ -161,6 +161,30 @@ html.mobile body {
   overscroll-behavior: none;
 }
 
+/* ─── Mobile shell height: fill the physical screen, both ends ───────────
+   The mobile Root's outer shell carries `.mobile-shell`. Its height is NOT
+   `100dvh`/`height:100%`: in a standalone home-screen app iOS WebKit resolves
+   both to the SAFE-AREA viewport, stopping ~34px short of the physical bottom
+   and leaving a dead "chin" band at the home indicator (r/PWA field study,
+   T643). Fork the height:
+     • home-screen app (`html.mobile.standalone`) → `100vh`, the large viewport
+       that DOES reach the true screen bottom under viewport-fit=cover +
+       black-translucent (index.html);
+     • plain Safari tab (`html.mobile` without `.standalone`) → `100dvh`, which
+       tracks the visible viewport so the composer isn't pushed under the URL
+       bar (100vh would overshoot there — T617).
+   `.standalone` is set on <html> by the mobile Root (navigator.standalone /
+   display-mode:standalone). With the black-translucent status bar this fills
+   the screen at BOTH ends — content flows under the status bar, background
+   reaches the true bottom. */
+html.mobile .mobile-shell {
+  height: 100dvh;
+}
+
+html.mobile.standalone .mobile-shell {
+  height: 100vh;
+}
+
 @layer base {
   * {
     @apply border-border;

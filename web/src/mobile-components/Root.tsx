@@ -40,9 +40,24 @@ function Root() {
   // query: the desktop/mobile split is a frozen JS matchMedia probe (width OR
   // `pointer: coarse`), which a `max-width` query would desync from. Cleared on
   // unmount for safety, though the tree is chosen once per session.
+  //
+  // Also tag `.standalone` when launched from the iOS home screen. The mobile
+  // shell height forks on it (index.css): a home-screen app has no browser
+  // chrome so `100vh` equals the full physical screen and — under
+  // viewport-fit=cover + black-translucent — reaches the true screen bottom
+  // (fixing the ~34px home-indicator "chin" gap that `100dvh`/`height:100%`
+  // leave, since those resolve to the safe-area-shrunk viewport in standalone
+  // WebKit; r/PWA field study, T643). In a plain Safari tab we keep `100dvh`
+  // (100vh would overshoot under the URL bar, T617). Detect via the legacy
+  // iOS-only `navigator.standalone` OR the `display-mode: standalone` query.
   useEffect(() => {
-    document.documentElement.classList.add("mobile")
-    return () => document.documentElement.classList.remove("mobile")
+    const root = document.documentElement
+    root.classList.add("mobile")
+    const standalone =
+      (navigator as Navigator & { standalone?: boolean }).standalone === true ||
+      window.matchMedia("(display-mode: standalone)").matches
+    if (standalone) root.classList.add("standalone")
+    return () => root.classList.remove("mobile", "standalone")
   }, [])
 
   return (
@@ -205,14 +220,19 @@ function MobileShell() {
   }
 
   return (
-    // h-dvh (dynamic viewport height), NOT h-screen (100vh): on iOS Safari
-    // 100vh is TALLER than the visible viewport (it counts the space under the
-    // address bar), so an h-screen shell pushes its bottom-anchored composer
-    // below the fold — it only reappears when the page is scrolled, which is
-    // exactly the "composer disappears when I scroll the thread" bug (T617).
-    // h-dvh tracks the *visible* viewport, so the composer sits at the real
-    // bottom of the screen and stays put.
-    <div className="flex h-dvh w-screen flex-col overflow-hidden bg-background text-foreground">
+    // `.mobile-shell` (index.css) drives the height, NOT `h-dvh`: in a
+    // standalone home-screen app, iOS WebKit resolves `100dvh`/`height:100%` to
+    // the SAFE-AREA viewport, so the shell stops ~34px short of the physical
+    // bottom and the true-black `.dark.mobile` background shows through as a
+    // "chin" band at the home indicator (r/PWA field study, T643). `100vh` is
+    // the large viewport that DOES reach the true bottom under
+    // viewport-fit=cover + black-translucent — so the class fork gives the shell
+    // `100vh` when standalone (`.standalone`) and `100dvh` in a plain Safari tab
+    // (where `100vh` overshoots under the URL bar, T617). Paired with the
+    // black-translucent status bar (index.html) this fills the screen at BOTH
+    // ends: content flows under the status bar (padded off by each view's
+    // env(safe-area-inset-top)) and the background reaches the true bottom.
+    <div className="mobile-shell flex w-screen flex-col overflow-hidden bg-background text-foreground">
       {/* No persistent chrome on mobile — no top bar, no bottom tab bar (T611).
           View navigation is being reworked; for now views are reached
           contextually (fleet → open agent → threads; show-in-finder → finder).
