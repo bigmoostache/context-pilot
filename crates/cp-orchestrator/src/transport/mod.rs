@@ -25,9 +25,7 @@
 //! |---|---|---|
 //! | `GET`  | `/api/fleet` | [`rest::fleet`] |
 //! | `GET`  | `/api/agent/{id}` | [`rest::agent`] |
-//! | `GET`  | `/api/agent/{id}/body/{hash}` | [`rest::body`] |
 //! | `POST` | `/api/agent/{id}/command` | [`rest::command`] |
-//! | `POST` | `/api/ticket` | [`rest::mint_ticket`] |
 //! | `GET`  | `/api/stream?agent={id}&ticket={t}` | SSE (this module) |
 
 mod auth;
@@ -297,6 +295,11 @@ fn route_rest(
         (Method::Get, ["api", "agent", id, "conversation"]) => inspect::finder::conversation(state, id),
         (Method::Post, ["api", "agent", id, "command"]) => rest::command(state, id, body_bytes),
         (Method::Post, ["api", "agent", id, "library", "command"]) => rest::create_command(state, id, body_bytes),
+        (Method::Get, ["api", "agent", id, "library", "agent", item]) => rest::read_library_agent(state, id, item),
+        (Method::Put, ["api", "agent", id, "library", "agent", item]) => {
+            rest::upsert_library_agent(state, id, item, body_bytes)
+        }
+        (Method::Delete, ["api", "agent", id, "library", "agent", item]) => rest::delete_library_agent(state, id, item),
         (Method::Post, ["api", "agent", id, "fs", "upload"]) => {
             inspect::finder::fs_upload(state, id, query, body_bytes)
         }

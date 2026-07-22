@@ -90,7 +90,16 @@ pub(super) fn transport() -> Value {
             },
             "required": ["id", "status"]
         },
-        // ── Auth ────────────────────────────────────────────────────
+        "LibraryAgentRaw": {
+            "type": "object",
+            "properties": {
+                "name": { "type": "string" },
+                "description": { "type": "string" },
+                "body": { "type": "string" },
+                "builtin": { "type": "boolean" }
+            },
+            "required": ["name", "description", "body", "builtin"]
+        },
         "AuthStatus": {
             "type": "object",
             "properties": {
