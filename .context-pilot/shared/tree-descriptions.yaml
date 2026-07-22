@@ -6970,6 +6970,10 @@
   path: web/src/components/finder/internal/useExternalDragUpload.ts
   description: 'Window-level external-file drag-upload lifecycle hook: shows ''Drop to upload'' overlay while an OS-file drag hovers, clears on drop/leave/cancel (heartbeat watchdog), hands dropped files to onFiles. Internal MOVE drags (no Files type) never raise it.'
   last_edited_ms: 0
+58191abc29c78003:
+  path: web/src/mobile-components/threads/ThreadComposer.tsx
+  description: 'Mobile ThreadComposer twin — iMessage-style input row (T615): standalone round ''+'' attach button left, single fully-rounded pill (border bg-card) holding 16px textarea + inline send button tucked inside the pill''s right edge, send shown only when sendable. Draft/keyboard/command-bubble logic byte-identical via useComposer.'
+  last_edited_ms: 1784708974814
 581ea00f4be2d58b:
   path: crates/cp-mod-chat/src/server.rs
   description: Global Tuwunel homeserver lifecycle. PID/socket/config file management. UDS HTTP helpers (get/post/put). pre_start_daemon() for parallel boot. ensure_daemon_running() + start_server(state). Geometric backoff health polling (50ms→500ms cap, 15s budget).
