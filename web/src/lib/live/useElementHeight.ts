@@ -34,7 +34,7 @@ export function useElementHeight(ref: RefObject<HTMLElement | null>): number {
     const ro = new ResizeObserver((entries) => {
       const entry = entries[0]
       if (!entry) return
-      const h = entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height
+      const h = entry.borderBoxSize[0]?.blockSize ?? entry.contentRect.height
       if (typeof h === "number") setHeight(h)
     })
     ro.observe(el, { box: "border-box" })

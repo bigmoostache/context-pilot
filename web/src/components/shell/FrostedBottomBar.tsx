@@ -1,4 +1,4 @@
-import { forwardRef, type ReactNode } from "react"
+import { type ReactNode, type Ref } from "react"
 import { cn } from "@/lib/utils"
 
 // ── Frosted floating bottom bar (mobile chrome) ──────────────────────
@@ -68,20 +68,26 @@ export function ProgressiveBlur() {
  * to the outer element so the consumer can measure its height for that spacer.
  * `className` is merged last for per-surface padding overrides.
  */
-export const FrostedBottomBar = forwardRef<HTMLDivElement, { children: ReactNode; className?: string }>(
-  function FrostedBottomBar({ children, className }, ref) {
-    return (
-      <div
-        ref={ref}
-        className={cn(
-          "absolute inset-x-0 bottom-0 z-10",
-          "bg-linear-to-t from-background/90 via-background/45 to-transparent",
-          className,
-        )}
-      >
-        <ProgressiveBlur />
-        {children}
-      </div>
-    )
-  },
-)
+export function FrostedBottomBar({
+  children,
+  className,
+  ref,
+}: {
+  children: ReactNode
+  className?: string
+  ref?: Ref<HTMLDivElement>
+}) {
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        "absolute inset-x-0 bottom-0 z-10",
+        "bg-linear-to-t from-background/90 via-background/45 to-transparent",
+        className,
+      )}
+    >
+      <ProgressiveBlur />
+      {children}
+    </div>
+  )
+}

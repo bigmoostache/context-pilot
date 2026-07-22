@@ -8,6 +8,7 @@ import {
   Loader2,
   Plus,
   Search,
+  Settings,
   Settings2,
   X,
 } from "lucide-react"
@@ -26,6 +27,7 @@ import type { Agent, AgentStatus } from "@/lib/types"
 import { cn, prefersReducedMotion } from "@/lib/utils"
 import { useSwipeRow } from "@/lib/live/useSwipeRow"
 import { RetiredSection } from "./FleetRetired"
+import { ConfigModal } from "@/mobile-components/shell/config/ConfigModal"
 
 const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
   working: { label: "Working", color: "var(--interactive)" },
@@ -66,6 +68,12 @@ export function FleetDashboard({
 }) {
   const [query, setQuery] = useState("")
   const [toast, setToast] = useState<string | null>(null)
+  // App-level Settings (Config) modal — the mobile home's app-settings door.
+  // Desktop opens ConfigModal from the TopBar gear / UserMenu → Settings; the
+  // mobile shell has no TopBar (T611), so the fleet (home) header carries the
+  // gear. This is the ONLY reachable entry to the app Config on mobile — the
+  // General pane's Claude usage section (T646) lives behind it.
+  const [configOpen, setConfigOpen] = useState(false)
   const createAgent = useCreateAgent()
   const inputRef = useRef<HTMLInputElement>(null)
   // Floating glass bottom bar (T637): reserve a 1.5× spacer sized from its
@@ -135,18 +143,7 @@ export function FleetDashboard({
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       <ScrollArea className="min-h-0 flex-1 bg-background">
         <div className={cn("mx-auto flex w-full flex-col", FLEET_MAX_W)}>
-          <header className="flex items-center justify-between gap-3 px-4 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-3">
-            <div className="flex flex-col gap-0.5">
-              <h1 className="text-[28px] leading-none font-bold tracking-tight text-foreground">
-                Agents
-              </h1>
-              {agents.length > 0 && (
-                <span className="text-[12.5px] text-muted-foreground/70">
-                  {agents.length} {agents.length === 1 ? "agent" : "agents"}
-                </span>
-              )}
-            </div>
-          </header>
+          <FleetHeader count={agents.length} onOpenConfig={() => setConfigOpen(true)} />
 
           {agents.length === 0 ? (
             <p className="px-4 py-16 text-center text-[14px] text-muted-foreground/55">
@@ -233,12 +230,48 @@ export function FleetDashboard({
       </FrostedBottomBar>
 
       <Toast message={toast} />
+
+      {/* App-level Settings — the mobile equivalent of the desktop TopBar gear /
+          UserMenu → Settings. General pane hosts the Claude usage section. */}
+      <ConfigModal open={configOpen} onClose={() => setConfigOpen(false)} />
     </div>
   )
 }
 
 /** Pixel width of the revealed action strip (two 68px action buttons). */
 const ACTION_W = 136
+
+/**
+ * Fleet (home) header — the title + agent count, and the app-Settings gear that
+ * opens the mobile {@link ConfigModal} (the mobile equivalent of the desktop
+ * TopBar gear, T611 removed the bar). Extracted so the FleetDashboard render
+ * stays within the per-function line budget.
+ */
+function FleetHeader({ count, onOpenConfig }: { count: number; onOpenConfig: () => void }) {
+  return (
+    <header className="flex items-center justify-between gap-3 px-4 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-3">
+      <div className="flex flex-col gap-0.5">
+        <h1 className="text-[28px] leading-none font-bold tracking-tight text-foreground">
+          Agents
+        </h1>
+        {count > 0 && (
+          <span className="text-[12.5px] text-muted-foreground/70">
+            {count} {count === 1 ? "agent" : "agents"}
+          </span>
+        )}
+      </div>
+      {/* App settings (Config) — opens the same ConfigModal the desktop TopBar
+          gear opens; its General pane carries the Claude usage section (T646). */}
+      <button
+        onClick={onOpenConfig}
+        aria-label="Settings"
+        className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground/70 transition-colors active:bg-muted active:text-foreground"
+      >
+        <Settings className="size-5.5" />
+      </button>
+    </header>
+  )
+}
 
 /**
  * An agent row wrapped so a **left-swipe** reveals its Manage / Retire actions —
