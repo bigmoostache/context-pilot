@@ -259,37 +259,71 @@ fn dir_is_empty(dir: &Path) -> bool {
     std::fs::read_dir(dir).map(|mut e| e.next().is_none()).unwrap_or(true)
 }
 
-/// Point `link` at `target`: write a sibling temp symlink and `rename` it over
-/// `link`. Renaming onto an existing symlink is atomic — there is no instant
-/// where the served root is absent. A pre-existing **real directory** at `link`
-/// (a legacy deploy that copied the SPA in place instead of symlinking) is
-/// removed first so the rename can land.
+/// A hidden sibling of `path`: `.<name>.<suffix>` in the same directory, so a
+/// `rename` between it and `path` stays within one directory (atomic).
+fn dot_sibling(path: &Path, suffix: &str) -> PathBuf {
+    let mut name = std::ffi::OsString::from(".");
+    name.push(path.file_name().unwrap_or_default());
+    name.push(".");
+    name.push(suffix);
+    path.with_file_name(name)
+}
+
+/// Point `link` at `target`: stage a sibling temp symlink, then `rename` it over
+/// `link`. Renaming onto an existing symlink is atomic — the steady-state swap
+/// (the `web/current` layout) never leaves the served root absent.
+///
+/// A pre-existing **real directory** at `link` (a legacy box whose
+/// `CP_WEB_ROOT` still points straight at `{cp_root}/web` — the OTA never
+/// rewrites the systemd unit) is the fleet's one-time migration to the symlink
+/// layout. `rename` cannot replace a non-empty directory, so the old dir is
+/// moved **aside** (not deleted), the symlink is put in place, and only then is
+/// the old dir dropped — the previous SPA survives until the swap lands, so a
+/// mid-swap failure restores it instead of leaving the box front-less.
 ///
 /// # Errors
 ///
-/// Returns an error if any filesystem step fails; `link` is left pointing where
-/// it did unless the final rename succeeds.
+/// Returns an error if any filesystem step fails; on a failed final rename the
+/// staged symlink is cleaned up and any moved-aside legacy dir is restored, so
+/// `link` is left serving what it did before.
 #[cfg(unix)]
 fn swap_web_symlink(link: &Path, target: &Path) -> Result<(), String> {
     use std::os::unix::fs::symlink;
     let parent = link.parent().ok_or_else(|| format!("web symlink {} has no parent", link.display()))?;
     std::fs::create_dir_all(parent).map_err(|e| format!("mkdir {}: {e}", parent.display()))?;
 
-    // Legacy layout guard: a real directory at `link` (old in-place deploy)
-    // must go before the rename — `rename(symlink, dir)` fails. A symlink is
-    // replaced by the rename itself, atomically.
-    let is_real_dir = link.symlink_metadata().map(|m| m.file_type().is_dir()).unwrap_or(false);
-    if is_real_dir {
-        std::fs::remove_dir_all(link).map_err(|e| format!("remove legacy web dir {}: {e}", link.display()))?;
-    }
-
-    let tmp = parent.join(".current.tmp");
+    // 1. Stage the replacement symlink at a sibling temp.
+    let tmp = dot_sibling(link, "tmp");
     let _rm = std::fs::remove_file(&tmp);
     symlink(target, &tmp).map_err(|e| format!("symlink {} -> {}: {e}", tmp.display(), target.display()))?;
-    std::fs::rename(&tmp, link).map_err(|e| {
+
+    // 2. Legacy layout: `link` is a real directory. Move it aside so the rename
+    //    can land — the old SPA stays intact under `aside` until we're done.
+    let is_real_dir = link.symlink_metadata().map(|m| m.file_type().is_dir()).unwrap_or(false);
+    let aside = is_real_dir.then(|| dot_sibling(link, "legacy"));
+    if let Some(aside) = &aside {
+        let _rm = std::fs::remove_dir_all(aside);
+        if let Err(e) = std::fs::rename(link, aside) {
+            let _cleanup = std::fs::remove_file(&tmp);
+            return Err(format!("move aside legacy web dir {}: {e}", link.display()));
+        }
+    }
+
+    // 3. Swap the symlink in. On failure, undo: drop the temp, put the legacy
+    //    dir back where it was.
+    if let Err(e) = std::fs::rename(&tmp, link) {
         let _cleanup = std::fs::remove_file(&tmp);
-        format!("promote web symlink {} -> {}: {e}", link.display(), target.display())
-    })
+        if let Some(aside) = &aside {
+            let _restore = std::fs::rename(aside, link);
+        }
+        return Err(format!("promote web symlink {} -> {}: {e}", link.display(), target.display()));
+    }
+
+    // 4. Symlink is live — the old SPA is now safe to drop.
+    if let Some(aside) = &aside {
+        let _rm = std::fs::remove_dir_all(aside);
+    }
+    Ok(())
 }
 
 #[cfg(not(unix))]
@@ -302,4 +336,65 @@ fn db_backup_path(auth_db_path: &Path, from: Option<&str>) -> PathBuf {
     let mut name = auth_db_path.file_name().map(std::ffi::OsStr::to_os_string).unwrap_or_default();
     name.push(format!(".bak-{}", from.unwrap_or("none")));
     auth_db_path.with_file_name(name)
+}
+
+// The `promote_web` no-op guards + happy symlink repoint live in
+// `updater/tests.rs`; the two `swap_web_symlink` layout transitions are unit
+// tested here, next to the private helper.
+#[cfg(all(test, unix))]
+mod web_tests {
+    use std::os::unix::fs::symlink;
+
+    use super::swap_web_symlink;
+
+    /// Fresh temp dir, removed by the caller.
+    fn tmp(label: &str) -> std::path::PathBuf {
+        let d = std::env::temp_dir().join(format!("cp-webswap-{label}-{}", std::process::id()));
+        let _rm = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).expect("mkdir");
+        d
+    }
+
+    /// Legacy box (`CP_WEB_ROOT` -> `{cp_root}/web`, a real dir): the swap
+    /// migrates the directory to a symlink at the release's `web/`, dropping the
+    /// old dir only after the symlink is live — and never loses the served SPA.
+    #[test]
+    fn migrates_a_real_directory_to_a_symlink() {
+        let base = tmp("legacy");
+        let link = base.join("web");
+        std::fs::create_dir_all(&link).expect("legacy web dir");
+        std::fs::write(link.join("index.html"), b"OLD").expect("old spa");
+        let target = base.join("releases/vY/web");
+        std::fs::create_dir_all(&target).expect("target");
+        std::fs::write(target.join("index.html"), b"NEW").expect("new spa");
+
+        swap_web_symlink(&link, &target).expect("migrate");
+
+        assert!(link.symlink_metadata().unwrap().file_type().is_symlink(), "link is now a symlink");
+        assert_eq!(std::fs::read_link(&link).unwrap(), target, "-> releases/vY/web");
+        assert_eq!(std::fs::read(link.join("index.html")).unwrap(), b"NEW", "serves the new SPA");
+        assert!(!base.join(".web.legacy").exists(), "moved-aside legacy dir dropped");
+        assert!(!base.join(".web.tmp").exists(), "temp symlink cleaned up");
+
+        let _rm = std::fs::remove_dir_all(&base);
+    }
+
+    /// Steady state (`web/current` already a symlink): the swap just repoints it,
+    /// with no aside dir and no absent-root window.
+    #[test]
+    fn repoints_an_existing_symlink() {
+        let base = tmp("symlink");
+        std::fs::create_dir_all(base.join("web/baseline")).expect("baseline");
+        let link = base.join("web/current");
+        symlink("baseline", &link).expect("symlink");
+        let target = base.join("releases/vZ/web");
+        std::fs::create_dir_all(&target).expect("target");
+
+        swap_web_symlink(&link, &target).expect("repoint");
+
+        assert_eq!(std::fs::read_link(&link).unwrap(), target);
+        assert!(!base.join("web/.current.legacy").exists(), "no aside dir for a symlink");
+
+        let _rm = std::fs::remove_dir_all(&base);
+    }
 }
