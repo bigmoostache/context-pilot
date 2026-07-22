@@ -3,6 +3,7 @@ import { FolderGit2, AlertTriangle, Plus, PanelLeft } from "lucide-react"
 import { ThreadList } from "@/mobile-components/threads/ThreadList"
 import { ThreadConversation } from "@/mobile-components/threads/ThreadConversation"
 import { NewThreadDialog } from "@/mobile-components/threads/NewThreadDialog"
+import { CornerButton } from "@/mobile-components/shell/CornerButton"
 import { useFleet, useThreads } from "@/lib/live"
 import { useThreadSelection, useThreadActions } from "@/lib/live/threadView"
 
@@ -98,30 +99,18 @@ export function ThreadsView({
         />
       )}
 
-      {/* Fixed toggle — pinned to the viewport top-left (there is no mobile
-          TopBar), so it never scrolls with the conversation beneath it. It sits
-          under the drawer scrim (lower z), so tapping it while the drawer is
-          open lands on the scrim and closes instead.
-
-          The `top` offset carries `env(safe-area-inset-top)`: in a standalone
-          home-screen app the web view draws UNDER the translucent iOS status
-          bar (T621), so a bare `top-1.5` would put the button behind the clock
-          where it can't be tapped — the exact bug the user hit. Adding the
-          inset pushes it clear of the status bar; in a plain Safari tab the
-          inset is 0, so the button keeps its original position.
-
-          The button is wrapped in a slightly larger `backdrop-blur-md` pad so the
-          content directly under AND just around the button is blurred — the
-          button stays legible over any message text that scrolls beneath it. */}
-      <div className="fixed top-[calc(env(safe-area-inset-top)+0.375rem)] left-1.5 z-30 rounded-2xl p-1 backdrop-blur-md">
-        <button
-          onClick={() => setDrawerOpen(true)}
-          aria-label="Show threads"
-          className="card-shadow flex size-9 items-center justify-center rounded-lg border border-border bg-card/95 text-foreground/80 transition-colors active:bg-muted"
-        >
-          <PanelLeft className="size-4.5" />
-        </button>
-      </div>
+      {/* Drawer toggle — the shared top-left corner button (see CornerButton:
+          fixed, safe-area-offset so it clears the iOS status bar in standalone,
+          T621). It carries `z-20` so it sits UNDER the drawer scrim (z-40): a
+          tap while the drawer is open lands on the scrim and closes it. */}
+      <CornerButton
+        side="left"
+        label="Show threads"
+        onClick={() => setDrawerOpen(true)}
+        className="z-20"
+      >
+        <PanelLeft className="size-4.5" />
+      </CornerButton>
 
       {/* Scrim — dims the conversation while the drawer is open; tapping it (or
           the toggle beneath it) closes the drawer. A <button> not a <div> so it

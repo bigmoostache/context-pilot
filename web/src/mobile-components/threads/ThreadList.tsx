@@ -4,14 +4,14 @@ import {
   X,
   Archive,
   ArchiveRestore,
-  ChevronLeft,
-  ChevronRight,
   Pause,
   Play,
   Trash2,
   SquarePen,
+  ChevronRight,
 } from "lucide-react"
 import { ScrollArea } from "@/mobile-components/ui/scroll-area"
+import { CornerButton } from "@/mobile-components/shell/CornerButton"
 import type { ThreadDetail } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { previewOf } from "@/lib/support/threadMessages"
@@ -52,22 +52,24 @@ function byPriority(a: ThreadDetail, b: ThreadDetail): number {
 }
 
 /**
- * Mobile thread roster — an **iOS-Messages-style** conversation list (T620).
+ * Mobile thread roster — an **iOS-Messages-style** conversation list (T620/T625).
  *
- * The desktop version is a dense sidebar rail (small type, always-visible
- * archive/pause/delete buttons on every row, "Agent's turn"/"User turn" group
- * headers with count pills). None of that reads as native on a phone, so the
- * mobile twin is rebuilt to feel like the iMessage conversation list:
+ * The desktop version is a dense sidebar rail. The mobile twin is rebuilt to feel
+ * native, and (T625) to put every interactive control where a thumb can reach it:
  *
- *   • a large title header with a compose (✎) icon instead of a full-width
- *     button;
- *   • a soft rounded search pill (no heavy bordered card);
- *   • tall rows — an initials avatar, a semibold title with a right-aligned
- *     timestamp, and a two-line grey preview — separated by hairlines inset
- *     past the avatar (not boxed cards);
- *   • a leading accent dot marking a thread that owes you a turn / is unread;
- *   • **swipe-left to reveal** the archive / pause / delete actions, so the
- *     resting row is clean (the desktop's button clutter is gone).
+ *   • **No top title bar.** The desktop "Threads / N conversations" header + a
+ *     top compose button are gone — a phone shouldn't hang primary actions off
+ *     the top edge (hard to reach, and under the status bar in standalone).
+ *   • **Bottom action bar.** Search moves to the BOTTOM of the screen with the
+ *     compose (new-thread) button beside it — both within thumb reach, safe-area
+ *     padded so they clear the home indicator.
+ *   • **Archived toggle in the top-right corner** — a shared {@link CornerButton}
+ *     (safe-area-offset so it's always tappable, even in standalone), flipping
+ *     between the live and archived sets. This replaces the old bottom
+ *     "Archived (N) ›" entry row and the archived back-header.
+ *   • tall rows (avatar, title + timestamp, 2-line preview), hairline
+ *     separators, a leading accent dot for a thread that owes you a turn, and
+ *     **swipe-left** to reveal archive / pause / delete.
  *
  * All filtering / search / sort logic is shared with desktop — only the chrome
  * and the touch affordances fork.
@@ -98,17 +100,71 @@ export function ThreadList({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-      <ListHeader
-        showArchived={showArchived}
-        onToggleArchived={onToggleArchived}
-        liveCount={live.length}
-        archivedCount={archivedCount}
-        onNewThread={onNewThread}
-      />
+      {/* Top-right corner control: flip between live and archived. Shares the
+          safe-area-aware CornerButton so it's reachable even in standalone.
+          Hidden when there's nothing archived AND we're in the live view (no
+          set to switch to). */}
+      {(showArchived || archivedCount > 0) && (
+        <CornerButton
+          side="right"
+          label={showArchived ? "Show active threads" : "Show archived threads"}
+          onClick={() => onToggleArchived(!showArchived)}
+          className="z-30"
+        >
+          {showArchived ? (
+            <ArchiveRestore className="size-4.5 text-(--signal)" />
+          ) : (
+            <Archive className="size-4.5" />
+          )}
+        </CornerButton>
+      )}
 
-      {/* search — soft rounded pill, iMessage style */}
-      <div className="shrink-0 px-4 pb-2">
-        <div className="flex items-center gap-2 rounded-xl bg-muted/60 px-3 py-2 text-[16px]">
+      {/* A minimal caption ONLY in the archived view, so the mode is legible
+          (the live view is deliberately chrome-free). */}
+      {showArchived && (
+        <div className="shrink-0 px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-1 text-center">
+          <span className="text-[13px] font-semibold tracking-wide text-muted-foreground/70">
+            Archived
+          </span>
+        </div>
+      )}
+
+      <ScrollArea className="min-h-0 flex-1">
+        {/* pad the top so the first row clears the floating corner button in the
+            live (caption-less) view */}
+        <div className={cn(showArchived ? "" : "pt-[calc(env(safe-area-inset-top)+3rem)]")}>
+          {visible.length === 0 ? (
+            <EmptyState hasQuery={q !== ""} showArchived={showArchived} />
+          ) : (
+            <ul className="flex flex-col">
+              {visible.map((t) => (
+                <li key={t.id}>
+                  <SwipeRow
+                    archived={showArchived}
+                    isPaused={!showArchived && Boolean(t.paused)}
+                    onArchive={() => onArchive(t.id)}
+                    onDelete={() => onDelete(t.id)}
+                    onPause={() => onPause(t.id)}
+                  >
+                    <ThreadRow
+                      t={t}
+                      selected={t.id === selectedId}
+                      archived={showArchived}
+                      onSelect={onSelect}
+                    />
+                  </SwipeRow>
+                  {/* hairline separator, inset past the avatar */}
+                  <div className="ml-17 h-px bg-border/60" />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </ScrollArea>
+
+      {/* Bottom action bar — search + compose, both in thumb reach (T625). */}
+      <div className="flex shrink-0 items-center gap-2 border-t border-border/70 px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="flex flex-1 items-center gap-2 rounded-xl bg-muted/60 px-3 py-2 text-[16px]">
           <Search className="size-4 shrink-0 text-muted-foreground/60" />
           <input
             value={query}
@@ -126,103 +182,19 @@ export function ThreadList({
             </button>
           )}
         </div>
-      </div>
-
-      <ScrollArea className="min-h-0 flex-1">
-        {visible.length === 0 ? (
-          <EmptyState hasQuery={q !== ""} showArchived={showArchived} />
-        ) : (
-          <ul className="flex flex-col">
-            {visible.map((t) => (
-              <li key={t.id}>
-                <SwipeRow
-                  archived={showArchived}
-                  isPaused={!showArchived && Boolean(t.paused)}
-                  onArchive={() => onArchive(t.id)}
-                  onDelete={() => onDelete(t.id)}
-                  onPause={() => onPause(t.id)}
-                >
-                  <ThreadRow
-                    t={t}
-                    selected={t.id === selectedId}
-                    archived={showArchived}
-                    onSelect={onSelect}
-                  />
-                </SwipeRow>
-                {/* hairline separator, inset past the avatar */}
-                <div className="ml-17 h-px bg-border/60" />
-              </li>
-            ))}
-          </ul>
+        {/* compose — the primary create affordance, a filled circle at the
+            bottom-right corner of the bar (hidden in the archived view, where
+            creating a thread makes no sense) */}
+        {!showArchived && (
+          <button
+            onClick={onNewThread}
+            aria-label="New thread"
+            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-(--signal) text-(--primary-foreground) transition-[filter] active:brightness-110"
+          >
+            <SquarePen className="size-5" />
+          </button>
         )}
-      </ScrollArea>
-
-      {/* archived entry point (hidden while already viewing archived) */}
-      {!showArchived && archivedCount > 0 && (
-        <button
-          onClick={() => onToggleArchived(true)}
-          className="flex shrink-0 items-center gap-2 border-t border-border px-4 py-3 text-[15px] text-muted-foreground active:bg-muted/50"
-        >
-          <Archive className="size-4" />
-          Archived
-          <span className="ml-auto text-muted-foreground/50 tabular-nums">{archivedCount}</span>
-          <ChevronRight className="size-4 text-muted-foreground/40" />
-        </button>
-      )}
-    </div>
-  )
-}
-
-/** Large-title header with a compose action — or, in the archived view, a
- *  back header. iMessage's large-title + top-right compose convention. */
-function ListHeader({
-  showArchived,
-  onToggleArchived,
-  liveCount,
-  archivedCount,
-  onNewThread,
-}: {
-  showArchived: boolean
-  onToggleArchived: (v: boolean) => void
-  liveCount: number
-  archivedCount: number
-  onNewThread: () => void
-}) {
-  if (showArchived) {
-    return (
-      <div className="flex items-center gap-1 px-3 pt-3 pb-2">
-        <button
-          onClick={() => onToggleArchived(false)}
-          className="flex items-center gap-0.5 text-[16px] text-(--signal) active:opacity-70"
-        >
-          <ChevronLeft className="size-5" />
-          Threads
-        </button>
-        <span className="ml-2 text-[17px] font-semibold text-foreground">Archived</span>
-        <span className="ml-auto pr-1 text-[13px] text-muted-foreground/60 tabular-nums">
-          {archivedCount}
-        </span>
       </div>
-    )
-  }
-  return (
-    <div className="flex items-end justify-between px-4 pt-4 pb-2">
-      <div className="flex flex-col">
-        <span className="text-[26px] leading-tight font-bold tracking-tight text-foreground">
-          Threads
-        </span>
-        <span className="text-[12px] text-muted-foreground/70 tabular-nums">
-          {liveCount} conversation{liveCount === 1 ? "" : "s"}
-        </span>
-      </div>
-      <button
-        onClick={onNewThread}
-        aria-label="New thread"
-        title="New thread"
-        className="flex size-9 items-center justify-center rounded-full text-(--signal) active:bg-(--signal)/10"
-      >
-        <SquarePen className="size-5.5" />
-      </button>
     </div>
   )
 }
@@ -425,10 +397,7 @@ function SwipeRow({
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
         onClickCapture={(e) => {
-          if (dx === 0) {
-          	return;
-          }
-
+          if (dx === 0) return
           e.preventDefault()
           e.stopPropagation()
           setDx(0)
