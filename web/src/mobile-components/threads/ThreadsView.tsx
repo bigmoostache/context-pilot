@@ -118,23 +118,27 @@ export function ThreadsView({
 
       {/* Scrim — dims the conversation while the drawer is open; tapping it (or
           the toggle beneath it) closes the drawer. A <button> not a <div> so it
-          carries keyboard semantics (jsx-a11y). */}
+          carries keyboard semantics (jsx-a11y). `fixed` (not `absolute`) so it
+          covers the viewport, not the tall scrolling ThreadsView container. */}
       <button
         aria-label="Close thread list"
         onClick={() => setDrawerOpen(false)}
         tabIndex={drawerOpen ? 0 : -1}
         className={
-          "absolute inset-0 z-40 bg-black/40 transition-opacity duration-200 " +
+          "fixed inset-0 z-40 bg-black/40 transition-opacity duration-200 " +
           (drawerOpen ? "opacity-100" : "pointer-events-none opacity-0")
         }
       />
 
       {/* Drawer — the thread list, sliding in from the left. Always mounted (so
-          it animates) but shoved off-screen and non-interactive when closed. */}
+          it animates) but shoved off-screen and non-interactive when closed.
+          `fixed inset-y-0` pins it to the VIEWPORT height, not the tall
+          scrolling ThreadsView container beneath it — so ThreadList's own
+          ScrollArea scrolls independently of the conversation (T616). */}
       <aside
         aria-hidden={!drawerOpen}
         className={
-          "absolute inset-y-0 left-0 z-50 flex w-[85%] max-w-[340px] flex-col border-r border-border bg-surface transition-transform duration-200 ease-out " +
+          "fixed inset-y-0 left-0 z-50 flex w-[85%] max-w-[340px] flex-col border-r border-border bg-surface transition-transform duration-200 ease-out " +
           (drawerOpen ? "translate-x-0" : "-translate-x-full")
         }
       >
