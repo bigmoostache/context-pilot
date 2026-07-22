@@ -1,12 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Loader2, XCircle } from "lucide-react"
-import {
-  fetchClaudeAccounts,
-  storeClaudeAccount,
-  switchClaudeAccount,
-  deleteClaudeAccount,
-} from "@/lib/api"
 import type { ClaudeAccountSummary } from "@/lib/api/generated/types.gen"
+import { useClaudeAccounts } from "@/lib/live/useClaudeUsage"
 import { cn } from "@/lib/utils"
 
 /** Format epoch ms as a short relative expiry string. */
@@ -69,52 +63,21 @@ function StoredAccountRow({
 }
 
 /** Stored accounts list — store current, switch to stored, delete.
- *  Extracted from UsageButton for the P8 line budget. */
+ *  Extracted from UsageButton for the P8 line budget. All the query/mutation
+ *  wiring lives in the shared {@link useClaudeAccounts} hook (M141). */
 export function StoredAccounts({ isValid, onSwitch }: { isValid: boolean; onSwitch: () => void }) {
-  const queryClient = useQueryClient()
-
-  const accountsQuery = useQuery({
-    queryKey: ["claude-accounts"],
-    queryFn: fetchClaudeAccounts,
-    staleTime: 10_000,
-    retry: 1,
-  })
-
-  const storeMutation = useMutation({
-    mutationFn: storeClaudeAccount,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["claude-accounts"] })
-    },
-  })
-
-  const switchMutation = useMutation({
-    mutationFn: switchClaudeAccount,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["claude-token-status"] })
-      void queryClient.invalidateQueries({ queryKey: ["claude-usage"] })
-      void queryClient.invalidateQueries({ queryKey: ["claude-accounts"] })
-      onSwitch()
-    },
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: deleteClaudeAccount,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["claude-accounts"] })
-    },
-  })
-
-  const accounts: ClaudeAccountSummary[] = accountsQuery.data?.accounts ?? []
+  const { accounts, storeCurrent, storing, storeError, switchTo, switching, switchError, remove } =
+    useClaudeAccounts(onSwitch)
 
   return (
     <div className="space-y-2">
       {isValid && (
         <button
-          onClick={() => storeMutation.mutate()}
-          disabled={storeMutation.isPending}
+          onClick={storeCurrent}
+          disabled={storing}
           className="flex w-full items-center justify-center gap-2 rounded-md bg-muted px-3 py-1.5 text-[12px] font-medium text-foreground transition-colors hover:bg-muted/80 disabled:opacity-50"
         >
-          {storeMutation.isPending ? (
+          {storing ? (
             <>
               <Loader2 className="size-3.5 animate-spin" /> Storing…
             </>
@@ -123,9 +86,9 @@ export function StoredAccounts({ isValid, onSwitch }: { isValid: boolean; onSwit
           )}
         </button>
       )}
-      {storeMutation.isError && (
+      {storeError != null && (
         <p className="text-[11px] text-red-500">
-          {storeMutation.error instanceof Error ? storeMutation.error.message : "Store failed"}
+          {storeError instanceof Error ? storeError.message : "Store failed"}
         </p>
       )}
       {accounts.length > 0 && (
@@ -135,16 +98,16 @@ export function StoredAccounts({ isValid, onSwitch }: { isValid: boolean; onSwit
             <StoredAccountRow
               key={account.email}
               account={account}
-              switching={switchMutation.isPending}
-              onSwitch={() => switchMutation.mutate(account.email)}
-              onDelete={() => deleteMutation.mutate(account.email)}
+              switching={switching}
+              onSwitch={() => switchTo(account.email)}
+              onDelete={() => remove(account.email)}
             />
           ))}
         </div>
       )}
-      {switchMutation.isError && (
+      {switchError != null && (
         <p className="text-[11px] text-red-500">
-          {switchMutation.error instanceof Error ? switchMutation.error.message : "Switch failed"}
+          {switchError instanceof Error ? switchError.message : "Switch failed"}
         </p>
       )}
     </div>

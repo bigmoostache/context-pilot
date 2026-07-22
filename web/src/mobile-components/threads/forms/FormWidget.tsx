@@ -144,7 +144,7 @@ function LockedForm({ spec, answer }: { spec: FormSpec; answer: FormAnswer }) {
     return typeof v === "string" && v.trim().length > 0
   })
   return (
-    <div className="rise card-shadow my-1.5 overflow-hidden rounded-xl border border-(--signal)/25 bg-linear-to-b from-(--signal)/8 to-(--signal)/2">
+    <div className="rise my-1.5 overflow-hidden rounded-2xl border border-(--signal)/25 bg-linear-to-b from-(--signal)/10 to-(--signal)/2 shadow-(--shadow-pop) backdrop-blur-xl backdrop-saturate-150">
       <div className="flex items-center gap-2 border-b border-signal/15 px-3 py-2">
         <span className="flex size-5 items-center justify-center rounded-full bg-(--signal) text-(--primary-foreground)">
           <Check className="size-3" strokeWidth={3} />
@@ -179,8 +179,8 @@ function LockedForm({ spec, answer }: { spec: FormSpec; answer: FormAnswer }) {
 /** The card header: an icon chip, the title, and the field count. */
 function FormHeader({ title, count }: { title: string | undefined; count: number }) {
   return (
-    <div className="flex items-center gap-2 border-b border-border/60 bg-muted/25 px-3 py-2">
-      <span className="flex size-5 items-center justify-center rounded-full bg-(--signal)/12 text-(--signal)">
+    <div className="flex items-center gap-2 border-b border-border/40 px-3.5 py-2.5">
+      <span className="flex size-5 items-center justify-center rounded-full bg-(--signal)/12 text-(--signal) ring-1 ring-(--signal)/20">
         <ClipboardList className="size-3" />
       </span>
       <div className="flex min-w-0 flex-col">
@@ -223,7 +223,7 @@ function FormFooter({
     ? "bg-(--warn) text-(--primary-foreground) active:brightness-105"
     : "bg-(--signal) text-(--primary-foreground) active:brightness-105"
   return (
-    <div className="flex items-center justify-between gap-3 border-t border-border/60 bg-muted/15 px-3 py-2">
+    <div className="flex items-center justify-between gap-3 border-t border-border/40 px-3.5 py-2.5">
       {/* Screen-reader announcement of the arm/disarm flip (the amber button
           change is otherwise visual-only). */}
       <span className="sr-only" role="status" aria-live="polite">
@@ -384,7 +384,7 @@ export function FormWidget({
   return (
     <div
       ref={cardRef}
-      className="rise card-shadow my-1.5 overflow-hidden rounded-2xl border border-border/60 bg-card"
+      className="rise my-1.5 overflow-hidden rounded-2xl border border-border/40 bg-card/55 shadow-(--shadow-pop) backdrop-blur-xl backdrop-saturate-150"
     >
       <FormHeader title={fullSpec.title} count={fullSpec.fields.length} />
       <div className="flex flex-col gap-4 p-3.5">
