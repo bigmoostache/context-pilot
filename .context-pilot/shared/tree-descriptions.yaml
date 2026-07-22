@@ -10350,6 +10350,10 @@
   path: web/src/components/threads/ThreadList.tsx
   description: 'Left rail of threads view — ALWAYS OPEN. Working search filters by name+last-preview. Groups: Needs you/Active/Working in parallel. Per-row hover Archive/Restore. Footer Archived toggle. New Thread button.'
   last_edited_ms: 1781694654417
+8366d7f187f8290f:
+  path: web/src/mobile-components/conversation/Message.tsx
+  description: Mobile message renderer twin. Wider bubbles (user 85%, assistant/tool 92%) for phone width, always-readable copy/delete (opacity-70 + active-press, no hover). Assistant author header removed (T611) — no orange dot/'Context Pilot' label; timestamp sits in the action row beneath the body. Body + tool card indent pl-1. Same 3 renderers + inline file-upload chip splicing; MessageFileChip + splitMessageSegments from @/mobile-components/threads/fileUpload (leak guard).
+  last_edited_ms: 1784708473284
 836f1dd9f00762cb:
   path: web/eslint.config.ts
   description: Frontend ESLint flat config — Rust-parity strict stack (branch web-lint), RATCHET P0→P13. P3 strictTypeChecked+stylisticTypeChecked. P4 anti-cheat (eslint-comments no-use, ban-ts-comment). P5 unicorn. P6 React (@eslint-react/react-hooks/jsx-a11y). P7 correctness+security (regexp/promise/import-x+no-cycle/n/security/no-unsanitized/no-secrets). P8 structural budgets (max-lines 500 + complexity/params/depth/statements). Untyped plugins cast to named-property shape + declared in types.d.ts. globalIgnores dist+generated/**+e2e.
