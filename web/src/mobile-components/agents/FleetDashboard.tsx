@@ -12,12 +12,12 @@ import {
   X,
 } from "lucide-react"
 import { ScrollArea } from "@/mobile-components/ui/scroll-area"
+import { FrostedBottomBar } from "@/mobile-components/shell/FrostedBottomBar"
+import { useElementHeight } from "@/lib/live/useElementHeight"
 import { accentVar, fmtCost, FLEET_MAX_W } from "@/lib/support/panelMeta"
 import {
   useMetrics,
-  useRetiredFleet,
   useRetireAgent,
-  useUnretireAgent,
   useAgentMeta,
   useCreateAgent,
 } from "@/lib/live"
@@ -25,6 +25,7 @@ import { avatarUrl } from "@/lib/api"
 import type { Agent, AgentStatus } from "@/lib/types"
 import { cn, prefersReducedMotion } from "@/lib/utils"
 import { useSwipeRow } from "@/lib/live/useSwipeRow"
+import { RetiredSection } from "./FleetRetired"
 
 const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
   working: { label: "Working", color: "var(--interactive)" },
@@ -67,6 +68,10 @@ export function FleetDashboard({
   const [toast, setToast] = useState<string | null>(null)
   const createAgent = useCreateAgent()
   const inputRef = useRef<HTMLInputElement>(null)
+  // Floating glass bottom bar (T637): reserve a 1.5× spacer sized from its
+  // measured height so the last row scrolls clear of the frosted bar.
+  const barRef = useRef<HTMLDivElement>(null)
+  const barH = useElementHeight(barRef)
 
   const flash = (m: string) => {
     setToast(m)
@@ -167,6 +172,10 @@ export function FleetDashboard({
           )}
 
           <RetiredSection onFlash={flash} />
+
+          {/* Bottom spacer = 1.5× the floating bar height, so the last row can
+              always scroll clear of the frosted glass bar (T637). */}
+          <div aria-hidden style={{ height: barH * 1.5 }} />
         </div>
       </ScrollArea>
 
@@ -175,7 +184,10 @@ export function FleetDashboard({
           name for a new agent. A create button appears only once the field is
           non-empty; tapping it — or pressing Return — spawns an agent with that
           name and clears the field. */}
-      <div className="flex shrink-0 items-center gap-2 border-t border-border/70 px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <FrostedBottomBar
+        ref={barRef}
+        className="flex items-center gap-2 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+      >
         <div className="flex flex-1 items-center gap-2 rounded-xl bg-muted/60 px-3 py-2 text-[16px]">
           <Search className="size-4 shrink-0 text-muted-foreground/60" />
           <input
@@ -218,7 +230,7 @@ export function FleetDashboard({
             )}
           </button>
         )}
-      </div>
+      </FrostedBottomBar>
 
       <Toast message={toast} />
     </div>
@@ -382,85 +394,6 @@ function HealthDot({ agentId }: { agentId: string }) {
   const { data } = useMetrics(agentId)
   if (!data || !healthCondition(data)) return null
   return <AlertTriangle className="size-3.5 shrink-0 text-(--warn)" aria-label="Health warning" />
-}
-
-/** Retired (archived) agents — same item styling, muted, shown only when at
- *  least one is retired (T271). A retired agent has no live process to open, so
- *  the row isn't tap-to-open; a swipe-left reveals its single Unretire action. */
-function RetiredSection({ onFlash }: { onFlash: (m: string) => void }) {
-  const { data: retired } = useRetiredFleet()
-  if (!retired || retired.length === 0) return null
-
-  return (
-    <section className="mt-4 flex flex-col">
-      <div className="flex items-center gap-2 px-4 pb-1">
-        <h2 className="text-[12.5px] font-semibold tracking-[0.06em] text-muted-foreground/80 uppercase">
-          Retired
-        </h2>
-        <span className="rounded-full bg-muted/60 px-1.5 py-0.5 text-[10.5px] font-medium text-muted-foreground/70">
-          {retired.length}
-        </span>
-      </div>
-      <ul className="flex flex-col">
-        {retired.map((a) => (
-          <li key={a.id}>
-            <RetiredSwipeRow agent={a} onFlash={onFlash} />
-          </li>
-        ))}
-      </ul>
-    </section>
-  )
-}
-
-/** A retired agent row — swipe-left reveals a single Unretire action (respawns
- *  it on its kept folder). No tap-to-open (there's no live process). */
-function RetiredSwipeRow({ agent, onFlash }: { agent: Agent; onFlash: (m: string) => void }) {
-  const { rowRef, close, bind } = useSwipeRow(68)
-  const unretire = useUnretireAgent()
-
-  const onUnretire = () => {
-    close()
-    if (unretire.isPending) return
-    unretire.mutate(agent.id, {
-      onSuccess: () => onFlash(`Bringing ${agent.name} back — it will reconnect in a moment`),
-      onError: (e) => onFlash(e instanceof Error ? e.message : `Could not unretire ${agent.name}`),
-    })
-  }
-
-  return (
-    <div className="relative overflow-hidden">
-      <div className="absolute inset-y-0 right-0 flex" style={{ width: 68 }}>
-        <button
-          onClick={onUnretire}
-          disabled={unretire.isPending}
-          className="flex w-full flex-col items-center justify-center gap-0.5 bg-(--interactive) text-[11px] font-medium text-white disabled:opacity-60"
-        >
-          {unretire.isPending ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <ArchiveRestore className="size-4" />
-          )}
-          Unretire
-        </button>
-      </div>
-      <div
-        ref={rowRef}
-        {...bind}
-        className="relative flex touch-pan-y items-center gap-3 bg-background px-4 py-3 select-none"
-      >
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted/50 text-muted-foreground">
-          <FolderGit2 className="size-5" />
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col leading-tight">
-          <span className="truncate text-[16px] font-medium text-foreground/75">{agent.name}</span>
-          <span className="truncate text-[12.5px] text-muted-foreground/60">{agent.folder}</span>
-        </span>
-        <span className="shrink-0 rounded-full bg-muted/60 px-2 py-0.5 text-[10.5px] font-medium text-muted-foreground/70">
-          Retired
-        </span>
-      </div>
-    </div>
-  )
 }
 
 /**

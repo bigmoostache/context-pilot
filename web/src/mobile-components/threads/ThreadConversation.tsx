@@ -1,4 +1,4 @@
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, memo, useCallback, useMemo, useRef, useState } from "react"
 import { ScrollArea } from "@/mobile-components/ui/scroll-area"
 import { Message } from "@/mobile-components/conversation/Message"
 import { ThreadComposer, type CommandSuggestion } from "@/mobile-components/threads/ThreadComposer"
@@ -10,6 +10,7 @@ import { uploadToNode, type UploadedFile } from "@/mobile-components/threads/fil
 import { FormMessageRow } from "@/mobile-components/threads/forms/FormMessageRow"
 import { isFormMessage } from "@/mobile-components/threads/forms/helpers"
 import { useScrollPin, useThreadForms } from "@/mobile-components/threads/forms/useThreadForms"
+import { useElementHeight } from "@/lib/live/useElementHeight"
 import { parseAutoLine, segmentLog, toChatMessage } from "@/lib/support/threadMessages"
 import type { ThreadDetail, ThreadMsg } from "@/lib/types"
 
@@ -205,23 +206,13 @@ export function ThreadConversation({
   const segments = useMemo(() => segmentLog(thread.log), [thread.log])
 
   // The composer floats as a glass overlay over the bottom of the conversation
-  // (so its backdrop-blur has content to frost). Measure its live height with a
-  // ResizeObserver and reserve 1.5× that as a bottom spacer in the scroll
-  // content, so the last message can always be scrolled clear of the floating
-  // composer (T637). The observer callback is event-driven (not a render-phase
-  // setState), and the height grows as the textarea auto-grows.
+  // (so its backdrop-blur has content to frost). Measure its live height and
+  // reserve 1.5× that as a bottom spacer in the scroll content, so the last
+  // message can always be scrolled clear of the floating composer (T637). The
+  // measurement rides the shared useElementHeight hook (tracks the textarea as
+  // it auto-grows).
   const composerRef = useRef<HTMLDivElement>(null)
-  const [composerH, setComposerH] = useState(0)
-  useEffect(() => {
-    const el = composerRef.current
-    if (!el) return
-    const ro = new ResizeObserver((entries) => {
-      const h = entries[0]?.contentRect.height
-      if (typeof h === "number") setComposerH(h)
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
+  const composerH = useElementHeight(composerRef)
 
 
   // Form derivations: answered-state lookup + submit handler (docs/forms.md §5).

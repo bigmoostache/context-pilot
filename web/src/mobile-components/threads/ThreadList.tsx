@@ -14,6 +14,8 @@ import {
 } from "lucide-react"
 import { ScrollArea } from "@/mobile-components/ui/scroll-area"
 import { CornerButton } from "@/mobile-components/shell/CornerButton"
+import { FrostedBottomBar } from "@/mobile-components/shell/FrostedBottomBar"
+import { useElementHeight } from "@/lib/live/useElementHeight"
 import type { ThreadDetail } from "@/lib/types"
 import { cn, prefersReducedMotion } from "@/lib/utils"
 import { previewOf } from "@/lib/support/threadMessages"
@@ -81,6 +83,12 @@ export function ThreadList({
   onPause,
   onNewThread,
 }: ThreadListProps) {
+  // The bottom search/create bar floats as a glass overlay (T637), so reserve a
+  // 1.5× bottom spacer in the scroll content sized from its measured height —
+  // the last row must scroll clear of the frosted bar. Mirrors the composer.
+  const barRef = useRef<HTMLDivElement>(null)
+  const barH = useElementHeight(barRef)
+
   const q = query.trim().toLowerCase()
   const matches = (t: ThreadDetail) =>
     q === "" || t.name.toLowerCase().includes(q) || previewOf(t).toLowerCase().includes(q)
@@ -110,7 +118,7 @@ export function ThreadList({
   }, [showArchived])
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
       {/* Top-left corner control: leave the thread sidebar for the agents (fleet)
           page (T631). Shares the safe-area-aware CornerButton so it's reachable
           even in standalone; the archived toggle mirrors it on the right. */}
@@ -177,6 +185,9 @@ export function ThreadList({
               ))}
             </ul>
           )}
+          {/* Bottom spacer = 1.5× the floating bar height, so the last row can
+              always scroll clear of the frosted glass bar (T637). */}
+          <div aria-hidden style={{ height: barH * 1.5 }} />
         </div>
       </ScrollArea>
 
@@ -185,7 +196,10 @@ export function ThreadList({
           thread. A create button appears only once the field is non-empty (live
           view); tapping it — or pressing return — creates a thread with that
           name and clears the field. */}
-      <div className="flex shrink-0 items-center gap-2 border-t border-border/70 px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <FrostedBottomBar
+        ref={barRef}
+        className="flex items-center gap-2 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+      >
         <div className="flex flex-1 items-center gap-2 rounded-xl bg-muted/60 px-3 py-2 text-[16px]">
           <Search className="size-4 shrink-0 text-muted-foreground/60" />
           <input
@@ -225,7 +239,7 @@ export function ThreadList({
             <Plus className="size-5" />
           </button>
         )}
-      </div>
+      </FrostedBottomBar>
     </div>
   )
 }

@@ -402,6 +402,10 @@
   path: crates/cp-mod-ocr/src/tools.rs
   description: OCR tool dispatch. flame!("ocr_exec"). Validates params, spawns background thread for Datalab API, registers OcrWatcher (non-blocking). Returns immediately with spine notification on completion.
   last_edited_ms: 0
+04da81a88478ac51:
+  path: web/src/mobile-components/threads/ThreadList.tsx
+  description: 'Mobile ThreadList twin. iMessage list. Leading status dot, title+time+2-line preview, swipe-left Archive+Pause/Delete (useSwipeRow). Top-left CornerButton (LayoutGrid, onGoToAgents) to fleet; top-right archived toggle. Bottom field DOUBLES as search+create (T633): typing filters live AND is new-thread name; round + button + Enter gated on query.trim()!=='''' && !showArchived; onNewThread(name).'
+  last_edited_ms: 0
 04e8425ae9fe986c:
   path: crates/cp-orchestrator/src/transport/maint/mod.rs
   description: 'IT maintenance plane (:9090) router — LAN-only + Admin-gated, no CORS (same-origin SPA). handle(): LAN guard → SPA static serve → Admin auth gate → route. Routes: status/login (public), me/password/me-patch/logout, identity get/set, ca/fingerprint + ca.crt raw, finalize. Product routes structurally absent (404). is_lan_addr predicate (loopback/RFC-1918/link-local/ULA). Full test suite (role gate, finalize pre-reqs, LAN predicate).'
@@ -1010,6 +1014,10 @@
   path: ui/src/components/shell/TopBar.tsx
   description: macOS title bar. App mark (Home)→fleet. At fleet altitude no agent selected → 'Mission control' caption (switcher + branch/cost hidden); inside an agent shows AgentSwitcher + per-agent segmented switcher Threads·Cockpit·Finder + branch+cost. Far-right Settings gear opens ConfigModal (always-mounted, controlled open). ThemeToggle.
   last_edited_ms: 1781524763692
+0ce89e743d38d868:
+  path: web/index.html
+  description: Vite HTML entry (desktop). Root div + main.tsx module script.
+  last_edited_ms: 0
 0cea40883be52574:
   path: web/src/mobile-components/auth/AgentAclSection.tsx
   description: Mobile per-agent ACL twin (embedded in mobile AgentModal). Hover-revealed actions -> always-visible, py-2.5 touch rows, 16px grant-form selects, single-column. Same list/grant/revoke/toggle-role hooks.
@@ -1646,6 +1654,10 @@
   path: crates/cp-mod-entities/Cargo.toml
   description: 'Entities module deps: cp-base, cp-render, cp-mod-utilities, cp-mod-search, rusqlite (bundled), crossterm, serde_json, log.'
   last_edited_ms: 1780592402505
+14e3cfc073c65d51:
+  path: web/src/mobile-components/conversation/Message.tsx
+  description: Mobile message renderer twin. Wider bubbles (user 85%, assistant/tool 92%) for phone width, always-readable copy/delete (opacity-70 + active-press, no hover). Assistant author header removed (T611) — no orange dot/'Context Pilot' label; timestamp sits in the action row beneath the body. Body + tool card indent pl-1. Same 3 renderers + inline file-upload chip splicing; MessageFileChip + splitMessageSegments from @/mobile-components/threads/fileUpload (leak guard).
+  last_edited_ms: 0
 14f377f7345a6b05:
   path: web/eslint.config.ts
   description: 'Frontend ESLint flat config — Rust-parity strict stack (branch web-lint), RATCHET P0→P13. P3: js.recommended + typescript-eslint strictTypeChecked + stylisticTypeChecked + reactRefresh.vite, projectService type-aware. P4 anti-cheat: eslint-comments no-use+no-unlimited-disable, ban-ts-comment hardened all-4-true, reportUnusedDisableDirectives error. P5 unicorn.configs.recommended: 2 calibrations (filename-case camel/pascal, catch-error-name name:e ignore err/error) + 8 tree-wide disables (name-replacements, no-null, consistent-boolean-name, prefer-global-this, no-non-function-verb-prefix, no-array-reduce, prefer-await, no-nested-ternary—the last IRRECONCILABLE with Prettier which strips the parens unicorn demands) + scoped ui/** (filename-case, max-nested-calls) + finderFs.ts (no-incorrect-template-string-interpolation). react-hooks classic pair. globalIgnores dist+generated/**+e2e/**+playwright.config.ts.'
@@ -6878,6 +6890,10 @@
   path: crates/cp-mod-callback/src/firing.rs
   description: 'Callback firing logic. fire_callback() spawns script via console server, registers CallbackWatcher. Dedup: kill_existing_callback() kills old process/watcher/session before re-spawn via active_sessions tracking. FireResult{session_key, replaced}. fire_async/blocking_callbacks() for batch dispatch with replacement summaries. CallbackWatcher: exit 0/7→kill_session (cleanup), exit !=0→deferred panel, timeout→deferred panel.'
   last_edited_ms: 0
+56b4ddd98503872e:
+  path: web/src/mobile-components/Root.tsx
+  description: Mobile tree root — real divergent twin (P4). Provider-contract boundary (mounts same Theme/Auth/Account/DevMode/Overlay/Tooltip). MobileShell + BottomTabBar (fleet/threads/finder) vs desktop top-tabs. Same cp-view/cp-agent localStorage.
+  last_edited_ms: 0
 56bb544e70a90d62:
   path: crates/cp-mod-callback/src/storage.rs
   description: YAML-backed persistent storage for callback definitions. Keyed by name (BTreeMap alphabetical). upsert/remove/populate/migrate functions. Script file read/write helpers (strip_script_header, write_script_file). cleanup_old_hash_keys migration.
@@ -7758,6 +7774,10 @@
   path: src/app/context/mod.rs
   description: Context preparation + unified freeze system. FreezeConditions (queue/tempo). Panel ordering stabilization. Per-panel content hashing + freeze budgets. Cache cost tracking via prefix-match. Culprit detection records panel type + max_freezes + break_kind (CacheBreakKind enum). Disappearance detection via previous_panel_id_types. flame!("prepare_context"). Reverie path branches.
   last_edited_ms: 1783093718401
+632a7ffb0ccc2de1:
+  path: web/package.json
+  description: 'Frontend deps. scripts: dev/build(tsc -b && vite build)/lint/preview + P2 format/format:check (prettier). engines.node ''^22.16.0 || >=24.0.0'' (P7 n/no-unsupported-features: exact code-driven floor for import.meta.dirname — n credits the ^22.16 backport + >=24, the 23.x gap is dead). @tanstack/react-query, react 19.2, tailwindcss 4.3, shadcn, vite 8, playwright, full eslint ratchet plugin roster + prettier + web-vitals.'
+  last_edited_ms: 0
 63311b87496dee1a:
   path: .git/index
   description: Git index (binary). Not source.
@@ -8314,6 +8334,10 @@
   path: crates/cp-oplog/src/replay.rs
   description: 'Oplog replay (GAP1/I5): Recovered{rev_head,heads,seen,roster}. fold_entry: Checkpoint=authoritative clone_from heads+seen+roster, MessageCreated=set_thread_head + RosterThread::fold_message, ThreadCreated/Archived/Restored/Paused/Resumed/Deleted/StatusChanged=RosterThread fold helpers (roster rebuilt from deltas), CommandEffect|SeenMark=seen.mark, others no-op. Fast-path reads only newest checkpoint-bearing segment; roster survives compaction because the checkpoint Snapshot carries it. Tests incl replay_rebuilds_roster_from_thread_deltas + roster_survives_compaction_via_checkpoint.'
   last_edited_ms: 1782315774643
+6a9c916ddfbc2004:
+  path: web/src/mobile-components/agents/ModelPicker.tsx
+  description: Mobile ModelPicker twin — scrollable provider rail (no-scrollbar overflow-x-auto), py-3 touch model cards, hover->active. Two-level registry shape + empty-guard identical, pure @/lib. Shared by mobile AgentModal + config GeneralPane.
+  last_edited_ms: 0
 6aa1bb0cafe85297:
   path: web/src/components/agents/FleetShell.tsx
   description: 'Fleet shell — sidebar-less Agents⇄Prompts toggle. Accepts agents prop, forwards to FleetDashboard. Passes agents[0]?.id to PromptsPage for live library. web-lint P7: FLEET_MAX_W moved OUT to lib/support/panelMeta (imported from there now) to break the FleetShell↔{FleetDashboard,PromptsPage} import cycle.'
@@ -9426,6 +9450,10 @@
   path: crates/cp-mod-bridge/src/boot.rs
   description: 'Boot — agent boot sequence + held resources. start_in flock bridge.lock (bounded retry) → OplogService::spawn → bind stream.sock → mint cap_token/boot_id → write registry → heartbeat Beacon → submit_durable(Lifecycle::Running). acquire_lock(path,max_retries): max_retries>0 = patient (sleep LOCK_RETRY_BACKOFF between attempts, the normal boot path); 0 = fail-fast single non-blocking flock (try_start, the background recovery path that must never sleep on the main loop). start_inner(folder,agents,model,retries) shared body; start()=patient, try_start()=fail-fast. Drop submit_durable(Stopping) before fs cleanup. Tests incl stale_socket_is_replaced + try_start_fails_fast_when_locked_then_recovers_when_freed (fail-fast refuses under contention in < one backoff, succeeds once lock freed).'
   last_edited_ms: 1781910990147
+77ec0e4aecee6b7f:
+  path: web/src/lib/utils.ts
+  description: 'Shared web utils. cn() (clsx+tailwind-merge). T367 zip-on-drop: zipFiles(files)->Promise<File> bundles dropped file(s) into ONE .zip client-side via fflate (DEFLATE level 6); single file -> `<name>.zip` (macOS Compress convention), many -> `dropped-<n>-files.zip`; uniqueZipEntry dedups colliding basenames inside the archive; rejects on read/fflate error (caller falls back to raw upload). T359 list logic: resolveEnter (send/newline/continue/remove, ordered marker auto-increment numeric+bijective-base26 alpha, unordered pretty bullets •◦▪‣ per depth) + resolveTab (Tab/Shift+Tab indent/outdent, ordered resumes sibling count via siblingOrderedMarkerAtDepth) + lineBounds + parseListLine. Consumed by ThreadComposer + ThreadConversation.'
+  last_edited_ms: 0
 780df92c8c9eccb3:
   path: Cargo.lock
   description: Workspace lockfile
@@ -9509,6 +9537,10 @@
 78cfc068e4c9b991:
   path: deploy_local.sh
   description: 'Local deploy script. 4 steps: build release, install to /usr/local/bin/cpilot, setup global gitignore, export API keys from .env to ~/.bashrc. Guards against running as root.'
+  last_edited_ms: 0
+78d55338105b2e8f:
+  path: web/src/mobile-components/agents/AgentModal/index.tsx
+  description: Mobile AgentModal index twin — desktop centered 460/1120px floating card becomes full-screen sheet (fixed inset-0, no max-width); body scrolls. Selection+mutation wiring shared via ./controller+./actions.
   last_edited_ms: 0
 78dfa1d87e263038:
   path: web/src/lib/api/finder.ts
@@ -10074,6 +10106,10 @@
   path: crates/cp-mod-prompt/src/library_panel.rs
   description: 'LibraryPanel: renders agent/skill/command tables, prompt editor view'
   last_edited_ms: 0
+7fba0f7d848b95db:
+  path: web/src/mobile-components/agents/FleetDashboard.tsx
+  description: 'Mobile FleetDashboard twin — iOS item-list (T632). Flat borderless list, each agent a full-width tappable row: avatar+status presence-dot, name, model·task subtitle, cost+chevron. Tap=open; swipe-left (useSwipeRow ACTION_W=136) reveals Manage/Retire. RetiredSwipeRow swipe=Unretire. Bottom field DOUBLES as search+create (T633 parity): typing filters roster live AND is new-agent name; round + button + Enter gated on query.trim()!==''''; create() mutates {name} (folder server-side, model default), clears field. autoCreate now focuses field (NewAgentSheet discarded). anime.js row cascade (once, ref-guard) + Toast spring. HealthDot amber glyph. 495 lines.'
+  last_edited_ms: 0
 7fd5238bda68c982:
   path: ui/src/components/shell/UserMenu.tsx
   description: 'Account avatar menu (T30) — replaced the old top-right Settings gear. Reads the live user from the shared account context (useAccount). Portaled Base-UI dropdown: gradient-initials AvatarMark trigger opens a floating menu with an identity header (name/email + Company/Personal pill) and Profile / Settings / Sign-out items. Settings still opens ConfigModal (reversible). Exports UserMenu + AvatarMark (shared with ProfileModal).'
@@ -10165,6 +10201,10 @@
 80d5cefd79765ed5:
   path: docs/genai-france-vibe.md
   description: GenAI France 2026 conference analysis — lineup, vibe, talk positioning, title naming patterns.
+  last_edited_ms: 0
+80d9b9eca2b1fb11:
+  path: web/src/mobile-components/threads/ThreadConversation.tsx
+  description: Mobile ThreadConversation twin — single full-width column (no FileSidebar rail), no OS drag-drop. Memoized AutoRun/MessageRow, scroll-pin, forms plumbing all shared desktop behaviour.
   last_edited_ms: 0
 80e1db9bf23550ca:
   path: src/app/prompt/repair.rs
@@ -10529,6 +10569,10 @@
 85772adaf2cec2f4:
   path: .git/index
   description: Git index (binary). Not source.
+  last_edited_ms: 0
+8579125fcdd77194:
+  path: web/src/mobile-components/ui/dialog.tsx
+  description: Mobile Dialog twin. Centered spring card -> bottom-anchored sheet (fixed inset-x-0 bottom-0, rounded-t-2xl, max-h-90vh scroll, safe-area pb, slide-up translate). Consumers overriding full-screen still win (twMerge last). Same Base UI portal/focus/scroll-lock/Esc.
   last_edited_ms: 0
 858e84c3d8bc466e:
   path: src/app/context/mod.rs
@@ -13158,6 +13202,10 @@ a6dcf235ac5b44fc:
   path: crates/cp-mod-logs/src/types.rs
   description: 'Log entry types. LogEntry: id, timestamp_ms, datetime, content, importance (no tags). LogsState: logs Vec + next_log_id counter. ms_to_iso() via cp_mod_utilities::time.'
   last_edited_ms: 0
+a6e42759a129e2f6:
+  path: web/src/index.css
+  description: Tailwind v4 + tw-animate. Two palettes (:root Cream light / .dark Dungeon Forge) as CSS token blocks; semantic tokens (signal/ok/warn/danger/surface). Finder micro-motion keyframes (finder-pop/ql-pop/menu-pop/ants/checker), modal-pop, highlight.js .hljs-* theme mapped to tokens (T280).
+  last_edited_ms: 0
 a6e931ee84d698fc:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
@@ -13366,6 +13414,10 @@ a9a05a7e9a12843e:
   path: web/src/components/shell/costs/format.ts
   description: Cost-dashboard value formatters (fmtDollar/fmtTokens). Own module so importing them never trips Fast Refresh's component-only-export rule (web-lint P0).
   last_edited_ms: 1783350174145
+a9a36fa1e6695e0b:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 a9af601f39a35773:
   path: web/src/components/finder/Finder.tsx
   description: 'Per-agent Finder file manager (confined to agent realm). useFs(agentId, relCwd) for live listings. T273 upload: toolbar button + drag-drop via hidden multi-file <input> + useUploadFiles → uploadFiles(). T275 internal drag-and-drop: useMoveItems → moveItemsInto(paths,destFolder) move.mutate (toast progress/result, clears selection); surface onDragOver/onDrop now GATED on dataTransfer.types.includes(''Files'') so ONLY external OS-file drags raise the ''Drop to upload'' overlay — internal MOVE_MIME drags pass through to folder drop targets. viewProps passes onMove. cmd/ctrl + shift multiselect + useMarquee rectangle selection already existed → batch moves drag the whole selection. Both FinderPreview usages pass agentId (T272). Quick Look CLOSED by default.'
@@ -14114,6 +14166,10 @@ b2efbee25bb64c0f:
   path: web/src/components/finder/internal/helpers.ts
   description: 'Finder shared types + pure helpers: Tab/PinnedFolder interfaces, CLICK_SETTLE_MS, NEW_FOLDER_SENTINEL, pinsKey/loadPins (localStorage), buildCrumbs, pathName. web-lint P3: req<T>(arr,i) invariant accessor (arr.at(i), throws on absent) — encodes a length-guard-proven invariant with a runtime check instead of a banned non-null assertion (!); used by useFinderActions back/forward.'
   last_edited_ms: 0
+b2f19803ac1f615f:
+  path: web/src/mobile-components/threads/ThreadComposer.tsx
+  description: 'Mobile ThreadComposer twin — iMessage-style input row (T615): standalone round ''+'' attach button left, single fully-rounded pill (border bg-card) holding 16px textarea + inline send button tucked inside the pill''s right edge, send shown only when sendable. Draft/keyboard/command-bubble logic byte-identical via useComposer.'
+  last_edited_ms: 0
 b303c82afde350e5:
   path: ui/src/components/shell/ConfigModal.tsx
   description: 'Settings modal (macOS System-Settings style): category rail (General/Model Providers/Search & Embeddings/Document AI/Web & Scraping/Integrations) + detail pane. Surfaces all CP config params — provider keys (Anthropic, Claude Code OAuth, Grok, Groq, DeepSeek, MiniMax), Voyage, Meilisearch status, Datalab, Brave, Firecrawl, GitHub — plus default-model picker + autonomy toggles. Masked keys w/ reveal, Connected/Not-set pills, opt-rise stagger, modal-pop/backdrop-fade motion. Design-only. Opened from TopBar gear.'
@@ -14669,6 +14725,10 @@ b9826fb573b2e9d0:
 b990d1b42dca6b2c:
   path: .claude/settings.local.json
   description: Claude Code project-local settings
+  last_edited_ms: 0
+b9ae0fcccd1189b4:
+  path: web/src/mobile-components/agents/AgentModal/parts.tsx
+  description: Mobile AgentModal parts twin — manage 2-col grid (form|vitals+ACL) stacks single column; 16px name input (iOS zoom), 36px close, safe-area footer. Header/Body/Footer + Controller identical, relative ../ModelPicker + ../../auth/../../shell resolve to mobile siblings.
   last_edited_ms: 0
 b9dc8dffec8374e4:
   path: src/ui/threads_view.rs
@@ -16201,6 +16261,10 @@ cd119edce88e0ed4:
 cd1ed76ac0e3ed4a:
   path: crates/cp-mod-callback/src/lib.rs
   description: 'Callback module. 3 tools: upsert/open/close editor. Depends on console. CallbackState: definitions (shared) + editor_open (per-worker). Glob-matched auto-fire on file edits. Callbacks always active.'
+  last_edited_ms: 0
+cd1f3f3f49d3dd05:
+  path: web/src/mobile-components/threads/ThreadsView.tsx
+  description: Mobile ThreadsView twin — conversation-primary + left drawer (T609). Drawer toggled by fixed top-left CornerButton, anime.js spring settle. onNewThread creates directly + closes drawer (T633, NewThreadDialog removed). onGoToAgents passed to ThreadList. Logic from shared @/lib/live/threadView.
   last_edited_ms: 0
 cd333d308467c2b4:
   path: src/app/run/tools/cleanup.rs

@@ -6,6 +6,7 @@ import { ArrowUp, Plus, Loader2, Clock, Pause } from "lucide-react"
 import type { ThreadStatus } from "@/lib/types"
 import { ComposerBubbles } from "@/mobile-components/threads/fileUpload"
 import type { UploadedFile, CommandSuggestion } from "@/mobile-components/threads/fileUpload/helpers"
+import { FrostedBottomBar } from "@/mobile-components/shell/FrostedBottomBar"
 import { parseDraft } from "@/lib/support/threadMessages"
 
 // CommandSuggestion lives beside the file-chip abstraction in ./fileUpload (both
@@ -283,14 +284,14 @@ function ComposerInputRow({
         disabled={!onAttach}
         title="Attach files"
         aria-label="Attach files"
-        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-card/60 text-muted-foreground/70 backdrop-blur-[6px] transition-colors active:bg-muted active:text-(--interactive) disabled:cursor-default disabled:opacity-40"
+        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-card/60 text-muted-foreground/70 backdrop-blur-[3px] transition-colors active:bg-muted active:text-(--interactive) disabled:cursor-default disabled:opacity-40"
       >
         <Plus className="size-5.5" strokeWidth={2.25} />
       </button>
 
       {/* The input pill — thin border, subtle fill, fully rounded. Send button
           lives INSIDE the pill's right edge (iMessage convention). */}
-      <div className="flex min-w-0 flex-1 items-end gap-1 rounded-[1.35rem] border border-border bg-card/70 py-1 pr-1 pl-3.5 backdrop-blur-[6px] focus-within:border-(--signal)/60">
+      <div className="flex min-w-0 flex-1 items-end gap-1 rounded-[1.35rem] border border-border bg-card/70 py-1 pr-1 pl-3.5 backdrop-blur-[3px] focus-within:border-(--signal)/60">
         <textarea
           ref={textareaRef}
           value={text}
@@ -325,44 +326,6 @@ function ComposerInputRow({
           </button>
         )}
       </div>
-    </div>
-  )
-}
-
-/**
- * True *progressive* backdrop-blur — max at the bottom fading to zero at the top
- * (T637). CSS has no gradient `backdrop-filter`, so this is the layered-mask
- * trick: stacked layers, each a STRONGER `backdrop-blur` masked with a
- * `linear-gradient` reaching LESS far up, so the heaviest blur pools at the
- * bottom and ramps smoothly to none at the top. `-webkit-` prefixes on
- * `backdropFilter` + `maskImage` are load-bearing on iOS Safari.
- */
-function ProgressiveBlur() {
-  // Each layer: [blur px, how far up the mask stays opaque]. Stronger blur =
-  // shorter reach, so heavier blur pools at the bottom.
-  const layers: [number, number][] = [
-    [0.5, 100],
-    [1.5, 75],
-    [3, 50],
-    [6, 25],
-  ]
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      {layers.map(([blur, reach], i) => {
-        const grad = `linear-gradient(to top, black 0%, transparent ${reach}%)`
-        return (
-          <div
-            key={i}
-            className="absolute inset-0"
-            style={{
-              backdropFilter: `blur(${blur}px) saturate(150%)`,
-              WebkitBackdropFilter: `blur(${blur}px) saturate(150%)`,
-              maskImage: grad,
-              WebkitMaskImage: grad,
-            }}
-          />
-        )
-      })}
     </div>
   )
 }
@@ -471,8 +434,7 @@ export function ThreadComposer({
   }
 
   return (
-    <div className="relative bg-linear-to-t from-background/90 via-background/45 to-transparent px-3 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
-      <ProgressiveBlur />
+    <FrostedBottomBar className="px-3 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
       {/* Unified bubble row (T350) — file chips + /command suggestions +
           create-command pill in ONE container. */}
       {(pendingFiles.length > 0 || commandsActive) && (
@@ -495,6 +457,6 @@ export function ThreadComposer({
         onSubmit={composer.handleSubmit}
         onAttach={onAttach}
       />
-    </div>
+    </FrostedBottomBar>
   )
 }
