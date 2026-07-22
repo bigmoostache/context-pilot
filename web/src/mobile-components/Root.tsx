@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react"
 import { LayoutGrid, MessagesSquare, FolderTree } from "lucide-react"
-import { TopBar } from "@/mobile-components/shell/TopBar"
+
 import { FleetDashboard } from "@/mobile-components/agents/FleetDashboard"
 import { ThreadsView } from "@/mobile-components/threads/ThreadsView"
 import { Finder } from "@/mobile-components/finder/Finder"
@@ -70,8 +70,8 @@ const TAB_LABEL: Record<MobileView, string> = {
  * Same view-routing model as desktop (fleet → threads/finder for a selected
  * agent, persisted to the same `cp-view` / `cp-agent` localStorage keys so the
  * two trees agree on last-view across a reload), but the chrome is mobile-first:
- * a slim {@link TopBar} on top and a thumb-reachable {@link BottomTabBar} instead
- * of the desktop's horizontal tab cluster.
+ * no header row at all — a thumb-reachable {@link BottomTabBar} carries both
+ * navigation and view identity, replacing the desktop's horizontal tab cluster.
  *
  * The disconnect-overlay + live-vitals plumbing desktop `AppShell` carries is
  * elided here for the P4 proof-of-concept: views receive a non-disconnected,
@@ -156,7 +156,8 @@ function MobileShell() {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
-      <TopBar title={TAB_LABEL[effectiveView]} onMenu={() => changeView("fleet")} />
+      {/* No top bar on mobile — the BottomTabBar carries nav + view identity, so
+          a header row would only steal vertical space (T611). */}
       <div className="min-h-0 flex-1 overflow-auto">{body()}</div>
       <BottomTabBar view={effectiveView} onViewChange={changeView} />
     </div>
