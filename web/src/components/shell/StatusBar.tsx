@@ -1,5 +1,14 @@
-import { Boxes, Loader2, MessagesSquare, RefreshCw, Wallet } from "lucide-react"
+import { Boxes, Bot, ChevronsUpDown, Loader2, MessagesSquare, RefreshCw, Wallet } from "lucide-react"
 import { fmtCost, fmtTokens } from "@/lib/support/panelMeta"
+import { useLibrary, sendCommand } from "@/lib/live"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import type { Agent, StreamPhase } from "@/lib/types"
 
 const phaseMeta: Record<StreamPhase, { label: string; color: string }> = {
@@ -24,6 +33,7 @@ export function StatusBar({
   fleet = false,
   agents = [],
   activeAgent,
+  activeAgentId = "",
   connected = true,
   onRestart,
   restarting = false,
@@ -32,6 +42,8 @@ export function StatusBar({
   fleet?: boolean
   agents?: Agent[]
   activeAgent?: Agent | undefined
+  /** The focused agent's id — drives the behaviour selector's library query + command. */
+  activeAgentId?: string
   /** False when the SSE push plane for this agent is down. */
   connected?: boolean
   /** Fires the restart API + full reconnect lifecycle (same as AgentModal Restart). */
@@ -46,6 +58,7 @@ export function StatusBar({
   ) : (
     <AgentStatus
       agent={activeAgent}
+      agentId={activeAgentId}
       connected={connected}
       onRestart={onRestart}
       restarting={restarting}
@@ -113,12 +126,14 @@ function agentVitals(agent?: Agent) {
 /** Single-agent session vitals — shown while an agent is focused. */
 function AgentStatus({
   agent,
+  agentId,
   connected = true,
   onRestart,
   restarting = false,
   loading = false,
 }: {
   agent?: Agent | undefined
+  agentId?: string
   connected?: boolean
   onRestart?: (() => void) | undefined
   restarting?: boolean
@@ -145,12 +160,77 @@ function AgentStatus({
         onRestart={onRestart}
       />
 
+      {agentId ? <BehaviourChip agentId={agentId} /> : null}
+
       <span className="ml-auto flex items-center gap-3">
         <ContextBar used={used} threshold={threshold} budget={budget} hit={hit} miss={miss} />
         <span className="h-3.5 w-px bg-border" />
         <span className="text-muted-foreground tabular-nums">{fmtCost(costUsd)}</span>
       </span>
     </footer>
+  )
+}
+
+/**
+ * Active-behaviour-agent chip + selector — right of the "Ready" indicator.
+ *
+ * Shows the loaded system-prompt agent's name (caveman / default / worker …)
+ * and, on click, a dropdown of the agent's prompt-library behaviour agents.
+ * Picking one issues a `load_behaviour` command down the SAME live path threads
+ * use (`sendCommand → POST /command → apply_command → set_active_agent`), so
+ * this component holds zero business logic (M141): the active flag comes from
+ * the backend's `library()` inspect read, the switch is a fire-and-forget
+ * command whose effect lands back through the library query on the next poll.
+ */
+function BehaviourChip({ agentId }: { agentId: string }) {
+  const { data: library = [] } = useLibrary(agentId)
+  const agentBehaviours = library.filter((item) => item.kind === "agent")
+  const active = agentBehaviours.find((item) => item.active)
+  const activeName = active?.name ?? "default"
+
+  const select = (id: string) => {
+    if (id === active?.id) return
+    void sendCommand(agentId, { kind: "load_behaviour", id }).catch(() => {
+      // Fire-and-forget: a failed switch keeps the current behaviour; the
+      // library query re-reports ground truth on its next poll.
+    })
+  }
+
+  return (
+    <>
+      <span className="h-3.5 w-px bg-border" />
+      <DropdownMenu>
+        <DropdownMenuTrigger className="flex cursor-pointer items-center gap-1.5 rounded-sm px-1.5 py-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground/85 focus:outline-none">
+          <Bot className="size-3.5" />
+          <span className="max-w-[120px] truncate font-medium text-foreground/80">{activeName}</span>
+          <ChevronsUpDown className="size-3 opacity-60" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" side="top" className="min-w-44">
+          <DropdownMenuLabel>System prompt</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {agentBehaviours.length === 0 ? (
+            <DropdownMenuItem disabled>No behaviours</DropdownMenuItem>
+          ) : (
+            agentBehaviours.map((item) => (
+              <DropdownMenuItem
+                key={item.id}
+                onClick={() => select(item.id)}
+                className={item.active ? "font-semibold text-foreground" : ""}
+              >
+                <span className="flex items-center gap-2">
+                  {item.active ? (
+                    <span className="size-1.5 rounded-full bg-(--ok)" />
+                  ) : (
+                    <span className="size-1.5" />
+                  )}
+                  {item.name}
+                </span>
+              </DropdownMenuItem>
+            ))
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
   )
 }
 

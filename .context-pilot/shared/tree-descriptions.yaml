@@ -4802,6 +4802,10 @@
   path: docs/talk/slides/2-3.html
   description: 'Slide: Instantaneous Feedback (HOWs section)'
   last_edited_ms: 1781078806768
+3e24561ca0abefbb:
+  path: crates/cp-mod-prompt/src/lib.rs
+  description: 'Prompt library module: Behaviour_create/agent_load/skill_load. pre_flight dispatch, is_prompt_file canonicalize. `pub mod tools` (T581) so tui bridge reaches tools::set_active_agent for LoadBehaviour.'
+  last_edited_ms: 1784710566797
 3e329d1612c18bf3:
   path: web/src/components/threads/fileUpload/helpers.ts
   description: 'Pure file-upload helpers + types: UploadedFile/CommandSuggestion/MessageSegment interfaces, buildUploadMessage (compose ```file-upload YAML blocks), splitMessageSegments (parse blocks in-place), uploadToNode. No JSX — importable without tripping Fast Refresh.'
@@ -5426,6 +5430,10 @@
   path: web/src/components/threads/ThreadList.tsx
   description: 'Left rail of threads view — ALWAYS OPEN. Working search filters by name+last-preview. Groups: Agent''s turn (MY_TURN), User turn (THEIR_TURN/ACTIVE). Sorted by lastActivityMs descending. Per-row hover Archive/Restore. Footer Archived toggle. New Thread button.'
   last_edited_ms: 1781781907933
+454a6ad1f023a479:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 454c8e34eda03e5a:
   path: web/knip.json
   description: 'knip dead-code/dep config (web-lint P10a). entry e2e/**, project src/**, ignore generated/** + ui/** (vendored). ignoreDependencies: tw-animate-css + @fontsource/ibm-plex-mono (CSS @import-only, knip-blind); type-coverage REMOVED P12e (P11''s package.json script now references it, so knip sees it used — stale ignore hint cleared). ignoreExportsUsedInFile. Hash-locked.'
@@ -6434,6 +6442,10 @@
   path: crates/cp-mod-files/src/tools/file.rs
   description: 'execute_open: accepts string or array for path param. flame!("file_open"). open_single_file: canonicalize, dedup, auto-expand tree folders. Background cache populates content.'
   last_edited_ms: 0
+51c9cc9ab16e6f77:
+  path: src/app/run/threads/commands.rs
+  description: 'Bridge command APPLICATION (K7 mutation half). apply_command dispatches Send/Create/Archive/Restore/Pause/Resume/Delete thread + DeleteMessage + Stop/Configure + LoadBehaviour (T581: apply_load_behaviour → cp_mod_prompt::tools::set_active_agent, footer active-agent switch). Focused-thread instant spine notif.'
+  last_edited_ms: 1784710566924
 51e352af852c07d5:
   path: web/src/lib/mock/extra.ts
   description: 'Mock data (split from mock/index for <500): usage analytics (USAGE_RATES, genUsage 12-month history) + cockpit panel payloads (treeRows/memoryCards/radar/todoItems/entityTables/toolGroups/callbackRows/scratchCells/queueActions) + currentUser.'
@@ -6646,6 +6658,10 @@
   path: src/app/actions/input.rs
   description: 'InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Thread input routing: handle_thread_input_submit. Thread creation: MAX_THREAD_NAME_LEN=200 cap. Paste sentinel expansion. /command replacement.'
   last_edited_ms: 1781448934651
+54ab58e6ae67270f:
+  path: crates/cp-wire/src/types/command.rs
+  description: 'Command+Frame structs #[non_exhaustive] A5 + Frame::new ctor. Kind enum #[expect(exhaustive_enums)] A4, Unknown catch-all (N-1). Variants: thread ops + Stop/InterruptStream/Configure + LoadBehaviour{id} (T581, serde load_behaviour, footer behaviour-agent switch).'
+  last_edited_ms: 1784710566860
 54aec342908731de:
   path: src/app/actions/helpers.rs
   description: Action utils + switch_to_panel (scroll-preserving). clean_llm_id_prefix, parse_context_pattern, eject_cursor_from_sentinel. select_context/page_dynamic split panel_id_key/sorted_by_panel_id/next_dynamic_page (A2).
@@ -9138,6 +9154,10 @@
   path: .uploads/sourced_pdf/sourced_pdf/cli.py
   description: 'CLI entry point (spdf). Subcommands: init, extract, validate, render, seal. Wires model.py + extract.py + render.py.'
   last_edited_ms: 1782145700659
+756d5427c3dbf2fe:
+  path: crates/cp-orchestrator/src/transport/inspect/panels.rs
+  description: 'Cockpit inspection-panel endpoints: memory/todos/spine/queue/scratchpad/tree/callbacks/usage/library/panel_list = tier-③ disk reads reshaped to maquette JSON. library() returns command body for /cmd suggestion (T350) + active=true flag on the loaded behaviour-agent read from config.json modules.system.active_agent_id (T581 footer selector). tools/radar/entities = DERIVED-state empty by design.'
+  last_edited_ms: 1784710566987
 757a1436a5544f76:
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus, ThreadAuthor, ThreadMessage, Thread, ThreadQuestionForm (from_json with 50q x 100opt caps + field-length caps via cap_str, YAML-escaped other_text with \r), ThreadsState + FocusState with TypeMap accessors.'
@@ -11150,6 +11170,10 @@
   path: crates/cp-mod-brave/src/api.rs
   description: Brave Search HTTP client. BraveClient with retry (3 attempts, 1s delay on 5xx). SearchParams + LLMContextParams structs. Rich callback fetching. Custom URL encoding. 10s request timeout.
   last_edited_ms: 0
+8eb5ea973df19156:
+  path: web/src/components/shell/StatusBar.tsx
+  description: 'Bottom status footer. Fleet mode: aggregates. Agent mode: AgentStatus reads live agent.phase (resolvePhase) + vitals via agentVitals(). StatusIndicator = loading/restarting/connected/disconnected cascade. BehaviourChip (T581): useLibrary filter kind=agent, shows active behaviour-agent name + Bot icon + dropdown, click sendCommand load_behaviour (fire-and-forget). ContextBar = two-segment hit/miss meter (T297).'
+  last_edited_ms: 1784710576165
 8ebf09fe61f2b561:
   path: web/src/components/shell/config/ConfigPanel.tsx
   description: 'Settings surface shell — macOS System-Settings layout: category rail + detail pane. variant ''dialog'' (TopBar gear, DialogClose chrome) | ''inline'' (fleet Settings page). Owns rail + chrome only; panes + building blocks live in ./ConfigPanes (<500 split). Auth-based filtering: adminOnly categories hidden for non-admins; when auth is disabled, all categories shown (everyone treated as admin).'
@@ -15910,6 +15934,10 @@ cba76a0d7308e149:
   path: src/app/run/threads/commands.rs
   description: 'Bridge command APPLICATION (K7 mutation half). apply_command dispatches SendMessage/CreateThread(paused:false)/ArchiveThread/RestoreThread/PauseThread(T371)/ResumeThread(T371)/DeleteThread(T371 permanent delete)/DeleteMessage(T416 per-message delete by epoch-ms timestamp)/Stop|Interrupt/Configure. SendMessage fires instant spine notification when message lands on CURRENTLY FOCUSED thread (T460) — user expects quick acknowledgement; unfocused threads rely on idle MY_TURN detection. DeleteThread removes thread from ThreadsState, cleans focus+bridge memos, emits durable ThreadDeleted. DeleteMessage removes single message by timestamp, emits durable MessageDeleted, updates bridge thread_msg_counts so emit_messages correctly detects subsequent appends (T418 fix). Cascade: deleting an assistant message also removes all consecutive auto:true messages PRECEDING it (tool-trace cleanup — the tool calls that produced the response), one MessageDeleted delta per removed message.'
   last_edited_ms: 0
+cbae3db8c24b9059:
+  path: crates/cp-mod-prompt/src/tools.rs
+  description: 'Prompt tool dispatch. behaviour_create (agent/skill/command .md creation), agent_load, skill_load. set_active_agent(state,&id)->Result = SHARED active-agent core (pub, T581): both agent_load tool AND tui bridge LoadBehaviour command call it, zero dup. Empty id = default.'
+  last_edited_ms: 1784710566703
 cbb3d21aa5745cd4:
   path: crates/cp-wire/tests/framing_integrity.rs
   description: 'Phase 21 (X788): exhaustive framing integrity suite — the V1 torn-tail property at byte granularity. Truncate at EVERY offset (clean-prefix-only, never fabricated frame), single-byte-flip at every offset (detected-or-byte-identical, never silent-different), payload-region corruption always CrcMismatch, trailing garbage doesn''t corrupt first decode, sub-header buffers Incomplete-never-panic, oversized len-prefix rejected-not-allocated, zero-length payload round-trips. Lib-only deps acked via use crc32c/serde/serde_json/sha2 as _ (per-target unused-crate-dependencies). 8 tests.'

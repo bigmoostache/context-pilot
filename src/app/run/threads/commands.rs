@@ -54,6 +54,9 @@ pub(super) fn apply_command(app: &mut App, cmd: Command) {
         CommandKind::Configure { provider, model } => {
             apply_configure(&mut app.state, &provider, &model);
         }
+        CommandKind::LoadBehaviour { id } => {
+            apply_load_behaviour(&mut app.state, &id);
+        }
         CommandKind::Unknown => {
             log::warn!("bridge: ignoring unknown command {}", cmd.id);
         }
@@ -406,4 +409,24 @@ fn apply_configure(state: &mut State, provider_str: &str, model_str: &str) {
     state.llm_provider = provider;
     state.flags.ui.dirty = true;
     log::info!("bridge: configured provider={provider_str} model={model_str}");
+}
+
+// ── LoadBehaviour (active behaviour agent) ─────────────────────────────
+
+/// Switch the agent's active behaviour agent (prompt-library system prompt)
+/// from the web footer selector. An empty `id` reverts to the default agent.
+///
+/// Routed through the shared [`cp_mod_prompt::tools::set_active_agent`] so the
+/// bridge command and the local `agent_load` tool mutate the same
+/// `PromptState.active_agent_id` through one path (no duplication). The touched
+/// SYSTEM + LIBRARY panels re-render; the active flag surfaces to the web
+/// footer on the next `library()` inspect read.
+fn apply_load_behaviour(state: &mut State, id: &str) {
+    match cp_mod_prompt::tools::set_active_agent(state, id) {
+        Ok(name) => {
+            state.flags.ui.dirty = true;
+            log::info!("bridge: loaded behaviour agent {name} (id={id:?})");
+        }
+        Err(e) => log::warn!("bridge: LoadBehaviour failed: {e}"),
+    }
 }

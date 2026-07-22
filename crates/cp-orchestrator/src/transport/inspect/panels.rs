@@ -70,6 +70,26 @@ pub fn library(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
         Ok(f) => f,
         Err(reply) => return reply,
     };
+
+    // The active behaviour agent is persisted at config.json
+    // `modules.system.active_agent_id` (the PromptModule's global module data —
+    // it is `is_global()`, so `build_module_data_maps` writes it under
+    // `Shared.modules["system"]`). Read it via the mtime-cached inspector so
+    // the footer selector can mark which agent is loaded, the same disk-read
+    // mechanism `usage()` uses. Absent (older state / never switched) → None.
+    let active_agent_id: Option<String> = {
+        match state.lock() {
+            Ok(mut b) => b.inspect_mut().read_config(Path::new(&folder)).ok().and_then(|cfg| {
+                cfg.get("modules")
+                    .and_then(|m| m.get("system"))
+                    .and_then(|s| s.get("active_agent_id"))
+                    .and_then(|v| v.as_str())
+                    .map(str::to_owned)
+            }),
+            Err(_) => return HttpReply::error(500, "backend lock poisoned"),
+        }
+    };
+
     let cp_dir = Path::new(&folder).join(".context-pilot");
     let mut items: Vec<serde_json::Value> = Vec::new();
 
@@ -91,12 +111,17 @@ pub fn library(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
             // Skipped for agents/skills (their bodies are large system prompts /
             // reference docs that nothing in the library list consumes).
             let body = (kind == "command").then(|| parse_command_body(&content));
+            // Mark the active behaviour agent so the footer selector can show
+            // and highlight it. Only meaningful for agents (skills/commands are
+            // not "active"); left absent otherwise.
+            let active = (kind == "agent" && active_agent_id.as_deref() == Some(id.as_str())).then_some(true);
             items.push(serde_json::json!({
                 "id": id,
                 "name": name,
                 "kind": kind,
                 "description": description,
                 "body": body,
+                "active": active,
             }));
         }
     }

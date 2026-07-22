@@ -80,33 +80,45 @@ fn behaviour_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), format!("Created {type_str} '{name}' (ID: {id}) at {}", path.display()), false)
 }
 
-/// Set the active agent by ID, or revert to the default agent.
-fn agent_load(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let id_opt = tool.input.get("id").and_then(|v| v.as_str());
-
-    let Some(id) = id_opt.filter(|s| !s.is_empty()) else {
-        PromptState::get_mut(state).active_agent_id = Some(library::default_agent_id().to_owned());
+/// Set the active behaviour agent by id (empty `id` reverts to default).
+///
+/// Shared by the `agent_load` tool and the bridge `LoadBehaviour` command so
+/// both mutate active-agent state through one path. Touches the SYSTEM +
+/// LIBRARY panels on success and returns the switched-to agent's display name.
+///
+/// # Errors
+///
+/// Returns an `Err` message when `id` is non-empty but names no known agent.
+pub fn set_active_agent(state: &mut State, id: &str) -> Result<String, String> {
+    if id.is_empty() {
+        let default = library::default_agent_id().to_owned();
+        PromptState::get_mut(state).active_agent_id = Some(default.clone());
         state.touch_panel(Kind::SYSTEM);
         state.touch_panel(Kind::LIBRARY);
-        return ToolResult::new(
-            tool.id.clone(),
-            format!("Switched to default agent ({})", library::default_agent_id()),
-            false,
-        );
-    };
-
-    // Dynamically load agents from disk to check existence
-    let all_agents = storage::load_prompts_for(PromptType::Agent);
-    if !all_agents.iter().any(|a| a.id == id) {
-        return ToolResult::new(tool.id.clone(), format!("Agent '{id}' not found"), true);
+        return Ok(format!("default agent ({default})"));
     }
+
+    // Dynamically load agents from disk to check existence.
+    let all_agents = storage::load_prompts_for(PromptType::Agent);
+    let Some(agent) = all_agents.iter().find(|a| a.id == id) else {
+        return Err(format!("Agent '{id}' not found"));
+    };
+    let name = agent.name.clone();
 
     PromptState::get_mut(state).active_agent_id = Some(id.to_owned());
     state.touch_panel(Kind::SYSTEM);
     state.touch_panel(Kind::LIBRARY);
+    Ok(name)
+}
 
-    let name = all_agents.iter().find(|a| a.id == id).map_or("unknown", |a| a.name.as_str());
-    ToolResult::new(tool.id.clone(), format!("Loaded agent '{name}' ({id})"), false)
+/// Set the active agent by ID, or revert to the default agent.
+fn agent_load(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let id = tool.input.get("id").and_then(|v| v.as_str()).unwrap_or("");
+    match set_active_agent(state, id) {
+        Ok(name) if id.is_empty() => ToolResult::new(tool.id.clone(), format!("Switched to {name}"), false),
+        Ok(name) => ToolResult::new(tool.id.clone(), format!("Loaded agent '{name}' ({id})"), false),
+        Err(e) => ToolResult::new(tool.id.clone(), e, true),
+    }
 }
 
 /// Load a skill into the active context as a panel.
