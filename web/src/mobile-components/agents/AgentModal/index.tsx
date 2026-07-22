@@ -1,104 +1,179 @@
+import { useCallback, useEffect, useRef, useState } from "react"
+import { animate, stagger } from "animejs"
 import { X } from "lucide-react"
 import { usePickerProviders } from "@/lib/support/models"
-import { useAuth } from "@/lib/providers/auth"
-import { useState } from "react"
-import { slugify, useSelectionState, type AgentModalMode } from "./controller"
+import { useRenameAgent, sendCommand } from "@/lib/live"
+import type { Agent } from "@/lib/types"
+import { prefersReducedMotion } from "@/lib/utils"
+import { useSelectionState } from "./controller"
 import { useAgentModalActions } from "./actions"
-import { AgentModalHeader, AgentModalBody, AgentModalFooter, type Controller } from "./parts"
+import {
+  SettingsHeader,
+  AvatarHero,
+  Section,
+  NameField,
+  ProviderBody,
+  VitalsBody,
+  DangerActions,
+  SettingsToast,
+} from "./parts"
 
 export type { AgentModalMode } from "./controller"
 
 /**
- * Agent create / manage dialog — mobile twin of `components/agents/AgentModal`.
+ * Agent Settings PAGE — the mobile twin of `components/agents/AgentModal`,
+ * reworked from a dialog into a **full-screen page** (T636). Desktop keeps its
+ * floating manage dialog; on a phone the dialog is replaced by this page,
+ * reached from two places (the agents list swipe → Manage, and a thread page's
+ * top-right Settings button). The caller owns where "Back" returns to (it wrote
+ * `cameToAgentSettingsFrom` before opening us and reads it in `onClose`).
  *
- * Same single-source-of-truth for both flows (create from fleet, manage from a
- * card), same selection + mutation wiring (all shared via ./controller +
- * ./actions). The fork is the surface: the desktop centered `460/1120px`
- * floating card becomes a **full-screen sheet** (`inset-0`, no rounded gutters,
- * no max-width) — a phone has no room for a floating modal, so the modal owns
- * the whole viewport and its body scrolls. The manage layout's desktop
- * two-column grid (form | vitals+ACL) is stacked to a single column in
- * {@link AgentModalBody}.
+ * There is **no Save button** — every field auto-saves the moment it changes:
+ *   • name → `renameAgent` on blur / Return (no-op when unchanged);
+ *   • provider/model → a `configure` command the instant a model is picked;
+ *   • avatar → uploaded immediately on file-pick / shuffle.
+ * Each save flashes a confirmation toast. Restart and Retire sit at the bottom;
+ * Retire returns to the origin via `onClose`.
+ *
+ * Config mutations (avatar upload + DiceBear shuffle, restart flow, retire) are
+ * the SAME shared hooks the desktop dialog uses (`useAgentModalActions`), so the
+ * two surfaces never drift; only name + model auto-save are wired here directly
+ * (the dialog batches them behind its Save button, the page saves per-field).
  */
 export function AgentModal({
-  modal,
+  agent,
   onClose,
   onFlash,
 }: {
-  modal: AgentModalMode
+  agent: Agent
   onClose: () => void
   onFlash?: (m: string) => void
 }) {
-  const isManage = modal.mode === "manage"
-  const agent = isManage ? modal.agent : undefined
-  const [name, setName] = useState(agent?.name ?? "")
-
   // Server-computed picker list: only providers with a configured key, org
   // allowlist already applied (empty ⇒ all).
   const { data: providers = [] } = usePickerProviders()
-  const sel = useSelectionState(isManage, agent, providers)
+  const sel = useSelectionState(true, agent, providers)
+  const [name, setName] = useState(agent.name)
+  const renameAgent = useRenameAgent()
+
+  // One transient confirmation toast at a time; cleared on unmount so a late
+  // save-ack can't setState a dead page.
+  const [toast, setToast] = useState<string | null>(null)
+  const toastTimerRef = useRef<number | null>(null)
+  const flash = useCallback(
+    (m: string) => {
+      onFlash?.(m)
+      if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current)
+      setToast(m)
+      toastTimerRef.current = window.setTimeout(() => setToast(null), 2200)
+    },
+    [onFlash],
+  )
+  useEffect(
+    () => () => {
+      if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current)
+    },
+    [],
+  )
+
+  // Shared avatar / restart / retire logic (the dialog's own hook). `submit` is
+  // unused here — the page auto-saves name + model per-field instead. `onClose`
+  // is the back-to-origin handler, so retire success returns there.
   const actions = useAgentModalActions({
-    isManage,
+    isManage: true,
     agent,
     name,
     sel,
     providers,
     onClose,
-    onFlash,
+    onFlash: flash,
   })
-  const { authEnabled } = useAuth()
 
-  const realm = isManage ? (agent?.folder ?? "") : `~/code/${slugify(name)}`
-  const canSubmit = (isManage || name.trim().length > 0) && !actions.pending
-
-  const c: Controller = {
-    isManage,
-    agent,
-    name,
-    setName,
-    providers,
-    provId: sel.provId,
-    modelId: sel.modelId,
-    setSel: sel.setSel,
-    realm,
-    canSubmit,
-    authEnabled: authEnabled ?? false,
-    ...actions,
+  /** Auto-save the name on blur / Return — no-op when unchanged or empty. */
+  const saveName = () => {
+    const n = name.trim()
+    if (n === "" || n === agent.name || renameAgent.isPending) return
+    renameAgent.mutate(
+      { agentId: agent.id, name: n },
+      {
+        onSuccess: () => flash(`Renamed to ${n}`),
+        onError: (e) => flash(e instanceof Error ? e.message : "Could not rename the agent"),
+      },
+    )
   }
 
+  /** Auto-save the provider/model the instant it's picked (fires `configure`). */
+  const setSelAndSave = (p: string, m: string) => {
+    sel.setSel(p, m)
+    sendCommand(agent.id, { kind: "configure", provider: p, model: m })
+      .then(() => flash("Model updated"))
+      .catch((e: unknown) => flash(e instanceof Error ? e.message : "Could not update the model"))
+  }
+
+  // #1 Section cascade (anime.js): stagger the settings sections in on mount for
+  // an iOS settings-page reveal. Runs once; reduced-motion shows them at rest.
+  const bodyRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = bodyRef.current
+    if (!el || prefersReducedMotion()) return
+    animate(el.children, {
+      opacity: [0, 1],
+      translateY: [12, 0],
+      delay: stagger(45),
+      duration: 300,
+      ease: "out(2)",
+    })
+  }, [])
+
   return (
-    <div className="fixed inset-0 z-40 flex flex-col">
-      {/* Click-to-dismiss backdrop as a focusable sibling button behind the
-          sheet, so the sheet need not stopPropagation. */}
-      <button
-        type="button"
-        aria-label="Close"
-        onClick={onClose}
-        className="backdrop-fade absolute inset-0 z-[-1] cursor-default bg-black/40 backdrop-blur-[3px]"
-      />
-      {/* full-screen sheet — the mobile replacement for the desktop floating
-          card. Owns the whole viewport; body scrolls. */}
-      <div className="modal-pop relative flex size-full flex-col overflow-hidden border-0 bg-popover">
-        <AgentModalHeader
-          isManage={c.isManage}
-          agent={c.agent}
-          avatarBust={c.avatarBust}
-          onAvatarChange={c.onAvatarChange}
-          onRandomizeAvatar={c.onRandomizeAvatar}
-          onClose={onClose}
+    <div className="fixed inset-0 z-40 flex flex-col bg-background">
+      <SettingsHeader agentName={agent.name} onBack={onClose} />
+
+      <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto">
+        <AvatarHero
+          agent={agent}
+          avatarBust={actions.avatarBust}
+          onAvatarChange={actions.onAvatarChange}
+          onRandomizeAvatar={actions.onRandomizeAvatar}
         />
-        <AgentModalBody c={c} />
-        {c.error && (
+
+        <Section label="Name">
+          <NameField name={name} setName={setName} onSave={saveName} />
+        </Section>
+
+        <Section label="Provider & model">
+          <ProviderBody
+            providers={providers}
+            provId={sel.provId}
+            modelId={sel.modelId}
+            onChange={setSelAndSave}
+          />
+        </Section>
+
+        <Section label="Service vitals">
+          <VitalsBody agentId={agent.id} />
+        </Section>
+
+        {actions.error && (
           <div
             role="alert"
             className="mx-4 mb-1 flex items-start gap-2 rounded-lg border border-(--danger)/30 bg-(--danger)/10 px-3 py-2 text-[12px] leading-snug text-(--danger)"
           >
             <X className="mt-px size-3.5 shrink-0" />
-            <span>{c.error}</span>
+            <span>{actions.error}</span>
           </div>
         )}
-        <AgentModalFooter c={c} />
+
+        <DangerActions
+          restart={actions.restart}
+          restartBusy={actions.restartBusy}
+          retire={actions.retire}
+          retireBusy={actions.retireBusy}
+          busy={actions.pending}
+        />
       </div>
+
+      <SettingsToast message={toast} />
     </div>
   )
 }

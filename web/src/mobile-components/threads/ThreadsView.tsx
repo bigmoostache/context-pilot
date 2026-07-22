@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { animate, createSpring } from "animejs"
-import { FolderGit2, AlertTriangle, Plus, PanelLeft } from "lucide-react"
+import { FolderGit2, AlertTriangle, Plus, PanelLeft, Settings2 } from "lucide-react"
 import { ThreadList } from "@/mobile-components/threads/ThreadList"
 import { ThreadConversation } from "@/mobile-components/threads/ThreadConversation"
 import { CornerButton } from "@/mobile-components/shell/CornerButton"
@@ -28,6 +28,7 @@ export function ThreadsView({
   activeAgentId,
   onShowInFinder,
   onGoToAgents,
+  onOpenSettings,
   disconnected,
   onReconnect,
 }: {
@@ -37,6 +38,9 @@ export function ThreadsView({
   /** leave the conversation for the agents (fleet) page — wired to the thread
    *  drawer's top-left corner button (T631) */
   onGoToAgents?: (() => void) | undefined
+  /** open this agent's full-screen Settings page — wired to the conversation's
+   *  top-right corner button (T636). Undefined when no live agent. */
+  onOpenSettings?: (() => void) | undefined
   disconnected?: boolean
   onReconnect?: () => void
 }) {
@@ -136,6 +140,15 @@ export function ThreadsView({
       >
         <PanelLeft className="size-4.5" />
       </CornerButton>
+
+      {/* Settings button — top-right of the conversation (that corner is free;
+          top-left is the drawer toggle). Opens this agent's full-screen Settings
+          page (T636). z-20 so the drawer scrim (z-40) covers it when open. */}
+      {onOpenSettings && (
+        <CornerButton side="right" label="Agent settings" onClick={onOpenSettings} className="z-20">
+          <Settings2 className="size-4.5" />
+        </CornerButton>
+      )}
 
       {/* Scrim — dims the conversation while the drawer is open; tapping it (or
           the toggle beneath it) closes the drawer. A <button> not a <div> so it

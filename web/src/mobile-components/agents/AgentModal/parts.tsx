@@ -1,127 +1,105 @@
 import { useEffect, useRef } from "react"
+import { animate, createSpring } from "animejs"
 import {
   Archive,
-  CornerDownLeft,
+  ChevronLeft,
   Dices,
-  FolderGit2,
-  Loader2,
+  ImagePlus,
   RefreshCw,
   Settings2,
-  Sparkles,
-  Wand2,
-  X,
 } from "lucide-react"
 import type { Agent } from "@/lib/types"
 import { avatarUrl } from "@/lib/api"
 import { type ProviderDef } from "@/lib/support/models"
 import { ModelPicker } from "../ModelPicker"
-import { AgentAclSection } from "../../auth/AgentAclSection"
 import { SessionVitals } from "../../shell/SessionVitals"
-import { cn } from "@/lib/utils"
+import { cn, prefersReducedMotion } from "@/lib/utils"
 
-/** Everything the render subcomponents need — assembled in {@link AgentModal}. */
-export interface Controller {
-  isManage: boolean
-  agent: Agent | undefined
-  name: string
-  setName: (v: string) => void
-  providers: ProviderDef[]
-  provId: string
-  modelId: string
-  setSel: (p: string, m: string) => void
-  realm: string
-  error: string | null
-  saving: boolean
-  pending: boolean
-  canSubmit: boolean
-  submit: () => void
-  retire: () => void
-  restart: () => void
-  retireBusy: boolean
-  restartBusy: boolean
-  avatarBust: number
-  onAvatarChange: (file: File) => void
-  onRandomizeAvatar: () => void
-  authEnabled: boolean
-}
+// ── Agent Settings page sections (mobile) ────────────────────────────
+//
+// Render subcomponents for the mobile Agent Settings PAGE (the divergent twin's
+// index reworked from a dialog into a full-screen page, T636). Desktop keeps its
+// floating manage dialog (components/agents/AgentModal); on a phone that dialog
+// is replaced by this page, reached from the agents list (swipe → Manage) and
+// from a thread page's top-right Settings button. Every field auto-saves, so
+// there is no Save button — only the back chevron and a confirmation toast.
 
-/** The submit button's label across the create/manage × idle/pending matrix. */
-function submitLabel(pending: boolean, saving: boolean, isManage: boolean): string {
-  if (pending) return saving ? "Saving…" : "Creating…"
-  return isManage ? "Save changes" : "Create agent"
+/**
+ * Sticky iOS-style nav header — a back chevron (returns to wherever the page was
+ * opened from, via the caller), a centred title, and the agent's name as a
+ * subtitle. Spring-rises on mount (anime.js); reduced-motion shows it at rest.
+ */
+export function SettingsHeader({ agentName, onBack }: { agentName: string; onBack: () => void }) {
+  const ref = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el || prefersReducedMotion()) return
+    animate(el, {
+      opacity: [0, 1],
+      translateY: [-8, 0],
+      ease: createSpring({ stiffness: 420, damping: 32 }),
+    })
+  }, [])
+  return (
+    <header
+      ref={ref}
+      className="sticky top-0 z-10 flex items-center gap-2 border-b border-border/70 bg-background/85 px-2 py-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] backdrop-blur-md"
+    >
+      <button
+        onClick={onBack}
+        aria-label="Back"
+        className="flex size-9 items-center justify-center rounded-lg text-(--interactive) transition-colors active:bg-muted/70"
+      >
+        <ChevronLeft className="size-6" />
+      </button>
+      <div className="flex min-w-0 flex-1 flex-col leading-tight">
+        <span className="text-[15px] font-semibold tracking-tight text-foreground">
+          Agent Settings
+        </span>
+        <span className="truncate text-[11.5px] text-muted-foreground/70">{agentName}</span>
+      </div>
+      <Settings2 className="mr-1 size-4 shrink-0 text-muted-foreground/40" />
+    </header>
+  )
 }
 
 /**
- * Hero header — mobile twin of the desktop AgentModal header. Same avatar
- * file-picker <label> (manage mode) + dice randomize badge + title/close, sized
- * up for touch: the close button is a 36px tap target and press feedback swaps
- * `hover:` for `active:`.
+ * Avatar hero — a large round avatar with two affordances: a **tap-to-upload**
+ * label overlay (image glyph) and a **Shuffle** badge that fetches a random
+ * DiceBear avatar. `avatarBust` is a cache-buster that changes after each
+ * successful upload so the new image shows immediately.
  */
-export function AgentModalHeader({
-  isManage,
+export function AvatarHero({
   agent,
   avatarBust,
   onAvatarChange,
   onRandomizeAvatar,
-  onClose,
 }: {
-  isManage: boolean
-  agent: Agent | undefined
+  agent: Agent
   avatarBust: number
   onAvatarChange: (file: File) => void
   onRandomizeAvatar: () => void
-  onClose: () => void
 }) {
   return (
-    <div className="relative flex items-start gap-3.5 border-b border-border/70 px-4 pt-5 pb-4">
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.5]"
-        style={{
-          background: isManage
-            ? "radial-gradient(120% 100% at 0% 0%, color-mix(in oklab, var(--signal) 16%, transparent), transparent 60%)"
-            : "radial-gradient(120% 100% at 0% 0%, color-mix(in oklab, var(--interactive) 18%, transparent), transparent 60%)",
-        }}
-      />
-      {isManage ? (
-        <div className="relative flex size-11 shrink-0">
-          <label
-            htmlFor="agent-avatar-input"
-            title="Tap to change avatar"
-            className={cn(
-              "flex size-11 cursor-pointer items-center justify-center overflow-hidden rounded-xl ring-1 transition-opacity ring-inset active:opacity-80",
-              "bg-(--signal)/14 text-(--signal) ring-(--signal)/25",
-            )}
-          >
-            {agent?.hasAvatar ? (
-              <img
-                src={avatarUrl(agent.id, avatarBust || undefined)}
-                alt={agent.name}
-                className="size-11 rounded-xl object-cover"
-              />
-            ) : (
-              <Settings2 className="size-[22px]" />
-            )}
-          </label>
-          {/* Dice badge — sibling of the label (NOT a descendant), so tapping it
-              randomizes the avatar without triggering the label's file picker. */}
-          <button
-            type="button"
-            onClick={onRandomizeAvatar}
-            title="Randomize avatar"
-            aria-label="Randomize avatar"
-            className="absolute -right-1.5 -bottom-1.5 flex size-6 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-colors active:border-(--signal)/40 active:text-(--signal)"
-          >
-            <Dices className="size-3" />
-          </button>
-        </div>
-      ) : (
-        <span className="relative flex size-11 shrink-0 items-center justify-center rounded-xl bg-(--interactive)/14 text-(--interactive) ring-1 ring-(--interactive)/25 ring-inset">
-          <Wand2 className="size-[22px]" />
-        </span>
-      )}
-      {isManage && (
+    <div className="flex flex-col items-center gap-3 px-4 pt-6 pb-4">
+      <div className="relative size-24">
+        <label
+          htmlFor="agent-settings-avatar"
+          title="Tap to change avatar"
+          className="flex size-24 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-(--signal)/14 text-(--signal) ring-1 ring-(--signal)/25 transition-opacity ring-inset active:opacity-80"
+        >
+          {agent.hasAvatar ? (
+            <img
+              src={avatarUrl(agent.id, avatarBust || undefined)}
+              alt={agent.name}
+              className="size-24 rounded-full object-cover"
+            />
+          ) : (
+            <ImagePlus className="size-8" />
+          )}
+        </label>
         <input
-          id="agent-avatar-input"
+          id="agent-settings-avatar"
           type="file"
           accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
           className="sr-only"
@@ -131,134 +109,157 @@ export function AgentModalHeader({
             e.target.value = ""
           }}
         />
-      )}
-      <div className="relative flex flex-1 flex-col gap-0.5 pt-0.5">
-        <h3 className="text-[17px] font-semibold tracking-tight text-foreground">
-          {isManage ? `Manage ${agent?.name}` : "Create an agent"}
-        </h3>
-        <p className="text-[12px] leading-relaxed text-muted-foreground">
-          {isManage
-            ? "Rename, switch model, or archive. The realm folder is fixed."
-            : "Name it, pick a model — its realm folder is created for you."}
-        </p>
+        {/* Shuffle badge — a sibling of the label (not a descendant), so tapping
+            it randomizes the avatar without triggering the label's file picker. */}
+        <button
+          type="button"
+          onClick={onRandomizeAvatar}
+          title="Shuffle avatar"
+          aria-label="Shuffle avatar"
+          className="absolute right-0 bottom-0 flex size-8 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-colors active:border-(--signal)/40 active:text-(--signal)"
+        >
+          <Dices className="size-4" />
+        </button>
       </div>
+      <span className="text-[12px] text-muted-foreground/60">
+        Tap the photo to upload · shuffle for a random one
+      </span>
+    </div>
+  )
+}
+
+/** A titled settings section wrapper — a small uppercase label above its body,
+ *  with consistent horizontal gutters. */
+export function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <section className="flex flex-col gap-2 px-4 py-3">
+      <span className="text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
+        {label}
+      </span>
+      {children}
+    </section>
+  )
+}
+
+/**
+ * Name field — 16px (defeats iOS focus-zoom), **auto-saves on blur** and on
+ * Return. The caller's `onSave` no-ops when the value is unchanged/empty, so a
+ * focus-in-focus-out without an edit costs nothing.
+ */
+export function NameField({
+  name,
+  setName,
+  onSave,
+}: {
+  name: string
+  setName: (v: string) => void
+  onSave: () => void
+}) {
+  return (
+    <div className="group flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-3 transition-colors focus-within:border-(--interactive)/70 focus-within:ring-2 focus-within:ring-(--interactive)/15">
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onBlur={onSave}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter") return
+          e.preventDefault()
+          e.currentTarget.blur()
+        }}
+        placeholder="agent name"
+        className="w-full bg-transparent text-[16px] font-medium text-foreground outline-none placeholder:font-normal placeholder:text-muted-foreground/45"
+      />
+    </div>
+  )
+}
+
+/**
+ * Provider & model picker body — the shared two-level picker. Selecting a model
+ * fires `onChange` immediately, which the page turns into an auto-save
+ * `configure` command (no Save button).
+ */
+export function ProviderBody({
+  providers,
+  provId,
+  modelId,
+  onChange,
+}: {
+  providers: ProviderDef[]
+  provId: string
+  modelId: string
+  onChange: (provider: string, model: string) => void
+}) {
+  return <ModelPicker providers={providers} provider={provId} model={modelId} onChange={onChange} />
+}
+
+/** Service-vitals section body — the on-demand connectivity board. */
+export function VitalsBody({ agentId }: { agentId: string }) {
+  return <SessionVitals agentId={agentId} />
+}
+
+/**
+ * Danger / lifecycle actions — Restart (kill + respawn the process from the
+ * current binary) and Retire (stop the process, keep the folder, return to
+ * origin). Full-width touch buttons, safe-area padded, with busy spinners.
+ */
+export function DangerActions({
+  restart,
+  restartBusy,
+  retire,
+  retireBusy,
+  busy,
+}: {
+  restart: () => void
+  restartBusy: boolean
+  retire: () => void
+  retireBusy: boolean
+  busy: boolean
+}) {
+  return (
+    <div className="mt-2 flex flex-col gap-2 px-4 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
       <button
-        onClick={onClose}
-        className="relative -mt-1 -mr-1 flex size-9 items-center justify-center rounded-md text-muted-foreground/55 transition-colors active:bg-muted/70 active:text-foreground"
-        aria-label="Close"
+        onClick={restart}
+        disabled={busy}
+        className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-[14px] font-medium text-foreground/85 transition-colors active:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        <X className="size-5" />
+        <RefreshCw className={cn("size-4", restartBusy && "animate-spin")} />
+        {restartBusy ? "Restarting…" : "Restart agent"}
+      </button>
+      <button
+        onClick={retire}
+        disabled={busy}
+        className="flex items-center justify-center gap-2 rounded-xl border border-(--danger)/30 bg-(--danger)/10 px-4 py-3 text-[14px] font-medium text-(--danger) transition-colors active:bg-(--danger)/20 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <Archive className={cn("size-4", retireBusy && "animate-pulse")} />
+        Retire agent
       </button>
     </div>
   )
 }
 
 /**
- * Body — mobile twin. The desktop manage layout is a two-column grid
- * (form | vitals+ACL); on a phone there's no room, so it **stacks to a single
- * column** (form first, then vitals + ACL below). The name field is 16px to
- * defeat iOS focus-zoom.
+ * Auto-save confirmation toast — springs up from the bottom on each new message
+ * (anime.js). Conditionally rendered, so a new message remounts it and the
+ * spring re-fires; reduced-motion shows it at rest.
  */
-export function AgentModalBody({ c }: { c: Controller }) {
-  const { isManage, agent, name, setName, realm, providers, provId, modelId, setSel } = c
-  const nameRef = useRef<HTMLInputElement>(null)
+export function SettingsToast({ message }: { message: string | null }) {
+  const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    const t = window.setTimeout(() => nameRef.current?.focus(), 60)
-    return () => window.clearTimeout(t)
+    const el = ref.current
+    if (!el || prefersReducedMotion()) return
+    animate(el, {
+      opacity: [0, 1],
+      translateY: [16, 0],
+      ease: createSpring({ stiffness: 420, damping: 30 }),
+    })
   }, [])
+  if (message === null) return null
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-5">
-      <div className="flex flex-col gap-5">
-        <div className="flex flex-col gap-2">
-          <span className="text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
-            Agent name
-          </span>
-          <div className="group flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-3 transition-colors focus-within:border-(--interactive)/70 focus-within:ring-2 focus-within:ring-(--interactive)/15">
-            <FolderGit2 className="size-[18px] shrink-0 text-muted-foreground/55 transition-colors group-focus-within:text-(--interactive)" />
-            <input
-              ref={nameRef}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="my-project"
-              className="w-full bg-transparent text-[16px] font-medium text-foreground outline-none placeholder:font-normal placeholder:text-muted-foreground/45"
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5 pl-0.5 text-[11.5px]">
-            <span className="text-muted-foreground/60">Realm</span>
-            <span className="text-muted-foreground/40">→</span>
-            <code className="rounded-md bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] text-foreground/75">
-              {realm}
-            </code>
-            {!isManage && <span className="text-muted-foreground/45">· created automatically</span>}
-          </div>
-        </div>
-        <div className="flex flex-col gap-2">
-          <span className="text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
-            Provider &amp; Model
-          </span>
-          <ModelPicker providers={providers} provider={provId} model={modelId} onChange={setSel} />
-        </div>
-      </div>
-      {isManage && agent && (
-        <div className="flex flex-col gap-5 border-t border-border/50 pt-5">
-          <SessionVitals agentId={agent.id} />
-          {c.authEnabled && <AgentAclSection agentId={agent.id} />}
-        </div>
-      )}
-    </div>
-  )
-}
-
-/** Footer — mobile twin. Retire + restart (manage) and the primary submit,
- *  full-height touch buttons; the ⌘↵ hint is hidden (no hardware keyboard). */
-export function AgentModalFooter({ c }: { c: Controller }) {
-  const { isManage, pending, saving, canSubmit } = c
-  return (
-    <div className="flex items-center gap-2 border-t border-border/70 bg-muted/25 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-      {isManage && (
-        <button
-          onClick={c.retire}
-          disabled={pending}
-          title="Stop the agent's process and move it to Retired. The realm folder is kept."
-          className="flex items-center gap-1.5 rounded-lg px-3 py-2.5 text-[13px] font-medium text-(--danger) transition-colors active:bg-(--danger)/10 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Archive className={cn("size-4", c.retireBusy && "animate-pulse")} />
-          Retire
-        </button>
-      )}
-      {isManage && (
-        <button
-          onClick={c.restart}
-          disabled={pending}
-          title="Kill and respawn the agent's process from the current binary."
-          className="flex items-center gap-1.5 rounded-lg px-3 py-2.5 text-[13px] font-medium text-foreground/80 transition-colors active:bg-muted/70 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <RefreshCw className={cn("size-4", c.restartBusy && "animate-spin")} />
-          {c.restartBusy ? "…" : "Restart"}
-        </button>
-      )}
-      <button
-        onClick={c.submit}
-        disabled={!canSubmit}
-        className={cn(
-          "ml-auto flex items-center gap-2 rounded-lg px-4 py-2.5 text-[14px] font-medium text-(--primary-foreground) transition-all",
-          canSubmit
-            ? "bg-(--interactive) active:scale-[0.98] active:brightness-105"
-            : "cursor-not-allowed bg-muted text-muted-foreground/60",
-        )}
-      >
-        {pending ? (
-          <Loader2 className="size-4 animate-spin" />
-        ) : isManage ? (
-          <Settings2 className="size-4" />
-        ) : (
-          <Sparkles className="size-4" />
-        )}
-        {submitLabel(pending, saving, isManage)}
-        <kbd className="ml-1 hidden items-center gap-0.5 rounded-sm bg-black/15 px-1 py-px font-mono text-[9.5px] opacity-80">
-          <CornerDownLeft className="size-2.5" />⌘
-        </kbd>
-      </button>
+    <div
+      ref={ref}
+      className="card-shadow fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2 rounded-lg border border-border bg-card px-4 py-2 text-[12px] text-foreground/90"
+    >
+      {message}
     </div>
   )
 }

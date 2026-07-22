@@ -25,7 +25,6 @@ import { avatarUrl } from "@/lib/api"
 import type { Agent, AgentStatus } from "@/lib/types"
 import { cn, prefersReducedMotion } from "@/lib/utils"
 import { useSwipeRow } from "@/lib/live/useSwipeRow"
-import { AgentModal } from "./AgentModal"
 
 const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
   working: { label: "Working", color: "var(--interactive)" },
@@ -34,8 +33,6 @@ const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
   disconnected: { label: "Disconnected", color: "var(--danger)" },
   waiting: { label: "Restarting", color: "var(--interactive)" },
 }
-
-type Modal = { mode: "manage"; agent: Agent } | null
 
 /**
  * Fleet dashboard — mobile twin of `components/agents/FleetDashboard`, rebuilt
@@ -56,15 +53,16 @@ type Modal = { mode: "manage"; agent: Agent } | null
 export function FleetDashboard({
   agents,
   onOpenAgent,
+  onManageAgent,
   autoCreate,
   onAutoCreateConsumed,
 }: {
   agents: Agent[]
   onOpenAgent: (id: string) => void
+  onManageAgent: (id: string) => void
   autoCreate?: boolean | undefined
   onAutoCreateConsumed?: (() => void) | undefined
 }) {
-  const [modal, setModal] = useState<Modal>(null)
   const [query, setQuery] = useState("")
   const [toast, setToast] = useState<string | null>(null)
   const createAgent = useCreateAgent()
@@ -160,7 +158,7 @@ export function FleetDashboard({
                   <AgentSwipeRow
                     agent={a}
                     onOpen={() => onOpenAgent(a.id)}
-                    onManage={() => setModal({ mode: "manage", agent: a })}
+                    onManage={() => onManageAgent(a.id)}
                     onFlash={flash}
                   />
                 </li>
@@ -171,8 +169,6 @@ export function FleetDashboard({
           <RetiredSection onFlash={flash} />
         </div>
       </ScrollArea>
-
-      {modal && <AgentModal modal={modal} onClose={() => setModal(null)} onFlash={flash} />}
 
       {/* Bottom action bar — the search field DOUBLES as the create input (T633,
           mirroring ThreadList): typing filters the roster live AND is the draft
