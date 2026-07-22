@@ -43,6 +43,7 @@ import {
   getApiAgentByIdMetrics,
   getApiAgentByIdVitals,
   getApiAgentByIdLibrary,
+  getApiAgentByIdToolcallByHash,
   getApiAgentByIdThreads,
   getApiProviders,
   getApiUpdateStatus,
@@ -160,6 +161,17 @@ export function fetchFleetMetrics(): Promise<AgentMetrics[]> {
 
 export function fetchLibrary(agentId: string): Promise<LibraryItem[]> {
   return sdk(getApiAgentByIdLibrary({ path: { id: agentId } }))
+}
+
+// ── Tool-call detail (T584 — lazy, fetched on click) ──────────────────
+
+export type ToolCallDetail = import("./generated/types.gen").ToolCallDetail
+
+/** Fetch one persisted tool-call detail blob by its content hash. The auto
+ *  tool-activity trace carries only the hash; the adaptive detail bubble calls
+ *  this the moment a user clicks the row (never prefetched). */
+export function fetchToolCall(agentId: string, hash: string): Promise<ToolCallDetail> {
+  return sdk(getApiAgentByIdToolcallByHash({ path: { id: agentId, hash } }))
 }
 
 // ── Providers (SDK) ───────────────────────────────────────────────────

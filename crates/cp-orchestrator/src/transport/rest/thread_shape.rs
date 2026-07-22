@@ -126,6 +126,14 @@ fn reshape_message(raw: &serde_json::Value, index: usize) -> serde_json::Value {
         "ts": raw.get("timestamp").and_then(serde_json::Value::as_u64).unwrap_or(0),
         "auto": raw.get("auto").and_then(serde_json::Value::as_bool).unwrap_or(false),
     });
+    // Content hash of the persisted full tool-call record (T584); present only
+    // on auto traces. The web UI fetches the blob on click for the detail bubble.
+    if let Some(tref) = raw.get("tool_ref").and_then(serde_json::Value::as_str) {
+        let _prev = msg
+            .as_object_mut()
+            .expect("just built")
+            .insert("toolRef".to_owned(), serde_json::Value::String(tref.to_owned()));
+    }
     if let Some(fp) = raw.get("file_path").and_then(serde_json::Value::as_str) {
         let _prev = msg
             .as_object_mut()

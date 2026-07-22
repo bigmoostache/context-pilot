@@ -465,6 +465,7 @@ export type ThreadMsg = {
     id: string;
     text?: string;
     tool?: ToolCall;
+    toolRef?: string;
     ts?: number;
 };
 
@@ -485,6 +486,17 @@ export type ToolCall = {
         [key: string]: string;
     };
     result?: string;
+    verb?: string;
+};
+
+export type ToolCallDetail = {
+    intent?: string;
+    isError: boolean;
+    name: string;
+    params: {
+        [key: string]: unknown;
+    };
+    result: string;
     verb?: string;
 };
 
@@ -1443,6 +1455,34 @@ export type GetApiAgentByIdThreadsResponses = {
 };
 
 export type GetApiAgentByIdThreadsResponse = GetApiAgentByIdThreadsResponses[keyof GetApiAgentByIdThreadsResponses];
+
+export type GetApiAgentByIdToolcallByHashData = {
+    body?: never;
+    path: {
+        id: string;
+        hash: string;
+    };
+    query?: never;
+    url: '/api/agent/{id}/toolcall/{hash}';
+};
+
+export type GetApiAgentByIdToolcallByHashErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiAgentByIdToolcallByHashError = GetApiAgentByIdToolcallByHashErrors[keyof GetApiAgentByIdToolcallByHashErrors];
+
+export type GetApiAgentByIdToolcallByHashResponses = {
+    /**
+     * Success
+     */
+    200: ToolCallDetail;
+};
+
+export type GetApiAgentByIdToolcallByHashResponse = GetApiAgentByIdToolcallByHashResponses[keyof GetApiAgentByIdToolcallByHashResponses];
 
 export type PostApiAgentByIdUnretireData = {
     body?: never;

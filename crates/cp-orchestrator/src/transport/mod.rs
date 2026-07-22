@@ -290,6 +290,7 @@ fn route_rest(
         (Method::Get, ["api", "agent", id, "threads"]) => rest::threads(state, id),
         (Method::Get, ["api", "agent", id, "usage"]) => inspect::panels::usage(state, id, query),
         (Method::Get, ["api", "agent", id, "library"]) => inspect::panels::library(state, id),
+        (Method::Get, ["api", "agent", id, "toolcall", hash]) => inspect::panels::toolcall(state, id, hash),
         (Method::Get, ["api", "agent", id, "fs"]) => inspect::finder::fs_list(state, id, query),
         (Method::Get, ["api", "agent", id, "fs", "preview"]) => inspect::finder::fs_preview(state, id, query),
         (Method::Get, ["api", "agent", id, "fs", "sheet"]) => inspect::finder::fs_sheet(state, id, query),

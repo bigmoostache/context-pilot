@@ -81,6 +81,14 @@ pub struct ThreadMessage {
     /// turn/focus. Defaults to `false` (back-compat with pre-feature data).
     #[serde(default)]
     pub auto: bool,
+    /// Content hash of this trace's full tool-call record (params + result),
+    /// persisted content-addressed under `.context-pilot/toolcalls/<hash>.json`.
+    /// Set only on `auto` traces (T584); `None` on ordinary messages and on
+    /// pre-feature data. The web UI fetches the blob on click to render an
+    /// adaptive detail bubble — never prefetched, so the thread-list payload
+    /// stays lean.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_ref: Option<String>,
 }
 
 impl ThreadMessage {
@@ -94,14 +102,20 @@ impl ThreadMessage {
             timestamp: cp_base::panels::now_ms(),
             acknowledged: false,
             auto: false,
+            tool_ref: None,
         }
     }
 
     /// An assistant-authored auto **tool-activity trace** — acknowledged (so it
     /// never flips turn/unread) and flagged [`auto`](Self::auto) (hidden from the
     /// agent's own context, rendered as a collapsible run). Stamped now.
+    ///
+    /// `tool_ref` is the content hash of the persisted full tool-call record
+    /// (params + result); the web UI fetches it on click. `None` when the record
+    /// could not be persisted (the trace still renders, just without a detail
+    /// bubble).
     #[must_use]
-    pub fn auto_trace(content: String) -> Self {
+    pub fn auto_trace(content: String, tool_ref: Option<String>) -> Self {
         Self {
             author: ThreadAuthor::Assistant,
             content: Some(content),
@@ -109,6 +123,7 @@ impl ThreadMessage {
             timestamp: cp_base::panels::now_ms(),
             acknowledged: true,
             auto: true,
+            tool_ref,
         }
     }
 }

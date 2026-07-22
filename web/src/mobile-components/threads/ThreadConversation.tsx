@@ -1,6 +1,7 @@
 import { Fragment, memo, useCallback, useMemo, useRef, useState } from "react"
 import { ScrollArea } from "@/mobile-components/ui/scroll-area"
 import { Message } from "@/mobile-components/conversation/Message"
+import { ToolCallBubble } from "@/mobile-components/conversation/ToolCallBubble"
 import { ThreadComposer, type CommandSuggestion } from "@/mobile-components/threads/ThreadComposer"
 import { CreateCommandDialog } from "@/mobile-components/threads/CreateCommandDialog"
 import { QuickLookSheet } from "@/mobile-components/finder/QuickLookSheet"
@@ -10,7 +11,8 @@ import { uploadToNode, type UploadedFile } from "@/mobile-components/threads/fil
 import { FormMessageRow } from "@/mobile-components/threads/forms/FormMessageRow"
 import { isFormMessage } from "@/mobile-components/threads/forms/helpers"
 import { useScrollPin, useThreadForms } from "@/mobile-components/threads/forms/useThreadForms"
-import { parseAutoLine, segmentLog, toChatMessage } from "@/lib/support/threadMessages"
+import { VerbIcon, parseAutoLine, segmentLog, toChatMessage } from "@/lib/support/threadMessages"
+import { cn } from "@/lib/utils"
 import type { ThreadDetail, ThreadMsg } from "@/lib/types"
 
 /**
@@ -19,8 +21,9 @@ import type { ThreadDetail, ThreadMsg } from "@/lib/types"
  * memo boundary keys on `msgs` reference so an unrelated SSE delta skips this
  * whole subtree (T510 render-storm fix).
  */
-const AutoRun = memo(function AutoRun({ msgs }: { msgs: ThreadMsg[] }) {
+const AutoRun = memo(function AutoRun({ msgs, agentId }: { msgs: ThreadMsg[]; agentId: string }) {
   const n = msgs.length
+  const [openId, setOpenId] = useState<string | null>(null)
   return (
     <details className="group/auto mb-2 ml-5 [contain-intrinsic-size:auto_2rem] [content-visibility:auto]">
       <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[12.5px] font-medium text-muted-foreground/75 transition-colors active:bg-muted/40">
@@ -31,14 +34,27 @@ const AutoRun = memo(function AutoRun({ msgs }: { msgs: ThreadMsg[] }) {
           ⚙ {n} tool action{n === 1 ? "" : "s"}
         </span>
       </summary>
-      <div className="mt-1 grid grid-cols-[auto_auto_1fr] gap-x-3 gap-y-0.5 border-l border-border/60 pl-3 font-mono text-[11px]">
+      <div className="mt-1 flex flex-col gap-0.5 border-l border-border/60 pl-3 font-mono text-[11px]">
         {msgs.map((m) => {
-          const { verb, tool, intent } = parseAutoLine(m)
+          const { verb, intent } = parseAutoLine(m)
+          const clickable = !!m.toolRef
+          const open = openId === m.id
           return (
             <Fragment key={m.id}>
-              <span className="text-(--interactive)">{verb}</span>
-              <span className="text-foreground/70">{tool}</span>
-              <span className="truncate text-muted-foreground/55">{intent}</span>
+              <button
+                type="button"
+                disabled={!clickable}
+                onClick={() => setOpenId(open ? null : m.id)}
+                className={cn(
+                  "flex items-center gap-2 rounded-sm px-1 py-0.5 text-left transition-colors",
+                  clickable ? "active:bg-muted/40" : "cursor-default",
+                  open && "bg-muted/50",
+                )}
+              >
+                <VerbIcon verb={verb} className="size-3.5 shrink-0 text-(--interactive)" />
+                <span className="truncate text-muted-foreground/70">{intent}</span>
+              </button>
+              {open && m.toolRef && <ToolCallBubble agentId={agentId} hash={m.toolRef} />}
             </Fragment>
           )
         })}
@@ -194,7 +210,7 @@ export function ThreadConversation({
 
           {segments.map((seg) =>
             seg.type === "auto" ? (
-              <AutoRun key={`auto-${seg.msgs[0]?.id ?? seg.type}`} msgs={seg.msgs} />
+              <AutoRun key={`auto-${seg.msgs[0]?.id ?? seg.type}`} msgs={seg.msgs} agentId={agentId} />
             ) : isFormMessage(seg.msg.text ?? "") ? (
               <FormMessageRow
                 key={seg.msg.id}
