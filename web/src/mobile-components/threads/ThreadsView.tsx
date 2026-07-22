@@ -3,7 +3,6 @@ import { animate, createSpring } from "animejs"
 import { FolderGit2, AlertTriangle, Plus, PanelLeft } from "lucide-react"
 import { ThreadList } from "@/mobile-components/threads/ThreadList"
 import { ThreadConversation } from "@/mobile-components/threads/ThreadConversation"
-import { NewThreadDialog } from "@/mobile-components/threads/NewThreadDialog"
 import { CornerButton } from "@/mobile-components/shell/CornerButton"
 import { useFleet, useThreads } from "@/lib/live"
 import { useThreadSelection, useThreadActions } from "@/lib/live/threadView"
@@ -121,7 +120,7 @@ export function ThreadsView({
       ) : (
         <EmptyRealm
           agentName={agents.find((a) => a.id === activeAgentId)?.name}
-          onNewThread={() => sel.setNewOpen(true)}
+          onNewThread={() => setDrawerOpen(true)}
         />
       )}
 
@@ -181,18 +180,12 @@ export function ThreadsView({
           onArchive={actions.handleArchive}
           onDelete={actions.handleDelete}
           onPause={actions.handlePause}
-          onNewThread={() => sel.setNewOpen(true)}
+          onNewThread={(name) => {
+            actions.handleCreate(name)
+            setDrawerOpen(false)
+          }}
         />
       </aside>
-
-      <NewThreadDialog
-        open={sel.newOpen}
-        onClose={() => sel.setNewOpen(false)}
-        onCreate={(name) => {
-          actions.handleCreate(name)
-          setDrawerOpen(false)
-        }}
-      />
 
       {actions.notice && (
         <div

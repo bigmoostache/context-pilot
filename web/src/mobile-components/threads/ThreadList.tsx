@@ -8,7 +8,7 @@ import {
   Pause,
   Play,
   Trash2,
-  SquarePen,
+  Plus,
   ChevronRight,
   LayoutGrid,
 } from "lucide-react"
@@ -38,8 +38,9 @@ interface ThreadListProps {
   onDelete: (id: string) => void
   /** pause ↔ resume a single thread (T371) */
   onPause: (id: string) => void
-  /** open the New Thread dialog */
-  onNewThread: () => void
+  /** create a thread named `name` — the bottom search field doubles as the
+   *  create input, so its current value IS the new thread's name (T633) */
+  onNewThread: (name: string) => void
 }
 
 /** Sort by most recent activity first. */
@@ -179,14 +180,26 @@ export function ThreadList({
         </div>
       </ScrollArea>
 
-      {/* Bottom action bar — search + compose, both in thumb reach (T625). */}
+      {/* Bottom action bar — the search field DOUBLES as the create input
+          (T633): typing filters the list live AND is the draft name for a new
+          thread. A create button appears only once the field is non-empty (live
+          view); tapping it — or pressing return — creates a thread with that
+          name and clears the field. */}
       <div className="flex shrink-0 items-center gap-2 border-t border-border/70 px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="flex flex-1 items-center gap-2 rounded-xl bg-muted/60 px-3 py-2 text-[16px]">
           <Search className="size-4 shrink-0 text-muted-foreground/60" />
           <input
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
-            placeholder={showArchived ? "Search archived" : "Search"}
+            onKeyDown={(e) => {
+              // Return creates a thread named after the current value (live view
+              // only) — the mobile keyboard's "go" affordance for the dual-use
+              // field. No-op on an empty field or in the archived view.
+              if (e.key !== "Enter" || showArchived || query.trim() === "") return
+              e.preventDefault()
+              onNewThread(query.trim())
+            }}
+            placeholder={showArchived ? "Search archived" : "Search or create a thread"}
             className="min-w-0 flex-1 bg-transparent text-foreground/90 outline-none placeholder:text-muted-foreground/55"
           />
           {query && (
@@ -199,16 +212,17 @@ export function ThreadList({
             </button>
           )}
         </div>
-        {/* compose — the primary create affordance, a filled circle at the
-            bottom-right corner of the bar (hidden in the archived view, where
-            creating a thread makes no sense) */}
-        {!showArchived && (
+        {/* Create — appears only when the field is non-empty (live view): the
+            field's value is the new thread's name. Hidden in the archived view
+            (creating there makes no sense) and when the field is empty (nothing
+            to name). */}
+        {!showArchived && query.trim() !== "" && (
           <button
-            onClick={onNewThread}
-            aria-label="New thread"
+            onClick={() => onNewThread(query.trim())}
+            aria-label="Create thread"
             className="flex size-11 shrink-0 items-center justify-center rounded-full bg-(--signal) text-(--primary-foreground) transition-[filter] active:brightness-110"
           >
-            <SquarePen className="size-5" />
+            <Plus className="size-5" />
           </button>
         )}
       </div>
