@@ -73,13 +73,13 @@ export function CornerButton({
         className={cn(
           // Circular frosted-glass target: NO background fill and NO border/ring
           // — the button is entirely transparent, so the only thing you see is
-          // the heavy backdrop blur + saturate turning whatever scrolls beneath
-          // into clean frosted glass, lifted off the page by a soft float
-          // shadow. `overflow-hidden` clips the tap-bloom sheen to the circle.
-          // 56px ≈ 1.5× the previous 36px.
+          // a LIGHT backdrop blur (a few px) + saturate turning whatever scrolls
+          // beneath into subtle frosted glass, lifted off the page by a soft
+          // float shadow. `overflow-hidden` clips the tap-bloom sheen to the
+          // circle. 56px ≈ 1.5× the previous 36px.
           "relative flex size-14 items-center justify-center overflow-hidden rounded-full",
           "text-foreground/85 shadow-(--shadow-pop)",
-          "backdrop-blur-xl backdrop-saturate-150",
+          "backdrop-blur-[3px] backdrop-saturate-150",
         )}
       >
         {/* Tap-bloom sheen — a faint glass tint pinned to the circle, invisible
