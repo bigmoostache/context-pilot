@@ -225,7 +225,17 @@ function MobileShell() {
           view's own bottom-anchored element (e.g. the composer's
           pb-[max(1rem,env(safe-area-inset-bottom))]), so padding it here too
           would double-count. In a plain Safari tab the inset is 0 = no-op. */}
-      <div className="min-h-0 flex-1 overflow-auto pt-[env(safe-area-inset-top)]">
+      {/* Fixed-height flex column (NOT overflow-auto): each view is a
+          `flex-1 min-h-0 flex-col` root that owns its OWN scroll (ThreadsView's
+          conversation ScrollArea, the fleet/finder ScrollAreas). A scrolling
+          outer wrapper here was a SECOND scroll layer — it let a view grow to
+          its content height, so ThreadConversation's `absolute bottom-0`
+          composer pinned to the bottom of ALL the messages (below the fold) and
+          scrolled with them instead of staying on-screen (T637). As a fixed
+          flex column with `overflow-hidden`, the view fills the viewport exactly,
+          its inner ScrollArea is the sole scroller, and the floating composer
+          pins to the real bottom of the screen. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden pt-[env(safe-area-inset-top)]">
         {body()}
       </div>
 
