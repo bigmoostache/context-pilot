@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react"
-import { FolderGit2, AlertTriangle, Plus, PanelLeft, X } from "lucide-react"
+import { FolderGit2, AlertTriangle, Plus, PanelLeft } from "lucide-react"
 import { ThreadList } from "@/mobile-components/threads/ThreadList"
 import { ThreadConversation } from "@/mobile-components/threads/ThreadConversation"
 import { NewThreadDialog } from "@/mobile-components/threads/NewThreadDialog"
@@ -159,20 +159,6 @@ export function ThreadsView({
           onNewThread={() => sel.setNewOpen(true)}
         />
       </aside>
-
-      {/* Close affordance for the drawer. A full-width drawer covers the scrim
-          and the open-toggle, so tapping outside is no longer possible — this
-          floating button (above the drawer) lets the user dismiss the list
-          without having to select a thread (T619). */}
-      {drawerOpen && (
-        <button
-          onClick={() => setDrawerOpen(false)}
-          aria-label="Close thread list"
-          className="fixed top-2 right-3 z-60 flex size-9 items-center justify-center rounded-full bg-card/90 text-foreground/80 backdrop-blur-md transition-colors active:bg-muted"
-        >
-          <X className="size-5" />
-        </button>
-      )}
 
       <NewThreadDialog
         open={sel.newOpen}
