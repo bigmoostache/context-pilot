@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react"
-import { animate, createSpring, stagger } from "animejs"
+import { useEffect, useRef } from "react"
+import { animate, stagger } from "animejs"
 import {
   Search,
   X,
@@ -16,6 +16,7 @@ import { CornerButton } from "@/mobile-components/shell/CornerButton"
 import type { ThreadDetail } from "@/lib/types"
 import { cn, prefersReducedMotion } from "@/lib/utils"
 import { previewOf } from "@/lib/support/threadMessages"
+import { useSwipeRow } from "@/lib/live/useSwipeRow"
 
 interface ThreadListProps {
   /** all of the realm's threads (archived included) — filtering happens here */
@@ -43,8 +44,7 @@ function byRecent(a: ThreadDetail, b: ThreadDetail): number {
   return (b.lastActivityMs ?? 0) - (a.lastActivityMs ?? 0)
 }
 
-/** Focused first, then agent-owes-you (MY_TURN), then most-recent — so the
- *  thread that wants attention floats to the top of the flat list. */
+/** Focused first, then MY_TURN (agent owes you), then most-recent. */
 function byPriority(a: ThreadDetail, b: ThreadDetail): number {
   const rank = (t: ThreadDetail) => (t.focused ? 0 : t.status === "MY_TURN" ? 1 : 2)
   const ra = rank(a)
@@ -55,25 +55,13 @@ function byPriority(a: ThreadDetail, b: ThreadDetail): number {
 /**
  * Mobile thread roster — an **iOS-Messages-style** conversation list (T620/T625).
  *
- * The desktop version is a dense sidebar rail. The mobile twin is rebuilt to feel
- * native, and (T625) to put every interactive control where a thumb can reach it:
- *
- *   • **No top title bar.** The desktop "Threads / N conversations" header + a
- *     top compose button are gone — a phone shouldn't hang primary actions off
- *     the top edge (hard to reach, and under the status bar in standalone).
- *   • **Bottom action bar.** Search moves to the BOTTOM of the screen with the
- *     compose (new-thread) button beside it — both within thumb reach, safe-area
- *     padded so they clear the home indicator.
- *   • **Archived toggle in the top-right corner** — a shared {@link CornerButton}
- *     (safe-area-offset so it's always tappable, even in standalone), flipping
- *     between the live and archived sets. This replaces the old bottom
- *     "Archived (N) ›" entry row and the archived back-header.
- *   • tall rows (avatar, title + timestamp, 2-line preview), hairline
- *     separators, a leading accent dot for a thread that owes you a turn, and
- *     **swipe-left** to reveal archive / pause / delete.
- *
- * All filtering / search / sort logic is shared with desktop — only the chrome
- * and the touch affordances fork.
+ * Rebuilt from the dense desktop sidebar to feel native and put every control in
+ * thumb reach: no top title bar; search + compose live in a BOTTOM action bar
+ * (safe-area padded); the archived toggle is a top-right {@link CornerButton};
+ * tall rows (leading status dot, title + timestamp, 2-line preview) with hairline
+ * separators; **swipe-left** reveals archive / pause / delete. All filtering /
+ * search / sort logic is shared with desktop — only the chrome + touch
+ * affordances fork.
  */
 export function ThreadList({
   threads,
@@ -230,14 +218,10 @@ function EmptyState({ hasQuery, showArchived }: { hasQuery: boolean; showArchive
 // ── row ──────────────────────────────────────────────────────────────
 
 /**
- * The leading status dot colour, encoding whose turn it is / what the thread is
- * doing (T627). One dot per row, first match wins:
- *   • yellow  (--warn)  — paused: the agent won't act until resumed;
- *   • green   (--ok)    — focused: the agent is actively on this thread now;
- *   • orange  (--signal)— agent's turn (MY_TURN / ACTIVE) but not yet focused —
- *                         it will pick this up soon;
- *   • grey    (muted)   — the user's turn (THEIR_TURN), nothing pending on the
- *                         agent side. Archived rows are always grey (inactive).
+ * The leading status dot colour, encoding whose turn it is (T627). First match
+ * wins: yellow (--warn) paused; green (--ok) focused; orange (--signal) agent's
+ * turn (MY_TURN / ACTIVE) not yet focused; grey (muted) the user's turn, or any
+ * archived row (inactive).
  */
 function statusTint(t: ThreadDetail, archived: boolean): string {
   if (archived) return "var(--muted-foreground)"
@@ -247,10 +231,9 @@ function statusTint(t: ThreadDetail, archived: boolean): string {
   return "var(--muted-foreground)"
 }
 
-/** iMessage-style conversation row: a leading status dot, title + timestamp, a
- *  2-line preview. The letter-avatar badge is gone (T627 — the initials carried
- *  no meaning); the coloured dot before the title now conveys the thread state.
- *  The row content sits above the swipe-revealed action strip ({@link SwipeRow}). */
+/** iMessage-style conversation row: leading status dot, title + timestamp, a
+ *  2-line preview. The coloured dot before the title conveys thread state (T627).
+ *  Row content sits above the swipe-revealed action strip ({@link SwipeRow}). */
 function ThreadRow({
   t,
   selected,
@@ -310,12 +293,11 @@ function ThreadRow({
 const ACTION_W = 136
 
 /**
- * Wrap a row so a **left-swipe** slides it aside to reveal its trailing
- * actions (archive / pause / delete) — the native iOS conversation-list
- * gesture, replacing the desktop's always-visible buttons. The row content
- * translates on X; the action strip sits pinned behind its right edge. A
- * partial swipe snaps open/closed on release, and tapping an open row closes
- * it (so a mis-swipe never eats the next tap).
+ * Wrap a row so a **left-swipe** slides it aside to reveal its trailing actions
+ * (archive / pause / delete) — the native iOS conversation-list gesture. All the
+ * gesture feel (direct-DOM-write drag, axis lock, pointer capture, velocity
+ * flick, spring snap) lives in {@link useSwipeRow}; this component is just the
+ * action strip + the bound sliding row.
  */
 function SwipeRow({
   children,
@@ -332,38 +314,7 @@ function SwipeRow({
   onDelete: () => void
   onPause: () => void
 }) {
-  const [dx, setDx] = useState(0)
-  const startXRef = useRef(0)
-  const baseXRef = useRef(0)
-  const open = dx <= -ACTION_W / 2
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    startXRef.current = e.touches[0]?.clientX ?? 0
-    baseXRef.current = dx
-  }
-  const onTouchMove = (e: React.TouchEvent) => {
-    const cur = e.touches[0]?.clientX ?? 0
-    const next = Math.min(0, Math.max(-ACTION_W, baseXRef.current + (cur - startXRef.current)))
-    setDx(next)
-  }
-  // #1 Spring release (anime.js): on lift, settle the row to open/closed with a
-  // spring instead of a flat CSS snap — the iOS rubber-band feel. React stays
-  // the SOLE writer of `transform` (via `dx`), so anime drives a plain number
-  // object and we mirror it into `dx` each frame in onUpdate — no two-writer
-  // fight over the element's transform. Reduced-motion jumps straight to target.
-  const onTouchEnd = () => {
-    const target = open ? -ACTION_W : 0
-    if (prefersReducedMotion()) {
-      setDx(target)
-      return
-    }
-    const o = { x: dx }
-    animate(o, {
-      x: target,
-      ease: createSpring({ stiffness: 400, damping: 34 }),
-      onUpdate: () => setDx(o.x),
-    })
-  }
+  const { rowRef, close, bind } = useSwipeRow(ACTION_W)
 
   // Second action is delete for an archived row (permanent), else pause/resume.
   return (
@@ -373,7 +324,7 @@ function SwipeRow({
         <button
           onClick={() => {
             onArchive()
-            setDx(0)
+            close()
           }}
           className="flex w-1/2 flex-col items-center justify-center gap-0.5 bg-(--warn) text-[11px] font-medium text-white"
         >
@@ -384,7 +335,7 @@ function SwipeRow({
           <button
             onClick={() => {
               onDelete()
-              setDx(0)
+              close()
             }}
             className="flex w-1/2 flex-col items-center justify-center gap-0.5 bg-(--danger) text-[11px] font-medium text-white"
           >
@@ -395,7 +346,7 @@ function SwipeRow({
           <button
             onClick={() => {
               onPause()
-              setDx(0)
+              close()
             }}
             className="flex w-1/2 flex-col items-center justify-center gap-0.5 bg-(--interactive) text-[11px] font-medium text-white"
           >
@@ -405,20 +356,11 @@ function SwipeRow({
         )}
       </div>
 
-      {/* row content — slides left on swipe; tapping while open just closes */}
-      <div
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-        onClickCapture={(e) => {
-          if (dx === 0) return
-          e.preventDefault()
-          e.stopPropagation()
-          setDx(0)
-        }}
-        className="relative bg-background"
-        style={{ transform: `translateX(${dx}px)` }}
-      >
+      {/* Row content — slides left on swipe. `touch-pan-y` keeps native vertical
+          scroll while the hook owns the horizontal drag; the transform is written
+          directly to this node (never via a React `style` prop) so a drag causes
+          zero re-renders. Tapping while open just closes. */}
+      <div ref={rowRef} {...bind} className="relative touch-pan-y bg-background select-none">
         {children}
       </div>
     </div>
