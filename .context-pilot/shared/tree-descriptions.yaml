@@ -12478,6 +12478,10 @@
   path: src/ui/ir/conversation.rs
   description: 'Conversation + overlay IR builder. Messages, history sections, streaming tools, input area. Overlays: Autocomplete, PerfOverlay (build_perf_overlay with frame budgets, CPU/Meili stats, FD count, op table), Config, SearchIndex. No QuestionForm overlay. Perf builder calls PERF.snapshot() and cp_mod_search::overlay_info().'
   last_edited_ms: 1781391612108
+9ef73592cd2b9d3b:
+  path: web/src/mobile-components/threads/ThreadList.tsx
+  description: Mobile ThreadList twin — iMessage-style conversation list (T620). Large bold title + compose (SquarePen) icon top-right; soft rounded search pill; tall rows (deterministic initials avatar circle + semibold title + right-aligned time + 2-line grey preview); hairline separators inset past avatar; leading blue dot on MY_TURN/unread. Swipe-left (touch drag translateX, snap open/closed via SwipeRow) reveals Archive + Pause/Delete strip — replaces desktop's always-visible buttons. Flat priority sort (focused>MY_TURN>recent); no turn group headers/count pills/working pill. 441 lines, swipe row in-file (threads/ dir at 8-entry cap). Filter/search/sort shared with desktop.
+  last_edited_ms: 1784710242901
 9efc1e2726bb28ef:
   path: src/app/run/threads.rs
   description: Thread-related helpers for the main event loop. maybe_inject_auto_read (synthetic Read on auto-continuation), check_my_turn_threads (idle MY_TURN detection + spine notification), extract_thread_ids (parse thread IDs from notification content). Free functions taking &mut App.

@@ -159,8 +159,19 @@ function MobileShell() {
     <div className="flex h-dvh w-screen flex-col overflow-hidden bg-background text-foreground">
       {/* No persistent chrome on mobile — no top bar, no bottom tab bar (T611).
           View navigation is being reworked; for now views are reached
-          contextually (fleet → open agent → threads; show-in-finder → finder). */}
-      <div className="min-h-0 flex-1 overflow-auto">{body()}</div>
+          contextually (fleet → open agent → threads; show-in-finder → finder).
+
+          pt safe-area inset: when the app runs as a standalone home-screen web
+          app (apple-mobile-web-app-status-bar-style=black-translucent) the web
+          view extends UNDER the iOS status bar, so the scrollable content is
+          padded down so it never sits beneath the clock/battery. Only the TOP
+          is padded here — the BOTTOM (home-indicator) inset is owned by each
+          view's own bottom-anchored element (e.g. the composer's
+          pb-[max(1rem,env(safe-area-inset-bottom))]), so padding it here too
+          would double-count. In a plain Safari tab the inset is 0 = no-op. */}
+      <div className="min-h-0 flex-1 overflow-auto pt-[env(safe-area-inset-top)]">
+        {body()}
+      </div>
     </div>
   )
 }

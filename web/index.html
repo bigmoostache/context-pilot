@@ -3,11 +3,31 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover lets the layout extend edge-to-edge INTO the safe
+         areas (notch / status bar / home indicator); the reclaimed regions are
+         then exposed to CSS as env(safe-area-inset-*) so content can pad away
+         from the clock/battery while the background still fills the whole
+         screen. Required for the "content under the status bar" look below. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
     <meta
       name="description"
       content="Context Pilot — phosphor cockpit interface (design maquette)"
     />
+    <!-- iOS standalone web app (Add to Home Screen). A PLAIN Safari TAB cannot
+         hide Safari's own chrome (the bottom back/URL/tabs toolbar) or draw
+         into the status bar — that is browser/OS chrome, not the page's. The
+         ONLY way a web page reclaims that space on iPhone is to run as a
+         standalone home-screen app: these meta tags make it launch fullscreen
+         with NO Safari chrome, and `black-translucent` makes the web view
+         extend UNDER the status bar so content flows edge-to-edge behind the
+         clock/battery (padded off via env(safe-area-inset-top)). -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Context Pilot" />
     <title>Context·Pilot — Cockpit</title>
     <!-- Set the theme class before first paint to avoid a light→dark flash
          (FOUC). Mirrors the logic in src/lib/theme.tsx: honour the saved
