@@ -223,8 +223,11 @@ export function ThreadConversation({
       <ScrollArea className="min-h-0 flex-1">
         {/* Tight horizontal gutter (WhatsApp/Messenger convention) — px-2 not
             p-4 so bubbles claim nearly the full phone width; vertical padding
-            stays roomier for scroll breathing room. */}
-        <div className="flex flex-col px-2 py-3">
+            stays roomier for scroll breathing room. The TOP pad carries
+            env(safe-area-inset-top) (T639) so the first message sits below the
+            iOS status bar at rest but scrolls edge-to-edge UNDER it — the shell
+            no longer pads the viewport down, each scroller owns its inset. */}
+        <div className="flex flex-col px-2 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-3">
           <div className="mb-3 flex items-center gap-2">
             <span className="h-px flex-1 bg-border/60" />
             <span className="text-[10.5px] text-muted-foreground/50">

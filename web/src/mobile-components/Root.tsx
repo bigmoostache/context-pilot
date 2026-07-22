@@ -234,10 +234,18 @@ function MobileShell() {
           scrolled with them instead of staying on-screen (T637). As a fixed
           flex column with `overflow-hidden`, the view fills the viewport exactly,
           its inner ScrollArea is the sole scroller, and the floating composer
-          pins to the real bottom of the screen. */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden pt-[env(safe-area-inset-top)]">
-        {body()}
-      </div>
+          pins to the real bottom of the screen.
+
+          NO top safe-area padding here (T639): a shared `pt-[env(safe-area-
+          inset-top)]` on this wrapper pushes every view's scroll VIEWPORT below
+          the iOS status bar, so content clips at the viewport top and never
+          scrolls UNDER the translucent bar (the "threads doesn't use the top
+          space" bug). Instead each scrolling view reaches y=0 and pads its own
+          scroll CONTENT with env(safe-area-inset-top) — the pattern the Agent
+          Settings page already uses (fixed inset-0 + internal header pad) — so
+          content sits below the clock at rest but scrolls edge-to-edge under it.
+          The agent-settings overlay owns its inset itself (fixed inset-0). */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{body()}</div>
 
       {/* Agent Settings page — a full-screen (fixed inset-0) overlay above every
           view. Rendered only when open AND the target agent still exists; its own

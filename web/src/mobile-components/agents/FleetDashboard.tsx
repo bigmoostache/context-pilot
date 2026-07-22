@@ -135,7 +135,7 @@ export function FleetDashboard({
     <div className="relative flex min-h-0 flex-1 flex-col">
       <ScrollArea className="min-h-0 flex-1 bg-background">
         <div className={cn("mx-auto flex w-full flex-col", FLEET_MAX_W)}>
-          <header className="flex items-center justify-between gap-3 px-4 pt-6 pb-3">
+          <header className="flex items-center justify-between gap-3 px-4 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-3">
             <div className="flex flex-col gap-0.5">
               <h1 className="text-[28px] leading-none font-bold tracking-tight text-foreground">
                 Agents
