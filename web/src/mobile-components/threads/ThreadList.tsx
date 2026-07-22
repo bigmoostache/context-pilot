@@ -1,4 +1,5 @@
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import { animate, createSpring, stagger } from "animejs"
 import {
   Search,
   X,
@@ -13,7 +14,7 @@ import {
 import { ScrollArea } from "@/mobile-components/ui/scroll-area"
 import { CornerButton } from "@/mobile-components/shell/CornerButton"
 import type { ThreadDetail } from "@/lib/types"
-import { cn } from "@/lib/utils"
+import { cn, prefersReducedMotion } from "@/lib/utils"
 import { previewOf } from "@/lib/support/threadMessages"
 
 interface ThreadListProps {
@@ -98,6 +99,23 @@ export function ThreadList({
   const source = showArchived ? archived : live
   const visible = source.filter((t) => matches(t)).toSorted(showArchived ? byRecent : byPriority)
 
+  // #3 List cascade (anime.js): stagger the rows in on first mount and whenever
+  // the set flips live↔archived. Deliberately keyed ONLY on `showArchived` (not
+  // the search query) — re-running the reveal on every keystroke would flicker
+  // the filtered list; search stays instant. Honours prefers-reduced-motion.
+  const listRef = useRef<HTMLUListElement>(null)
+  useEffect(() => {
+    const ul = listRef.current
+    if (!ul || prefersReducedMotion()) return
+    animate(ul.children, {
+      opacity: [0, 1],
+      translateY: [6, 0],
+      delay: stagger(18),
+      duration: 300,
+      ease: "out(2)",
+    })
+  }, [showArchived])
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
       {/* Top-right corner control: flip between live and archived. Shares the
@@ -136,7 +154,7 @@ export function ThreadList({
           {visible.length === 0 ? (
             <EmptyState hasQuery={q !== ""} showArchived={showArchived} />
           ) : (
-            <ul className="flex flex-col">
+            <ul ref={listRef} className="flex flex-col">
               {visible.map((t) => (
                 <li key={t.id}>
                   <SwipeRow
@@ -328,7 +346,24 @@ function SwipeRow({
     const next = Math.min(0, Math.max(-ACTION_W, baseXRef.current + (cur - startXRef.current)))
     setDx(next)
   }
-  const onTouchEnd = () => setDx(open ? -ACTION_W : 0)
+  // #1 Spring release (anime.js): on lift, settle the row to open/closed with a
+  // spring instead of a flat CSS snap — the iOS rubber-band feel. React stays
+  // the SOLE writer of `transform` (via `dx`), so anime drives a plain number
+  // object and we mirror it into `dx` each frame in onUpdate — no two-writer
+  // fight over the element's transform. Reduced-motion jumps straight to target.
+  const onTouchEnd = () => {
+    const target = open ? -ACTION_W : 0
+    if (prefersReducedMotion()) {
+      setDx(target)
+      return
+    }
+    const o = { x: dx }
+    animate(o, {
+      x: target,
+      ease: createSpring({ stiffness: 400, damping: 34 }),
+      onUpdate: () => setDx(o.x),
+    })
+  }
 
   // Second action is delete for an archived row (permanent), else pause/resume.
   return (
@@ -381,7 +416,7 @@ function SwipeRow({
           e.stopPropagation()
           setDx(0)
         }}
-        className="relative bg-background transition-transform duration-150"
+        className="relative bg-background"
         style={{ transform: `translateX(${dx}px)` }}
       >
         {children}

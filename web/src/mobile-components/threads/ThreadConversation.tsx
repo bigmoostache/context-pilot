@@ -59,12 +59,14 @@ const MessageRow = memo(
     onOpenFile,
     onShowInFinder,
     onDelete,
+    fresh,
   }: {
     msg: ThreadMsg
     agentId: string
     onOpenFile: (file: UploadedFile) => void
     onShowInFinder: ((path: string) => void) | undefined
     onDelete: (msg: ThreadMsg) => void
+    fresh: boolean
   }) {
     return (
       <div className="[contain-intrinsic-size:auto_5rem] [content-visibility:auto]">
@@ -74,6 +76,7 @@ const MessageRow = memo(
           onOpenFile={onOpenFile}
           onShowInFinder={onShowInFinder}
           onDelete={() => onDelete(msg)}
+          fresh={fresh}
         />
         {msg.fileRef && (
           <div className="pb-1.5 pl-5">
@@ -85,7 +88,7 @@ const MessageRow = memo(
       </div>
     )
   },
-  (a, b) => a.msg === b.msg && a.agentId === b.agentId,
+  (a, b) => a.msg === b.msg && a.agentId === b.agentId && a.fresh === b.fresh,
 )
 
 /**
@@ -159,8 +162,32 @@ export function ThreadConversation({
   // message (T414/T512) — auto tool-traces update a collapsed counter and must
   // not yank the scroll away from what the user is reading.
   const bottomRef = useRef<HTMLDivElement>(null)
-  const nonAutoCount = useMemo(() => thread.log.filter((m) => !m.auto).length, [thread.log])
-  useScrollPin(bottomRef, thread.id, nonAutoCount)
+  const nonAuto = useMemo(() => thread.log.filter((m) => !m.auto), [thread.log])
+  useScrollPin(bottomRef, thread.id, nonAuto.length)
+
+  // #5 Sent-bubble pop (anime.js): mark the SINGLE newest non-auto message as
+  // `fresh` when the log grows, so its bubble springs in (send/receive
+  // confirmation) — but NOT the whole initial batch, and NOT on a thread switch.
+  // This is React's blessed "adjust state while rendering" pattern (NOT an
+  // effect — a guarded setState during render, which re-renders in place with no
+  // intermediate paint and is StrictMode-safe): comparing the prior non-auto
+  // count/thread to the current, the message that just landed (last non-auto)
+  // becomes the fresh one. Message's useBubblePop pops exactly that row.
+  const [prevThread, setPrevThread] = useState(thread.id)
+  const [prevCount, setPrevCount] = useState(nonAuto.length)
+  const [freshId, setFreshId] = useState<string | null>(null)
+  if (prevThread !== thread.id) {
+    setPrevThread(thread.id)
+    setPrevCount(nonAuto.length)
+    setFreshId(null)
+  } else if (nonAuto.length !== prevCount) {
+    // Grew on an already-seen thread (prevCount>0 skips the first paint) → the
+    // last non-auto message is the one that just landed.
+    setFreshId(
+      prevCount > 0 && nonAuto.length > prevCount ? (nonAuto.at(-1)?.id ?? null) : null,
+    )
+    setPrevCount(nonAuto.length)
+  }
 
   /** Delete a message via the agent command bridge. Stable across renders
    *  (deps: agentId + thread.id) so it doesn't defeat the {@link MessageRow}
@@ -218,6 +245,7 @@ export function ThreadConversation({
                 onOpenFile={setSheetFile}
                 onShowInFinder={onShowInFinder}
                 onDelete={handleDelete}
+                fresh={seg.msg.id === freshId}
               />
             ),
           )}

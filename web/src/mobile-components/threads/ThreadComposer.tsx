@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { lineBounds, resolveEnter, resolveTab } from "@/lib/utils"
+import { animate, createSpring } from "animejs"
+import { lineBounds, resolveEnter, resolveTab, prefersReducedMotion } from "@/lib/utils"
 import { measure } from "@/lib/support/telemetry"
 import { ArrowUp, Plus, Loader2, Clock, Pause } from "lucide-react"
 import type { ThreadStatus } from "@/lib/types"
@@ -258,6 +259,20 @@ function ComposerInputRow({
   onAttach: ((files: File[]) => void | Promise<void>) | undefined
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // #4 Send-button pop (anime.js): spring the send button in the instant it
+  // becomes available (iMessage pops it, not a hard cut). The button is
+  // conditionally rendered, so this effect fires when `sendable` flips true and
+  // the ref has just mounted. Reduced-motion skips it (button appears at rest).
+  const sendBtnRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    const btn = sendBtnRef.current
+    if (!btn || !sendable || prefersReducedMotion()) return
+    animate(btn, {
+      scale: [0, 1],
+      opacity: [0, 1],
+      ease: createSpring({ stiffness: 600, damping: 20 }),
+    })
+  }, [sendable])
   return (
     // iMessage-style row: a standalone round attach button on the LEFT, then a
     // single rounded pill holding the textarea with the send button tucked
@@ -314,6 +329,7 @@ function ComposerInputRow({
             on an empty field), so the empty pill stays clean. */}
         {sendable && (
           <button
+            ref={sendBtnRef}
             onClick={onSubmit}
             aria-label="Send message"
             className="mb-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-(--signal) text-(--primary-foreground) transition-[filter] active:brightness-110"

@@ -8,13 +8,15 @@
 // attachment chip + segment splitter are pulled from the mobile mirror tree
 // (leak guard) so a mobile message never reaches into the desktop tree.
 
+import { useEffect, useRef } from "react"
+import { animate, createSpring } from "animejs"
 import { ChevronDown, Terminal, Trash2, User } from "lucide-react"
 import type { ChatMessage } from "@/lib/types"
 import { Markdown, type MarkdownVariant } from "@/lib/support/markdown"
 import { CopyButton } from "./CopyButton"
 import { MessageFileChip } from "@/mobile-components/threads/fileUpload"
 import { splitMessageSegments, type UploadedFile } from "@/mobile-components/threads/fileUpload/helpers"
-import { cn } from "@/lib/utils"
+import { cn, prefersReducedMotion } from "@/lib/utils"
 
 /**
  * Props every message renderer accepts.
@@ -36,9 +38,12 @@ interface MessageProps {
   onShowInFinder?: ((path: string) => void) | undefined
   /** permanently delete this message from the thread */
   onDelete?: (() => void) | undefined
+  /** true for a message that just APPENDED (not part of the initial load) —
+   *  drives the anime.js spring pop that reads as send/receive confirmation. */
+  fresh?: boolean | undefined
 }
 
-export function Message({ msg, agentId, onOpenFile, onShowInFinder, onDelete }: MessageProps) {
+export function Message({ msg, agentId, onOpenFile, onShowInFinder, onDelete, fresh }: MessageProps) {
   if (msg.role === "tool" && msg.tool) return <ToolMessage msg={msg} />
   if (msg.role === "user")
     return (
@@ -48,6 +53,7 @@ export function Message({ msg, agentId, onOpenFile, onShowInFinder, onDelete }: 
         onOpenFile={onOpenFile}
         onShowInFinder={onShowInFinder}
         onDelete={onDelete}
+        fresh={fresh}
       />
     )
   return (
@@ -57,8 +63,32 @@ export function Message({ msg, agentId, onOpenFile, onShowInFinder, onDelete }: 
       onOpenFile={onOpenFile}
       onShowInFinder={onShowInFinder}
       onDelete={onDelete}
+      fresh={fresh}
     />
   )
+}
+
+/**
+ * Spring-pop a just-appended message bubble (iMessage send/receive
+ * confirmation). No-op unless `fresh` is set — the initial history batch mounts
+ * every row at once and must NOT all pop; only a message appended after the
+ * first render carries `fresh`. Honours prefers-reduced-motion. Keyed on
+ * `fresh`: the appended row mounts already-fresh so the pop fires once; when a
+ * later append demotes it to non-fresh the effect re-runs and early-returns.
+ */
+function useBubblePop(fresh: boolean | undefined) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el || !fresh || prefersReducedMotion()) return
+    animate(el, {
+      scale: [0.96, 1],
+      translateY: [8, 0],
+      opacity: [0, 1],
+      ease: createSpring({ stiffness: 500, damping: 24 }),
+    })
+  }, [fresh])
+  return ref
 }
 
 /**
@@ -140,11 +170,15 @@ function DeleteButton({ align, onDelete }: { align: "start" | "end"; onDelete: (
   )
 }
 
-function UserMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete }: MessageProps) {
+function UserMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete, fresh }: MessageProps) {
+  const bubbleRef = useBubblePop(fresh)
   return (
     <div className="rise flex flex-col items-end gap-1 py-2">
       {/* wider bubble than desktop (78%) — a phone needs the horizontal room */}
-      <div className="card-shadow max-w-[85%] rounded-2xl rounded-br-md bg-(--signal) px-3.5 py-2 text-[13px] leading-relaxed text-(--primary-foreground)">
+      <div
+        ref={bubbleRef}
+        className="card-shadow max-w-[85%] rounded-2xl rounded-br-md bg-(--signal) px-3.5 py-2 text-[13px] leading-relaxed text-(--primary-foreground)"
+      >
         <MessageBody
           text={msg.text ?? ""}
           variant="onAccent"
@@ -165,7 +199,8 @@ function UserMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete }: Mes
   )
 }
 
-function AssistantMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete }: MessageProps) {
+function AssistantMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete, fresh }: MessageProps) {
+  const bubbleRef = useBubblePop(fresh)
   return (
     <div className="rise flex flex-col gap-1.5 py-2">
       {/* No author header on mobile (T611) — the orange mark + "Context Pilot"
@@ -173,7 +208,10 @@ function AssistantMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete }
           identifiable by its left alignment; the timestamp moves down into the
           action row beneath the message. */}
       {/* wider than desktop (88%) + a slimmer indent to reclaim phone width */}
-      <div className="max-w-[92%] pl-1 text-[13.5px] leading-relaxed text-foreground/90">
+      <div
+        ref={bubbleRef}
+        className="max-w-[92%] pl-1 text-[13.5px] leading-relaxed text-foreground/90"
+      >
         <MessageBody
           text={msg.text ?? ""}
           variant="default"

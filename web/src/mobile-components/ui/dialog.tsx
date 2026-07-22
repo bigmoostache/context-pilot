@@ -1,6 +1,8 @@
+import { useEffect, useRef } from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
+import { animate, createSpring } from "animejs"
 
-import { cn } from "@/lib/utils"
+import { cn, prefersReducedMotion } from "@/lib/utils"
 
 /**
  * shadcn-style Dialog (mobile twin) built on Base UI's Dialog primitive.
@@ -48,17 +50,43 @@ function DialogBackdrop({ className, ...props }: DialogPrimitive.Backdrop.Props)
  * translate transition (desktop uses a centred scale spring instead).
  */
 function DialogContent({ className, children, ...props }: DialogPrimitive.Popup.Props) {
+  // #6 Sheet rise (anime.js): spring the sheet up + fade on open, for a livelier
+  // entrance than the flat CSS translate. The Popup mounts fresh each open (Base
+  // UI unmounts it on close), so a mount-effect is the one-shot trigger. anime
+  // owns the ENTRY only: transitions are killed while it runs, then the inline
+  // transform/opacity/transition it wrote are cleared on completion so Base UI's
+  // class-driven `data-ending-style:translate-y-full` governs the CLOSE. The
+  // `data-starting-style` entry translate is dropped from the class list so the
+  // two never both drive the opening frame. Reduced-motion skips the spring.
+  const popupRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = popupRef.current
+    if (!el || prefersReducedMotion()) return
+    el.style.transition = "none"
+    animate(el, {
+      translateY: [24, 0],
+      opacity: [0, 1],
+      ease: createSpring({ stiffness: 320, damping: 30 }),
+      onComplete: () => {
+        el.style.transform = ""
+        el.style.opacity = ""
+        el.style.transition = ""
+      },
+    })
+  }, [])
+
   return (
     <DialogPrimitive.Portal>
       <DialogBackdrop />
       <DialogPrimitive.Popup
+        ref={popupRef}
         data-slot="dialog-content"
         className={cn(
           "fixed inset-x-0 bottom-0 z-50 max-h-[90vh] overflow-y-auto",
           "rounded-t-2xl border-t border-border bg-popover text-popover-foreground",
           "pb-[env(safe-area-inset-bottom)] shadow-(--shadow-pop) outline-none",
           "transition-transform duration-200 ease-out",
-          "data-ending-style:translate-y-full data-starting-style:translate-y-full",
+          "data-ending-style:translate-y-full",
           className,
         )}
         {...props}

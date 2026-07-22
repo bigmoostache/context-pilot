@@ -1,4 +1,5 @@
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { animate, createSpring } from "animejs"
 import { FolderGit2, AlertTriangle, Plus, PanelLeft } from "lucide-react"
 import { ThreadList } from "@/mobile-components/threads/ThreadList"
 import { ThreadConversation } from "@/mobile-components/threads/ThreadConversation"
@@ -6,6 +7,7 @@ import { NewThreadDialog } from "@/mobile-components/threads/NewThreadDialog"
 import { CornerButton } from "@/mobile-components/shell/CornerButton"
 import { useFleet, useThreads } from "@/lib/live"
 import { useThreadSelection, useThreadActions } from "@/lib/live/threadView"
+import { prefersReducedMotion } from "@/lib/utils"
 
 /**
  * Mobile thread surface — the divergent twin of `components/threads/ThreadsView`.
@@ -55,6 +57,26 @@ export function ThreadsView({
     },
     [sel],
   )
+
+  // #2 Drawer settle (anime.js): spring the drawer's slide instead of the flat
+  // CSS transition, for the subtle iOS overshoot-and-settle. anime owns the
+  // aside's transform (translateX 0% ↔ -100%); the first run is skipped (the
+  // drawer mounts closed off-screen — a spring there would flash it in) and
+  // reduced-motion snaps to the end position. The `-translate-x-full` class is
+  // dropped from the aside so React and anime never both write transform.
+  const drawerRef = useRef<HTMLElement>(null)
+  const firstRunRef = useRef(true)
+  useEffect(() => {
+    const el = drawerRef.current
+    if (!el) return
+    const to = drawerOpen ? "0%" : "-100%"
+    if (firstRunRef.current || prefersReducedMotion()) {
+      firstRunRef.current = false
+      el.style.transform = `translateX(${to})`
+      return
+    }
+    animate(el, { translateX: to, ease: createSpring({ stiffness: 300, damping: 30 }) })
+  }, [drawerOpen])
 
   // No agent at all → bare empty state (no realm to render a roster for).
   if (!hasAgent) {
@@ -135,10 +157,12 @@ export function ThreadsView({
           sliver of the dimmed conversation peeking at the edge just cramps the
           list for no benefit (T619). */}
       <aside
+        ref={drawerRef}
         aria-hidden={!drawerOpen}
+        style={{ transform: "translateX(-100%)" }}
         className={
-          "fixed inset-0 z-50 flex flex-col bg-surface transition-transform duration-200 ease-out " +
-          (drawerOpen ? "translate-x-0" : "-translate-x-full")
+          "fixed inset-0 z-50 flex flex-col bg-surface " +
+          (drawerOpen ? "" : "pointer-events-none")
         }
       >
         <ThreadList
