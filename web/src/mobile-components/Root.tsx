@@ -1,5 +1,4 @@
 import { useState, useCallback } from "react"
-import { LayoutGrid, MessagesSquare, FolderTree } from "lucide-react"
 
 import { FleetDashboard } from "@/mobile-components/agents/FleetDashboard"
 import { ThreadsView } from "@/mobile-components/threads/ThreadsView"
@@ -12,7 +11,6 @@ import { AuthProvider } from "@/lib/providers/AuthProvider"
 import { DevModeProvider } from "@/lib/providers/toggles/DevModeProvider"
 import { ShowOverlayProvider } from "@/lib/providers/toggles/ShowOverlayProvider"
 import { useFleet } from "@/lib/live"
-import { cn } from "@/lib/utils"
 import type { ViewMode } from "@/lib/types"
 import "@/App.css"
 
@@ -28,10 +26,10 @@ import "@/App.css"
  * the shared `@/lib` layer (not forked); only the presentation children resolve
  * through the `@/mobile-components` token, which is what the leak guard enforces.
  *
- * Ancestor-promotion in action (design §3.3): this real `Root` is the promoted
- * ancestor of the divergent `shell/TopBar` leaf, and it routes every view child
- * through `@/mobile-components/…` — so a future divergence anywhere beneath it is
- * reachable, never bypassed by a stub.
+ * Ancestor-promotion in action (design §3.3): this real `Root` is a promoted
+ * ancestor that routes every view child through `@/mobile-components/…` (e.g. the
+ * divergent `threads/ThreadsView` leaf) — so a future divergence anywhere beneath
+ * it is reachable, never bypassed by a stub.
  */
 function Root() {
   return (
@@ -58,20 +56,16 @@ function Root() {
  *  proof-of-concept scope). */
 type MobileView = Extract<ViewMode, "fleet" | "threads" | "finder">
 
-const TAB_LABEL: Record<MobileView, string> = {
-  fleet: "Fleet",
-  threads: "Threads",
-  finder: "Finder",
-}
-
 /**
  * Mobile app shell — the chrome that diverges from desktop `AppShell`.
  *
  * Same view-routing model as desktop (fleet → threads/finder for a selected
  * agent, persisted to the same `cp-view` / `cp-agent` localStorage keys so the
- * two trees agree on last-view across a reload), but the chrome is mobile-first:
- * no header row at all — a thumb-reachable {@link BottomTabBar} carries both
- * navigation and view identity, replacing the desktop's horizontal tab cluster.
+ * two trees agree on last-view across a reload). The mobile chrome is currently
+ * minimal to the point of absence: there is no top bar and no bottom tab bar
+ * (both removed, T611) — persistent navigation is being reworked, so for now the
+ * views are reached contextually (fleet → open agent → threads; show-in-finder
+ * → finder).
  *
  * The disconnect-overlay + live-vitals plumbing desktop `AppShell` carries is
  * elided here for the P4 proof-of-concept: views receive a non-disconnected,
@@ -156,44 +150,11 @@ function MobileShell() {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
-      {/* No top bar on mobile — the BottomTabBar carries nav + view identity, so
-          a header row would only steal vertical space (T611). */}
+      {/* No persistent chrome on mobile — no top bar, no bottom tab bar (T611).
+          View navigation is being reworked; for now views are reached
+          contextually (fleet → open agent → threads; show-in-finder → finder). */}
       <div className="min-h-0 flex-1 overflow-auto">{body()}</div>
-      <BottomTabBar view={effectiveView} onViewChange={changeView} />
     </div>
-  )
-}
-
-/** Thumb-reachable bottom navigation — the mobile replacement for the desktop
- *  TopBar's inline view tabs. Three fixed surfaces, active tab accented. */
-function BottomTabBar({
-  view,
-  onViewChange,
-}: {
-  view: MobileView
-  onViewChange: (v: MobileView) => void
-}) {
-  const tabs: { id: MobileView; icon: typeof LayoutGrid }[] = [
-    { id: "fleet", icon: LayoutGrid },
-    { id: "threads", icon: MessagesSquare },
-    { id: "finder", icon: FolderTree },
-  ]
-  return (
-    <nav className="flex h-14 shrink-0 items-stretch border-t border-border bg-card">
-      {tabs.map(({ id, icon: Icon }) => (
-        <button
-          key={id}
-          onClick={() => onViewChange(id)}
-          className={cn(
-            "flex flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors",
-            view === id ? "text-(--signal)" : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          <Icon className="size-5" />
-          {TAB_LABEL[id]}
-        </button>
-      ))}
-    </nav>
   )
 }
 
