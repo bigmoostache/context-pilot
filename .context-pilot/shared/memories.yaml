@@ -127,7 +127,7 @@
   - run
   last_edited_ms: 1784202957618
 3254fdbc36d9b4e8:
-  tl_dr: T581 footer behaviour-selector SHIPPED with SSE invalidation. Active agent shown, switchable, and live-invalidated via oplog BehaviourChanged→SSE delta→qk.library invalidate. Reuses threads/commands sync, zero dup. Set+invalidate land on tui reload (N-1).
+  tl_dr: 'T581 footer behaviour-selector SHIPPED, live-invalidation fixed (a3116ce4). Stale-chip root cause: OpEntryKind schema lacked agent_id (M160 earlier wrong). Schema+regen done; frontend folds delta.agent_id into library cache. Body has full detail.'
   contents: |-
     T581 Footer feature — done, all legs.
 
@@ -146,7 +146,7 @@
   - behaviour
   - load_behaviour
   - shipped
-  last_edited_ms: 1784712696519
+  last_edited_ms: 1784714773060
 3d36396d2a618055:
   tl_dr: NEVER touch temp_1.md or temp_2.md — they are user's personal files. Do not read, write, edit, or revert them.
   importance: critical
