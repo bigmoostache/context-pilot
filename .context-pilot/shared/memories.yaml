@@ -204,24 +204,6 @@
   - P9
   - resume
   last_edited_ms: 1784203006412
-47b6cb9381d3d65a:
-  tl_dr: 'T581 agent-editor SHIPPED: footer behaviour selector gets per-item Delete/Export/Edit + Create/Import rows. Backend seed-merge + GET/PUT/DELETE library/agent/{item}; frontend AgentEditorDialog + BehaviourChip. Details in body.'
-  contents: |-
-    T581 agent-editor SHIPPED (footer behaviour selector). Per-item Delete/Export/Edit + Create/Import rows.
-
-    Backend: orchestrator library() seed-merges cp_base library::agents()/skills()/commands() with disk .md (disk wins on id, builtin:true flag) in inspect/panels.rs. Three endpoints in rest/create.rs: read_library_agent (GET raw {name,description,body,builtin}, seed fallback for pure builtin), upsert_library_agent (PUT overwrite = override), delete_library_agent (DELETE, 404 pure-builtin = no file). Helpers compose_md/split_frontmatter/seed_agent. Routes in transport/mod.rs. openapi tests paths.rs+schemas_ext.rs + openapi.json regen.
-
-    Frontend: shell/AgentEditorDialog.tsx (one dialog, create/edit/import flows, useAgentEditorFields hook render-phase seed + async fetch effect, converge on PUT upsert). shell/BehaviourChip.tsx (dropdown Create/Import rows + per-item rows, parseAgentMd inline regex-free md parser for import preview, Delete hidden for pure builtins builtin!==true). mutations.ts useUpsertLibraryAgent+useDeleteLibraryAgent. api/index.ts fetchLibraryAgent/upsertLibraryAgent/deleteLibraryAgent + LibraryAgentRaw. StatusBar inline BehaviourChip extracted to own file. Mobile twins scaffolded.
-
-    All callbacks green. Local commit only (M151).
-  importance: high
-  labels:
-  - T581
-  - footer
-  - agent-editor
-  - shipped
-  - library
-  last_edited_ms: 1784722876591
 47b97e9a3b5951a1:
   tl_dr: 'T568: ''Use'' release selection now survives orchestrator reload. Backend::new reconciles persisted active_tag onto agent_binary at boot. Fix in transport/rest/backend.rs.'
   contents: 'select_release persists active_tag to releases/config.json but only mutated in-memory agent_binary, so reload reverted spawns to CP_AGENT_BINARY boot seed while UI badge still showed release Active — silent incoherence. Fix: Backend::new does releases.active_tag().map(binary_path).filter(bin.exists()).unwrap_or(agent_binary) — active_tag WINS over env seed, fallback to seed if binary deleted out from under us.'
@@ -259,6 +241,24 @@
   - feature
   - T570
   last_edited_ms: 1784222610385
+535fabcd17a6ae63:
+  tl_dr: 'T581 agent-editor SHIPPED (commit bea16ed6, local only M151): footer behaviour selector per-item Delete/Export/Edit + Create/Import rows. Backend seed-merge + GET/PUT/DELETE library/agent/{item}; frontend AgentEditorDialog + BehaviourChip. Details in body.'
+  contents: |-
+    T581 agent-editor SHIPPED, commit bea16ed6 (master, local only per M151).
+
+    Backend (orchestrator): library() (inspect/panels.rs) seed-merges cp_base library::agents()/skills()/commands() with disk .md (disk wins on id, builtin:true flag), mirrors tui storage::load_prompts_for. Three endpoints in rest/create.rs: read_library_agent (GET raw {name,description,body,builtin}, seed fallback for pure builtin), upsert_library_agent (PUT overwrite=override), delete_library_agent (DELETE 404 pure-builtin). Helpers compose_md/split_frontmatter/seed_agent. Routes in transport/mod.rs. openapi tests + openapi.json + generated TS regen.
+
+    Frontend: shell/AgentEditorDialog.tsx (one dialog create/edit/import, useAgentEditorFields hook render-phase seed + async fetch effect, converge on PUT upsert). shell/BehaviourChip.tsx (extracted from StatusBar; dropdown Create/Import rows + per-item Edit/Export/Delete, Delete hidden when builtin!==true; parseAgentMd inline regex-free md parser for import preview). mutations.ts useUpsertLibraryAgent+useDeleteLibraryAgent. api/index.ts fetchLibraryAgent/upsertLibraryAgent/deleteLibraryAgent + LibraryAgentRaw. Mobile twins scaffolded.
+
+    Needs orchestrator rebuild+restart for backend endpoints live (M99). All callbacks green.
+  importance: high
+  labels:
+  - T581
+  - footer
+  - agent-editor
+  - shipped
+  - library
+  last_edited_ms: 1784722914375
 5623177cb0b0ed7d:
   tl_dr: 'MULTI-WORKER (subworkers branch, off master): N equal workers, true concurrency, single main loop. Design doc: docs/design-subworkers.md. 14 shared modules, 8 per-worker.'
   importance: critical

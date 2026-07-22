@@ -1,5 +1,5 @@
 import { useRef, useState } from "react"
-import { Bot, Download, Pencil, Plus, Trash2, Upload } from "lucide-react"
+import { Bot, Download, Lock, Pencil, Plus, Trash2, Upload } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -252,13 +252,18 @@ function BehaviourRow({
   return (
     <DropdownMenuItem
       onClick={onSelect}
-      className={`group/row justify-between ${item.active ? "font-semibold text-foreground" : ""}`}
+      className={`group/row justify-between focus:bg-transparent focus:text-foreground data-highlighted:bg-transparent ${
+        item.active ? "font-semibold text-foreground" : "text-foreground/70 focus:font-medium"
+      }`}
     >
       <span className="flex items-center gap-2">
         {item.active ? (
           <span className="size-1.5 rounded-full bg-(--ok)" />
         ) : (
           <span className="size-1.5" />
+        )}
+        {item.builtin === true && (
+          <Lock className="size-3 shrink-0 text-muted-foreground/50" aria-label="built-in" />
         )}
         {item.name || item.id}
       </span>
@@ -296,8 +301,8 @@ function RowButton({
       type="button"
       title={title}
       onClick={onClick}
-      className={`flex size-5 items-center justify-center rounded-sm transition-colors hover:bg-muted ${
-        danger ? "text-muted-foreground hover:text-(--danger)" : "text-muted-foreground hover:text-foreground"
+      className={`flex size-5 items-center justify-center rounded-sm transition-colors ${
+        danger ? "text-muted-foreground/70 hover:text-(--danger)" : "text-muted-foreground/70 hover:text-foreground"
       }`}
     >
       {children}

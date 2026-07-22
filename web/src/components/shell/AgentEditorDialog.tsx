@@ -144,8 +144,8 @@ export function AgentEditorDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && close()}>
-      <DialogContent className="w-[560px] max-w-[94vw] p-0">
-        <form onSubmit={submit} className="flex flex-col">
+      <DialogContent className="flex h-[88vh] max-h-[900px] w-[92vw] max-w-[1080px] flex-col overflow-hidden p-0">
+        <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
           {/* Header */}
           <div className="flex items-start gap-3 border-b border-border/70 px-5 py-4">
             <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--signal)/15 text-(--signal)">
@@ -163,11 +163,11 @@ export function AgentEditorDialog({
 
           {/* Body */}
           {loading ? (
-            <div className="flex items-center justify-center gap-2 px-5 py-10 text-muted-foreground">
+            <div className="flex flex-1 items-center justify-center gap-2 px-5 py-10 text-muted-foreground">
               <Loader2 className="size-4 animate-spin" /> Loading…
             </div>
           ) : (
-            <div className="flex flex-col gap-4 px-5 py-4">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
               <label htmlFor="agent-name" className="flex flex-col gap-1.5">
                 <span className="text-[12px] font-medium text-foreground/80">Name</span>
                 <Input
@@ -195,14 +195,14 @@ export function AgentEditorDialog({
                 />
               </label>
 
-              <label htmlFor="agent-body" className="flex flex-col gap-1.5">
+              <label htmlFor="agent-body" className="flex min-h-0 flex-1 flex-col gap-1.5">
                 <span className="text-[12px] font-medium text-foreground/80">System prompt</span>
                 <Textarea
                   id="agent-body"
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
                   placeholder="The system prompt this behaviour agent loads…"
-                  className="min-h-[220px] font-mono text-[12.5px] leading-relaxed"
+                  className="h-full min-h-[220px] resize-none font-mono text-[12.5px] leading-relaxed"
                 />
               </label>
 
