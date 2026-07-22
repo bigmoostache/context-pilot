@@ -3622,6 +3622,10 @@
   path: src/app/run/reverie.rs
   description: Reverie event processing with flame!("reverie_tools"). maybe_start_reverie_stream, process_reverie_events, handle_reverie_tools (tool dispatch + queue support), check_reverie_end_turn (Report nudge). Multi-agent concurrent.
   last_edited_ms: 0
+2da3494d464955ed:
+  path: web/src/mobile-components/threads/ThreadsView.tsx
+  description: Mobile ThreadsView twin — conversation-primary + left drawer (T609). Drawer toggled by fixed top-left CornerButton, anime.js spring settle. onNewThread creates directly + closes drawer (T633, NewThreadDialog removed). onGoToAgents passed to ThreadList. Logic from shared @/lib/live/threadView.
+  last_edited_ms: 1784720928248
 2dc479a494f40736:
   path: crates/cp-mod-tree/src/types.rs
   description: Tree state types. TreeFileDescription (path, description, file_hash). TreeState (filter, open_folders, descriptions). DEFAULT_TREE_FILTER constant.
@@ -4410,6 +4414,10 @@
   path: docs/vision-layered-cognitive-architecture.md
   description: 'Long-term vision doc: 5-layer cognitive architecture (Reflexes→Policies→Reasoning→Reflection→Identity). Core insight: LLM as architect not executor. 6 missing pieces: policy compiler, sensory streams, motor abstraction, persistent life, delegation/swarm, consequence modeling. Maps Context Pilot''s current state to each layer.'
   last_edited_ms: 0
+38afe8c60b53f415:
+  path: web/src/mobile-components/threads/NewThreadDialog.tsx
+  description: '@generated mirror stub (export* desktop) — mobile NewThreadDialog discarded T633; create now lives inline in ThreadList''s bottom search field.'
+  last_edited_ms: 1784720928055
 38c999b0841cf949:
   path: crates/cp-base/src/tools/api_schema.rs
   description: LLM API schema builder. build_api() generates JSON tool array. inject_global_params() adds compulsory intent/verb to every tool schema.
@@ -19238,6 +19246,10 @@ f60552a56b821833:
   path: web/src/components/shell/StatsPopup.tsx
   description: 'Session ''vitals'' popup — accepts agentId, uses usePanels()+useAgentMeta() for live token budget + cost. Hosts the T269 Check Vitals action: on-demand (never polling) fetchVitals(agentId) → renders a status table (colored dot ok=--ok/error=--danger/unavailable=--muted-foreground + name + honest detail line + latency badge). Prepends 2 browser-observed rows (Frontend self ok + Frontend→Orchestrator round-trip ms measured via performance.now). Local useState (vitals/checking/vitalsErr), Stethoscope/Loader2 button. Portaled Dialog.'
   last_edited_ms: 1781880378944
+f607049b93af292d:
+  path: web/src/mobile-components/threads/ThreadList.tsx
+  description: 'Mobile ThreadList twin. iMessage list. Leading status dot, title+time+2-line preview, swipe-left Archive+Pause/Delete (useSwipeRow). Top-left CornerButton (LayoutGrid, onGoToAgents) to fleet; top-right archived toggle. Bottom field DOUBLES as search+create (T633): typing filters live AND is new-thread name; round + button + Enter gated on query.trim()!=='''' && !showArchived; onNewThread(name).'
+  last_edited_ms: 1784720928155
 f6135e932829a066:
   path: src/app/run/lifecycle.rs
   description: 'Main event loop with flame!("loop"). Input-first (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. poll_bridge_commands runs every tick. X18 LATENCY: adaptive idle poll — 8ms streaming/dirty, 2ms when bridge_active (web UI connected, keeps command→apply latency ≤ a few ms), 50ms otherwise. Ownership checks. Render ~28fps. Thread helpers in run/threads.rs.'
