@@ -147,20 +147,17 @@ export function ThreadList({
         </CornerButton>
       )}
 
-      {/* A minimal caption ONLY in the archived view, so the mode is legible
-          (the live view is deliberately chrome-free). */}
-      {showArchived && (
-        <div className="shrink-0 px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-1 text-center">
-          <span className="text-[13px] font-semibold tracking-wide text-muted-foreground/70">
-            Archived
-          </span>
-        </div>
-      )}
-
+      {/* No "Archived" caption: it sat OUTSIDE the ScrollArea as a non-scrolling
+          strip that occupied the safe-area region, so archived content could
+          never scroll UNDER the iOS status bar (T639). The mode is already
+          conveyed by the top-right toggle glyph (ArchiveRestore, signal-tinted),
+          so the caption was redundant chrome — dropped, and the archived list
+          now pads + scrolls edge-to-edge exactly like the live list. */}
       <ScrollArea className="min-h-0 flex-1">
-        {/* pad the top so the first row clears the floating corner button in the
-            live (caption-less) view */}
-        <div className={cn(showArchived ? "" : "pt-[calc(env(safe-area-inset-top)+3rem)]")}>
+        {/* pad the top so the first row clears the floating corner buttons AND
+            sits below the iOS status bar at rest, while scrolling edge-to-edge
+            UNDER it — applied in BOTH live and archived modes now (T639). */}
+        <div className="pt-[calc(env(safe-area-inset-top)+3rem)]">
           {visible.length === 0 ? (
             <EmptyState hasQuery={q !== ""} showArchived={showArchived} />
           ) : (
