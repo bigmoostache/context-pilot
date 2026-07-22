@@ -12,6 +12,8 @@ import { AuthProvider } from "@/lib/providers/AuthProvider"
 import { DevModeProvider } from "@/lib/providers/toggles/DevModeProvider"
 import { ShowOverlayProvider } from "@/lib/providers/toggles/ShowOverlayProvider"
 import { useFleet } from "@/lib/live"
+import { TopButtonsProvider } from "@/lib/providers/topButtons/provider"
+import { useTopButtons } from "@/lib/providers/topButtons"
 import type { ViewMode } from "@/lib/types"
 import "@/App.css"
 
@@ -51,7 +53,9 @@ function Root() {
             <ShowOverlayProvider>
               <TooltipProvider delay={350} closeDelay={80}>
                 <AuthGuard>
-                  <MobileShell />
+                  <TopButtonsProvider>
+                    <MobileShell />
+                  </TopButtonsProvider>
                 </AuthGuard>
               </TooltipProvider>
             </ShowOverlayProvider>
@@ -146,6 +150,12 @@ function MobileShell() {
   // Any non-fleet view needs a live agent; a stale/empty selection falls back to
   // the fleet grid (mirrors desktop's effectiveView guard).
   const effectiveView: MobileView = view !== "fleet" && !activeAgent ? "fleet" : view
+
+  // Signal the top-buttons provider on every page switch so the corner controls
+  // re-spring their glyph in lock-step with the transition (T637). Fires on
+  // mount too, seeding the entrance spring.
+  const { bump } = useTopButtons()
+  useEffect(bump, [effectiveView, bump])
 
   // The agent whose Settings page is open, resolved to a live fleet member (a
   // just-retired agent vanishes from the list → the overlay closes itself).

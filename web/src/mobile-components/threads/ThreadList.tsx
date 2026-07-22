@@ -116,7 +116,7 @@ export function ThreadList({
           even in standalone; the archived toggle mirrors it on the right. */}
       {onGoToAgents && (
         <CornerButton side="left" label="Show agents" onClick={onGoToAgents} className="z-30">
-          <LayoutGrid className="size-4.5" />
+          <LayoutGrid />
         </CornerButton>
       )}
 
@@ -132,9 +132,9 @@ export function ThreadList({
           className="z-30"
         >
           {showArchived ? (
-            <ArchiveRestore className="size-4.5 text-(--signal)" />
+            <ArchiveRestore className="text-(--signal)" />
           ) : (
-            <Archive className="size-4.5" />
+            <Archive />
           )}
         </CornerButton>
       )}

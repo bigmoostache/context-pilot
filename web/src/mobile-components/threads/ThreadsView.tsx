@@ -6,6 +6,7 @@ import { ThreadConversation } from "@/mobile-components/threads/ThreadConversati
 import { CornerButton } from "@/mobile-components/shell/CornerButton"
 import { useFleet, useThreads } from "@/lib/live"
 import { useThreadSelection, useThreadActions } from "@/lib/live/threadView"
+import { useTopButtons } from "@/lib/providers/topButtons"
 import { prefersReducedMotion } from "@/lib/utils"
 
 /**
@@ -56,6 +57,13 @@ export function ThreadsView({
   // conversation owns the screen); the user taps the top-left toggle to browse
   // threads, and picking one closes it again.
   const [drawerOpen, setDrawerOpen] = useState(false)
+
+  // Signal the top-buttons provider on every drawer edge (T637): the corner
+  // controls swap between the conversation's set (drawer toggle / settings) and
+  // the thread-list's set (agents grid / archived toggle), so their glyphs
+  // re-spring in sync with the slide.
+  const { bump } = useTopButtons()
+  useEffect(bump, [drawerOpen, bump])
 
   const openThread = useCallback(
     (id: string) => {
@@ -138,7 +146,7 @@ export function ThreadsView({
         onClick={() => setDrawerOpen(true)}
         className="z-20"
       >
-        <PanelLeft className="size-4.5" />
+        <PanelLeft />
       </CornerButton>
 
       {/* Settings button — top-right of the conversation (that corner is free;
@@ -146,7 +154,7 @@ export function ThreadsView({
           page (T636). z-20 so the drawer scrim (z-40) covers it when open. */}
       {onOpenSettings && (
         <CornerButton side="right" label="Agent settings" onClick={onOpenSettings} className="z-20">
-          <Settings2 className="size-4.5" />
+          <Settings2 />
         </CornerButton>
       )}
 
