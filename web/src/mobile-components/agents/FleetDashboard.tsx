@@ -7,10 +7,11 @@ import {
   FolderGit2,
   Loader2,
   Plus,
+  Search,
   Settings2,
+  X,
 } from "lucide-react"
 import { ScrollArea } from "@/mobile-components/ui/scroll-area"
-import { Dialog, DialogContent, DialogTitle } from "@/mobile-components/ui/dialog"
 import { accentVar, fmtCost, FLEET_MAX_W } from "@/lib/support/panelMeta"
 import {
   useMetrics,
@@ -42,10 +43,15 @@ type Modal = { mode: "manage"; agent: Agent } | null
  * (T632): a flat borderless list where each agent is a full-width tappable row
  * (leading avatar/icon with a status presence-dot, name, `model · task`
  * subtitle, trailing cost + chevron). Tap opens the agent; swipe-left reveals
- * Manage / Retire (shared `useSwipeRow`). The `+` opens a light {@link
- * NewAgentSheet} bottom sheet (single name field, model defaults, set later via
- * Manage) instead of the heavy full-screen `AgentModal`. anime.js cascades the
- * rows in on first load and pops the toast.
+ * Manage / Retire (shared `useSwipeRow`).
+ *
+ * Creation mirrors the mobile ThreadList (T633): the **bottom bar field doubles
+ * as search and the create-name** — typing filters the roster live AND is the
+ * draft name for a new agent; a round `+` button appears only once the field is
+ * non-empty, and tapping it (or pressing Return) spawns an agent with that name
+ * (folder derived server-side, model defaulted — change it later via Manage)
+ * then clears the field. This replaced the earlier full-screen `AgentModal`
+ * create flow and the intermediate `NewAgentSheet` bottom sheet.
  */
 export function FleetDashboard({
   agents,
@@ -59,22 +65,50 @@ export function FleetDashboard({
   onAutoCreateConsumed?: (() => void) | undefined
 }) {
   const [modal, setModal] = useState<Modal>(null)
-  const [creating, setCreating] = useState(false)
+  const [query, setQuery] = useState("")
   const [toast, setToast] = useState<string | null>(null)
-
-  // Honour an external "create a new agent" request from the switcher — a
-  // genuine reaction to a prop edge, deferred to a microtask so it lands after
-  // commit (same set-state-in-effect avoidance as desktop).
-  useEffect(() => {
-    if (!autoCreate) return
-    queueMicrotask(() => setCreating(true))
-    onAutoCreateConsumed?.()
-  }, [autoCreate, onAutoCreateConsumed])
+  const createAgent = useCreateAgent()
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const flash = (m: string) => {
     setToast(m)
     window.setTimeout(() => setToast(null), 2200)
   }
+
+  /** Spawn an agent named after the current field value, then clear it. Folder
+   *  is derived server-side from the name; the model defaults (set later via
+   *  Manage). No-op on an empty field or while a create is already in flight. */
+  const create = () => {
+    const name = query.trim()
+    if (name === "" || createAgent.isPending) return
+    createAgent.mutate(
+      { name },
+      {
+        onSuccess: (receipt) => {
+          flash(`Spawning “${name}” in ${receipt.folder}`)
+          setQuery("")
+        },
+        onError: (err) =>
+          flash(err instanceof Error ? err.message : "Could not create the agent"),
+      },
+    )
+  }
+
+  // Honour an external "create a new agent" request from the switcher — a
+  // genuine reaction to a prop edge, deferred to a microtask so it lands after
+  // commit (set-state-in-effect avoidance). There's no create sheet anymore, so
+  // this focuses the dual-use bottom field (the create surface) instead.
+  useEffect(() => {
+    if (!autoCreate) return
+    queueMicrotask(() => inputRef.current?.focus())
+    onAutoCreateConsumed?.()
+  }, [autoCreate, onAutoCreateConsumed])
+
+  // Live filter: the field doubles as search, so the roster narrows as the user
+  // types (matching name substring, case-insensitive). Whatever is typed is ALSO
+  // the draft name for the create button below — same dual-use as ThreadList.
+  const q = query.trim().toLowerCase()
+  const filtered = q === "" ? agents : agents.filter((a) => a.name.toLowerCase().includes(q))
 
   // #1 List cascade (anime.js): stagger the rows in the first time the roster
   // lands. A ref guard runs it ONCE — creating/retiring later must not re-cascade
@@ -109,22 +143,19 @@ export function FleetDashboard({
                 </span>
               )}
             </div>
-            <button
-              onClick={() => setCreating(true)}
-              aria-label="New agent"
-              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-(--interactive)/12 text-(--interactive) transition-[filter] active:brightness-110"
-            >
-              <Plus className="size-5.5" strokeWidth={2.5} />
-            </button>
           </header>
 
           {agents.length === 0 ? (
             <p className="px-4 py-16 text-center text-[14px] text-muted-foreground/55">
-              No agents yet — tap + to create one.
+              No agents yet — type a name below to create one.
+            </p>
+          ) : filtered.length === 0 ? (
+            <p className="px-4 py-16 text-center text-[14px] text-muted-foreground/55">
+              No agents match “{query.trim()}”.
             </p>
           ) : (
             <ul ref={listRef} className="flex flex-col">
-              {agents.map((a) => (
+              {filtered.map((a) => (
                 <li key={a.id}>
                   <AgentSwipeRow
                     agent={a}
@@ -143,7 +174,55 @@ export function FleetDashboard({
 
       {modal && <AgentModal modal={modal} onClose={() => setModal(null)} onFlash={flash} />}
 
-      <NewAgentSheet open={creating} onClose={() => setCreating(false)} onFlash={flash} />
+      {/* Bottom action bar — the search field DOUBLES as the create input (T633,
+          mirroring ThreadList): typing filters the roster live AND is the draft
+          name for a new agent. A create button appears only once the field is
+          non-empty; tapping it — or pressing Return — spawns an agent with that
+          name and clears the field. */}
+      <div className="flex shrink-0 items-center gap-2 border-t border-border/70 px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="flex flex-1 items-center gap-2 rounded-xl bg-muted/60 px-3 py-2 text-[16px]">
+          <Search className="size-4 shrink-0 text-muted-foreground/60" />
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              // Return spawns an agent named after the current value — the mobile
+              // keyboard's "go" affordance for the dual-use field. No-op empty.
+              if (e.key !== "Enter" || query.trim() === "") return
+              e.preventDefault()
+              create()
+            }}
+            placeholder="Search or create an agent"
+            className="min-w-0 flex-1 bg-transparent text-foreground/90 outline-none placeholder:text-muted-foreground/55"
+          />
+          {query && (
+            <button
+              onClick={() => setQuery("")}
+              className="shrink-0 text-muted-foreground/55 active:text-foreground"
+              title="Clear"
+            >
+              <X className="size-4" />
+            </button>
+          )}
+        </div>
+        {/* Create — appears only when the field is non-empty: the field's value
+            is the new agent's name. */}
+        {query.trim() !== "" && (
+          <button
+            onClick={create}
+            disabled={createAgent.isPending}
+            aria-label="Create agent"
+            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-(--interactive) text-(--primary-foreground) transition-[filter] active:brightness-110 disabled:opacity-60"
+          >
+            {createAgent.isPending ? (
+              <Loader2 className="size-5 animate-spin" />
+            ) : (
+              <Plus className="size-5" />
+            )}
+          </button>
+        )}
+      </div>
 
       <Toast message={toast} />
     </div>
@@ -385,90 +464,6 @@ function RetiredSwipeRow({ agent, onFlash }: { agent: Agent; onFlash: (m: string
         </span>
       </div>
     </div>
-  )
-}
-
-/**
- * Light bottom-sheet agent creation (T632) — replaces the heavy full-screen
- * `AgentModal` create flow, mirroring the New-Thread sheet the user preferred:
- * grabber, `Cancel · New Agent · Create` nav bar, one autofocused 16px name
- * field (16px defeats iOS focus-zoom). The model defaults server-side (change it
- * later via Manage), so creation is one field, one tap. Submitting spawns the
- * agent (folder derived from the name) and flashes the receipt.
- */
-function NewAgentSheet({
-  open,
-  onClose,
-  onFlash,
-}: {
-  open: boolean
-  onClose: () => void
-  onFlash: (m: string) => void
-}) {
-  const [name, setName] = useState("")
-  const createAgent = useCreateAgent()
-  const canCreate = name.trim().length > 0 && !createAgent.isPending
-
-  const close = () => {
-    setName("")
-    onClose()
-  }
-
-  const submit = (e: React.SyntheticEvent) => {
-    e.preventDefault()
-    if (!canCreate) return
-    createAgent.mutate(
-      { name: name.trim() },
-      {
-        onSuccess: (receipt) => {
-          onFlash(`Spawning “${name.trim()}” in ${receipt.folder}`)
-          close()
-        },
-        onError: (err) =>
-          onFlash(err instanceof Error ? err.message : "Could not create the agent"),
-      },
-    )
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && close()}>
-      <DialogContent className="px-0 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-        <div className="mx-auto mb-1 h-1 w-9 rounded-full bg-muted-foreground/25" />
-
-        {/* iOS nav-bar header: Cancel · title · Create */}
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center border-b border-border/70 px-4 py-2">
-          <button
-            type="button"
-            onClick={close}
-            className="justify-self-start text-[16px] text-(--interactive) active:opacity-60"
-          >
-            Cancel
-          </button>
-          <DialogTitle className="justify-self-center text-[16px]">New Agent</DialogTitle>
-          <button
-            type="submit"
-            form="new-agent-form"
-            disabled={!canCreate}
-            className="justify-self-end text-[16px] font-semibold text-(--interactive) active:opacity-60 disabled:text-muted-foreground/40"
-          >
-            Create
-          </button>
-        </div>
-
-        <form id="new-agent-form" onSubmit={submit} className="px-4 pt-4">
-          <input
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Agent name"
-            className="w-full rounded-xl bg-muted/60 px-4 py-3 text-[16px] text-foreground/90 outline-none placeholder:text-muted-foreground/50"
-          />
-          <p className="mt-2 px-1 text-[12.5px] text-muted-foreground/70">
-            Spawns an agent in a folder named after it. Pick its model later via Manage.
-          </p>
-        </form>
-      </DialogContent>
-    </Dialog>
   )
 }
 
