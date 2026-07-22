@@ -2706,6 +2706,10 @@
   path: crates/cp-oplog/src/service.rs
   description: 'OplogService off-loop group-commit + GAP2/I2 backpressure. Durability + BestEffortOutcome enums #[expect(exhaustive_enums)] A4 registered. Durability::of classifies best-effort (phase/cost/focus) vs durable.'
   last_edited_ms: 0
+22d7d9ee8bb88dac:
+  path: web/src/mobile-components/agents/FleetDashboard.tsx
+  description: 'Mobile FleetDashboard twin — reworked iOS-native (T631): large title + top-right add glyph, single-col tappable card stack (whole card tap = open agent, ChevronRight affordance), swipe-left (useSwipeRow, ACTION_W=136) reveals Manage/Retire, anime.js card cascade stagger-in (once, ref-guarded) + Toast createSpring pop; dashed NewAgentCard only when fleet empty; RetiredSection single-col Unretire button. Live vitals/health/create/retire/unretire logic identical to desktop.'
+  last_edited_ms: 1784715938581
 22f763ba98065e09:
   path: web/src/components/finder/Finder.tsx
   description: 'Per-agent Finder file manager (493 LOC after X913 split). Owns view state + derived listings + render; delegates fs mutations/nav to useFinderActions, selection/open/tab/menu to useFinderSelection, keyboard to useFinderKeyboard, external drag to useExternalDragUpload, bottom chrome to FinderOverlays. QuickLook = modal shadcn Sheet (2/3 width, grid+list). T334: revealPath prop — navigates to file''s parent directory and selects the file when set (used by Show in Finder from thread file chips).'
@@ -12270,6 +12274,10 @@
   path: crates/cp-wire/src/lib.rs
   description: 'Versioning primitives: PROTOCOL_VERSION const + accepts(their_major) N-1 compat check. Declares framing + types modules. 4 tests.'
   last_edited_ms: 0
+9be60d377c407906:
+  path: web/src/mobile-components/threads/ThreadList.tsx
+  description: 'Mobile ThreadList twin — iMessage list (T620/T627/T631). Leading status dot (green focused/orange agent-turn/yellow paused/grey user-turn), title+time+2-line preview, swipe-left reveals Archive+Pause/Delete via useSwipeRow. Top-LEFT CornerButton (LayoutGrid, onGoToAgents) navigates to fleet page; top-RIGHT CornerButton archived toggle. Bottom action bar: search pill + compose. onGoToAgents prop typed (()=>void)|undefined.'
+  last_edited_ms: 1784715938709
 9bfbd78ae78db924:
   path: src/llms/claude_code_api_key/mod.rs
   description: Claude Code API Key implementation. Uses ANTHROPIC_API_KEY with Bearer auth + Claude Code headers. Replicates Claude Code request signature for Claude 4.5 model access.
@@ -16066,6 +16074,10 @@ cbbef4219a1d03ee:
   path: src/ui/ir/render_sidebar.rs
   description: 'Sidebar ratatui renderer — render_sidebar_from_ir(). Normal mode: token bar box, fixed/dynamic entries with pagination, PR card, token stats. Collapsed mode: icon strip. Entry rendering: indicator+icon+shortcut+label+tokens. Token color gradient (grey→red).'
   last_edited_ms: 0
+cbc047bc86d8744f:
+  path: web/src/mobile-components/threads/ThreadsView.tsx
+  description: Mobile ThreadsView twin — conversation-primary + left drawer (T609). Drawer toggled by fixed top-left CornerButton; anime.js spring settle. Passes onGoToAgents (typed (()=>void)|undefined) through to ThreadList's top-left agents button (T631). Logic from shared @/lib/live/threadView.
+  last_edited_ms: 1784715938799
 cbd2c8d917fc2247:
   path: web/src/components/finder/Finder.tsx
   description: Per-agent Finder file manager (confined to agent realm). useFs(agentId, relCwd) for live listings. Tabs+history+nav+selection+drag-drop+statusbar+marquee. PinnedFolder type + loadPins/pinsKey localStorage helpers (key cp-finder-pins:<agentId>); pins state persisted via useEffect; addPin/removePin. ColumnsView called with live-Miller props (agentId/agentFolder/chain/currentNodes/onNavigate). FinderSidebar + ContextMenu wired with onPin/onUnpin. Four view modes, keyboard control. Quick Look panel CLOSED by default; opens on single-click of a file (select handler), not on double-click.
