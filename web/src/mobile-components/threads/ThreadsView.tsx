@@ -42,10 +42,10 @@ export function ThreadsView({
   const actions = useThreadActions(activeAgentId, threads, sel)
 
   // The one piece of state desktop's always-open rail doesn't need: whether the
-  // thread-list drawer is showing. Opens on mount (roster is the landing view)
-  // and any time the user taps the toggle; closes when a thread is picked so the
-  // conversation gets the full screen.
-  const [drawerOpen, setDrawerOpen] = useState(true)
+  // thread-list drawer is showing. Closed by default when a realm opens (the
+  // conversation owns the screen); the user taps the top-left toggle to browse
+  // threads, and picking one closes it again.
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   const openThread = useCallback(
     (id: string) => {
