@@ -124,7 +124,12 @@ function DeleteButton({ align, onDelete }: { align: "start" | "end"; onDelete: (
       onClick={onDelete}
       aria-label="Delete message"
       className={cn(
-        "flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] transition-colors",
+        // Match CopyButton's box metrics EXACTLY (gap-1, px-1 py-0.5, text-[10px],
+        // size-3 icon) so the two buttons + the timestamp span render at the same
+        // height — otherwise the action row's `items-center` fights each child's
+        // `self-*` and they visibly stagger (T613). No hover on touch: steady
+        // opacity with an active-press danger tint.
+        "flex items-center gap-1 rounded-md px-1 py-0.5 text-[10px] transition-colors",
         "text-muted-foreground/70 outline-none active:text-(--danger)",
         align === "end" ? "self-end" : "self-start",
       )}
@@ -182,7 +187,7 @@ function AssistantMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete }
       </div>
       {!msg.streaming && (
         <div className="flex items-center gap-2 pl-1">
-          <span className="text-[10px] text-muted-foreground/60">{msg.ts}</span>
+          <span className="text-[10px] leading-none text-muted-foreground/60">{msg.ts}</span>
           <CopyButton text={msg.text ?? ""} align="start" label="Copy message" />
           {onDelete && <DeleteButton align="start" onDelete={onDelete} />}
         </div>
