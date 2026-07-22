@@ -18,7 +18,8 @@
          view stops extending under the status bar and loses its edge-to-edge
          full-screen look (the T639 regression). Leaving the manifest UNLINKED
          drops iOS back to the legacy apple-mobile-web-app standalone path,
-         which black-translucent + viewport-fit=cover drive edge-to-edge. The
+         driven by the meta tags below (viewport-fit=cover; status-bar style —
+         see the T643 note there). The
          iOS home-screen icon still comes from the apple-touch-icon above (NOT
          the manifest), so nothing is lost on iOS. public/site.webmanifest is
          kept in the tree for a future Android/Chrome install, where it would be
@@ -41,12 +42,23 @@
          into the status bar — that is browser/OS chrome, not the page's. The
          ONLY way a web page reclaims that space on iPhone is to run as a
          standalone home-screen app: these meta tags make it launch fullscreen
-         with NO Safari chrome, and `black-translucent` makes the web view
-         extend UNDER the status bar so content flows edge-to-edge behind the
-         clock/battery (padded off via env(safe-area-inset-top)). -->
+         with NO Safari chrome.
+
+         Status-bar style is `black` (opaque), NOT `black-translucent` (T643):
+         on iOS 26 standalone, the black-translucent + viewport-fit=cover combo
+         is field-confirmed (r/PWA study, public test site) to shrink the web
+         view short of the physical bottom — a permanent ~34px dead "chin" band
+         at the home indicator that keyboard cycles aggravate. With a
+         NON-translucent style the web view's bottom touches the true bottom of
+         the screen. Tradeoff: content starts BELOW the status bar instead of
+         flowing under the clock (env(safe-area-inset-top) resolves to 0, so the
+         views' top padding degrades harmlessly). `black` matches the mobile
+         true-black dark background (.dark.mobile) so the bar reads as part of
+         the app. iOS caches this config AT Add-to-Home-Screen time — changing
+         it requires deleting and re-adding the home-screen icon. -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="Context Pilot" />
     <title>Context·Pilot — Cockpit</title>
     <!-- Set the theme class before first paint to avoid a light→dark flash
