@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import { ScrollArea } from "@/mobile-components/ui/scroll-area"
 import { FrostedBottomBar } from "@/mobile-components/shell/FrostedBottomBar"
+import { CornerButton } from "@/mobile-components/shell/CornerButton"
 import { useElementHeight } from "@/lib/live/useElementHeight"
 import { accentVar, fmtCost, FLEET_MAX_W } from "@/lib/support/panelMeta"
 import {
@@ -68,11 +69,9 @@ export function FleetDashboard({
 }) {
   const [query, setQuery] = useState("")
   const [toast, setToast] = useState<string | null>(null)
-  // Standalone Claude usage page — the mobile home's Anthropic-usage door. The
-  // desktop header Anthropic button opens a usage popover; the mobile shell has
-  // no TopBar (T611), so the fleet (home) header gear opens this dedicated
-  // full-screen usage PAGE (token status, rate-limit bars, stored accounts,
-  // login) — styled like the rest of the app, NOT a config dialog.
+  // Standalone Claude usage page — opened by the top-right CornerButton (the
+  // mobile home's Anthropic-usage door; token status, rate-limit bars, stored
+  // accounts, login), styled like the rest of the app, NOT a config dialog.
   const [usageOpen, setUsageOpen] = useState(false)
   const createAgent = useCreateAgent()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -141,9 +140,14 @@ export function FleetDashboard({
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      {/* App-wide top-right glass CornerButton — opens the Claude usage page. */}
+      <CornerButton side="right" label="Claude usage" onClick={() => setUsageOpen(true)}>
+        <Settings />
+      </CornerButton>
+
       <ScrollArea className="min-h-0 flex-1 bg-background">
         <div className={cn("mx-auto flex w-full flex-col", FLEET_MAX_W)}>
-          <FleetHeader count={agents.length} onOpenConfig={() => setUsageOpen(true)} />
+          <FleetHeader count={agents.length} />
 
           {agents.length === 0 ? (
             <p className="px-4 py-16 text-center text-[14px] text-muted-foreground/55">
@@ -181,53 +185,14 @@ export function FleetDashboard({
           name for a new agent. A create button appears only once the field is
           non-empty; tapping it — or pressing Return — spawns an agent with that
           name and clears the field. */}
-      <FrostedBottomBar
-        ref={barRef}
-        className="flex items-center gap-2 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
-      >
-        <div className="flex flex-1 items-center gap-2 rounded-xl bg-muted/60 px-3 py-2 text-[16px]">
-          <Search className="size-4 shrink-0 text-muted-foreground/60" />
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              // Return spawns an agent named after the current value — the mobile
-              // keyboard's "go" affordance for the dual-use field. No-op empty.
-              if (e.key !== "Enter" || query.trim() === "") return
-              e.preventDefault()
-              create()
-            }}
-            placeholder="Search or create an agent"
-            className="min-w-0 flex-1 bg-transparent text-foreground/90 outline-none placeholder:text-muted-foreground/55"
-          />
-          {query && (
-            <button
-              onClick={() => setQuery("")}
-              className="shrink-0 text-muted-foreground/55 active:text-foreground"
-              title="Clear"
-            >
-              <X className="size-4" />
-            </button>
-          )}
-        </div>
-        {/* Create — appears only when the field is non-empty: the field's value
-            is the new agent's name. */}
-        {query.trim() !== "" && (
-          <button
-            onClick={create}
-            disabled={createAgent.isPending}
-            aria-label="Create agent"
-            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-(--interactive) text-(--primary-foreground) transition-[filter] active:brightness-110 disabled:opacity-60"
-          >
-            {createAgent.isPending ? (
-              <Loader2 className="size-5 animate-spin" />
-            ) : (
-              <Plus className="size-5" />
-            )}
-          </button>
-        )}
-      </FrostedBottomBar>
+      <FleetSearchBar
+        query={query}
+        setQuery={setQuery}
+        onCreate={create}
+        creating={createAgent.isPending}
+        inputRef={inputRef}
+        barRef={barRef}
+      />
 
       <Toast message={toast} />
 
@@ -242,12 +207,86 @@ export function FleetDashboard({
 const ACTION_W = 136
 
 /**
- * Fleet (home) header — the title + agent count, and the app-Settings gear that
- * opens the mobile {@link ConfigModal} (the mobile equivalent of the desktop
- * TopBar gear, T611 removed the bar). Extracted so the FleetDashboard render
- * stays within the per-function line budget.
+ * The floating bottom bar whose text field DOUBLES as search + create-name
+ * (T633, mirroring ThreadList): typing filters the roster live AND is the draft
+ * name for a new agent. A round create button appears only once the field is
+ * non-empty; tapping it — or pressing Return — spawns an agent with that name
+ * and clears the field. Extracted so the FleetDashboard render stays within the
+ * per-function line budget.
  */
-function FleetHeader({ count, onOpenConfig }: { count: number; onOpenConfig: () => void }) {
+function FleetSearchBar({
+  query,
+  setQuery,
+  onCreate,
+  creating,
+  inputRef,
+  barRef,
+}: {
+  query: string
+  setQuery: (v: string) => void
+  onCreate: () => void
+  creating: boolean
+  inputRef: React.RefObject<HTMLInputElement | null>
+  barRef: React.RefObject<HTMLDivElement | null>
+}) {
+  return (
+    <FrostedBottomBar
+      ref={barRef}
+      className="flex items-center gap-2 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+    >
+      <div className="flex flex-1 items-center gap-2 rounded-xl bg-muted/60 px-3 py-2 text-[16px]">
+        <Search className="size-4 shrink-0 text-muted-foreground/60" />
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            // Return spawns an agent named after the current value — the mobile
+            // keyboard's "go" affordance for the dual-use field. No-op empty.
+            if (e.key !== "Enter" || query.trim() === "") return
+            e.preventDefault()
+            onCreate()
+          }}
+          placeholder="Search or create an agent"
+          className="min-w-0 flex-1 bg-transparent text-foreground/90 outline-none placeholder:text-muted-foreground/55"
+        />
+        {query && (
+          <button
+            onClick={() => setQuery("")}
+            className="shrink-0 text-muted-foreground/55 active:text-foreground"
+            title="Clear"
+          >
+            <X className="size-4" />
+          </button>
+        )}
+      </div>
+      {/* Create — appears only when the field is non-empty: the field's value
+          is the new agent's name. */}
+      {query.trim() !== "" && (
+        <button
+          onClick={onCreate}
+          disabled={creating}
+          aria-label="Create agent"
+          className="flex size-11 shrink-0 items-center justify-center rounded-full bg-(--interactive) text-(--primary-foreground) transition-[filter] active:brightness-110 disabled:opacity-60"
+        >
+          {creating ? (
+            <Loader2 className="size-5 animate-spin" />
+          ) : (
+            <Plus className="size-5" />
+          )}
+        </button>
+      )}
+    </FrostedBottomBar>
+  )
+}
+
+/**
+ * Fleet (home) header — the title + agent count. The app-Settings/usage entry
+ * is the top-right {@link CornerButton} rendered by the dashboard root (the
+ * usual app corner control), not an in-flow header button. Extracted so the
+ * FleetDashboard render stays within the per-function line budget.
+ */
+function FleetHeader({ count }: { count: number }) {
   return (
     <header className="flex items-center justify-between gap-3 px-4 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-3">
       <div className="flex flex-col gap-0.5">
@@ -260,15 +299,6 @@ function FleetHeader({ count, onOpenConfig }: { count: number; onOpenConfig: () 
           </span>
         )}
       </div>
-      {/* Claude usage — opens the standalone full-screen usage page (token
-          status, rate-limit bars, stored accounts, login), T646. */}
-      <button
-        onClick={onOpenConfig}
-        aria-label="Claude usage"
-        className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground/70 transition-colors active:bg-muted active:text-foreground"
-      >
-        <Settings className="size-5.5" />
-      </button>
     </header>
   )
 }
