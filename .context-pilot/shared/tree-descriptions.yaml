@@ -14694,6 +14694,10 @@ ba1851aea6e21ecc:
   path: ui/src/components/agents/FleetSidebar.tsx
   description: Mission-control left nav rail (fleet dashboard). FleetPage=agents|prompts|usage|settings. NO identity header (TopBar owns it). NO in-rail collapse button — collapse driven by FleetShell's border rail. 4 nav items (icon+label+hint, active=card-shadow). Width = shared var(--sidebar-w); collapsed animates aside width →0 (fixed-width inner shell). page/onSelect/collapsed props.
   last_edited_ms: 1781533961624
+ba1a9f4c654f62ec:
+  path: web/src/mobile-components/agents/FleetDashboard.tsx
+  description: 'Mobile FleetDashboard twin — iOS item-list (T632). Flat borderless list, each agent a full-width tappable row: avatar+status presence-dot, name, model·task subtitle, cost+chevron. Tap=open; swipe-left (useSwipeRow ACTION_W=136) reveals Manage/Retire. RetiredSwipeRow swipe=Unretire. Bottom field DOUBLES as search+create (T633 parity): typing filters roster live AND is new-agent name; round + button + Enter gated on query.trim()!==''''; create() mutates {name} (folder server-side, model default), clears field. autoCreate now focuses field (NewAgentSheet discarded). anime.js row cascade (once, ref-guard) + Toast spring. HealthDot amber glyph. 495 lines.'
+  last_edited_ms: 1784721417970
 ba25cfc6ad219cce:
   path: src/app/prompt/repair.rs
   description: 'Final-phase tool-pairing repair. A9: uses ContentBlock accessors (.tool_use()/.tool_result()/.text()) instead of struct-variant matches. repair_tool_pairing split ensure_adjacent_results/drop_stray_results. Enforces Anthropic tool_result-immediately-after-tool_use adjacency. 6 unit tests.'
