@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react"
 import { useMutation } from "@tanstack/react-query"
-import { Loader2, ExternalLink, CheckCircle2, XCircle, LogIn, RefreshCw } from "lucide-react"
+import { Loader2, ExternalLink, CheckCircle2, XCircle, LogIn } from "lucide-react"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { Tip } from "@/components/ui/tip"
 import {
@@ -9,9 +9,7 @@ import {
   completeClaudeLogin,
 } from "@/lib/api"
 import { useClaudeUsage } from "@/lib/live/useClaudeUsage"
-import { cn } from "@/lib/utils"
-import { StoredAccounts } from "./StoredAccounts"
-import { UsageLimits } from "./UsageLimits"
+import { ClaudeUsageBody } from "@/components/agents/ClaudeUsagePage"
 
 /** Anthropic "A" logomark (Simple Icons, 24×24 viewBox). */
 function AnthropicMark({ className }: { className?: string }) {
@@ -20,18 +18,6 @@ function AnthropicMark({ className }: { className?: string }) {
       <path d="M13.827 3.52h3.603L24 20.48h-3.603l-6.57-16.96zm-7.257 0h3.603l6.57 16.96h-3.603L11.627 16.47H5.166L3.653 20.48H0L6.57 3.52zm1.04 4.96l-2.49 6.7h5.47l-2.49-6.7z" />
     </svg>
   )
-}
-
-/** Format epoch ms as a short relative expiry string. */
-function formatExpiry(epochMs: number): string {
-  const now = Date.now()
-  const diff = epochMs - now
-  if (diff < 0) return "Expired"
-  const mins = Math.floor(diff / 60_000)
-  if (mins < 60) return `${mins}m left`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ${mins % 60}m left`
-  return `${Math.floor(hrs / 24)}d left`
 }
 
 type LoginStep = "idle" | "starting" | "waiting_for_code" | "completing" | "done" | "error"
@@ -252,90 +238,16 @@ export function LoginFlow({ onDone }: { onDone: () => void }) {
 
 type TokenStatus = Awaited<ReturnType<typeof fetchClaudeTokenStatus>>
 
-/** Account email + token status row + refresh control — extracted for P8 budget. */
-function TokenStatusRow({
-  data,
-  isLoading,
-  isValid,
-  refreshPending,
-  refreshError,
-  onRefresh,
-}: {
-  data: TokenStatus | undefined
-  isLoading: boolean
-  isValid: boolean
-  refreshPending: boolean
-  refreshError: unknown
-  onRefresh: () => void
-}) {
-  return (
-    <>
-      {data?.account_email && (
-        <p className="truncate text-[11px] text-muted-foreground">{data.account_email}</p>
-      )}
-      {isLoading && (
-        <div className="flex items-center justify-center py-2">
-          <Loader2 className="size-4 animate-spin text-muted-foreground" />
-        </div>
-      )}
-      {data && (
-        <div className="flex items-center justify-between rounded-md bg-muted/40 px-2.5 py-1.5">
-          <div className="flex items-center gap-1.5 text-[12px]">
-            <div className={cn("size-2 rounded-full", isValid ? "bg-emerald-500" : "bg-red-500")} />
-            <span className="font-medium text-foreground">
-              {isValid ? "Token valid" : "Token expired"}
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            {isValid && data.expires_at != null && (
-              <span className="text-[11px] text-muted-foreground tabular-nums">
-                {formatExpiry(data.expires_at)}
-              </span>
-            )}
-            <button
-              onClick={onRefresh}
-              disabled={refreshPending}
-              title="Refresh token"
-              className="flex size-5 items-center justify-center rounded-sm text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-            >
-              {refreshPending ? (
-                <Loader2 className="size-3 animate-spin" />
-              ) : (
-                <RefreshCw className="size-3" />
-              )}
-            </button>
-          </div>
-        </div>
-      )}
-      {refreshError != null && (
-        <p className="text-[11px] text-red-500">
-          Refresh failed: {refreshError instanceof Error ? refreshError.message : "unknown error"}
-        </p>
-      )}
-    </>
-  )
-}
-
 /** Anthropic logo button that opens a popover with live usage bars + login. */
 export function UsageButton() {
   const [open, setOpen] = useState(false)
 
   // All the query/mutation/auto-refresh orchestration lives in the shared
-  // useClaudeUsage hook (also consumed by the mobile Config usage section), so
-  // this button is pure chrome over it. `polling` follows the popover: the 30s
+  // useClaudeUsage hook (also consumed by the mobile Config usage page), so this
+  // button is pure chrome over it. `polling` follows the popover: the 30s
   // foreground cadence while open, the 5min idle cadence while closed.
-  const {
-    tokenStatus,
-    usage,
-    isValid,
-    limits,
-    sessionPct,
-    refreshPending,
-    refreshError,
-    refresh,
-    invalidate,
-  } = useClaudeUsage(open)
-  const { isLoading, isError } = usage
+  const usage = useClaudeUsage(open)
+  const { sessionPct, invalidate } = usage
 
   // Camembert (pie-chart) background behind the Anthropic logo — shows
   // session usage at a glance without opening the popover.
@@ -367,23 +279,8 @@ export function UsageButton() {
       <PopoverContent side="bottom" align="end" sideOffset={8} className="w-72 space-y-3 p-4">
         <h4 className="text-[13px] font-semibold">Claude Code Usage</h4>
 
-        {/* ── Account email · token status · refresh ───────── */}
-        <TokenStatusRow
-          data={tokenStatus.data}
-          isLoading={tokenStatus.isLoading}
-          isValid={isValid}
-          refreshPending={refreshPending}
-          refreshError={refreshError}
-          onRefresh={refresh}
-        />
-
-        {/* ── Usage limits (only when token valid) ─────────── */}
-        <UsageLimits isValid={isValid} isLoading={isLoading} isError={isError} limits={limits} />
-
-        {/* ── Stored accounts (multi-account vault) ────────── */}
-        <div className="border-t border-border pt-3">
-          <StoredAccounts isValid={isValid} onSwitch={handleLoginDone} />
-        </div>
+        {/* ── Shared usage body: token status · usage bars · stored accounts ── */}
+        <ClaudeUsageBody usage={usage} />
 
         {/* ── Login flow (always available) ────────────────── */}
         <div className="border-t border-border pt-3">
