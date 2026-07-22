@@ -1,4 +1,4 @@
-import { Fragment, memo, useCallback, useMemo, useRef, useState } from "react"
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ScrollArea } from "@/mobile-components/ui/scroll-area"
 import { Message } from "@/mobile-components/conversation/Message"
 import { ThreadComposer, type CommandSuggestion } from "@/mobile-components/threads/ThreadComposer"
@@ -204,6 +204,26 @@ export function ThreadConversation({
   // so each segment object stays reference-stable across delta re-renders.
   const segments = useMemo(() => segmentLog(thread.log), [thread.log])
 
+  // The composer floats as a glass overlay over the bottom of the conversation
+  // (so its backdrop-blur has content to frost). Measure its live height with a
+  // ResizeObserver and reserve 1.5× that as a bottom spacer in the scroll
+  // content, so the last message can always be scrolled clear of the floating
+  // composer (T637). The observer callback is event-driven (not a render-phase
+  // setState), and the height grows as the textarea auto-grows.
+  const composerRef = useRef<HTMLDivElement>(null)
+  const [composerH, setComposerH] = useState(0)
+  useEffect(() => {
+    const el = composerRef.current
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      const h = entries[0]?.contentRect.height
+      if (typeof h === "number") setComposerH(h)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+
   // Form derivations: answered-state lookup + submit handler (docs/forms.md §5).
   const { answersByForm, onFormSubmit } = useThreadForms(thread.log, agentId, thread.id)
 
@@ -249,25 +269,34 @@ export function ThreadConversation({
               />
             ),
           )}
+          {/* Bottom spacer = 1.5× the floating composer's height, so the last
+              real message can always scroll clear of the glass composer that
+              overlays the bottom of this scroll area (T637). */}
+          <div aria-hidden style={{ height: composerH * 1.5 }} />
           {/* scroll anchor — keeps the latest message in view */}
           <div ref={bottomRef} />
         </div>
       </ScrollArea>
 
-      <ThreadComposer
-        key={thread.id}
-        status={thread.status}
-        focused={thread.focused}
-        paused={thread.paused}
-        onSend={onSend}
-        onAttach={onAttach}
-        pendingFiles={pendingFiles}
-        onRemoveFile={onRemoveFile}
-        suggestions={suggestions}
-        firstMessage={thread.log.length === 0}
-        onCreateCommand={() => setCreateCmdOpen(true)}
-        draftKey={`cp-draft-${agentId}-${thread.id}`}
-      />
+      {/* Floating glass composer — absolutely positioned over the bottom of the
+          conversation so its backdrop-blur frosts the messages scrolling beneath
+          it (T637). The reserved spacer above keeps the last message reachable. */}
+      <div ref={composerRef} className="absolute inset-x-0 bottom-0 z-10">
+        <ThreadComposer
+          key={thread.id}
+          status={thread.status}
+          focused={thread.focused}
+          paused={thread.paused}
+          onSend={onSend}
+          onAttach={onAttach}
+          pendingFiles={pendingFiles}
+          onRemoveFile={onRemoveFile}
+          suggestions={suggestions}
+          firstMessage={thread.log.length === 0}
+          onCreateCommand={() => setCreateCmdOpen(true)}
+          draftKey={`cp-draft-${agentId}-${thread.id}`}
+        />
+      </div>
 
       <QuickLookSheet
         node={sheetFile ? uploadToNode(sheetFile) : null}

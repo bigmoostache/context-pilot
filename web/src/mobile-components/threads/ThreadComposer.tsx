@@ -295,7 +295,7 @@ function ComposerInputRow({
         disabled={!onAttach}
         title="Attach files"
         aria-label="Attach files"
-        className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground/70 transition-colors active:bg-muted active:text-(--interactive) disabled:cursor-default disabled:opacity-40"
+        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-card/60 text-muted-foreground/70 backdrop-blur-[6px] transition-colors active:bg-muted active:text-(--interactive) disabled:cursor-default disabled:opacity-40"
       >
         <Plus className="size-5.5" strokeWidth={2.25} />
       </button>
@@ -303,7 +303,7 @@ function ComposerInputRow({
       {/* The input pill — thin border, subtle fill, fully rounded so a single
           line reads as a capsule and it softens as it grows. The send button
           lives INSIDE the pill's right edge (iMessage convention). */}
-      <div className="flex min-w-0 flex-1 items-end gap-1 rounded-[1.35rem] border border-border bg-card py-1 pr-1 pl-3.5 focus-within:border-(--signal)/60">
+      <div className="flex min-w-0 flex-1 items-end gap-1 rounded-[1.35rem] border border-border bg-card/70 py-1 pr-1 pl-3.5 backdrop-blur-[6px] focus-within:border-(--signal)/60">
         <textarea
           ref={textareaRef}
           value={text}
@@ -450,7 +450,7 @@ export function ThreadComposer({
   }
 
   return (
-    <div className="shrink-0 px-3 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
+    <div className="bg-linear-to-t from-background/90 via-background/45 to-transparent px-3 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-[3px] backdrop-saturate-150">
       {/* Unified bubble row (T350) — file-upload chips + /command suggestions +
           create-command pill, all in ONE normal-flow container. */}
       {(pendingFiles.length > 0 || commandsActive) && (
