@@ -133,6 +133,15 @@ pub enum Kind {
         model: String,
     },
 
+    /// Switch the agent's active behaviour agent (prompt-library system
+    /// prompt) by library id. An empty id reverts to the default agent —
+    /// same contract as the agent-side `agent_load` tool, which this shares.
+    #[serde(rename = "load_behaviour")]
+    LoadBehaviour {
+        /// Prompt-library agent id to activate (empty = default).
+        id: String,
+    },
+
     /// Catch-all for variants added in a newer protocol version.
     ///
     /// An N-1 receiver deserialises any unrecognised `"kind"` tag here

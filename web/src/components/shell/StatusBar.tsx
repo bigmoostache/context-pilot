@@ -1,5 +1,6 @@
 import { Boxes, Loader2, MessagesSquare, RefreshCw, Wallet } from "lucide-react"
 import { fmtCost, fmtTokens } from "@/lib/support/panelMeta"
+import { BehaviourChip } from "./BehaviourChip"
 import type { Agent, StreamPhase } from "@/lib/types"
 
 const phaseMeta: Record<StreamPhase, { label: string; color: string }> = {
@@ -24,6 +25,7 @@ export function StatusBar({
   fleet = false,
   agents = [],
   activeAgent,
+  activeAgentId = "",
   connected = true,
   onRestart,
   restarting = false,
@@ -32,6 +34,8 @@ export function StatusBar({
   fleet?: boolean
   agents?: Agent[]
   activeAgent?: Agent | undefined
+  /** The focused agent's id — drives the behaviour selector's library query + command. */
+  activeAgentId?: string
   /** False when the SSE push plane for this agent is down. */
   connected?: boolean
   /** Fires the restart API + full reconnect lifecycle (same as AgentModal Restart). */
@@ -46,6 +50,7 @@ export function StatusBar({
   ) : (
     <AgentStatus
       agent={activeAgent}
+      agentId={activeAgentId}
       connected={connected}
       onRestart={onRestart}
       restarting={restarting}
@@ -113,12 +118,14 @@ function agentVitals(agent?: Agent) {
 /** Single-agent session vitals — shown while an agent is focused. */
 function AgentStatus({
   agent,
+  agentId,
   connected = true,
   onRestart,
   restarting = false,
   loading = false,
 }: {
   agent?: Agent | undefined
+  agentId?: string
   connected?: boolean
   onRestart?: (() => void) | undefined
   restarting?: boolean
@@ -144,6 +151,8 @@ function AgentStatus({
         loading={loading}
         onRestart={onRestart}
       />
+
+      {agentId ? <BehaviourChip agentId={agentId} /> : null}
 
       <span className="ml-auto flex items-center gap-3">
         <ContextBar used={used} threshold={threshold} budget={budget} hit={hit} miss={miss} />

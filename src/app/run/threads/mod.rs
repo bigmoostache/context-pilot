@@ -12,7 +12,9 @@ mod commands;
 mod messages;
 mod paused;
 pub(super) use archived::emit_thread_archived;
-pub(super) use bridge::{bridge_active, emit_thread_focus, emit_thread_status, emit_vitals, poll_bridge_commands};
+pub(super) use bridge::{
+    bridge_active, emit_behaviour, emit_thread_focus, emit_thread_status, emit_vitals, poll_bridge_commands,
+};
 pub(super) use messages::emit_messages;
 pub(super) use paused::emit_thread_paused;
 
@@ -21,6 +23,22 @@ use crate::app::PendingDone;
 use cp_base::tools::ToolUse;
 use cp_mod_spine::types::{NotificationType, SpineState};
 use cp_mod_threads::types::{FocusState, ThreadMessage, ThreadStatus, ThreadsState};
+
+/// Run every bridge live-emission chokepoint for one main-loop tick — the
+/// vitals, message, roster-status, focus, behaviour, archived, and paused
+/// observe-on-change emitters, grouped behind one call so the loop keeps a
+/// single entry point (and `lifecycle.rs` stays under the 500-line cap). Each
+/// emitter is a no-op when the bridge is OFF, so this whole barge is free at
+/// anchor. Order mirrors the historical inline sequence.
+pub(super) fn emit_bridge_deltas(app: &mut App) {
+    emit_vitals(app);
+    emit_messages(app);
+    emit_thread_status(app);
+    emit_thread_focus(app);
+    emit_behaviour(app);
+    emit_thread_archived(app);
+    emit_thread_paused(app);
+}
 
 /// Inject a synthetic `Read` tool call when auto-continuation fires for a
 /// thread notification while the AI is unfocused.

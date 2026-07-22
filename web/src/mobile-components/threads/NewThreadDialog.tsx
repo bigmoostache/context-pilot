@@ -1,6 +1,11 @@
 import { useState } from "react"
 import { MessagesSquare } from "lucide-react"
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/mobile-components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from "@/mobile-components/ui/dialog"
 
 /**
  * Mobile New Thread dialog — the divergent twin of `components/threads/

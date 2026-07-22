@@ -4,7 +4,10 @@ import { measure } from "@/lib/support/telemetry"
 import { ArrowUp, Paperclip, Loader2, Clock, Pause } from "lucide-react"
 import type { ThreadStatus } from "@/lib/types"
 import { ComposerBubbles } from "@/mobile-components/threads/fileUpload"
-import type { UploadedFile, CommandSuggestion } from "@/mobile-components/threads/fileUpload/helpers"
+import type {
+  UploadedFile,
+  CommandSuggestion,
+} from "@/mobile-components/threads/fileUpload/helpers"
 import { parseDraft } from "@/lib/support/threadMessages"
 
 // CommandSuggestion lives beside the file-chip abstraction in ./fileUpload (both

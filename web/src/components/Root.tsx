@@ -203,6 +203,7 @@ function AppShell() {
         fleet={effectiveView === "fleet"}
         agents={agents}
         activeAgent={activeAgent}
+        activeAgentId={activeAgentId}
         connected={sseConnected && !agentStale}
         onRestart={restartAgent}
         restarting={agentRestarting}
