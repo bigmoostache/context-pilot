@@ -10246,6 +10246,10 @@
   path: src/app/actions/helpers.rs
   description: Utility functions + switch_to_panel (scroll-preserving panel switch). clean_llm_id_prefix, parse_context_pattern, find_context_by_id, eject_cursor_from_sentinel.
   last_edited_ms: 0
+81ee6983c0b56071:
+  path: web/src/mobile-components/threads/ThreadsView.tsx
+  description: Mobile ThreadsView twin — conversation-primary + drawer (T609). Conversation is full-bleed base layer; thread list slides in from left as a drawer toggled by a fixed top-left PanelLeft button. Selecting/creating a thread closes drawer. drawerOpen state (opens on mount), scrim is a <button> (a11y), drawer always-mounted + translate-x. Logic from shared @/lib/live/threadView hooks; desktop untouched.
+  last_edited_ms: 1784707598962
 81fdedff722ffbe6:
   path: web/src/components/shell/widgets/UsageButton.tsx
   description: 'Claude Code OAuth usage button. Anthropic "A" logomark trigger opens popover: account email, token status (valid/expired + expiry + refresh), session/weekly usage bars, LoginFlow (PKCE). T472 login-trap fix: waiting_for_code auto-poller snapshots current token expiry into baselineExpiryRef and only auto-completes on a token whose expiry STRICTLY exceeds baseline. P8: extracted TokenStatusRow (email + valid/expired row + refresh) and UsageLimits (bars/loading/error/empty) so UsageButton stays under cx15; WaitingForCode (the paste-code step) extracted so LoginFlow stays under the 150-line budget. Lazy-fetches on open, 30s auto-refresh.'
