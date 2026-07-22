@@ -163,15 +163,12 @@ function UserMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete }: Mes
 function AssistantMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete }: MessageProps) {
   return (
     <div className="rise flex flex-col gap-1.5 py-2">
-      <div className="flex items-center gap-2">
-        <span className="flex size-5 items-center justify-center rounded-full bg-(--signal)/15">
-          <span className="size-2 rounded-full bg-(--signal)" />
-        </span>
-        <span className="text-[12px] font-semibold text-foreground/85">Context Pilot</span>
-        <span className="text-[10px] text-muted-foreground/60">{msg.ts}</span>
-      </div>
+      {/* No author header on mobile (T611) — the orange mark + "Context Pilot"
+          label were pure vertical-space cost. The assistant bubble is already
+          identifiable by its left alignment; the timestamp moves down into the
+          action row beneath the message. */}
       {/* wider than desktop (88%) + a slimmer indent to reclaim phone width */}
-      <div className="max-w-[92%] pl-7 text-[13.5px] leading-relaxed text-foreground/90">
+      <div className="max-w-[92%] pl-1 text-[13.5px] leading-relaxed text-foreground/90">
         <MessageBody
           text={msg.text ?? ""}
           variant="default"
@@ -184,7 +181,8 @@ function AssistantMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete }
         )}
       </div>
       {!msg.streaming && (
-        <div className="flex items-center gap-2 pl-7">
+        <div className="flex items-center gap-2 pl-1">
+          <span className="text-[10px] text-muted-foreground/60">{msg.ts}</span>
           <CopyButton text={msg.text ?? ""} align="start" label="Copy message" />
           {onDelete && <DeleteButton align="start" onDelete={onDelete} />}
         </div>
@@ -197,7 +195,7 @@ function ToolMessage({ msg }: { msg: ChatMessage }) {
   if (!msg.tool) return null
   const t = msg.tool
   return (
-    <div className="rise py-2 pl-7">
+    <div className="rise py-2 pl-1">
       <div
         className={cn(
           "card-shadow max-w-[92%] overflow-hidden rounded-xl border bg-card",
