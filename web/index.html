@@ -3,6 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <!-- iOS home-screen glyph. Safari uses this PNG (NOT the SVG favicon, NOT
+         the manifest icons) for the Add-to-Home-Screen icon; without it iOS
+         falls back to a blurry screenshot of the page (T621). 180×180 is the
+         current iPhone @3x home-screen size; iOS downscales it for every other
+         slot and applies its own rounded-rect mask. -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!-- PWA manifest — name, standalone display, icon set, theme/background
+         colour. Drives the Android/Chrome install glyph + splash; on iOS 16.4+
+         it also feeds the home-screen app metadata (the apple-touch-icon above
+         still wins for the icon itself). theme-color paints the status-bar
+         backing to the app's dark background so the translucent status bar
+         blends into the cockpit instead of flashing white. -->
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#222220" />
     <!-- viewport-fit=cover lets the layout extend edge-to-edge INTO the safe
          areas (notch / status bar / home indicator); the reclaimed regions are
          then exposed to CSS as env(safe-area-inset-*) so content can pad away

@@ -103,10 +103,17 @@ export function ThreadsView({
           under the drawer scrim (lower z), so tapping it while the drawer is
           open lands on the scrim and closes instead.
 
+          The `top` offset carries `env(safe-area-inset-top)`: in a standalone
+          home-screen app the web view draws UNDER the translucent iOS status
+          bar (T621), so a bare `top-1.5` would put the button behind the clock
+          where it can't be tapped — the exact bug the user hit. Adding the
+          inset pushes it clear of the status bar; in a plain Safari tab the
+          inset is 0, so the button keeps its original position.
+
           The button is wrapped in a slightly larger `backdrop-blur-md` pad so the
           content directly under AND just around the button is blurred — the
           button stays legible over any message text that scrolls beneath it. */}
-      <div className="fixed top-1.5 left-1.5 z-30 rounded-2xl p-1 backdrop-blur-md">
+      <div className="fixed top-[calc(env(safe-area-inset-top)+0.375rem)] left-1.5 z-30 rounded-2xl p-1 backdrop-blur-md">
         <button
           onClick={() => setDrawerOpen(true)}
           aria-label="Show threads"
