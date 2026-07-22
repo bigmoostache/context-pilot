@@ -145,6 +145,22 @@
   --background: #000; /* true black app backdrop (phone) */
 }
 
+/* ─── Mobile: no document rubber-band ───────────────────────────────────
+   On iOS a drag that starts inside a scroller ALREADY at its top/bottom edge
+   chains up to the document and rubber-bands the WHOLE viewport — which drags
+   even `fixed`/`absolute` chrome (the floating bottom bar) with it. It reads as
+   "the whole app scrolls, including the bar that was meant to be pinned", and
+   feels random because it only fires when the inner scroller has no room left
+   in the drag direction (e.g. dragging down from the top of the agents list).
+   `overscroll-behavior: none` stops the scroll chain at the document so an
+   at-the-edge drag is simply absorbed — inner scrollers still scroll normally,
+   only the viewport-level bounce is gone. Scoped to `.mobile` (set on <html> by
+   the mobile Root) so the desktop app is untouched. */
+html.mobile,
+html.mobile body {
+  overscroll-behavior: none;
+}
+
 @layer base {
   * {
     @apply border-border;
