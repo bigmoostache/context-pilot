@@ -42,7 +42,7 @@ function stripQuotes(value: string): string {
 
 /** Drop a leading UTF-8 BOM (U+FEFF), then any leading CR/LF/space run. */
 function stripLeading(text: string): string {
-  const noBom = text.codePointAt(0) === 0xfe_ff ? text.slice(1) : text
+  const noBom = text.codePointAt(0) === 0xFE_FF ? text.slice(1) : text
   return noBom.trimStart()
 }
 
