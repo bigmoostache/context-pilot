@@ -345,6 +345,7 @@ export type OpEntry = {
  * Discriminated-union payload of a single oplog delta, keyed by `kind`.
  */
 export type OpEntryKind = {
+    agent_id?: string;
     budget_tokens?: number;
     cost_usd?: number;
     head?: string;

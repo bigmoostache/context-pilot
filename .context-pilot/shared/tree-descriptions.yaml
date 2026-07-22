@@ -278,6 +278,10 @@
   path: .git/index
   description: Git index (binary). Not source.
   last_edited_ms: 0
+03930d80ecd1e3a3:
+  path: src/app/run/threads/mod.rs
+  description: 'Thread helpers for main loop: maybe_inject_auto_read (filters paused threads — T371), check_my_turn_threads (filters paused threads — T371), extract_thread_ids, maybe_append_tool_activity. emit_thread_paused re-exported from paused.rs.'
+  last_edited_ms: 0
 039885da0912cd1c:
   path: crates/cp-mod-prompt/src/skill_panel.rs
   description: Skill panel UI. Markdown-rendered content via cp_render::markdown::to_blocks(). Title/refresh/context methods. refresh() syncs cached_content for all loaded skills.
@@ -2702,6 +2706,10 @@
   path: crates/cp-mod-console/src/pollers.rs
   description: FilePoller (tails log file 100ms into RingBuffer, drain_available, grace read on stop) + StatusPoller (polls server status 500ms, mark_terminal/poll_once helpers, marks dead on exit/unreachable).
   last_edited_ms: 1784481184531
+231ed65c204bb7d2:
+  path: crates/cp-orchestrator/src/services/materialized_view/mod.rs
+  description: In-memory materialized view of the fleet — per-agent projection folded from oplog entries. AgentView (rev/heads/roster/phase/lifecycle/cost/context/focused_thread). apply() folds ThreadPaused/ThreadResumed/ThreadDeleted via RosterThread::fold_paused/fold_deleted. Checkpoint = authoritative reset (bounded restart). CostSnapshot + ContextSnapshot value types with utoipa::ToSchema for OpenAPI.
+  last_edited_ms: 0
 232eaac66b06b6be:
   path: .github/checks/check-web-structure.sh
   description: 'Frontend structural guardrail: ≤8 entries/dir + ≤500 lines/file under web/src (shadcn ui/ + lib/api/generated/ exempt). Repo root via git rev-parse --show-toplevel (cwd-independent). Used by CB7 callback + CI Structure job.'
@@ -4182,6 +4190,10 @@
   path: crates/cp-mod-git/src/result_panel.rs
   description: 'GitResultPanel: static read-only command output panel (no auto-refresh). Timeout execution, diff-aware syntax coloring. Refreshes only when explicitly dirtied by mutating commands.'
   last_edited_ms: 1782988305173
+3621f45bd50a548e:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 3626ade6e9ad38d4:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
@@ -4806,6 +4818,10 @@
   path: crates/cp-mod-prompt/src/lib.rs
   description: 'Prompt library module: Behaviour_create/agent_load/skill_load. pre_flight dispatch, is_prompt_file canonicalize. `pub mod tools` (T581) so tui bridge reaches tools::set_active_agent for LoadBehaviour.'
   last_edited_ms: 1784710566797
+3e269001c17f46ba:
+  path: crates/cp-oplog/src/service.rs
+  description: 'OplogService off-loop group-commit + GAP2/I2 backpressure. Durability enum #[expect(exhaustive_enums)]. BestEffortOutcome #[expect(exhaustive_enums)] — IRREDUCIBLE: matched exhaustively by tests/service_group_commit.rs integration target (downstream crate), non_exhaustive would force wildcard_enum_match_arm (forbid). Durability::of classifies best-effort (phase/cost/focus) vs durable.'
+  last_edited_ms: 0
 3e329d1612c18bf3:
   path: web/src/components/threads/fileUpload/helpers.ts
   description: 'Pure file-upload helpers + types: UploadedFile/CommandSuggestion/MessageSegment interfaces, buildUploadMessage (compose ```file-upload YAML blocks), splitMessageSegments (parse blocks in-place), uploadToNode. No JSX — importable without tripping Fast Refresh.'
@@ -8482,6 +8498,10 @@
   path: crates/cp-mod-tree/Cargo.toml
   description: 'Tree module deps: cp-base, cp-render, crossterm, serde, serde_json, globset, sha2.'
   last_edited_ms: 1780497937361
+6d61c92cadd484fb:
+  path: src/app/run/threads/bridge.rs
+  description: 'Bridge command intake + live-state emission (gated bridge-ON). A9: accept_commands boot/intake via bs.boot.as_ref()/bs.intake.as_mut(). emit_thread_status/focus/vitals chokepoints. wire_turn/wire_phase.'
+  last_edited_ms: 0
 6d6ee4cd006d4ea3:
   path: src/modules/overview/tools/mod.rs
   description: 'Tool submodule routing: close_context, manage_tools, panel_goto_page'
@@ -9417,6 +9437,10 @@
 7893c6f6ee3ced9a:
   path: src/llms/cache/cache_optimizer.rs
   description: 'Exact two-level DP optimizer. Minimizes expected recompute cost. Phase 1: per-super-block split DP. Phase 2: knapsack across super-blocks. O(N²·K) time. Prefix sums for O(1) block_cost. Backtracks for positions.'
+  last_edited_ms: 0
+78950f55d5e02ef0:
+  path: web/src/lib/query/sync.ts
+  description: SSE→QueryClient delta bridge (push plane). qk registry, ensureSync, applyDelta functional-updater fold, hydrateSpilledMessage (T357), throttledInvalidateInspection (T492). Re-exports reducers+OpEntry.
   last_edited_ms: 0
 78c478c0dfa4ea81:
   path: web/src/components/shell/StatusBar.tsx
@@ -12494,6 +12518,10 @@
   path: crates/cp-base/src/cast.rs
   description: 'Safe trait: saturating numeric casts all int/float. Module-level #[expect] on lossy_float (int->float mantissa) + float_to_int (no TryFrom<float> in std) covers all as_conversions/precision/truncation there. Macro-driven impls.'
   last_edited_ms: 1784479706246
+9fa06c707055b4ea:
+  path: crates/cp-mod-bridge/src/lib.rs
+  description: 'BridgeModule: init_state activates Boot when CP_BRIDGE=1 OR --bridge CLI flag. MemoSeeds u8 bitfield (5 flags: messages/statuses/focus/archived/paused) with const accessor/seed methods. BridgeState includes thread_paused_memo HashMap + seeded:MemoSeeds. PENDING+try_recover self-heal.'
+  last_edited_ms: 0
 9fa3340ca469d86b:
   path: crates/cp-orchestrator/src/registry/tailer.rs
   description: 'Tailer — backend''s incremental, gap-free oplog consumer (poll/seed/last_rev). T309: added a per-segment BYTE cursor (last_offset) — poll() now skips segments < cursor, and for the active segment does a single stat(); if file_len<=consumed_offset NOTHING is read or parsed (the idle no-append case that previously re-read+re-deserialized the whole current segment every 100ms tick, pinning a core), else scans ONLY the appended tail bytes[offset..] (torn-tail-safe via Scan.valid_len), resetting offset to 0 on a segment roll. Re-exported from channel.rs. 5 tests.'
@@ -12533,6 +12561,10 @@
 a00f87830d66c380:
   path: crates/cp-base/src/state/context.rs
   description: 'Kind registry + Entry type. TypeMeta, init_context_type_registry, fixed_panel_order. Kind string-backed context type with well-known constants (ENTITIES, ENTITY_RESULT, etc). Entry struct: id/uid/context_type/name/token_count/metadata + cache/freeze fields. estimate_tokens, make_default_entry.'
+  last_edited_ms: 0
+a02ffea8c4bd607f:
+  path: crates/cp-wire/src/types/oplog.rs
+  description: 'OpEntry struct #[non_exhaustive] A5 + OpEntry::new ctor. OpEntryKind enum #[expect(exhaustive_enums)] A4 (Unknown catch-all).'
   last_edited_ms: 0
 a03ccb8509cc6fd0:
   path: src/app/run/tools/pipeline.rs
@@ -14070,6 +14102,10 @@ b3ccdc957029cfc7:
   path: src/app/context/freeze.rs
   description: 'Freeze policy: per-panel and ordering freeze decisions (queue, tempo, breath budget).'
   last_edited_ms: 1783093718330
+b3d36d8f83a513aa:
+  path: src/app/run/lifecycle.rs
+  description: Main event loop. run split handle_input_phase(InputOutcome enum)/render_frame/compute_poll_ms/run_background_phase/auto_resume_stream_if_flagged/recover_bridge_if_pending/drain_chat_sync_if_due (A2). check_spine, EventChannels. T309 spinner gating.
+  last_edited_ms: 0
 b3d3c3f9eb60cefd:
   path: src/app/run/tools/cleanup.rs
   description: 'Watcher polling: blocking sentinel replacement + async spine notifications. A2 split + A9 clean (dp.metadata for entry index, result.as_ref/as_mut, pending_done take).'
@@ -15918,6 +15954,10 @@ caf2ca4d3f48b4d6:
   path: src/app/run/tools/cost_log.rs
   description: Per-tick cost-tracking TSV. append_cost_tsv() consumes TickTelemetry (culprit + token layout from stream start) + tick cost counters (from stream end), appends 15-column row to .context-pilot/logs/cost-tracking.tsv. Best-effort, never blocks pipeline.
   last_edited_ms: 1782919010078
+caf4747c6ce281f9:
+  path: crates/cp-oplog/src/replay.rs
+  description: 'Oplog replay. Recovered struct #[non_exhaustive] A5. fold_entry via ref_match!. A11 shadow clean.'
+  last_edited_ms: 0
 cb25f09fa3660254:
   path: crates/cp-mod-files/src/tools/write.rs
   description: file_write tool. flame!("file_write"). Creates parent dirs, writes content, updates/creates context Entry. Diff-style preview in result (first 20 lines).

@@ -1091,6 +1091,9 @@
       "OpEntryKind": {
         "description": "Discriminated-union payload of a single oplog delta, keyed by `kind`.",
         "properties": {
+          "agent_id": {
+            "type": "string"
+          },
           "budget_tokens": {
             "type": "integer"
           },

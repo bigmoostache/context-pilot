@@ -32,8 +32,9 @@ import { getOrCreateSseClient } from "./sse"
 import { queryClient } from "./queryClient"
 import { fetchMessageBody } from "../api"
 import { applyAgentDelta, applyThreadDelta, type OpEntry } from "./reducers"
+import { applyLibraryDelta } from "./library"
 import { measure } from "../support/telemetry"
-import type { Agent, ThreadDetail } from "../types"
+import type { Agent, ThreadDetail, LibraryItem } from "../types"
 
 // Re-export the pure folds + delta type so existing `@/lib/query/sync`
 // consumers keep their import surface (the reducers moved to ./reducers for the
@@ -119,6 +120,26 @@ async function hydrateSpilledMessage(
 }
 
 /**
+ * Fold a `behaviour_changed` delta into the cached library so the footer chip
+ * flips the instant the delta lands (threads' fold discipline, not an optimistic
+ * guess — the delta IS the backend's confirmation). When the library isn't
+ * cached yet (chip unmounted) the fold returns `null` and we invalidate so the
+ * next read hydrates ground truth — the event-driven twin of the config.json
+ * mtime backstop. Extracted from applyDelta to keep its cyclomatic complexity in
+ * budget.
+ */
+function foldBehaviourIntoLibrary(client: QueryClient, agentId: string, km: OpEntry["kind"]): void {
+  const lk = qk.library(agentId)
+  const lPrev = client.getQueryData<LibraryItem[]>(lk)
+  const lNext = applyLibraryDelta(lPrev, km)
+  if (lNext === null) {
+    void client.invalidateQueries({ queryKey: lk })
+  } else if (lNext !== lPrev) {
+    client.setQueryData(lk, lNext)
+  }
+}
+
+/**
  * Apply one parsed delta to the agent's delta-covered caches. Folds into BOTH
  * the threads and agent-meta caches (each reducer ignores deltas not its own),
  * then advances the rev guard. A reducer verdict of `null` ("can't fold")
@@ -148,8 +169,10 @@ function applyDelta(client: QueryClient, agentId: string, entry: OpEntry): void 
   // resource) rather than fold — matching the orchestrator's MaterializedView
   // no-op and the oplog best-effort class. Untuned by the invalidate throttle:
   // a behaviour switch is a rare, discrete action, so the refetch is instant.
+  // Behaviour change → fold the authoritative new active-agent id straight into
+  // the cached library (see foldBehaviourIntoLibrary).
   if (km.kind === "behaviour_changed") {
-    void client.invalidateQueries({ queryKey: qk.library(agentId) })
+    foldBehaviourIntoLibrary(client, agentId, km)
   }
 
   // Threads cache fold.
