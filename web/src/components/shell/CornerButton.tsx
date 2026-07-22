@@ -59,7 +59,7 @@ export function CornerButton({
   return (
     <div
       className={cn(
-        "fixed top-[calc(env(safe-area-inset-top)+0.5rem)] z-30",
+        "fixed top-[calc(env(safe-area-inset-top)+0.5rem)] z-30 standalone:top-[calc(env(safe-area-inset-top)-0.5rem)]",
         side === "left" ? "left-2.5" : "right-2.5",
         className,
       )}

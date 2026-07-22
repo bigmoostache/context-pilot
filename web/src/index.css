@@ -9,6 +9,13 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* `standalone:` utilities apply only when the app runs as an iOS home-screen /
+   PWA standalone app — the mobile Root tags <html class="standalone"> then
+   (navigator.standalone / display-mode:standalone). Lets a component tighten
+   its safe-area offset for standalone (where env(safe-area-inset-top) is the
+   full status-bar height) without touching the plain-Safari-tab case. */
+@custom-variant standalone (&:is(html.standalone *));
+
 /*
   ════════════════════════════════════════════════════════════════════════
   CONTEXT·PILOT — Two switchable palettes, enterprise / macOS aesthetic.
