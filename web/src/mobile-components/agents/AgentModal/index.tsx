@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { animate, stagger } from "animejs"
-import { X } from "lucide-react"
+import { ChevronLeft, X } from "lucide-react"
 import { usePickerProviders } from "@/lib/support/models"
 import { useRenameAgent, sendCommand } from "@/lib/live"
 import type { Agent } from "@/lib/types"
 import { prefersReducedMotion } from "@/lib/utils"
+import { CornerButton } from "@/mobile-components/shell/CornerButton"
 import { useSelectionState } from "./controller"
 import { useAgentModalActions } from "./actions"
 import {
-  SettingsHeader,
   AvatarHero,
   Section,
   NameField,
@@ -127,9 +127,24 @@ export function AgentModal({
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-background">
-      <SettingsHeader agentName={agent.name} onBack={onClose} />
+      {/* App-wide glass return button, floating top-left — same primitive every
+          other mobile surface uses. Back returns to origin via onClose. z-30
+          (CornerButton default) keeps it above the scrolling body. */}
+      <CornerButton side="left" label="Back" onClick={onClose}>
+        <ChevronLeft />
+      </CornerButton>
 
       <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto">
+        {/* Header standardised to the agents-page layout: a big left-aligned
+            title + subtitle (agent name). Top padding clears the floating
+            CornerButton so the title sits below it, not under it. */}
+        <header className="flex flex-col gap-0.5 px-4 pt-[calc(env(safe-area-inset-top)+4.5rem)] pb-1">
+          <h1 className="text-[28px] leading-none font-bold tracking-tight text-foreground">
+            Agent Settings
+          </h1>
+          <span className="truncate text-[13px] text-muted-foreground/70">{agent.name}</span>
+        </header>
+
         <AvatarHero
           agent={agent}
           avatarBust={actions.avatarBust}

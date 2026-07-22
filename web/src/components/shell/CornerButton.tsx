@@ -54,7 +54,7 @@ export function CornerButton({
   /** merged last — override the z-index / positioning for a specific stack */
   className?: string
 }) {
-  const { press, glyphRef } = useCornerMotion()
+  const { press, glyphRef, sheenRef } = useCornerMotion()
 
   return (
     <div
@@ -71,22 +71,32 @@ export function CornerButton({
         }}
         aria-label={label}
         className={cn(
-          // Circular glass target: a translucent theme surface (works in both
-          // palettes via color-mix on --surface), a heavy backdrop blur +
-          // saturate so whatever scrolls under it reads as frosted glass, a
-          // hairline border + inset highlight for the "lifted glass" edge, and a
-          // float shadow. 56px ≈ 1.5× the previous 36px.
-          "flex size-14 items-center justify-center rounded-full",
-          "border border-white/15 text-foreground/85",
-          "bg-[color-mix(in_oklab,var(--surface)_55%,transparent)]",
-          "shadow-(--shadow-pop) ring-1 ring-white/10 ring-inset",
+          // Circular frosted-glass target: NO background fill and NO border/ring
+          // — the button is entirely transparent, so the only thing you see is
+          // the heavy backdrop blur + saturate turning whatever scrolls beneath
+          // into clean frosted glass, lifted off the page by a soft float
+          // shadow. `overflow-hidden` clips the tap-bloom sheen to the circle.
+          // 56px ≈ 1.5× the previous 36px.
+          "relative flex size-14 items-center justify-center overflow-hidden rounded-full",
+          "text-foreground/85 shadow-(--shadow-pop)",
           "backdrop-blur-xl backdrop-saturate-150",
-          "transition-colors active:bg-[color-mix(in_oklab,var(--surface)_72%,transparent)]",
         )}
       >
+        {/* Tap-bloom sheen — a faint glass tint pinned to the circle, invisible
+            at rest (opacity 0) and bloomed out then faded on each press by
+            {@link useCornerMotion}. It gives the transparent button a lively
+            "glass ripples on touch" flash without a permanent grey fill. */}
+        <span
+          ref={sheenRef}
+          aria-hidden
+          className="pointer-events-none absolute inset-0 rounded-full bg-[color-mix(in_oklab,var(--surface)_60%,transparent)] opacity-0"
+        />
         {/* the glyph is the animated element — the button itself stays put so
             the backdrop-blur pane doesn't re-rasterise mid-spring */}
-        <span ref={glyphRef} className="flex items-center justify-center [&>svg]:size-6">
+        <span
+          ref={glyphRef}
+          className="relative flex items-center justify-center [&>svg]:size-6"
+        >
           {children}
         </span>
       </button>
@@ -95,9 +105,11 @@ export function CornerButton({
 }
 
 /** The corner button's anime.js motion: entrance + page-transition icon swap +
- *  press-release pop. All guarded by `prefers-reduced-motion`. */
+ *  press-release pop (glyph) + tap-bloom sheen (glass background flash). All
+ *  guarded by `prefers-reduced-motion`. */
 function useCornerMotion() {
   const glyphRef = useRef<HTMLSpanElement>(null)
+  const sheenRef = useRef<HTMLSpanElement>(null)
   const { navKey } = useTopButtons()
 
   // Icon-swap spring: on mount AND on every navigation edge (navKey change) the
@@ -115,16 +127,24 @@ function useCornerMotion() {
     })
   }, [navKey])
 
-  /** Press-release pop — a quick spring back to rest from a shrunk state, fired
-   *  on tap for tactile feedback. */
+  /** Press-release feedback: a quick spring pop of the glyph, plus a one-shot
+   *  bloom of the glass sheen (faint tint scales up from the centre and fades
+   *  back to transparent) — so the tap visibly "ripples" the glass. */
   const press = () => {
-    const el = glyphRef.current
-    if (!el || prefersReducedMotion()) return
-    animate(el, {
-      scale: [0.82, 1],
-      ease: createSpring({ stiffness: 600, damping: 14 }),
-    })
+    if (prefersReducedMotion()) return
+    const glyph = glyphRef.current
+    if (glyph) {
+      animate(glyph, { scale: [0.82, 1], ease: createSpring({ stiffness: 600, damping: 14 }) })
+    }
+    const sheen = sheenRef.current
+    if (sheen) {
+      animate(sheen, {
+        opacity: [0.55, 0],
+        scale: [0.6, 1.06],
+        ease: createSpring({ stiffness: 460, damping: 24 }),
+      })
+    }
   }
 
-  return { press, glyphRef }
+  return { press, glyphRef, sheenRef }
 }

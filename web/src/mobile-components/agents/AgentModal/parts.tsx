@@ -2,11 +2,9 @@ import { useEffect, useRef } from "react"
 import { animate, createSpring } from "animejs"
 import {
   Archive,
-  ChevronLeft,
   Dices,
   ImagePlus,
   RefreshCw,
-  Settings2,
 } from "lucide-react"
 import type { Agent } from "@/lib/types"
 import { avatarUrl } from "@/lib/api"
@@ -24,44 +22,10 @@ import { cn, prefersReducedMotion } from "@/lib/utils"
 // from a thread page's top-right Settings button. Every field auto-saves, so
 // there is no Save button — only the back chevron and a confirmation toast.
 
-/**
- * Sticky iOS-style nav header — a back chevron (returns to wherever the page was
- * opened from, via the caller), a centred title, and the agent's name as a
- * subtitle. Spring-rises on mount (anime.js); reduced-motion shows it at rest.
- */
-export function SettingsHeader({ agentName, onBack }: { agentName: string; onBack: () => void }) {
-  const ref = useRef<HTMLElement>(null)
-  useEffect(() => {
-    const el = ref.current
-    if (!el || prefersReducedMotion()) return
-    animate(el, {
-      opacity: [0, 1],
-      translateY: [-8, 0],
-      ease: createSpring({ stiffness: 420, damping: 32 }),
-    })
-  }, [])
-  return (
-    <header
-      ref={ref}
-      className="sticky top-0 z-10 flex items-center gap-2 border-b border-border/70 bg-background/85 px-2 py-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] backdrop-blur-md"
-    >
-      <button
-        onClick={onBack}
-        aria-label="Back"
-        className="flex size-9 items-center justify-center rounded-lg text-(--interactive) transition-colors active:bg-muted/70"
-      >
-        <ChevronLeft className="size-6" />
-      </button>
-      <div className="flex min-w-0 flex-1 flex-col leading-tight">
-        <span className="text-[15px] font-semibold tracking-tight text-foreground">
-          Agent Settings
-        </span>
-        <span className="truncate text-[11.5px] text-muted-foreground/70">{agentName}</span>
-      </div>
-      <Settings2 className="mr-1 size-4 shrink-0 text-muted-foreground/40" />
-    </header>
-  )
-}
+// The page's back button + title header are no longer a bespoke sticky bar:
+// AgentModal now renders the app-wide glass `CornerButton` (top-left) for the
+// return action and a big left-aligned title header matching the agents page,
+// so the settings surface reads identically to the rest of the mobile chrome.
 
 /**
  * Avatar hero — a large round avatar with two affordances: a **tap-to-upload**
