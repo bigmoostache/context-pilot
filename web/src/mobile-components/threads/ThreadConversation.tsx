@@ -183,7 +183,10 @@ export function ThreadConversation({
   return (
     <main className="relative flex min-w-0 flex-1 flex-col bg-background">
       <ScrollArea className="min-h-0 flex-1">
-        <div className="flex flex-col p-4">
+        {/* Tight horizontal gutter (WhatsApp/Messenger convention) — px-2 not
+            p-4 so bubbles claim nearly the full phone width; vertical padding
+            stays roomier for scroll breathing room. */}
+        <div className="flex flex-col px-2 py-3">
           <div className="mb-3 flex items-center gap-2">
             <span className="h-px flex-1 bg-border/60" />
             <span className="text-[10.5px] text-muted-foreground/50">
