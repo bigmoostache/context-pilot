@@ -173,7 +173,11 @@ function useComposer(
     requestAnimationFrame(() => {
       const el = textareaRef.current
       if (el) el.style.height = "auto"
-      el?.focus()
+      // Mobile divergence: BLUR after send (not focus like desktop) so the caret
+      // leaves the field and the on-screen keyboard dismisses — sending is a
+      // "done typing" gesture on a phone, whereas desktop keeps focus to fire off
+      // several messages in a row.
+      el?.blur()
     })
   }
 
