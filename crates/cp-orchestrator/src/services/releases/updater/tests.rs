@@ -5,7 +5,7 @@
 //! §5.4.1), so these tests exercise the exact embedded trust anchor.
 
 use super::super::{ReleaseStore, boot_check, boot_commit_when_healthy, semver_sort_key};
-use super::apply::{boot_reconcile, promote_committed, stage_apply};
+use super::apply::{boot_reconcile, promote_committed, promote_web, stage_apply};
 use super::download::{tag_dir, verify_and_extract};
 use super::state::{UpdateResult, UpdateState};
 use super::verify::iso8601_to_epoch;
@@ -321,6 +321,43 @@ fn updater_apply_rollback_cycle() {
         matches!(st.last_result, Some(UpdateResult::RolledBack { ref attempted, .. }) if attempted == "vY"),
         "rollback recorded: {st:?}"
     );
+
+    drop(std::fs::remove_dir_all(&base));
+}
+
+// ── OTA front — the served-SPA symlink moves with the binaries ──────────────
+
+/// The front follows the binaries: on promote, `promote_web` atomically
+/// repoints the `web/current` symlink (`CP_WEB_ROOT`) at the release's bundled
+/// `releases/<tag>/web`, and is a no-op when the bundle ships no `web/` (compat)
+/// or `CP_WEB_ROOT` is unset (API-only deployment).
+#[cfg(unix)]
+#[test]
+fn promote_web_moves_the_served_spa() {
+    use std::os::unix::fs::symlink;
+    let base = temp_dir("webprom");
+    // Ansible day-0: web/baseline holds the shipped SPA, web/current -> baseline.
+    let current = base.join("web/current");
+    std::fs::create_dir_all(base.join("web/baseline")).expect("baseline dir");
+    std::fs::write(base.join("web/baseline/index.html"), b"OLD").expect("old spa");
+    symlink("baseline", &current).expect("current symlink");
+    let store = ReleaseStore::load(base.join("releases"));
+    let served = || std::fs::read(current.join("index.html")).expect("read served");
+    // No-op guards leave current -> baseline: a tag with no bundled web/, and
+    // an unset CP_WEB_ROOT, both keep serving the day-0 SPA.
+    promote_web(&store, "vY", Some(current.as_path())).expect("no-op: no bundled web");
+    promote_web(&store, "vY", None).expect("no-op: CP_WEB_ROOT unset");
+    assert_eq!(served(), b"OLD", "front untouched by the no-op guards");
+    assert_eq!(std::fs::read_link(&current).expect("target"), std::path::Path::new("baseline"));
+
+    // A release that bundles web/ is promoted: current atomically repoints at
+    // releases/vY/web and stays a symlink.
+    std::fs::create_dir_all(store.dir().join("vY/web")).expect("tag web dir");
+    std::fs::write(store.dir().join("vY/web/index.html"), b"NEW").expect("new spa");
+    promote_web(&store, "vY", Some(current.as_path())).expect("promote web");
+    assert_eq!(served(), b"NEW", "release SPA after promote");
+    assert!(current.symlink_metadata().expect("meta").file_type().is_symlink(), "stays a symlink");
+    assert_eq!(std::fs::read_link(&current).expect("target"), store.dir().join("vY/web"));
 
     drop(std::fs::remove_dir_all(&base));
 }
