@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react"
-import { FolderGit2, AlertTriangle, Plus, PanelLeft } from "lucide-react"
+import { FolderGit2, AlertTriangle, Plus, PanelLeft, X } from "lucide-react"
 import { ThreadList } from "@/mobile-components/threads/ThreadList"
 import { ThreadConversation } from "@/mobile-components/threads/ThreadConversation"
 import { NewThreadDialog } from "@/mobile-components/threads/NewThreadDialog"
@@ -134,11 +134,14 @@ export function ThreadsView({
           it animates) but shoved off-screen and non-interactive when closed.
           `fixed inset-y-0` pins it to the VIEWPORT height, not the tall
           scrolling ThreadsView container beneath it — so ThreadList's own
-          ScrollArea scrolls independently of the conversation (T616). */}
+          ScrollArea scrolls independently of the conversation (T616). Full
+          viewport width (`inset-0`, not a partial `w-[85%]`) — on a phone a
+          sliver of the dimmed conversation peeking at the edge just cramps the
+          list for no benefit (T619). */}
       <aside
         aria-hidden={!drawerOpen}
         className={
-          "fixed inset-y-0 left-0 z-50 flex w-[85%] max-w-[340px] flex-col border-r border-border bg-surface transition-transform duration-200 ease-out " +
+          "fixed inset-0 z-50 flex flex-col bg-surface transition-transform duration-200 ease-out " +
           (drawerOpen ? "translate-x-0" : "-translate-x-full")
         }
       >
@@ -156,6 +159,20 @@ export function ThreadsView({
           onNewThread={() => sel.setNewOpen(true)}
         />
       </aside>
+
+      {/* Close affordance for the drawer. A full-width drawer covers the scrim
+          and the open-toggle, so tapping outside is no longer possible — this
+          floating button (above the drawer) lets the user dismiss the list
+          without having to select a thread (T619). */}
+      {drawerOpen && (
+        <button
+          onClick={() => setDrawerOpen(false)}
+          aria-label="Close thread list"
+          className="fixed top-2 right-3 z-60 flex size-9 items-center justify-center rounded-full bg-card/90 text-foreground/80 backdrop-blur-md transition-colors active:bg-muted"
+        >
+          <X className="size-5" />
+        </button>
+      )}
 
       <NewThreadDialog
         open={sel.newOpen}
