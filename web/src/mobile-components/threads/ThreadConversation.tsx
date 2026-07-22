@@ -10,7 +10,6 @@ import { uploadToNode, type UploadedFile } from "@/mobile-components/threads/fil
 import { FormMessageRow } from "@/mobile-components/threads/forms/FormMessageRow"
 import { isFormMessage } from "@/mobile-components/threads/forms/helpers"
 import { useScrollPin, useThreadForms } from "@/mobile-components/threads/forms/useThreadForms"
-import { useElementHeight } from "@/lib/live/useElementHeight"
 import { parseAutoLine, segmentLog, toChatMessage } from "@/lib/support/threadMessages"
 import type { ThreadDetail, ThreadMsg } from "@/lib/types"
 
@@ -206,13 +205,15 @@ export function ThreadConversation({
   const segments = useMemo(() => segmentLog(thread.log), [thread.log])
 
   // The composer floats as a glass overlay over the bottom of the conversation
-  // (so its backdrop-blur has content to frost). Measure its live height and
-  // reserve 1.5× that as a bottom spacer in the scroll content, so the last
-  // message can always be scrolled clear of the floating composer (T637). The
-  // measurement rides the shared useElementHeight hook (tracks the textarea as
-  // it auto-grows).
-  const composerRef = useRef<HTMLDivElement>(null)
-  const composerH = useElementHeight(composerRef)
+  // (so its backdrop-blur has content to frost), so the last message must be
+  // able to scroll clear of it. A MEASURED spacer (composer height × N) proved
+  // fragile: the scroll-pin fires before the ResizeObserver reports a height, so
+  // the pin lands on a still-zero spacer and the newest message stays tucked
+  // under the composer (T639). Instead reserve a fixed, generous "ghost message"
+  // of dead space at the end of the scroll content — taller than the composer in
+  // any resting state (+ the home-indicator safe area) — so the last real
+  // message always clears it with no dependency on measurement timing.
+
 
 
   // Form derivations: answered-state lookup + submit handler (docs/forms.md §5).
@@ -263,10 +264,12 @@ export function ThreadConversation({
               />
             ),
           )}
-          {/* Bottom spacer = 1.5× the floating composer's height, so the last
-              real message can always scroll clear of the glass composer that
-              overlays the bottom of this scroll area (T637). */}
-          <div aria-hidden style={{ height: composerH * 1.5 }} />
+          {/* Fixed "ghost message" spacer — a tall block of dead space so the
+              last real message can always scroll clear of the floating glass
+              composer that overlays the bottom (T639). Fixed (not measured) so
+              it never depends on ResizeObserver timing vs the scroll-pin; sized
+              taller than the resting composer + the home-indicator safe area. */}
+          <div aria-hidden style={{ height: "calc(16rem + env(safe-area-inset-bottom))" }} />
           {/* scroll anchor — keeps the latest message in view */}
           <div ref={bottomRef} />
         </div>
@@ -275,7 +278,7 @@ export function ThreadConversation({
       {/* Floating glass composer — absolutely positioned over the bottom of the
           conversation so its backdrop-blur frosts the messages scrolling beneath
           it (T637). The reserved spacer above keeps the last message reachable. */}
-      <div ref={composerRef} className="absolute inset-x-0 bottom-0 z-10">
+      <div className="absolute inset-x-0 bottom-0 z-10">
         <ThreadComposer
           key={thread.id}
           status={thread.status}
