@@ -10,14 +10,19 @@
          current iPhone @3x home-screen size; iOS downscales it for every other
          slot and applies its own rounded-rect mask. -->
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <!-- PWA manifest — name, standalone display, icon set, theme/background
-         colour. Drives the Android/Chrome install glyph + splash; on iOS 16.4+
-         it also feeds the home-screen app metadata (the apple-touch-icon above
-         still wins for the icon itself). theme-color paints the status-bar
-         backing to the app's dark background so the translucent status bar
-         blends into the cockpit instead of flashing white. -->
+    <!-- PWA manifest — name, standalone display, icon set, background colour.
+         Drives the Android/Chrome install glyph + splash; on iOS 16.4+ it also
+         feeds the home-screen app metadata (the apple-touch-icon above still
+         wins for the icon itself).
+
+         DELIBERATELY NO `theme-color` meta and NO manifest `theme_color`: on
+         iOS 16.4+ a theme-color paints an OPAQUE status-bar backing that
+         OVERRIDES `apple-mobile-web-app-status-bar-style=black-translucent`,
+         so the web view stops extending under the status bar and the app loses
+         its edge-to-edge full-screen look (T639 regression). Without a
+         theme-color, iOS honours black-translucent again and the content flows
+         behind the clock/battery as intended. -->
     <link rel="manifest" href="/site.webmanifest" />
-    <meta name="theme-color" content="#222220" />
     <!-- viewport-fit=cover lets the layout extend edge-to-edge INTO the safe
          areas (notch / status bar / home indicator); the reclaimed regions are
          then exposed to CSS as env(safe-area-inset-*) so content can pad away
