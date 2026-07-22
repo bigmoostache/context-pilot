@@ -149,7 +149,14 @@ function MobileShell() {
   }
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
+    // h-dvh (dynamic viewport height), NOT h-screen (100vh): on iOS Safari
+    // 100vh is TALLER than the visible viewport (it counts the space under the
+    // address bar), so an h-screen shell pushes its bottom-anchored composer
+    // below the fold — it only reappears when the page is scrolled, which is
+    // exactly the "composer disappears when I scroll the thread" bug (T617).
+    // h-dvh tracks the *visible* viewport, so the composer sits at the real
+    // bottom of the screen and stays put.
+    <div className="flex h-dvh w-screen flex-col overflow-hidden bg-background text-foreground">
       {/* No persistent chrome on mobile — no top bar, no bottom tab bar (T611).
           View navigation is being reworked; for now views are reached
           contextually (fleet → open agent → threads; show-in-finder → finder). */}
