@@ -3898,6 +3898,10 @@
   path: web/.gitignore
   description: web/ gitignore. node_modules, dist, *.local, editor dirs, and Playwright e2e artifacts (test-results, playwright-report, .playwright) — transient run output, never committed.
   last_edited_ms: 1781814025229
+314c8be25e3edc5a:
+  path: web/src/mobile-components/agents/FleetDashboard.tsx
+  description: 'Mobile FleetDashboard twin — iOS item-list (T632, was card grid). Flat borderless list, each agent a full-width tappable row: leading avatar/icon + status presence-dot, name (bold needs-you), model·task subtitle, trailing cost + chevron. Tap=open agent; swipe-left (useSwipeRow ACTION_W=136) reveals Manage/Retire. RetiredSwipeRow swipe-left=Unretire. + opens light NewAgentSheet bottom sheet (single name field, model defaults, set later via Manage) NOT full-screen AgentModal. anime.js row cascade (once, ref-guard) + Toast createSpring. HealthDot compact amber glyph. 500 lines.'
+  last_edited_ms: 1784716628917
 314cac58c76158d9:
   path: src/app/run/threads/commands.rs
   description: Bridge command APPLICATION (K7 mutation half), split from bridge.rs for the 500-line limit. apply_command dispatches SendMessage(inject user msg + MyTurn flip + on_user_message)/CreateThread(+emit_roster_delta ThreadCreated + prime status memo)/ArchiveThread(soft-delete + focus cleanup + emit ThreadArchived)/RestoreThread(emit ThreadRestored)/Stop|Interrupt(mirror Esc StopStreaming)/Configure(serde-deserialize provider+model, set on state). Imports emit_roster_delta + wire_turn (pub(super)) from bridge.
