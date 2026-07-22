@@ -181,7 +181,7 @@ export function ThreadConversation({
   const { answersByForm, onFormSubmit } = useThreadForms(thread.log, agentId, thread.id)
 
   return (
-    <main className="relative flex min-w-0 flex-1 flex-col bg-background">
+    <main className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-background">
       <ScrollArea className="min-h-0 flex-1">
         {/* Tight horizontal gutter (WhatsApp/Messenger convention) — px-2 not
             p-4 so bubbles claim nearly the full phone width; vertical padding

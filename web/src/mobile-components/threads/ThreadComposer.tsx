@@ -285,7 +285,7 @@ function ComposerInputRow({
       {/* The input pill — thin border, subtle fill, fully rounded so a single
           line reads as a capsule and it softens as it grows. The send button
           lives INSIDE the pill's right edge (iMessage convention). */}
-      <div className="flex flex-1 items-end gap-1 rounded-[1.35rem] border border-border bg-card py-1 pr-1 pl-3.5 focus-within:border-(--signal)/60">
+      <div className="flex min-w-0 flex-1 items-end gap-1 rounded-[1.35rem] border border-border bg-card py-1 pr-1 pl-3.5 focus-within:border-(--signal)/60">
         <textarea
           ref={textareaRef}
           autoFocus
@@ -306,7 +306,7 @@ function ComposerInputRow({
           }}
           placeholder="Message…"
           rows={1}
-          className="max-h-[200px] min-h-[30px] flex-1 resize-none self-center bg-transparent py-1 text-[16px] leading-snug text-foreground/90 outline-none placeholder:text-muted-foreground/50"
+          className="max-h-[200px] min-h-[30px] min-w-0 flex-1 resize-none self-center bg-transparent py-1 text-[16px] leading-snug text-foreground/90 outline-none placeholder:text-muted-foreground/50"
         />
         {/* Send appears only when there's something to send (iMessage hides it
             on an empty field), so the empty pill stays clean. */}
