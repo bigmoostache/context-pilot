@@ -1,17 +1,15 @@
 import { useState, useEffect, useRef, useMemo } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 import { Loader2, ExternalLink, CheckCircle2, XCircle, LogIn, RefreshCw } from "lucide-react"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { Tip } from "@/components/ui/tip"
 import {
-  fetchClaudeUsage,
   fetchClaudeTokenStatus,
   startClaudeLogin,
   completeClaudeLogin,
-  refreshClaudeLogin,
 } from "@/lib/api"
+import { useClaudeUsage } from "@/lib/live/useClaudeUsage"
 import { cn } from "@/lib/utils"
-import { resetProviderCache } from "@/lib/support/models"
 import { StoredAccounts } from "./StoredAccounts"
 import { UsageLimits } from "./UsageLimits"
 
@@ -321,54 +319,26 @@ function TokenStatusRow({
 /** Anthropic logo button that opens a popover with live usage bars + login. */
 export function UsageButton() {
   const [open, setOpen] = useState(false)
-  const queryClient = useQueryClient()
 
-  // A token change can flip the OAuth providers between usable and not, so every
-  // token-affecting success must also refresh the provider registry — drop the
-  // memoised singleton (which never expires on its own) and invalidate the
-  // `["providers"]` query (prefix-matches the picker's `["providers","picker"]`
-  // too) so mounted model pickers refetch instead of showing "No models
-  // available" until a full page reload.
-  const invalidateTokenDependents = () => {
-    void queryClient.invalidateQueries({ queryKey: ["claude-token-status"] })
-    void queryClient.invalidateQueries({ queryKey: ["claude-usage"] })
-    resetProviderCache()
-    void queryClient.invalidateQueries({ queryKey: ["providers"] })
-  }
-
-  const refreshMutation = useMutation({
-    mutationFn: refreshClaudeLogin,
-    onSuccess: invalidateTokenDependents,
-  })
-
-  const tokenStatus = useQuery({
-    queryKey: ["claude-token-status"],
-    queryFn: fetchClaudeTokenStatus,
-    // Always poll — background check enables auto-refresh before expiry.
-    refetchInterval: open ? 30_000 : 300_000,
-    staleTime: 10_000,
-    retry: 1,
-  })
-
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["claude-usage"],
-    queryFn: fetchClaudeUsage,
-    // Always poll when token valid — feeds the background usage indicator.
-    enabled: tokenStatus.data?.valid === true,
-    refetchInterval: open ? 30_000 : 300_000,
-    staleTime: 10_000,
-    retry: 1,
-  })
-
-  const limits = (data?.limits ?? []).filter((l) => l.percent > 0)
-  const isValid = tokenStatus.data?.valid === true
+  // All the query/mutation/auto-refresh orchestration lives in the shared
+  // useClaudeUsage hook (also consumed by the mobile Config usage section), so
+  // this button is pure chrome over it. `polling` follows the popover: the 30s
+  // foreground cadence while open, the 5min idle cadence while closed.
+  const {
+    tokenStatus,
+    usage,
+    isValid,
+    limits,
+    sessionPct,
+    refreshPending,
+    refreshError,
+    refresh,
+    invalidate,
+  } = useClaudeUsage(open)
+  const { isLoading, isError } = usage
 
   // Camembert (pie-chart) background behind the Anthropic logo — shows
   // session usage at a glance without opening the popover.
-  const sessionPct = useMemo(() => {
-    const session = data?.limits?.find((l) => l.kind === "session")
-    return session ? Math.min(session.percent, 100) : 0
-  }, [data?.limits])
   const pieBg = useMemo(() => {
     if (sessionPct <= 0) return
     const color =
@@ -380,29 +350,7 @@ export function UsageButton() {
     return `conic-gradient(from 0deg, ${color} ${String(sessionPct)}%, transparent ${String(sessionPct)}%)`
   }, [sessionPct])
 
-  // Auto-refresh when token expires within 30 minutes.
-  // Ref pattern mirrors LoginFlow's onDoneRef — stable callback avoids
-  // exhaustive-deps issues with the mutation object.
-  const refreshMutateRef = useRef(refreshMutation.mutate)
-  useEffect(() => {
-    refreshMutateRef.current = refreshMutation.mutate
-  })
-  const autoRefreshAttemptedRef = useRef(false)
-  useEffect(() => {
-    const status = tokenStatus.data
-    if (!status?.valid || status.expires_at == null) return
-    const remaining = status.expires_at - Date.now()
-    if (remaining > 0 && remaining < 30 * 60_000) {
-      if (!autoRefreshAttemptedRef.current) {
-        autoRefreshAttemptedRef.current = true
-        refreshMutateRef.current()
-      }
-    } else {
-      autoRefreshAttemptedRef.current = false
-    }
-  }, [tokenStatus.data])
-
-  const handleLoginDone = invalidateTokenDependents
+  const handleLoginDone = invalidate
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -424,9 +372,9 @@ export function UsageButton() {
           data={tokenStatus.data}
           isLoading={tokenStatus.isLoading}
           isValid={isValid}
-          refreshPending={refreshMutation.isPending}
-          refreshError={refreshMutation.isError ? refreshMutation.error : null}
-          onRefresh={() => refreshMutation.mutate()}
+          refreshPending={refreshPending}
+          refreshError={refreshError}
+          onRefresh={refresh}
         />
 
         {/* ── Usage limits (only when token valid) ─────────── */}
