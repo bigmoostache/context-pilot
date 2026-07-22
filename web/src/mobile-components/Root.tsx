@@ -150,6 +150,7 @@ function MobileShell() {
         key={activeAgentId}
         activeAgentId={activeAgentId}
         onShowInFinder={showInFinder}
+        onGoToAgents={() => changeView("fleet")}
         disconnected={false}
         onReconnect={() => {
           /* mobile PoC: live reconnect not wired */

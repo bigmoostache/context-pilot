@@ -10,6 +10,7 @@ import {
   Trash2,
   SquarePen,
   ChevronRight,
+  LayoutGrid,
 } from "lucide-react"
 import { ScrollArea } from "@/mobile-components/ui/scroll-area"
 import { CornerButton } from "@/mobile-components/shell/CornerButton"
@@ -23,6 +24,8 @@ interface ThreadListProps {
   threads: ThreadDetail[]
   selectedId: string
   onSelect: (id: string) => void
+  /** leave for the agents (fleet) page — the sidebar's top-left corner button (T631) */
+  onGoToAgents?: (() => void) | undefined
   /** live search query (controlled by the parent so it survives navigation) */
   query: string
   onQueryChange: (q: string) => void
@@ -67,6 +70,7 @@ export function ThreadList({
   threads,
   selectedId,
   onSelect,
+  onGoToAgents,
   query,
   onQueryChange,
   showArchived,
@@ -106,6 +110,15 @@ export function ThreadList({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
+      {/* Top-left corner control: leave the thread sidebar for the agents (fleet)
+          page (T631). Shares the safe-area-aware CornerButton so it's reachable
+          even in standalone; the archived toggle mirrors it on the right. */}
+      {onGoToAgents && (
+        <CornerButton side="left" label="Show agents" onClick={onGoToAgents} className="z-30">
+          <LayoutGrid className="size-4.5" />
+        </CornerButton>
+      )}
+
       {/* Top-right corner control: flip between live and archived. Shares the
           safe-area-aware CornerButton so it's reachable even in standalone.
           Hidden when there's nothing archived AND we're in the live view (no

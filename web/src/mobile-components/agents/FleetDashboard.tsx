@@ -1,20 +1,29 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import { animate, createSpring, stagger } from "animejs"
 import {
   AlertTriangle,
   ArchiveRestore,
   Bot,
+  ChevronRight,
   FolderGit2,
   FolderPlus,
   Loader2,
-  Rocket,
+  Plus,
   Settings2,
 } from "lucide-react"
 import { ScrollArea } from "@/mobile-components/ui/scroll-area"
 import { accentVar, fmtCost, FLEET_MAX_W } from "@/lib/support/panelMeta"
-import { useMetrics, useRetiredFleet, useUnretireAgent, useAgentMeta } from "@/lib/live"
+import {
+  useMetrics,
+  useRetiredFleet,
+  useRetireAgent,
+  useUnretireAgent,
+  useAgentMeta,
+} from "@/lib/live"
 import { avatarUrl } from "@/lib/api"
 import type { Agent, AgentStatus } from "@/lib/types"
-import { cn } from "@/lib/utils"
+import { cn, prefersReducedMotion } from "@/lib/utils"
+import { useSwipeRow } from "@/lib/live/useSwipeRow"
 import { AgentModal } from "./AgentModal"
 
 const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
@@ -28,15 +37,21 @@ const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
 type Modal = { mode: "create" } | { mode: "manage"; agent: Agent } | null
 
 /**
- * Fleet dashboard — mobile twin of `components/agents/FleetDashboard`.
+ * Fleet dashboard — mobile twin of `components/agents/FleetDashboard`, reworked
+ * to a full iOS-native feel to match the threads surface (T631).
  *
- * This is the mobile shell's home tab (BottomTabBar → fleet). Same mission
- * control (aggregate cards, create / manage flows) and same live-vitals
- * plumbing, but the desktop `md:grid-cols-2` card grid collapses to a **single
- * full-width column** (a phone has no room for two cards abreast) and every
- * interactive surface swaps `hover:` for `active:` press feedback. The card
- * actions grow to full-height tap targets. Selection/create/unretire logic is
- * identical — only the layout axis and touch affordances fork.
+ * The desktop `md:grid-cols-2` card grid becomes a **single full-width column**
+ * of tappable rows: the whole card is the primary action (tap = open the agent,
+ * mirroring a thread row tap opening its conversation), and the secondary
+ * actions (Manage / Retire) hide behind a **swipe-left** reveal — the same
+ * gesture engine (`useSwipeRow`) and iOS convention the thread list uses, so the
+ * card face stays clean instead of carrying an always-visible button pair.
+ *
+ * A large iOS title heads the page with a top-right add glyph (Contacts-style);
+ * the dashed "New agent" card only appears when the fleet is empty, as
+ * onboarding. anime.js springs the cards in on first load and pops the toast.
+ * Selection / create / retire / unretire logic is identical to desktop — only
+ * the layout axis, touch affordances, and motion fork.
  */
 export function FleetDashboard({
   agents,
@@ -66,33 +81,63 @@ export function FleetDashboard({
     window.setTimeout(() => setToast(null), 2200)
   }
 
+  // #1 Card cascade (anime.js): stagger the fleet cards in the first time the
+  // roster lands (mount / initial fetch), for the iOS list-populate feel. A ref
+  // guard runs it ONCE — creating/retiring an agent later must not re-cascade
+  // the whole list (that would flicker unrelated rows). Reduced-motion skips it.
+  const listRef = useRef<HTMLDivElement>(null)
+  const cascadedRef = useRef(false)
+  useEffect(() => {
+    const el = listRef.current
+    if (!el || cascadedRef.current || agents.length === 0 || prefersReducedMotion()) return
+    cascadedRef.current = true
+    animate(el.children, {
+      opacity: [0, 1],
+      translateY: [8, 0],
+      delay: stagger(40),
+      duration: 320,
+      ease: "out(2)",
+    })
+  }, [agents.length])
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       <ScrollArea className="min-h-0 flex-1 bg-background">
-        <div className={cn("mx-auto flex w-full flex-col gap-6 px-4 py-6", FLEET_MAX_W)}>
-          <header className="flex items-end justify-between gap-3">
-            <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Agents</h1>
+        <div className={cn("mx-auto flex w-full flex-col gap-5 px-4 py-6", FLEET_MAX_W)}>
+          {/* iOS large-title header + Contacts-style top-right add glyph. */}
+          <header className="flex items-center justify-between gap-3">
+            <div className="flex flex-col gap-0.5">
+              <h1 className="text-[28px] leading-none font-bold tracking-tight text-foreground">
+                Agents
+              </h1>
+              {agents.length > 0 && (
+                <span className="text-[12.5px] text-muted-foreground/70">
+                  {agents.length} {agents.length === 1 ? "agent" : "agents"}
+                </span>
+              )}
+            </div>
             <button
               onClick={() => setModal({ mode: "create" })}
-              className="flex shrink-0 items-center gap-2 rounded-lg bg-(--interactive) px-3.5 py-2.5 text-[13px] font-medium text-(--primary-foreground) transition-[filter] active:brightness-105"
+              aria-label="New agent"
+              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-(--interactive)/12 text-(--interactive) transition-[filter] active:brightness-110"
             >
-              <FolderPlus className="size-4" />
-              New
+              <Plus className="size-5.5" strokeWidth={2.5} />
             </button>
           </header>
 
-          {/* single-column card stack — the mobile replacement for the desktop
-              two-up grid. */}
-          <div className="flex flex-col gap-3">
+          {/* single-column tappable card stack — swipe-left reveals actions */}
+          <div ref={listRef} className="flex flex-col gap-3">
             {agents.map((a) => (
-              <AgentCard
+              <AgentSwipeRow
                 key={a.id}
                 agent={a}
                 onOpen={() => onOpenAgent(a.id)}
                 onManage={() => setModal({ mode: "manage", agent: a })}
+                onFlash={flash}
               />
             ))}
-            <NewAgentCard onClick={() => setModal({ mode: "create" })} />
+            {/* dashed onboarding card only when the fleet is empty */}
+            {agents.length === 0 && <NewAgentCard onClick={() => setModal({ mode: "create" })} />}
           </div>
 
           <RetiredSection onFlash={flash} />
@@ -101,33 +146,93 @@ export function FleetDashboard({
 
       {modal && <AgentModal modal={modal} onClose={() => setModal(null)} onFlash={flash} />}
 
-      {toast && (
-        <div className="pop-shadow absolute bottom-6 left-1/2 z-30 -translate-x-1/2 rounded-lg border border-border bg-card px-4 py-2 text-[12px] text-foreground/90">
-          {toast}
-        </div>
-      )}
+      <Toast message={toast} />
     </div>
   )
 }
 
-function AgentCard({
+/** Pixel width of the revealed action strip (two 68px action buttons). */
+const ACTION_W = 136
+
+/**
+ * A fleet card wrapped so a **left-swipe** reveals its trailing actions (Manage /
+ * Retire) — the native iOS list gesture, reusing the shared {@link useSwipeRow}
+ * engine (direct-DOM-write drag, axis lock, pointer capture, velocity flick,
+ * spring snap). The card face itself is the primary tap target (open the agent);
+ * the swipe strip carries the secondary actions the desktop card showed as a
+ * permanent button row.
+ */
+function AgentSwipeRow({
   agent,
   onOpen,
   onManage,
+  onFlash,
 }: {
   agent: Agent
   onOpen: () => void
   onManage: () => void
+  onFlash: (m: string) => void
 }) {
-  // Live vitals ride the per-agent meta cache (SSE-folded); the polled fleet row
-  // is the fallback until the first delta. ensureSync(agent.id) fires here.
+  const { rowRef, close, bind } = useSwipeRow(ACTION_W)
+  const retire = useRetireAgent()
+
+  const onRetire = () => {
+    close()
+    if (retire.isPending) return
+    retire.mutate(agent.id, {
+      onSuccess: () => onFlash(`Retiring ${agent.name} — its folder is kept`),
+      onError: (e) => onFlash(e instanceof Error ? e.message : `Could not retire ${agent.name}`),
+    })
+  }
+
+  return (
+    <div className="relative overflow-hidden rounded-xl">
+      {/* action strip — behind the card, pinned to the right edge */}
+      <div className="absolute inset-y-0 right-0 flex" style={{ width: ACTION_W }}>
+        <button
+          onClick={() => {
+            onManage()
+            close()
+          }}
+          className="flex w-1/2 flex-col items-center justify-center gap-0.5 bg-(--interactive) text-[11px] font-medium text-white"
+        >
+          <Settings2 className="size-4" />
+          Manage
+        </button>
+        <button
+          onClick={onRetire}
+          className="flex w-1/2 flex-col items-center justify-center gap-0.5 bg-(--warn) text-[11px] font-medium text-white"
+        >
+          <ArchiveRestore className="size-4" />
+          Retire
+        </button>
+      </div>
+
+      {/* Card content — slides left on swipe. `touch-pan-y` keeps native vertical
+          scroll while the hook owns the horizontal drag; the transform is written
+          directly to this node (never via a React `style` prop) so a drag causes
+          zero re-renders. Tapping while open just closes. */}
+      <div ref={rowRef} {...bind} className="relative touch-pan-y select-none">
+        <AgentCard agent={agent} onOpen={onOpen} />
+      </div>
+    </div>
+  )
+}
+
+/** The tappable fleet card face — whole card opens the agent (T631). Live vitals
+ *  (status dot, cost) ride the per-agent meta cache; the polled fleet row is the
+ *  fallback until the first delta. A trailing chevron signals it's tappable. */
+function AgentCard({ agent, onOpen }: { agent: Agent; onOpen: () => void }) {
   const { data: live } = useAgentMeta(agent.id)
   const a = live ?? agent
   const s = statusMeta[a.status]
   const accent = accentVar[a.accent]
 
   return (
-    <div className="card-shadow flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
+    <button
+      onClick={onOpen}
+      className="card-shadow flex w-full flex-col gap-3 rounded-xl border border-border bg-card p-4 text-left transition-colors active:bg-muted/40"
+    >
       <div className="flex items-center gap-3">
         {a.hasAvatar ? (
           <img
@@ -158,6 +263,7 @@ function AgentCard({
           />
           {s.label}
         </span>
+        <ChevronRight className="size-4 shrink-0 text-muted-foreground/30" />
       </div>
 
       {/* §19 health — a degraded stream / lagging projection surfaces here so
@@ -177,24 +283,7 @@ function AgentCard({
           {fmtCost(a.costUsd)}
         </span>
       </div>
-
-      <div className="mt-0.5 flex items-center gap-2">
-        <button
-          onClick={onOpen}
-          className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-(--signal) px-3 py-2.5 text-[13.5px] font-medium text-(--primary-foreground) transition-[filter] active:brightness-105"
-        >
-          <Rocket className="size-4" />
-          Open
-        </button>
-        <button
-          onClick={onManage}
-          className="flex items-center justify-center gap-1.5 rounded-lg border border-border bg-muted/40 px-3.5 py-2.5 text-[13.5px] font-medium text-foreground/70 transition-colors active:border-(--interactive)/50 active:text-(--interactive)"
-        >
-          <Settings2 className="size-4" />
-          Manage
-        </button>
-      </div>
-    </div>
+    </button>
   )
 }
 
@@ -250,7 +339,8 @@ function HealthBadge({ agentId }: { agentId: string }) {
 }
 
 /** Retired (archived) agents section — single-column on mobile, shown only when
- *  at least one agent is retired (T271). */
+ *  at least one agent is retired (T271). Retired agents have no live process, so
+ *  the card is not swipe/tap-to-open; a single Unretire button restores it. */
 function RetiredSection({ onFlash }: { onFlash: (m: string) => void }) {
   const { data: retired } = useRetiredFleet()
   if (!retired || retired.length === 0) return null
@@ -332,5 +422,33 @@ function NewAgentCard({ onClick }: { onClick: () => void }) {
         Initialize an agent in a folder — its realm for the whole session.
       </span>
     </button>
+  )
+}
+
+/**
+ * The transient action toast — springs in from below (anime.js) for a livelier
+ * confirmation than a flat appear. Renders nothing when there's no message; the
+ * spring fires on each mount (the element is conditionally rendered, so a new
+ * message remounts it). Reduced-motion shows it at rest.
+ */
+function Toast({ message }: { message: string | null }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el || prefersReducedMotion()) return
+    animate(el, {
+      translateY: [16, 0],
+      opacity: [0, 1],
+      ease: createSpring({ stiffness: 420, damping: 30 }),
+    })
+  }, [])
+  if (message === null) return null
+  return (
+    <div
+      ref={ref}
+      className="pop-shadow absolute bottom-6 left-1/2 z-30 -translate-x-1/2 rounded-lg border border-border bg-card px-4 py-2 text-[12px] text-foreground/90"
+    >
+      {message}
+    </div>
   )
 }

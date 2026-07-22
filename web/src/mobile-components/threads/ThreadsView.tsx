@@ -28,12 +28,16 @@ import { prefersReducedMotion } from "@/lib/utils"
 export function ThreadsView({
   activeAgentId,
   onShowInFinder,
+  onGoToAgents,
   disconnected,
   onReconnect,
 }: {
   activeAgentId: string
   /** navigate the Finder to a file's parent directory and select it (T334) */
   onShowInFinder?: (path: string) => void
+  /** leave the conversation for the agents (fleet) page — wired to the thread
+   *  drawer's top-left corner button (T631) */
+  onGoToAgents?: (() => void) | undefined
   disconnected?: boolean
   onReconnect?: () => void
 }) {
@@ -169,6 +173,7 @@ export function ThreadsView({
           threads={threads}
           selectedId={sel.effectiveSelectedId}
           onSelect={openThread}
+          onGoToAgents={onGoToAgents}
           query={sel.query}
           onQueryChange={sel.setQuery}
           showArchived={sel.showArchived}
