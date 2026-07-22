@@ -13474,6 +13474,10 @@ ad2e1beccb95dee4:
   path: crates/cp-oplog/src/compact.rs
   description: 'Compaction + GAP3 body-GC. Report struct #[non_exhaustive] A5. A11 shadow_reuse clean.'
   last_edited_ms: 1784542899601
+ad36520788974cff:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 ad406cb2efef9153:
   path: web/src/components/agents/FleetDashboard.tsx
   description: Fleet welcome dashboard (live). AgentCard reads useAgentMeta (delta-folded status dot + cost). statusMeta includes 'waiting' (Restarting). §19 HealthBadge (useMetrics). RetiredSection/RetiredCard (unretire). Create/manage via AgentModal.
@@ -18670,6 +18674,10 @@ f1699e8e5b824d94:
   path: web/src/components/finder/internal/useFinderSelection.ts
   description: 'Finder render-coupled selection/open/tab/context-menu handlers hook: macOS click semantics (onRowClick instant-select then deferred slow-rename or non-reflowing QuickLook open), open/openInNewTab, openContext/openEmptyContext, tab new/close, sort, goUp, trashNode.'
   last_edited_ms: 0
+f16b8dc3a76b94d3:
+  path: crates/cp-mod-bridge/tests/state.rs
+  description: 'Bridge module identity + BridgeState cold-default invariants (3 tests). Moved out of src/lib.rs when it drifted past the 500-line cap (src/ folder was at the 8-entry limit). Asserts pub surface: BridgeModule id/name/is_core/is_global + no tools; BridgeState::default all-None/empty incl last_behaviour + seeded.behaviour() (T581).'
+  last_edited_ms: 1784712704243
 f16f0fe05a9edeb4:
   path: crates/cp-oplog/src/append.rs
   description: OplogWriter single-writer WAL, uses OpEntry::new/Snapshot::new ctors (A5).
@@ -19414,6 +19422,10 @@ fa529da3b0bb39c4:
   path: crates/cp-orchestrator/src/transport/inspect/metrics.rs
   description: '§19 observability metrics endpoints. agent_metrics + fleet_metrics build per-agent snapshot: durable cost-breaker state (tripped/spend/budget), stream health (subs/dropped/degraded), view-vs-oplog rev lag (oplog_head_rev read fresh outside the lock), phase+lifecycle. T346: fleet_metrics now takes auth_user and ACL-filters via auth::filter_fleet (mirrors fleet_meta — a regular user must not enumerate every agent''s id/cost/budget via the Usage page). Only figures the backend genuinely holds — latency histograms deliberately not synthesised.'
   last_edited_ms: 0
+fa5a3b0a78e9c41b:
+  path: web/src/components/shell/StatusBar.tsx
+  description: 'Bottom status footer. Fleet mode: aggregates. Agent mode: AgentStatus reads live agent.phase (resolvePhase) + vitals via agentVitals(). StatusIndicator = loading/restarting/connected/disconnected cascade. BehaviourChip (T581): useLibrary filter kind=agent, shows active behaviour-agent name + Bot icon + dropdown, click sendCommand load_behaviour (fire-and-forget). ContextBar = two-segment hit/miss meter (T297).'
+  last_edited_ms: 0
 fa639896f94b2d15:
   path: web/src/mobile-components/shell/TopBar.tsx
   description: Mobile TopBar twin — slim hamburger + centered title (lucide-only, leak-clean). First hand-authored divergent leaf (P4); desktop dense control cluster splits to BottomTabBar + drawer.
@@ -19825,6 +19837,10 @@ fef3821b37ad53f0:
 fefb63ecae3e8db4:
   path: crates/cp-mod-threads/src/lib.rs
   description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, count positive. Send to a THEIR_TURN thread is ALLOWED (status stays THEIR_TURN) — no block. Focus enforcement with dangling/escalation. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
+  last_edited_ms: 0
+ff113a00eb4f5b5c:
+  path: web/src/components/Root.tsx
+  description: Desktop tree root — extracted from former App.tsx body. Provider-contract boundary + AppShell (view-router fleet/threads/finder/costs, TopBar+StatusBar, live vitals/SSE, disconnect overlay). Mirror twin of mobile Root.
   last_edited_ms: 0
 ff334ba4f3a157e6:
   path: crates/cp-wire/src/types/registry.rs

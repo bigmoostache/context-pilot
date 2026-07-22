@@ -141,6 +141,17 @@ function applyDelta(client: QueryClient, agentId: string, entry: OpEntry): void 
     void hydrateSpilledMessage(client, agentId, entry)
   }
 
+  // Behaviour change → invalidate the agent's library query so the footer chip
+  // refetches the fresh active agent. The event-driven twin of the coarse
+  // config.json mtime `invalidate` backstop: the active behaviour is a tier-②
+  // read, not delta-covered view state, so we INVALIDATE (like every inspection
+  // resource) rather than fold — matching the orchestrator's MaterializedView
+  // no-op and the oplog best-effort class. Untuned by the invalidate throttle:
+  // a behaviour switch is a rare, discrete action, so the refetch is instant.
+  if (km.kind === "behaviour_changed") {
+    void client.invalidateQueries({ queryKey: qk.library(agentId) })
+  }
+
   // Threads cache fold.
   const tk = qk.threads(agentId)
   const tPrev = client.getQueryData<ThreadDetail[]>(tk)

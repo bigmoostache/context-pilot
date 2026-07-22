@@ -221,12 +221,7 @@ impl App {
         super::tools::watchdog::mark(super::tools::watchdog::Step::Bridge);
         super::threads::poll_bridge_commands(self);
         super::tools::watchdog::mark(super::tools::watchdog::Step::ThreadsEmit);
-        super::threads::emit_vitals(self);
-        super::threads::emit_messages(self);
-        super::threads::emit_thread_status(self);
-        super::threads::emit_thread_focus(self);
-        super::threads::emit_thread_archived(self);
-        super::threads::emit_thread_paused(self);
+        super::threads::emit_bridge_deltas(self);
         super::tools::watchdog::mark(super::tools::watchdog::Step::Stream);
         super::streaming::process_stream_events(self, ch.rx);
         super::streaming::handle_retry(self, ch.tx);
