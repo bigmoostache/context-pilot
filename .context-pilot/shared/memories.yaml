@@ -517,6 +517,28 @@ e836c43fddc2af12:
   - T585
   - lint
   last_edited_ms: 1784472185167
+ef0637f705a1a17d:
+  tl_dr: 'T643 SOLVED: iOS standalone bottom dead band. Cause = black-translucent + viewport-fit=cover meta combo shrinking webview short of physical bottom. Fix 01d46d9a: status-bar style -> opaque ''black''. NEVER reintroduce black-translucent. Lessons in body.'
+  contents: |-
+    Confirmed working on iOS 26.5.2 standalone (Add-to-Home-Screen), user verified.
+
+    FIX: web/index.html apple-mobile-web-app-status-bar-style = black (opaque), NOT black-translucent. Keep viewport-fit=cover. Keep manifest UNLINKED (T639: linked manifest forces opaque-bar PWA path). h-dvh shell + blur-on-send base untouched.
+
+    LESSONS:
+    1. Keyboard-stuck viewport (dvh/visualViewport stays short after keyboard dismiss) = WebKit bug 301857, FIXED iOS 26.1 (cordova-ios#1575). Devices 26.1+ don't have it — don't fight it in CSS/JS.
+    2. black-translucent + viewport-fit=cover combo = chin gap in standalone (r/PWA field study). Opaque style: webview bottom touches true screen bottom; env(safe-area-inset-top) becomes 0 (top pads degrade harmlessly); opaque black bar blends with .dark.mobile #000.
+    3. Failed approaches (never retry): focusout scrollTo reset, visualViewport.height pinning (feeds broken value), position:fixed inset:0 shell (resolves to safe-area viewport, 34px short), 100vh-when-standalone (worse), interactive-widget=resizes-content (unsupported iOS).
+    4. iOS caches standalone config AT install — any meta change requires delete + re-add home-screen icon to test.
+    5. Debug protocol that worked: ask device OS version FIRST, find upstream bug trackers (cordova/WebKit), distinguish OS bug vs config bug before touching code.
+  importance: critical
+  labels:
+  - ios
+  - standalone
+  - pwa
+  - viewport
+  - T643
+  - gotcha
+  last_edited_ms: 1784734763938
 efe78c079599d3d0:
   tl_dr: 'User workflow preference: when exploring/describing files, MUST follow strict order: open files → describe in tree → close files → iterate to next batch. Never close before describing.'
   importance: critical
