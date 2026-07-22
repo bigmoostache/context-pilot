@@ -25,8 +25,7 @@ function slugify(name: string): string {
 
 /** The editor's working mode — a fresh create, or editing an existing item. */
 export type AgentEditorMode =
-  | { kind: "create" }
-  | { kind: "edit"; itemId: string; builtin: boolean }
+  { kind: "create" } | { kind: "edit"; itemId: string; builtin: boolean }
 
 /** The prefill an Import/Edit flow seeds the editor with. */
 interface Prefill {
@@ -41,14 +40,21 @@ interface Prefill {
  *  NOT an effect) for Create/Import; the Edit path flags `loading` here and
  *  fetches the raw `.md` (or built-in seed) in the effect below, whose setState
  *  runs in async callbacks (after paint) so it never trips set-state-in-effect. */
-function useAgentEditorFields(open: boolean, mode: AgentEditorMode, agentId: string, initial?: Prefill) {
+function useAgentEditorFields(
+  open: boolean,
+  mode: AgentEditorMode,
+  agentId: string,
+  initial?: Prefill,
+) {
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [body, setBody] = useState("")
   const [loading, setLoading] = useState(false)
   const [seededKey, setSeededKey] = useState<string | null>(null)
 
-  const openKey = open ? `${mode.kind === "edit" ? `edit:${mode.itemId}` : "create"}:${initial ? "seed" : "empty"}` : null
+  const openKey = open
+    ? `${mode.kind === "edit" ? `edit:${mode.itemId}` : "create"}:${initial ? "seed" : "empty"}`
+    : null
   if (openKey !== seededKey) {
     setSeededKey(openKey)
     if (initial) {
@@ -113,12 +119,8 @@ export function AgentEditorDialog({
   /** Prefill (Import path passes the parsed `.md`; Edit fetches on open). */
   initial?: Prefill | undefined
 }) {
-  const { name, setName, description, setDescription, body, setBody, loading } = useAgentEditorFields(
-    open,
-    mode,
-    agentId,
-    initial,
-  )
+  const { name, setName, description, setDescription, body, setBody, loading } =
+    useAgentEditorFields(open, mode, agentId, initial)
   const upsert = useUpsertLibraryAgent(agentId)
 
   const slug = mode.kind === "edit" ? mode.itemId : slugify(name)
@@ -140,7 +142,12 @@ export function AgentEditorDialog({
     )
   }
 
-  const title = mode.kind === "create" ? "New behaviour agent" : isBuiltin ? "Override built-in agent" : "Edit agent"
+  const title =
+    mode.kind === "create"
+      ? "New behaviour agent"
+      : isBuiltin
+        ? "Override built-in agent"
+        : "Edit agent"
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && close()}>
@@ -225,4 +232,3 @@ export function AgentEditorDialog({
     </Dialog>
   )
 }
-

@@ -9,6 +9,18 @@
 use cp_base::modules::Module as _;
 use cp_mod_bridge::{BridgeModule, BridgeState};
 
+// `-F unused-crate-dependencies` fires per test binary: this one exercises only
+// the module identity + cold-default surface, so every dev/manifest dep it does
+// not touch must be silenced or the workspace-lint build fails (mirrors the
+// sibling test binaries' silencer blocks).
+use cp_oplog as _;
+use cp_render as _;
+use cp_wire as _;
+use log as _;
+use nix as _;
+use serde_json as _;
+use tempfile as _;
+
 #[test]
 fn bridge_module_identity() {
     let m = BridgeModule;

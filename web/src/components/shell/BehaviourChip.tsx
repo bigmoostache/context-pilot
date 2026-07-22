@@ -42,7 +42,7 @@ function stripQuotes(value: string): string {
 
 /** Drop a leading UTF-8 BOM (U+FEFF), then any leading CR/LF/space run. */
 function stripLeading(text: string): string {
-  const noBom = text.codePointAt(0) === 0xFE_FF ? text.slice(1) : text
+  const noBom = text.codePointAt(0) === 0xfe_ff ? text.slice(1) : text
   return noBom.trimStart()
 }
 
@@ -148,7 +148,9 @@ export function BehaviourChip({ agentId }: { agentId: string }) {
       <DropdownMenu>
         <DropdownMenuTrigger className="flex cursor-pointer items-center gap-1.5 rounded-sm px-1.5 py-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground/85 focus:outline-none">
           <Bot className="size-3.5" />
-          <span className="max-w-[120px] truncate font-medium text-foreground/80">{activeName}</span>
+          <span className="max-w-[120px] truncate font-medium text-foreground/80">
+            {activeName}
+          </span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" side="top" className="min-w-64">
           <DropdownMenuGroup>
@@ -302,7 +304,9 @@ function RowButton({
       title={title}
       onClick={onClick}
       className={`flex size-5 items-center justify-center rounded-sm transition-colors ${
-        danger ? "text-muted-foreground/70 hover:text-(--danger)" : "text-muted-foreground/70 hover:text-foreground"
+        danger
+          ? "text-muted-foreground/70 hover:text-(--danger)"
+          : "text-muted-foreground/70 hover:text-foreground"
       }`}
     >
       {children}

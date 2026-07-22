@@ -92,9 +92,7 @@ export function ThreadsView({
             onSend={actions.handleSend}
             onAttach={actions.handleAttach}
             pendingFiles={sel.pendingFiles}
-            onRemoveFile={(i) =>
-              sel.setPendingFiles((prev) => prev.filter((_, idx) => idx !== i))
-            }
+            onRemoveFile={(i) => sel.setPendingFiles((prev) => prev.filter((_, idx) => idx !== i))}
             onShowInFinder={onShowInFinder}
           />
         </>

@@ -632,6 +632,16 @@ f73736833df4e426:
   - contract
   - ts-nocheck
   last_edited_ms: 1783418954418
+f94cc1928a2d1feb:
+  tl_dr: 'WORKFLOW RULE (T581): NEVER push to master. Always new branch + new PR. Commit locally, branch off master, push the branch, open PR to master via gh. Augments M151 (don''t push unless asked) with the delivery mechanism when push IS asked.'
+  importance: critical
+  labels:
+  - workflow
+  - git
+  - branch
+  - pr
+  - no-master-push
+  last_edited_ms: 1784725331492
 fb262826c899b682:
   tl_dr: 'check-rust-tests.sh now `cargo test --workspace` (was tui-only, blind to 26 crates). Fixed 3 pre-existing breakages exposed by it. Chain #30.'
   contents: 'T518. Switched check-rust-tests.sh to `cargo test --workspace`. Fixed 3 pre-existing breakages: cp-wire snapshot missing `paused` field, 8 test binaries with drifted use-extern silencer blocks, command() REST handler lost cost-breaker gate. Chain #30.'

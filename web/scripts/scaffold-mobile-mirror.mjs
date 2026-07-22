@@ -71,7 +71,7 @@ function exportShape(absPath) {
   let hasNamed = false
 
   for (const stmt of sf.statements) {
-    const mods = ts.canHaveModifiers(stmt) ? ts.getModifiers(stmt) ?? [] : []
+    const mods = ts.canHaveModifiers(stmt) ? (ts.getModifiers(stmt) ?? []) : []
     const isExported = mods.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
     const isDefault = mods.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword)
 
@@ -110,7 +110,10 @@ function exportShape(absPath) {
 /** The `@/components/…` module specifier for a mirror-relative path (POSIX
  *  separators, extension stripped — the alias resolves the rest). */
 function desktopSpecifier(relPath) {
-  const noExt = relPath.replace(/\.tsx?$/, "").split(sep).join("/")
+  const noExt = relPath
+    .replace(/\.tsx?$/, "")
+    .split(sep)
+    .join("/")
   return `@/components/${noExt}`
 }
 
@@ -199,7 +202,9 @@ function main() {
         stdio: "inherit",
       })
     } catch {
-      console.error("mirror drift: mobile-components is out of sync — run `pnpm mirror:scaffold` and commit.")
+      console.error(
+        "mirror drift: mobile-components is out of sync — run `pnpm mirror:scaffold` and commit.",
+      )
       process.exit(1)
     }
   }

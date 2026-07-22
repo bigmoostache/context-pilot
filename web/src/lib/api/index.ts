@@ -246,14 +246,13 @@ export function upsertLibraryAgent(
   itemId: string,
   agent: { name: string; description?: string; body: string },
 ): Promise<CreateCommandReceipt> {
-  return sdk(putApiAgentByIdLibraryAgentByItem({ path: { id: agentId, item: itemId }, body: agent }))
+  return sdk(
+    putApiAgentByIdLibraryAgentByItem({ path: { id: agentId, item: itemId }, body: agent }),
+  )
 }
 
 /** Delete a behaviour agent's on-disk `.md` (override revert, or user agent removal). */
-export function deleteLibraryAgent(
-  agentId: string,
-  itemId: string,
-): Promise<CreateCommandReceipt> {
+export function deleteLibraryAgent(agentId: string, itemId: string): Promise<CreateCommandReceipt> {
   return sdk(deleteApiAgentByIdLibraryAgentByItem({ path: { id: agentId, item: itemId } }))
 }
 

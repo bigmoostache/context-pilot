@@ -28,10 +28,7 @@ type Kind = OpEntry["kind"]
  * the chip falls back to its "default" label — matching the backend's
  * `library()` read, which marks nothing active when `active_agent_id` is empty.
  */
-export function applyLibraryDelta(
-  prev: LibraryItem[] | undefined,
-  k: Kind,
-): LibraryItem[] | null {
+export function applyLibraryDelta(prev: LibraryItem[] | undefined, k: Kind): LibraryItem[] | null {
   if (!prev) return null // not loaded yet (chip unmounted) → hydrate on next read
   const activeId = k.agent_id ?? null
   const next = prev.map((it) => {
