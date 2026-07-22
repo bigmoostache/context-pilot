@@ -3,11 +3,63 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <!-- iOS home-screen glyph. Safari uses this PNG (NOT the SVG favicon, NOT
+         the manifest icons) for the Add-to-Home-Screen icon; without it iOS
+         falls back to a blurry screenshot of the page (T621). 180×180 is the
+         current iPhone @3x home-screen size; iOS downscales it for every other
+         slot and applies its own rounded-rect mask. -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!-- NO <link rel="manifest"> ON PURPOSE (T639). On iOS 16.4+ a linked
+         manifest with `display: standalone` makes Safari launch the Add-to-
+         Home-Screen app via the MANIFEST PWA path, which reserves an OPAQUE
+         status bar and no longer honours
+         `apple-mobile-web-app-status-bar-style=black-translucent` — so the web
+         view stops extending under the status bar and loses its edge-to-edge
+         full-screen look (the T639 regression). Leaving the manifest UNLINKED
+         drops iOS back to the legacy apple-mobile-web-app standalone path,
+         driven by the meta tags below (viewport-fit=cover; status-bar style —
+         see the T643 note there). The
+         iOS home-screen icon still comes from the apple-touch-icon above (NOT
+         the manifest), so nothing is lost on iOS. public/site.webmanifest is
+         kept in the tree for a future Android/Chrome install, where it would be
+         re-linked behind a platform check. -->
+    <!-- viewport-fit=cover lets the layout extend edge-to-edge INTO the safe
+         areas (notch / status bar / home indicator); the reclaimed regions are
+         then exposed to CSS as env(safe-area-inset-*) so content can pad away
+         from the clock/battery while the background still fills the whole
+         screen. Required for the "content under the status bar" look below. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta
       name="description"
       content="Context Pilot — phosphor cockpit interface (design maquette)"
     />
+    <!-- iOS standalone web app (Add to Home Screen). A PLAIN Safari TAB cannot
+         hide Safari's own chrome (the bottom back/URL/tabs toolbar) or draw
+         into the status bar — that is browser/OS chrome, not the page's. The
+         ONLY way a web page reclaims that space on iPhone is to run as a
+         standalone home-screen app: these meta tags make it launch fullscreen
+         with NO Safari chrome.
+
+         Status-bar style is `black-translucent` (T643 both-ends recipe): the
+         web view extends UNDER the status bar (top edge at the true screen
+         top), so the app is edge-to-edge at the TOP — the clock/battery float
+         as a translucent overlay and content pads clear of them via
+         env(safe-area-inset-top) while the background still fills that region.
+         The BOTTOM chin gap that this combo (black-translucent +
+         viewport-fit=cover) is infamous for is NOT caused by black-translucent
+         itself — it is caused by sizing the fill with `100dvh`/`height:100%`,
+         which resolve to the safe-area-shrunk viewport in standalone WebKit.
+         The mobile shell instead uses `100vh` when standalone (see
+         `.mobile-shell` in index.css), the large viewport that reaches the TRUE
+         bottom — so the app fills BOTH ends. (Apple ships no current iOS-26
+         guidance on this; the recipe is the r/PWA field study.) iOS caches this
+         config AT Add-to-Home-Screen time — changing it requires deleting and
+         re-adding the home-screen icon. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Context Pilot" />
     <title>Context·Pilot — Cockpit</title>
     <!-- Set the theme class before first paint to avoid a light→dark flash
          (FOUC). Mirrors the logic in src/lib/theme.tsx: honour the saved

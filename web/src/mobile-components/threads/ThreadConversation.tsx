@@ -59,12 +59,14 @@ const MessageRow = memo(
     onOpenFile,
     onShowInFinder,
     onDelete,
+    fresh,
   }: {
     msg: ThreadMsg
     agentId: string
     onOpenFile: (file: UploadedFile) => void
     onShowInFinder: ((path: string) => void) | undefined
     onDelete: (msg: ThreadMsg) => void
+    fresh: boolean
   }) {
     return (
       <div className="[contain-intrinsic-size:auto_5rem] [content-visibility:auto]">
@@ -74,6 +76,7 @@ const MessageRow = memo(
           onOpenFile={onOpenFile}
           onShowInFinder={onShowInFinder}
           onDelete={() => onDelete(msg)}
+          fresh={fresh}
         />
         {msg.fileRef && (
           <div className="pb-1.5 pl-5">
@@ -85,7 +88,7 @@ const MessageRow = memo(
       </div>
     )
   },
-  (a, b) => a.msg === b.msg && a.agentId === b.agentId,
+  (a, b) => a.msg === b.msg && a.agentId === b.agentId && a.fresh === b.fresh,
 )
 
 /**
@@ -159,8 +162,30 @@ export function ThreadConversation({
   // message (T414/T512) — auto tool-traces update a collapsed counter and must
   // not yank the scroll away from what the user is reading.
   const bottomRef = useRef<HTMLDivElement>(null)
-  const nonAutoCount = useMemo(() => thread.log.filter((m) => !m.auto).length, [thread.log])
-  useScrollPin(bottomRef, thread.id, nonAutoCount)
+  const nonAuto = useMemo(() => thread.log.filter((m) => !m.auto), [thread.log])
+  useScrollPin(bottomRef, thread.id, nonAuto.length)
+
+  // #5 Sent-bubble pop (anime.js): mark the SINGLE newest non-auto message as
+  // `fresh` when the log grows, so its bubble springs in (send/receive
+  // confirmation) — but NOT the whole initial batch, and NOT on a thread switch.
+  // This is React's blessed "adjust state while rendering" pattern (NOT an
+  // effect — a guarded setState during render, which re-renders in place with no
+  // intermediate paint and is StrictMode-safe): comparing the prior non-auto
+  // count/thread to the current, the message that just landed (last non-auto)
+  // becomes the fresh one. Message's useBubblePop pops exactly that row.
+  const [prevThread, setPrevThread] = useState(thread.id)
+  const [prevCount, setPrevCount] = useState(nonAuto.length)
+  const [freshId, setFreshId] = useState<string | null>(null)
+  if (prevThread !== thread.id) {
+    setPrevThread(thread.id)
+    setPrevCount(nonAuto.length)
+    setFreshId(null)
+  } else if (nonAuto.length !== prevCount) {
+    // Grew on an already-seen thread (prevCount>0 skips the first paint) → the
+    // last non-auto message is the one that just landed.
+    setFreshId(prevCount > 0 && nonAuto.length > prevCount ? (nonAuto.at(-1)?.id ?? null) : null)
+    setPrevCount(nonAuto.length)
+  }
 
   /** Delete a message via the agent command bridge. Stable across renders
    *  (deps: agentId + thread.id) so it doesn't defeat the {@link MessageRow}
@@ -177,13 +202,29 @@ export function ThreadConversation({
   // so each segment object stays reference-stable across delta re-renders.
   const segments = useMemo(() => segmentLog(thread.log), [thread.log])
 
+  // The composer floats as a glass overlay over the bottom of the conversation
+  // (so its backdrop-blur has content to frost), so the last message must be
+  // able to scroll clear of it. A MEASURED spacer (composer height × N) proved
+  // fragile: the scroll-pin fires before the ResizeObserver reports a height, so
+  // the pin lands on a still-zero spacer and the newest message stays tucked
+  // under the composer (T639). Instead reserve a fixed, generous "ghost message"
+  // of dead space at the end of the scroll content — taller than the composer in
+  // any resting state (+ the home-indicator safe area) — so the last real
+  // message always clears it with no dependency on measurement timing.
+
   // Form derivations: answered-state lookup + submit handler (docs/forms.md §5).
   const { answersByForm, onFormSubmit } = useThreadForms(thread.log, agentId, thread.id)
 
   return (
-    <main className="relative flex min-w-0 flex-1 flex-col bg-background">
+    <main className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-background">
       <ScrollArea className="min-h-0 flex-1">
-        <div className="flex flex-col p-4">
+        {/* Tight horizontal gutter (WhatsApp/Messenger convention) — px-2 not
+            p-4 so bubbles claim nearly the full phone width; vertical padding
+            stays roomier for scroll breathing room. The TOP pad carries
+            env(safe-area-inset-top) (T639) so the first message sits below the
+            iOS status bar at rest but scrolls edge-to-edge UNDER it — the shell
+            no longer pads the viewport down, each scroller owns its inset. */}
+        <div className="flex flex-col px-2 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-3">
           <div className="mb-3 flex items-center gap-2">
             <span className="h-px flex-1 bg-border/60" />
             <span className="text-[10.5px] text-muted-foreground/50">
@@ -215,28 +256,40 @@ export function ThreadConversation({
                 onOpenFile={setSheetFile}
                 onShowInFinder={onShowInFinder}
                 onDelete={handleDelete}
+                fresh={seg.msg.id === freshId}
               />
             ),
           )}
+          {/* Fixed "ghost message" spacer — a tall block of dead space so the
+              last real message can always scroll clear of the floating glass
+              composer that overlays the bottom (T639). Fixed (not measured) so
+              it never depends on ResizeObserver timing vs the scroll-pin; sized
+              taller than the resting composer + the home-indicator safe area. */}
+          <div aria-hidden style={{ height: "calc(16rem + env(safe-area-inset-bottom))" }} />
           {/* scroll anchor — keeps the latest message in view */}
           <div ref={bottomRef} />
         </div>
       </ScrollArea>
 
-      <ThreadComposer
-        key={thread.id}
-        status={thread.status}
-        focused={thread.focused}
-        paused={thread.paused}
-        onSend={onSend}
-        onAttach={onAttach}
-        pendingFiles={pendingFiles}
-        onRemoveFile={onRemoveFile}
-        suggestions={suggestions}
-        firstMessage={thread.log.length === 0}
-        onCreateCommand={() => setCreateCmdOpen(true)}
-        draftKey={`cp-draft-${agentId}-${thread.id}`}
-      />
+      {/* Floating glass composer — absolutely positioned over the bottom of the
+          conversation so its backdrop-blur frosts the messages scrolling beneath
+          it (T637). The reserved spacer above keeps the last message reachable. */}
+      <div className="absolute inset-x-0 bottom-0 z-10">
+        <ThreadComposer
+          key={thread.id}
+          status={thread.status}
+          focused={thread.focused}
+          paused={thread.paused}
+          onSend={onSend}
+          onAttach={onAttach}
+          pendingFiles={pendingFiles}
+          onRemoveFile={onRemoveFile}
+          suggestions={suggestions}
+          firstMessage={thread.log.length === 0}
+          onCreateCommand={() => setCreateCmdOpen(true)}
+          draftKey={`cp-draft-${agentId}-${thread.id}`}
+        />
+      </div>
 
       <QuickLookSheet
         node={sheetFile ? uploadToNode(sheetFile) : null}

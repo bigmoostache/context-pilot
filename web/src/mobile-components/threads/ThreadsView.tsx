@@ -1,37 +1,47 @@
-import { useState, useCallback } from "react"
-import { FolderGit2, AlertTriangle, Plus, ChevronLeft } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { animate, createSpring } from "animejs"
+import { FolderGit2, AlertTriangle, Plus, PanelLeft, Settings2 } from "lucide-react"
 import { ThreadList } from "@/mobile-components/threads/ThreadList"
 import { ThreadConversation } from "@/mobile-components/threads/ThreadConversation"
-import { NewThreadDialog } from "@/mobile-components/threads/NewThreadDialog"
+import { CornerButton } from "@/mobile-components/shell/CornerButton"
 import { useFleet, useThreads } from "@/lib/live"
 import { useThreadSelection, useThreadActions } from "@/lib/live/threadView"
+import { useTopButtons } from "@/lib/providers/topButtons"
+import { prefersReducedMotion } from "@/lib/utils"
 
 /**
  * Mobile thread surface — the divergent twin of `components/threads/ThreadsView`.
  *
- * The desktop view is a two-pane master-detail (list rail + conversation side by
- * side); at phone width there is no room for both, so mobile forks the SAME
- * behaviour into **stack navigation**: a full-width list screen, and — once a
- * thread is opened — a full-width conversation screen with a back affordance.
+ * The desktop view is a two-pane master-detail (a permanent list rail beside the
+ * conversation). At phone width a permanent rail steals the entire screen from
+ * the conversation and makes reading it impossible (T609), so mobile forks the
+ * SAME behaviour into a **conversation-primary + drawer** layout: the
+ * conversation is the full-bleed base layer, and the thread list lives in a
+ * slide-in left drawer toggled by a fixed top-left button (hamburger). Opening a
+ * thread closes the drawer, handing the whole screen back to the conversation.
+ *
  * Only the presentation differs; every piece of logic (selection persistence,
  * archive/pause/delete/create/send/attach, the failure notice) comes from the
  * shared `@/lib/live/threadView` hooks the desktop view also consumes, so the
  * two trees can never drift (design-mobile.md §3.2, architecture rule M141).
- *
- * Child components resolve through the `@/mobile-components/…` token (mirror
- * leak-guard): they are stub twins today (byte-identical to desktop), and become
- * real mobile layouts as this folder's recode proceeds — this view is already
- * wired to whichever version the mirror resolves.
  */
 export function ThreadsView({
   activeAgentId,
   onShowInFinder,
+  onGoToAgents,
+  onOpenSettings,
   disconnected,
   onReconnect,
 }: {
   activeAgentId: string
   /** navigate the Finder to a file's parent directory and select it (T334) */
   onShowInFinder?: (path: string) => void
+  /** leave the conversation for the agents (fleet) page — wired to the thread
+   *  drawer's top-left corner button (T631) */
+  onGoToAgents?: (() => void) | undefined
+  /** open this agent's full-screen Settings page — wired to the conversation's
+   *  top-right corner button (T636). Undefined when no live agent. */
+  onOpenSettings?: (() => void) | undefined
   disconnected?: boolean
   onReconnect?: () => void
 }) {
@@ -42,19 +52,46 @@ export function ThreadsView({
   const sel = useThreadSelection(activeAgentId, threads)
   const actions = useThreadActions(activeAgentId, threads, sel)
 
-  // Stack-nav position — the one piece of state desktop's side-by-side layout
-  // doesn't need. "list" shows the roster; "conversation" shows the opened
-  // thread. Opening a thread pushes; the back control pops.
-  const [screen, setScreen] = useState<"list" | "conversation">("list")
+  // The one piece of state desktop's always-open rail doesn't need: whether the
+  // thread-list drawer is showing. Closed by default when a realm opens (the
+  // conversation owns the screen); the user taps the top-left toggle to browse
+  // threads, and picking one closes it again.
+  const [drawerOpen, setDrawerOpen] = useState(false)
+
+  // Signal the top-buttons provider on every drawer edge (T637): the corner
+  // controls swap between the conversation's set (drawer toggle / settings) and
+  // the thread-list's set (agents grid / archived toggle), so their glyphs
+  // re-spring in sync with the slide.
+  const { bump } = useTopButtons()
+  useEffect(bump, [drawerOpen, bump])
 
   const openThread = useCallback(
     (id: string) => {
       sel.setSelectedId(id)
-      setScreen("conversation")
+      setDrawerOpen(false)
     },
     [sel],
   )
-  const back = useCallback(() => setScreen("list"), [])
+
+  // #2 Drawer settle (anime.js): spring the drawer's slide instead of the flat
+  // CSS transition, for the subtle iOS overshoot-and-settle. anime owns the
+  // aside's transform (translateX 0% ↔ -100%); the first run is skipped (the
+  // drawer mounts closed off-screen — a spring there would flash it in) and
+  // reduced-motion snaps to the end position. The `-translate-x-full` class is
+  // dropped from the aside so React and anime never both write transform.
+  const drawerRef = useRef<HTMLElement>(null)
+  const firstRunRef = useRef(true)
+  useEffect(() => {
+    const el = drawerRef.current
+    if (!el) return
+    const to = drawerOpen ? "0%" : "-100%"
+    if (firstRunRef.current || prefersReducedMotion()) {
+      firstRunRef.current = false
+      el.style.transform = `translateX(${to})`
+      return
+    }
+    animate(el, { translateX: to, ease: createSpring({ stiffness: 300, damping: 30 }) })
+  }, [drawerOpen])
 
   // No agent at all → bare empty state (no realm to render a roster for).
   if (!hasAgent) {
@@ -62,9 +99,6 @@ export function ThreadsView({
   }
 
   const thread = threads.find((t) => t.id === sel.effectiveSelectedId)
-  // A conversation screen with no resolvable thread (stale/empty selection)
-  // falls back to the list so the user is never stranded on a blank pane.
-  const showConversation = screen === "conversation"
 
   return (
     <div
@@ -83,26 +117,82 @@ export function ThreadsView({
         />
       )}
 
-      {showConversation && thread ? (
-        <>
-          <ConversationHeader title={thread.name} onBack={back} />
-          <ThreadConversation
-            thread={thread}
-            agentId={activeAgentId}
-            onSend={actions.handleSend}
-            onAttach={actions.handleAttach}
-            pendingFiles={sel.pendingFiles}
-            onRemoveFile={(i) =>
-              sel.setPendingFiles((prev) => prev.filter((_, idx) => idx !== i))
-            }
-            onShowInFinder={onShowInFinder}
-          />
-        </>
+      {/* Base layer: the conversation (or an empty-realm hint). Full-bleed — the
+          list no longer shares the screen with it. */}
+      {thread ? (
+        <ThreadConversation
+          thread={thread}
+          agentId={activeAgentId}
+          onSend={actions.handleSend}
+          onAttach={actions.handleAttach}
+          pendingFiles={sel.pendingFiles}
+          onRemoveFile={(i) => sel.setPendingFiles((prev) => prev.filter((_, idx) => idx !== i))}
+          onShowInFinder={onShowInFinder}
+        />
       ) : (
+        <EmptyRealm
+          agentName={agents.find((a) => a.id === activeAgentId)?.name}
+          onNewThread={() => setDrawerOpen(true)}
+        />
+      )}
+
+      {/* Drawer toggle — the shared top-left corner button (see CornerButton:
+          fixed, safe-area-offset so it clears the iOS status bar in standalone,
+          T621). It carries `z-20` so it sits UNDER the drawer scrim (z-40): a
+          tap while the drawer is open lands on the scrim and closes it. */}
+      <CornerButton
+        side="left"
+        label="Show threads"
+        onClick={() => setDrawerOpen(true)}
+        className="z-20"
+      >
+        <PanelLeft />
+      </CornerButton>
+
+      {/* Settings button — top-right of the conversation (that corner is free;
+          top-left is the drawer toggle). Opens this agent's full-screen Settings
+          page (T636). z-20 so the drawer scrim (z-40) covers it when open. */}
+      {onOpenSettings && (
+        <CornerButton side="right" label="Agent settings" onClick={onOpenSettings} className="z-20">
+          <Settings2 />
+        </CornerButton>
+      )}
+
+      {/* Scrim — dims the conversation while the drawer is open; tapping it (or
+          the toggle beneath it) closes the drawer. A <button> not a <div> so it
+          carries keyboard semantics (jsx-a11y). `fixed` (not `absolute`) so it
+          covers the viewport, not the tall scrolling ThreadsView container. */}
+      <button
+        aria-label="Close thread list"
+        onClick={() => setDrawerOpen(false)}
+        tabIndex={drawerOpen ? 0 : -1}
+        className={
+          "fixed inset-0 z-40 bg-black/40 transition-opacity duration-200 " +
+          (drawerOpen ? "opacity-100" : "pointer-events-none opacity-0")
+        }
+      />
+
+      {/* Drawer — the thread list, sliding in from the left. Always mounted (so
+          it animates) but shoved off-screen and non-interactive when closed.
+          `fixed inset-y-0` pins it to the VIEWPORT height, not the tall
+          scrolling ThreadsView container beneath it — so ThreadList's own
+          ScrollArea scrolls independently of the conversation (T616). Full
+          viewport width (`inset-0`, not a partial `w-[85%]`) — on a phone a
+          sliver of the dimmed conversation peeking at the edge just cramps the
+          list for no benefit (T619). */}
+      <aside
+        ref={drawerRef}
+        aria-hidden={!drawerOpen}
+        style={{ transform: "translateX(-100%)" }}
+        className={
+          "fixed inset-0 z-50 flex flex-col bg-surface " + (drawerOpen ? "" : "pointer-events-none")
+        }
+      >
         <ThreadList
           threads={threads}
           selectedId={sel.effectiveSelectedId}
           onSelect={openThread}
+          onGoToAgents={onGoToAgents}
           query={sel.query}
           onQueryChange={sel.setQuery}
           showArchived={sel.showArchived}
@@ -110,15 +200,12 @@ export function ThreadsView({
           onArchive={actions.handleArchive}
           onDelete={actions.handleDelete}
           onPause={actions.handlePause}
-          onNewThread={() => sel.setNewOpen(true)}
+          onNewThread={(name) => {
+            actions.handleCreate(name)
+            setDrawerOpen(false)
+          }}
         />
-      )}
-
-      <NewThreadDialog
-        open={sel.newOpen}
-        onClose={() => sel.setNewOpen(false)}
-        onCreate={actions.handleCreate}
-      />
+      </aside>
 
       {actions.notice && (
         <div
@@ -133,27 +220,9 @@ export function ThreadsView({
   )
 }
 
-/** Slim conversation-screen header for the stack: a back control (pops to the
- *  list) plus the thread title. Replaces the desktop's always-visible list rail,
- *  which is the affordance mobile trades for full-width message space. */
-function ConversationHeader({ title, onBack }: { title: string; onBack: () => void }) {
-  return (
-    <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-2">
-      <button
-        onClick={onBack}
-        aria-label="Back to threads"
-        className="flex size-8 items-center justify-center rounded-md text-foreground/80 transition-colors hover:bg-muted/60"
-      >
-        <ChevronLeft className="size-5" />
-      </button>
-      <span className="truncate text-[14px] font-semibold tracking-tight">{title}</span>
-    </header>
-  )
-}
-
-/** Shown when there is no agent (no realm) — the mobile twin of the desktop
- *  EmptyRealm. When `onNewThread` is supplied it offers a primary action so an
- *  empty realm can bootstrap its first thread. */
+/** Shown when there is no agent (no realm) or no thread picked yet — the mobile
+ *  twin of the desktop EmptyRealm. When `onNewThread` is supplied it offers a
+ *  primary action so an empty realm can bootstrap its first thread. */
 function EmptyRealm({
   agentName,
   onNewThread,
@@ -170,7 +239,7 @@ function EmptyRealm({
         {agentName ? (
           <>
             <span className="font-medium text-foreground/80">{agentName}</span> has no threads yet —
-            start one to put it to work in its folder.
+            tap the menu (top-left) to browse, or start one to put it to work in its folder.
           </>
         ) : (
           "Select an agent to see its threads."

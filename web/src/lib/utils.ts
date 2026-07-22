@@ -21,6 +21,23 @@ export function clipboard(): Clipboard | undefined {
   return navigator.clipboard
 }
 
+/**
+ * Whether the user asked the OS to minimise non-essential motion.
+ *
+ * Read at animation time (a plain query, NOT a hook) so every anime.js-driven
+ * flourish can short-circuit to its end state when `(prefers-reduced-motion:
+ * reduce)` is set — an accessibility contract (vestibular-disorder safety) the
+ * animation sites honour by jumping straight to the final value instead of
+ * springing/staggering. Guards against `matchMedia` being absent (older/SSR).
+ */
+export function prefersReducedMotion(): boolean {
+  // `matchMedia` is typed always-present by lib.dom, but is genuinely absent on
+  // an older browser / SSR — a runtime `typeof` guard is the honest check (and
+  // narrows the type so the call site carries no "unnecessary" optional chain).
+  if (typeof matchMedia !== "function") return false
+  return matchMedia("(prefers-reduced-motion: reduce)").matches
+}
+
 // ── Client-side zip-on-drop (T367) ────────────────────────────────────
 //
 // Bundle the file(s) a user drops onto the thread conversation into a SINGLE

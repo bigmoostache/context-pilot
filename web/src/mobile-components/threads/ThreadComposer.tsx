@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { lineBounds, resolveEnter, resolveTab } from "@/lib/utils"
+import { animate, createSpring } from "animejs"
+import { lineBounds, resolveEnter, resolveTab, prefersReducedMotion } from "@/lib/utils"
 import { measure } from "@/lib/support/telemetry"
-import { ArrowUp, Paperclip, Loader2, Clock, Pause } from "lucide-react"
+import { ArrowUp, Plus, Loader2, Clock, Pause } from "lucide-react"
 import type { ThreadStatus } from "@/lib/types"
 import { ComposerBubbles } from "@/mobile-components/threads/fileUpload"
-import type { UploadedFile, CommandSuggestion } from "@/mobile-components/threads/fileUpload/helpers"
+import type {
+  UploadedFile,
+  CommandSuggestion,
+} from "@/mobile-components/threads/fileUpload/helpers"
+import { FrostedBottomBar } from "@/mobile-components/shell/FrostedBottomBar"
 import { parseDraft } from "@/lib/support/threadMessages"
 
 // CommandSuggestion lives beside the file-chip abstraction in ./fileUpload (both
@@ -21,13 +26,11 @@ interface Banner {
 }
 
 /**
- * Resolve the composer's turn-status banner from the thread state (T39/T371).
- *
- * A flat precedence chain (not a nested ternary): a paused thread shows the
- * amber pause notice; otherwise, only when the agent owes this thread a
- * response, an active spinner while streaming / working the FOCUSED thread, or
- * a static "will pick up soon" clock for a queued (non-focused) agent-turn
- * thread. Returns null on the user's turn (no banner).
+ * Resolve the composer's turn-status banner from thread state (T39/T371). Flat
+ * precedence: paused shows the amber pause notice; else only when the agent owes
+ * this thread — an active spinner while streaming / working the FOCUSED thread,
+ * or a static "will pick up soon" clock for a queued (non-focused) agent turn.
+ * Null on the user's turn.
  */
 function resolveComposerBanner(
   paused: boolean,
@@ -63,10 +66,10 @@ function resolveComposerBanner(
   }
 }
 
-/** Everything the composer render needs from its draft/keyboard logic. Flat
- *  (not nested under one object) so the render passes `textareaRef` to `ref=`
- *  as a bare identifier — the react-hooks/refs pass rejects reading a ref
- *  through a member access of a ref-bearing object. */
+/** Everything the composer render needs from its draft/keyboard logic. Flat (not
+ *  nested under one object) so the render passes `textareaRef` to `ref=` as a
+ *  bare identifier — the react-hooks/refs pass rejects reading a ref through a
+ *  member access of a ref-bearing object. */
 interface Composer {
   text: string
   caret: number
@@ -83,16 +86,15 @@ interface Composer {
 /**
  * Own the composer's draft text + caret, the persisted-draft round-trip, the
  * auto-grow textarea, and the keyboard/command-prefill handlers — identical to
- * the desktop twin (shared draft/keyboard behaviour), extracted so both units
- * stay within the P8 budgets.
+ * desktop (shared behaviour), extracted to keep both units within P8 budgets.
  */
 function useComposer(
   draftKey: string | undefined,
   onSend: ((text: string) => void) | undefined,
 ): Composer {
   // Seed text + caret from the persisted draft ONCE per mount so a remount
-  // (thread switch / return from another view) or a full reload restores both
-  // what was being typed and where the cursor sat (T304).
+  // (thread switch / return) or a full reload restores what was being typed
+  // and where the cursor sat (T304).
   const [seed] = useState(() => parseDraft(draftKey))
   const [text, setText] = useState(() => seed.text)
   const [caret, setCaret] = useState(() => seed.selStart)
@@ -104,11 +106,12 @@ function useComposer(
     else localStorage.removeItem(draftKey)
   }
 
-  // Apply the saved caret/selection once the textarea has mounted (T304).
+  // Restore the saved caret/selection once the textarea mounts (T304); do NOT
+  // focus — focusing on thread-open pops the mobile keyboard unbidden (T622).
+  // Post-user-action focus (send, /command pick) is handled elsewhere.
   useEffect(() => {
     const el = textareaRef.current
     if (!el || !seed.text) return
-    el.focus()
     el.setSelectionRange(seed.selStart, seed.selEnd)
   }, [seed])
 
@@ -123,8 +126,7 @@ function useComposer(
   }
   useEffect(autoResize, [text])
 
-  // The text typed after `/` on the current line, or null if the caret isn't on
-  // a slash-prefixed line. Drives both the bubble visibility and prefix filter.
+  // Text typed after `/` on the current line, or null when not on a slash line.
   const slashPrefix = useMemo((): string | null => {
     const { start, end } = lineBounds(text, caret)
     const line = text.slice(start, end)
@@ -174,7 +176,11 @@ function useComposer(
     requestAnimationFrame(() => {
       const el = textareaRef.current
       if (el) el.style.height = "auto"
-      el?.focus()
+      // Mobile divergence: BLUR after send (not focus like desktop) so the caret
+      // leaves the field and the on-screen keyboard dismisses — sending is a
+      // "done typing" gesture on a phone, whereas desktop keeps focus to fire off
+      // several messages in a row.
+      el?.blur()
     })
   }
 
@@ -226,14 +232,10 @@ function useComposer(
 }
 
 /**
- * The composer's input row — the mobile-tuned twin. Same structure as desktop
- * (paperclip + auto-grow textarea + send) with touch-first sizing:
- *
- *   • **16px textarea font** — iOS Safari auto-zooms the viewport when a focused
- *     input has a font smaller than 16px; the desktop 13.5px would jank the
- *     whole layout on every tap. 16px pins the zoom off.
- *   • **Larger tap targets** — the paperclip and send button grow to 36px, and
- *     the input row gets more vertical padding, for comfortable thumb use.
+ * The composer's input row — mobile-tuned twin. Same structure as desktop
+ * (paperclip + auto-grow textarea + send) with touch-first sizing: 16px textarea
+ * font (below 16px iOS Safari auto-zooms the viewport on focus), and 36px tap
+ * targets for the paperclip + send.
  */
 function ComposerInputRow({
   textareaRef,
@@ -255,8 +257,23 @@ function ComposerInputRow({
   onAttach: ((files: File[]) => void | Promise<void>) | undefined
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // #4 Send-button pop (anime.js): spring the send button in when it becomes
+  // available (iMessage pops it, not a hard cut). Conditionally rendered, so
+  // this fires when `sendable` flips true. Reduced-motion skips it.
+  const sendBtnRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    const btn = sendBtnRef.current
+    if (!btn || !sendable || prefersReducedMotion()) return
+    animate(btn, {
+      scale: [0, 1],
+      opacity: [0, 1],
+      ease: createSpring({ stiffness: 600, damping: 20 }),
+    })
+  }, [sendable])
   return (
-    <div className="card-shadow flex items-end gap-2 rounded-2xl border border-border bg-card p-3 focus-within:border-(--signal)/60">
+    // iMessage-style row: standalone round attach button on the LEFT, then a
+    // single rounded pill holding the textarea with send tucked inside its edge.
+    <div className="flex items-end gap-2">
       <input
         ref={fileInputRef}
         type="file"
@@ -268,45 +285,54 @@ function ComposerInputRow({
           e.target.value = ""
         }}
       />
+      {/* Standalone attach affordance (like iMessage's +), outside the pill. */}
       <button
         onClick={() => fileInputRef.current?.click()}
         disabled={!onAttach}
         title="Attach files"
         aria-label="Attach files"
-        className="mb-0.5 flex size-9 items-center justify-center text-muted-foreground/60 transition-colors active:text-(--interactive) disabled:cursor-default disabled:opacity-40"
+        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-card/60 text-muted-foreground/70 backdrop-blur-[3px] transition-colors active:bg-muted active:text-(--interactive) disabled:cursor-default disabled:opacity-40"
       >
-        <Paperclip className="size-5" />
+        <Plus className="size-5.5" strokeWidth={2.25} />
       </button>
-      <textarea
-        ref={textareaRef}
-        autoFocus
-        value={text}
-        onChange={onChange}
-        onSelect={onSelect}
-        onKeyDown={onKeyDown}
-        onPaste={(e) => {
-          const items = [...e.clipboardData.items]
-          const images = items
-            .filter((i) => i.kind === "file" && i.type.startsWith("image/"))
-            .map((i) => i.getAsFile())
-            .filter((f): f is File => f !== null)
-          if (images.length > 0 && onAttach) {
-            e.preventDefault()
-            void onAttach(images)
-          }
-        }}
-        placeholder="Reply to this thread…"
-        rows={1}
-        className="max-h-[200px] min-h-[28px] flex-1 resize-none bg-transparent text-[16px] leading-relaxed text-foreground/90 outline-none placeholder:text-muted-foreground/60"
-      />
-      <button
-        onClick={onSubmit}
-        disabled={!sendable}
-        aria-label="Send message"
-        className="flex size-9 items-center justify-center rounded-full bg-(--signal) text-(--primary-foreground) transition-[filter] active:brightness-105 disabled:opacity-40"
-      >
-        <ArrowUp className="size-5" strokeWidth={2.5} />
-      </button>
+
+      {/* The input pill — thin border, subtle fill, fully rounded. Send button
+          lives INSIDE the pill's right edge (iMessage convention). */}
+      <div className="flex min-w-0 flex-1 items-end gap-1 rounded-[1.35rem] border border-border bg-card/70 py-1 pr-1 pl-3.5 backdrop-blur-[3px] focus-within:border-(--signal)/60">
+        <textarea
+          ref={textareaRef}
+          value={text}
+          onChange={onChange}
+          onSelect={onSelect}
+          onKeyDown={onKeyDown}
+          onPaste={(e) => {
+            const items = [...e.clipboardData.items]
+            const images = items
+              .filter((i) => i.kind === "file" && i.type.startsWith("image/"))
+              .map((i) => i.getAsFile())
+              .filter((f): f is File => f !== null)
+            if (images.length > 0 && onAttach) {
+              e.preventDefault()
+              void onAttach(images)
+            }
+          }}
+          placeholder="Message…"
+          rows={1}
+          className="max-h-[200px] min-h-[30px] min-w-0 flex-1 resize-none self-center bg-transparent py-1 text-[16px] leading-snug text-foreground/90 outline-none placeholder:text-muted-foreground/50"
+        />
+        {/* Send appears only when there's something to send (empty pill stays
+            clean). */}
+        {sendable && (
+          <button
+            ref={sendBtnRef}
+            onClick={onSubmit}
+            aria-label="Send message"
+            className="mb-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-(--signal) text-(--primary-foreground) transition-[filter] active:brightness-110"
+          >
+            <ArrowUp className="size-4.5" strokeWidth={2.75} />
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -330,15 +356,12 @@ function ComposerBanner({ banner }: { banner: Banner }) {
 }
 
 /**
- * Mobile thread composer — the divergent twin of `components/threads/
- * ThreadComposer`. Always active regardless of turn status; the turn-status
- * banner reflects agent activity on this thread (T39/T371).
- *
- * Behaviour (draft persistence, list-aware Enter/Tab, `/command` bubbles with
- * Tab autocomplete + Space expansion) is byte-for-byte the desktop logic — only
- * the input row's sizing forks for touch (16px font to defeat iOS focus-zoom,
- * 36px tap targets) and the outer padding carries a `safe-area-inset-bottom`
- * so the composer clears the phone's home indicator.
+ * Mobile thread composer — divergent twin of `components/threads/ThreadComposer`.
+ * Always active; the turn-status banner reflects agent activity (T39/T371).
+ * Behaviour (draft persistence, list-aware Enter/Tab, `/command` bubbles with Tab
+ * autocomplete + Space expansion) is byte-for-byte the desktop logic — only the
+ * input row's touch sizing forks (16px font vs iOS focus-zoom, 36px targets) and
+ * the outer padding carries `safe-area-inset-bottom` to clear the home indicator.
  */
 export function ThreadComposer({
   status,
@@ -383,8 +406,7 @@ export function ThreadComposer({
 
   const sendable = composer.canSend(pendingFiles.length)
 
-  // Offer /command bubbles mid-draft on a slash line (any thread) OR on a
-  // brand-new thread with an empty composer. File chips show independently.
+  // /command bubbles on a slash line, or on a brand-new empty thread.
   const commandsActive = composer.slashPrefix !== null || (firstMessage && !composer.text.trim())
 
   const filteredSuggestions = useMemo(() => {
@@ -419,9 +441,9 @@ export function ThreadComposer({
   }
 
   return (
-    <div className="shrink-0 px-3 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
-      {/* Unified bubble row (T350) — file-upload chips + /command suggestions +
-          create-command pill, all in ONE normal-flow container. */}
+    <FrostedBottomBar className="px-3 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      {/* Unified bubble row (T350) — file chips + /command suggestions +
+          create-command pill in ONE container. */}
       {(pendingFiles.length > 0 || commandsActive) && (
         <ComposerBubbles
           files={pendingFiles}
@@ -442,6 +464,6 @@ export function ThreadComposer({
         onSubmit={composer.handleSubmit}
         onAttach={onAttach}
       />
-    </div>
+    </FrostedBottomBar>
   )
 }
