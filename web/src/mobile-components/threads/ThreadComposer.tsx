@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { lineBounds, resolveEnter, resolveTab } from "@/lib/utils"
 import { measure } from "@/lib/support/telemetry"
-import { ArrowUp, Paperclip, Loader2, Clock, Pause } from "lucide-react"
+import { ArrowUp, Plus, Loader2, Clock, Pause } from "lucide-react"
 import type { ThreadStatus } from "@/lib/types"
 import { ComposerBubbles } from "@/mobile-components/threads/fileUpload"
 import type { UploadedFile, CommandSuggestion } from "@/mobile-components/threads/fileUpload/helpers"
@@ -256,7 +256,10 @@ function ComposerInputRow({
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   return (
-    <div className="card-shadow flex items-end gap-2 rounded-2xl border border-border bg-card p-3 focus-within:border-(--signal)/60">
+    // iMessage-style row: a standalone round attach button on the LEFT, then a
+    // single rounded pill holding the textarea with the send button tucked
+    // inside its right edge — not a heavy bordered card wrapping everything.
+    <div className="flex items-end gap-2">
       <input
         ref={fileInputRef}
         type="file"
@@ -268,45 +271,55 @@ function ComposerInputRow({
           e.target.value = ""
         }}
       />
+      {/* Standalone attach affordance (like iMessage's +), outside the pill. */}
       <button
         onClick={() => fileInputRef.current?.click()}
         disabled={!onAttach}
         title="Attach files"
         aria-label="Attach files"
-        className="mb-0.5 flex size-9 items-center justify-center text-muted-foreground/60 transition-colors active:text-(--interactive) disabled:cursor-default disabled:opacity-40"
+        className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground/70 transition-colors active:bg-muted active:text-(--interactive) disabled:cursor-default disabled:opacity-40"
       >
-        <Paperclip className="size-5" />
+        <Plus className="size-5.5" strokeWidth={2.25} />
       </button>
-      <textarea
-        ref={textareaRef}
-        autoFocus
-        value={text}
-        onChange={onChange}
-        onSelect={onSelect}
-        onKeyDown={onKeyDown}
-        onPaste={(e) => {
-          const items = [...e.clipboardData.items]
-          const images = items
-            .filter((i) => i.kind === "file" && i.type.startsWith("image/"))
-            .map((i) => i.getAsFile())
-            .filter((f): f is File => f !== null)
-          if (images.length > 0 && onAttach) {
-            e.preventDefault()
-            void onAttach(images)
-          }
-        }}
-        placeholder="Reply to this thread…"
-        rows={1}
-        className="max-h-[200px] min-h-[28px] flex-1 resize-none bg-transparent text-[16px] leading-relaxed text-foreground/90 outline-none placeholder:text-muted-foreground/60"
-      />
-      <button
-        onClick={onSubmit}
-        disabled={!sendable}
-        aria-label="Send message"
-        className="flex size-9 items-center justify-center rounded-full bg-(--signal) text-(--primary-foreground) transition-[filter] active:brightness-105 disabled:opacity-40"
-      >
-        <ArrowUp className="size-5" strokeWidth={2.5} />
-      </button>
+
+      {/* The input pill — thin border, subtle fill, fully rounded so a single
+          line reads as a capsule and it softens as it grows. The send button
+          lives INSIDE the pill's right edge (iMessage convention). */}
+      <div className="flex flex-1 items-end gap-1 rounded-[1.35rem] border border-border bg-card py-1 pr-1 pl-3.5 focus-within:border-(--signal)/60">
+        <textarea
+          ref={textareaRef}
+          autoFocus
+          value={text}
+          onChange={onChange}
+          onSelect={onSelect}
+          onKeyDown={onKeyDown}
+          onPaste={(e) => {
+            const items = [...e.clipboardData.items]
+            const images = items
+              .filter((i) => i.kind === "file" && i.type.startsWith("image/"))
+              .map((i) => i.getAsFile())
+              .filter((f): f is File => f !== null)
+            if (images.length > 0 && onAttach) {
+              e.preventDefault()
+              void onAttach(images)
+            }
+          }}
+          placeholder="Message…"
+          rows={1}
+          className="max-h-[200px] min-h-[30px] flex-1 resize-none self-center bg-transparent py-1 text-[16px] leading-snug text-foreground/90 outline-none placeholder:text-muted-foreground/50"
+        />
+        {/* Send appears only when there's something to send (iMessage hides it
+            on an empty field), so the empty pill stays clean. */}
+        {sendable && (
+          <button
+            onClick={onSubmit}
+            aria-label="Send message"
+            className="mb-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-(--signal) text-(--primary-foreground) transition-[filter] active:brightness-110"
+          >
+            <ArrowUp className="size-4.5" strokeWidth={2.75} />
+          </button>
+        )}
+      </div>
     </div>
   )
 }
