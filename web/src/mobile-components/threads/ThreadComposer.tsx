@@ -22,13 +22,11 @@ interface Banner {
 }
 
 /**
- * Resolve the composer's turn-status banner from the thread state (T39/T371).
- *
- * A flat precedence chain (not a nested ternary): a paused thread shows the
- * amber pause notice; otherwise, only when the agent owes this thread a
- * response, an active spinner while streaming / working the FOCUSED thread, or
- * a static "will pick up soon" clock for a queued (non-focused) agent-turn
- * thread. Returns null on the user's turn (no banner).
+ * Resolve the composer's turn-status banner from thread state (T39/T371). Flat
+ * precedence: paused shows the amber pause notice; else only when the agent owes
+ * this thread — an active spinner while streaming / working the FOCUSED thread,
+ * or a static "will pick up soon" clock for a queued (non-focused) agent turn.
+ * Null on the user's turn.
  */
 function resolveComposerBanner(
   paused: boolean,
@@ -64,10 +62,10 @@ function resolveComposerBanner(
   }
 }
 
-/** Everything the composer render needs from its draft/keyboard logic. Flat
- *  (not nested under one object) so the render passes `textareaRef` to `ref=`
- *  as a bare identifier — the react-hooks/refs pass rejects reading a ref
- *  through a member access of a ref-bearing object. */
+/** Everything the composer render needs from its draft/keyboard logic. Flat (not
+ *  nested under one object) so the render passes `textareaRef` to `ref=` as a
+ *  bare identifier — the react-hooks/refs pass rejects reading a ref through a
+ *  member access of a ref-bearing object. */
 interface Composer {
   text: string
   caret: number
@@ -84,16 +82,15 @@ interface Composer {
 /**
  * Own the composer's draft text + caret, the persisted-draft round-trip, the
  * auto-grow textarea, and the keyboard/command-prefill handlers — identical to
- * the desktop twin (shared draft/keyboard behaviour), extracted so both units
- * stay within the P8 budgets.
+ * desktop (shared behaviour), extracted to keep both units within P8 budgets.
  */
 function useComposer(
   draftKey: string | undefined,
   onSend: ((text: string) => void) | undefined,
 ): Composer {
   // Seed text + caret from the persisted draft ONCE per mount so a remount
-  // (thread switch / return from another view) or a full reload restores both
-  // what was being typed and where the cursor sat (T304).
+  // (thread switch / return) or a full reload restores what was being typed
+  // and where the cursor sat (T304).
   const [seed] = useState(() => parseDraft(draftKey))
   const [text, setText] = useState(() => seed.text)
   const [caret, setCaret] = useState(() => seed.selStart)
@@ -105,11 +102,9 @@ function useComposer(
     else localStorage.removeItem(draftKey)
   }
 
-  // Restore the saved caret/selection once the textarea has mounted (T304) —
-  // but do NOT focus. On mobile, focusing the composer when a thread opens pops
-  // the on-screen keyboard unbidden and yanks the view up (T622); the caret is
-  // only restored so that IF the user taps in, the cursor lands where they left
-  // off. Post-user-action focus (send, /command pick) is handled elsewhere.
+  // Restore the saved caret/selection once the textarea mounts (T304); do NOT
+  // focus — focusing on thread-open pops the mobile keyboard unbidden (T622).
+  // Post-user-action focus (send, /command pick) is handled elsewhere.
   useEffect(() => {
     const el = textareaRef.current
     if (!el || !seed.text) return
@@ -127,8 +122,7 @@ function useComposer(
   }
   useEffect(autoResize, [text])
 
-  // The text typed after `/` on the current line, or null if the caret isn't on
-  // a slash-prefixed line. Drives both the bubble visibility and prefix filter.
+  // Text typed after `/` on the current line, or null when not on a slash line.
   const slashPrefix = useMemo((): string | null => {
     const { start, end } = lineBounds(text, caret)
     const line = text.slice(start, end)
@@ -230,14 +224,10 @@ function useComposer(
 }
 
 /**
- * The composer's input row — the mobile-tuned twin. Same structure as desktop
- * (paperclip + auto-grow textarea + send) with touch-first sizing:
- *
- *   • **16px textarea font** — iOS Safari auto-zooms the viewport when a focused
- *     input has a font smaller than 16px; the desktop 13.5px would jank the
- *     whole layout on every tap. 16px pins the zoom off.
- *   • **Larger tap targets** — the paperclip and send button grow to 36px, and
- *     the input row gets more vertical padding, for comfortable thumb use.
+ * The composer's input row — mobile-tuned twin. Same structure as desktop
+ * (paperclip + auto-grow textarea + send) with touch-first sizing: 16px textarea
+ * font (below 16px iOS Safari auto-zooms the viewport on focus), and 36px tap
+ * targets for the paperclip + send.
  */
 function ComposerInputRow({
   textareaRef,
@@ -259,10 +249,9 @@ function ComposerInputRow({
   onAttach: ((files: File[]) => void | Promise<void>) | undefined
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
-  // #4 Send-button pop (anime.js): spring the send button in the instant it
-  // becomes available (iMessage pops it, not a hard cut). The button is
-  // conditionally rendered, so this effect fires when `sendable` flips true and
-  // the ref has just mounted. Reduced-motion skips it (button appears at rest).
+  // #4 Send-button pop (anime.js): spring the send button in when it becomes
+  // available (iMessage pops it, not a hard cut). Conditionally rendered, so
+  // this fires when `sendable` flips true. Reduced-motion skips it.
   const sendBtnRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     const btn = sendBtnRef.current
@@ -274,9 +263,8 @@ function ComposerInputRow({
     })
   }, [sendable])
   return (
-    // iMessage-style row: a standalone round attach button on the LEFT, then a
-    // single rounded pill holding the textarea with the send button tucked
-    // inside its right edge — not a heavy bordered card wrapping everything.
+    // iMessage-style row: standalone round attach button on the LEFT, then a
+    // single rounded pill holding the textarea with send tucked inside its edge.
     <div className="flex items-end gap-2">
       <input
         ref={fileInputRef}
@@ -300,8 +288,7 @@ function ComposerInputRow({
         <Plus className="size-5.5" strokeWidth={2.25} />
       </button>
 
-      {/* The input pill — thin border, subtle fill, fully rounded so a single
-          line reads as a capsule and it softens as it grows. The send button
+      {/* The input pill — thin border, subtle fill, fully rounded. Send button
           lives INSIDE the pill's right edge (iMessage convention). */}
       <div className="flex min-w-0 flex-1 items-end gap-1 rounded-[1.35rem] border border-border bg-card/70 py-1 pr-1 pl-3.5 backdrop-blur-[6px] focus-within:border-(--signal)/60">
         <textarea
@@ -325,8 +312,8 @@ function ComposerInputRow({
           rows={1}
           className="max-h-[200px] min-h-[30px] min-w-0 flex-1 resize-none self-center bg-transparent py-1 text-[16px] leading-snug text-foreground/90 outline-none placeholder:text-muted-foreground/50"
         />
-        {/* Send appears only when there's something to send (iMessage hides it
-            on an empty field), so the empty pill stays clean. */}
+        {/* Send appears only when there's something to send (empty pill stays
+            clean). */}
         {sendable && (
           <button
             ref={sendBtnRef}
@@ -338,6 +325,44 @@ function ComposerInputRow({
           </button>
         )}
       </div>
+    </div>
+  )
+}
+
+/**
+ * True *progressive* backdrop-blur — max at the bottom fading to zero at the top
+ * (T637). CSS has no gradient `backdrop-filter`, so this is the layered-mask
+ * trick: stacked layers, each a STRONGER `backdrop-blur` masked with a
+ * `linear-gradient` reaching LESS far up, so the heaviest blur pools at the
+ * bottom and ramps smoothly to none at the top. `-webkit-` prefixes on
+ * `backdropFilter` + `maskImage` are load-bearing on iOS Safari.
+ */
+function ProgressiveBlur() {
+  // Each layer: [blur px, how far up the mask stays opaque]. Stronger blur =
+  // shorter reach, so heavier blur pools at the bottom.
+  const layers: [number, number][] = [
+    [0.5, 100],
+    [1.5, 75],
+    [3, 50],
+    [6, 25],
+  ]
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+      {layers.map(([blur, reach], i) => {
+        const grad = `linear-gradient(to top, black 0%, transparent ${reach}%)`
+        return (
+          <div
+            key={i}
+            className="absolute inset-0"
+            style={{
+              backdropFilter: `blur(${blur}px) saturate(150%)`,
+              WebkitBackdropFilter: `blur(${blur}px) saturate(150%)`,
+              maskImage: grad,
+              WebkitMaskImage: grad,
+            }}
+          />
+        )
+      })}
     </div>
   )
 }
@@ -361,15 +386,12 @@ function ComposerBanner({ banner }: { banner: Banner }) {
 }
 
 /**
- * Mobile thread composer — the divergent twin of `components/threads/
- * ThreadComposer`. Always active regardless of turn status; the turn-status
- * banner reflects agent activity on this thread (T39/T371).
- *
- * Behaviour (draft persistence, list-aware Enter/Tab, `/command` bubbles with
- * Tab autocomplete + Space expansion) is byte-for-byte the desktop logic — only
- * the input row's sizing forks for touch (16px font to defeat iOS focus-zoom,
- * 36px tap targets) and the outer padding carries a `safe-area-inset-bottom`
- * so the composer clears the phone's home indicator.
+ * Mobile thread composer — divergent twin of `components/threads/ThreadComposer`.
+ * Always active; the turn-status banner reflects agent activity (T39/T371).
+ * Behaviour (draft persistence, list-aware Enter/Tab, `/command` bubbles with Tab
+ * autocomplete + Space expansion) is byte-for-byte the desktop logic — only the
+ * input row's touch sizing forks (16px font vs iOS focus-zoom, 36px targets) and
+ * the outer padding carries `safe-area-inset-bottom` to clear the home indicator.
  */
 export function ThreadComposer({
   status,
@@ -414,8 +436,7 @@ export function ThreadComposer({
 
   const sendable = composer.canSend(pendingFiles.length)
 
-  // Offer /command bubbles mid-draft on a slash line (any thread) OR on a
-  // brand-new thread with an empty composer. File chips show independently.
+  // /command bubbles on a slash line, or on a brand-new empty thread.
   const commandsActive = composer.slashPrefix !== null || (firstMessage && !composer.text.trim())
 
   const filteredSuggestions = useMemo(() => {
@@ -450,9 +471,10 @@ export function ThreadComposer({
   }
 
   return (
-    <div className="bg-linear-to-t from-background/90 via-background/45 to-transparent px-3 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-[3px] backdrop-saturate-150">
-      {/* Unified bubble row (T350) — file-upload chips + /command suggestions +
-          create-command pill, all in ONE normal-flow container. */}
+    <div className="relative bg-linear-to-t from-background/90 via-background/45 to-transparent px-3 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <ProgressiveBlur />
+      {/* Unified bubble row (T350) — file chips + /command suggestions +
+          create-command pill in ONE container. */}
       {(pendingFiles.length > 0 || commandsActive) && (
         <ComposerBubbles
           files={pendingFiles}
