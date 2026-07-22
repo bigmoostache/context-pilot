@@ -1,19 +1,31 @@
 import { useState } from "react"
-import { MessagesSquare } from "lucide-react"
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/mobile-components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle } from "@/mobile-components/ui/dialog"
 
 /**
- * Mobile New Thread dialog — the divergent twin of `components/threads/
- * NewThreadDialog`. Same single-field "give it a title" flow and shadcn Dialog
- * primitive (focus-trap, scroll-lock, Esc), forked only for touch:
+ * Mobile New Thread sheet — the divergent twin of `components/threads/
+ * NewThreadDialog`, rebuilt to feel like an iOS "new message" flow (T624)
+ * rather than a transcribed desktop modal card.
  *
- *   • **16px title input** — iOS Safari auto-zooms the viewport when a focused
- *     input's font is under 16px; the desktop 13px would jank the layout on tap.
- *   • **Taller controls** — the input and both buttons grow for comfortable
- *     thumb use.
+ * The presentation is an iOS **bottom sheet** (the mobile `ui/dialog` primitive
+ * already anchors bottom, rounds its top, and pads the home-indicator safe
+ * area — this consumer just embraces it instead of overriding a fixed centred
+ * width). Inside:
  *
- * The real bottom-sheet presentation lands when `ui/dialog` itself is recoded
- * for mobile (mirror token already resolves to it here).
+ *   • a **grabber** pill at the top edge — the universal iOS "drag me down /
+ *     dismissable sheet" affordance;
+ *   • an iOS **nav-bar header**: a `Cancel` text link (left), the `New Thread`
+ *     title (centre), and a bold `Create` action (right) that stays disabled
+ *     until a title is typed — the Cancel|Title|Done convention every iOS modal
+ *     uses, replacing the desktop two-button footer row;
+ *   • a single large **16px rounded input** (16px defeats iOS focus-zoom),
+ *     autofocused so the keyboard is ready the instant the sheet opens — here
+ *     autofocus is wanted: the user tapped compose deliberately, exactly like
+ *     iMessage focusing the To: field on compose.
+ *
+ * Submitting (the Create action or the keyboard return) hands the title up; the
+ * parent prepends a fresh MY_TURN thread and closes the sheet. Dismiss is the
+ * native sheet gesture (tap the dimmed backdrop / swipe down) or the Cancel
+ * link.
  */
 export function NewThreadDialog({
   open,
@@ -41,44 +53,45 @@ export function NewThreadDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && close()}>
-      <DialogContent className="w-[440px] max-w-[94vw] p-5">
-        <form onSubmit={submit} className="flex flex-col gap-4">
-          <div className="flex items-center gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--signal)/15 text-(--signal)">
-              <MessagesSquare className="size-[18px]" />
-            </span>
-            <div className="flex flex-col">
-              <DialogTitle>New Thread</DialogTitle>
-              <DialogDescription>
-                Give it a title — you can put the agent to work once it's open.
-              </DialogDescription>
-            </div>
-          </div>
+      {/* No width override — let the primitive's full-width bottom-sheet base
+          stand. px-0 so the header hairline can span edge-to-edge; children
+          re-inset themselves. */}
+      <DialogContent className="px-0 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+        {/* grabber — the iOS "this sheet is dismissable" pill */}
+        <div className="mx-auto mb-1 h-1 w-9 rounded-full bg-muted-foreground/25" />
 
+        {/* iOS nav-bar header: Cancel · title · Create */}
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center border-b border-border/70 px-4 py-2">
+          <button
+            type="button"
+            onClick={close}
+            className="justify-self-start text-[16px] text-(--signal) active:opacity-60"
+          >
+            Cancel
+          </button>
+          <DialogTitle className="justify-self-center text-[16px]">New Thread</DialogTitle>
+          <button
+            type="submit"
+            form="new-thread-form"
+            disabled={!canCreate}
+            className="justify-self-end text-[16px] font-semibold text-(--signal) active:opacity-60 disabled:text-muted-foreground/40"
+          >
+            Create
+          </button>
+        </div>
+
+        {/* the single input — big, rounded, autofocused */}
+        <form id="new-thread-form" onSubmit={submit} className="px-4 pt-4">
           <input
             autoFocus
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. Refactor the cache engine"
-            className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-[16px] text-foreground/90 outline-none placeholder:text-muted-foreground/50 focus:border-(--signal)/60"
+            placeholder="What should this thread be about?"
+            className="w-full rounded-xl bg-muted/60 px-4 py-3 text-[16px] text-foreground/90 outline-none placeholder:text-muted-foreground/50"
           />
-
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={close}
-              className="rounded-lg px-4 py-2.5 text-[13px] font-medium text-muted-foreground transition-colors active:bg-muted/60"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={!canCreate}
-              className="rounded-lg bg-(--signal) px-4 py-2.5 text-[13px] font-medium text-(--primary-foreground) transition-[filter] active:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Create thread
-            </button>
-          </div>
+          <p className="mt-2 px-1 text-[12.5px] text-muted-foreground/70">
+            Give it a title — you can put the agent to work once it's open.
+          </p>
         </form>
       </DialogContent>
     </Dialog>
