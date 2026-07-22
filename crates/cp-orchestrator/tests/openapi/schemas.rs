@@ -107,7 +107,8 @@ pub(super) fn core() -> Value {
                 "ts": { "type": "integer" },
                 "tool": r("ToolCall"),
                 "fileRef": { "type": "string" },
-                "auto": { "type": "boolean" }
+                "auto": { "type": "boolean" },
+                "toolRef": { "type": "string" }
             },
             "required": ["id", "author"]
         },
@@ -122,6 +123,18 @@ pub(super) fn core() -> Value {
                 "isError": { "type": "boolean" }
             },
             "required": ["name"]
+        },
+        "ToolCallDetail": {
+            "type": "object",
+            "properties": {
+                "name": { "type": "string" },
+                "intent": { "type": "string" },
+                "verb": { "type": "string" },
+                "params": { "type": "object", "additionalProperties": true },
+                "result": { "type": "string" },
+                "isError": { "type": "boolean" }
+            },
+            "required": ["name", "params", "result", "isError"]
         },
         "ThreadsResponse": {
             "type": "object",

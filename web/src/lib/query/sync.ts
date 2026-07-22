@@ -54,6 +54,7 @@ export const qk = {
   threads: (id: string) => ["threads", id] as const,
   metrics: (id: string) => ["metrics", id] as const,
   library: (id: string) => ["library", id] as const,
+  toolcall: (id: string, hash: string) => ["toolcall", id, hash] as const,
   fs: (id: string, path: string) => ["fs", id, path] as const,
   fsPreview: (id: string, path: string) => ["fs-preview", id, path] as const,
   fsSheet: (id: string, path: string) => ["fs-sheet", id, path] as const,

@@ -265,6 +265,27 @@ export function useLibrary(agentId: string): LiveQueryResult<LibraryItem[]> {
   })
 }
 
+/**
+ * Lazily fetch one persisted tool-call detail blob (T584) by its content hash.
+ *
+ * An auto tool-activity trace carries only a `toolRef` hash; the adaptive
+ * detail bubble mounts this hook with `enabled` flipped true the moment the row
+ * is expanded, so the (potentially large) params + result are fetched ON CLICK
+ * and never ride the thread-list payload. The blob is immutable + content-
+ * addressed, so there is no SSE bridge and the backstop poll is off (`pollMs:0`)
+ * — one fetch, cached forever under its hash key.
+ */
+export function useToolCall(
+  agentId: string,
+  hash: string,
+  enabled: boolean,
+): LiveQueryResult<api.ToolCallDetail> {
+  return useLive(qk.toolcall(agentId, hash), () => api.fetchToolCall(agentId, hash), {
+    enabled: enabled && !!agentId && !!hash,
+    pollMs: 0,
+  })
+}
+
 // ── Commands (imperative, not hooks) ──────────────────────────────────
 
 export { mintTicket } from "../api"

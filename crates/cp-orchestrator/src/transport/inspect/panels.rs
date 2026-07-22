@@ -61,6 +61,35 @@ pub fn usage(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
     }
 }
 
+/// `GET /api/agent/{id}/toolcall/{hash}` — a persisted tool-call detail blob.
+///
+/// Serves the content-addressed record the agent wrote under
+/// `<realm>/.context-pilot/toolcalls/<hash>.json` when it appended an auto
+/// tool-activity trace (T584). The web UI fetches this **on click** to render
+/// the adaptive detail bubble, so the full params + (potentially large) result
+/// never ride the thread-list payload.
+///
+/// The `hash` segment is content-addressed (hex sha256) — it is validated to be
+/// hex-only so a crafted `../` traversal can never escape the toolcalls dir.
+/// Returns the raw JSON blob (already the shape the client wants), `400` for a
+/// malformed hash, `404` when no blob exists for that hash.
+pub fn toolcall(state: &Mutex<Backend>, agent_id: &str, hash: &str) -> HttpReply {
+    // Reject anything that isn't a bare hex digest — blocks path traversal and
+    // any non-content-address lookup before it touches the filesystem.
+    if hash.is_empty() || !hash.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return HttpReply::error(400, "malformed toolcall hash");
+    }
+    let folder = match agent_folder(state, agent_id) {
+        Ok(f) => f,
+        Err(reply) => return reply,
+    };
+    let path = Path::new(&folder).join(".context-pilot").join("toolcalls").join(format!("{hash}.json"));
+    match std::fs::read_to_string(&path) {
+        Ok(body) => HttpReply { status: 200, body },
+        Err(_) => HttpReply::error(404, "toolcall not found"),
+    }
+}
+
 /// `GET /api/agent/{id}/library` — prompt library items.
 ///
 /// Scans the agent's `.context-pilot/{agents,skills,commands}/` directories

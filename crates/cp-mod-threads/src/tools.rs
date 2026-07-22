@@ -76,6 +76,7 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
         timestamp: now,
         acknowledged: true,
         auto: false,
+        tool_ref: None,
     };
 
     // Build result message before mutating — need thread name.

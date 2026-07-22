@@ -70,6 +70,28 @@
   tl_dr: 'Context Pilot env vars: ANTHROPIC_API_KEY, BRAVE_API_KEY, FIRECRAWL_API_KEY, GITHUB_TOKEN (core). Optional LLM providers and chat bridge tokens. Loaded via dotenvy from .env, fallback to global config.'
   importance: high
   last_edited_ms: 0
+1e022fec5765a736:
+  tl_dr: 'T581 footer behaviour-selector: reuse the commands library sync path for agents (user mandate: no code duplication, agents+commands share tui-side cp-mod-prompt).'
+  contents: |-
+    T581 'Footer' feature — show + select the active behaviour-agent (system prompt: caveman/default/worker/planner) in the StatusBar footer right of 'Ready'. User mandate: DO NOT reinvent — replicate EXACTLY the frontend↔orchestrator↔tui sync used for threads/commands; agents must ride THE SAME code path as commands (they share tui-side backend cp-mod-prompt PromptType Agent/Skill/Command). Frontend then trivial.
+
+    INVESTIGATION FINDINGS (from P36/P38/P41 searches):
+    - Active behaviour = PromptState.active_agent_id (cp-mod-prompt), TUI-internal, persisted via save_module_data (serializes active_agent_id + loaded_skill_ids) to agent worker state. NOT journaled to oplog, NOT in cp-wire AgentView (heads/roster/focused/phase/lifecycle/cost/context — no behaviour field), NOT in fleet/meta. Frontend has zero visibility today.
+    - agent_load(id) tool (cp-mod-prompt/src/tools.rs agent_load) sets active_agent_id + touch_panel SYSTEM/LIBRARY. Empty id = revert to default.
+    - LIBRARY LIST endpoint EXISTS: GET /api/agent/{id}/library (crates/cp-orchestrator/src/transport/inspect/panels.rs `library()`) — scans .context-pilot/{agents,skills,commands}/*.md, returns LibraryItem[] {id,name,kind,description,body}. body populated only for kind=='command' (for composer /cmd seeding). So agents ARE already listed by this endpoint (kind='agent'), just not surfaced/active-marked in frontend.
+    - COMMAND CREATE path: POST /api/agent/{id}/library/command (create.rs create_command) writes .md to commands dir; agent fs-watch picks up; frontend useCreateCommand invalidates qk.library. Frontend: fetchLibrary/createCommand in web/src/lib/api/index.ts, useCreateCommand in web/src/lib/live/mutations.ts, LibraryItem type in generated.
+    - LibraryItem generated type already has optional `active?: boolean` + `builtin?` + `meta?` fields (web types.gen.ts) — active flag plumbing partially present.
+    - StatusBar.tsx (web/src/components/shell/StatusBar.tsx): AgentStatus footer, StatusIndicator shows Ready/phase dot. Chip would go right of that.
+    - KEY GAP: 'which agent is ACTIVE' not exposed (library() doesn't set active flag) + no SET-active path from frontend (agent_load is an AI tool). SET a live agent's behaviour needs commanding the running process — no user/REST path exists. Threads write-path precedent: frontend→POST command→orchestrator→bridge command intake→agent apply_command (src/app/run/threads/commands.rs).
+  importance: high
+  labels:
+  - T581
+  - behaviour
+  - library
+  - sync
+  - agent_load
+  - footer
+  last_edited_ms: 0
 1f7ae27d462497dd:
   tl_dr: NEVER touch Tailscale or network configuration on Mac Mini 'gilbert'. User explicitly forbids it. Tailscale already configured. Deploy Context Pilot without any network changes.
   importance: critical
@@ -104,6 +126,27 @@
   - terminal-bench
   - run
   last_edited_ms: 1784202957618
+3254fdbc36d9b4e8:
+  tl_dr: 'T581 footer behaviour-selector SHIPPED, live-invalidation fixed (a3116ce4). Stale-chip root cause: OpEntryKind schema lacked agent_id (M160 earlier wrong). Schema+regen done; frontend folds delta.agent_id into library cache. Body has full detail.'
+  contents: |-
+    T581 Footer feature — done, all legs.
+
+    ARCHITECTURE (reused threads/commands sync exactly, no new mechanism):
+    - READ (active flag): orchestrator inspect/panels.rs library() reads config.json modules.system.active_agent_id (PromptModule is_global → Shared.modules["system"]) via inspect_mut().read_config, sets active=true on matching kind=agent item. Same disk-read as usage(). LibraryItem.active already in generated types. VERIFIED LIVE: caveman active=true on self realm.
+    - SET (switch): cp-wire command.rs Kind::LoadBehaviour{id} (serde rename load_behaviour, Unknown catch-all = N-1 safe). tui apply_command (src/app/run/threads/commands.rs) new arm apply_load_behaviour → cp_mod_prompt::tools::set_active_agent (SHARED core extracted from agent_load tool — pub fn set_active_agent(state,&id)->Result, both tool + bridge call it, zero dup). NO new REST endpoint — reuses POST /api/agent/{id}/command generic intake.
+    - FRONTEND: StatusBar.tsx BehaviourChip subcomponent — useLibrary filter kind=agent, find active, show name + Bot icon + dropdown. Click → sendCommand(agentId,{kind:'load_behaviour',id}) fire-and-forget. activeAgentId threaded StatusBar→AgentStatus, Root passes it. tsc+eslint green.
+
+    N-1 NOTE: live SET only works once the RUNNING tui has the new arm. Pre-change binaries decode load_behaviour as Kind::Unknown and ignore (correct). So SET proof requires self-reload (user does it). Release tui + orchestrator both rebuilt.
+
+    command.rs NOT in hash-chain (no password gate). All rust-lints green.
+  importance: high
+  labels:
+  - T581
+  - footer
+  - behaviour
+  - load_behaviour
+  - shipped
+  last_edited_ms: 0
 3d36396d2a618055:
   tl_dr: NEVER touch temp_1.md or temp_2.md — they are user's personal files. Do not read, write, edit, or revert them.
   importance: critical
@@ -198,6 +241,24 @@
   - feature
   - T570
   last_edited_ms: 1784222610385
+535fabcd17a6ae63:
+  tl_dr: 'T581 agent-editor SHIPPED (commit bea16ed6, local only M151): footer behaviour selector per-item Delete/Export/Edit + Create/Import rows. Backend seed-merge + GET/PUT/DELETE library/agent/{item}; frontend AgentEditorDialog + BehaviourChip. Details in body.'
+  contents: |-
+    T581 agent-editor SHIPPED, commit bea16ed6 (master, local only per M151).
+
+    Backend (orchestrator): library() (inspect/panels.rs) seed-merges cp_base library::agents()/skills()/commands() with disk .md (disk wins on id, builtin:true flag), mirrors tui storage::load_prompts_for. Three endpoints in rest/create.rs: read_library_agent (GET raw {name,description,body,builtin}, seed fallback for pure builtin), upsert_library_agent (PUT overwrite=override), delete_library_agent (DELETE 404 pure-builtin). Helpers compose_md/split_frontmatter/seed_agent. Routes in transport/mod.rs. openapi tests + openapi.json + generated TS regen.
+
+    Frontend: shell/AgentEditorDialog.tsx (one dialog create/edit/import, useAgentEditorFields hook render-phase seed + async fetch effect, converge on PUT upsert). shell/BehaviourChip.tsx (extracted from StatusBar; dropdown Create/Import rows + per-item Edit/Export/Delete, Delete hidden when builtin!==true; parseAgentMd inline regex-free md parser for import preview). mutations.ts useUpsertLibraryAgent+useDeleteLibraryAgent. api/index.ts fetchLibraryAgent/upsertLibraryAgent/deleteLibraryAgent + LibraryAgentRaw. Mobile twins scaffolded.
+
+    Needs orchestrator rebuild+restart for backend endpoints live (M99). All callbacks green.
+  importance: high
+  labels:
+  - T581
+  - footer
+  - agent-editor
+  - shipped
+  - library
+  last_edited_ms: 0
 5623177cb0b0ed7d:
   tl_dr: 'MULTI-WORKER (subworkers branch, off master): N equal workers, true concurrency, single main loop. Design doc: docs/design-subworkers.md. 14 shared modules, 8 per-worker.'
   importance: critical
@@ -571,6 +632,16 @@ f73736833df4e426:
   - contract
   - ts-nocheck
   last_edited_ms: 1783418954418
+f94cc1928a2d1feb:
+  tl_dr: 'WORKFLOW RULE (T581): NEVER push to master. Always new branch + new PR. Commit locally, branch off master, push the branch, open PR to master via gh. Augments M151 (don''t push unless asked) with the delivery mechanism when push IS asked.'
+  importance: critical
+  labels:
+  - workflow
+  - git
+  - branch
+  - pr
+  - no-master-push
+  last_edited_ms: 0
 fb262826c899b682:
   tl_dr: 'check-rust-tests.sh now `cargo test --workspace` (was tui-only, blind to 26 crates). Fixed 3 pre-existing breakages exposed by it. Chain #30.'
   contents: 'T518. Switched check-rust-tests.sh to `cargo test --workspace`. Fixed 3 pre-existing breakages: cp-wire snapshot missing `paused` field, 8 test binaries with drifted use-extern silencer blocks, command() REST handler lost cost-breaker gate. Chain #30.'

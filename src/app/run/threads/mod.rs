@@ -232,6 +232,14 @@ fn extract_thread_ids(content: &str) -> Vec<String> {
 /// (skipped in `build_panel_content`) and rendered as a **collapsible run** in
 /// the web UI and TUI rather than as a normal bubble.
 ///
+/// The full tool-call record (name, verb, intent, params, result, error flag)
+/// is persisted **content-addressed** under `.context-pilot/toolcalls/<hash>.json`
+/// (T584) and the trace carries only its `tool_ref` hash. The web UI fetches
+/// that blob **on click** to render an adaptive detail bubble, so the params and
+/// (potentially large) result never bloat the thread-list payload. Persistence
+/// is best-effort: a write failure just leaves `tool_ref = None` and the trace
+/// still renders.
+///
 /// Invariants this upholds:
 /// - **Never changes turn or focus.** The trace is `Assistant`-authored and
 ///   `acknowledged` (so it can't flip the thread to `MY_TURN` or count as
@@ -245,8 +253,12 @@ fn extract_thread_ids(content: &str) -> Vec<String> {
 /// The live [`emit_messages`] chokepoint picks the appended message up on the
 /// next loop tick and pushes it to the backend view (and the web UI) for free,
 /// since an auto message is an ordinary thread message on the wire (carrying its
-/// `auto` flag).
-pub(in crate::app::run) fn maybe_append_tool_activity(state: &mut cp_base::state::runtime::State, tool: &ToolUse) {
+/// `auto` flag + `tool_ref`).
+pub(in crate::app::run) fn maybe_append_tool_activity(
+    state: &mut cp_base::state::runtime::State,
+    tool: &ToolUse,
+    result: &crate::infra::tools::ToolResult,
+) {
     let Some(tid) = FocusState::get(state).focused_thread_id.clone() else {
         return;
     };
@@ -259,8 +271,46 @@ pub(in crate::app::run) fn maybe_append_tool_activity(state: &mut cp_base::state
     let intent = tool.input.get("intent").and_then(serde_json::Value::as_str).unwrap_or("");
     let line = format!("/* auto */ {verb} · {tool_name} — {intent}", tool_name = tool.name);
 
+    // Persist the full record content-addressed; the hash rides the trace.
+    let tool_ref = persist_tool_call(tool, result);
+
     let ts = ThreadsState::get_mut(state);
     if let Some(thread) = ts.threads.iter_mut().find(|t| t.id == tid) {
-        thread.messages.push(ThreadMessage::auto_trace(line));
+        thread.messages.push(ThreadMessage::auto_trace(line, tool_ref));
     }
+}
+
+/// Serialize a tool call's full record and store it immutably under
+/// `.context-pilot/toolcalls/<hash>.json`, returning its content-hash.
+///
+/// The blob is the adaptive-bubble payload the web UI fetches on click: tool
+/// name, the agent-supplied verb/intent, the raw input params, and the result
+/// text + error flag. Content-addressing makes the write idempotent (the same
+/// call twice is one file) and lets the orchestrator's toolcall endpoint serve
+/// it by hash. Kept in a dedicated dir rather than the oplog body store because
+/// that store garbage-collects bodies unreferenced by the oplog — these blobs
+/// are referenced only by a thread message, so they would be reclaimed.
+///
+/// Best-effort: any serialization or write error returns `None` (the caller
+/// then emits a trace without a detail bubble rather than failing the tool).
+fn persist_tool_call(tool: &ToolUse, result: &crate::infra::tools::ToolResult) -> Option<String> {
+    let blob = serde_json::json!({
+        "name": tool.name,
+        "verb": tool.input.get("verb").and_then(serde_json::Value::as_str).unwrap_or(""),
+        "intent": tool.input.get("intent").and_then(serde_json::Value::as_str).unwrap_or(""),
+        "params": tool.input,
+        "result": result.content,
+        "isError": result.is_error,
+    });
+    let bytes = serde_json::to_vec(&blob).ok()?;
+    let hash = cp_wire::types::ContentHash::of(&bytes).to_hex();
+
+    let dir = std::path::Path::new(cp_base::config::constants::STORE_DIR).join("toolcalls");
+    std::fs::create_dir_all(&dir).ok()?;
+    let path = dir.join(format!("{hash}.json"));
+    // Content-addressed ⇒ an existing file already holds identical bytes.
+    if !path.exists() {
+        std::fs::write(&path, &bytes).ok()?;
+    }
+    Some(hash)
 }

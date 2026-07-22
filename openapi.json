@@ -1498,6 +1498,9 @@
           "tool": {
             "$ref": "#/components/schemas/ToolCall"
           },
+          "toolRef": {
+            "type": "string"
+          },
           "ts": {
             "type": "integer"
           }
@@ -1563,6 +1566,36 @@
         },
         "required": [
           "name"
+        ],
+        "type": "object"
+      },
+      "ToolCallDetail": {
+        "properties": {
+          "intent": {
+            "type": "string"
+          },
+          "isError": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "result": {
+            "type": "string"
+          },
+          "verb": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "params",
+          "result",
+          "isError"
         ],
         "type": "object"
       },
@@ -3402,6 +3435,54 @@
           }
         },
         "summary": "Agent threads + conversation",
+        "tags": [
+          "agent"
+        ]
+      }
+    },
+    "/api/agent/{id}/toolcall/{hash}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "hash",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolCallDetail"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Persisted tool-call detail blob (T584)",
         "tags": [
           "agent"
         ]

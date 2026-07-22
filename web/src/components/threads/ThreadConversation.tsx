@@ -2,12 +2,13 @@ import { Fragment, memo, useCallback, useMemo, useRef, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Message } from "@/components/conversation/Message"
+import { ToolCallBubble } from "@/components/conversation/ToolCallBubble"
 import { ThreadComposer, type CommandSuggestion } from "./ThreadComposer"
 import { CreateCommandDialog } from "./CreateCommandDialog"
 import { QuickLookSheet } from "@/components/finder/QuickLookSheet"
 import { useLibrary } from "@/lib/live"
 import { sendCommand } from "@/lib/api"
-import { extractDroppedFiles, zipDropped } from "@/lib/utils"
+import { extractDroppedFiles, zipDropped, cn } from "@/lib/utils"
 import { uploadToNode, splitMessageSegments, type UploadedFile } from "./fileUpload/helpers"
 import { FormMessageRow } from "./forms/FormMessageRow"
 import { isFormMessage } from "./forms/helpers"
@@ -119,8 +120,9 @@ function useConversationDrop(onAttach: ((files: File[]) => void | Promise<void>)
  * renders an unrelated SSE delta triggers — the shallow prop compare then skips
  * this whole subtree. Part of the T510 render-storm fix.
  */
-const AutoRun = memo(function AutoRun({ msgs }: { msgs: ThreadMsg[] }) {
+const AutoRun = memo(function AutoRun({ msgs, agentId }: { msgs: ThreadMsg[]; agentId: string }) {
   const n = msgs.length
+  const [openId, setOpenId] = useState<string | null>(null)
   return (
     <details className="group/auto mb-2 ml-7 [contain-intrinsic-size:auto_2rem] [content-visibility:auto]">
       <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[12.5px] font-medium text-muted-foreground/75 transition-colors hover:bg-muted/40 hover:text-muted-foreground">
@@ -131,13 +133,29 @@ const AutoRun = memo(function AutoRun({ msgs }: { msgs: ThreadMsg[] }) {
           ⚙ {n} tool action{n === 1 ? "" : "s"}
         </span>
       </summary>
-      <div className="mt-1 grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1 border-l border-border/60 pl-3 font-mono text-[11px]">
+      <div className="mt-1 flex flex-col gap-0.5 border-l border-border/60 pl-3 font-mono text-[11px]">
         {msgs.map((m) => {
           const { verb, intent } = parseAutoLine(m)
+          const clickable = !!m.toolRef
+          const open = openId === m.id
           return (
             <Fragment key={m.id}>
-              <VerbIcon verb={verb} className="size-3.5 text-(--interactive)" />
-              <span className="truncate text-muted-foreground/70">{intent}</span>
+              <button
+                type="button"
+                disabled={!clickable}
+                onClick={() => setOpenId(open ? null : m.id)}
+                className={cn(
+                  "flex items-center gap-2 rounded-sm px-1 py-0.5 text-left transition-colors",
+                  clickable ? "cursor-pointer hover:bg-muted/40" : "cursor-default",
+                  open && "bg-muted/50",
+                )}
+              >
+                <VerbIcon verb={verb} className="size-3.5 shrink-0 text-(--interactive)" />
+                <span className="truncate text-muted-foreground/70">{intent}</span>
+              </button>
+              {open && m.toolRef && (
+                <ToolCallBubble agentId={agentId} hash={m.toolRef} />
+              )}
             </Fragment>
           )
         })}
@@ -355,7 +373,7 @@ export function ThreadConversation({
 
             {segments.map((seg) =>
               seg.type === "auto" ? (
-                <AutoRun key={`auto-${seg.msgs[0]?.id ?? seg.type}`} msgs={seg.msgs} />
+                <AutoRun key={`auto-${seg.msgs[0]?.id ?? seg.type}`} msgs={seg.msgs} agentId={agentId} />
               ) : isFormMessage(seg.msg.text ?? "") ? (
                 <FormMessageRow
                   key={seg.msg.id}
