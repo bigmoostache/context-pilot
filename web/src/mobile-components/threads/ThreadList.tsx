@@ -153,8 +153,6 @@ export function ThreadList({
                       onSelect={onSelect}
                     />
                   </SwipeRow>
-                  {/* hairline separator, inset past the avatar */}
-                  <div className="ml-17 h-px bg-border/60" />
                 </li>
               ))}
             </ul>
@@ -213,33 +211,28 @@ function EmptyState({ hasQuery, showArchived }: { hasQuery: boolean; showArchive
 
 // ── row ──────────────────────────────────────────────────────────────
 
-/** Deterministic avatar tint from the thread id — a stable per-thread colour
- *  so the same conversation always wears the same badge (iMessage-ish). */
-const AVATAR_TINTS = [
-  "var(--signal)",
-  "var(--ok)",
-  "var(--warn)",
-  "var(--interactive)",
-  "var(--danger)",
-]
-function avatarTint(id: string): string {
-  let sum = 0
-  for (const ch of id) sum += ch.codePointAt(0) ?? 0
-  return AVATAR_TINTS[sum % AVATAR_TINTS.length] ?? "var(--signal)"
+/**
+ * The leading status dot colour, encoding whose turn it is / what the thread is
+ * doing (T627). One dot per row, first match wins:
+ *   • yellow  (--warn)  — paused: the agent won't act until resumed;
+ *   • green   (--ok)    — focused: the agent is actively on this thread now;
+ *   • orange  (--signal)— agent's turn (MY_TURN / ACTIVE) but not yet focused —
+ *                         it will pick this up soon;
+ *   • grey    (muted)   — the user's turn (THEIR_TURN), nothing pending on the
+ *                         agent side. Archived rows are always grey (inactive).
+ */
+function statusTint(t: ThreadDetail, archived: boolean): string {
+  if (archived) return "var(--muted-foreground)"
+  if (t.paused) return "var(--warn)"
+  if (t.focused) return "var(--ok)"
+  if (t.status === "MY_TURN" || t.status === "ACTIVE") return "var(--signal)"
+  return "var(--muted-foreground)"
 }
 
-/** Up-to-two-letter initials from the thread name. */
-function initials(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean)
-  if (words.length === 0) return "#"
-  const first = words[0]?.[0] ?? ""
-  const second = words.length > 1 ? (words.at(-1)?.[0] ?? "") : ""
-  return (first + second).toUpperCase()
-}
-
-/** iMessage-style conversation row: avatar, title + timestamp, 2-line preview,
- *  a leading accent dot when the thread owes you a turn or has unread. The row
- *  content sits above the swipe-revealed action strip (see {@link SwipeRow}). */
+/** iMessage-style conversation row: a leading status dot, title + timestamp, a
+ *  2-line preview. The letter-avatar badge is gone (T627 — the initials carried
+ *  no meaning); the coloured dot before the title now conveys the thread state.
+ *  The row content sits above the swipe-revealed action strip ({@link SwipeRow}). */
 function ThreadRow({
   t,
   selected,
@@ -252,10 +245,10 @@ function ThreadRow({
   onSelect: (id: string) => void
 }) {
   const preview = previewOf(t)
-  const paused = !archived && Boolean(t.paused)
-  const unread = !archived && (t.unread ?? 0) > 0
-  // The blue "attention" dot: a thread that owes you a reply or carries unread.
-  const attention = !archived && (unread || t.status === "MY_TURN" || t.focused)
+  // Bold the title when the agent owes this thread a turn (or it's focused /
+  // unread) — a subtle emphasis on the rows that want attention.
+  const attention =
+    !archived && ((t.unread ?? 0) > 0 || t.status === "MY_TURN" || t.focused)
 
   return (
     <button
@@ -265,22 +258,13 @@ function ThreadRow({
         selected ? "bg-muted/50" : "bg-background active:bg-muted/40",
       )}
     >
-      {/* leading attention dot — occupies a fixed gutter so titles align */}
-      <span className="flex w-2 shrink-0 justify-center">
-        {attention && <span className="size-2 rounded-full bg-(--signal)" />}
-      </span>
-
-      {/* avatar */}
-      <span
-        className="flex size-11 shrink-0 items-center justify-center rounded-full text-[15px] font-semibold text-white"
-        style={{ background: archived ? "var(--muted-foreground)" : avatarTint(t.id) }}
-      >
-        {initials(t.name)}
-      </span>
-
-      {/* text column */}
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex items-baseline gap-2">
+          {/* status dot — inline before the title, coloured by thread state */}
+          <span
+            className="size-2.5 shrink-0 translate-y-px rounded-full"
+            style={{ background: statusTint(t, archived) }}
+          />
           <span
             className={cn(
               "truncate text-[16px] text-foreground",
@@ -294,13 +278,8 @@ function ThreadRow({
           </span>
           <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/30" />
         </span>
-        <span className="flex items-center gap-1.5">
-          {paused && (
-            <span className="shrink-0 text-[11px] font-medium text-(--warn)">Paused ·</span>
-          )}
-          <span className="line-clamp-2 min-w-0 flex-1 text-[14px] leading-snug text-muted-foreground/70">
-            {preview}
-          </span>
+        <span className="line-clamp-2 min-w-0 text-[14px] leading-snug text-muted-foreground/70">
+          {preview}
         </span>
       </span>
     </button>
