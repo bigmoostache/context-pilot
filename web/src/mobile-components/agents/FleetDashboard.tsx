@@ -27,7 +27,7 @@ import type { Agent, AgentStatus } from "@/lib/types"
 import { cn, prefersReducedMotion } from "@/lib/utils"
 import { useSwipeRow } from "@/lib/live/useSwipeRow"
 import { RetiredSection } from "./FleetRetired"
-import { ConfigModal } from "@/mobile-components/shell/config/ConfigModal"
+import { ClaudeUsagePage } from "./ClaudeUsagePage"
 
 const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
   working: { label: "Working", color: "var(--interactive)" },
@@ -68,12 +68,12 @@ export function FleetDashboard({
 }) {
   const [query, setQuery] = useState("")
   const [toast, setToast] = useState<string | null>(null)
-  // App-level Settings (Config) modal — the mobile home's app-settings door.
-  // Desktop opens ConfigModal from the TopBar gear / UserMenu → Settings; the
-  // mobile shell has no TopBar (T611), so the fleet (home) header carries the
-  // gear. This is the ONLY reachable entry to the app Config on mobile — the
-  // General pane's Claude usage section (T646) lives behind it.
-  const [configOpen, setConfigOpen] = useState(false)
+  // Standalone Claude usage page — the mobile home's Anthropic-usage door. The
+  // desktop header Anthropic button opens a usage popover; the mobile shell has
+  // no TopBar (T611), so the fleet (home) header gear opens this dedicated
+  // full-screen usage PAGE (token status, rate-limit bars, stored accounts,
+  // login) — styled like the rest of the app, NOT a config dialog.
+  const [usageOpen, setUsageOpen] = useState(false)
   const createAgent = useCreateAgent()
   const inputRef = useRef<HTMLInputElement>(null)
   // Floating glass bottom bar (T637): reserve a 1.5× spacer sized from its
@@ -143,7 +143,7 @@ export function FleetDashboard({
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       <ScrollArea className="min-h-0 flex-1 bg-background">
         <div className={cn("mx-auto flex w-full flex-col", FLEET_MAX_W)}>
-          <FleetHeader count={agents.length} onOpenConfig={() => setConfigOpen(true)} />
+          <FleetHeader count={agents.length} onOpenConfig={() => setUsageOpen(true)} />
 
           {agents.length === 0 ? (
             <p className="px-4 py-16 text-center text-[14px] text-muted-foreground/55">
@@ -231,9 +231,9 @@ export function FleetDashboard({
 
       <Toast message={toast} />
 
-      {/* App-level Settings — the mobile equivalent of the desktop TopBar gear /
-          UserMenu → Settings. General pane hosts the Claude usage section. */}
-      <ConfigModal open={configOpen} onClose={() => setConfigOpen(false)} />
+      {/* Standalone Claude usage page — the mobile equivalent of the desktop
+          header Anthropic usage popover (T646), as a full-screen page. */}
+      {usageOpen && <ClaudeUsagePage onClose={() => setUsageOpen(false)} />}
     </div>
   )
 }
@@ -260,11 +260,11 @@ function FleetHeader({ count, onOpenConfig }: { count: number; onOpenConfig: () 
           </span>
         )}
       </div>
-      {/* App settings (Config) — opens the same ConfigModal the desktop TopBar
-          gear opens; its General pane carries the Claude usage section (T646). */}
+      {/* Claude usage — opens the standalone full-screen usage page (token
+          status, rate-limit bars, stored accounts, login), T646. */}
       <button
         onClick={onOpenConfig}
-        aria-label="Settings"
+        aria-label="Claude usage"
         className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground/70 transition-colors active:bg-muted active:text-foreground"
       >
         <Settings className="size-5.5" />

@@ -1,14 +1,8 @@
 import { useState } from "react"
 import type { CatId } from "./categories"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { Check, Lock, Loader2, RefreshCw } from "lucide-react"
+import { Check, Lock } from "lucide-react"
 import { UsagePage } from "@/mobile-components/agents/UsagePage"
-import { useClaudeUsage } from "@/lib/live/useClaudeUsage"
-// Claude usage/OAuth chrome reused via mobile-mirror tokens (stubs re-export the
-// desktop widgets) — same surfaces the header button opens; card is mobile-native.
-import { UsageLimits } from "@/mobile-components/shell/widgets/UsageLimits"
-import { StoredAccounts } from "@/mobile-components/shell/widgets/StoredAccounts"
-import { LoginFlow } from "@/mobile-components/shell/widgets/UsageButton"
 import { UpdatePane } from "./UpdatePane"
 import { SecretsPane } from "./SecretsPane"
 import { ItPane } from "./ItPane"
@@ -158,8 +152,6 @@ function GeneralPane() {
       <DevModeToggle i={3} />
       <ShowOverlayToggle i={4} />
       <AccessControlToggle i={5} />
-
-      <ClaudeUsageSection />
     </Stack>
   )
 }
@@ -420,81 +412,3 @@ function ToggleRow({
   )
 }
 
-/** Relative expiry string (mirrors the desktop UsageButton helper). */
-function formatExpiry(epochMs: number): string {
-  const diff = epochMs - Date.now()
-  if (diff < 0) return "Expired"
-  const mins = Math.floor(diff / 60_000)
-  if (mins < 60) return `${mins}m left`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ${mins % 60}m left`
-  return `${Math.floor(hrs / 24)}d left`
-}
-
-/**
- * Claude Code usage/OAuth section — mobile Config surface for the SAME state the
- * desktop header Anthropic button opens (token status/expiry, rate-limit bars,
- * stored accounts, PKCE login). Same show/no-show logic via {@link useClaudeUsage}
- * (bars only while valid, store gated on validity, login always available); only
- * the wrapping card is mobile-native.
- */
-function ClaudeUsageSection() {
-  const { tokenStatus, usage, isValid, limits, refreshPending, refreshError, refresh, invalidate } =
-    useClaudeUsage(true)
-  const data = tokenStatus.data
-  return (
-    <FieldGroup label="Claude Code usage" hint="Anthropic session & weekly limits">
-      <div className="flex flex-col gap-2 rounded-xl border border-border bg-card px-3.5 py-3">
-        {data?.account_email && (
-          <span className="truncate text-[12px] text-muted-foreground">{data.account_email}</span>
-        )}
-        {tokenStatus.isLoading && !data ? (
-          <span className="flex items-center gap-2 text-[12px] text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" /> Checking token…
-          </span>
-        ) : data ? (
-          <div className="flex items-center gap-2.5">
-            <span
-              className={cn("size-2 shrink-0 rounded-full", isValid ? "bg-(--ok)" : "bg-(--danger)")}
-            />
-            <span className="text-[13px] font-medium text-foreground/90">
-              {isValid ? "Token valid" : "Token expired"}
-            </span>
-            {isValid && data.expires_at != null && (
-              <span className="text-[11px] text-muted-foreground tabular-nums">
-                {formatExpiry(data.expires_at)}
-              </span>
-            )}
-            <button
-              onClick={() => refresh()}
-              disabled={refreshPending}
-              aria-label="Refresh token"
-              className="ml-auto flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground/70 transition-colors active:bg-muted active:text-foreground disabled:opacity-50"
-            >
-              {refreshPending ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <RefreshCw className="size-4" />
-              )}
-            </button>
-          </div>
-        ) : null}
-        {refreshError != null && (
-          <span className="text-[11px] text-(--danger)">
-            Refresh failed: {refreshError instanceof Error ? refreshError.message : "unknown error"}
-          </span>
-        )}
-      </div>
-      <UsageLimits
-        isValid={isValid}
-        isLoading={usage.isLoading}
-        isError={usage.isError}
-        limits={limits}
-      />
-      <StoredAccounts isValid={isValid} onSwitch={invalidate} />
-      <div className="border-t border-border/60 pt-3">
-        <LoginFlow onDone={invalidate} />
-      </div>
-    </FieldGroup>
-  )
-}
