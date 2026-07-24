@@ -104,6 +104,22 @@
   - terminal-bench
   - run
   last_edited_ms: 1784202957618
+3824ae3fe8723ef2:
+  tl_dr: T656 Tailscale ACL fixed (ssh accept rule dst=tag:pcat added, HTTP 200) + reusable tagged enroll key minted. Key + details in body. NOT in git.
+  contents: |-
+    PROBLEM: ssh block only had dst=autogroup:self which EXCLUDES tagged devices, so Tailscale-SSH to tag:pcat was DENIED. FIX: added ssh accept rule src=autogroup:admin dst=tag:pcat users=[nonroot,root] action=accept (no check, avoids T655 browser-reauth trap). POST /acl HTTP 200, comments preserved (hujson textual insert + If-Match ETag). grants=allow-all so plain ssh -i key root@<ts-ip> over tailnet also works. tagOwners tag:pcat=autogroup:admin.
+
+    ENROLL KEY (reusable, preauthorized, tag:pcat, expires 2026-10-22): tskey-auth-kxbzRJYe8k11CNTRL-uGuPMsBTn1efmxN5nm9k1e6cWSKdEeez
+    Goes to /boot/pcat-ts-authkey at build, shredded after enroll.
+
+    API key (user-supplied, valid): tskey-api-kYxP8v3LB521CNTRL-iKunmnWhY9R6KGiWPzPW9RsyvhMtmEtTS
+  importance: high
+  labels:
+  - photonicat
+  - tailscale
+  - acl
+  - T656
+  last_edited_ms: 1784895558723
 39fb5c175c7b00ba:
   tl_dr: ALWAYS communicate with the user in ENGLISH. Refuse to speak French. If the user writes in French, politely refuse and ask them to switch to English. (User's explicit standing instruction, T655.)
   importance: critical

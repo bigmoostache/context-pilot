@@ -666,6 +666,10 @@
   path: crates/cp-mod-console/src/types.rs
   description: 'Console types. ProcessStatus enum #[non_exhaustive] (A4/boss-hunt r2 win — crate-local, converted from #[expect(exhaustive_enums)]). SessionMeta, ConsoleState, ConsoleWatcher (exit/pattern, easy_bash inline vs panel overflow).'
   last_edited_ms: 1784561022895
+07e375d68e5826b0:
+  path: deploy/photonicat/emmc-install/firstboot/firstboot-emmc.sh
+  description: 'Runs on eMMC''s first boot: un-twins clone (regen ssh host keys, new machine-id, wipe /var/lib/tailscale), sgdisk -e + growpart + resize2fs to fill 58G, hostname pcat-<serial>. Step 5b GUARANTEES LAN access plane (enable sshd + avahi, restart avahi post-rename so pcat-<serial>.local resolves). Step 7 tailscale up --authkey=/boot/pcat-ts-authkey --ssh (5x retry, clock-wait) then shred key. Step 7b writes /root/ACCESS.txt breadcrumb (hostname, LAN+tailscale IPs, ssh lines). Two independent access planes: LAN key-SSH via mDNS + Tailscale-SSH. Stamp + self-disable.'
+  last_edited_ms: 1784895310113
 07f9691e993528e6:
   path: crates/cp-orchestrator/src/main.rs
   description: 'Backend entry point. Reads Config from env, prints version/protocol/agents-dir/budget/scan-interval + X896 new-agent realm root + agent binary, creates Runtime, starts driver thread, serves HTTP (blocking). `use <crate> as _` block acknowledges lib-only deps in the bin target (per-target unused-crate-dependencies forbid): incl portable_pty, calamine, csv (T282 sheet parsing — used only by the lib finder/sheet.rs, not main).'
