@@ -443,7 +443,7 @@ b5af3513e41563ec:
   - philosophy
   last_edited_ms: 1784576922310
 b63f42389e433d93:
-  tl_dr: T656 Photonicat zero-touch eMMC install system BUILT (deploy/photonicat/emmc-install/, plan/build tooling only). Now ALSO self-provisions Context Pilot on-box (Model A). tag:pcat in ACL. Full design/facts/file-map in body.
+  tl_dr: T656/T658 Photonicat zero-touch eMMC install system BUILT (deploy/photonicat/emmc-install/). Self-provisions Context Pilot on-box (Model A). tag:pcat in ACL. T658 tailscale-enrol fix shipped 2b34dca6. Full design/facts/file-map in body.
   contents: |-
     T656 — zero-touch Debian-to-eMMC install for Photonicat 2 fleet.
 
@@ -473,7 +473,7 @@ b63f42389e433d93:
   - T656
   - deploy
   - tailscale
-  last_edited_ms: 1784912694515
+  last_edited_ms: 1784915661373
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   importance: high
