@@ -18,6 +18,10 @@
   path: .github/workflows/release.yml
   description: 'Release workflow (push tags v*). 5-target build matrix (tui+cp-console-server) + appliance bundle (aarch64 musl: cp-orchestrator+tui+SPA) + GitHub Release. pnpm action-setup pinned to 11.6.0 (matches lockfile origin, see ci.yml).'
   last_edited_ms: 0
+0056cba797da24f9:
+  path: deploy/photonicat/emmc-install/build/build-golden-image.sh
+  description: 'Builds the golden eMMC image: dd clone SRC_DISK (asterix SD), e2fsck, resize2fs -M shrink + slack, seed firstboot unit + operator ssh pubkey + ts authkey, sgdisk resize p2/GPT, truncate, sha256, zstd. Linux-only host (asterix, NOT Mac Mini). Inputs via env: SRC_DISK/OUT/PUBKEY/TS_AUTHKEY.'
+  last_edited_ms: 1784891900725
 00579a2b586985a8:
   path: crates/cp-mod-console/src/types.rs
   description: 'Console module types. ConsoleState (sessions HashMap + next_session_id), ProcessStatus enum, SessionMeta for persistence. ConsoleWatcher: exit/pattern modes, easy_bash inline (≤150 lines AND ≤8000 bytes) vs panel, blocking/async. format_wait_result helper.'
@@ -4402,6 +4406,10 @@
   path: crates/cp-mod-files/src/tools/edit_file.rs
   description: 'execute_edit: replace old_string with new_string. flame!("file_edit"). Normalized matching for trailing whitespace. Unified diff display. Panel reference in LLM result. Closest-match error hints.'
   last_edited_ms: 0
+3868cf231d711613:
+  path: deploy/ansible/tasks/deploy.yml
+  description: 'Ansible: ship binaries+SPA+systemd units+Caddyfile to Armbian/Debian box under /opt/context-pilot. Does not start (start.yml does). Idempotent. Part of site.yml provisioning pipeline (fetch/deploy/keys/seed/start/display).'
+  last_edited_ms: 1784888636933
 3874011eb459f11a:
   path: sandbox/tasks/inputs/password-recovery/instruction_local.md
   description: Adapted task instruction for local CP headless run — paths relative (./varsea, ./recovered_passwords.txt) instead of /app/.
@@ -4958,6 +4966,10 @@
   path: docs/rust-static-analysis-tools.md
   description: 'Comprehensive listing of Rust static analysis tools, modeled after Holzmann''s classic C tools page. Covers: compiler (rustc/clippy), commercial (CodeQL/Semgrep/Coverity/Klocwork/SonarQube/TrustInSoft), academic (Miri/Rudra/MIRAI/MirChecker/lockbud/Yuga), formal verification (Kani/Prusti/Verus/Creusot/Flux/Aeneas/hax), theory (RustBelt/Stacked Borrows), fuzzing (cargo-fuzz/bolero/proptest/loom), supply chain (cargo-audit/deny/geiger/vet/crev), CI pipeline recommendations, textbooks.'
   last_edited_ms: 0
+3f00cb7f67d2375c:
+  path: deploy/photonicat/emmc-install/firstboot/firstboot-emmc.sh
+  description: 'Runs on eMMC''s first boot: un-twins the clone (regen ssh host keys, new machine-id, wipe /var/lib/tailscale), sgdisk -e + growpart + resize2fs to fill 58G, hostname pcat-<device-tree-serial>, tailscale up --authkey=/boot/pcat-ts-authkey --ssh then shred key, stamp /var/lib/pcat-firstboot.done + self-disable.'
+  last_edited_ms: 1784891900368
 3f063b641da90997:
   path: web/src/App.tsx
   description: 'Root shell. activeAgent = useAgentMeta(activeAgentId) (delta-folded per-agent meta) ?? fleetAgent (polled-fleet identity fallback) so the always-visible TopBar + StatusBar ride the push plane for phase/cost/tokens instead of the 15s fleet poll (T297). view/agent persisted to localStorage; effectiveView falls back to fleet when no live agent. T334: finderRevealPath state + showInFinder handler switch to finder view and pass revealPath to Finder for file reveal.'
@@ -6706,6 +6718,10 @@
   path: .git/index
   description: Git index (binary). Not source.
   last_edited_ms: 0
+54403d55166efdd1:
+  path: deploy/photonicat/emmc-install/firstboot/pcat-firstboot.service
+  description: systemd oneshot driving firstboot-emmc.sh. After network-online+tailscaled (step 6 enrols). ConditionPathExists=!stamp, self-disabled by the script. Enabled into golden image by build-golden-image.sh.
+  last_edited_ms: 1784891900457
 546a03827d62b106:
   path: crates/cp-mod-threads/src/tools.rs
   description: 'Thread tool handlers. execute_send/execute_read/build_panel_content. T353: execute_send AUTO-UNARCHIVES archived threads. build_panel_content shows paused:true for paused threads (T371). Archived threads filtered out of LLM-facing context. YAML-structured output (T372). MAX caps on content/file-path/questions/panel-messages.'
@@ -11686,6 +11702,10 @@
   path: web/vite.config.ts
   description: 'Vite dev config. T310: single-origin tailnet serving — server.allowedHosts:true (accept the macbook.<tailnet>.ts.net Host from `tailscale serve`''s reverse proxy, anti-DNS-rebinding relaxed since the server binds 127.0.0.1 and is exposed only over the private WireGuard tailnet) + server.proxy ''/api''→http://127.0.0.1:7878 (REST + /api/stream SSE) so the frontend uses a RELATIVE base (VITE_API_URL="" in .env.local) and the app works identically at localhost:5174 or https://<host>.ts.net (phone access) with no CORS/mixed-content. @ alias → ./src.'
   last_edited_ms: 0
+939b73293ec5a94d:
+  path: deploy/photonicat/emmc-install/README.md
+  description: 'Full protocol doc: why (drop armbian-install), verified board facts, file layout, 4-stage flow (golden build, init-SD build, field install, ansible provisioning), 9 pre-solved frictions, open items. Locked decisions + secrets policy.'
+  last_edited_ms: 1784891900904
 93b840f82dc03e9a:
   path: crates/cp-orchestrator/src/registry/tailer.rs
   description: 'Tailer — backend''s incremental, gap-free oplog consumer (poll/seed/last_rev). T309: added a per-segment BYTE cursor (last_offset) — poll() now skips segments < cursor, and for the active segment does a single stat(); if file_len<=consumed_offset NOTHING is read or parsed (the idle no-append case that previously re-read+re-deserialized the whole current segment every 100ms tick, pinning a core), else scans ONLY the appended tail bytes[offset..] (torn-tail-safe via Scan.valid_len), resetting offset to 0 on a segment roll. Re-exported from channel.rs. 5 tests.'
@@ -17762,6 +17782,10 @@ e2c579843c4364f1:
   path: crates/cp-base/src/state/mod.rs
   description: 'Sub-module hub: actions, autocomplete, context, data, flags, runtime (State struct), watchers. Inline reverie module with Session struct (kind, agent, messages, tool_call_count).'
   last_edited_ms: 0
+e2c690ff5735f436:
+  path: deploy/photonicat/emmc-install/build/build-init-sd.sh
+  description: 'Assembles the init-SD: write base Debian image to card, grow rootfs, seed installer payload (init-sd-install.sh + pcat_lcd.py + unit + golden.img.zst), strip the firstboot unit (target-only). Inputs via env: BASE_IMG/CARD/GOLDEN_DIR. Interactive card-device confirm.'
+  last_edited_ms: 1784891900815
 e2cc79609e6076d5:
   path: web/src/mobile-components/finder/FinderChrome.tsx
   description: 'Mobile finder chrome twin: FinderTabs (always-visible ✕, no hover), FinderToolbar (single scrollable 36px-control row, no icon-slider/Tips/pathbar-toggle), FinderPathBar (taller tap crumbs). Re-exports FinderSidebar for path parity (unreachable on mobile).'
@@ -18270,10 +18294,18 @@ e92f540548fee6a0:
   path: src/app/run/tools/mod.rs
   description: 'Sub-module declarations: checks, cleanup, pipeline, queue_flush.'
   last_edited_ms: 0
+e939db50d5619f2c:
+  path: deploy/photonicat/emmc-install/installer/pcat-installer.service
+  description: systemd oneshot driving init-sd-install.sh. Offline (After=local-fs.target, no network). TimeoutStartSec=1800 (full flash+verify). ConditionPathExists=!/opt/pcat-install/.installed.
+  last_edited_ms: 1784891900636
 e9408a68182c08d5:
   path: web/src/components/threads/ThreadComposer.tsx
   description: 'Thread composer (always-active textarea + turn-status banner). T298 paperclip; T304 draftKey; T331 staged pendingFiles; T348/T350 /command bubbles + create pill; T359 Enter/Tab list logic; T371/T429 paused banner. T350 unified ComposerBubbles. T468 paste-to-upload: onPaste reads clipboardData.items+getAsFile() (not .files) for images. onAttach widened to void|Promise<void> (T471). prefill seeds expanded prompt body.'
   last_edited_ms: 0
+e96c0e3bc800299e:
+  path: deploy/photonicat/emmc-install/lcd/pcat_lcd.py
+  description: GC9307 SPI LCD 4-state progress painter (flashing PCT/verify/done/error). Python spidev+libgpiod, 5x7 bitmap font, init sequence transcribed from vendor periph.io-gc9307 st7789.go. /dev/spidev1.0, RST=122 DC=121, 172x320 rot180 MADCTL 0x48 coloffset 34. One-shot per state screen.
+  last_edited_ms: 1784891900242
 e9875e4d636d72e9:
   path: src/llms/oai_providers/openai_streaming.rs
   description: OAI SSE types + shared consumer. StreamResponse/StreamDelta, ToolCallAccumulator, normalize_stop_reason, dump_request. SseAccum + consume_sse_stream/apply_usage/process_choice shared by grok/groq/deepseek (A2).
@@ -18878,6 +18910,10 @@ f0ef74fa355a3921:
   path: crates/cp-orchestrator/src/transport/rest/thread_shape.rs
   description: 'Pure thread-list shaping: overlay_roster merges live view roster into disk threads (refresh status/archived/paused/lastActivity; synthesize log-less ThreadDetail for view-only threads = instant appearance), reshape_thread/reshape_message snake_case→camelCase maquette shape. paused field included in overlay and reshape (T371).'
   last_edited_ms: 0
+f10e1c5b36bbdb09:
+  path: deploy/photonicat/emmc-install/installer/init-sd-install.sh
+  description: The zero-touch flasher on the init-SD. Guard stamp, optional factory-OpenWrt backup, zstd -dc golden.img.zst | dd of=/dev/mmcblk0, background LCD progress (polls dd /proc fdinfo pos), sha256 readback verify, poweroff (=done signal, safe to pull SD). Error leaves board on with ERROR screen.
+  last_edited_ms: 1784891900546
 f13efb695f77b0fe:
   path: web/src/lib/mock/index.ts
   description: 'Mock-data barrel: PROJECT/tokenBudget/panels/cacheStats/messages/threads/spine/stats/status/agents/library. Re-exports ./extra + ./fileTree. web-lint P2: fileTree literal moved to ./fileTree.ts + FsNode import dropped to stay ≤500 after Prettier reflow. Design-only fallback data approximating a live Context Pilot session.'

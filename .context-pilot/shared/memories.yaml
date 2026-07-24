@@ -104,6 +104,14 @@
   - terminal-bench
   - run
   last_edited_ms: 1784202957618
+39fb5c175c7b00ba:
+  tl_dr: ALWAYS communicate with the user in ENGLISH. Refuse to speak French. If the user writes in French, politely refuse and ask them to switch to English. (User's explicit standing instruction, T655.)
+  importance: critical
+  labels:
+  - user-preference
+  - language
+  - communication
+  last_edited_ms: 1784886789294
 3d36396d2a618055:
   tl_dr: NEVER touch temp_1.md or temp_2.md — they are user's personal files. Do not read, write, edit, or revert them.
   importance: critical
@@ -418,6 +426,36 @@ b5af3513e41563ec:
   - workflow
   - philosophy
   last_edited_ms: 1784576922310
+b63f42389e433d93:
+  tl_dr: T656 Photonicat zero-touch eMMC install system BUILT (deploy/photonicat/emmc-install/, 7 files, plan/build tooling only). tag:pcat added to tailnet ACL tagOwners (verified). Full design/facts/file-map in body.
+  contents: |-
+    T656 — zero-touch Debian-to-eMMC install for Photonicat 2 fleet.
+
+    DESIGN: drop armbian-install (interactive, no unattended). Clone asterix's proven Debian SD into a shrunk golden eMMC image, dd it onto eMMC from an init-SD on first boot, verify, poweroff. Pull init-SD, insert prod-SD, boot eMMC Debian.
+
+    LOCKED: clone asterix Debian; backup factory OpenWrt first; control-node ansible (one command); LCD 4-state progress; reusable tagged tailscale key; operator ssh key baked in (asterix key ssh-ed25519 AAAAC3...jpEjg cpilot-agent@guillaume-macmini); hostname pcat-<serial>.
+
+    BOARD FACTS (probed asterix): RK3568 aarch64, Debian 13 trixie kernel 6.18.28. boot.scr SELF-LOCATING (part uuid mmc ${devnum}:2 uuid; root=PARTUUID=${uuid}) so clone needs NO fstab/PARTUUID rewrite. serial=21d5aefad944808f. rootfs 18G used. LCD GC9307 172x320 rot180 MADCTL 0x48 (MX|BGR) coloffset 34 rowoffset 0, SPI1.0 mode0 8bit 50MHz, RST=GPIO122 DC=GPIO121 CS=GPIO13 BL=GPIO13/PWM. growpart/resize2fs/e2fsck/sgdisk present.
+
+    FILES:
+    - lcd/pcat_lcd.py: python spidev+libgpiod GC9307 painter, 4 states, 5x7 font, init transcribed from vendor periph.io-gc9307 st7789.go. Deps python3-spidev python3-libgpiod.
+    - firstboot/firstboot-emmc.sh: eMMC first boot — regen ssh host keys, new machine-id, wipe /var/lib/tailscale, sgdisk -e + growpart + resize2fs fill 58G, hostname pcat-$SER, tailscale up --authkey=$(cat /boot/pcat-ts-authkey) --ssh, shred key, stamp+self-disable.
+    - installer/init-sd-install.sh: init-SD — guard stamp, optional OpenWrt backup, zstd -dc golden.img.zst|dd of=/dev/mmcblk0, bg LCD progress via /proc fdinfo pos, sha256 readback verify, poweroff (=done signal).
+    - build/build-golden-image.sh: clone SRC_DISK, resize2fs -M shrink+slack, seed firstboot+keys, sgdisk resize+truncate, sha256, zstd. Linux-only (asterix).
+    - build/build-init-sd.sh: write base Debian, grow, seed installer payload+golden, strip firstboot unit.
+
+    SECRETS: tailscale authkey NOT in git — runtime /boot/pcat-ts-authkey, shredded after enrol.
+
+    OPEN: mint reusable tagged tailscale key (tag:pcat now in ACL); provide base Debian image; SD access (Mac Mini no reader, asterix is build host, user giving card later).
+  importance: high
+  labels:
+  - photonicat
+  - emmc
+  - install
+  - T656
+  - deploy
+  - tailscale
+  last_edited_ms: 1784891862371
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   importance: high
