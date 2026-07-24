@@ -61,8 +61,19 @@ ln -sf /etc/machine-id /var/lib/dbus/machine-id
 
 # ── 3. wipe the cloned tailscale identity (else it steals asterix's node) ────
 echo "[3] wiping tailscale state"
-systemctl stop tailscaled 2>/dev/null || true
-rm -rf /var/lib/tailscale/* 2>/dev/null || true
+# Wipe the CLONE's tailscale identity ONCE, guarded by a persistent marker. The
+# stamp is written only at the very END of this script, so a crash after a
+# SUCCESSFUL enrol (step 7) but before the stamp re-runs the whole script — and
+# re-wiping here would DESTROY our own fresh enrol, after which step 7 finds the
+# /boot key already shredded = the box is permanently unenrollable. The marker
+# makes this destructive step idempotent across such re-runs.
+if [ ! -e /var/lib/pcat-identity-cleaned ]; then
+  systemctl stop tailscaled 2>/dev/null || true
+  rm -rf /var/lib/tailscale/* 2>/dev/null || true
+  mkdir -p /var/lib && touch /var/lib/pcat-identity-cleaned
+else
+  echo "identity already cleaned on a prior run — skipping tailscale wipe"
+fi
 
 # ── 4. grow the rootfs to fill the eMMC ─────────────────────────────────────
 # The golden image is a shrunk disk image dd'd onto a bigger eMMC, so the GPT

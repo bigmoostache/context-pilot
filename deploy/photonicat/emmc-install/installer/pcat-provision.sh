@@ -37,7 +37,10 @@ exec >>"$LOG" 2>&1
 echo "=== pcat provision $(date -Is) ==="
 
 # LCD paint is best-effort — a broken painter must never abort provisioning.
-lcd() { [ -x "$LCD" ] || [ -f "$LCD" ] && python3 "$LCD" "$@" 2>/dev/null || true; }
+# NB: group the existence test — `[ -x ] || [ -f ] && python3` without braces
+# parses as `([ -x ] || ([ -f ] && python3))`, so an EXECUTABLE painter (the
+# real case, install -Dm755) short-circuits on `[ -x ]` and python3 NEVER runs.
+lcd() { { [ -x "$LCD" ] || [ -f "$LCD" ]; } && python3 "$LCD" "$@" 2>/dev/null || true; }
 
 fail() {
   echo "PROVISION FAIL: $*"
