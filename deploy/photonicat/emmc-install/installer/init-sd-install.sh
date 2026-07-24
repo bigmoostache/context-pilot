@@ -5,18 +5,26 @@
 # script (driven by pcat-installer.service on the init-SD's first boot) writes
 # the baked golden image onto the eMMC, verifies it, paints progress on the LCD,
 # and powers the board off. Power-off IS the done-signal: board dark = safe to
-# pull the init-SD. The technician then inserts the prod-SD and powers on, and
-# the box comes up on eMMC Debian (firstboot-emmc.sh personalises it there).
+# pull the init-SD.
+#
+# HARDENING (v2, T656): the v1 assumed /dev/mmcblk0 was the eMMC and fd 1 was
+# dd's output — both wrong/dangerous. This version:
+#   * DETECTS the eMMC by its non-removable attribute and REFUSES to write the
+#     booted (init-SD) device or any removable device — the single most
+#     dangerous bug was dd'ing the wrong disk when kernel probe order swaps
+#     mmcblk0/mmcblk1 between boots.
+#   * tracks REAL flash progress from the of= fd (not stdout), with a startup
+#     wait so the watcher never exits before dd opens the device.
+#   * space-guards the optional OpenWrt backup so it can't fill the init-SD and
+#     wedge the subsequent flash.
+#   * treats EVERY external tool as possibly-absent (preflight) and every step
+#     as fail-loud (LCD ERROR + board stays on) rather than fail-silent.
 #
 # Layout on the init-SD (all under /opt/pcat-install, dropped by build-init-sd.sh):
-#   golden.img.zst   — zstd-compressed golden eMMC image (~4-6 GB)
-#   golden.img.zst.sha256 — checksum of the DECOMPRESSED image for read-back verify
-#   lcd/pcat_lcd.py  — the GC9307 progress painter
-#
-# Safety: a stamp file on the init-SD (/opt/pcat-install/.installed) guards
-# re-entry, so leaving the init-SD in across the post-install reboot never
-# re-flashes. And the SD is boot-priority, so the ONLY thing that stops a re-flash
-# loop is either pulling the SD (intended) or this stamp (belt + braces).
+#   golden.img.zst        — zstd-compressed golden eMMC image
+#   golden.img.zst.sha256 — sha256 of the DECOMPRESSED image (read-back verify)
+#   .img-size             — decompressed byte count
+#   lcd/pcat_lcd.py       — the GC9307 progress painter
 set -uo pipefail
 
 BASE=/opt/pcat-install
@@ -24,19 +32,69 @@ IMG_ZST="$BASE/golden.img.zst"
 SHA="$BASE/golden.img.zst.sha256"       # sha256 of the DECOMPRESSED image
 LCD="$BASE/lcd/pcat_lcd.py"
 STAMP="$BASE/.installed"
-TARGET=/dev/mmcblk0                       # the eMMC
 LOG=/var/log/pcat-install.log
 exec >>"$LOG" 2>&1
 echo "=== pcat init-SD install $(date -Is) ==="
 
+# LCD paint is best-effort — a broken painter must NEVER abort a flash.
 lcd() { python3 "$LCD" "$@" 2>/dev/null || true; }
+
 fail() {
   echo "FAIL: $*"
   lcd error "$*"
-  sleep 10
-  # leave the board ON on failure so the technician sees the error screen.
+  sync
+  # Leave the board ON on failure so the technician sees the error screen and
+  # the eMMC is NOT left in an unknown half-state silently powered off.
   exit 1
 }
+
+# ── preflight: every external tool the flash depends on must exist ──────────
+# A missing zstd/dd/sha256sum mid-flash is the classic silent-failure; catch it
+# up front while we can still show a clean error.
+for tool in dd zstd sha256sum lsblk findmnt; do
+  command -v "$tool" >/dev/null 2>&1 || fail "MISSING TOOL $tool"
+done
+
+# ── identify the booted (init-SD) device so we NEVER flash ourselves ────────
+# findmnt gives the source partition of /, e.g. /dev/mmcblk1p2; strip the
+# partition suffix to get the whole-disk node (mmcblk1). Kernel probe order is
+# NOT stable across boots, so we must resolve this dynamically, not assume.
+ROOT_SRC="$(findmnt -no SOURCE / 2>/dev/null)"
+ROOT_DISK="$(lsblk -no pkname "$ROOT_SRC" 2>/dev/null | head -1)"
+[ -n "$ROOT_DISK" ] || fail "CANT FIND BOOT DISK"
+echo "booted from /dev/$ROOT_DISK ($ROOT_SRC)"
+
+# ── detect the eMMC: an mmc block device that is NON-removable and is NOT the
+#    device we booted from. The eMMC is soldered (removable=0); the SD card is
+#    removable=1. This is the ONLY safe discriminator — the mmcblkN NUMBER is
+#    not stable. If we can't find exactly one candidate, we REFUSE to guess. ──
+detect_emmc() {
+  local d name rem
+  local found=""
+  for d in /sys/block/mmcblk*; do
+    [ -e "$d" ] || continue
+    name="$(basename "$d")"
+    [ "$name" = "$ROOT_DISK" ] && continue          # never the booted device
+    rem="$(cat "$d/removable" 2>/dev/null || echo 1)"
+    [ "$rem" = "0" ] || continue                    # eMMC is non-removable
+    # skip boot0/boot1 hardware-boot partitions, keep the main device
+    case "$name" in *boot*|*rpmb*) continue;; esac
+    if [ -n "$found" ]; then
+      echo "AMBIGUOUS: both /dev/$found and /dev/$name look like eMMC" >&2
+      return 1
+    fi
+    found="$name"
+  done
+  [ -n "$found" ] || return 1
+  echo "$found"
+}
+
+EMMC_NAME="$(detect_emmc)" || fail "CANT SAFELY IDENTIFY EMMC"
+TARGET="/dev/$EMMC_NAME"
+[ -b "$TARGET" ] || fail "NO EMMC BLOCK DEV"
+# Absolute belt-and-braces: refuse if target somehow equals the boot disk.
+[ "$EMMC_NAME" = "$ROOT_DISK" ] && fail "REFUSE FLASH BOOT DISK"
+echo "eMMC target = $TARGET"
 
 # ── guard: already flashed this card? ───────────────────────────────────────
 if [ -e "$STAMP" ]; then
@@ -47,49 +105,81 @@ if [ -e "$STAMP" ]; then
   exit 0
 fi
 
-# ── sanity: image + checksum + target present ───────────────────────────────
+# ── sanity: image + checksum + size present and non-empty ───────────────────
 [ -s "$IMG_ZST" ] || fail "GOLDEN IMG MISSING"
 [ -s "$SHA" ]     || fail "CHECKSUM MISSING"
-[ -b "$TARGET" ]  || fail "NO EMMC"
+[ -s "$BASE/.img-size" ] || fail "IMG-SIZE MISSING"
+IMG_BYTES="$(cat "$BASE/.img-size")"
+[ "$IMG_BYTES" -gt 0 ] 2>/dev/null || fail "BAD IMG-SIZE"
+
+# ── target must be at least as large as the decompressed image ──────────────
+TGT_BYTES="$(blockdev --getsize64 "$TARGET" 2>/dev/null || echo 0)"
+if [ "$TGT_BYTES" -gt 0 ] && [ "$TGT_BYTES" -lt "$IMG_BYTES" ]; then
+  fail "EMMC SMALLER THAN IMAGE"
+fi
 
 # ── OPTIONAL: back up the factory OpenWrt before overwrite (D2) ──────────────
-# Controlled by a flag file so build-init-sd.sh can size the card accordingly.
+# Space-guarded: a backup that fills the init-SD would wedge the flash below.
+# We need free space on $BASE ≥ the eMMC size (worst case, incompressible).
 if [ -e "$BASE/.backup-openwrt" ]; then
-  echo "backing up factory eMMC to init-SD"
-  lcd flashing 0
-  dd if="$TARGET" bs=16M conv=fsync 2>/dev/null | zstd -3 -o "$BASE/openwrt-factory.img.zst" \
-    && echo "backup OK" || echo "backup FAILED (continuing anyway)"
+  FREE_KB="$(df -Pk "$BASE" | awk 'NR==2{print $4}')"
+  NEED_KB=$(( TGT_BYTES / 1024 / 2 ))   # assume ≥2:1 zstd on a squashfs image
+  if [ "${FREE_KB:-0}" -lt "$NEED_KB" ]; then
+    echo "SKIP backup: only ${FREE_KB}KB free, need ~${NEED_KB}KB — flash takes priority"
+  else
+    echo "backing up factory eMMC to init-SD"
+    lcd flashing 0
+    if dd if="$TARGET" bs=16M conv=fsync 2>/dev/null | zstd -3 -o "$BASE/openwrt-factory.img.zst"; then
+      echo "backup OK"
+    else
+      echo "backup FAILED — removing partial, continuing"
+      rm -f "$BASE/openwrt-factory.img.zst"
+    fi
+  fi
 fi
 
 # ── flash: decompress the golden image straight onto the eMMC ───────────────
-# Progress is estimated from the decompressed image size (recorded at build time
-# in .img-size) vs bytes written, sampled by a background watcher that repaints
-# the LCD every few seconds. dd conv=fsync forces the data to physical media.
-echo "flashing golden image to $TARGET"
+echo "flashing golden image to $TARGET ($IMG_BYTES bytes)"
 lcd flashing 1
 
-IMG_BYTES=0
-[ -e "$BASE/.img-size" ] && IMG_BYTES="$(cat "$BASE/.img-size")"
+# Start the writer, then the progress watcher. The watcher reads the REAL
+# output-file offset from the of= fd (found by resolving /proc/PID/fd symlinks
+# to $TARGET), NOT fd 1 (dd's stdout, which the v1 bug read). It waits for the
+# fd to appear so it never exits before dd opens the device.
+zstd -dc "$IMG_ZST" | dd of="$TARGET" bs=16M conv=fsync iflag=fullblock &
+DDPID=$!
 
-# background progress painter: poll dd's output offset via /proc, repaint LCD.
 (
-  while :; do
-    sleep 4
-    # find the dd writing to the eMMC and read its file position
-    ddpid="$(pgrep -f "dd of=$TARGET" | head -1)"
-    [ -z "$ddpid" ] && break
-    pos="$(awk '/^pos:/{print $2}' "/proc/$ddpid/fdinfo/1" 2>/dev/null)"
-    if [ -n "$pos" ] && [ "$IMG_BYTES" -gt 0 ]; then
+  # wait up to 20s for dd to open the target fd
+  ddfd=""
+  for _ in $(seq 1 20); do
+    for l in /proc/"$DDPID"/fd/*; do
+      [ -e "$l" ] || continue
+      if [ "$(readlink -f "$l" 2>/dev/null)" = "$TARGET" ]; then ddfd="$l"; break; fi
+    done
+    [ -n "$ddfd" ] && break
+    sleep 1
+  done
+  [ -n "$ddfd" ] || exit 0
+  fdinfo="/proc/$DDPID/fdinfo/$(basename "$ddfd")"
+  while kill -0 "$DDPID" 2>/dev/null; do
+    pos="$(awk '/^pos:/{print $2}' "$fdinfo" 2>/dev/null)"
+    if [ -n "$pos" ]; then
       pct=$(( pos * 100 / IMG_BYTES ))
       [ "$pct" -gt 99 ] && pct=99
+      [ "$pct" -lt 0 ] && pct=0
       lcd flashing "$pct"
     fi
+    sleep 4
   done
 ) &
 WATCH=$!
 
-zstd -dc "$IMG_ZST" | dd of="$TARGET" bs=16M conv=fsync iflag=fullblock \
-  || fail "DD WRITE FAILED"
+# Wait for the writer and capture its real exit status (not the subshell's).
+if ! wait "$DDPID"; then
+  kill "$WATCH" 2>/dev/null || true
+  fail "DD WRITE FAILED"
+fi
 kill "$WATCH" 2>/dev/null || true
 sync
 echo "flash written, syncing"
@@ -98,9 +188,10 @@ echo "flash written, syncing"
 lcd verify
 WANT="$(cut -d' ' -f1 <"$SHA")"
 echo "verifying $IMG_BYTES bytes against $WANT"
-GOT="$(dd if="$TARGET" bs=16M count=$(( (IMG_BYTES + 16*1024*1024 - 1) / (16*1024*1024) )) 2>/dev/null \
+GOT="$(dd if="$TARGET" bs=1M iflag=fullblock count=$(( (IMG_BYTES + 1048575) / 1048576 )) 2>/dev/null \
         | head -c "$IMG_BYTES" | sha256sum | cut -d' ' -f1)"
 if [ "$GOT" != "$WANT" ]; then
+  echo "GOT=$GOT WANT=$WANT"
   fail "VERIFY MISMATCH"
 fi
 echo "verify OK"

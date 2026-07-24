@@ -386,6 +386,10 @@
   path: crates/cp-oplog/src/replay.rs
   description: 'Oplog replay (GAP1/I5): ReplayState{rev_head,heads,seen}. fold_entry(&mut ReplayState,&entry) pub(crate): Checkpoint=authoritative clone_from(heads+seen), MessageCreated=set_thread_head, CommandEffect|SeenMark=seen.mark(token,rev), others no-op. replay() fast-path reads ONLY newest segment when it opens with a checkpoint (Snapshot-seeded); replay_full fallback for seg-0-only. OplogResult from crate::error. Heads PartialEq order-sensitive. 10 tests incl seen-set V3 + fast==full.'
   last_edited_ms: 0
+049061fcc1c567e6:
+  path: web/src/lib/providers/topButtons/index.tsx
+  description: Top-corner buttons coordination context (navKey + bump). Mobile CornerButton re-fires icon-swap spring on each nav edge. Hook+context only; Provider in sibling file.
+  last_edited_ms: 1784893275221
 049459df21b26ae2:
   path: web/src/lib/api/index.ts
   description: 'REST API client barrel: fleet/agent/threads/panels/memory/todos/spine/queue/scratchpad/tree/callbacks/tools/radar/entities/metrics/vitals/usage/library + commands (sendCommand) + mintTicket + renameAgent (T328) + avatar CRUD (uploadAvatar/deleteAvatar/avatarUrl, T338). Re-exports ./finder + shares ./client request/BASE/envelope. The @/lib/api single import surface.'
@@ -1474,6 +1478,10 @@
   path: crates/cp-mod-threads/src/lib.rs
   description: 'Threads module. 2 tools: Send, Read. pre_flight split check_focus_enforcement + preflight_send + preflight_read helpers (A2). Focus enforcement dangling/escalation. TOOL_TEXTS LazyLock. fixed_order=5.'
   last_edited_ms: 0
+12a476cded7b353b:
+  path: web/src/components/shell/widgets/UsageButton.tsx
+  description: 'Claude Code OAuth usage button. Anthropic ''A'' logomark trigger opens popover: token status, session/weekly usage bars, LoginFlow (PKCE) with WaitingForCode extracted. Camembert conic-gradient session-% behind logo. T472 login-trap fix (baselineExpiryRef strict-advance).'
+  last_edited_ms: 1784893294161
 12c73f7fcf2884c6:
   path: web/src/lib/support/telemetry/frames.ts
   description: Long Animation Frames (LoAF) + Long Tasks telemetry producer. PerformanceObserver on 'long-animation-frame' (Chromium 123+, rich scripts[] attribution → culprit 'func @ source') with 'longtask' fallback. Records LoafEvent{duration,blockingDuration,script}/LongTaskEvent. Minimal local interfaces downcast from PerformanceEntry (not in lib.dom). Catches non-interaction render storms. Chromium-only — silent on Firefox (why the rAF stall watchdog exists).
@@ -4738,6 +4746,10 @@
   path: crates/cp-base/src/tools/pre_flight.rs
   description: 'Verdict struct #[non_exhaustive] A5 (has ::new/::error/::warning builders).'
   last_edited_ms: 1784499344769
+3c6d5f6e9845b9ab:
+  path: web/src/components/auth/Onboarding.tsx
+  description: 'First-run admin onboarding: single acknowledgement that flips onboarding_completed (provider keys provisioned out-of-band, nothing to configure).'
+  last_edited_ms: 1784893275033
 3c7723e612c9754f:
   path: crates/cp-orchestrator/src/transport/rest/releases.rs
   description: 'Release management REST handlers (T427). 5 endpoints: list_releases (GET, merged local+remote+arch+active), set_arch (PUT, manual or auto-detect), download_release (POST, download+extract tarball), select_release (PUT, set active binary+supervisor), delete_release (DELETE). All pub(crate).'
@@ -5538,6 +5550,10 @@
   path: crates/cp-orchestrator/src/transport/inspect/panels.rs
   description: 'Cockpit inspection-panel endpoints (in inspect/): memory/todos/spine/queue/scratchpad/tree/callbacks/usage/library/panel_list = tier-② disk reads reshaped to maquette JSON. PLUS tools/radar/entities = DERIVED-state endpoints that return their NORMAL EMPTY shape by design (200 [] / {anchors:[],results:[]}, NOT 404): the inspection plane structurally can''t rebuild them from tier-② files (tools catalog=compile-time module YAMLs in the agent binary; radar=live half-life log ranking; entities=open SQLite, on-disk db is 0 bytes) — agent_folder guard so an unknown id still 404s; frontend renders an honest ''unavailable over web inspection plane'' notice. Absolute crate::transport:: paths.'
   last_edited_ms: 1781820973406
+45adb4e163d9a6de:
+  path: web/src/mobile-components/agents/ClaudeUsagePage.tsx
+  description: Mobile Claude usage page — standalone full-screen iOS grouped-list (token status/expiry/refresh, usage bars, stored accounts, PKCE login) via shared useClaudeUsage hook; opened from fleet gear.
+  last_edited_ms: 1784893275932
 45bf5cbdde7d1a21:
   path: src/llms/claude_code_api_key/mod.rs
   description: Claude Code API Key implementation. API key from vault ("anthropic") with Bearer auth + Claude Code headers. Replicates Claude Code request signature for Claude 4.5 model access.
@@ -6618,6 +6634,10 @@
   path: web/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: thread conversation + composer. segmentLog folds auto traces into AutoRun. T367/T471 OS-file drag-drop+zip. web-lint P5: isFileDrag + handleDragOver hoisted to module scope. web-lint P6: drag-depth counter ref renamed dragDepthRef (naming-convention-ref-name).'
   last_edited_ms: 1783417834268
+52d919506f82df73:
+  path: web/src/mobile-components/agents/AgentModal/controller.ts
+  description: '@generated mobile-mirror stub — re-exports desktop AgentModal controller.'
+  last_edited_ms: 1784893275311
 52e2cc2794a14c4e:
   path: .uploads/strip_ref_patterns.py
   description: 'Class-1 ref_patterns rewriter: `if let PAT(ref x)=SCRUT` -> `PAT(x)=&(SCRUT)` by clippy-reported line. 75 auto, 34 manual (match arms, ref mut, multiline).'
@@ -7118,6 +7138,10 @@
   path: web/src/lib/api/generated/sdk.gen.ts
   description: Auto-generated typed SDK functions from openapi.json. One function per REST endpoint (getApiFleetMeta, getApiAgentByIdThreads, postApiAuthLogin, etc). Uses @hey-api client runtime, NOT the manual request() wrapper.
   last_edited_ms: 0
+59de66a3c7bb8c8b:
+  path: web/src/components/auth/DayZeroSetup.tsx
+  description: 'Day-0 provisioning screen (next_action=set_identity): name the box (DNS/IP) then distribute CA root; posts POST /api/it/identity, brings :443 up.'
+  last_edited_ms: 1784893275132
 59eecbdb5322736a:
   path: .git/index
   description: Git index (binary). Not source.
@@ -8178,6 +8202,10 @@
   path: crates/cp-mod-entities/src/panels/format.rs
   description: SQL result formatting shared by tools + panels. query_to_markdown (200-row cap, 0-row enrichment hint), format_cell, format_markdown_table, extract_table_name (case-insensitive byte-safe FROM scan — no to_uppercase offset bug).
   last_edited_ms: 0
+6880304ac03618ae:
+  path: .uploads/IMG_1642-ocr.md
+  description: OCR output — black/white dog in orange sunglasses on a towel. Transient upload.
+  last_edited_ms: 1784893275578
 6893744dc33373d1:
   path: web/src/components/shell/config/ReleasesPane.tsx
   description: Admin-only release management pane (T427). Architecture selector (auto-detect or manual), release cards with tag/date/size + status chips (Latest/Downloaded/Active), download/use/delete actions via generated SDK. Error state with retry button. queryFn uses responseStyle:data pattern (direct return, throwOnError handles errors). Data from GET /api/releases → ReleaseStore backend.
@@ -9990,6 +10018,10 @@
   path: crates/cp-oplog/src/error.rs
   description: 'OplogError{Io,Frame} + Display + From impls + OplogResult alias. #[expect(exhaustive_enums)] A4 registered. No std::error::Error (dodges missing_trait_methods).'
   last_edited_ms: 0
+7e1a222a1226c2bb:
+  path: web/src/components/agents/FleetDashboard.tsx
+  description: Fleet welcome dashboard (live). AgentCard reads useAgentMeta (delta-folded status dot + cost). statusMeta includes 'waiting' (Restarting). §19 HealthBadge (useMetrics). RetiredSection/RetiredCard (unretire). Create/manage via AgentModal.
+  last_edited_ms: 1784893294065
 7e287be06fea8478:
   path: src/app/run/threads/messages.rs
   description: 'Phase 2.2 (X839): live thread-message emission for the main loop. emit_messages = observe-on-change chokepoint diffing each thread''s message vector vs BridgeState.thread_msg_counts (seeded no-emit on first pass so a restarted agent doesn''t replay backlog). build_pending → JSON body {id,author,text,ts,question,fileRef}; emit_one_message stages body in content-addressed Store (I13 barrier: small=Inline rides delta, large=Spilled durable file) BEFORE submit_durable(MessageCreated{thread_id,message_id,head,inline_body}). No-op bridge-OFF. Captures messages from every source (Send tool / TUI reply / web SendMessage) via one uniform path.'
@@ -11634,6 +11666,10 @@
   path: crates/cp-mod-tree/Cargo.toml
   description: 'Tree module deps: cp-base, cp-render, crossterm, serde, serde_json, ignore, cp-mod-utilities.'
   last_edited_ms: 1780565428699
+927dfb928b0a377d:
+  path: web/src/mobile-components/shell/widgets/StoredAccounts.tsx
+  description: '@generated mobile-mirror stub — re-exports desktop StoredAccounts (rendered inside mobile ClaudeUsagePage).'
+  last_edited_ms: 1784893275844
 92888e48e287579e:
   path: crates/cp-wire/src/heartbeat.rs
   description: 'Fixed 60-byte binary liveness record. Heartbeat{schema_version,timestamp_ms,sequence,pid,boot_id} + encode/decode (LE: ver4+ts8+seq8+pid4+boot_id32+crc4) + is_fresh(saturating) + matches_boot (pid-reuse defence). u32/u64 to_le const-fn #[expect(as_conversions)] after BYTE_MASK (wire contract, to_le_bytes forbidden). HEARTBEAT_LEN=60. I/O-free.'
@@ -12078,6 +12114,10 @@
   path: crates/cp-orchestrator/src/registry/channel.rs
   description: Per-agent channel — backend read/write handle. AgentChannel (from_entry/hydrate/send/send_with_retry) + read_ack. Tailer moved to sibling tailer.rs (split for 500-line limit) and re-exported here via `pub use crate::registry::tailer::Tailer` so channel::Tailer stays valid for all call sites. 320 lines.
   last_edited_ms: 0
+97d8b32e1b4bad2e:
+  path: web/index.html
+  description: Vite HTML entry (desktop). iOS standalone meta (black-translucent status bar, viewport-fit=cover, manifest UNLINKED per T639). apple-touch-icon. Pre-paint theme-class script (FOUC guard).
+  last_edited_ms: 1784893294249
 97e600789e19c98b:
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (IR blocks → blocks_to_lines: selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (scrollable messages via scroll_offset, author/timestamp headers, content). All content through IR pipeline. Tab/Shift+Tab nav.'
@@ -12502,6 +12542,10 @@
   path: crates/cp-orchestrator/src/transport/rest/mod.rs
   description: 'REST resource handlers. fleet() filtered by auth_user ACL (FR-12). command() dispatches commands. rename_agent (T328), upload/delete avatar (T338). threads() prefers view roster. mint_ticket embeds auth_user.id (Phase 7). resolve_entry. Backend re-exported from backend.rs. Submodules: create, restart, retire, library, thread_shape, backend.'
   last_edited_ms: 1782324281383
+9e121aee3b7ebe7f:
+  path: web/scripts/gen-icons.py
+  description: 'Generates PWA/home-screen icon set from scripts/assets/app-icon-source.png (apple-touch 180, 192/512, maskable, favicon-32), compositing onto dark theme bg. Run: python3 scripts/gen-icons.py.'
+  last_edited_ms: 1784893275401
 9e202c919322b366:
   path: crates/cp-mod-brave/src/panel.rs
   description: Brave result panel. Static content persisted in metadata (META_CONTENT). Cache restore from metadata post-reload. Pagination support. BRAVE_PANEL_TYPE constant.
@@ -13502,6 +13546,10 @@ aa7622653fe04cbf:
   path: src/ui/perf/overlay.rs
   description: 'Perf overlay adapter. A6: budget-bar fill + sparkline index routed via float_math. render_op_table split (A2).'
   last_edited_ms: 0
+aa785e555ab90854:
+  path: web/src/mobile-components/threads/forms/FormWidget.tsx
+  description: Mobile FormWidget twin — routes mobile FormFields (its only fork); draft persistence, two-click incomplete-submit gate, locked receipt byte-identical to desktop.
+  last_edited_ms: 1784893276030
 aa7d4bb60801af69:
   path: web/src/components/shell/costs/CostsView.tsx
   description: Cost Analysis dashboard page. Summary cards, culprit donut, cost timeline, cost/tool/culprit-cost/max-freeze bars, two token distribution bars (panel-estimated + API-reported), Tool×Culprit cross-tab with heat-map. Tempo/queue/no-break AND-filters. Copy as Markdown button. TanStack useQuery + fetchFsPreview 15s refetch.
@@ -13718,6 +13766,10 @@ adfe8c0af4ba9bf7:
   path: web/src/lib/support/markdown.tsx
   description: 'GFM markdown renderer (react-markdown+remark-gfm+math+katex). onAccent/default variants. clipboard() guard. web-lint P5 pending: no-useless-recursion + no-array-callback-reference on extractText:39 and .map(fmtRow):115.'
   last_edited_ms: 1783412977437
+ae0d84da9e8aa50f:
+  path: web/src/mobile-components/shell/widgets/UsageButton.tsx
+  description: '@generated mobile-mirror stub — re-exports desktop UsageButton (LoginFlow reused by mobile via this token).'
+  last_edited_ms: 1784893275754
 ae116ff12ae35cfb:
   path: web/src/components/shell/StatusBar.tsx
   description: 'Bottom status footer. Fleet mode: accepts agents prop for aggregates (count, threads, needs-you, spend). Agent mode: accepts activeAgent prop, derives phase from status, wires cost live. Cache bar (cacheStats/tokenBudget) still mock.'
@@ -14706,6 +14758,10 @@ b91450545db6847c:
   path: src/app/run/tools/mod.rs
   description: 'Sub-module declarations: checks, cleanup, pipeline, queue_flush.'
   last_edited_ms: 1780651842184
+b917fe26bb227d99:
+  path: .uploads/image-2-ocr.md
+  description: OCR output — 3D cartoon man with beard/glasses pointing up. Transient upload.
+  last_edited_ms: 1784893275490
 b92c4c51d2a37642:
   path: src/modules/mod.rs
   description: Module registry. 20 modules via all_modules(). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
@@ -14722,6 +14778,10 @@ b93a801b0d39d75c:
   path: ui/src/components/panels/cockpit/ThreadsPanel.tsx
   description: 'Cockpit Threads maquette: thread roster cards (status dot Needs-you/Active/Working, name, msg count, last activity, last-message preview). Reads mock threadDetails.'
   last_edited_ms: 1781600050385
+b95556b01a012622:
+  path: web/src/index.css
+  description: Tailwind v4 + tw-animate. Two palettes (:root Cream light / .dark Dungeon Forge) as CSS token blocks; semantic tokens. .mobile-shell height fork (100vh standalone / 100dvh tab, T643). Finder micro-motion keyframes, highlight.js .hljs-* theme.
+  last_edited_ms: 1784893294337
 b9661eb0dddc0dbd:
   path: src/modules/overview/tools/panel_goto_page.rs
   description: 'panel_goto_page: navigate paginated panels, range validation, recomputes token_count per page'
@@ -18482,6 +18542,10 @@ ebd0e564032505d5:
   path: src/state/persistence/mod.rs
   description: Phased boot loading (5 phases). BootConfig/BootPanels structs. boot_load_config/panels/messages/assemble_state functions. Legacy load_state() entry point. panel_to_context() helper.
   last_edited_ms: 0
+ebd90f12927b359e:
+  path: web/src/mobile-components/shell/widgets/UsageLimits.tsx
+  description: '@generated mobile-mirror stub — re-exports desktop UsageLimits (zero touch divergence).'
+  last_edited_ms: 1784893275666
 ebdf6e51ce9dc683:
   path: crates/cp-mod-git/src/tools.rs
   description: Git tool. Read-only → dynamic git_result panels. Mutating → async subprocess via spawn_async_tool. flame!("git_exec"). GIT_ASKPASS temp script for HTTPS auth. Cache invalidation via regex patterns.

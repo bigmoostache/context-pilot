@@ -18,8 +18,10 @@ ConditionPathExists=!/var/lib/pcat-firstboot.done
 Type=oneshot
 ExecStart=/usr/local/sbin/firstboot-emmc.sh
 RemainAfterExit=no
-# Give resize2fs / tailscale room; don't wedge boot forever.
-TimeoutStartSec=300
+# Give resize2fs + clock-wait (~30s) + tailscale enrol retries (5×10s) room;
+# 300s could kill the enrol loop on a slow box. Still bounded so a hung step
+# never wedges boot forever (the unit is non-critical: RemainAfterExit=no).
+TimeoutStartSec=600
 
 [Install]
 WantedBy=multi-user.target
