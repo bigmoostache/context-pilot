@@ -65,13 +65,32 @@ command -v ansible-playbook >/dev/null 2>&1 || fail "NO ANSIBLE"
 # the tailscale enrol (T658).
 ls /boot >/dev/null 2>&1 || true
 mountpoint -q /boot || mount /boot 2>/dev/null || true
-VARS=""
+SRCVARS=""
 for cand in /boot/pcat-provision.yml /boot/firmware/pcat-provision.yml \
             /etc/pcat-provision.yml /var/lib/pcat/provision.yml; do
-  [ -s "$cand" ] && { VARS="$cand"; break; }
+  [ -s "$cand" ] && { SRCVARS="$cand"; break; }
 done
-[ -n "$VARS" ] || fail "NO PROVISION VARS (searched /boot, /etc, /var/lib/pcat)"
-echo "using vars file $VARS"
+[ -n "$SRCVARS" ] || fail "NO PROVISION VARS (searched /boot, /etc, /var/lib/pcat)"
+
+# HARDENING (T658): the vars file carries provider API keys (and optionally
+# account passwords) in cleartext. Stage it into tmpfs (/run, RAM-backed) and
+# shred the PERSISTENT copy IMMEDIATELY — same reasoning as the tailscale key:
+#   * /boot is persistent flash (often vfat, no unix perms) — a raw secrets file
+#     there is readable by anyone who pulls the eMMC;
+#   * `shred` is NOT a reliable secure-erase on flash (wear-levelling/COW), so
+#     the real control is a MINIMAL exposure window, not the overwrite. Copying
+#     to /run then deleting the /boot copy up front shrinks the window to
+#     seconds; /run never hits disk and is wiped on poweroff.
+# The tmpfs copy is removed on ANY exit (success or fail) via the trap below, so
+# a failed provision does not leave secrets on RAM or disk. A retry must re-drop
+# the /boot file — the safer default.
+VARS=/run/pcat-provision.yml
+( umask 077; cat "$SRCVARS" >"$VARS" ) || fail "COULD NOT STAGE VARS TO TMPFS"
+chmod 600 "$VARS" 2>/dev/null || true
+trap 'shred -u "$VARS" 2>/dev/null || rm -f "$VARS" 2>/dev/null || true' EXIT
+shred -u "$SRCVARS" 2>/dev/null || rm -f "$SRCVARS" || true
+sync
+echo "staged provision vars to tmpfs; persistent copy shredded"
 
 # ── run the play against ourselves ──────────────────────────────────────────
 # -c local: no SSH, act on this host. -i 'localhost,': single-host inventory.
@@ -84,9 +103,9 @@ else
   fail "ANSIBLE PLAY FAILED"
 fi
 
-# ── shred the secrets now the box is provisioned ────────────────────────────
-echo "shredding $VARS"
-shred -u "$VARS" 2>/dev/null || rm -f "$VARS" || true
+# ── secrets cleanup is handled by the EXIT trap (tmpfs copy shredded on any ──
+# exit; the persistent /boot copy was already shredded up front). Nothing to do
+# here beyond stamping success.
 
 # ── stamp + self-disable ────────────────────────────────────────────────────
 echo "stamping done + disabling unit"

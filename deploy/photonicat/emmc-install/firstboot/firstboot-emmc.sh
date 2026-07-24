@@ -158,19 +158,39 @@ echo "[7] tailscale enrol"
 # is actually visible.
 ls /boot >/dev/null 2>&1 || true
 mountpoint -q /boot || mount /boot 2>/dev/null || true
-KEYFILE=""
+SRCKEY=""
 for cand in /boot/pcat-ts-authkey /boot/firmware/pcat-ts-authkey /etc/pcat-ts-authkey /var/lib/pcat/ts-authkey; do
-  [ -s "$cand" ] && { KEYFILE="$cand"; break; }
+  [ -s "$cand" ] && { SRCKEY="$cand"; break; }
 done
-if [ -n "$KEYFILE" ]; then
-  echo "using key at $KEYFILE"
+# HARDENING (T658): stage the key into tmpfs (/run, RAM-backed) and shred the
+# PERSISTENT copy IMMEDIATELY, before we even try to enrol. Rationale:
+#   * /boot on this board is likely vfat (no unix perms), and it is persistent
+#     flash — a raw authkey sitting there is readable by anyone who pulls the
+#     eMMC, for the whole enrol window (and forever if enrol fails);
+#   * `shred` is NOT a reliable secure-erase on eMMC/flash (wear-levelling +
+#     COW mean the original blocks may survive), so the real control is a TINY
+#     exposure window, not the overwrite. Copying to /run then deleting the
+#     /boot copy up front shrinks that window to a few seconds, and /run never
+#     touches disk + is wiped on poweroff. If enrol later fails, the key is
+#     gone from /boot too — a retry must re-drop it, which is the safer default.
+KEYFILE=""
+if [ -n "$SRCKEY" ]; then
+  KEYFILE=/run/pcat-ts-authkey
+  ( umask 077; cat "$SRCKEY" >"$KEYFILE" ) 2>/dev/null || KEYFILE=""
+  chmod 600 "$KEYFILE" 2>/dev/null || true
+  # nuke the persistent copy now (shred best-effort, then unlink for certainty)
+  shred -u "$SRCKEY" 2>/dev/null || rm -f "$SRCKEY" || true
+  sync
+fi
+if [ -n "$KEYFILE" ] && [ -s "$KEYFILE" ]; then
+  echo "staged ts-authkey to tmpfs; persistent /boot copy shredded"
   KEY="$(tr -d '[:space:]' <"$KEYFILE")"
   # guard against the classic tskey-api-… ↔ tskey-auth-… mix-up: only an AUTH
   # key can enrol a node; an API key just fails `tailscale up` opaquely.
   case "$KEY" in
     tskey-auth-*) : ;;
-    tskey-api-*)  echo "REFUSING enrol: /boot key is a tskey-api-… (need tskey-auth-…)"; KEY="" ;;
-    *)            echo "WARNING: /boot key has unexpected prefix — attempting enrol anyway" ;;
+    tskey-api-*)  echo "REFUSING enrol: key is a tskey-api-… (need tskey-auth-…)"; KEY="" ;;
+    *)            echo "WARNING: key has unexpected prefix — attempting enrol anyway" ;;
   esac
 fi
 if [ -n "${KEYFILE:-}" ] && [ -n "${KEY:-}" ]; then
@@ -184,11 +204,12 @@ if [ -n "${KEYFILE:-}" ] && [ -n "${KEY:-}" ]; then
     sleep 10
   done
   [ -z "$ok" ] && echo "TAILSCALE ENROL FAILED after retries — box will need manual enrol"
-  # shred the key now the box is enrolled so a pulled eMMC can't leak it
-  shred -u "$KEYFILE" 2>/dev/null || rm -f "$KEYFILE" || true
 else
   echo "no usable ts-authkey found (searched /boot, /boot/firmware, /etc, /var/lib/pcat) — skipping enrol"
 fi
+# always drop the in-RAM key + the shell copy, enrolled or not
+KEY=""
+[ -n "${KEYFILE:-}" ] && { shred -u "$KEYFILE" 2>/dev/null || rm -f "$KEYFILE" || true; }
 
 # ── 7b. write an access breadcrumb so the operator sees how to reach the box ─
 # Two independent planes are now up (LAN key-SSH via avahi, Tailscale-SSH). Record
