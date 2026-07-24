@@ -41,10 +41,25 @@ ROOT_PART_NO="$(echo "$ROOT_SRC" | grep -oE '[0-9]+$')"
 DISK="/dev/${ROOT_DISK:-mmcblk0}"
 echo "booted rootfs=$ROOT_SRC disk=$DISK part=$ROOT_PART_NO"
 
+# Is this the FIRST run (clone identity not yet cleaned)? The stamp is written
+# only when enrol is settled (see step 8), so a box that boots without WAN and
+# fails to enrol re-runs this whole script on the NEXT boot to retry. The
+# destructive, one-time identity ops (ssh host-key regen, machine-id reset,
+# tailscale wipe) must fire EXACTLY ONCE, else every retry boot mints new ssh
+# host keys + a new machine-id = known_hosts thrash + journald/dbus churn. The
+# persistent marker gates them; idempotent config (PermitRootLogin, hostname,
+# resize, sshd/avahi enable) still runs every boot.
+FRESH=1
+[ -e /var/lib/pcat-identity-cleaned ] && FRESH=""
+
 # ── 1. regenerate SSH host keys (kill the clone's twin keys) ────────────────
 echo "[1] regenerating SSH host keys"
-rm -f /etc/ssh/ssh_host_*
-( dpkg-reconfigure openssh-server 2>/dev/null ) || ssh-keygen -A || true
+if [ -n "$FRESH" ]; then
+  rm -f /etc/ssh/ssh_host_*
+  ( dpkg-reconfigure openssh-server 2>/dev/null ) || ssh-keygen -A || true
+else
+  echo "identity already cleaned on a prior run — keeping existing host keys"
+fi
 # ensure key-only root login works (the baked authorized_keys is for root)
 if [ -f /etc/ssh/sshd_config ] && ! grep -qE '^\s*PermitRootLogin\s+prohibit-password' /etc/ssh/sshd_config; then
   sed -i 's/^\s*#\?\s*PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
@@ -54,20 +69,22 @@ systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null || true
 
 # ── 2. fresh machine-id (clone shares asterix's; breaks systemd/journald/dbus) ─
 echo "[2] resetting machine-id"
-: >/etc/machine-id
-rm -f /var/lib/dbus/machine-id
-systemd-machine-id-setup || true
-ln -sf /etc/machine-id /var/lib/dbus/machine-id
+if [ -n "$FRESH" ]; then
+  : >/etc/machine-id
+  rm -f /var/lib/dbus/machine-id
+  systemd-machine-id-setup || true
+  ln -sf /etc/machine-id /var/lib/dbus/machine-id
+else
+  echo "identity already cleaned on a prior run — keeping machine-id"
+fi
 
 # ── 3. wipe the cloned tailscale identity (else it steals asterix's node) ────
 echo "[3] wiping tailscale state"
-# Wipe the CLONE's tailscale identity ONCE, guarded by a persistent marker. The
-# stamp is written only at the very END of this script, so a crash after a
-# SUCCESSFUL enrol (step 7) but before the stamp re-runs the whole script — and
-# re-wiping here would DESTROY our own fresh enrol, after which step 7 finds the
-# /boot key already shredded = the box is permanently unenrollable. The marker
-# makes this destructive step idempotent across such re-runs.
-if [ ! -e /var/lib/pcat-identity-cleaned ]; then
+# Wipe the CLONE's tailscale identity ONCE, gated by the same FRESH marker as
+# steps 1-2. If enrol later fails and this script re-runs, re-wiping here would
+# DESTROY a live enrol from a prior boot; the marker prevents that. The marker
+# is written at the END of this block so a crash mid-cleanup still re-cleans.
+if [ -n "$FRESH" ]; then
   systemctl stop tailscaled 2>/dev/null || true
   rm -rf /var/lib/tailscale/* 2>/dev/null || true
   mkdir -p /var/lib && touch /var/lib/pcat-identity-cleaned
@@ -169,6 +186,7 @@ echo "[7] tailscale enrol"
 # is actually visible.
 ls /boot >/dev/null 2>&1 || true
 mountpoint -q /boot || mount /boot 2>/dev/null || true
+enrol_pending=""   # set when a usable key failed to enrol (blocks the done-stamp)
 SRCKEY=""
 for cand in /boot/pcat-ts-authkey /boot/firmware/pcat-ts-authkey /etc/pcat-ts-authkey /var/lib/pcat/ts-authkey; do
   [ -s "$cand" ] && { SRCKEY="$cand"; break; }
@@ -219,10 +237,15 @@ if [ -n "${KEYFILE:-}" ] && [ -n "${KEY:-}" ]; then
     sleep 10
   done
   [ -z "$ok" ] && echo "TAILSCALE ENROL FAILED after retries — key kept on /boot for next-boot retry"
+  # A USABLE key that failed to enrol is a TRANSIENT failure (no WAN yet, DNS not
+  # ready, tailscaled slow) — mark it pending so step 8 does NOT stamp, and the
+  # next boot re-runs and retries. A wrong-TYPE key (KEY="" above) never reaches
+  # here, so it stamps normally (no point retrying an unfixable key forever).
+  [ -z "$ok" ] && enrol_pending=1
   # Only now the box is enrolled is it safe to destroy the persistent /boot key.
-  # On failure we deliberately LEAVE it so the stamp-guarded firstboot re-run can
-  # retry — shred is unreliable on eMMC/vfat anyway, so the real control is that
-  # the key never outlives a SUCCESSFUL enrol (normal-operation exposure only).
+  # On failure we deliberately LEAVE it so the next-boot re-run can retry —
+  # shred is unreliable on eMMC/vfat anyway, so the real control is that the key
+  # never outlives a SUCCESSFUL enrol (normal-operation exposure only).
   if [ -n "$ok" ] && [ -n "${SRCKEY:-}" ]; then
     shred -u "$SRCKEY" 2>/dev/null || rm -f "$SRCKEY" || true
     sync
@@ -254,8 +277,16 @@ TS_IP="$(tailscale ip -4 2>/dev/null | head -1)"
 cat /root/ACCESS.txt 2>/dev/null || true
 
 # ── 8. stamp + self-disable ─────────────────────────────────────────────────
-echo "[8] stamping done + disabling unit"
-mkdir -p "$(dirname "$STAMP")"
-date -Is >"$STAMP"
-systemctl disable pcat-firstboot.service 2>/dev/null || true
+# ── 8. stamp + self-disable (unless a usable enrol is still pending) ─────────
+# If a usable ts-authkey was present but enrol failed (transient: no WAN yet),
+# do NOT stamp/disable — leave the unit armed so the next boot retries. The
+# one-time identity ops are marker-gated (steps 1-3), so retries are churn-free.
+if [ -n "$enrol_pending" ]; then
+  echo "[8] enrol pending (usable key, transient failure) — NOT stamping; will retry next boot"
+else
+  echo "[8] stamping done + disabling unit"
+  mkdir -p "$(dirname "$STAMP")"
+  date -Is >"$STAMP"
+  systemctl disable pcat-firstboot.service 2>/dev/null || true
+fi
 echo "=== firstboot complete: $HOST ==="
