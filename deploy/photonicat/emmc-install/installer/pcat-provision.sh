@@ -59,6 +59,12 @@ command -v ansible-playbook >/dev/null 2>&1 || fail "NO ANSIBLE"
 [ -f "$PLAYBOOK" ] || fail "NO PLAYBOOK"
 
 # ── locate the secrets file (same multi-path search as the tailscale key) ────
+# /boot is a systemd AUTOFS automount (empty until walked into), so force it to
+# mount BEFORE the search or the `[ -s ]` test sees an empty /boot and we fail
+# "NO PROVISION VARS" despite the file being present — the same trap that broke
+# the tailscale enrol (T658).
+ls /boot >/dev/null 2>&1 || true
+mountpoint -q /boot || mount /boot 2>/dev/null || true
 VARS=""
 for cand in /boot/pcat-provision.yml /boot/firmware/pcat-provision.yml \
             /etc/pcat-provision.yml /var/lib/pcat/provision.yml; do

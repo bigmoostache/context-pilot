@@ -113,6 +113,11 @@ install -Dm644 "$HERE/../firstboot/pcat-firstboot.service" \
 ln -sf ../pcat-firstboot.service \
   "$MNT/etc/systemd/system/multi-user.target.wants/pcat-firstboot.service"
 
+# Stamp the build epoch (rootfs, NOT the autofs /boot) so firstboot can floor a
+# lagging RTC forward to at least build time before the tailscale TLS login —
+# fixes the "clock in 2025 → x509 not-yet-valid → enrol skipped" failure (T658).
+date +%s >"$MNT/etc/pcat-build-epoch"
+
 # ── Model A self-provision payload (optional): bake the Ansible tree + wrapper +
 # unit so the box installs Context Pilot itself on first boot. Skipped entirely
 # when PROVISION_VARS is unset AND the ansible tree is absent (bare-Debian image).
@@ -173,25 +178,38 @@ umount "$MNT"
 # beneath — the v1 shadow bug). Both are SHREDDED on the box after use
 # (pcat-ts-authkey after tailscale enrol; pcat-provision.yml after the install).
 if [ -n "$TS_AUTHKEY" ] || [ -n "$PROVISION_VARS" ]; then
+  # guard the classic tskey-api-… ↔ tskey-auth-… mix-up at BUILD time (fail fast
+  # rather than ship an image that silently can't enrol) — T658.
+  if [ -n "$TS_AUTHKEY" ]; then
+    case "$TS_AUTHKEY" in
+      tskey-auth-*) : ;;
+      tskey-api-*)  echo "FATAL: TS_AUTHKEY is a tskey-api-… key; enrol needs a tskey-auth-… key"; exit 1 ;;
+      *)            echo "WARNING: TS_AUTHKEY has an unexpected prefix — proceeding, but verify it is an auth key" ;;
+    esac
+  fi
   BOOTP="${LOOP}p${BOOT_PARTNO}"
   if [ -e "$BOOTP" ]; then
     mount "$BOOTP" "$MNT"
     if [ -n "$TS_AUTHKEY" ]; then
       printf '%s' "$TS_AUTHKEY" >"$MNT/pcat-ts-authkey"
       chmod 600 "$MNT/pcat-ts-authkey"
-      echo "tailscale key written to boot partition p${BOOT_PARTNO}"
+      # ASSERT the key actually landed on the boot partition — the whole enrol
+      # depends on it, and a silent miss here is exactly what broke T658.
+      [ -s "$MNT/pcat-ts-authkey" ] || { echo "FATAL: pcat-ts-authkey did not land on boot partition $BOOTP"; umount "$MNT"; exit 1; }
+      echo "tailscale key written + verified on boot partition p${BOOT_PARTNO}"
     fi
     if [ -n "$PROVISION_VARS" ]; then
       if [ -r "$PROVISION_VARS" ]; then
         install -m600 "$PROVISION_VARS" "$MNT/pcat-provision.yml"
-        echo "provision secrets written to boot partition p${BOOT_PARTNO}"
+        [ -s "$MNT/pcat-provision.yml" ] || { echo "FATAL: pcat-provision.yml did not land on boot partition $BOOTP"; umount "$MNT"; exit 1; }
+        echo "provision secrets written + verified on boot partition p${BOOT_PARTNO}"
       else
         echo "WARNING: PROVISION_VARS $PROVISION_VARS not readable — secrets NOT seeded"
       fi
     fi
     umount "$MNT"
   else
-    echo "WARNING: boot partition $BOOTP not found — key/secrets NOT seeded"
+    echo "FATAL: boot partition $BOOTP not found — key/secrets cannot be seeded"; exit 1
   fi
 fi
 rmdir "$MNT"

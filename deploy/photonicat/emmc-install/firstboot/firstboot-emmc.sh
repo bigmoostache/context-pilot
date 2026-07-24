@@ -112,18 +112,36 @@ systemctl enable --now avahi-daemon 2>/dev/null || true
 systemctl restart avahi-daemon 2>/dev/null || true
 
 # ── 6. sync the clock (a wrong RTC breaks tailscale's TLS login) ────────────
+# ROOT-CAUSE FIX (T658): a fresh box booted with RTC=2025-09; the old guard
+# `[ $yr -ge 2025 ]` was SATISFIED by that stale clock yet it is still ~months
+# BEFORE the tailscale login cert's notBefore, so TLS died `x509: certificate is
+# not yet valid` and enrol was skipped. A hardcoded year floor is fragile — the
+# real floor is "no earlier than when this image was built". build-golden-image
+# stamps that epoch into /etc/pcat-build-epoch (rootfs, always present, NOT the
+# autofs /boot), so we can always jump a lagging RTC forward to at least build
+# time before any TLS. NTP still corrects to true time when the network is up;
+# the epoch floor is only the guaranteed lower bound.
 echo "[6] syncing clock before enrol"
 timedatectl set-ntp true 2>/dev/null || true
-# give NTP a moment; fall back to a coarse HTTP-date if the year is clearly wrong
+BUILD_EPOCH="$(cat /etc/pcat-build-epoch 2>/dev/null || echo 0)"
+# give NTP a moment; break as soon as the clock is at/after the build epoch
 for _ in $(seq 1 15); do
-  yr="$(date +%Y)"
-  [ "$yr" -ge 2025 ] 2>/dev/null && break
+  now="$(date +%s 2>/dev/null || echo 0)"
+  [ "$now" -ge "$BUILD_EPOCH" ] 2>/dev/null && [ "$BUILD_EPOCH" -gt 0 ] 2>/dev/null && break
   sleep 2
 done
-if [ "$(date +%Y)" -lt 2025 ] 2>/dev/null; then
-  # last resort: pull Date: header from a well-known host
+# still behind the build epoch? NTP didn't land — try an HTTP Date header, then
+# fall back to hard-setting the clock to the build epoch floor (guarantees the
+# year is current-or-newer, so cert notBefore checks pass).
+now="$(date +%s 2>/dev/null || echo 0)"
+if [ "$BUILD_EPOCH" -gt 0 ] 2>/dev/null && [ "$now" -lt "$BUILD_EPOCH" ] 2>/dev/null; then
   hdr="$(curl -sI --max-time 10 https://www.google.com 2>/dev/null | grep -i '^date:' | cut -d' ' -f2-)"
   [ -n "$hdr" ] && date -s "$hdr" 2>/dev/null || true
+  now="$(date +%s 2>/dev/null || echo 0)"
+  if [ "$now" -lt "$BUILD_EPOCH" ] 2>/dev/null; then
+    echo "clock still < build epoch — forcing date to build-epoch floor"
+    date -s "@$BUILD_EPOCH" 2>/dev/null || true
+  fi
 fi
 echo "clock now: $(date -Is)"
 
@@ -132,14 +150,31 @@ echo "clock now: $(date -Is)"
 # search both, since the build may have placed it either way. Retry the enrol,
 # because DNS/NTP/tailscaled may not be ready on the first attempt.
 echo "[7] tailscale enrol"
+# ROOT-CAUSE FIX (T658): /boot on this board is a systemd AUTOFS automount, so it
+# is empty until something walks into it. A bare `[ -s /boot/pcat-ts-authkey ]`
+# may run before the mount is triggered, making firstboot see an empty /boot and
+# log "no ts-authkey found — skipping enrol" (exactly what happened). Force the
+# automount (and an explicit mount fallback) BEFORE searching, so the baked key
+# is actually visible.
+ls /boot >/dev/null 2>&1 || true
+mountpoint -q /boot || mount /boot 2>/dev/null || true
 KEYFILE=""
 for cand in /boot/pcat-ts-authkey /boot/firmware/pcat-ts-authkey /etc/pcat-ts-authkey /var/lib/pcat/ts-authkey; do
   [ -s "$cand" ] && { KEYFILE="$cand"; break; }
 done
 if [ -n "$KEYFILE" ]; then
   echo "using key at $KEYFILE"
-  systemctl enable --now tailscaled 2>/dev/null || true
   KEY="$(tr -d '[:space:]' <"$KEYFILE")"
+  # guard against the classic tskey-api-… ↔ tskey-auth-… mix-up: only an AUTH
+  # key can enrol a node; an API key just fails `tailscale up` opaquely.
+  case "$KEY" in
+    tskey-auth-*) : ;;
+    tskey-api-*)  echo "REFUSING enrol: /boot key is a tskey-api-… (need tskey-auth-…)"; KEY="" ;;
+    *)            echo "WARNING: /boot key has unexpected prefix — attempting enrol anyway" ;;
+  esac
+fi
+if [ -n "${KEYFILE:-}" ] && [ -n "${KEY:-}" ]; then
+  systemctl enable --now tailscaled 2>/dev/null || true
   ok=""
   for attempt in 1 2 3 4 5; do
     if tailscale up --authkey="$KEY" --ssh --hostname="$HOST" --accept-dns=false 2>&1; then
@@ -152,7 +187,7 @@ if [ -n "$KEYFILE" ]; then
   # shred the key now the box is enrolled so a pulled eMMC can't leak it
   shred -u "$KEYFILE" 2>/dev/null || rm -f "$KEYFILE" || true
 else
-  echo "no ts-authkey found (searched /boot, /boot/firmware, /etc, /var/lib/pcat) — skipping enrol"
+  echo "no usable ts-authkey found (searched /boot, /boot/firmware, /etc, /var/lib/pcat) — skipping enrol"
 fi
 
 # ── 7b. write an access breadcrumb so the operator sees how to reach the box ─
