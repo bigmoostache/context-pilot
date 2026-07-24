@@ -54,6 +54,30 @@ fails or box unreachable · **P2** = robustness / observability.
 5. Dry-run the flasher on a **spare eMMC/board** first; confirm the eMMC actually boots post-write before trusting the fleet run.
 6. Confirm the base init-SD image boots this exact board (asterix's own image is the safe choice).
 
+## Live hardware verification (asterix, T656)
+
+Every non-destructive subcomponent was exercised on the real board (loopback
+files under `/tmp`, real mmcblk partition tables never touched). Results:
+
+| Subcomponent | Test | Result |
+|--------------|------|--------|
+| eMMC detect (`detect_emmc`) | run on asterix (booted from SD) | returns `mmcblk0`, `mmcblk0boot0/boot1` skipped, SD excluded ✓ |
+| Flash pipeline | `zstd -dc \| dd` onto a loop "eMMC", 200 MB random image | dd rc=0, sha256 readback **MATCH** ✓ |
+| Progress-fd watcher (friction #6) | resolve `of=` fd from `/proc/PID/fd`, read `fdinfo pos` | resolved `/dev/loop0`, `pos` read, `pct` computed ✓ |
+| Golden shrink | `resize2fs -P` geometry, `partx -n START`, GUID restore, truncate | START parsed non-empty, **PARTUUID PRESERVED**, image SHRUNK ✓ |
+| Firstboot grow | `sgdisk -e` + `growpart` + `resize2fs` up onto a bigger loop disk | p2 grew to fill disk, fsck clean, GPT valid ✓ |
+| Build refusals (×6) | hostile inputs: live-root src/card, non-block, missing pubkey, eMMC card | all **REFUSED** before any write (sentinel-guarded) ✓ |
+| Serial → hostname | `/proc/device-tree/serial-number` pipeline | `pcat-21d5aefad944808f` (len 16) ✓ |
+| Key-search (shadow fix) | fake keys across the 4 search paths | boot partition wins priority order ✓ |
+| systemd units | `systemd-analyze verify` | no syntax/directive errors ✓ |
+| LCD painter | live paint on the panel after masking vendor + sysfs-unexport | exit 0, no EBUSY ✓ |
+
+**Bug found + fixed by live testing:** `build-init-sd.sh` gated the target on
+`removable==1`, but a native mmc-slot SD reports `removable=0` — identical to the
+eMMC — so a legitimate init-SD was **false-refused**. Fixed to use the same
+`device/type` discriminator as `init-sd-install.sh` (refuse eMMC=`MMC` + root +
+mounted; allow SD=`SD` even when `removable=0`). Re-verified live.
+
 ## Known things this system deliberately does NOT do
 
 - It does not automate imaging from a second host (step 2) — that's a human step by nature.
