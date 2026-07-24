@@ -162,28 +162,32 @@ SRCKEY=""
 for cand in /boot/pcat-ts-authkey /boot/firmware/pcat-ts-authkey /etc/pcat-ts-authkey /var/lib/pcat/ts-authkey; do
   [ -s "$cand" ] && { SRCKEY="$cand"; break; }
 done
-# HARDENING (T658): stage the key into tmpfs (/run, RAM-backed) and shred the
-# PERSISTENT copy IMMEDIATELY, before we even try to enrol. Rationale:
+# HARDENING (T658): enrol from a tmpfs (/run, RAM-backed) copy and destroy the
+# persistent /boot copy only AFTER a successful enrol. Rationale:
 #   * /boot on this board is likely vfat (no unix perms), and it is persistent
 #     flash — a raw authkey sitting there is readable by anyone who pulls the
-#     eMMC, for the whole enrol window (and forever if enrol fails);
+#     eMMC, so we want it gone the moment it is no longer needed;
 #   * `shred` is NOT a reliable secure-erase on eMMC/flash (wear-levelling +
-#     COW mean the original blocks may survive), so the real control is a TINY
-#     exposure window, not the overwrite. Copying to /run then deleting the
-#     /boot copy up front shrinks that window to a few seconds, and /run never
-#     touches disk + is wiped on poweroff. If enrol later fails, the key is
-#     gone from /boot too — a retry must re-drop it, which is the safer default.
+#     COW mean the original blocks may survive), so the real control is that the
+#     key never outlives a SUCCESSFUL enrol — not the overwrite itself;
+#   * we do NOT shred up front: firstboot is stamp-guarded and re-runs until it
+#     succeeds, so a crash or failed enrol must leave the /boot key intact for
+#     the next boot to retry. The /run copy is the short-lived working copy,
+#     never touches disk, and is wiped on poweroff / dropped below.
 KEYFILE=""
 if [ -n "$SRCKEY" ]; then
   KEYFILE=/run/pcat-ts-authkey
   ( umask 077; cat "$SRCKEY" >"$KEYFILE" ) 2>/dev/null || KEYFILE=""
-  chmod 600 "$KEYFILE" 2>/dev/null || true
-  # nuke the persistent copy now (shred best-effort, then unlink for certainty)
-  shred -u "$SRCKEY" 2>/dev/null || rm -f "$SRCKEY" || true
-  sync
+  [ -n "$KEYFILE" ] && chmod 600 "$KEYFILE" 2>/dev/null || true
+  # NOTE: the persistent /boot copy is NOT shredded here — only AFTER a
+  # successful enrol (see below). firstboot is stamp-guarded and re-runs until
+  # it succeeds, so the key must survive a crash/failed enrol to let the next
+  # boot retry; destroying it up front would strand the box unenrollable on any
+  # transient failure. The /run (tmpfs) copy we enrol from is the short-lived,
+  # reliably-erasable working copy.
 fi
 if [ -n "$KEYFILE" ] && [ -s "$KEYFILE" ]; then
-  echo "staged ts-authkey to tmpfs; persistent /boot copy shredded"
+  echo "staged ts-authkey to tmpfs (persistent /boot copy kept until enrol succeeds)"
   KEY="$(tr -d '[:space:]' <"$KEYFILE")"
   # guard against the classic tskey-api-… ↔ tskey-auth-… mix-up: only an AUTH
   # key can enrol a node; an API key just fails `tailscale up` opaquely.
@@ -203,7 +207,15 @@ if [ -n "${KEYFILE:-}" ] && [ -n "${KEY:-}" ]; then
     echo "tailscale up attempt $attempt failed — retry in 10s (check key not expired/quota)"
     sleep 10
   done
-  [ -z "$ok" ] && echo "TAILSCALE ENROL FAILED after retries — box will need manual enrol"
+  [ -z "$ok" ] && echo "TAILSCALE ENROL FAILED after retries — key kept on /boot for next-boot retry"
+  # Only now the box is enrolled is it safe to destroy the persistent /boot key.
+  # On failure we deliberately LEAVE it so the stamp-guarded firstboot re-run can
+  # retry — shred is unreliable on eMMC/vfat anyway, so the real control is that
+  # the key never outlives a SUCCESSFUL enrol (normal-operation exposure only).
+  if [ -n "$ok" ] && [ -n "${SRCKEY:-}" ]; then
+    shred -u "$SRCKEY" 2>/dev/null || rm -f "$SRCKEY" || true
+    sync
+  fi
 else
   echo "no usable ts-authkey found (searched /boot, /boot/firmware, /etc, /var/lib/pcat) — skipping enrol"
 fi

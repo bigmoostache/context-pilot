@@ -73,24 +73,31 @@ done
 [ -n "$SRCVARS" ] || fail "NO PROVISION VARS (searched /boot, /etc, /var/lib/pcat)"
 
 # HARDENING (T658): the vars file carries provider API keys (and optionally
-# account passwords) in cleartext. Stage it into tmpfs (/run, RAM-backed) and
-# shred the PERSISTENT copy IMMEDIATELY — same reasoning as the tailscale key:
+# account passwords) in cleartext. Run ansible from a tmpfs (/run, RAM-backed)
+# copy and destroy the persistent /boot copy only AFTER the play succeeds:
 #   * /boot is persistent flash (often vfat, no unix perms) — a raw secrets file
-#     there is readable by anyone who pulls the eMMC;
+#     there is readable by anyone who pulls the eMMC, so we want it gone the
+#     moment provisioning no longer needs it;
 #   * `shred` is NOT a reliable secure-erase on flash (wear-levelling/COW), so
-#     the real control is a MINIMAL exposure window, not the overwrite. Copying
-#     to /run then deleting the /boot copy up front shrinks the window to
-#     seconds; /run never hits disk and is wiped on poweroff.
+#     the real control is that the secret never outlives a SUCCESSFUL install —
+#     not the overwrite itself;
+#   * we do NOT shred up front: provisioning is stamp-guarded and re-runs until
+#     it succeeds, and the play is network-heavy (release download + driver
+#     compile) so transient failure is likely; a crash/failure must leave the
+#     /boot copy intact so the next boot retries without a human re-dropping it.
 # The tmpfs copy is removed on ANY exit (success or fail) via the trap below, so
-# a failed provision does not leave secrets on RAM or disk. A retry must re-drop
-# the /boot file — the safer default.
+# a failed provision leaves no secret in RAM.
 VARS=/run/pcat-provision.yml
 ( umask 077; cat "$SRCVARS" >"$VARS" ) || fail "COULD NOT STAGE VARS TO TMPFS"
 chmod 600 "$VARS" 2>/dev/null || true
 trap 'shred -u "$VARS" 2>/dev/null || rm -f "$VARS" 2>/dev/null || true' EXIT
-shred -u "$SRCVARS" 2>/dev/null || rm -f "$SRCVARS" || true
-sync
-echo "staged provision vars to tmpfs; persistent copy shredded"
+# NOTE: the persistent /boot copy is NOT shredded here — only AFTER the ansible
+# play SUCCEEDS (see below). provisioning is stamp-guarded and re-runs until it
+# succeeds, and the play is network-heavy (release download + driver compile) so
+# a transient failure is likely; destroying the secret up front would force a
+# human to re-drop /boot on every blip, defeating zero-touch. The /run (tmpfs)
+# copy ansible reads from is the short-lived, reliably-erasable working copy.
+echo "staged provision vars to tmpfs (persistent copy kept until provisioning succeeds)"
 
 # ── run the play against ourselves ──────────────────────────────────────────
 # -c local: no SSH, act on this host. -i 'localhost,': single-host inventory.
@@ -99,13 +106,18 @@ lcd provisioning
 echo "running ansible-playbook -c local against localhost"
 if ansible-playbook -c local -i 'localhost,' "$PLAYBOOK" -e @"$VARS"; then
   echo "ansible play OK"
+  # provisioning succeeded — now destroy the persistent /boot secret (the /run
+  # copy is dropped by the EXIT trap). On failure fail() exits with /boot intact
+  # so the stamp-guarded re-run retries without a human re-dropping the file.
+  shred -u "$SRCVARS" 2>/dev/null || rm -f "$SRCVARS" || true
+  sync
 else
   fail "ANSIBLE PLAY FAILED"
 fi
 
-# ── secrets cleanup is handled by the EXIT trap (tmpfs copy shredded on any ──
-# exit; the persistent /boot copy was already shredded up front). Nothing to do
-# here beyond stamping success.
+# ── secrets cleanup: the /run tmpfs copy is dropped by the EXIT trap on any ──
+# exit; the persistent /boot copy was shredded above only after the play
+# succeeded. Nothing to do here beyond stamping success.
 
 # ── stamp + self-disable ────────────────────────────────────────────────────
 echo "stamping done + disabling unit"
