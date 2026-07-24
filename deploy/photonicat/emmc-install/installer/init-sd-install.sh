@@ -31,7 +31,7 @@ BASE=/opt/pcat-install
 IMG_ZST="$BASE/golden.img.zst"
 SHA="$BASE/golden.img.zst.sha256"       # sha256 of the DECOMPRESSED image
 LCD="$BASE/lcd/pcat_lcd.py"
-STAMP="$BASE/.installed"
+STAMP=/run/pcat-install.done   # tmpfs — cleared every power-on so the card re-flashes each fresh boot (reusable fleet tool); only guards a within-boot double-run
 LOG=/var/log/pcat-install.log
 exec >>"$LOG" 2>&1
 echo "=== pcat init-SD install $(date -Is) ==="
@@ -102,9 +102,12 @@ TARGET="/dev/$EMMC_NAME"
 [ "$EMMC_NAME" = "$ROOT_DISK" ] && fail "REFUSE FLASH BOOT DISK"
 echo "eMMC target = $TARGET"
 
-# ── guard: already flashed this card? ───────────────────────────────────────
+# ── guard: already flashed THIS BOOT? (stamp lives in /run, gone next power-on)
+# The card is a reusable fleet tool: every fresh power-on re-flashes whatever
+# eMMC is present, so one card serves hundreds of boxes. This guard only stops a
+# within-boot double-run (e.g. a systemd restart), never the next box.
 if [ -e "$STAMP" ]; then
-  echo "stamp present — already flashed, powering off"
+  echo "stamp present this boot — already flashed, powering off"
   lcd done
   sleep 3
   poweroff

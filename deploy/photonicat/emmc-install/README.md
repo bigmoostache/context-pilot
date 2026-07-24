@@ -196,6 +196,10 @@ Physical recovery fallbacks:
     unreachable after it boots off eMMC.
 11. **Clock / TLS on enrol** → NTP wait + 5× retry so a wrong RTC doesn't break
     the Tailscale enrol (`x509: not yet valid`).
+12. **One card, many boxes** → the installer's done-stamp lives in `/run` (tmpfs),
+    not on the card, so every fresh power-on re-flashes whatever eMMC is present.
+    One init-SD serves the whole fleet; re-powering a box with the card still in
+    is a harmless idempotent re-flash (same golden bytes, sha256 verify passes).
 
 ## Open items before a real run
 

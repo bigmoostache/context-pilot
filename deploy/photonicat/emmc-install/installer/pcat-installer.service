@@ -5,15 +5,17 @@
 # rootfs) but does NOT need the network — the whole install is offline. Python3 +
 # spidev are on the init-SD image for the LCD painter.
 #
-# The script stamps /opt/pcat-install/.installed and powers off on success, so
-# this unit effectively runs once per card; leaving the init-SD in across a
-# reboot is safe (stamp guard + the script just powers off again).
+# The script stamps /run/pcat-install.done (tmpfs) and powers off on success.
+# Because the stamp lives in /run it is gone on the next power-on, so the SAME
+# card re-flashes each fresh boot — a reusable fleet tool for hundreds of boxes.
+# Leaving the card in across a reboot just re-flashes the same golden bytes
+# (idempotent no-op, sha256 verify still passes).
 
 [Unit]
 Description=Photonicat zero-touch eMMC installer (init-SD)
 After=local-fs.target
 # Offline install — deliberately no network dependency.
-ConditionPathExists=!/opt/pcat-install/.installed
+ConditionPathExists=!/run/pcat-install.done
 
 [Service]
 Type=oneshot
