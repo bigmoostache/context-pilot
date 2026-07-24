@@ -10,7 +10,6 @@
 //! client and fetches the data via `GET /api/providers` — zero hardcoded model
 //! lists in TypeScript.
 
-use cp_base::config::global;
 use serde::Serialize;
 
 use crate::transport::rest;
@@ -425,10 +424,18 @@ fn has_param(query: &str, key: &str) -> bool {
 /// configured; the Claude Code OAuth backends instead need a present,
 /// non-expired credentials file (provisioned out-of-band — see
 /// `deploy/ansible/claude-oauth.yml`).
+///
+/// Key presence is resolved through the [`cp_vault`] credential vault — the same
+/// store the settings page writes to (`vault.set()`). This matters because the
+/// vault reflects keys added **at runtime** (in-memory override + a direct
+/// re-read of `~/.context-pilot/.env`), whereas `global::has_api_key` only sees
+/// process env vars loaded by dotenvy at boot. Reading the vault here keeps the
+/// picker in sync with the key manager without requiring an orchestrator
+/// restart.
 fn provider_usable(id: &str) -> bool {
     match id {
         "claudecode" | "claudecodev2" => oauth_creds::claude_oauth_available(),
-        _ => provider_key_name(id).is_some_and(global::has_api_key),
+        _ => provider_key_name(id).is_some_and(|key| cp_vault::vault().get(key).is_some()),
     }
 }
 
