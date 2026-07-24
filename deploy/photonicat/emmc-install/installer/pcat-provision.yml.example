@@ -1,0 +1,35 @@
+# pcat-provision.yml — Model A self-provision secrets, consumed by
+# pcat-provision.sh as `ansible-playbook -e @/boot/pcat-provision.yml`.
+#
+# THIS IS ANSIBLE EXTRA-VARS (YAML), not a shell env file. Copy to a gitignored
+# local file, fill in real keys, and inject it at build time via
+#   build-golden-image.sh  PROVISION_VARS=/path/to/pcat-provision.yml
+# It lands on the boot partition and is SHREDDED by pcat-provision.sh right after
+# a successful install (same lifecycle as pcat-ts-authkey). NEVER commit real values.
+
+# Client admin account seeded into Context Pilot (a random 20-char password is
+# generated per box and written to the on-box delivery sheet unless you pin one).
+cp_admin_email: "admin@example.com"
+# cp_admin_password: "…"            # optional — leave unset for a random one
+# cp_superadmin_email: "vendor@context-pilot.internal"   # optional override
+
+# Provider / integration API keys installed into providers.env on the box.
+# List only what this fleet should have. The GitHub release + Caddy are PUBLIC,
+# so NO GitHub token is required here.
+cp_provider_keys:
+  ANTHROPIC_API_KEY: "sk-ant-REPLACE-ME"
+  # Search / OCR / embeddings / scrape integrations (fill the ones this fleet uses):
+  BRAVE_API_KEY: "REPLACE-ME"
+  DATALAB_API_KEY: "REPLACE-ME"
+  VOYAGE_API_KEY: "REPLACE-ME"
+  FIRECRAWL_API_KEY: "REPLACE-ME"
+  # Other pass-through names the orchestrator understands:
+  # DEEPSEEK_API_KEY / GROQ_API_KEY / XAI_API_KEY / MINIMAX_API_KEY / GITHUB_TOKEN
+
+# Which Context Pilot release to install ('latest', a tag like 'v0.3.0', or
+# 'local' to use a bundle baked next to the playbook).
+release: "latest"
+
+# Build + install the Photonicat GC9307 mini-display driver (compiles from
+# source — the slow part of provisioning). Set false to skip.
+install_display: true

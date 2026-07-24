@@ -55,7 +55,10 @@ emmc-install/
 │   └── pcat-firstboot.service      systemd oneshot (self-disabling)
 ├── installer/
 │   ├── init-sd-install.sh          runs ON the init-SD: flash eMMC + verify + poweroff
-│   └── pcat-installer.service      systemd oneshot
+│   ├── pcat-installer.service      systemd oneshot
+│   ├── pcat-provision.sh           runs ON the eMMC box: ansible -c local self-install + shred
+│   ├── pcat-provision.service      systemd oneshot (after firstboot + network)
+│   └── pcat-provision.yml.example  admin email + cp_provider_keys template
 ├── build/
 │   ├── build-golden-image.sh       clone asterix SD → shrink → seed → compress
 │   └── build-init-sd.sh            write base Debian + seed installer payload
@@ -91,6 +94,19 @@ sudo ./build/build-golden-image.sh
 ```
 
 Output: `golden.img.zst`, `.sha256`, `.img-size`.
+
+To make the box **self-install Context Pilot** on first boot (Stage 4), also
+pass `PROVISION_VARS=` pointing at a filled `installer/pcat-provision.yml`
+(admin email + `cp_provider_keys`). The build bakes the `deploy/ansible` tree +
+an ansible runtime into the image and writes the secrets onto the boot
+partition (shredded on the box after install):
+
+```bash
+SRC_DISK=/dev/mmcblk1 OUT=/mnt/scratch/pcat-golden \
+PUBKEY=/path/to/operator_key.pub TS_AUTHKEY='tskey-auth-...' \
+PROVISION_VARS=/path/to/pcat-provision.yml \
+sudo ./build/build-golden-image.sh
+```
 
 ### Stage 2 — build the init-SD (once per installer card)
 
@@ -133,9 +149,38 @@ sudo ./build/build-init-sd.sh
    - **writes `/root/ACCESS.txt`** (step 7b): hostname, LAN IP, Tailscale IP, and
      ready-to-paste ssh lines, so the first login has the exact coordinates.
 
-### Stage 4 — Context Pilot provisioning (control node, one command)
+### Stage 4 — Context Pilot provisioning (automatic, on the box)
 
-From your machine (SSH key already baked in, so no `ssh-copy-id`):
+If the golden image was built with `PROVISION_VARS=` (see Stage 1), the box
+**installs Context Pilot itself** on first boot — no control node, no manual
+step. A `pcat-provision.service` runs *after* `firstboot-emmc.sh` (identity +
+tailscale done) and after the network is up, executing the existing playbook
+against localhost:
+
+```bash
+ansible-playbook -c local -i 'localhost,' /opt/pcat-provision/ansible/site.yml \
+  -e @/boot/pcat-provision.yml
+```
+
+The LCD shows `INSTALLING CONTEXT PILOT` during the run (release download +
+Caddy + compiling the GC9307 driver — minutes). On success the service shreds
+`/boot/pcat-provision.yml` (so a pulled eMMC can't leak the provider keys),
+stamps `/var/lib/pcat-provision.done`, and self-disables. On failure it leaves
+the box **up and reachable** (both SSH planes stay live) with the error on the
+LCD and the log at `/var/log/pcat-provision.log` for a re-run.
+
+`/boot/pcat-provision.yml` is Ansible **extra-vars (YAML)** — see
+`installer/pcat-provision.yml.example`. It carries the client `cp_admin_email`
+and the `cp_provider_keys` dict. Any key name the orchestrator understands rides
+in that dict verbatim (`providers.env.j2` writes each entry):
+`ANTHROPIC_API_KEY`, `BRAVE_API_KEY`, `DATALAB_API_KEY`, `VOYAGE_API_KEY`,
+`FIRECRAWL_API_KEY`, plus `DEEPSEEK/GROQ/XAI/MINIMAX/GITHUB_TOKEN`. The GitHub
+release + Caddy are **public**, so no GitHub token is needed just to install.
+
+#### Fallback — provision from a control node (manual)
+
+If you built the image **without** `PROVISION_VARS` (bare Debian), provision
+later from any machine with the SSH key (baked in, so no `ssh-copy-id`):
 
 ```bash
 cd deploy/ansible
@@ -200,6 +245,11 @@ Physical recovery fallbacks:
     not on the card, so every fresh power-on re-flashes whatever eMMC is present.
     One init-SD serves the whole fleet; re-powering a box with the card still in
     is a harmless idempotent re-flash (same golden bytes, sha256 verify passes).
+13. **Context Pilot install needs a control node** → eliminated for the common
+    case: with `PROVISION_VARS` baked in, `pcat-provision.service` runs the
+    Ansible play `-c local` against the box itself on first boot (own phase, own
+    timeout, own LCD state), then shreds the secrets. No control node, no manual
+    step. The push-from-control-node path stays as a fallback for bare images.
 
 ## Open items before a real run
 
@@ -210,3 +260,7 @@ Physical recovery fallbacks:
 - **Done:** reusable tagged Tailscale enroll key minted (`tag:pcat`, 90-day),
   `tag:pcat` added to `tagOwners`, and the ssh `accept` rule for `dst: tag:pcat`
   installed in the ACL (all verified live).
+- **Done:** on-box self-provision of Context Pilot (`pcat-provision.service` +
+  `pcat-provision.sh`, ansible tree baked into the image, secrets on `/boot`
+  shredded after install). Fill `installer/pcat-provision.yml` and pass
+  `PROVISION_VARS=` to the golden build.

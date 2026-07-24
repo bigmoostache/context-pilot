@@ -34,6 +34,16 @@ ROOT_PARTNO="${ROOT_PARTNO:-2}"            # rootfs partition number
 SHRINK_SLACK_MB="${SHRINK_SLACK_MB:-1500}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
+# ── Model A self-provision (optional): bake the Ansible tree + a runtime + the
+# provision unit into the golden image so each box installs Context Pilot itself
+# on first boot. PROVISION_VARS points at a pcat-provision.yml (admin email +
+# provider keys + release tag); it is written to the BOOT partition and shredded
+# on the box after a successful install. Unset PROVISION_VARS to skip entirely
+# (image comes up as a bare Debian box, provisioning done later by hand).
+ANSIBLE_DIR="${ANSIBLE_DIR:-$HERE/../../../ansible}"   # deploy/ansible tree
+PROVISION_VARS="${PROVISION_VARS:-}"                    # path to pcat-provision.yml
+INSTALL_ANSIBLE="${INSTALL_ANSIBLE:-1}"                # chroot-install ansible into image
+
 # ── preflight: required tools ───────────────────────────────────────────────
 for t in dd losetup e2fsck resize2fs dumpe2fs sgdisk zstd sha256sum truncate partx; do
   command -v "$t" >/dev/null 2>&1 || { echo "MISSING TOOL: $t"; exit 1; }
@@ -102,6 +112,46 @@ install -Dm644 "$HERE/../firstboot/pcat-firstboot.service" \
   "$MNT/etc/systemd/system/pcat-firstboot.service"
 ln -sf ../pcat-firstboot.service \
   "$MNT/etc/systemd/system/multi-user.target.wants/pcat-firstboot.service"
+
+# ── Model A self-provision payload (optional): bake the Ansible tree + wrapper +
+# unit so the box installs Context Pilot itself on first boot. Skipped entirely
+# when PROVISION_VARS is unset AND the ansible tree is absent (bare-Debian image).
+if [ -n "$PROVISION_VARS" ] || [ -d "$ANSIBLE_DIR" ]; then
+  if [ -d "$ANSIBLE_DIR" ]; then
+    echo "seeding self-provision payload from $ANSIBLE_DIR"
+    install -d "$MNT/opt/pcat-provision"
+    # the whole deploy/ansible tree (playbook + tasks + templates) — NOT secret
+    cp -a "$ANSIBLE_DIR/." "$MNT/opt/pcat-provision/ansible/"
+    # strip any operator-local secret files that may sit in the tree (*.local.yml)
+    find "$MNT/opt/pcat-provision/ansible" -name '*.local.yml' -delete 2>/dev/null || true
+    install -Dm755 "$HERE/../installer/pcat-provision.sh" \
+      "$MNT/opt/pcat-provision/pcat-provision.sh"
+    install -Dm644 "$HERE/../installer/pcat-provision.service" \
+      "$MNT/etc/systemd/system/pcat-provision.service"
+    ln -sf ../pcat-provision.service \
+      "$MNT/etc/systemd/system/multi-user.target.wants/pcat-provision.service"
+    # the painter lives under /opt/pcat-install on the init-SD, but the eMMC clone
+    # has no init-SD payload — ship the painter here too so the LCD state works.
+    install -Dm755 "$HERE/../lcd/pcat_lcd.py" "$MNT/opt/pcat-install/lcd/pcat_lcd.py"
+    # chroot-install the ansible runtime so `ansible-playbook -c local` exists on
+    # the box (missing = the provision unit fails loud, box stays reachable).
+    if [ "$INSTALL_ANSIBLE" = "1" ] && command -v chroot >/dev/null 2>&1; then
+      for d in dev proc sys; do mount --bind "/$d" "$MNT/$d" 2>/dev/null || true; done
+      cp /etc/resolv.conf "$MNT/etc/resolv.conf" 2>/dev/null || true
+      chroot "$MNT" /bin/bash -c '
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update -y &&
+        apt-get install -y --no-install-recommends ansible git curl ca-certificates
+      ' || echo "WARNING: ansible install in chroot failed — provisioning will no-op until installed"
+      for d in dev proc sys; do umount "$MNT/$d" 2>/dev/null || true; done
+    else
+      echo "NOTE: skipping ansible chroot-install (INSTALL_ANSIBLE=$INSTALL_ANSIBLE) — ensure the base image has ansible"
+    fi
+  else
+    echo "WARNING: PROVISION_VARS set but ANSIBLE_DIR $ANSIBLE_DIR missing — no payload seeded"
+  fi
+fi
+
 # operator ssh key -> root, and allow key-only root login
 install -Dm600 /dev/null "$MNT/root/.ssh/authorized_keys"
 cat "$PUBKEY" >>"$MNT/root/.ssh/authorized_keys"
@@ -117,16 +167,31 @@ umount "$MNT"
 # The tailscale key must survive the /boot mount at runtime, so write it onto
 # the BOOT partition itself (label 'boot'), NOT the rootfs /boot dir (which the
 # boot partition mounts over, hiding anything beneath — the v1 shadow bug).
-if [ -n "$TS_AUTHKEY" ]; then
+# The tailscale key AND the self-provision secrets must survive the /boot mount
+# at runtime, so write them onto the BOOT partition itself (label 'boot'), NOT
+# the rootfs /boot dir (which the boot partition mounts over, hiding anything
+# beneath — the v1 shadow bug). Both are SHREDDED on the box after use
+# (pcat-ts-authkey after tailscale enrol; pcat-provision.yml after the install).
+if [ -n "$TS_AUTHKEY" ] || [ -n "$PROVISION_VARS" ]; then
   BOOTP="${LOOP}p${BOOT_PARTNO}"
   if [ -e "$BOOTP" ]; then
     mount "$BOOTP" "$MNT"
-    printf '%s' "$TS_AUTHKEY" >"$MNT/pcat-ts-authkey"
-    chmod 600 "$MNT/pcat-ts-authkey"
+    if [ -n "$TS_AUTHKEY" ]; then
+      printf '%s' "$TS_AUTHKEY" >"$MNT/pcat-ts-authkey"
+      chmod 600 "$MNT/pcat-ts-authkey"
+      echo "tailscale key written to boot partition p${BOOT_PARTNO}"
+    fi
+    if [ -n "$PROVISION_VARS" ]; then
+      if [ -r "$PROVISION_VARS" ]; then
+        install -m600 "$PROVISION_VARS" "$MNT/pcat-provision.yml"
+        echo "provision secrets written to boot partition p${BOOT_PARTNO}"
+      else
+        echo "WARNING: PROVISION_VARS $PROVISION_VARS not readable — secrets NOT seeded"
+      fi
+    fi
     umount "$MNT"
-    echo "tailscale key written to boot partition p${BOOT_PARTNO}"
   else
-    echo "WARNING: boot partition $BOOTP not found — key NOT seeded"
+    echo "WARNING: boot partition $BOOTP not found — key/secrets NOT seeded"
   fi
 fi
 rmdir "$MNT"

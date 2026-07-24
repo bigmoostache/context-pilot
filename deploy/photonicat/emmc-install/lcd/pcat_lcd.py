@@ -29,7 +29,7 @@ RST=GPIO122, DC=GPIO121, CS=GPIO13 (vendor UseCS=false), BL=PWM. Geometry
 172x320, rotation 180 => MADCTL 0x48 (MX|BGR), column offset 34, row offset 0.
 
 Usage (per state; one-shot process each):
-    pcat_lcd.py flashing 43 | verify | done | error "msg"
+    pcat_lcd.py flashing 43 | verify | provisioning | done | error "msg"
 """
 
 from __future__ import annotations
@@ -308,6 +308,16 @@ def _screen_verify(p: Panel) -> None:
     p.text("CHECKSUM", 20, 160, WHITE, scale=2)
 
 
+def _screen_provisioning(p: Panel) -> None:
+    # Shown while pcat-provision.service runs the local Ansible play (download
+    # release + Caddy, seed admin, compile the display driver). Minutes-long,
+    # so a static "working" screen is enough — no percentage is available.
+    p.clear(BLACK)
+    p.text("INSTALLING", 8, 110, AMBER, scale=2)
+    p.text("CONTEXT PILOT", 8, 150, AMBER, scale=1)
+    p.text("PLEASE WAIT", 20, 210, WHITE, scale=1)
+
+
 def _screen_done(p: Panel) -> None:
     p.clear(BLACK)
     p.text("DONE", 40, 110, GREEN, scale=4)
@@ -339,6 +349,8 @@ def main(argv: list[str]) -> int:
             _screen_flashing(panel, int(argv[2]) if len(argv) > 2 else 0)
         elif state == "verify":
             _screen_verify(panel)
+        elif state == "provisioning":
+            _screen_provisioning(panel)
         elif state == "done":
             _screen_done(panel)
         elif state == "error":

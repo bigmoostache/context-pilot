@@ -443,26 +443,28 @@ b5af3513e41563ec:
   - philosophy
   last_edited_ms: 1784576922310
 b63f42389e433d93:
-  tl_dr: T656 Photonicat zero-touch eMMC install system BUILT (deploy/photonicat/emmc-install/, 7 files, plan/build tooling only). tag:pcat added to tailnet ACL tagOwners (verified). Full design/facts/file-map in body.
+  tl_dr: T656 Photonicat zero-touch eMMC install system BUILT (deploy/photonicat/emmc-install/, plan/build tooling only). Now ALSO self-provisions Context Pilot on-box (Model A). tag:pcat in ACL. Full design/facts/file-map in body.
   contents: |-
     T656 — zero-touch Debian-to-eMMC install for Photonicat 2 fleet.
 
     DESIGN: drop armbian-install (interactive, no unattended). Clone asterix's proven Debian SD into a shrunk golden eMMC image, dd it onto eMMC from an init-SD on first boot, verify, poweroff. Pull init-SD, insert prod-SD, boot eMMC Debian.
 
-    LOCKED: clone asterix Debian; backup factory OpenWrt first; control-node ansible (one command); LCD 4-state progress; reusable tagged tailscale key; operator ssh key baked in (asterix key ssh-ed25519 AAAAC3...jpEjg cpilot-agent@guillaume-macmini); hostname pcat-<serial>.
+    LOCKED: clone asterix Debian; backup factory OpenWrt first; LCD 4-state progress; reusable tagged tailscale key; operator ssh key baked in (asterix key ssh-ed25519 AAAAC3...jpEjg cpilot-agent@guillaume-macmini); hostname pcat-<serial>.
 
-    BOARD FACTS (probed asterix): RK3568 aarch64, Debian 13 trixie kernel 6.18.28. boot.scr SELF-LOCATING (part uuid mmc ${devnum}:2 uuid; root=PARTUUID=${uuid}) so clone needs NO fstab/PARTUUID rewrite. serial=21d5aefad944808f. rootfs 18G used. LCD GC9307 172x320 rot180 MADCTL 0x48 (MX|BGR) coloffset 34 rowoffset 0, SPI1.0 mode0 8bit 50MHz, RST=GPIO122 DC=GPIO121 CS=GPIO13 BL=GPIO13/PWM. growpart/resize2fs/e2fsck/sgdisk present.
+    BOARD FACTS (probed asterix): RK3568 aarch64, Debian 13 trixie kernel 6.18.28. boot.scr SELF-LOCATING (part uuid mmc ${devnum}:2 uuid; root=PARTUUID=${uuid}) so clone needs NO fstab/PARTUUID rewrite. serial=21d5aefad944808f. rootfs 18G used. LCD GC9307 172x320 rot180 MADCTL 0x48 coloffset 34, SPI1.0 mode0 8bit 50MHz, RST=GPIO122 DC=GPIO121. removable flag USELESS (both mmc=0); discriminator = /sys/block/mmcblkN/device/type (MMC vs SD) + mmcblkNboot0 sibling. growpart/resize2fs/e2fsck/sgdisk present.
 
-    FILES:
-    - lcd/pcat_lcd.py: python spidev+libgpiod GC9307 painter, 4 states, 5x7 font, init transcribed from vendor periph.io-gc9307 st7789.go. Deps python3-spidev python3-libgpiod.
-    - firstboot/firstboot-emmc.sh: eMMC first boot — regen ssh host keys, new machine-id, wipe /var/lib/tailscale, sgdisk -e + growpart + resize2fs fill 58G, hostname pcat-$SER, tailscale up --authkey=$(cat /boot/pcat-ts-authkey) --ssh, shred key, stamp+self-disable.
-    - installer/init-sd-install.sh: init-SD — guard stamp, optional OpenWrt backup, zstd -dc golden.img.zst|dd of=/dev/mmcblk0, bg LCD progress via /proc fdinfo pos, sha256 readback verify, poweroff (=done signal).
-    - build/build-golden-image.sh: clone SRC_DISK, resize2fs -M shrink+slack, seed firstboot+keys, sgdisk resize+truncate, sha256, zstd. Linux-only (asterix).
-    - build/build-init-sd.sh: write base Debian, grow, seed installer payload+golden, strip firstboot unit.
+    FILES (deploy/photonicat/emmc-install/):
+    - lcd/pcat_lcd.py: python spidev+libgpiod GC9307 painter, states flashing/verify/provisioning/done/error. v2+v1 libgpiod adapter, RK bank arithmetic chip=gpio//32 off=gpio%32 (122->chip3 off26). Deps python3-spidev python3-libgpiod.
+    - firstboot/firstboot-emmc.sh: eMMC first boot — regen ssh host keys, new machine-id, wipe /var/lib/tailscale, sgdisk -e + growpart + resize2fs fill 58G, hostname pcat-$SER, sshd+avahi (LAN plane), tailscale up --authkey=/boot/pcat-ts-authkey --ssh (5x retry+clock-wait), shred key, ACCESS.txt breadcrumb, stamp+self-disable.
+    - installer/init-sd-install.sh: init-SD flasher — stamp /run tmpfs (reusable N boxes), optional OpenWrt backup, zstd -dc golden.img.zst|dd of=eMMC (detect by device/type), bg LCD progress via /proc fdinfo pos, sha256 readback verify, poweroff.
+    - installer/pcat-provision.sh + .service: MODEL A self-provision (T658). Runs on eMMC box first boot AFTER firstboot. ansible-playbook -c local -i localhost, /opt/pcat-provision/ansible/site.yml -e @/boot/pcat-provision.yml. Own phase (slow: release dl + Caddy + GC9307 driver compile), TimeoutStartSec=2400, LCD 'INSTALLING'. Success: shred yml + stamp /var/lib/pcat-provision.done + self-disable. Fail: box stays up+reachable, log /var/log/pcat-provision.log. Public artifacts=no GitHub token.
+    - installer/pcat-provision.yml.example: ansible extra-vars YAML. cp_admin_email + cp_provider_keys dict (ANTHROPIC/BRAVE/DATALAB/VOYAGE/FIRECRAWL) + release + install_display.
+    - build/build-golden-image.sh: clone SRC_DISK, resize2fs -M shrink+slack, seed firstboot+keys, sgdisk resize+truncate, sha256, zstd. NEW: PROVISION_VARS= bakes deploy/ansible tree + ansible runtime (chroot apt) + provision payload + writes secrets on boot partition. Linux-only (asterix).
+    - build/build-init-sd.sh: write base Debian, grow, seed installer payload+golden, strip firstboot unit, mask vendor LCD (frees gpio for painter).
 
-    SECRETS: tailscale authkey NOT in git — runtime /boot/pcat-ts-authkey, shredded after enrol.
+    SECRETS: tailscale authkey + provision.yml NOT in git — runtime on /boot, shredded after use.
 
-    OPEN: mint reusable tagged tailscale key (tag:pcat now in ACL); provide base Debian image; SD access (Mac Mini no reader, asterix is build host, user giving card later).
+    MODEL A picked over B (control-node push): mirrors ts-key trust model (inject /boot, shred after). User also wants BRAVE/DATALAB/VOYAGE/FIRECRAWL keys — all fit cp_provider_keys dict, zero design change, providers.env.j2 passes through.
   importance: high
   labels:
   - photonicat
@@ -471,7 +473,7 @@ b63f42389e433d93:
   - T656
   - deploy
   - tailscale
-  last_edited_ms: 1784891862371
+  last_edited_ms: 1784912694515
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   importance: high
