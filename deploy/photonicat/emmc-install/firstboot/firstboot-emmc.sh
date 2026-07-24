@@ -97,6 +97,20 @@ else
 fi
 echo "hostname = $HOST"
 
+# ── 5b. GUARANTEE the LAN access path (plain SSH by baked key + mDNS) ────────
+# This is the access plane that does NOT depend on Tailscale (step 7 may fail if
+# the key is expired or there is no internet at boot). It must always come up:
+#   * sshd enabled + running (the baked /root/.ssh/authorized_keys authorises the
+#     operator key over the LAN);
+#   * avahi advertising <hostname>.local so the box is reachable as
+#     pcat-<serial>.local without knowing its DHCP address.
+# avahi caches the OLD hostname until restarted, so restart it AFTER the rename
+# or .local would still resolve to the stale clone name.
+echo "[5b] ensuring LAN SSH + mDNS access path"
+systemctl enable --now ssh 2>/dev/null || systemctl enable --now sshd 2>/dev/null || true
+systemctl enable --now avahi-daemon 2>/dev/null || true
+systemctl restart avahi-daemon 2>/dev/null || true
+
 # ── 6. sync the clock (a wrong RTC breaks tailscale's TLS login) ────────────
 echo "[6] syncing clock before enrol"
 timedatectl set-ntp true 2>/dev/null || true
@@ -140,6 +154,25 @@ if [ -n "$KEYFILE" ]; then
 else
   echo "no ts-authkey found (searched /boot, /boot/firmware, /etc, /var/lib/pcat) — skipping enrol"
 fi
+
+# ── 7b. write an access breadcrumb so the operator sees how to reach the box ─
+# Two independent planes are now up (LAN key-SSH via avahi, Tailscale-SSH). Record
+# every coordinate to /root/ACCESS.txt and the log so the first person in — or a
+# technician reading the console — knows exactly where to connect, without
+# guessing the DHCP lease.
+echo "[7b] writing access breadcrumb"
+LAN_IP="$(ip -4 -o addr show scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | paste -sd, -)"
+TS_IP="$(tailscale ip -4 2>/dev/null | head -1)"
+{
+  echo "host      : $HOST"
+  echo "mdns      : ${HOST}.local"
+  echo "lan_ip    : ${LAN_IP:-<none>}"
+  echo "tailscale : ${TS_IP:-<not enrolled>}"
+  echo "ssh       : ssh root@${HOST}.local   (LAN, baked key)"
+  [ -n "$TS_IP" ] && echo "ssh (ts)  : tailscale ssh root@${HOST}"
+  echo "written   : $(date -Is)"
+} >/root/ACCESS.txt 2>/dev/null || true
+cat /root/ACCESS.txt 2>/dev/null || true
 
 # ── 8. stamp + self-disable ─────────────────────────────────────────────────
 echo "[8] stamping done + disabling unit"
