@@ -32,17 +32,31 @@ for t in dd lsblk findmnt partprobe growpart e2fsck resize2fs; do
   command -v "$t" >/dev/null 2>&1 || { echo "MISSING TOOL: $t"; exit 1; }
 done
 
-# ── SAFETY: the card must be REMOVABLE, NOT the running root, NOT mounted ─────
+# ── SAFETY: the card must NOT be the running root, NOT mounted, NOT the eMMC ──
+# HARDWARE NOTE (verified live on asterix, T656): the `removable` flag is NOT a
+# reliable "is this a safe SD" signal on RK-class boards — an SD in the native
+# mmc slot reports removable=0, identical to the internal eMMC. So we do NOT
+# hard-gate on `removable` (that false-refuses a legitimate native-slot init-SD);
+# instead we use the same discriminator the on-device installer uses:
+#   * REFUSE the running-root disk (never wipe the OS we booted from);
+#   * REFUSE the eMMC — /sys/.../device/type == "MMC" (an SD reports "SD");
+#   * REFUSE any mounted disk (torn-write / wrong-target risk).
+# A USB card reader still reports removable=1 (the normal PC case); a native
+# mmc-slot SD reports removable=0 but type "SD" — allowed, with a warning so the
+# operator notices. ALLOW_NONREMOVABLE=1 remains an override for exotic readers.
 CARD_NAME="$(basename "$CARD")"
 ROOT_SRC="$(findmnt -no SOURCE / 2>/dev/null || true)"
 ROOT_DISK="$(lsblk -no pkname "$ROOT_SRC" 2>/dev/null | head -1 || true)"
 [ "/dev/$ROOT_DISK" = "$CARD" ] && { echo "REFUSE: $CARD is the running root disk"; exit 1; }
+CARD_TYPE="$(cat "/sys/block/$CARD_NAME/device/type" 2>/dev/null || echo '')"
+[ "$CARD_TYPE" = "MMC" ] && { echo "REFUSE: $CARD is the internal eMMC (device/type=MMC) — never flash the eMMC as an init-SD"; exit 1; }
 REM="$(cat "/sys/block/$CARD_NAME/removable" 2>/dev/null || echo 0)"
-if [ "$REM" != "1" ]; then
-  echo "REFUSE: $CARD is not removable (removable=$REM). This looks like an internal disk."
-  echo "Override only if you are ABSOLUTELY sure by setting ALLOW_NONREMOVABLE=1."
+if [ "$REM" != "1" ] && [ "$CARD_TYPE" != "SD" ]; then
+  echo "REFUSE: $CARD is not removable (removable=$REM) and not an SD card (device/type='$CARD_TYPE')."
+  echo "This looks like an internal disk. Override with ALLOW_NONREMOVABLE=1 only if certain."
   [ "${ALLOW_NONREMOVABLE:-0}" = "1" ] || exit 1
 fi
+[ "$REM" != "1" ] && echo "NOTE: $CARD reports removable=0 but device/type='$CARD_TYPE' (native-slot SD) — proceeding."
 if lsblk -nro MOUNTPOINT "$CARD" 2>/dev/null | grep -q .; then
   echo "REFUSE: $CARD has mounted partitions — unmount first:"; lsblk "$CARD"; exit 1
 fi
