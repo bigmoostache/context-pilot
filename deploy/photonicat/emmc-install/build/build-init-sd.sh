@@ -98,6 +98,14 @@ cp "$GOLDEN_DIR/.img-size"             "$MNT/opt/pcat-install/.img-size"
 rm -f "$MNT/etc/systemd/system/multi-user.target.wants/pcat-firstboot.service" || true
 rm -f "$MNT/etc/systemd/system/pcat-firstboot.service" || true
 
+# MASK the vendor LCD dashboard on the init-SD. It exports gpio122/121 via
+# LEGACY sysfs at boot, which makes our installer's painter fail with EBUSY
+# ("Device or resource busy") when it tries to claim the same lines via
+# libgpiod (VERIFIED live on asterix, T656). Masking frees the LCD for the
+# installer. The eMMC target clone keeps the vendor dashboard — only the
+# transient init-SD environment gives it up.
+ln -sf /dev/null "$MNT/etc/systemd/system/pcat2_mini_display.service" || true
+
 echo "=== [4] install runtime deps into the image (chroot) ==="
 # The flasher needs zstd + sgdisk + growpart; the painter needs python3 + spidev
 # + libgpiod. Missing any = silent field failure, so bake them in now. Best-

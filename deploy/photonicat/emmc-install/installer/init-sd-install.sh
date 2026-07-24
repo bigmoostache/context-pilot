@@ -64,26 +64,32 @@ ROOT_DISK="$(lsblk -no pkname "$ROOT_SRC" 2>/dev/null | head -1)"
 [ -n "$ROOT_DISK" ] || fail "CANT FIND BOOT DISK"
 echo "booted from /dev/$ROOT_DISK ($ROOT_SRC)"
 
-# ── detect the eMMC: an mmc block device that is NON-removable and is NOT the
-#    device we booted from. The eMMC is soldered (removable=0); the SD card is
-#    removable=1. This is the ONLY safe discriminator — the mmcblkN NUMBER is
-#    not stable. If we can't find exactly one candidate, we REFUSE to guess. ──
+# ── detect the eMMC and NEVER the SD we booted from ─────────────────────────
+# PROBED LIVE on asterix (T656): the `removable` flag is USELESS here — BOTH the
+# eMMC (mmcblk0) and the SD (mmcblk1) report removable=0. The real, canonical
+# discriminators for an eMMC are:
+#   1. /sys/block/mmcblkN/device/type == "MMC"  (the SD reports "SD")  ← primary
+#   2. a hardware-boot sibling /sys/block/mmcblkNboot0 exists (eMMC-only) ← backup
+# We take a candidate only if it is NOT the booted device and matches at least
+# one signal, and we REFUSE to guess if more than one qualifies. The mmcblkN
+# NUMBER is deliberately never trusted (kernel probe order isn't stable).
 detect_emmc() {
-  local d name rem
-  local found=""
+  local d name dtype found=""
   for d in /sys/block/mmcblk*; do
     [ -e "$d" ] || continue
     name="$(basename "$d")"
     [ "$name" = "$ROOT_DISK" ] && continue          # never the booted device
-    rem="$(cat "$d/removable" 2>/dev/null || echo 1)"
-    [ "$rem" = "0" ] || continue                    # eMMC is non-removable
-    # skip boot0/boot1 hardware-boot partitions, keep the main device
+    # skip the boot0/boot1/rpmb hardware partitions, keep the main device node
     case "$name" in *boot*|*rpmb*) continue;; esac
-    if [ -n "$found" ]; then
-      echo "AMBIGUOUS: both /dev/$found and /dev/$name look like eMMC" >&2
-      return 1
+    dtype="$(cat "$d/device/type" 2>/dev/null || echo '')"
+    # primary: type MMC == eMMC; backup: presence of a boot0 hardware partition
+    if [ "$dtype" = "MMC" ] || [ -e "/sys/block/${name}boot0" ]; then
+      if [ -n "$found" ]; then
+        echo "AMBIGUOUS: both /dev/$found and /dev/$name look like eMMC" >&2
+        return 1
+      fi
+      found="$name"
     fi
-    found="$name"
   done
   [ -n "$found" ] || return 1
   echo "$found"

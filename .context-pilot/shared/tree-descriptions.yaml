@@ -15366,6 +15366,10 @@ c07395815ca8865e:
   path: crates/cp-mod-firecrawl/Cargo.toml
   description: 'Firecrawl module deps: cp-base, cp-render, crossterm, reqwest, serde, serde_json, serde_yaml.'
   last_edited_ms: 0
+c084d3bb73f806e0:
+  path: deploy/photonicat/emmc-install/firstboot/pcat-firstboot.service
+  description: systemd oneshot driving firstboot-emmc.sh on the eMMC clone's first boot. After=network-online+tailscaled (step 6 enrols). Type=oneshot, RemainAfterExit=no, TimeoutStartSec=600 (clock-wait + 5x tailscale enrol retries must fit). ConditionPathExists=!/var/lib/pcat-firstboot.done; script self-disables. Enabled into golden image by build-golden-image.sh.
+  last_edited_ms: 1784893392785
 c08adb1e8799e0c1:
   path: src/llms/cache/prompt_tick_csv.rs
   description: Prompt tick CSV dumper for cache debugging. dump_prompt_tick_csv split rolling_cleanup_csvs/block_to_row/tool_result_context (A2). Writes every assembled-prompt message to .context-pilot/prompt_ticks/ each tick, keeps 20 most recent. classify_text_context tags block types.

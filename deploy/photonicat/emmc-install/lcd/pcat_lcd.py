@@ -55,10 +55,14 @@ SWRESET, SLPOUT, COLMOD = 0x01, 0x11, 0x3A
 MADCTL, INVOFF, NORON, DISPON = 0x36, 0x20, 0x13, 0x29
 CASET, RASET, RAMWR = 0x2A, 0x2B, 0x2C
 
-# RK-style line names the kernel exposes for these pins, plus the flat offsets
-# (RST=122, DC=121) as a LAST-RESORT fallback if names can't be matched.
-RST_NAME, DC_NAME = "GPIO3_C2", "GPIO3_C1"   # RK3568 bank3 C2/C1 = 122/121
-RST_OFF, DC_OFF = 122, 121
+# HARDWARE-VERIFIED (T656, live vendor process /proc/PID/fd on asterix): the
+# vendor driver holds RST=global gpio122 and DC=global gpio121, both on the
+# `2ae30000.gpio` controller = gpiochip3. The kernel exposes NO useful line
+# names here (gpioinfo shows every line `unnamed`), so name lookup is hopeless;
+# the RELIABLE mapping is RK bank arithmetic: 32 lines per bank/chip, so
+#   chip = global // 32 , offset = global % 32
+# 122 -> chip3 offset26 , 121 -> chip3 offset25 (matches the live fds exactly).
+RST_GLOBAL, DC_GLOBAL = 122, 121
 
 BLACK, WHITE = (0, 0, 0), (255, 255, 255)
 GREEN, RED, AMBER = (0x86, 0xBC, 0x6F), (0xC8, 0x50, 0x50), (0xE5, 0xC0, 0x7B)
@@ -77,36 +81,75 @@ def rgb565(rgb: tuple[int, int, int]) -> bytes:
 _HAVE_V2 = hasattr(gpiod, "request_lines") or hasattr(gpiod, "LineSettings")
 
 
-def _find_chip_line(name: str, fallback_off: int):
-    """Return (chip_path, offset) for a line NAME by scanning every gpiochip; if
-    no chip exposes that name, fall back to (gpiochip0, fallback_off)."""
-    import glob
+def _resolve_line(global_num: int):
+    """Map an RK global GPIO number to (chip_path, offset).
 
-    for path in sorted(glob.glob("/dev/gpiochip*")):
+    HARDWARE-VERIFIED (T656): RK banks are 32 lines each and map 1:1 onto the
+    gpiochips, so chip index = global // 32 and offset = global % 32 (gpio122 ->
+    gpiochip3 off26, confirmed against the live vendor process's open fds). We
+    still cross-check the derived chip's line count and, if the arithmetic ever
+    overshoots on an unexpected topology, walk the chips accumulating line
+    counts to find the one that owns this global number.
+    """
+    chip_idx, offset = divmod(global_num, 32)
+    cand = f"/dev/gpiochip{chip_idx}"
+
+    def _num_lines(path: str) -> int:
         try:
             if _HAVE_V2:
-                info = gpiod.Chip(path).get_info()
-                num = info.num_lines
-                chip = gpiod.Chip(path)
-                for off in range(num):
-                    if chip.get_line_info(off).name == name:
-                        return path, off
-            else:
-                chip = gpiod.Chip(path)
-                for off in range(chip.num_lines()):
-                    if chip.get_line(off).name() == name:
-                        return path, off
-        except Exception:  # noqa: BLE001 — chip probe best-effort
-            continue
-    return "/dev/gpiochip0", fallback_off
+                return gpiod.Chip(path).get_info().num_lines
+            return gpiod.Chip(path).num_lines()
+        except Exception:  # noqa: BLE001 — probe best-effort
+            return 0
+
+    # happy path: the 32-per-bank chip exists and is wide enough
+    if _num_lines(cand) > offset:
+        return cand, offset
+
+    # fallback: accumulate line counts across chips (handles non-32 banks)
+    import glob
+
+    base = 0
+    for path in sorted(glob.glob("/dev/gpiochip*")):
+        n = _num_lines(path)
+        if base <= global_num < base + n:
+            return path, global_num - base
+        base += n
+    # last resort: trust the arithmetic even if we couldn't size the chip
+    return cand, offset
 
 
 class GpioOut:
     """A single output line, libgpiod-version-agnostic."""
 
-    def __init__(self, name: str, fallback_off: int) -> None:
-        path, off = _find_chip_line(name, fallback_off)
+    def __init__(self, global_num: int) -> None:
+        path, off = _resolve_line(global_num)
         self._off = off
+        self._request(path, off, global_num)
+
+    def _request(self, path: str, off: int, global_num: int) -> None:
+        """Claim the line, defeating a stale LEGACY-sysfs export on EBUSY.
+
+        The vendor dashboard claims RST/DC through /sys/class/gpio (verified on
+        asterix); a crashed holder can leave the line exported, so a fresh
+        libgpiod request_lines fails with EBUSY (errno 16). We unexport it and
+        retry once. On the init-SD the vendor service is masked, so this is
+        belt-and-braces, not the primary fix.
+        """
+        try:
+            self._claim(path, off)
+        except OSError as exc:
+            if exc.errno != 16:  # EBUSY only
+                raise
+            try:
+                with open("/sys/class/gpio/unexport", "w") as fh:
+                    fh.write(str(global_num))
+            except Exception:  # noqa: BLE001 — best-effort
+                pass
+            time.sleep(0.2)
+            self._claim(path, off)
+
+    def _claim(self, path: str, off: int) -> None:
         if _HAVE_V2:
             settings = gpiod.LineSettings(direction=gpiod.line.Direction.OUTPUT)
             self._req = gpiod.request_lines(
@@ -141,8 +184,8 @@ class Panel:
         self.spi.open(1, 0)  # bus 1 dev 0 -> /dev/spidev1.0
         self.spi.mode = 0
         self.spi.max_speed_hz = 50_000_000
-        self._dc = GpioOut(DC_NAME, DC_OFF)
-        self._rst = GpioOut(RST_NAME, RST_OFF)
+        self._dc = GpioOut(DC_GLOBAL)
+        self._rst = GpioOut(RST_GLOBAL)
 
     def _cmd(self, c: int) -> None:
         self._dc.set(0)
