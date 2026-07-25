@@ -104,6 +104,7 @@ devis-attali-context-pilot.md
 
 # Python virtualenv (local Ansible control node)
 .venv/
+.venv*/
 
 # Ansible working inventory (real client hosts — keep only the .example tracked)
 deploy/ansible/inventory.ini

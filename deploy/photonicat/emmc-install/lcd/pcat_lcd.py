@@ -68,6 +68,38 @@ BLACK, WHITE = (0, 0, 0), (255, 255, 255)
 GREEN, RED, AMBER = (0x86, 0xBC, 0x6F), (0xC8, 0x50, 0x50), (0xE5, 0xC0, 0x7B)
 
 
+def enable_backlight() -> None:
+    """Unblank + brighten the panel backlight via sysfs (best-effort).
+
+    On the VENDOR image the backlight was already on (the vendor dashboard drove
+    it), so the painter never had to. On a plain Armbian image nothing turns it
+    on: the backlight defaults to FB_BLANK_POWERDOWN (bl_power=4) with the panel
+    dark even though our SPI pixel writes succeed — the "black screen" symptom.
+    We walk /sys/class/backlight/*, set bl_power=0 (unblank) and brightness high.
+    Any failure is swallowed: a missing/odd backlight must not abort the paint.
+    """
+    import glob
+    import os
+
+    for bl in glob.glob("/sys/class/backlight/*"):
+        try:
+            with open(os.path.join(bl, "bl_power"), "w") as fh:
+                fh.write("0")
+        except Exception:  # noqa: BLE001 — best-effort
+            pass
+        try:
+            maxb = 255
+            try:
+                with open(os.path.join(bl, "max_brightness")) as fh:
+                    maxb = int(fh.read().strip() or "255")
+            except Exception:  # noqa: BLE001
+                pass
+            with open(os.path.join(bl, "brightness"), "w") as fh:
+                fh.write(str(maxb))
+        except Exception:  # noqa: BLE001 — best-effort
+            pass
+
+
 def rgb565(rgb: tuple[int, int, int]) -> bytes:
     """Pack (R,G,B) into a big-endian RGB565 word (BGR handled by MADCTL)."""
     r, g, b = rgb
@@ -197,6 +229,7 @@ class Panel:
             self.spi.writebytes2(payload[i : i + 4096])
 
     def init(self) -> None:
+        enable_backlight()  # Armbian leaves the panel blanked; the vendor didn't
         self._rst.set(1); time.sleep(0.010)
         self._rst.set(0); time.sleep(0.050)
         self._rst.set(1); time.sleep(0.010)

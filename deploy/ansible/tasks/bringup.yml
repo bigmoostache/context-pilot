@@ -1,0 +1,120 @@
+---
+# Box bring-up: per-box identity, owned by Ansible (Armbian's first-run already
+# regenerated SSH host keys + machine-id and grew the rootfs). Runs FIRST —
+# hostname + the maintenance user are foundational and independent of the Context
+# Pilot deploy. Tailscale enrol is deliberately NOT here yet (to be added later).
+#
+# We log in as root on a freshly-flashed Armbian box (become: false); the flasher
+# injected only root's key, so this play creates the human-facing user.
+
+# ── hostname: dh-<hardware-serial> ──────────────────────────────────────────
+- name: Read the hardware serial from the device tree
+  ansible.builtin.slurp:
+    src: /proc/device-tree/serial-number
+  register: _dt_serial
+  failed_when: false
+
+- name: Read machine-id (hostname fallback source)
+  ansible.builtin.slurp:
+    src: /etc/machine-id
+  register: _machine_id
+  failed_when: false
+
+- name: Derive the serial (device-tree, alnum only)
+  ansible.builtin.set_fact:
+    box_serial: "{{ (_dt_serial.content | b64decode | regex_replace('[^0-9A-Za-z]', '')) if (_dt_serial.content is defined) else '' }}"
+
+- name: Compute the final hostname (prefix-serial, else machine-id fallback)
+  ansible.builtin.set_fact:
+    box_hostname: "{{ box_hostname_prefix }}-{{ box_serial if (box_serial | length > 0) else ((_machine_id.content | default('') | b64decode | trim)[:12]) }}"
+
+- name: Set the system hostname
+  ansible.builtin.hostname:
+    name: "{{ box_hostname }}"
+
+- name: Map 127.0.1.1 to the hostname in /etc/hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1\b'
+    line: "127.0.1.1\t{{ box_hostname }}"
+    state: present
+
+- name: Report the hostname
+  ansible.builtin.debug:
+    msg: "hostname set to {{ box_hostname }}"
+
+# ── bootstrap package tooling ───────────────────────────────────────────────
+- name: Bootstrap python3-apt so the ansible apt module works on minimal images
+  # The ansible.builtin.apt MODULE (used later, e.g. tasks/display.yml) needs
+  # python3-apt on the TARGET; a minimal Armbian image may not ship it. Install it
+  # up front with apt-get (which needs nothing pre-installed) so every later apt
+  # task works. shell (not command) is required for the `&&`; creates-guarded so
+  # it is idempotent.
+  ansible.builtin.shell: apt-get update && apt-get install -y --no-install-recommends python3-apt  # noqa: command-instead-of-module
+  args:
+    creates: /usr/lib/python3/dist-packages/apt/__init__.py
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+  changed_when: true
+
+# ── maintenance user (key-based login, passwordless sudo) ────────────────────
+- name: Ensure sudo is installed (minimal Armbian may lack it)
+  # Deliberately apt-get, not the apt module: the ansible.builtin.apt module
+  # requires python3-apt on the target, which a minimal Armbian image may not
+  # have — apt-get + a creates guard works with nothing pre-installed. # noqa: command-instead-of-module
+  ansible.builtin.command: apt-get install -y --no-install-recommends sudo
+  args:
+    creates: /usr/bin/sudo
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+  when: box_user_sudo | bool
+
+- name: Create the maintenance user ({{ box_username }})
+  ansible.builtin.user:
+    name: "{{ box_username }}"
+    shell: /bin/bash
+    create_home: true
+    groups: "{{ ['sudo'] if (box_user_sudo | bool) else omit }}"
+    append: true
+    password: "{{ box_user_password_hash if (box_user_password_hash | length > 0) else omit }}"
+
+- name: Reuse root's injected key for the user when none is given
+  ansible.builtin.slurp:
+    src: /root/.ssh/authorized_keys
+  register: _root_authkeys
+  failed_when: false
+  when: box_user_ssh_key | length == 0
+
+- name: Resolve the user's authorized key (explicit, else root's)
+  ansible.builtin.set_fact:
+    _user_key: "{{ box_user_ssh_key if (box_user_ssh_key | length > 0) else (_root_authkeys.content | default('') | b64decode) }}"
+
+- name: Create the user's ~/.ssh
+  ansible.builtin.file:
+    path: "/home/{{ box_username }}/.ssh"
+    state: directory
+    owner: "{{ box_username }}"
+    group: "{{ box_username }}"
+    mode: "0700"
+  when: _user_key | trim | length > 0
+
+- name: Install the SSH key for the user
+  ansible.builtin.copy:
+    dest: "/home/{{ box_username }}/.ssh/authorized_keys"
+    content: "{{ _user_key | trim }}\n"
+    owner: "{{ box_username }}"
+    group: "{{ box_username }}"
+    mode: "0600"
+  when: _user_key | trim | length > 0
+
+- name: Passwordless sudo for the maintenance user (key-only login stays usable)
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/90-{{ box_username }}"
+    content: "{{ box_username }} ALL=(ALL) NOPASSWD:ALL\n"
+    mode: "0440"
+    validate: "visudo -cf %s"
+  when: box_user_sudo | bool
+
+- name: Report the maintenance user
+  ansible.builtin.debug:
+    msg: "user {{ box_username }} created (sudo={{ box_user_sudo | bool }}, key={{ (_user_key | trim | length > 0) | ternary('installed', 'none') }})"
