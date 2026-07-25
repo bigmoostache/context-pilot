@@ -91,7 +91,14 @@ pub fn get_settings(state: &Mutex<Backend>, auth_user: Option<&User>) -> HttpRep
     let (auth_enabled, access_control) =
         state.lock().map(|b| (b.auth.is_some(), b.access_control)).unwrap_or((false, false));
     let providers: Vec<serde_json::Value> =
-        LLM_PROVIDERS.iter().map(|id| serde_json::json!({ "id": id, "configured": global::has_api_key(id) })).collect();
+        // Resolve via the vault (not `global::has_api_key`) so a key added at
+        // runtime through the settings page shows as configured without an
+        // orchestrator restart. LLM_PROVIDERS ids are already vault canonical
+        // names (e.g. "xai").
+        LLM_PROVIDERS
+            .iter()
+            .map(|id| serde_json::json!({ "id": id, "configured": cp_vault::vault().get(id).is_some() }))
+            .collect();
     HttpReply::ok(&serde_json::json!({
         "default_provider": global::get_setting(DEFAULT_PROVIDER),
         "default_model": global::get_setting(DEFAULT_MODEL),
