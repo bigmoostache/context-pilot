@@ -55,6 +55,10 @@
     # Without pcat-manager the driver can't read the DC rail, so it treats the box
     # as "on battery" and blanks the LCD after the 60s battery dimmer. Stretch it.
     cp_display_battery_dimmer_seconds: "{{ display_battery_dimmer_seconds | default(86400) }}"
+    # ── 5G modem toolbox (Quectel RM520N-GL) ──
+    # Installs the modem tooling only (mmcli/qmicli/mbimcli/picocom) so we can talk
+    # to the modem. WAN config (APN, failover routing) is left for later.
+    cp_install_modem: "{{ install_modem | default(true) | bool }}"
   tasks:
     - name: Bring up box identity (hostname dh-<serial> + maintenance user)
       ansible.builtin.include_tasks: tasks/bringup.yml
@@ -75,3 +79,6 @@
     - name: Install the Photonicat mini-display driver (GC9307 SPI LCD)
       ansible.builtin.include_tasks: tasks/display.yml
       when: cp_install_display | bool
+    - name: Install the 5G modem toolbox (Quectel RM520N-GL)
+      ansible.builtin.include_tasks: tasks/modem.yml
+      when: cp_install_modem | bool
