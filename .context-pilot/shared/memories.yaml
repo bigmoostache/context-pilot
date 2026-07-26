@@ -119,7 +119,7 @@
   - tailscale
   - acl
   - T656
-  last_edited_ms: 0
+  last_edited_ms: 1784895558723
 39fb5c175c7b00ba:
   tl_dr: ALWAYS communicate with the user in ENGLISH. Refuse to speak French. If the user writes in French, politely refuse and ask them to switch to English. (User's explicit standing instruction, T655.)
   importance: critical
@@ -127,7 +127,7 @@
   - user-preference
   - language
   - communication
-  last_edited_ms: 0
+  last_edited_ms: 1784886789294
 3d36396d2a618055:
   tl_dr: NEVER touch temp_1.md or temp_2.md — they are user's personal files. Do not read, write, edit, or revert them.
   importance: critical
@@ -497,7 +497,7 @@ b63f42389e433d93:
   - T656
   - deploy
   - tailscale
-  last_edited_ms: 0
+  last_edited_ms: 1784915661373
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   importance: high

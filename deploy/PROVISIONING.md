@@ -1,6 +1,6 @@
 # Provisionnement d'une box Context Pilot — procédure complète
 
-> De la box (Armbian/Debian 13, systemd) au cockpit en prod. Cible matérielle : Photonicat 2 reflashée sur l'**image officielle Armbian Debian 13**(systemd, aarch64). Flashage de l'image : `photonicat/docs/debian2-flash-protocol.md`. Détails playbook : `ansible/README.md`. Décisions & caveats : sections en bas.
+> De la box (Armbian/Debian 13, systemd) au cockpit en prod. Cible matérielle : Photonicat 2 (**RK3576**) sur l'**image officielle Armbian Debian 13** (systemd, aarch64). Flashage : **zéro-touch via `photonicat/emmc-install/`** (SD installatrice → `dd` Armbian sur l'eMMC + clé root injectée), ou manuel `photonicat/docs/debian2-flash-protocol.md`. Détails playbook : `ansible/README.md`. Décisions & caveats : sections en bas.
 
 ## Deux plans d'accès (à garder en tête)
 
@@ -33,34 +33,34 @@
 
 - Sur le tailnet. Venv + Ansible : `python3 -m venv .venv && ./.venv/bin/pip install ansible` (`.venv` gitignoré).
 
-## Phase 1 — Day-0 sur la box (Armbian Debian, manuel)
+## Phase 1 — Day-0 sur la box (Armbian Debian)
 
-1. **Flasher l'image officielle Armbian Debian 13** sur la box (procédure complète microSD/eMMC : `photonicat/docs/debian2-flash-protocol.md`), booter, puis `ssh root@<ip-lan>` (l'IP DHCP de la box sur ton réseau ; login root de l'image). Pousser ta clé (`ssh-copy-id`) ; sur un reflash, l'empreinte d'hôte change → `ssh-keygen -R <ip>` d'abord.
-2. **Installer Tailscale — dépôt apt officiel** (Debian standard, pas d'opkg/CVE) :
+**Voie recommandée — installeur eMMC zéro-touch** (`photonicat/emmc-install/`) : une SD installatrice flashe l'image Armbian pristine sur l'eMMC, **injecte la clé root**, vérifie (sha256) et s'éteint — progression sur le LCD. Retirer la SD, rallumer → la box boote Armbian sur l'eMMC (identité régénérée + rootfs agrandi par l'Armbian first-run), joignable en `ssh root@<ip-lan>`. Détails : `photonicat/emmc-install/README.md`. Sur un reflash, l'empreinte d'hôte change → `ssh-keygen -R <ip>` d'abord.
 
-   ```sh
-   curl -fsSL https://tailscale.com/install.sh | sh    # ajoute le repo + le service systemd
-   systemctl enable --now tailscaled
-   ```
-3. **Enrôler** (systemd gère le daemon, pas de service procd à poser) :
+*(Alternative manuelle : flasher via `photonicat/docs/debian2-flash-protocol.md`, booter, `ssh-copy-id`.)*
 
-   ```sh
-   tailscale up --authkey=<key> --advertise-tags=tag:cp-<client> \
-                --hostname=<unit> --ssh --accept-routes=false
-   ```
-4. La box est joignable en `<unit>.<tailnet>.ts.net`. Vérifier (console) : tag OK + **Key expiry disabled**.
+Le **hostname `dh-<serial>` et le user `dh`** ne sont PAS posés ici : c'est Ansible (`bringup`, Phase 3) qui s'en charge.
 
-> **État réel (2026-07-05)** : le premier déploiement Debian (`192.168.1.116`) a été fait en **auth par clé directe sur le LAN** (mon `id_ed25519` poussé sur la box), pas encore par le tailnet. L'overlay Tailscale ci-dessus reste la stratégie de flotte ; il a été validé bout-en-bout le 2026-06-27, mais **sur l'ancienne box OpenWrt** — le chemin apt/systemd Debian n'a pas encore été rejoué en vrai. Le break-glass LAN (clé) reste le fallback.
-
-## Phase 2 — Construire l'artefact (control node)
+**Tailscale — encore manuel** (le câblage dans Ansible `bringup` est un TODO) :
 
 ```sh
-deploy/photonicat/build.sh        # cross-compile aarch64-musl + SPA → deploy/ansible/.artifacts/ (release=local)
+curl -fsSL https://tailscale.com/install.sh | sh    # dépôt apt officiel + service systemd
+systemctl enable --now tailscaled
+tailscale up --authkey=<key> --advertise-tags=tag:cp-<client> \
+             --hostname=<unit> --ssh --accept-routes=false
 ```
 
-(ou un tag GitHub Release : `-e release=v0.x.y`.)
+La box est joignable en `<unit>.<tailnet>.ts.net`. Vérifier (console) : tag OK + **Key expiry disabled**.
 
-> ⚠️ `-e release=latest` **ne marche plus tel quel** : les GitHub Releases ne shippent plus le bundle appliance `cpilot-appliance-aarch64.tar.gz`. Tant que le workflow release n'est pas réaligné, **construire en local** et déployer avec `-e release=local`. `build.sh` bâtit la SPA via `npm run build` (Vite) — ce qui contourne aussi les erreurs `tsc -b` de type-check qui peuvent casser le build.
+> **État réel (2026-07-25)** : la chaîne **SD → eMMC → Ansible est validée bout-en-bout sur RK3576** (flash + clé root + `bringup` hostname `dh-<serial>` / user `dh` + deploy stable *et* nightly, services actifs, API 200 ; box de test `192.168.1.38` / `dh-7681f2a227e0f10d`). **Tailscale reste manuel** : l'overlay a été validé le 2026-06-27 mais **sur l'ancienne box OpenWrt** — le chemin apt/systemd Debian n'a pas encore été rejoué. Le break-glass LAN (clé) reste le fallback.
+
+## Phase 2 — Choisir la release (control node)
+
+**Voie recommandée — canal signé** : le playbook résout `channels/stable.json` (défaut) ou `nightly.json` sur la branche `channels`, épingle l'URL de l'artefact et **vérifie le sha256** au téléchargement. Rien à builder — passer `-e channel=stable` (défaut) ou `-e channel=nightly`.
+
+Alternatives : un tag précis `-e release=v0.x.y`, ou un build local `-e release=local` (via `deploy/photonicat/build.sh` → `.artifacts/`, utile en dev — bâtit la SPA par `npm run build`/Vite, ce qui contourne les erreurs `tsc -b`).
+
+> L'ancienne consigne « `release=latest` est mort → build local » est **caduque** : le canal signé est désormais la voie normale (et pointe sur des releases qui shippent bien `cpilot-linux-aarch64-musl.tar.gz`).
 
 ## Phase 3 — Déployer via Ansible (par le tailnet, ou LAN break-glass)
 
@@ -76,10 +76,10 @@ deploy/photonicat/build.sh        # cross-compile aarch64-musl + SPA → deploy/
 
    ```sh
    ./.venv/bin/ansible-playbook -i deploy/ansible/inventory.ini deploy/ansible/site.yml \
-     --limit <client> -e @deploy/ansible/<client>.local.yml -e release=local
+     --limit <client> -e @deploy/ansible/<client>.local.yml -e channel=stable
    ```
 
-   Le playbook (`site.yml`, systemd) : **fetch** (artefact, control node) → **deploy**(binaires/SPA/units systemd/Caddyfile sous `/opt/context-pilot`) → **keys** (`providers.env`) → **seed** (admin write-once + fiche `out/<unit>-admin.txt`) → **start** (units `enable`+`start`, sondes santé). Pas de manipulation de firewall/ports : l'image Armbian n'a que `:22` ouvert.
+   Le playbook (`site.yml`, systemd) : **bringup** (hostname `dh-<serial>` + user `dh` avec clé root + NOPASSWD sudo) → **fetch** (canal signé, sha256, control node) → **deploy** (binaires/SPA/units systemd/Caddyfile sous `/opt/context-pilot`) → **keys** (`providers.env`) → **seed** (admin write-once + fiche `out/<unit>-admin.txt`) → **start** (units `enable`+`start`, sondes santé) → **display** (driver LCD GC9307). Pas de manipulation de firewall/ports : l'image Armbian n'a que `:22` ouvert.
 
 ## Phase 3 bis — (optionnel) Claude Code OAuth par abonnement
 
@@ -131,14 +131,14 @@ deploy/photonicat/build.sh        # cross-compile aarch64-musl + SPA → deploy/
 - **OS = Armbian Debian 13 / systemd.** La box est reflashée sur l'image officielle Armbian ; Context Pilot tourne sous deux units systemd (`context-pilot`, `caddy`), racine `/opt/context-pilot`. (L'ancien chemin d'usine OpenWrt/procd a été retiré.)
 - **Accès distant = Tailscale.** SaaS d'abord, **Headscale en migration** (client identique → bascule = un flag `--login-server`). Nœuds **tagués par client**, **Tailscale SSH** (pas de clé distribuée), auth-key taguée **reusable → single-use** à l'industrialisation. C'est aussi une **hypothèse de sécurité du design auth** (le transport chiffré est supposé par le modèle bearer-token/CORS).
 - **Tailscale via le dépôt apt officiel Debian** (`install.sh`), service systemd `tailscaled`.
-- **Day-0 manuel d'abord** (flash + apt + enrôlement) → à scripter en `bootstrap.sh` → cuire dans une image Armbian custom (first-boot) pour qu'un flash de NOTRE image rejoigne le tailnet seul.
-- **MàJ app = push Ansible** maintenant ; **agent pull à manifeste signé** = cible long terme (scale + tolérance offline). **Signer les artefacts** (cosign/minisign) dans les deux cas.
+- **Day-0 = installeur eMMC zéro-touch** (`photonicat/emmc-install/`, RK3576 validé 2026-07-25) : SD installatrice → `dd` Armbian pristine + clé root injectée, puis Ansible (`bringup` hostname/user, deploy). Remplace le plan « scripter `bootstrap.sh` → image bakée ». **Tailscale reste à intégrer dans `bringup`** (encore manuel).
+- **MàJ app = push Ansible** pour le bootstrap ; **pull à manifeste signé = en place côté produit** (canaux `channels/*.json` + **minisign** vérifié par l'orchestrateur OTA, clé `UPDATE_PUBKEY`). Ansible vérifie le **sha256** du canal ; la vérif minisign côté Ansible reste un TODO.
 - **Secrets au lancement** (`-e @file` gitignoré), jamais commités — pas de vault (option ansible-vault dispo).
 - **Control node** : laptop maintenant → **VPS bastion tagué** quand la flotte grossit (concentre root sur toutes les box + le déchiffrement des secrets → cible à durcir).
 
 ## Caveats / landmines opérationnelles
 
-- `-e release=latest` **est mort** (le bundle appliance n'est plus publié) → **build local +** `release=local`.
+- **Releases = canal signé** : `-e channel=stable|nightly` (sha256 vérifié) est la voie normale ; `-e release=<tag>|local` restent dispo. L'ancien « `release=latest` est mort » n'est plus d'actualité.
 - **Cert maintenance / IP.** Le cert `tls internal` de Caddy est lié à l'**identité** (IP LAN + nom). Tester via l'**IP réelle** de la box, pas `127.0.0.1` (SNI/identité ≠ loopback → `tlsv1 alert internal error`). Le **nom** (`pilot.acme.fr`) est **inerte tant que le DNS client ne pointe pas dessus** — accès par IP en attendant. Nommer la box ≠ créer le DNS : prévoir l'enregistrement A côté client.
 - **Copie SPA lente.** Le déploiement ship+untar **un** tarball de \~19 Mo (`unarchive`) plutôt qu'une copie récursive par fichier (centaines de fonts KaTeX → round-trips SFTP + checksum, timeout 2 min). Lancer le playbook **en tâche de fond** (le foreground a un cap 2 min).
 - **Upgrade Tailscale.** `tailscale ssh` passe par une session gérée par `tailscaled` → redémarrer le daemon coupe la session SSH. Sous systemd, `systemctl restart tailscaled` **détache** le restart de ta session (il survit) ; via `tailscale up` interactif, préférer le LAN break-glass.
@@ -147,16 +147,16 @@ deploy/photonicat/build.sh        # cross-compile aarch64-musl + SPA → deploy/
 
 ## Reste à industrialiser (non bloquant)
 
-- [ ] Scripter la Phase 1 en `bootstrap.sh`, puis cuire dans une **image Armbian custom** (first-boot → re-join auto).
+- [x] Day-0 zéro-touch → **fait** via `photonicat/emmc-install/` (SD → eMMC + clé root, validé RK3576 2026-07-25). Reste à **archiver/épingler** l'image Armbian de base dans notre stockage.
 
-- [ ] Rejouer/valider l'enrôlement Tailscale **sur Debian/systemd** (validé jusqu'ici sur l'ancienne box OpenWrt).
+- [ ] **Intégrer l'enrôlement Tailscale dans Ansible `bringup`** (clé taguée réutilisable, `--ssh`) — encore manuel ; à rejouer/valider **sur Debian/systemd** (validé jusqu'ici sur l'ancienne box OpenWrt).
 
-- [ ] Réaligner le workflow GitHub Release pour re-publier `cpilot-appliance-aarch64.tar.gz` (sortir de `release=local`).
+- [x] Release via **canal signé** (`channels/*.json`, sha256) → **fait** (`-e channel=stable|nightly`). Sortie de `release=local` obtenue.
 
 - [ ] Révoquer les auth-keys de provisioning après usage.
 
-- [ ] Signer les artefacts (cosign/minisign) + vérif on-device.
+- [x] Signer les artefacts + vérif on-device → **fait côté produit** (minisign, orchestrateur OTA). Reste : vérif **minisign côté Ansible** (aujourd'hui sha256 seul).
 
 - [ ] Control node : passer du laptop à un VPS bastion tagué quand la flotte grossit.
 
-- [ ] Finir l'onboarding de `192.168.1.116` (actuellement `provisioned=false`, `providers.env` vide).
+- [ ] Onboarding jour-0 dans le navigateur (`:9090`) : nommer la box, pousser la CA, `Finalize` (box de test actuelle : `dh-7681f2a227e0f10d` / `192.168.1.38`, `provisioned=false`).
