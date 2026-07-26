@@ -18,6 +18,10 @@
   path: .github/workflows/release.yml
   description: 'Release workflow (push tags v*). 5-target build matrix (tui+cp-console-server) + appliance bundle (aarch64 musl: cp-orchestrator+tui+SPA) + GitHub Release. pnpm action-setup pinned to 11.6.0 (matches lockfile origin, see ci.yml).'
   last_edited_ms: 0
+0056cba797da24f9:
+  path: deploy/photonicat/emmc-install/build/build-golden-image.sh
+  description: 'Builds the golden eMMC image: dd clone SRC_DISK (asterix SD), e2fsck, resize2fs -M shrink + slack, seed firstboot unit + operator ssh pubkey + ts authkey, sgdisk resize p2/GPT, truncate, sha256, zstd. Linux-only host (asterix, NOT Mac Mini). Inputs via env: SRC_DISK/OUT/PUBKEY/TS_AUTHKEY.'
+  last_edited_ms: 1784891900725
 00579a2b586985a8:
   path: crates/cp-mod-console/src/types.rs
   description: 'Console module types. ConsoleState (sessions HashMap + next_session_id), ProcessStatus enum, SessionMeta for persistence. ConsoleWatcher: exit/pattern modes, easy_bash inline (≤150 lines AND ≤8000 bytes) vs panel, blocking/async. format_wait_result helper.'
@@ -382,6 +386,10 @@
   path: crates/cp-oplog/src/replay.rs
   description: 'Oplog replay (GAP1/I5): ReplayState{rev_head,heads,seen}. fold_entry(&mut ReplayState,&entry) pub(crate): Checkpoint=authoritative clone_from(heads+seen), MessageCreated=set_thread_head, CommandEffect|SeenMark=seen.mark(token,rev), others no-op. replay() fast-path reads ONLY newest segment when it opens with a checkpoint (Snapshot-seeded); replay_full fallback for seg-0-only. OplogResult from crate::error. Heads PartialEq order-sensitive. 10 tests incl seen-set V3 + fast==full.'
   last_edited_ms: 0
+049061fcc1c567e6:
+  path: web/src/lib/providers/topButtons/index.tsx
+  description: Top-corner buttons coordination context (navKey + bump). Mobile CornerButton re-fires icon-swap spring on each nav edge. Hook+context only; Provider in sibling file.
+  last_edited_ms: 1784893275221
 049459df21b26ae2:
   path: web/src/lib/api/index.ts
   description: 'REST API client barrel: fleet/agent/threads/panels/memory/todos/spine/queue/scratchpad/tree/callbacks/tools/radar/entities/metrics/vitals/usage/library + commands (sendCommand) + mintTicket + renameAgent (T328) + avatar CRUD (uploadAvatar/deleteAvatar/avatarUrl, T338). Re-exports ./finder + shares ./client request/BASE/envelope. The @/lib/api single import surface.'
@@ -658,6 +666,10 @@
   path: crates/cp-mod-console/src/types.rs
   description: 'Console types. ProcessStatus enum #[non_exhaustive] (A4/boss-hunt r2 win — crate-local, converted from #[expect(exhaustive_enums)]). SessionMeta, ConsoleState, ConsoleWatcher (exit/pattern, easy_bash inline vs panel overflow).'
   last_edited_ms: 1784561022895
+07e375d68e5826b0:
+  path: deploy/photonicat/emmc-install/firstboot/firstboot-emmc.sh
+  description: 'Runs on eMMC''s first boot: un-twins clone (regen ssh host keys, new machine-id, wipe /var/lib/tailscale), sgdisk -e + growpart + resize2fs to fill 58G, hostname pcat-<serial>. Step 5b GUARANTEES LAN access plane (enable sshd + avahi, restart avahi post-rename so pcat-<serial>.local resolves). Step 7 tailscale up --authkey=/boot/pcat-ts-authkey --ssh (5x retry, clock-wait) then shred key. Step 7b writes /root/ACCESS.txt breadcrumb (hostname, LAN+tailscale IPs, ssh lines). Two independent access planes: LAN key-SSH via mDNS + Tailscale-SSH. Stamp + self-disable.'
+  last_edited_ms: 1784895310113
 07f9691e993528e6:
   path: crates/cp-orchestrator/src/main.rs
   description: 'Backend entry point. Reads Config from env, prints version/protocol/agents-dir/budget/scan-interval + X896 new-agent realm root + agent binary, creates Runtime, starts driver thread, serves HTTP (blocking). `use <crate> as _` block acknowledges lib-only deps in the bin target (per-target unused-crate-dependencies forbid): incl portable_pty, calamine, csv (T282 sheet parsing — used only by the lib finder/sheet.rs, not main).'
@@ -1470,6 +1482,10 @@
   path: crates/cp-mod-threads/src/lib.rs
   description: 'Threads module. 2 tools: Send, Read. pre_flight split check_focus_enforcement + preflight_send + preflight_read helpers (A2). Focus enforcement dangling/escalation. TOOL_TEXTS LazyLock. fixed_order=5.'
   last_edited_ms: 0
+12a476cded7b353b:
+  path: web/src/components/shell/widgets/UsageButton.tsx
+  description: 'Claude Code OAuth usage button. Anthropic ''A'' logomark trigger opens popover: token status, session/weekly usage bars, LoginFlow (PKCE) with WaitingForCode extracted. Camembert conic-gradient session-% behind logo. T472 login-trap fix (baselineExpiryRef strict-advance).'
+  last_edited_ms: 1784893294161
 12c73f7fcf2884c6:
   path: web/src/lib/support/telemetry/frames.ts
   description: Long Animation Frames (LoAF) + Long Tasks telemetry producer. PerformanceObserver on 'long-animation-frame' (Chromium 123+, rich scripts[] attribution → culprit 'func @ source') with 'longtask' fallback. Records LoafEvent{duration,blockingDuration,script}/LongTaskEvent. Minimal local interfaces downcast from PerformanceEntry (not in lib.dom). Catches non-interaction render storms. Chromium-only — silent on Firefox (why the rAF stall watchdog exists).
@@ -1850,6 +1866,10 @@
   path: src/app/context/init.rs
   description: 'Context init: ensure_default_contexts (fixed panel creation, UID assignment, squatter eviction via evict_squatter/insert_fixed_panel). Re-exports agent seeds from prompt module.'
   last_edited_ms: 1784495886530
+1731cb2f47f957cc:
+  path: deploy/photonicat/emmc-install/README.md
+  description: 'Full protocol doc: why (drop armbian-install), verified board facts, file layout, 4-stage flow (golden build, init-SD build, field install, Context Pilot provisioning), 13 pre-solved frictions, open items. Stage 4 now AUTOMATIC self-provision (pcat-provision.service, ansible -c local, secrets on /boot shredded) with control-node push as fallback. Locked decisions + secrets policy.'
+  last_edited_ms: 1784912667770
 1742d19afe63d2ac:
   path: src/app/run/tools/checks.rs
   description: 'Post-tool non-blocking polls: panel readiness (5s timeout), deferred sleep timer, question form resolution. Each resumes streaming pipeline when condition met.'
@@ -3998,6 +4018,10 @@
   path: src/app/context/mod.rs
   description: Context preparation + unified freeze system. FreezeConditions (queue/tempo). Panel ordering stabilization. Per-panel content hashing + freeze budgets. Cache cost tracking via prefix-match. flame!("prepare_context"). Reverie path branches.
   last_edited_ms: 0
+327d26f31d17050a:
+  path: deploy/photonicat/emmc-install/installer/pcat-provision.yml.example
+  description: Ansible extra-vars (YAML) template for -e @/boot/pcat-provision.yml. cp_admin_email + cp_provider_keys dict (ANTHROPIC/BRAVE/DATALAB/VOYAGE/FIRECRAWL surfaced; DEEPSEEK/GROQ/XAI/MINIMAX/GITHUB_TOKEN commented) + release + install_display. Copy to gitignored local, PROVISION_VARS= at build, shredded on box after install. NEVER commit real values.
+  last_edited_ms: 1784912655465
 32ac6f83146bab6b:
   path: crates/cp-orchestrator/tests/openapi/paths.rs
   description: OpenAPI path definitions — all REST endpoints grouped by tag (fleet, agent, fs, auth, env, ACL, providers, releases, claude-usage+login+refresh). Includes deploy + restart-orchestrator paths.
@@ -4402,6 +4426,10 @@
   path: crates/cp-mod-files/src/tools/edit_file.rs
   description: 'execute_edit: replace old_string with new_string. flame!("file_edit"). Normalized matching for trailing whitespace. Unified diff display. Panel reference in LLM result. Closest-match error hints.'
   last_edited_ms: 0
+3868cf231d711613:
+  path: deploy/ansible/tasks/deploy.yml
+  description: 'Ansible: ship binaries+SPA+systemd units+Caddyfile to Armbian/Debian box under /opt/context-pilot. Does not start (start.yml does). Idempotent. Part of site.yml provisioning pipeline (fetch/deploy/keys/seed/start/display).'
+  last_edited_ms: 1784888636933
 3874011eb459f11a:
   path: sandbox/tasks/inputs/password-recovery/instruction_local.md
   description: Adapted task instruction for local CP headless run — paths relative (./varsea, ./recovered_passwords.txt) instead of /app/.
@@ -4730,6 +4758,10 @@
   path: crates/cp-base/src/tools/pre_flight.rs
   description: 'Verdict struct #[non_exhaustive] A5 (has ::new/::error/::warning builders).'
   last_edited_ms: 1784499344769
+3c6d5f6e9845b9ab:
+  path: web/src/components/auth/Onboarding.tsx
+  description: 'First-run admin onboarding: single acknowledgement that flips onboarding_completed (provider keys provisioned out-of-band, nothing to configure).'
+  last_edited_ms: 1784893275033
 3c7723e612c9754f:
   path: crates/cp-orchestrator/src/transport/rest/releases.rs
   description: 'Release management REST handlers (T427). 5 endpoints: list_releases (GET, merged local+remote+arch+active), set_arch (PUT, manual or auto-detect), download_release (POST, download+extract tarball), select_release (PUT, set active binary+supervisor), delete_release (DELETE). All pub(crate).'
@@ -4958,6 +4990,10 @@
   path: docs/rust-static-analysis-tools.md
   description: 'Comprehensive listing of Rust static analysis tools, modeled after Holzmann''s classic C tools page. Covers: compiler (rustc/clippy), commercial (CodeQL/Semgrep/Coverity/Klocwork/SonarQube/TrustInSoft), academic (Miri/Rudra/MIRAI/MirChecker/lockbud/Yuga), formal verification (Kani/Prusti/Verus/Creusot/Flux/Aeneas/hax), theory (RustBelt/Stacked Borrows), fuzzing (cargo-fuzz/bolero/proptest/loom), supply chain (cargo-audit/deny/geiger/vet/crev), CI pipeline recommendations, textbooks.'
   last_edited_ms: 0
+3f00cb7f67d2375c:
+  path: deploy/photonicat/emmc-install/firstboot/firstboot-emmc.sh
+  description: 'Runs on eMMC''s first boot: un-twins the clone (regen ssh host keys, new machine-id, wipe /var/lib/tailscale), sgdisk -e + growpart + resize2fs to fill 58G, hostname pcat-<device-tree-serial>, tailscale up --authkey=/boot/pcat-ts-authkey --ssh then shred key, stamp /var/lib/pcat-firstboot.done + self-disable.'
+  last_edited_ms: 1784891900368
 3f063b641da90997:
   path: web/src/App.tsx
   description: 'Root shell. activeAgent = useAgentMeta(activeAgentId) (delta-folded per-agent meta) ?? fleetAgent (polled-fleet identity fallback) so the always-visible TopBar + StatusBar ride the push plane for phase/cost/tokens instead of the 15s fleet poll (T297). view/agent persisted to localStorage; effectiveView falls back to fleet when no live agent. T334: finderRevealPath state + showInFinder handler switch to finder view and pass revealPath to Finder for file reveal.'
@@ -5526,6 +5562,10 @@
   path: crates/cp-orchestrator/src/transport/inspect/panels.rs
   description: 'Cockpit inspection-panel endpoints (in inspect/): memory/todos/spine/queue/scratchpad/tree/callbacks/usage/library/panel_list = tier-② disk reads reshaped to maquette JSON. PLUS tools/radar/entities = DERIVED-state endpoints that return their NORMAL EMPTY shape by design (200 [] / {anchors:[],results:[]}, NOT 404): the inspection plane structurally can''t rebuild them from tier-② files (tools catalog=compile-time module YAMLs in the agent binary; radar=live half-life log ranking; entities=open SQLite, on-disk db is 0 bytes) — agent_folder guard so an unknown id still 404s; frontend renders an honest ''unavailable over web inspection plane'' notice. Absolute crate::transport:: paths.'
   last_edited_ms: 1781820973406
+45adb4e163d9a6de:
+  path: web/src/mobile-components/agents/ClaudeUsagePage.tsx
+  description: Mobile Claude usage page — standalone full-screen iOS grouped-list (token status/expiry/refresh, usage bars, stored accounts, PKCE login) via shared useClaudeUsage hook; opened from fleet gear.
+  last_edited_ms: 1784893275932
 45bf5cbdde7d1a21:
   path: src/llms/claude_code_api_key/mod.rs
   description: Claude Code API Key implementation. API key from vault ("anthropic") with Bearer auth + Claude Code headers. Replicates Claude Code request signature for Claude 4.5 model access.
@@ -6454,6 +6494,10 @@
   path: ui/src/components/agents/FleetDashboard.tsx
   description: 'Fleet welcome dashboard — mission control + EXCLUSIVE agent create/manage surface. Centred on shared FLEET_MAX_W. Greeting, AgentCard grid (status badge + one-line task + model·cost; Open→threads, Manage→modal), New-agent card. autoCreate prop (T21): useEffect opens AgentModal in create mode then calls onAutoCreateConsumed. AgentModal (Apple-grade): gradient hero, name-as-star w/ live slugified realm preview, rich model cards, autofocus+Esc+⌘↵.'
   last_edited_ms: 1781545852612
+51000fa5041c386c:
+  path: deploy/photonicat/emmc-install/installer/pcat-provision.sh
+  description: 'Model A self-provision: runs on eMMC box first boot (pcat-provision.service), AFTER firstboot. ansible-playbook -c local -i localhost, /opt/pcat-provision/ansible/site.yml -e @/boot/pcat-provision.yml. Own phase (slow: release download + Caddy + GC9307 driver compile). LCD ''INSTALLING CONTEXT PILOT''. On success shred secrets yml + stamp /var/lib/pcat-provision.done + self-disable. On fail leave box up+reachable (both SSH planes) with error screen + /var/log/pcat-provision.log. Secrets multi-path search like ts-key. Public artifacts = no GitHub token needed.'
+  last_edited_ms: 1784912655240
 510b29f50d1352b9:
   path: crates/cp-vault/src/lib.rs
   description: 'Crate root. LazyLock global vault instance, vault() accessor. pub modules: local, oauth, registry, types. bridge module behind cfg(feature=bridge). Backend selection: CP_BRIDGE → BridgeVault, else LocalVault.'
@@ -6606,6 +6650,10 @@
   path: web/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: thread conversation + composer. segmentLog folds auto traces into AutoRun. T367/T471 OS-file drag-drop+zip. web-lint P5: isFileDrag + handleDragOver hoisted to module scope. web-lint P6: drag-depth counter ref renamed dragDepthRef (naming-convention-ref-name).'
   last_edited_ms: 1783417834268
+52d919506f82df73:
+  path: web/src/mobile-components/agents/AgentModal/controller.ts
+  description: '@generated mobile-mirror stub — re-exports desktop AgentModal controller.'
+  last_edited_ms: 1784893275311
 52e2cc2794a14c4e:
   path: .uploads/strip_ref_patterns.py
   description: 'Class-1 ref_patterns rewriter: `if let PAT(ref x)=SCRUT` -> `PAT(x)=&(SCRUT)` by clippy-reported line. 75 auto, 34 manual (match arms, ref mut, multiline).'
@@ -6706,6 +6754,10 @@
   path: .git/index
   description: Git index (binary). Not source.
   last_edited_ms: 0
+54403d55166efdd1:
+  path: deploy/photonicat/emmc-install/firstboot/pcat-firstboot.service
+  description: systemd oneshot driving firstboot-emmc.sh. After network-online+tailscaled (step 6 enrols). ConditionPathExists=!stamp, self-disabled by the script. Enabled into golden image by build-golden-image.sh.
+  last_edited_ms: 1784891900457
 546a03827d62b106:
   path: crates/cp-mod-threads/src/tools.rs
   description: 'Thread tool handlers. execute_send/execute_read/build_panel_content. T353: execute_send AUTO-UNARCHIVES archived threads. build_panel_content shows paused:true for paused threads (T371). Archived threads filtered out of LLM-facing context. YAML-structured output (T372). MAX caps on content/file-path/questions/panel-messages.'
@@ -7102,6 +7154,10 @@
   path: web/src/lib/api/generated/sdk.gen.ts
   description: Auto-generated typed SDK functions from openapi.json. One function per REST endpoint (getApiFleetMeta, getApiAgentByIdThreads, postApiAuthLogin, etc). Uses @hey-api client runtime, NOT the manual request() wrapper.
   last_edited_ms: 0
+59de66a3c7bb8c8b:
+  path: web/src/components/auth/DayZeroSetup.tsx
+  description: 'Day-0 provisioning screen (next_action=set_identity): name the box (DNS/IP) then distribute CA root; posts POST /api/it/identity, brings :443 up.'
+  last_edited_ms: 1784893275132
 59eecbdb5322736a:
   path: .git/index
   description: Git index (binary). Not source.
@@ -8162,6 +8218,10 @@
   path: crates/cp-mod-entities/src/panels/format.rs
   description: SQL result formatting shared by tools + panels. query_to_markdown (200-row cap, 0-row enrichment hint), format_cell, format_markdown_table, extract_table_name (case-insensitive byte-safe FROM scan — no to_uppercase offset bug).
   last_edited_ms: 0
+6880304ac03618ae:
+  path: .uploads/IMG_1642-ocr.md
+  description: OCR output — black/white dog in orange sunglasses on a towel. Transient upload.
+  last_edited_ms: 1784893275578
 6893744dc33373d1:
   path: web/src/components/shell/config/ReleasesPane.tsx
   description: Admin-only release management pane (T427). Architecture selector (auto-detect or manual), release cards with tag/date/size + status chips (Latest/Downloaded/Active), download/use/delete actions via generated SDK. Error state with retry button. queryFn uses responseStyle:data pattern (direct return, throwOnError handles errors). Data from GET /api/releases → ReleaseStore backend.
@@ -9974,6 +10034,10 @@
   path: crates/cp-oplog/src/error.rs
   description: 'OplogError{Io,Frame} + Display + From impls + OplogResult alias. #[expect(exhaustive_enums)] A4 registered. No std::error::Error (dodges missing_trait_methods).'
   last_edited_ms: 0
+7e1a222a1226c2bb:
+  path: web/src/components/agents/FleetDashboard.tsx
+  description: Fleet welcome dashboard (live). AgentCard reads useAgentMeta (delta-folded status dot + cost). statusMeta includes 'waiting' (Restarting). §19 HealthBadge (useMetrics). RetiredSection/RetiredCard (unretire). Create/manage via AgentModal.
+  last_edited_ms: 1784893294065
 7e287be06fea8478:
   path: src/app/run/threads/messages.rs
   description: 'Phase 2.2 (X839): live thread-message emission for the main loop. emit_messages = observe-on-change chokepoint diffing each thread''s message vector vs BridgeState.thread_msg_counts (seeded no-emit on first pass so a restarted agent doesn''t replay backlog). build_pending → JSON body {id,author,text,ts,question,fileRef}; emit_one_message stages body in content-addressed Store (I13 barrier: small=Inline rides delta, large=Spilled durable file) BEFORE submit_durable(MessageCreated{thread_id,message_id,head,inline_body}). No-op bridge-OFF. Captures messages from every source (Send tool / TUI reply / web SendMessage) via one uniform path.'
@@ -11618,6 +11682,10 @@
   path: crates/cp-mod-tree/Cargo.toml
   description: 'Tree module deps: cp-base, cp-render, crossterm, serde, serde_json, ignore, cp-mod-utilities.'
   last_edited_ms: 1780565428699
+927dfb928b0a377d:
+  path: web/src/mobile-components/shell/widgets/StoredAccounts.tsx
+  description: '@generated mobile-mirror stub — re-exports desktop StoredAccounts (rendered inside mobile ClaudeUsagePage).'
+  last_edited_ms: 1784893275844
 92888e48e287579e:
   path: crates/cp-wire/src/heartbeat.rs
   description: 'Fixed 60-byte binary liveness record. Heartbeat{schema_version,timestamp_ms,sequence,pid,boot_id} + encode/decode (LE: ver4+ts8+seq8+pid4+boot_id32+crc4) + is_fresh(saturating) + matches_boot (pid-reuse defence). u32/u64 to_le const-fn #[expect(as_conversions)] after BYTE_MASK (wire contract, to_le_bytes forbidden). HEARTBEAT_LEN=60. I/O-free.'
@@ -11686,6 +11754,10 @@
   path: web/vite.config.ts
   description: 'Vite dev config. T310: single-origin tailnet serving — server.allowedHosts:true (accept the macbook.<tailnet>.ts.net Host from `tailscale serve`''s reverse proxy, anti-DNS-rebinding relaxed since the server binds 127.0.0.1 and is exposed only over the private WireGuard tailnet) + server.proxy ''/api''→http://127.0.0.1:7878 (REST + /api/stream SSE) so the frontend uses a RELATIVE base (VITE_API_URL="" in .env.local) and the app works identically at localhost:5174 or https://<host>.ts.net (phone access) with no CORS/mixed-content. @ alias → ./src.'
   last_edited_ms: 0
+939b73293ec5a94d:
+  path: deploy/photonicat/emmc-install/README.md
+  description: 'Full protocol doc: why (drop armbian-install), verified board facts, file layout, 4-stage flow (golden build, init-SD build, field install, ansible provisioning), 9 pre-solved frictions, open items. Locked decisions + secrets policy.'
+  last_edited_ms: 1784891900904
 93b840f82dc03e9a:
   path: crates/cp-orchestrator/src/registry/tailer.rs
   description: 'Tailer — backend''s incremental, gap-free oplog consumer (poll/seed/last_rev). T309: added a per-segment BYTE cursor (last_offset) — poll() now skips segments < cursor, and for the active segment does a single stat(); if file_len<=consumed_offset NOTHING is read or parsed (the idle no-append case that previously re-read+re-deserialized the whole current segment every 100ms tick, pinning a core), else scans ONLY the appended tail bytes[offset..] (torn-tail-safe via Scan.valid_len), resetting offset to 0 on a segment roll. Re-exported from channel.rs. 5 tests.'
@@ -11798,6 +11870,10 @@
   path: ui/src/components/agents/UsagePage.tsx
   description: Cost & token analytics page (fleet 'Usage'). Reads mock usage{}. Hero stat cards (spend/tokens/cache-hit-rate/messages), spend sparkline, per-agent cost bars (proportional, fill-sweep), token-composition stacked bar, cache economics. CSS-only charts, decorative time-range toggle.
   last_edited_ms: 1781531138864
+94bec52f5767a89a:
+  path: deploy/photonicat/emmc-install/installer/pcat-installer.service
+  description: systemd oneshot driving init-sd-install.sh. Offline (After=local-fs.target, no network). TimeoutStartSec=1800. ConditionPathExists=!/run/pcat-install.done (tmpfs stamp) so the card re-flashes each fresh boot — reusable fleet tool.
+  last_edited_ms: 1784897928029
 94c9f015736f744e:
   path: crates/cp-orchestrator/src/services/cost_breaker.rs
   description: 'Phase 18: CostBreaker — durable per-agent spend breaker (R2-8/V9). Verdict{Allowed,Tripped}. observe(id,cumulative_usd) = HIGH-WATER MAX (a post-reboot cumulative-0 can''t lower the mark → trip survives crash-loop, V9). check(id): poisoned→Tripped (fail-closed under read uncertainty), spend>budget→Tripped, else Allowed (no-entry = definite-zero = Allowed, NOT fail-closed). rebuild_from_view(&MaterializedView) reconstructs trip state from durable oplog-derived cost on backend restart. poison/clear_poison for indeterminate cost. 6 tests incl V9 crash-loop latch + rebuild-after-restart.'
@@ -12058,6 +12134,10 @@
   path: crates/cp-orchestrator/src/registry/channel.rs
   description: Per-agent channel — backend read/write handle. AgentChannel (from_entry/hydrate/send/send_with_retry) + read_ack. Tailer moved to sibling tailer.rs (split for 500-line limit) and re-exported here via `pub use crate::registry::tailer::Tailer` so channel::Tailer stays valid for all call sites. 320 lines.
   last_edited_ms: 0
+97d8b32e1b4bad2e:
+  path: web/index.html
+  description: Vite HTML entry (desktop). iOS standalone meta (black-translucent status bar, viewport-fit=cover, manifest UNLINKED per T639). apple-touch-icon. Pre-paint theme-class script (FOUC guard).
+  last_edited_ms: 1784893294249
 97e600789e19c98b:
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (IR blocks → blocks_to_lines: selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (scrollable messages via scroll_offset, author/timestamp headers, content). All content through IR pipeline. Tab/Shift+Tab nav.'
@@ -12206,6 +12286,10 @@
   path: crates/cp-base/src/state/flags.rs
   description: Stream-phase state machine (Idle/Receiving/ExecutingTools), UI/config/lifecycle boolean flags, streaming-tool advisory state. StatusBools composite struct organizes all flags by domain. HighlightIrFn callback type. Secondary mode removed.
   last_edited_ms: 1784197695892
+9a3c23d3815e5dde:
+  path: deploy/photonicat/emmc-install/installer/init-sd-install.sh
+  description: The zero-touch flasher on the init-SD. Guard stamp (now /run/pcat-install.done, tmpfs — cleared every power-on so ONE card re-flashes N boxes; only blocks within-boot double-run), optional factory-OpenWrt backup, zstd -dc golden.img.zst | dd of=/dev/mmcblk0, background LCD progress (polls dd /proc fdinfo pos), sha256 readback verify, poweroff (=done signal). Error leaves board on with ERROR screen.
+  last_edited_ms: 1784897927918
 9a3dfb3caa3e5c62:
   path: web/src/lib/api/index.ts
   description: 'REST API client barrel: fleet/agent/threads/panels/memory/todos/spine/queue/scratchpad/tree/callbacks/tools/radar/entities/metrics/vitals/usage/library + commands (sendCommand) + mintTicket + renameAgent (T328) + avatar CRUD (uploadAvatar/deleteAvatar/avatarUrl, T338). Re-exports ./auth + ./finder + shares ./client request/BASE/envelope. The @/lib/api single import surface.'
@@ -12482,6 +12566,10 @@
   path: crates/cp-orchestrator/src/transport/rest/mod.rs
   description: 'REST resource handlers. fleet() filtered by auth_user ACL (FR-12). command() dispatches commands. rename_agent (T328), upload/delete avatar (T338). threads() prefers view roster. mint_ticket embeds auth_user.id (Phase 7). resolve_entry. Backend re-exported from backend.rs. Submodules: create, restart, retire, library, thread_shape, backend.'
   last_edited_ms: 1782324281383
+9e121aee3b7ebe7f:
+  path: web/scripts/gen-icons.py
+  description: 'Generates PWA/home-screen icon set from scripts/assets/app-icon-source.png (apple-touch 180, 192/512, maskable, favicon-32), compositing onto dark theme bg. Run: python3 scripts/gen-icons.py.'
+  last_edited_ms: 1784893275401
 9e202c919322b366:
   path: crates/cp-mod-brave/src/panel.rs
   description: Brave result panel. Static content persisted in metadata (META_CONTENT). Cache restore from metadata post-reload. Pagination support. BRAVE_PANEL_TYPE constant.
@@ -13482,6 +13570,10 @@ aa7622653fe04cbf:
   path: src/ui/perf/overlay.rs
   description: 'Perf overlay adapter. A6: budget-bar fill + sparkline index routed via float_math. render_op_table split (A2).'
   last_edited_ms: 0
+aa785e555ab90854:
+  path: web/src/mobile-components/threads/forms/FormWidget.tsx
+  description: Mobile FormWidget twin — routes mobile FormFields (its only fork); draft persistence, two-click incomplete-submit gate, locked receipt byte-identical to desktop.
+  last_edited_ms: 1784893276030
 aa7d4bb60801af69:
   path: web/src/components/shell/costs/CostsView.tsx
   description: Cost Analysis dashboard page. Summary cards, culprit donut, cost timeline, cost/tool/culprit-cost/max-freeze bars, two token distribution bars (panel-estimated + API-reported), Tool×Culprit cross-tab with heat-map. Tempo/queue/no-break AND-filters. Copy as Markdown button. TanStack useQuery + fetchFsPreview 15s refetch.
@@ -13698,6 +13790,10 @@ adfe8c0af4ba9bf7:
   path: web/src/lib/support/markdown.tsx
   description: 'GFM markdown renderer (react-markdown+remark-gfm+math+katex). onAccent/default variants. clipboard() guard. web-lint P5 pending: no-useless-recursion + no-array-callback-reference on extractText:39 and .map(fmtRow):115.'
   last_edited_ms: 1783412977437
+ae0d84da9e8aa50f:
+  path: web/src/mobile-components/shell/widgets/UsageButton.tsx
+  description: '@generated mobile-mirror stub — re-exports desktop UsageButton (LoginFlow reused by mobile via this token).'
+  last_edited_ms: 1784893275754
 ae116ff12ae35cfb:
   path: web/src/components/shell/StatusBar.tsx
   description: 'Bottom status footer. Fleet mode: accepts agents prop for aggregates (count, threads, needs-you, spend). Agent mode: accepts activeAgent prop, derives phase from status, wires cost live. Cache bar (cacheStats/tokenBudget) still mock.'
@@ -14686,6 +14782,10 @@ b91450545db6847c:
   path: src/app/run/tools/mod.rs
   description: 'Sub-module declarations: checks, cleanup, pipeline, queue_flush.'
   last_edited_ms: 1780651842184
+b917fe26bb227d99:
+  path: .uploads/image-2-ocr.md
+  description: OCR output — 3D cartoon man with beard/glasses pointing up. Transient upload.
+  last_edited_ms: 1784893275490
 b92c4c51d2a37642:
   path: src/modules/mod.rs
   description: Module registry. 20 modules via all_modules(). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
@@ -14702,6 +14802,10 @@ b93a801b0d39d75c:
   path: ui/src/components/panels/cockpit/ThreadsPanel.tsx
   description: 'Cockpit Threads maquette: thread roster cards (status dot Needs-you/Active/Working, name, msg count, last activity, last-message preview). Reads mock threadDetails.'
   last_edited_ms: 1781600050385
+b95556b01a012622:
+  path: web/src/index.css
+  description: Tailwind v4 + tw-animate. Two palettes (:root Cream light / .dark Dungeon Forge) as CSS token blocks; semantic tokens. .mobile-shell height fork (100vh standalone / 100dvh tab, T643). Finder micro-motion keyframes, highlight.js .hljs-* theme.
+  last_edited_ms: 1784893294337
 b9661eb0dddc0dbd:
   path: src/modules/overview/tools/panel_goto_page.rs
   description: 'panel_goto_page: navigate paginated panels, range validation, recomputes token_count per page'
@@ -15286,6 +15390,10 @@ c07395815ca8865e:
   path: crates/cp-mod-firecrawl/Cargo.toml
   description: 'Firecrawl module deps: cp-base, cp-render, crossterm, reqwest, serde, serde_json, serde_yaml.'
   last_edited_ms: 0
+c084d3bb73f806e0:
+  path: deploy/photonicat/emmc-install/firstboot/pcat-firstboot.service
+  description: systemd oneshot driving firstboot-emmc.sh on the eMMC clone's first boot. After=network-online+tailscaled (step 6 enrols). Type=oneshot, RemainAfterExit=no, TimeoutStartSec=600 (clock-wait + 5x tailscale enrol retries must fit). ConditionPathExists=!/var/lib/pcat-firstboot.done; script self-disables. Enabled into golden image by build-golden-image.sh.
+  last_edited_ms: 1784893392785
 c08adb1e8799e0c1:
   path: src/llms/cache/prompt_tick_csv.rs
   description: Prompt tick CSV dumper for cache debugging. dump_prompt_tick_csv split rolling_cleanup_csvs/block_to_row/tool_result_context (A2). Writes every assembled-prompt message to .context-pilot/prompt_ticks/ each tick, keeps 20 most recent. classify_text_context tags block types.
@@ -17762,6 +17870,10 @@ e2c579843c4364f1:
   path: crates/cp-base/src/state/mod.rs
   description: 'Sub-module hub: actions, autocomplete, context, data, flags, runtime (State struct), watchers. Inline reverie module with Session struct (kind, agent, messages, tool_call_count).'
   last_edited_ms: 0
+e2c690ff5735f436:
+  path: deploy/photonicat/emmc-install/build/build-init-sd.sh
+  description: 'Assembles the init-SD: write base Debian image to card, grow rootfs, seed installer payload (init-sd-install.sh + pcat_lcd.py + unit + golden.img.zst), strip the firstboot unit (target-only). Inputs via env: BASE_IMG/CARD/GOLDEN_DIR. Interactive card-device confirm.'
+  last_edited_ms: 1784891900815
 e2cc79609e6076d5:
   path: web/src/mobile-components/finder/FinderChrome.tsx
   description: 'Mobile finder chrome twin: FinderTabs (always-visible ✕, no hover), FinderToolbar (single scrollable 36px-control row, no icon-slider/Tips/pathbar-toggle), FinderPathBar (taller tap crumbs). Re-exports FinderSidebar for path parity (unreachable on mobile).'
@@ -18270,10 +18382,18 @@ e92f540548fee6a0:
   path: src/app/run/tools/mod.rs
   description: 'Sub-module declarations: checks, cleanup, pipeline, queue_flush.'
   last_edited_ms: 0
+e939db50d5619f2c:
+  path: deploy/photonicat/emmc-install/installer/pcat-installer.service
+  description: systemd oneshot driving init-sd-install.sh. Offline (After=local-fs.target, no network). TimeoutStartSec=1800 (full flash+verify). ConditionPathExists=!/opt/pcat-install/.installed.
+  last_edited_ms: 1784891900636
 e9408a68182c08d5:
   path: web/src/components/threads/ThreadComposer.tsx
   description: 'Thread composer (always-active textarea + turn-status banner). T298 paperclip; T304 draftKey; T331 staged pendingFiles; T348/T350 /command bubbles + create pill; T359 Enter/Tab list logic; T371/T429 paused banner. T350 unified ComposerBubbles. T468 paste-to-upload: onPaste reads clipboardData.items+getAsFile() (not .files) for images. onAttach widened to void|Promise<void> (T471). prefill seeds expanded prompt body.'
   last_edited_ms: 0
+e96c0e3bc800299e:
+  path: deploy/photonicat/emmc-install/lcd/pcat_lcd.py
+  description: GC9307 SPI LCD 4-state progress painter (flashing PCT/verify/done/error). Python spidev+libgpiod, 5x7 bitmap font, init sequence transcribed from vendor periph.io-gc9307 st7789.go. /dev/spidev1.0, RST=122 DC=121, 172x320 rot180 MADCTL 0x48 coloffset 34. One-shot per state screen.
+  last_edited_ms: 1784891900242
 e9875e4d636d72e9:
   path: src/llms/oai_providers/openai_streaming.rs
   description: OAI SSE types + shared consumer. StreamResponse/StreamDelta, ToolCallAccumulator, normalize_stop_reason, dump_request. SseAccum + consume_sse_stream/apply_usage/process_choice shared by grok/groq/deepseek (A2).
@@ -18450,6 +18570,10 @@ ebd0e564032505d5:
   path: src/state/persistence/mod.rs
   description: Phased boot loading (5 phases). BootConfig/BootPanels structs. boot_load_config/panels/messages/assemble_state functions. Legacy load_state() entry point. panel_to_context() helper.
   last_edited_ms: 0
+ebd90f12927b359e:
+  path: web/src/mobile-components/shell/widgets/UsageLimits.tsx
+  description: '@generated mobile-mirror stub — re-exports desktop UsageLimits (zero touch divergence).'
+  last_edited_ms: 1784893275666
 ebdf6e51ce9dc683:
   path: crates/cp-mod-git/src/tools.rs
   description: Git tool. Read-only → dynamic git_result panels. Mutating → async subprocess via spawn_async_tool. flame!("git_exec"). GIT_ASKPASS temp script for HTTPS auth. Cache invalidation via regex patterns.
@@ -18878,6 +19002,10 @@ f0ef74fa355a3921:
   path: crates/cp-orchestrator/src/transport/rest/thread_shape.rs
   description: 'Pure thread-list shaping: overlay_roster merges live view roster into disk threads (refresh status/archived/paused/lastActivity; synthesize log-less ThreadDetail for view-only threads = instant appearance), reshape_thread/reshape_message snake_case→camelCase maquette shape. paused field included in overlay and reshape (T371).'
   last_edited_ms: 0
+f10e1c5b36bbdb09:
+  path: deploy/photonicat/emmc-install/installer/init-sd-install.sh
+  description: The zero-touch flasher on the init-SD. Guard stamp, optional factory-OpenWrt backup, zstd -dc golden.img.zst | dd of=/dev/mmcblk0, background LCD progress (polls dd /proc fdinfo pos), sha256 readback verify, poweroff (=done signal, safe to pull SD). Error leaves board on with ERROR screen.
+  last_edited_ms: 1784891900546
 f13efb695f77b0fe:
   path: web/src/lib/mock/index.ts
   description: 'Mock-data barrel: PROJECT/tokenBudget/panels/cacheStats/messages/threads/spine/stats/status/agents/library. Re-exports ./extra + ./fileTree. web-lint P2: fileTree literal moved to ./fileTree.ts + FsNode import dropped to stay ≤500 after Prettier reflow. Design-only fallback data approximating a live Context Pilot session.'
@@ -19086,6 +19214,10 @@ f3653b71de53c804:
   path: crates/cp-mod-bridge/src/command.rs
   description: 'Phase 13 (X780) MILESTONE M2: Intake — agent command intake (authn + journal-then-ack + dedup, I9/I11/I4). new(oplog_dir,cap_token) seeds SeenSet via replay. handle_frame(oplog,bytes)->(framed_ack, Option<Command>): decode_frame (decode_raw+from_slice, None=malformed→reject) → process(): (1) auth empty-or-mismatch→reject ''bad bearer''; (2) seen.contains(dedup)→accept w/ rev_of, NO re-apply (idempotent); (3) append_durable(CommandEffect{cmd_id,dedup}) fsync-before-accept, seen.mark, accept+Some(command); journal err→reject ''journal failed'' (fail-closed). handle_connection(oplog,&mut UnixStream): read framed frames in a loop (boxed READ_CHUNK buf, MAX_CONNECTION_BUFFER 1MiB overflow guard), ack each, return freshly-accepted Commands. Does NOT apply (caller injects via actions/input.rs K7) and does NOT own OplogService (single-writer, Boot-owned, by ref). 7 tests incl V2 dedup-survives-deadman-reexec + handle_connection over socketpair.'
   last_edited_ms: 1781627477150
+f3736e8407d0d3b4:
+  path: deploy/photonicat/emmc-install/installer/pcat-provision.service
+  description: systemd oneshot driving pcat-provision.sh. After=pcat-firstboot.service network-online.target tailscaled.service, Requires=pcat-firstboot. TimeoutStartSec=2400 (download+compile). ConditionPathExists=!/var/lib/pcat-provision.done; script self-disables. Enabled into golden image by build-golden-image.sh.
+  last_edited_ms: 1784912655376
 f379d2a878f22b32:
   path: crates/cp-mod-github/Cargo.toml
   description: 'GitHub module deps: cp-base, cp-render, crossterm, regex, cp-mod-utilities, serde_json, secrecy.'
@@ -19138,6 +19270,10 @@ f407622a5f195179:
   path: web/src/mobile-components/shell/widgets/ProfileModal.tsx
   description: Mobile ProfileModal twin — full-screen sheet (w-screen h-screen vs 540x88vh), 16px inputs (iOS focus-zoom), 44px touch controls. Name/email/password/sessions RBAC logic identical, mobile ui/dialog token.
   last_edited_ms: 1784666918428
+f4194378bdc1d6d7:
+  path: deploy/photonicat/emmc-install/build/build-golden-image.sh
+  description: 'Clone asterix SD to shrunk seeded golden eMMC image (Linux/asterix only). Refuses live-root/mounted source + same-disk scratch, preserves p2 GUID, sgdisk shrink+truncate, sha256+zstd. Seeds firstboot unit + operator ssh key (rootfs) + ts-key on BOOT partition (shadow-safe). NEW: optional Model A self-provision — PROVISION_VARS= bakes deploy/ansible tree + ansible runtime (chroot apt) + pcat-provision.sh/.service + pcat_lcd.py into image, writes secrets yml onto boot partition (shredded on box). Env: SRC_DISK/OUT/PUBKEY/TS_AUTHKEY/PROVISION_VARS/ANSIBLE_DIR/INSTALL_ANSIBLE.'
+  last_edited_ms: 1784912667641
 f443597431fc2e8e:
   path: src/llms/minimax/mod.rs
   description: MiniMax provider — Anthropic-compatible API via Token Plan. SSE streaming identical to Anthropic protocol. MINIMAX_API_KEY auth.
