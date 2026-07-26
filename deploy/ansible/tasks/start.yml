@@ -35,8 +35,13 @@
 # the cockpit on :80 (day-0) or :443 (once the client names the box), so the
 # public URL depends on provisioning state and is reported, not probed.
 - name: Report readiness
+  # An IPv6 ansible_host (the fleet ULA) MUST be bracketed in a URL — a bare
+  # fd59:…:f10d:80 is unparseable for a browser or curl, and that URL is what the
+  # technician pastes at day-0. Detect it by the ':' that no IPv4/DNS host has.
   ansible.builtin.debug:
     msg: >-
       {{ inventory_hostname }} ready —
-      day-0 setup at http://{{ ansible_host | default(inventory_hostname) }}:80
+      day-0 setup at http://{{ ('[' ~ _day0_host ~ ']') if ':' in _day0_host else _day0_host }}:80
       (unprovisioned box; becomes https://<name> once the client names it).
+  vars:
+    _day0_host: "{{ ansible_host | default(inventory_hostname) }}"

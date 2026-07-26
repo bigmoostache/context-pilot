@@ -6,18 +6,25 @@
 #   2. dd a pristine Armbian image onto it,
 #   3. verify the written region against the recorded sha256,
 #   4. inject ONLY the operator's root SSH key (so Ansible can connect),
-#   5. power off.
+#   5. impose the fleet ULA so the box is IDENTIFIABLE before first contact,
+#   6. paint DONE + the box's IPv6 identity and STOP, leaving the board on.
 # Everything else (custom user, hostname, tailscale, Context Pilot) is Ansible's
-# job on a later boot. No golden image, no offline block-surgery, no LCD.
+# job on a later boot. No golden image, no offline block-surgery.
 #
-# Power-off IS the done-signal: board dark = safe to pull the init-SD, then boot
-# the eMMC and let Ansible take over.
+# THE DONE SCREEN IS THE DONE-SIGNAL (it used to be power-off). The board is left
+# running on purpose: the panel carries the box's address, and an automatic
+# poweroff would blank it before the operator could read it. Sequence for the
+# operator: read the address → press the POWER BUTTON → board dark → pull the SD.
+# Set AUTO_POWEROFF (see below) for unattended fleet flashing, where nobody is
+# watching the panel and "board dark" is the cheapest completion signal.
 #
 # Payload on the init-SD (under /opt/pcat-install, dropped by build-init-sd.sh):
 #   armbian.img.xz     — xz-compressed pristine Armbian image for THIS board
 #   armbian.sha256     — sha256 of the DECOMPRESSED image (read-back verify)
 #   armbian.img-size   — decompressed byte count
 #   root.pub           — operator root public key (the ONLY thing we inject)
+#   ula-prefix         — the fleet ULA /48 (product constant, build input)
+#   ula/*              — pcat-ula assigner + its systemd unit + NM dispatcher
 #   lcd/pcat_lcd.py    — GC9307 front-panel progress painter (best-effort)
 #   debs/*.deb         — python3-spidev + python3-libgpiod (offline LCD deps)
 set -uo pipefail
@@ -27,6 +34,8 @@ IMG_XZ="$BASE/armbian.img.xz"
 SHA="$BASE/armbian.sha256"          # sha256 of the DECOMPRESSED image
 SIZEF="$BASE/armbian.img-size"      # decompressed byte count
 PUBKEY="$BASE/root.pub"
+ULA_DIR="$BASE/ula"                 # pcat-ula assigner + unit + NM dispatcher
+ULA_PREFIX_F="$BASE/ula-prefix"     # fleet ULA /48 (product constant)
 LCD="$BASE/lcd/pcat_lcd.py"         # GC9307 progress painter
 STAMP=/run/pcat-install.done        # tmpfs — only guards a within-boot double-run
 LOG=/var/log/pcat-install.log
@@ -47,6 +56,16 @@ fail() {
   exit 1
 }
 
+# ── completion behaviour: manual power-off (default) vs unattended ────────────
+# Default 0 = leave the board ON when done, so the LCD keeps showing the box's
+# IPv6 identity until a human presses the power button. Seed `auto-poweroff` with
+# "1" on the init-SD (build-init-sd.sh AUTO_POWEROFF=1) to get the old behaviour
+# back for unattended fleet flashing.
+AUTO_POWEROFF=0
+if [ -s "$BASE/auto-poweroff" ] && grep -q '^1' "$BASE/auto-poweroff" 2>/dev/null; then
+  AUTO_POWEROFF=1
+fi
+
 # ── preflight: every tool the flash + inject depends on ─────────────────────
 for tool in dd xz sha256sum lsblk findmnt blockdev mount umount; do
   command -v "$tool" >/dev/null 2>&1 || fail "MISSING TOOL $tool"
@@ -61,6 +80,35 @@ command -v partprobe >/dev/null 2>&1 || command -v partx >/dev/null 2>&1 \
 # fail(); it runs before the first lcd() call so progress paints from the start.
 if ls "$BASE/debs/"*.deb >/dev/null 2>&1; then
   dpkg -i "$BASE/debs/"*.deb >/dev/null 2>&1 && echo "LCD deps installed" || echo "LCD deps install failed (progress screen skipped)"
+fi
+
+# ── derive this board's ULA identity from the hardware serial ────────────────
+# We run ON the target board, so /proc/device-tree/serial-number here is the SAME
+# serial Ansible reads later for the hostname (tasks/bringup.yml) — the address
+# and the name come from one source, and both are known before the box has ever
+# been contacted.
+#
+# The pcat serial is 16 hex chars = exactly 64 bits = an IPv6 interface-id, split
+# into 4 groups: 7681f2a227e0f10d -> 7681:f2a2:27e0:f10d. Sticking to a full
+# 64-bit interface-id (rather than a shorter one padded with a zero group) keeps
+# the address in canonical form, so what we write is exactly what `ip -6 addr`
+# prints back and what the technician reads off the label.
+ULA_PREFIX=""
+ULA_IID=""
+[ -s "$ULA_PREFIX_F" ] && ULA_PREFIX="$(tr -d ' \t\n\r' <"$ULA_PREFIX_F")"
+SERIAL_HEX="$(tr -d '\0' </proc/device-tree/serial-number 2>/dev/null \
+              | tr 'A-Z' 'a-z' | tr -cd '0-9a-f')"
+if [ -n "$SERIAL_HEX" ]; then
+  SERIAL_HEX="0000000000000000$SERIAL_HEX"      # left-pad short/odd serials
+  H="${SERIAL_HEX: -16}"                        # keep the low 64 bits
+  [ "$H" = "0000000000000000" ] || ULA_IID="${H:0:4}:${H:4:4}:${H:8:4}:${H:12:4}"
+fi
+if [ -n "$ULA_PREFIX" ] && [ -n "$ULA_IID" ]; then
+  echo "ULA identity: $ULA_PREFIX:1:$ULA_IID (port 1)"
+else
+  # Degrade, never abort: no serial or no prefix = no ULA. The box stays reachable
+  # over DHCP/link-local, it just costs the operator a hunt.
+  echo "WARNING: no ULA identity (prefix='$ULA_PREFIX' serial='$SERIAL_HEX') — skipping"
 fi
 
 # ── identify the booted (init-SD) device so we NEVER flash ourselves ────────
@@ -103,9 +151,11 @@ echo "eMMC target = $TARGET"
 
 # ── within-boot double-run guard (stamp in /run, gone next power-on) ─────────
 if [ -e "$STAMP" ]; then
-  echo "stamp present this boot — already flashed, powering off"
-  lcd done
-  sync; sleep 2; poweroff; exit 0
+  echo "stamp present this boot — already flashed"
+  lcd done "$ULA_IID"
+  sync
+  [ "$AUTO_POWEROFF" = "1" ] && { sleep 2; poweroff; }
+  exit 0
 fi
 
 # ── sanity: payload present ─────────────────────────────────────────────────
@@ -218,15 +268,59 @@ fi
 # unit and still runs. VERIFY this behavior on the actual Armbian image.
 rm -f "$MNT/root/.not_logged_in_yet" 2>/dev/null || true
 
+# ── impose the fleet ULA (deterministic IPv6 identity) ───────────────────────
+# Drop the assigner + its two triggers onto the eMMC rootfs and pin THIS board's
+# interface-id in /etc/default/pcat-ula. From the first boot the box answers on
+# fd..:..:..:1:<serial>, with no DHCP, no router and no discovery step — which is
+# exactly the address the operator puts in inventory.ini.
+#
+# Best-effort by design (like the LCD): a missing payload must not undo a verified
+# flash. The address is a convenience; the root key is what Ansible truly needs.
+if [ -n "$ULA_PREFIX" ] && [ -n "$ULA_IID" ] && [ -d "$ULA_DIR" ]; then
+  if install -Dm755 "$ULA_DIR/pcat-ula.sh" "$MNT/usr/local/sbin/pcat-ula" 2>/dev/null &&
+     install -Dm644 "$ULA_DIR/pcat-ula.service" "$MNT/etc/systemd/system/pcat-ula.service" 2>/dev/null; then
+    printf 'PCAT_ULA_PREFIX=%s\nPCAT_ULA_IID=%s\n' "$ULA_PREFIX" "$ULA_IID" \
+      >"$MNT/etc/default/pcat-ula"
+    chmod 644 "$MNT/etc/default/pcat-ula"
+    # enable the unit offline: systemctl can't run against a cold rootfs, so we
+    # create the multi-user.target.wants symlink by hand (what `enable` does).
+    install -d -m755 "$MNT/etc/systemd/system/multi-user.target.wants"
+    ln -sf ../pcat-ula.service \
+      "$MNT/etc/systemd/system/multi-user.target.wants/pcat-ula.service"
+    # NM dispatcher: harmless if the image turns out not to use NetworkManager
+    # (nothing ever calls it), essential if it does (NM drops foreign addresses).
+    install -Dm755 "$ULA_DIR/nm-dispatcher-50-pcat-ula" \
+      "$MNT/etc/NetworkManager/dispatcher.d/50-pcat-ula" 2>/dev/null || true
+    echo "ULA imposed: $ULA_PREFIX:1:$ULA_IID (port 1), :2: on the second port"
+  else
+    echo "WARNING: could not install the ULA assigner — box will be DHCP-only"
+  fi
+else
+  echo "no ULA payload/identity — skipping (box will be DHCP-only)"
+fi
+
 sync
 umount "$MNT" 2>/dev/null || true
 rmdir "$MNT" 2>/dev/null || true
 echo "root key injected"
 
-# ── done: stamp, paint DONE, power off (= safe-to-pull signal) ──────────────
+# ── done: stamp, paint DONE + the address, and stop ─────────────────────────
 date -Is >"$STAMP"
 sync
-lcd done
-echo "=== install complete, powering off ==="
-sleep 3
-poweroff
+# The DONE screen carries the interface-id: the technician reads the box's address
+# off the panel instead of hunting for it. Empty = no ULA, the screen says so.
+lcd done "$ULA_IID"
+echo "=== install complete ==="
+if [ "$AUTO_POWEROFF" = "1" ]; then
+  echo "AUTO_POWEROFF=1 — powering off (board dark = safe to pull the init-SD)"
+  sleep 3
+  poweroff
+else
+  # Nothing is written past this point (the flash is synced and verified), so the
+  # board can sit here indefinitely. We do NOT power off: the panel is the only
+  # place the operator can read the address, and pulling the SD while it is the
+  # RUNNING ROOTFS is what we want to avoid — hence "power button first".
+  echo "board left ON so the LCD keeps showing the address."
+  echo "operator: read the IPv6 id → press the POWER BUTTON → then pull the SD."
+fi
+exit 0

@@ -1,0 +1,17 @@
+[Unit]
+Description=Assign the fleet ULA (deterministic IPv6, one /64 per Ethernet port)
+Documentation=file:///usr/local/sbin/pcat-ula
+# No network-online dependency on purpose: `ip -6 addr replace` works on a DOWN
+# interface (the address goes live at link-up), so we want this EARLY — the whole
+# point is to be reachable without waiting on DHCP. The script waits for the
+# ports to exist by itself, so no udev-settle ordering hack is needed either.
+Wants=network.target
+Before=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/pcat-ula
+
+[Install]
+WantedBy=multi-user.target
