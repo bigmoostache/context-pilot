@@ -514,6 +514,10 @@
   path: crates/cp-mod-scratchpad/src/tools.rs
   description: 'Scratchpad tools with flame!("scratch_create"), flame!("scratch_edit"), flame!("scratch_wipe"). Cell CRUD. Wipe: empty array = all, otherwise by ID.'
   last_edited_ms: 0
+05c83b09b788cf1b:
+  path: deploy/ansible/tasks/fetch.yml
+  description: Fetch pre-built appliance artifacts from GitHub Release onto control node (no local build). Pulls aarch64-musl bundle + stock Caddy arm64. release=local uses build.sh output. Extracts bundle for shipping over SSH to offline LAN box.
+  last_edited_ms: 1785081471690
 05d99c6026071fe5:
   path: crates/cp-mod-bridge/Cargo.toml
   description: 'Bridge module deps: cp-base, cp-render, cp-wire, cp-oplog, nix 0.30 (fs, for Flock RAII), serde_json. dev: tempfile. Workspace lints.'
@@ -6578,6 +6582,10 @@
   path: src/modules/pre_flight.rs
   description: 'Pre-flight validation: Phase 0 trap block, Phase 0.25 compulsory intent/verb (blocking), Phase 0.5 duplicate Close_conversation_history queue check, Phase 1 schema validation, Phase 2 module semantic checks. Phase 2 SKIPS the threads module while the history-cleanup trap is active (QueueState.trap_active) — otherwise threads focus enforcement blocks Close_conversation_history and deadlocks the two traps.'
   last_edited_ms: 1781525989192
+51904fbf3ad74aa3:
+  path: deploy/ansible/templates/providers.env.j2
+  description: Jinja template for per-client provider/integration API keys. Templated from cp_provider_keys, chmod 600, sourced at boot by context-pilot systemd unit (EnvironmentFile). Not in version control. Rewritten every run for key rotation.
+  last_edited_ms: 1785081471516
 51bf1b6553848f93:
   path: crates/cp-mod-github/src/lib.rs
   description: 'GitHub module. 1 tool: gh_execute. Dynamic github_result panels. Depends on git module. classify sub-module for read-only vs mutating. Tool visualizer for PR/issue status coloring.'
@@ -10110,6 +10118,10 @@
   path: web/src/mobile-components/ui/dropdown-menu.tsx
   description: Mobile DropdownMenu twin. Every actionable row >=44px tap (min-h-11, py-2.5), popup widened (min-w-48). Kept anchored (Base UI Positioner), not re-sheeted, preserving focus-return + keyboard nav. All sub/checkbox/radio subcomponents touch-sized.
   last_edited_ms: 1784669584561
+7e2dcf49d32941e6:
+  path: deploy/ansible/examples/secrets.example.yml
+  description: Runtime secrets template (never committed with real values). Copy to gitignored <client>.local.yml, fill cp_provider_keys (ANTHROPIC/DEEPSEEK/GROQ/etc), pass via -e @file at launch. One file per --limit <client> run.
+  last_edited_ms: 1785081471603
 7e366dbc9974613f:
   path: web/src/lib/query/reducers.ts
   description: 'SSE delta reducers: applyThreadDelta/applyAgentDelta fold into cache; mergeThreadLogs reconciles poll+delta (T123/T360). Conditional spreads for exactOptional (P1).'
@@ -11726,6 +11738,10 @@
   path: crates/cp-wire/src/types/mod.rs
   description: ContentHash (SHA-256, custom hex serde, Copy), Phase (Idle/Streaming/Tooling), LifecycleState (Starting/Running/Stopping/Stopped). Re-exports all submodule types.
   last_edited_ms: 1781617086693
+92529bc30c9f1bcf:
+  path: deploy/ansible/tasks/keys.yml
+  description: Per-client provider API keys task. Templates providers.env (chmod 600, sourced at boot) from cp_provider_keys dict supplied at launch (gitignored local file or vault). Rewritten every run so key rotation = edit + re-run --limit <client>.
+  last_edited_ms: 1785081471290
 92634363d80019b3:
   path: web/src/components/auth/ForcePasswordChange.tsx
   description: Forced password-change screen (first login / must_change_password). Blocks app until user rotates the seed password; on success refreshMe clears the flag and AuthGuard re-renders through. Field subcomponent (password inputs), MIN_PASSWORD_LEN=8.
@@ -20294,6 +20310,10 @@ ff5e2aa0b27af18c:
   path: crates/cp-base/src/config/accessors/library.rs
   description: Seed prompt library accessors (agents/skills/commands) (A7 split).
   last_edited_ms: 1784536096734
+ff64487da9d7be43:
+  path: deploy/ansible/tasks/seed.yml
+  description: 'Admin-seed tasks (Obj 6.1/6.2). Idempotent: unit with existing seed.env left untouched. Generates unique 20-char passwords for superadmin (vendor) + admin (client) accounts, writes seed.env chmod 600, writes printable delivery sheet on control node.'
+  last_edited_ms: 1785081471428
 ff702272b5c58ee7:
   path: ui/src/components/agents/PromptsPage.tsx
   description: Global prompt-library page (fleet 'Prompts'). Renders mock library[] (system/skills/commands) as cards with KIND_META icon/accent/blurb, filter tabs (all + per-kind w/ counts), kind sections in 'all' view. 'agent' kind labelled 'System' (overloaded word). Header has Import + New buttons. Card click / New / Import open PromptModal + ImportModal. Built-in badge only (no Active — meaningless at fleet altitude).
