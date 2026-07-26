@@ -223,12 +223,27 @@ pub(super) fn transport() -> Value {
             },
             "required": ["fingerprint", "algorithm"]
         },
+        "ItDetectedAddresses": {
+            "type": "object",
+            "description": "Addresses the box observes on itself, so the day-0 wizard can tell the \
+                operator which one to hand to the client instead of guessing. `ipv4` is the source \
+                address the kernel would route from (the DHCP lease in practice), and is what \
+                belongs in `Identity.ip`. `ulas` are the fleet ULAs (RFC 4193), derived from the \
+                hardware serial and therefore permanent: a maintenance plane for the vendor, not an \
+                address the client can use.",
+            "properties": {
+                "ipv4": { "type": "string", "nullable": true },
+                "ulas": { "type": "array", "items": { "type": "string" } }
+            },
+            "required": ["ipv4", "ulas"]
+        },
         "ItIdentityResponse": {
             "type": "object",
             "properties": {
-                "identity": { "allOf": [r("Identity")], "nullable": true }
+                "identity": { "allOf": [r("Identity")], "nullable": true },
+                "detected": r("ItDetectedAddresses")
             },
-            "required": ["identity"]
+            "required": ["identity", "detected"]
         },
         "ItSetIdentityResponse": {
             "type": "object",

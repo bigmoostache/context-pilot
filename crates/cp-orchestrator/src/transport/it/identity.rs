@@ -80,14 +80,33 @@ pub(crate) fn validate_ip(ip: &str) -> bool {
     ip.parse::<std::net::IpAddr>().is_ok()
 }
 
-/// `GET /api/it/identity` — the current box identity, or `null` when
-/// unset. Lets the wizard prefill the name/IP form on a re-visited box.
+/// `GET /api/it/identity` — the current box identity, or `null` when unset, plus
+/// the addresses the box detects on itself (`detected.ipv4`, `detected.ulas`).
+/// Lets the wizard prefill the name/IP form on a re-visited box, and — on a
+/// day-0 box, where the identity is still `null` — tell the operator which
+/// address to give the client instead of asking them to know it.
 pub(crate) fn get_identity(state: &Mutex<Backend>) -> HttpReply {
     let identity = match state.lock() {
         Ok(b) => load_identity(&identity_path(&b.agents_dir)),
         Err(_) => return HttpReply::error(500, "backend lock poisoned"),
     };
-    HttpReply::ok(&serde_json::json!({ "identity": identity }))
+    // `detected` exists so the day-0 wizard never has to make the operator GUESS
+    // the box's own address. At day-0 the operator arrives over the fleet ULA
+    // (deterministic, on the label) precisely because the DHCP IPv4 is unknown to
+    // everyone — including to the delivery sheet. The box is the one party that
+    // knows it, so it reports it: `ipv4` is what belongs in `Identity.ip` (the
+    // client-facing identity, and a cert subject), `ulas` are the vendor-side
+    // maintenance addresses, already added to the cert subjects automatically.
+    //
+    // Same detectors the Caddyfile renderer uses, so what the wizard displays is
+    // exactly what would end up in the cert — never an independent guess.
+    HttpReply::ok(&serde_json::json!({
+        "identity": identity,
+        "detected": {
+            "ipv4": super::caddy::detect_host_ip(),
+            "ulas": super::caddy::detect_ulas(),
+        },
+    }))
 }
 
 /// Render and write the Caddyfile for the current persisted state at boot (M3).
