@@ -296,7 +296,6 @@ const fn handle_config_event(key: &KeyEvent, state: &State) -> Action {
         KeyCode::Esc => Action::ToggleConfigView,
         // Number keys select provider
         KeyCode::Char('1') => Action::ConfigSelectProvider(LlmProvider::Anthropic),
-        KeyCode::Char('2') => Action::ConfigSelectProvider(LlmProvider::ClaudeCode),
         KeyCode::Char('3') => Action::ConfigSelectProvider(LlmProvider::Grok),
         KeyCode::Char('4') => Action::ConfigSelectProvider(LlmProvider::Groq),
         KeyCode::Char('5') => Action::ConfigSelectProvider(LlmProvider::DeepSeek),
@@ -308,6 +307,8 @@ const fn handle_config_event(key: &KeyEvent, state: &State) -> Action {
         KeyCode::Char('b') => dispatch_primary_model(state, 1),
         KeyCode::Char('c') => dispatch_primary_model(state, 2),
         KeyCode::Char('d') => dispatch_primary_model(state, 3),
+        KeyCode::Char('e') => dispatch_primary_model(state, 4),
+        KeyCode::Char('f') => dispatch_primary_model(state, 5),
         // Theme selection - t/T to cycle through themes
         KeyCode::Char('t') => Action::ConfigNextTheme,
         KeyCode::Char('T') => Action::ConfigPrevTheme,

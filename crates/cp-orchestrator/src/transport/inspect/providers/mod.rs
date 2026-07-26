@@ -54,13 +54,13 @@ fn all_providers() -> Vec<ProviderDef> {
     vec![
         ProviderDef {
             id: "claudecodev2",
-            name: "Claude Code V2",
-            description: "OAuth — Opus 4.8 · Fable 5 · Sonnet 4.6",
+            name: "Claude Code",
+            description: "OAuth — Opus 5 · 4.8 · 4.6 · Sonnet 5 · Fable 5 · Haiku 4.5",
             models: vec![
                 ModelDef {
-                    id: "claude-opus48",
-                    api_name: "claude-opus-4-8",
-                    display_name: "Opus 4.8",
+                    id: "claude-opus5",
+                    api_name: "claude-opus-5",
+                    display_name: "Opus 5",
                     context_window: 200_000,
                     max_output: 64_000,
                     input_price: 5.0,
@@ -69,9 +69,31 @@ fn all_providers() -> Vec<ProviderDef> {
                     is_default: true,
                 },
                 ModelDef {
-                    id: "claude-sonnet46",
-                    api_name: "claude-sonnet-4-6",
-                    display_name: "Sonnet 4.6",
+                    id: "claude-opus48",
+                    api_name: "claude-opus-4-8",
+                    display_name: "Opus 4.8",
+                    context_window: 200_000,
+                    max_output: 64_000,
+                    input_price: 5.0,
+                    output_price: 25.0,
+                    badge: None,
+                    is_default: false,
+                },
+                ModelDef {
+                    id: "claude-opus46",
+                    api_name: "claude-opus-4-6",
+                    display_name: "Opus 4.6",
+                    context_window: 200_000,
+                    max_output: 64_000,
+                    input_price: 5.0,
+                    output_price: 25.0,
+                    badge: None,
+                    is_default: false,
+                },
+                ModelDef {
+                    id: "claude-sonnet5",
+                    api_name: "claude-sonnet-5",
+                    display_name: "Sonnet 5",
                     context_window: 1_000_000,
                     max_output: 64_000,
                     input_price: 3.0,
@@ -90,92 +112,23 @@ fn all_providers() -> Vec<ProviderDef> {
                     badge: Some("Creative"),
                     is_default: false,
                 },
+                ModelDef {
+                    id: "claude-haiku45",
+                    api_name: "claude-haiku-4-5-20251001",
+                    display_name: "Haiku 4.5",
+                    context_window: 200_000,
+                    max_output: 64_000,
+                    input_price: 1.0,
+                    output_price: 5.0,
+                    badge: Some("Fast & cheap"),
+                    is_default: false,
+                },
             ],
         },
         ProviderDef {
             id: "anthropic",
-            name: "Anthropic",
+            name: "Anthropic (API Key)",
             description: "Direct API — Opus 4.5 · Sonnet 4.5 · Haiku 4.5",
-            models: vec![
-                ModelDef {
-                    id: "claude-opus45",
-                    api_name: "claude-opus-4-6",
-                    display_name: "Opus 4.5",
-                    context_window: 200_000,
-                    max_output: 128_000,
-                    input_price: 5.0,
-                    output_price: 25.0,
-                    badge: Some("Most capable"),
-                    is_default: true,
-                },
-                ModelDef {
-                    id: "claude-sonnet45",
-                    api_name: "claude-sonnet-4-5-20250929",
-                    display_name: "Sonnet 4.5",
-                    context_window: 200_000,
-                    max_output: 64_000,
-                    input_price: 3.0,
-                    output_price: 15.0,
-                    badge: Some("Balanced"),
-                    is_default: false,
-                },
-                ModelDef {
-                    id: "claude-haiku45",
-                    api_name: "claude-haiku-4-5-20251001",
-                    display_name: "Haiku 4.5",
-                    context_window: 200_000,
-                    max_output: 64_000,
-                    input_price: 1.0,
-                    output_price: 5.0,
-                    badge: Some("Fast & cheap"),
-                    is_default: false,
-                },
-            ],
-        },
-        ProviderDef {
-            id: "claudecode",
-            name: "Claude Code (OAuth)",
-            description: "OAuth V1 — Opus 4.5 · Sonnet 4.5 · Haiku 4.5",
-            models: vec![
-                ModelDef {
-                    id: "claude-opus45",
-                    api_name: "claude-opus-4-6",
-                    display_name: "Opus 4.5",
-                    context_window: 200_000,
-                    max_output: 128_000,
-                    input_price: 5.0,
-                    output_price: 25.0,
-                    badge: Some("Most capable"),
-                    is_default: true,
-                },
-                ModelDef {
-                    id: "claude-sonnet45",
-                    api_name: "claude-sonnet-4-5-20250929",
-                    display_name: "Sonnet 4.5",
-                    context_window: 200_000,
-                    max_output: 64_000,
-                    input_price: 3.0,
-                    output_price: 15.0,
-                    badge: Some("Balanced"),
-                    is_default: false,
-                },
-                ModelDef {
-                    id: "claude-haiku45",
-                    api_name: "claude-haiku-4-5-20251001",
-                    display_name: "Haiku 4.5",
-                    context_window: 200_000,
-                    max_output: 64_000,
-                    input_price: 1.0,
-                    output_price: 5.0,
-                    badge: Some("Fast & cheap"),
-                    is_default: false,
-                },
-            ],
-        },
-        ProviderDef {
-            id: "claudecodeapikey",
-            name: "Claude Code (API Key)",
-            description: "API key — Opus 4.5 · Sonnet 4.5 · Haiku 4.5",
             models: vec![
                 ModelDef {
                     id: "claude-opus45",
@@ -434,7 +387,7 @@ fn has_param(query: &str, key: &str) -> bool {
 /// restart.
 fn provider_usable(id: &str) -> bool {
     match id {
-        "claudecode" | "claudecodev2" => oauth_creds::claude_oauth_available(),
+        "claudecodev2" => oauth_creds::claude_oauth_available(),
         _ => provider_key_name(id).is_some_and(|key| cp_vault::vault().get(key).is_some()),
     }
 }
@@ -444,7 +397,7 @@ fn provider_usable(id: &str) -> bool {
 /// backends — their usability is decided by [`claude_oauth_available`]).
 fn provider_key_name(id: &str) -> Option<&'static str> {
     match id {
-        "anthropic" | "claudecodeapikey" => Some("anthropic"),
+        "anthropic" => Some("anthropic"),
         "grok" => Some("xai"),
         "groq" => Some("groq"),
         "deepseek" => Some("deepseek"),
@@ -476,8 +429,7 @@ mod tests {
 
     #[test]
     fn oauth_providers_route_through_the_oauth_check_not_an_api_key() {
-        // The OAuth backends must never be gated on an API-key name.
-        assert_eq!(provider_key_name("claudecode"), None);
+        // The OAuth backend must never be gated on an API-key name.
         assert_eq!(provider_key_name("claudecodev2"), None);
     }
 }

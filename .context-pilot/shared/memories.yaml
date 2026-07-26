@@ -47,15 +47,15 @@
   - overview
   last_edited_ms: 1784202931972
 141fecab40a0635e:
-  tl_dr: 'Claude Code V2: only `diagnostics` body field is internal-only (400). thinking/output_config/context_management/temperature/top_p/top_k all WORK with the 9 beta flags. V2 = headers + models opus-4-8, fable-5, sonnet-4-6.'
+  tl_dr: 'T661: V1 claude_code DELETED. Sole OAuth provider = ClaudeCodeV2 (FE label ''Claude Code''), 13 beta flags led by oauth-2025-04-20 (haiku strips context-1m), UA 2.1.220, 6 bare-ID models. api_key module kept but FE-hidden. FE = 2 buttons. Detail in body.'
   contents: 'Claude Code V2: OAuth Bearer, 9 beta headers. Models: opus-4-8 ($5/$25 200K), fable-5 ($10/$50 400K cap), sonnet-4-6 ($3/$15 1M). Thinking adaptive works. diagnostics body field = sole 400 culprit. Subagent = haiku-4-5, 4 tools (read-only), cc_is_subagent=true billing header.'
   importance: high
   labels:
   - llm-provider
   - claude-code
   - api
-  - v2
-  last_edited_ms: 1784203006404
+  - T661
+  last_edited_ms: 1785078047501
 1552560f9d4055af:
   tl_dr: 'Datalab OCR API: POST /api/v1/convert (multipart, X-Api-Key). Poll GET /convert/{id}. Returns markdown. Old /marker and /ocr endpoints deprecated.'
   contents: 'Endpoint: POST https://www.datalab.to/api/v1/convert (multipart, X-Api-Key). Poll: GET /api/v1/convert/{id}. Params: mode, output_format (markdown/html/json/chunks), max_pages, page_range. Old /marker and /ocr deprecated.'
@@ -249,6 +249,30 @@
   tl_dr: 'HISTORICAL: Thinking mode plan implemented. ThinkingConfig in LlmRequest, ThinkingChunk SSE parsing, TUI display all shipped.'
   importance: low
   last_edited_ms: 1784202931993
+705e343c20db1a4f:
+  tl_dr: 'Agents restarted via cockpit die seconds after boot + meili dies (''os error''); manual cpilot works. Cause: ORPHANED meili from prior orchestrator deploy (PPID 1) holds shared LMDB data dir. Fix: reap the orphaned meili. Details in body.'
+  contents: |-
+    AGENT+MEILI DEATH MODE (Mac Mini, solved T651).
+
+    SYMPTOM: agent restarted via cockpit restarts then dies a few seconds later, its meilisearch dies too with an 'os error'. A manually-launched `cpilot` works fine.
+
+    ROOT CAUSE: an ORPHANED meilisearch from a previous orchestrator deploy (its parent orchestrator died — e.g. killed by a failed relaunch — so it was reparented to launchd, PPID 1) still holds the shared meili data dir (~/.context-pilot/meilisearch/data). meilisearch opens each index as a single-writer LMDB env. A newly-spawned agent's meili tries to open the same already-locked env, dies on the lock/IO error, and the agent that depends on search dies with it. The manual cpilot survives because it reuses the already-live instance instead of spawning a second one.
+
+    THE TELL: `ps aux | grep meilisearch` shows TWO meili procs on the SAME `--db-path` but different ports. The stale one has PPID 1 (orphaned). In this incident: stale pid 2250 (~/cp-server/bin/meilisearch, port 7700, Tue deploy) vs live pid 32380 (~/.context-pilot/meilisearch/bin/meilisearch, port 49595).
+
+    FIX: kill the orphaned meili (and any orphaned cp-console-server PPID-1 zombies). Then only one meili holds the db, agents restart cleanly. Verify: single meili proc, `curl 127.0.0.1:49595/health` = 200, orchestrator 7878 = 200.
+
+    PREVENTION: any orchestrator kill+relaunch (release deploy) MUST reap the old meili before relaunch, or the zombie recurs. Live global meili on this box: port 49595, binary ~/.context-pilot/meilisearch/bin/meilisearch, spawned as a child of the first booting agent.
+  importance: high
+  labels:
+  - ops
+  - meilisearch
+  - agent-death
+  - lmdb
+  - gotcha
+  - mac-mini
+  - deploy
+  last_edited_ms: 0
 711abc0a918906ba:
   tl_dr: 'BANNED: #[allow(...)] lint suppressions. Always use #[expect(...)] for unavoidable cases. Register exceptions in .github/checks/. Never #[allow], always #[expect].'
   importance: critical

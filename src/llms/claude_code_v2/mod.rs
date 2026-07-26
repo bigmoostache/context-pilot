@@ -1,13 +1,15 @@
 //! Claude Code V2 OAuth API implementation.
 //!
-//! Uses the same OAuth tokens as `claude_code`, loaded via the [`cp_vault`]
-//! credential vault, but with the updated request format captured from Claude
-//! Code CLI v2.1.170:
-//! - Adaptive thinking (`"thinking": { "type": "adaptive" }`)
-//! - High effort output (`"output_config": { "effort": "high" }`)
-//! - Context management with thinking preservation
-//! - Updated beta flags (14 flags vs original 5)
-//! - Updated billing header and user-agent strings
+//! Uses OAuth tokens loaded via the [`cp_vault`] credential vault, with the
+//! request signature captured live from Claude Code CLI v2.1.220:
+//! - Endpoint `/v1/messages?beta=true`, Bearer-OAuth auth (no `x-api-key`).
+//! - 13 beta flags led by `oauth-2025-04-20` (selects the Bearer path);
+//!   `context-1m-2025-08-07` stripped per-model for Haiku (subscription rejects it).
+//! - First system block is the Claude Code identity — OAuth tokens are gated to
+//!   Claude-Code-shaped requests.
+//! - Stainless user-agent `claude-cli/2.1.220 (external, sdk-cli)`, macOS/arm64.
+//!
+//! Reuses `helpers` + `parse_sse_stream` from `claude_code_api_key`.
 
 use std::sync::mpsc::Sender;
 
@@ -24,35 +26,56 @@ use crate::infra::tools::build_api;
 /// API endpoint with beta query parameter.
 const ENDPOINT: &str = "https://api.anthropic.com/v1/messages?beta=true";
 
-/// Beta flags from captured Claude Code CLI v2.1.170 traffic.
-/// 5 internal-only flags removed (code-completions, code-reviews, patterns,
-/// model-preference, expanded-citations) — the public API rejects them.
-const BETA_HEADER: &str = "\
-    claude-code-20250219,\
-    oauth-2025-04-20,\
-    interleaved-thinking-2025-05-14,\
-    context-management-2025-06-27,\
-    prompt-caching-scope-2026-01-05,\
-    structured-outputs-2025-12-15,\
-    files-api-2025-04-14,\
-    mcp-client-2025-04-04,\
-    token-efficient-tools-2025-02-19";
-
-/// Billing header for V2 traffic validation.
+/// Base beta flags captured live from Claude Code CLI v2.1.220 (main-agent set).
 ///
-/// `cc_is_subagent=true;` is appended systematically — captured Claude Code
-/// subagent traffic carries this flag (main-agent traffic does not). Marking
-/// our requests as subagent may route them through a distinct billing/rate
-/// bucket.
-const BILLING_HEADER: &str =
-    "x-anthropic-billing-header: cc_version=2.1.170.6bc; cc_entrypoint=sdk-cli; cch=3d037; cc_is_subagent=true;";
+/// `oauth-2025-04-20` MUST lead: it selects the Bearer-OAuth auth path. Without
+/// it the server falls back to `x-api-key` and rejects the request
+/// (`invalid x-api-key`). Every flag below was validated against the live
+/// `/v1/messages?beta=true` endpoint (200 for opus/sonnet/fable). `context-1m`
+/// is stripped per-model for Haiku (see [`beta_header_for`]).
+const BETA_FLAGS: &[&str] = &[
+    "oauth-2025-04-20",
+    "claude-code-20250219",
+    "context-1m-2025-08-07",
+    "interleaved-thinking-2025-05-14",
+    "thinking-token-count-2026-05-13",
+    "context-management-2025-06-27",
+    "prompt-caching-scope-2026-01-05",
+    "mid-conversation-system-2026-04-07",
+    "advisor-tool-2026-03-01",
+    "advanced-tool-use-2025-11-20",
+    "effort-2025-11-24",
+    "fallback-credit-2026-06-01",
+    "cache-diagnosis-2026-04-07",
+];
 
-/// POST an assembled V2 request body to the endpoint with the full CLI v2.1.170
-/// header signature (Bearer OAuth, 9 beta flags, stainless UA). Extracted so
+/// The Claude Code identity system block. OAuth tokens are gated to
+/// Claude-Code-shaped requests: the FIRST system block must be this identity
+/// text or the API rejects the credential.
+const CC_IDENTITY: &str = "You are Claude Code, Anthropic's official CLI for Claude.";
+
+/// Assemble the `anthropic-beta` header for a given API model. Haiku-tier
+/// rejects the 1M long-context beta on this subscription
+/// (`The long context beta is not yet available for this subscription`), so
+/// `context-1m-2025-08-07` is dropped for any `haiku` model; all others keep the
+/// full set.
+fn beta_header_for(model: &str) -> String {
+    let is_haiku = model.contains("haiku");
+    BETA_FLAGS
+        .iter()
+        .filter(|flag| !(is_haiku && **flag == "context-1m-2025-08-07"))
+        .copied()
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+/// POST an assembled V2 request body with the full CLI v2.1.220 header
+/// signature (Bearer OAuth, model-aware beta flags, stainless UA). Extracted so
 /// `do_stream` stays under the line cap.
 fn send_v2_request(
     client: &Client,
     access_token: &str,
+    model: &str,
     api_request: &serde_json::Value,
 ) -> Result<reqwest::blocking::Response, LlmError> {
     client
@@ -60,18 +83,18 @@ fn send_v2_request(
         .header("accept", "text/event-stream")
         .header("authorization", format!("Bearer {access_token}"))
         .header("anthropic-version", API_VERSION)
-        .header("anthropic-beta", BETA_HEADER)
+        .header("anthropic-beta", beta_header_for(model))
         .header("anthropic-dangerous-direct-browser-access", "true")
         .header("content-type", "application/json")
-        .header("user-agent", "claude-cli/2.1.170 (external, sdk-cli)")
+        .header("user-agent", "claude-cli/2.1.220 (external, sdk-cli)")
         .header("x-app", "cli")
-        .header("x-stainless-arch", "x64")
+        .header("x-stainless-arch", "arm64")
         .header("x-stainless-lang", "js")
-        .header("x-stainless-os", "Linux")
+        .header("x-stainless-os", "MacOS")
         .header("x-stainless-package-version", "0.94.0")
         .header("x-stainless-retry-count", "0")
         .header("x-stainless-runtime", "node")
-        .header("x-stainless-runtime-version", "v24.3.0")
+        .header("x-stainless-runtime-version", "v26.3.0")
         .header("x-stainless-timeout", "600")
         .json(api_request)
         .send()
@@ -118,14 +141,13 @@ impl ClaudeCodeV2Client {
 
         let mapped_model = helpers::map_model_name(&request.model);
 
-        // Build V2 request body — matches V1 structure (standard fields only).
-        // Captured V2 fields (thinking, output_config, context_management,
-        // diagnostics) are internal-only and rejected by the public API.
+        // Build V2 request body. The first system block MUST be the Claude Code
+        // identity — OAuth tokens are gated to Claude-Code-shaped requests.
         let api_request = serde_json::json!({
             "model": mapped_model,
             "max_tokens": request.max_output_tokens,
             "system": [
-                {"type": "text", "text": BILLING_HEADER},
+                {"type": "text", "text": CC_IDENTITY},
                 {"type": "text", "text": system_text}
             ],
             "messages": json_messages,
@@ -136,8 +158,8 @@ impl ClaudeCodeV2Client {
         // Debug dump
         helpers::dump_last_request(&request.worker_id, &api_request);
 
-        // Build and send request with V2 headers
-        let response = send_v2_request(&client, access_token.expose_secret(), &api_request)?;
+        // Build and send request with V2 headers (beta flags are model-aware)
+        let response = send_v2_request(&client, access_token.expose_secret(), mapped_model, &api_request)?;
 
         if !response.status().is_success() {
             let status = response.status().as_u16();
@@ -182,8 +204,9 @@ impl ClaudeCodeV2Client {
 
         let client = Client::new();
         let mapped_model = helpers::map_model_name(model);
+        let beta = beta_header_for(mapped_model);
         let system_json = serde_json::json!([
-            {"type": "text", "text": BILLING_HEADER},
+            {"type": "text", "text": CC_IDENTITY},
             {"type": "text", "text": "You are a helpful assistant."}
         ]);
         // Post one probe body with V2 headers; report whether it succeeded.
@@ -192,7 +215,7 @@ impl ClaudeCodeV2Client {
                 .post(ENDPOINT)
                 .header("authorization", format!("Bearer {access_token}"))
                 .header("anthropic-version", API_VERSION)
-                .header("anthropic-beta", BETA_HEADER)
+                .header("anthropic-beta", &beta)
                 .header("content-type", "application/json")
                 .json(body)
                 .send()
