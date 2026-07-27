@@ -73,7 +73,10 @@ export function ThreadsView({
           A margin transition — not a transform — is what actually reclaims the
           layout width, so the pane truly widens as the rail leaves. */}
       <div
-        className="shrink-0 transition-[margin-left] duration-300 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none"
+        // `flex` so the wrapped <aside> (which sizes itself from flex-stretch,
+        // not an explicit height) still fills the row's full height — a plain
+        // block wrapper collapses it to content height (T670 regression).
+        className="flex shrink-0 transition-[margin-left] duration-300 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none"
         style={{ marginLeft: railOpen ? 0 : "calc(-1 * var(--sidebar-w))" }}
       >
         <ThreadList
