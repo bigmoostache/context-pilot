@@ -2034,6 +2034,10 @@
   path: crates/cp-base/src/state/context.rs
   description: 'Kind registry + Entry type. TypeMeta, init_context_type_registry, fixed_panel_order. Kind string-backed context type with well-known constants (ENTITIES, ENTITY_RESULT, etc). Entry struct: id/uid/context_type/name/token_count/metadata + cache/freeze fields. estimate_tokens, make_default_entry.'
   last_edited_ms: 0
+190420839f55cf9d:
+  path: web/src/components/Root.tsx
+  description: Desktop tree root — extracted from former App.tsx body. Provider-contract boundary + AppShell (view-router fleet/threads/finder/costs, TopBar+StatusBar, live vitals/SSE, disconnect overlay). Mirror twin of mobile Root.
+  last_edited_ms: 0
 1912951a6792c99a:
   path: web/src/lib/support/finderFs.ts
   description: 'Finder mock filesystem — one rich realm re-rooted per agent. P8 refactor: buildRealm (was 253-line object literal) now a thin assembler over per-directory subtree builders srcDir/docsDir/mediaDir/planningDir + rootFiles, each (p:(rel)=>string)=>FinderNode using the folder-prefixing p. SAMPLE_RS/TS + README/CHANGELOG/ROADMAP/DECK/SPEC/PEAKS mock payloads. findNode/pathChain/collectStarred/nodeSize/childCounts/sortNodes helpers. no-incorrect-template-string-interpolation scoped-off (embedded code samples'' literal braces).'
@@ -3762,6 +3766,10 @@
   path: crates/cp-mod-tree/src/types.rs
   description: Tree state types. TreeFileDescription (path, description, file_hash). TreeState (filter, open_folders, descriptions). DEFAULT_TREE_FILTER constant.
   last_edited_ms: 0
+2dd7307bbf10cbea:
+  path: web/src/components/threads/ThreadList.tsx
+  description: Thread sidebar list. Grouped by turn-status (Agent's turn / User turn) + Archived view. Search now lives in ThreadSearchPalette (T669) opened from ListHeader's Search button; ListHeader also has a PanelLeftClose sidebar-collapse button. Row-hover title marquee via useTitleMarquee (WAA). Subcomponents RowActions/RowMeta/ListHeader/EmptyState keep budgets. Exactly 500 lines (cap).
+  last_edited_ms: 0
 2dd8737ace049963:
   path: docs/trust-center/logos/datalab.svg
   description: 'Datalab geometric mark SVG, fill #1A1A1A. From datalab.to/images/datalab-icon.svg.'
@@ -3801,6 +3809,10 @@
 2e32f15f585527b9:
   path: src/state/persistence/save.rs
   description: 'Save operations: flame!("save_batch") + flame!("save_state"). build_save_batch() serializes config/worker/panels/messages/logs into WriteBatch. save_state() blocking sync persist. check_ownership(). log_error() to disk.'
+  last_edited_ms: 0
+2e42810530345f2a:
+  path: .context-pilot/shared/tree-descriptions.yaml
+  description: Persisted tree descriptions YAML. Synced to git alongside code commits per M15.
   last_edited_ms: 0
 2e44c327688828b7:
   path: ui/src/components/threads/ThreadDetailRail.tsx
@@ -4402,6 +4414,10 @@
   path: crates/cp-orchestrator/src/transport/rest/mod.rs
   description: 'REST resource handlers. fleet() filtered by ACL. command() dispatches. rename/avatar/threads/body. vault_snapshot + env_keys + settings exports. claude_usage()/token_status()/login_start()/login_complete()/refresh_login() for Claude OAuth (T451). resolve_entry. Submodules: backend, claude_oauth, config, create, lifecycle, releases, thread_shape.'
   last_edited_ms: 1783286500514
+36815bf8219f69fc:
+  path: web/src/components/threads/dialogs/NewThreadDialog.tsx
+  description: New Thread dialog — title-only sheet on the portaled Base UI Dialog; submit prepends a MY_TURN thread and selects it. Moved into threads/dialogs/ (T669) to free a threads/ dir slot under the 8-entry cap.
+  last_edited_ms: 0
 368256897a7dcee0:
   path: crates/cp-orchestrator/src/transport/rest/claude_oauth.rs
   description: 'Claude Code OAuth helpers — usage proxy, token status (incl account_email via /api/oauth/profile, T465), PKCE login (start/complete), token refresh (POST /refresh, grant_type=refresh_token). T472: a refresh failure (e.g. invalid_grant — refresh token rotated/expired) DELIBERATELY leaves stored credentials in place; the access token''s lifetime is independent and often has hours of runway, so clearing on refresh failure would strand a still-valid session. Reads/writes macOS Keychain + ~/.claude/.credentials.json. PkceSession stored in Backend.'
@@ -5022,6 +5038,10 @@
   path: docs/trust-center/subprocessors.html
   description: 'Subprocessor Register page. 7 sections: LLM providers table (6 providers), auxiliary services table (5 services), local services table (4 services), change log table (4 entries), operator responsibility notice, vendor risk assessment criteria (8-criterion table with mandatory/preferred weights), data flow summary (ASCII architecture diagram).'
   last_edited_ms: 1782134784830
+3e1af04487e4f0ba:
+  path: web/src/components/agents/FleetDashboard.tsx
+  description: Fleet welcome dashboard (live). AgentCard reads useAgentMeta (delta-folded status dot + cost). statusMeta includes 'waiting' (Restarting). §19 HealthBadge (useMetrics). RetiredSection/RetiredCard (unretire). Create/manage via AgentModal.
+  last_edited_ms: 0
 3e1dcc436a6467f8:
   path: docs/talk/slides/2-3.html
   description: 'Slide: Instantaneous Feedback (HOWs section)'
@@ -10961,6 +10981,10 @@
 8620fd4094c9381f:
   path: src/app/run/mod.rs
   description: 'Sub-module declarations. 6 modules: input (constructor/autocomplete), lifecycle (main loop), reverie (sub-agent), streaming (LLM responses), tools (execution pipeline), watchers (file/GH).'
+  last_edited_ms: 0
+86275279df007b77:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 862823cb996e6131:
   path: crates/cp-mod-github/src/panel.rs
@@ -19826,6 +19850,10 @@ f407622a5f195179:
   path: web/src/mobile-components/shell/widgets/ProfileModal.tsx
   description: Mobile ProfileModal twin — full-screen sheet (w-screen h-screen vs 540x88vh), 16px inputs (iOS focus-zoom), 44px touch controls. Name/email/password/sessions RBAC logic identical, mobile ui/dialog token.
   last_edited_ms: 1784666918428
+f421e538c632d922:
+  path: web/src/components/shell/TopBar.tsx
+  description: 'Slim macOS-style title bar (T321 trimmed): app mark→fleet, agent switcher, per-agent view tabs (Threads/Finder/Cockpit/Costs), agent-config gear, UsageButton, account UserMenu. Costs tab dev-mode only. P8: view-tab cluster extracted into a ViewTabs subcomponent (moving the two devMode gates off TopBar''s complexity budget); TopBar fn now <150 lines / cx<15.'
+  last_edited_ms: 0
 f443597431fc2e8e:
   path: src/llms/minimax/mod.rs
   description: MiniMax provider — Anthropic-compatible API via Token Plan. SSE streaming identical to Anthropic protocol. MINIMAX_API_KEY auth.

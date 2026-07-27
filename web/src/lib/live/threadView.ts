@@ -24,10 +24,12 @@ import type { ThreadDetail } from "@/lib/types"
  *  "create paused" flag that queues the seeded message without waking the agent. */
 export interface CreateThreadOpts {
   title: string
-  /** first user message, auto-sent right after creation (empty = none) */
+  /** first user message, auto-sent to the new thread once its id is known (empty = none) */
   firstMessage: string
-  /** raw files to upload to `.uploads/` and append as `file-upload` blocks */
-  files: File[]
+  /** files ALREADY uploaded to `.uploads/` (the dialog uploads on attach so the
+   *  draft — paths included — survives a close/reopen via localStorage); folded
+   *  into the first message as `file-upload` blocks at send time */
+  files: UploadedFile[]
   /** create the thread already paused (seeded message queued, no MY_TURN nudge) */
   paused: boolean
 }
@@ -69,6 +71,10 @@ export interface Selection {
   setPendingFiles: React.Dispatch<React.SetStateAction<UploadedFile[]>>
   /** the resolved-to-a-real-thread id (selection may point at a stale/archived row) */
   effectiveSelectedId: string
+  /** the id of a thread that was JUST auto-selected after `armAutoSelect` — the
+   *  seam {@link useThreadActions} uses to send a create's first message once the
+   *  server-assigned id is known (T679). Null until such an event fires. */
+  justCreatedId: string | null
   /** flag the next threads update to auto-select the newly-created thread */
   armAutoSelect: () => void
   /** cancel a pending auto-select (create failed before the id arrived) */
@@ -99,11 +105,13 @@ export function useThreadSelection(activeAgentId: string, threads: ThreadDetail[
   const pendingSelectRef = useRef(false)
   const prevThreadIdsRef = useRef<Set<string>>(new Set())
   const currentIds = useMemo(() => new Set(threads.map((t) => t.id)), [threads])
+  const [justCreatedId, setJustCreatedId] = useState<string | null>(null)
   useEffect(() => {
     if (pendingSelectRef.current && threads.length > 0) {
       const newId = threads.find((t) => !prevThreadIdsRef.current.has(t.id))?.id
       if (newId) {
         setSelectedId(newId)
+        setJustCreatedId(newId)
         pendingSelectRef.current = false
       }
     }
@@ -141,6 +149,7 @@ export function useThreadSelection(activeAgentId: string, threads: ThreadDetail[
     pendingFiles,
     setPendingFiles,
     effectiveSelectedId,
+    justCreatedId,
     armAutoSelect: () => {
       pendingSelectRef.current = true
     },
@@ -179,6 +188,9 @@ export function useThreadActions(
 
   const [notice, setNotice] = useState<string | null>(null)
   const noticeTimerRef = useRef<number | null>(null)
+  // First-message body staged by handleCreate, dispatched by the send-after-id
+  // effect once the new thread's id is observed (T679). Null = nothing pending.
+  const pendingCreateRef = useRef<string | null>(null)
   const flash = useCallback((msg: string) => {
     if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current)
     setNotice(msg)
@@ -236,29 +248,24 @@ export function useThreadActions(
       sel.setNewOpen(false)
       sel.setQuery("")
       sel.setShowArchived(false)
+      // Stash the first-message body (text + already-uploaded file blocks) so the
+      // send-after-id effect can dispatch it the moment the new thread's
+      // server-assigned id lands (T679). The old path relied on the backend
+      // applying `initial_message` atomically, which silently dropped the message
+      // against an N-1 agent; sending frontend-side keyed on the observed id is
+      // robust and needs no orchestrator change.
+      const content = buildCombinedContent(opts.firstMessage, opts.files)
+      pendingCreateRef.current = content || null
       sel.armAutoSelect()
       void (async () => {
         try {
-          // Upload any attachments to `.uploads/` first, then fold them into the
-          // first message as `file-upload` blocks — identical to a manual send.
-          const uploaded: UploadedFile[] = []
-          for (const f of opts.files) {
-            const r = await uploadUnique(activeAgentId, ".uploads", f)
-            uploaded.push({
-              path: r.path,
-              name: r.name,
-              size: r.size,
-              note: `uploaded by user at ${new Date().toISOString()}`,
-            })
-          }
-          const content = buildCombinedContent(opts.firstMessage, uploaded)
           await sendCommand(activeAgentId, {
             kind: "create_thread",
             name: opts.title.trim() || "Untitled thread",
-            ...(content && { initial_message: content }),
             paused: opts.paused,
           })
         } catch (e) {
+          pendingCreateRef.current = null
           sel.disarmAutoSelect()
           flash(describeCommandError("create the thread", e))
         }
@@ -266,6 +273,21 @@ export function useThreadActions(
     },
     [activeAgentId, flash, sel],
   )
+
+  // Send the create's first message once the new thread's id is known (T679).
+  // `sel.justCreatedId` flips to the server-assigned id when the auto-select
+  // effect picks the newcomer out of the SSE roster delta; if a pending body is
+  // staged, dispatch it to that exact id — never a stale/wrong thread.
+  useEffect(() => {
+    const content = pendingCreateRef.current
+    if (!sel.justCreatedId || !content) return
+    pendingCreateRef.current = null
+    sendCommand(activeAgentId, {
+      kind: "send_message",
+      thread_id: sel.justCreatedId,
+      content,
+    }).catch((e: unknown) => flash(describeCommandError("send the first message", e)))
+  }, [sel.justCreatedId, activeAgentId, flash])
 
   const handleSend = useCallback(
     (text: string) => {

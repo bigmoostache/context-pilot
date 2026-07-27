@@ -127,6 +127,7 @@ export function ThreadsView({
         open={sel.newOpen}
         onClose={() => sel.setNewOpen(false)}
         onCreate={actions.handleCreate}
+        agentId={activeAgentId}
       />
 
       {actions.notice && (

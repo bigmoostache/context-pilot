@@ -1,43 +1,74 @@
 import { useState, useRef, useEffect } from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
-import { Paperclip, X, CornerDownLeft } from "lucide-react"
+import { Paperclip, X, CornerDownLeft, Loader2 } from "lucide-react"
+import { uploadUnique } from "@/lib/api"
 import type { CreateThreadOpts } from "@/lib/live/threadView"
+import type { UploadedFile } from "@/lib/live/threadUpload"
 import { cn } from "@/lib/utils"
 
-/**
- * New Thread dialog (T674, reworked T678) — a Linear-"new issue"-style composer.
- *
- * Layout mirrors Linear's fast-create popup: a large borderless **title** line,
- * a seamless **auto-growing** first-message editor beneath it (grows with the
- * text like the thread composer, capped at 44vh so the surface always stays on
- * screen), then a single footer action row — attach (icon button, left) + a
- * "start paused" toggle switch, with the primary Create action on the right.
- * There is no Cancel button: Esc and clicking the backdrop already dismiss.
- *
- * Attachments are staged locally and only uploaded on submit by the parent's
- * {@link CreateThreadOpts} handler, which folds them into the first message and
- * dispatches a single `create_thread` command.
- *
- * Built directly on Base UI's Dialog primitive (Portal escapes the vibrancy
- * containing-block, plus focus-trap / scroll-lock / Esc for free). Motion is
- * bespoke: the surface is anchored near the top (no vertical-centering
- * transform to fight) and springs in via `sheet-pop-in` / out via
- * `sheet-pop-out`, so open *and* close feel smooth. `⌘/Ctrl+Enter` submits.
- */
-export function NewThreadDialog({
-  open,
-  onClose,
-  onCreate,
-}: {
-  open: boolean
-  onClose: () => void
-  onCreate: (opts: CreateThreadOpts) => void
-}) {
-  const [title, setTitle] = useState("")
-  const [firstMessage, setFirstMessage] = useState("")
-  const [files, setFiles] = useState<File[]>([])
-  const [paused, setPaused] = useState(false)
+/** Persisted draft shape — everything the composer holds, so a close/reopen (or
+ *  a full reload) restores the exact in-progress thread. Files are stored as
+ *  ALREADY-uploaded {@link UploadedFile} records (the dialog uploads on attach),
+ *  so the draft is JSON-serialisable and the attachments survive too (T679). */
+interface Draft {
+  title: string
+  firstMessage: string
+  files: UploadedFile[]
+  paused: boolean
+}
+
+const EMPTY_DRAFT: Draft = { title: "", firstMessage: "", files: [], paused: false }
+
+/** Per-agent localStorage key for the in-progress new-thread draft. */
+function draftKey(agentId: string): string {
+  return `cp-newthread-${agentId}`
+}
+
+/** Hydrate the persisted draft for an agent, falling back to an empty draft on a
+ *  missing / malformed entry (never throws into render). */
+function loadDraft(agentId: string): Draft {
+  try {
+    const raw = localStorage.getItem(draftKey(agentId))
+    if (!raw) return EMPTY_DRAFT
+    const d = JSON.parse(raw) as Partial<Draft>
+    return {
+      title: typeof d.title === "string" ? d.title : "",
+      firstMessage: typeof d.firstMessage === "string" ? d.firstMessage : "",
+      files: Array.isArray(d.files) ? d.files : [],
+      paused: d.paused === true,
+    }
+  } catch {
+    return EMPTY_DRAFT
+  }
+}
+
+/** All composer state + handlers for the new-thread dialog, extracted from the
+ *  component so its render fn stays within the max-lines budget. Owns the draft
+ *  hydrate/persist, the auto-grow ref, on-attach uploads, and submit/clear. */
+function useNewThreadDraft(
+  agentId: string,
+  open: boolean,
+  onCreate: (o: CreateThreadOpts) => void,
+) {
+  // Seed all composer state from the persisted per-agent draft (render-phase
+  // initializer, runs once per mount). The dialog body unmounts on close (Base
+  // UI only renders the Popup while open), so a reopen re-hydrates from here.
+  const initial = () => loadDraft(agentId)
+  const [title, setTitle] = useState(() => initial().title)
+  const [firstMessage, setFirstMessage] = useState(() => initial().firstMessage)
+  const [files, setFiles] = useState<UploadedFile[]>(() => initial().files)
+  const [paused, setPaused] = useState(() => initial().paused)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
   const canCreate = title.trim().length > 0
+
+  // Mirror the composer to localStorage on every change so the draft survives a
+  // close/reopen or a reload. Persist regardless of `open` — the whole point is
+  // that a dismissed-but-not-submitted draft comes back intact.
+  useEffect(() => {
+    const draft: Draft = { title, firstMessage, files, paused }
+    localStorage.setItem(draftKey(agentId), JSON.stringify(draft))
+  }, [agentId, title, firstMessage, files, paused])
 
   // Auto-grow the message editor to fit its content (like the thread composer):
   // reset to `auto`, then set to `scrollHeight`. The CSS `max-h-[44vh]` caps the
@@ -51,22 +82,21 @@ export function NewThreadDialog({
     el.style.height = `${el.scrollHeight}px`
   }, [firstMessage, open])
 
-  const reset = () => {
+  // Wipe the draft (state + persisted key) — ONLY on a successful create.
+  const clearDraft = () => {
     setTitle("")
     setFirstMessage("")
     setFiles([])
     setPaused(false)
-  }
-  const close = () => {
-    reset()
-    onClose()
+    setErr(null)
+    localStorage.removeItem(draftKey(agentId))
   }
 
   const submit = (e: React.SyntheticEvent) => {
     e.preventDefault()
-    if (!canCreate) return
+    if (!canCreate || busy) return
     onCreate({ title, firstMessage, files, paused })
-    reset()
+    clearDraft()
   }
 
   // ⌘/Ctrl+Enter submits from anywhere in the form (Linear parity).
@@ -74,13 +104,114 @@ export function NewThreadDialog({
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") submit(e)
   }
 
-  const addFiles = (list: FileList | null) => {
-    if (!list || list.length === 0) return
-    setFiles((prev) => [...prev, ...list])
+  // Upload attachments to `.uploads/` immediately so the draft holds serialisable
+  // paths (survives close/reopen), not raw File objects (T679).
+  const addFiles = async (list: FileList | null) => {
+    const picked = [...(list ?? [])]
+    if (picked.length === 0) return
+    setBusy(true)
+    setErr(null)
+    try {
+      const added: UploadedFile[] = []
+      for (const f of picked) {
+        const r = await uploadUnique(agentId, ".uploads", f)
+        added.push({
+          path: r.path,
+          name: r.name,
+          size: r.size,
+          note: `uploaded by user at ${new Date().toISOString()}`,
+        })
+      }
+      setFiles((prev) => [...prev, ...added])
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Upload failed")
+    } finally {
+      setBusy(false)
+    }
   }
 
+  return {
+    title,
+    setTitle,
+    firstMessage,
+    setFirstMessage,
+    files,
+    setFiles,
+    paused,
+    setPaused,
+    busy,
+    err,
+    canCreate,
+    msgRef,
+    submit,
+    onKeyDown,
+    addFiles,
+  }
+}
+
+/**
+ * New Thread dialog (T674, reworked T678/T679) — a Linear-"new issue"-style
+ * composer.
+ *
+ * Layout mirrors Linear's fast-create popup: a large borderless **title** line,
+ * a seamless **auto-growing** first-message editor beneath it (grows with the
+ * text like the thread composer, capped at 44vh so the surface always stays on
+ * screen), then a single footer action row — attach (icon button, left) + a
+ * "start paused" toggle switch, with the primary Create action on the right.
+ * There is no Cancel button: Esc and clicking the backdrop already dismiss.
+ *
+ * **Draft persistence (T679):** the whole composer state (title, first message,
+ * attachments, paused) is mirrored to a per-agent localStorage key on every
+ * change, so leaving the dialog and coming back — or a full reload — restores
+ * the in-progress thread. Attachments upload to `.uploads/` *on attach* (not on
+ * submit), so what is persisted is a list of realm-relative paths, not
+ * un-serialisable `File` objects. The draft is cleared only on a successful
+ * create, never on close.
+ *
+ * **Submit (T679):** the first message is NOT handed to the backend as an
+ * atomic `initial_message` (that silently dropped against an N-1 agent).
+ * `onCreate` creates the thread name-only and the parent sends the composed
+ * first message once the new thread's server-assigned id is observed — so the
+ * message always lands on the right thread and needs no orchestrator change.
+ *
+ * Built directly on Base UI's Dialog primitive (Portal escapes the vibrancy
+ * containing-block, plus focus-trap / scroll-lock / Esc for free). Motion is
+ * bespoke: the surface is anchored near the top (no vertical-centering
+ * transform to fight) and springs in via `sheet-pop-in` / out via
+ * `sheet-pop-out`, so open *and* close feel smooth. `⌘/Ctrl+Enter` submits.
+ */
+export function NewThreadDialog({
+  open,
+  onClose,
+  onCreate,
+  agentId,
+}: {
+  open: boolean
+  onClose: () => void
+  onCreate: (opts: CreateThreadOpts) => void
+  /** owning agent — scopes the draft key and receives on-attach uploads */
+  agentId: string
+}) {
+  const {
+    title,
+    setTitle,
+    firstMessage,
+    setFirstMessage,
+    files,
+    setFiles,
+    paused,
+    setPaused,
+    busy,
+    err,
+    canCreate,
+    msgRef,
+    submit,
+    onKeyDown,
+    addFiles,
+  } = useNewThreadDraft(agentId, open, onCreate)
+
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={(o) => !o && close()}>
+    <DialogPrimitive.Root open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Backdrop
           className={cn(
@@ -110,7 +241,7 @@ export function NewThreadDialog({
               </span>
               <button
                 type="button"
-                onClick={close}
+                onClick={onClose}
                 aria-label="Close"
                 className="ml-auto flex size-6 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
               >
@@ -141,6 +272,7 @@ export function NewThreadDialog({
               files={files}
               onRemove={(i) => setFiles((p) => p.filter((_, idx) => idx !== i))}
             />
+            {err && <span className="px-4 pb-1 text-[11px] text-(--danger)">{err}</span>}
 
             {/* footer — attach + start-paused toggle (left), Create (right) */}
             <div className="flex items-center gap-3 border-t border-border px-3.5 py-2.5">
@@ -148,12 +280,20 @@ export function NewThreadDialog({
                 title="Attach files"
                 className="flex size-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground"
               >
-                <Paperclip className="size-4" />
+                {busy ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Paperclip className="size-4" />
+                )}
                 <input
                   type="file"
                   multiple
                   className="hidden"
-                  onChange={(e) => addFiles(e.target.files)}
+                  disabled={busy}
+                  onChange={(e) => {
+                    void addFiles(e.target.files)
+                    e.target.value = ""
+                  }}
                 />
               </label>
 
@@ -164,7 +304,7 @@ export function NewThreadDialog({
 
               <button
                 type="submit"
-                disabled={!canCreate}
+                disabled={!canCreate || busy}
                 className="ml-auto flex items-center gap-1.5 rounded-md bg-(--signal) px-3 py-1.5 text-[12.5px] font-medium text-(--primary-foreground) transition-[filter] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Create thread
@@ -202,14 +342,20 @@ function PausedToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   )
 }
 
-/** Staged-attachment chips (removable). Files upload only on submit. */
-function FileChips({ files, onRemove }: { files: File[]; onRemove: (index: number) => void }) {
+/** Staged-attachment chips (removable). Files are already uploaded (T679). */
+function FileChips({
+  files,
+  onRemove,
+}: {
+  files: UploadedFile[]
+  onRemove: (index: number) => void
+}) {
   if (files.length === 0) return null
   return (
     <div className="flex flex-wrap gap-1.5 px-4 pb-1">
       {files.map((f, i) => (
         <span
-          key={`${f.name}-${i}`}
+          key={`${f.path}-${i}`}
           className="flex items-center gap-1.5 rounded-md border border-border bg-muted/50 px-2 py-1 text-[11px] text-foreground/80"
         >
           <span className="max-w-[180px] truncate">{f.name}</span>
