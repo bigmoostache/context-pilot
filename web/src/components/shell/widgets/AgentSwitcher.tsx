@@ -54,7 +54,8 @@ export function AgentSwitcher({
       <DropdownMenuTrigger
         className={cn(
           "flex h-8 items-center gap-2 rounded-md px-1.5 text-left transition-colors outline-none",
-          "hover:bg-muted/50",
+          // Exact same hover as a threads-sidebar row (T676): soft card lift.
+          "hover:card-shadow hover:bg-card",
         )}
       >
         {/* Single-line trigger: just the workspace name (the folder path was
