@@ -14,6 +14,18 @@ import { fetchLibraryAgent } from "@/lib/api"
 import type { LibraryItem } from "@/lib/types"
 import { AgentEditorDialog, type AgentEditorMode } from "./AgentEditorDialog"
 
+/**
+ * Standard dropdown-row highlight — the SAME soft signal wash the AgentSwitcher
+ * uses (T697), so every menu in the app reads identically on hover/keyboard
+ * focus. `color-mix` over transparent darkens correctly in dark mode and
+ * lightens from the popover surface in light mode; the `!` beats base-ui's stock
+ * `focus:bg-accent` / `data-highlighted` defaults, and `transition-colors`
+ * gives the Linear-smooth fade. Text is pinned to `foreground` so the wash never
+ * washes the label out.
+ */
+const ROW_HILITE =
+  "transition-colors focus:bg-[color-mix(in_oklab,var(--signal)_11%,transparent)]! focus:text-foreground! data-highlighted:bg-[color-mix(in_oklab,var(--signal)_11%,transparent)]! data-highlighted:text-foreground!"
+
 /** The editor dialog's open state: closed, or open in one of its three flows. */
 type EditorState =
   | { open: false }
@@ -146,7 +158,7 @@ export function BehaviourChip({ agentId }: { agentId: string }) {
     <>
       <span className="h-3.5 w-px bg-border" />
       <DropdownMenu>
-        <DropdownMenuTrigger className="flex cursor-pointer items-center gap-1.5 rounded-sm px-1.5 py-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground/85 focus:outline-none">
+        <DropdownMenuTrigger className="flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground/85 focus:outline-none">
           <Bot className="size-3.5" />
           <span className="max-w-[120px] truncate font-medium text-foreground/80">
             {activeName}
@@ -156,14 +168,17 @@ export function BehaviourChip({ agentId }: { agentId: string }) {
           <DropdownMenuGroup>
             <DropdownMenuLabel>System prompt</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setEditor({ open: true, mode: { kind: "create" } })}>
-              <span className="flex items-center gap-2 text-foreground/80">
-                <Plus className="size-3.5" /> Create agent
+            <DropdownMenuItem
+              className={ROW_HILITE}
+              onClick={() => setEditor({ open: true, mode: { kind: "create" } })}
+            >
+              <span className="flex items-center gap-2 text-foreground/80 group-focus/dropdown-menu-item:text-foreground! group-data-highlighted/dropdown-menu-item:text-foreground!">
+                <Plus className="size-3.5 text-muted-foreground/70" /> Create agent
               </span>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
-              <span className="flex items-center gap-2 text-foreground/80">
-                <Upload className="size-3.5" /> Import agent
+            <DropdownMenuItem className={ROW_HILITE} onClick={() => fileInputRef.current?.click()}>
+              <span className="flex items-center gap-2 text-foreground/80 group-focus/dropdown-menu-item:text-foreground! group-data-highlighted/dropdown-menu-item:text-foreground!">
+                <Upload className="size-3.5 text-muted-foreground/70" /> Import agent
               </span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -254,11 +269,11 @@ function BehaviourRow({
   return (
     <DropdownMenuItem
       onClick={onSelect}
-      className={`group/row justify-between focus:bg-transparent focus:text-foreground data-highlighted:bg-transparent ${
-        item.active ? "font-semibold text-foreground" : "text-foreground/70 focus:font-medium"
+      className={`group/row justify-between ${ROW_HILITE} ${
+        item.active ? "font-semibold text-foreground" : "text-foreground/70"
       }`}
     >
-      <span className="flex items-center gap-2">
+      <span className="flex items-center gap-2 group-focus/dropdown-menu-item:text-foreground! group-data-highlighted/dropdown-menu-item:text-foreground!">
         {item.active ? (
           <span className="size-1.5 rounded-full bg-(--ok)" />
         ) : (
@@ -269,7 +284,7 @@ function BehaviourRow({
         )}
         {item.name || item.id}
       </span>
-      <span className="flex items-center gap-1 opacity-0 transition-opacity group-hover/row:opacity-100">
+      <span className="flex items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover/row:opacity-100">
         <RowButton title="Edit" onClick={stopAnd(onEdit)}>
           <Pencil className="size-3" />
         </RowButton>
@@ -303,10 +318,10 @@ function RowButton({
       type="button"
       title={title}
       onClick={onClick}
-      className={`flex size-5 items-center justify-center rounded-sm transition-colors ${
+      className={`flex size-5 items-center justify-center rounded-md transition-colors ${
         danger
-          ? "text-muted-foreground/70 hover:text-(--danger)"
-          : "text-muted-foreground/70 hover:text-foreground"
+          ? "text-muted-foreground/70 hover:bg-muted hover:text-(--danger)"
+          : "text-muted-foreground/70 hover:bg-muted hover:text-foreground"
       }`}
     >
       {children}
