@@ -1,15 +1,17 @@
 # pcat-installer.service — runs the eMMC flasher once on the init-SD's boot.
 #
-# Fires on the init-SD's first boot, flashes the eMMC, and powers the board off.
-# Ordered after the local filesystems (the golden image lives on the init-SD
-# rootfs) but does NOT need the network — the whole install is offline. Python3 +
-# spidev are on the init-SD image for the LCD painter.
+# Fires on the init-SD's first boot and flashes the eMMC. Ordered after the local
+# filesystems (the payload lives on the init-SD rootfs) but does NOT need the
+# network — the whole install is offline. Python3 + spidev are on the init-SD
+# image for the LCD painter.
 #
-# The script stamps /run/pcat-install.done (tmpfs) and powers off on success.
+# The script stamps /run/pcat-install.done (tmpfs) and, by default, LEAVES THE
+# BOARD ON with the address painted on the LCD (the operator powers off with the
+# button). AUTO_POWEROFF=1 on the card restores the unattended behaviour.
 # Because the stamp lives in /run it is gone on the next power-on, so the SAME
 # card re-flashes each fresh boot — a reusable fleet tool for hundreds of boxes.
-# Leaving the card in across a reboot just re-flashes the same golden bytes
-# (idempotent no-op, sha256 verify still passes).
+# Leaving the card in across a reboot just re-flashes the same bytes (idempotent
+# no-op, sha256 verify still passes).
 
 [Unit]
 Description=Photonicat zero-touch eMMC installer (init-SD)

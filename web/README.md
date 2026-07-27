@@ -43,11 +43,12 @@ CP_BRIDGE=1 cargo run --release           # self-registers with backend
 
 ## Environment variables
 
-| Variable       | Default                 | Description                                |
-| -------------- | ----------------------- | ------------------------------------------ |
-| `CP_ORCH_PORT` | `7878`                  | Orchestrator HTTP port                     |
-| `VITE_API_URL` | `http://localhost:7878` | Backend URL (web client)                   |
-| `CP_BRIDGE`    | unset                   | Set to `1` to activate agent bridge in TUI |
+| Variable       | Default                 | Description                                                                                  |
+| -------------- | ----------------------- | -------------------------------------------------------------------------------------------- |
+| `CP_ORCH_PORT` | `7878`                  | Orchestrator HTTP port                                                                       |
+| `CP_ORCH_BIND` | `127.0.0.1`             | Orchestrator listen address — loopback (Caddy fronts the LAN); `0.0.0.0` opens a dev backend |
+| `VITE_API_URL` | `http://localhost:7878` | Backend URL (web client)                                                                     |
+| `CP_BRIDGE`    | unset                   | Set to `1` to activate agent bridge in TUI                                                   |
 
 ## Data flow
 

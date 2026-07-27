@@ -25,6 +25,28 @@
   delay: 1
   until: health.status == 200
 
+# Caddy is the box's only LAN-facing app surface. The orchestrator speaks
+# cleartext HTTP and its auth model assumes an encrypted transport, so a backend
+# socket on the LAN would let anyone skip both the TLS and the :80 -> :443
+# redirect. The binary binds loopback by default (CP_ORCH_BIND) — this asserts
+# the running process actually did, rather than trusting the unit file.
+- name: List the addresses the orchestrator listens on
+  ansible.builtin.shell:
+    cmd: set -o pipefail; ss -Hltn "sport = :7878" | awk '{print $4}'
+    executable: /bin/bash
+  changed_when: false
+  register: orch_listen
+
+- name: Assert the orchestrator faces the loopback only
+  ansible.builtin.assert:
+    that:
+      - orch_listen.stdout_lines | reject('match', '(127\.|\[::1\])') | list | length == 0
+    fail_msg: >-
+      The orchestrator is listening on {{ orch_listen.stdout_lines | join(', ') }} —
+      the backend is reachable from the LAN in cleartext, bypassing Caddy.
+      Check CP_ORCH_BIND in the context-pilot unit (expected 127.0.0.1).
+    success_msg: "orchestrator bound to {{ orch_listen.stdout_lines | join(', ') | default('nothing', true) }} — Caddy is the only front door"
+
 - name: (Re)start Caddy (now that the orchestrator wrote the Caddyfile)
   ansible.builtin.systemd_service:
     name: caddy
@@ -35,8 +57,13 @@
 # the cockpit on :80 (day-0) or :443 (once the client names the box), so the
 # public URL depends on provisioning state and is reported, not probed.
 - name: Report readiness
+  # An IPv6 ansible_host (the fleet ULA) MUST be bracketed in a URL — a bare
+  # fd59:…:f10d:80 is unparseable for a browser or curl, and that URL is what the
+  # technician pastes at day-0. Detect it by the ':' that no IPv4/DNS host has.
   ansible.builtin.debug:
     msg: >-
       {{ inventory_hostname }} ready —
-      day-0 setup at http://{{ ansible_host | default(inventory_hostname) }}:80
+      day-0 setup at http://{{ ('[' ~ _day0_host ~ ']') if ':' in _day0_host else _day0_host }}:80
       (unprovisioned box; becomes https://<name> once the client names it).
+  vars:
+    _day0_host: "{{ ansible_host | default(inventory_hostname) }}"

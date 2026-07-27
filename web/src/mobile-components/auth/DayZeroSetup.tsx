@@ -7,7 +7,7 @@
 // focusing a field never triggers iOS Safari's focus-zoom.
 
 import { useEffect, useState, type SyntheticEvent } from "react"
-import { setItIdentity, fetchItCaFingerprint, downloadItCaCert } from "@/lib/api"
+import { setItIdentity, fetchItIdentity, fetchItCaFingerprint, downloadItCaCert } from "@/lib/api"
 import { useAuth } from "@/lib/providers/auth"
 
 export function DayZeroSetup() {
@@ -44,8 +44,31 @@ export function DayZeroSetup() {
 function IdentityPhase({ onDone }: { onDone: () => void }) {
   const [name, setName] = useState("")
   const [ip, setIp] = useState("")
+  const [detected, setDetected] = useState<{ ipv4: string | null } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+
+  // The operator reaches a day-0 box over its fleet ULA — deterministic, derived
+  // from the hardware serial, printable before the box ever boots — precisely
+  // BECAUSE nobody knows the DHCP IPv4 yet. The box is the only party that does,
+  // so it reports it and we seed the field with it rather than asking the operator
+  // to go find it. Prefill only: a failure leaves an empty, still-usable form.
+  useEffect(() => {
+    let live = true
+    fetchItIdentity()
+      .then((res) => {
+        if (!live) return
+        setDetected(res.detected)
+        setName(res.identity?.name ?? "")
+        setIp(res.identity?.ip ?? res.detected.ipv4 ?? "")
+      })
+      .catch(() => {
+        /* prefill is a convenience: on failure the operator just types the address */
+      })
+    return () => {
+      live = false
+    }
+  }, [])
 
   const submit = async (e: SyntheticEvent) => {
     e.preventDefault()
@@ -72,6 +95,7 @@ function IdentityPhase({ onDone }: { onDone: () => void }) {
         autoFocus
       />
       <Field label="LAN IP address" value={ip} onChange={setIp} placeholder="192.168.1.116" />
+      {detected && <DetectedAddresses detected={detected} />}
       <p className="-mt-1 text-[11px] text-muted-foreground">
         Saving issues the TLS certificate for this name/IP and brings the secure (https) site up.
         Use a static lease so the address doesn't change.
@@ -204,5 +228,21 @@ function Field({
                    placeholder:text-muted-foreground/50 focus:border-signal focus:ring-1 focus:ring-signal focus:outline-none"
       />
     </label>
+  )
+}
+
+/** The LAN address the box observes on itself, so the operator never has to guess
+ *  what belongs in the field above. Only the client-facing IPv4 is shown: the
+ *  fleet ULAs are ours, they are already covered by the certificate
+ *  automatically, and nothing the operator does here depends on seeing them.
+ *  Stacked rather than two-column: the value stays readable on a phone. */
+function DetectedAddresses({ detected }: { detected: { ipv4: string | null } }) {
+  return (
+    <dl className="-mt-1 flex flex-col gap-2 rounded-md bg-muted/40 px-3 py-2 text-xs">
+      <div className="flex flex-col gap-0.5">
+        <dt className="text-muted-foreground">Detected LAN address — the client uses this</dt>
+        <dd className="font-mono break-all text-foreground">{detected.ipv4 ?? "unknown"}</dd>
+      </div>
+    </dl>
   )
 }

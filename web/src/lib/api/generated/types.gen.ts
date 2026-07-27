@@ -294,12 +294,21 @@ export type Identity = {
     name: string;
 };
 
+/**
+ * Addresses the box observes on itself, so the day-0 wizard can tell the operator which one to hand to the client instead of guessing. `ipv4` is the source address the kernel would route from (the DHCP lease in practice), and is what belongs in `Identity.ip`. `ulas` are the fleet ULAs (RFC 4193), derived from the hardware serial and therefore permanent: a maintenance plane for the vendor, not an address the client can use.
+ */
+export type ItDetectedAddresses = {
+    ipv4: string | null;
+    ulas: Array<string>;
+};
+
 export type ItFingerprint = {
     algorithm: string;
     fingerprint: string;
 };
 
 export type ItIdentityResponse = {
+    detected: ItDetectedAddresses;
     identity: Identity | null;
 };
 
