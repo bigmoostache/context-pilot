@@ -58,7 +58,7 @@ export function AgentSwitcher({
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn(
-          "flex h-8 items-center gap-2 rounded-md px-1.5 text-left transition-colors outline-none",
+          "flex h-8 items-center gap-2 rounded-lg px-1.5 text-left transition-colors outline-none",
           // Exact same hover as a threads-sidebar row (T676): soft card lift.
           "hover:card-shadow hover:bg-card",
         )}
