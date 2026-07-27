@@ -326,7 +326,7 @@ function ThreadRow({
       onMouseEnter={marquee.onMouseEnter}
       onMouseLeave={marquee.onMouseLeave}
       className={cn(
-        "group relative flex w-full flex-col gap-1 rounded-lg px-2.5 py-2 text-left transition-colors select-none",
+        "group relative mb-0.5 flex w-full flex-col gap-1 rounded-lg px-2.5 py-2 text-left transition-colors select-none",
         selected ? "card-shadow bg-card" : "hover:card-shadow hover:bg-card",
       )}
     >
