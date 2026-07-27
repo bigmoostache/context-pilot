@@ -356,7 +356,7 @@
   - prettier
   - gotcha
   - post-mortem
-  last_edited_ms: 0
+  last_edited_ms: 1785166436193
 6cc818f12c0d231a:
   tl_dr: 'DOCUMENTATION QUALITY: Documentation is ABSOLUTELY CRITICAL. Do NOT half-ass it. If understanding a function requires opening extra files to see context, DO IT. Don''t document to document — document to HELP future readers. Take the extra step.'
   importance: critical
