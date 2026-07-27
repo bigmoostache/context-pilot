@@ -25,4 +25,4 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)/web"
 
 echo "check-web-deadcode: knip (dead files / exports / deps)…"
-npx knip
+npx knip --debug --no-progress
