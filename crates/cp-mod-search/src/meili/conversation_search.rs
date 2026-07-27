@@ -23,6 +23,14 @@ use crate::meili::api::{MeiliClient, SearchParams};
 /// leg dominates.
 const CONVERSATION_SEMANTIC_RATIO: f64 = 0.5;
 
+/// Max characters of a message returned in a [`ConvHit`]. A search hit is a
+/// preview line, not the whole message, so the stored text is snippet-capped
+/// here at the source: it keeps the reply small (a whole thread's worth of
+/// multi-KB messages otherwise blows the backend's framed-read bound) and
+/// matches what the palette actually renders — one truncated line. UTF-8-safe
+/// (cut on a `char` boundary via `chars().take`).
+const HIT_SNIPPET_CHARS: usize = 280;
+
 /// Resolved inputs for [`search_conversations`].
 ///
 /// A single params struct (rather than six positional arguments) keeps the
@@ -104,11 +112,14 @@ fn parse_hits(json: &serde_json::Value) -> Vec<ConvHit> {
 /// Build one [`ConvHit`] from a single Meilisearch hit document.
 fn hit_from_doc(doc: &serde_json::Value) -> ConvHit {
     let str_field = |k: &str| doc.get(k).and_then(serde_json::Value::as_str).unwrap_or_default().to_owned();
+    // Snippet-cap the message text (UTF-8-safe) — a hit is a preview, not the
+    // whole message; keeps the framed reply small (see HIT_SNIPPET_CHARS).
+    let text: String = str_field("text").chars().take(HIT_SNIPPET_CHARS).collect();
     ConvHit::from_parts(&cp_wire::types::payload::query::HitParts {
         thread_id: &str_field("thread_id"),
         thread_name: &str_field("thread_name"),
         author: &str_field("author"),
-        text: &str_field("text"),
+        text: &text,
         ts_ms: doc.get("ts_ms").and_then(serde_json::Value::as_u64).unwrap_or(0),
         score: doc.get("_rankingScore").and_then(serde_json::Value::as_f64).unwrap_or(0.0),
     })

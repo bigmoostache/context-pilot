@@ -40,9 +40,13 @@ pub use crate::registry::tailer::Tailer;
 /// Subdirectory of the oplog directory holding spilled body files.
 const BODIES_DIR: &str = "bodies";
 
-/// Maximum bytes to accumulate when reading an ack before giving up (a
+/// Maximum bytes to accumulate when reading a framed reply before giving up (a
 /// safety bound against a peer that sends an endless un-decodable stream).
-const MAX_ACK_BUFFER: usize = 64 * 1024;
+/// Sized for the largest legitimate reply — a `SearchConversations` response
+/// carrying up to 100 snippet-capped hits (an ack is a few hundred bytes, so
+/// the shared bound is generous for it) — so a valid multi-hit response is
+/// never mistaken for a runaway stream.
+const MAX_ACK_BUFFER: usize = 8 * 1024 * 1024;
 
 /// Read timeout applied to the UDS socket when awaiting an ack.
 const ACK_READ_TIMEOUT: Duration = Duration::from_secs(5);

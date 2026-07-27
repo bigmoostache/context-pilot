@@ -650,6 +650,10 @@
   path: crates/cp-mod-git/src/cache_invalidation.rs
   description: 'Cache invalidation: 11 regex rules mapping mutating git commands to stale panel patterns, find_invalidations()'
   last_edited_ms: 0
+07950c817af2a15b:
+  path: crates/cp-orchestrator/src/registry/channel.rs
+  description: Per-agent channel — backend read/write handle. AgentChannel (from_entry/hydrate/send/send_with_retry) + read_ack. Tailer moved to sibling tailer.rs (split for 500-line limit) and re-exported here via `pub use crate::registry::tailer::Tailer` so channel::Tailer stays valid for all call sites. 320 lines.
+  last_edited_ms: 0
 079beba918e324ab:
   path: .git/index
   description: Git index (binary). Not source.
@@ -4326,6 +4330,10 @@
   path: crates/cp-mod-git/src/result_panel.rs
   description: 'GitResultPanel: static read-only command output panel (no auto-refresh). Timeout execution, diff-aware syntax coloring. Refreshes only when explicitly dirtied by mutating commands.'
   last_edited_ms: 1782988305173
+36223080b015debd:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 3626ade6e9ad38d4:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
@@ -5881,6 +5889,10 @@
 48adef6164d29e4e:
   path: web/src/lib/query/sse.ts
   description: 'Reconnecting SSE client for one agent''s event stream. EventSource with ticket auth, last_rev resume param (T268 fix), exponential backoff (1s→30s). Singleton per agent via getOrCreateSseClient. Named event listeners: delta/stream/resync/invalidate. Wildcard ''*'' subscriber support. subscribeConnection(callback) for reactive connection state (open/error transitions). web-lint P3: `closed` flag read through an isClosed() getter at the onerror + catch sites — a direct !closed is CFA-narrowed to always-true (its only mutation is in the deferred close()), a function call is opaque to CFA.'
+  last_edited_ms: 0
+48b838a4146ff35a:
+  path: crates/cp-mod-search/src/meili/conversation_search.rs
+  description: T671 stateless read-path hybrid search. SearchConvParams{port,master_key,project_hash,query,limit,thread_id} (6-field literal, dodges too_many_arguments, yaml-registered exhaustive). search_conversations() hybrid semanticRatio 0.5, thread_id filter, parse_hits maps _rankingScore+doc fields to ConvHit. No State borrow (takes creds by value).
   last_edited_ms: 0
 48c47f454669065f:
   path: crates/cp-mod-console/src/manager.rs
@@ -10538,6 +10550,10 @@
   path: web/src/mobile-components/threads/ThreadsView.tsx
   description: Mobile ThreadsView twin — conversation-primary + drawer (T609). Conversation is full-bleed base layer; thread list slides in from left as a drawer toggled by a fixed top-left PanelLeft button. Selecting/creating a thread closes drawer. drawerOpen state (opens on mount), scrim is a <button> (a11y), drawer always-mounted + translate-x. Logic from shared @/lib/live/threadView hooks; desktop untouched.
   last_edited_ms: 1784707598962
+81f3ff141192e0eb:
+  path: web/src/components/threads/ThreadList.tsx
+  description: Thread sidebar list. Grouped by turn-status (Agent's turn / User turn) + Archived view. Search now lives in ThreadSearchPalette (T669) opened from ListHeader's Search button; ListHeader also has a PanelLeftClose sidebar-collapse button. Row-hover title marquee via useTitleMarquee (WAA). Subcomponents RowActions/RowMeta/ListHeader/EmptyState keep budgets. Exactly 500 lines (cap).
+  last_edited_ms: 0
 81fdedff722ffbe6:
   path: web/src/components/shell/widgets/UsageButton.tsx
   description: 'Claude Code OAuth usage button. Anthropic "A" logomark trigger opens popover: account email, token status (valid/expired + expiry + refresh), session/weekly usage bars, LoginFlow (PKCE). T472 login-trap fix: waiting_for_code auto-poller snapshots current token expiry into baselineExpiryRef and only auto-completes on a token whose expiry STRICTLY exceeds baseline. P8: extracted TokenStatusRow (email + valid/expired row + refresh) and UsageLimits (bars/loading/error/empty) so UsageButton stays under cx15; WaitingForCode (the paste-code step) extracted so LoginFlow stays under the 150-line budget. Lazy-fetches on open, 30s auto-refresh.'
@@ -11234,6 +11250,10 @@
   path: web/src/lib/api/index.ts
   description: 'REST API client barrel. SDK layer: 28 endpoints via generated SDK. Re-exports ./auth+./finder+./body+./env-keys. web-lint P5: env-keys re-export will become ./envKeys after filename-case rename.'
   last_edited_ms: 1783412977275
+8a8f322b0658c4ab:
+  path: web/src/lib/api/index.ts
+  description: 'REST API client barrel. SDK layer: 28 endpoints via generated SDK. Re-exports ./auth+./finder+./body+./envKeys (env-keys.ts renamed envKeys.ts in web-lint P5 filename-case).'
+  last_edited_ms: 0
 8a987d9b5d2fe395:
   path: crates/cp-base/src/state/mod.rs
   description: 'State sub-module hub. Inline reverie module: Session + Kind enum #[expect(exhaustive_enums)] A4 (ContextOptimizer).'
@@ -12502,6 +12522,10 @@
   path: crates/cp-orchestrator/tests/openapi/schemas_ext.rs
   description: Transport-layer OpenAPI schemas — receipts, auth, env-keys, filesystem, FinderKind, LLM registry, SSE delta protocol (OpEntryKind incl 'state' field for lifecycle deltas — T566), release management, Claude Code usage+login.
   last_edited_ms: 1784213115955
+9a4eb57ff5d615b1:
+  path: web/src/components/threads/ThreadsView.tsx
+  description: 'Desktop ThreadsView — master-detail (list rail + conversation). railOpen collapse (T669) animates (T670): rail stays mounted, slides via transitioned negative left-margin; slide wrapper is flex (T670 fix 7117931e — a plain block wrapper broke the aside''s flex-stretch, collapsing it to content height); root overflow-hidden clips the off-screen rail; floating PanelLeft reopen button fades+nudges in when collapsed; motion-reduce snaps. Shared useThreadSelection+useThreadActions from lib/live/threadView. Mobile twin = stack nav.'
+  last_edited_ms: 0
 9a60d5ece4db8516:
   path: web/src/components/shell/TopBar.tsx
   description: 'Slim macOS-style title bar (T321 trimmed): app mark→fleet, agent switcher, per-agent view tabs (Threads/Finder/Cockpit/Costs), agent-config gear, UsageButton, account UserMenu. Costs tab dev-mode only. P8: view-tab cluster extracted into a ViewTabs subcomponent (moving the two devMode gates off TopBar''s complexity budget); TopBar fn now <150 lines / cx<15.'
@@ -16842,6 +16866,10 @@ cf7db5bad4e490d3:
   path: web/src/components/agents/FleetDashboard.tsx
   description: 'Fleet welcome dashboard (live). Accepts agents prop (useFleet). Agent cards: status pill + §19 HealthBadge (polls useMetrics → surfaces FIRST non-nominal condition as a coloured role=status pill: breaker.tripped→red ''Over budget'', stream.degraded→amber ''Stream degraded'', rev.lag>REV_LAG_WARN(50)→amber ''Projection lagging''; nominal/unloaded→renders nothing so healthy cards stay clean) — makes a tripped breaker VISIBLE not a silent latch (T121). model + cost. Create/manage via AgentModal.'
   last_edited_ms: 0
+cf7e2b00f02e704f:
+  path: .context-pilot/shared/memories.yaml
+  description: Agent-managed memory store (auto-synced from live state). Merge conflicts here are last_edited_ms churn only — resolve keeping real timestamps, preserve unique entries both sides.
+  last_edited_ms: 0
 cf7f4853ddd84a11:
   path: src/app/run/tools/watchdog.rs
   description: 'Interactive main-loop watchdog (T358) — PURELY OBSERVATIONAL wedge detector + auto-diagnostics, never terminates/signals (human at keyboard). Two cooperating detectors on the single-threaded TUI loop: (1) heartbeat — beat() stored at loop top each iteration; stale > WEDGE_STALL_MS(15s) ⇒ total wedge; (2) activity marker — mark(Step) before each loop phase (Step enum 0..12 Idle/Input/Bridge/ThreadsEmit/Stream/Cache/Watchers/Tools/Spine/Reverie/PanelRefresh/Render/Save); a step in flight > SLOW_STEP_MS(12s) ⇒ names the wedged culprit. spawn() launches a detached monitor_loop()->! polling every 2s; on a trip dump_diagnostic(&Wedge) writes .context-pilot/errors/watchdog-<ts>.log with CPU% (high=busy-loop, low=blocked/deadlock) + per-thread states (Linux /proc/self/task wchan) / macOS `sample` backtrace. beat/mark = AtomicU64/U8 Relaxed (~ns, zero happy-path cost). Episode-dedup via last heartbeat. CPU_SAMPLE_MS cfg-gated to linux.'
@@ -17766,6 +17794,10 @@ dc9f4e77914b4f5c:
   path: crates/cp-mod-git/src/lib.rs
   description: 'Git module. 1 tool: git_execute. refresh_git_status() for overview (branch + numstat). Watches .git/ paths. watcher_immediate_refresh=false to prevent feedback. overview_context_section renders changes table — HARD-CAPPED at GIT_OVERVIEW_CAP_BYTES (8 KiB): a broken .gitignore mid-rebase can make git report thousands of files, ballooning the section to 1M+ tokens and wrecking context; beyond budget it truncates on a newline boundary + appends ''(Rest hidden, N kB left)''.'
   last_edited_ms: 1782291787377
+dca6b79ffd20f2bf:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 dcacc6ed6d035d9d:
   path: web/src/mobile-components/finder/preview/livePreviews.tsx
   description: Mobile live Finder previews twin. Touch-sized zoom/copy/save (36-40px active-press vs desktop hover), MarkdownEditor lazy import swapped to @/mobile-components twin (leak guard), SheetGrid stub lazy-load (Univer touch-native). dangerouslySetInnerHTML scope-off in eslint.config + registry.
@@ -18113,6 +18145,10 @@ e1edbb91772b4d91:
 e1f54075ea2f5313:
   path: crates/cp-mod-files/Cargo.toml
   description: 'Files module deps: cp-base, cp-mod-tree, cp-mod-queue, cp-render, crossterm, serde_json.'
+  last_edited_ms: 0
+e1fbec93c7d9cd99:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 e200b487ca0a32a7:
   path: .git/index
