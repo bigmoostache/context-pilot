@@ -471,7 +471,7 @@ export function ThreadComposer({
   }
 
   return (
-    <div className="shrink-0 px-5 pt-2 pb-4">
+    <div className="shrink-0 px-5 pb-4">
       {/* Unified bubble row (T350) — file-upload chips + /command suggestions +
           the create-command pill, all in ONE transparent, normal-flow container
           between the conversation and the textarea. */}
