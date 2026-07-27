@@ -1,0 +1,79 @@
+---
+# Modem tooling for the Photonicat 2 (Quectel RM520N-GL 5G modem).
+#
+# Scope: install ONLY the packages needed to talk to / experiment with the modem.
+# No WAN config, no NetworkManager, no routing, no APN — that is deliberately left
+# for later. This just makes the standard modem toolbox available on the box.
+#
+# What you get:
+#   • mmcli      (modemmanager)    — high-level modem control + status
+#   • qmicli     (libqmi-utils)    — raw QMI on /dev/cdc-wdm0
+#   • mbimcli    (libmbim-utils)   — raw MBIM (if the modem is switched to MBIM)
+#   • picocom    (picocom)         — serial terminal for AT commands on /dev/ttyUSB*
+#   • usb_modeswitch(usb-modeswitch) — USB composite-mode switching, if ever needed
+#
+# ModemManager is enabled + started so `mmcli -L` works out of the box. Note: MM
+# claims the modem's control ports, which can get in the way of raw qmicli/AT
+# poking — stop it first (`systemctl stop ModemManager`) when you want the ports
+# to yourself.
+#
+# GOTCHA baked in below: the modem enumerates at boot, but ModemManager's udev
+# rules (77-mm-*.rules) only land now, with the package. So the already-present
+# ports — crucially the QMI *net* port (wwu1u1i4) — were never tagged, and MM
+# fails to assemble the modem ("Failed to find a net port in the QMI modem"). A
+# reboot would self-heal, but we don't require one: we reload the udev rules and
+# re-trigger add events (net subsystem included) so the live modem gets tagged,
+# then (re)start MM to re-probe. On a fresh boot this is a harmless no-op.
+#
+# Skip entirely with -e cp_install_modem=false.
+
+- name: Install the 5G modem toolbox (ModemManager + libqmi/libmbim + serial term)
+  ansible.builtin.apt:
+    name:
+      - modemmanager
+      - libqmi-utils
+      - libmbim-utils
+      - usb-modeswitch
+      - picocom
+    state: present
+    update_cache: true
+  register: _modem_pkgs
+
+- name: Re-tag the already-enumerated modem for the freshly-installed MM udev rules
+  # Only needed the run that installs MM (the modem was already up before its rules
+  # existed). --action=add across the modem-relevant subsystems, net INCLUDED, so
+  # the QMI net port gets its ID_MM_CANDIDATE tag and MM can find it; settle waits
+  # for the events to drain before MM re-probes.
+  ansible.builtin.shell: >-
+    udevadm control --reload-rules &&
+    udevadm trigger --action=add
+    --subsystem-match=usb --subsystem-match=usbmisc
+    --subsystem-match=tty --subsystem-match=net &&
+    udevadm settle
+  when: _modem_pkgs is changed
+  changed_when: false
+
+- name: Enable + (re)start ModemManager so it probes the (now-tagged) modem
+  # Restart — not just start — when the package was newly installed, because the
+  # postinst already started MM once BEFORE the re-tag above, so it needs another
+  # probe pass to actually assemble the modem.
+  ansible.builtin.systemd_service:
+    name: ModemManager
+    state: "{{ 'restarted' if (_modem_pkgs is changed) else 'started' }}"
+    enabled: true
+    daemon_reload: true
+
+- name: Wait for ModemManager to detect the modem
+  ansible.builtin.command: mmcli -L
+  register: _mm_list
+  until: "'/Modem/' in _mm_list.stdout"
+  retries: 12
+  delay: 3
+  changed_when: false
+  failed_when: false
+
+- name: Report detected modems
+  ansible.builtin.debug:
+    msg: >-
+      {{ _mm_list.stdout if ('/Modem/' in (_mm_list.stdout | default('')))
+         else 'No modem detected yet — check `mmcli -L` on the box (hardware/coverage).' }}

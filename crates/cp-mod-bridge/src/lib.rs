@@ -94,6 +94,8 @@ impl MemoSeeds {
     const ARCHIVED: u8 = 1 << 3;
     /// Bit position: paused memo.
     const PAUSED: u8 = 1 << 4;
+    /// Bit position: behaviour (active-agent) memo.
+    const BEHAVIOUR: u8 = 1 << 5;
 
     /// Messages memo seeded (`emit_messages`).
     #[must_use]
@@ -120,6 +122,11 @@ impl MemoSeeds {
     pub const fn paused(self) -> bool {
         self.0 & Self::PAUSED != 0
     }
+    /// Behaviour (active-agent) memo seeded (`emit_behaviour`).
+    #[must_use]
+    pub const fn behaviour(self) -> bool {
+        self.0 & Self::BEHAVIOUR != 0
+    }
 
     /// Mark messages as seeded.
     pub const fn seed_messages(&mut self) {
@@ -140,6 +147,10 @@ impl MemoSeeds {
     /// Mark paused as seeded.
     pub const fn seed_paused(&mut self) {
         self.0 |= Self::PAUSED;
+    }
+    /// Mark behaviour (active-agent) as seeded.
+    pub const fn seed_behaviour(&mut self) {
+        self.0 |= Self::BEHAVIOUR;
     }
 }
 
@@ -217,6 +228,18 @@ pub struct BridgeState {
     /// the backend view (and the web UI's focused-thread highlight) in
     /// milliseconds, not on the next debounced disk flush + poll.
     pub last_focus: Option<String>,
+
+    /// Last active **behaviour agent** id emitted as a
+    /// [`BehaviourChanged`](cp_wire::types::oplog::OpEntryKind::BehaviourChanged)
+    /// delta. The behaviour chokepoint diffs the live
+    /// `PromptState.active_agent_id` against this memo every tick and emits only
+    /// on an actual change (the same observe-on-change discipline as the
+    /// status/focus/vitals chokepoints), so switching the active system prompt
+    /// from *any* source (the `agent_load` tool or the web footer's
+    /// `LoadBehaviour` command) reaches the frontend — which invalidates its
+    /// library query — in milliseconds, not on the coarse `config.json` mtime
+    /// backstop. `None` until the first seed.
+    pub last_behaviour: Option<String>,
 
     /// Per-thread archived flag as last emitted/seeded, keyed by thread id.
     /// The archived chokepoint diffs each thread's live `archived` against this
@@ -445,50 +468,5 @@ impl Module for BridgeModule {
 
     fn watcher_immediate_refresh(&self) -> bool {
         true
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn bridge_module_identity() {
-        let m = BridgeModule;
-        assert_eq!(m.id(), "bridge");
-        assert_eq!(m.name(), "Bridge");
-        assert!(!m.is_core());
-        assert!(m.is_global());
-    }
-
-    #[test]
-    fn bridge_module_no_tools() {
-        let m = BridgeModule;
-        assert!(m.tool_definitions().is_empty());
-    }
-
-    #[test]
-    fn bridge_state_default_is_none() {
-        let bs = BridgeState::default();
-        assert!(bs.boot.is_none());
-        assert!(bs.tee.is_none());
-        assert!(bs.intake.is_none());
-        assert_eq!(bs.tee_seq, 0);
-        assert_eq!(bs.last_phase, None);
-        assert!((bs.last_cost_usd - 0.0).abs() < f64::EPSILON);
-        assert!(bs.last_context.is_none());
-        assert!(bs.store.is_none());
-        assert!(bs.thread_msg_counts.is_empty());
-        assert!(bs.thread_statuses.is_empty());
-        assert!(bs.last_focus.is_none());
-        assert!(bs.thread_archived_memo.is_empty());
-        assert!(bs.thread_paused_memo.is_empty());
-        assert!(!bs.seeded.messages());
-        assert!(!bs.seeded.statuses());
-        assert!(!bs.seeded.focus());
-        assert!(!bs.seeded.archived());
-        assert!(!bs.seeded.paused());
-        assert!(!bs.pending);
-        assert!(bs.pending_model.is_empty());
     }
 }

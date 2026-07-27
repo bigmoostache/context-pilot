@@ -13,8 +13,8 @@ import {
   X,
 } from "lucide-react"
 import { ScrollArea } from "@/mobile-components/ui/scroll-area"
-import { FrostedBottomBar } from "@/mobile-components/shell/FrostedBottomBar"
-import { CornerButton } from "@/mobile-components/shell/CornerButton"
+import { FrostedBottomBar } from "@/mobile-components/shell/chrome/FrostedBottomBar"
+import { CornerButton } from "@/mobile-components/shell/chrome/CornerButton"
 import { useElementHeight } from "@/lib/live/useElementHeight"
 import { accentVar, fmtCost, FLEET_MAX_W } from "@/lib/support/panelMeta"
 import { useMetrics, useRetireAgent, useAgentMeta, useCreateAgent } from "@/lib/live"

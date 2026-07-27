@@ -5,7 +5,7 @@
 //!
 //! Previously this logic was duplicated across 3+ provider implementations:
 //! - `anthropic/messages.rs` — `messages_to_api()`
-//! - `claude_code/stream.rs` — inline panel injection
+//! - `claude_code_v2/mod.rs` — inline panel injection
 //! - `openai_compat.rs` — `build_messages()`
 //!
 //! Now: ONE function, ONE representation, all providers just serialize.

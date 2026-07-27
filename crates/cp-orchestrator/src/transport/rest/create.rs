@@ -284,3 +284,174 @@ struct CreateCommandReceipt {
     id: String,
     status: &'static str,
 }
+
+// ── Agent library CRUD (T581 footer editor) ─────────────────────────
+
+/// `GET /api/agent/{id}/library/agent/{itemId}` — one behaviour agent's raw
+/// authoring fields for the footer selector's Export + Edit-prefill.
+///
+/// Returns `{ name, description, body, builtin }`. Reads the on-disk
+/// `agents/<itemId>.md` when present (a user agent or a local override of a
+/// built-in); otherwise falls back to the compiled-in seed of that id (a pure
+/// built-in with no local copy — still exportable + editable, editing writes
+/// the first override). `404` only when neither a disk file nor a seed exists.
+pub fn read_library_agent(state: &Mutex<Backend>, id: &str, item_id: &str) -> HttpReply {
+    let entry = match resolve_entry(state, id) {
+        Ok(e) => e,
+        Err(reply) => return reply,
+    };
+    let file_path =
+        std::path::Path::new(&entry.folder).join(".context-pilot").join("agents").join(format!("{item_id}.md"));
+
+    // Disk copy wins (user agent or local override); it also carries the
+    // `builtin` flag when its id shadows a compiled-in seed.
+    if let Ok(content) = std::fs::read_to_string(&file_path) {
+        let (name, description, body) = split_frontmatter(&content);
+        let builtin = seed_agent(item_id).is_some();
+        return HttpReply::json(200, &LibraryAgentRaw { name, description, body, builtin });
+    }
+
+    // No disk file — a pure built-in. Serve its seed so Export/Edit still work.
+    match seed_agent(item_id) {
+        Some(seed) => HttpReply::json(
+            200,
+            &LibraryAgentRaw {
+                name: seed.name.clone(),
+                description: seed.description.clone(),
+                body: seed.content.clone(),
+                builtin: true,
+            },
+        ),
+        None => HttpReply::error(404, "no such agent"),
+    }
+}
+
+/// `PUT /api/agent/{id}/library/agent/{itemId}` — create or overwrite a
+/// behaviour agent's `.md` (create a user agent, or write a local override of a
+/// built-in).
+///
+/// Body: `{ "name": "...", "description": "...?", "body": "..." }`. `name` and
+/// `body` are required. The file id is the URL's `itemId` (stable across edits —
+/// only the frontmatter `name` changes, so a rename never orphans the file);
+/// unlike [`create_command`] this DELIBERATELY overwrites, since overwriting a
+/// built-in's id is exactly how an override is authored.
+///
+/// Returns `200` `{ id, status }`, `400` for a blank name/body or malformed
+/// JSON, `404` for an unknown agent, `502` if the file cannot be written.
+pub fn upsert_library_agent(state: &Mutex<Backend>, id: &str, item_id: &str, body_bytes: &[u8]) -> HttpReply {
+    let Ok(req) = serde_json::from_slice::<UpsertAgentReq>(body_bytes) else {
+        return HttpReply::error(400, "malformed upsert-agent request");
+    };
+    let name = req.name.trim();
+    if name.is_empty() {
+        return HttpReply::error(400, "agent name is required");
+    }
+    let body = req.body.trim();
+    if body.is_empty() {
+        return HttpReply::error(400, "agent body is required");
+    }
+
+    let entry = match resolve_entry(state, id) {
+        Ok(e) => e,
+        Err(reply) => return reply,
+    };
+    let agents_dir = std::path::Path::new(&entry.folder).join(".context-pilot").join("agents");
+    let file_path = agents_dir.join(format!("{item_id}.md"));
+
+    if let Err(e) = std::fs::create_dir_all(&agents_dir) {
+        return HttpReply::error(502, &format!("could not create agents directory: {e}"));
+    }
+    let markdown = compose_md(name, req.description.trim(), body);
+    if let Err(e) = std::fs::write(&file_path, markdown) {
+        return HttpReply::error(502, &format!("could not write agent file: {e}"));
+    }
+    HttpReply::json(200, &CreateCommandReceipt { id: item_id.to_owned(), status: "saved" })
+}
+
+/// `DELETE /api/agent/{id}/library/agent/{itemId}` — remove a behaviour agent's
+/// on-disk `.md`.
+///
+/// If the file was a local override of a built-in, the compiled-in seed
+/// reappears on the next list; if it was a pure user agent, it is gone. A pure
+/// built-in has NO file to delete, so this returns `404` — the frontend hides
+/// Delete on such rows, this is the authoritative backstop.
+pub fn delete_library_agent(state: &Mutex<Backend>, id: &str, item_id: &str) -> HttpReply {
+    let entry = match resolve_entry(state, id) {
+        Ok(e) => e,
+        Err(reply) => return reply,
+    };
+    let file_path =
+        std::path::Path::new(&entry.folder).join(".context-pilot").join("agents").join(format!("{item_id}.md"));
+    if !file_path.exists() {
+        return HttpReply::error(404, "no local agent file to delete (pure built-in)");
+    }
+    match std::fs::remove_file(&file_path) {
+        Ok(()) => HttpReply::json(200, &CreateCommandReceipt { id: item_id.to_owned(), status: "deleted" }),
+        Err(e) => HttpReply::error(502, &format!("could not delete agent file: {e}")),
+    }
+}
+
+/// Look up a compiled-in seed agent by id (for the built-in Export/Edit
+/// fallback + the `builtin` flag).
+fn seed_agent(item_id: &str) -> Option<&'static cp_base::config::SeedEntry> {
+    cp_base::config::accessors::library::agents().iter().find(|s| s.id == item_id)
+}
+
+/// Compose a prompt `.md` — YAML frontmatter (`name`/`description`) + body.
+/// Shared by [`create_command`] and [`upsert_library_agent`] so both emit the
+/// exact same on-disk shape the tui loader parses.
+fn compose_md(name: &str, description: &str, body: &str) -> String {
+    let mut markdown = String::new();
+    markdown.push_str("---\n");
+    markdown.push_str(&format!("name: {}\n", yaml_scalar(name)));
+    markdown.push_str(&format!("description: {}\n", yaml_scalar(description)));
+    markdown.push_str("---\n");
+    markdown.push_str(body);
+    markdown.push('\n');
+    markdown
+}
+
+/// Split a prompt `.md` into `(name, description, body)` — the read twin of
+/// [`compose_md`]. Tolerant of a missing frontmatter block (whole file = body).
+fn split_frontmatter(content: &str) -> (String, String, String) {
+    let trimmed = content.trim_start();
+    if !trimmed.starts_with("---") {
+        return (String::new(), String::new(), content.trim().to_owned());
+    }
+    let after_first = trimmed.get(3..).unwrap_or("").trim_start_matches(['\r', '\n']);
+    let Some(end) = after_first.find("\n---") else {
+        return (String::new(), String::new(), content.trim().to_owned());
+    };
+    let front = after_first.get(..end).unwrap_or("");
+    let mut name = String::new();
+    let mut description = String::new();
+    for line in front.lines() {
+        if let Some(rest) = line.strip_prefix("name:") {
+            name = rest.trim().trim_matches('"').trim_matches('\'').to_owned();
+        } else if let Some(rest) = line.strip_prefix("description:") {
+            description = rest.trim().trim_matches('"').trim_matches('\'').to_owned();
+        }
+    }
+    // Body = everything after the closing fence line.
+    let after_fence = after_first.get(end.saturating_add(1)..).unwrap_or("");
+    let body = after_fence.find('\n').map_or("", |nl| after_fence.get(nl.saturating_add(1)..).unwrap_or("")).trim();
+    (name, description, body.to_owned())
+}
+
+/// The raw authoring fields returned by [`read_library_agent`].
+#[derive(Serialize)]
+struct LibraryAgentRaw {
+    name: String,
+    description: String,
+    body: String,
+    builtin: bool,
+}
+
+/// The `PUT /api/agent/{id}/library/agent/{itemId}` request body.
+#[derive(Deserialize)]
+struct UpsertAgentReq {
+    name: String,
+    #[serde(default)]
+    description: String,
+    body: String,
+}

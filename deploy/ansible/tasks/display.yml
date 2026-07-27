@@ -48,6 +48,7 @@
     GOFLAGS: -mod=mod
   when: cp_display_clone.changed or not cp_display_installed.stat.exists
   register: cp_display_build
+  changed_when: true   # a build that actually runs always produces a new binary
 
 - name: Install the display binary
   ansible.builtin.copy:

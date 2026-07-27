@@ -13,8 +13,8 @@ import {
   LayoutGrid,
 } from "lucide-react"
 import { ScrollArea } from "@/mobile-components/ui/scroll-area"
-import { CornerButton } from "@/mobile-components/shell/CornerButton"
-import { FrostedBottomBar } from "@/mobile-components/shell/FrostedBottomBar"
+import { CornerButton } from "@/mobile-components/shell/chrome/CornerButton"
+import { FrostedBottomBar } from "@/mobile-components/shell/chrome/FrostedBottomBar"
 import { useElementHeight } from "@/lib/live/useElementHeight"
 import type { ThreadDetail } from "@/lib/types"
 import { cn, prefersReducedMotion } from "@/lib/utils"

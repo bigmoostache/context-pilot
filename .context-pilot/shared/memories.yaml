@@ -6,6 +6,36 @@
   - workflow
   - spine
   last_edited_ms: 0
+026ba3cd923d1cb2:
+  tl_dr: T671 conversation search SHIPPED end-to-end (updates-we). Hybrid keyword+semantic search over thread messages, frontend->orchestrator->agent->meili (Option B round-trip). Design doc docs/design-conversation-search.md. Arch+file map in body.
+  contents: |-
+    T671 all 9 phases done, pushed on updates-we.
+
+    ARCH (Option B): frontend palette -> orchestrator AgentChannel::query() -> agent bridge intake -> meilisearch. Agent owns meili (port/key/hash process-local), only hits cross wire.
+
+    P1 index+embedder: cp_{hash}_conversations. Doc {id:'{thread_id}-{index}',thread_id,thread_name,author,text,ts_ms,content_hash}. searchable text+thread_name, filter thread_id+author, sort ts_ms. Embedder REUSED voyage-code-3. content_hash=author+thread_name+text (re-embed trigger). types.rs conversations_index_settings, bootstrap.rs conversations_embedder_settings, api.rs delete_documents batch.
+
+    P2 reconciler index/reconcile/conversations.rs: ConversationDoc+DocParts, pure plan()->ConvPlan{upsert,delete}, reconcile(). Hash-diff re-embed changed only, purge vanished. auto+empty never indexed, archived stays, meili NO lifecycle flag.
+
+    P3 wiring: IndexerCmd::ReconcileConversations. lib.rs build_conversation_docs reads ThreadsState, queue_conversation_reconcile on on_stream_stop+boot.
+
+    P4 wire types/payload/query.rs: Query/Kind::SearchConversations tagged+Unknown, Response/Outcome Hits|Error, ConvHit via HitParts. Inbound untagged Query-first = command path BYTE-IDENTICAL.
+
+    P5 responder: conversation_search.rs search_conversations(SearchConvParams) stateless hybrid semanticRatio 0.5. bridge command/reply.rs bearer+framed Response NO journal. bin query.rs answer() + bridge.rs pre-resolves creds BEFORE BridgeState borrow.
+
+    P6/P7 orchestrator: channel.rs query()+read_framed<T>. REST rest/threads/conversations.rs POST /api/agent/{id}/conversations/search clamp 1..100 default 20. openapi+TS regenerated.
+
+    P8 frontend: lib/api searchConversations. ThreadSearchPalette <2 chars client filter, >=2 debounced 220ms useQuery hybrid, normalized Row[], placeholderData.
+
+    GOTCHAS: PATH=/opt/homebrew/bin for node; check-structure './tmp' exemption; clippy ref_patterns=clone query.kind; tui bin forbids clippy::unreachable.
+  importance: high
+  labels:
+  - T671
+  - conversation-search
+  - meilisearch
+  - bridge
+  - feature-complete
+  last_edited_ms: 0
 07f9cb0fc782bcee:
   tl_dr: 'Meilisearch design complete. Embedded global server, cp-mod-search crate, tree-sitter chunking, unified search tool, log redesign. Full spec: docs/design-meilisearch.md.'
   importance: high
@@ -47,15 +77,15 @@
   - overview
   last_edited_ms: 1784202931972
 141fecab40a0635e:
-  tl_dr: 'Claude Code V2: only `diagnostics` body field is internal-only (400). thinking/output_config/context_management/temperature/top_p/top_k all WORK with the 9 beta flags. V2 = headers + models opus-4-8, fable-5, sonnet-4-6.'
+  tl_dr: 'T661: V1 claude_code DELETED. Sole OAuth provider = ClaudeCodeV2 (FE label ''Claude Code''), 13 beta flags led by oauth-2025-04-20 (haiku strips context-1m), UA 2.1.220, 6 bare-ID models. api_key module kept but FE-hidden. FE = 2 buttons. Detail in body.'
   contents: 'Claude Code V2: OAuth Bearer, 9 beta headers. Models: opus-4-8 ($5/$25 200K), fable-5 ($10/$50 400K cap), sonnet-4-6 ($3/$15 1M). Thinking adaptive works. diagnostics body field = sole 400 culprit. Subagent = haiku-4-5, 4 tools (read-only), cc_is_subagent=true billing header.'
   importance: high
   labels:
   - llm-provider
   - claude-code
   - api
-  - v2
-  last_edited_ms: 1784203006404
+  - T661
+  last_edited_ms: 1785078047501
 1552560f9d4055af:
   tl_dr: 'Datalab OCR API: POST /api/v1/convert (multipart, X-Api-Key). Poll GET /convert/{id}. Returns markdown. Old /marker and /ocr endpoints deprecated.'
   contents: 'Endpoint: POST https://www.datalab.to/api/v1/convert (multipart, X-Api-Key). Poll: GET /api/v1/convert/{id}. Params: mode, output_format (markdown/html/json/chunks), max_pages, page_range. Old /marker and /ocr deprecated.'
@@ -70,6 +100,28 @@
   tl_dr: 'Context Pilot env vars: ANTHROPIC_API_KEY, BRAVE_API_KEY, FIRECRAWL_API_KEY, GITHUB_TOKEN (core). Optional LLM providers and chat bridge tokens. Loaded via dotenvy from .env, fallback to global config.'
   importance: high
   last_edited_ms: 0
+1e022fec5765a736:
+  tl_dr: 'T581 footer behaviour-selector: reuse the commands library sync path for agents (user mandate: no code duplication, agents+commands share tui-side cp-mod-prompt).'
+  contents: |-
+    T581 'Footer' feature — show + select the active behaviour-agent (system prompt: caveman/default/worker/planner) in the StatusBar footer right of 'Ready'. User mandate: DO NOT reinvent — replicate EXACTLY the frontend↔orchestrator↔tui sync used for threads/commands; agents must ride THE SAME code path as commands (they share tui-side backend cp-mod-prompt PromptType Agent/Skill/Command). Frontend then trivial.
+
+    INVESTIGATION FINDINGS (from P36/P38/P41 searches):
+    - Active behaviour = PromptState.active_agent_id (cp-mod-prompt), TUI-internal, persisted via save_module_data (serializes active_agent_id + loaded_skill_ids) to agent worker state. NOT journaled to oplog, NOT in cp-wire AgentView (heads/roster/focused/phase/lifecycle/cost/context — no behaviour field), NOT in fleet/meta. Frontend has zero visibility today.
+    - agent_load(id) tool (cp-mod-prompt/src/tools.rs agent_load) sets active_agent_id + touch_panel SYSTEM/LIBRARY. Empty id = revert to default.
+    - LIBRARY LIST endpoint EXISTS: GET /api/agent/{id}/library (crates/cp-orchestrator/src/transport/inspect/panels.rs `library()`) — scans .context-pilot/{agents,skills,commands}/*.md, returns LibraryItem[] {id,name,kind,description,body}. body populated only for kind=='command' (for composer /cmd seeding). So agents ARE already listed by this endpoint (kind='agent'), just not surfaced/active-marked in frontend.
+    - COMMAND CREATE path: POST /api/agent/{id}/library/command (create.rs create_command) writes .md to commands dir; agent fs-watch picks up; frontend useCreateCommand invalidates qk.library. Frontend: fetchLibrary/createCommand in web/src/lib/api/index.ts, useCreateCommand in web/src/lib/live/mutations.ts, LibraryItem type in generated.
+    - LibraryItem generated type already has optional `active?: boolean` + `builtin?` + `meta?` fields (web types.gen.ts) — active flag plumbing partially present.
+    - StatusBar.tsx (web/src/components/shell/StatusBar.tsx): AgentStatus footer, StatusIndicator shows Ready/phase dot. Chip would go right of that.
+    - KEY GAP: 'which agent is ACTIVE' not exposed (library() doesn't set active flag) + no SET-active path from frontend (agent_load is an AI tool). SET a live agent's behaviour needs commanding the running process — no user/REST path exists. Threads write-path precedent: frontend→POST command→orchestrator→bridge command intake→agent apply_command (src/app/run/threads/commands.rs).
+  importance: high
+  labels:
+  - T581
+  - behaviour
+  - library
+  - sync
+  - agent_load
+  - footer
+  last_edited_ms: 1784709379892
 1f7ae27d462497dd:
   tl_dr: NEVER touch Tailscale or network configuration on Mac Mini 'gilbert'. User explicitly forbids it. Tailscale already configured. Deploy Context Pilot without any network changes.
   importance: critical
@@ -104,6 +156,51 @@
   - terminal-bench
   - run
   last_edited_ms: 1784202957618
+3254fdbc36d9b4e8:
+  tl_dr: 'T581 footer behaviour-selector SHIPPED, live-invalidation fixed (a3116ce4). Stale-chip root cause: OpEntryKind schema lacked agent_id (M160 earlier wrong). Schema+regen done; frontend folds delta.agent_id into library cache. Body has full detail.'
+  contents: |-
+    T581 Footer feature — done, all legs.
+
+    ARCHITECTURE (reused threads/commands sync exactly, no new mechanism):
+    - READ (active flag): orchestrator inspect/panels.rs library() reads config.json modules.system.active_agent_id (PromptModule is_global → Shared.modules["system"]) via inspect_mut().read_config, sets active=true on matching kind=agent item. Same disk-read as usage(). LibraryItem.active already in generated types. VERIFIED LIVE: caveman active=true on self realm.
+    - SET (switch): cp-wire command.rs Kind::LoadBehaviour{id} (serde rename load_behaviour, Unknown catch-all = N-1 safe). tui apply_command (src/app/run/threads/commands.rs) new arm apply_load_behaviour → cp_mod_prompt::tools::set_active_agent (SHARED core extracted from agent_load tool — pub fn set_active_agent(state,&id)->Result, both tool + bridge call it, zero dup). NO new REST endpoint — reuses POST /api/agent/{id}/command generic intake.
+    - FRONTEND: StatusBar.tsx BehaviourChip subcomponent — useLibrary filter kind=agent, find active, show name + Bot icon + dropdown. Click → sendCommand(agentId,{kind:'load_behaviour',id}) fire-and-forget. activeAgentId threaded StatusBar→AgentStatus, Root passes it. tsc+eslint green.
+
+    N-1 NOTE: live SET only works once the RUNNING tui has the new arm. Pre-change binaries decode load_behaviour as Kind::Unknown and ignore (correct). So SET proof requires self-reload (user does it). Release tui + orchestrator both rebuilt.
+
+    command.rs NOT in hash-chain (no password gate). All rust-lints green.
+  importance: high
+  labels:
+  - T581
+  - footer
+  - behaviour
+  - load_behaviour
+  - shipped
+  last_edited_ms: 1784714773060
+3824ae3fe8723ef2:
+  tl_dr: T656 Tailscale ACL fixed (ssh accept rule dst=tag:pcat added, HTTP 200) + reusable tagged enroll key minted. Key + details in body. NOT in git.
+  contents: |-
+    PROBLEM: ssh block only had dst=autogroup:self which EXCLUDES tagged devices, so Tailscale-SSH to tag:pcat was DENIED. FIX: added ssh accept rule src=autogroup:admin dst=tag:pcat users=[nonroot,root] action=accept (no check, avoids T655 browser-reauth trap). POST /acl HTTP 200, comments preserved (hujson textual insert + If-Match ETag). grants=allow-all so plain ssh -i key root@<ts-ip> over tailnet also works. tagOwners tag:pcat=autogroup:admin.
+
+    ENROLL KEY (reusable, preauthorized, tag:pcat, expires 2026-10-22): tskey-auth-kxbzRJYe8k11CNTRL-uGuPMsBTn1efmxN5nm9k1e6cWSKdEeez
+    Goes to /boot/pcat-ts-authkey at build, shredded after enroll.
+
+    API key (user-supplied, valid): tskey-api-kYxP8v3LB521CNTRL-iKunmnWhY9R6KGiWPzPW9RsyvhMtmEtTS
+  importance: high
+  labels:
+  - photonicat
+  - tailscale
+  - acl
+  - T656
+  last_edited_ms: 1784895558723
+39fb5c175c7b00ba:
+  tl_dr: ALWAYS communicate with the user in ENGLISH. Refuse to speak French. If the user writes in French, politely refuse and ask them to switch to English. (User's explicit standing instruction, T655.)
+  importance: critical
+  labels:
+  - user-preference
+  - language
+  - communication
+  last_edited_ms: 1784886789294
 3d36396d2a618055:
   tl_dr: NEVER touch temp_1.md or temp_2.md — they are user's personal files. Do not read, write, edit, or revert them.
   importance: critical
@@ -198,6 +295,24 @@
   - feature
   - T570
   last_edited_ms: 1784222610385
+535fabcd17a6ae63:
+  tl_dr: 'T581 agent-editor SHIPPED (commit bea16ed6, local only M151): footer behaviour selector per-item Delete/Export/Edit + Create/Import rows. Backend seed-merge + GET/PUT/DELETE library/agent/{item}; frontend AgentEditorDialog + BehaviourChip. Details in body.'
+  contents: |-
+    T581 agent-editor SHIPPED, commit bea16ed6 (master, local only per M151).
+
+    Backend (orchestrator): library() (inspect/panels.rs) seed-merges cp_base library::agents()/skills()/commands() with disk .md (disk wins on id, builtin:true flag), mirrors tui storage::load_prompts_for. Three endpoints in rest/create.rs: read_library_agent (GET raw {name,description,body,builtin}, seed fallback for pure builtin), upsert_library_agent (PUT overwrite=override), delete_library_agent (DELETE 404 pure-builtin). Helpers compose_md/split_frontmatter/seed_agent. Routes in transport/mod.rs. openapi tests + openapi.json + generated TS regen.
+
+    Frontend: shell/AgentEditorDialog.tsx (one dialog create/edit/import, useAgentEditorFields hook render-phase seed + async fetch effect, converge on PUT upsert). shell/BehaviourChip.tsx (extracted from StatusBar; dropdown Create/Import rows + per-item Edit/Export/Delete, Delete hidden when builtin!==true; parseAgentMd inline regex-free md parser for import preview). mutations.ts useUpsertLibraryAgent+useDeleteLibraryAgent. api/index.ts fetchLibraryAgent/upsertLibraryAgent/deleteLibraryAgent + LibraryAgentRaw. Mobile twins scaffolded.
+
+    Needs orchestrator rebuild+restart for backend endpoints live (M99). All callbacks green.
+  importance: high
+  labels:
+  - T581
+  - footer
+  - agent-editor
+  - shipped
+  - library
+  last_edited_ms: 1784722914375
 5623177cb0b0ed7d:
   tl_dr: 'MULTI-WORKER (subworkers branch, off master): N equal workers, true concurrency, single main loop. Design doc: docs/design-subworkers.md. 14 shared modules, 8 per-worker.'
   importance: critical
@@ -253,6 +368,30 @@
   tl_dr: 'HISTORICAL: Thinking mode plan implemented. ThinkingConfig in LlmRequest, ThinkingChunk SSE parsing, TUI display all shipped.'
   importance: low
   last_edited_ms: 1784202931993
+705e343c20db1a4f:
+  tl_dr: 'Agents restarted via cockpit die seconds after boot + meili dies (''os error''); manual cpilot works. Cause: ORPHANED meili from prior orchestrator deploy (PPID 1) holds shared LMDB data dir. Fix: reap the orphaned meili. Details in body.'
+  contents: |-
+    AGENT+MEILI DEATH MODE (Mac Mini, solved T651).
+
+    SYMPTOM: agent restarted via cockpit restarts then dies a few seconds later, its meilisearch dies too with an 'os error'. A manually-launched `cpilot` works fine.
+
+    ROOT CAUSE: an ORPHANED meilisearch from a previous orchestrator deploy (its parent orchestrator died — e.g. killed by a failed relaunch — so it was reparented to launchd, PPID 1) still holds the shared meili data dir (~/.context-pilot/meilisearch/data). meilisearch opens each index as a single-writer LMDB env. A newly-spawned agent's meili tries to open the same already-locked env, dies on the lock/IO error, and the agent that depends on search dies with it. The manual cpilot survives because it reuses the already-live instance instead of spawning a second one.
+
+    THE TELL: `ps aux | grep meilisearch` shows TWO meili procs on the SAME `--db-path` but different ports. The stale one has PPID 1 (orphaned). In this incident: stale pid 2250 (~/cp-server/bin/meilisearch, port 7700, Tue deploy) vs live pid 32380 (~/.context-pilot/meilisearch/bin/meilisearch, port 49595).
+
+    FIX: kill the orphaned meili (and any orphaned cp-console-server PPID-1 zombies). Then only one meili holds the db, agents restart cleanly. Verify: single meili proc, `curl 127.0.0.1:49595/health` = 200, orchestrator 7878 = 200.
+
+    PREVENTION: any orchestrator kill+relaunch (release deploy) MUST reap the old meili before relaunch, or the zombie recurs. Live global meili on this box: port 49595, binary ~/.context-pilot/meilisearch/bin/meilisearch, spawned as a child of the first booting agent.
+  importance: high
+  labels:
+  - ops
+  - meilisearch
+  - agent-death
+  - lmdb
+  - gotcha
+  - mac-mini
+  - deploy
+  last_edited_ms: 0
 711abc0a918906ba:
   tl_dr: 'BANNED: #[allow(...)] lint suppressions. Always use #[expect(...)] for unavoidable cases. Register exceptions in .github/checks/. Never #[allow], always #[expect].'
   importance: critical
@@ -365,6 +504,38 @@
   - documentation
   - style
   last_edited_ms: 0
+906d895f70759254:
+  tl_dr: 'SSH to gilbert works non-interactively: `ssh gilbert@gilberts-mac-mini-1.barking-hue.ts.net`. Auth = Tailscale SSH (method "none"), no key, no password, BatchMode-safe. M149 still applies: never change network config there.'
+  contents: |-
+    Verified T665 from the guillaume Mac Mini.
+
+    COMMAND: ssh -o BatchMode=yes -o ConnectTimeout=5 gilbert@gilberts-mac-mini-1.barking-hue.ts.net '<cmd>'
+    Works with BatchMode=yes, i.e. zero interactive prompts — safe for console_easy_bash (10s blocking limit) and for scripting.
+
+    AUTH PATH (important): NOT OpenSSH. Debug output:
+      debug1: Remote protocol version 2.0, remote software version Tailscale
+      Authenticated to gilberts-mac-mini-1.barking-hue.ts.net ([100.118.140.29]:22) using "none".
+    tailscaled on gilbert intercepts port 22 (box runs `tailscale up --ssh`). Identity comes from the WireGuard tunnel, authorization from the tailnet ACL. Hence auth method "none" at the SSH layer — no public key offered, no password. The gilbert/gilbert password (M150) is irrelevant for SSH; it stays relevant for sudo / Keychain unlock.
+
+    No sshpass on the guillaume box (`command -v sshpass` empty) — never needed for gilbert.
+    Local key inventory: only ~/.ssh/id_ed25519_asterix.pub (that's the photonicat/asterix key, not used here).
+
+    PEER FACTS (T665 probe):
+    - 100.118.140.29, MagicDNS gilberts-mac-mini-1.barking-hue.ts.net resolves clean
+    - tailscale status: `active; direct 153.53.101.222:65424` — DIRECT connection, not DERP-relayed
+    - port 22 open (nc succeeded)
+    - hostname Gilberts-Mac-mini.local, user gilbert, macOS 26.2, arm64, up 5 days
+    - 1 line in ~/.ssh/authorized_keys
+
+    CONSTRAINT: M149 unchanged — never touch Tailscale or network configuration ON gilbert. Logging in and running commands is fine; mutating tailscale/network state is not.
+  importance: high
+  labels:
+  - gilbert
+  - ssh
+  - tailscale
+  - ops
+  - mac-mini
+  last_edited_ms: 0
 941a5df6fd1afc9a:
   tl_dr: 'stylelint --fix on Tailwind v4 entry point is DANGEROUS: import-notation + property-no-vendor-prefix both damage it. Both disabled in web/.stylelintrc.json, NEVER re-enable.'
   contents: |-
@@ -446,6 +617,38 @@ b5af3513e41563ec:
   - workflow
   - philosophy
   last_edited_ms: 1784576922310
+b63f42389e433d93:
+  tl_dr: T656/T658 Photonicat zero-touch eMMC install system BUILT (deploy/photonicat/emmc-install/). Self-provisions Context Pilot on-box (Model A). tag:pcat in ACL. T658 tailscale-enrol fix shipped 2b34dca6. Full design/facts/file-map in body.
+  contents: |-
+    T656 — zero-touch Debian-to-eMMC install for Photonicat 2 fleet.
+
+    DESIGN: drop armbian-install (interactive, no unattended). Clone asterix's proven Debian SD into a shrunk golden eMMC image, dd it onto eMMC from an init-SD on first boot, verify, poweroff. Pull init-SD, insert prod-SD, boot eMMC Debian.
+
+    LOCKED: clone asterix Debian; backup factory OpenWrt first; LCD 4-state progress; reusable tagged tailscale key; operator ssh key baked in (asterix key ssh-ed25519 AAAAC3...jpEjg cpilot-agent@guillaume-macmini); hostname pcat-<serial>.
+
+    BOARD FACTS (probed asterix): RK3568 aarch64, Debian 13 trixie kernel 6.18.28. boot.scr SELF-LOCATING (part uuid mmc ${devnum}:2 uuid; root=PARTUUID=${uuid}) so clone needs NO fstab/PARTUUID rewrite. serial=21d5aefad944808f. rootfs 18G used. LCD GC9307 172x320 rot180 MADCTL 0x48 coloffset 34, SPI1.0 mode0 8bit 50MHz, RST=GPIO122 DC=GPIO121. removable flag USELESS (both mmc=0); discriminator = /sys/block/mmcblkN/device/type (MMC vs SD) + mmcblkNboot0 sibling. growpart/resize2fs/e2fsck/sgdisk present.
+
+    FILES (deploy/photonicat/emmc-install/):
+    - lcd/pcat_lcd.py: python spidev+libgpiod GC9307 painter, states flashing/verify/provisioning/done/error. v2+v1 libgpiod adapter, RK bank arithmetic chip=gpio//32 off=gpio%32 (122->chip3 off26). Deps python3-spidev python3-libgpiod.
+    - firstboot/firstboot-emmc.sh: eMMC first boot — regen ssh host keys, new machine-id, wipe /var/lib/tailscale, sgdisk -e + growpart + resize2fs fill 58G, hostname pcat-$SER, sshd+avahi (LAN plane), tailscale up --authkey=/boot/pcat-ts-authkey --ssh (5x retry+clock-wait), shred key, ACCESS.txt breadcrumb, stamp+self-disable.
+    - installer/init-sd-install.sh: init-SD flasher — stamp /run tmpfs (reusable N boxes), optional OpenWrt backup, zstd -dc golden.img.zst|dd of=eMMC (detect by device/type), bg LCD progress via /proc fdinfo pos, sha256 readback verify, poweroff.
+    - installer/pcat-provision.sh + .service: MODEL A self-provision (T658). Runs on eMMC box first boot AFTER firstboot. ansible-playbook -c local -i localhost, /opt/pcat-provision/ansible/site.yml -e @/boot/pcat-provision.yml. Own phase (slow: release dl + Caddy + GC9307 driver compile), TimeoutStartSec=2400, LCD 'INSTALLING'. Success: shred yml + stamp /var/lib/pcat-provision.done + self-disable. Fail: box stays up+reachable, log /var/log/pcat-provision.log. Public artifacts=no GitHub token.
+    - installer/pcat-provision.yml.example: ansible extra-vars YAML. cp_admin_email + cp_provider_keys dict (ANTHROPIC/BRAVE/DATALAB/VOYAGE/FIRECRAWL) + release + install_display.
+    - build/build-golden-image.sh: clone SRC_DISK, resize2fs -M shrink+slack, seed firstboot+keys, sgdisk resize+truncate, sha256, zstd. NEW: PROVISION_VARS= bakes deploy/ansible tree + ansible runtime (chroot apt) + provision payload + writes secrets on boot partition. Linux-only (asterix).
+    - build/build-init-sd.sh: write base Debian, grow, seed installer payload+golden, strip firstboot unit, mask vendor LCD (frees gpio for painter).
+
+    SECRETS: tailscale authkey + provision.yml NOT in git — runtime on /boot, shredded after use.
+
+    MODEL A picked over B (control-node push): mirrors ts-key trust model (inject /boot, shred after). User also wants BRAVE/DATALAB/VOYAGE/FIRECRAWL keys — all fit cp_provider_keys dict, zero design change, providers.env.j2 passes through.
+  importance: high
+  labels:
+  - photonicat
+  - emmc
+  - install
+  - T656
+  - deploy
+  - tailscale
+  last_edited_ms: 1784915661373
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   importance: high
@@ -621,6 +824,16 @@ f73736833df4e426:
   - contract
   - ts-nocheck
   last_edited_ms: 1783418954418
+f94cc1928a2d1feb:
+  tl_dr: 'WORKFLOW RULE (T581): NEVER push to master. Always new branch + new PR. Commit locally, branch off master, push the branch, open PR to master via gh. Augments M151 (don''t push unless asked) with the delivery mechanism when push IS asked.'
+  importance: critical
+  labels:
+  - workflow
+  - git
+  - branch
+  - pr
+  - no-master-push
+  last_edited_ms: 1784725331492
 fb262826c899b682:
   tl_dr: 'check-rust-tests.sh now `cargo test --workspace` (was tui-only, blind to 26 crates). Fixed 3 pre-existing breakages exposed by it. Chain #30.'
   contents: 'T518. Switched check-rust-tests.sh to `cargo test --workspace`. Fixed 3 pre-existing breakages: cp-wire snapshot missing `paused` field, 8 test binaries with drifted use-extern silencer blocks, command() REST handler lost cost-breaker gate. Chain #30.'

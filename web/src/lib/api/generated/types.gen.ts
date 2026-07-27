@@ -295,6 +295,13 @@ export type ItSetIdentityResponse = {
     reloaded: boolean;
 };
 
+export type LibraryAgentRaw = {
+    body: string;
+    builtin: boolean;
+    description: string;
+    name: string;
+};
+
 export type LibraryItem = {
     active?: boolean;
     body?: string;
@@ -345,6 +352,7 @@ export type OpEntry = {
  * Discriminated-union payload of a single oplog delta, keyed by `kind`.
  */
 export type OpEntryKind = {
+    agent_id?: string;
     budget_tokens?: number;
     cost_usd?: number;
     head?: string;
@@ -1248,6 +1256,94 @@ export type GetApiAgentByIdLibraryResponses = {
 };
 
 export type GetApiAgentByIdLibraryResponse = GetApiAgentByIdLibraryResponses[keyof GetApiAgentByIdLibraryResponses];
+
+export type DeleteApiAgentByIdLibraryAgentByItemData = {
+    body?: never;
+    path: {
+        id: string;
+        item: string;
+    };
+    query?: never;
+    url: '/api/agent/{id}/library/agent/{item}';
+};
+
+export type DeleteApiAgentByIdLibraryAgentByItemErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type DeleteApiAgentByIdLibraryAgentByItemError = DeleteApiAgentByIdLibraryAgentByItemErrors[keyof DeleteApiAgentByIdLibraryAgentByItemErrors];
+
+export type DeleteApiAgentByIdLibraryAgentByItemResponses = {
+    /**
+     * Success
+     */
+    200: CreateCommandReceipt;
+};
+
+export type DeleteApiAgentByIdLibraryAgentByItemResponse = DeleteApiAgentByIdLibraryAgentByItemResponses[keyof DeleteApiAgentByIdLibraryAgentByItemResponses];
+
+export type GetApiAgentByIdLibraryAgentByItemData = {
+    body?: never;
+    path: {
+        id: string;
+        item: string;
+    };
+    query?: never;
+    url: '/api/agent/{id}/library/agent/{item}';
+};
+
+export type GetApiAgentByIdLibraryAgentByItemErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiAgentByIdLibraryAgentByItemError = GetApiAgentByIdLibraryAgentByItemErrors[keyof GetApiAgentByIdLibraryAgentByItemErrors];
+
+export type GetApiAgentByIdLibraryAgentByItemResponses = {
+    /**
+     * Success
+     */
+    200: LibraryAgentRaw;
+};
+
+export type GetApiAgentByIdLibraryAgentByItemResponse = GetApiAgentByIdLibraryAgentByItemResponses[keyof GetApiAgentByIdLibraryAgentByItemResponses];
+
+export type PutApiAgentByIdLibraryAgentByItemData = {
+    body: {
+        body: string;
+        description?: string;
+        name: string;
+    };
+    path: {
+        id: string;
+        item: string;
+    };
+    query?: never;
+    url: '/api/agent/{id}/library/agent/{item}';
+};
+
+export type PutApiAgentByIdLibraryAgentByItemErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PutApiAgentByIdLibraryAgentByItemError = PutApiAgentByIdLibraryAgentByItemErrors[keyof PutApiAgentByIdLibraryAgentByItemErrors];
+
+export type PutApiAgentByIdLibraryAgentByItemResponses = {
+    /**
+     * Success
+     */
+    200: CreateCommandReceipt;
+};
+
+export type PutApiAgentByIdLibraryAgentByItemResponse = PutApiAgentByIdLibraryAgentByItemResponses[keyof PutApiAgentByIdLibraryAgentByItemResponses];
 
 export type PostApiAgentByIdLibraryCommandData = {
     body: {
