@@ -230,7 +230,7 @@ function collectThreadFiles(log: ThreadMsg[]): ThreadFile[] {
  */
 function UnarchiveBar({ onUnarchive }: { onUnarchive: () => void }) {
   return (
-    <div className="px-5 pt-2">
+    <div className="px-5 pt-2 pb-2">
       <button
         onClick={onUnarchive}
         className="flex w-full items-center justify-center gap-2 rounded-xl border border-(--signal)/40 bg-(--signal)/10 px-4 py-2.5 text-[13px] font-medium text-(--signal) transition-colors hover:bg-(--signal)/15"
