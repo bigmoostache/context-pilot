@@ -118,6 +118,7 @@ export function ThreadsView({
           pendingFiles={sel.pendingFiles}
           onRemoveFile={(i) => sel.setPendingFiles((prev) => prev.filter((_, idx) => idx !== i))}
           onShowInFinder={onShowInFinder}
+          onUnarchive={() => actions.handleArchive(thread.id)}
         />
       ) : (
         <EmptyRealm agentName={agent.name} onNewThread={() => sel.setNewOpen(true)} />
