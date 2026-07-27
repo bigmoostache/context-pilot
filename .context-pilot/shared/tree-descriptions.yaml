@@ -6626,6 +6626,10 @@
   path: .git/index
   description: Git index (binary). Not source.
   last_edited_ms: 0
+52437f8609ece7e3:
+  path: .context-pilot/shared/tree-descriptions.yaml
+  description: Persisted tree descriptions YAML. Synced to git alongside code commits per M15.
+  last_edited_ms: 1785164260031
 524ebae9b37bd103:
   path: crates/cp-orchestrator/src/transport/stream.rs
   description: 'SSE producer loop (run_stream), extracted from transport/mod.rs to stay under the line budget. Tails one agent''s oplog (rev-numbered durable deltas) + stream-hub frames, pushes both down the SSE sink until disconnect. T123 cold-connect fix: a fresh subscriber (no Last-Event-ID) seeds the Tailer at the oplog HEAD (oplog_head_rev) so it rides only the live tail instead of replaying the whole history; reconnect seeds at last-seen rev for gap replay. TAIL_REPOLL=5ms backstop (macOS FSEvents), KEEPALIVE=10s.'
@@ -16810,6 +16814,10 @@ d145d1f75bd0258f:
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. route_rest dispatches all /api routes incl auth/ACL/env-keys/providers/releases/claude-usage+login+refresh(T451). handle() has centralized Bearer gate + per-agent ACL check. handle_stream = SSE with ticket-based ACL.
   last_edited_ms: 0
+d1554728527af01d:
+  path: web/src/mobile-components/threads/ThreadsView.tsx
+  description: Mobile ThreadsView twin — conversation-primary + left drawer (T609). Drawer toggled by fixed top-left CornerButton, anime.js spring settle. onNewThread creates directly + closes drawer (T633, NewThreadDialog removed). onGoToAgents passed to ThreadList. Logic from shared @/lib/live/threadView.
+  last_edited_ms: 1785164260243
 d165a994ae75f945:
   path: crates/cp-mod-utilities/src/hash.rs
   description: FNV-1a 128-bit content hashing. compute(bytes) and compute_str(str) return 32-char hex. Replaces sha2 crate.
@@ -18538,6 +18546,10 @@ e9408a68182c08d5:
   path: web/src/components/threads/ThreadComposer.tsx
   description: 'Thread composer (always-active textarea + turn-status banner). T298 paperclip; T304 draftKey; T331 staged pendingFiles; T348/T350 /command bubbles + create pill; T359 Enter/Tab list logic; T371/T429 paused banner. T350 unified ComposerBubbles. T468 paste-to-upload: onPaste reads clipboardData.items+getAsFile() (not .files) for images. onAttach widened to void|Promise<void> (T471). prefill seeds expanded prompt body.'
   last_edited_ms: 0
+e94abd108e97d92b:
+  path: .context-pilot/shared/memories.yaml
+  description: Persisted memories YAML (M15+). Synced to git alongside code commits per M15.
+  last_edited_ms: 1785164260334
 e9875e4d636d72e9:
   path: src/llms/oai_providers/openai_streaming.rs
   description: OAI SSE types + shared consumer. StreamResponse/StreamDelta, ToolCallAccumulator, normalize_stop_reason, dump_request. SseAccum + consume_sse_stream/apply_usage/process_choice shared by grok/groq/deepseek (A2).
@@ -18874,6 +18886,10 @@ edb8c8562aab184f:
   path: src/llms/cache/cache_optimizer/superblock_dp.rs
   description: 'Per-super-block forward DP for cache_optimizer. A6: float math routed via float_math (uniform/div/add). solve_superblock/fill_h_table/backtrack_cuts/collect_best_cuts/normalize_density.'
   last_edited_ms: 1784534667469
+edbd7f85bf63814b:
+  path: web/src/mobile-components/threads/ThreadComposer.tsx
+  description: 'Mobile ThreadComposer twin — iMessage-style input row (T615): standalone round ''+'' attach button left, single fully-rounded pill (border bg-card) holding 16px textarea + inline send button tucked inside the pill''s right edge, send shown only when sendable. Draft/keyboard/command-bubble logic byte-identical via useComposer.'
+  last_edited_ms: 1785164260154
 edc01d935acf6d8e:
   path: web/src/components/panels/cockpit/PanelFrame.tsx
   description: 'Shared cockpit panel shell: accent icon + name + subtitle + token/cost chip header, scrolling body. Exports PanelFrame, PanelSection, ImportanceDot, Chip, InspectionUnavailable. web-lint P1: PanelFrame subtitle/tokens/cost/accent + Chip accent widened to `| undefined`.'
