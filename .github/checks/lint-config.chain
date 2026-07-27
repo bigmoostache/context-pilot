@@ -7366,3 +7366,253 @@ index 5fe495ec..6e3aaf35 100644
    - path: "web/**"
      rule: "import-x/default"
 # --- End entry #78 ---
+79:dc3609f8d020d06905a6c759363c3a85a0048ca836cb3cabd8addc44208cb526:065cd4c232fb115954a3a61887cd016ec9919455fd65e4a0192c8b88b2a62355:c15d962a24ad5c11b72e688fc4deb537a44b495fa24a553f49a89d8fd8401082
+# --- Diff for entry #79 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index c037044e..3e9dedfb 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -371,3 +371,44 @@ exceptions:
+       grouping, so #[non_exhaustive] is impossible.
+     strategy: >
+       Irreducible — a 6-arg constructor trips too_many_arguments; the exhaustive literal is honest.
++
++  # ── exhaustive_enums: T671 read-path query contracts ─────────────────
++  # The read-plane mirror of the command contracts above: query Kind is built
++  # by the orchestrator and matched exhaustively by the agent (Unknown catch-all
++  # for N-1); Outcome/Inbound are closed reply/discriminator taxonomies whose
++  # #[non_exhaustive] would force forbidden cross-crate wildcard arms.
++
++  - path: "crates/cp-wire/src/types/payload/query.rs"
++    match: "query Kind carries an Unknown catch-all for N-1 tolerance"
++    reason: >
++      Query Kind has an Unknown catch-all and is constructed by the orchestrator,
++      matched exhaustively by the agent; non_exhaustive would forbid that construction.
++    strategy: >
++      Irreducible — the Unknown variant already provides forward-compat.
++
++  - path: "crates/cp-wire/src/types/payload/query.rs"
++    match: "query Outcome is a closed reply taxonomy"
++    reason: >
++      Outcome enumerates the two reply shapes (hits or error), constructed by the agent
++      and matched exhaustively by the orchestrator; non_exhaustive would force forbidden
++      wildcard arms.
++    strategy: >
++      Irreducible — closed reply taxonomy, wildcard arms are forbidden.
++
++  - path: "crates/cp-wire/src/types/payload/query.rs"
++    match: "closed 2-variant on-wire discriminator"
++    reason: >
++      Inbound is the closed query-or-command socket discriminator, matched exhaustively
++      by the agent intake; non_exhaustive would force a forbidden cross-crate wildcard arm.
++    strategy: >
++      Irreducible — closed 2-variant discriminator, wildcard arms are forbidden.
++
++  - path: "crates/cp-wire/src/types/payload/query.rs"
++    match: "borrowed builder params for ConvHit"
++    reason: >
++      HitParts is the borrowed params bundle for ConvHit::from_parts, built by struct
++      literal cross-crate (the agent maps a Meilisearch row into it). A constructor would
++      take six positional arguments and re-trip too_many_arguments — the exact lint this
++      params struct exists to avoid — so #[non_exhaustive] is impossible.
++    strategy: >
++      Irreducible — the exhaustive literal is the whole point; a ctor re-trips too_many_arguments.
+# --- End entry #79 ---
+80:c15d962a24ad5c11b72e688fc4deb537a44b495fa24a553f49a89d8fd8401082:8b4efaddebe30106b27d6a6f112d95947f70717f33644ec0143d4110e857d963:39dba841c9f0665cd151548d1c9884cbb573e86f636b72acc2e0604e9f94f6a5
+# --- Diff for entry #80 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index c037044e..81e8634e 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -371,3 +371,54 @@ exceptions:
+       grouping, so #[non_exhaustive] is impossible.
+     strategy: >
+       Irreducible — a 6-arg constructor trips too_many_arguments; the exhaustive literal is honest.
++
++  # ── exhaustive_enums: T671 read-path query contracts ─────────────────
++  # The read-plane mirror of the command contracts above: query Kind is built
++  # by the orchestrator and matched exhaustively by the agent (Unknown catch-all
++  # for N-1); Outcome/Inbound are closed reply/discriminator taxonomies whose
++  # #[non_exhaustive] would force forbidden cross-crate wildcard arms.
++
++  - path: "crates/cp-wire/src/types/payload/query.rs"
++    match: "query Kind carries an Unknown catch-all for N-1 tolerance"
++    reason: >
++      Query Kind has an Unknown catch-all and is constructed by the orchestrator,
++      matched exhaustively by the agent; non_exhaustive would forbid that construction.
++    strategy: >
++      Irreducible — the Unknown variant already provides forward-compat.
++
++  - path: "crates/cp-wire/src/types/payload/query.rs"
++    match: "query Outcome is a closed reply taxonomy"
++    reason: >
++      Outcome enumerates the two reply shapes (hits or error), constructed by the agent
++      and matched exhaustively by the orchestrator; non_exhaustive would force forbidden
++      wildcard arms.
++    strategy: >
++      Irreducible — closed reply taxonomy, wildcard arms are forbidden.
++
++  - path: "crates/cp-wire/src/types/payload/query.rs"
++    match: "closed 2-variant on-wire discriminator"
++    reason: >
++      Inbound is the closed query-or-command socket discriminator, matched exhaustively
++      by the agent intake; non_exhaustive would force a forbidden cross-crate wildcard arm.
++    strategy: >
++      Irreducible — closed 2-variant discriminator, wildcard arms are forbidden.
++
++  - path: "crates/cp-wire/src/types/payload/query.rs"
++    match: "borrowed builder params for ConvHit"
++    reason: >
++      HitParts is the borrowed params bundle for ConvHit::from_parts, built by struct
++      literal cross-crate (the agent maps a Meilisearch row into it). A constructor would
++      take six positional arguments and re-trip too_many_arguments — the exact lint this
++      params struct exists to avoid — so #[non_exhaustive] is impossible.
++    strategy: >
++      Irreducible — the exhaustive literal is the whole point; a ctor re-trips too_many_arguments.
++
++  - path: "crates/cp-mod-search/src/conversation_search.rs"
++    match: "resolved search inputs built by struct literal at the single agent accept-loop call site"
++    reason: >
++      SearchConvParams bundles the six resolved inputs to search_conversations, built by
++      struct literal at the single agent accept-loop call site. A constructor would take
++      six positional arguments and re-trip too_many_arguments — the exact lint this params
++      struct exists to avoid — so #[non_exhaustive] is impossible.
++    strategy: >
++      Irreducible — the exhaustive literal is the whole point; a ctor re-trips too_many_arguments.
+# --- End entry #80 ---
+81:39dba841c9f0665cd151548d1c9884cbb573e86f636b72acc2e0604e9f94f6a5:4c8f309c84671b59bc3bacef75aed39627353d1aac6bf903a880f1535df2bef7:6675c240d42876fa751472b76a1f1dd8a3ec863b39511d9b156985f10802c9fd
+# --- Diff for entry #81 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index c037044e..ec098a9e 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -371,3 +371,54 @@ exceptions:
+       grouping, so #[non_exhaustive] is impossible.
+     strategy: >
+       Irreducible — a 6-arg constructor trips too_many_arguments; the exhaustive literal is honest.
++
++  # ── exhaustive_enums: T671 read-path query contracts ─────────────────
++  # The read-plane mirror of the command contracts above: query Kind is built
++  # by the orchestrator and matched exhaustively by the agent (Unknown catch-all
++  # for N-1); Outcome/Inbound are closed reply/discriminator taxonomies whose
++  # #[non_exhaustive] would force forbidden cross-crate wildcard arms.
++
++  - path: "crates/cp-wire/src/types/payload/query.rs"
++    match: "query Kind carries an Unknown catch-all for N-1 tolerance"
++    reason: >
++      Query Kind has an Unknown catch-all and is constructed by the orchestrator,
++      matched exhaustively by the agent; non_exhaustive would forbid that construction.
++    strategy: >
++      Irreducible — the Unknown variant already provides forward-compat.
++
++  - path: "crates/cp-wire/src/types/payload/query.rs"
++    match: "query Outcome is a closed reply taxonomy"
++    reason: >
++      Outcome enumerates the two reply shapes (hits or error), constructed by the agent
++      and matched exhaustively by the orchestrator; non_exhaustive would force forbidden
++      wildcard arms.
++    strategy: >
++      Irreducible — closed reply taxonomy, wildcard arms are forbidden.
++
++  - path: "crates/cp-wire/src/types/payload/query.rs"
++    match: "closed 2-variant on-wire discriminator"
++    reason: >
++      Inbound is the closed query-or-command socket discriminator, matched exhaustively
++      by the agent intake; non_exhaustive would force a forbidden cross-crate wildcard arm.
++    strategy: >
++      Irreducible — closed 2-variant discriminator, wildcard arms are forbidden.
++
++  - path: "crates/cp-wire/src/types/payload/query.rs"
++    match: "borrowed builder params for ConvHit"
++    reason: >
++      HitParts is the borrowed params bundle for ConvHit::from_parts, built by struct
++      literal cross-crate (the agent maps a Meilisearch row into it). A constructor would
++      take six positional arguments and re-trip too_many_arguments — the exact lint this
++      params struct exists to avoid — so #[non_exhaustive] is impossible.
++    strategy: >
++      Irreducible — the exhaustive literal is the whole point; a ctor re-trips too_many_arguments.
++
++  - path: "crates/cp-mod-search/src/meili/conversation_search.rs"
++    match: "resolved search inputs built by struct literal at the single agent accept-loop call site"
++    reason: >
++      SearchConvParams bundles the six resolved inputs to search_conversations, built by
++      struct literal at the single agent accept-loop call site. A constructor would take
++      six positional arguments and re-trip too_many_arguments — the exact lint this params
++      struct exists to avoid — so #[non_exhaustive] is impossible.
++    strategy: >
++      Irreducible — the exhaustive literal is the whole point; a ctor re-trips too_many_arguments.
+# --- End entry #81 ---
+82:6675c240d42876fa751472b76a1f1dd8a3ec863b39511d9b156985f10802c9fd:96fbfc9296b351f418672ebd624f5e96d34139f49274d6ebf46cf6c8ee6b3927:2d2b3e6c9514b8d4743bd64f0fa82b9a9c9bff051db6da8f9c281c094892a61d
+# --- Diff for entry #82 ---
+diff --git a/.github/checks/check-structure.sh b/.github/checks/check-structure.sh
+index c424f085..e71deb68 100755
+--- a/.github/checks/check-structure.sh
++++ b/.github/checks/check-structure.sh
+@@ -65,6 +65,7 @@ done < <(find . -mindepth 1 -type d \
+   -not -path './logs' -not -path './logs/*' \
+   -not -path './dumps' -not -path './dumps/*' \
+   -not -path './sandbox' -not -path './sandbox/*' \
++  -not -path './tmp' -not -path './tmp/*' \
+   -not -path './gaia' -not -path './gaia/*' \
+   -not -path './test-results' -not -path './test-results/*' \
+   -not -path './report' -not -path './report/*')
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index c037044e..ec098a9e 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -371,3 +371,54 @@ exceptions:
+       grouping, so #[non_exhaustive] is impossible.
+     strategy: >
+       Irreducible — a 6-arg constructor trips too_many_arguments; the exhaustive literal is honest.
++
++  # ── exhaustive_enums: T671 read-path query contracts ─────────────────
++  # The read-plane mirror of the command contracts above: query Kind is built
++  # by the orchestrator and matched exhaustively by the agent (Unknown catch-all
++  # for N-1); Outcome/Inbound are closed reply/discriminator taxonomies whose
++  # #[non_exhaustive] would force forbidden cross-crate wildcard arms.
++
++  - path: "crates/cp-wire/src/types/payload/query.rs"
++    match: "query Kind carries an Unknown catch-all for N-1 tolerance"
++    reason: >
++      Query Kind has an Unknown catch-all and is constructed by the orchestrator,
++      matched exhaustively by the agent; non_exhaustive would forbid that construction.
++    strategy: >
++      Irreducible — the Unknown variant already provides forward-compat.
++
++  - path: "crates/cp-wire/src/types/payload/query.rs"
++    match: "query Outcome is a closed reply taxonomy"
++    reason: >
++      Outcome enumerates the two reply shapes (hits or error), constructed by the agent
++      and matched exhaustively by the orchestrator; non_exhaustive would force forbidden
++      wildcard arms.
++    strategy: >
++      Irreducible — closed reply taxonomy, wildcard arms are forbidden.
++
++  - path: "crates/cp-wire/src/types/payload/query.rs"
++    match: "closed 2-variant on-wire discriminator"
++    reason: >
++      Inbound is the closed query-or-command socket discriminator, matched exhaustively
++      by the agent intake; non_exhaustive would force a forbidden cross-crate wildcard arm.
++    strategy: >
++      Irreducible — closed 2-variant discriminator, wildcard arms are forbidden.
++
++  - path: "crates/cp-wire/src/types/payload/query.rs"
++    match: "borrowed builder params for ConvHit"
++    reason: >
++      HitParts is the borrowed params bundle for ConvHit::from_parts, built by struct
++      literal cross-crate (the agent maps a Meilisearch row into it). A constructor would
++      take six positional arguments and re-trip too_many_arguments — the exact lint this
++      params struct exists to avoid — so #[non_exhaustive] is impossible.
++    strategy: >
++      Irreducible — the exhaustive literal is the whole point; a ctor re-trips too_many_arguments.
++
++  - path: "crates/cp-mod-search/src/meili/conversation_search.rs"
++    match: "resolved search inputs built by struct literal at the single agent accept-loop call site"
++    reason: >
++      SearchConvParams bundles the six resolved inputs to search_conversations, built by
++      struct literal at the single agent accept-loop call site. A constructor would take
++      six positional arguments and re-trip too_many_arguments — the exact lint this params
++      struct exists to avoid — so #[non_exhaustive] is impossible.
++    strategy: >
++      Irreducible — the exhaustive literal is the whole point; a ctor re-trips too_many_arguments.
+# --- End entry #82 ---

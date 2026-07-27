@@ -47,6 +47,8 @@ struct IndexerCtx {
     client: MeiliClient,
     /// Index UID for project files.
     files_uid: String,
+    /// Index UID for thread conversations (T671 reconcile target).
+    conv_uid: String,
     /// Root directory of the project.
     project_root: PathBuf,
     /// File splitter chain (tree-sitter → fixed-size fallback).
@@ -165,6 +167,21 @@ fn dispatch_cmd(ctx: &mut IndexerCtx, cmd: IndexerCmd) {
             }
             log::info!("Initial project scan complete");
         }
+        IndexerCmd::ReconcileConversations(docs) => run_conversation_reconcile(ctx, &docs),
+    }
+}
+
+/// Run a queued conversations reconcile against the index, logging the outcome.
+///
+/// Split out of [`dispatch_cmd`] so that hot path stays under the cognitive
+/// complexity budget. A no-op result (nothing changed) is silent.
+fn run_conversation_reconcile(ctx: &IndexerCtx, docs: &[crate::index::reconcile::conversations::ConversationDoc]) {
+    match crate::index::reconcile::conversations::reconcile(&ctx.client, &ctx.conv_uid, docs) {
+        Ok((up, del)) if up > 0 || del > 0 => {
+            log::info!("Conversation reconcile: {up} upserted, {del} deleted");
+        }
+        Ok(_) => {} // no-op — nothing changed
+        Err(e) => log::warn!("Conversation reconcile failed: {e}"),
     }
 }
 
@@ -184,6 +201,7 @@ fn indexer_loop(rx: &mpsc::Receiver<IndexerCmd>, params: &IndexerParams) {
     let mut ctx = IndexerCtx {
         client,
         files_uid: format!("cp_{}_files", params.project_hash),
+        conv_uid: format!("cp_{}_conversations", params.project_hash),
         project_root: params.project_root.clone(),
         splitter: SplitterChain::new(),
         metrics: std::sync::Arc::clone(&params.metrics),
@@ -211,6 +229,9 @@ fn indexer_loop(rx: &mpsc::Receiver<IndexerCmd>, params: &IndexerParams) {
 fn deduplicate(batch: Vec<IndexerCmd>) -> Vec<IndexerCmd> {
     let mut latest: HashMap<PathBuf, IndexerCmd> = HashMap::new();
     let mut has_scan_complete = false;
+    // Reconcile commands carry a doc payload (not a path), so they can't be
+    // path-deduped. Kept in order and appended after the file ops.
+    let mut passthrough: Vec<IndexerCmd> = Vec::new();
 
     for cmd in batch {
         cp_base::deref_match!(&cmd, {
@@ -220,6 +241,9 @@ fn deduplicate(batch: Vec<IndexerCmd>) -> Vec<IndexerCmd> {
             IndexerCmd::ScanComplete => {
                 has_scan_complete = true;
             }
+            IndexerCmd::ReconcileConversations(_) => {
+                passthrough.push(cmd);
+            }
         });
     }
 
@@ -227,6 +251,7 @@ fn deduplicate(batch: Vec<IndexerCmd>) -> Vec<IndexerCmd> {
     if has_scan_complete {
         result.push(IndexerCmd::ScanComplete);
     }
+    result.extend(passthrough);
     result
 }
 

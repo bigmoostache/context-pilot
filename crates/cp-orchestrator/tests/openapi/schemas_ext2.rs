@@ -240,6 +240,26 @@ pub(super) fn deploy() -> Value {
                 "accounts": arr(r("ClaudeAccountSummary"))
             },
             "required": ["accounts"]
+        },
+        // ── Conversation search (T671) ──────────────────────────────
+        "ConvHit": {
+            "type": "object",
+            "properties": {
+                "thread_id": { "type": "string" },
+                "thread_name": { "type": "string" },
+                "author": { "type": "string" },
+                "text": { "type": "string" },
+                "ts_ms": { "type": "integer", "format": "int64" },
+                "score": { "type": "number", "format": "double" }
+            },
+            "required": ["thread_id", "thread_name", "author", "text", "ts_ms", "score"]
+        },
+        "ConversationSearchResult": {
+            "type": "object",
+            "properties": {
+                "hits": arr(r("ConvHit"))
+            },
+            "required": ["hits"]
         }
     })
 }

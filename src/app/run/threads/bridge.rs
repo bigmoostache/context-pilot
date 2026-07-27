@@ -25,6 +25,7 @@ use cp_mod_bridge::BridgeState;
 use cp_mod_threads::types::{FocusState, ThreadStatus, ThreadsState};
 use cp_wire::types::command::Command;
 use cp_wire::types::oplog::OpEntryKind;
+use cp_wire::types::payload::query::Query;
 use cp_wire::types::{Phase, ThreadTurn};
 
 use crate::app::App;
@@ -97,6 +98,16 @@ const DRAIN_BUDGET: u32 = 64;
 /// accepted commands (an errored connection still counts, so draining
 /// continues to the next pending one).
 fn accept_commands(state: &mut State) -> Option<Vec<Command>> {
+    // Resolve the search credentials BEFORE borrowing `BridgeState`. The
+    // responder closure below must not touch `State`: the command-path `Intake`
+    // is `&mut`-borrowed out of that same `State` for the whole connection, so a
+    // second borrow for `SearchState` would not type-check. Copying the (small,
+    // session-stable) credentials out first makes the closure self-contained.
+    // `None` when the search module is down — queries then answer with a
+    // graceful "search unavailable" rather than failing the connection.
+    let search_creds = cp_mod_search::meili_credentials(state)
+        .and_then(|(port, key)| cp_mod_search::project_hash(state).map(|hash| (port, key, hash)));
+
     let bs = state.ext_mut::<BridgeState>();
 
     // Split borrows: &boot (for listener + oplog) and &mut intake.
@@ -125,7 +136,9 @@ fn accept_commands(state: &mut State) -> Option<Vec<Command>> {
     // Bound how long we wait for the commander to finish writing.
     let _ignored = stream.set_read_timeout(Some(READ_TIMEOUT));
 
-    match intake.handle_connection(boot.oplog(), &mut stream) {
+    let responder = |query: &Query| super::query::answer(search_creds.as_ref(), query);
+
+    match intake.handle_connection(boot.oplog(), &mut stream, &responder) {
         Ok(cmds) => Some(cmds),
         Err(e) => {
             log::error!("bridge: command intake error: {e:?}");

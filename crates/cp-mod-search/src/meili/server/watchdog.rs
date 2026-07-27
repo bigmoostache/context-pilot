@@ -3,7 +3,7 @@
 //!
 //! ## Why this exists
 //!
-//! [`super::server::ensure_server_running`] only runs **once** per agent, at
+//! [`super::ensure_server_running`] only runs **once** per agent, at
 //! module load (boot/reload). Nothing watched the server afterwards, so if the
 //! global Meilisearch process died mid-session (OOM under an embedding burst, an
 //! OS `kill`, a laptop sleep/resume severing it, a crash) it stayed dead until an
@@ -22,7 +22,7 @@
 //!
 //! 2. [`run`] — the watchdog loop. One per agent: every [`WATCHDOG_INTERVAL`] it
 //!    health-checks the server and, on failure, drives a guarded respawn (which
-//!    rebinds the **same** port — see [`super::server::ensure_server_running`] —
+//!    rebinds the **same** port — see [`super::ensure_server_running`] —
 //!    so every agent's cached port stays valid and the blip is transparent).
 //!    Consecutive failures back off so a permanently-broken server (missing
 //!    binary, port stolen) doesn't hot-loop.
@@ -33,8 +33,6 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
-
-use super::server;
 
 /// How often the watchdog probes server health.
 const WATCHDOG_INTERVAL: Duration = Duration::from_secs(5);
@@ -60,7 +58,7 @@ const LOCK_POLL: Duration = Duration::from_millis(200);
 
 /// Path to the machine-wide spawn lock: `~/.context-pilot/meilisearch/spawn.lock`.
 fn lock_path() -> Option<PathBuf> {
-    server::global_meili_dir().ok().map(|d| d.join("spawn.lock"))
+    super::global_meili_dir().ok().map(|d| d.join("spawn.lock"))
 }
 
 /// RAII guard over the machine-wide Meilisearch spawn lock.
@@ -148,7 +146,7 @@ impl WatchdogHandle {
     /// The cadence is [`WATCHDOG_INTERVAL`]; on a failed health probe it drives a
     /// single-flight respawn via [`respawn`]. The port/key are captured by value
     /// — they stay valid across respawns because the server rebinds the same
-    /// port (stable-port policy in [`super::server`]).
+    /// port (stable-port policy in [`super`]).
     pub(crate) fn spawn(port: u16, master_key: String) -> Self {
         let (stop, rx) = mpsc::channel::<()>();
         let join = std::thread::Builder::new()
@@ -192,7 +190,7 @@ fn run(rx: &mpsc::Receiver<()>, port: u16, master_key: &str) {
             Err(mpsc::RecvTimeoutError::Timeout) => {}
         }
 
-        if server::health_ok(port, master_key) {
+        if super::health_ok(port, master_key) {
             consecutive_failures = 0;
             continue;
         }
@@ -239,12 +237,12 @@ fn respawn() -> Result<(), String> {
         if let Some(_guard) = SpawnLock::try_acquire() {
             // We're the elected spawner. Re-check first: the server may have come
             // back while we were contending, in which case reconnect is enough.
-            return server::ensure_server_running().map(|_info| ());
+            return super::ensure_server_running().map(|_info| ());
         }
 
         // Someone else is spawning. Wait a beat, then see if the server is back.
         std::thread::sleep(LOCK_POLL);
-        if server::reconnect_ok() {
+        if super::reconnect_ok() {
             return Ok(());
         }
 

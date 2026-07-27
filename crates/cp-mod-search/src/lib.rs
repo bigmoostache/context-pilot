@@ -285,7 +285,7 @@ impl Module for SearchModule {
         // no manual restart. Stored in SearchState so a reload drops+replaces it
         // (its Drop stops the old thread — never stacks two watchdogs).
         let watchdog = (persist.port > 0)
-            .then(|| meili::watchdog::WatchdogHandle::spawn(persist.port, persist.master_key.clone()));
+            .then(|| meili::server::watchdog::WatchdogHandle::spawn(persist.port, persist.master_key.clone()));
 
         // Hourly reconcile + embedding-backup tick — only when the server is up
         // AND the indexer channel exists (the tick queues its reconcile delta
@@ -313,6 +313,10 @@ impl Module for SearchModule {
 
         // Backfill: push any existing logs to Meilisearch (idempotent upsert)
         index::logsync::sync_logs_to_meilisearch(state);
+
+        // Backfill the conversations index once at boot from persisted threads
+        // (periodic freshening thereafter rides `on_stream_stop`).
+        queue_conversation_reconcile(state);
 
         // Pre-populate Context Radar from persisted signals + logs
         radar::refresh(state);
@@ -383,7 +387,13 @@ impl Module for SearchModule {
 
     fn on_user_message(&self, _state: &mut State) {}
 
-    fn on_stream_stop(&self, _state: &mut State) {}
+    fn on_stream_stop(&self, state: &mut State) {
+        // A turn just ended, so thread messages may have changed. Snapshot the
+        // live threads and hand a fresh desired-doc set to the indexer thread,
+        // which diffs+applies against the conversations index (T671). Cheap when
+        // nothing changed — the hash diff skips every unchanged message.
+        queue_conversation_reconcile(state);
+    }
 
     fn on_stream_chunk(&self, _text: &str, _state: &mut State) {}
 
@@ -426,4 +436,62 @@ pub fn refresh_radar(state: &State) {
 /// `task_context` parameter.  Caps the buffer at [`types::MAX_TASK_SIGNALS`].
 pub fn push_task_signal(state: &mut State, content: &str) {
     radar::push_signal(state, content);
+}
+
+/// Build the desired conversation-doc set from the live threads (T671).
+///
+/// One [`index::reconcile::conversations::ConversationDoc`] per non-`auto`,
+/// non-empty thread message. `auto` (tool-trace) and empty-content messages are
+/// dropped here so they never enter the index — matching the reconcile
+/// contract. The doc `index` is the message's position in its thread, giving a
+/// stable id (`"{thread_id}-{index}"`) for append-only threads. Archived threads
+/// are still included (their docs stay searchable); a deleted thread simply
+/// stops appearing, so the reconciler purges its docs.
+fn build_conversation_docs(state: &State) -> Vec<index::reconcile::conversations::ConversationDoc> {
+    use index::reconcile::conversations::{ConversationDoc, DocParts};
+
+    let threads = &cp_mod_threads::types::ThreadsState::get(state).threads;
+    let mut docs = Vec::new();
+    for thread in threads {
+        for (index, msg) in thread.messages.iter().enumerate() {
+            if msg.auto {
+                continue; // tool-trace — never indexed
+            }
+            let Some(text) = msg.content.as_deref() else {
+                continue; // file-only / empty message — nothing to search
+            };
+            if text.is_empty() {
+                continue;
+            }
+            let author = msg.author.to_string(); // "user" / "assistant"
+            docs.push(ConversationDoc::from_parts(&DocParts {
+                thread_id: &thread.id,
+                index,
+                thread_name: &thread.name,
+                author: &author,
+                text,
+                ts_ms: msg.timestamp,
+            }));
+        }
+    }
+    docs
+}
+
+/// Snapshot the live threads and queue a conversations-index reconcile on the
+/// background indexer thread (T671).
+///
+/// Doc-building must run here (it needs `ThreadsState` from `State`), but the
+/// Meilisearch writes run off-thread: the desired docs travel over the existing
+/// indexer channel as [`types::IndexerCmd::ReconcileConversations`], so the main
+/// loop never blocks on HTTP. No-op when the indexer channel is absent (server
+/// down).
+pub fn queue_conversation_reconcile(state: &State) {
+    let Some(ss) = state.get_ext::<SearchState>() else {
+        return;
+    };
+    let Some(tx) = ss.indexer_tx.as_ref() else {
+        return; // indexer not running (server unavailable)
+    };
+    let docs = build_conversation_docs(state);
+    let _r = tx.send(types::IndexerCmd::ReconcileConversations(docs));
 }

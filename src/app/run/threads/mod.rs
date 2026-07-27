@@ -11,6 +11,7 @@ mod bridge;
 mod commands;
 mod messages;
 mod paused;
+mod query;
 pub(super) use archived::emit_thread_archived;
 pub(super) use bridge::{bridge_active, emit_thread_focus, emit_thread_status, emit_vitals, poll_bridge_commands};
 pub(super) use messages::emit_messages;

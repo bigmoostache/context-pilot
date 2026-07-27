@@ -252,6 +252,15 @@ pub(super) fn paths() -> Value {
         }}),
         "/api/agent/{id}/command": with_agent(post("agent", "Send command to agent",
             Some(json!({ "type": "object" })), r("CommandReceipt"))),
+        "/api/agent/{id}/conversations/search": with_agent(post("agent", "Hybrid conversation search", Some(json!({
+            "type": "object",
+            "properties": {
+                "query": { "type": "string" },
+                "limit": { "type": "integer", "format": "int32" },
+                "thread_id": { "type": "string" }
+            },
+            "required": ["query"]
+        })), r("ConversationSearchResult"))),
         "/api/agent/{id}/restart": with_agent(post("agent", "Restart agent", None, r("RestartReceipt"))),
         "/api/agent/{id}/retire": with_agent(post("agent", "Retire agent", None, r("RetireReceipt"))),
         "/api/agent/{id}/unretire": with_agent(post("agent", "Unretire agent", None, r("UnretireReceipt"))),

@@ -4002,6 +4002,10 @@
   path: src/ui/help/config_overlay/mod.rs
   description: 'Config overlay renderer. Renders ConfigOverlay IR centered: provider/model sections, budget bars, toggles, help text. Consumes pre-built IR snapshot.'
   last_edited_ms: 1784534092067
+31b8a6bebfde249b:
+  path: web/src/components/threads/ThreadsView.tsx
+  description: 'Desktop ThreadsView — master-detail (list rail + conversation). railOpen collapse (T669) now animates (T670): rail stays mounted, slides in/out via transitioned negative left-margin (root overflow-hidden clips it), conversation reclaims width; floating PanelLeft reopen button fades+nudges in when collapsed; motion-reduce snaps. Shared useThreadSelection+useThreadActions from lib/live/threadView. Mobile twin = stack nav.'
+  last_edited_ms: 1785154769784
 31dd75744eab57f8:
   path: .git/index
   description: Git index (binary). Not source.
@@ -10550,6 +10554,10 @@
   path: .github/checks/lint-config.chain
   description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
   last_edited_ms: 0
+832e7a45f67ac86a:
+  path: web/src/components/threads/dialogs/NewThreadDialog.tsx
+  description: New Thread dialog — title-only sheet on the portaled Base UI Dialog; submit prepends a MY_TURN thread and selects it. Moved into threads/dialogs/ (T669) to free a threads/ dir slot under the 8-entry cap.
+  last_edited_ms: 1785154583175
 833266156d550d17:
   path: src/llms/claude_code_v2/mod.rs
   description: 'Claude Code V2 OAuth client. Same OAuth tokens as claude_code via cp_vault, but updated headers from CLI v2.1.170: 9 beta flags, billing cc_version=2.1.170, ua claude-cli/2.1.170. Body = clean V1 structure; only ''diagnostics'' field is rejected by public API. Reuses helpers + parse_sse_stream from claude_code_api_key.'
@@ -11642,6 +11650,10 @@
   path: crates/cp-wire/src/framing.rs
   description: 'Oplog record framing: len(4B LE)+CRC32C(4B LE)+JSON payload. encode_raw/decode_raw + encode_entry/decode_entry. u32_to_le const-fn #[expect(as_conversions)] after BYTE_MASK. FrameError enum (no std Error, dodges missing_trait_methods). All buffer access via .get().'
   last_edited_ms: 1784479706165
+90bf5d8362fbc9ab:
+  path: web/src/components/threads/ThreadsView.tsx
+  description: 'Desktop ThreadsView — master-detail (list rail + conversation). railOpen collapse (T669) animates (T670): rail stays mounted, slides via transitioned negative left-margin; slide wrapper is flex (T670 fix 7117931e — a plain block wrapper broke the aside''s flex-stretch, collapsing it to content height); root overflow-hidden clips the off-screen rail; floating PanelLeft reopen button fades+nudges in when collapsed; motion-reduce snaps. Shared useThreadSelection+useThreadActions from lib/live/threadView. Mobile twin = stack nav.'
+  last_edited_ms: 1785155836932
 90c7bac787948ffb:
   path: crates/cp-mod-memory/src/lib.rs
   description: 'Memory module. 2 tools: memory_create/update. Fixed MEMORY panel. Global, not core. 80-token tl_dr cap. Module data: memories + next_id + open_ids. Importance-gradient visualizer (critical→low).'
@@ -12262,6 +12274,10 @@
   path: src/llms/claude_code_v2/mod.rs
   description: 'Claude Code V2 OAuth client. new() loads the token via cp_vault::vault().get("claude_oauth") (single vault entry point, overrides→Keychain→file, T504 unification). Updated headers from CLI v2.1.170: 9 beta flags, billing cc_version=2.1.170, ua claude-cli/2.1.170. Body = clean V1 structure; only ''diagnostics'' field is rejected by public API. Reuses helpers + parse_sse_stream from claude_code_api_key.'
   last_edited_ms: 0
+9834f3f702eb1af0:
+  path: web/src/components/threads/dialogs/ThreadSearchPalette.tsx
+  description: Thread search command-palette (T669). Base UI Dialog overlay opened from the sidebar header search button, replacing the old inline search box. Combobox input + listbox results, recent-first name+preview filter (previewOf), ↑/↓ nav + Enter open + Esc close, footer kbd hints. Inner PaletteBody mounts only while open (fresh query/active state, no reset effect); active row derived-clamped at render (activeIdx) to avoid set-state-in-effect.
+  last_edited_ms: 1785154583043
 9844fdd1cab86e77:
   path: crates/cp-mod-git/src/lib.rs
   description: 'Git module. 1 tool: git_execute. refresh_git_status() split into current_branch/parse_numstat_line/collect_tracked/append_staged/append_untracked. overview_context_section renders changes table (push_changes_table + cap_overview_output, HARD-CAPPED 8KiB). git_line_semantic split status/diff/meta. Watches .git/ paths.'
@@ -18098,6 +18114,10 @@ e3e81cfa82f248b9:
   path: web/src/components/threads/ThreadList.tsx
   description: 'Thread sidebar list. ThreadList (search/filter/new-thread) + ThreadRow (dot/name/focused+paused badges/time/preview + hover actions: pause/play + archive/restore). Groups: User turn / Agent''s turn / Archived. Pause button only in active view (T371).'
   last_edited_ms: 0
+e3f83c3a9d31f605:
+  path: web/src/components/threads/ThreadList.tsx
+  description: Thread sidebar list. Grouped by turn-status (Agent's turn / User turn) + Archived view. Search now lives in ThreadSearchPalette (T669) opened from ListHeader's Search button; ListHeader also has a PanelLeftClose sidebar-collapse button. Row-hover title marquee via useTitleMarquee (WAA). Subcomponents RowActions/RowMeta/ListHeader/EmptyState keep budgets. Exactly 500 lines (cap).
+  last_edited_ms: 1785154583267
 e401a7ccd895bd3b:
   path: crates/cp-orchestrator/Cargo.toml
   description: 'Backend deps: cp-wire + cp-oplog + nix 0.30 (signal) + serde + serde_json + serde_yaml + tiny_http (0.12, transport). dev: cp-mod-bridge (test-only) + tempfile. lib+bin. Workspace lints.'
@@ -18450,6 +18470,10 @@ e8740d926f5b34f9:
   path: src/state/cache.rs
   description: 'CachePool: 6-worker thread pool for non-blocking panel cache refresh, LazyLock global, process_cache_request() API'
   last_edited_ms: 0
+e875a5ddd6c1a833:
+  path: web/src/components/threads/ThreadsView.tsx
+  description: 'Desktop ThreadsView — master-detail (list rail + conversation). railOpen collapse state (T669): ThreadList gated on it with onToggleSidebar; floating PanelLeft reopen button when collapsed. Shared useThreadSelection+useThreadActions from lib/live/threadView. Mobile twin = stack nav.'
+  last_edited_ms: 1785154583359
 e8818705939ac67f:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search.

@@ -513,9 +513,11 @@ version = "0.1.0"
 dependencies = [
  "cp-base",
  "cp-mod-logs",
+ "cp-mod-threads",
  "cp-mod-utilities",
  "cp-render",
  "cp-vault",
+ "cp-wire",
  "crossterm",
  "log",
  "notify",

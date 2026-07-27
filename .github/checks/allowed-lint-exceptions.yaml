@@ -371,3 +371,54 @@ exceptions:
       grouping, so #[non_exhaustive] is impossible.
     strategy: >
       Irreducible — a 6-arg constructor trips too_many_arguments; the exhaustive literal is honest.
+
+  # ── exhaustive_enums: T671 read-path query contracts ─────────────────
+  # The read-plane mirror of the command contracts above: query Kind is built
+  # by the orchestrator and matched exhaustively by the agent (Unknown catch-all
+  # for N-1); Outcome/Inbound are closed reply/discriminator taxonomies whose
+  # #[non_exhaustive] would force forbidden cross-crate wildcard arms.
+
+  - path: "crates/cp-wire/src/types/payload/query.rs"
+    match: "query Kind carries an Unknown catch-all for N-1 tolerance"
+    reason: >
+      Query Kind has an Unknown catch-all and is constructed by the orchestrator,
+      matched exhaustively by the agent; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — the Unknown variant already provides forward-compat.
+
+  - path: "crates/cp-wire/src/types/payload/query.rs"
+    match: "query Outcome is a closed reply taxonomy"
+    reason: >
+      Outcome enumerates the two reply shapes (hits or error), constructed by the agent
+      and matched exhaustively by the orchestrator; non_exhaustive would force forbidden
+      wildcard arms.
+    strategy: >
+      Irreducible — closed reply taxonomy, wildcard arms are forbidden.
+
+  - path: "crates/cp-wire/src/types/payload/query.rs"
+    match: "closed 2-variant on-wire discriminator"
+    reason: >
+      Inbound is the closed query-or-command socket discriminator, matched exhaustively
+      by the agent intake; non_exhaustive would force a forbidden cross-crate wildcard arm.
+    strategy: >
+      Irreducible — closed 2-variant discriminator, wildcard arms are forbidden.
+
+  - path: "crates/cp-wire/src/types/payload/query.rs"
+    match: "borrowed builder params for ConvHit"
+    reason: >
+      HitParts is the borrowed params bundle for ConvHit::from_parts, built by struct
+      literal cross-crate (the agent maps a Meilisearch row into it). A constructor would
+      take six positional arguments and re-trip too_many_arguments — the exact lint this
+      params struct exists to avoid — so #[non_exhaustive] is impossible.
+    strategy: >
+      Irreducible — the exhaustive literal is the whole point; a ctor re-trips too_many_arguments.
+
+  - path: "crates/cp-mod-search/src/meili/conversation_search.rs"
+    match: "resolved search inputs built by struct literal at the single agent accept-loop call site"
+    reason: >
+      SearchConvParams bundles the six resolved inputs to search_conversations, built by
+      struct literal at the single agent accept-loop call site. A constructor would take
+      six positional arguments and re-trip too_many_arguments — the exact lint this params
+      struct exists to avoid — so #[non_exhaustive] is impossible.
+    strategy: >
+      Irreducible — the exhaustive literal is the whole point; a ctor re-trips too_many_arguments.

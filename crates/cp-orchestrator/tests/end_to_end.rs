@@ -174,7 +174,7 @@ fn a_command_journals_on_the_agent_and_re_emerges_as_an_sse_delta() {
             let oplog = OplogService::spawn(&oplog_dir).expect("spawn oplog");
             let mut intake = Intake::new(&oplog_dir, cap_token).expect("intake");
             let (mut conn, _addr) = listener.accept().expect("accept");
-            let _applied = intake.handle_connection(&oplog, &mut conn).expect("handle");
+            let _applied = intake.handle_connection(&oplog, &mut conn, &no_queries).expect("handle");
             oplog.shutdown().expect("shutdown");
         })
     };
@@ -281,4 +281,12 @@ fn the_stream_survives_a_soak_of_connect_disconnect_cycles() {
     // The server is still healthy after the soak: a plain REST call answers.
     let fleet = common::get(&addr, "/api/fleet", &[]);
     assert_eq!(fleet.status, 200, "the server stays healthy after the soak");
+}
+
+/// Query responder used by the intake tests: this suite exercises the COMMAND
+/// half of the socket, so every read-path query answers with a plain error
+/// (T671). Passing a real search responder would drag Meilisearch into a test
+/// that has nothing to do with it.
+fn no_queries(_query: &cp_wire::types::payload::query::Query) -> cp_wire::types::payload::query::Outcome {
+    cp_wire::types::payload::query::Outcome::Error { reason: "queries not exercised here".to_owned() }
 }

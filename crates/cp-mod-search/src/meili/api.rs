@@ -264,6 +264,32 @@ impl MeiliClient {
         super::tasks::extract_task_uid(resp, "delete_documents_by_filter")
     }
 
+    /// Delete documents by their primary-key ids (batch).
+    ///
+    /// Uses `POST /indexes/{uid}/documents/delete-batch` with a JSON array of
+    /// ids. Preferred over filter-based deletion when the exact ids are known
+    /// (the conversations reconciler diffs desired vs existing ids), since it
+    /// needs no filterable-attribute on the primary key. Returns the task UID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the API call fails.
+    pub fn delete_documents(&self, uid: &str, ids: &[String]) -> Result<u64, String> {
+        let url = format!("{}/indexes/{uid}/documents/delete-batch", self.base_url);
+        let body = serde_json::Value::Array(ids.iter().map(|id| serde_json::Value::String(id.clone())).collect());
+
+        let resp = self
+            .http
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Content-Type", "application/json")
+            .body(body.to_string())
+            .send()
+            .map_err(|e| format!("delete_documents request failed: {e}"))?;
+
+        super::tasks::extract_task_uid(resp, "delete_documents")
+    }
+
     // -- Stats ----------------------------------------------------------------
 
     /// Get global statistics across all indexes (`GET /stats`).
@@ -352,41 +378,6 @@ impl MeiliClient {
 
     // -- Search ---------------------------------------------------------------
 
-    /// Build the JSON body for a single search query (shared by `search` and `multi_search`).
-    fn build_search_body(params: &SearchParams<'_>) -> serde_json::Value {
-        let mut body = serde_json::json!({
-            "q": params.query,
-            "limit": params.limit,
-            "showRankingScore": true,
-            "showMatchesPosition": false,
-        });
-
-        if let Some(f) = params.filter
-            && let Some(obj) = body.as_object_mut()
-        {
-            let _prev = obj.insert("filter".to_owned(), serde_json::Value::String(f.to_owned()));
-        }
-        if let Some(s) = params.sort
-            && let Some(obj) = body.as_object_mut()
-        {
-            let _prev =
-                obj.insert("sort".to_owned(), serde_json::Value::Array(vec![serde_json::Value::String(s.to_owned())]));
-        }
-        if let Some(ratio) = params.semantic_ratio
-            && let Some(obj) = body.as_object_mut()
-        {
-            let _prev = obj.insert(
-                "hybrid".to_owned(),
-                serde_json::json!({
-                    "semanticRatio": ratio,
-                    "embedder": "default"
-                }),
-            );
-        }
-
-        body
-    }
-
     /// Query a single index and return raw Meilisearch results.
     ///
     /// See [Meilisearch search API](https://docs.meilisearch.com/reference/api/search.html).
@@ -396,7 +387,7 @@ impl MeiliClient {
     /// Returns an error if the API call fails or the response cannot be parsed.
     pub(crate) fn search(&self, params: &SearchParams<'_>) -> Result<serde_json::Value, String> {
         let url = format!("{}/indexes/{}/search", self.base_url, params.uid);
-        let body = Self::build_search_body(params);
+        let body = super::search_body::build_search_body(params);
 
         let resp = self
             .http
@@ -429,7 +420,7 @@ impl MeiliClient {
         let query_bodies: Vec<serde_json::Value> = queries
             .iter()
             .map(|params| {
-                let mut body = Self::build_search_body(params);
+                let mut body = super::search_body::build_search_body(params);
                 if let Some(obj) = body.as_object_mut() {
                     let _prev = obj.insert("indexUid".to_owned(), serde_json::Value::String(params.uid.to_owned()));
                 }

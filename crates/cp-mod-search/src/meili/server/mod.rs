@@ -9,7 +9,10 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-use super::download;
+/// Binary download and platform detection.
+pub(crate) mod download;
+/// Server supervision: single-flight spawn lock + per-agent watchdog thread.
+pub(crate) mod watchdog;
 
 // -- Global paths ------------------------------------------------------------
 

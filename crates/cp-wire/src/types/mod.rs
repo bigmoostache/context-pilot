@@ -6,9 +6,9 @@
 //! gracefully round-trips a variant it has never seen.
 
 pub mod ack;
-pub mod body;
 pub mod command;
 pub mod oplog;
+pub mod payload;
 pub mod registry;
 pub mod snapshot;
 pub mod stream;

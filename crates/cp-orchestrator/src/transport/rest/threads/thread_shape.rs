@@ -19,7 +19,7 @@ use crate::services::materialized_view::RosterEntry;
 /// up-to-the-millisecond source — design doc I5); otherwise synthesise a
 /// log-less `ThreadDetail` so a thread created since the last disk flush still
 /// appears immediately.
-pub(super) fn overlay_roster(details: &mut Vec<serde_json::Value>, roster: &[RosterEntry], agent_id: &str) {
+pub(crate) fn overlay_roster(details: &mut Vec<serde_json::Value>, roster: &[RosterEntry], agent_id: &str) {
     for entry in roster {
         let existing = details
             .iter_mut()
@@ -73,7 +73,7 @@ fn roster_status_value(status: ThreadTurn) -> serde_json::Value {
 /// Reshape one raw thread from agent state to the maquette `ThreadDetail`
 /// shape: snake_case → camelCase, computed fields (`messageCount`, `unread`,
 /// `lastMessage`, `lastActivity`), and messages mapped to `log`.
-pub(super) fn reshape_thread(raw: &serde_json::Value, agent_id: &str) -> serde_json::Value {
+pub(crate) fn reshape_thread(raw: &serde_json::Value, agent_id: &str) -> serde_json::Value {
     let messages = raw.get("messages").and_then(serde_json::Value::as_array);
     let msg_count = messages.map_or(0, Vec::len);
     let unread = messages.map_or(0, |msgs| {

@@ -30,7 +30,7 @@ mod config;
 mod create;
 mod lifecycle;
 mod releases;
-mod thread_shape;
+mod threads;
 pub use backend::Backend;
 pub(crate) use claude_oauth::accounts::{delete_account, list_accounts, store_account, switch_account};
 pub(crate) use claude_oauth::{claude_usage, login_complete, login_start, refresh_login, token_status};
@@ -45,7 +45,8 @@ pub(crate) use releases::{
     delete_release, deploy_fleet, download_release, list_releases, releases_break_glass, restart_orchestrator,
     select_release, set_arch,
 };
-use thread_shape::{overlay_roster, reshape_thread};
+pub(crate) use threads::conversations::search_conversations;
+use threads::{overlay_roster, reshape_thread};
 
 /// A transport-agnostic reply: an HTTP status and a JSON body.
 #[derive(Clone, Debug, PartialEq, Eq)]

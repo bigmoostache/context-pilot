@@ -96,7 +96,7 @@ pub(crate) struct SearchState {
     /// Per-agent Meilisearch supervision thread. `None` when the server never
     /// came up (port 0). Dropping it (on reload) stops the old watchdog so a
     /// reload never stacks a second supervisor on the same global server.
-    pub watchdog: Option<super::meili::watchdog::WatchdogHandle>,
+    pub watchdog: Option<super::meili::server::watchdog::WatchdogHandle>,
     /// Hourly reconcile + embedding-backup tick thread. `None` when the server
     /// never came up. Dropped on reload so a reload never stacks two tickers.
     pub backup_tick: Option<super::index::tick::BackupTickHandle>,
@@ -266,6 +266,10 @@ pub(crate) enum IndexerCmd {
     DeleteFile(PathBuf),
     /// The initial full-project scan has finished.
     ScanComplete,
+    /// Batch-reconcile the conversations index against a desired doc set
+    /// (T671). Built on a State-bearing thread from the live `ThreadsState`,
+    /// then run on the indexer thread (which owns the Meilisearch client).
+    ReconcileConversations(Vec<crate::index::reconcile::conversations::ConversationDoc>),
 }
 
 // -- Public overlay info -----------------------------------------------------
@@ -407,5 +411,24 @@ pub(crate) fn logs_index_settings() -> serde_json::Value {
         "searchableAttributes": ["content"],
         "filterableAttributes": ["timestamp_ms", "importance", "worker_id"],
         "sortableAttributes": ["timestamp_ms"]
+    })
+}
+
+/// Meilisearch settings for the **conversations** index (T671).
+///
+/// Indexes one document per user/assistant thread message so the thread-search
+/// palette can hybrid-search (keyword + semantic) across everything ever said
+/// in a thread, not just its name. `thread_id` is filterable so the reconciler
+/// can scope per-thread purges; `author` is filterable for future faceting;
+/// `ts_ms` is sortable so recency ties can break toward newer messages.
+pub(crate) fn conversations_index_settings() -> serde_json::Value {
+    serde_json::json!({
+        "searchableAttributes": ["text", "thread_name"],
+        "filterableAttributes": ["thread_id", "author"],
+        "sortableAttributes": ["ts_ms"],
+        "typoTolerance": {
+            "enabled": true,
+            "minWordSizeForTypos": { "oneTypo": 4, "twoTypos": 8 }
+        }
     })
 }

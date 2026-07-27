@@ -9,6 +9,11 @@
 //!   integrity.
 //! * [`send`](AgentChannel::send) — deliver a [`Command`] to the agent over its
 //!   UDS stream socket, returning the durable [`Ack`] (journal-then-ack, I11).
+//! * [`query`](AgentChannel::query) — ask the agent a **read-only** question
+//!   over that same socket (T671), returning a
+//!   [`Response`](cp_wire::types::payload::query::Response). Nothing is
+//!   journaled and no `rev` is assigned; the reply carries data, not a durable
+//!   effect.
 //!
 //! The incremental oplog consumer that feeds the materialized view lives in the
 //! sibling [`tailer`](crate::registry::tailer) module; [`Tailer`] is re-exported
@@ -24,6 +29,7 @@ use cp_wire::framing;
 use cp_wire::types::ContentHash;
 use cp_wire::types::ack::Ack;
 use cp_wire::types::command::{Command, Frame as CommandFrame};
+use cp_wire::types::payload::query::{Frame as QueryFrame, Query, Response};
 use cp_wire::types::registry::Entry;
 
 /// Re-export so the tailer stays reachable at the historical `channel::Tailer`
@@ -154,31 +160,80 @@ impl AgentChannel {
         }
         Err(last_err.unwrap_or_else(|| io::Error::other("send_with_retry: no attempts")))
     }
+
+    /// Send a read-only [`Query`] to the agent and return its [`Response`]
+    /// (T671).
+    ///
+    /// The transport is **identical** to [`send`](Self::send) — same socket,
+    /// same length+CRC framing, same bearer `cap_token` — differing only in the
+    /// frame shape written. The agent's intake tells the two apart via the
+    /// untagged [`Inbound`](cp_wire::types::payload::query::Inbound)
+    /// discriminator, so this rides the proven command socket without
+    /// perturbing it.
+    ///
+    /// Unlike a command, a query is **not journaled** and returns no `rev`: it
+    /// mutates nothing, so there is no durable effect to acknowledge — the reply
+    /// carries data. A *failed lookup* is reported inside the response as
+    /// [`Outcome::Error`](cp_wire::types::payload::query::Outcome::Error), not
+    /// as an `Err` here; an `Err` means the agent was unreachable or the wire
+    /// broke.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`io::Error`] if the agent is unreachable (connection refused),
+    /// the socket write fails, no response arrives within [`ACK_READ_TIMEOUT`],
+    /// or the reply cannot be decoded.
+    pub fn query(&self, query: Query) -> io::Result<Response> {
+        let frame = QueryFrame::new(self.cap_token.clone(), query);
+        let payload =
+            serde_json::to_vec(&frame).map_err(|e| io::Error::other(format!("serialize query frame: {e}")))?;
+        let frame_bytes = framing::encode_raw(&payload).map_err(|e| io::Error::other(format!("frame query: {e}")))?;
+
+        let mut stream = UnixStream::connect(&self.socket_path)?;
+        let _timeout = stream.set_read_timeout(Some(ACK_READ_TIMEOUT));
+        stream.write_all(&frame_bytes)?;
+        // Half-close the write side so the agent's read loop sees EOF after this
+        // single query — the same one-request-per-connection contract the
+        // command path uses.
+        stream.shutdown(std::net::Shutdown::Write)?;
+
+        read_framed(&mut stream, "response")
+    }
 }
 
 /// Read a framed [`Ack`] from `stream`, bounded by [`MAX_ACK_BUFFER`].
 fn read_ack(stream: &mut UnixStream) -> io::Result<Ack> {
+    read_framed(stream, "ack")
+}
+
+/// Read one length+CRC framed, JSON-encoded `T` from `stream`, bounded by
+/// [`MAX_ACK_BUFFER`].
+///
+/// Shared by the command path ([`read_ack`]) and the query path
+/// ([`AgentChannel::query`]) — both speak the same envelope, differing only in
+/// the payload type. `what` names the expected payload in error messages so a
+/// decode failure says which half of the protocol broke.
+fn read_framed<T: serde::de::DeserializeOwned>(stream: &mut UnixStream, what: &str) -> io::Result<T> {
     let mut buf: Vec<u8> = Vec::new();
     let mut chunk = [0u8; READ_CHUNK];
 
     loop {
         let read = stream.read(&mut chunk)?;
         if read == 0 && buf.is_empty() {
-            return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "agent closed before ack"));
+            return Err(io::Error::new(io::ErrorKind::UnexpectedEof, format!("agent closed before {what}")));
         }
         if let Some(got) = chunk.get(..read) {
             buf.extend_from_slice(got);
         }
-        // Try to decode a complete framed Ack.
+        // Try to decode a complete framed payload.
         if let Ok((payload, _consumed)) = framing::decode_raw(&buf) {
-            let ack: Ack = serde_json::from_slice(payload).map_err(|e| io::Error::other(format!("decode ack: {e}")))?;
-            return Ok(ack);
+            return serde_json::from_slice(payload).map_err(|e| io::Error::other(format!("decode {what}: {e}")));
         }
         if read == 0 {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "incomplete ack frame"));
+            return Err(io::Error::new(io::ErrorKind::InvalidData, format!("incomplete {what} frame")));
         }
         if buf.len() > MAX_ACK_BUFFER {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "ack buffer overflow"));
+            return Err(io::Error::new(io::ErrorKind::InvalidData, format!("{what} buffer overflow")));
         }
     }
 }
@@ -187,6 +242,7 @@ fn read_ack(stream: &mut UnixStream) -> io::Result<Ack> {
 mod tests {
     use super::*;
     use cp_wire::types::ack::Status;
+    use cp_wire::types::payload::query::{ConvHit, HitParts, Kind as QueryKind, Outcome};
     use std::os::unix::net::UnixListener;
     use tempfile::tempdir;
 
@@ -292,5 +348,70 @@ mod tests {
         };
         let result = ch.send(test_command("fail"));
         assert!(result.is_err(), "connection refused must surface as an error");
+    }
+
+    // ── query tests (T671) ─────────────────────────────────────────────
+
+    /// A minimal query server: drains one framed query frame, then writes back
+    /// a canned single-hit Response. Mirrors [`echo_ack_server`] on the read
+    /// plane.
+    fn echo_hits_server(listener: UnixListener) {
+        let (mut conn, _addr) = listener.accept().expect("accept");
+        let mut chunk = [0u8; READ_CHUNK];
+        while conn.read(&mut chunk).expect("read") != 0 {}
+
+        let response = Response::new(
+            "q-1".to_owned(),
+            Outcome::Hits {
+                hits: vec![ConvHit::from_parts(&HitParts {
+                    thread_id: "T3",
+                    thread_name: "Auth",
+                    author: "user",
+                    text: "the token check",
+                    ts_ms: 7,
+                    score: 0.9,
+                })],
+            },
+        );
+        let payload = serde_json::to_vec(&response).expect("ser");
+        let frame = framing::encode_raw(&payload).expect("frame");
+        conn.write_all(&frame).expect("write");
+    }
+
+    /// A `SearchConversations` query for the tests below.
+    fn test_query() -> Query {
+        Query::new(
+            "q-1".to_owned(),
+            QueryKind::SearchConversations { query: "auth bug".to_owned(), limit: 5, thread_id: None },
+        )
+    }
+
+    #[test]
+    fn query_receives_hits_from_agent() {
+        let dir = tempdir().expect("dir");
+        let sock = dir.path().join("query.sock");
+        let listener = UnixListener::bind(&sock).expect("bind");
+
+        let server = thread::spawn(move || echo_hits_server(listener));
+
+        let ch = AgentChannel { socket_path: sock, cap_token: "tok".to_owned(), bodies_dir: PathBuf::new() };
+        let response = ch.query(test_query()).expect("query");
+        assert_eq!(response.query_id, "q-1", "the reply echoes the query id");
+        match response.result {
+            Outcome::Hits { hits } => assert_eq!(hits.len(), 1),
+            Outcome::Error { reason } => panic!("expected hits, got error: {reason}"),
+        }
+
+        server.join().expect("join");
+    }
+
+    #[test]
+    fn query_returns_error_on_connection_refused() {
+        let ch = AgentChannel {
+            socket_path: PathBuf::from("/tmp/nonexistent_query_socket_for_test.sock"),
+            cap_token: "tok".to_owned(),
+            bodies_dir: PathBuf::new(),
+        };
+        assert!(ch.query(test_query()).is_err(), "connection refused must surface as an error");
     }
 }
