@@ -39,7 +39,7 @@ pub(crate) use config::it::{it_ca_fingerprint, it_get_identity, it_provisioned, 
 pub(crate) use config::settings::{allowed_models, onboarding_completed};
 pub use config::settings::{get_settings, update_settings};
 pub(crate) use config::update::{APPLY_IN_FLIGHT, update_apply, update_check, update_set_mode, update_status};
-pub use create::{create_agent, create_command};
+pub use create::{create_agent, create_command, delete_library_agent, read_library_agent, upsert_library_agent};
 pub use lifecycle::{restart_agent, retire_agent, unretire_agent};
 pub(crate) use releases::{
     delete_release, deploy_fleet, download_release, list_releases, releases_break_glass, restart_orchestrator,

@@ -185,11 +185,14 @@ impl AgentView {
                     miss_tokens: *miss_tokens,
                 };
             }
-            // Durability-only records, message-delete, and forward-compat
-            // unknowns do not affect the projected state.
+            // Durability-only records, message-delete, behaviour-change, and
+            // forward-compat unknowns do not affect the projected state — the
+            // active behaviour is a tier-② `config.json` read the frontend
+            // fetches on invalidation, never folded view state.
             OpEntryKind::CommandEffect { .. }
             | OpEntryKind::SeenMark { .. }
             | OpEntryKind::MessageDeleted { .. }
+            | OpEntryKind::BehaviourChanged { .. }
             | OpEntryKind::Unknown => {}
         }
     }

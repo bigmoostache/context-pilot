@@ -257,6 +257,28 @@ pub enum OpEntryKind {
         miss_tokens: u64,
     },
 
+    /// The agent's active **behaviour agent** (system prompt) changed — a new
+    /// library agent was loaded (or reverted to default) via the `agent_load`
+    /// tool or the web footer's `LoadBehaviour` command.
+    ///
+    /// Ephemeral, disposable UI signal in the same class as
+    /// [`PhaseTransition`](Self::PhaseTransition): it rides the **best-effort**
+    /// durability path, is **not** carried in a [`Checkpoint`](Self::Checkpoint)
+    /// snapshot, and self-heals — a dropped delta is covered by the coarse
+    /// `config.json` mtime backstop. Observers do **not** fold it (the active
+    /// behaviour is a tier-② `config.json` read, not view state); they use it to
+    /// **invalidate** their cached library/behaviour view so the next read
+    /// surfaces the fresh active agent — the event-driven twin of the mtime
+    /// backstop, matching the thread-roster push discipline (T581).
+    #[serde(rename = "behaviour_changed")]
+    BehaviourChanged {
+        /// The newly-active behaviour agent id, or `None` on revert-to-default.
+        /// Informational — an observer may simply refetch the library on any
+        /// `behaviour_changed`, ignoring the payload.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        agent_id: Option<String>,
+    },
+
     /// State checkpoint — bounds replay length on restart (GAP 1 / I5).
     #[serde(rename = "checkpoint")]
     Checkpoint {
@@ -405,5 +427,31 @@ mod tests {
         };
         let json = serde_json::to_string(&entry).expect("serialize");
         assert!(json.contains("\"kind\":\"thread_archived\""), "stable tag: {json}");
+    }
+
+    #[test]
+    fn behaviour_changed_round_trip_and_stable_tag() {
+        // Carries the new active agent id and round-trips; the id is omitted on
+        // a revert-to-default (None).
+        let with_id = OpEntry {
+            schema_version: 1,
+            rev: 5,
+            timestamp_ms: 0,
+            kind: OpEntryKind::BehaviourChanged { agent_id: Some("caveman".into()) },
+        };
+        let json = serde_json::to_string(&with_id).expect("serialize");
+        assert!(json.contains("\"kind\":\"behaviour_changed\""), "stable tag: {json}");
+        assert!(json.contains("caveman"), "carries the active id: {json}");
+        assert_eq!(serde_json::from_str::<OpEntry>(&json).expect("deserialize"), with_id);
+
+        let reverted = OpEntry {
+            schema_version: 1,
+            rev: 6,
+            timestamp_ms: 0,
+            kind: OpEntryKind::BehaviourChanged { agent_id: None },
+        };
+        let json = serde_json::to_string(&reverted).expect("serialize");
+        assert!(!json.contains("agent_id"), "None id omitted: {json}");
+        assert_eq!(serde_json::from_str::<OpEntry>(&json).expect("deserialize"), reverted);
     }
 }

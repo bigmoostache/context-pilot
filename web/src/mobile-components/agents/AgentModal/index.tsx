@@ -5,7 +5,7 @@ import { usePickerProviders } from "@/lib/support/models"
 import { useRenameAgent, sendCommand } from "@/lib/live"
 import type { Agent } from "@/lib/types"
 import { prefersReducedMotion } from "@/lib/utils"
-import { CornerButton } from "@/mobile-components/shell/CornerButton"
+import { CornerButton } from "@/mobile-components/shell/chrome/CornerButton"
 import { useSelectionState } from "./controller"
 import { useAgentModalActions } from "./actions"
 import {

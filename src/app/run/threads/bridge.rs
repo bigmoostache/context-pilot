@@ -22,7 +22,7 @@ use std::time::Duration;
 
 use cp_base::state::runtime::State;
 use cp_mod_bridge::BridgeState;
-use cp_mod_threads::types::{FocusState, ThreadStatus, ThreadsState};
+use cp_mod_threads::types::{ThreadStatus, ThreadsState};
 use cp_wire::types::command::Command;
 use cp_wire::types::oplog::OpEntryKind;
 use cp_wire::types::payload::query::Query;
@@ -196,7 +196,7 @@ const fn wire_phase(phase: cp_base::state::flags::StreamPhase) -> Phase {
 /// [`CostAggregate`](OpEntryKind::CostAggregate)): a lost intermediate phase is
 /// reconstructed on replay and a dropped cost sample re-aggregates, so unlike
 /// the roster deltas these must never stall the main loop for durability (I2).
-fn emit_best_effort(state: &State, kind: OpEntryKind) {
+pub(in crate::app::run) fn emit_best_effort(state: &State, kind: OpEntryKind) {
     if let Some(bs) = state.get_ext::<BridgeState>()
         && let Some(boot) = bs.boot.as_ref()
     {
@@ -407,54 +407,5 @@ pub(in crate::app::run) fn emit_thread_status(app: &mut App) {
     for (thread_id, status) in changed {
         emit_roster_delta(&app.state, OpEntryKind::ThreadStatusChanged { thread_id: thread_id.clone(), status });
         let _prev = app.state.ext_mut::<BridgeState>().thread_statuses.insert(thread_id, status);
-    }
-}
-
-// ── Thread focus emission (focused-thread highlight — design doc I8) ──────
-
-/// Emit a [`ThreadFocusChanged`](OpEntryKind::ThreadFocusChanged) the instant
-/// the agent's focused thread changes, so the backend view (and the web UI's
-/// focused-thread highlight) reflect it in milliseconds instead of waiting on
-/// the debounced tier-② disk write plus the frontend's backstop poll.
-///
-/// Like [`emit_thread_status`] this is a main-loop **observe-on-change
-/// chokepoint**: it diffs the live [`FocusState::focused_thread_id`] against the
-/// snapshot held in [`BridgeState::last_focus`] and emits **only on an actual
-/// change**, so it captures focus from *every* source with one uniform path —
-/// the idle `MY_TURN` auto-`Read` ([`maybe_inject_auto_read`](super::maybe_inject_auto_read)),
-/// a manual `Read`, or focus release on archive / a finished turn — rather than
-/// an emit call scattered at each focus-mutation site.
-///
-/// Focus is ephemeral, disposable UI state (the same class as phase), so it
-/// rides the **best-effort** path ([`emit_best_effort`]): a dropped focus delta
-/// self-heals from the agent's tier-② `FocusState` on the next `/threads` read
-/// and is superseded by the next focus change.
-///
-/// The first pass after boot **seeds** the snapshot without emitting, so a
-/// (re)started agent does not replay its current focus as a spurious change
-/// (the cold focus rides the frontend's initial tier-② load).
-///
-/// No-op when the bridge is OFF.
-pub(in crate::app::run) fn emit_thread_focus(app: &mut App) {
-    if !bridge_active(&app.state) {
-        return;
-    }
-
-    let focused = FocusState::get(&app.state).focused_thread_id.clone();
-
-    // First pass: snapshot the existing focus without emitting.
-    let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.focus());
-    if !seeded {
-        let bs = app.state.ext_mut::<BridgeState>();
-        bs.last_focus = focused;
-        bs.seeded.seed_focus();
-        return;
-    }
-
-    // Emit only on an actual change.
-    let changed = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.last_focus != focused);
-    if changed {
-        emit_best_effort(&app.state, OpEntryKind::ThreadFocusChanged { thread_id: focused.clone() });
-        app.state.ext_mut::<BridgeState>().last_focus = focused;
     }
 }

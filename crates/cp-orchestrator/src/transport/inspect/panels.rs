@@ -70,38 +70,129 @@ pub fn library(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
         Ok(f) => f,
         Err(reply) => return reply,
     };
+
+    // The active behaviour agent is persisted at config.json
+    // `modules.system.active_agent_id` (the PromptModule's global module data —
+    // it is `is_global()`, so `build_module_data_maps` writes it under
+    // `Shared.modules["system"]`). Read it via the mtime-cached inspector so
+    // the footer selector can mark which agent is loaded, the same disk-read
+    // mechanism `usage()` uses. Absent (older state / never switched) → None.
+    let active_agent_id: Option<String> = {
+        match state.lock() {
+            Ok(mut b) => b.inspect_mut().read_config(Path::new(&folder)).ok().and_then(|cfg| {
+                cfg.get("modules")
+                    .and_then(|m| m.get("system"))
+                    .and_then(|s| s.get("active_agent_id"))
+                    .and_then(|v| v.as_str())
+                    .map(str::to_owned)
+            }),
+            Err(_) => return HttpReply::error(500, "backend lock poisoned"),
+        }
+    };
+
     let cp_dir = Path::new(&folder).join(".context-pilot");
     let mut items: Vec<serde_json::Value> = Vec::new();
 
     for (kind, subdir) in [("agent", "agents"), ("skill", "skills"), ("command", "commands")] {
+        // Seed built-in ids for this kind — an on-disk `.md` whose id matches one
+        // is an OVERRIDE of a compiled-in seed (flag it `builtin: true`), and any
+        // seed with NO disk file is appended below so the dropdown lists it too.
+        // Mirrors the tui-side `cp_mod_prompt::storage::load_prompts_for` merge:
+        // one seed source (`yamls/library.yaml` via `cp_base`), disk wins on id.
+        let seeds = seed_entries(kind);
+
+        let mut disk_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
         let dir = cp_dir.join(subdir);
-        let Ok(entries) = std::fs::read_dir(&dir) else { continue };
-        for entry in entries {
-            let Ok(entry) = entry else { continue };
-            let path = entry.path();
-            if path.extension().and_then(std::ffi::OsStr::to_str) != Some("md") {
+        if let Ok(entries) = std::fs::read_dir(&dir) {
+            for entry in entries {
+                let Ok(entry) = entry else { continue };
+                let path = entry.path();
+                if path.extension().and_then(std::ffi::OsStr::to_str) != Some("md") {
+                    continue;
+                }
+                let Ok(content) = std::fs::read_to_string(&path) else { continue };
+                let (name, description) = parse_frontmatter(&content);
+                let id = path.file_stem().and_then(std::ffi::OsStr::to_str).unwrap_or("").to_owned();
+                if id.is_empty() {
+                    continue;
+                }
+                let is_builtin = seeds.iter().any(|s| s.id == id);
+                let _new = disk_ids.insert(id.clone());
+                items.push(library_item(
+                    kind,
+                    &id,
+                    &name,
+                    &description,
+                    &content,
+                    active_agent_id.as_deref(),
+                    is_builtin,
+                ));
+            }
+        }
+
+        // Append seed built-ins that have no on-disk override, so the dropdown
+        // lists every agent even before the user has created a local copy.
+        for seed in seeds {
+            if disk_ids.contains(&seed.id) {
                 continue;
             }
-            let Ok(content) = std::fs::read_to_string(&path) else { continue };
-            let (name, description) = parse_frontmatter(&content);
-            let id = path.file_stem().and_then(std::ffi::OsStr::to_str).unwrap_or("").to_owned();
-            // For commands, surface the prompt BODY (text after frontmatter) so
-            // the web thread composer can seed the actual prompt when a `/cmd`
-            // suggestion bubble is clicked (T350) — not the bare `/cmd` token.
-            // Skipped for agents/skills (their bodies are large system prompts /
-            // reference docs that nothing in the library list consumes).
-            let body = (kind == "command").then(|| parse_command_body(&content));
+            let active = (kind == "agent" && active_agent_id.as_deref() == Some(seed.id.as_str())).then_some(true);
+            let body = (kind == "command").then(|| seed.content.clone());
             items.push(serde_json::json!({
-                "id": id,
-                "name": name,
+                "id": seed.id,
+                "name": seed.name,
                 "kind": kind,
-                "description": description,
+                "description": seed.description,
                 "body": body,
+                "active": active,
+                "builtin": true,
             }));
         }
     }
 
     HttpReply::ok(&items)
+}
+
+/// The compiled-in seed entries for a library `kind` (`"agent"`/`"skill"`/
+/// `"command"`) — the same `yamls/library.yaml` source the tui loader uses, so
+/// the orchestrator's list mirrors the agent's own built-in set exactly.
+fn seed_entries(kind: &str) -> &'static [cp_base::config::SeedEntry] {
+    use cp_base::config::accessors::library;
+    match kind {
+        "agent" => library::agents(),
+        "skill" => library::skills(),
+        "command" => library::commands(),
+        _ => &[],
+    }
+}
+
+/// Build one `LibraryItem` JSON object from an on-disk `.md`.
+///
+/// `body` is surfaced only for commands (the `/cmd` composer seed — T350);
+/// agent/skill bodies are large and nothing in the list consumes them (Export /
+/// Edit fetch them on demand). `active` marks the loaded behaviour agent;
+/// `builtin` flags an id that also exists as a compiled-in seed (i.e. this disk
+/// file is a local OVERRIDE of a built-in).
+fn library_item(
+    kind: &str,
+    id: &str,
+    name: &str,
+    description: &str,
+    content: &str,
+    active_agent_id: Option<&str>,
+    is_builtin: bool,
+) -> serde_json::Value {
+    let body = (kind == "command").then(|| parse_command_body(content));
+    let active = (kind == "agent" && active_agent_id == Some(id)).then_some(true);
+    serde_json::json!({
+        "id": id,
+        "name": name,
+        "kind": kind,
+        "description": description,
+        "body": body,
+        "active": active,
+        "builtin": is_builtin.then_some(true),
+    })
 }
 
 /// Extract the markdown **body** of a command file — everything after the

@@ -90,7 +90,16 @@ pub(super) fn transport() -> Value {
             },
             "required": ["id", "status"]
         },
-        // ── Auth ────────────────────────────────────────────────────
+        "LibraryAgentRaw": {
+            "type": "object",
+            "properties": {
+                "name": { "type": "string" },
+                "description": { "type": "string" },
+                "body": { "type": "string" },
+                "builtin": { "type": "boolean" }
+            },
+            "required": ["name", "description", "body", "builtin"]
+        },
         "AuthStatus": {
             "type": "object",
             "properties": {
@@ -382,7 +391,10 @@ pub(super) fn transport() -> Value {
                 "message_id": { "type": "string" },
                 "head": { "type": "string" },
                 "inline_body": { "type": "string" },
-                "message_ts": { "type": "integer" }
+                "message_ts": { "type": "integer" },
+                // behaviour_changed delta payload: the newly-active behaviour-agent
+                // id (absent on a revert-to-default), carried by a `kind:"behaviour_changed"` entry.
+                "agent_id": { "type": "string" }
             },
             "required": ["kind"]
         },
