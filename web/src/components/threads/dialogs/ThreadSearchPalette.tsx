@@ -287,7 +287,9 @@ function ResultList({
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="truncate text-[13px]">{row.primary}</span>
               {row.secondary !== "" && (
-                <span className="truncate text-[11px] text-muted-foreground/55">{row.secondary}</span>
+                <span className="truncate text-[11px] text-muted-foreground/55">
+                  {row.secondary}
+                </span>
               )}
             </span>
             {i === activeIdx ? (

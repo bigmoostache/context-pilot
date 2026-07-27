@@ -294,8 +294,8 @@ export function searchConversations(
       path: { id: agentId },
       body: {
         query,
-        ...((opts?.limit != null) && { limit: opts.limit }),
-        ...((opts?.threadId != null) && { thread_id: opts.threadId }),
+        ...(opts?.limit != null && { limit: opts.limit }),
+        ...(opts?.threadId != null && { thread_id: opts.threadId }),
       },
     }),
   ).then((r) => r.hits)
