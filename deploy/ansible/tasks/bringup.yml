@@ -43,6 +43,80 @@
   ansible.builtin.debug:
     msg: "hostname set to {{ box_hostname }}"
 
+# ── fleet ULA: a deterministic IPv6 identity, derived from the SAME serial ────
+# The zero-touch installer already imposed this address at flash time — that is
+# what makes a box reachable before Ansible has ever connected. We re-assert it
+# here so that (a) boxes flashed before this existed pick it up without a reflash,
+# and (b) the declarative side stays the reference: same serial in, same address
+# out. Skipped when the serial is unreadable (no identity to derive from).
+- name: Derive the ULA interface-id from the serial (low 64 bits, 4 hex groups)
+  # The pcat serial is 16 hex chars = exactly one IPv6 interface-id, so
+  # 7681f2a227e0f10d becomes 7681:f2a2:27e0:f10d and the address stays in
+  # canonical form (no ambiguous '::' for a single zero group).
+  ansible.builtin.set_fact:
+    box_ula_iid: >-
+      {{ (('0' * 16) ~ (box_serial | lower | regex_replace('[^0-9a-f]', '')))[-16:]
+         | regex_replace('(.{4})(.{4})(.{4})(.{4})', '\1:\2:\3:\4') }}
+
+- name: Compute this box's ULA (port 1; the second port lives in :2:)
+  ansible.builtin.set_fact:
+    box_ula: "{{ box_ula_prefix }}:1:{{ box_ula_iid }}"
+    box_ula_usable: "{{ box_ula_iid != '0000:0000:0000:0000' }}"
+
+- name: Install the ULA assigner + its triggers
+  when: box_ula_usable | bool
+  block:
+    - name: Ship the ULA assigner
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/deploy/photonicat/emmc-install/ula/pcat-ula.sh"
+        dest: /usr/local/sbin/pcat-ula
+        mode: "0755"
+
+    - name: Pin this box's ULA identity
+      ansible.builtin.copy:
+        dest: /etc/default/pcat-ula
+        content: |
+          PCAT_ULA_PREFIX={{ box_ula_prefix }}
+          PCAT_ULA_IID={{ box_ula_iid }}
+        mode: "0644"
+
+    - name: Ship the boot-time oneshot
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/deploy/photonicat/emmc-install/ula/pcat-ula.service"
+        dest: /etc/systemd/system/pcat-ula.service
+        mode: "0644"
+
+    - name: Ensure the NetworkManager dispatcher directory exists
+      # NM drops addresses it did not add itself when it reactivates a connection,
+      # so the dispatcher hook is what makes the ULA survive a carrier bounce or a
+      # DHCP renew. Creating the directory is harmless if NM is not installed.
+      ansible.builtin.file:
+        path: /etc/NetworkManager/dispatcher.d
+        state: directory
+        mode: "0755"
+
+    - name: Ship the NetworkManager dispatcher hook
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/deploy/photonicat/emmc-install/ula/nm-dispatcher-50-pcat-ula"
+        dest: /etc/NetworkManager/dispatcher.d/50-pcat-ula
+        owner: root
+        group: root
+        mode: "0755"    # NM ignores group/other-writable or non-executable hooks
+
+    - name: Enable + run the ULA assigner now
+      ansible.builtin.systemd_service:
+        name: pcat-ula.service
+        daemon_reload: true
+        enabled: true
+        state: restarted
+
+- name: Report the ULA
+  ansible.builtin.debug:
+    msg: >-
+      {{ ('ULA ' ~ box_ula ~ ' (port 1) — ssh root@' ~ box_ula)
+         if (box_ula_usable | bool)
+         else 'no ULA: hardware serial unreadable, box stays DHCP/link-local only' }}
+
 # ── bootstrap package tooling ───────────────────────────────────────────────
 - name: Bootstrap python3-apt so the ansible apt module works on minimal images
   # The ansible.builtin.apt MODULE (used later, e.g. tasks/display.yml) needs

@@ -947,6 +947,26 @@
         ],
         "type": "object"
       },
+      "ItDetectedAddresses": {
+        "description": "Addresses the box observes on itself, so the day-0 wizard can tell the operator which one to hand to the client instead of guessing. `ipv4` is the source address the kernel would route from (the DHCP lease in practice), and is what belongs in `Identity.ip`. `ulas` are the fleet ULAs (RFC 4193), derived from the hardware serial and therefore permanent: a maintenance plane for the vendor, not an address the client can use.",
+        "properties": {
+          "ipv4": {
+            "nullable": true,
+            "type": "string"
+          },
+          "ulas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "ipv4",
+          "ulas"
+        ],
+        "type": "object"
+      },
       "ItFingerprint": {
         "properties": {
           "algorithm": {
@@ -964,6 +984,9 @@
       },
       "ItIdentityResponse": {
         "properties": {
+          "detected": {
+            "$ref": "#/components/schemas/ItDetectedAddresses"
+          },
           "identity": {
             "allOf": [
               {
@@ -974,7 +997,8 @@
           }
         },
         "required": [
-          "identity"
+          "identity",
+          "detected"
         ],
         "type": "object"
       },

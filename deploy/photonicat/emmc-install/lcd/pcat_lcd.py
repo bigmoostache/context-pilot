@@ -29,7 +29,8 @@ RST=GPIO122, DC=GPIO121, CS=GPIO13 (vendor UseCS=false), BL=PWM. Geometry
 172x320, rotation 180 => MADCTL 0x48 (MX|BGR), column offset 34, row offset 0.
 
 Usage (per state; one-shot process each):
-    pcat_lcd.py flashing 43 | verify | provisioning | done | error "msg"
+    pcat_lcd.py flashing 43 | verify | provisioning | error "msg"
+    pcat_lcd.py done [7681:f2a2:27e0:f10d]   # ULA interface-id, shown on the panel
 """
 
 from __future__ import annotations
@@ -286,6 +287,9 @@ FONT5X7: dict[str, tuple[int, int, int, int, int]] = {
     "%": (0x23, 0x13, 0x08, 0x64, 0x62),
     "-": (0x08, 0x08, 0x08, 0x08, 0x08),
     ".": (0x00, 0x60, 0x60, 0x00, 0x00),
+    # ":" is REQUIRED to paint an IPv6 interface-id — without it the DONE screen
+    # would silently blank the separators (unknown glyphs fall back to space).
+    ":": (0x00, 0x24, 0x24, 0x00, 0x00),
     "0": (0x3E, 0x51, 0x49, 0x45, 0x3E),
     "1": (0x00, 0x42, 0x7F, 0x40, 0x00),
     "2": (0x42, 0x61, 0x51, 0x49, 0x46),
@@ -305,12 +309,14 @@ FONT5X7: dict[str, tuple[int, int, int, int, int]] = {
     "G": (0x3E, 0x41, 0x49, 0x49, 0x7A),
     "H": (0x7F, 0x08, 0x08, 0x08, 0x7F),
     "I": (0x00, 0x41, 0x7F, 0x41, 0x00),
+    "J": (0x20, 0x40, 0x41, 0x3F, 0x01),
     "K": (0x7F, 0x08, 0x14, 0x22, 0x41),
     "L": (0x7F, 0x40, 0x40, 0x40, 0x40),
     "M": (0x7F, 0x02, 0x0C, 0x02, 0x7F),
     "N": (0x7F, 0x04, 0x08, 0x10, 0x7F),
     "O": (0x3E, 0x41, 0x41, 0x41, 0x3E),
     "P": (0x7F, 0x09, 0x09, 0x09, 0x06),
+    "Q": (0x3E, 0x41, 0x51, 0x21, 0x5E),
     "R": (0x7F, 0x09, 0x19, 0x29, 0x46),
     "S": (0x46, 0x49, 0x49, 0x49, 0x31),
     "T": (0x01, 0x01, 0x7F, 0x01, 0x01),
@@ -351,11 +357,30 @@ def _screen_provisioning(p: Panel) -> None:
     p.text("PLEASE WAIT", 20, 210, WHITE, scale=1)
 
 
-def _screen_done(p: Panel) -> None:
+def _screen_done(p: Panel, ula_iid: str = "") -> None:
+    """Install finished — and, crucially, the box's IPv6 identity.
+
+    The interface-id IS the hardware serial, so this panel tells the technician
+    the box's permanent address (prefix + `:1:` + this) without needing DHCP, a
+    scan, or a label reader. Painted in two lines of two hex groups because the
+    full 19-char id does not fit at a readable scale on a 172 px panel.
+
+    The board is deliberately still running when this is painted, so the screen
+    doubles as the instruction card: the operator powers off with the BUTTON
+    (pulling the SD while it is the running rootfs is what we avoid), then pulls
+    the card.
+    """
     p.clear(BLACK)
-    p.text("DONE", 40, 110, GREEN, scale=4)
-    p.text("REMOVE SD", 16, 180, GREEN, scale=2)
-    p.text("POWERING OFF", 18, 240, WHITE, scale=1)
+    p.text("DONE", 50, 20, GREEN, scale=3)
+    groups = [g for g in ula_iid.strip().split(":") if g]
+    if len(groups) == 4:
+        p.text("IPV6 ID", 8, 60, AMBER, scale=1)
+        p.text(f"{groups[0]}:{groups[1]}", 32, 78, AMBER, scale=2)
+        p.text(f"{groups[2]}:{groups[3]}", 32, 104, AMBER, scale=2)
+    else:
+        p.text("NO IPV6 ID", 8, 78, WHITE, scale=1)
+    p.text("PRESS POWER", 53, 250, WHITE, scale=1)
+    p.text("THEN REMOVE SD", 44, 268, WHITE, scale=1)
 
 
 def _screen_error(p: Panel, msg: str) -> None:
@@ -368,7 +393,11 @@ def _screen_error(p: Panel, msg: str) -> None:
 
 def main(argv: list[str]) -> int:
     if len(argv) < 2:
-        print("usage: pcat_lcd.py {flashing PCT|verify|done|error [msg]}", file=sys.stderr)
+        print(
+            "usage: pcat_lcd.py {flashing PCT|verify|provisioning"
+            "|done [ULA-IID]|error [msg]}",
+            file=sys.stderr,
+        )
         return 2
     state = argv[1].lower()
     try:
@@ -385,7 +414,7 @@ def main(argv: list[str]) -> int:
         elif state == "provisioning":
             _screen_provisioning(panel)
         elif state == "done":
-            _screen_done(panel)
+            _screen_done(panel, argv[2] if len(argv) > 2 else "")
         elif state == "error":
             _screen_error(panel, argv[2] if len(argv) > 2 else "unknown")
         else:

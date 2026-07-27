@@ -1,7 +1,15 @@
 ==================== Context Pilot — IT delivery sheet ====================
 
+{# An IPv6 host (the fleet ULA) must be bracketed inside a URL: a bare
+   fd59:…:f10d:80 is unparseable for a browser. IPv4/DNS names pass through. #}
+{% set _day0_host = ansible_host | default(inventory_hostname) %}
   Unit               : {{ inventory_hostname }}
-  Day-0 setup URL    : http://{{ ansible_host | default(inventory_hostname) }}:80
+  Day-0 setup URL    : http://{{ '[' ~ _day0_host ~ ']' if ':' in _day0_host else _day0_host }}:80
+{% if box_ula is defined and (box_ula_usable | default(false) | bool) %}
+  Maintenance IPv6   : {{ box_ula }}        (port 1; second port: {{ box_ula_prefix }}:2:{{ box_ula_iid }})
+                       Fixed address, no DHCP needed. Reach it from the same LAN
+                       segment with an address in {{ box_ula_prefix }}:1::/64.
+{% endif %}
 
   Vendor (superadmin) account — provider secrets, invisible to the client:
     Email    : {{ cp_seed_superadmin_email }}

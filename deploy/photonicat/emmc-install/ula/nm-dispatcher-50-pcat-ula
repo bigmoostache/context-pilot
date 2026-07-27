@@ -1,0 +1,19 @@
+#!/bin/sh
+# NetworkManager dispatcher hook — re-assert the fleet ULA after NM (re)configures
+# an interface. Installed as /etc/NetworkManager/dispatcher.d/50-pcat-ula.
+#
+# The boot-time oneshot is NOT enough on its own: NM owns the addresses of the
+# connections it manages and drops the ones it did not add itself, so a
+# `nmcli con up`, a carrier bounce or a DHCP renew would silently take our ULA
+# away. This hook runs AFTER NM has applied its own config, which is the only
+# place where re-adding the address sticks.
+#
+# NM calls dispatcher scripts as: <script> <interface> <action>. The script must
+# be root-owned, non-group/other-writable and executable, or NM ignores it.
+case "${2:-}" in
+  up|dhcp4-change|dhcp6-change|reapply|connectivity-change) ;;
+  *) exit 0 ;;
+esac
+
+[ -x /usr/local/sbin/pcat-ula ] || exit 0
+exec /usr/local/sbin/pcat-ula

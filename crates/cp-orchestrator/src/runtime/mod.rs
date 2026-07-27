@@ -19,6 +19,7 @@
 //! | Env var | Default | Meaning |
 //! |---|---|---|
 //! | `CP_ORCH_PORT` | `7878` | Product cockpit HTTP listen port |
+//! | `CP_ORCH_BIND` | `127.0.0.1` | Listen address — loopback, Caddy fronts the LAN |
 //! | `CP_AGENTS_DIR` | `~/.context-pilot/agents` | Registry directory |
 //! | `CP_SCAN_INTERVAL_MS` | `2000` | Registry-discovery + tier-② mtime poll cadence (ms) |
 //!
@@ -43,6 +44,17 @@ use crate::transport::Backend;
 /// Default product cockpit HTTP listen port.
 const DEFAULT_PORT: u16 = 7878;
 
+/// Default listen address: **loopback only**.
+///
+/// The cockpit's only LAN-facing surface is Caddy, which terminates TLS and
+/// proxies to `127.0.0.1:7878` (see [`crate::transport::it::caddy`]). Binding
+/// every interface would publish the backend itself on the LAN in cleartext,
+/// letting anyone bypass the `:80`→`:443` redirect the provisioned box relies
+/// on — while the auth model (bearer token, CORS) assumes an encrypted
+/// transport. Override with `CP_ORCH_BIND` (e.g. `0.0.0.0` for a dev box whose
+/// UI is opened from another machine).
+const DEFAULT_BIND: &str = "127.0.0.1";
+
 /// Default registry + oplog poll interval.
 const DEFAULT_SCAN_INTERVAL: Duration = Duration::from_millis(2000);
 
@@ -51,6 +63,9 @@ const DEFAULT_SCAN_INTERVAL: Duration = Duration::from_millis(2000);
 pub struct Config {
     /// Product cockpit HTTP listen port.
     pub port: u16,
+    /// Address the cockpit binds (`CP_ORCH_BIND`, default `127.0.0.1` —
+    /// loopback, so every LAN request arrives through Caddy).
+    pub bind: String,
     /// Directory holding agent registry records.
     pub agents_dir: PathBuf,
     /// How often the driver scans the registry and tails oplogs.
@@ -85,6 +100,14 @@ impl Config {
     /// (so the default directory cannot be derived).
     pub fn from_env() -> Result<Self, String> {
         let port = std::env::var("CP_ORCH_PORT").ok().and_then(|s| s.parse().ok()).unwrap_or(DEFAULT_PORT);
+
+        // Loopback unless explicitly widened: the appliance's LAN surface is
+        // Caddy, never the backend socket.
+        let bind = std::env::var("CP_ORCH_BIND")
+            .ok()
+            .map(|s| s.trim().to_owned())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| DEFAULT_BIND.to_owned());
 
         let agents_dir = match std::env::var_os("CP_AGENTS_DIR") {
             Some(dir) => PathBuf::from(dir),
@@ -125,7 +148,31 @@ impl Config {
 
         let auth_db_path = crate::services::auth::store::AuthStore::default_db_path();
 
-        Ok(Self { port, agents_dir, scan_interval, agents_root, agent_binary, auth_enabled, session_ttl, auth_db_path })
+        Ok(Self {
+            port,
+            bind,
+            agents_dir,
+            scan_interval,
+            agents_root,
+            agent_binary,
+            auth_enabled,
+            session_ttl,
+            auth_db_path,
+        })
+    }
+
+    /// The `host:port` string handed to the HTTP acceptor.
+    ///
+    /// IPv6 literals are bracketed (`[::1]:7878`) so `to_socket_addrs` parses
+    /// them; an already-bracketed value is left alone.
+    #[must_use]
+    pub fn listen_addr(&self) -> String {
+        let host = self.bind.as_str();
+        if host.contains(':') && !host.starts_with('[') {
+            format!("[{host}]:{}", self.port)
+        } else {
+            format!("{host}:{}", self.port)
+        }
     }
 }
 
@@ -277,7 +324,7 @@ impl Runtime {
         // configured (CP_CADDYFILE); never fatal.
         crate::transport::it::apply_caddy_at_boot(&self.backend);
 
-        let addr = format!("0.0.0.0:{}", self.config.port);
+        let addr = self.config.listen_addr();
         eprintln!("serving on http://{addr}");
         crate::transport::serve(&addr, Arc::clone(&self.backend))
     }
@@ -300,5 +347,33 @@ mod tests {
             assert!(cfg.port > 0);
             assert!(cfg.scan_interval.as_millis() > 0);
         }
+    }
+
+    #[test]
+    fn default_bind_is_loopback() {
+        // Not cosmetic: the backend speaks cleartext HTTP and its auth model
+        // assumes an encrypted transport, so its socket must never face the
+        // LAN — Caddy does (`:80` day-0, `:443` provisioned).
+        let ip: std::net::IpAddr = DEFAULT_BIND.parse().expect("default bind is an IP literal");
+        assert!(ip.is_loopback(), "the cockpit backend must bind loopback; Caddy fronts the LAN");
+    }
+
+    #[test]
+    fn listen_addr_brackets_ipv6_literals() {
+        if std::env::var_os("HOME").is_none() {
+            return;
+        }
+        let mut cfg = Config::from_env().expect("config");
+        cfg.port = 7878;
+
+        cfg.bind = "127.0.0.1".to_owned();
+        assert_eq!(cfg.listen_addr(), "127.0.0.1:7878");
+
+        cfg.bind = "::1".to_owned();
+        assert_eq!(cfg.listen_addr(), "[::1]:7878");
+
+        // An operator who brackets it themselves must not get `[[::1]]`.
+        cfg.bind = "[::1]".to_owned();
+        assert_eq!(cfg.listen_addr(), "[::1]:7878");
     }
 }

@@ -46,6 +46,13 @@
     box_user_sudo: "{{ box_sudo | default(true) | bool }}"
     box_user_ssh_key: "{{ box_ssh_key | default('') }}"          # empty → reuse root's injected key
     box_user_password_hash: "{{ box_password_hash | default('') }}"  # empty → key-only (no password)
+    # ── fleet ULA (RFC 4193): a PRODUCT CONSTANT, drawn once, never per box ──
+    # Each box answers at <prefix>:<port>:<serial-as-interface-id>, so its address
+    # is known before first contact — no DHCP hunt, no mDNS, nothing asked of the
+    # client network. MUST stay in sync with ULA_PREFIX in
+    # deploy/photonicat/emmc-install/build/build-init-sd.sh. Changing it orphans
+    # every inventory entry already written against the old prefix.
+    box_ula_prefix: "{{ ula_prefix | default('fd59:ec78:2da4') }}"
     # Photonicat 2 mini-display (GC9307 SPI LCD) — built + installed on the box.
     cp_install_display: "{{ install_display | default(true) | bool }}"
     cp_display_repo: https://github.com/photonicat/photonicat2_mini_display.git
