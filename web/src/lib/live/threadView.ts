@@ -14,7 +14,6 @@
 // tree never crosses the mirror leak-guard.
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react"
-import type { RefObject } from "react"
 import { sendCommand } from "@/lib/live"
 import { uploadUnique } from "@/lib/api"
 import { buildUploadMessage, type UploadedFile } from "@/lib/live/threadUpload"
@@ -169,75 +168,6 @@ export function useThreadSelection(activeAgentId: string, threads: ThreadDetail[
   }
 }
 
-/** The staged create descriptor: the first-message body (empty = none) plus the
- *  requested start-paused state. Held in a ref across the create's async legs. */
-type PendingCreate = { content: string; paused: boolean } | null
-
-/** Args for {@link useCreateSequence} — bundled into one object so the hook
- *  stays within the parameter budget. */
-interface CreateSequenceArgs {
-  agentId: string
-  threads: ThreadDetail[]
-  justCreatedId: string | null
-  pendingCreateRef: RefObject<PendingCreate>
-  pauseRequestedRef: RefObject<boolean>
-  flash: (msg: string) => void
-}
-
-/**
- * Drive a staged thread-create to completion, strictly ordered against the SSE
- * roster (T687). Once the new thread's id is known (`justCreatedId`), it runs on
- * every roster delta:
- *   1. If a pause was requested and the thread is not yet paused, dispatch
- *      `pause_thread` ONCE and wait — returning until a later delta shows it
- *      paused (guarded by `pauseRequestedRef` so it fires exactly once).
- *   2. Once no pause is pending (not requested, or confirmed paused), send the
- *      first message (if any) to that exact id, then clear the sequence.
- *
- * The order is load-bearing: a message sent before the pause lands would wake
- * the agent, defeating "start paused". A pause failure surfaces a notice and
- * aborts WITHOUT sending — delivering into a still-active thread is the bug.
- */
-function useCreateSequence({
-  agentId,
-  threads,
-  justCreatedId,
-  pendingCreateRef,
-  pauseRequestedRef,
-  flash,
-}: CreateSequenceArgs) {
-  useEffect(() => {
-    const pending = pendingCreateRef.current
-    if (!pending || !justCreatedId) return
-    const t = threads.find((x) => x.id === justCreatedId)
-    if (!t) return
-
-    if (pending.paused && !t.paused) {
-      if (pauseRequestedRef.current) return
-      pauseRequestedRef.current = true
-      sendCommand(agentId, { kind: "pause_thread", thread_id: justCreatedId }).catch(
-        (e: unknown) => {
-          pendingCreateRef.current = null
-          pauseRequestedRef.current = false
-          flash(describeCommandError("pause the thread", e))
-        },
-      )
-      return
-    }
-
-    const content = pending.content
-    pendingCreateRef.current = null
-    pauseRequestedRef.current = false
-    if (content) {
-      sendCommand(agentId, {
-        kind: "send_message",
-        thread_id: justCreatedId,
-        content,
-      }).catch((e: unknown) => flash(describeCommandError("send the first message", e)))
-    }
-  }, [justCreatedId, threads, agentId, pendingCreateRef, pauseRequestedRef, flash])
-}
-
 /** The command handlers + failure notice returned by {@link useThreadActions}. */
 export interface Actions {
   notice: string | null
@@ -267,14 +197,6 @@ export function useThreadActions(
 
   const [notice, setNotice] = useState<string | null>(null)
   const noticeTimerRef = useRef<number | null>(null)
-  // The create sequence staged by handleCreate, driven to completion by the
-  // create-sequence effect below once the new thread's id is observed (T679/
-  // T687). `content` is the first-message body (empty = none); `paused` is the
-  // requested start-paused state. Null = no create in flight.
-  const pendingCreateRef = useRef<PendingCreate>(null)
-  // Guards a single pause_thread dispatch during the awaiting-pause window so
-  // the effect doesn't re-fire it on every intervening roster delta (T687).
-  const pauseRequestedRef = useRef(false)
   const flash = useCallback((msg: string) => {
     if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current)
     setNotice(msg)
@@ -332,30 +254,33 @@ export function useThreadActions(
       sel.setNewOpen(false)
       sel.setQuery("")
       sel.setShowArchived(false)
-      // Stage the whole create sequence, then drive it strictly frontend-side
-      // keyed on roster deltas (T687): create name-only → wait for the id →
-      // (if requested) pause → wait until paused → send the first message. The
-      // order matters — a message sent before the pause lands would wake the
-      // agent, defeating "start paused". Neither `initial_message` nor `paused`
-      // rides the create_thread command: an N-1 agent silently ignores those
-      // fields (the exact bug this replaces), whereas pause_thread /
-      // send_message are long-established commands it always honours.
-      // Same upload-on-attach + `file-upload` block path as the thread composer
-      // (buildCombinedContent → buildUploadMessage), so a new thread's first
-      // message carries its attachments identically. `filesFirst` prepends the
-      // blocks so the attachments lead the message (T687).
+      // ONE atomic command carries the whole intent — name, first message, and
+      // paused — applied in-process by the agent in strict create -> pause ->
+      // send order (T687). This deliberately replaces the former frontend
+      // orchestration (create name-only, then guess the new thread's id from a
+      // roster set-diff, then fire pause / send from a volatile ref). That
+      // orchestration LOST DATA: the first message lived only in a ref, and any
+      // derailment — a mis-guessed id, a coalesced/missed roster delta, a
+      // second create clobbering the ref, or a pause that never reflected —
+      // dropped the message silently. Here the message content rides the
+      // durable, deduped command payload and the agent applies it atomically,
+      // so it can never vanish. Same upload-on-attach + `file-upload` block
+      // path as the composer (buildCombinedContent -> buildUploadMessage);
+      // `filesFirst` prepends the blocks so attachments lead the message.
       const content = buildCombinedContent(opts.firstMessage, opts.files, true)
-      pendingCreateRef.current = { content, paused: opts.paused }
-      pauseRequestedRef.current = false
+      // Arm the visual auto-select so the new thread opens once it appears
+      // (selection only — it no longer gates message delivery, so a mis-select
+      // is a harmless view glitch, never data loss).
       sel.armAutoSelect()
       void (async () => {
         try {
           await sendCommand(activeAgentId, {
             kind: "create_thread",
             name: opts.title.trim() || "Untitled thread",
+            ...(content && { initial_message: content }),
+            paused: opts.paused,
           })
         } catch (e) {
-          pendingCreateRef.current = null
           sel.disarmAutoSelect()
           flash(describeCommandError("create the thread", e))
         }
@@ -363,17 +288,6 @@ export function useThreadActions(
     },
     [activeAgentId, flash, sel],
   )
-
-  // Drive the staged create sequence (create → wait id → pause → wait paused →
-  // send) to completion (T687), extracted to a hook to keep this fn in budget.
-  useCreateSequence({
-    agentId: activeAgentId,
-    threads,
-    justCreatedId: sel.justCreatedId,
-    pendingCreateRef,
-    pauseRequestedRef,
-    flash,
-  })
 
   const handleSend = useCallback(
     (text: string) => {
