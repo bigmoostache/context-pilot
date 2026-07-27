@@ -463,6 +463,34 @@ html.mobile.standalone .mobile-shell {
   animation: modal-pop 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* Linear-style composer dialog: anchored near the top (no vertical centering
+   transform to fight), springs down + scales up on open, lifts + fades on
+   close. Kept separate from modal-pop so the top-anchored surfaces don't
+   inherit the centered surfaces' translate. */
+@keyframes sheet-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes sheet-pop-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
+}
+
 /* gentle per-item rise for stacked option cards */
 @keyframes opt-rise {
   from {

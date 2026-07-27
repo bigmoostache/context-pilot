@@ -33,6 +33,11 @@ interface ThreadListProps {
   onPause: (id: string) => void
   onNewThread: () => void
   onToggleSidebar: () => void
+  /** optional controlled search-palette open state — when omitted the list owns
+   *  it internally (T713: ThreadsView drives it so the floating collapsed-rail
+   *  cluster can open search too). */
+  searchOpen?: boolean | undefined
+  onSearchOpenChange?: ((v: boolean) => void) | undefined
 }
 
 /** Sort threads by most recent activity first. */
@@ -60,8 +65,13 @@ export function ThreadList({
   onPause,
   onNewThread,
   onToggleSidebar,
+  searchOpen: searchOpenProp,
+  onSearchOpenChange,
 }: ThreadListProps) {
-  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchOpenLocal, setSearchOpenLocal] = useState(false)
+  // Controlled when the parent supplies both; otherwise the list owns it.
+  const searchOpen = searchOpenProp ?? searchOpenLocal
+  const setSearchOpen = onSearchOpenChange ?? setSearchOpenLocal
 
   const live = threads.filter((t) => !t.archived)
   const archived = threads.filter((t) => t.archived)
@@ -86,8 +96,6 @@ export function ThreadList({
   const working = visible
     .filter((t) => t.status === "THEIR_TURN" || t.status === "ACTIVE")
     .toSorted(byRecent)
-  // agent-owned, actively-or-parallel working count (for the header pill)
-  const workingCount = live.filter((t) => t.status !== "MY_TURN").length
 
   const row = (t: ThreadDetail, archivedRow?: boolean) => (
     <ThreadRow
@@ -112,33 +120,19 @@ export function ThreadList({
         <ListHeader
           showArchived={showArchived}
           onToggleArchived={onToggleArchived}
-          liveCount={live.length}
           archivedCount={archivedCount}
-          workingCount={workingCount}
           onOpenSearch={() => setSearchOpen(true)}
           onToggleSidebar={onToggleSidebar}
+          onNewThread={onNewThread}
         />
 
-        {/* new thread (hidden in archived view — archived is read-only) */}
-        {!showArchived && (
-          <div className="shrink-0 px-3 pb-2">
-            <button
-              onClick={onNewThread}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-(--signal) px-3 py-2 text-[12.5px] font-medium text-(--primary-foreground) transition-[filter] hover:brightness-105"
-            >
-              <Plus className="size-4" />
-              New Thread
-            </button>
-          </div>
-        )}
-
         <ScrollArea className="min-h-0 flex-1">
-          <div className="px-2 py-1">
+          <div className="px-2 pb-1">
             {visible.length === 0 && <EmptyState showArchived={showArchived} />}
 
             {!showArchived && (
               <>
-                {mine.length > 0 && <Group label="Agent's turn" count={mine.length} />}
+                {mine.length > 0 && <Group label="Agent's turn" count={mine.length} first />}
                 {mine.map((t) => row(t))}
 
                 {working.length > 0 && <Group label="User turn" count={working.length} />}
@@ -156,7 +150,7 @@ export function ThreadList({
         {!showArchived && archivedCount > 0 && (
           <button
             onClick={() => onToggleArchived(true)}
-            className="flex shrink-0 items-center gap-2 border-t border-border px-3.5 py-2.5 text-[12px] text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+            className="hover:card-shadow mx-2 mb-2 flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-[12px] text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
           >
             <Archive className="size-3.5" />
             Archived
@@ -184,22 +178,20 @@ export function ThreadList({
 function ListHeader({
   showArchived,
   onToggleArchived,
-  liveCount,
   archivedCount,
-  workingCount,
   onOpenSearch,
   onToggleSidebar,
+  onNewThread,
 }: {
   showArchived: boolean
   onToggleArchived: (v: boolean) => void
-  liveCount: number
   archivedCount: number
-  workingCount: number
   onOpenSearch: () => void
   onToggleSidebar: () => void
+  onNewThread: () => void
 }) {
   return (
-    <div className="flex items-center gap-2 px-3 pt-3 pb-2.5">
+    <div className="flex items-center gap-2 px-3 pt-3 pb-1">
       {showArchived ? (
         <button
           onClick={() => onToggleArchived(false)}
@@ -209,30 +201,19 @@ function ListHeader({
           Archived
           <span className="text-muted-foreground/50 tabular-nums">{archivedCount}</span>
         </button>
-      ) : (
-        <>
-          <span className="text-[11px] text-muted-foreground tabular-nums">
-            {liveCount} thread{liveCount === 1 ? "" : "s"}
-          </span>
-          {workingCount > 0 && (
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10.5px] font-medium"
-              style={{
-                background: "color-mix(in oklab, var(--interactive) 14%, transparent)",
-                color: "var(--interactive)",
-              }}
-            >
-              <span className="relative flex size-1.5">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-(--interactive) opacity-70" />
-                <span className="relative inline-flex size-1.5 rounded-full bg-(--interactive)" />
-              </span>
-              {workingCount} working
-            </span>
-          )}
-        </>
-      )}
-      {/* right-aligned chrome: open search palette + collapse the rail */}
-      <div className="ml-auto flex items-center gap-1">
+      ) : null}
+      {/* left-aligned chrome: new thread + open search palette (sit right after
+          the archived back-button when it is shown) */}
+      <div className="flex items-center gap-1">
+        {!showArchived && (
+          <button
+            onClick={onNewThread}
+            title="New thread"
+            className="flex size-6 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Plus className="size-3.5" />
+          </button>
+        )}
         <button
           onClick={onOpenSearch}
           title="Search threads"
@@ -240,14 +221,15 @@ function ListHeader({
         >
           <Search className="size-3.5" />
         </button>
-        <button
-          onClick={onToggleSidebar}
-          title="Hide sidebar"
-          className="flex size-6 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <PanelLeftClose className="size-3.5" />
-        </button>
       </div>
+      {/* right-aligned: collapse the rail — pushed to the far right, unmoved */}
+      <button
+        onClick={onToggleSidebar}
+        title="Hide sidebar"
+        className="ml-auto flex size-6 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
+      >
+        <PanelLeftClose className="size-3.5" />
+      </button>
     </div>
   )
 }
@@ -259,15 +241,10 @@ function EmptyState({ showArchived }: { showArchived: boolean }) {
   return <p className="px-2.5 py-6 text-center text-[11.5px] text-muted-foreground/55">{message}</p>
 }
 
-function Group({ label, count, accent }: { label: string; count: number; accent?: string }) {
+function Group({ label, count, first }: { label: string; count: number; first?: boolean }) {
   return (
-    <div className="flex items-center gap-2 px-2.5 pt-3 pb-1">
-      <span
-        className="text-[11px] font-semibold"
-        style={{ color: accent ?? "var(--muted-foreground)" }}
-      >
-        {label}
-      </span>
+    <div className={cn("flex items-center gap-2 px-2.5 pb-1", first ? "pt-1.5" : "pt-3")}>
+      <span className="text-[11px] font-semibold text-muted-foreground">{label}</span>
       <span className="text-[11px] text-muted-foreground/45 tabular-nums">{count}</span>
     </div>
   )
@@ -349,7 +326,7 @@ function ThreadRow({
       onMouseEnter={marquee.onMouseEnter}
       onMouseLeave={marquee.onMouseLeave}
       className={cn(
-        "group relative flex w-full flex-col gap-1 rounded-lg px-2.5 py-2 text-left transition-colors select-none",
+        "group relative mb-0.5 flex w-full flex-col gap-1 rounded-lg px-2.5 py-2 text-left transition-colors select-none",
         selected ? "card-shadow bg-card" : "hover:card-shadow hover:bg-card",
       )}
     >

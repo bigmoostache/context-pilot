@@ -1,5 +1,5 @@
 import { Fragment, memo, useCallback, useMemo, useRef, useState } from "react"
-import { Loader2 } from "lucide-react"
+import { Loader2, ArchiveRestore } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Message } from "@/components/conversation/Message"
 import { ThreadComposer, type CommandSuggestion } from "./ThreadComposer"
@@ -224,6 +224,25 @@ function collectThreadFiles(log: ThreadMsg[]): ThreadFile[] {
 }
 
 /**
+ * Large restore-from-archive bar shown above the composer while viewing an
+ * archived thread (T709). Signal-accented, full width within the composer
+ * column; clicking fires the parent's restore command.
+ */
+function UnarchiveBar({ onUnarchive }: { onUnarchive: () => void }) {
+  return (
+    <div className="px-5 py-2">
+      <button
+        onClick={onUnarchive}
+        className="flex w-full items-center justify-center gap-2 rounded-xl border border-(--signal)/40 bg-(--signal)/10 px-4 py-1.5 text-[13px] font-medium text-(--signal) shadow-sm transition-colors hover:bg-(--signal)/20 hover:shadow-sm"
+      >
+        <ArchiveRestore className="size-4" />
+        Unarchive thread
+      </button>
+    </div>
+  )
+}
+
+/**
  * Center pane — the selected thread's full conversation + composer.
  *
  * Intentionally header-less: the thread's identity (name + turn status) already
@@ -239,6 +258,7 @@ export function ThreadConversation({
   pendingFiles = [],
   onRemoveFile,
   onShowInFinder,
+  onUnarchive,
 }: {
   thread: ThreadDetail
   /** owning agent — needed to open the shared Quick Look drawer for an attachment */
@@ -253,6 +273,8 @@ export function ThreadConversation({
   onRemoveFile?: ((index: number) => void) | undefined
   /** navigate the Finder to a file's parent directory and select it (T334) */
   onShowInFinder?: ((path: string) => void) | undefined
+  /** restore this thread from the archive — only rendered when the thread is archived (T709) */
+  onUnarchive?: (() => void) | undefined
 }) {
   // The attachment whose Quick Look drawer is open (null = closed). A
   // `file-upload` chip in any message sets it; the shared QuickLookSheet renders
@@ -386,6 +408,7 @@ export function ThreadConversation({
         </ScrollArea>
 
         <div className="mx-auto w-full max-w-[720px]">
+          {thread.archived && onUnarchive && <UnarchiveBar onUnarchive={onUnarchive} />}
           <ThreadComposer
             key={thread.id}
             status={thread.status}

@@ -27,8 +27,8 @@ pub(super) fn apply_command(app: &mut App, cmd: Command) {
         CommandKind::SendMessage { thread_id, content } => {
             apply_send_message(&mut app.state, &thread_id, &content);
         }
-        CommandKind::CreateThread { name } => {
-            apply_create_thread(&mut app.state, &name);
+        CommandKind::CreateThread { name, initial_message, paused } => {
+            apply_create_thread(&mut app.state, &name, initial_message.as_deref(), paused);
         }
         CommandKind::ArchiveThread { thread_id } => {
             apply_archive_thread(&mut app.state, &thread_id);
@@ -112,8 +112,17 @@ fn apply_send_message(state: &mut State, thread_id: &str, content: &str) {
 
 // ── CreateThread ────────────────────────────────────────────────────────
 
-/// Create a new thread with the given name.
-fn apply_create_thread(state: &mut State, name: &str) {
+/// Create a new thread with the given name, optionally seeding a first user
+/// message and starting it paused.
+///
+/// Strict order (T687): create, then pause (if requested), then seed the first
+/// message through [`apply_send_message`]. Pausing before the send guarantees
+/// the seeded message lands on an already-paused thread, so it can never nudge
+/// the agent — the whole sequence is one atomic command application, with no
+/// frontend id round-trip and no window where the message exists un-paused.
+/// The message content rides the durable command payload, closing the
+/// data-loss race a frontend create -> wait-id -> send orchestration had.
+fn apply_create_thread(state: &mut State, name: &str, initial_message: Option<&str>, paused: bool) {
     let ts = ThreadsState::get_mut(state);
     let id = format!("T{}", ts.next_id);
     ts.next_id = ts.next_id.saturating_add(1);
@@ -142,6 +151,20 @@ fn apply_create_thread(state: &mut State, name: &str) {
 
     state.flags.ui.dirty = true;
     log::info!("bridge: created thread {id} \"{name}\"");
+
+    // Strict create -> pause -> send order (T687). Pause FIRST when requested,
+    // so the seeded message lands on an already-paused thread and can never
+    // nudge the agent — even transiently. Both mutations run in this single
+    // atomic command application: there is no window where the message exists
+    // on an un-paused thread. Sending inside the command (rather than a
+    // frontend id round-trip) also makes the message durable in the command
+    // payload, closing the data-loss race the frontend orchestration had.
+    if paused {
+        apply_pause_thread(state, &id);
+    }
+    if let Some(content) = initial_message.filter(|c| !c.trim().is_empty()) {
+        apply_send_message(state, &id, content);
+    }
 }
 
 // ── ArchiveThread ───────────────────────────────────────────────────────

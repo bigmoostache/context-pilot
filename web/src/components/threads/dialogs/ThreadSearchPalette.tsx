@@ -30,7 +30,7 @@ export function ThreadSearchPalette({
 }) {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="flex max-h-[min(560px,80vh)] w-[560px] max-w-[92vw] flex-col p-0">
+      <DialogContent className="flex max-h-[min(560px,80vh)] w-[720px] max-w-[92vw] flex-col p-0">
         <DialogTitle className="sr-only">Search threads</DialogTitle>
         {open && (
           <PaletteBody threads={threads} agentId={agentId} onClose={onClose} onSelect={onSelect} />

@@ -201,7 +201,7 @@ export function ThreadsView({
           onDelete={actions.handleDelete}
           onPause={actions.handlePause}
           onNewThread={(name) => {
-            actions.handleCreate(name)
+            actions.handleCreate({ title: name, firstMessage: "", files: [], paused: false })
             setDrawerOpen(false)
           }}
         />

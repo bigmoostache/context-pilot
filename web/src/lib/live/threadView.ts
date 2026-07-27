@@ -19,17 +19,41 @@ import { uploadUnique } from "@/lib/api"
 import { buildUploadMessage, type UploadedFile } from "@/lib/live/threadUpload"
 import type { ThreadDetail } from "@/lib/types"
 
+/** Rich thread-creation payload collected by the New Thread dialog (T674):
+ *  a title plus an optional first message (auto-sent), file attachments, and a
+ *  "create paused" flag that queues the seeded message without waking the agent. */
+export interface CreateThreadOpts {
+  title: string
+  /** first user message, auto-sent to the new thread once its id is known (empty = none) */
+  firstMessage: string
+  /** files ALREADY uploaded to `.uploads/` (the dialog uploads on attach so the
+   *  draft — paths included — survives a close/reopen via localStorage); folded
+   *  into the first message as `file-upload` blocks at send time */
+  files: UploadedFile[]
+  /** create the thread already paused (seeded message queued, no MY_TURN nudge) */
+  paused: boolean
+}
+
 /**
- * Build a combined message body from user text and pending file attachments.
- * Text comes first (if any), then file blocks. Either can be absent — a
- * send with only pending files produces just the file blocks; one with only
- * text produces just text.
+ * Build a combined message body from user text and pending file attachments,
+ * reusing the exact same ` ```file-upload ` block composer the thread composer
+ * uses ({@link buildUploadMessage}). Either part can be absent — a send with
+ * only files produces just the file blocks; one with only text produces just
+ * text.
+ *
+ * `filesFirst` controls ordering. The thread composer sends text first then the
+ * file blocks (default, `false`). The new-thread create flow prepends the file
+ * blocks so the attachments lead the very first message (T687).
  */
-export function buildCombinedContent(text: string, files: UploadedFile[]): string {
-  const parts: string[] = []
-  if (text.trim()) parts.push(text.trim())
-  if (files.length > 0) parts.push(buildUploadMessage(files))
-  return parts.join("\n\n")
+export function buildCombinedContent(
+  text: string,
+  files: UploadedFile[],
+  filesFirst = false,
+): string {
+  const textPart = text.trim()
+  const filePart = files.length > 0 ? buildUploadMessage(files) : ""
+  const parts = filesFirst ? [filePart, textPart] : [textPart, filePart]
+  return parts.filter(Boolean).join("\n\n")
 }
 
 /**
@@ -56,6 +80,10 @@ export interface Selection {
   setPendingFiles: React.Dispatch<React.SetStateAction<UploadedFile[]>>
   /** the resolved-to-a-real-thread id (selection may point at a stale/archived row) */
   effectiveSelectedId: string
+  /** the id of a thread that was JUST auto-selected after `armAutoSelect` — the
+   *  seam {@link useThreadActions} uses to send a create's first message once the
+   *  server-assigned id is known (T679). Null until such an event fires. */
+  justCreatedId: string | null
   /** flag the next threads update to auto-select the newly-created thread */
   armAutoSelect: () => void
   /** cancel a pending auto-select (create failed before the id arrived) */
@@ -86,11 +114,13 @@ export function useThreadSelection(activeAgentId: string, threads: ThreadDetail[
   const pendingSelectRef = useRef(false)
   const prevThreadIdsRef = useRef<Set<string>>(new Set())
   const currentIds = useMemo(() => new Set(threads.map((t) => t.id)), [threads])
+  const [justCreatedId, setJustCreatedId] = useState<string | null>(null)
   useEffect(() => {
     if (pendingSelectRef.current && threads.length > 0) {
       const newId = threads.find((t) => !prevThreadIdsRef.current.has(t.id))?.id
       if (newId) {
         setSelectedId(newId)
+        setJustCreatedId(newId)
         pendingSelectRef.current = false
       }
     }
@@ -128,6 +158,7 @@ export function useThreadSelection(activeAgentId: string, threads: ThreadDetail[
     pendingFiles,
     setPendingFiles,
     effectiveSelectedId,
+    justCreatedId,
     armAutoSelect: () => {
       pendingSelectRef.current = true
     },
@@ -143,7 +174,7 @@ export interface Actions {
   handleArchive: (id: string) => void
   handlePause: (id: string) => void
   handleDelete: (id: string) => void
-  handleCreate: (title: string) => void
+  handleCreate: (opts: CreateThreadOpts) => void
   handleSend: (text: string) => void
   handleAttach: (files: File[]) => void | Promise<void>
 }
@@ -217,18 +248,43 @@ export function useThreadActions(
   )
 
   const handleCreate = useCallback(
-    (title: string) => {
-      sel.armAutoSelect()
-      sendCommand(activeAgentId, {
-        kind: "create_thread",
-        name: title.trim() || "Untitled thread",
-      }).catch((e: unknown) => {
-        sel.disarmAutoSelect()
-        flash(describeCommandError("create the thread", e))
-      })
+    (opts: CreateThreadOpts) => {
+      // Close the dialog + reset the browse state immediately; the create is
+      // fire-and-forget with its own failure notice (T121).
       sel.setNewOpen(false)
       sel.setQuery("")
       sel.setShowArchived(false)
+      // ONE atomic command carries the whole intent — name, first message, and
+      // paused — applied in-process by the agent in strict create -> pause ->
+      // send order (T687). This deliberately replaces the former frontend
+      // orchestration (create name-only, then guess the new thread's id from a
+      // roster set-diff, then fire pause / send from a volatile ref). That
+      // orchestration LOST DATA: the first message lived only in a ref, and any
+      // derailment — a mis-guessed id, a coalesced/missed roster delta, a
+      // second create clobbering the ref, or a pause that never reflected —
+      // dropped the message silently. Here the message content rides the
+      // durable, deduped command payload and the agent applies it atomically,
+      // so it can never vanish. Same upload-on-attach + `file-upload` block
+      // path as the composer (buildCombinedContent -> buildUploadMessage);
+      // `filesFirst` prepends the blocks so attachments lead the message.
+      const content = buildCombinedContent(opts.firstMessage, opts.files, true)
+      // Arm the visual auto-select so the new thread opens once it appears
+      // (selection only — it no longer gates message delivery, so a mis-select
+      // is a harmless view glitch, never data loss).
+      sel.armAutoSelect()
+      void (async () => {
+        try {
+          await sendCommand(activeAgentId, {
+            kind: "create_thread",
+            name: opts.title.trim() || "Untitled thread",
+            ...(content && { initial_message: content }),
+            paused: opts.paused,
+          })
+        } catch (e) {
+          sel.disarmAutoSelect()
+          flash(describeCommandError("create the thread", e))
+        }
+      })()
     },
     [activeAgentId, flash, sel],
   )

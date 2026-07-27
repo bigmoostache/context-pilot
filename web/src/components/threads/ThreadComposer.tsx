@@ -295,7 +295,11 @@ function ComposerInputRow({
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   return (
-    <div className="card-shadow flex items-end gap-2 rounded-2xl border border-border bg-card px-3 py-2.5 focus-within:border-(--signal)/60">
+    // Linear-style two-row composer (T692, UI only): the textarea spans the full
+    // width on top, and a bottom action row holds the attach control (left) and
+    // the circular submit (pushed right). Behaviour is unchanged — same refs,
+    // handlers, autogrow and props; only the layout was restructured.
+    <div className="card-shadow flex flex-col gap-1.5 rounded-2xl border border-border bg-card px-3 py-2.5 focus-within:border-(--signal)/60">
       <input
         ref={fileInputRef}
         type="file"
@@ -308,14 +312,6 @@ function ComposerInputRow({
           e.target.value = ""
         }}
       />
-      <button
-        onClick={() => fileInputRef.current?.click()}
-        disabled={!onAttach}
-        title="Attach files"
-        className="mb-0.5 text-muted-foreground/60 transition-colors hover:text-(--interactive) disabled:cursor-default disabled:opacity-40 disabled:hover:text-muted-foreground/60"
-      >
-        <Paperclip className="size-4" />
-      </button>
       <textarea
         ref={textareaRef}
         autoFocus
@@ -336,15 +332,25 @@ function ComposerInputRow({
         }}
         placeholder="Reply to this thread…"
         rows={1}
-        className="max-h-[200px] min-h-[24px] flex-1 resize-none bg-transparent text-[13.5px] leading-relaxed text-foreground/90 outline-none placeholder:text-muted-foreground/60"
+        className="max-h-[200px] min-h-[24px] w-full resize-none bg-transparent px-1 pt-1 text-[13.5px] leading-relaxed text-foreground/90 outline-none placeholder:text-muted-foreground/60"
       />
-      <button
-        onClick={onSubmit}
-        disabled={!sendable}
-        className="flex size-7 items-center justify-center rounded-full bg-(--signal) text-(--primary-foreground) transition-[filter] hover:brightness-105 disabled:opacity-40 disabled:hover:brightness-100"
-      >
-        <ArrowUp className="size-4" strokeWidth={2.5} />
-      </button>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={!onAttach}
+          title="Attach files"
+          className="flex size-7 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-muted hover:text-(--interactive) disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground/60"
+        >
+          <Paperclip className="size-4" />
+        </button>
+        <button
+          onClick={onSubmit}
+          disabled={!sendable}
+          className="ml-auto flex size-7 items-center justify-center rounded-full bg-(--signal) text-(--primary-foreground) transition-[filter] hover:brightness-105 disabled:opacity-40 disabled:hover:brightness-100"
+        >
+          <ArrowUp className="size-4" strokeWidth={2.5} />
+        </button>
+      </div>
     </div>
   )
 }
@@ -353,14 +359,14 @@ function ComposerInputRow({
 function ComposerBanner({ banner }: { banner: Banner }) {
   return (
     <div
-      className={`mb-2 flex items-center justify-center gap-2 rounded-xl px-3 py-1.5 text-[11.5px] ${banner.paused ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-muted/40 text-muted-foreground"}`}
+      className={`mb-2 flex cursor-default items-center justify-center gap-2 rounded-xl border px-4 py-1.5 text-[13px] font-medium select-none ${banner.paused ? "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400" : "border-border bg-muted/40 text-muted-foreground"}`}
     >
       {banner.paused ? (
-        <Pause className="size-3.5" />
+        <Pause className="size-4" />
       ) : banner.working ? (
-        <Loader2 className="size-3.5 animate-spin" style={{ color: banner.color }} />
+        <Loader2 className="size-4 animate-spin" style={{ color: banner.color }} />
       ) : (
-        <Clock className="size-3.5" />
+        <Clock className="size-4" />
       )}
       <span>{banner.text}</span>
     </div>
@@ -465,7 +471,7 @@ export function ThreadComposer({
   }
 
   return (
-    <div className="shrink-0 px-5 pt-2 pb-4">
+    <div className="shrink-0 px-5 pb-4">
       {/* Unified bubble row (T350) — file-upload chips + /command suggestions +
           the create-command pill, all in ONE transparent, normal-flow container
           between the conversation and the textarea. */}
