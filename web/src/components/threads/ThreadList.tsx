@@ -33,6 +33,11 @@ interface ThreadListProps {
   onPause: (id: string) => void
   onNewThread: () => void
   onToggleSidebar: () => void
+  /** optional controlled search-palette open state — when omitted the list owns
+   *  it internally (T713: ThreadsView drives it so the floating collapsed-rail
+   *  cluster can open search too). */
+  searchOpen?: boolean | undefined
+  onSearchOpenChange?: ((v: boolean) => void) | undefined
 }
 
 /** Sort threads by most recent activity first. */
@@ -60,8 +65,13 @@ export function ThreadList({
   onPause,
   onNewThread,
   onToggleSidebar,
+  searchOpen: searchOpenProp,
+  onSearchOpenChange,
 }: ThreadListProps) {
-  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchOpenLocal, setSearchOpenLocal] = useState(false)
+  // Controlled when the parent supplies both; otherwise the list owns it.
+  const searchOpen = searchOpenProp ?? searchOpenLocal
+  const setSearchOpen = onSearchOpenChange ?? setSearchOpenLocal
 
   const live = threads.filter((t) => !t.archived)
   const archived = threads.filter((t) => t.archived)

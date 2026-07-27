@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { FolderGit2, AlertTriangle, Plus, PanelLeft } from "lucide-react"
+import { FolderGit2, AlertTriangle, Plus, PanelLeft, Search } from "lucide-react"
 import { ThreadList } from "./ThreadList"
 import { ThreadConversation } from "./ThreadConversation"
 import { NewThreadDialog } from "./dialogs/NewThreadDialog"
@@ -41,6 +41,7 @@ export function ThreadsView({
   const sel = useThreadSelection(activeAgentId, threads)
   const actions = useThreadActions(activeAgentId, threads, sel)
   const [railOpen, setRailOpen] = useState(true)
+  const [searchOpen, setSearchOpen] = useState(false)
 
   // Only bail to a bare empty state when there is genuinely no agent. A fresh
   // agent with zero threads MUST still render the sidebar — that is where the
@@ -91,20 +92,30 @@ export function ThreadsView({
           onPause={actions.handlePause}
           onNewThread={() => sel.setNewOpen(true)}
           onToggleSidebar={() => setRailOpen(false)}
+          searchOpen={searchOpen}
+          onSearchOpenChange={setSearchOpen}
         />
       </div>
 
-      {/* Floating reopen affordance — fades in only once the rail is hidden. */}
-      <button
-        onClick={() => setRailOpen(true)}
-        title="Show sidebar"
+      {/* Floating cluster — fades in only once the rail is hidden. The
+          show-sidebar button leads; New-thread + Search sit under it so the two
+          primary list actions stay reachable with the rail collapsed (T713). */}
+      <div
         className={cn(
-          "card-shadow absolute top-3 left-3 z-30 flex size-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground/70 transition-[opacity,transform] duration-200 hover:bg-muted hover:text-foreground",
+          "absolute top-3 left-3 z-30 flex flex-col gap-1.5 transition-[opacity,transform] duration-200",
           railOpen ? "pointer-events-none -translate-x-1 opacity-0" : "opacity-100",
         )}
       >
-        <PanelLeft className="size-4" />
-      </button>
+        <FloatingRailButton title="Show sidebar" onClick={() => setRailOpen(true)}>
+          <PanelLeft className="size-4" />
+        </FloatingRailButton>
+        <FloatingRailButton title="New thread" onClick={() => sel.setNewOpen(true)}>
+          <Plus className="size-4" />
+        </FloatingRailButton>
+        <FloatingRailButton title="Search threads" onClick={() => setSearchOpen(true)}>
+          <Search className="size-4" />
+        </FloatingRailButton>
+      </div>
 
       {/* The conversation pane shows the selected thread, or — for a realm with
           no thread selected/created yet — a hint pointing at the sidebar's New
@@ -144,6 +155,28 @@ export function ThreadsView({
         </div>
       )}
     </div>
+  )
+}
+
+/** One button in the collapsed-rail floating cluster (T713) — shared card-lift
+ *  styling so the show-sidebar / new-thread / search glyphs read as a set. */
+function FloatingRailButton({
+  title,
+  onClick,
+  children,
+}: {
+  title: string
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="card-shadow flex size-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground"
+    >
+      {children}
+    </button>
   )
 }
 
