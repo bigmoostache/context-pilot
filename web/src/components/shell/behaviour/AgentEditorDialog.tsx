@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react"
-import { Bot, Loader2 } from "lucide-react"
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Button } from "@/components/ui/button"
+import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
+import { Bot, Loader2, X, CornerDownLeft } from "lucide-react"
 import { fetchLibraryAgent } from "@/lib/api"
 import { useUpsertLibraryAgent } from "@/lib/live"
+import { cn } from "@/lib/utils"
 
 /**
  * Derive a behaviour-agent file id (slug) from its name — mirrors the
@@ -142,93 +140,119 @@ export function AgentEditorDialog({
     )
   }
 
+  // ⌘/Ctrl+Enter submits from anywhere in the form (Linear parity).
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") submit(e)
+  }
+
   const title =
-    mode.kind === "create"
-      ? "New behaviour agent"
-      : isBuiltin
-        ? "Override built-in agent"
-        : "Edit agent"
+    mode.kind === "create" ? "New agent" : isBuiltin ? "Override built-in" : "Edit agent"
+
+  const submitLabel = mode.kind === "create" ? "Create agent" : "Save agent"
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && close()}>
-      <DialogContent className="flex h-[88vh] max-h-[900px] w-[92vw] max-w-[1080px] flex-col overflow-hidden p-0">
-        <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
-          {/* Header */}
-          <div className="flex items-start gap-3 border-b border-border/70 px-5 py-4">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--signal)/15 text-(--signal)">
-              <Bot className="size-[18px]" />
-            </span>
-            <div className="flex flex-col gap-0.5">
-              <DialogTitle>{title}</DialogTitle>
-              <DialogDescription>
-                {isBuiltin
-                  ? "Saving writes a local copy that overrides the built-in — the original is never touched."
-                  : "A system-prompt agent for this realm's behaviour selector."}
-              </DialogDescription>
+    <DialogPrimitive.Root open={open} onOpenChange={(o) => !o && close()}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Backdrop
+          className={cn(
+            "fixed inset-0 z-50 bg-black/40 backdrop-blur-[3px] transition-opacity duration-200",
+            "data-ending-style:opacity-0 data-starting-style:opacity-0",
+          )}
+        />
+        <DialogPrimitive.Popup
+          onKeyDown={onKeyDown}
+          className={cn(
+            "fixed top-[8vh] left-1/2 z-50 flex max-h-[86vh] w-[760px] max-w-[94vw] -translate-x-1/2 flex-col",
+            "overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground",
+            "shadow-(--shadow-pop) outline-none",
+            "animate-[sheet-pop-in_.22s_cubic-bezier(.16,1,.3,1)]",
+            "data-ending-style:animate-[sheet-pop-out_.15s_ease-in_forwards]",
+          )}
+        >
+          <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+            {/* breadcrumb + close — mirrors the New Thread sheet chrome */}
+            <div className="flex items-center gap-2 px-4 pt-3 pb-1">
+              <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+                <span className="flex size-[15px] items-center justify-center rounded-sm bg-(--signal)/15 text-(--signal)">
+                  <Bot className="size-2.5" />
+                </span>
+                <span className="text-muted-foreground/50">›</span>
+                <span className="text-foreground/70">{title}</span>
+              </span>
+              <button
+                type="button"
+                onClick={close}
+                aria-label="Close"
+                className="ml-auto flex size-6 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <X className="size-3.5" />
+              </button>
             </div>
-          </div>
 
-          {/* Body */}
-          {loading ? (
-            <div className="flex flex-1 items-center justify-center gap-2 px-5 py-10 text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" /> Loading…
-            </div>
-          ) : (
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
-              <label htmlFor="agent-name" className="flex flex-col gap-1.5">
-                <span className="text-[12px] font-medium text-foreground/80">Name</span>
-                <Input
-                  id="agent-name"
+            {loading ? (
+              <div className="flex flex-1 items-center justify-center gap-2 px-5 py-16 text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" /> Loading…
+              </div>
+            ) : (
+              <div className="flex min-h-0 flex-1 flex-col">
+                {/* name — big borderless title line */}
+                <input
                   autoFocus
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Worker"
+                  placeholder="Agent name"
+                  className="w-full bg-transparent px-4 pt-1 text-[19px] font-semibold tracking-tight text-foreground outline-none placeholder:text-muted-foreground/40"
                 />
-                <span className="text-[11px] text-muted-foreground/70">
+                <span className="px-4 pt-0.5 text-[11px] text-muted-foreground/70">
                   File id <span className="font-mono text-(--interactive)">{slug}</span>
-                  {mode.kind === "edit" && " (fixed — rename only changes the display name)"}
+                  {mode.kind === "edit" && " · rename only changes the display name"}
                 </span>
-              </label>
 
-              <label htmlFor="agent-desc" className="flex flex-col gap-1.5">
-                <span className="text-[12px] font-medium text-foreground/80">
-                  Description <span className="text-muted-foreground/60">(optional)</span>
-                </span>
-                <Input
-                  id="agent-desc"
+                {/* description — seamless secondary line */}
+                <input
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="One-line summary"
+                  placeholder="One-line description (optional)"
+                  className="w-full bg-transparent px-4 pt-2.5 text-[13.5px] text-foreground/90 outline-none placeholder:text-muted-foreground/40"
                 />
-              </label>
 
-              <label htmlFor="agent-body" className="flex min-h-0 flex-1 flex-col gap-1.5">
-                <span className="text-[12px] font-medium text-foreground/80">System prompt</span>
-                <Textarea
-                  id="agent-body"
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  placeholder="The system prompt this behaviour agent loads…"
-                  className="h-full min-h-[220px] resize-none font-mono text-[12.5px] leading-relaxed"
-                />
-              </label>
+                {/* system prompt — the primary field, its own scroll region */}
+                <div className="mt-2 flex min-h-0 flex-1 flex-col border-t border-border/60">
+                  <span className="px-4 pt-2.5 text-[11px] font-medium tracking-wide text-muted-foreground/70 uppercase">
+                    System prompt
+                  </span>
+                  <textarea
+                    value={body}
+                    onChange={(e) => setBody(e.target.value)}
+                    placeholder="The system prompt this behaviour agent loads…"
+                    className="min-h-[240px] w-full flex-1 resize-none overflow-y-auto bg-transparent px-4 pt-1.5 pb-3 font-mono text-[12.5px] leading-relaxed text-foreground/90 outline-none placeholder:text-muted-foreground/40"
+                  />
+                </div>
 
-              {error && <p className="text-[12px] text-destructive">{error}</p>}
+                {error && <span className="px-4 pb-1 text-[11px] text-(--danger)">{error}</span>}
+              </div>
+            )}
+
+            {/* footer — override note (left), submit (right); Esc/backdrop close */}
+            <div className="flex items-center gap-3 border-t border-border px-3.5 py-2.5">
+              {isBuiltin && (
+                <span className="text-[11px] text-muted-foreground/70">
+                  Saves a local copy — the built-in is never touched.
+                </span>
+              )}
+              <button
+                type="submit"
+                disabled={!canSave || upsert.isPending || loading}
+                className="ml-auto flex items-center gap-1.5 rounded-md bg-(--signal) px-3 py-1.5 text-[12.5px] font-medium text-(--primary-foreground) transition-[filter] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {upsert.isPending && <Loader2 className="size-3.5 animate-spin" />}
+                {submitLabel}
+                <CornerDownLeft className="size-3.5 opacity-70" />
+              </button>
             </div>
-          )}
-
-          {/* Footer */}
-          <div className="flex items-center justify-end gap-2 border-t border-border/70 px-5 py-3">
-            <Button type="button" variant="ghost" size="sm" onClick={close}>
-              Cancel
-            </Button>
-            <Button type="submit" size="sm" disabled={!canSave || upsert.isPending || loading}>
-              {upsert.isPending && <Loader2 className="size-3.5 animate-spin" />}
-              {mode.kind === "create" ? "Create" : "Save"}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+          </form>
+        </DialogPrimitive.Popup>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   )
 }

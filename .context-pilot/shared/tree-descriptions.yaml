@@ -1070,6 +1070,10 @@
   path: .context-pilot/scripts/rust-check.sh
   description: 'CB4 callback script. Runs 3 checks on every .rs edit: (1) cargo fmt --check, (2) cargo check -D warnings, (3) cargo clippy --all-targets -D warnings. Matches CI ci.yml steps. Fmt check added T462 (was missing since June 5 consolidation).'
   last_edited_ms: 1782897541690
+0d307a39aeefdebd:
+  path: web/src/components/shell/widgets/AgentSwitcher.tsx
+  description: TopBar workspace switcher dropdown (one agent=one folder); switch/create/fleet. AgentDot shows avatar image (T338) when hasAvatar is true, fallback to accent-tinted FolderGit2 icon.
+  last_edited_ms: 0
 0d41e0a5a1aa82df:
   path: web/src/components/finder/internal/useFinderDownloads.ts
   description: Finder download actions hook (downloadSelected + downloadActiveFile), split from Finder.tsx (web-lint P2) to hold it ≤500 lines after Prettier reflow. Streams files via downloadFile from the orchestration plane; failures surface through the shared flash toast. Matches the useFinderActions/Selection/Keyboard hook-per-concern pattern.
@@ -5730,6 +5734,10 @@
   path: web/src/components/threads/forms/FormWidget.tsx
   description: Interactive form widget rendered inline from ```form``` block. localStorage draft per form-id, fieldFilled client-side submit gate, LockedForm read-only view.
   last_edited_ms: 0
+4575c5b6dc0e7f67:
+  path: .context-pilot/shared/tree-descriptions.yaml
+  description: Persisted tree descriptions YAML. Synced to git alongside code commits per M15.
+  last_edited_ms: 0
 457797ff3549e45c:
   path: src/app/run/tools/pipeline.rs
   description: Main tool execution pipeline. Pre-flight → queue intercept (with auto-flush on trap defusal) → execute → callbacks → tempo break → sentinel deferral. History cleanup trap. Queue flush replay. Context Radar signals, Meilisearch log sync. Whole-pipeline timing. flame!("tool_pipeline") + flame!("callbacks").
@@ -6181,6 +6189,10 @@
 4bb29ba2d5f87011:
   path: src/app/run/streaming.rs
   description: 'Stream event processing. process_stream_events + handle_stream_error_event (A2). A9: pending_done 9-tuple take() owned bind. Chunk/ToolUse/Done/Error, retry, finalize_stream cache engine.'
+  last_edited_ms: 0
+4bb300cbc2b848a5:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 4bb73a43caaf50e4:
   path: crates/cp-orchestrator/src/transport/rest/threads/conversations.rs
@@ -8214,6 +8226,10 @@
   path: web/src/lib/query/reducers.ts
   description: 'SSE delta reducers: applyThreadDelta folds thread_created/archived/restored/paused/resumed/deleted/status_changed/focus_changed/message_created into TanStack cache. mergeThreadLogs reconciles poll+delta. applyAgentDelta folds phase/cost/context.'
   last_edited_ms: 0
+64f7a7039e4d6510:
+  path: .context-pilot/shared/memories.yaml
+  description: Agent-managed memory store (auto-synced from live state). Merge conflicts here are last_edited_ms churn only — resolve keeping real timestamps, preserve unique entries both sides.
+  last_edited_ms: 0
 64fc50484d25d809:
   path: src/modules/overview/tools/preflight.rs
   description: Core module pre_flight validation. Dispatches preflight_close_panel/check_tree_description_gate/preflight_tool_manage/preflight_panel_goto_page (A2). Warns on missing/stale tree descriptions, unknown tools, out-of-range pages.
@@ -8242,6 +8258,10 @@
   path: src/llms/mod.rs
   description: 'LLM abstraction layer. A9: ContentBlock accessors text()/tool_use()/tool_result() (in cache/content_block.rs) replace struct-variant matches; cc_json via cp_base::deref_match!; LlmError Display via deref_match. 7 providers, cache breakpoints.'
   last_edited_ms: 1784541444001
+654643b6ff34d286:
+  path: .context-pilot/shared/tree-descriptions.yaml
+  description: Persisted tree descriptions YAML. Synced to git alongside code commits per M15.
+  last_edited_ms: 0
 654ba9adfc91d9e8:
   path: crates/cp-orchestrator/tests/openapi/main.rs
   description: OpenAPI spec generator (integration test, --ignored). build_spec assembles schemas + paths. generate_openapi writes openapi.json. Acknowledges lib-only deps (incl reqwest, openssl).
@@ -8365,6 +8385,10 @@
 66cdf4355c091617:
   path: src/app/run/tools/cleanup.rs
   description: Watcher polling (blocking sentinel replacement + async spine notifications), ASYNC_ERROR_PREFIX handling for is_error, DynPanel creation for both blocking/async paths, interrupt cleanup. flame!("watchers").
+  last_edited_ms: 0
+66d375771936bf76:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 66db07a3a0c75832:
   path: crates/cp-mod-threads/src/tools.rs
@@ -13430,6 +13454,10 @@ a28e519595c811d9:
   path: crates/cp-base/src/state/data/config.rs
   description: 'Shared/WorkerState/PanelData serde structs. ViewMode enum #[expect(exhaustive_enums)] A4 (serde(other) on Normal for N-1).'
   last_edited_ms: 1784496447547
+a2a1bf0cf6420323:
+  path: yamls/library.yaml
+  description: 'Library config: built-in agent/skill/command seeds, default agent prompt template. setup-guides skill removed.'
+  last_edited_ms: 0
 a2ab866cbb42292d:
   path: crates/cp-wire/src/types/mod.rs
   description: 'ContentHash (SHA-256, Copy, hex serde: of/to_hex/from_hex). Phase enum (Idle/Streaming/Tooling), LifecycleState (Starting/Running/Stopping/Stopped), ThreadTurn (MyTurn/TheirTurn/Unknown, snake_case) — wire mirror of threads ThreadStatus, defined here (not imported from cp-mod-threads) to keep layering one-directional. Declares+re-exports ack/body/command/oplog/registry/snapshot/stream. SHA-256 vector + round-trip + ThreadTurn tolerant-decode tests.'
