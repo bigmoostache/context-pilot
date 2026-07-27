@@ -18,14 +18,39 @@
     - "{{ artifacts_dir }}"
     - "{{ artifacts_dir }}/bundle"
 
+# Resolve the artifact from the signed release CHANNEL (channels/<channel>.json)
+# rather than GitHub's "latest" — latest can lag the channel (it was v0.1.0 while
+# stable pinned v0.2.12). The manifest gives an exact, pinned URL + sha256, so the
+# download is content-verified. (TODO: also verify the .minisig once the minisign
+# pubkey is provisioned on the control node.)
+- name: Resolve the release channel manifest ({{ cp_release }})
+  ansible.builtin.uri:
+    url: "{{ cp_channel_url }}"
+    return_content: true
+  register: _channel
+  when: cp_release in ['stable', 'nightly']
+
+- name: Pin the artifact URL + sha256 from the channel manifest
+  ansible.builtin.set_fact:
+    appliance_bundle_url: "{{ (_channel.content | from_json).artifacts['linux-aarch64-musl'].url }}"
+    appliance_bundle_sha256: "{{ (_channel.content | from_json).artifacts['linux-aarch64-musl'].sha256 }}"
+    cp_resolved_version: "{{ (_channel.content | from_json).version }}"
+  when: cp_release in ['stable', 'nightly']
+
+- name: Show the resolved release
+  ansible.builtin.debug:
+    msg: "channel={{ cp_release }} version={{ cp_resolved_version | default('n/a') }} url={{ appliance_bundle_url }}"
+  when: cp_release in ['stable', 'nightly']
+
 # `release=local` uses the bundle produced by deploy/photonicat/build.sh (when a
 # GitHub release can't be cut yet); any other value downloads from GitHub.
-- name: Download the appliance bundle from the GitHub release ({{ cp_release }})
+- name: Download the appliance bundle ({{ cp_release }})
   ansible.builtin.get_url:
     url: "{{ appliance_bundle_url }}"
     dest: "{{ artifacts_dir }}/cpilot-linux-aarch64-musl.tar.gz"
     mode: "0644"
     force: true # always fetch the requested release's bundle
+    checksum: "{{ ('sha256:' + appliance_bundle_sha256) if (appliance_bundle_sha256 is defined) else omit }}"
   when: cp_release != 'local'
 
 - name: Verify an appliance bundle is present

@@ -1,2 +1,295 @@
-// @generated mobile-mirror stub — do not edit; regenerate via pnpm mirror:scaffold
-export * from "@/components/agents/UsagePage"
+import { useMemo, useState } from "react"
+import { Coins, Hash, ServerCrash } from "lucide-react"
+import { ScrollArea } from "@/mobile-components/ui/scroll-area"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/mobile-components/ui/table"
+import { useFleet, useFleetMetrics } from "@/lib/live"
+import type { Agent, UsageUnit } from "@/lib/types"
+import type { AgentMetrics } from "@/lib/api"
+import { cn } from "@/lib/utils"
+
+/**
+ * Cost & token usage — mobile twin of `components/agents/UsagePage`.
+ *
+ * Same live backend source (cumulative-since-boot spend + input/output token
+ * totals folded from the oplog), same honest-grain notice. The fork is layout:
+ * the desktop 3-up summary card grid collapses to a **single column** and the
+ * per-agent table is wrapped in a horizontal scroll region (`overflow-x-auto`)
+ * so its five columns don't overflow a phone. Unit lens + agent filter stay,
+ * touch-sized. This twin is routed by the mobile config GeneralPane (usage
+ * category), so it must be a real (marker-less) file.
+ */
+
+/** One agent's live usage row, joined from fleet meta + §19 metrics. */
+interface Row {
+  agent: Agent
+  spendUsd: number
+  inputTokens: number
+  outputTokens: number
+}
+
+const agentAccent = (a: Agent) =>
+  ({
+    signal: "var(--signal)",
+    interactive: "var(--interactive)",
+    ok: "var(--ok)",
+    warn: "var(--warn)",
+    danger: "var(--danger)",
+  })[a.accent]
+
+/** Compact USD formatter: `$4.20` under $10, `$420` under $1K, else `$4.2K`. */
+const fmtUsd = (v: number) =>
+  `$${v < 10 ? v.toFixed(2) : v < 1000 ? v.toFixed(0) : `${(v / 1000).toFixed(1)}K`}`
+
+/** Compact token count: `4.20M` / `420K` / raw count. */
+const fmtTok = (v: number) =>
+  v >= 1e6
+    ? `${(v / 1e6).toFixed(2)}M`
+    : v >= 1e3
+      ? `${(v / 1e3).toFixed(0)}K`
+      : String(Math.round(v))
+
+export function UsagePage() {
+  const [unit, setUnit] = useState<UsageUnit>("usd")
+  const [agentId, setAgentId] = useState<string>("all")
+
+  const { data: agents = [] } = useFleet()
+  const { data: metrics = [] } = useFleetMetrics()
+
+  // Join the two live sources by agent id into one usage row each.
+  const rows = useMemo<Row[]>(() => {
+    const byId = new Map<string, AgentMetrics>(metrics.map((m) => [m.id, m]))
+    return agents.map((agent) => {
+      const m = byId.get(agent.id)
+      return {
+        agent,
+        spendUsd: agent.costUsd,
+        inputTokens: m?.tokens?.input ?? 0,
+        outputTokens: m?.tokens?.output ?? 0,
+      }
+    })
+  }, [agents, metrics])
+
+  const visible = agentId === "all" ? rows : rows.filter((r) => r.agent.id === agentId)
+
+  const totals = useMemo(
+    () =>
+      visible.reduce(
+        (acc, r) => ({
+          spendUsd: acc.spendUsd + r.spendUsd,
+          inputTokens: acc.inputTokens + r.inputTokens,
+          outputTokens: acc.outputTokens + r.outputTokens,
+        }),
+        { spendUsd: 0, inputTokens: 0, outputTokens: 0 },
+      ),
+    [visible],
+  )
+
+  const fmt = unit === "usd" ? fmtUsd : fmtTok
+  const totalValue = unit === "usd" ? totals.spendUsd : totals.inputTokens + totals.outputTokens
+
+  return (
+    <ScrollArea className="h-full">
+      <div className="mx-auto flex max-w-[920px] flex-col gap-5 p-4">
+        {/* header + controls — wraps on mobile */}
+        <header className="flex flex-col gap-3">
+          <div className="flex flex-col gap-0.5">
+            <h2 className="text-[17px] font-semibold text-foreground">Usage</h2>
+            <p className="text-[12.5px] text-muted-foreground">
+              Live cumulative-since-boot totals across the fleet
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* agent filter — 16px text to defeat iOS focus-zoom on the select */}
+            <select
+              value={agentId}
+              onChange={(e) => setAgentId(e.target.value)}
+              className="card-shadow flex-1 rounded-lg border border-border bg-card px-2.5 py-2 text-[16px] text-foreground/85"
+              aria-label="Filter by agent"
+            >
+              <option value="all">All agents</option>
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+            {/* unit lens */}
+            <div className="flex items-center rounded-lg border border-border bg-muted/60 p-0.5">
+              <UnitTab
+                active={unit === "usd"}
+                onClick={() => setUnit("usd")}
+                icon={Coins}
+                label="$"
+              />
+              <UnitTab
+                active={unit === "tokens"}
+                onClick={() => setUnit("tokens")}
+                icon={Hash}
+                label="Tokens"
+              />
+            </div>
+          </div>
+        </header>
+
+        {/* summary cards — single column on mobile */}
+        <section className="flex flex-col gap-3">
+          <SummaryCard label="Total spend" value={fmtUsd(totals.spendUsd)} accent="var(--signal)" />
+          <SummaryCard
+            label="Input tokens"
+            value={fmtTok(totals.inputTokens)}
+            accent="var(--interactive)"
+          />
+          <SummaryCard
+            label="Output tokens"
+            value={fmtTok(totals.outputTokens)}
+            accent="var(--ok)"
+          />
+        </section>
+
+        {/* per-agent table */}
+        <UsageTable visible={visible} totals={totals} />
+        <p className="sr-only">Active unit total: {fmt(totalValue)}</p>
+
+        {/* honest boundary notice */}
+        <section
+          role="note"
+          className="flex items-start gap-2.5 rounded-xl border border-dashed border-border bg-muted/30 p-4"
+        >
+          <ServerCrash className="mt-0.5 size-4 shrink-0 text-muted-foreground/70" />
+          <p className="text-[12px] leading-relaxed text-muted-foreground">
+            A month-by-month usage history and the cache <strong>hit/miss</strong> token split are
+            not shown: the backend retains only cumulative-since-boot totals on the oplog, and the
+            hit/miss split is private agent working-set state that is never journaled.
+          </p>
+        </section>
+      </div>
+    </ScrollArea>
+  )
+}
+
+/** The fleet's per-agent usage totals (the active-filter aggregate). */
+interface Totals {
+  spendUsd: number
+  inputTokens: number
+  outputTokens: number
+}
+
+/** Per-agent usage table (or empty placeholder), wrapped in a horizontal scroll
+ *  region so its five columns don't overflow a phone; totals footer. */
+function UsageTable({ visible, totals }: { visible: Row[]; totals: Totals }) {
+  return (
+    <section className="flex flex-col gap-2.5">
+      <span className="text-[13px] font-semibold text-foreground/90">By agent</span>
+      {visible.length === 0 ? (
+        <div className="card-shadow rounded-xl border border-border bg-card p-8 text-center text-[12.5px] text-muted-foreground">
+          No agents in the fleet yet.
+        </div>
+      ) : (
+        <div className="card-shadow no-scrollbar overflow-x-auto rounded-xl border border-border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Agent</TableHead>
+                <TableHead className="text-right">Input</TableHead>
+                <TableHead className="text-right">Output</TableHead>
+                <TableHead className="text-right">Spend</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {visible.map((r) => (
+                <TableRow key={r.agent.id}>
+                  <TableCell className="font-medium text-foreground/85">
+                    <span className="flex items-center gap-2">
+                      <span
+                        className="size-2 shrink-0 rounded-full"
+                        style={{ background: agentAccent(r.agent) }}
+                      />
+                      {r.agent.name}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right text-foreground/75 tabular-nums">
+                    {fmtTok(r.inputTokens)}
+                  </TableCell>
+                  <TableCell className="text-right text-foreground/75 tabular-nums">
+                    {fmtTok(r.outputTokens)}
+                  </TableCell>
+                  <TableCell className="text-right font-semibold text-foreground/90 tabular-nums">
+                    {fmtUsd(r.spendUsd)}
+                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground/80 tabular-nums">
+                    {fmtTok(r.inputTokens + r.outputTokens)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+            <TableFooter>
+              <TableRow className="hover:bg-transparent">
+                <TableCell className="font-semibold text-foreground/90">Total</TableCell>
+                <TableCell className="text-right font-semibold text-foreground/85 tabular-nums">
+                  {fmtTok(totals.inputTokens)}
+                </TableCell>
+                <TableCell className="text-right font-semibold text-foreground/85 tabular-nums">
+                  {fmtTok(totals.outputTokens)}
+                </TableCell>
+                <TableCell className="text-right font-semibold text-foreground tabular-nums">
+                  {fmtUsd(totals.spendUsd)}
+                </TableCell>
+                <TableCell className="text-right font-semibold text-foreground/85 tabular-nums">
+                  {fmtTok(totals.inputTokens + totals.outputTokens)}
+                </TableCell>
+              </TableRow>
+            </TableFooter>
+          </Table>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function SummaryCard({ label, value, accent }: { label: string; value: string; accent: string }) {
+  return (
+    <div className="card-shadow flex flex-col gap-1 rounded-xl border border-border bg-card p-4">
+      <span className="text-[11px] tracking-wide text-muted-foreground/65 uppercase">{label}</span>
+      <span className="text-[22px] font-semibold tabular-nums" style={{ color: accent }}>
+        {value}
+      </span>
+    </div>
+  )
+}
+
+function UnitTab({
+  active,
+  onClick,
+  icon: Icon,
+  label,
+}: {
+  active: boolean
+  onClick: () => void
+  icon: typeof Coins
+  label: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-colors",
+        active
+          ? "card-shadow bg-card text-foreground"
+          : "text-muted-foreground active:text-foreground/80",
+      )}
+    >
+      <Icon className="size-3.5" />
+      {label}
+    </button>
+  )
+}

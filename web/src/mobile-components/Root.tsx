@@ -1,7 +1,7 @@
-import { useState, useCallback } from "react"
-import { LayoutGrid, MessagesSquare, FolderTree } from "lucide-react"
-import { TopBar } from "@/mobile-components/shell/TopBar"
+import { useState, useCallback, useEffect } from "react"
+
 import { FleetDashboard } from "@/mobile-components/agents/FleetDashboard"
+import { AgentModal } from "@/mobile-components/agents/AgentModal"
 import { ThreadsView } from "@/mobile-components/threads/ThreadsView"
 import { Finder } from "@/mobile-components/finder/Finder"
 import { TooltipProvider } from "@/mobile-components/ui/tooltip"
@@ -12,7 +12,8 @@ import { AuthProvider } from "@/lib/providers/AuthProvider"
 import { DevModeProvider } from "@/lib/providers/toggles/DevModeProvider"
 import { ShowOverlayProvider } from "@/lib/providers/toggles/ShowOverlayProvider"
 import { useFleet } from "@/lib/live"
-import { cn } from "@/lib/utils"
+import { TopButtonsProvider } from "@/lib/providers/topButtons/provider"
+import { useTopButtons } from "@/lib/providers/topButtons"
 import type { ViewMode } from "@/lib/types"
 import "@/App.css"
 
@@ -28,12 +29,37 @@ import "@/App.css"
  * the shared `@/lib` layer (not forked); only the presentation children resolve
  * through the `@/mobile-components` token, which is what the leak guard enforces.
  *
- * Ancestor-promotion in action (design §3.3): this real `Root` is the promoted
- * ancestor of the divergent `shell/TopBar` leaf, and it routes every view child
- * through `@/mobile-components/…` — so a future divergence anywhere beneath it is
- * reachable, never bypassed by a stub.
+ * Ancestor-promotion in action (design §3.3): this real `Root` is a promoted
+ * ancestor that routes every view child through `@/mobile-components/…` (e.g. the
+ * divergent `threads/ThreadsView` leaf) — so a future divergence anywhere beneath
+ * it is reachable, never bypassed by a stub.
  */
 function Root() {
+  // Tag <html> as the mobile tree so mobile-only theme overrides in index.css
+  // (`.dark.mobile` → true-black background) apply. This can't be a CSS media
+  // query: the desktop/mobile split is a frozen JS matchMedia probe (width OR
+  // `pointer: coarse`), which a `max-width` query would desync from. Cleared on
+  // unmount for safety, though the tree is chosen once per session.
+  //
+  // Also tag `.standalone` when launched from the iOS home screen. The mobile
+  // shell height forks on it (index.css): a home-screen app has no browser
+  // chrome so `100vh` equals the full physical screen and — under
+  // viewport-fit=cover + black-translucent — reaches the true screen bottom
+  // (fixing the ~34px home-indicator "chin" gap that `100dvh`/`height:100%`
+  // leave, since those resolve to the safe-area-shrunk viewport in standalone
+  // WebKit; r/PWA field study, T643). In a plain Safari tab we keep `100dvh`
+  // (100vh would overshoot under the URL bar, T617). Detect via the legacy
+  // iOS-only `navigator.standalone` OR the `display-mode: standalone` query.
+  useEffect(() => {
+    const root = document.documentElement
+    root.classList.add("mobile")
+    const standalone =
+      (navigator as Navigator & { standalone?: boolean }).standalone === true ||
+      window.matchMedia("(display-mode: standalone)").matches
+    if (standalone) root.classList.add("standalone")
+    return () => root.classList.remove("mobile", "standalone")
+  }, [])
+
   return (
     <ThemeProvider>
       <AuthProvider>
@@ -42,7 +68,9 @@ function Root() {
             <ShowOverlayProvider>
               <TooltipProvider delay={350} closeDelay={80}>
                 <AuthGuard>
-                  <MobileShell />
+                  <TopButtonsProvider>
+                    <MobileShell />
+                  </TopButtonsProvider>
                 </AuthGuard>
               </TooltipProvider>
             </ShowOverlayProvider>
@@ -58,20 +86,16 @@ function Root() {
  *  proof-of-concept scope). */
 type MobileView = Extract<ViewMode, "fleet" | "threads" | "finder">
 
-const TAB_LABEL: Record<MobileView, string> = {
-  fleet: "Fleet",
-  threads: "Threads",
-  finder: "Finder",
-}
-
 /**
  * Mobile app shell — the chrome that diverges from desktop `AppShell`.
  *
  * Same view-routing model as desktop (fleet → threads/finder for a selected
  * agent, persisted to the same `cp-view` / `cp-agent` localStorage keys so the
- * two trees agree on last-view across a reload), but the chrome is mobile-first:
- * a slim {@link TopBar} on top and a thumb-reachable {@link BottomTabBar} instead
- * of the desktop's horizontal tab cluster.
+ * two trees agree on last-view across a reload). The mobile chrome is currently
+ * minimal to the point of absence: there is no top bar and no bottom tab bar
+ * (both removed, T611) — persistent navigation is being reworked, so for now the
+ * views are reached contextually (fleet → open agent → threads; show-in-finder
+ * → finder).
  *
  * The disconnect-overlay + live-vitals plumbing desktop `AppShell` carries is
  * elided here for the P4 proof-of-concept: views receive a non-disconnected,
@@ -86,6 +110,12 @@ function MobileShell() {
   })
   const [activeAgentId, setActiveAgentId] = useState(() => localStorage.getItem("cp-agent") ?? "")
   const [finderRevealPath, setFinderRevealPath] = useState<string | null>(null)
+  // Which agent's full-screen Settings page is open (null = none). It's a
+  // transient overlay, NOT a persisted `view` — a reload must never land on it,
+  // so it lives in its own state rather than the cp-view union. The origin the
+  // back button returns to is stashed in localStorage (`cameToAgentSettingsFrom`)
+  // per the T636 spec: "agentsList" or the agent id (opened from that thread).
+  const [settingsAgentId, setSettingsAgentId] = useState<string | null>(null)
 
   const activeAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
 
@@ -110,9 +140,41 @@ function MobileShell() {
     [changeView],
   )
 
+  // Open the agent Settings page, stashing where Back should return: "agentsList"
+  // when opened from the fleet grid, or the agent id when opened from that
+  // agent's thread page (so Back re-selects that agent's threads). T636 spec.
+  const openAgentSettings = useCallback((agentId: string, fromList: boolean) => {
+    localStorage.setItem("cameToAgentSettingsFrom", fromList ? "agentsList" : agentId)
+    setSettingsAgentId(agentId)
+  }, [])
+
+  // Close the Settings page and return to origin (read from localStorage): the
+  // fleet grid, or that agent's threads view.
+  const backFromSettings = useCallback(() => {
+    const from = localStorage.getItem("cameToAgentSettingsFrom")
+    setSettingsAgentId(null)
+    if (from && from !== "agentsList") {
+      setActiveAgentId(from)
+      localStorage.setItem("cp-agent", from)
+      changeView("threads")
+    } else {
+      changeView("fleet")
+    }
+  }, [changeView])
+
   // Any non-fleet view needs a live agent; a stale/empty selection falls back to
   // the fleet grid (mirrors desktop's effectiveView guard).
   const effectiveView: MobileView = view !== "fleet" && !activeAgent ? "fleet" : view
+
+  // Signal the top-buttons provider on every page switch so the corner controls
+  // re-spring their glyph in lock-step with the transition (T637). Fires on
+  // mount too, seeding the entrance spring.
+  const { bump } = useTopButtons()
+  useEffect(bump, [effectiveView, bump])
+
+  // The agent whose Settings page is open, resolved to a live fleet member (a
+  // just-retired agent vanishes from the list → the overlay closes itself).
+  const settingsAgent = settingsAgentId ? agents.find((a) => a.id === settingsAgentId) : undefined
 
   const body = () => {
     if (effectiveView === "fleet") {
@@ -120,6 +182,7 @@ function MobileShell() {
         <FleetDashboard
           agents={agents}
           onOpenAgent={openAgent}
+          onManageAgent={(id) => openAgentSettings(id, true)}
           autoCreate={false}
           onAutoCreateConsumed={() => {
             /* mobile PoC: auto-create dialog not wired */
@@ -146,6 +209,8 @@ function MobileShell() {
         key={activeAgentId}
         activeAgentId={activeAgentId}
         onShowInFinder={showInFinder}
+        onGoToAgents={() => changeView("fleet")}
+        onOpenSettings={activeAgent ? () => openAgentSettings(activeAgent.id, false) : undefined}
         disconnected={false}
         onReconnect={() => {
           /* mobile PoC: live reconnect not wired */
@@ -155,44 +220,58 @@ function MobileShell() {
   }
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
-      <TopBar title={TAB_LABEL[effectiveView]} onMenu={() => changeView("fleet")} />
-      <div className="min-h-0 flex-1 overflow-auto">{body()}</div>
-      <BottomTabBar view={effectiveView} onViewChange={changeView} />
-    </div>
-  )
-}
+    // `.mobile-shell` (index.css) drives the height, NOT `h-dvh`: in a
+    // standalone home-screen app, iOS WebKit resolves `100dvh`/`height:100%` to
+    // the SAFE-AREA viewport, so the shell stops ~34px short of the physical
+    // bottom and the true-black `.dark.mobile` background shows through as a
+    // "chin" band at the home indicator (r/PWA field study, T643). `100vh` is
+    // the large viewport that DOES reach the true bottom under
+    // viewport-fit=cover + black-translucent — so the class fork gives the shell
+    // `100vh` when standalone (`.standalone`) and `100dvh` in a plain Safari tab
+    // (where `100vh` overshoots under the URL bar, T617). Paired with the
+    // black-translucent status bar (index.html) this fills the screen at BOTH
+    // ends: content flows under the status bar (padded off by each view's
+    // env(safe-area-inset-top)) and the background reaches the true bottom.
+    <div className="mobile-shell flex w-screen flex-col overflow-hidden bg-background text-foreground">
+      {/* No persistent chrome on mobile — no top bar, no bottom tab bar (T611).
+          View navigation is being reworked; for now views are reached
+          contextually (fleet → open agent → threads; show-in-finder → finder).
 
-/** Thumb-reachable bottom navigation — the mobile replacement for the desktop
- *  TopBar's inline view tabs. Three fixed surfaces, active tab accented. */
-function BottomTabBar({
-  view,
-  onViewChange,
-}: {
-  view: MobileView
-  onViewChange: (v: MobileView) => void
-}) {
-  const tabs: { id: MobileView; icon: typeof LayoutGrid }[] = [
-    { id: "fleet", icon: LayoutGrid },
-    { id: "threads", icon: MessagesSquare },
-    { id: "finder", icon: FolderTree },
-  ]
-  return (
-    <nav className="flex h-14 shrink-0 items-stretch border-t border-border bg-card">
-      {tabs.map(({ id, icon: Icon }) => (
-        <button
-          key={id}
-          onClick={() => onViewChange(id)}
-          className={cn(
-            "flex flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors",
-            view === id ? "text-(--signal)" : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          <Icon className="size-5" />
-          {TAB_LABEL[id]}
-        </button>
-      ))}
-    </nav>
+          pt safe-area inset: when the app runs as a standalone home-screen web
+          app (apple-mobile-web-app-status-bar-style=black-translucent) the web
+          view extends UNDER the iOS status bar, so the scrollable content is
+          padded down so it never sits beneath the clock/battery. Only the TOP
+          is padded here — the BOTTOM (home-indicator) inset is owned by each
+          view's own bottom-anchored element (e.g. the composer's
+          pb-[max(1rem,env(safe-area-inset-bottom))]), so padding it here too
+          would double-count. In a plain Safari tab the inset is 0 = no-op. */}
+      {/* Fixed-height flex column (NOT overflow-auto): each view is a
+          `flex-1 min-h-0 flex-col` root that owns its OWN scroll (ThreadsView's
+          conversation ScrollArea, the fleet/finder ScrollAreas). A scrolling
+          outer wrapper here was a SECOND scroll layer — it let a view grow to
+          its content height, so ThreadConversation's `absolute bottom-0`
+          composer pinned to the bottom of ALL the messages (below the fold) and
+          scrolled with them instead of staying on-screen (T637). As a fixed
+          flex column with `overflow-hidden`, the view fills the viewport exactly,
+          its inner ScrollArea is the sole scroller, and the floating composer
+          pins to the real bottom of the screen.
+
+          NO top safe-area padding here (T639): a shared `pt-[env(safe-area-
+          inset-top)]` on this wrapper pushes every view's scroll VIEWPORT below
+          the iOS status bar, so content clips at the viewport top and never
+          scrolls UNDER the translucent bar (the "threads doesn't use the top
+          space" bug). Instead each scrolling view reaches y=0 and pads its own
+          scroll CONTENT with env(safe-area-inset-top) — the pattern the Agent
+          Settings page already uses (fixed inset-0 + internal header pad) — so
+          content sits below the clock at rest but scrolls edge-to-edge under it.
+          The agent-settings overlay owns its inset itself (fixed inset-0). */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{body()}</div>
+
+      {/* Agent Settings page — a full-screen (fixed inset-0) overlay above every
+          view. Rendered only when open AND the target agent still exists; its own
+          back chevron calls backFromSettings to return to the stashed origin. */}
+      {settingsAgent && <AgentModal agent={settingsAgent} onClose={backFromSettings} />}
+    </div>
   )
 }
 

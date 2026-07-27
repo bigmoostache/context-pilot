@@ -343,78 +343,99 @@ impl ModelInfo for MiniMaxModel {
 }
 
 /// Claude Code V2 model variants (OAuth, updated request format).
+///
+/// API names are bare model IDs validated live against the OAuth
+/// `/v1/messages?beta=true` endpoint (all return 200). The dated
+/// `claude-opus-4-6-20250805` alias 404s — only the bare `claude-opus-4-6`
+/// resolves, so every variant carries a bare ID and the provider's
+/// `map_model_name` passes them through unchanged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ClaudeCodeV2Model {
-    /// Claude Opus 4.8 — latest flagship model.
+    /// Claude Opus 5 — latest flagship.
     #[default]
+    ClaudeOpus5,
+    /// Claude Opus 4.8 — previous flagship.
     ClaudeOpus48,
-    /// Claude Fable 5 — premium tier, 1M context.
+    /// Claude Opus 4.6 — earlier Opus.
+    ClaudeOpus46,
+    /// Claude Sonnet 5 — balanced cost / capability, 1M context.
+    ClaudeSonnet5,
+    /// Claude Fable 5 — premium tier, 400K context.
     ClaudeFable5,
-    /// Claude Sonnet 4.6 — balanced cost / capability, 1M context.
-    ClaudeSonnet46,
+    /// Claude Haiku 4.5 — fast and cheap. Rejects the 1M long-context beta,
+    /// so the provider strips `context-1m-*` from its beta header for this model.
+    ClaudeHaiku45,
 }
 
 impl ModelInfo for ClaudeCodeV2Model {
     fn api_name(&self) -> &'static str {
         match *self {
+            Self::ClaudeOpus5 => "claude-opus-5",
             Self::ClaudeOpus48 => "claude-opus-4-8",
+            Self::ClaudeOpus46 => "claude-opus-4-6",
+            Self::ClaudeSonnet5 => "claude-sonnet-5",
             Self::ClaudeFable5 => "claude-fable-5",
-            Self::ClaudeSonnet46 => "claude-sonnet-4-6",
+            Self::ClaudeHaiku45 => "claude-haiku-4-5-20251001",
         }
     }
 
     fn display_name(&self) -> &'static str {
         match *self {
+            Self::ClaudeOpus5 => "Opus 5",
             Self::ClaudeOpus48 => "Opus 4.8",
+            Self::ClaudeOpus46 => "Opus 4.6",
+            Self::ClaudeSonnet5 => "Sonnet 5",
             Self::ClaudeFable5 => "Fable 5",
-            Self::ClaudeSonnet46 => "Sonnet 4.6",
+            Self::ClaudeHaiku45 => "Haiku 4.5",
         }
     }
 
     fn context_window(&self) -> usize {
         match *self {
-            Self::ClaudeOpus48 => 200_000,
+            Self::ClaudeOpus5 | Self::ClaudeOpus48 | Self::ClaudeOpus46 | Self::ClaudeHaiku45 => 200_000,
             Self::ClaudeFable5 => 400_000,
-            Self::ClaudeSonnet46 => 1_000_000,
+            Self::ClaudeSonnet5 => 1_000_000,
         }
     }
 
     fn input_price_per_mtok(&self) -> f32 {
         match *self {
-            Self::ClaudeOpus48 => 5.0,
+            Self::ClaudeOpus5 | Self::ClaudeOpus48 | Self::ClaudeOpus46 => 5.0,
             Self::ClaudeFable5 => 10.0,
-            Self::ClaudeSonnet46 => 3.0,
+            Self::ClaudeSonnet5 => 3.0,
+            Self::ClaudeHaiku45 => 1.0,
         }
     }
 
     fn output_price_per_mtok(&self) -> f32 {
         match *self {
-            Self::ClaudeOpus48 => 25.0,
+            Self::ClaudeOpus5 | Self::ClaudeOpus48 | Self::ClaudeOpus46 => 25.0,
             Self::ClaudeFable5 => 50.0,
-            Self::ClaudeSonnet46 => 15.0,
+            Self::ClaudeSonnet5 => 15.0,
+            Self::ClaudeHaiku45 => 5.0,
         }
     }
 
     fn cache_hit_price_per_mtok(&self) -> f32 {
         match *self {
-            Self::ClaudeOpus48 => 0.50,
+            Self::ClaudeOpus5 | Self::ClaudeOpus48 | Self::ClaudeOpus46 => 0.50,
             Self::ClaudeFable5 => 1.0,
-            Self::ClaudeSonnet46 => 0.30,
+            Self::ClaudeSonnet5 => 0.30,
+            Self::ClaudeHaiku45 => 0.10,
         }
     }
 
     fn cache_miss_price_per_mtok(&self) -> f32 {
         match *self {
-            Self::ClaudeOpus48 => 6.25,
+            Self::ClaudeOpus5 | Self::ClaudeOpus48 | Self::ClaudeOpus46 => 6.25,
             Self::ClaudeFable5 => 12.50,
-            Self::ClaudeSonnet46 => 3.75,
+            Self::ClaudeSonnet5 => 3.75,
+            Self::ClaudeHaiku45 => 1.25,
         }
     }
 
     fn max_output_tokens(&self) -> u32 {
-        match *self {
-            Self::ClaudeOpus48 | Self::ClaudeFable5 | Self::ClaudeSonnet46 => 64_000,
-        }
+        64_000
     }
 }

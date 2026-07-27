@@ -28,10 +28,24 @@
     cp_seed_admin_email: "{{ cp_admin_email | default('admin@admin.fr') }}"
     sheets_dir: "{{ playbook_dir }}/out"
     gh_repo: bigmoostache/context-pilot
-    cp_release: "{{ release | default('latest') }}"
+    # Which release to install. Default = the signed 'stable' CHANNEL
+    # (channels/stable.json), NOT GitHub's "latest" (latest lagged stable:
+    # v0.1.0 vs v0.2.12). Pick a channel with -e channel=stable|nightly; or pin
+    # something else with -e release=<tag> | =latest | =local (channel wins if
+    # both are given).
+    cp_release: "{{ channel | default(release | default('stable')) }}"
+    cp_channel_url: "{{ channel_url | default('https://raw.githubusercontent.com/' + gh_repo + '/channels/' + cp_release + '.json') }}"
+    # Fallback URL for an explicit tag / 'latest'; channel mode overrides this in
+    # tasks/fetch.yml with the pinned, sha256-verified artifact from the manifest.
     appliance_bundle_url: >-
       https://github.com/{{ gh_repo }}/releases/{{ 'latest/download' if cp_release == 'latest' else 'download/' + cp_release }}/cpilot-linux-aarch64-musl.tar.gz
     caddy_url: "https://caddyserver.com/api/download?os=linux&arch=arm64"
+    # ── box bring-up (hostname + maintenance user); tailscale added later ──
+    box_hostname_prefix: "{{ hostname_prefix | default('dh') }}"
+    box_username: "{{ box_user | default('dh') }}"
+    box_user_sudo: "{{ box_sudo | default(true) | bool }}"
+    box_user_ssh_key: "{{ box_ssh_key | default('') }}"          # empty → reuse root's injected key
+    box_user_password_hash: "{{ box_password_hash | default('') }}"  # empty → key-only (no password)
     # Photonicat 2 mini-display (GC9307 SPI LCD) — built + installed on the box.
     cp_install_display: "{{ install_display | default(true) | bool }}"
     cp_display_repo: https://github.com/photonicat/photonicat2_mini_display.git
@@ -41,7 +55,13 @@
     # Without pcat-manager the driver can't read the DC rail, so it treats the box
     # as "on battery" and blanks the LCD after the 60s battery dimmer. Stretch it.
     cp_display_battery_dimmer_seconds: "{{ display_battery_dimmer_seconds | default(86400) }}"
+    # ── 5G modem toolbox (Quectel RM520N-GL) ──
+    # Installs the modem tooling only (mmcli/qmicli/mbimcli/picocom) so we can talk
+    # to the modem. WAN config (APN, failover routing) is left for later.
+    cp_install_modem: "{{ install_modem | default(true) | bool }}"
   tasks:
+    - name: Bring up box identity (hostname dh-<serial> + maintenance user)
+      ansible.builtin.include_tasks: tasks/bringup.yml
     - name: Fetch the release bundle + Caddy (control node, once)
       ansible.builtin.include_tasks:
         file: tasks/fetch.yml
@@ -59,3 +79,6 @@
     - name: Install the Photonicat mini-display driver (GC9307 SPI LCD)
       ansible.builtin.include_tasks: tasks/display.yml
       when: cp_install_display | bool
+    - name: Install the 5G modem toolbox (Quectel RM520N-GL)
+      ansible.builtin.include_tasks: tasks/modem.yml
+      when: cp_install_modem | bool

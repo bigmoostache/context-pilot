@@ -12,7 +12,7 @@ use crate::state::State;
 /// Dispatch primary model selection based on provider and index (0=a, 1=b, 2=c, 3=d).
 pub(super) const fn dispatch_primary_model(state: &State, idx: usize) -> Action {
     match state.llm_provider {
-        LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => anthropic_model(idx),
+        LlmProvider::Anthropic | LlmProvider::ClaudeCodeApiKey => anthropic_model(idx),
         LlmProvider::Grok => grok_model(idx),
         LlmProvider::Groq => groq_model(idx),
         LlmProvider::DeepSeek => deepseek_model(idx),
@@ -69,12 +69,15 @@ const fn minimax_model(idx: usize) -> Action {
     }
 }
 
-/// Claude Code V2 model for letter index (`a`/`b`/`c`).
+/// Claude Code V2 model for letter index (`a`–`f`).
 const fn claude_code_v2_model(idx: usize) -> Action {
     match idx {
-        0 => Action::ConfigSelectClaudeCodeV2Model(ClaudeCodeV2Model::ClaudeOpus48),
-        1 => Action::ConfigSelectClaudeCodeV2Model(ClaudeCodeV2Model::ClaudeFable5),
-        2 => Action::ConfigSelectClaudeCodeV2Model(ClaudeCodeV2Model::ClaudeSonnet46),
+        0 => Action::ConfigSelectClaudeCodeV2Model(ClaudeCodeV2Model::ClaudeOpus5),
+        1 => Action::ConfigSelectClaudeCodeV2Model(ClaudeCodeV2Model::ClaudeOpus48),
+        2 => Action::ConfigSelectClaudeCodeV2Model(ClaudeCodeV2Model::ClaudeOpus46),
+        3 => Action::ConfigSelectClaudeCodeV2Model(ClaudeCodeV2Model::ClaudeSonnet5),
+        4 => Action::ConfigSelectClaudeCodeV2Model(ClaudeCodeV2Model::ClaudeFable5),
+        5 => Action::ConfigSelectClaudeCodeV2Model(ClaudeCodeV2Model::ClaudeHaiku45),
         _ => Action::None,
     }
 }

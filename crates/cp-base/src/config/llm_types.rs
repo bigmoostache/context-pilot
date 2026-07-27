@@ -120,9 +120,6 @@ pub enum LlmProvider {
     /// Direct Anthropic Messages API (API-key auth).
     #[default]
     Anthropic,
-    /// Claude Code CLI backend (OAuth-based, pipes through `cc` process).
-    #[serde(alias = "claudecode")]
-    ClaudeCode,
     /// Claude Code with explicit API key (bypasses OAuth).
     #[serde(alias = "claudecodeapikey")]
     ClaudeCodeApiKey,

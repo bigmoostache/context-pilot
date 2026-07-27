@@ -15,22 +15,17 @@ import { cn } from "@/lib/utils"
 
 // ── per-category bodies ───────────────────────────────────────────
 //
-// Mobile twin of `components/shell/config/ConfigPanes`. It MUST be a real
+// Mobile twin of `components/shell/config/ConfigPanes`. MUST be a real
 // (marker-less) twin, not a stub: it routes to the mobile `UpdatePane`,
-// `SecretsPane`, `ItPane` (real touch twins) via relative imports, and to the
-// mobile `UsagePage` via the mirror token — a stub would `export *` the desktop
-// module and pull the DESKTOP sub-panes, bypassing the mobile ones (the
-// ancestor-promotion rule, design-mobile.md §3.3).
+// `SecretsPane`, `ItPane` via relative imports and the mobile `UsagePage` via
+// the mirror token — a stub would `export *` the desktop module and pull the
+// DESKTOP sub-panes, bypassing the mobile ones (ancestor-promotion,
+// design-mobile.md §3.3).
 //
-// Provider / integration API keys are provisioned out-of-band by the operator
-// (vendor, over SSH/Ansible) and never edited from the cockpit. The Services
-// pane is read-only: it just shows which integrations are available (key
-// present) vs. greyed-out (key absent).
-//
-// Divergence from desktop is touch-only: the option/service rows and the model
-// allowlist checkboxes grow their tap padding, and `hover:` becomes `active:`.
-// All settings logic (the org allowlist save, dev-mode/overlay/access-control
-// toggles) is byte-identical — it lives in the shared `@/lib` layer.
+// Provider/integration API keys are provisioned out-of-band (vendor, SSH/
+// Ansible), never edited from the cockpit — the Services pane is read-only.
+// Divergence from desktop is touch-only (tap padding, `hover:`→`active:`); all
+// settings logic lives in the shared `@/lib` layer.
 export function CategoryBody({ cat }: { cat: CatId }) {
   switch (cat) {
     case "general": {

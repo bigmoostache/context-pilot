@@ -84,13 +84,13 @@ function loadDraft(key: string, spec: FormSpec): Record<string, AnswerValue> {
   return base
 }
 
-/** A single labelled field row (numbered label + the type's input). When
+/** A single labelled field row (plain label above the type's input). When
  *  `highlight` is set (a blank mandatory field at the moment the incomplete
- *  submit arms) the row rings amber and its label turns amber, pointing the
- *  user straight at what's unfilled. `data-field-id` lets the widget scroll the
- *  first missing row into view. */
+ *  submit arms) the row's label turns amber and the input rings amber, pointing
+ *  the user straight at what's unfilled. `data-field-id` lets the widget scroll
+ *  the first missing row into view. No numeric prefix / indent — an iOS form
+ *  labels fields plainly, it doesn't number them (the "more mobile native" ask). */
 function FieldRow({
-  index,
   field,
   value,
   onChange,
@@ -98,7 +98,6 @@ function FieldRow({
   highlight,
   agentId,
 }: {
-  index: number
   field: FormField
   value: AnswerValue
   onChange: (v: AnswerValue) => void
@@ -107,14 +106,13 @@ function FieldRow({
   agentId: string
 }) {
   return (
-    <div className="flex flex-col gap-1.5" data-field-id={field.id}>
-      <label className="flex items-baseline gap-2 text-[12px] font-medium text-foreground/85">
-        <span className="font-mono text-[10.5px] text-muted-foreground/60 tabular-nums">
-          {String(index + 1).padStart(2, "0")}
-        </span>
-        <span className={highlight ? "text-(--warn)" : undefined}>{field.label}</span>
+    <div className="flex flex-col gap-2" data-field-id={field.id}>
+      <label
+        className={`px-0.5 text-[13px] font-medium ${highlight ? "text-(--warn)" : "text-foreground/80"}`}
+      >
+        {field.label}
       </label>
-      <div className={highlight ? "rounded-lg pl-[24px] ring-1 ring-(--warn)/50" : "pl-[24px]"}>
+      <div className={highlight ? "rounded-xl ring-1 ring-(--warn)/50" : undefined}>
         <FieldInput
           field={field}
           value={value}
@@ -386,14 +384,13 @@ export function FormWidget({
   return (
     <div
       ref={cardRef}
-      className="rise card-shadow my-1.5 overflow-hidden rounded-xl border border-border/70 bg-card"
+      className="rise card-shadow my-1.5 overflow-hidden rounded-2xl border border-border/60 bg-card"
     >
       <FormHeader title={fullSpec.title} count={fullSpec.fields.length} />
-      <div className="flex flex-col gap-2.5 p-3">
-        {fullSpec.fields.map((f, i) => (
+      <div className="flex flex-col gap-4 p-3.5">
+        {fullSpec.fields.map((f) => (
           <FieldRow
             key={f.id}
-            index={i}
             field={f}
             value={values[f.id] ?? ""}
             onChange={(v) => setValue(f.id, v)}

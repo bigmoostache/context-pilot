@@ -44,9 +44,23 @@ function asList(v: AnswerValue): string[] {
   return v ? [v] : []
 }
 
-/** One selectable option row (radio/checkbox). The control is a custom glyph so
- *  the checked state reads crisply against the signal-tinted selected surface.
- *  Mobile: `py-2.5` (vs desktop `py-1.5`) for a comfortable ≥40px tap target. */
+/** A grouped-list container for option rows — the iOS "grouped inset list"
+ *  idiom: one rounded card with hairline row dividers, so a set of choices reads
+ *  as a single discrete block instead of a stack of individually-bordered pills
+ *  (the "more discrete boxing" the mobile form was asked for). */
+function OptionGroup({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="divide-y divide-border/50 overflow-hidden rounded-xl border border-border/60 bg-card">
+      {children}
+    </div>
+  )
+}
+
+/** One selectable option row (radio/checkbox) inside an {@link OptionGroup}. The
+ *  row is borderless (the group card supplies the boxing) and the whole row is
+ *  the tap target; a custom glyph carries the checked state and the selected row
+ *  gets a faint signal tint — the native iOS list-row selection look. `py-3`
+ *  keeps a comfortable ≥44px touch target. */
 function OptionRow({
   kind,
   on,
@@ -64,28 +78,26 @@ function OptionRow({
 }) {
   return (
     <label
-      className={`group flex cursor-pointer items-start gap-2.5 rounded-xl border px-3 py-2.5 text-[13px] transition-all ${
-        on
-          ? "border-(--signal)/70 bg-(--signal)/8 shadow-[inset_0_0_0_1px_var(--signal)]"
-          : "border-border/70 active:bg-muted/40"
+      className={`group flex cursor-pointer items-start gap-3 px-3.5 py-3 text-[14px] transition-colors ${
+        on ? "bg-(--signal)/8" : "active:bg-muted/40"
       } ${disabled ? "pointer-events-none opacity-60" : ""}`}
     >
       <input type={kind} checked={on} disabled={disabled} onChange={onPick} className="sr-only" />
       <span
-        className={`mt-0.5 flex size-4 shrink-0 items-center justify-center border transition-colors ${
-          kind === "radio" ? "rounded-full" : "rounded-sm"
+        className={`mt-0.5 flex size-[18px] shrink-0 items-center justify-center border transition-colors ${
+          kind === "radio" ? "rounded-full" : "rounded-md"
         } ${on ? "border-(--signal) bg-(--signal) text-(--primary-foreground)" : "border-border/80 bg-background"}`}
       >
         {on &&
           (kind === "radio" ? (
-            <span className="size-1.5 rounded-full bg-current" />
+            <span className="size-2 rounded-full bg-current" />
           ) : (
-            <Check className="size-3" strokeWidth={3} />
+            <Check className="size-3.5" strokeWidth={3} />
           ))}
       </span>
       <span className="min-w-0">
         <span className="block font-medium text-foreground/90">{label}</span>
-        {detail && <span className="block text-[11.5px] text-muted-foreground/70">{detail}</span>}
+        {detail && <span className="block text-[12px] text-muted-foreground/70">{detail}</span>}
       </span>
     </label>
   )
@@ -99,7 +111,7 @@ function SingleField({ field, value, onChange, disabled }: FieldProps) {
   const labels = (field.options ?? []).map((o) => o.label)
   const isOther = field.allowOther === true && sel !== "" && !labels.includes(sel)
   return (
-    <div className="flex flex-col gap-1">
+    <OptionGroup>
       {(field.options ?? []).map((o) => (
         <OptionRow
           key={o.label}
@@ -113,10 +125,8 @@ function SingleField({ field, value, onChange, disabled }: FieldProps) {
       ))}
       {field.allowOther === true && (
         <label
-          className={`group flex cursor-pointer items-start gap-2.5 rounded-xl border px-3 py-2.5 text-[13px] transition-all ${
-            isOther
-              ? "border-(--signal)/70 bg-(--signal)/8 shadow-[inset_0_0_0_1px_var(--signal)]"
-              : "border-border/70 active:bg-muted/40"
+          className={`group flex cursor-pointer items-start gap-3 px-3.5 py-3 text-[14px] transition-colors ${
+            isOther ? "bg-(--signal)/8" : "active:bg-muted/40"
           } ${disabled ? "pointer-events-none opacity-60" : ""}`}
         >
           <input
@@ -127,9 +137,9 @@ function SingleField({ field, value, onChange, disabled }: FieldProps) {
             className="sr-only"
           />
           <span
-            className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border transition-colors ${isOther ? "border-(--signal) bg-(--signal) text-(--primary-foreground)" : "border-border/80 bg-background"}`}
+            className={`mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-full border transition-colors ${isOther ? "border-(--signal) bg-(--signal) text-(--primary-foreground)" : "border-border/80 bg-background"}`}
           >
-            {isOther && <span className="size-1.5 rounded-full bg-current" />}
+            {isOther && <span className="size-2 rounded-full bg-current" />}
           </span>
           <span className="min-w-0 flex-1">
             <span className="block font-medium text-foreground/90">Other…</span>
@@ -141,13 +151,13 @@ function SingleField({ field, value, onChange, disabled }: FieldProps) {
                 disabled={disabled}
                 onChange={(e) => onChange(e.target.value || " ")}
                 placeholder="Type your answer"
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-2.5 py-2 text-[16px] transition-shadow outline-none focus:border-(--signal) focus:shadow-[0_0_0_3px_var(--signal)]/15"
+                className="mt-2 w-full rounded-lg border border-transparent bg-muted/50 px-3 py-2.5 text-[16px] transition-colors outline-none focus:border-(--signal)/60 focus:bg-background"
               />
             )}
           </span>
         </label>
       )}
-    </div>
+    </OptionGroup>
   )
 }
 
@@ -158,7 +168,7 @@ function MultiField({ field, value, onChange, disabled }: FieldProps) {
     onChange(sel.includes(label) ? sel.filter((l) => l !== label) : [...sel, label])
   }
   return (
-    <div className="flex flex-col gap-1">
+    <OptionGroup>
       {(field.options ?? []).map((o) => (
         <OptionRow
           key={o.label}
@@ -170,12 +180,12 @@ function MultiField({ field, value, onChange, disabled }: FieldProps) {
           detail={o.detail}
         />
       ))}
-    </div>
+    </OptionGroup>
   )
 }
 
 const SCALAR_INPUT =
-  "w-full rounded-lg border border-border/80 bg-background px-3 py-2 text-[16px] text-foreground/90 outline-none transition-shadow focus:border-(--signal) focus:shadow-[0_0_0_3px_var(--signal)]/15 disabled:opacity-60"
+  "w-full rounded-xl border border-transparent bg-muted/50 px-3.5 py-3 text-[16px] text-foreground/90 outline-none transition-colors focus:border-(--signal)/60 focus:bg-background disabled:opacity-60"
 
 /** text / number — a single controlled input keyed off the field type (`date`
  *  is handled separately by {@link DateField}). */
@@ -216,7 +226,7 @@ function DateField({ value, onChange, disabled }: FieldProps) {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         disabled={disabled}
-        className={`flex w-full items-center gap-2 rounded-lg border border-border/80 bg-background px-3 py-2 text-left text-[16px] transition-shadow outline-none focus:border-(--signal) focus:shadow-[0_0_0_3px_var(--signal)]/15 disabled:opacity-60 ${
+        className={`flex w-full items-center gap-2 rounded-xl border border-transparent bg-muted/50 px-3.5 py-3 text-left text-[16px] transition-colors outline-none focus:border-(--signal)/60 focus:bg-background disabled:opacity-60 ${
           selected ? "text-foreground/90" : "text-muted-foreground/70"
         }`}
       >

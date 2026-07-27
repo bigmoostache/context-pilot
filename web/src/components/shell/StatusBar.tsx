@@ -1,6 +1,6 @@
 import { Boxes, Loader2, MessagesSquare, RefreshCw, Wallet } from "lucide-react"
 import { fmtCost, fmtTokens } from "@/lib/support/panelMeta"
-import { BehaviourChip } from "./BehaviourChip"
+import { BehaviourChip } from "./behaviour/BehaviourChip"
 import type { Agent, StreamPhase } from "@/lib/types"
 
 const phaseMeta: Record<StreamPhase, { label: string; color: string }> = {

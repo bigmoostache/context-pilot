@@ -9,6 +9,13 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* `standalone:` utilities apply only when the app runs as an iOS home-screen /
+   PWA standalone app — the mobile Root tags <html class="standalone"> then
+   (navigator.standalone / display-mode:standalone). Lets a component tighten
+   its safe-area offset for standalone (where env(safe-area-inset-top) is the
+   full status-bar height) without touching the plain-Safari-tab case. */
+@custom-variant standalone (&:is(html.standalone *));
+
 /*
   ════════════════════════════════════════════════════════════════════════
   CONTEXT·PILOT — Two switchable palettes, enterprise / macOS aesthetic.
@@ -130,6 +137,59 @@
   --shadow-pop: 0 10px 34px hsl(var(--shadow-color) / 60%);
 
   color-scheme: dark;
+}
+
+/* ─── DARK · mobile override ────────────────────────────────────────────
+   On a phone, dark mode reads more "pro" as a true black backdrop rather
+   than the desktop's warm charcoal (#222220). The `.mobile` class is set on
+   <html> by the mobile Root at first paint (it can't be a CSS media query:
+   the desktop/mobile split is a JS matchMedia probe — `(pointer: coarse)`
+   included — that a `max-width` query would desync from). Only --background
+   goes black; --surface / --card keep their charcoal so composer, cards and
+   the thread drawer still float visibly ABOVE the black base (depth intact,
+   not one flat black slab). */
+.dark.mobile {
+  --background: #000; /* true black app backdrop (phone) */
+}
+
+/* ─── Mobile: no document rubber-band ───────────────────────────────────
+   On iOS a drag that starts inside a scroller ALREADY at its top/bottom edge
+   chains up to the document and rubber-bands the WHOLE viewport — which drags
+   even `fixed`/`absolute` chrome (the floating bottom bar) with it. It reads as
+   "the whole app scrolls, including the bar that was meant to be pinned", and
+   feels random because it only fires when the inner scroller has no room left
+   in the drag direction (e.g. dragging down from the top of the agents list).
+   `overscroll-behavior: none` stops the scroll chain at the document so an
+   at-the-edge drag is simply absorbed — inner scrollers still scroll normally,
+   only the viewport-level bounce is gone. Scoped to `.mobile` (set on <html> by
+   the mobile Root) so the desktop app is untouched. */
+html.mobile,
+html.mobile body {
+  overscroll-behavior: none;
+}
+
+/* ─── Mobile shell height: fill the physical screen, both ends ───────────
+   The mobile Root's outer shell carries `.mobile-shell`. Its height is NOT
+   `100dvh`/`height:100%`: in a standalone home-screen app iOS WebKit resolves
+   both to the SAFE-AREA viewport, stopping ~34px short of the physical bottom
+   and leaving a dead "chin" band at the home indicator (r/PWA field study,
+   T643). Fork the height:
+     • home-screen app (`html.mobile.standalone`) → `100vh`, the large viewport
+       that DOES reach the true screen bottom under viewport-fit=cover +
+       black-translucent (index.html);
+     • plain Safari tab (`html.mobile` without `.standalone`) → `100dvh`, which
+       tracks the visible viewport so the composer isn't pushed under the URL
+       bar (100vh would overshoot there — T617).
+   `.standalone` is set on <html> by the mobile Root (navigator.standalone /
+   display-mode:standalone). With the black-translucent status bar this fills
+   the screen at BOTH ends — content flows under the status bar, background
+   reaches the true bottom. */
+html.mobile .mobile-shell {
+  height: 100dvh;
+}
+
+html.mobile.standalone .mobile-shell {
+  height: 100vh;
 }
 
 @layer base {
