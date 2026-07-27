@@ -140,7 +140,7 @@ export function ThreadList({
         {!showArchived && archivedCount > 0 && (
           <button
             onClick={() => onToggleArchived(true)}
-            className="mx-2 mb-2 flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-[12px] text-muted-foreground transition-colors hover:card-shadow hover:bg-card hover:text-foreground"
+            className="hover:card-shadow mx-2 mb-2 flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-[12px] text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
           >
             <Archive className="size-3.5" />
             Archived
@@ -192,8 +192,9 @@ function ListHeader({
           <span className="text-muted-foreground/50 tabular-nums">{archivedCount}</span>
         </button>
       ) : null}
-      {/* right-aligned chrome: new thread + open search palette + collapse the rail */}
-      <div className="ml-auto flex items-center gap-1">
+      {/* left-aligned chrome: new thread + open search palette (sit right after
+          the archived back-button when it is shown) */}
+      <div className="flex items-center gap-1">
         {!showArchived && (
           <button
             onClick={onNewThread}
@@ -210,14 +211,15 @@ function ListHeader({
         >
           <Search className="size-3.5" />
         </button>
-        <button
-          onClick={onToggleSidebar}
-          title="Hide sidebar"
-          className="flex size-6 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <PanelLeftClose className="size-3.5" />
-        </button>
       </div>
+      {/* right-aligned: collapse the rail — pushed to the far right, unmoved */}
+      <button
+        onClick={onToggleSidebar}
+        title="Hide sidebar"
+        className="ml-auto flex size-6 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
+      >
+        <PanelLeftClose className="size-3.5" />
+      </button>
     </div>
   )
 }
