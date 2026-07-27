@@ -1,7 +1,8 @@
-import { FolderGit2, AlertTriangle, Plus } from "lucide-react"
+import { useState } from "react"
+import { FolderGit2, AlertTriangle, Plus, PanelLeft } from "lucide-react"
 import { ThreadList } from "./ThreadList"
 import { ThreadConversation } from "./ThreadConversation"
-import { NewThreadDialog } from "./NewThreadDialog"
+import { NewThreadDialog } from "./dialogs/NewThreadDialog"
 import { useFleet, useThreads } from "@/lib/live"
 import { useThreadSelection, useThreadActions } from "@/lib/live/threadView"
 
@@ -38,6 +39,7 @@ export function ThreadsView({
 
   const sel = useThreadSelection(activeAgentId, threads)
   const actions = useThreadActions(activeAgentId, threads, sel)
+  const [railOpen, setRailOpen] = useState(true)
 
   // Only bail to a bare empty state when there is genuinely no agent. A fresh
   // agent with zero threads MUST still render the sidebar — that is where the
@@ -64,19 +66,28 @@ export function ThreadsView({
           aria-label="Reconnect to agent"
         />
       )}
-      <ThreadList
-        threads={threads}
-        selectedId={sel.effectiveSelectedId}
-        onSelect={sel.setSelectedId}
-        query={sel.query}
-        onQueryChange={sel.setQuery}
-        showArchived={sel.showArchived}
-        onToggleArchived={sel.setShowArchived}
-        onArchive={actions.handleArchive}
-        onDelete={actions.handleDelete}
-        onPause={actions.handlePause}
-        onNewThread={() => sel.setNewOpen(true)}
-      />
+      {railOpen ? (
+        <ThreadList
+          threads={threads}
+          selectedId={sel.effectiveSelectedId}
+          onSelect={sel.setSelectedId}
+          showArchived={sel.showArchived}
+          onToggleArchived={sel.setShowArchived}
+          onArchive={actions.handleArchive}
+          onDelete={actions.handleDelete}
+          onPause={actions.handlePause}
+          onNewThread={() => sel.setNewOpen(true)}
+          onToggleSidebar={() => setRailOpen(false)}
+        />
+      ) : (
+        <button
+          onClick={() => setRailOpen(true)}
+          title="Show sidebar"
+          className="card-shadow absolute top-3 left-3 z-30 flex size-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <PanelLeft className="size-4" />
+        </button>
+      )}
 
       {/* The conversation pane shows the selected thread, or — for a realm with
           no thread selected/created yet — a hint pointing at the sidebar's New

@@ -1,29 +1,27 @@
 import {
   Plus,
   Search,
-  X,
   Archive,
   ArchiveRestore,
   ChevronLeft,
+  PanelLeftClose,
   Pause,
   Play,
   Trash2,
 } from "lucide-react"
-import { useRef } from "react"
+import { useRef, useState } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { ThreadDetail } from "@/lib/types"
 import { cn, prefersReducedMotion } from "@/lib/utils"
 import { clickable } from "@/lib/support/a11y"
 import { previewOf } from "@/lib/support/threadMessages"
+import { ThreadSearchPalette } from "./dialogs/ThreadSearchPalette"
 
 interface ThreadListProps {
   /** all of the realm's threads (archived included) — filtering happens here */
   threads: ThreadDetail[]
   selectedId: string
   onSelect: (id: string) => void
-  /** live search query (controlled by the parent so it survives collapse) */
-  query: string
-  onQueryChange: (q: string) => void
   /** archived view toggle */
   showArchived: boolean
   onToggleArchived: (v: boolean) => void
@@ -35,6 +33,8 @@ interface ThreadListProps {
   onPause: (id: string) => void
   /** open the New Thread dialog */
   onNewThread: () => void
+  /** collapse the rail (header show/hide button, T669) */
+  onToggleSidebar: () => void
 }
 
 /** Sort threads by most recent activity first. */
@@ -43,37 +43,33 @@ function byRecent(a: ThreadDetail, b: ThreadDetail): number {
 }
 
 /**
- * Left rail of the thread-centered view — a clean, grouped chat sidebar. The
- * agent identity lives in the TopBar, not here; the rail is always open (T23).
- * The search box filters by name + last-message preview. Threads are grouped by
- * turn-status (**Agent's turn** / **User turn**) with an on-demand **Archived**
- * view; width is the shared `--sidebar-w` var. Structure (P8): top bar + empty
- * placeholder → {@link ListHeader} / {@link EmptyState}, row hover actions +
- * badges → {@link RowActions} / {@link RowMeta}, keeping budgets.
+ * Left rail of the thread-centered view — grouped chat sidebar. Agent identity
+ * lives in the TopBar; the rail collapses via the header button (T669). Threads
+ * group by turn-status (**Agent's turn** / **User turn**) with an **Archived**
+ * view; search moved to the {@link ThreadSearchPalette} command palette. Width =
+ * shared `--sidebar-w`. Structure (P8): {@link ListHeader} / {@link EmptyState}
+ * / {@link RowActions} / {@link RowMeta} keep budgets.
  */
 export function ThreadList({
   threads,
   selectedId,
   onSelect,
-  query,
-  onQueryChange,
   showArchived,
   onToggleArchived,
   onArchive,
   onDelete,
   onPause,
   onNewThread,
+  onToggleSidebar,
 }: ThreadListProps) {
-  const q = query.trim().toLowerCase()
-  const matches = (t: ThreadDetail) =>
-    q === "" || t.name.toLowerCase().includes(q) || previewOf(t).toLowerCase().includes(q)
+  const [searchOpen, setSearchOpen] = useState(false)
 
   const live = threads.filter((t) => !t.archived)
   const archived = threads.filter((t) => t.archived)
   const archivedCount = archived.length
 
-  // search applies to whichever set is on screen
-  const visible = (showArchived ? archived : live).filter((t) => matches(t))
+  // the group that's on screen (search now lives in the command palette)
+  const visible = showArchived ? archived : live
 
   /**
    * Sort the "Agent's turn" group focused-first, then by recency (T36). The
@@ -120,9 +116,11 @@ export function ThreadList({
           liveCount={live.length}
           archivedCount={archivedCount}
           workingCount={workingCount}
+          onOpenSearch={() => setSearchOpen(true)}
+          onToggleSidebar={onToggleSidebar}
         />
 
-        {/* new thread + search (hidden in archived view — archived is read-only) */}
+        {/* new thread (hidden in archived view — archived is read-only) */}
         {!showArchived && (
           <div className="shrink-0 px-3 pb-2">
             <button
@@ -135,31 +133,9 @@ export function ThreadList({
           </div>
         )}
 
-        {/* search — works in both live and archived views */}
-        <div className="shrink-0 px-3 pb-2">
-          <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12px] focus-within:border-(--signal)/60">
-            <Search className="size-3.5 shrink-0 text-muted-foreground/60" />
-            <input
-              value={query}
-              onChange={(e) => onQueryChange(e.target.value)}
-              placeholder={showArchived ? "Search archived…" : "Search threads…"}
-              className="min-w-0 flex-1 bg-transparent text-foreground/90 outline-none placeholder:text-muted-foreground/55"
-            />
-            {query && (
-              <button
-                onClick={() => onQueryChange("")}
-                className="shrink-0 text-muted-foreground/55 transition-colors hover:text-foreground"
-                title="Clear"
-              >
-                <X className="size-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
-
         <ScrollArea className="min-h-0 flex-1">
           <div className="px-2 py-1">
-            {visible.length === 0 && <EmptyState hasQuery={q !== ""} showArchived={showArchived} />}
+            {visible.length === 0 && <EmptyState showArchived={showArchived} />}
 
             {!showArchived && (
               <>
@@ -189,6 +165,16 @@ export function ThreadList({
           </button>
         )}
       </div>
+
+      <ThreadSearchPalette
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        threads={threads}
+        onSelect={(id) => {
+          onSelect(id)
+          setSearchOpen(false)
+        }}
+      />
     </aside>
   )
 }
@@ -201,12 +187,16 @@ function ListHeader({
   liveCount,
   archivedCount,
   workingCount,
+  onOpenSearch,
+  onToggleSidebar,
 }: {
   showArchived: boolean
   onToggleArchived: (v: boolean) => void
   liveCount: number
   archivedCount: number
   workingCount: number
+  onOpenSearch: () => void
+  onToggleSidebar: () => void
 }) {
   return (
     <div className="flex items-center gap-2 px-3 pt-3 pb-2.5">
@@ -241,18 +231,31 @@ function ListHeader({
           )}
         </>
       )}
+      {/* right-aligned chrome: open search palette + collapse the rail */}
+      <div className="ml-auto flex items-center gap-1">
+        <button
+          onClick={onOpenSearch}
+          title="Search threads"
+          className="flex size-6 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <Search className="size-3.5" />
+        </button>
+        <button
+          onClick={onToggleSidebar}
+          title="Hide sidebar"
+          className="flex size-6 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <PanelLeftClose className="size-3.5" />
+        </button>
+      </div>
     </div>
   )
 }
 
-/** The empty placeholder shown when no thread is visible — copy adapts to
- *  whether a search is active and which set (live/archived) is on screen. */
-function EmptyState({ hasQuery, showArchived }: { hasQuery: boolean; showArchived: boolean }) {
-  const message = hasQuery
-    ? "No threads match your search."
-    : showArchived
-      ? "No archived threads."
-      : "No threads yet."
+/** The empty placeholder shown when no thread is visible — copy adapts to which
+ *  set (live/archived) is on screen. */
+function EmptyState({ showArchived }: { showArchived: boolean }) {
+  const message = showArchived ? "No archived threads." : "No threads yet."
   return <p className="px-2.5 py-6 text-center text-[11.5px] text-muted-foreground/55">{message}</p>
 }
 
@@ -310,8 +313,7 @@ function MarqueeTitle({ name, trackRef }: { name: string; trackRef: React.Ref<HT
   )
 }
 
-/** The status-dot colour for a thread row: green when focused/active, signal
- *  when it's your turn, muted otherwise. A flat if-chain, not a nested ternary. */
+/** Status-dot colour: green focused/active, signal on your turn, else muted. Flat if-chain. */
 function dotColor(isFocused: boolean, status: ThreadDetail["status"]): string {
   if (isFocused) return "var(--ok)"
   if (status === "MY_TURN") return "var(--signal)"
@@ -390,9 +392,7 @@ function ThreadRow({
   )
 }
 
-/** The hover-revealed action cluster on a row's first line: archive/restore,
- *  optional permanent-delete (archived rows) and optional pause/resume (live
- *  rows). Each button stops propagation so it doesn't also select the row. */
+/** Hover-revealed row actions: archive/restore, delete (archived), pause/resume (live). Each stops propagation so it doesn't select the row. */
 function RowActions({
   id,
   archived,
