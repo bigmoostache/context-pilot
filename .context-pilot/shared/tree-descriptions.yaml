@@ -13390,6 +13390,10 @@ a50c325b9efa2c06:
   path: src/ui/ir/mod.rs
   description: IR-to-ratatui adapter. semantic_to_style (pub(crate)) + ir_span_to_ratatui (with reversed support). blocks_to_lines converts IR Block vec to ratatui Lines. Table/ProgressBar/Tree/KeyValue renderers. build_frame + build_active_panel frame assembly.
   last_edited_ms: 0
+a5100e92e0a95026:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 a515641cbf0c1942:
   path: src/infra/watcher.rs
   description: 'FileWatcher: notify crate wrapper, WatchEvent enum, canonical path dedup, rewatch_file() for atomic renames, non-blocking poll'
@@ -19973,6 +19977,10 @@ f8162028a837bf57:
 f83ca97744482dff:
   path: web/src/lib/types.ts
   description: 'Thread types: ThreadDetail (id/name/status/agent/timestamps/unread/archived/paused/focused/log). ThreadStatus, ThreadMsg, ThreadQuestion. paused:boolean added T371.'
+  last_edited_ms: 0
+f84929274eb793f8:
+  path: crates/cp-mod-search/src/meili/conversation_search.rs
+  description: T671 stateless read-path hybrid search. SearchConvParams{port,master_key,project_hash,query,limit,thread_id} (6-field literal, dodges too_many_arguments, yaml-registered exhaustive). search_conversations() hybrid semanticRatio 0.5, thread_id filter, parse_hits maps _rankingScore+doc fields to ConvHit. No State borrow (takes creds by value).
   last_edited_ms: 0
 f84a283c2aabf485:
   path: crates/cp-mod-files/src/tools/file.rs
