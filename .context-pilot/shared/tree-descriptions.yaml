@@ -358,6 +358,10 @@
   path: src/main.rs
   description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook. use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
   last_edited_ms: 0
+04016d68d892043a:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 04371fcbb2d21d4b:
   path: web/src/components/agents/AgentModal/index.tsx
   description: 'AgentModal shell (P8 split): create/manage dialog, single source for both flows (fleet dashboard + TopBar). Wires useSelectionState + useAgentModalActions into Controller, renders Header/Body/Footer subcomponents. authEnabled coerced ?? false. Backdrop = focusable sibling button.'
@@ -793,6 +797,10 @@
 0979aeb287e6bdc9:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
+  last_edited_ms: 0
+098639811469d0c7:
+  path: deploy/ansible/tasks/fetch.yml
+  description: Fetch pre-built appliance artifacts from GitHub Release onto control node (no local build). Pulls aarch64-musl bundle + stock Caddy arm64. release=local uses build.sh output. Extracts bundle for shipping over SSH to offline LAN box.
   last_edited_ms: 0
 09881ed90d401989:
   path: web/.prettierrc.json
@@ -2814,6 +2822,10 @@
   path: web/src/components/auth/ForcePasswordChange.tsx
   description: Forced password-change screen (first login / must_change_password). Blocks app until user rotates the seed password; on success refreshMe clears the flag and AuthGuard re-renders through. Field subcomponent (password inputs), MIN_PASSWORD_LEN=8.
   last_edited_ms: 0
+23df9d5b2b6b4800:
+  path: tmp/Attali/iran/vite.config.js
+  description: 'Vite dev-server config for the Iran report — SUPERSEDED by bs-config.js (browser-sync), kept for reference. Vite used purely as a static server (no bundling), with allowedHosts + a wss HMR client pinned to guillaume.barking-hue.ts.net:7443 to work behind the tailscale HTTPS proxy. Abandoned: vite''s dep re-optimize triggers a post-paint reload and it treats stylesheets as HMR modules, swapping the <link> after Paged.js has rewritten the DOM — CSS visibly loads then vanishes.'
+  last_edited_ms: 1785136968557
 23fd2fd437b74750:
   path: docs/prompt-building.md
   description: How context/prompts are assembled for LLM calls
@@ -4962,6 +4974,10 @@
   path: crates/cp-mod-brave/src/tools.rs
   description: Brave tool dispatch. get_client() reads key from vault. Both tools async via spawn_async_tool. DynPanel + DYN_PANEL_ID_PLACEHOLDER.
   last_edited_ms: 0
+3e847efd482bb6f4:
+  path: deploy/photonicat/emmc-install/build/build-init-sd.sh
+  description: 'Assembles the init-SD: write base Debian image to card, grow rootfs, seed installer payload (init-sd-install.sh + pcat_lcd.py + unit + golden.img.zst), strip the firstboot unit (target-only). Inputs via env: BASE_IMG/CARD/GOLDEN_DIR. Interactive card-device confirm.'
+  last_edited_ms: 0
 3ea42e434ffe36bb:
   path: crates/cp-mod-callback/Cargo.toml
   description: 'Callback module deps: cp-base, cp-render, cp-mod-console, crossterm, serde, serde_json, globset, sha2.'
@@ -5650,6 +5666,10 @@
   path: crates/cp-mod-callback/src/trigger.rs
   description: Callback trigger engine. collect_changed_files() via normalize_changed_path + merge_changed_file helpers (A2 split). match_callbacks() via match_one_def + def_matches_file helpers. validate_skip_names warns non-existent. partition_callbacks splits blocking/async.
   last_edited_ms: 0
+466ac91ee1efe532:
+  path: deploy/photonicat/emmc-install/lcd/pcat_lcd.py
+  description: GC9307 SPI LCD 4-state progress painter (flashing PCT/verify/done/error). Python spidev+libgpiod, 5x7 bitmap font, init sequence transcribed from vendor periph.io-gc9307 st7789.go. /dev/spidev1.0, RST=122 DC=121, 172x320 rot180 MADCTL 0x48 coloffset 34. One-shot per state screen.
+  last_edited_ms: 0
 466eda19b597a9fb:
   path: crates/cp-mod-bridge/src/lib.rs
   description: 'BridgeModule: init_state activates Boot when CP_BRIDGE=1; PENDING+try_recover self-heal. ContextMemo alias for ContextUsage emit memo. on_stream_chunk→Token, on_stream_stop→PhaseHint(Idle).'
@@ -5830,6 +5850,10 @@
   path: crates/cp-mod-scratchpad/src/panel.rs
   description: 'ScratchpadPanel: cell preview (5 lines max), format_cells_for_context() for LLM, no cache needed'
   last_edited_ms: 0
+48f85a6a3b6f1c76:
+  path: tmp/Attali/iran/css/typography.css
+  description: Ephemeral (tmp/). Iran report visual style — heading hierarchy, opps/players boxes, editorial tables, strategy blocks, portraits, full-bleed navy cover, dotted-leader TOC. Consumes tokens.css, no paged-media mechanics.
+  last_edited_ms: 1785082412104
 4929c669e80e1829:
   path: yamls/tools/entities.yaml
   description: 'Entity SQL tool YAML. Single tool: entity_sql with sql, request_path, live, output_path, dry_run params. Full SQLite support description (JOINs, CTEs, RETURNING, CREATE TABLE IF NOT EXISTS).'
@@ -6090,6 +6114,10 @@
   path: crates/cp-orchestrator/src/transport/rest/mod.rs
   description: REST resource handlers. fleet() filtered by auth_user ACL (FR-12). command() breaker check GATED on SendMessage only. rename_agent (T328), upload/delete avatar (T338). threads() prefers view roster. mint_ticket, resolve_entry. create_agent + retire in siblings.
   last_edited_ms: 1782238272790
+4c9d975f139dc087:
+  path: deploy/photonicat/emmc-install/README.md
+  description: 'Full protocol doc: why (drop armbian-install), verified board facts, file layout, 4-stage flow (golden build, init-SD build, field install, ansible provisioning), 9 pre-solved frictions, open items. Locked decisions + secrets policy.'
+  last_edited_ms: 0
 4ca9437ec189df40:
   path: web/src/lib/api/index.ts
   description: 'REST API client barrel: fleet/agent/threads/panels/memory/todos/spine/queue/scratchpad/tree/callbacks/tools/radar/entities/metrics/vitals/usage/library + commands (sendCommand) + mintTicket. Re-exports ./finder + shares ./client request/BASE/envelope. The @/lib/api single import surface.'
@@ -11022,6 +11050,10 @@
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: 'Transport hub. Backend shared state + serve/serve_bound + route_rest (22 routes) + handle_stream SSE. CORS + OPTIONS 204. run_stream SSE producer: Tailer.poll→rev-numbered delta events for every OpEntry, drains StreamHub frames, dirty→invalidate. X18 LATENCY FIX: TAIL_REPOLL=5ms caps the OplogWaiter.wait timeout so the tailer re-polls every 5ms regardless of OS event latency (macOS FSEvents coalesces ~350ms — was the visible-latency floor); waiter still wakes sub-ms on Linux inotify (I12 ''inotify primary, tight poll backstop''). KEEPALIVE_INTERVAL=10s gated on Instant so the 5ms loop doesn''t spam keepalive comments. Yielded command→visible p50 14ms / p99 33ms (from 349ms).'
   last_edited_ms: 1781793072089
+8912bac2962d0f4d:
+  path: .gitignore
+  description: Git ignore rules. Includes *.sourced_pdf, .uploads, bridge runtime artifacts, harbor outputs, mitmproxy captures, .DS_Store, docs/slides build artifacts. devis-attali-context-pilot.md added after security incident. .context-pilot/* blocks messages/ (116K conversation YAMLs) from accidental commit.
+  last_edited_ms: 0
 8921a8f5df87a89e:
   path: crates/cp-mod-github/src/classify/mod.rs
   description: 'gh command classification ReadOnly/Mutating: static READ_ONLY_GROUPS + READ_ONLY_ACTIONS tables (binary_search), `gh api` method-aware. Shell arg parse + operator block.'
@@ -11570,6 +11602,10 @@
   path: .github/checks/allowed-eslint-exceptions.yaml
   description: Registry of allowed CONFIG-LEVEL ESLint exceptions (web-lint, frontend twin of allowed-lint-exceptions.yaml). Inline suppression BANNED; only legal escape is a config-level scoped rules:{off} override in eslint.config.ts, each registered here with reason+strategy, enforced bidirectionally by check-frontend-suppressions.sh. Covers P4→P8. Hash-lock deferred to P12.
   last_edited_ms: 1783497002785
+9066eaeb38d7fe29:
+  path: tmp/Attali/iran/bs-config.js
+  description: browser-sync dev-serve config for the Iran report (port 8899) — the ACTIVE server. Chosen over vite because vite's dep re-optimize reload and CSS-as-HMR-module swapping both break Paged.js after it paginates. injectChanges hot-swaps CSS with no reload; HTML/JS edits full-reload but a rewriteRules-injected scroll-restore snippet (retries scrollTo until async pagination reaches the saved offset, 5s cap) returns you to your prior position. Injected at serve time only, so index.html stays clean for PDF export.
+  last_edited_ms: 1785136968375
 90759f8bbe365234:
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
@@ -11938,6 +11974,10 @@
   path: ui/src/components/agents/UsagePage.tsx
   description: Cost & token analytics page (fleet 'Usage'). Reads mock usage{}. Hero stat cards (spend/tokens/cache-hit-rate/messages), spend sparkline, per-agent cost bars (proportional, fill-sweep), token-composition stacked bar, cache economics. CSS-only charts, decorative time-range toggle.
   last_edited_ms: 1781531138864
+94bec52f5767a89a:
+  path: deploy/photonicat/emmc-install/installer/pcat-installer.service
+  description: systemd oneshot driving init-sd-install.sh. Offline (After=local-fs.target, no network). TimeoutStartSec=1800 (full flash+verify). ConditionPathExists=!/opt/pcat-install/.installed.
+  last_edited_ms: 0
 94c9f015736f744e:
   path: crates/cp-orchestrator/src/services/cost_breaker.rs
   description: 'Phase 18: CostBreaker — durable per-agent spend breaker (R2-8/V9). Verdict{Allowed,Tripped}. observe(id,cumulative_usd) = HIGH-WATER MAX (a post-reboot cumulative-0 can''t lower the mark → trip survives crash-loop, V9). check(id): poisoned→Tripped (fail-closed under read uncertainty), spend>budget→Tripped, else Allowed (no-entry = definite-zero = Allowed, NOT fail-closed). rebuild_from_view(&MaterializedView) reconstructs trip state from durable oplog-derived cost on backend restart. poison/clear_poison for indeterminate cost. 6 tests incl V9 crash-loop latch + rebuild-after-restart.'
@@ -14850,6 +14890,10 @@ b8c80869fc5f9ccb:
   path: crates/cp-base/src/state/flags.rs
   description: Stream-phase state machine (Idle/Receiving/ExecutingTools), UI/config/lifecycle boolean flags, streaming-tool advisory state. StatusBools composite struct organizes all flags by domain. HighlightIrFn callback type.
   last_edited_ms: 0
+b8e1f14e314bd175:
+  path: tmp/Attali/iran/css/page.css
+  description: Ephemeral (tmp/). Iran report paged-media engine — @page geometry, running header band via position:running(), fragmentation control, pure-CSS TOC page numbers (target-counter), PDF bookmarks. Brand-agnostic, consumes tokens.css.
+  last_edited_ms: 1785082412016
 b8f64fa82adb3c74:
   path: web/src/lib/types.ts
   description: Domain types barrel. Re-exports backend types from generated/types.gen. Agent = Omit<GenAgent,'status'> & {accent, status:AgentStatus} (status widened). AgentStatus = GenAgent['status'] | 'waiting' (client-only restart status set by useRestartFlow, cleared by Lifecycle::Running). ThreadMsg/ThreadDetail Omit-widen for ts/questions/log. Optionals widened |undefined for exactOptionalPropertyTypes.
@@ -15522,6 +15566,10 @@ c128c6c1a8afa6e1:
   path: crates/cp-mod-search/src/meili/bootstrap.rs
   description: 'Init-time helpers: index creation (files+logs), Voyage AI embedder config, project path hashing via FNV-1a, initial metrics population.'
   last_edited_ms: 0
+c1385556182833cd:
+  path: tmp/Attali/iran/vivliostyle.config.js
+  description: 'Vivliostyle CLI preview config for the Iran report — ABANDONED approach, kept for reference. Sole purpose was vite.server.allowedHosts:true to stop the underlying vite dev server 403-ing the tailscale tailnet Host header (''Blocked request. This host is not allowed''). Dropped because the Vivliostyle viewer lives at /__vivliostyle-viewer/index.html#src=... (bare / is 404) and the auto-generated #src pointed at http://127.0.0.1:8899, which resolves to the REMOTE browser''s own loopback plus mixed-content on https.'
+  last_edited_ms: 1785136968466
 c13963c6d7794d8b:
   path: ui/src/lib/types.ts
   description: Maquette domain types. Adds Agent (id/name/folder/branch/model/status/cost/threads/accent), FsNode (fs browser tree), AgentStatus. ViewMode = agents|cockpit|threads. Plus thread-view types.
@@ -16570,6 +16618,14 @@ cecdf17d89089a9e:
   path: src/modules/conversation/render_input_blocks/mod.rs
   description: IR-based input area renderer emits Vec<Block>. Cursor, paste-placeholder expansion, command highlighting, selection, command hints. sentinels submodule (A2).
   last_edited_ms: 0
+cecf3c2e0bb76dea:
+  path: tmp/Attali/iran/css/tokens.css
+  description: Ephemeral (tmp/). Iran report design tokens — :root CSS custom properties only (page geometry A4, MISA/Attali brand palette navy+terracotta, Fraunces/Inter/Amiri font scale, spacing rhythm). Sole file to edit for a re-skin.
+  last_edited_ms: 1785082411891
+cedd6f5e4e05edda:
+  path: deploy/photonicat/emmc-install/installer/init-sd-install.sh
+  description: The zero-touch flasher on the init-SD. Guard stamp, optional factory-OpenWrt backup, zstd -dc golden.img.zst | dd of=/dev/mmcblk0, background LCD progress (polls dd /proc fdinfo pos), sha256 readback verify, poweroff (=done signal, safe to pull SD). Error leaves board on with ERROR screen.
+  last_edited_ms: 0
 cede408bdcb51ae7:
   path: crates/cp-wire/src/framing.rs
   description: 'Oplog record framing len+CRC32C. FrameError enum #[expect(exhaustive_enums)] A4; Display #[expect(ref_patterns)] A9 (foundational). u32_to_le const-fn #[expect(as_conversions)] A1 after BYTE_MASK. encode/decode_raw + encode/decode_entry.'
@@ -17066,6 +17122,10 @@ d531e3fcb3c03ea3:
   path: crates/cp-mod-files/src/lib.rs
   description: Files module Open/Edit/Write. build_virtual_content replays queue edits, preflight 4-way disk/virtual matrix, visualize_diff.
   last_edited_ms: 0
+d550eeb5d1521536:
+  path: .context-pilot/shared/memories.yaml
+  description: Agent-managed memory store (auto-synced from live state). Merge conflicts here are last_edited_ms churn only — resolve keeping real timestamps, preserve unique entries both sides.
+  last_edited_ms: 1785082412193
 d556a06956df63fb:
   path: web/src/lib/live/mutations.ts
   description: 'Live imperative mutations (split from live/index for <500): finder writes (useUploadFiles/useWriteFile/useCreateFolder/useMoveItems/useRenameItem/useTrashItems) + agent lifecycle (useCreateAgent/useRestartAgent/useRenameAgent(T328)/useRetiredFleet/useRetireAgent/useUnretireAgent) + avatar (useUploadAvatar/useDeleteAvatar, T338) + useCreateCommand (T350 — POST library/command, invalidates qk.library). One-shot POSTs → useMutation, invalidate the affected query family on success.'
@@ -17610,6 +17670,10 @@ ddc5dfaedd2baef1:
   path: crates/cp-mod-search/Cargo.toml
   description: 'Search module deps: cp-base, cp-vault, cp-mod-logs, cp-render, crossterm, serde, serde_json, cp-mod-utilities, reqwest, notify, tree-sitter (9 langs), serde_yaml, log.'
   last_edited_ms: 1783253850642
+ddc9857e9cece85e:
+  path: deploy/PROVISIONING.md
+  description: 'Full Context Pilot box provisioning procedure (FR). Factory box → prod cockpit. Two access planes (vendor→tailnet, client→LAN). Port allocation (:443 cockpit, :9090 maint, :8088 LuCI, :22 SSH). Phases 0–4: Tailscale control-plane + control node, day-0 (AP WiFi + static Tailscale binary + procd service + enroll), build artifact, Ansible deploy, IT onboarding. Phase 3bis: optional Claude Code OAuth subscription creds (read-only, no refresh). Decisions + operational caveats (self-cut on Tailscale upgrade, key-expiry, firewall, /mnt/data).'
+  last_edited_ms: 0
 dddb27db9c06fd79:
   path: web/src/lib/types.ts
   description: 'Maquette domain types. Agent now carries live vitals: phase?(idle|streaming|tooling) + inputTokens?/outputTokens? folded from the PhaseTransition/CostAggregate SSE deltas (T297) alongside status/costUsd. ContextPanel, ThreadDetail (log:ThreadMsg[] with auto flag), Finder/Library/Usage shapes.'
@@ -17989,6 +18053,10 @@ e328d46cc250a855:
 e335a9ad6ebc1a28:
   path: src/llms/oai_providers/openai_compat.rs
   description: Shared OpenAI-compat message builder for Grok/Groq/DeepSeek. OaiMessage/OaiToolCall types. build_messages() with pre-assembled or raw paths. Tool pairing. Panel injection as fake tool calls.
+  last_edited_ms: 0
+e36e15c8b786e2b4:
+  path: .context-pilot/shared/memories.yaml
+  description: Agent-managed memory store (auto-synced from live state). Merge conflicts here are last_edited_ms churn only — resolve keeping real timestamps, preserve unique entries both sides.
   last_edited_ms: 0
 e379f41796f125d6:
   path: web/src/components/threads/fileUpload/FileSidebar.tsx
@@ -19858,6 +19926,10 @@ fa22a5cc8be4d318:
   path: src/llms/cache/cache_engine.rs
   description: Cache breakpoint engine. Hash chain (acc_hash = sha256(block + prev)). Tracks alive BPs via hash match. Places beacon at frontier+20. Runs DP optimizer for 3 additional BPs (4 total). 5-min TTL matching Anthropic.
   last_edited_ms: 0
+fa2641c6a0558871:
+  path: tmp/Attali/iran/index.html
+  description: 'Iran country-profile report for MISA (attali associates). Single static HTML document, no build step — rendered to paged sheets in-browser by vendored Paged.js. Three CSS layers loaded in order (tokens vars, page engine, typography). Cover + auto-generated TOC (js/toc.js defines PagedConfig.before, must load BEFORE paged.polyfill.js) + two parts: Country Profile (political/economic outlook, strategies, timeline) and Areas of Potential Cooperation (sanctions-gated, energy/transport/mining/agriculture/hajj) + appendix of Iranian institutions. Running header band uses position:running() to repeat in @top-center on body pages only.'
+  last_edited_ms: 1785136968276
 fa529da3b0bb39c4:
   path: crates/cp-orchestrator/src/transport/inspect/metrics.rs
   description: '§19 observability metrics endpoints. agent_metrics + fleet_metrics build per-agent snapshot: durable cost-breaker state (tripped/spend/budget), stream health (subs/dropped/degraded), view-vs-oplog rev lag (oplog_head_rev read fresh outside the lock), phase+lifecycle. T346: fleet_metrics now takes auth_user and ACL-filters via auth::filter_fleet (mirrors fleet_meta — a regular user must not enumerate every agent''s id/cost/budget via the Usage page). Only figures the backend genuinely holds — latency histograms deliberately not synthesised.'

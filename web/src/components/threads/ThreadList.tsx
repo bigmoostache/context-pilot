@@ -9,9 +9,10 @@ import {
   Play,
   Trash2,
 } from "lucide-react"
+import { useRef } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { ThreadDetail } from "@/lib/types"
-import { cn } from "@/lib/utils"
+import { cn, prefersReducedMotion } from "@/lib/utils"
 import { clickable } from "@/lib/support/a11y"
 import { previewOf } from "@/lib/support/threadMessages"
 
@@ -42,22 +43,13 @@ function byRecent(a: ThreadDetail, b: ThreadDetail): number {
 }
 
 /**
- * Left rail of the thread-centered view — a clean, grouped chat sidebar.
- *
- * The agent identity (name / folder / logo) is intentionally *not* repeated
- * here: it already lives in the TopBar. The rail is **always open** — there is
- * no collapse affordance (removed per T23).
- *
- * The search box genuinely filters (by name + last-message preview). Threads
- * are grouped by turn-status — **Needs you** (MY_TURN), **Active** (the single
- * green thread the agent is streaming right now), **Working in parallel**
- * (THEIR_TURN) — with an on-demand **Archived** view. Its width is the shared
- * `--sidebar-w` CSS variable so it lines up with every other rail.
- *
- * Structure (P8): the context-sensitive top bar and the empty placeholder are
- * factored into {@link ListHeader} / {@link EmptyState}, and each row's hover
- * actions + badges into {@link RowActions} / {@link RowMeta}, so this component
- * and {@link ThreadRow} both stay within the complexity/line budgets.
+ * Left rail of the thread-centered view — a clean, grouped chat sidebar. The
+ * agent identity lives in the TopBar, not here; the rail is always open (T23).
+ * The search box filters by name + last-message preview. Threads are grouped by
+ * turn-status (**Agent's turn** / **User turn**) with an on-demand **Archived**
+ * view; width is the shared `--sidebar-w` var. Structure (P8): top bar + empty
+ * placeholder → {@link ListHeader} / {@link EmptyState}, row hover actions +
+ * badges → {@link RowActions} / {@link RowMeta}, keeping budgets.
  */
 export function ThreadList({
   threads,
@@ -85,9 +77,8 @@ export function ThreadList({
 
   /**
    * Sort the "Agent's turn" group focused-first, then by recency (T36). The
-   * thread the agent is actively focused on (`focused_thread_id`, surfaced as
-   * `t.focused`) is the one most worth seeing at a glance, so it floats to the
-   * top of the section regardless of last-activity time.
+   * focused thread (`focused_thread_id`, surfaced as `t.focused`) is the most
+   * worth seeing, so it floats to the top regardless of last-activity time.
    */
   const byFocusThenRecent = (a: ThreadDetail, b: ThreadDetail) => {
     const fa = a.focused ? 1 : 0
@@ -279,6 +270,46 @@ function Group({ label, count, accent }: { label: string; count: number; accent?
   )
 }
 
+/** Row-hover title marquee (WAA): 0.3s dwell, scroll left at 10 chars/s, 0.3s dwell, teleport back.
+ *  Returns text-track ref + row hover handlers; no-op if the title fits or prefers-reduced-motion. */
+function useTitleMarquee() {
+  const trackRef = useRef<HTMLSpanElement>(null)
+  const animRef = useRef<Animation | null>(null)
+  const onMouseEnter = () => {
+    const el = trackRef.current
+    if (!el || prefersReducedMotion()) return
+    const dist = Math.max(0, el.scrollWidth - el.clientWidth)
+    if (dist === 0) return
+    const scrollS = dist / (el.scrollWidth / Math.max(1, el.textContent.length)) / 10
+    const total = 0.6 + scrollS
+    animRef.current = el.animate(
+      [
+        { transform: "translateX(0)", offset: 0 },
+        { transform: "translateX(0)", offset: 0.3 / total },
+        { transform: `translateX(-${dist}px)`, offset: (0.3 + scrollS) / total },
+        { transform: `translateX(-${dist}px)`, offset: 1 },
+      ],
+      { duration: total * 1000, iterations: Infinity, easing: "linear" },
+    )
+  }
+  const onMouseLeave = () => animRef.current?.cancel()
+  return { trackRef, onMouseEnter, onMouseLeave }
+}
+
+/** Thread title markup — ellipsis at rest, brightens + un-clips on row hover; motion via {@link useTitleMarquee}. */
+function MarqueeTitle({ name, trackRef }: { name: string; trackRef: React.Ref<HTMLSpanElement> }) {
+  return (
+    <span className="min-w-0 flex-1 overflow-hidden">
+      <span
+        ref={trackRef}
+        className="block truncate text-[13px] font-medium text-foreground/90 group-hover:overflow-visible group-hover:text-clip group-hover:text-foreground"
+      >
+        {name}
+      </span>
+    </span>
+  )
+}
+
 /** The status-dot colour for a thread row: green when focused/active, signal
  *  when it's your turn, muted otherwise. A flat if-chain, not a nested ternary. */
 function dotColor(isFocused: boolean, status: ThreadDetail["status"]): string {
@@ -309,18 +340,18 @@ function ThreadRow({
   const isPaused = !archived && t.paused
   const dot = dotColor(Boolean(isFocused), t.status)
   const pulse = isFocused || t.status === "MY_TURN" || t.status === "ACTIVE"
+  const marquee = useTitleMarquee()
 
   return (
     <div
+      onMouseEnter={marquee.onMouseEnter}
+      onMouseLeave={marquee.onMouseLeave}
       className={cn(
-        "group relative flex w-full flex-col gap-1 rounded-lg px-2.5 py-2 text-left transition-colors",
-        selected ? "card-shadow bg-card" : "hover:bg-muted/60",
+        "group relative flex w-full flex-col gap-1 rounded-lg px-2.5 py-2 text-left transition-colors select-none",
+        selected ? "card-shadow bg-card" : "hover:card-shadow hover:bg-card",
       )}
     >
-      <div
-        {...clickable(() => onSelect(t.id))}
-        className="flex cursor-pointer flex-col gap-1 text-left"
-      >
+      <div {...clickable(() => onSelect(t.id))} className="flex flex-col gap-1 text-left">
         {/* line 1 — dot + name + time + hover actions */}
         <div className="flex items-center gap-2">
           <span
@@ -332,7 +363,7 @@ function ThreadRow({
               background: archived ? "var(--muted-foreground)" : isPaused ? "var(--warn)" : dot,
             }}
           />
-          <span className="truncate text-[13px] font-medium text-foreground/90">{t.name}</span>
+          <MarqueeTitle name={t.name} trackRef={marquee.trackRef} />
           <span className="relative ml-auto shrink-0">
             <span className="text-[10.5px] text-muted-foreground/50 tabular-nums transition-opacity group-hover:opacity-0">
               {t.lastActivity}
@@ -384,7 +415,7 @@ function RowActions({
           e.stopPropagation()
           onArchive(id)
         }}
-        className="flex size-5 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-muted hover:text-foreground"
+        className="flex size-5 items-center justify-center rounded-md text-muted-foreground/60 group-hover:text-foreground hover:bg-muted"
         title={archived ? "Restore" : "Archive"}
       >
         {archived ? <ArchiveRestore className="size-3" /> : <Archive className="size-3" />}
@@ -395,7 +426,7 @@ function RowActions({
             e.stopPropagation()
             onDelete(id)
           }}
-          className="flex size-5 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-muted hover:text-(--danger)"
+          className="flex size-5 items-center justify-center rounded-md text-muted-foreground/60 group-hover:text-foreground hover:bg-muted hover:text-(--danger)"
           title="Delete permanently"
         >
           <Trash2 className="size-3" />
@@ -407,7 +438,7 @@ function RowActions({
             e.stopPropagation()
             onPause(id)
           }}
-          className="flex size-5 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-muted hover:text-foreground"
+          className="flex size-5 items-center justify-center rounded-md text-muted-foreground/60 group-hover:text-foreground hover:bg-muted"
           title={isPaused ? "Resume" : "Pause"}
         >
           {isPaused ? <Play className="size-3" /> : <Pause className="size-3" />}

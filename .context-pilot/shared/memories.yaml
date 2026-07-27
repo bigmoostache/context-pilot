@@ -385,6 +385,38 @@
   - documentation
   - style
   last_edited_ms: 0
+906d895f70759254:
+  tl_dr: 'SSH to gilbert works non-interactively: `ssh gilbert@gilberts-mac-mini-1.barking-hue.ts.net`. Auth = Tailscale SSH (method "none"), no key, no password, BatchMode-safe. M149 still applies: never change network config there.'
+  contents: |-
+    Verified T665 from the guillaume Mac Mini.
+
+    COMMAND: ssh -o BatchMode=yes -o ConnectTimeout=5 gilbert@gilberts-mac-mini-1.barking-hue.ts.net '<cmd>'
+    Works with BatchMode=yes, i.e. zero interactive prompts — safe for console_easy_bash (10s blocking limit) and for scripting.
+
+    AUTH PATH (important): NOT OpenSSH. Debug output:
+      debug1: Remote protocol version 2.0, remote software version Tailscale
+      Authenticated to gilberts-mac-mini-1.barking-hue.ts.net ([100.118.140.29]:22) using "none".
+    tailscaled on gilbert intercepts port 22 (box runs `tailscale up --ssh`). Identity comes from the WireGuard tunnel, authorization from the tailnet ACL. Hence auth method "none" at the SSH layer — no public key offered, no password. The gilbert/gilbert password (M150) is irrelevant for SSH; it stays relevant for sudo / Keychain unlock.
+
+    No sshpass on the guillaume box (`command -v sshpass` empty) — never needed for gilbert.
+    Local key inventory: only ~/.ssh/id_ed25519_asterix.pub (that's the photonicat/asterix key, not used here).
+
+    PEER FACTS (T665 probe):
+    - 100.118.140.29, MagicDNS gilberts-mac-mini-1.barking-hue.ts.net resolves clean
+    - tailscale status: `active; direct 153.53.101.222:65424` — DIRECT connection, not DERP-relayed
+    - port 22 open (nc succeeded)
+    - hostname Gilberts-Mac-mini.local, user gilbert, macOS 26.2, arm64, up 5 days
+    - 1 line in ~/.ssh/authorized_keys
+
+    CONSTRAINT: M149 unchanged — never touch Tailscale or network configuration ON gilbert. Logging in and running commands is fine; mutating tailscale/network state is not.
+  importance: high
+  labels:
+  - gilbert
+  - ssh
+  - tailscale
+  - ops
+  - mac-mini
+  last_edited_ms: 1785137059764
 941a5df6fd1afc9a:
   tl_dr: 'stylelint --fix on Tailwind v4 entry point is DANGEROUS: import-notation + property-no-vendor-prefix both damage it. Both disabled in web/.stylelintrc.json, NEVER re-enable.'
   contents: |-
