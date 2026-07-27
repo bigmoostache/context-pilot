@@ -1,9 +1,10 @@
-import { Check, ChevronDown, FolderGit2 } from "lucide-react"
+import { Check, ChevronDown, FolderGit2, LayoutGrid } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { accentVar } from "@/lib/support/panelMeta"
@@ -42,10 +43,14 @@ export function AgentSwitcher({
   agents,
   activeId,
   onSwitch,
+  onManageAgents,
 }: {
   agents: Agent[]
   activeId?: string | undefined
   onSwitch: (id: string) => void
+  /** open the fleet dashboard — the sole place agents are created/managed
+   *  (T685: this replaces the removed TopBar home button). */
+  onManageAgents?: (() => void) | undefined
 }) {
   const active = agents.find((a) => a.id === activeId)
 
@@ -87,6 +92,26 @@ export function AgentSwitcher({
       </DropdownMenuTrigger>
 
       <DropdownMenuContent className="w-[280px]" align="start" sideOffset={6}>
+        {onManageAgents && (
+          <>
+            <DropdownMenuItem
+              onClick={onManageAgents}
+              className={cn(
+                "flex items-center gap-2.5 py-1.5 font-medium",
+                "focus:bg-[color-mix(in_oklab,var(--signal)_11%,transparent)]! focus:text-foreground!",
+                "data-highlighted:bg-[color-mix(in_oklab,var(--signal)_11%,transparent)]! data-highlighted:text-foreground!",
+              )}
+            >
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-[color-mix(in_oklab,var(--signal)_16%,transparent)] text-(--signal)">
+                <LayoutGrid className="size-3.5" />
+              </span>
+              <span className="text-[12.5px] text-foreground/90 group-focus/dropdown-menu-item:text-foreground! group-data-highlighted/dropdown-menu-item:text-foreground!">
+                Manage Agents
+              </span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuGroup>
           {agents
             .toSorted((a, b) => statusOrder[a.status] - statusOrder[b.status])

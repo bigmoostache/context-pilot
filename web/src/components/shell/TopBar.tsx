@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { MessagesSquare, FolderTree, Home, Settings2, BarChart3 } from "lucide-react"
+import { MessagesSquare, FolderTree, Settings2, BarChart3 } from "lucide-react"
 import { ThemeToggle } from "./widgets/ThemeToggle"
 import { AgentSwitcher } from "./widgets/AgentSwitcher"
 import { UsageButton } from "./widgets/UsageButton"
@@ -40,27 +40,10 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, agent
   return (
     <>
       <header className="vibrancy flex h-12 shrink-0 items-center gap-3 border-b border-border px-4">
-        <Tip
-          title="Mission control"
-          body="Back to the fleet — an overview of all your agents."
-          side="bottom"
-        >
-          <button
-            onClick={() => onViewChange("fleet")}
-            className={cn(
-              "flex items-center rounded-md px-1.5 py-1 transition-colors",
-              inFleet ? "text-foreground" : "text-foreground/90 hover:bg-muted/50",
-            )}
-            aria-label="Mission control"
-          >
-            <Home className="size-4 text-(--signal)" />
-          </button>
-        </Tip>
-
-        <span className="ml-1 text-muted-foreground/40">/</span>
         <AgentSwitcher
           agents={agents}
           activeId={inFleet ? undefined : activeAgentId}
+          onManageAgents={() => onViewChange("fleet")}
           onSwitch={
             inFleet
               ? (id) => {
