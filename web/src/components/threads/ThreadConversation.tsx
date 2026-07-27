@@ -233,7 +233,7 @@ function UnarchiveBar({ onUnarchive }: { onUnarchive: () => void }) {
     <div className="px-5 py-2">
       <button
         onClick={onUnarchive}
-        className="flex w-full items-center justify-center gap-2 rounded-xl border border-(--signal)/40 bg-(--signal)/10 px-4 py-2.5 text-[13px] font-medium text-(--signal) shadow-sm transition-colors hover:bg-(--signal)/20 hover:shadow-sm"
+        className="flex w-full items-center justify-center gap-2 rounded-xl border border-(--signal)/40 bg-(--signal)/10 px-4 py-1.5 text-[13px] font-medium text-(--signal) shadow-sm transition-colors hover:bg-(--signal)/20 hover:shadow-sm"
       >
         <ArchiveRestore className="size-4" />
         Unarchive thread

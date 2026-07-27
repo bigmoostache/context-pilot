@@ -359,7 +359,7 @@ function ComposerInputRow({
 function ComposerBanner({ banner }: { banner: Banner }) {
   return (
     <div
-      className={`mb-2 flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-[13px] font-medium ${banner.paused ? "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400" : "border-border bg-muted/40 text-muted-foreground"}`}
+      className={`mb-2 flex items-center justify-center gap-2 rounded-xl border px-4 py-1.5 text-[13px] font-medium ${banner.paused ? "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400" : "border-border bg-muted/40 text-muted-foreground"}`}
     >
       {banner.paused ? (
         <Pause className="size-4" />
