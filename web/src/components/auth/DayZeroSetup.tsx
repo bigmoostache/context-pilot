@@ -50,7 +50,7 @@ export function DayZeroSetup() {
 function IdentityPhase({ onDone }: { onDone: () => void }) {
   const [name, setName] = useState("")
   const [ip, setIp] = useState("")
-  const [detected, setDetected] = useState<{ ipv4: string | null; ulas: string[] } | null>(null)
+  const [detected, setDetected] = useState<{ ipv4: string | null } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -235,25 +235,17 @@ function Field({
   )
 }
 
-/** What the box observes about its own addressing, so the operator never has to
- *  guess it. The two lines are deliberately labelled for their AUDIENCE: the
- *  detected IPv4 is what the client's staff and DNS will use (and what belongs in
- *  the field above), while a ULA is ours — permanent, derived from the hardware
- *  serial, reachable only from the same LAN segment, and already covered by the
- *  certificate automatically. */
-function DetectedAddresses({ detected }: { detected: { ipv4: string | null; ulas: string[] } }) {
+/** The LAN address the box observes on itself, so the operator never has to guess
+ *  what belongs in the field above. Only the client-facing IPv4 is shown: the
+ *  fleet ULAs are ours, they are already covered by the certificate
+ *  automatically, and nothing the operator does here depends on seeing them. */
+function DetectedAddresses({ detected }: { detected: { ipv4: string | null } }) {
   return (
     <dl className="-mt-1 flex flex-col gap-1 rounded-md bg-muted/40 px-3 py-2 text-[11px]">
       <div className="flex items-baseline justify-between gap-3">
         <dt className="text-muted-foreground">Detected LAN address — the client uses this</dt>
         <dd className="font-mono text-foreground">{detected.ipv4 ?? "unknown"}</dd>
       </div>
-      {detected.ulas.map((ula) => (
-        <div key={ula} className="flex items-baseline justify-between gap-3">
-          <dt className="shrink-0 text-muted-foreground">Maintenance address — permanent</dt>
-          <dd className="truncate font-mono text-foreground">{ula}</dd>
-        </div>
-      ))}
     </dl>
   )
 }
