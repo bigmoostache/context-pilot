@@ -121,12 +121,12 @@ export function ThreadList({
         />
 
         <ScrollArea className="min-h-0 flex-1">
-          <div className="px-2 py-1">
+          <div className="px-2 pb-1">
             {visible.length === 0 && <EmptyState showArchived={showArchived} />}
 
             {!showArchived && (
               <>
-                {mine.length > 0 && <Group label="Agent's turn" count={mine.length} />}
+                {mine.length > 0 && <Group label="Agent's turn" count={mine.length} first />}
                 {mine.map((t) => row(t))}
 
                 {working.length > 0 && <Group label="User turn" count={working.length} />}
@@ -189,7 +189,7 @@ function ListHeader({
   onNewThread: () => void
 }) {
   return (
-    <div className="flex items-center gap-2 px-3 pt-3 pb-2.5">
+    <div className="flex items-center gap-2 px-3 pt-3 pb-1">
       {showArchived ? (
         <button
           onClick={() => onToggleArchived(false)}
@@ -258,15 +258,10 @@ function EmptyState({ showArchived }: { showArchived: boolean }) {
   return <p className="px-2.5 py-6 text-center text-[11.5px] text-muted-foreground/55">{message}</p>
 }
 
-function Group({ label, count, accent }: { label: string; count: number; accent?: string }) {
+function Group({ label, count, first }: { label: string; count: number; first?: boolean }) {
   return (
-    <div className="flex items-center gap-2 px-2.5 pt-3 pb-1">
-      <span
-        className="text-[11px] font-semibold"
-        style={{ color: accent ?? "var(--muted-foreground)" }}
-      >
-        {label}
-      </span>
+    <div className={cn("flex items-center gap-2 px-2.5 pb-1", first ? "pt-1.5" : "pt-3")}>
+      <span className="text-[11px] font-semibold text-muted-foreground">{label}</span>
       <span className="text-[11px] text-muted-foreground/45 tabular-nums">{count}</span>
     </div>
   )
