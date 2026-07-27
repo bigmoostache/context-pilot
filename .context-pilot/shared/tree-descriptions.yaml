@@ -3254,6 +3254,10 @@
   path: crates/cp-mod-files/src/panel.rs
   description: File panel. Background cache system for file content with syntax highlighting (IR spans). Hash-based change detection. PANEL_MAX_LOAD_BYTES hard limit. Pagination. No cache_refresh_interval (watcher-based).
   last_edited_ms: 1780608591297
+289680e72c27c9ea:
+  path: crates/cp-mod-bridge/src/command/reply.rs
+  description: T671 agent read-path query answering. answer(frame,cap_token,responder) bearer-checks then calls injected Responder=&dyn Fn(&Query)->Outcome (bad/empty bearer = graceful Error, no torn connection). encode(Response) framed len+CRC. NO journal (query mutates nothing). Lookup injected by bin (bridge stays meili-agnostic).
+  last_edited_ms: 1785160644965
 289fab6ac2eccb97:
   path: ui/src/components/agents/AgentModal.tsx
   description: 'Agent create/manage dialog — single source of truth for both flows (extracted from FleetDashboard, T26). Exports AgentModal + AgentModalMode + MODELS/MODEL_META/slugify. Manage mode: rename / switch model / archive (realm fixed); create mode: name-as-star w/ live slugified realm preview. Gradient hero, rich model cards, autofocus+Esc+⌘↵. onFlash OPTIONAL toast sink (fleet supplies one; TopBar omits). Backdrop is absolute inset-0 → host must give a viewport-sized positioning context (fleet uses a relative container; TopBar renders it as a sibling of the .vibrancy header to escape the backdrop-filter containing block).'
@@ -5298,6 +5302,10 @@
   path: crates/cp-orchestrator/tests/openapi/main.rs
   description: OpenAPI spec generator (integration test, --ignored). build_spec assembles schemas + paths. generate_openapi writes openapi.json. Acknowledges lib-only deps (incl reqwest, openssl).
   last_edited_ms: 0
+41bd347ee2d14694:
+  path: crates/cp-mod-search/src/index/reconcile/conversations.rs
+  description: T671 conversation reconciler. ConversationDoc{id:'{thread_id}-{index}',thread_id,thread_name,author,text,ts_ms,content_hash} + DocParts builder (hash folds author+thread_name+text). Pure plan(existing id->hash, desired)->ConvPlan{upsert idxs, delete ids} (sorted, unit-testable). reconcile(client,uid,desired) fetch_projection snapshot + add_documents changed + delete_documents vanished. 5 tests.
+  last_edited_ms: 1785160644591
 41d11948e4a50679:
   path: docs/threads.md
   description: 'Design doc for threads feature: parallel discussion/work topics. Core model, tools (Send/Read/Ask), coucou integration (recurrent scheduling), fixed panel, Ctrl+V threads view. Status: brainstorm.'
@@ -5366,6 +5374,10 @@
   path: crates/cp-orchestrator/tests/openapi/paths.rs
   description: OpenAPI path definitions — all REST endpoints grouped by tag (fleet, agent, fs, auth, env, ACL, providers).
   last_edited_ms: 1782472627386
+42afded165cabd16:
+  path: crates/cp-wire/src/types/payload/query.rs
+  description: 'T671 read-path wire types. Query{id,kind}, Kind::SearchConversations{query,limit,thread_id} tagged+Unknown. Frame{auth,query}. Response{query_id,result}, Outcome tagged Hits{Vec<ConvHit>}|Error{reason}. ConvHit{thread_id,thread_name,author,text,ts_ms,score} via HitParts literal. Inbound #[serde(untagged)]{Query|Command} Query-first, disjoint required fields = command path byte-identical. 4 exhaustive lint expects registered.'
+  last_edited_ms: 1785160644776
 42bffdd004292130:
   path: .github/checks/lint-config.chain
   description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
@@ -5490,6 +5502,10 @@
   path: crates/cp-render/src/markdown.rs
   description: Markdown->IR parser. to_blocks/parse_line/parse_inline flat dispatcher over handle_code/handle_marker/handle_link + take_code/take_bold/take_link + LinkParse enum (A2). Table parsing split_table_row/is_separator_row/parse_alignment/parse_table.
   last_edited_ms: 0
+44074ade6219776e:
+  path: crates/cp-orchestrator/src/transport/rest/threads/mod.rs
+  description: Thread-facing REST helpers hub (rest/ 8-entry cap). thread_shape (reshape agent thread + overlay oplog roster, re-exported pub(crate)) + conversations (T671 search handler).
+  last_edited_ms: 1785160645252
 440f034e6e260f23:
   path: crates/cp-base/src/state/mod.rs
   description: State sub-module hub. reverie moved to runtime/ (A7).
@@ -6062,6 +6078,10 @@
   path: src/app/run/streaming.rs
   description: 'Stream event processing. process_stream_events + handle_stream_error_event (A2). A9: pending_done 9-tuple take() owned bind. Chunk/ToolUse/Done/Error, retry, finalize_stream cache engine.'
   last_edited_ms: 0
+4bb73a43caaf50e4:
+  path: crates/cp-orchestrator/src/transport/rest/threads/conversations.rs
+  description: T671 REST handler POST /api/agent/{id}/conversations/search. SearchRequest{query,limit?,thread_id?}, limit clamp 1..100 default 20. Forwards via AgentChannel::query() (no backend lock held). Outcome::Hits->200, Outcome::Error->502 w/ agent reason, unreachable->502, bad body->400, unknown agent->404.
+  last_edited_ms: 1785160645159
 4bb896637366abe2:
   path: crates/cp-mod-spine/src/guard_rail.rs
   description: 'Guard rail implementations: MaxOutputTokens, MaxCost (stream/burst-based), MaxDuration, MaxMessages, MaxAutoRetries. GuardRailStopLogic trait. all_guard_rails() static list.'
@@ -11354,6 +11374,10 @@
   path: crates/cp-orchestrator/src/transport/rest/mod.rs
   description: 'REST resource handlers. fleet() filtered by auth_user ACL (FR-12). command() dispatches commands (no cost breaker gate — removed T378). rename_agent (T328), upload/delete avatar (T338). threads() prefers view roster. mint_ticket embeds auth_user.id in ticket (Phase 7). resolve_entry. Submodules: create_agent, restart, retire, create_command (T350 rest/library.rs — POST library/command).'
   last_edited_ms: 1782314925969
+8c4468fdf8aeb622:
+  path: docs/design-conversation-search.md
+  description: T671 conversation-search design doc. Hybrid keyword+semantic search over thread messages, Option B round-trip (frontend->orchestrator->agent->meili). Covers cp_{hash}_conversations index+voyage-code-3 embedder, content_hash reconciler (re-embed changed only, purge vanished, archived stays), Inbound untagged multiplex (command byte-identical), Query/Response/ConvHit wire types, read path, dual-mode palette. File map at end.
+  last_edited_ms: 1785160644491
 8c4aaf61fc72e9ac:
   path: crates/cp-orchestrator/src/transport/rest/releases.rs
   description: 'Release management REST handlers (T427). 5 endpoints: list_releases (GET, merged local+remote+arch+active), set_arch (PUT, manual or auto-detect), download_release (POST, download+extract tarball), select_release (PUT, set active binary+supervisor), delete_release (DELETE). All pub(crate).'
@@ -13754,6 +13778,10 @@ aa4a6502419c0853:
   path: src/app/actions/mod.rs
   description: Central action dispatch (Elm/Redux-style). CycleViewMode resets scroll_offset + user_scrolled. Thread actions extracted to threads.rs.
   last_edited_ms: 1781450046498
+aa4d02a352cd7125:
+  path: src/app/run/threads/query.rs
+  description: T671 bin-side query responder closure. answer(creds,query) builds SearchConvParams from pre-resolved (port,master_key,project_hash) and calls cp_mod_search search_conversations. None creds / Unknown kind = graceful Outcome::Error. Extracted from bridge.rs (500-line cap + shadow_reuse). Bin forbids clippy::unreachable so uses error_reason match-helper.
+  last_edited_ms: 1785160645058
 aa4fb032325f6ff0:
   path: crates/cp-mod-brave/src/lib.rs
   description: 'Brave Search module. 2 tools: brave_search (snippets), brave_llm_context (deep extracted content). Dynamic brave_result panels. No state. Global, non-core.'
@@ -14810,6 +14838,10 @@ b66cc173e6faed4e:
   path: web/src/mobile-components/shell/config/ConfigPanel.tsx
   description: Mobile ConfigPanel twin — horizontal scrollable pill-tab strip replaces desktop 230px side rail, pane full-width below. Same category visibility gates. Routes ./ConfigPanes (mobile).
   last_edited_ms: 1784666642906
+b67165b05fa9a25d:
+  path: crates/cp-wire/src/types/payload/mod.rs
+  description: payload/ hub (keeps types/ under 8-entry cap). Declares body (content-addressed message body ref) + query (T671 read-path Query/Response + Inbound socket discriminator).
+  last_edited_ms: 1785160644869
 b689ff54e81da946:
   path: src/infra/tools.rs
   description: Re-exports cp_base::tools types. execute_tool() dispatches via module system. execute_reload_tui() sets reload flag + writes config.json.
@@ -16150,6 +16182,10 @@ c6fa2582d15711d1:
   path: crates/cp-wire/src/types/oplog.rs
   description: 'OpEntry struct #[non_exhaustive] A5 + OpEntry::new ctor. OpEntryKind enum #[expect(exhaustive_enums)] A4 (Unknown catch-all).'
   last_edited_ms: 1784499344066
+c703c39ed8fbd210:
+  path: crates/cp-mod-search/src/meili/conversation_search.rs
+  description: T671 stateless read-path hybrid search. SearchConvParams{port,master_key,project_hash,query,limit,thread_id} (6-field literal, dodges too_many_arguments, yaml-registered exhaustive). search_conversations() hybrid semanticRatio 0.5, thread_id filter, parse_hits maps _rankingScore+doc fields to ConvHit. No State borrow (takes creds by value).
+  last_edited_ms: 1785160644684
 c72aaf91f2310ccd:
   path: crates/cp-orchestrator/tests/services_integration.rs
   description: 'Phase 29 (X796) backend services integration suite (4 tests, green, ~0.1s). Drives MaterializedView+CostBreaker+StreamHub TOGETHER against real cp-oplog via Tailer: restart rebuild, real segment-roll checkpoint, R2-17 reconcile, fleet isolation.'
@@ -16158,6 +16194,10 @@ c72db20f11261c9f:
   path: src/ui/help/config_overlay/budget_bars.rs
   description: Budget bars adapter for config overlay. Renders ConfigBudgetBar IR entries as filled/empty block bars with semantic colors. 24-cell bar width.
   last_edited_ms: 0
+c72df356488bc4ac:
+  path: web/src/components/threads/dialogs/ThreadSearchPalette.tsx
+  description: 'T671 thread search palette (Base UI Dialog). PaletteBody dual-mode: <2 chars instant client thread filter (name+preview), >=2 debounced 220ms useQuery hybrid conversation search (searchConversations SDK), normalized into flat Row[]. Shared kbd nav (up/down/enter), derived-clamped activeIdx, placeholderData no-flash. ResultList subcomponent (per-fn line cap). Mobile twin = @generated stub.'
+  last_edited_ms: 1785160645345
 c7372ec4aab83bc9:
   path: crates/cp-mod-memory/src/lib.rs
   description: 'Memory module. 2 tools: memory_create/update. Fixed MEMORY panel. Global, not core. 80-token tl_dr cap. Module data: memories + next_id + open_ids. Importance-gradient visualizer (critical→low).'

@@ -6,6 +6,36 @@
   - workflow
   - spine
   last_edited_ms: 0
+026ba3cd923d1cb2:
+  tl_dr: T671 conversation search SHIPPED end-to-end (updates-we). Hybrid keyword+semantic search over thread messages, frontend->orchestrator->agent->meili (Option B round-trip). Design doc docs/design-conversation-search.md. Arch+file map in body.
+  contents: |-
+    T671 all 9 phases done, pushed on updates-we.
+
+    ARCH (Option B): frontend palette -> orchestrator AgentChannel::query() -> agent bridge intake -> meilisearch. Agent owns meili (port/key/hash process-local), only hits cross wire.
+
+    P1 index+embedder: cp_{hash}_conversations. Doc {id:'{thread_id}-{index}',thread_id,thread_name,author,text,ts_ms,content_hash}. searchable text+thread_name, filter thread_id+author, sort ts_ms. Embedder REUSED voyage-code-3. content_hash=author+thread_name+text (re-embed trigger). types.rs conversations_index_settings, bootstrap.rs conversations_embedder_settings, api.rs delete_documents batch.
+
+    P2 reconciler index/reconcile/conversations.rs: ConversationDoc+DocParts, pure plan()->ConvPlan{upsert,delete}, reconcile(). Hash-diff re-embed changed only, purge vanished. auto+empty never indexed, archived stays, meili NO lifecycle flag.
+
+    P3 wiring: IndexerCmd::ReconcileConversations. lib.rs build_conversation_docs reads ThreadsState, queue_conversation_reconcile on on_stream_stop+boot.
+
+    P4 wire types/payload/query.rs: Query/Kind::SearchConversations tagged+Unknown, Response/Outcome Hits|Error, ConvHit via HitParts. Inbound untagged Query-first = command path BYTE-IDENTICAL.
+
+    P5 responder: conversation_search.rs search_conversations(SearchConvParams) stateless hybrid semanticRatio 0.5. bridge command/reply.rs bearer+framed Response NO journal. bin query.rs answer() + bridge.rs pre-resolves creds BEFORE BridgeState borrow.
+
+    P6/P7 orchestrator: channel.rs query()+read_framed<T>. REST rest/threads/conversations.rs POST /api/agent/{id}/conversations/search clamp 1..100 default 20. openapi+TS regenerated.
+
+    P8 frontend: lib/api searchConversations. ThreadSearchPalette <2 chars client filter, >=2 debounced 220ms useQuery hybrid, normalized Row[], placeholderData.
+
+    GOTCHAS: PATH=/opt/homebrew/bin for node; check-structure './tmp' exemption; clippy ref_patterns=clone query.kind; tui bin forbids clippy::unreachable.
+  importance: high
+  labels:
+  - T671
+  - conversation-search
+  - meilisearch
+  - bridge
+  - feature-complete
+  last_edited_ms: 1785160614255
 07f9cb0fc782bcee:
   tl_dr: 'Meilisearch design complete. Embedded global server, cp-mod-search crate, tree-sitter chunking, unified search tool, log redesign. Full spec: docs/design-meilisearch.md.'
   importance: high
