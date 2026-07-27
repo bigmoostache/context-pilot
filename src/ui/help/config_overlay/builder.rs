@@ -19,15 +19,14 @@ pub(crate) fn build_config_overlay(state: &State) -> ConfigOverlay {
     use crate::llms::{LlmProvider, ModelInfo};
 
     // Providers
-    let provider_list: [(LlmProvider, &str, &str); 8] = [
-        (LlmProvider::Anthropic, "1", "Anthropic Claude"),
-        (LlmProvider::ClaudeCode, "2", "Claude Code (OAuth)"),
+    let provider_list: [(LlmProvider, &str, &str); 7] = [
+        (LlmProvider::Anthropic, "1", "Anthropic (API Key)"),
         (LlmProvider::ClaudeCodeApiKey, "6", "Claude Code (API Key)"),
         (LlmProvider::Grok, "3", "Grok (xAI)"),
         (LlmProvider::Groq, "4", "Groq"),
         (LlmProvider::DeepSeek, "5", "DeepSeek"),
         (LlmProvider::MiniMax, "7", "MiniMax (Token Plan)"),
-        (LlmProvider::ClaudeCodeV2, "8", "Claude Code V2 (OAuth)"),
+        (LlmProvider::ClaudeCodeV2, "8", "Claude Code"),
     ];
 
     let providers = provider_list
@@ -74,7 +73,7 @@ fn build_models(state: &State, model_entry: &ModelEntryFn) -> (String, Vec<Confi
 
     let title = "Model".to_owned();
     let models = match state.llm_provider {
-        LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
+        LlmProvider::Anthropic | LlmProvider::ClaudeCodeApiKey => {
             vec![
                 model_entry(state.anthropic_model == AnthropicModel::ClaudeOpus45, "a", &AnthropicModel::ClaudeOpus45),
                 model_entry(
@@ -107,28 +106,29 @@ fn build_models(state: &State, model_entry: &ModelEntryFn) -> (String, Vec<Confi
             model_entry(state.minimax_model == MiniMaxModel::M27, "a", &MiniMaxModel::M27),
             model_entry(state.minimax_model == MiniMaxModel::M27Highspeed, "b", &MiniMaxModel::M27Highspeed),
         ],
-        LlmProvider::ClaudeCodeV2 => {
-            use crate::llms::ClaudeCodeV2Model;
-            vec![
-                model_entry(
-                    state.claude_code_v2_model == ClaudeCodeV2Model::ClaudeOpus48,
-                    "a",
-                    &ClaudeCodeV2Model::ClaudeOpus48,
-                ),
-                model_entry(
-                    state.claude_code_v2_model == ClaudeCodeV2Model::ClaudeFable5,
-                    "b",
-                    &ClaudeCodeV2Model::ClaudeFable5,
-                ),
-                model_entry(
-                    state.claude_code_v2_model == ClaudeCodeV2Model::ClaudeSonnet46,
-                    "c",
-                    &ClaudeCodeV2Model::ClaudeSonnet46,
-                ),
-            ]
-        }
+        LlmProvider::ClaudeCodeV2 => build_v2_models(state, model_entry),
     };
     (title, models)
+}
+
+/// Build the Claude Code (V2) model entries (keys `a`–`f`).
+///
+/// Split from [`build_models`] so that function stays under the 60-line cap:
+/// six models is the largest roster and inflates the parent past the limit.
+fn build_v2_models(state: &State, model_entry: &ModelEntryFn) -> Vec<ConfigModel> {
+    use crate::llms::ClaudeCodeV2Model;
+    let sel = state.claude_code_v2_model;
+    [
+        ("a", ClaudeCodeV2Model::ClaudeOpus5),
+        ("b", ClaudeCodeV2Model::ClaudeOpus48),
+        ("c", ClaudeCodeV2Model::ClaudeOpus46),
+        ("d", ClaudeCodeV2Model::ClaudeSonnet5),
+        ("e", ClaudeCodeV2Model::ClaudeFable5),
+        ("f", ClaudeCodeV2Model::ClaudeHaiku45),
+    ]
+    .iter()
+    .map(|&(key, model)| model_entry(sel == model, key, &model))
+    .collect()
 }
 
 /// Build the budget bar entries.

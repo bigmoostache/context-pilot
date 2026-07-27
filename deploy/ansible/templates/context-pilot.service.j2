@@ -23,7 +23,10 @@ Environment=CP_ORCH_PORT=7878
 Environment=CP_CADDYFILE={{ cp_root }}/caddy/Caddyfile
 Environment=CP_CADDY_BIN={{ cp_root }}/bin/caddy
 Environment=CP_CA_ROOT={{ cp_root }}/caddy/data/caddy/pki/authorities/local/root.crt
-Environment=CP_WEB_ROOT={{ cp_root }}/web
+# Served SPA — a `current` symlink the OTA updater atomically repoints at the
+# active release's bundled front (`releases/<tag>/web`). Day-0 it points at
+# `web/baseline` (the SPA Ansible shipped); a failed update never touches it.
+Environment=CP_WEB_ROOT={{ cp_root }}/web/current
 Environment=CP_AGENT_BINARY={{ cp_root }}/bin/tui
 # Provisioning values (templated by Ansible, chmod 600). Loaded as KEY=value.
 #   seed.env      — per-UNIT admin seed (CP_SEED_ADMIN_*); write-once, seeded

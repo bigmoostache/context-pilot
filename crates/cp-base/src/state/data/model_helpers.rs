@@ -32,9 +32,7 @@ pub trait ModelPricing {
 impl ModelPricing for State {
     fn current_model(&self) -> String {
         match self.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
-                self.anthropic_model.api_name().to_owned()
-            }
+            LlmProvider::Anthropic | LlmProvider::ClaudeCodeApiKey => self.anthropic_model.api_name().to_owned(),
             LlmProvider::Grok => self.grok_model.api_name().to_owned(),
             LlmProvider::Groq => self.groq_model.api_name().to_owned(),
             LlmProvider::DeepSeek => self.deepseek_model.api_name().to_owned(),
@@ -45,9 +43,7 @@ impl ModelPricing for State {
 
     fn current_max_output_tokens(&self) -> u32 {
         match self.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
-                self.anthropic_model.max_output_tokens()
-            }
+            LlmProvider::Anthropic | LlmProvider::ClaudeCodeApiKey => self.anthropic_model.max_output_tokens(),
             LlmProvider::Grok => self.grok_model.max_output_tokens(),
             LlmProvider::Groq => self.groq_model.max_output_tokens(),
             LlmProvider::DeepSeek => self.deepseek_model.max_output_tokens(),
@@ -58,9 +54,7 @@ impl ModelPricing for State {
 
     fn model_context_window(&self) -> usize {
         match self.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
-                self.anthropic_model.context_window()
-            }
+            LlmProvider::Anthropic | LlmProvider::ClaudeCodeApiKey => self.anthropic_model.context_window(),
             LlmProvider::Grok => self.grok_model.context_window(),
             LlmProvider::Groq => self.groq_model.context_window(),
             LlmProvider::DeepSeek => self.deepseek_model.context_window(),
@@ -75,9 +69,7 @@ impl ModelPricing for State {
 
     fn cache_hit_price_per_mtok(&self) -> f32 {
         match self.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
-                self.anthropic_model.cache_hit_price_per_mtok()
-            }
+            LlmProvider::Anthropic | LlmProvider::ClaudeCodeApiKey => self.anthropic_model.cache_hit_price_per_mtok(),
             LlmProvider::Grok => self.grok_model.cache_hit_price_per_mtok(),
             LlmProvider::Groq => self.groq_model.cache_hit_price_per_mtok(),
             LlmProvider::DeepSeek => self.deepseek_model.cache_hit_price_per_mtok(),
@@ -88,9 +80,7 @@ impl ModelPricing for State {
 
     fn input_price_per_mtok(&self) -> f32 {
         match self.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
-                self.anthropic_model.input_price_per_mtok()
-            }
+            LlmProvider::Anthropic | LlmProvider::ClaudeCodeApiKey => self.anthropic_model.input_price_per_mtok(),
             LlmProvider::Grok => self.grok_model.input_price_per_mtok(),
             LlmProvider::Groq => self.groq_model.input_price_per_mtok(),
             LlmProvider::DeepSeek => self.deepseek_model.input_price_per_mtok(),
@@ -101,9 +91,7 @@ impl ModelPricing for State {
 
     fn cache_miss_price_per_mtok(&self) -> f32 {
         match self.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
-                self.anthropic_model.cache_miss_price_per_mtok()
-            }
+            LlmProvider::Anthropic | LlmProvider::ClaudeCodeApiKey => self.anthropic_model.cache_miss_price_per_mtok(),
             LlmProvider::Grok => self.grok_model.cache_miss_price_per_mtok(),
             LlmProvider::Groq => self.groq_model.cache_miss_price_per_mtok(),
             LlmProvider::DeepSeek => self.deepseek_model.cache_miss_price_per_mtok(),
@@ -114,9 +102,7 @@ impl ModelPricing for State {
 
     fn output_price_per_mtok(&self) -> f32 {
         match self.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
-                self.anthropic_model.output_price_per_mtok()
-            }
+            LlmProvider::Anthropic | LlmProvider::ClaudeCodeApiKey => self.anthropic_model.output_price_per_mtok(),
             LlmProvider::Grok => self.grok_model.output_price_per_mtok(),
             LlmProvider::Groq => self.groq_model.output_price_per_mtok(),
             LlmProvider::DeepSeek => self.deepseek_model.output_price_per_mtok(),

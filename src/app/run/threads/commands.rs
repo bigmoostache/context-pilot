@@ -382,7 +382,7 @@ fn apply_configure(state: &mut State, provider_str: &str, model_str: &str) {
 
     let model_val = serde_json::Value::String(model_str.to_owned());
     let model_ok = match provider {
-        LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
+        LlmProvider::Anthropic | LlmProvider::ClaudeCodeApiKey => {
             serde_json::from_value::<AnthropicModel>(model_val).map(|m| state.anthropic_model = m).is_ok()
         }
         LlmProvider::ClaudeCodeV2 => {

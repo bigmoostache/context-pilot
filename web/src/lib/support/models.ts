@@ -6,7 +6,7 @@
 // decoration (Lucide icons) and provides lookup helpers.
 
 import type { LucideIcon } from "lucide-react"
-import { Sparkles, Gauge, Zap, Bot, Cpu, KeyRound, ShieldCheck } from "lucide-react"
+import { Sparkles, Gauge, Zap, Bot, Cpu } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import type {
   ModelDef as GenModelDef,
@@ -30,8 +30,6 @@ export interface ProviderDef extends Omit<GenProviderDef, "models"> {
 const PROVIDER_ICONS: Record<string, LucideIcon> = {
   claudecodev2: Cpu,
   anthropic: Sparkles,
-  claudecode: ShieldCheck,
-  claudecodeapikey: KeyRound,
   grok: Zap,
   groq: Gauge,
   deepseek: Bot,
