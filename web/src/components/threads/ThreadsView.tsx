@@ -5,6 +5,7 @@ import { ThreadConversation } from "./ThreadConversation"
 import { NewThreadDialog } from "./dialogs/NewThreadDialog"
 import { useFleet, useThreads } from "@/lib/live"
 import { useThreadSelection, useThreadActions } from "@/lib/live/threadView"
+import { cn } from "@/lib/utils"
 
 /**
  * Thread-centered view — the conversation-first layout: thread list (left) |
@@ -52,7 +53,7 @@ export function ThreadsView({
 
   return (
     <div
-      className="relative flex min-h-0 flex-1"
+      className="relative flex min-h-0 flex-1 overflow-hidden"
       style={
         disconnected
           ? { filter: "blur(3px) grayscale(0.5)", transition: "filter 300ms" }
@@ -66,7 +67,15 @@ export function ThreadsView({
           aria-label="Reconnect to agent"
         />
       )}
-      {railOpen ? (
+      {/* The rail stays mounted and slides in/out via an animated negative
+          left-margin (the root's overflow-hidden clips it off-screen when
+          closed); the sibling conversation grows to fill the reclaimed space.
+          A margin transition — not a transform — is what actually reclaims the
+          layout width, so the pane truly widens as the rail leaves. */}
+      <div
+        className="shrink-0 transition-[margin-left] duration-300 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none"
+        style={{ marginLeft: railOpen ? 0 : "calc(-1 * var(--sidebar-w))" }}
+      >
         <ThreadList
           threads={threads}
           selectedId={sel.effectiveSelectedId}
@@ -79,15 +88,19 @@ export function ThreadsView({
           onNewThread={() => sel.setNewOpen(true)}
           onToggleSidebar={() => setRailOpen(false)}
         />
-      ) : (
-        <button
-          onClick={() => setRailOpen(true)}
-          title="Show sidebar"
-          className="card-shadow absolute top-3 left-3 z-30 flex size-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <PanelLeft className="size-4" />
-        </button>
-      )}
+      </div>
+
+      {/* Floating reopen affordance — fades in only once the rail is hidden. */}
+      <button
+        onClick={() => setRailOpen(true)}
+        title="Show sidebar"
+        className={cn(
+          "card-shadow absolute top-3 left-3 z-30 flex size-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground/70 transition-[opacity,transform] duration-200 hover:bg-muted hover:text-foreground",
+          railOpen ? "pointer-events-none -translate-x-1 opacity-0" : "opacity-100",
+        )}
+      >
+        <PanelLeft className="size-4" />
+      </button>
 
       {/* The conversation pane shows the selected thread, or — for a realm with
           no thread selected/created yet — a hint pointing at the sidebar's New
