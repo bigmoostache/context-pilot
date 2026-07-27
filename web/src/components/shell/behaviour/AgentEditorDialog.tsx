@@ -162,7 +162,7 @@ export function AgentEditorDialog({
         <DialogPrimitive.Popup
           onKeyDown={onKeyDown}
           className={cn(
-            "fixed top-[8vh] left-1/2 z-50 flex max-h-[86vh] w-[760px] max-w-[94vw] -translate-x-1/2 flex-col",
+            "fixed top-[5vh] left-1/2 z-50 flex max-h-[90vh] w-[920px] max-w-[94vw] -translate-x-1/2 flex-col",
             "overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground",
             "shadow-(--shadow-pop) outline-none",
             "animate-[sheet-pop-in_.22s_cubic-bezier(.16,1,.3,1)]",
@@ -225,7 +225,7 @@ export function AgentEditorDialog({
                     value={body}
                     onChange={(e) => setBody(e.target.value)}
                     placeholder="The system prompt this behaviour agent loads…"
-                    className="min-h-[240px] w-full flex-1 resize-none overflow-y-auto bg-transparent px-4 pt-1.5 pb-3 font-mono text-[12.5px] leading-relaxed text-foreground/90 outline-none placeholder:text-muted-foreground/40"
+                    className="min-h-[340px] w-full flex-1 resize-none overflow-y-auto bg-transparent px-4 pt-1.5 pb-3 font-mono text-[12.5px] leading-relaxed text-foreground/90 outline-none placeholder:text-muted-foreground/40"
                   />
                 </div>
 

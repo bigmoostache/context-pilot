@@ -131,6 +131,37 @@
   - forbidden
   - tailscale
   last_edited_ms: 1783602624394
+21b8a2267668c015:
+  tl_dr: 'DEPLOY TRAP (T687): source fix correct but fleet stale. system_reload re-execs agent from RELEASE binary, never restarts orchestrator; stale orch serde-drops unknown command fields. Deploy fresh binaries + restart orch, then VERIFY.'
+  contents: |-
+    Cost 4 false 'fixed' claims + a furious user.
+
+    MECHANISM:
+    - system_reload re-execs the AGENT from the active_tag RELEASE binary (~/.context-pilot/releases/<tag>/cpilot), NOT target/release/tui.
+    - system_reload NEVER touches the orchestrator (M99: orchestrator = rebuild+RESTART).
+    - Orchestrator typed-decodes POST /command via serde_json::from_slice::<Command>. serde SILENTLY DROPS unknown fields, so a stale orchestrator strips new command fields (e.g. initial_message) before the agent sees them. Symptom: 'thread created but message lost'.
+
+    DEPLOY CHECKLIST after Rust source edit:
+    1. cargo build --release.
+    2. cp target/release/tui -> ~/.context-pilot/releases/<active_tag>/cpilot (active_tag in releases/config.json).
+    3. cp target/release/cp-orchestrator -> ~/cp-server/bin/cp-orchestrator.
+    4. Restart orchestrator: kill pid on :7878, relaunch from cwd ~/cp-server, env CP_WEB_ROOT=~/cp-server/web CP_BRIDGE=1 + BRAVE/VOYAGE/ANTHROPIC keys + PATH=/opt/homebrew/bin:... (M160 reap orphan meili).
+    5. system_reload self to pick up fresh release binary.
+
+    VERIFY:
+    - strings <running-binary> | grep -c <new-field> >0 on BOTH orchestrator and agent.
+    - Live curl POST /api/agent/{id}/command FULL envelope {schema_version:1,id,seq:0,dedup_token,kind:{...}} then GET /threads, assert effect. Missing envelope = {"error":"malformed command"}.
+
+    T687 proof: initial_message landed (T704); paused=true landed msg AND paused (T705). Deleted after.
+  importance: critical
+  labels:
+  - deploy
+  - stale-binary
+  - orchestrator
+  - system_reload
+  - gotcha
+  - T687
+  last_edited_ms: 1785177810832
 2abaa3035bec794f:
   tl_dr: 'Harbor adapter (context_pilot_agent.py) validated. Reward 1.0 on break-filter-js-from-html. Model-mapping bug: apply_provider_model ignores --model for claude_code_v2 provider.'
   importance: medium
