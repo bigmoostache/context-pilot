@@ -81,6 +81,7 @@ export function ThreadsView({
       >
         <ThreadList
           threads={threads}
+          agentId={activeAgentId}
           selectedId={sel.effectiveSelectedId}
           onSelect={sel.setSelectedId}
           showArchived={sel.showArchived}

@@ -58,6 +58,7 @@ import {
   postApiAgentByIdAvatar,
   postApiAgentByIdCommand,
   postApiAgentByIdLibraryCommand,
+  postApiAgentByIdConversationsSearch,
   postApiTicket,
 } from "./generated"
 import { buildCommandEnvelope, sdk } from "./client"
@@ -84,6 +85,7 @@ export type {
   ClaudeLoginCompleteResponse,
 } from "./generated/types.gen"
 export type { ClaudeAccountSummary, ClaudeAccountsListResponse } from "./generated/types.gen"
+export type { ConvHit } from "./generated/types.gen"
 
 // ── Helper: align TS with runtime (setupClient.ts guarantees) ─────────
 
@@ -270,6 +272,33 @@ export async function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
       log: t.log,
     }
   })
+}
+
+// ── Conversation search (T671, hybrid keyword+semantic) ──────────────
+
+/**
+ * Hybrid (keyword + semantic) search over an agent's conversation index.
+ *
+ * Forwards to the agent over the bridge; Meilisearch embeds the raw query
+ * server-side, so no fabricated semantic query is needed. `threadId` scopes
+ * the search to one thread (omit for realm-wide). Returns hits best-scored
+ * first; an empty array means no match.
+ */
+export function searchConversations(
+  agentId: string,
+  query: string,
+  opts?: { limit?: number; threadId?: string },
+): Promise<import("./generated/types.gen").ConvHit[]> {
+  return sdk<{ hits: import("./generated/types.gen").ConvHit[] }>(
+    postApiAgentByIdConversationsSearch({
+      path: { id: agentId },
+      body: {
+        query,
+        ...((opts?.limit != null) && { limit: opts.limit }),
+        ...((opts?.threadId != null) && { thread_id: opts.threadId }),
+      },
+    }),
+  ).then((r) => r.hits)
 }
 
 // ── Claude Code usage (SDK) ───────────────────────────────────────────

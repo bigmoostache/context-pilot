@@ -20,20 +20,18 @@ import { ThreadSearchPalette } from "./dialogs/ThreadSearchPalette"
 interface ThreadListProps {
   /** all of the realm's threads (archived included) — filtering happens here */
   threads: ThreadDetail[]
+  /** owning agent — the conversation-search target for the palette (T671) */
+  agentId: string
   selectedId: string
   onSelect: (id: string) => void
-  /** archived view toggle */
   showArchived: boolean
   onToggleArchived: (v: boolean) => void
-  /** archive ↔ restore a single thread */
   onArchive: (id: string) => void
   /** permanently delete a thread (T371) */
   onDelete: (id: string) => void
   /** pause ↔ resume a single thread (T371) */
   onPause: (id: string) => void
-  /** open the New Thread dialog */
   onNewThread: () => void
-  /** collapse the rail (header show/hide button, T669) */
   onToggleSidebar: () => void
 }
 
@@ -52,6 +50,7 @@ function byRecent(a: ThreadDetail, b: ThreadDetail): number {
  */
 export function ThreadList({
   threads,
+  agentId,
   selectedId,
   onSelect,
   showArchived,
@@ -170,6 +169,7 @@ export function ThreadList({
         open={searchOpen}
         onClose={() => setSearchOpen(false)}
         threads={threads}
+        agentId={agentId}
         onSelect={(id) => {
           onSelect(id)
           setSearchOpen(false)
