@@ -65,11 +65,23 @@ pub enum Kind {
         content: String,
     },
 
-    /// Create a new thread.
+    /// Create a new thread, optionally seeding its first user message and
+    /// starting it paused.
     #[serde(rename = "create_thread")]
     CreateThread {
         /// Human-readable thread name.
         name: String,
+        /// Optional first user message, sent atomically right after the thread
+        /// is created (already carries any `file-upload` blocks the frontend
+        /// composed). `None` = create an empty thread. An N-1 agent that
+        /// predates this field ignores it and creates an empty thread.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        initial_message: Option<String>,
+        /// Create the thread already paused (suppress `MY_TURN` notifications)
+        /// so a seeded first message is queued without waking the agent.
+        /// Defaults to `false`; an N-1 agent ignores it (thread stays active).
+        #[serde(default)]
+        paused: bool,
     },
 
     /// Archive an existing thread.

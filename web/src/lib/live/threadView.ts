@@ -19,6 +19,19 @@ import { uploadUnique } from "@/lib/api"
 import { buildUploadMessage, type UploadedFile } from "@/lib/live/threadUpload"
 import type { ThreadDetail } from "@/lib/types"
 
+/** Rich thread-creation payload collected by the New Thread dialog (T674):
+ *  a title plus an optional first message (auto-sent), file attachments, and a
+ *  "create paused" flag that queues the seeded message without waking the agent. */
+export interface CreateThreadOpts {
+  title: string
+  /** first user message, auto-sent right after creation (empty = none) */
+  firstMessage: string
+  /** raw files to upload to `.uploads/` and append as `file-upload` blocks */
+  files: File[]
+  /** create the thread already paused (seeded message queued, no MY_TURN nudge) */
+  paused: boolean
+}
+
 /**
  * Build a combined message body from user text and pending file attachments.
  * Text comes first (if any), then file blocks. Either can be absent — a
@@ -143,7 +156,7 @@ export interface Actions {
   handleArchive: (id: string) => void
   handlePause: (id: string) => void
   handleDelete: (id: string) => void
-  handleCreate: (title: string) => void
+  handleCreate: (opts: CreateThreadOpts) => void
   handleSend: (text: string) => void
   handleAttach: (files: File[]) => void | Promise<void>
 }
@@ -217,18 +230,39 @@ export function useThreadActions(
   )
 
   const handleCreate = useCallback(
-    (title: string) => {
-      sel.armAutoSelect()
-      sendCommand(activeAgentId, {
-        kind: "create_thread",
-        name: title.trim() || "Untitled thread",
-      }).catch((e: unknown) => {
-        sel.disarmAutoSelect()
-        flash(describeCommandError("create the thread", e))
-      })
+    (opts: CreateThreadOpts) => {
+      // Close the dialog + reset the browse state immediately; the create is
+      // fire-and-forget with its own failure notice (T121).
       sel.setNewOpen(false)
       sel.setQuery("")
       sel.setShowArchived(false)
+      sel.armAutoSelect()
+      void (async () => {
+        try {
+          // Upload any attachments to `.uploads/` first, then fold them into the
+          // first message as `file-upload` blocks — identical to a manual send.
+          const uploaded: UploadedFile[] = []
+          for (const f of opts.files) {
+            const r = await uploadUnique(activeAgentId, ".uploads", f)
+            uploaded.push({
+              path: r.path,
+              name: r.name,
+              size: r.size,
+              note: `uploaded by user at ${new Date().toISOString()}`,
+            })
+          }
+          const content = buildCombinedContent(opts.firstMessage, uploaded)
+          await sendCommand(activeAgentId, {
+            kind: "create_thread",
+            name: opts.title.trim() || "Untitled thread",
+            ...(content && { initial_message: content }),
+            paused: opts.paused,
+          })
+        } catch (e) {
+          sel.disarmAutoSelect()
+          flash(describeCommandError("create the thread", e))
+        }
+      })()
     },
     [activeAgentId, flash, sel],
   )

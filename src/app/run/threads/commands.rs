@@ -27,8 +27,8 @@ pub(super) fn apply_command(app: &mut App, cmd: Command) {
         CommandKind::SendMessage { thread_id, content } => {
             apply_send_message(&mut app.state, &thread_id, &content);
         }
-        CommandKind::CreateThread { name } => {
-            apply_create_thread(&mut app.state, &name);
+        CommandKind::CreateThread { name, initial_message, paused } => {
+            apply_create_thread(&mut app.state, &name, initial_message.as_deref(), paused);
         }
         CommandKind::ArchiveThread { thread_id } => {
             apply_archive_thread(&mut app.state, &thread_id);
@@ -112,8 +112,16 @@ fn apply_send_message(state: &mut State, thread_id: &str, content: &str) {
 
 // ── CreateThread ────────────────────────────────────────────────────────
 
-/// Create a new thread with the given name.
-fn apply_create_thread(state: &mut State, name: &str) {
+/// Create a new thread with the given name, optionally seeding a first user
+/// message and starting it paused.
+///
+/// The optional first message is applied through [`apply_send_message`] right
+/// after creation, so a "create + first message" reuses the exact same
+/// message-append + `MY_TURN` transition + roster-delta path a later manual
+/// send would take — atomic in one command, with no frontend id round-trip.
+/// When `paused` is set the thread is paused *after* the message lands, so the
+/// seeded message is queued without waking the agent (no `MY_TURN` nudge).
+fn apply_create_thread(state: &mut State, name: &str, initial_message: Option<&str>, paused: bool) {
     let ts = ThreadsState::get_mut(state);
     let id = format!("T{}", ts.next_id);
     ts.next_id = ts.next_id.saturating_add(1);
@@ -142,6 +150,15 @@ fn apply_create_thread(state: &mut State, name: &str) {
 
     state.flags.ui.dirty = true;
     log::info!("bridge: created thread {id} \"{name}\"");
+
+    // Seed the first message (if any) through the normal send path, then pause
+    // (if requested) so the queued message doesn't nudge the agent.
+    if let Some(content) = initial_message.filter(|c| !c.trim().is_empty()) {
+        apply_send_message(state, &id, content);
+    }
+    if paused {
+        apply_pause_thread(state, &id);
+    }
 }
 
 // ── ArchiveThread ───────────────────────────────────────────────────────
