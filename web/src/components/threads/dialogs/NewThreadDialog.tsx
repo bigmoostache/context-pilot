@@ -1,15 +1,19 @@
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
-import { Paperclip, Pause, X, CornerDownLeft } from "lucide-react"
+import { Paperclip, X, CornerDownLeft } from "lucide-react"
 import type { CreateThreadOpts } from "@/lib/live/threadView"
 import { cn } from "@/lib/utils"
 
 /**
- * New Thread dialog (T674) — a Linear-"new issue"-style composer.
+ * New Thread dialog (T674, reworked T678) — a Linear-"new issue"-style composer.
  *
  * Layout mirrors Linear's fast-create popup: a large borderless **title** line,
- * a seamless **first message** editor beneath it (auto-sent on create), then a
- * chip toolbar (attach + "start paused") and a footer with the primary action.
+ * a seamless **auto-growing** first-message editor beneath it (grows with the
+ * text like the thread composer, capped at 44vh so the surface always stays on
+ * screen), then a single footer action row — attach (icon button, left) + a
+ * "start paused" toggle switch, with the primary Create action on the right.
+ * There is no Cancel button: Esc and clicking the backdrop already dismiss.
+ *
  * Attachments are staged locally and only uploaded on submit by the parent's
  * {@link CreateThreadOpts} handler, which folds them into the first message and
  * dispatches a single `create_thread` command.
@@ -34,6 +38,18 @@ export function NewThreadDialog({
   const [files, setFiles] = useState<File[]>([])
   const [paused, setPaused] = useState(false)
   const canCreate = title.trim().length > 0
+
+  // Auto-grow the message editor to fit its content (like the thread composer):
+  // reset to `auto`, then set to `scrollHeight`. The CSS `max-h-[44vh]` caps the
+  // element and `overflow-y-auto` scrolls past that cap, so a very long draft
+  // never pushes the dialog off screen.
+  const msgRef = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => {
+    const el = msgRef.current
+    if (!el) return
+    el.style.height = "auto"
+    el.style.height = `${el.scrollHeight}px`
+  }, [firstMessage, open])
 
   const reset = () => {
     setTitle("")
@@ -75,7 +91,7 @@ export function NewThreadDialog({
         <DialogPrimitive.Popup
           onKeyDown={onKeyDown}
           className={cn(
-            "fixed top-[11vh] left-1/2 z-50 w-[560px] max-w-[92vw] -translate-x-1/2",
+            "fixed top-[11vh] left-1/2 z-50 w-[740px] max-w-[94vw] -translate-x-1/2",
             "overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground",
             "shadow-(--shadow-pop) outline-none",
             "animate-[sheet-pop-in_.22s_cubic-bezier(.16,1,.3,1)]",
@@ -111,13 +127,14 @@ export function NewThreadDialog({
               className="w-full bg-transparent px-4 pt-1 text-[19px] font-semibold tracking-tight text-foreground outline-none placeholder:text-muted-foreground/40"
             />
 
-            {/* first message — seamless editor under the title */}
+            {/* first message — seamless auto-growing editor under the title */}
             <textarea
+              ref={msgRef}
               value={firstMessage}
               onChange={(e) => setFirstMessage(e.target.value)}
               placeholder="Add a first message… (sent automatically)"
-              rows={4}
-              className="w-full resize-none bg-transparent px-4 pt-2 pb-3 text-[13.5px] leading-relaxed text-foreground/90 outline-none placeholder:text-muted-foreground/40"
+              rows={2}
+              className="max-h-[44vh] w-full resize-none overflow-y-auto bg-transparent px-4 pt-2 pb-3 text-[13.5px] leading-relaxed text-foreground/90 outline-none placeholder:text-muted-foreground/40"
             />
 
             <FileChips
@@ -125,11 +142,13 @@ export function NewThreadDialog({
               onRemove={(i) => setFiles((p) => p.filter((_, idx) => idx !== i))}
             />
 
-            {/* chip toolbar — Linear action-row: attach + paused */}
-            <div className="flex items-center gap-1.5 px-3.5 py-2">
-              <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] font-medium text-muted-foreground transition-colors hover:border-(--signal)/50 hover:text-foreground">
-                <Paperclip className="size-3.5" />
-                Attach
+            {/* footer — attach + start-paused toggle (left), Create (right) */}
+            <div className="flex items-center gap-3 border-t border-border px-3.5 py-2.5">
+              <label
+                title="Attach files"
+                className="flex size-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <Paperclip className="size-4" />
                 <input
                   type="file"
                   multiple
@@ -137,35 +156,16 @@ export function NewThreadDialog({
                   onChange={(e) => addFiles(e.target.files)}
                 />
               </label>
-              <button
-                type="button"
-                onClick={() => setPaused((p) => !p)}
-                aria-pressed={paused}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-md border px-2 py-1 text-[12px] font-medium transition-colors",
-                  paused
-                    ? "border-(--warn)/40 bg-(--warn)/12 text-(--warn)"
-                    : "border-border text-muted-foreground hover:border-(--warn)/40 hover:text-foreground",
-                )}
-              >
-                <Pause className="size-3.5" />
-                {paused ? "Starts paused" : "Start paused"}
-              </button>
-            </div>
 
-            {/* footer — divider + primary action */}
-            <div className="flex items-center justify-end gap-2 border-t border-border px-3.5 py-2.5">
-              <button
-                type="button"
-                onClick={close}
-                className="rounded-md px-3 py-1.5 text-[12.5px] font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-              >
-                Cancel
-              </button>
+              <span className="flex items-center gap-2 text-[12px] font-medium text-muted-foreground select-none">
+                <PausedToggle on={paused} onToggle={() => setPaused((p) => !p)} />
+                Start paused
+              </span>
+
               <button
                 type="submit"
                 disabled={!canCreate}
-                className="flex items-center gap-1.5 rounded-md bg-(--signal) px-3 py-1.5 text-[12.5px] font-medium text-(--primary-foreground) transition-[filter] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+                className="ml-auto flex items-center gap-1.5 rounded-md bg-(--signal) px-3 py-1.5 text-[12.5px] font-medium text-(--primary-foreground) transition-[filter] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Create thread
                 <CornerDownLeft className="size-3.5 opacity-70" />
@@ -175,6 +175,30 @@ export function NewThreadDialog({
         </DialogPrimitive.Popup>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
+  )
+}
+
+/** Neutral on/off switch for the "start paused" option — same switch markup as
+ *  the form `toggle` field, in the paused-amber accent. */
+function PausedToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={onToggle}
+      className={cn(
+        "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors",
+        on ? "bg-(--warn)" : "bg-muted",
+      )}
+    >
+      <span
+        className={cn(
+          "inline-block size-4 transform rounded-full bg-white shadow-sm transition-transform",
+          on ? "translate-x-4" : "translate-x-0.5",
+        )}
+      />
+    </button>
   )
 }
 
