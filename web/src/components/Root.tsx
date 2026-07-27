@@ -68,9 +68,6 @@ function AppShell() {
     return modes[localStorage.getItem("cp-view") ?? ""] ?? "fleet"
   })
   const [activeAgentId, setActiveAgentId] = useState(() => localStorage.getItem("cp-agent") ?? "")
-  // One-shot request to pop the "create agent" dialog on the fleet dashboard
-  // (raised by the workspace switcher's "New agent" entry).
-  const [createAgent, setCreateAgent] = useState(false)
 
   // Persist view + agent selection across reloads (write-through effects rather
   // than setter wrappers, so the useState setters keep their canonical names).
@@ -118,12 +115,6 @@ function AppShell() {
     setView("threads")
   }
 
-  // "New agent" from the switcher → fleet altitude + create dialog.
-  const newAgent = () => {
-    setView("fleet")
-    setCreateAgent(true)
-  }
-
   // T334: "Show in Finder" — switch to finder view and reveal a specific file.
   const [finderRevealPath, setFinderRevealPath] = useState<string | null>(null)
   const showInFinder = useCallback((path: string) => {
@@ -135,14 +126,7 @@ function AppShell() {
   // so each branch reads cleanly and the fleet fallthrough is explicit.
   const renderView = () => {
     if (effectiveView === "fleet") {
-      return (
-        <FleetDashboard
-          agents={agents}
-          onOpenAgent={openAgent}
-          autoCreate={createAgent}
-          onAutoCreateConsumed={() => setCreateAgent(false)}
-        />
-      )
+      return <FleetDashboard agents={agents} onOpenAgent={openAgent} />
     }
     if (effectiveView === "costs") {
       return (
@@ -193,7 +177,6 @@ function AppShell() {
         onViewChange={setView}
         activeAgentId={activeAgentId}
         onSwitchAgent={setActiveAgentId}
-        onNewAgent={newAgent}
         agents={agents}
       />
 

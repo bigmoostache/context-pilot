@@ -18,20 +18,12 @@ interface TopBarProps {
   onViewChange: (v: ViewMode) => void
   activeAgentId: string
   onSwitchAgent: (id: string) => void
-  onNewAgent: () => void
   agents: Agent[]
 }
 
 /** Slim macOS-style title bar — app mark (→ fleet), workspace switcher,
  *  per-agent view tabs (Threads · Finder), branch, cost, theme. */
-export function TopBar({
-  view,
-  onViewChange,
-  activeAgentId,
-  onSwitchAgent,
-  onNewAgent,
-  agents,
-}: TopBarProps) {
+export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, agents }: TopBarProps) {
   const activeAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
   // OAuth usage/login widget applies ONLY to the OAuth providers (Bearer token
   // via vault "claude_oauth"). The `anthropic` provider authenticates by
@@ -56,12 +48,12 @@ export function TopBar({
           <button
             onClick={() => onViewChange("fleet")}
             className={cn(
-              "flex items-center gap-1.5 rounded-md px-1.5 py-1 transition-colors",
+              "flex items-center rounded-md px-1.5 py-1 transition-colors",
               inFleet ? "text-foreground" : "text-foreground/90 hover:bg-muted/50",
             )}
+            aria-label="Mission control"
           >
             <Home className="size-4 text-(--signal)" />
-            <span className="text-[13px] font-semibold tracking-tight">Context Pilot</span>
           </button>
         </Tip>
 
@@ -77,8 +69,6 @@ export function TopBar({
                 }
               : onSwitchAgent
           }
-          onFleet={() => onViewChange("fleet")}
-          onNewAgent={onNewAgent}
         />
 
         {!inFleet && <ViewTabs view={view} onViewChange={onViewChange} devMode={devMode} />}

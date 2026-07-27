@@ -1,11 +1,9 @@
-import { Check, ChevronsUpDown, FolderGit2, Plus } from "lucide-react"
+import { Check, ChevronDown, FolderGit2 } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { accentVar } from "@/lib/support/panelMeta"
@@ -32,28 +30,22 @@ const statusOrder: Record<AgentStatus, number> = {
 
 /**
  * Workspace switcher (1 agent = 1 folder). Sits at the left of the TopBar:
- * shows the active agent + its folder, opens a menu to switch between agents
- * or jump to the Agents launcher to browse the filesystem / create a new one.
+ * shows the active agent + its folder, opens a menu to switch between agents.
+ * Fleet management (create / manage) lives solely in the fleet view, reached
+ * via the TopBar's home button — the menu is now a pure switch list (T676).
  *
  * When no agent is focused (fleet altitude), pass `activeId` undefined: the
  * trigger keeps the same shape but shows a neutral **"Select an agent"**
- * placeholder, so the header card never disappears — it stays as a consistent,
- * always-available entry point to switch / create / manage agents.
+ * placeholder, so the header entry point never disappears.
  */
 export function AgentSwitcher({
   agents,
   activeId,
   onSwitch,
-  onFleet,
-  onNewAgent,
 }: {
   agents: Agent[]
   activeId?: string | undefined
   onSwitch: (id: string) => void
-  /** Jump to the fleet dashboard — the only place agents are managed. */
-  onFleet: () => void
-  /** Jump to the fleet dashboard AND open the create-agent dialog. */
-  onNewAgent: () => void
 }) {
   const active = agents.find((a) => a.id === activeId)
 
@@ -61,8 +53,8 @@ export function AgentSwitcher({
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn(
-          "flex h-8 items-center gap-2 rounded-lg border border-border bg-card px-2.5 text-left transition-colors outline-none",
-          "card-shadow hover:border-(--signal)/50",
+          "flex h-8 items-center gap-2 rounded-md px-1.5 text-left transition-colors outline-none",
+          "hover:bg-muted/50",
         )}
       >
         {/* Single-line trigger: just the workspace name (the folder path was
@@ -90,14 +82,11 @@ export function AgentSwitcher({
             </span>
           </>
         )}
-        <ChevronsUpDown className="ml-1 size-3.5 shrink-0 text-muted-foreground/60" />
+        <ChevronDown className="ml-0.5 size-3.5 shrink-0 text-muted-foreground/50" />
       </DropdownMenuTrigger>
 
       <DropdownMenuContent className="w-[280px]" align="start" sideOffset={6}>
         <DropdownMenuGroup>
-          <DropdownMenuLabel className="text-[11px]">
-            Workspaces · one agent per folder
-          </DropdownMenuLabel>
           {agents
             .toSorted((a, b) => statusOrder[a.status] - statusOrder[b.status])
             .map((a) => (
@@ -148,29 +137,6 @@ export function AgentSwitcher({
                 {a.id === activeId && <Check className="size-3.5 shrink-0 text-(--signal)" />}
               </DropdownMenuItem>
             ))}
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          <DropdownMenuItem
-            onClick={onNewAgent}
-            className={cn(
-              "gap-2 py-1.5 text-[12.5px]",
-              "focus:bg-muted! focus:text-foreground! data-highlighted:bg-muted! data-highlighted:text-foreground!",
-            )}
-          >
-            <Plus className="size-3.5 text-(--interactive)" />
-            New agent…
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={onFleet}
-            className={cn(
-              "gap-2 py-1.5 text-[12.5px]",
-              "focus:bg-muted! focus:text-foreground! data-highlighted:bg-muted! data-highlighted:text-foreground!",
-            )}
-          >
-            <FolderGit2 className="size-3.5 text-muted-foreground" />
-            Manage agents (fleet)
-          </DropdownMenuItem>
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>

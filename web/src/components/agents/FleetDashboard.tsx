@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { AlertTriangle, Bot, FolderGit2, FolderPlus, Rocket, Settings2 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { accentVar, fmtCost, FLEET_MAX_W } from "@/lib/support/panelMeta"
@@ -27,33 +27,12 @@ type Modal = { mode: "create" } | { mode: "manage"; agent: Agent } | null
 export function FleetDashboard({
   agents,
   onOpenAgent,
-  autoCreate,
-  onAutoCreateConsumed,
 }: {
   agents: Agent[]
   onOpenAgent: (id: string) => void
-  /** When flipped true (e.g. via the TopBar "New agent" entry), open the
-   *  create dialog immediately and signal back so the flag can be cleared. */
-  autoCreate?: boolean | undefined
-  onAutoCreateConsumed?: (() => void) | undefined
 }) {
   const [modal, setModal] = useState<Modal>(null)
   const [toast, setToast] = useState<string | null>(null)
-
-  // Honour an external "create a new agent" request (from the workspace
-  // switcher). Opening the modal is a genuine REACTION to a prop edge (not
-  // render-derived state), so it lives in an effect keyed on `autoCreate`. The
-  // `setModal` is deferred to a microtask so it lands AFTER commit rather than
-  // synchronously inside the effect — the same pattern the Finder's reveal path
-  // uses to stay clear of @eslint-react/set-state-in-effect (a synchronous
-  // in-effect setState would cascade an extra render). The parent is notified
-  // in the same effect (a plain callback, no local state) so it can clear the
-  // one-shot flag.
-  useEffect(() => {
-    if (!autoCreate) return
-    queueMicrotask(() => setModal({ mode: "create" }))
-    onAutoCreateConsumed?.()
-  }, [autoCreate, onAutoCreateConsumed])
 
   const flash = (m: string) => {
     setToast(m)
