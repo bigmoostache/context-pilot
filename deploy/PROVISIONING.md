@@ -16,10 +16,12 @@ Relevé sur matériel (RK3576, box de test, 2026-07-26) depuis un poste du LAN :
 | --- | --- | --- | --- |
 | `:443` | **Caddy → cockpit Context Pilot** (cert `tls internal`) | client (IP/nom) + nous (ULA) | ouvert, `200`, SPA servie sur l'IPv4 **et** sur l'ULA |
 | `:80` | **Caddy** → `308` vers `https://<hôte>` une fois provisionnée ; **cockpit en clair sur n'importe quel hôte** avant | day-0 : quiconque atteint la box | ouvert |
-| `:7878` | **orchestrateur, directement** — *pas* derrière Caddy | (voir avertissement) | **ouvert en clair, `200`** |
+| `:7878` | **orchestrateur** — l'upstream de Caddy, **bindé sur le loopback** | personne depuis le LAN | fermé de l'extérieur (`127.0.0.1` seulement) |
 | `:22` | SSH | nous (ULA sur site, tailnet à distance) | ouvert |
 
-> **`:7878` est exposé sur le LAN, en clair.** L'orchestrateur écoute sur `0.0.0.0:7878` (IPv4 seulement, pas de `[::]`), donc le backend est joignable sans TLS et sans passer par Caddy. Or le modèle d'auth (bearer-token/CORS) **suppose un transport chiffré** — voir les décisions plus bas. À traiter : binder sur le loopback, ou filtrer.
+> **Tout le trafic applicatif passe par Caddy.** L'orchestrateur écoute sur `127.0.0.1:7878` (défaut du binaire, réaffirmé par `CP_ORCH_BIND=127.0.0.1` dans l'unité systemd) : le backend n'a **aucune** socket face au LAN, donc le modèle d'auth (bearer-token/CORS) tient sa prémisse de transport chiffré, et le `308` de `:80` vers `:443` n'est plus contournable. Élargir le bind (`CP_ORCH_BIND=0.0.0.0`) est réservé au dev — jamais sur une box livrée. Le relevé du 26/07 ci-dessus est antérieur au correctif : `:7878` y répondait `200` en clair sur le LAN.
+>
+> **Corollaire pour nous.** Atteindre le backend sans Caddy (debug, `curl` d'API) passe désormais par un tunnel SSH — `ssh -L 8878:127.0.0.1:7878 root@<box>` puis `http://127.0.0.1:8878/…` — y compris depuis le tailnet, où `:7878` n'est plus ouvert. Le cockpit lui-même reste en `https://[<ula>]/` ou `https://<ip-lan>/`.
 >
 > **Caddy filtre par `Host`, et un hôte inconnu reçoit un `200` au corps vide.** Le code HTTP seul ne prouve donc rien : toujours vérifier la **taille du corps** (la SPA fait ~5,3 ko). Les hôtes servis sont l'IP et le nom saisis à l'onboarding **plus les ULA de la box**, ajoutées automatiquement ; avant provisionnement le day-0 répond sur n'importe quel hôte. `127.0.0.1` n'est jamais servi — tester par une adresse réelle.
 >
@@ -33,7 +35,7 @@ Relevé sur matériel (RK3576, box de test, 2026-07-26) depuis un poste du LAN :
 2. **Access Controls** → policy file, puis **Save** (sinon les tags sont refusés) :
    - `groups.group:ops` = tes identités (ex. `Anima879@github`)
    - `tagOwners."tag:cp-<client>"` = `["group:ops"]`
-   - `acls` : `group:ops` → `tag:cp-<client>` sur `:22/:443/:7878`
+   - `acls` : `group:ops` → `tag:cp-<client>` sur `:22/:443` (pas `:7878` : le backend est sur le loopback, on l'atteint par Caddy)
    - `ssh` : `group:ops` → `tag:cp-<client>`, user `root` (Tailscale SSH, pas de clé à distribuer)
 3. **Settings → Keys** : générer une auth-key **taguée** `tag:cp-<client>`**, reusable, non-ephemeral, pre-approved**. C'est un secret → Vault / fichier local, jamais commité.
 
@@ -109,7 +111,7 @@ Alternatives : un tag précis `-e release=v0.x.y`, ou un build local `-e release
      --limit <client> -e @deploy/ansible/<client>.local.yml -e channel=stable
    ```
 
-   Le playbook (`site.yml`, systemd) : **bringup** (hostname `dh-<serial>` + user `dh` avec clé root + NOPASSWD sudo) → **fetch** (canal signé, sha256, control node) → **deploy** (binaires/SPA/units systemd/Caddyfile sous `/opt/context-pilot`) → **keys** (`providers.env`) → **seed** (admin write-once + fiche `out/<unit>-admin.txt`) → **start** (units `enable`+`start`, sondes santé) → **display** (driver LCD GC9307) → **modem** (outillage 5G). Aucune manipulation de firewall : l'image Armbian n'a pas de règles, mais le déploiement **ouvre `:80`, `:443` et `:7878`** (cf. tableau des ports).
+   Le playbook (`site.yml`, systemd) : **bringup** (hostname `dh-<serial>` + user `dh` avec clé root + NOPASSWD sudo) → **fetch** (canal signé, sha256, control node) → **deploy** (binaires/SPA/units systemd/Caddyfile sous `/opt/context-pilot`) → **keys** (`providers.env`) → **seed** (admin write-once + fiche `out/<unit>-admin.txt`) → **start** (units `enable`+`start`, sondes santé) → **display** (driver LCD GC9307) → **modem** (outillage 5G). Aucune manipulation de firewall : l'image Armbian n'a pas de règles, mais le déploiement **ouvre `:80` et `:443`** — les deux ports de Caddy, et eux seuls : l'orchestrateur reste sur le loopback (cf. tableau des ports).
 
 ## Phase 3 bis — (optionnel) Claude Code OAuth par abonnement
 
@@ -187,7 +189,7 @@ Une box fraîchement déployée est **non provisionnée** : pas de certificat, d
 - **Copie SPA lente.** Le déploiement ship+untar **un** tarball de \~19 Mo (`unarchive`) plutôt qu'une copie récursive par fichier (centaines de fonts KaTeX → round-trips SFTP + checksum, timeout 2 min). Lancer le playbook **en tâche de fond** (le foreground a un cap 2 min).
 - **Upgrade Tailscale.** `tailscale ssh` passe par une session gérée par `tailscaled` → redémarrer le daemon coupe la session SSH. Sous systemd, `systemctl restart tailscaled` **détache** le restart de ta session (il survit) ; via `tailscale up` interactif, préférer le LAN break-glass.
 - **Key-expiry.** Vérifier **« Key expiry disabled »** sur chaque nœud tagué (sinon il tombe du tailnet à \~180 j). C'est automatique pour les nœuds tagués mais à confirmer en console.
-- **Firewall = responsabilité IT client.** Le périmètre réseau (qui atteint la box sur le LAN) est du ressort de l'IT. L'image Armbian nue n'ouvre que `:22` ; **après déploiement la box expose `:22`, `:80`, `:443` et `:7878`** — ce dernier en clair et sans Caddy devant (cf. l'avertissement du tableau des ports). Tant que `:7878` n'est pas bindé sur le loopback, ce port fait partie du périmètre à filtrer.
+- **Firewall = responsabilité IT client.** Le périmètre réseau (qui atteint la box sur le LAN) est du ressort de l'IT. L'image Armbian nue n'ouvre que `:22` ; **après déploiement la box expose `:22`, `:80` et `:443`** — le backend, lui, est sur le loopback, donc rien n'écoute sur le LAN qui ne soit ni SSH ni Caddy.
 
 ## Reste à industrialiser (non bloquant)
 
@@ -209,6 +211,6 @@ Une box fraîchement déployée est **non provisionnée** : pas de certificat, d
 
 - [ ] **Simplifier la fiche de livraison** : son URL day-0 reprend `ansible_host` (donc l'ULA quand on pilote en IPv6). Maintenant que la page d'onboarding annonce elle-même l'IPv4, la fiche n'a plus besoin d'URL client du tout — elle peut ne porter que l'ULA, imprimable dès la sortie d'usine.
 
-- [ ] **Binder l'orchestrateur sur le loopback** (aujourd'hui `0.0.0.0:7878`, en clair sur le LAN, IPv4 seulement) ou le filtrer — le modèle d'auth suppose un transport chiffré.
+- [x] **Binder l'orchestrateur sur le loopback** → **fait** : bind par défaut `127.0.0.1` (`CP_ORCH_BIND` pour élargir en dev), posé aussi explicitement dans l'unité systemd, et **vérifié à chaque déploiement** — `start.yml` lit `ss` sur la box et échoue si le backend écoute ailleurs que sur le loopback. Reste à rejouer un scan depuis le LAN sur la box de test après la prochaine release.
 
 - [ ] **Marquer la version déployée sur la box** (fichier ou `--version` câblé sur le tag) : aujourd'hui impossible de savoir quelle release tourne.

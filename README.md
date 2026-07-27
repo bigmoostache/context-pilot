@@ -44,7 +44,7 @@ Context Pilot is not one process. It is a small constellation of cooperating sur
 | Surface | Crate / dir | Role |
 |---|---|---|
 | **Agent (TUI)** | `src/` (`tui` binary) | The interactive coding agent: event loop, tools, LLM streaming, panels, persistence. |
-| **Orchestrator** | `crates/cp-orchestrator` | Fleet control plane: discover, observe, command, supervise; serves REST + SSE on `:7878`. |
+| **Orchestrator** | `crates/cp-orchestrator` | Fleet control plane: discover, observe, command, supervise; serves REST + SSE on `:7878` (loopback — on the appliance Caddy fronts it on `:80`/`:443`). |
 | **Web frontend** | `web/` | Browser cockpit: fleet dashboard, per-agent threads / panels / file manager. |
 | **Console server** | `crates/cp-console-server` | Per-realm daemon running child processes that survive TUI restarts. |
 | **Meilisearch** | external process | Full-text index of project files + logs. |

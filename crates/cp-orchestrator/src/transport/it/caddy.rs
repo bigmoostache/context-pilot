@@ -19,6 +19,12 @@
 //! * `:80`  → 308 redirect to `:443` **once provisioned** — no cleartext app
 //!   surface after day-0.
 //!
+//! Caddy is the **only** LAN-facing surface: the orchestrator itself binds
+//! loopback (`CP_ORCH_BIND`, default `127.0.0.1` — see
+//! [`crate::runtime::Config`]), so the redirect above cannot be sidestepped by
+//! talking to `:7878` directly, and the auth model keeps its assumption of an
+//! encrypted transport.
+//!
 //! Reload is **best-effort and env-gated**: with no `CP_CADDYFILE` set (local
 //! dev, tests) the whole step is skipped, so the orchestrator runs fine without
 //! Caddy. With it set, the render is written atomically and `caddy reload` is
