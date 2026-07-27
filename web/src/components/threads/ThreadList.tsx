@@ -86,8 +86,6 @@ export function ThreadList({
   const working = visible
     .filter((t) => t.status === "THEIR_TURN" || t.status === "ACTIVE")
     .toSorted(byRecent)
-  // agent-owned, actively-or-parallel working count (for the header pill)
-  const workingCount = live.filter((t) => t.status !== "MY_TURN").length
 
   const row = (t: ThreadDetail, archivedRow?: boolean) => (
     <ThreadRow
@@ -112,9 +110,7 @@ export function ThreadList({
         <ListHeader
           showArchived={showArchived}
           onToggleArchived={onToggleArchived}
-          liveCount={live.length}
           archivedCount={archivedCount}
-          workingCount={workingCount}
           onOpenSearch={() => setSearchOpen(true)}
           onToggleSidebar={onToggleSidebar}
           onNewThread={onNewThread}
@@ -172,18 +168,14 @@ export function ThreadList({
 function ListHeader({
   showArchived,
   onToggleArchived,
-  liveCount,
   archivedCount,
-  workingCount,
   onOpenSearch,
   onToggleSidebar,
   onNewThread,
 }: {
   showArchived: boolean
   onToggleArchived: (v: boolean) => void
-  liveCount: number
   archivedCount: number
-  workingCount: number
   onOpenSearch: () => void
   onToggleSidebar: () => void
   onNewThread: () => void
@@ -199,28 +191,7 @@ function ListHeader({
           Archived
           <span className="text-muted-foreground/50 tabular-nums">{archivedCount}</span>
         </button>
-      ) : (
-        <>
-          <span className="text-[11px] text-muted-foreground tabular-nums">
-            {liveCount} thread{liveCount === 1 ? "" : "s"}
-          </span>
-          {workingCount > 0 && (
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10.5px] font-medium"
-              style={{
-                background: "color-mix(in oklab, var(--interactive) 14%, transparent)",
-                color: "var(--interactive)",
-              }}
-            >
-              <span className="relative flex size-1.5">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-(--interactive) opacity-70" />
-                <span className="relative inline-flex size-1.5 rounded-full bg-(--interactive)" />
-              </span>
-              {workingCount} working
-            </span>
-          )}
-        </>
-      )}
+      ) : null}
       {/* right-aligned chrome: new thread + open search palette + collapse the rail */}
       <div className="ml-auto flex items-center gap-1">
         {!showArchived && (
