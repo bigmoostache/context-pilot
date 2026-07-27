@@ -102,7 +102,7 @@ export function AgentSwitcher({
                 "data-highlighted:bg-[color-mix(in_oklab,var(--signal)_11%,transparent)]! data-highlighted:text-foreground!",
               )}
             >
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-[color-mix(in_oklab,var(--signal)_16%,transparent)] text-(--signal)">
+              <span className="flex size-7 shrink-0 items-center justify-center text-(--signal)">
                 <LayoutGrid className="size-3.5" />
               </span>
               <span className="text-[12.5px] text-foreground/90 group-focus/dropdown-menu-item:text-foreground! group-data-highlighted/dropdown-menu-item:text-foreground!">
