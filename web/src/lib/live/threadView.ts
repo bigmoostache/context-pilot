@@ -36,16 +36,25 @@ export interface CreateThreadOpts {
 }
 
 /**
- * Build a combined message body from user text and pending file attachments.
- * Text comes first (if any), then file blocks. Either can be absent — a
- * send with only pending files produces just the file blocks; one with only
- * text produces just text.
+ * Build a combined message body from user text and pending file attachments,
+ * reusing the exact same ` ```file-upload ` block composer the thread composer
+ * uses ({@link buildUploadMessage}). Either part can be absent — a send with
+ * only files produces just the file blocks; one with only text produces just
+ * text.
+ *
+ * `filesFirst` controls ordering. The thread composer sends text first then the
+ * file blocks (default, `false`). The new-thread create flow prepends the file
+ * blocks so the attachments lead the very first message (T687).
  */
-export function buildCombinedContent(text: string, files: UploadedFile[]): string {
-  const parts: string[] = []
-  if (text.trim()) parts.push(text.trim())
-  if (files.length > 0) parts.push(buildUploadMessage(files))
-  return parts.join("\n\n")
+export function buildCombinedContent(
+  text: string,
+  files: UploadedFile[],
+  filesFirst = false,
+): string {
+  const textPart = text.trim()
+  const filePart = files.length > 0 ? buildUploadMessage(files) : ""
+  const parts = filesFirst ? [filePart, textPart] : [textPart, filePart]
+  return parts.filter(Boolean).join("\n\n")
 }
 
 /**
@@ -331,7 +340,11 @@ export function useThreadActions(
       // rides the create_thread command: an N-1 agent silently ignores those
       // fields (the exact bug this replaces), whereas pause_thread /
       // send_message are long-established commands it always honours.
-      const content = buildCombinedContent(opts.firstMessage, opts.files)
+      // Same upload-on-attach + `file-upload` block path as the thread composer
+      // (buildCombinedContent → buildUploadMessage), so a new thread's first
+      // message carries its attachments identically. `filesFirst` prepends the
+      // blocks so the attachments lead the message (T687).
+      const content = buildCombinedContent(opts.firstMessage, opts.files, true)
       pendingCreateRef.current = { content, paused: opts.paused }
       pauseRequestedRef.current = false
       sel.armAutoSelect()
