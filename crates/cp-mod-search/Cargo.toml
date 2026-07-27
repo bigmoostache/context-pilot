@@ -13,6 +13,8 @@ readme.workspace = true
 cp-base.workspace = true
 cp-vault = { path = "../cp-vault" }
 cp-mod-logs = { path = "../cp-mod-logs" }
+cp-mod-threads = { path = "../cp-mod-threads" }
+cp-wire = { path = "../cp-wire" }
 cp-render.workspace = true
 crossterm.workspace = true
 serde.workspace = true

@@ -44,8 +44,19 @@ pub(crate) fn ensure_indexes(port: u16, master_key: &str, project_hash: &str) ->
         log::info!("Created logs index: {logs_uid}");
     }
 
+    // Conversations index (T671) — one doc per thread message for hybrid
+    // thread-content search.
+    let conversations_uid = format!("cp_{project_hash}_conversations");
+    if !meili.index_exists(&conversations_uid)? {
+        let create_task = meili.create_index(&conversations_uid, "id")?;
+        super::tasks::wait_for_task(&meili, create_task)?;
+        let settings_task = meili.update_settings(&conversations_uid, &types::conversations_index_settings())?;
+        super::tasks::wait_for_task(&meili, settings_task)?;
+        log::info!("Created conversations index: {conversations_uid}");
+    }
+
     // Configure embedders for hybrid search (idempotent — only if not already set)
-    configure_embedders(&meili, &files_uid, &logs_uid);
+    configure_embedders(&meili, &files_uid, &logs_uid, &conversations_uid);
 
     Ok(())
 }
@@ -205,7 +216,7 @@ fn configure_one_embedder(meili: &api::MeiliClient, uid: &str, settings: &serde_
 ///
 /// This is a fire-and-forget operation: Meilisearch will call the Voyage API
 /// in the background to generate embeddings for all documents.
-fn configure_embedders(meili: &api::MeiliClient, files_uid: &str, logs_uid: &str) {
+fn configure_embedders(meili: &api::MeiliClient, files_uid: &str, logs_uid: &str, conversations_uid: &str) {
     let Some(api_key) = read_voyage_api_key() else {
         log::info!("Voyage API key not configured \u{2014} skipping embedder setup (keyword-only search)");
         return;
@@ -213,6 +224,7 @@ fn configure_embedders(meili: &api::MeiliClient, files_uid: &str, logs_uid: &str
 
     configure_one_embedder(meili, files_uid, &files_embedder_settings(&api_key));
     configure_one_embedder(meili, logs_uid, &logs_embedder_settings(&api_key));
+    configure_one_embedder(meili, conversations_uid, &conversations_embedder_settings(&api_key));
 }
 
 /// Read the Voyage AI API key from the credential vault.
@@ -270,6 +282,34 @@ fn logs_embedder_settings(api_key: &str) -> serde_json::Value {
                 ]
             },
             "documentTemplate": "[{{doc.importance}}] {{doc.content}}"
+        }
+    })
+}
+
+/// Embedder settings for the conversations index (T671).
+///
+/// Reuses voyage-code-3 (handles prose fine). The template surfaces author +
+/// thread name + message text so the embedding captures WHO said WHAT in WHICH
+/// thread — the same signal a user recalls when searching. `truncatewords`
+/// caps very long messages so one giant message can't blow the byte budget.
+fn conversations_embedder_settings(api_key: &str) -> serde_json::Value {
+    serde_json::json!({
+        "default": {
+            "source": "rest",
+            "url": VOYAGE_URL,
+            "apiKey": api_key,
+            "request": {
+                "model": VOYAGE_MODEL,
+                "input": ["{{text}}", "{{..}}"]
+            },
+            "response": {
+                "data": [
+                    { "embedding": "{{embedding}}" },
+                    "{{..}}"
+                ]
+            },
+            "documentTemplate": "[{{doc.author}}] {{doc.thread_name}}: {{doc.text | truncatewords: 100}}",
+            "documentTemplateMaxBytes": 1024
         }
     })
 }

@@ -112,7 +112,7 @@ fn a_command_round_trips_over_a_connection_and_stays_exactly_once_across_reexec(
             acks
         });
 
-        let applied = intake.handle_connection(&oplog, &mut server).expect("handle");
+        let applied = intake.handle_connection(&oplog, &mut server, &no_queries).expect("handle");
         assert_eq!(applied.len(), 1, "the command was freshly accepted");
         let statuses = writer.join().expect("writer joined");
         assert_eq!(statuses, vec![Status::Accepted], "the commander saw one Accepted ack");
@@ -132,7 +132,7 @@ fn a_command_round_trips_over_a_connection_and_stays_exactly_once_across_reexec(
             acks
         });
 
-        let applied = intake.handle_connection(&oplog, &mut server).expect("handle");
+        let applied = intake.handle_connection(&oplog, &mut server, &no_queries).expect("handle");
         assert!(applied.is_empty(), "after re-exec the redelivered command is NOT re-applied");
         let statuses = writer.join().expect("writer joined");
         assert_eq!(statuses, vec![Status::Accepted], "a duplicate is still acknowledged accepted");
@@ -162,7 +162,7 @@ fn one_connection_applies_distinct_commands_and_dedups_repeats() {
         acks
     });
 
-    let applied = intake.handle_connection(&oplog, &mut server).expect("handle");
+    let applied = intake.handle_connection(&oplog, &mut server, &no_queries).expect("handle");
     assert_eq!(applied.len(), 2, "only the two distinct commands are applied");
     let statuses = writer.join().expect("writer joined");
     assert_eq!(statuses.len(), 3, "every frame is acknowledged");
@@ -273,4 +273,12 @@ fn the_tee_streams_an_ordered_multi_frame_burst() {
     assert_eq!(seqs, expected, "all frames arrive exactly once, in publish order");
 
     tee.shutdown();
+}
+
+/// Query responder used by the intake tests: this suite exercises the COMMAND
+/// half of the socket, so every read-path query answers with a plain error
+/// (T671). Passing a real search responder would drag Meilisearch into a test
+/// that has nothing to do with it.
+fn no_queries(_query: &cp_wire::types::payload::query::Query) -> cp_wire::types::payload::query::Outcome {
+    cp_wire::types::payload::query::Outcome::Error { reason: "queries not exercised here".to_owned() }
 }

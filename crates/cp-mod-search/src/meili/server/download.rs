@@ -5,7 +5,7 @@
 
 use std::time::Duration;
 
-use super::server::{binary_path, ensure_global_dirs};
+use super::{binary_path, ensure_global_dirs};
 
 /// Detect the current platform for Meilisearch binary download.
 ///

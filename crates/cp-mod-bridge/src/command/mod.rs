@@ -54,9 +54,13 @@ use cp_wire::framing;
 use cp_wire::types::ack::{Ack, Status};
 use cp_wire::types::command::{Command, Frame as CommandFrame};
 use cp_wire::types::oplog::OpEntryKind;
+use cp_wire::types::payload::query::Inbound;
 use cp_wire::types::snapshot::SeenSet;
 
 use crate::error::{BootResult, Error};
+
+/// Read-path query answering (bearer check + injected lookup + framing).
+pub mod reply;
 
 /// Largest accumulated read (per connection) before a frame is abandoned as
 /// junk — bounds memory against a peer that sends an endless un-decodable
@@ -113,32 +117,53 @@ impl Intake {
         (encode_ack(&ack), to_apply)
     }
 
-    /// Drive a connected commander: read framed commands until EOF, acking each.
+    /// Drive a connected peer: read framed [`Inbound`] frames until EOF,
+    /// answering each in place.
     ///
     /// Supports a long-lived bidirectional connection (the same stream the tee
     /// publishes on, design doc — one UDS consumer per agent). Each fully-read
-    /// frame is processed and its ack written back immediately. Returns the
-    /// commands that were freshly accepted, in arrival order, for the caller to
-    /// apply.
+    /// frame is dispatched by shape (T671):
+    ///
+    /// - a **command** frame runs the unchanged authenticate → dedup →
+    ///   journal-then-ack path, and its framed [`Ack`] is written back
+    ///   immediately;
+    /// - a **query** frame is answered read-only via `responder` (bearer check
+    ///   only — no journal, no dedup, nothing to apply) and its framed
+    ///   [`Response`](cp_wire::types::payload::query::Response) is written back.
+    ///
+    /// Returns the commands that were freshly accepted, in arrival order, for
+    /// the caller to apply. Queries contribute nothing to that vector — they
+    /// mutate nothing.
     ///
     /// # Errors
     ///
     /// Returns [`Error::Io`] on a socket read/write fault. A peer that floods
     /// un-decodable bytes past [`MAX_CONNECTION_BUFFER`] ends the connection
     /// with an `Error::Io` rather than growing memory without bound.
-    pub fn handle_connection(&mut self, oplog: &OplogService, stream: &mut UnixStream) -> BootResult<Vec<Command>> {
+    pub fn handle_connection(
+        &mut self,
+        oplog: &OplogService,
+        stream: &mut UnixStream,
+        responder: reply::Responder<'_>,
+    ) -> BootResult<Vec<Command>> {
         let mut buf: Vec<u8> = Vec::new();
         let mut chunk = vec![0u8; READ_CHUNK].into_boxed_slice();
         let mut applied: Vec<Command> = Vec::new();
 
         loop {
             // Drain every complete frame currently buffered.
-            while let Some((consumed, frame)) = take_frame(&buf) {
-                let (ack, to_apply) = self.process(oplog, frame);
-                stream.write_all(&encode_ack(&ack)).map_err(|e| Error::io("write command ack", e))?;
-                if let Some(command) = to_apply {
-                    applied.push(command);
-                }
+            while let Some((consumed, inbound)) = take_inbound(&buf) {
+                let out = match inbound {
+                    Inbound::Command(frame) => {
+                        let (ack, to_apply) = self.process(oplog, frame);
+                        if let Some(command) = to_apply {
+                            applied.push(command);
+                        }
+                        encode_ack(&ack)
+                    }
+                    Inbound::Query(frame) => reply::encode(&reply::answer(&frame, &self.cap_token, responder)),
+                };
+                stream.write_all(&out).map_err(|e| Error::io("write command reply", e))?;
                 let _drained: Vec<u8> = buf.drain(..consumed).collect();
             }
 
@@ -198,15 +223,21 @@ fn decode_frame(frame_bytes: &[u8]) -> Option<CommandFrame> {
 }
 
 /// Pull the first complete frame out of `buf`, returning `(bytes_consumed,
-/// frame)`, or `None` if the buffer holds no complete, valid frame yet.
+/// inbound)`, or `None` if the buffer holds no complete, valid frame yet.
+///
+/// Decodes into [`Inbound`] — the untagged query-or-command discriminator —
+/// so one socket carries both planes (T671). The union is tried query-first and
+/// the two shapes are disjoint by required field (`query` vs `command`), so a
+/// pre-T671 bare command frame still decodes as
+/// [`Command`](Inbound::Command): the command path is byte-identical.
 ///
 /// A corrupt/incomplete leading frame returns `None`; the caller keeps reading
 /// (an incomplete frame completes later, and a genuinely corrupt one is bounded
 /// by [`MAX_CONNECTION_BUFFER`]).
-fn take_frame(buf: &[u8]) -> Option<(usize, CommandFrame)> {
+fn take_inbound(buf: &[u8]) -> Option<(usize, Inbound)> {
     let (payload, consumed) = framing::decode_raw(buf).ok()?;
-    let frame = serde_json::from_slice(payload).ok()?;
-    Some((consumed, frame))
+    let inbound = serde_json::from_slice(payload).ok()?;
+    Some((consumed, inbound))
 }
 
 /// Build an `Accepted` ack for `cmd_id` at `rev`.
@@ -393,7 +424,11 @@ mod tests {
             decode_ack(&buf).status
         });
 
-        let applied = intake.handle_connection(&oplog, &mut server).expect("handle");
+        // A command-only connection never consults the responder.
+        let never = |_q: &cp_wire::types::payload::query::Query| -> cp_wire::types::payload::query::Outcome {
+            unreachable!("no query frame on this connection");
+        };
+        let applied = intake.handle_connection(&oplog, &mut server, &never).expect("handle");
         assert_eq!(applied.len(), 1, "one fresh command was accepted off the connection");
         let status = writer.join().expect("join");
         assert_eq!(status, Status::Accepted, "the commander saw an Accepted ack");

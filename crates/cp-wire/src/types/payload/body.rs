@@ -7,7 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::ContentHash;
+use crate::types::ContentHash;
 
 /// A content-addressed body: hash + data.
 ///

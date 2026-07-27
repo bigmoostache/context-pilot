@@ -22,9 +22,10 @@ use std::time::Duration;
 
 use cp_base::state::runtime::State;
 use cp_mod_bridge::BridgeState;
-use cp_mod_threads::types::{FocusState, ThreadStatus, ThreadsState};
+use cp_mod_threads::types::{ThreadStatus, ThreadsState};
 use cp_wire::types::command::Command;
 use cp_wire::types::oplog::OpEntryKind;
+use cp_wire::types::payload::query::Query;
 use cp_wire::types::{Phase, ThreadTurn};
 
 use crate::app::App;
@@ -97,6 +98,16 @@ const DRAIN_BUDGET: u32 = 64;
 /// accepted commands (an errored connection still counts, so draining
 /// continues to the next pending one).
 fn accept_commands(state: &mut State) -> Option<Vec<Command>> {
+    // Resolve the search credentials BEFORE borrowing `BridgeState`. The
+    // responder closure below must not touch `State`: the command-path `Intake`
+    // is `&mut`-borrowed out of that same `State` for the whole connection, so a
+    // second borrow for `SearchState` would not type-check. Copying the (small,
+    // session-stable) credentials out first makes the closure self-contained.
+    // `None` when the search module is down — queries then answer with a
+    // graceful "search unavailable" rather than failing the connection.
+    let search_creds = cp_mod_search::meili_credentials(state)
+        .and_then(|(port, key)| cp_mod_search::project_hash(state).map(|hash| (port, key, hash)));
+
     let bs = state.ext_mut::<BridgeState>();
 
     // Split borrows: &boot (for listener + oplog) and &mut intake.
@@ -125,7 +136,9 @@ fn accept_commands(state: &mut State) -> Option<Vec<Command>> {
     // Bound how long we wait for the commander to finish writing.
     let _ignored = stream.set_read_timeout(Some(READ_TIMEOUT));
 
-    match intake.handle_connection(boot.oplog(), &mut stream) {
+    let responder = |query: &Query| super::query::answer(search_creds.as_ref(), query);
+
+    match intake.handle_connection(boot.oplog(), &mut stream, &responder) {
         Ok(cmds) => Some(cmds),
         Err(e) => {
             log::error!("bridge: command intake error: {e:?}");
@@ -183,7 +196,7 @@ const fn wire_phase(phase: cp_base::state::flags::StreamPhase) -> Phase {
 /// [`CostAggregate`](OpEntryKind::CostAggregate)): a lost intermediate phase is
 /// reconstructed on replay and a dropped cost sample re-aggregates, so unlike
 /// the roster deltas these must never stall the main loop for durability (I2).
-fn emit_best_effort(state: &State, kind: OpEntryKind) {
+pub(in crate::app::run) fn emit_best_effort(state: &State, kind: OpEntryKind) {
     if let Some(bs) = state.get_ext::<BridgeState>()
         && let Some(boot) = bs.boot.as_ref()
     {
@@ -394,104 +407,5 @@ pub(in crate::app::run) fn emit_thread_status(app: &mut App) {
     for (thread_id, status) in changed {
         emit_roster_delta(&app.state, OpEntryKind::ThreadStatusChanged { thread_id: thread_id.clone(), status });
         let _prev = app.state.ext_mut::<BridgeState>().thread_statuses.insert(thread_id, status);
-    }
-}
-
-// ── Thread focus emission (focused-thread highlight — design doc I8) ──────
-
-/// Emit a [`ThreadFocusChanged`](OpEntryKind::ThreadFocusChanged) the instant
-/// the agent's focused thread changes, so the backend view (and the web UI's
-/// focused-thread highlight) reflect it in milliseconds instead of waiting on
-/// the debounced tier-② disk write plus the frontend's backstop poll.
-///
-/// Like [`emit_thread_status`] this is a main-loop **observe-on-change
-/// chokepoint**: it diffs the live [`FocusState::focused_thread_id`] against the
-/// snapshot held in [`BridgeState::last_focus`] and emits **only on an actual
-/// change**, so it captures focus from *every* source with one uniform path —
-/// the idle `MY_TURN` auto-`Read` ([`maybe_inject_auto_read`](super::maybe_inject_auto_read)),
-/// a manual `Read`, or focus release on archive / a finished turn — rather than
-/// an emit call scattered at each focus-mutation site.
-///
-/// Focus is ephemeral, disposable UI state (the same class as phase), so it
-/// rides the **best-effort** path ([`emit_best_effort`]): a dropped focus delta
-/// self-heals from the agent's tier-② `FocusState` on the next `/threads` read
-/// and is superseded by the next focus change.
-///
-/// The first pass after boot **seeds** the snapshot without emitting, so a
-/// (re)started agent does not replay its current focus as a spurious change
-/// (the cold focus rides the frontend's initial tier-② load).
-///
-/// No-op when the bridge is OFF.
-pub(in crate::app::run) fn emit_thread_focus(app: &mut App) {
-    if !bridge_active(&app.state) {
-        return;
-    }
-
-    let focused = FocusState::get(&app.state).focused_thread_id.clone();
-
-    // First pass: snapshot the existing focus without emitting.
-    let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.focus());
-    if !seeded {
-        let bs = app.state.ext_mut::<BridgeState>();
-        bs.last_focus = focused;
-        bs.seeded.seed_focus();
-        return;
-    }
-
-    // Emit only on an actual change.
-    let changed = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.last_focus != focused);
-    if changed {
-        emit_best_effort(&app.state, OpEntryKind::ThreadFocusChanged { thread_id: focused.clone() });
-        app.state.ext_mut::<BridgeState>().last_focus = focused;
-    }
-}
-
-// ── Behaviour emission (active behaviour-agent — design doc I8, T581) ─────
-
-/// Emit a [`BehaviourChanged`](OpEntryKind::BehaviourChanged) the instant the
-/// agent's active behaviour agent (system prompt) changes, so the web footer's
-/// behaviour chip reflects it in milliseconds instead of waiting on the coarse
-/// `config.json` mtime backstop (~2s) plus the invalidate throttle.
-///
-/// A main-loop **observe-on-change chokepoint** — the exact idiom of
-/// [`emit_thread_status`] / [`emit_thread_focus`]: it diffs the live
-/// [`PromptState::active_agent_id`] against the snapshot held in
-/// [`BridgeState::last_behaviour`] and emits **only on an actual change**, so it
-/// captures a switch from *every* source with one uniform path — the local
-/// `agent_load` tool **and** a web `LoadBehaviour` command — rather than an emit
-/// call scattered at each mutation site.
-///
-/// The active behaviour is disposable UI state (the same class as focus/phase),
-/// so it rides the **best-effort** path ([`emit_best_effort`]): a dropped delta
-/// self-heals via the mtime backstop and is superseded by the next change. The
-/// observer (the web bridge) does not fold it — it invalidates its library query
-/// so the next read surfaces the fresh active agent from tier-② `config.json`.
-///
-/// The first pass after boot **seeds** the snapshot without emitting, so a
-/// (re)started agent does not replay its current behaviour as a spurious change
-/// (the cold value rides the frontend's initial library load).
-///
-/// No-op when the bridge is OFF.
-pub(in crate::app::run) fn emit_behaviour(app: &mut App) {
-    if !bridge_active(&app.state) {
-        return;
-    }
-
-    let active = cp_mod_prompt::types::PromptState::get(&app.state).active_agent_id.clone();
-
-    // First pass: snapshot the existing active behaviour without emitting.
-    let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.behaviour());
-    if !seeded {
-        let bs = app.state.ext_mut::<BridgeState>();
-        bs.last_behaviour = active;
-        bs.seeded.seed_behaviour();
-        return;
-    }
-
-    // Emit only on an actual change.
-    let changed = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.last_behaviour != active);
-    if changed {
-        emit_best_effort(&app.state, OpEntryKind::BehaviourChanged { agent_id: active.clone() });
-        app.state.ext_mut::<BridgeState>().last_behaviour = active;
     }
 }

@@ -270,7 +270,7 @@ fn a_command_round_trips_to_a_real_intake_and_stays_exactly_once() {
             let mut intake = Intake::new(&oplog_dir, token).expect("intake");
             for _ in 0..2 {
                 let (mut conn, _addr) = listener.accept().expect("accept");
-                let _applied = intake.handle_connection(&oplog, &mut conn).expect("handle");
+                let _applied = intake.handle_connection(&oplog, &mut conn, &no_queries).expect("handle");
             }
             oplog.shutdown().expect("shutdown");
         })
@@ -291,4 +291,12 @@ fn a_command_round_trips_to_a_real_intake_and_stays_exactly_once() {
 
     let recovered = replay(&oplog_dir).expect("replay");
     assert_eq!(recovered.seen.len(), 1, "exactly one durable command effect");
+}
+
+/// Query responder used by the intake tests: this suite exercises the COMMAND
+/// half of the socket, so every read-path query answers with a plain error
+/// (T671). Passing a real search responder would drag Meilisearch into a test
+/// that has nothing to do with it.
+fn no_queries(_query: &cp_wire::types::payload::query::Query) -> cp_wire::types::payload::query::Outcome {
+    cp_wire::types::payload::query::Outcome::Error { reason: "queries not exercised here".to_owned() }
 }

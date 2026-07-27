@@ -572,6 +572,39 @@
         ],
         "type": "object"
       },
+      "ConvHit": {
+        "properties": {
+          "author": {
+            "type": "string"
+          },
+          "score": {
+            "format": "double",
+            "type": "number"
+          },
+          "text": {
+            "type": "string"
+          },
+          "thread_id": {
+            "type": "string"
+          },
+          "thread_name": {
+            "type": "string"
+          },
+          "ts_ms": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "thread_id",
+          "thread_name",
+          "author",
+          "text",
+          "ts_ms",
+          "score"
+        ],
+        "type": "object"
+      },
       "ConversationMsg": {
         "properties": {
           "content": {
@@ -616,6 +649,20 @@
           "role",
           "content",
           "timestamp_ms"
+        ],
+        "type": "object"
+      },
+      "ConversationSearchResult": {
+        "properties": {
+          "hits": {
+            "items": {
+              "$ref": "#/components/schemas/ConvHit"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "hits"
         ],
         "type": "object"
       },
@@ -2368,6 +2415,71 @@
           }
         },
         "summary": "Conversation feed",
+        "tags": [
+          "agent"
+        ]
+      }
+    },
+    "/api/agent/{id}/conversations/search": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "limit": {
+                    "format": "int32",
+                    "type": "integer"
+                  },
+                  "query": {
+                    "type": "string"
+                  },
+                  "thread_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "query"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationSearchResult"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Hybrid conversation search",
         "tags": [
           "agent"
         ]

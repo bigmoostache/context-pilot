@@ -10,6 +10,9 @@
 //! It runs once at boot (subsuming the cold-start full scan — an empty index
 //! diffs to "index everything") and again on the hourly tick.
 
+/// Conversation (thread-message) ⇄ index reconciliation (T671).
+pub(crate) mod conversations;
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;
@@ -184,38 +187,38 @@ mod tests {
     #[test]
     fn diff_offline_add() {
         let index = HashMap::new();
-        let disk = HashMap::from([("a.rs".to_string(), fp(1, 10))]);
+        let disk = HashMap::from([("a.rs".to_owned(), fp(1, 10))]);
         let plan = diff(&index, &disk);
-        assert_eq!(plan.to_index, vec!["a.rs".to_string()]);
+        assert_eq!(plan.to_index, vec!["a.rs".to_owned()]);
         assert!(plan.to_delete.is_empty());
     }
 
     #[test]
     fn diff_offline_delete() {
-        let index = HashMap::from([("a.rs".to_string(), fp(1, 10))]);
+        let index = HashMap::from([("a.rs".to_owned(), fp(1, 10))]);
         let disk = HashMap::new();
         let plan = diff(&index, &disk);
         assert!(plan.to_index.is_empty());
-        assert_eq!(plan.to_delete, vec!["a.rs".to_string()]);
+        assert_eq!(plan.to_delete, vec!["a.rs".to_owned()]);
     }
 
     #[test]
     fn diff_offline_edit_mtime() {
-        let index = HashMap::from([("a.rs".to_string(), fp(1, 10))]);
-        let disk = HashMap::from([("a.rs".to_string(), fp(2, 10))]);
-        assert_eq!(diff(&index, &disk).to_index, vec!["a.rs".to_string()]);
+        let index = HashMap::from([("a.rs".to_owned(), fp(1, 10))]);
+        let disk = HashMap::from([("a.rs".to_owned(), fp(2, 10))]);
+        assert_eq!(diff(&index, &disk).to_index, vec!["a.rs".to_owned()]);
     }
 
     #[test]
     fn diff_offline_edit_size() {
-        let index = HashMap::from([("a.rs".to_string(), fp(1, 10))]);
-        let disk = HashMap::from([("a.rs".to_string(), fp(1, 20))]);
-        assert_eq!(diff(&index, &disk).to_index, vec!["a.rs".to_string()]);
+        let index = HashMap::from([("a.rs".to_owned(), fp(1, 10))]);
+        let disk = HashMap::from([("a.rs".to_owned(), fp(1, 20))]);
+        assert_eq!(diff(&index, &disk).to_index, vec!["a.rs".to_owned()]);
     }
 
     #[test]
     fn diff_equal_is_skip() {
-        let same = HashMap::from([("a.rs".to_string(), fp(1, 10)), ("b.rs".to_string(), fp(3, 30))]);
+        let same = HashMap::from([("a.rs".to_owned(), fp(1, 10)), ("b.rs".to_owned(), fp(3, 30))]);
         let plan = diff(&same, &same.clone());
         assert!(plan.is_empty(), "identical maps must produce an empty plan");
     }
@@ -223,17 +226,17 @@ mod tests {
     #[test]
     fn diff_mixed_is_sorted_and_complete() {
         let index = HashMap::from([
-            ("keep.rs".to_string(), fp(1, 1)),
-            ("gone.rs".to_string(), fp(1, 1)),
-            ("edit.rs".to_string(), fp(1, 1)),
+            ("keep.rs".to_owned(), fp(1, 1)),
+            ("gone.rs".to_owned(), fp(1, 1)),
+            ("edit.rs".to_owned(), fp(1, 1)),
         ]);
         let disk = HashMap::from([
-            ("keep.rs".to_string(), fp(1, 1)), // equal
-            ("edit.rs".to_string(), fp(9, 1)), // changed
-            ("new.rs".to_string(), fp(1, 1)),  // added
+            ("keep.rs".to_owned(), fp(1, 1)), // equal
+            ("edit.rs".to_owned(), fp(9, 1)), // changed
+            ("new.rs".to_owned(), fp(1, 1)),  // added
         ]);
         let plan = diff(&index, &disk);
-        assert_eq!(plan.to_index, vec!["edit.rs".to_string(), "new.rs".to_string()]);
-        assert_eq!(plan.to_delete, vec!["gone.rs".to_string()]);
+        assert_eq!(plan.to_index, vec!["edit.rs".to_owned(), "new.rs".to_owned()]);
+        assert_eq!(plan.to_delete, vec!["gone.rs".to_owned()]);
     }
 }

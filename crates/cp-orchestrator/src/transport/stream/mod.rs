@@ -15,6 +15,9 @@ pub mod sse;
 // Single-use SSE upgrade tickets (I9b). They exist solely to gate the SSE
 // upgrade `GET`, so they live alongside the stream machinery they protect.
 pub mod ticket;
+// The `GET /api/stream` landing pad (ticket redemption + ACL + producer
+// hand-off), split out of the transport router for its line budget.
+pub mod upgrade;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};

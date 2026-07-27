@@ -171,6 +171,15 @@ export type CommandReceipt = {
     status: string;
 };
 
+export type ConvHit = {
+    author: string;
+    score: number;
+    text: string;
+    thread_id: string;
+    thread_name: string;
+    ts_ms: number;
+};
+
 export type ConversationMsg = {
     content: string;
     id: string;
@@ -184,6 +193,10 @@ export type ConversationMsg = {
         [key: string]: unknown;
     }> | null;
     uid: string;
+};
+
+export type ConversationSearchResult = {
+    hits: Array<ConvHit>;
 };
 
 export type CreateAgentReceipt = {
@@ -867,6 +880,37 @@ export type GetApiAgentByIdConversationResponses = {
 };
 
 export type GetApiAgentByIdConversationResponse = GetApiAgentByIdConversationResponses[keyof GetApiAgentByIdConversationResponses];
+
+export type PostApiAgentByIdConversationsSearchData = {
+    body: {
+        limit?: number;
+        query: string;
+        thread_id?: string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/agent/{id}/conversations/search';
+};
+
+export type PostApiAgentByIdConversationsSearchErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiAgentByIdConversationsSearchError = PostApiAgentByIdConversationsSearchErrors[keyof PostApiAgentByIdConversationsSearchErrors];
+
+export type PostApiAgentByIdConversationsSearchResponses = {
+    /**
+     * Success
+     */
+    200: ConversationSearchResult;
+};
+
+export type PostApiAgentByIdConversationsSearchResponse = PostApiAgentByIdConversationsSearchResponses[keyof PostApiAgentByIdConversationsSearchResponses];
 
 export type GetApiAgentByIdFsData = {
     body?: never;

@@ -65,6 +65,7 @@ done < <(find . -mindepth 1 -type d \
   -not -path './logs' -not -path './logs/*' \
   -not -path './dumps' -not -path './dumps/*' \
   -not -path './sandbox' -not -path './sandbox/*' \
+  -not -path './tmp' -not -path './tmp/*' \
   -not -path './gaia' -not -path './gaia/*' \
   -not -path './test-results' -not -path './test-results/*' \
   -not -path './report' -not -path './report/*')
