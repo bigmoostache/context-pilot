@@ -15,7 +15,10 @@ mod skill_panel;
 /// Persistent storage for prompt items (agents, skills, commands).
 pub mod storage;
 /// Tool handlers for `Behaviour_create`, `agent_load`, `skill_load`.
-mod tools;
+///
+/// Public so the tui bridge can call [`tools::set_active_agent`] to apply a
+/// `LoadBehaviour` command through the same path as the `agent_load` tool.
+pub mod tools;
 /// Prompt item types: `PromptItem`, `PromptState`, `PromptType`.
 pub mod types;
 

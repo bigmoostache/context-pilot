@@ -445,3 +445,53 @@ pub(in crate::app::run) fn emit_thread_focus(app: &mut App) {
         app.state.ext_mut::<BridgeState>().last_focus = focused;
     }
 }
+
+// ── Behaviour emission (active behaviour-agent — design doc I8, T581) ─────
+
+/// Emit a [`BehaviourChanged`](OpEntryKind::BehaviourChanged) the instant the
+/// agent's active behaviour agent (system prompt) changes, so the web footer's
+/// behaviour chip reflects it in milliseconds instead of waiting on the coarse
+/// `config.json` mtime backstop (~2s) plus the invalidate throttle.
+///
+/// A main-loop **observe-on-change chokepoint** — the exact idiom of
+/// [`emit_thread_status`] / [`emit_thread_focus`]: it diffs the live
+/// [`PromptState::active_agent_id`] against the snapshot held in
+/// [`BridgeState::last_behaviour`] and emits **only on an actual change**, so it
+/// captures a switch from *every* source with one uniform path — the local
+/// `agent_load` tool **and** a web `LoadBehaviour` command — rather than an emit
+/// call scattered at each mutation site.
+///
+/// The active behaviour is disposable UI state (the same class as focus/phase),
+/// so it rides the **best-effort** path ([`emit_best_effort`]): a dropped delta
+/// self-heals via the mtime backstop and is superseded by the next change. The
+/// observer (the web bridge) does not fold it — it invalidates its library query
+/// so the next read surfaces the fresh active agent from tier-② `config.json`.
+///
+/// The first pass after boot **seeds** the snapshot without emitting, so a
+/// (re)started agent does not replay its current behaviour as a spurious change
+/// (the cold value rides the frontend's initial library load).
+///
+/// No-op when the bridge is OFF.
+pub(in crate::app::run) fn emit_behaviour(app: &mut App) {
+    if !bridge_active(&app.state) {
+        return;
+    }
+
+    let active = cp_mod_prompt::types::PromptState::get(&app.state).active_agent_id.clone();
+
+    // First pass: snapshot the existing active behaviour without emitting.
+    let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.behaviour());
+    if !seeded {
+        let bs = app.state.ext_mut::<BridgeState>();
+        bs.last_behaviour = active;
+        bs.seeded.seed_behaviour();
+        return;
+    }
+
+    // Emit only on an actual change.
+    let changed = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.last_behaviour != active);
+    if changed {
+        emit_best_effort(&app.state, OpEntryKind::BehaviourChanged { agent_id: active.clone() });
+        app.state.ext_mut::<BridgeState>().last_behaviour = active;
+    }
+}

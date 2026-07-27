@@ -276,6 +276,39 @@ pub(super) fn paths() -> Value {
             "properties": { "name": { "type": "string" }, "description": { "type": "string" }, "body": { "type": "string" } },
             "required": ["name", "body"]
         })), r("CreateCommandReceipt"))),
+        "/api/agent/{id}/library/agent/{item}": merge(
+            merge(
+                json!({ "get": {
+                    "tags": ["agent"], "summary": "Read behaviour agent raw",
+                    "parameters": [
+                        { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+                        { "name": "item", "in": "path", "required": true, "schema": { "type": "string" } }
+                    ],
+                    "responses": merge(ok(r("LibraryAgentRaw")), err())
+                }}),
+                json!({ "put": {
+                    "tags": ["agent"], "summary": "Create or override behaviour agent",
+                    "parameters": [
+                        { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+                        { "name": "item", "in": "path", "required": true, "schema": { "type": "string" } }
+                    ],
+                    "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                        "type": "object",
+                        "properties": { "name": { "type": "string" }, "description": { "type": "string" }, "body": { "type": "string" } },
+                        "required": ["name", "body"]
+                    }}}},
+                    "responses": merge(ok(r("CreateCommandReceipt")), err())
+                }})
+            ),
+            json!({ "delete": {
+                "tags": ["agent"], "summary": "Delete behaviour agent override",
+                "parameters": [
+                    { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+                    { "name": "item", "in": "path", "required": true, "schema": { "type": "string" } }
+                ],
+                "responses": merge(ok(r("CreateCommandReceipt")), err())
+            }})
+        ),
         // ── ACL ─────────────────────────────────────────────────────
         "/api/agent/{id}/acl": merge(
             with_agent(get("auth", "List agent ACL", arr(r("AclEntry")))),

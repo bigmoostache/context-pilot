@@ -311,3 +311,43 @@ export function useCreateCommand(agentId: string) {
     },
   })
 }
+
+/**
+ * Mutation to create or overwrite a behaviour agent `.md` (T581 footer editor).
+ * One-shot `PUT …/library/agent/{itemId}` — a user agent, or a local override
+ * of a built-in. Not a delta-covered resource → a `useMutation`. On success the
+ * agent's `useLibrary` query is invalidated so the new/edited agent surfaces in
+ * the selector immediately (the running agent also picks the file up on its own
+ * filesystem watch, and a behaviour switch re-reads it).
+ */
+export function useUpsertLibraryAgent(agentId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (agent: { itemId: string; name: string; description?: string; body: string }) =>
+      api.upsertLibraryAgent(agentId, agent.itemId, {
+        name: agent.name,
+        description: agent.description ?? "",
+        body: agent.body,
+      }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: qk.library(agentId) })
+    },
+  })
+}
+
+/**
+ * Mutation to delete a behaviour agent's on-disk `.md` (T581 footer editor).
+ * If the file overrode a built-in, the compiled-in seed reappears; if it was a
+ * pure user agent, it is gone. Not a delta-covered resource → a `useMutation`.
+ * On success the agent's `useLibrary` query is invalidated so the row updates
+ * (reverts to seed, or vanishes) at once.
+ */
+export function useDeleteLibraryAgent(agentId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (itemId: string) => api.deleteLibraryAgent(agentId, itemId),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: qk.library(agentId) })
+    },
+  })
+}

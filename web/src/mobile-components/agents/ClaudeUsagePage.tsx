@@ -4,7 +4,7 @@ import { ChevronLeft, Loader2, RefreshCw } from "lucide-react"
 import { useClaudeUsage } from "@/lib/live/useClaudeUsage"
 import type { ClaudeUsageLimit } from "@/lib/api/generated/types.gen"
 import { cn, prefersReducedMotion } from "@/lib/utils"
-import { CornerButton } from "@/mobile-components/shell/CornerButton"
+import { CornerButton } from "@/mobile-components/shell/chrome/CornerButton"
 import { StoredAccounts } from "@/mobile-components/shell/widgets/StoredAccounts"
 import { LoginFlow } from "@/mobile-components/shell/widgets/UsageButton"
 

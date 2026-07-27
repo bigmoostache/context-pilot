@@ -9,7 +9,7 @@ import type {
   UploadedFile,
   CommandSuggestion,
 } from "@/mobile-components/threads/fileUpload/helpers"
-import { FrostedBottomBar } from "@/mobile-components/shell/FrostedBottomBar"
+import { FrostedBottomBar } from "@/mobile-components/shell/chrome/FrostedBottomBar"
 import { parseDraft } from "@/lib/support/threadMessages"
 
 // CommandSuggestion lives beside the file-chip abstraction in ./fileUpload (both
