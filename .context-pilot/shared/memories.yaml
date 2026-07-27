@@ -214,6 +214,34 @@
   - deadman
   - historical
   last_edited_ms: 1784202948992
+6c22bdb28d5dd166:
+  tl_dr: 'CI Frontend red: exit-1 always prints after the LAST header (knip) because check-ts-lints.sh aggregates 8 sub-checks. Never infer the culprit from the error''s position — grep the whole log. knip falsely blamed twice; prettier was the real cause.'
+  contents: |-
+    THE TRAP (hit twice: T648 2026-07-22, T672 2026-07-27 — user furious the 2nd time, ~200 wasted tool calls).
+
+    MECHANISM: .github/checks/check-ts-lints.sh uses `set -uo pipefail` (NO -e) and runs all 8 sub-checks unconditionally:
+      eslint · prettier --check · stylelint · tsc -b · type-coverage · suppressions · rule-census · knip
+    Each failure does `|| fail=1`; the script then `exit "$fail"` at the very end. GitHub prints `##[error]Process completed with exit code 1` at the moment the STEP ends — i.e. always after the last section header, `=== dead code (knip) ===`. This makes knip look guilty every single time regardless of the true culprit.
+
+    CORRECT PROTOCOL when the Frontend job is red:
+    1. Fetch the full job log (GitHub REST: /actions/jobs/<id>/logs — gh CLI is NOT installed, M156).
+    2. `grep -n "^2.*=== "` to list every section header with line numbers.
+    3. Read the BODY between each pair of headers. A failing sub-check prints its own diagnostics there (`[warn] <file>` for prettier, rule violations for eslint, `error TS####` for tsc).
+    4. Do NOT tail-read. Do NOT stop at the first plausible suspect.
+    5. If the user PASTED the log, read all of it before forming a hypothesis — in T672 the decisive `[warn] src/components/shell/behaviour/BehaviourChip.tsx` line was in the user's FIRST paste and I missed it for an hour.
+
+    DISCONFIRMATION TRICK (only if genuinely stuck): temporarily wrap the suspect in `if <cmd>; then rc=0; else rc=$?; fi; echo "real exit code = $rc"`. Must use the if-form — plain `cmd; rc=$?` never runs under `set -euo pipefail` in check-web-deadcode.sh. Revert the probe once the answer is in.
+
+    EFFICIENCY LESSON: never use a CI round-trip (~2.5 min) as the debug loop when the log already in hand answers the question. And after ANY merge, re-run the FULL local gate `bash .github/checks/check-ts-lints.sh` — a prior fix (prettier on BehaviourChip.tsx) was silently clobbered by a second master merge, which is what resurrected the failure.
+  importance: critical
+  labels:
+  - ci
+  - diagnosis
+  - knip
+  - prettier
+  - gotcha
+  - post-mortem
+  last_edited_ms: 1785166436193
 6cc818f12c0d231a:
   tl_dr: 'DOCUMENTATION QUALITY: Documentation is ABSOLUTELY CRITICAL. Do NOT half-ass it. If understanding a function requires opening extra files to see context, DO IT. Don''t document to document — document to HELP future readers. Take the extra step.'
   importance: critical
