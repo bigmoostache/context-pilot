@@ -140,7 +140,7 @@ export function ThreadList({
         {!showArchived && archivedCount > 0 && (
           <button
             onClick={() => onToggleArchived(true)}
-            className="flex shrink-0 items-center gap-2 border-t border-border px-3.5 py-2.5 text-[12px] text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+            className="flex shrink-0 items-center gap-2 px-3.5 py-2.5 text-[12px] text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
           >
             <Archive className="size-3.5" />
             Archived
