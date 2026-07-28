@@ -2042,6 +2042,10 @@
   path: docs/threads.md
   description: 'Design doc for threads feature: parallel discussion/work topics. Core model, tools (Send/Read/Ask), coucou integration (recurrent scheduling), fixed panel, Ctrl+V threads view. Status: brainstorm.'
   last_edited_ms: 1781349633701
+18db81cfaaf56157:
+  path: deploy/PROVISIONING.md
+  description: 'Full Context Pilot box provisioning procedure (FR). Factory box → prod cockpit. Two access planes (vendor→tailnet, client→LAN). Port allocation (:443 cockpit, :9090 maint, :8088 LuCI, :22 SSH). Phases 0–4: Tailscale control-plane + control node, day-0 (AP WiFi + static Tailscale binary + procd service + enroll), build artifact, Ansible deploy, IT onboarding. Phase 3bis: optional Claude Code OAuth subscription creds (read-only, no refresh). Decisions + operational caveats (self-cut on Tailscale upgrade, key-expiry, firewall, /mnt/data).'
+  last_edited_ms: 0
 18e69c0c8055006e:
   path: web/src/components/agents/AgentModal.tsx
   description: 'Agent create/manage dialog. useProviders() hook fetches registry. Manage: 2-col (960px) — left = name + ModelPicker (providers prop), right = SessionVitals + ACL. Submit sends Configure + rename. Create: single-col, persists defaults to localStorage.'
@@ -2745,6 +2749,10 @@
 21a717360bc91e22:
   path: web/src/lib/api/generated/client/index.ts
   description: 'Client barrel re-exports: createClient, createConfig, mergeHeaders, type exports (Client, Config, Options, RequestResult, TDataShape, etc).'
+  last_edited_ms: 0
+21a95a92203a432c:
+  path: web/src/components/threads/ThreadConversation.tsx
+  description: 'Center pane: thread conversation + composer. T510 FREEZE FIX: MessageRow React.memo (comparator msg===+agentId===) + AutoRun memo + useMemo(segmentLog) + content-visibility:auto per row. useConversationDrop hook (T367/T471 OS-file drag+zip). scrollIntoView measure-wrapped, 6-frame converge. FileSidebar rail for thread attachments.'
   last_edited_ms: 0
 21b5a0d10a4cb88f:
   path: web/src/components/threads/ThreadsView.tsx
@@ -4602,6 +4610,10 @@
   path: web/src/components/finder/preview/FinderPreview.tsx
   description: 'Quick Look preview shell + Body() kind router. Routes node → mock previews (mockPreviews), live fetchers (livePreviews), or shared leaf renderers (previewParts). T306: the drawer header''s Download button is wired to downloadFile(agentId, node.path) (streams the realm file via the backend attachment endpoint) — actionable only in the live Finder (agentId scopes the realm), inert in the mock; hidden for folders. The decorative Share button was removed app-wide (no utility).'
   last_edited_ms: 1782054164059
+387e923db29ebc7f:
+  path: .context-pilot/shared/tree-descriptions.yaml
+  description: Persisted tree descriptions YAML. Synced to git alongside code commits per M15.
+  last_edited_ms: 0
 387f3b11754928d1:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search.
@@ -7350,6 +7362,10 @@
   path: crates/cp-base/src/state/context.rs
   description: 'Kind registry + Entry type. TypeMeta 9-field #[expect(exhaustive_structs)] A5 (25 cross-crate sites). A6: estimate_tokens via float_math::ceil_ratio. EmittedState/ScrollState/Entry #[non_exhaustive]+builders. make_default_entry.'
   last_edited_ms: 0
+588d7e7323bf6994:
+  path: crates/cp-orchestrator/src/runtime/mod.rs
+  description: 'Orchestrator runtime — Config (env vars: port, maint_port, agents_dir, scan_interval, auth, session_ttl) + Runtime (start_driver background thread + serve HTTP). driver_loop: registry scan (slow cadence) + oplog tail (fast 100ms TAIL_INTERVAL) + config mtime backstop + auth backup. Two listeners: product :7878 + maintenance :9090. Caddy apply at boot.'
+  last_edited_ms: 0
 58d63e6da1bfd473:
   path: ui/src/components/shell/StatsPopup.tsx
   description: Session 'vitals' popup — the stats that used to live in the cockpit's right rail, now summoned from an Activity button in the global TopBar header. Portaled Dialog primitive (escapes vibrancy containing block). Context-budget meter + threshold tick + stat rows from mock.stats.
@@ -7741,6 +7757,10 @@
 5edaca03764ba233:
   path: crates/cp-mod-queue/src/lib.rs
   description: 'Queue module. 3 tools: pause/execute/undo. Fixed QUEUE panel. Not core. QueueState: active, queued_calls, next_index. Trap state (trap_active/panel_ids/optional_ids) persisted in save/load. Queue_execute handled in pipeline.rs (needs dispatch). Reverie-allowed.'
+  last_edited_ms: 0
+5edb9bb5a1a91bbc:
+  path: README.md
+  description: 'Project README — global ARCHITECTURE overview (rewritten from the old philosophy/marketing copy, T278). 10 sections + ASCII topology diagram: system overview (5 surfaces), the agent TUI (main loop/modules/panels/LLM providers/tier-② persistence), three-tier durability + push-vs-inspection planes, the orchestrator (registry/services/supervisor/transport routes), the bridge (CP_BRIDGE=1 boot sequence), the web frontend (TanStack Query + SSE push), sidecars (console server, Meilisearch, SQLite entities), the cp-wire protocol types, repo layout, engineering constraints (500-line/8-entry caps, lints, hash chain) + flame telemetry.'
   last_edited_ms: 0
 5ef0edc62bb421db:
   path: crates/cp-orchestrator/Cargo.toml
@@ -9282,6 +9302,10 @@
   path: web/src/components/agents/AgentModal/actions.ts
   description: 'AgentModal mutations hook (P8 split): useAgentModalActions bundles create/rename/restart/retire/avatar mutations + Esc/⌘↵ key handler (bound once via latest-refs). Uses useRestartFlow for full restart lifecycle (API call + SSE drop detection + reconnect wait + 30s failsafe). ActionsArgs object bundles 7 params (max-params 4). saveManage sends configure+rename; create maps apiName.'
   last_edited_ms: 1784202781489
+71c22c2e75d783c3:
+  path: web/src/mobile-components/auth/DayZeroSetup.tsx
+  description: Mobile day-0 provisioning twin. 2-phase wizard (identity/trust), 16px Field inputs, py-3 buttons. Same POST /api/it/identity + CA fingerprint poll logic.
+  last_edited_ms: 0
 71c66f2db2c64dbf:
   path: crates/cp-orchestrator/src/services/auth/store.rs
   description: AuthStore — SQLite-backed auth CRUD. Schema init (users/sessions/agent_acl), Argon2id hashing, token/UUID generation. User CRUD, session lifecycle (create/validate/revoke with lazy sweep). ACL ops extracted to sibling acl.rs.
@@ -9386,6 +9410,10 @@
   path: crates/cp-orchestrator/src/transport/inspect/finder/sheet.rs
   description: 'Finder spreadsheet→table JSON (T282): fs_sheet (GET /fs/sheet?path=). csv/tsv via the `csv` reader (quote+embedded-newline aware); xlsx/xls/xlsb/ods/xlsm via calamine open_workbook_auto. Both collapse to {sheets:[{name,rows:[[cell]]}],truncated}, every cell stringified (cell_to_string: integral floats lose the .0 tail). Bounded MAX_ROWS=1000 × MAX_COLS=50 × MAX_SHEETS=20; csv read-capped 8MiB. Confined via support:: (escape 403, non-file 404, unsupported/unparseable 415, missing param 400).'
   last_edited_ms: 1781896321103
+730186e6941125c9:
+  path: deploy/photonicat/emmc-install/installer/init-sd-install.sh
+  description: The zero-touch flasher on the init-SD. Guard stamp, optional factory-OpenWrt backup, zstd -dc golden.img.zst | dd of=/dev/mmcblk0, background LCD progress (polls dd /proc fdinfo pos), sha256 readback verify, poweroff (=done signal, safe to pull SD). Error leaves board on with ERROR screen.
+  last_edited_ms: 0
 730bf605abb836a5:
   path: crates/cp-mod-console/src/types.rs
   description: 'Console types. ProcessStatus enum #[expect(exhaustive_enums)] A4. SessionMeta, ConsoleState, ConsoleWatcher (exit/pattern, easy_bash inline vs panel overflow).'
@@ -9650,6 +9678,10 @@
   path: web/src/components/Root.tsx
   description: Desktop tree root — extracted from former App.tsx body. Provider-contract boundary + AppShell (view-router fleet/threads/finder/costs, TopBar+StatusBar, live vitals/SSE, disconnect overlay). Mirror twin of mobile Root.
   last_edited_ms: 1784666644246
+7588f9ad4a60ec72:
+  path: web/src/components/threads/ThreadComposer.tsx
+  description: 'Thread composer — always active, regardless of turn status. Turn-status banner reflects agent activity on this thread (T39/T371). Structure (P8): draft logic in useComposer, banner in ComposerBanner, input row in ComposerInputRow. T556: prefix-filtered /command bubbles with Tab autocomplete and Space expansion.'
+  last_edited_ms: 0
 758c6087049c485e:
   path: crates/cp-mod-search/src/panel.rs
   description: Search result panel + YAML formatter. format_results groups chunks by path + logs + entities. update_if_changed via let _changed (T586).
@@ -10566,6 +10598,10 @@
   path: openapi.json
   description: Generated OpenAPI 3.0.3 spec (70KB). Source of truth for TypeScript client codegen. Regenerated from Rust types via tests/openapi.rs.
   last_edited_ms: 0
+80400004d69ff42d:
+  path: crates/cp-orchestrator/tests/openapi/schemas_ext.rs
+  description: Transport-layer OpenAPI schemas — receipts, auth, env-keys, filesystem, FinderKind, LLM registry, SSE delta protocol (OpEntryKind incl 'state' field for lifecycle deltas — T566), release management, Claude Code usage+login.
+  last_edited_ms: 0
 80619247f5c1d0f5:
   path: web/src/components/shell/widgets/UserMenu.tsx
   description: 'Account avatar menu (T30). Gradient AvatarMark trigger + portaled dropdown: identity header div, Profile/Settings/Manage Users (Phase 10, admin-only)/Sign-out. Sign out wired to useAuth().logout when auth enabled. onOpenUsers callback triggers admin UsersDialog.'
@@ -10857,6 +10893,10 @@
 838aab6a32750248:
   path: crates/cp-orchestrator/tests/supervisor_lifecycle.rs
   description: 'Phase 28 (X795) backend supervisor lifecycle suite (4 tests, all green, ~15s). Black-box public-API + real OS processes, covering what supervisor/tests.rs unit tests can''t: (1) SIGTERM→grace→SIGKILL escalation vs `/bin/sh -c "trap '''' TERM; exec sleep 60"` (unit spawn_and_stop never walks escalation path); (2) multi-agent fleet spawn 3 → stop all → all pids ESRCH-gone (spawned children reaped, no zombie); (3) adopted FOREIGN process really signalled on stop (status.signal()==SIGTERM 15; supervisor signals but doesn''t reap what it didn''t spawn); (4) check_liveness routes spawned Exited (try_wait) + adopted Vanished (signal-0) in ONE pass. pid_present helper via nix kill(_,None)!=ESRCH. Top `use cp_mod_bridge/cp_oplog/serde/serde_json/tiny_http as _;`.'
+  last_edited_ms: 0
+83a1f2ecfe457def:
+  path: web/src/components/auth/DayZeroSetup.tsx
+  description: 'Day-0 provisioning screen (next_action=set_identity): name the box (DNS/IP) then distribute CA root; posts POST /api/it/identity, brings :443 up.'
   last_edited_ms: 0
 83c59efd682f0ecc:
   path: tedx.md
@@ -12178,6 +12218,10 @@
   path: crates/cp-mod-callback/src/trigger.rs
   description: Callback trigger engine. collect_changed_files() extracts paths from Edit/Write tools. match_callbacks() with flame!("cb_match") matches files against glob patterns. validate_skip_names() warns on non-existent callbacks. partition_callbacks() splits blocking/async.
   last_edited_ms: 0
+936371f437344897:
+  path: deploy/photonicat/emmc-install/lcd/pcat_lcd.py
+  description: GC9307 SPI LCD 4-state progress painter (flashing PCT/verify/done/error). Python spidev+libgpiod, 5x7 bitmap font, init sequence transcribed from vendor periph.io-gc9307 st7789.go. /dev/spidev1.0, RST=122 DC=121, 172x320 rot180 MADCTL 0x48 coloffset 34. One-shot per state screen.
+  last_edited_ms: 0
 93675230eb37ea5b:
   path: .git/index
   description: Git index (binary). Not source.
@@ -12333,6 +12377,10 @@
 9557ff70b0d90a25:
   path: src/modules/conversation/render_input_blocks.rs
   description: IR input area renderer. Cursor + paste placeholder expansion + command highlighting + selection highlighting (via apply_selection_to_spans with reversed spans). InputBlockCtx context, expand_paste_sentinels mapping, command hints.
+  last_edited_ms: 0
+955927c3631059fd:
+  path: web/README.md
+  description: 'Web client documentation: architecture (REST+SSE two-plane), quick start (run-stack.sh), manual start, env vars, data flow (inspection+orchestration planes), key directories, tech stack.'
   last_edited_ms: 0
 9567f58da9cf921d:
   path: src/infra/mod.rs
@@ -13050,6 +13098,10 @@
   path: crates/cp-wire/src/types/command.rs
   description: Command envelope (id, seq, dedup_token) + Kind (SendMessage, CreateThread, ArchiveThread, RestoreThread, PauseThread, ResumeThread, DeleteThread, InterruptStream, Stop, Configure{provider,model}, Unknown). Frame{schema_version, auth, command}. PauseThread/ResumeThread added for T371. DeleteThread added for T371 permanent delete.
   last_edited_ms: 1782315774512
+9e6f9c6ed64b39a7:
+  path: deploy/photonicat/emmc-install/build/build-init-sd.sh
+  description: 'Assembles the init-SD: write base Debian image to card, grow rootfs, seed installer payload (init-sd-install.sh + pcat_lcd.py + unit + golden.img.zst), strip the firstboot unit (target-only). Inputs via env: BASE_IMG/CARD/GOLDEN_DIR. Interactive card-device confirm.'
+  last_edited_ms: 0
 9e742fd75d006bc4:
   path: src/ui/threads_view/mod.rs
   description: Threads view layout + thread list rendering. Two-pane layout (thread list | messages). Virtual '+ New Thread' entry. IR pipeline for list items (status dots, unread indicators, selection highlight). maybe_activate_thread_question() lazy question form init. truncate_str helper.
@@ -13430,6 +13482,10 @@ a1be7723d6430d79:
   path: crates/cp-wire/src/types/oplog.rs
   description: 'OpEntry + OpEntryKind internally-tagged enum: CommandEffect, SeenMark, PhaseTransition, MessageCreated{...,inline_body}, ThreadCreated/Archived/Restored/Paused/Resumed/Deleted/StatusChanged, ThreadFocusChanged, Lifecycle, CostAggregate, ContextUsage{used,threshold,budget,hit_tokens,miss_tokens (T297 cache split, #[serde(default)] N-1)}, Checkpoint, Unknown. Framed (len+CRC). round-trip + tolerant-decode + roster + stable-tag tests.'
   last_edited_ms: 1782315774544
+a1e294df4d2bd95d:
+  path: web/src/components/threads/ThreadsView.tsx
+  description: 'Desktop ThreadsView — master-detail (list rail + conversation). railOpen collapse (T669) animates (T670): rail stays mounted, slides via transitioned negative left-margin; slide wrapper is flex (T670 fix 7117931e — a plain block wrapper broke the aside''s flex-stretch, collapsing it to content height); root overflow-hidden clips the off-screen rail; floating PanelLeft reopen button fades+nudges in when collapsed; motion-reduce snaps. Shared useThreadSelection+useThreadActions from lib/live/threadView. Mobile twin = stack nav.'
+  last_edited_ms: 0
 a1ffaeff3ac46448:
   path: web/src/components/threads/ThreadsView.tsx
   description: 'Thread sidebar orchestrator. P8 refactor: logic split into TWO same-file hooks — useThreadSelection (selectedId/query/showArchived/newOpen/pendingFiles + effectiveSelectedId resolution + persist effect + auto-select-new-thread diff effect + switch-thread pending-files render-phase reset) and useThreadActions (flash/notice + handleArchive/Pause/Delete/Create/Send/Attach, all routing rejections through describeCommandError toast per T121) — so the render body meets the 150-line/30-statement budgets. `thread` lookup moved below the no-agent early exit (unicorn/no-declarations-before-early-exit). handleAttach uploads to .uploads/ via uploadUnique. Wires ThreadList+ThreadConversation+NewThreadDialog + EmptyRealm.'
@@ -16286,6 +16342,10 @@ c4e9d7be47211a1c:
   path: crates/cp-mod-queue/Cargo.toml
   description: 'Queue module deps: cp-base, cp-render, crossterm, serde, serde_json.'
   last_edited_ms: 1780563847626
+c50579caadeebb35:
+  path: deploy/photonicat/emmc-install/README.md
+  description: 'Full protocol doc: why (drop armbian-install), verified board facts, file layout, 4-stage flow (golden build, init-SD build, field install, ansible provisioning), 9 pre-solved frictions, open items. Locked decisions + secrets policy.'
+  last_edited_ms: 0
 c509a5f5c91dc5b3:
   path: ui/src/App.tsx
   description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). FleetDashboard at fleet altitude; threads/cockpit/finder per-agent. Cockpit = LeftRail + Conversation (RightInspector removed; stats now in header popup). openAgent switches agent→threads. Finder keyed by agent.id.
@@ -17926,6 +17986,10 @@ da174be66a37f518:
   path: src/app/run/reverie.rs
   description: 'Reverie event processing. A9: HashMap iter filter closures over &(&K,&V) -> |entry| entry.0/.1. apply_reverie_event/dispatch_one_reverie_tool/record_reverie_tool_exchange/reverie_over_tool_cap/restream_reverie_if_alive/destroy_reverie_on_report. Multi-agent concurrent.'
   last_edited_ms: 0
+da18e73cedc6db46:
+  path: deploy/photonicat/emmc-install/installer/pcat-installer.service
+  description: systemd oneshot driving init-sd-install.sh. Offline (After=local-fs.target, no network). TimeoutStartSec=1800 (full flash+verify). ConditionPathExists=!/opt/pcat-install/.installed.
+  last_edited_ms: 0
 da1e497617676b58:
   path: crates/cp-base/src/state/data/model_helpers.rs
   description: 'ModelPricing trait: model selection, pricing, context budget, cleaning thresholds — impl for State + token_cost()'
@@ -18430,6 +18494,10 @@ e19314fbc0e8ca8e:
   path: ui/src/components/agents/FleetDashboard.tsx
   description: 'Fleet welcome dashboard — agent create/manage entry. Centred on shared FLEET_MAX_W. Slim header (T28): just an ''Agents'' h1 + New-agent button (no ''Mission control'' label, no subtitle). AgentCard grid (status badge + one-line task + model·cost; Open→threads, Manage→AgentModal), New-agent card. autoCreate prop (T21) opens AgentModal in create mode then calls onAutoCreateConsumed. AgentModal lives in ./AgentModal (T26), shared with the TopBar per-agent config button.'
   last_edited_ms: 1781597617596
+e1a5db4621871daf:
+  path: openapi.json
+  description: Generated OpenAPI 3.0.3 spec (70KB). Source of truth for TypeScript client codegen. Regenerated from Rust types via tests/openapi.rs.
+  last_edited_ms: 0
 e1a8486381ab592f:
   path: .uploads/apply_clippy_fix.py
   description: Applies clippy suggested_replacement by byte offset (highest-first), reads BOTH primary AND child(help) spans. Bypasses cargo --fix MaybeIncorrect skip. EXCLUDE redundant_pub_crate (damaging).
@@ -20338,6 +20406,10 @@ f89ccd9dd26859f5:
   path: web/src/components/finder/FinderChrome.tsx
   description: 'Finder chrome: tab strip, main toolbar (nav/crumbs/view-switch/search/icon-size/actions), path bar + NavBtn/SegBtn. FinderSidebar re-exported from support/.'
   last_edited_ms: 1783412977550
+f8ac4584250fcad4:
+  path: web/src/components/threads/ThreadList.tsx
+  description: Thread sidebar list. Grouped by turn-status (Agent's turn / User turn) + Archived view. Search now lives in ThreadSearchPalette (T669) opened from ListHeader's Search button; ListHeader also has a PanelLeftClose sidebar-collapse button. Row-hover title marquee via useTitleMarquee (WAA). Subcomponents RowActions/RowMeta/ListHeader/EmptyState keep budgets. Exactly 500 lines (cap).
+  last_edited_ms: 0
 f8cfbcdcc4351bbd:
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. route_rest dispatches all /api routes incl auth/ACL/env-keys/providers/releases/claude-usage+login+refresh(T451). handle() has centralized Bearer gate + per-agent ACL check. handle_stream = SSE with ticket-based ACL.
@@ -20930,6 +21002,10 @@ ff5e2aa0b27af18c:
   path: crates/cp-base/src/config/accessors/library.rs
   description: Seed prompt library accessors (agents/skills/commands) (A7 split).
   last_edited_ms: 1784536096734
+ff60afa5b9659465:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 ff64487da9d7be43:
   path: deploy/ansible/tasks/seed.yml
   description: 'Admin-seed tasks (Obj 6.1/6.2). Idempotent: unit with existing seed.env left untouched. Generates unique 20-char passwords for superadmin (vendor) + admin (client) accounts, writes seed.env chmod 600, writes printable delivery sheet on control node.'

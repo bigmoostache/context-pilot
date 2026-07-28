@@ -17,8 +17,21 @@ use types::MemoryState;
 
 use cp_base::cast::Safe as _;
 
-/// Maximum token length for memory `tl_dr` field (enforced on create/update)
-pub const MEMORY_TLDR_MAX_TOKENS: usize = 80;
+/// Token budget ADVERTISED to the model for a memory `tl_dr`.
+///
+/// The number quoted in the tool docs and the rejection message. Deliberately
+/// lower than the real limit ([`MEMORY_TLDR_HARD_CAP`]): the model routinely
+/// overshoots a stated cap by a bit, so quoting 80 lands it comfortably under
+/// the true 120 and the create/update succeeds instead of failing on a
+/// marginal overrun.
+pub const MEMORY_TLDR_ADVERTISED_TOKENS: usize = 80;
+
+/// The REAL enforced ceiling for a memory `tl_dr` (create/update reject above).
+///
+/// Never surface this number to the model — it must only ever see
+/// [`MEMORY_TLDR_ADVERTISED_TOKENS`] (80), so its self-trimming aims well below
+/// the true limit and marginal overruns still pass.
+pub const MEMORY_TLDR_HARD_CAP: usize = 120;
 
 use serde_json::json;
 
