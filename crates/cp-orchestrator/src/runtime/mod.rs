@@ -244,6 +244,15 @@ impl Runtime {
         update_scheduler::spawn(Arc::clone(&self.backend), self.config.auth_db_path.clone(), install)
     }
 
+    /// Spawn the Claude OAuth refresh sweeper: a standalone thread that keeps the
+    /// active token AND every stored account fresh, refreshing any that fall
+    /// within an hour of expiry. Needs no backend state (OAuth lives on disk /
+    /// Keychain), so it takes nothing and holds no locks. See
+    /// [`crate::transport::rest::spawn_oauth_refresh`].
+    pub fn start_oauth_sweeper(&self) -> thread::JoinHandle<()> {
+        crate::transport::rest::spawn_oauth_refresh()
+    }
+
     /// Spawn the self-update committer thread (update-policy §5.5 steps 4-5).
     ///
     /// It polls our own `/healthz` and, once a staged update's boot proves

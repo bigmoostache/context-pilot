@@ -6,6 +6,7 @@
 //! browser, then pastes the resulting code back into the frontend dialog.
 
 pub(crate) mod accounts;
+pub(crate) mod sweep;
 
 use std::sync::Mutex;
 use std::time::{Duration, Instant};

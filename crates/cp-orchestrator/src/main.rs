@@ -100,6 +100,10 @@ fn main() {
     let runtime = Runtime::new(config);
     let _driver = runtime.start_driver();
 
+    // Keep every Claude OAuth account (active + stored) auto-refreshed, so a
+    // token never expires from under the fleet regardless of any open UI.
+    let _oauth_sweeper = runtime.start_oauth_sweeper();
+
     // Health-gated commit of a staged update (update-policy §5.5): a committer
     // thread polls our own `/healthz` and, only after a real `200` within the
     // deadline, commits the binary swap and promotes the release state

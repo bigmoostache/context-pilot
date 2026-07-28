@@ -94,6 +94,10 @@
   path: web/src/mobile-components/shell/widgets/UsageButton.tsx
   description: '@generated mobile-mirror stub — re-exports desktop UsageButton (LoginFlow reused by mobile via this token).'
   last_edited_ms: 0
+016998dae3456238:
+  path: crates/cp-orchestrator/src/main.rs
+  description: Backend entry point. Loads .env via dotenvy (project-local + global fallback) before config. Reads Config from env, prints version/protocol/agents-dir/budget/scan-interval + agents_root + agent_binary, creates Runtime, starts driver thread, serves HTTP (blocking).
+  last_edited_ms: 0
 017021fe83997a4c:
   path: src/ui/search_overlay/display.rs
   description: Display column builders for search index overlay. build_left_display + build_right_display split into per-section push_* helpers (database/index/extensions/splitter/embeddings/tasks/recomputed/recently_sent) (A2).
@@ -589,6 +593,10 @@
 06c1b9ac8c794dad:
   path: .git/index
   description: Git index (binary). Not source.
+  last_edited_ms: 0
+06c26e4344158f0b:
+  path: crates/cp-mod-memory/src/tools.rs
+  description: Memory tools. execute_create split create_one_memory(Result<String,String> per-item parse+store). execute_update split UpdateTally struct + delete_memory + apply_memory_fields + modify_memory + apply_one_update + build_update_output (A2). tl_dr 80-token cap validate_tldr.
   last_edited_ms: 0
 06c821b4ca10c31a:
   path: web/src/components/finder/views/ColumnsView.tsx
@@ -2310,6 +2318,10 @@
   path: web/src/components/shell/CockpitView.tsx
   description: 'Cockpit (panel-centered) view assembler. Accepts agentId, passes to LeftRail + PanelPane. Two columns: LeftRail (context navigator) | PanelPane (selected surface). Default selected = ''conversation''.'
   last_edited_ms: 1781695333798
+1c5cd80aa94bc361:
+  path: .context-pilot/shared/tree-descriptions.yaml
+  description: Persisted tree descriptions YAML. Synced to git alongside code commits per M15.
+  last_edited_ms: 0
 1c60356763e64307:
   path: crates/cp-mod-github/Cargo.toml
   description: 'GitHub module deps: cp-base, cp-render, crossterm, regex, sha2, serde_json, secrecy.'
@@ -3522,6 +3534,10 @@
   path: crates/cp-orchestrator/src/services/materialized_view.rs
   description: 'Phase 18: MaterializedView — in-mem fleet projection folded from OpEntry stream (one AgentView per agent). AgentView{rev,heads,phase,lifecycle,cost:CostSnapshot}.apply(&OpEntry): Checkpoint=authoritative heads reset (I5 count-bounded restart mechanism at view layer), MessageCreated=set_thread_head, PhaseTransition/Lifecycle/CostAggregate=latest-wins (cost cumulative-since-boot so NOT summed), CommandEffect/SeenMark/Unknown=inert. rev=max. MaterializedView{agents:HashMap}: apply/apply_batch/get/remove/len/agent_ids. AgentView+CostSnapshot derive Serialize for the REST transport. 7 tests.'
   last_edited_ms: 1781647826946
+2ac66180a810a899:
+  path: crates/cp-orchestrator/src/transport/rest/claude_oauth/sweep.rs
+  description: Background OAuth refresh sweep — standalone thread (BOOT_DELAY 10s, SWEEP_INTERVAL 600s) keeps active-slot token AND every stored account fresh, refreshing any within REFRESH_THRESHOLD_MS (1h) of expiry. No Backend lock (OAuth state on disk/Keychain). Supersedes frontend popover auto-refresh. sweep_once = refresh_active_if_stale + accounts::refresh_stored_accounts.
+  last_edited_ms: 1785266142281
 2acd97845cc5d377:
   path: ui/src/components/panels/cockpit/ToolsPanel.tsx
   description: 'Cockpit Tools maquette: enabled tool registry grouped by category (name, one-line desc, enabled/disabled dot). Reads mock toolGroups.'
@@ -8046,6 +8062,10 @@
   path: src/llms/cache/cache_engine.rs
   description: Cache breakpoint engine. Hash chain (acc_hash = sha256(block + prev)). Tracks alive BPs via hash match. Places beacon at frontier+20. Runs DP optimizer for 3 additional BPs (4 total). 5-min TTL matching Anthropic.
   last_edited_ms: 0
+624686134d31a389:
+  path: crates/cp-orchestrator/src/transport/rest/claude_oauth/mod.rs
+  description: 'Claude Code OAuth helpers: usage proxy, token status, PKCE login flow (start/complete), refresh, credential I/O (Keychain+file). Constants: CLIENT_ID, TOKEN_URL, TOKEN_USER_AGENT, SCOPES. PkceSession stored in Backend. extract_code parses raw/URL/code#state input.'
+  last_edited_ms: 0
 624fe986019b9241:
   path: src/ui/search_overlay/text.rs
   description: Plain-text export of Ctrl+I overlay for clipboard. build_overlay_text split per-section writers write_server/write_index_stats/write_extensions_splitter/write_embeddings/write_task_trailers (A2). Includes Meili CPU%/RAM.
@@ -8498,6 +8518,10 @@
   path: .github/checks/check-file-lengths.sh
   description: File length check script (max 500 lines)
   last_edited_ms: 0
+67d4367356d1236c:
+  path: crates/cp-orchestrator/src/transport/rest/claude_oauth/accounts.rs
+  description: 'Multi-account Claude OAuth token vault. 4 endpoints: list/store/switch/delete. Storage ~/.context-pilot/claude-accounts.json (BTreeMap by email). REFRESH_THRESHOLD_MS=1h. Shared refresh POST extracted to try_refresh (de-dupes 3 call sites); is_stale(threshold), refresh_stored_accounts(threshold) for the sweep; maybe_refresh(threshold) refreshes on switch.'
+  last_edited_ms: 1785266142510
 67f09cfa05b1c9f8:
   path: web/src/components/shell/widgets/UsageButton.tsx
   description: 'Claude Code OAuth usage limits button. Anthropic "A" logomark trigger opens popover with token status (valid/expired + expiry), session/weekly usage bars (color-coded by severity), and LoginFlow (PKCE: open browser → auto-detect via polling → fallback manual code paste). Lazy-fetches on open, 30s auto-refresh.'
@@ -9505,6 +9529,10 @@
 73dd279b530a7953:
   path: web/src/components/threads/forms/FormFields.tsx
   description: '8 form field input renderers: single+allow-other, multi, text, number, date, toggle, confirm+confirm-word, files (immediate upload). FieldInput dispatcher.'
+  last_edited_ms: 0
+7401467bc3e9f87d:
+  path: crates/cp-mod-memory/src/lib.rs
+  description: 'Memory module. 2 tools: memory_create/update. Fixed MEMORY panel. Global, not core. 80-token tl_dr cap. Module data: memories + next_id + open_ids. Importance-gradient visualizer (critical→low).'
   last_edited_ms: 0
 74150afab89d24d0:
   path: src/app/reverie/mod.rs
@@ -11646,6 +11674,10 @@
   path: docs/design-conversation-search.md
   description: T671 conversation-search design doc. Hybrid keyword+semantic search over thread messages, Option B round-trip (frontend->orchestrator->agent->meili). Covers cp_{hash}_conversations index+voyage-code-3 embedder, content_hash reconciler (re-embed changed only, purge vanished, archived stays), Inbound untagged multiplex (command byte-identical), Query/Response/ConvHit wire types, read path, dual-mode palette. File map at end.
   last_edited_ms: 1785160644491
+8c4510cb4a2607af:
+  path: web/src/lib/live/useClaudeUsage.ts
+  description: Claude Code usage/token orchestration (shared desktop+mobile). useClaudeUsage (token-status + usage queries, manual refresh, cache invalidator). useClaudeAccounts (store/switch/delete). useClaudeLogin (PKCE state machine + auto-detect poller). Popover auto-refresh REMOVED — orchestrator sweep owns it server-side now.
+  last_edited_ms: 1785266142418
 8c4aaf61fc72e9ac:
   path: crates/cp-orchestrator/src/transport/rest/releases.rs
   description: 'Release management REST handlers (T427). 5 endpoints: list_releases (GET, merged local+remote+arch+active), set_arch (PUT, manual or auto-detect), download_release (POST, download+extract tarball), select_release (PUT, set active binary+supervisor), delete_release (DELETE). All pub(crate).'
@@ -14634,6 +14666,10 @@ b0ef0be513a36e65:
   path: crates/cp-orchestrator/src/runtime.rs
   description: 'Runtime — env Config (port/agents_dir/budget/scan_interval) + driver loop with TWO decoupled cadences: slow scan_interval (2s) for registry scan + config.json mtime backstop (inspection-resource freshness signal → SSE invalidate; X863 comment precise) + tmp reap; fast TAIL_INTERVAL (100ms) for tail_all_agents (Tailer.poll → view.apply_batch → breaker.observe). serve() blocks on HTTP. Felt-latency path is oplog-tail-primary via the SSE producer''s OplogWaiter (inotify).'
   last_edited_ms: 1781821687524
+b0f60ac39037c1d8:
+  path: crates/cp-orchestrator/src/runtime/mod.rs
+  description: Orchestrator runtime — Config (env vars) + Runtime. start_driver (registry scan + oplog tail). start_oauth_sweeper (Claude token auto-refresh thread). start_update_scheduler + start_update_committer (auto-update). serve (HTTP, Caddy apply at boot).
+  last_edited_ms: 1785266142601
 b115eff75bfa20be:
   path: web/src/mobile-components/threads/forms/FormMessageRow.tsx
   description: Mobile FormMessageRow twin — un-memoized form-bearing row. Routes mobile conversation/Message + FormWidget token. Parse helpers shared (./helpers stub).
@@ -20298,6 +20334,10 @@ f7207867229d3d86:
   path: crates/cp-mod-prompt/Cargo.toml
   description: 'Prompt module crate deps: cp-base, cp-render, crossterm, serde, serde_json, serde_yaml.'
   last_edited_ms: 0
+f74b76107e495ddc:
+  path: crates/cp-orchestrator/src/transport/rest/mod.rs
+  description: 'REST resource handlers. fleet() filtered by ACL. command() dispatches. rename/avatar/threads/body. vault_snapshot + env_keys + settings exports. claude_usage()/token_status()/login_start()/login_complete()/refresh_login() for Claude OAuth (T451). resolve_entry. Submodules: backend, claude_oauth, config, create, lifecycle, releases, thread_shape.'
+  last_edited_ms: 0
 f74fa3be25ccf5fa:
   path: src/modules/conversation_history/mod.rs
   description: 'Conversation history module. Core/global. Dynamic panels for frozen history chunks. on_close_context redirects to Close_conversation_history tool. Sub-modules: panel, trap.'
@@ -20773,6 +20813,10 @@ fc7d4dce281874be:
 fc951562b9dce358:
   path: crates/cp-mod-threads/src/tools.rs
   description: 'Thread tool handlers. execute_send/execute_read/build_panel_content. T353: execute_send AUTO-UNARCHIVES an archived target thread (thread.archived=true → set false) — sending to an archived thread is allowed (AI may remember its id), and the reply makes it visible again, mirroring the web frontend''s unarchive-on-send; surfaced in the tool result as ''[thread was archived — automatically unarchived]''. Archived threads filtered out of LLM-facing context. X887: build_panel_content also filters .filter(|m| !m.auto) (visible Vec, skip/total on non-auto count) so the AI never re-reads its own auto tool-activity traces. T343: tool result only lists threads with unack > 0 (concise). MAX caps on content/file-path/questions/panel-messages.'
+  last_edited_ms: 0
+fc9717f4835fdddb:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 fc9cc30874f14d93:
   path: ui/src/components/shell/TopBar.tsx
