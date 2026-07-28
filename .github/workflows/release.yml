@@ -1,10 +1,13 @@
 name: Build & Release
 
 # ── ONE code path for every release. ────────────────────────────────────────
-# Both triggers run the EXACT same jobs (web → build matrix → release):
+# Both triggers run the EXACT same jobs (gate → web → build matrix → release):
 #   • push to master   → auto-release tagged  v<version>-<short_sha>  (make_latest)
 #   • push of a v* tag  → release tagged with that tag
 # There is no separate "build" workflow — this file is the whole pipeline.
+#
+# Nothing ships that CI has not blessed: the `gate` job below blocks every
+# other job on a successful ci.yml run for this exact commit.
 #
 # Every architecture tarball is a COMPLETE bundle, laid out FLAT at the root:
 #   cpilot              (the agent TUI)
@@ -39,10 +42,84 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # ── Never release what CI has not blessed ─────────────────────────────────
+  # ci.yml and this file both fire on a push to master, in parallel, with no
+  # dependency between them — GitHub Actions has no `needs:` across workflows.
+  # So without this job a commit that fails CI still builds five tarballs and
+  # publishes a signed `nightly.json`. Worse, ci.yml does not fire on tag
+  # pushes at all (it watches `branches`, and a tag is not a branch), so the
+  # STABLE channel — the one the fleet follows — was published with no checks
+  # whatsoever.
+  #
+  # This is a polling guard rather than a `workflow_run` trigger on purpose.
+  # `workflow_run` evaluates in the default branch's context: `github.sha`
+  # becomes master's head and `github.ref_type`/`ref_name` no longer carry the
+  # tag — and those are exactly what the release job derives the tag from, what
+  # the concurrency group keys on, and what selects stable vs nightly. It also
+  # would not cover the tag path at all, since ci.yml never runs on tags.
+  #
+  # `github.sha` is the tagged commit on a tag push, so both triggers resolve to
+  # the same CI run: the one that graded that commit when it landed on master.
+  # A tag on a commit that never went through CI finds no run and is refused —
+  # deliberately, that is the case this job exists for.
+  gate:
+    name: Require green CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Require a successful CI run for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # CI settles in 2-3 min. Poll far past that, then refuse rather than
+          # release something unverified — a timeout must never mean "ship it".
+          deadline=$(( $(date +%s) + 40 * 60 ))
+          while :; do
+            info=$(gh api \
+              "repos/${REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&per_page=1" \
+              --jq '(.workflow_runs[0] // {})
+                    | "\(.status // "missing")|\(.conclusion // "")|\(.html_url // "")"' \
+              2>/dev/null) || info="missing||"
+            status=${info%%|*}
+            rest=${info#*|}
+            conclusion=${rest%%|*}
+            url=${rest#*|}
+
+            case "$status" in
+              completed)
+                if [ "$conclusion" = "success" ]; then
+                  echo "CI is green for ${SHA} — releasing. ${url}"
+                  exit 0
+                fi
+                echo "::error::CI concluded '${conclusion}' for ${SHA} — refusing to release. ${url}"
+                exit 1
+                ;;
+              missing)
+                echo "no ci.yml run for ${SHA} yet — waiting…"
+                ;;
+              *)
+                echo "ci.yml is '${status}' for ${SHA} — waiting… ${url}"
+                ;;
+            esac
+
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::timed out waiting for a ci.yml run on ${SHA} — refusing to release."
+              exit 1
+            fi
+            sleep 15
+          done
+
   # The SPA is architecture-independent — build it ONCE and share the dist to
   # every platform bundle via an artifact.
   web:
     name: Build SPA (shared)
+    needs: gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
