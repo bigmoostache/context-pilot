@@ -1,0 +1,35 @@
+# cargo-release configuration.
+#
+# Context Pilot ships as an APPLIANCE, not as crates.io packages. The release
+# act is a `v*` tag: .github/workflows/release.yml turns it into per-arch
+# tarballs plus a minisign-signed `stable.json` on the `channels` branch, which
+# the fleet polls (docs/update-policy.md §5.5).
+#
+# The workspace shares one version (`[workspace.package] version`), so all
+# crates move together and a single `v<version>` tag names the release.
+
+# Belt and braces. Every package also carries its own `publish = false`, which
+# is the real guard (cargo honours it whatever tool drives the release); this
+# line just stops cargo-release reaching the publish step at all.
+publish = false
+
+shared-version = true
+consolidate-commits = true
+
+tag = true
+tag-name = "v{{version}}"
+tag-message = "Context Pilot {{tag_name}}"
+
+pre-release-commit-message = "chore(release): v{{version}}"
+
+# `--execute` pushes the bump commit AND the tag straight to origin, so the run
+# is the release: CI signs stable.json and every box in `auto` mode applies it
+# in its next 03:00–05:00 window. There is no confirmation step after this.
+push = true
+push-remote = "origin"
+
+# Which makes this line the safety net. The tag is the fleet release act, so it
+# must only ever exist on master — without this, a `cargo release --execute`
+# from whatever branch happened to be checked out would tag that branch's tip
+# and promote it to every appliance.
+allow-branch = ["master"]

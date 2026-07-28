@@ -12,6 +12,7 @@ readme.workspace = true
 [[bin]]
 name = "cp-console-server"
 path = "src/main.rs"
+publish = false
 
 [dependencies]
 serde = { workspace = true }
