@@ -295,7 +295,7 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
 name = "cp-base"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "cp-mod-utilities",
  "cp-render",
@@ -310,7 +310,7 @@ dependencies = [
 
 [[package]]
 name = "cp-console-server"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "nix 0.30.1",
  "rlimit",
@@ -321,7 +321,7 @@ dependencies = [
 
 [[package]]
 name = "cp-mod-brave"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-render",
@@ -335,7 +335,7 @@ dependencies = [
 
 [[package]]
 name = "cp-mod-bridge"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-oplog",
@@ -349,7 +349,7 @@ dependencies = [
 
 [[package]]
 name = "cp-mod-callback"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-mod-console",
@@ -362,7 +362,7 @@ dependencies = [
 
 [[package]]
 name = "cp-mod-console"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-render",
@@ -374,7 +374,7 @@ dependencies = [
 
 [[package]]
 name = "cp-mod-entities"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-mod-search",
@@ -388,7 +388,7 @@ dependencies = [
 
 [[package]]
 name = "cp-mod-files"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-mod-queue",
@@ -400,7 +400,7 @@ dependencies = [
 
 [[package]]
 name = "cp-mod-firecrawl"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-render",
@@ -414,7 +414,7 @@ dependencies = [
 
 [[package]]
 name = "cp-mod-git"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-render",
@@ -426,7 +426,7 @@ dependencies = [
 
 [[package]]
 name = "cp-mod-github"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-mod-utilities",
@@ -438,7 +438,7 @@ dependencies = [
 
 [[package]]
 name = "cp-mod-logs"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-mod-utilities",
@@ -450,7 +450,7 @@ dependencies = [
 
 [[package]]
 name = "cp-mod-memory"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-mod-utilities",
@@ -462,7 +462,7 @@ dependencies = [
 
 [[package]]
 name = "cp-mod-ocr"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-mod-utilities",
@@ -475,7 +475,7 @@ dependencies = [
 
 [[package]]
 name = "cp-mod-prompt"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-render",
@@ -487,7 +487,7 @@ dependencies = [
 
 [[package]]
 name = "cp-mod-queue"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-render",
@@ -498,7 +498,7 @@ dependencies = [
 
 [[package]]
 name = "cp-mod-scratchpad"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-render",
@@ -509,7 +509,7 @@ dependencies = [
 
 [[package]]
 name = "cp-mod-search"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-mod-logs",
@@ -538,7 +538,7 @@ dependencies = [
 
 [[package]]
 name = "cp-mod-spine"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-mod-utilities",
@@ -550,7 +550,7 @@ dependencies = [
 
 [[package]]
 name = "cp-mod-threads"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-render",
@@ -561,7 +561,7 @@ dependencies = [
 
 [[package]]
 name = "cp-mod-todo"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-render",
@@ -572,7 +572,7 @@ dependencies = [
 
 [[package]]
 name = "cp-mod-tree"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-mod-utilities",
@@ -585,11 +585,11 @@ dependencies = [
 
 [[package]]
 name = "cp-mod-utilities"
-version = "0.1.0"
+version = "0.2.13"
 
 [[package]]
 name = "cp-oplog"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "cp-wire",
  "tempfile",
@@ -597,7 +597,7 @@ dependencies = [
 
 [[package]]
 name = "cp-orchestrator"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "argon2",
  "base64",
@@ -627,14 +627,14 @@ dependencies = [
 
 [[package]]
 name = "cp-render"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "cp-vault"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "fs2",
  "log",
@@ -646,7 +646,7 @@ dependencies = [
 
 [[package]]
 name = "cp-wire"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "crc32c",
  "serde",
@@ -3284,7 +3284,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "tui"
-version = "0.1.0"
+version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-mod-brave",
