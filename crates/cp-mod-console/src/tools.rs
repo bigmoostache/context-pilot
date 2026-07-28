@@ -256,7 +256,7 @@ pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
         Ok(r) => r,
         Err(e) => return *e,
     };
-    let max_wait: u64 = tool.input.get("max_wait").and_then(serde_json::Value::as_u64).unwrap_or(30).clamp(1, 30);
+    let max_wait: u64 = tool.input.get("max_wait").and_then(serde_json::Value::as_u64).unwrap_or(60).clamp(1, 60);
 
     match early_watch_result(tool, state, &req) {
         Ok(Some(done)) => return done,

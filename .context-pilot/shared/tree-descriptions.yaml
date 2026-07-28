@@ -4970,6 +4970,10 @@
   path: crates/cp-mod-prompt/src/skill_panel.rs
   description: Skill panel UI. Markdown-rendered content via cp_render::markdown::to_blocks(). Title/refresh/context methods. refresh() syncs cached_content for all loaded skills.
   last_edited_ms: 0
+3c9e87852c6bd69c:
+  path: crates/cp-mod-console/src/lib.rs
+  description: 'Console module. 5 tools. Dynamic console panels. init: find/create Unix socket server. save/load: session reconnection + orphan cleanup. Leaks stdin on save to prevent EOF. Tool visualizer. console_wait max_wait param default 60.'
+  last_edited_ms: 1785266957561
 3c9f7e6eefbd3fa7:
   path: web/src/components/shell/config/UpdatePane.tsx
   description: Desktop Update pane (O5.2). Version+channel, auto/manual/paused mode, maintenance window, apply-progress poll. All server-persisted /api/update/*. Mobile twin exists.
@@ -9850,6 +9854,10 @@
   path: src/ui/ir/render_sidebar.rs
   description: 'Sidebar ratatui renderer. A6: bar-fill fractions routed via float_math (mul/div/add). Token bar box, pagination, PR card, stats. content_width const-fn #[expect(as_conversions)].'
   last_edited_ms: 1784534060386
+7784a22d68b86e23:
+  path: crates/cp-mod-console/src/tools.rs
+  description: 'Console tools: create, send_keys, wait, watch, easy_bash. CONSOLE_WAIT_BLOCKING_SENTINEL const. Git/gh guardrails. console_wait max_wait default+cap = 60s (was 30).'
+  last_edited_ms: 1785266957468
 77938a5be7952a78:
   path: crates/cp-render/src/lib.rs
   description: 'IR crate root. Semantic + Block (#[non_exhaustive]) + Align enum #[expect(exhaustive_enums)] A4. Span with semantic+modifiers.'
@@ -10814,6 +10822,10 @@
   path: web/src/components/shell/SessionVitals.tsx
   description: Session vitals as an EMBEDDABLE section (no Dialog chrome) — extracted from the deleted StatsPopup (T321). Context-budget meter + figure chips (Context/Panels/Session cost) + on-demand Service-vitals connectivity board (fetchVitals, prepends the 2 browser-only rows). Rendered inside AgentModal manage mode's right column.
   last_edited_ms: 1782119305882
+82493d7ccbee31a7:
+  path: crates/cp-mod-console/src/types.rs
+  description: 'Console types. ProcessStatus enum #[non_exhaustive]. SessionMeta, ConsoleState, ConsoleWatcher (exit/pattern, easy_bash inline vs panel overflow). check_timeout now preserves_tempo on BOTH branches (console_wait + easy_bash timeouts no longer break tempo).'
+  last_edited_ms: 1785266957359
 8251aca4fb98413d:
   path: ui/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: selected thread''s full conversation. toChatMessage() maps ThreadMsg→ChatMessage to reuse cockpit Message renderer. Renders embedded QuestionForm + fileRef chips. ThreadComposer at bottom.'

@@ -251,7 +251,7 @@ impl Module for ConsoleModule {
                 .param("id", ParamType::String, true)
                 .param_enum("mode", &["exit", "pattern"], true)
                 .param("pattern", ParamType::String, false)
-                .param_with_default("max_wait", ParamType::Integer, "30")
+                .param_with_default("max_wait", ParamType::Integer, "60")
                 .build(),
             ToolDefinition::from_yaml("console_watch", t)
                 .short_desc("Async watch for process event")
