@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 description = "Unified credential vault — single source of truth for all API keys and secrets"
 repository = "https://github.com/guillaumeMusic/context-pilot"
-readme = "README.md"
+readme.workspace = true
 keywords = ["credentials", "vault", "secrets"]
 categories = ["authentication"]
 
