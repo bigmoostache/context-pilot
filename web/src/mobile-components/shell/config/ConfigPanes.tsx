@@ -5,6 +5,7 @@ import { Check, Lock } from "lucide-react"
 import { UsagePage } from "@/mobile-components/agents/UsagePage"
 import { UpdatePane } from "./UpdatePane"
 import { SecretsPane } from "./SecretsPane"
+import { ItNetworkPane } from "./ItNetworkPane"
 import { ItPane } from "./ItPane"
 import { useProviders } from "@/lib/support/models"
 import { fetchSettings, updateSettings, fetchEnvKeys } from "@/lib/api"
@@ -41,7 +42,16 @@ export function CategoryBody({ cat }: { cat: CatId }) {
       return <SecretsPane />
     }
     case "it": {
-      return <ItPane />
+      // Two panes, one category. ItPane owns identity + TLS trust and
+      // ItNetworkPane owns the uplink + Wi-Fi; mounting them as siblings HERE
+      // rather than nesting one inside the other is what keeps them free of a
+      // module cycle, so ItNetworkPane can share ItPane's field primitives.
+      return (
+        <div className="flex flex-col gap-6">
+          <ItPane />
+          <ItNetworkPane />
+        </div>
+      )
     }
     case "update": {
       return <UpdatePane />

@@ -22,6 +22,10 @@ import { cn } from "@/lib/utils"
  *    (`GET /api/it/ca.crt`) and its SHA-256 fingerprint for out-of-band
  *    verification (`GET /api/it/ca/fingerprint`).
  *
+ * The uplink + Wi-Fi half of the IT category lives in the sibling
+ * `ItNetworkPane`, mounted next to this one by `ConfigPanes`. It reuses
+ * {@link SectionLabel} and {@link TextField} from here.
+ *
  * Divergence from desktop is touch-only: the text inputs carry a **16px font**
  * (iOS Safari auto-zooms the viewport on focus below 16px), and the action
  * buttons grow / swap `hover:` for `active:`. All mutation logic — identity
@@ -68,7 +72,7 @@ function ProvisionStatus() {
   )
 }
 
-function SectionLabel({ label, hint }: { label: string; hint: string }) {
+export function SectionLabel({ label, hint }: { label: string; hint: string }) {
   return (
     <div className="flex items-baseline gap-2">
       <span className="text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
@@ -227,7 +231,7 @@ function TrustSection() {
 
 /** A labelled single-line text input, matching the pane's card styling. The
  *  input font is 16px so iOS Safari doesn't auto-zoom the viewport on focus. */
-function TextField({
+export function TextField({
   label,
   hint,
   value,
