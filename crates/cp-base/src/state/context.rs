@@ -148,6 +148,8 @@ impl Kind {
     pub const ENTITY_RESULT: &str = "entity_result";
     /// Threads panel (parallel discussion topics).
     pub const THREADS: &str = "threads";
+    /// Agora panel (agent self-identity).
+    pub const AGORA: &str = "agora";
 
     /// Returns true if this is a fixed/system context type (looked up from registry).
     #[must_use]
