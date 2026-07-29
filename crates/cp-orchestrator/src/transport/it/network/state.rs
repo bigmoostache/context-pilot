@@ -1,16 +1,17 @@
-//! The persisted network document — `.network.json` (design-network-uplink §6).
+//! The persisted network document — `.network.json`.
 //!
 //! One owner, one applier. Ansible **seeds** this file write-once at
 //! provisioning time; from then on the cockpit's `can_manage_it` routes are the
 //! only thing that edits it, and the backend applier is the only thing that
 //! turns it into system configuration. That is what makes "Ansible configures it
 //! *and* the UI configures it" safe: a re-run of `site.yml` finds the file
-//! present and leaves it alone, so the client's choices survive (FR-NET-12).
+//! present and leaves it alone, so the client's choices survive a re-run unless
+//! the vendor explicitly forces a re-seed.
 //!
 //! It lives beside `.identity.json` and `.provisioned` in the agents dir, mode
 //! `0600` — it holds the Wi-Fi PSK and the SIM PIN. Those two, plus the WWAN
 //! password, are **never** returned by a read path: [`NetworkConfig::redacted`]
-//! replaces each with a `*_set` boolean (FR-NET-13).
+//! replaces each with a `*_set` boolean.
 
 use std::path::{Path, PathBuf};
 
@@ -18,7 +19,7 @@ use serde::{Deserialize, Serialize};
 
 use super::super::state::write_atomic;
 
-/// Which uplink the box routes through (design §7).
+/// Which uplink the box routes through.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub(crate) enum UplinkMode {
     /// Ethernet only; the modem is not connected.
@@ -51,7 +52,8 @@ impl UplinkMode {
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub(crate) enum Standby {
     /// Bearer connected at a standby metric — failover is a metric flip
-    /// (sub-second), at the cost of keeping the SIM attached (landmine 8).
+    /// (sub-second), at the cost of keeping the SIM attached and spending a
+    /// little data on keep-alive. Say so to a client on a metered plan.
     #[default]
     #[serde(rename = "hot")]
     Hot,
@@ -102,7 +104,10 @@ pub(crate) struct WwanConfig {
     /// PAP/CHAP password — secret, never read back.
     pub(crate) password: Option<String>,
     /// SIM PIN — secret, never read back. `None` for a SIM with no PIN lock,
-    /// which is the case on the test box (M0 closed landmine 4 on this point).
+    /// which is the case on the test box: it reports `lock: sim-pin2`, but that
+    /// is the fixed-dialing lock and does not gate data — MEASURED, `AT+CPIN?`
+    /// answers `READY` and `mmcli -m 0 --enable` succeeds with no PIN. The field
+    /// stays for the SIMs that do lock.
     pub(crate) pin: Option<String>,
     /// Whether the bearer may attach to a roaming network.
     pub(crate) roaming: bool,
@@ -123,13 +128,15 @@ pub(crate) struct ApConfig {
     pub(crate) band: Band,
     /// Channel number, or `0` for automatic selection.
     pub(crate) channel: u16,
-    /// ISO-3166 regulatory country code. Without one, every 5 GHz channel is
-    /// `no IR` and the AP cannot start at all (FR-NET-14, landmine 1).
+    /// ISO-3166 regulatory country code. Under the world-default domain `00`
+    /// every 5 GHz channel is `no IR` (no initiating radiation) and the AP
+    /// cannot start at all, so this is a functional prerequisite, not a nicety.
     pub(crate) country: String,
     /// Suppress the SSID from beacons.
     pub(crate) hidden: bool,
     /// NAT + DHCP + DNS the active uplink to AP clients. Off leaves the AP a
-    /// cul-de-sac whose only reachable service is the cockpit (FR-NET-09).
+    /// cul-de-sac whose only reachable service is the cockpit — NAT would make
+    /// the box a router on the client's LAN, and that is their IT's call.
     pub(crate) share_internet: bool,
 }
 
@@ -148,7 +155,7 @@ impl Default for ApConfig {
     }
 }
 
-/// Failover probe tuning (design §8).
+/// Failover probe tuning for `cp-uplink-watch`.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct ProbeConfig {
     /// Addresses probed through the WAN interface; any reply counts as up.
@@ -220,7 +227,7 @@ pub(crate) fn network_path(agents_dir: &Path) -> PathBuf {
 /// falling back to `mode: wan` with the AP off — the safest possible posture, and
 /// one that keeps the cockpit reachable on the fleet ULA.
 ///
-/// **But never silently** (R4). The blast radius of one bad field is the whole
+/// **But never silently.** The blast radius of one bad field is the whole
 /// document — an Ansible seed with `ap_enabled=true` and no `ap_password`
 /// renders `passphrase: null`, which is refused here, and the box then also
 /// loses its mode, its APN, its SIM PIN and its probe tuning while Ansible
@@ -298,7 +305,7 @@ pub(crate) fn validate(config: &NetworkConfig) -> Result<(), String> {
 
 /// Validate the AP half. The country check is deliberately conditional on
 /// `enabled`: a box that has never been given a country must still be able to
-/// persist an SSID, but must not be able to turn the radio on (FR-NET-14).
+/// persist an SSID, but must not be able to turn the radio on.
 ///
 /// # Errors
 ///
@@ -323,8 +330,8 @@ pub(crate) fn validate_ap(access_point: &ApConfig) -> Result<(), String> {
 }
 
 /// The two things an AP needs before it can legally beacon: a regulatory country
-/// (FR-NET-14 — without it every 5 GHz channel is `no IR`) and a passphrase (we
-/// do not ship open networks).
+/// (without it every 5 GHz channel is `no IR` and the radio never starts) and a
+/// passphrase (we do not ship open networks).
 fn enabled_ap_prerequisites(access_point: &ApConfig) -> Result<(), String> {
     if access_point.country.is_empty() {
         return Err("a regulatory country code is required before the access point can be enabled".to_owned());
@@ -383,7 +390,7 @@ fn valid_channel(band: Band, channel: u16) -> bool {
     }
 }
 
-// ── Secret elision (FR-NET-13) ──────────────────────────────────────────────
+// ── Secret elision ──────────────────────────────────────────────────────────
 
 impl NetworkConfig {
     /// The read-path projection: the same document with every secret replaced by

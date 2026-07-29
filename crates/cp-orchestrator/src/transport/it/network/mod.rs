@@ -1,6 +1,6 @@
 //! Internet uplink (WAN / 5G) + Wi-Fi access point — state, API and applier.
 //!
-//! Design: `docs/design-network-uplink.md`. The appliance ships with a 5G modem
+//! The appliance ships with a 5G modem
 //! and two Wi-Fi radios and, before this module, used neither. Three uplink
 //! modes (`wan`, `wan_5g`, `5g`) and an access point are configurable by the
 //! vendor at provisioning time (Ansible seeds [`state`]) and by the client's IT
@@ -13,12 +13,12 @@
 //! * [`apply`] — state → system configuration (`nmcli`, `networkctl`, `iw`,
 //!   `sysctl`, and the Caddy site list). Env-gated exactly like `CP_CADDYFILE`:
 //!   with the gates unset the backend persists and performs **no** system call,
-//!   which is what makes the whole feature testable off-box (NFR-NET-04).
+//!   which is what makes the whole feature testable off-box.
 //! * [`status`] — the live read-back the cockpit polls.
 //! * [`uplink`] — both files of the interface with `cp-uplink-watch`: the
 //!   environment we render for it and the state it publishes back.
 //!
-//! **The invariant that outranks every feature here (NFR-NET-01):** no mode ever
+//! **The invariant that outranks every feature here:** no mode ever
 //! alters an address on `end0`/`end1`. Only default routes are touched. The
 //! fleet ULA, the DHCP lease, the LAN reachability of the cockpit and the day-0
 //! access path survive every mode, because they are the fleet's only recovery
@@ -75,7 +75,7 @@ fn config_path(state: &Mutex<Backend>) -> Result<PathBuf, HttpReply> {
 /// up` (a modem with no coverage), a `wan` apply ran to completion in the
 /// meantime and removed the strict-mode drop-in, and then the first one finished
 /// and wrote the drop-in back — leaving the persisted document saying `wan`
-/// while the box had no default route. §6's "one owner, one applier" is about
+/// while the box had no default route. "One owner, one applier" is about
 /// Ansible-vs-cockpit; it says nothing about two concurrent cockpit calls, and
 /// this is the missing half. A dedicated lock, never the backend `Mutex`, so it
 /// is safe to hold across the `nmcli` subprocesses — exactly like `CADDY_LOCK`.
@@ -111,7 +111,7 @@ where
 
 /// Persist `next`, then apply it — rolling **both** back on failure.
 ///
-/// NFR-NET-05: a bad setting can never wedge the box. This mirrors
+/// A bad setting can never wedge the box. This mirrors
 /// [`caddy::regenerate`](super::caddy::regenerate) deliberately, down to the
 /// shape of the error: the previous document is written back and re-applied, so
 /// the box is left exactly as it was found, and the caller turns the `Err` into
@@ -127,12 +127,12 @@ fn commit(state: &Mutex<Backend>, path: &Path, previous: &NetworkConfig, next: &
     state::save(path, next).map_err(|e| format!("persist .network.json: {e}"))?;
     // Caddy FIRST, before the AP can beacon: the generated Caddyfile enumerates
     // explicit site addresses, so `10.42.0.1` must already be one of them when
-    // the first client associates or they meet a TLS `internal error` (landmine
-    // 11). Only when the address set actually changes — regenerating on every
+    // the first client associates, or they meet a TLS `internal error` instead
+    // of the cockpit. Only when the address set actually changes — regenerating on every
     // unrelated mode save would make a momentarily-unreachable Caddy fail a
     // network call that has nothing to do with it.
     //
-    // R2: this used to be a bare `?`. The document was already saved by then, so
+    // This used to be a bare `?`. The document was already saved by then, so
     // a Caddy failure answered `502 "the box is unchanged"` while `.network.json`
     // held `next` — and `apply_network_at_boot` applied it at the next start. The
     // change was deferred, not rejected, and the reply was untrue. Nothing has
@@ -210,8 +210,8 @@ pub(crate) fn caddy_subjects_for(agents_dir: &Path) -> Vec<String> {
 /// good on, on both of its failure paths: a Caddy failure restores the document
 /// before anything is applied at all, and an apply failure restores the document
 /// *and* re-applies it — which, since [`apply`] records each step's mark only on
-/// that step's success, genuinely re-runs every step that ran (R1/R2). Before
-/// those two fixes the sentence was true only by luck.
+/// that step's success, genuinely re-runs every step that ran. Before those two
+/// fixes the sentence was true only by luck.
 fn reply_for(outcome: Result<bool, String>, payload: serde_json::Value) -> HttpReply {
     match outcome {
         Ok(applied) => {
@@ -238,7 +238,7 @@ fn reply_for(outcome: Result<bool, String>, payload: serde_json::Value) -> HttpR
 ///
 /// Never fails on a missing state file or an absent tool: the config falls back
 /// to defaults (fail-closed — `wan`, AP off) and every tool-backed status field
-/// degrades to `null`, so a dev machine with no gates set answers `200` (O3.5).
+/// degrades to `null`, so a dev machine with no gates set answers `200`.
 pub(crate) fn get_network(state: &Mutex<Backend>, bearer_visible: bool, has_modem: bool) -> HttpReply {
     let path = match config_path(state) {
         Ok(path) => path,
@@ -266,7 +266,8 @@ pub(crate) fn set_mode(state: &Mutex<Backend>, body: &[u8], has_modem: bool) -> 
     };
     // A box with no modem must not be able to reach a mode that depends on one.
     // `5g` there would suppress the ethernet default route with nothing to
-    // replace it — recoverable (NFR-NET-01) but never something to offer.
+    // replace it — recoverable, since no mode ever alters an address on the
+    // ethernet ports, but never something to offer.
     if !matches!(req.mode, UplinkMode::Wan) && !has_modem {
         return HttpReply::error(400, "this box has no 5G modem");
     }
@@ -327,7 +328,7 @@ pub(crate) fn set_ap(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
 
 /// `POST /api/it/network/wwan` — the 5G bearer settings.
 ///
-/// **Superadmin only** (FR-NET-15, revised): the SIM is ours, the data plan is
+/// **Superadmin only:** the SIM is ours, the data plan is
 /// ours, and the APN that goes with them is a fleet-wide vendor decision — a
 /// client's IT admin changing it breaks their own connectivity and bills us for
 /// it. Same boundary as the provider API keys.
@@ -382,7 +383,7 @@ pub(crate) fn set_wwan(state: &Mutex<Backend>, body: &[u8], has_modem: bool) -> 
 ///
 /// Write-and-apply, never fails startup: a box whose modem is missing, whose SIM
 /// is absent or whose radio is rfkilled must still boot into a reachable
-/// cockpit. A failure here is a journal line, not a dead appliance (NFR-NET-06).
+/// cockpit. A failure here is a journal line, not a dead appliance.
 pub(crate) fn apply_network_at_boot(state: &Mutex<Backend>) {
     let Ok(path) = config_path(state) else {
         return;

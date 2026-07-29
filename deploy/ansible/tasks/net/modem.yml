@@ -4,9 +4,8 @@
 # Scope: install ONLY the packages needed to talk to / experiment with the modem.
 # No WAN config, no NetworkManager, no routing, no APN — that is the job of its
 # sibling `network.yml` (NetworkManager + the seam + the state file) and of the
-# backend applier, which is the only writer of system network config. See
-# docs/design-network-uplink.md §5/§6/§12. This file just makes the standard
-# modem toolbox available on the box.
+# backend applier, which is the only writer of system network config. This file
+# just makes the standard modem toolbox available on the box.
 #
 # What you get:
 #   • mmcli      (modemmanager)    — high-level modem control + status

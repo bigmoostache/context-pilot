@@ -15,8 +15,17 @@ import {
 import { TextField, Toggle } from "./ItPane"
 
 /**
- * 5G bearer form (FR-NET-15). `password` and `pin` are write-only, with the same
- * omit-to-keep rule as the AP passphrase.
+ * 5G bearer form. The bearer is the **vendor's**, not the client's: we ship the
+ * SIM and the data plan, so the APN and its credentials are a fleet decision
+ * rather than a per-site one. Only `can_manage_secrets` (superadmin) may read or
+ * write this block; a client's `can_manage_it` admin gets the bearer's live
+ * *status*, which is what they need when the box loses its uplink, and nothing
+ * else. That gate is not enforced here — the pane only renders this form when
+ * the server sent a `config.wwan`, so a client admin never sees the control at
+ * all rather than being shown one they cannot use.
+ *
+ * `password` and `pin` are write-only, with the same omit-to-keep rule as the AP
+ * passphrase.
  *
  * Same draft-over-server-value shape as {@link ApForm}, and for the same reason:
  * this form is never remounted, so a poll tick cannot eat a half-typed PIN and

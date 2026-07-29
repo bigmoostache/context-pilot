@@ -326,7 +326,7 @@ export type ItIdentityResponse = {
 };
 
 /**
- * Wi-Fi access-point settings. `country` is a functional prerequisite, not a nicety: under the world-default regulatory domain every 5 GHz channel is `no IR` and the AP cannot start (FR-NET-14).
+ * Wi-Fi access-point settings. `country` is a functional prerequisite, not a nicety: under the world-default regulatory domain every 5 GHz channel is `no IR` and the radio cannot start, so enabling the AP without a country code is refused.
  */
 export type ItNetworkAp = {
     band: 'bg' | 'a';
@@ -437,7 +437,7 @@ export type ItNetworkStatus = {
 };
 
 /**
- * What the failover supervisor itself believes, parsed from `/run/cp-uplink/state` (design §8). Null when `cp-uplink` is not running or has not yet written its first line. Everything else under `status` is observed from the system; this block is the only place the supervisor's INTENT and its streak counters are visible, and it is what makes a failover that did not happen diagnosable.
+ * What the failover supervisor itself believes, parsed from the state line the `cp-uplink` daemon writes to `/run/cp-uplink/state` on every probe round. Null when `cp-uplink` is not running or has not yet written its first line. Everything else under `status` is observed from the system; this block is the only place the supervisor's INTENT and its streak counters are visible, and it is what makes a failover that did not happen diagnosable.
  */
 export type ItNetworkSupervisor = {
     /**

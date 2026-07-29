@@ -122,10 +122,12 @@ pub(crate) fn apply_caddy_at_boot(state: &Mutex<Backend>) {
         Ok(b) => (
             super::is_provisioned(&b.provision_flag_path),
             load_identity(&identity_path(&b.agents_dir)),
-            // The Wi-Fi AP's address, when the AP is enabled: it is a site Caddy
-            // must serve, and this runs before the network applier brings the AP
-            // up, so the cert exists before the first client can associate
-            // (landmine 11).
+            // The Wi-Fi AP's address, when the AP is enabled: Caddy listens on
+            // the wildcard `*:443` but the generated file enumerates EXPLICIT
+            // site addresses, so an AP client whose gateway address is missing
+            // from that list gets a TLS `internal error`. This runs before the
+            // network applier brings the AP up, so the cert exists before the
+            // first client can associate.
             super::network::caddy_subjects_for(&b.agents_dir),
         ),
         Err(_) => return,

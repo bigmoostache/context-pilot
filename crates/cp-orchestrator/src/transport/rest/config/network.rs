@@ -1,5 +1,5 @@
-//! Network REST handlers — the uplink + access-point surface (design
-//! `docs/design-network-uplink.md` §10), gated on `can_manage_it` (admin+) —
+//! Network REST handlers — the uplink + access-point surface, gated on
+//! `can_manage_it` (admin+) —
 //! **except the 5G bearer, which is `can_manage_secrets` (superadmin).**
 //!
 //! The split is a business boundary, not a security one. The uplink mode and
@@ -14,7 +14,7 @@
 //! delegate. Gate semantics mirror the rest of the RBAC surface — a `None`
 //! `auth_user` means access control is off (god-mode, FR-v3-08) and passes
 //! through; a present caller without `can_manage_it` is a `403`. Client gating
-//! is cosmetic, the server is authoritative (NFR-NET-03).
+//! is cosmetic, the server is authoritative.
 
 use std::sync::Mutex;
 
@@ -57,19 +57,20 @@ pub(crate) fn it_get_network(state: &Mutex<Backend>, auth_user: Option<&User>) -
         .unwrap_or_else(|| network::get_network(state, bearer_visible(auth_user), network::modem_present()))
 }
 
-/// `POST /api/it/network/mode` — select `wan`, `wan_5g` or `5g` (FR-NET-03).
+/// `POST /api/it/network/mode` — select `wan`, `wan_5g` or `5g`.
 pub(crate) fn it_set_network_mode(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&User>) -> HttpReply {
     denied(auth_user).unwrap_or_else(|| network::set_mode(state, body, network::modem_present()))
 }
 
-/// `POST /api/it/network/ap` — the access-point settings (FR-NET-07/08/09).
-/// A `400` when the body is invalid, and specifically when the AP is enabled
-/// without a regulatory country (FR-NET-14).
+/// `POST /api/it/network/ap` — the access-point settings: SSID, passphrase,
+/// band, channel, country, hidden-SSID and internet sharing. A `400` when the
+/// body is invalid, and specifically when the AP is enabled without a regulatory
+/// country — without one the radio has no channel it is allowed to beacon on.
 pub(crate) fn it_set_network_ap(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&User>) -> HttpReply {
     denied(auth_user).unwrap_or_else(|| network::set_ap(state, body))
 }
 
-/// `POST /api/it/network/wwan` — the 5G bearer settings (FR-NET-15, revised).
+/// `POST /api/it/network/wwan` — the 5G bearer settings.
 /// **Superadmin only** — see the module doc.
 pub(crate) fn it_set_network_wwan(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&User>) -> HttpReply {
     denied_bearer(auth_user).unwrap_or_else(|| network::set_wwan(state, body, network::modem_present()))
@@ -182,7 +183,8 @@ mod tests {
 
     /// A box that is not a 5G variant must not be able to reach a mode that
     /// needs one — `5g` there would suppress the ethernet default route with
-    /// nothing to replace it. Recoverable (NFR-NET-01) but never worth offering.
+    /// nothing to replace it. Recoverable — no mode ever alters an address on
+    /// the ethernet ports — but never worth offering.
     ///
     /// The hardware fact is threaded in rather than probed inside the handler,
     /// so this drives the no-modem variant without touching the environment.
@@ -228,7 +230,7 @@ mod tests {
         assert_eq!(it_set_network_ap(&state, no_country, None).status, 400, "enabling with no country → 400");
     }
 
-    /// FR-NET-13 at the transport boundary: a PSK that was just written is not
+    /// Secret elision at the transport boundary: a PSK that was just written is not
     /// echoed by the response, nor by any later read.
     #[test]
     fn secrets_never_come_back_out() {

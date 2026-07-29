@@ -1,8 +1,8 @@
 //! Unit tests for the network document, its validation and its secret elision.
 //!
-//! Everything here runs with **no env gates set**, so the applier is inert
-//! (NFR-NET-04) and these tests never touch the machine's network — which is the
-//! whole reason the gate exists.
+//! Everything here runs with **no env gates set**, so the applier is inert and
+//! these tests never touch the machine's network — which is the whole reason the
+//! gate exists.
 
 use super::apply::{
     Marks, STEP_AP, STEP_AP_ACTIVATION, STEP_MODE, STEP_UPLINK_ENV, STEP_WWAN, StepHashes, coerce_mode, step,
@@ -103,9 +103,9 @@ fn ssid_and_passphrase_bounds_are_enforced() {
 
 #[test]
 fn an_ap_cannot_be_enabled_without_a_country() {
-    // FR-NET-14: with the world-default domain every 5 GHz channel is `no IR`
-    // and the AP simply never beacons, so this is a functional prerequisite
-    // rather than a policy check.
+    // With the world-default regulatory domain `00` every 5 GHz channel is
+    // `no IR` and the AP simply never beacons, so this is a functional
+    // prerequisite rather than a policy check.
     let mut config = populated();
     config.ap.country = String::new();
     assert!(state::validate_ap(&config.ap).is_err(), "enabling with no country is refused");
@@ -159,7 +159,7 @@ fn apn_and_pin_charsets_are_enforced() {
     assert!(state::validate_wwan(&config.wwan).is_ok(), "8 digits is the top of the range");
 }
 
-/// FR-NET-13 — the load-bearing test. Every read-path projection is serialised
+/// The load-bearing secret test. Every read-path projection is serialised
 /// and searched for the literal secrets. If a field is ever added to the struct
 /// and mirrored into `redacted` without thought, this is what catches it.
 #[test]
@@ -215,7 +215,7 @@ fn mode_spellings_match_the_wire() {
 
 #[test]
 fn status_degrades_to_null_for_every_gated_field() {
-    // O3.5's off-box half. The two halves that need a TOOL degrade to null; the
+    // The off-box half. The two halves that need a TOOL degrade to null; the
     // two that only need `/proc/net/route` stay truthful, because they are what
     // an admin watches during a failover and a box missing every optional tool
     // still deserves an honest answer there.
@@ -228,9 +228,9 @@ fn status_degrades_to_null_for_every_gated_field() {
     assert!(wan.get("ip").is_some_and(serde_json::Value::is_null), "no CP_IP_BIN ⇒ null address");
 }
 
-// ── The per-step applied marks (R1 + B1) ────────────────────────────────────
+// ── The per-step applied marks ──────────────────────────────────────────────
 
-/// B1 — the fingerprint used to be whole-document, so **any** mode change
+/// The fingerprint used to be whole-document, so **any** mode change
 /// re-ran `reconcile_ap` + `nmcli connection up cp-ap` and dropped every
 /// associated Wi-Fi client. The comment next to it claimed the opposite.
 #[test]
@@ -258,7 +258,7 @@ fn each_step_keys_on_its_own_inputs() {
     let after = StepHashes::of(&renamed);
     assert_ne!(StepHashes::of(&base).access_point, after.access_point, "the profile must be rewritten");
     assert_eq!(StepHashes::of(&base).ap_activation, after.ap_activation, "but the AP is not bounced");
-    assert_eq!(StepHashes::of(&base).wwan, after.wwan, "and the bearer is not touched at all (B2's other half)");
+    assert_eq!(StepHashes::of(&base).wwan, after.wwan, "and the bearer is not touched at all — the other half");
     assert_eq!(StepHashes::of(&base).mode, after.mode);
 
     // Probe tuning is the supervisor's business and nothing else's.
@@ -281,7 +281,7 @@ fn each_step_keys_on_its_own_inputs() {
     assert_ne!(StepHashes::of(&base).access_point, StepHashes::of(&rekeyed).access_point);
 }
 
-/// R1 — the load-bearing one. This is `commit`'s rollback, played out against
+/// The load-bearing one. This is `commit`'s rollback, played out against
 /// the marks: `apply(next)` gets partway and fails, then `apply(previous)` must
 /// **re-run every step that actually ran**.
 ///
@@ -319,7 +319,7 @@ fn a_partial_apply_leaves_the_rollback_with_work_to_do() {
     step(&mut marks, STEP_WWAN, after.wwan, || Ok(())).expect("bearer ok");
     step(&mut marks, STEP_AP, after.access_point, || Ok(())).expect("ap ok");
     let failed = step(&mut marks, STEP_MODE, after.mode, || Err("networkctl reconfigure failed".to_owned()));
-    assert!(failed.is_err(), "the mode step failed, exactly as O3.2 describes");
+    assert!(failed.is_err(), "the mode step failed partway through the apply");
 
     // The rollback. Every step that RAN with `next` must run again with
     // `previous`; the one that never ran is correctly skipped.
@@ -386,9 +386,9 @@ fn a_failed_step_records_nothing() {
     assert!(!Marks::load(&marker).unchanged(STEP_WWAN, &hashes.wwan), "the step still has work to do");
 }
 
-// ── FR-NET-16 below the transport layer (R3) ────────────────────────────────
+// ── No modem ⇒ no 5G mode, below the transport layer ────────────────────────
 
-/// R3 — the "no modem ⇒ no 5G mode" guard lived only in the HTTP handlers, so a
+/// The "no modem ⇒ no 5G mode" guard lived only in the HTTP handlers, so a
 /// document seeded `5g` by `-e net_mode=5g` on a non-5G variant suppressed
 /// `end0`'s default route at **every boot**, with no way back from the cockpit.
 #[test]
@@ -420,12 +420,13 @@ fn a_5g_variant_applies_exactly_what_it_was_given() {
     assert_eq!(coerce_mode(&ethernet, false).mode, UplinkMode::Wan);
 }
 
-// ── The three supervisor knobs (C2) ─────────────────────────────────────────
+// ── The three supervisor knobs ──────────────────────────────────────────────
 
-/// C2 — `probe_timeout_s`, `cooldown_s` and `nm_wait_s` had no field, so they
+/// `probe_timeout_s`, `cooldown_s` and `nm_wait_s` once had no field, so they
 /// were permanently 3/60/20 and unreachable. Deliberately **no**
-/// `#[serde(default)]`: a template/struct mismatch must be loud (R4's log line)
-/// rather than a field that silently reverts to a default nobody chose.
+/// `#[serde(default)]`: a template/struct mismatch must be loud — `load` names
+/// what the box just lost — rather than a field that silently reverts to a
+/// default nobody chose.
 #[test]
 fn the_three_supervisor_knobs_are_persisted_and_bounded() {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -469,7 +470,7 @@ fn a_document_missing_the_new_probe_fields_is_refused() {
 }
 
 /// The read projection carries them too — a cockpit that cannot see a value
-/// cannot offer to change it (C5's shape, applied to the fields C2 adds).
+/// cannot offer to change it.
 #[test]
 fn the_read_projection_exposes_the_probe_tuning() {
     let projected = populated().redacted(true);

@@ -1,9 +1,9 @@
-//! Live uplink status — what the cockpit polls every 5 s (FR-NET-10/11).
+//! Live uplink status — what the cockpit polls every 5 s.
 //!
 //! Read from the system, never from what we believe we configured: `/proc/net`,
 //! `ip`, `nmcli -t`, `mmcli -J` and `iw`. A human who ran `nmcli` by hand on the
-//! box (landmine 9) sees their change reflected here until the next apply
-//! reverts it — an honest read-out is what makes the box debuggable.
+//! box sees their change reflected here until the next apply reverts it — an
+//! honest read-out is what makes the box debuggable.
 //!
 //! **Every *tool-backed* field degrades to `null` rather than erroring when that
 //! tool is absent.** A dev machine with no gates set answers `200`; a box whose
@@ -32,7 +32,7 @@ use super::uplink::supervisor_status;
 ///
 /// `config` is passed in — not re-read — so the config and the status in the
 /// same response describe the same instant. `has_modem` is threaded in from the
-/// transport layer for the same reason (C10): one hardware probe per request,
+/// transport layer for the same reason: one hardware probe per request,
 /// and one answer, so the `modem_present` the cockpit reads is the same one the
 /// handlers gated on rather than an independent sysfs read that could disagree.
 pub(crate) fn probe(config: &NetworkConfig, has_modem: bool) -> Value {
@@ -104,7 +104,7 @@ fn hex_le_ipv4(hex: &str) -> Option<String> {
 
 /// Classify the default-route device: `wan`, `wwan`, `other` or `none`.
 ///
-/// **`other` is not decoration** (B17). The old fall-through labelled *anything*
+/// **`other` is not decoration.** The old fall-through labelled *anything*
 /// it did not recognise `wwan`, so a box routing through `tun0`, `wg0`, `docker0`
 /// or the second Wi-Fi radio told the cockpit — mid-failover, on the one screen
 /// an admin is watching — that the 5G bearer had taken over. `other` says the
@@ -141,7 +141,7 @@ fn classify_device(dev: &str) -> &'static str {
 ///
 /// `default_dev`/`gateway` come from the single `/proc/net/route` read in
 /// [`probe`]; re-reading the table here made a `GET` parse it twice and let the
-/// two halves of one response straddle a failover (C10).
+/// two halves of one response straddle a failover.
 fn wan_status(default_dev: Option<&str>, gateway: Option<&str>) -> Value {
     let iface = wan_iface();
     let carrier =
@@ -211,7 +211,7 @@ fn wwan_status(tools: &Tools) -> Option<Value> {
 /// something an apply turns on behind the admin's back.
 ///
 /// `modem` is the D-Bus path [`wwan_status`] already discovered from `mmcli -L`,
-/// not the index `0` this used to hardcode (B14). ModemManager increments the
+/// not the index `0` this used to hardcode. ModemManager increments the
 /// index across re-enumerations, so after a modem reset every other bearer field
 /// was correct and the signal alone silently read `null`.
 fn signal_dbm(mmcli: &OsStr, modem: &str) -> Value {
@@ -268,11 +268,11 @@ fn nmcli_first_address(nmcli: &OsStr, profile: &str) -> Value {
 // ── Access point ────────────────────────────────────────────────────────────
 
 /// Whether the AP is beaconing, on what channel, under which country, and how
-/// many clients are associated (FR-NET-11).
+/// many clients are associated.
 ///
 /// `ssid` and `channel` both come from one `iw dev <ap> info` — one call, and
 /// **the radio's own answer**, which is what this object claims to be. It used
-/// to echo `config.ap.ssid` straight back (C10): labelled live status while
+/// to echo `config.ap.ssid` straight back: labelled live status while
 /// actually being the document, so a profile that had not been re-activated
 /// since a rename reported the new name off an AP still beaconing the old one.
 /// The config value remains the fallback for the honest cases — no `iw`, or the
@@ -442,7 +442,7 @@ end0\t0001A8C0\t00000000\t0001\t0\t0\t100\t00FFFFFF\t0\t0\t0\n";
 
     #[test]
     fn status_is_well_formed_without_gates() {
-        // O3.5's off-box half: a dev machine answers 200 with a well-formed
+        // The off-box half: a dev machine answers 200 with a well-formed
         // object whose optional halves are null, not an error.
         let status = probe(&NetworkConfig::default(), true);
         for field in ["active_uplink", "wan", "wwan", "ap", "supervisor"] {
@@ -451,13 +451,13 @@ end0\t0001A8C0\t00000000\t0001\t0\t0\t100\t00FFFFFF\t0\t0\t0\n";
         assert!(status.get("wwan").is_some_and(Value::is_null), "no mmcli gate ⇒ null bearer");
         assert!(status.get("ap").is_some_and(Value::is_null), "no nmcli gate ⇒ null AP");
         assert!(status.get("supervisor").is_some_and(Value::is_null), "no state file ⇒ null supervisor");
-        // C10 — the hardware fact is the one the caller threaded in, not a
+        // The hardware fact is the one the caller threaded in, not a
         // second sysfs read that could disagree with the handler's own gate.
         assert_eq!(status.get("modem_present"), Some(&json!(true)));
         assert_eq!(probe(&NetworkConfig::default(), false).get("modem_present"), Some(&json!(false)));
     }
 
-    /// B17 — the fall-through used to call **everything** it did not recognise
+    /// The fall-through used to call **everything** it did not recognise
     /// `wwan`, so a VPN, a container bridge or the second Wi-Fi radio holding
     /// the default route told the cockpit the 5G bearer had taken over. That is
     /// the one screen an admin watches during a failover.
@@ -473,7 +473,7 @@ end0\t0001A8C0\t00000000\t0001\t0\t0\t100\t00FFFFFF\t0\t0\t0\n";
         assert_eq!(active_uplink(None), json!("none"));
     }
 
-    /// C10 — `ssid` and `channel` come off the radio, from one `iw dev … info`.
+    /// `ssid` and `channel` come off the radio, from one `iw dev … info`.
     #[test]
     fn the_live_ssid_and_channel_are_read_from_the_radio() {
         let info = "Interface wlp1s0\n\tifindex 4\n\ttype AP\n\tssid ContextPilot f10d\n\tchannel 36 (5180 MHz), width: 80 MHz\n";

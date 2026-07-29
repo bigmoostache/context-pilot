@@ -15,7 +15,7 @@
 //!
 //! The PSK, the bearer password and the SIM PIN are passed to `nmcli` as ordinary
 //! argv slots and are never logged: [`super::apply::run`] reports the tool's own
-//! stderr and never the argv it sent (O3.1).
+//! stderr and never the argv it sent.
 
 use std::ffi::OsStr;
 
@@ -48,7 +48,7 @@ fn exists(nmcli: &OsStr, name: &str) -> bool {
 ///   route-metric properties in that mode and this value is written **once**,
 ///   in [`reconcile_wwan`]'s `connection add`, as the profile's starting point.
 ///
-/// B2: pushing it unconditionally meant that saving an SSID during an outage
+/// Pushing it unconditionally meant that saving an SSID during an outage
 /// reset the metric the supervisor had just promoted, while the supervisor still
 /// believed `promoted=yes` and would therefore never re-promote — a silent loss
 /// of the 5G uplink at NetworkManager's next reactivation.
@@ -72,7 +72,8 @@ const fn applier_owns_metric(mode: UplinkMode) -> bool {
 ///
 /// `wan` never. Strict `5g` always — it is the only uplink. `wan_5g` only in
 /// `hot` standby: `cold` deliberately leaves the bearer down and lets the
-/// supervisor pay the setup cost at failover time, for metered SIMs (landmine 8).
+/// supervisor pay the setup cost at failover time, for metered SIMs — `hot`
+/// keeps the SIM attached and consuming keep-alive data.
 const fn wwan_autoconnect(config: &NetworkConfig) -> bool {
     match config.mode {
         UplinkMode::Wan => false,
@@ -84,11 +85,11 @@ const fn wwan_autoconnect(config: &NetworkConfig) -> bool {
 /// The full `nmcli connection modify cp-wwan …` argument vector.
 ///
 /// Split out from [`reconcile_wwan`] so a unit test can assert the exact argv
-/// for a representative state without a NetworkManager anywhere near it (O3.1).
+/// for a representative state without a NetworkManager anywhere near it.
 ///
 /// In `wan_5g` the two route-metric properties are **absent** — the supervisor
-/// owns them there, and an unrelated save must not walk on a live failover
-/// (B2). See [`wwan_metric`] for the ownership boundary.
+/// owns them there, and an unrelated save must not walk on a live failover.
+/// See [`wwan_metric`] for the ownership boundary.
 pub(crate) fn wwan_args(config: &NetworkConfig) -> Vec<String> {
     let mut args = vec![
         "connection".to_owned(),
@@ -122,12 +123,13 @@ pub(crate) fn wwan_args(config: &NetworkConfig) -> Vec<String> {
 
 /// The full `nmcli connection modify cp-ap …` argument vector.
 ///
-/// **`ipv4.method` is `shared` in BOTH sharing modes**, which is a correction to
-/// §9's `manual`. Measured: `manual` gives the interface its address and nothing
-/// else — no DHCP server — so a client cannot get onto the network at all
-/// without being hand-configured with a static address. That makes FR-NET-09's
-/// "a cockpit-access-only network" unreachable in practice, and fails O3.3's own
-/// criterion ("with sharing off, **the same client** still loads the cockpit").
+/// **`ipv4.method` is `shared` in BOTH sharing modes**, which corrects the
+/// `manual` this was first specified with. MEASURED: `manual` gives the
+/// interface its address and nothing else — no DHCP server — so a client cannot
+/// get onto the network at all without being hand-configured with a static
+/// address. That makes the whole point of sharing-off, a cockpit-access-only
+/// network, unreachable in practice: with sharing off, **the same client** must
+/// still be able to load the cockpit.
 ///
 /// NetworkManager has no "DHCP server without NAT" method, so the cul-de-sac is
 /// built the other way round: keep `shared` for dnsmasq's DHCP + DNS, then take
@@ -168,7 +170,7 @@ pub(crate) fn ap_args(config: &NetworkConfig) -> Vec<String> {
 }
 
 /// The `802-11-wireless-security.*` group — **omitted entirely when no
-/// passphrase is set** (B18).
+/// passphrase is set**.
 ///
 /// A factory-fresh box has `passphrase: None` (the Ansible default whenever
 /// `ap_password` is empty), and the previous code still sent
@@ -190,8 +192,8 @@ fn security_args(config: &NetworkConfig) -> Vec<String> {
         return Vec::new();
     };
     vec![
-        // `wpa-psk` + RSN/CCMP — and O6.4's answer is that this IS how WPA3
-        // ships here. The four settings are one decision, not two.
+        // `wpa-psk` + RSN/CCMP — and this IS how WPA3 ships here. The four
+        // settings are one decision, not two.
         //
         // Left at NM's defaults, the AP advertised a legacy WPA1 information
         // element with TKIP alongside an RSN element whose only AKM was `PSK`:
@@ -228,7 +230,7 @@ fn security_args(config: &NetworkConfig) -> Vec<String> {
 ///
 /// Split out from [`reconcile_wwan`] for the same reason [`wwan_args`] is: it
 /// is now the **only** place `wan_5g`'s route metric is ever written, so a test
-/// has to be able to see it without a NetworkManager (B2).
+/// has to be able to see it without a NetworkManager.
 fn wwan_create_args(config: &NetworkConfig) -> Vec<String> {
     let metric = wwan_metric(config.mode).to_string();
     vec![
@@ -248,7 +250,7 @@ fn wwan_create_args(config: &NetworkConfig) -> Vec<String> {
         "no".to_owned(),
         // The bearer's STARTING metric. In `wan_5g` this is written here and
         // nowhere else — from then on `cp-uplink-watch` arbitrates it and
-        // [`wwan_args`] deliberately leaves it alone (B2). In `wan` and `5g` it
+        // [`wwan_args`] deliberately leaves it alone. In `wan` and `5g` it
         // is redundant with the `modify` that follows, and harmlessly so.
         "ipv4.route-metric".to_owned(),
         metric.clone(),
@@ -332,7 +334,7 @@ mod tests {
         }
     }
 
-    /// O3.1 — the exact argv for a representative state, asserted with no
+    /// The exact argv for a representative state, asserted with no
     /// NetworkManager anywhere near it.
     #[test]
     fn wwan_argv_matches_the_mode() {
@@ -351,7 +353,7 @@ mod tests {
         assert_eq!(value_of(&ethernet, "connection.autoconnect"), Some("no"), "wan never brings the modem up");
     }
 
-    /// B2 — in `wan_5g` the METRIC IS THE FAILOVER MECHANISM and belongs to
+    /// In `wan_5g` the METRIC IS THE FAILOVER MECHANISM and belongs to
     /// `cp-uplink-watch`. Saving an SSID during an outage used to re-pin it to
     /// 700 while the supervisor still believed `promoted=yes` and would never
     /// re-promote, silently costing the box its 5G uplink.
@@ -376,7 +378,7 @@ mod tests {
 
     #[test]
     fn cold_standby_does_not_autoconnect() {
-        // The whole point of `cold` (landmine 8): the SIM stays unattached until
+        // The whole point of `cold`: the SIM stays unattached until
         // the supervisor actually needs it, for a metered plan.
         let mut cold = config(UplinkMode::WanThen5g);
         cold.wwan.standby = Standby::Cold;
@@ -392,10 +394,10 @@ mod tests {
         assert_eq!(value_of(&shared, "802-11-wireless.band"), Some("a"));
         assert_eq!(value_of(&shared, "802-11-wireless.channel"), Some("36"));
 
-        // MEASURED correction to §9: `manual` would leave the AP with no DHCP
-        // server, so a client could not get onto the cul-de-sac network at all
-        // and FR-NET-09's "the cockpit is the only reachable service" would be
-        // reachable by nobody. The profile stays `shared`; the cul-de-sac is
+        // MEASURED: `manual` would leave the AP with no DHCP server, so a client
+        // could not get onto the cul-de-sac network at all, and the cockpit —
+        // the one service that network exists to reach — would be reachable by
+        // nobody. The profile stays `shared`; the cul-de-sac is
         // made by removing forwarding and the masquerade table instead.
         let mut cul_de_sac = config(UplinkMode::Wan);
         cul_de_sac.ap.share_internet = false;
@@ -414,7 +416,7 @@ mod tests {
         assert_eq!(value_of(&ap_args(&auto), "802-11-wireless.channel"), Some(""));
     }
 
-    /// O6.4 — the four settings that together give WPA2/WPA3 transition mode
+    /// The four settings that together give WPA2/WPA3 transition mode
     /// with no legacy TKIP. Measured beacon: `Authentication suites: PSK
     /// PSK/SHA-256 SAE` over RSN/CCMP, with the WPA1 element gone.
     #[test]
@@ -426,7 +428,7 @@ mod tests {
         assert_eq!(value_of(&argv, "802-11-wireless-security.group"), Some("ccmp"), "no TKIP");
     }
 
-    /// B18 — a factory-fresh box has no passphrase, and `psk ""` alongside
+    /// A factory-fresh box has no passphrase, and `psk ""` alongside
     /// `key-mgmt wpa-psk` is an argv nmcli may reject outright. One rejection
     /// there turns **every** network POST on such a box into a `502`, so the
     /// whole security group is omitted until a PSK exists.

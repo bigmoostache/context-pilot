@@ -1,5 +1,5 @@
 #!/bin/sh
-# cp-uplink-watch — the WAN ⇄ 5G failover supervisor (design-network-uplink §8).
+# cp-uplink-watch — the WAN ⇄ 5G failover supervisor.
 #
 # WHY A DEDICATED DAEMON, not a task inside the orchestrator: it must survive an
 # orchestrator crash or an OTA restart (the moments the box is MOST likely to
@@ -10,15 +10,18 @@
 # default route via end0 and will happily blackhole every packet. Route metrics
 # react to CARRIER; only an end-to-end probe reacts to REACHABILITY.
 #
-# INTERFACE-BOUND PROBING is load-bearing: `ping -I end0` pins the probe to the
-# WAN port (SO_BINDTODEVICE) instead of following the default route. Probing
-# through the default route would be circular — once we failed over to 5G the
-# probe would start succeeding over 5G and we would immediately "recover" the
-# WAN we just demoted.
+# INTERFACE-BOUND PROBING IS NOT OPTIONAL, and it is the one thing in this file
+# that cannot be simplified away: `ping -I end0` pins the probe to the WAN port
+# (SO_BINDTODEVICE) instead of following the default route. Probing through the
+# default route would be CIRCULAR — the probe would test whichever uplink is
+# currently preferred, so the moment we failed over to 5G the probe would start
+# succeeding over 5G and we would immediately "recover" the very WAN we just
+# demoted, then fail over again, forever. The question this daemon asks is "is
+# THIS interface carrying traffic", never "does the box have internet".
 #
 # SCOPE: active only in `wan_5g`. In `wan` and `5g` the routing is static and
 # there is nothing to arbitrate, so the loop only refreshes the state file that
-# `GET /api/it/network` reads (design §8).
+# `GET /api/it/network` reads.
 #
 # NOT SUPERVISING IS A FIRST-CLASS OUTCOME, not an error path. Two startup guards
 # (below) can switch this daemon to observe-only even in `wan_5g`, because the
@@ -131,7 +134,10 @@ write_state() {
 # The device carrying the lowest-metric IPv4 default route — i.e. what the box
 # actually uses right now. Read from the kernel, never inferred from what we
 # believe we configured, so the state file stays honest even if a human ran
-# `nmcli` behind our back (landmine 9).
+# `nmcli` behind our back. That human loses: the backend applier is the only
+# writer of system network config, so a hand-made profile or metric is reverted
+# at the next apply or the next boot. Documented, not defended against — but the
+# state file must at least report the truth while it lasts.
 current_default_dev() {
   ip -4 route show default 2>/dev/null \
     | awk '{ m = 0; for (i = 1; i < NF; i++) if ($i == "metric") m = $(i + 1);
@@ -252,12 +258,19 @@ disengage_wwan() {
 # fails (no coverage, no SIM). A transition line that only appears on success
 # would hide exactly the cases someone is reading the journal to understand.
 #
-# ONE DECISION, ONE TRANSITION LINE (O5.1) — but a decision that could not be
-# carried out is NOT abandoned. It stays on the books as `promoted=yes
-# achieved=no` and `retry_actuation` keeps pushing at it, without ever
-# re-announcing the transition. That distinction is the difference between a
-# bearer that gets one attempt for an entire outage — modem still enumerating,
-# transient no-coverage, the `--wait` cap — and one that eventually comes up.
+# ONE DECISION, ONE TRANSITION LINE. This is an acceptance criterion, not a
+# preference: `journalctl -u cp-uplink` must show exactly one transition per
+# event, or nobody can tell a single failover from a flapping link. MEASURED on
+# the blackhole simulation (probe targets dropped upstream while the carrier and
+# the DHCP lease stayed up): exactly 2 `TRANSITION` lines for a full fail-over +
+# fail-back cycle.
+#
+# But a decision that could not be carried out is NOT abandoned. It stays on the
+# books as `promoted=yes achieved=no` and `retry_actuation` keeps pushing at it,
+# without ever re-announcing the transition. That distinction is the difference
+# between a bearer that gets one attempt for an entire outage — modem still
+# enumerating, transient no-coverage, the `--wait` cap — and one that eventually
+# comes up.
 promote_wwan() {   # $1 = reason
   log "TRANSITION → 5G — $1"
   last_transition=$(date +%s)
@@ -426,7 +439,7 @@ while [ "$running" = "1" ]; do
   # which is what the kernel currently shows. They differ exactly when a
   # promotion could not be carried out (no coverage, no SIM), and keying off the
   # kernel there would re-promote and re-log on every single cooldown for as
-  # long as the outage lasted. One decision, one transition line (O5.1).
+  # long as the outage lasted. One decision, one transition line.
   #
   # The retry comes LAST on purpose: if the WAN came back while a promotion was
   # still failing to take, demoting is strictly better than finishing a failover

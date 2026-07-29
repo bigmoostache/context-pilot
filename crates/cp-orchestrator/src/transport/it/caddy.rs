@@ -142,7 +142,7 @@ fn bracketed(subject: &str) -> String {
 /// for it. Today that is the Wi-Fi AP's `10.42.0.1`: Caddy listens on the
 /// wildcard `*:443` but the generated file enumerates explicit site addresses,
 /// so without this an AP client gets a TLS `internal error` while plain HTTP
-/// answers `200` (landmine 11, measured in M0/O0.2).
+/// answers `200` — measured on hardware, not deduced.
 ///
 /// The ULA is appended, never operator-entered: `Identity` holds a single `ip`,
 /// and that one belongs to the CLIENT (the address their staff and their DNS will

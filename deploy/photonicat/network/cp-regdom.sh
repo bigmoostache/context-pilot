@@ -1,17 +1,22 @@
 #!/bin/sh
 # cp-regdom — push the configured Wi-Fi regulatory country code into the kernel.
 #
-# WHY THIS EXISTS (design-network-uplink §9, landmine 1): out of the box the
-# regulatory domain is the world default `00`, under which `iw phy phy0 info`
-# reports EVERY 5 GHz channel — and 2.4 GHz channels 12/13 — as `(no IR)`, no
-# initiating radiation. An AP cannot start on a `no IR` channel, so a country
-# code is a functional prerequisite for the access point, not a nicety.
-# Measured on phy0: `iw reg set FR` takes the `no IR` count from 89 to 0 and
-# channel 36 from 20 dBm/unusable to 23 dBm/usable.
+# WHY THIS EXISTS: out of the box the regulatory domain is the world default
+# `00`, under which `iw phy phy0 info` reports EVERY 5 GHz channel — and 2.4 GHz
+# channels 12/13 — as `(no IR)`, no initiating radiation. An AP cannot start on a
+# `no IR` channel, so a country code is a functional prerequisite for the access
+# point, not a nicety. MEASURED on phy0 of this hardware: `iw reg set FR` takes
+# the `no IR` count from 89 to 0, and channel 36 from 20 dBm/unusable to
+# 23 dBm/usable. Those two numbers are the whole justification for this file.
 #
-# Landmine 12: `iw reg get` flags both radios `(self-managed)`, which reads as
-# "your country code will be ignored". It is not so — ath11k forwards the user
-# hint to firmware and honours it. Do not re-derive the opposite from the flag.
+# THE `(self-managed)` TRAP — do not re-derive the opposite from the flag.
+# `iw reg get` flags BOTH radios `(self-managed)`, which reads as "the firmware
+# owns the domain, your country code will be ignored". Read that way, this script
+# looks pointless. It is not so: measured, ath11k (phy0) forwards the user hint to
+# firmware and honours it — that is where the 89 → 0 above comes from. Self-managed
+# means the phy may also have opinions of its own, not that yours are discarded.
+# phy1 (aic8800) genuinely does stay at `00` forever, which is why the check below
+# reads the `global` block and never "the first country line in the output".
 #
 # WHO CALLS THIS — two entry points, one implementation. There is exactly one
 # place in this appliance that talks to `iw reg set`, and it is this file.
@@ -36,9 +41,10 @@
 # journal line. THE EXIT STATUS IS NOT A SUCCESS SIGNAL and no caller may gate on
 # it: a box that misses its regulatory domain still routes, still serves the
 # cockpit and still has a working ethernet uplink — only the AP is affected, and
-# the applier refuses to enable it without a country anyway (FR-NET-14). An
-# applier that failed an apply over this would trade a degraded AP for a rollback
-# of the whole network document.
+# the applier refuses to enable the AP without a country in the first place, so a
+# country that failed to take is the narrower of the two problems. An applier that
+# failed an apply over this would trade a degraded AP for a rollback of the whole
+# network document.
 set -u
 
 CONF=/etc/default/cp-network

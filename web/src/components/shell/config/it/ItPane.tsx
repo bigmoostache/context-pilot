@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils"
  * {@link SectionLabel} and {@link TextField} from here.
  *
  * The UI bits are migrated from the maintenance wizard's `IdentityStep` +
- * `TrustStep` (kept in place until M5 removes the plane).
+ * `TrustStep` (kept in place until the maintenance plane itself is removed).
  */
 export function ItPane() {
   return (

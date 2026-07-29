@@ -12,9 +12,9 @@
 //!   [`supervisor_status`] into the `status.supervisor` object.
 //!
 //! Keeping them together is the point: they are one contract, and every past
-//! drift between the two — three variables the backend never rendered (C2), a
-//! state file nothing opened (C1) — was a drift between two files that lived
-//! nowhere near each other.
+//! drift between the two — three variables the backend never rendered, a state
+//! file nothing opened — was a drift between two files that lived nowhere near
+//! each other.
 
 use std::path::PathBuf;
 
@@ -27,7 +27,7 @@ use super::state::{NetworkConfig, ProbeConfig};
 
 /// Render `/etc/default/cp-uplink` and restart the supervisor when it changed.
 ///
-/// Only on change (O5.3): the supervisor is the thing that restores
+/// Only on change: the supervisor is the thing that restores
 /// connectivity, and bouncing it on every unrelated save would drop its
 /// hysteresis state and re-arm the cooldown for nothing.
 ///
@@ -56,8 +56,8 @@ pub(crate) fn write_uplink_env(tools: &Tools, config: &NetworkConfig) -> Result<
 /// unit, in the same spirit as `/etc/default/pcat-ula`.
 ///
 /// Every variable `cp-uplink-watch` reads is written here. The three timing
-/// knobs were the exception until C2: with no field in [`ProbeConfig`] to render
-/// them they were permanently 3 s / 60 s / 20 s and unreachable from the
+/// knobs were the exception for a while: with no field in [`ProbeConfig`] to
+/// render them they were permanently 3 s / 60 s / 20 s and unreachable from the
 /// cockpit, which in particular made the cooldown meaningless the moment
 /// `interval_s` was raised past 60.
 ///
@@ -106,7 +106,7 @@ pub(super) fn validate_probe(probe: &ProbeConfig) -> Result<(), String> {
     validate_probe_timing(probe)
 }
 
-/// The three seconds-valued supervisor knobs (C2), split out of
+/// The three seconds-valued supervisor knobs, split out of
 /// [`validate_probe`] to keep either function inside the complexity budget.
 ///
 /// The ranges are what the supervisor can actually honour, not taste:
@@ -146,11 +146,11 @@ fn uplink_state_path() -> PathBuf {
 
 /// The supervisor's published state, or `null` when it has published none.
 ///
-/// # Why this is read at all (C1)
+/// # Why this is read at all
 ///
 /// `cp-uplink-watch` rewrites this file every probe round and, until now,
-/// **nothing opened it** — while `cp-uplink.service`'s own header and design §8
-/// both stated as fact that the cockpit reads it. It carries the four things
+/// **nothing opened it** — while `cp-uplink.service`'s own header stated as fact
+/// that the cockpit reads it. It carries the four things
 /// `/proc/net/route` structurally cannot express, and they are exactly what an
 /// admin wants during a failover: whether the supervisor is running at all,
 /// whether *it* decided to promote the bearer (as opposed to what the kernel
@@ -165,8 +165,8 @@ pub(crate) fn supervisor_status() -> Value {
 /// Tolerant in exactly the way the `nmcli -t` parsers are: unknown keys are
 /// ignored, missing keys take their default, and a value that will not parse
 /// takes its default rather than failing the whole read. That tolerance is what
-/// lets the shell side add a key — `achieved` is being added for B4's "decided
-/// but could not be carried out" — without a flag-day change. An absent
+/// lets the shell side add a key — `achieved` is being added for the "decided
+/// but could not be carried out" case — without a flag-day change. An absent
 /// `achieved` therefore reads as `true`: the older script only ever recorded
 /// decisions it believed had succeeded.
 ///
@@ -277,7 +277,7 @@ impl UplinkState {
 mod tests {
     use super::*;
 
-    /// C1 — a realistic `/run/cp-uplink/state`, mid-failover, byte-for-byte in
+    /// A realistic `/run/cp-uplink/state`, mid-failover, byte-for-byte in
     /// the shape `write_state` emits.
     #[test]
     fn the_supervisors_own_state_is_parsed() {
@@ -319,7 +319,8 @@ last_reason=end0 unreachable for 3 consecutive probes
         assert_eq!(state.get("active_uplink"), Some(&json!("none")), "an absent key takes its default");
         assert_eq!(state.get("achieved"), Some(&json!(true)), "a script predating the key is not 'failing'");
 
-        // The key the shell side is adding for B4, read as written.
+        // The key the shell side is adding for "decided but not achieved",
+        // read as written.
         assert_eq!(parse_uplink_state("promoted=yes\nachieved=no\n").get("achieved"), Some(&json!(false)));
 
         // A word this build does not know must not widen the response's enum.
@@ -329,7 +330,7 @@ last_reason=end0 unreachable for 3 consecutive probes
         assert_eq!(parse_uplink_state("# just a comment\n"), Value::Null, "…and neither is a comment");
     }
 
-    /// C2 — the bounds on the three new knobs are what the supervisor can
+    /// The bounds on the three timing knobs are what the supervisor can
     /// actually honour, so they are asserted against the validator itself.
     #[test]
     fn the_supervisor_knobs_are_bounded_by_what_it_can_honour() {
@@ -358,7 +359,7 @@ last_reason=end0 unreachable for 3 consecutive probes
         assert!(validate_probe(&never_binds).is_ok(), "a never-binding cooldown is a choice, not an error");
     }
 
-    /// C2 — the three knobs that had no line at all. `cp-uplink-watch` reads
+    /// The three knobs that once had no line at all. `cp-uplink-watch` reads
     /// every one of these names; before this they were dead defaults in the
     /// script and unreachable from the cockpit.
     #[test]

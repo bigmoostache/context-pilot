@@ -23,7 +23,8 @@
     repo_root: "{{ playbook_dir | dirname | dirname }}"
     artifacts_dir: "{{ playbook_dir }}/.artifacts"
     cp_root: /opt/context-pilot
-    # Two seeded accounts (design §13.4): the vendor `superadmin` + client `admin`.
+    # Two seeded accounts (docs/design-auth.md §13.4): the vendor `superadmin` +
+    # client `admin`.
     cp_seed_superadmin_email: "{{ cp_superadmin_email | default('vendor@context-pilot.internal') }}"
     cp_seed_admin_email: "{{ cp_admin_email | default('admin@admin.fr') }}"
     sheets_dir: "{{ playbook_dir }}/out"
@@ -65,13 +66,18 @@
     # ── 5G modem toolbox (Quectel RM520N-GL) ──
     # Installs the modem tooling only (mmcli/qmicli/mbimcli/picocom) so we can talk
     # to the modem. The uplink itself (APN, routing, failover) is configured by
-    # tasks/net/network.yml + the backend applier — see docs/design-network-uplink.md.
+    # tasks/net/network.yml + the backend applier.
     cp_install_modem: "{{ install_modem | default(true) | bool }}"
     # ── internet uplink (WAN / 5G) + Wi-Fi access point ──
-    # docs/design-network-uplink.md §12. Ansible SEEDS the state file write-once
-    # and installs the machinery; the backend applier is the only writer of
-    # system network config, so a re-run never reverts an IT admin's cockpit
-    # choices (FR-NET-12). Re-seed deliberately with -e cp_net_force=true.
+    # Ansible SEEDS the state file (.network.json) write-once and installs the
+    # machinery; the backend applier is the only writer of system network config.
+    # THE STATE FILE IS WRITE-ONCE ON PURPOSE: once a box is in a client's hands,
+    # the IT admin's cockpit settings are the newer truth, and a re-run of this
+    # playbook must never silently revert them — that is the whole reason Ansible
+    # does not apply anything here. `-e cp_net_force=true` overwrites the file
+    # deliberately, and is the only way back to the vendor baseline (use it when
+    # re-provisioning a box for a different site, or when a client has locked
+    # themselves out of their own uplink).
     cp_net_enabled: "{{ net_enabled | default(true) | bool }}"
     cp_net_mode: "{{ net_mode | default('wan') }}"            # wan | wan_5g | 5g
     cp_net_force: "{{ net_force | default(false) | bool }}"
@@ -85,7 +91,9 @@
     cp_wwan_roaming: "{{ wwan_roaming | default(false) | bool }}"
     cp_wwan_standby: "{{ wwan_standby | default('hot') }}"    # hot | cold
     # Wi-Fi AP — off by default: turning a client's appliance into a broadcasting
-    # router is the client IT's decision, not ours (landmine 6).
+    # router is the client IT's decision, not ours. With sharing on, the box does
+    # NAT onto the client LAN, i.e. it becomes a router on a network we do not
+    # own — never something to hand out by default.
     cp_ap_enabled: "{{ ap_enabled | default(false) | bool }}"
     cp_ap_ssid: "{{ ap_ssid | default('ContextPilot-' + (box_serial | default('') | lower)[-4:]) }}"
     cp_ap_password: "{{ ap_password | default('') }}"
@@ -94,8 +102,10 @@
     cp_ap_country: "{{ ap_country | default('FR') }}"
     cp_ap_hidden: "{{ ap_hidden | default(false) | bool }}"
     cp_ap_share: "{{ ap_share | default(true) | bool }}"
-    # Failover probing (§8) — interface-bound, so it tests the WAN path itself
-    # rather than whatever the default route currently prefers.
+    # Failover probing — interface-bound (`ping -I <wan>`), so it tests the WAN
+    # path itself rather than whatever the default route currently prefers.
+    # Probing through the default route would be circular: after a failover the
+    # probe would succeed over 5G and instantly "recover" the WAN it just demoted.
     #
     # TARGETS ARE COERCED, not merely documented. `-e net_probe_targets=1.1.1.1,8.8.8.8`
     # arrives as a STRING, and a JSON string where the backend requires an array
@@ -178,7 +188,7 @@
           networks). ap_country must be two letters (it is
           '{{ cp_ap_country }}') and is REQUIRED when ap_enabled=true — without a
           regulatory domain every 5 GHz channel is no-IR and the AP cannot
-          beacon at all (landmine 1). ap_channel must be 0 (automatic) or one of
+          beacon at all. ap_channel must be 0 (automatic) or one of
           {{ _cp_ap_legal_channels | join(', ') }} for ap_band='{{ cp_ap_band }}'.
         success_msg: >-
           AP variables accepted (enabled={{ cp_ap_enabled }}, band={{ cp_ap_band }},
@@ -288,8 +298,9 @@
   #
   # ORDER IS LOAD-BEARING, and handlers run in the order they are DEFINED here,
   # never in notification order: the regulatory country must be in force in the
-  # kernel BEFORE the applier brings `cp-ap` up, or the AP silently fails to
-  # beacon (landmine 1). Hence regdom, then orchestrator, then the health probe.
+  # kernel BEFORE the applier brings `cp-ap` up, or the AP starts under the world
+  # default domain `00`, where every 5 GHz channel is `no IR`, and silently fails
+  # to beacon. Hence regdom, then orchestrator, then the health probe.
   handlers:
     - name: Push the seeded regulatory country into the kernel
       # RemainAfterExit=yes on cp-regdom.service means a oneshot that already ran

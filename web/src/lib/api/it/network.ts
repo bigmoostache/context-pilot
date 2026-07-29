@@ -1,4 +1,4 @@
-// ── Internet-uplink cockpit logic (docs/design-network-uplink.md §11) ─
+// ── Internet-uplink cockpit logic ───────────────────────────────────
 //
 // Everything the uplink + Wi-Fi pane knows that has nothing to do with how it
 // looks: the mode table, the poll interval, the form drafts and their request
@@ -34,7 +34,8 @@ import type {
 export const IT_NETWORK_KEY = ["it-network"] as const
 
 /** How often the status card re-reads the box while the pane is open. Fast
- *  enough that a failover is visible without a manual refresh (O4.1).
+ *  enough that a failover — or a mode change taking effect — is visible within
+ *  about ten seconds, without a manual refresh.
  *
  *  Nothing may be keyed off this query's identity — see {@link apDraftFrom}. */
 export const POLL_MS = 5000
@@ -133,8 +134,9 @@ export interface ApDraft {
 }
 
 /** Seed an AP draft from the server's projection. The passphrase always starts
- *  empty: it is write-only, the server never sends it back, and leaving the
- *  field empty is what keeps the stored key (FR-NET-13). */
+ *  empty: no read route ever returns it — the projection carries only
+ *  `passphrase_set` — and leaving the field empty is what keeps the stored
+ *  key. */
 export function apDraftFrom(ap: ItNetworkAp): ApDraft {
   return {
     enabled: ap.enabled,

@@ -1,4 +1,4 @@
-// ── Internet-uplink status formatting (docs/design-network-uplink.md §11) ─
+// ── Internet-uplink status formatting ───────────────────────────────
 //
 // The read half of the uplink pane: turning `GET /api/it/network`'s `status`
 // and its read-only `probe` block into the strings the status cards render.
@@ -206,7 +206,29 @@ export function supervisorView(supervisor: ItNetworkSupervisor): SupervisorView 
   return { tone: "ok", headline: "Watching the ethernet path", detail: reason, rows }
 }
 
-/** The supervisor's raw fields, in the order they answer "and why?". */
+/**
+ * The supervisor's raw fields, in the order they answer "and why?".
+ *
+ * The card deliberately shows three things that are routinely confused for one:
+ *
+ *  - **`promoted`** — what the supervisor *decided*. "5G should carry" or
+ *    "ethernet should carry". A decision, nothing more.
+ *  - **`achieved`** — whether that decision was actually *actuated*, re-read
+ *    from `nmcli` rather than inferred from the exit status of the command that
+ *    tried. A promotion that could not land (modem still enumerating, no
+ *    coverage, the `--wait` cap) is `promoted` without `achieved`, and it is
+ *    retried on later turns instead of being written off as done.
+ *  - **`active_uplink`** — what the *kernel* is routing through right now, which
+ *    is the only one of the three an outside observer can check. It can
+ *    disagree with the other two both ways: a decision that has not landed
+ *    yet, or something outside the supervisor (a `nmcli` run, a reboot)
+ *    resetting the metric under it.
+ *
+ * Collapsing them was the original bug: a supervisor that set `promoted` before
+ * actuating and never checked believed it had failed over while the box had no
+ * uplink at all. Hence "Decision" (decided · in force / NOT in force) and
+ * "Kernel route" as two separate rows.
+ */
 function supervisorRows(supervisor: ItNetworkSupervisor): StatusRow[] {
   return [
     {

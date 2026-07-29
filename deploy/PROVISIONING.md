@@ -160,11 +160,13 @@ Une box fraîchement déployée est **non provisionnée** : pas de certificat, d
 
 ## Phase 5 — Réseau : uplink (WAN / 5G) et point d'accès Wi-Fi
 
-Optionnelle et **désactivée par défaut** côté Wi-Fi. Conception complète :
-`docs/design-network-uplink.md`. Ce qui est installé par `site.yml`
+Optionnelle et **désactivée par défaut** côté Wi-Fi. Ce qui est installé par `site.yml`
 (`tasks/net/network.yml`, sauté avec `-e cp_net_enabled=false`) :
 NetworkManager (avec l'ethernet **non géré**, cf. caveats), `cp-regdom.service`
-(domaine réglementaire) et `cp-uplink.service` (bascule WAN ⇄ 5G).
+(domaine réglementaire) et `cp-uplink.service` (bascule WAN ⇄ 5G). Le *pourquoi*
+de chaque pièce (ordonnancements porteurs, mesures, pièges) est commenté dans les
+fichiers eux-mêmes — `deploy/photonicat/network/` et `tasks/net/network.yml` — et
+résumé dans les caveats en bas de page.
 
 **Ansible ne configure rien — il *sème*.** `.network.json` est écrit **une seule
 fois** (`0600`, à côté de `.identity.json`) ; ensuite l'admin IT est seul maître à

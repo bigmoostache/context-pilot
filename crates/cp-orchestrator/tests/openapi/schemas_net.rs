@@ -1,5 +1,5 @@
 //! Network OpenAPI schemas — uplink mode, 5G bearer, Wi-Fi AP, live status and
-//! the failover supervisor's state block (docs/design-network-uplink.md §10).
+//! the failover supervisor's state block.
 //!
 //! Split out of [`schemas_ext2`](super::schemas_ext2) when the supervisor block
 //! and the per-field secret documentation pushed that file past the 500-line
@@ -163,7 +163,7 @@ pub(super) fn mode_body() -> Value {
 ///
 /// Secrets are write-only: the bearer password, the SIM PIN and the Wi-Fi PSK
 /// are POSTed but never returned, so every read schema carries a `*_set`
-/// boolean in their place (FR-NET-13).
+/// boolean in their place.
 pub(super) fn network() -> Value {
     json!({
         "ItNetworkWwan": {
@@ -183,7 +183,7 @@ pub(super) fn network() -> Value {
             "type": "object",
             "description": "Wi-Fi access-point settings. `country` is a functional prerequisite, \
                 not a nicety: under the world-default regulatory domain every 5 GHz channel is \
-                `no IR` and the AP cannot start (FR-NET-14).",
+                `no IR` and the radio cannot start, so enabling the AP without a country code is refused.",
             "properties": merge(ap_properties(), json!({
                 "passphrase_set": { "type": "boolean", "description": "Whether a PSK is stored. The key itself is never returned." }
             })),
@@ -275,8 +275,9 @@ pub(super) fn network() -> Value {
         },
         "ItNetworkSupervisor": {
             "type": "object",
-            "description": "What the failover supervisor itself believes, parsed from `/run/cp-uplink/state` \
-                (design §8). Null when `cp-uplink` is not running or has not yet written its first line. \
+            "description": "What the failover supervisor itself believes, parsed from the state line the \
+                `cp-uplink` daemon writes to `/run/cp-uplink/state` on every probe round. Null when \
+                `cp-uplink` is not running or has not yet written its first line. \
                 Everything else under `status` is observed from the system; this block is the only place the \
                 supervisor's INTENT and its streak counters are visible, and it is what makes a failover that \
                 did not happen diagnosable.",

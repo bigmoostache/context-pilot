@@ -62,11 +62,21 @@ export function fetchItProvisioned(): Promise<{ provisioned: boolean }> {
   return sdk(getApiItProvisioned())
 }
 
-// ── Internet uplink + Wi-Fi access point (design-network-uplink §10) ─
+// ── Internet uplink + Wi-Fi access point ────────────────────────────
 
-/** Uplink + AP configuration (secrets elided) plus live status. Polled while
- *  the network pane is open, so the status card tracks a failover without a
- *  manual refresh. */
+/** Uplink + AP configuration plus live status. Polled while the network pane is
+ *  open, so the status card tracks a failover without a manual refresh.
+ *
+ *  No secret is ever in this response: the Wi-Fi passphrase and the SIM PIN and
+ *  password are never returned by any read route. Each is replaced by a
+ *  `*_set: boolean` (`passphrase_set`, `pin_set`, `password_set`) saying only
+ *  whether one is stored — enough for the forms to show "set / not set" and to
+ *  decide whether the AP may be enabled, and never enough to leak the value. On
+ *  the write side the same fields are three-state: omitted keeps what is stored,
+ *  `null` clears it, a string replaces it.
+ *
+ *  `config.wwan` is `null` for anyone without `can_manage_secrets`, which is how
+ *  the 5G block disappears from the pane rather than being refused. */
 export function fetchItNetwork(): Promise<ItNetworkResponse> {
   return sdk(getApiItNetwork())
 }
@@ -78,14 +88,19 @@ export function setItNetworkMode(body: ItNetworkModeBody): Promise<ItNetworkMode
 }
 
 /** Set the access-point configuration. `passphrase` is write-only: omit the
- *  field to keep the stored PSK, send null to clear it. Enabling the AP without
- *  a regulatory country is a 400 (FR-NET-14). */
+ *  field to keep the stored PSK, send null to clear it, send a string to replace
+ *  it. Enabling the AP without a regulatory country is a 400 — the country is
+ *  what `cp-regdom` feeds to `iw reg set`, and with no regulatory domain the
+ *  5 GHz band is unusable, so it is a functional prerequisite and not a
+ *  nicety. */
 export function setItNetworkAp(body: ItNetworkApBody): Promise<ItNetworkApResult> {
   return sdk(postApiItNetworkAp({ body }))
 }
 
-/** Set the 5G bearer configuration. `password` and `pin` are write-only, with
- *  the same omit-to-keep semantics as the AP passphrase. */
+/** Set the 5G bearer configuration. Vendor-only (`can_manage_secrets`): the SIM
+ *  and the data plan are ours, so the APN is a fleet decision, not a per-site
+ *  one. `password` and `pin` are write-only, with the same omit-to-keep
+ *  semantics as the AP passphrase. */
 export function setItNetworkWwan(body: ItNetworkWwanBody): Promise<ItNetworkWwanResult> {
   return sdk(postApiItNetworkWwan({ body }))
 }

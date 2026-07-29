@@ -94,7 +94,7 @@ pub(super) fn paths() -> Value {
         "/api/it/provisioned": get("it", "Whether the box has been provisioned", json!({
             "type": "object", "properties": { "provisioned": { "type": "boolean" } }, "required": ["provisioned"]
         })),
-        // ── Internet uplink + Wi-Fi AP (docs/design-network-uplink.md §10) ──
+        // ── Internet uplink + Wi-Fi AP ────────────────────────────────────
         // The three bodies come from `schemas_net`, which builds each of them
         // from the same field list as the read schema it mirrors (review C9),
         // and carries the tri-state contract of every write-only secret as a

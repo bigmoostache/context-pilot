@@ -1,5 +1,8 @@
 {#-
-  .network.json — the document the backend reads at every boot (design §6/§12).
+  .network.json — the document the backend reads at every boot, and the single
+  source of truth for the uplink and the AP. Ansible writes it exactly once
+  (write-once, like seed.env); from then on the cockpit owns it and the backend
+  applier is the only thing that turns it into system configuration.
 
   THE FIELD SET MUST MATCH `NetworkConfig` EXACTLY. Not one struct in
   crates/cp-orchestrator/src/transport/it/network/state.rs carries

@@ -1050,7 +1050,7 @@
         "type": "object"
       },
       "ItNetworkAp": {
-        "description": "Wi-Fi access-point settings. `country` is a functional prerequisite, not a nicety: under the world-default regulatory domain every 5 GHz channel is `no IR` and the AP cannot start (FR-NET-14).",
+        "description": "Wi-Fi access-point settings. `country` is a functional prerequisite, not a nicety: under the world-default regulatory domain every 5 GHz channel is `no IR` and the radio cannot start, so enabling the AP without a country code is refused.",
         "properties": {
           "band": {
             "enum": [
@@ -1317,7 +1317,7 @@
         "type": "object"
       },
       "ItNetworkSupervisor": {
-        "description": "What the failover supervisor itself believes, parsed from `/run/cp-uplink/state` (design §8). Null when `cp-uplink` is not running or has not yet written its first line. Everything else under `status` is observed from the system; this block is the only place the supervisor's INTENT and its streak counters are visible, and it is what makes a failover that did not happen diagnosable.",
+        "description": "What the failover supervisor itself believes, parsed from the state line the `cp-uplink` daemon writes to `/run/cp-uplink/state` on every probe round. Null when `cp-uplink` is not running or has not yet written its first line. Everything else under `status` is observed from the system; this block is the only place the supervisor's INTENT and its streak counters are visible, and it is what makes a failover that did not happen diagnosable.",
         "properties": {
           "achieved": {
             "description": "CARRIED OUT: the decision in `promoted` actually took effect on the bearer. `promoted: true` with `achieved: false` is the outage signature — the supervisor wanted 5G and could not activate it (no coverage, no SIM, modem still enumerating), so the box has no uplink at all rather than the 5G one the decision implies.",

@@ -1,20 +1,24 @@
 ---
 # Internet uplink (WAN / 5G) + Wi-Fi access point — the system foundation.
-# Design: docs/design-network-uplink.md §5/§12 (M1).
 #
 # SCOPE, and what it deliberately is NOT: this file installs the machinery and
-# SEEDS the state file. It never creates an `nmcli` profile, never sets a route
-# and never brings a radio up. The backend applier is the ONLY writer of system
-# network config (design §6) — one source of truth, one code path to debug. A
-# second applier here is exactly how "Ansible configures it AND the UI
-# configures it" turns into "the next site.yml run silently reverted the
-# client's choices" (FR-NET-12).
+# SEEDS the state file. IT SEEDS, IT NEVER APPLIES. It never creates an `nmcli`
+# profile, never sets a route and never brings a radio up. The backend applier is
+# the ONLY writer of system network config — one source of truth, one code path to
+# debug, one place to look when the box is doing something nobody asked for. A
+# second applier here is exactly how "Ansible configures it AND the UI configures
+# it" turns into "the next site.yml run silently reverted the client's choices",
+# which is the classic failure mode this split exists to make impossible by
+# construction: the IT admin's cockpit changes are the newer truth and Ansible
+# has no way to express an opinion about them.
 #
 # ORDER IS LOAD-BEARING. `10-cp-unmanaged.conf` ships BEFORE the network-manager
 # package, because NetworkManager purges addresses it did not install itself: if
 # it ever grabs end0/end1 it takes the fleet ULA with it, and the ULA is the ONLY
-# day-0 and break-glass path for the whole fleet (landmine 2). The already-shipped
-# `50-pcat-ula` NM dispatcher hook is the safety net if this is ever violated.
+# day-0 and break-glass path for the whole fleet. The package's postinst starts NM
+# immediately, so "before" means before the apt task below, not merely earlier in
+# the play. The `50-pcat-ula` NM dispatcher hook shipped by tasks/bringup.yml
+# re-asserts the ULA if this is ever violated — a net, not a substitute.
 #
 # Skip entirely with -e cp_net_enabled=false.
 
@@ -60,16 +64,20 @@
     state: present
     update_cache: true
 
-# ── landmine 10: the unbounded boot stall ───────────────────────────────────
+# ── the unbounded boot stall ────────────────────────────────────────────────
 - name: Mask NetworkManager-wait-online.service
-  # Installing network-manager ENABLES this unit. It is WantedBy=network-online
-  # .target and context-pilot.service is After=/Wants= that target, and its
-  # ExecStart is `nm-online -s` with TimeoutStartUSec=infinity. Today NM manages
-  # nothing that autoconnects so it settles instantly — but the moment `cp-wwan`
-  # gets `autoconnect yes` (modes wan_5g/5g) "NM startup complete" waits on a
-  # modem that, with no SIM or no coverage, may never connect. That is an
-  # unbounded delay in front of the cockpit. systemd-networkd-wait-online already
-  # covers the real uplink (5.475 s on the test box), so nothing is lost.
+  # THE MASK IS THE POINT OF THIS TASK, and it is not housekeeping. Installing
+  # network-manager ENABLES this unit. It is WantedBy=network-online.target and
+  # context-pilot.service is After=/Wants= that target, and its ExecStart is
+  # `nm-online -s` with TimeoutStartUSec=infinity — no timeout at all. Today NM
+  # manages nothing that autoconnects so it settles instantly and the trap is
+  # invisible; but the moment `cp-wwan` gets `autoconnect yes` (modes wan_5g/5g)
+  # "NM startup complete" waits on a modem that, with no SIM or no coverage, may
+  # never connect. That is an UNBOUNDED stall sitting directly in front of the
+  # cockpit at every boot — the box looks bricked and nothing says why. Left
+  # unmasked, the failure only appears once a client picks a 5G mode, i.e. far
+  # from here. systemd-networkd-wait-online already covers the real uplink
+  # (5.475 s measured on the test box), so masking this costs nothing.
   ansible.builtin.systemd_service:
     name: NetworkManager-wait-online.service
     masked: true
@@ -83,7 +91,9 @@
     enabled: true
     daemon_reload: true
 
-# ── regulatory domain (FR-NET-14, landmine 1) ───────────────────────────────
+# ── regulatory domain — a functional prerequisite of the AP, not a nicety ───
+# Under the world default domain `00` every 5 GHz channel is `no IR` and the AP
+# cannot beacon at all; the backend refuses to enable an AP with no country set.
 - name: Pin where the network state file lives (read by cp-regdom at boot)
   ansible.builtin.copy:
     dest: /etc/default/cp-network
@@ -111,7 +121,7 @@
     mode: "0644"
   register: _cp_regdom_unit
 
-# ── failover supervisor (§8) ────────────────────────────────────────────────
+# ── failover supervisor (WAN ⇄ 5G) ──────────────────────────────────────────
 - name: Ship the uplink failover supervisor
   ansible.builtin.copy:
     src: "{{ repo_root }}/deploy/photonicat/network/cp-uplink-watch"
@@ -129,7 +139,7 @@
     mode: "0644"
   register: _cp_uplink_unit
 
-# ── state seeding: write-once, exactly like seed.env (FR-NET-12) ────────────
+# ── state seeding: write-once, exactly like seed.env ────────────────────────
 - name: Check whether this box already has a network state file
   ansible.builtin.stat:
     path: "{{ cp_net_state_path }}"
@@ -156,8 +166,8 @@
 
 - name: Seed .network.json (0600 — it holds the Wi-Fi PSK and the SIM PIN)
   # Write-once. An IT admin's cockpit changes are the newer truth; a re-run of
-  # site.yml must never revert them (FR-NET-12). `-e cp_net_force=true` re-seeds
-  # deliberately, which is the documented way back to the vendor baseline.
+  # site.yml must never revert them. `-e cp_net_force=true` re-seeds deliberately,
+  # which is the documented — and only — way back to the vendor baseline.
   #
   # The notify is what makes a seeded document take EFFECT. Nothing re-reads this
   # file on its own: tasks/start.yml already started the orchestrator, which read
@@ -231,8 +241,10 @@
 
 - name: Enable the failover supervisor
   # Started, not restarted-on-every-run: the backend renders
-  # /etc/default/cp-uplink and restarts this unit when the config actually
-  # changes (O5.3). Bouncing it here on an unchanged box would be churn.
+  # /etc/default/cp-uplink and restarts this unit only when the config actually
+  # changes. Bouncing it here on an unchanged box would be churn, and it would
+  # cost the supervisor its hysteresis state (the streaks are in-memory) for
+  # nothing.
   ansible.builtin.systemd_service:
     name: cp-uplink.service
     daemon_reload: true

@@ -1,6 +1,6 @@
 //! State → system configuration. The **only** writer of system network config.
 //!
-//! # The env gate (NFR-NET-04)
+//! # The env gate
 //!
 //! Every tool this module drives is named by an environment variable, exactly as
 //! Caddy is named by `CP_CADDYFILE`:
@@ -29,7 +29,7 @@
 //!
 //! [`Tools::resolve`] returns `None` — and [`apply`] then reports `Ok(false)`
 //! having performed no system call — when `CP_NMCLI_BIN` is **unset or names a
-//! path that does not exist**. Both halves matter (B3): every provisioned box
+//! path that does not exist**. Both halves matter: every provisioned box
 //! gets the variable templated into its unit file whether or not NetworkManager
 //! was ever installed, so gating on the variable alone made a box deployed with
 //! `net_enabled=false` believe it was live and answer `502` to every network
@@ -46,14 +46,14 @@
 //! The steps are ordered by what breaks if they are not:
 //!
 //! 1. **Regulatory domain first.** An AP brought up under the world default `00`
-//!    lands on a `no IR` channel and never beacons (landmine 1).
+//!    lands on a `no IR` channel and never beacons.
 //! 2. **Profiles**, then **activation**, then **routes** — so a half-configured
 //!    uplink is never the default route.
 //! 3. **The supervisor's config last**, once the world it supervises is real.
 //!
 //! The Caddy site list is the one arrow this module does *not* own: it is driven
 //! from [`commit`](super::commit) **before** the apply, so `10.42.0.1` is already
-//! a served name by the time the first AP client can associate (landmine 11).
+//! a served name when the first AP client associates — or it meets a TLS error.
 
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -66,8 +66,7 @@ use super::state::{NetworkConfig, UplinkMode};
 use super::{profiles, routes, uplink};
 
 /// The AP's own address — the gateway AP clients get from NetworkManager's
-/// dnsmasq, and (landmine 11) a name Caddy must serve for the cockpit to be
-/// reachable over HTTPS from the AP subnet.
+/// dnsmasq, and a name Caddy must serve for HTTPS to work from the AP subnet.
 pub(crate) const AP_ADDRESS: &str = "10.42.0.1";
 
 /// The 5G bearer profile. Fixed, not derived from state: it is the handle the
@@ -90,7 +89,7 @@ pub(crate) fn wan_iface() -> String {
 
 /// The AP radio — `wlp1s0`, the ath11k (Wi-Fi 6, 6 GHz-capable, 23–30 dBm).
 /// `wlan0` (aic8800) is deliberately left free for a future Wi-Fi client
-/// uplink; do not consume it (landmine 7).
+/// uplink; do not consume it.
 pub(crate) fn ap_device() -> String {
     std::env::var("CP_AP_IFACE").unwrap_or_else(|_unset| "wlp1s0".to_owned())
 }
@@ -98,7 +97,7 @@ pub(crate) fn ap_device() -> String {
 /// The modem's NetworkManager device: the QMI **control** port `cdc-wdm0`, not
 /// the net port. NM drives the modem through ModemManager on the control port
 /// and applies the resulting IP config to `wwu1u1i4` itself, which is not an NM
-/// device at all (M0 correction to §5).
+/// device at all — MEASURED: `nmcli device status` lists `cdc-wdm0  gsm`.
 pub(crate) fn wwan_device() -> String {
     std::env::var("CP_WWAN_DEV").unwrap_or_else(|_unset| "cdc-wdm0".to_owned())
 }
@@ -107,9 +106,9 @@ pub(crate) fn wwan_device() -> String {
 ///
 /// The Photonicat 2 ships in variants, and a box without the M.2 modem must not
 /// be offered a 5G uplink at all: picking `5g` there suppresses the ethernet
-/// default route with nothing to replace it. (Recoverable — NFR-NET-01 keeps the
-/// cockpit on the LAN address and the fleet ULA — but it should never be
-/// reachable from the UI in the first place.)
+/// default route with nothing to replace it. (Recoverable — no mode ever alters
+/// an address on the ethernet ports, so the cockpit stays on the LAN address and
+/// the fleet ULA — but it should never be reachable from the UI at all.)
 ///
 /// Probed from **sysfs, not from ModemManager**. `mmcli` answering is a
 /// statement about a daemon's current view; `/sys/class/usbmisc/cdc-wdm*` and
@@ -120,8 +119,8 @@ pub(crate) fn wwan_device() -> String {
 ///   probe reads wrong, and for tests.
 /// * With the applier inert — [`nmcli_bin`] answering `None`: local dev, every
 ///   unit test, a box with no NetworkManager — this reports `true`. Off-box
-///   there is no hardware to protect, and NFR-NET-04 already guarantees nothing
-///   is applied.
+///   there is no hardware to protect, and the env gate already guarantees
+///   nothing is applied.
 pub(crate) fn modem_present() -> bool {
     if let Some(forced) = std::env::var_os("CP_WWAN_PRESENT") {
         return forced == "1";
@@ -136,7 +135,7 @@ pub(crate) fn modem_present() -> bool {
 /// `nmcli`'s path, **only if that path exists**.
 ///
 /// The whole applier hangs off this one answer, so it is the one place the
-/// distinction is made. Checking the file rather than the variable is B3's fix:
+/// distinction is made. Checking the file rather than the variable matters:
 /// `context-pilot.service.j2` templates `CP_NMCLI_BIN` onto every box, including
 /// one deployed with `net_enabled=false` where NetworkManager was never
 /// installed. Believing the variable there meant every `nmcli` spawn failed,
@@ -166,7 +165,7 @@ pub(crate) struct Tools {
     /// `systemctl`, to restart the failover supervisor after a config change.
     pub(crate) systemctl: Option<OsString>,
     /// `nft`, to drop NetworkManager's masquerade table when the AP is a
-    /// cul-de-sac (FR-NET-09).
+    /// cul-de-sac — internet sharing off, cockpit access only.
     pub(crate) nft: Option<OsString>,
     /// `cp-regdom`, the appliance's single implementation of "push the
     /// regulatory country". Preferred over [`Self::iw`] when installed — see
@@ -209,7 +208,7 @@ impl Tools {
 ///
 /// Returns a message describing the first step that failed. The caller
 /// ([`commit`](super::commit)) then rolls the document **and** the system back,
-/// so a bad setting can never wedge the box (NFR-NET-05).
+/// so a bad setting can never wedge the box.
 pub(crate) fn apply(requested: &NetworkConfig) -> Result<bool, String> {
     let Some(tools) = Tools::resolve() else {
         return Ok(false); // no gate in this environment — persistence only.
@@ -240,14 +239,13 @@ pub(crate) fn apply(requested: &NetworkConfig) -> Result<bool, String> {
 /// The configuration the applier will actually enforce, which is not always the
 /// one that was asked for.
 ///
-/// **FR-NET-16 belongs here, not in the HTTP handlers** (R3). The handlers'
-/// `400 "this box has no 5G modem"` is a much better answer for a human and it
-/// stays — but it is not the only way a `5g` document reaches the system.
-/// `apply_network_at_boot` reads the file straight off disk, and
-/// `network.json.j2` templates `cp_net_mode` verbatim, so `-e net_mode=5g` on a
-/// non-5G variant seeds a document that suppresses `end0`'s default route at
-/// **every boot** — precisely the failure FR-NET-16 exists to prevent, reachable
-/// from provisioning with nothing to object.
+/// **"A box with no modem is never offered a 5G mode" belongs here, not in the
+/// HTTP handlers.** The handlers' `400 "this box has no 5G modem"` is a better
+/// answer for a human and it stays — but it is not the only way a `5g` document
+/// reaches the system. `apply_network_at_boot` reads the file straight off disk
+/// and `network.json.j2` templates `cp_net_mode` verbatim, so `-e net_mode=5g`
+/// on a non-5G variant seeds a document that suppresses `end0`'s default route
+/// at **every boot**, reachable from provisioning with nothing to object.
 ///
 /// Coercing to `wan` rather than refusing the whole apply is the deliberate
 /// choice: a refusal would also take the access point down and leave the box
@@ -272,7 +270,7 @@ pub(super) fn coerce_mode(requested: &NetworkConfig, has_modem: bool) -> Cow<'_,
     }
     eprintln!(
         "WARN: network: mode `{}` requires a 5G modem and this box has none — applying `wan` instead, \
-         routing over {} (FR-NET-16). The document is unchanged.",
+         routing over {}. The document is unchanged.",
         requested.mode.as_str(),
         wan_iface()
     );
@@ -284,21 +282,26 @@ pub(super) fn coerce_mode(requested: &NetworkConfig, has_modem: bool) -> Cow<'_,
 /// Push the regulatory country code before any radio comes up.
 ///
 /// Best-effort and never fatal in either path: without a country the AP simply
-/// cannot be enabled (the state layer refuses it, FR-NET-14), so there is
-/// nothing here worth rolling an apply back over. It is issued even when the
-/// global domain already matches — a cheap netlink hint, and a self-managed phy
-/// that came up since the last call would otherwise never receive it
-/// (landmine 12).
+/// cannot be enabled (the state layer refuses it), so there is nothing here
+/// worth rolling an apply back over. It is issued even when the global domain
+/// already matches — a cheap netlink hint, and a self-managed phy that came up
+/// since the last call would otherwise never receive it.
 ///
-/// # `cp-regdom` first, `iw` only as a fallback (C3)
+/// `iw reg get` flags both radios `(self-managed)`, which normally reads as "the
+/// driver ignores your country code". Do not re-derive that from the flag alone:
+/// MEASURED, `iw reg set FR` took `phy0` (ath11k) from the world default `00` to
+/// `FR: DFS-ETSI` and its **`no IR` channel count from 89 to 0** — channels
+/// 36–48 from unusable to 23 dBm, channel 100 to 30 dBm with radar detection.
+/// Without this call there is no 5 GHz AP at all.
+///
+/// # `cp-regdom` first, `iw` only as a fallback
 ///
 /// `deploy/photonicat/network/cp-regdom.sh` says in its own header that the
-/// applier calls it on every AP apply, and design §9 says the same. It did not:
-/// it shelled out to `iw reg set` itself, which made the script a **second
-/// implementation** of this function — two places to fix a landmine, and a
-/// script whose boot path and whose apply path could silently diverge. With
-/// `CP_REGDOM_BIN` set, the country goes through the one implementation, as a
-/// single argument.
+/// applier calls it on every AP apply. It did not: it shelled out to
+/// `iw reg set` itself, which made the script a **second implementation** of
+/// this function — two places to fix the same hazard, and a script whose boot
+/// path and whose apply path could silently diverge. With `CP_REGDOM_BIN` set,
+/// the country goes through the one implementation, as a single argument.
 ///
 /// The `iw` path stays because the script is not always there: off-box, in a
 /// container, and on any box where `network.yml` has not installed
@@ -321,7 +324,7 @@ fn apply_regdom(tools: &Tools, config: &NetworkConfig) {
     }
 }
 
-// ── Per-step applied marks (R1 + B1) ────────────────────────────────────────
+// ── Per-step applied marks ──────────────────────────────────────────────────
 
 /// Marker key for `reconcile_wwan`.
 pub(super) const STEP_WWAN: &str = "wwan";
@@ -336,8 +339,8 @@ pub(super) const STEP_UPLINK_ENV: &str = "uplink_env";
 
 /// Where the marks live. `/run` by default, which is **cleared at every boot**
 /// — so `apply_network_at_boot` always reconciles for real, and only same-boot
-/// repeats are skipped. That is exactly the behaviour landmine 9 documents: a
-/// human's `nmcli` edit is reverted at the next apply or boot.
+/// repeats are skipped. That is intended: only the backend writes system network
+/// config, so a human's `nmcli` edit is reverted at the next apply or boot.
 fn applied_marker() -> PathBuf {
     std::env::var_os("CP_NETWORK_APPLIED").map_or_else(|| PathBuf::from("/run/cp-network-applied"), PathBuf::from)
 }
@@ -354,18 +357,18 @@ fn hash_of<T: Serialize>(inputs: &T) -> String {
 ///
 /// # Why this is not one whole-document fingerprint
 ///
-/// It used to be, and that was two bugs at once (R1 + B1).
+/// It used to be, and that was two bugs at once.
 ///
-/// * **B1.** Any mode change moved the whole-document hash, so `reconcile_ap` +
+/// * Any mode change moved the whole-document hash, so `reconcile_ap` +
 ///   `nmcli connection up cp-ap` re-ran and **every associated Wi-Fi client was
 ///   dropped** — while the comment sitting next to it claimed the marker existed
 ///   to prevent exactly that.
-/// * **R1**, the serious one. The marker was written only after a *complete*
+/// * The serious one: the marker was written only after a *complete*
 ///   successful apply, so a partial failure left it holding the hash of the
 ///   PREVIOUS document. `commit`'s rollback then called `apply(previous)`, the
 ///   fingerprint matched, and the rollback performed **no system work at all**:
-///   no `nmcli`, no drop-in, no sysctl. NFR-NET-05 did not hold, and the `502`'s
-///   "the box is unchanged" was false.
+///   no `nmcli`, no drop-in, no sysctl. The guarantee that a failed apply leaves
+///   the box as it was found did not hold, and the `502` was lying.
 ///
 /// Recording each hash **immediately after its step succeeds** ([`Marks::record`])
 /// makes the rollback correct by construction rather than by care: a step that
@@ -466,7 +469,7 @@ where
 ///
 /// Secrets never reach a log line through this path: the error carries the
 /// tool's own stderr, and the argv — which is where the PSK, the bearer password
-/// and the SIM PIN travel — is deliberately **never** logged (O3.1).
+/// and the SIM PIN travel — is deliberately **never** logged.
 ///
 /// # Errors
 ///
@@ -485,12 +488,12 @@ pub(crate) fn run(bin: &OsStr, args: &[String]) -> Result<String, String> {
 
 /// The Caddy site addresses this configuration needs beyond the box's own.
 ///
-/// Landmine 11: Caddy listens on the wildcard `*:443` but the generated
-/// Caddyfile enumerates **explicit** site addresses, so `10.42.0.1` gets a TLS
-/// `internal error` until it is one of them — measured in M0/O0.2, where the AP
-/// subnet reached the cockpit over plain HTTP but not over HTTPS. FR-NET-09's
-/// "the AP is a cul-de-sac whose only reachable service is the cockpit" is not
-/// satisfied by the network applier alone.
+/// Caddy listens on the wildcard `*:443` but the generated Caddyfile enumerates
+/// **explicit** site addresses, so `10.42.0.1` gets a TLS `internal error` until
+/// it is one of them. MEASURED: a client associated to the AP reached the
+/// cockpit over plain HTTP (`200`) and failed TLS over HTTPS. "The AP is a
+/// cul-de-sac whose only reachable service is the cockpit" is therefore not
+/// satisfied by the network applier alone — enabling it moves the site list too.
 pub(crate) fn caddy_subjects(config: &NetworkConfig) -> Vec<String> {
     if config.ap.enabled { vec![AP_ADDRESS.to_owned()] } else { Vec::new() }
 }

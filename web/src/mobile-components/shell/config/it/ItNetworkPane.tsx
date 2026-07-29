@@ -25,7 +25,7 @@ import { ApForm } from "./ItApForm"
 import { WwanForm } from "./ItWwanForm"
 
 /**
- * Internet uplink + Wi-Fi access point (docs/design-network-uplink.md §11) —
+ * Internet uplink + Wi-Fi access point —
  * mobile twin of `components/shell/config/it/ItNetworkPane`.
  *
  * Divergence from desktop is touch-only: the mode rows and the retry button
@@ -36,13 +36,13 @@ import { WwanForm } from "./ItWwanForm"
  *
  * A sibling of {@link ItPane}, mounted next to it by `ConfigPanes`, so it
  * inherits the same `can_manage_it` gate: the caller only renders the IT
- * category for admin+, and the backend answers 403 to anyone else regardless
- * (NFR-NET-03 — client gating is cosmetic).
+ * category for admin+, and the backend answers 403 to anyone else regardless.
+ * The client-side gating is cosmetic; the server is the authority.
  *
  * Both forms write through the API layer, whose secret handling is what the UI
  * has to respect: the passphrase is **write-only**, so the server never sends it
  * back and the field starts empty on every load. Leaving it empty keeps the
- * stored key; typing replaces it (FR-NET-13).
+ * stored key; typing replaces it.
  */
 export function ItNetworkPane() {
   const { data, isLoading, isError, error, refetch } = useQuery({
