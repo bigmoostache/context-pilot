@@ -803,7 +803,15 @@ takes the directory to 7 + 1.
 **Measured:** full `site.yml` over the fleet ULA finished `failed=0`;
 `nmcli device status` reports `end0`/`end1` `unmanaged` and
 `wlp1s0`/`wlan0`/`cdc-wdm0` managed; `NetworkManager-wait-online.service` reads
-`masked`.
+`masked`. On a re-run, **every task in this file reports `ok`, zero `changed`**,
+with the two seeding tasks `skipping` — the write-once contract holding.
+
+*Trap worth knowing when iterating on a box:* `context-pilot.service` carries
+`StartLimitBurst=5` / `StartLimitIntervalSec=3600`, so more than five restarts in
+an hour — easy to hit while deploying test binaries — makes the playbook fail
+with "start of the service was attempted too often". It reads exactly like a
+crash and is not one. `systemctl reset-failed context-pilot` clears it. Recorded
+in `PROVISIONING.md`.
 
 **Done when:** on a re-run of the full playbook, `nmcli device status` reports
 `end0` and `end1` as `unmanaged` and `wlp1s0`/`cdc-wdm0` as managed, and a second
