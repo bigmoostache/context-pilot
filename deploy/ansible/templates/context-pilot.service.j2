@@ -27,6 +27,19 @@ Environment=CP_ORCH_BIND=127.0.0.1
 Environment=CP_CADDYFILE={{ cp_root }}/caddy/Caddyfile
 Environment=CP_CADDY_BIN={{ cp_root }}/bin/caddy
 Environment=CP_CA_ROOT={{ cp_root }}/caddy/data/caddy/pki/authorities/local/root.crt
+# Network applier gates (docs/design-network-uplink.md §10). Each names one tool;
+# with CP_NMCLI_BIN unset the applier is inert and the backend only persists, so
+# a dev machine never touches its own network. Absolute paths, because the unit
+# has no PATH worth relying on.
+Environment=CP_NMCLI_BIN=/usr/bin/nmcli
+Environment=CP_MMCLI_BIN=/usr/bin/mmcli
+Environment=CP_IW_BIN=/usr/sbin/iw
+Environment=CP_IP_BIN=/usr/sbin/ip
+Environment=CP_NETWORKCTL_BIN=/usr/bin/networkctl
+Environment=CP_SYSTEMCTL_BIN=/usr/bin/systemctl
+Environment=CP_NFT_BIN=/usr/sbin/nft
+Environment=CP_NETWORKD_DIR=/etc/systemd/network
+Environment=CP_UPLINK_ENV=/etc/default/cp-uplink
 # Served SPA — a `current` symlink the OTA updater atomically repoints at the
 # active release's bundled front (`releases/<tag>/web`). Day-0 it points at
 # `web/baseline` (the SPA Ansible shipped); a failed update never touches it.

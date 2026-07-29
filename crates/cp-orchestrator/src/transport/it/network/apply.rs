@@ -11,6 +11,7 @@
 //! | `CP_IW_BIN` | `iw` — the regulatory domain |
 //! | `CP_NETWORKCTL_BIN` | `networkctl` — reload/reconfigure after the drop-in |
 //! | `CP_SYSTEMCTL_BIN` | `systemctl` — restart the failover supervisor |
+//! | `CP_NFT_BIN` | `nft` — drop NM's masquerade table for a cul-de-sac AP |
 //! | `CP_NETWORKD_DIR` | where the strict-`5g` drop-in is written |
 //! | `CP_UPLINK_ENV` | `/etc/default/cp-uplink`, the supervisor's config |
 //! | `CP_WAN_IFACE` / `CP_AP_IFACE` / `CP_WWAN_DEV` | hardware names, overridable |
@@ -94,6 +95,9 @@ pub(crate) struct Tools {
     pub(crate) networkctl: Option<OsString>,
     /// `systemctl`, to restart the failover supervisor after a config change.
     pub(crate) systemctl: Option<OsString>,
+    /// `nft`, to drop NetworkManager's masquerade table when the AP is a
+    /// cul-de-sac (FR-NET-09).
+    pub(crate) nft: Option<OsString>,
     /// Directory holding the `end0` `.network` drop-in for strict `5g`.
     pub(crate) networkd_dir: Option<PathBuf>,
     /// `/etc/default/cp-uplink` — the failover supervisor's configuration.
@@ -109,6 +113,7 @@ impl Tools {
             iw: std::env::var_os("CP_IW_BIN"),
             networkctl: std::env::var_os("CP_NETWORKCTL_BIN"),
             systemctl: std::env::var_os("CP_SYSTEMCTL_BIN"),
+            nft: std::env::var_os("CP_NFT_BIN"),
             networkd_dir: std::env::var_os("CP_NETWORKD_DIR").map(PathBuf::from),
             uplink_env: std::env::var_os("CP_UPLINK_ENV").map(PathBuf::from),
         })

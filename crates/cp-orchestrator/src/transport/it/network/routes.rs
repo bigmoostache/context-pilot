@@ -141,7 +141,31 @@ pub(crate) fn apply_ap_activation(tools: &Tools, config: &NetworkConfig) -> Resu
         // roll back a legitimate setting.
         eprintln!("network: {} (non-fatal): {failure}", super::apply::AP_PROFILE);
     }
-    set_ip_forward(config.ap.enabled && config.ap.share_internet)
+    let sharing = config.ap.enabled && config.ap.share_internet;
+    if !sharing {
+        // The profile stays `ipv4.method shared` in both modes so dnsmasq keeps
+        // handing out addresses (see `profiles::ap_args`). Dropping the
+        // masquerade table is what turns it into a cul-de-sac, and it must
+        // happen AFTER activation, which is when NetworkManager installs it.
+        drop_nat_table(tools);
+    }
+    set_ip_forward(sharing)
+}
+
+/// Remove NetworkManager's `nm-shared-<iface>` masquerade table.
+///
+/// Best-effort and gated on `CP_NFT_BIN`: an absent table is the normal state,
+/// not an error. Measured on hardware — after the delete, NM does **not** put it
+/// back on its own, so the AP stays a cul-de-sac until the next activation, and
+/// the next apply re-runs this anyway.
+fn drop_nat_table(tools: &Tools) {
+    let Some(nft) = tools.nft.as_ref() else {
+        return;
+    };
+    let table = format!("nm-shared-{}", super::apply::ap_device());
+    let args = ["delete".to_owned(), "table".to_owned(), "ip".to_owned(), table];
+    // A "No such file or directory" here just means there was nothing to drop.
+    let _dropped = run(nft, &args);
 }
 
 /// Write `net.ipv4.ip_forward` directly through `/proc`.

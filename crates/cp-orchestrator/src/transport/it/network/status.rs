@@ -5,9 +5,9 @@
 //! box (landmine 9) sees their change reflected here until the next apply
 //! reverts it — an honest read-out is what makes the box debuggable.
 //!
-//! **Every field degrades to `null` rather than erroring when a tool is absent.**
-//! A dev machine with no gates set answers `200` with a fully-null status; a box
-//! whose modem was pulled reports `wwan: null` and keeps serving the cockpit.
+//! **Every tool-backed field degrades to `null` rather than erroring when that
+//! tool is absent.** A dev machine with no gates set answers `200`; a box whose
+//! modem was pulled reports `wwan: null` and keeps serving the cockpit.
 //!
 //! The default-route half needs no gate at all: it is parsed from
 //! `/proc/net/route`, so `active_uplink` and `has_default_route` — the two
@@ -160,9 +160,10 @@ fn wwan_status(tools: &Tools) -> Option<Value> {
     }))
 }
 
-/// Received power in dBm, from `mmcli --signal-get`. Null unless signal polling
-/// has been set up on the modem, which is deliberately not something an apply
-/// turns on behind the admin's back.
+/// Received power in dBm, from `mmcli --signal-get`, best technology first.
+///
+/// Null unless signal polling has been set up on the modem — deliberately not
+/// something an apply turns on behind the admin's back.
 fn signal_dbm(mmcli: &OsStr) -> Value {
     let Ok(out) = run(mmcli, &["-J".to_owned(), "-m".to_owned(), "0".to_owned(), "--signal-get".to_owned()]) else {
         return Value::Null;
@@ -173,11 +174,29 @@ fn signal_dbm(mmcli: &OsStr) -> Value {
     let signal = parsed.get("modem").and_then(|m| m.get("signal"));
     for (tech, field) in [("5g", "rsrp"), ("lte", "rsrp"), ("umts", "rscp"), ("gsm", "rssi")] {
         let reading = signal.and_then(|s| s.get(tech)).and_then(|t| t.get(field)).and_then(Value::as_str);
-        if let Some(value) = reading.and_then(|raw| raw.parse::<f64>().ok()) {
-            return json!(value);
+        if let Some(dbm) = reading.and_then(plausible_dbm) {
+            return json!(dbm);
         }
     }
     Value::Null
+}
+
+/// Parse an `mmcli` power reading, rejecting the sentinels it uses for "no
+/// measurement".
+///
+/// MEASURED on the test box: with the modem searching, `5g.rsrp` reads
+/// `-32768.00` and `5g.snr` reads `-3276.80` while `lte.rsrp` carries the real
+/// `-110.00`. Taking the first parseable number would report a signal of
+/// −32768 dBm — worse than no reading, because it looks like data. Anything
+/// outside the physically plausible band is treated as absent, so the search
+/// falls through to the technology that actually has a measurement. `"--"`
+/// fails to parse and is rejected on the way in.
+fn plausible_dbm(raw: &str) -> Option<i64> {
+    // Integer part only: dBm is displayed whole, and going through f64 would
+    // need a lossy cast back that the lint config rightly forbids.
+    let whole = raw.split_once('.').map_or(raw, |(before, _after)| before);
+    let value = whole.trim().parse::<i64>().ok()?;
+    if (-160..=0).contains(&value) { Some(value) } else { None }
 }
 
 /// The first IPv4 address NetworkManager assigned to `profile`, without its
@@ -333,6 +352,19 @@ end0\t0001A8C0\t00000000\t0001\t0\t0\t100\t00FFFFFF\t0\t0\t0\n";
         assert_eq!(parse_global_country(output).as_deref(), Some("FR"));
         let unset = "global\ncountry 00: DFS-UNSET\n\nphy#0 (self-managed)\ncountry FR: DFS-ETSI\n";
         assert_eq!(parse_global_country(unset).as_deref(), Some("00"), "the phy's FR must not be mistaken for global");
+    }
+
+    #[test]
+    fn implausible_signal_readings_are_rejected() {
+        // MEASURED with the modem searching: the 5g block reads -32768.00 while
+        // lte carries the real -110.00. Taking the first parseable number would
+        // report −32768 dBm, which is worse than null because it looks like data.
+        assert_eq!(plausible_dbm("-110.00"), Some(-110));
+        assert_eq!(plausible_dbm("-80"), Some(-80));
+        assert_eq!(plausible_dbm("-32768.00"), None, "mmcli's no-measurement sentinel");
+        assert_eq!(plausible_dbm("-3276.80"), None, "the SNR sentinel, if ever misread as power");
+        assert_eq!(plausible_dbm("--"), None, "mmcli's absent-field spelling");
+        assert_eq!(plausible_dbm("42.0"), None, "a positive dBm is not a received power");
     }
 
     #[test]
