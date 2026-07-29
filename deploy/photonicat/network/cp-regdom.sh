@@ -13,14 +13,32 @@
 # "your country code will be ignored". It is not so — ath11k forwards the user
 # hint to firmware and honours it. Do not re-derive the opposite from the flag.
 #
-# WHO CALLS THIS: cp-regdom.service at boot (before NetworkManager brings any
-# radio up), and the backend applier on every AP apply — the country must be in
-# force BEFORE `cp-ap` is activated, or the AP silently fails to beacon.
+# WHO CALLS THIS — two entry points, one implementation. There is exactly one
+# place in this appliance that talks to `iw reg set`, and it is this file.
 #
-# NEVER FATAL: every failure path exits 0 with a journal line. A box that misses
-# its regulatory domain still routes, still serves the cockpit, and still has a
-# working ethernet uplink — only the AP is affected, and the applier refuses to
-# enable it without a country anyway (FR-NET-14).
+#   1. `cp-regdom` (no arguments) — cp-regdom.service at boot, before
+#      NetworkManager brings any radio up. Nothing else is running that early, so
+#      the country is read straight out of .network.json with `sed`.
+#
+#   2. `cp-regdom <CC>` — the backend applier on every AP apply, passing the
+#      country as a single argument. The country must be in force BEFORE `cp-ap`
+#      is activated or the AP silently fails to beacon, and at that moment the
+#      applier already holds the value in memory: making it re-read the file it
+#      just wrote would be a second source of truth for no gain. An argument, if
+#      present, therefore WINS over the file and the file is not consulted.
+#
+# CLI CONTRACT: at most one argument, a two-letter ISO-3166 country code, case
+# insensitive. Anything else — three letters, digits, an empty string — is a
+# no-op with a journal line; garbage is never handed to `iw`. Extra arguments are
+# ignored.
+#
+# NEVER FATAL: every path exits 0, including every failure path, each with a
+# journal line. THE EXIT STATUS IS NOT A SUCCESS SIGNAL and no caller may gate on
+# it: a box that misses its regulatory domain still routes, still serves the
+# cockpit and still has a working ethernet uplink — only the AP is affected, and
+# the applier refuses to enable it without a country anyway (FR-NET-14). An
+# applier that failed an apply over this would trade a degraded AP for a rollback
+# of the whole network document.
 set -u
 
 CONF=/etc/default/cp-network
@@ -39,22 +57,49 @@ fi
 
 command -v iw >/dev/null 2>&1 || { log "iw not installed — nothing to do"; exit 0; }
 
-if [ ! -r "$CP_NETWORK_STATE" ]; then
-  log "no state file at $CP_NETWORK_STATE — leaving the regulatory domain alone"
-  exit 0
-fi
+if [ "$#" -gt 0 ]; then
+  # ── Entry point 2: the applier told us the country ────────────────────────
+  # It arrives already validated by the backend (two alphabetic characters), and
+  # it is re-checked here anyway: this script is on $PATH as root and the check
+  # costs one `case`. Rejecting rather than sanitising is deliberate — a code we
+  # had to repair is a code we do not understand, and `iw reg set` would take
+  # something plausible-looking and leave the radio somewhere nobody intended.
+  case "$1" in
+    [[:alpha:]][[:alpha:]])
+      country=$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]')
+      ;;
+    *)
+      log "ignoring '$1': not a two-letter country code — leaving the regulatory domain alone"
+      exit 0
+      ;;
+  esac
+else
+  # ── Entry point 1: boot, read it out of the state file ────────────────────
+  if [ ! -r "$CP_NETWORK_STATE" ]; then
+    log "no state file at $CP_NETWORK_STATE — leaving the regulatory domain alone"
+    exit 0
+  fi
 
-# Deliberately sed, not jq: jq is not a dependency of this appliance and this
-# runs at boot before anything optional is guaranteed present. The state file is
-# written by serde_json::to_vec_pretty, so the country is always on its own line
-# as `"country": "FR"`. A malformed or absent value simply yields the empty
-# string and we no-op.
-country=$(sed -n 's/.*"country"[[:space:]]*:[[:space:]]*"\([A-Za-z][A-Za-z]\)".*/\1/p' \
-  "$CP_NETWORK_STATE" 2>/dev/null | head -1 | tr '[:lower:]' '[:upper:]')
+  # Deliberately sed, not jq: jq is not a dependency of this appliance and this
+  # runs at boot before anything optional is guaranteed present.
+  #
+  # ANCHORED TO A WHOLE LINE, both ends. The state file is written by
+  # `serde_json::to_vec_pretty`, which puts every key alone on its own line as
+  # `  "country": "FR",` — that is the assumption this pattern pins, and it is
+  # the reason anchoring is safe. Unanchored, `.*"country".*` matched the string
+  # anywhere on any line, so a `"country"` appearing inside some other VALUE (an
+  # SSID, an APN) would be picked up by `head -1` and silently win over the real
+  # field. There is exactly one `"country"` key in the document today (ap.country);
+  # if a second one is ever added, this becomes first-wins again and needs
+  # narrowing to the `ap` object — hence the note.
+  country=$(sed -n \
+    's/^[[:space:]]*"country"[[:space:]]*:[[:space:]]*"\([A-Za-z][A-Za-z]\)"[[:space:]]*,\{0,1\}[[:space:]]*$/\1/p' \
+    "$CP_NETWORK_STATE" 2>/dev/null | head -1 | tr '[:lower:]' '[:upper:]')
 
-if [ -z "$country" ]; then
-  log "no country code configured — leaving the regulatory domain alone (5 GHz stays no-IR)"
-  exit 0
+  if [ -z "$country" ]; then
+    log "no country code configured — leaving the regulatory domain alone (5 GHz stays no-IR)"
+    exit 0
+  fi
 fi
 
 # Read the GLOBAL domain specifically, not the first `country` line in the file.

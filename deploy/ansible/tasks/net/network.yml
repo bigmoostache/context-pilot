@@ -42,6 +42,13 @@
   # firewall backend for the shared-mode masquerade. wireless-regdb + iw are what
   # make `iw reg set` actually change anything (measured present already on the
   # test box, listed here so a bare image is not a surprise).
+  #
+  # iputils-ping is listed for the same reason and it is the least obvious entry
+  # here: `cp-uplink-watch` IS the failover mechanism and it works by calling
+  # `ping -I <wan>`. Debian gives the package Priority: important, so it is
+  # present on essentially every image — which is exactly why its absence would
+  # not be noticed. A box without it fails every probe, fails over permanently
+  # to 5G and says nothing.
   ansible.builtin.apt:
     name:
       - network-manager
@@ -49,6 +56,7 @@
       - nftables
       - wireless-regdb
       - iw
+      - iputils-ping
     state: present
     update_cache: true
 
@@ -128,9 +136,21 @@
   register: _cp_net_state
 
 - name: Ensure the agents dir exists (the state file lives beside .identity.json)
+  # OWNER AND MODE MATCH THE ORCHESTRATOR, deliberately. context-pilot.service
+  # declares no `User=`, so the orchestrator runs as root, and its own
+  # `write_atomic` creates any missing parent with `create_dir_all` — root-owned,
+  # 0755 under the service's umask. Pinning the same values here means Ansible
+  # and the service agree instead of each undoing the other on alternate runs.
+  # Secrecy is carried by the FILE, not by this directory: .network.json is 0600
+  # (state.rs `restrict`) because it holds the Wi-Fi PSK and the SIM PIN, while
+  # .identity.json beside it is deliberately world-readable. Tightening this
+  # directory to 0700 here would be undone the first time the orchestrator
+  # recreates it — a false tightening is worse than a documented 0755.
   ansible.builtin.file:
     path: "{{ cp_net_state_path | dirname }}"
     state: directory
+    owner: root
+    group: root
     mode: "0755"
   when: (not _cp_net_state.stat.exists) or (cp_net_force | bool)
 
@@ -138,6 +158,13 @@
   # Write-once. An IT admin's cockpit changes are the newer truth; a re-run of
   # site.yml must never revert them (FR-NET-12). `-e cp_net_force=true` re-seeds
   # deliberately, which is the documented way back to the vendor baseline.
+  #
+  # The notify is what makes a seeded document take EFFECT. Nothing re-reads this
+  # file on its own: tasks/start.yml already started the orchestrator, which read
+  # the *previous* document at startup and rendered /etc/default/cp-uplink from
+  # it, and cp-regdom is a oneshot that already ran. Both handlers live in
+  # site.yml (see the block comment there) and fire once, at the end of the play,
+  # only when this task actually changed something.
   ansible.builtin.template:
     src: "{{ playbook_dir }}/templates/network.json.j2"
     dest: "{{ cp_net_state_path }}"
@@ -145,7 +172,47 @@
     group: root
     mode: "0600"
   no_log: true
+  notify: cp network state seeded
   when: (not _cp_net_state.stat.exists) or (cp_net_force | bool)
+
+# ── read back what we just wrote ────────────────────────────────────────────
+# The backend is fail-closed on this document: `state::load` falls back to
+# NetworkConfig::default() on any parse or validation failure, so a template that
+# emitted a malformed or incomplete document costs the box its mode, its APN, its
+# SIM PIN and its probe tuning — silently, with Ansible reporting `ok`. site.yml's
+# pre_tasks constrain the INPUTS; this asserts the OUTPUT actually landed.
+# ProbeConfig and friends carry no #[serde(default)] anywhere, so a field this
+# template forgets is fatal to the whole file, not just to that field — hence the
+# top-level key check rather than a bare "is it JSON".
+- name: Read the seeded state file back
+  # no_log: the slurped content is the PSK and the SIM PIN in base64.
+  # `not ansible_check_mode`: --check does not write the template, so there would
+  # be nothing to read back and the failure would be an artefact of the dry run.
+  ansible.builtin.slurp:
+    src: "{{ cp_net_state_path }}"
+  register: _cp_net_seeded
+  no_log: true
+  when: ((not _cp_net_state.stat.exists) or (cp_net_force | bool)) and not ansible_check_mode
+
+- name: Assert the seeded state file is the document the backend expects
+  # Deliberately NOT no_log, so the failure is legible — and it stays safe
+  # because nothing here touches a value: the assertions read only the set of
+  # top-level KEY NAMES, and the message quotes only that set. The one path that
+  # could echo content is `from_json` on a malformed document, whose error names
+  # the failing expression and the byte offset, never the bytes.
+  ansible.builtin.assert:
+    that:
+      - _cp_net_doc_keys == ['ap', 'mode', 'probe', 'wwan']
+    fail_msg: >-
+      {{ cp_net_state_path }} is not the document the backend expects — it has
+      top-level keys {{ _cp_net_doc_keys | join(', ') }}, expected ap, mode,
+      probe, wwan. The backend would fall back to its defaults (mode wan, AP off)
+      and say nothing. Check templates/network.json.j2 against NetworkConfig in
+      crates/cp-orchestrator/src/transport/it/network/state.rs.
+    success_msg: "{{ cp_net_state_path }} parses and carries all four sections (ap, mode, probe, wwan)"
+  vars:
+    _cp_net_doc_keys: "{{ (_cp_net_seeded.content | b64decode | from_json).keys() | list | sort }}"
+  when: ((not _cp_net_state.stat.exists) or (cp_net_force | bool)) and not ansible_check_mode
 
 - name: Report a state file that was left untouched
   ansible.builtin.debug:

@@ -555,7 +555,7 @@ export const postApiItIdentity = <ThrowOnError extends boolean = false>(options:
 });
 
 /**
- * Uplink + access-point configuration (secrets elided; `config.wwan` null without can_manage_secrets) and live status
+ * Uplink + access-point configuration (secrets elided) and live status. `config.wwan` is null for either of two independent reasons: a caller without `can_manage_secrets`, or a box with no modem (`status.modem_present` false). `config.probe` is read-only — it is seeded at provisioning time.
  */
 export const getApiItNetwork = <ThrowOnError extends boolean = false>(options?: Options<GetApiItNetworkData, ThrowOnError>): RequestResult<GetApiItNetworkResponses, GetApiItNetworkErrors, ThrowOnError> => (options?.client ?? client).get<GetApiItNetworkResponses, GetApiItNetworkErrors, ThrowOnError>({ url: '/api/it/network', ...options });
 

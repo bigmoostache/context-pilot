@@ -22,10 +22,6 @@ use std::ffi::OsStr;
 use super::apply::{AP_PROFILE, WWAN_PROFILE, ap_device, run, wwan_device};
 use super::state::{NetworkConfig, Standby, UplinkMode};
 
-/// Seconds `nmcli` may spend bringing a profile up or down before we stop
-/// waiting on it. See [`set_active`] for why the default 90 s is unusable here.
-const ACTIVATION_TIMEOUT_S: u32 = 20;
-
 /// `nmcli`'s spelling of a boolean.
 const fn yes_no(value: bool) -> &'static str {
     if value { "yes" } else { "no" }
@@ -41,10 +37,34 @@ fn exists(nmcli: &OsStr, name: &str) -> bool {
 /// standby otherwise. `end0` sits at 100 (netplan's DHCP default), so 50 wins
 /// and 700 loses — the two stacks meet only in the kernel routing table, where a
 /// metric is a metric regardless of who installed it.
+///
+/// # Who owns this metric (do not undo)
+///
+/// * `wan` and `5g` — **the applier**. The metric is a constant of the mode,
+///   nothing else moves it, and [`wwan_args`] re-pins it on every apply.
+/// * `wan_5g` — **`cp-uplink-watch`**. There the metric *is* the failover
+///   mechanism: the supervisor drops the bearer to 50 to promote it and lifts
+///   it back to 700 to demote it. So [`wwan_args`] deliberately omits both
+///   route-metric properties in that mode and this value is written **once**,
+///   in [`reconcile_wwan`]'s `connection add`, as the profile's starting point.
+///
+/// B2: pushing it unconditionally meant that saving an SSID during an outage
+/// reset the metric the supervisor had just promoted, while the supervisor still
+/// believed `promoted=yes` and would therefore never re-promote — a silent loss
+/// of the 5G uplink at NetworkManager's next reactivation.
 pub(crate) const fn wwan_metric(mode: UplinkMode) -> u32 {
     match mode {
         UplinkMode::FiveG => super::apply::METRIC_PREFERRED,
         UplinkMode::Wan | UplinkMode::WanThen5g => super::apply::METRIC_STANDBY,
+    }
+}
+
+/// Whether the applier, rather than the supervisor, owns the bearer's route
+/// metric in this mode. See [`wwan_metric`] for the boundary.
+const fn applier_owns_metric(mode: UplinkMode) -> bool {
+    match mode {
+        UplinkMode::Wan | UplinkMode::FiveG => true,
+        UplinkMode::WanThen5g => false,
     }
 }
 
@@ -65,9 +85,12 @@ const fn wwan_autoconnect(config: &NetworkConfig) -> bool {
 ///
 /// Split out from [`reconcile_wwan`] so a unit test can assert the exact argv
 /// for a representative state without a NetworkManager anywhere near it (O3.1).
+///
+/// In `wan_5g` the two route-metric properties are **absent** — the supervisor
+/// owns them there, and an unrelated save must not walk on a live failover
+/// (B2). See [`wwan_metric`] for the ownership boundary.
 pub(crate) fn wwan_args(config: &NetworkConfig) -> Vec<String> {
-    let metric = wwan_metric(config.mode).to_string();
-    vec![
+    let mut args = vec![
         "connection".to_owned(),
         "modify".to_owned(),
         WWAN_PROFILE.to_owned(),
@@ -86,11 +109,15 @@ pub(crate) fn wwan_args(config: &NetworkConfig) -> Vec<String> {
         yes_no(!config.wwan.roaming).to_owned(),
         "connection.autoconnect".to_owned(),
         yes_no(wwan_autoconnect(config)).to_owned(),
-        "ipv4.route-metric".to_owned(),
-        metric.clone(),
-        "ipv6.route-metric".to_owned(),
-        metric,
-    ]
+    ];
+    if applier_owns_metric(config.mode) {
+        let metric = wwan_metric(config.mode).to_string();
+        args.push("ipv4.route-metric".to_owned());
+        args.push(metric.clone());
+        args.push("ipv6.route-metric".to_owned());
+        args.push(metric);
+    }
+    args
 }
 
 /// The full `nmcli connection modify cp-ap …` argument vector.
@@ -109,7 +136,7 @@ pub(crate) fn wwan_args(config: &NetworkConfig) -> Vec<String> {
 /// the kernel level rather than by a profile setting.
 pub(crate) fn ap_args(config: &NetworkConfig) -> Vec<String> {
     let method = "shared";
-    vec![
+    let mut args = vec![
         "connection".to_owned(),
         "modify".to_owned(),
         AP_PROFILE.to_owned(),
@@ -129,6 +156,40 @@ pub(crate) fn ap_args(config: &NetworkConfig) -> Vec<String> {
         if config.ap.channel == 0 { String::new() } else { config.ap.channel.to_string() },
         "802-11-wireless.hidden".to_owned(),
         yes_no(config.ap.hidden).to_owned(),
+        "ipv4.method".to_owned(),
+        method.to_owned(),
+        "ipv4.addresses".to_owned(),
+        format!("{}/24", super::apply::AP_ADDRESS),
+        "connection.autoconnect".to_owned(),
+        yes_no(config.ap.enabled).to_owned(),
+    ];
+    args.extend(security_args(config));
+    args
+}
+
+/// The `802-11-wireless-security.*` group — **omitted entirely when no
+/// passphrase is set** (B18).
+///
+/// A factory-fresh box has `passphrase: None` (the Ansible default whenever
+/// `ap_password` is empty), and the previous code still sent
+/// `802-11-wireless-security.psk ""` alongside `key-mgmt wpa-psk`. If nmcli
+/// refuses that pair, [`super::apply::apply`] returns `Err` and **every** network
+/// POST on such a box answers `502`, plus a WARN at every boot — an entire class
+/// of box bricked for the API by a default. Nothing is lost by leaving the group
+/// out: `enabled_ap_prerequisites` already refuses to enable an AP without a
+/// passphrase, so the profile simply is not securable until one is set.
+///
+/// The trade-off, stated so nobody has to rediscover it: clearing a
+/// **previously-set** passphrase does not scrub the PSK out of the root-owned
+/// `cp-ap` profile — it stays there until a new one replaces it. That is the
+/// right side to fail on. The alternative is emitting an empty `psk`, which is
+/// exactly the argv that may be rejected, and the AP cannot beacon in either
+/// case because the document is what gates activation.
+fn security_args(config: &NetworkConfig) -> Vec<String> {
+    let Some(psk) = config.ap.passphrase.as_ref() else {
+        return Vec::new();
+    };
+    vec![
         // `wpa-psk` + RSN/CCMP — and O6.4's answer is that this IS how WPA3
         // ships here. The four settings are one decision, not two.
         //
@@ -159,13 +220,40 @@ pub(crate) fn ap_args(config: &NetworkConfig) -> Vec<String> {
         "802-11-wireless-security.group".to_owned(),
         "ccmp".to_owned(),
         "802-11-wireless-security.psk".to_owned(),
-        config.ap.passphrase.clone().unwrap_or_default(),
-        "ipv4.method".to_owned(),
-        method.to_owned(),
-        "ipv4.addresses".to_owned(),
-        format!("{}/24", super::apply::AP_ADDRESS),
+        psk.clone(),
+    ]
+}
+
+/// The one-off `nmcli connection add cp-wwan …` argument vector.
+///
+/// Split out from [`reconcile_wwan`] for the same reason [`wwan_args`] is: it
+/// is now the **only** place `wan_5g`'s route metric is ever written, so a test
+/// has to be able to see it without a NetworkManager (B2).
+fn wwan_create_args(config: &NetworkConfig) -> Vec<String> {
+    let metric = wwan_metric(config.mode).to_string();
+    vec![
+        "connection".to_owned(),
+        "add".to_owned(),
+        "type".to_owned(),
+        "gsm".to_owned(),
+        "con-name".to_owned(),
+        WWAN_PROFILE.to_owned(),
+        "ifname".to_owned(),
+        wwan_device(),
+        "apn".to_owned(),
+        config.wwan.apn.clone(),
+        // Never autoconnect at creation: the mode step decides, and a
+        // half-configured bearer must not race ahead of it.
         "connection.autoconnect".to_owned(),
-        yes_no(config.ap.enabled).to_owned(),
+        "no".to_owned(),
+        // The bearer's STARTING metric. In `wan_5g` this is written here and
+        // nowhere else — from then on `cp-uplink-watch` arbitrates it and
+        // [`wwan_args`] deliberately leaves it alone (B2). In `wan` and `5g` it
+        // is redundant with the `modify` that follows, and harmlessly so.
+        "ipv4.route-metric".to_owned(),
+        metric.clone(),
+        "ipv6.route-metric".to_owned(),
+        metric,
     ]
 }
 
@@ -176,23 +264,7 @@ pub(crate) fn ap_args(config: &NetworkConfig) -> Vec<String> {
 /// Returns `nmcli`'s stderr when the profile cannot be created or modified.
 pub(crate) fn reconcile_wwan(nmcli: &OsStr, config: &NetworkConfig) -> Result<(), String> {
     if !exists(nmcli, WWAN_PROFILE) {
-        let created = vec![
-            "connection".to_owned(),
-            "add".to_owned(),
-            "type".to_owned(),
-            "gsm".to_owned(),
-            "con-name".to_owned(),
-            WWAN_PROFILE.to_owned(),
-            "ifname".to_owned(),
-            wwan_device(),
-            "apn".to_owned(),
-            config.wwan.apn.clone(),
-            // Never autoconnect at creation: the mode step decides, and a
-            // half-configured bearer must not race ahead of it.
-            "connection.autoconnect".to_owned(),
-            "no".to_owned(),
-        ];
-        let _out = run(nmcli, &created).map_err(|e| format!("create {WWAN_PROFILE}: {e}"))?;
+        let _out = run(nmcli, &wwan_create_args(config)).map_err(|e| format!("create {WWAN_PROFILE}: {e}"))?;
     }
     let _out = run(nmcli, &wwan_args(config)).map_err(|e| format!("configure {WWAN_PROFILE}: {e}"))?;
     Ok(())
@@ -223,38 +295,6 @@ pub(crate) fn reconcile_ap(nmcli: &OsStr, config: &NetworkConfig) -> Result<(), 
     }
     let _out = run(nmcli, &ap_args(config)).map_err(|e| format!("configure {AP_PROFILE}: {e}"))?;
     Ok(())
-}
-
-/// Bring a profile up or down, tolerating "already in that state".
-///
-/// `nmcli connection down` on an inactive profile and `up` on an active one both
-/// exit non-zero, and neither is a failure of ours. Activation failures on the
-/// bearer are also non-fatal by design — see [`super::apply`].
-pub(crate) fn set_active(nmcli: &OsStr, profile: &str, active: bool) -> Result<(), String> {
-    let verb = if active { "up" } else { "down" };
-    // `--wait` is not a nicety. nmcli's default activation timeout is 90 s, and
-    // a bearer with no coverage takes ALL of it — measured on hardware, where it
-    // held an HTTP request (and the applier lock) open long enough for the
-    // cockpit's button to look permanently frozen. Activation is best-effort
-    // anyway (see `routes::apply_mode`), so a bounded wait loses nothing: the AP
-    // came up in 4 s in M0, and a modem that has not attached in 20 s was not
-    // going to.
-    let args = [
-        "--wait".to_owned(),
-        ACTIVATION_TIMEOUT_S.to_string(),
-        "connection".to_owned(),
-        verb.to_owned(),
-        profile.to_owned(),
-    ];
-    match run(nmcli, &args) {
-        Ok(_out) => Ok(()),
-        // `nmcli connection down` on a profile that is already inactive exits
-        // non-zero. That is the NORMAL state for both profiles on a box in
-        // `wan` with the AP off, so treating it as a failure would put two
-        // alarming lines in the journal on every single boot.
-        Err(failure) if !active && failure.contains("not an active connection") => Ok(()),
-        Err(failure) => Err(format!("{verb} {profile}: {failure}")),
-    }
 }
 
 #[cfg(test)]
@@ -297,18 +337,41 @@ mod tests {
     #[test]
     fn wwan_argv_matches_the_mode() {
         let standby = wwan_args(&config(UplinkMode::WanThen5g));
-        assert_eq!(value_of(&standby, "ipv4.route-metric"), Some("700"), "standing by, above end0's 100");
-        assert_eq!(value_of(&standby, "ipv6.route-metric"), Some("700"), "both families move together");
         assert_eq!(value_of(&standby, "gsm.apn"), Some("orange.fr"));
         assert_eq!(value_of(&standby, "gsm.home-only"), Some("yes"), "roaming false ⇒ home-only yes");
         assert_eq!(value_of(&standby, "connection.autoconnect"), Some("yes"), "hot standby autoconnects");
 
         let strict = wwan_args(&config(UplinkMode::FiveG));
         assert_eq!(value_of(&strict, "ipv4.route-metric"), Some("50"), "the chosen uplink, below end0's 100");
+        assert_eq!(value_of(&strict, "ipv6.route-metric"), Some("50"), "both families move together");
         assert_eq!(value_of(&strict, "connection.autoconnect"), Some("yes"));
 
         let ethernet = wwan_args(&config(UplinkMode::Wan));
+        assert_eq!(value_of(&ethernet, "ipv4.route-metric"), Some("700"), "parked above end0's 100");
         assert_eq!(value_of(&ethernet, "connection.autoconnect"), Some("no"), "wan never brings the modem up");
+    }
+
+    /// B2 — in `wan_5g` the METRIC IS THE FAILOVER MECHANISM and belongs to
+    /// `cp-uplink-watch`. Saving an SSID during an outage used to re-pin it to
+    /// 700 while the supervisor still believed `promoted=yes` and would never
+    /// re-promote, silently costing the box its 5G uplink.
+    #[test]
+    fn the_supervisor_owns_the_metric_in_wan_5g() {
+        let failover = wwan_args(&config(UplinkMode::WanThen5g));
+        assert_eq!(value_of(&failover, "ipv4.route-metric"), None, "an unrelated apply must not touch it");
+        assert_eq!(value_of(&failover, "ipv6.route-metric"), None, "…in either family");
+        assert!(
+            failover.iter().all(|arg| !arg.contains("route-metric")),
+            "no route-metric property survives in wan_5g: {failover:?}"
+        );
+
+        // …but the profile still starts life at the standby metric, written
+        // once at creation. Without this the bearer would be created at NM's
+        // default and could outrank end0 before the supervisor ever ran.
+        let created = wwan_create_args(&config(UplinkMode::WanThen5g));
+        assert_eq!(value_of(&created, "ipv4.route-metric"), Some("700"), "the starting point is still ours");
+        assert_eq!(value_of(&created, "ipv6.route-metric"), Some("700"));
+        assert_eq!(value_of(&wwan_create_args(&config(UplinkMode::FiveG)), "ipv4.route-metric"), Some("50"));
     }
 
     #[test]
@@ -361,6 +424,30 @@ mod tests {
         assert_eq!(value_of(&argv, "802-11-wireless-security.proto"), Some("rsn"), "no WPA1 element");
         assert_eq!(value_of(&argv, "802-11-wireless-security.pairwise"), Some("ccmp"), "no TKIP");
         assert_eq!(value_of(&argv, "802-11-wireless-security.group"), Some("ccmp"), "no TKIP");
+    }
+
+    /// B18 — a factory-fresh box has no passphrase, and `psk ""` alongside
+    /// `key-mgmt wpa-psk` is an argv nmcli may reject outright. One rejection
+    /// there turns **every** network POST on such a box into a `502`, so the
+    /// whole security group is omitted until a PSK exists.
+    #[test]
+    fn no_passphrase_means_no_security_group_at_all() {
+        let mut fresh = config(UplinkMode::Wan);
+        fresh.ap.enabled = false; // an AP with no PSK cannot be enabled anyway
+        fresh.ap.passphrase = None;
+        let argv = ap_args(&fresh);
+        assert!(
+            argv.iter().all(|arg| !arg.starts_with("802-11-wireless-security.")),
+            "not one security property is sent without a PSK: {argv:?}"
+        );
+        assert!(argv.iter().all(|arg| !arg.is_empty()), "and no empty value is sent in its place");
+        // The rest of the profile is unaffected — the box still gets its SSID,
+        // its band and its address, it simply is not securable yet.
+        assert_eq!(value_of(&argv, "802-11-wireless.ssid"), Some("ContextPilot-f10d"));
+        assert_eq!(value_of(&argv, "ipv4.addresses"), Some("10.42.0.1/24"));
+
+        // With one set, the whole group comes back.
+        assert_eq!(value_of(&ap_args(&config(UplinkMode::Wan)), "802-11-wireless-security.key-mgmt"), Some("wpa-psk"));
     }
 
     #[test]

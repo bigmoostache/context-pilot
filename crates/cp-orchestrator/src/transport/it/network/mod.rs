@@ -15,6 +15,8 @@
 //!   with the gates unset the backend persists and performs **no** system call,
 //!   which is what makes the whole feature testable off-box (NFR-NET-04).
 //! * [`status`] — the live read-back the cockpit polls.
+//! * [`uplink`] — both files of the interface with `cp-uplink-watch`: the
+//!   environment we render for it and the state it publishes back.
 //!
 //! **The invariant that outranks every feature here (NFR-NET-01):** no mode ever
 //! alters an address on `end0`/`end1`. Only default routes are touched. The
@@ -27,6 +29,7 @@ mod profiles;
 mod routes;
 pub(crate) mod state;
 mod status;
+mod uplink;
 
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -128,15 +131,39 @@ fn commit(state: &Mutex<Backend>, path: &Path, previous: &NetworkConfig, next: &
     // 11). Only when the address set actually changes — regenerating on every
     // unrelated mode save would make a momentarily-unreachable Caddy fail a
     // network call that has nothing to do with it.
-    sync_caddy(state, previous, next)?;
+    //
+    // R2: this used to be a bare `?`. The document was already saved by then, so
+    // a Caddy failure answered `502 "the box is unchanged"` while `.network.json`
+    // held `next` — and `apply_network_at_boot` applied it at the next start. The
+    // change was deferred, not rejected, and the reply was untrue. Nothing has
+    // been applied at this point, so restoring the document is the whole rollback.
+    if let Err(failure) = sync_caddy(state, previous, next) {
+        restore(path, previous);
+        return Err(format!("caddy site list failed (rolled back): {failure}"));
+    }
     match apply::apply(next) {
         Ok(applied) => Ok(applied),
         Err(failure) => {
-            let _restored = state::save(path, previous);
+            restore(path, previous);
             let _uncaddied = sync_caddy(state, next, previous);
             let _reapplied = apply::apply(previous);
             Err(format!("network apply failed (rolled back): {failure}"))
         }
+    }
+}
+
+/// Write `previous` back over the persisted document, saying so when that fails.
+///
+/// A silent `let _restored` here was hiding the one state this module must never
+/// be quiet about: the document and the system disagreeing. If this line ever
+/// appears, the next boot will apply a configuration the operator was told had
+/// been rolled back.
+fn restore(path: &Path, previous: &NetworkConfig) {
+    if let Err(failure) = state::save(path, previous) {
+        eprintln!(
+            "WARN: network: could not restore .network.json after a failed apply ({failure}) — \
+             the persisted document no longer matches the box, and the next boot will apply it"
+        );
     }
 }
 
@@ -178,6 +205,13 @@ pub(crate) fn caddy_subjects_for(agents_dir: &Path) -> Vec<String> {
 }
 
 /// Turn a `commit` outcome into the handler's reply, with `payload` merged in.
+///
+/// The `502`'s "the box is unchanged" is now a claim [`commit`] actually makes
+/// good on, on both of its failure paths: a Caddy failure restores the document
+/// before anything is applied at all, and an apply failure restores the document
+/// *and* re-applies it — which, since [`apply`] records each step's mark only on
+/// that step's success, genuinely re-runs every step that ran (R1/R2). Before
+/// those two fixes the sentence was true only by luck.
 fn reply_for(outcome: Result<bool, String>, payload: serde_json::Value) -> HttpReply {
     match outcome {
         Ok(applied) => {
@@ -215,7 +249,7 @@ pub(crate) fn get_network(state: &Mutex<Backend>, bearer_visible: bool, has_mode
     // not the vendor, or this box is not a 5G variant at all.
     HttpReply::ok(&serde_json::json!({
         "config": config.redacted(bearer_visible && has_modem),
-        "status": status::probe(&config),
+        "status": status::probe(&config, has_modem),
     }))
 }
 

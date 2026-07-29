@@ -1,3 +1,19 @@
+{#-
+  .network.json — the document the backend reads at every boot (design §6/§12).
+
+  THE FIELD SET MUST MATCH `NetworkConfig` EXACTLY. Not one struct in
+  crates/cp-orchestrator/src/transport/it/network/state.rs carries
+  #[serde(default)] — deliberately — so a field this template omits does not
+  default: it makes the whole file unparseable, and `state::load` then falls back
+  to NetworkConfig::default() (mode wan, AP off) without a word. The same is true
+  of any value the validators reject. tasks/net/network.yml reads this file back
+  and asserts the four sections are there; site.yml's pre_tasks constrain the
+  values. Both exist because Ansible otherwise reports `ok` for all of it.
+
+  `| to_json` everywhere a string is emitted, so a quote or a backslash in an
+  SSID or a passphrase cannot break out of the JSON. Empty secrets render as
+  `null` (absent), never as `""` — the backend reads `None` as "not set".
+-#}
 {
   "mode": {{ cp_net_mode | to_json }},
   "wwan": {
@@ -22,6 +38,9 @@
     "targets": {{ cp_net_probe_targets | to_json }},
     "fail_threshold": {{ cp_net_probe_fail_threshold | int }},
     "ok_threshold": {{ cp_net_probe_ok_threshold | int }},
-    "interval_s": {{ cp_net_probe_interval_s | int }}
+    "interval_s": {{ cp_net_probe_interval_s | int }},
+    "probe_timeout_s": {{ cp_net_probe_timeout_s | int }},
+    "cooldown_s": {{ cp_net_probe_cooldown_s | int }},
+    "nm_wait_s": {{ cp_net_probe_nm_wait_s | int }}
   }
 }

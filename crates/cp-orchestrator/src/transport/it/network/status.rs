@@ -5,54 +5,69 @@
 //! box (landmine 9) sees their change reflected here until the next apply
 //! reverts it — an honest read-out is what makes the box debuggable.
 //!
-//! **Every tool-backed field degrades to `null` rather than erroring when that
+//! **Every *tool-backed* field degrades to `null` rather than erroring when that
 //! tool is absent.** A dev machine with no gates set answers `200`; a box whose
 //! modem was pulled reports `wwan: null` and keeps serving the cockpit.
 //!
-//! The default-route half needs no gate at all: it is parsed from
-//! `/proc/net/route`, so `active_uplink` and `has_default_route` — the two
-//! fields an admin actually watches during a failover — stay truthful even on a
-//! box where every optional tool is missing.
+//! Two fields deliberately **never** degrade, and a caller must not expect a
+//! null from them: `modem_present` is a sysfs hardware fact with a defined
+//! answer everywhere, and `active_uplink` is one of four strings — `none` is its
+//! spelling of "nothing to report", not `null`. Both need no gate at all,
+//! because the default-route half is parsed from `/proc/net/route`, and they are
+//! precisely the two fields an admin watches during a failover.
+//!
+//! `supervisor` is a third kind: `null` when `cp-uplink-watch` has published no
+//! state, an object when it has. That is a statement about the supervisor, not
+//! about a missing tool.
 
 use std::ffi::OsStr;
 
 use serde_json::{Value, json};
 
-use super::apply::{AP_PROFILE, Tools, WWAN_PROFILE, ap_device, run, wan_iface};
+use super::apply::{AP_PROFILE, Tools, WWAN_PROFILE, ap_device, run, wan_iface, wwan_device};
 use super::state::NetworkConfig;
+use super::uplink::supervisor_status;
 
 /// Build the `status` half of `GET /api/it/network`.
 ///
 /// `config` is passed in — not re-read — so the config and the status in the
-/// same response describe the same instant.
-pub(crate) fn probe(config: &NetworkConfig) -> Value {
-    let default_dev = default_route_device();
+/// same response describe the same instant. `has_modem` is threaded in from the
+/// transport layer for the same reason (C10): one hardware probe per request,
+/// and one answer, so the `modem_present` the cockpit reads is the same one the
+/// handlers gated on rather than an independent sysfs read that could disagree.
+pub(crate) fn probe(config: &NetworkConfig, has_modem: bool) -> Value {
+    // One `/proc/net/route` read per request, threaded into both consumers —
+    // it was parsed twice, and the two reads could straddle a failover.
+    let route = default_route();
+    let default_dev = route.as_ref().map(|pair| pair.0.as_str());
+    let gateway = route.as_ref().map(|pair| pair.1.as_str());
     let tools = Tools::resolve();
     json!({
-        "active_uplink": active_uplink(default_dev.as_deref()),
+        "active_uplink": active_uplink(default_dev),
         // A HARDWARE fact, distinct from `wwan` below: this box either is a 5G
         // variant or it is not, and the answer must not flap while ModemManager
         // restarts. It is what tells the cockpit whether to offer the 5G uplink
         // modes at all — and it is readable by any `can_manage_it` caller, since
         // choosing the uplink mode is the client admin's job even though the
         // bearer's configuration is the vendor's.
-        "modem_present": super::modem_present(),
-        "wan": wan_status(default_dev.as_deref()),
+        "modem_present": has_modem,
+        "wan": wan_status(default_dev, gateway),
         "wwan": tools.as_ref().and_then(wwan_status),
         "ap": tools.as_ref().map(|tools| ap_status(tools, config)),
+        "supervisor": supervisor_status(),
     })
 }
 
 // ── Default route, straight from /proc (no gate) ────────────────────────────
 
-/// The interface carrying the lowest-metric IPv4 default route.
+/// `(iface, gateway)` of the lowest-metric IPv4 default route.
 ///
 /// `/proc/net/route` columns are `Iface Destination Gateway Flags RefCnt Use
 /// Metric Mask …`, with the addresses as little-endian hex. A default route is
 /// destination `00000000` **and** mask `00000000`.
-fn default_route_device() -> Option<String> {
+fn default_route() -> Option<(String, String)> {
     let table = std::fs::read_to_string("/proc/net/route").ok()?;
-    parse_default_route(&table).map(|(dev, _gw)| dev)
+    parse_default_route(&table)
 }
 
 /// Pure half of the `/proc/net/route` read — `(iface, gateway)` of the
@@ -87,33 +102,56 @@ fn hex_le_ipv4(hex: &str) -> Option<String> {
     Some(std::net::Ipv4Addr::new(byte0, byte1, byte2, byte3).to_string())
 }
 
-/// Classify the default-route device as the ethernet WAN, the bearer, or none.
+/// Classify the default-route device: `wan`, `wwan`, `other` or `none`.
+///
+/// **`other` is not decoration** (B17). The old fall-through labelled *anything*
+/// it did not recognise `wwan`, so a box routing through `tun0`, `wg0`, `docker0`
+/// or the second Wi-Fi radio told the cockpit — mid-failover, on the one screen
+/// an admin is watching — that the 5G bearer had taken over. `other` says the
+/// true thing: the box has a default route and it is not one of ours.
+///
+/// The sibling `classify_dev` in `deploy/photonicat/network/cp-uplink-watch`
+/// implements the same four values against the same devices. They must agree:
+/// this one is what the cockpit renders, that one is what the supervisor
+/// publishes into `/run/cp-uplink/state`, and the cockpit shows both.
 fn active_uplink(default_dev: Option<&str>) -> Value {
-    match default_dev {
-        None => json!("none"),
-        Some(dev) if dev == wan_iface() => json!("wan"),
-        Some(dev) if dev.starts_with("en") || dev.starts_with("eth") => json!("wan"),
-        Some(_other) => json!("wwan"),
+    let Some(dev) = default_dev else {
+        return json!("none");
+    };
+    json!(classify_device(dev))
+}
+
+/// Pure device-name classifier. Its counterpart for the supervisor's
+/// already-classified word is `uplink::normalise_uplink`.
+fn classify_device(dev: &str) -> &'static str {
+    if dev == wan_iface() || dev.starts_with("en") || dev.starts_with("eth") {
+        return "wan";
     }
+    // The QMI net port is `wwu…`; `CP_WWAN_DEV` names the control port, which
+    // never carries a route but costs nothing to accept.
+    if dev == wwan_device() || dev.starts_with("ww") {
+        return "wwan";
+    }
+    "other"
 }
 
 // ── Ethernet WAN ────────────────────────────────────────────────────────────
 
 /// Carrier + address + whether this port currently holds the default route.
-fn wan_status(default_dev: Option<&str>) -> Value {
+///
+/// `default_dev`/`gateway` come from the single `/proc/net/route` read in
+/// [`probe`]; re-reading the table here made a `GET` parse it twice and let the
+/// two halves of one response straddle a failover (C10).
+fn wan_status(default_dev: Option<&str>, gateway: Option<&str>) -> Value {
     let iface = wan_iface();
     let carrier =
         std::fs::read_to_string(format!("/sys/class/net/{iface}/carrier")).is_ok_and(|state| state.trim() == "1");
-    let gateway = std::fs::read_to_string("/proc/net/route")
-        .ok()
-        .and_then(|table| parse_default_route(&table))
-        .filter(|(dev, _gw)| *dev == iface)
-        .map(|(_dev, gateway)| gateway);
+    let holds_route = default_dev == Some(iface.as_str());
     json!({
         "carrier": carrier,
         "ip": interface_ipv4(&iface),
-        "gateway": gateway,
-        "has_default_route": default_dev == Some(iface.as_str()),
+        "gateway": if holds_route { gateway.map_or(Value::Null, |addr| json!(addr)) } else { Value::Null },
+        "has_default_route": holds_route,
     })
 }
 
@@ -148,7 +186,7 @@ fn wwan_status(tools: &Tools) -> Option<Value> {
     let listed = run(&mmcli, &["-J".to_owned(), "-L".to_owned()]).ok()?;
     let list: Value = serde_json::from_str(&listed).ok()?;
     let path = list.get("modem-list")?.as_array()?.first()?.as_str()?.to_owned();
-    let shown = run(&mmcli, &["-J".to_owned(), "-m".to_owned(), path]).ok()?;
+    let shown = run(&mmcli, &["-J".to_owned(), "-m".to_owned(), path.clone()]).ok()?;
     let modem: Value = serde_json::from_str(&shown).ok()?;
     let generic = modem.get("modem").and_then(|m| m.get("generic"));
     let gpp = modem.get("modem").and_then(|m| m.get("3gpp"));
@@ -161,7 +199,7 @@ fn wwan_status(tools: &Tools) -> Option<Value> {
             .and_then(Value::as_array)
             .map(|techs| techs.iter().filter_map(Value::as_str).collect::<Vec<_>>().join(", "))
             .map_or(Value::Null, |joined| if joined.is_empty() { Value::Null } else { json!(joined) }),
-        "signal_dbm": signal_dbm(&mmcli),
+        "signal_dbm": signal_dbm(&mmcli, &path),
         "ip": nmcli_first_address(&tools.nmcli, WWAN_PROFILE),
         "registered": matches!(registration, "home" | "roaming"),
     }))
@@ -171,8 +209,14 @@ fn wwan_status(tools: &Tools) -> Option<Value> {
 ///
 /// Null unless signal polling has been set up on the modem — deliberately not
 /// something an apply turns on behind the admin's back.
-fn signal_dbm(mmcli: &OsStr) -> Value {
-    let Ok(out) = run(mmcli, &["-J".to_owned(), "-m".to_owned(), "0".to_owned(), "--signal-get".to_owned()]) else {
+///
+/// `modem` is the D-Bus path [`wwan_status`] already discovered from `mmcli -L`,
+/// not the index `0` this used to hardcode (B14). ModemManager increments the
+/// index across re-enumerations, so after a modem reset every other bearer field
+/// was correct and the signal alone silently read `null`.
+fn signal_dbm(mmcli: &OsStr, modem: &str) -> Value {
+    let args = ["-J".to_owned(), "-m".to_owned(), modem.to_owned(), "--signal-get".to_owned()];
+    let Ok(out) = run(mmcli, &args) else {
         return Value::Null;
     };
     let Ok(parsed) = serde_json::from_str::<Value>(&out) else {
@@ -225,6 +269,15 @@ fn nmcli_first_address(nmcli: &OsStr, profile: &str) -> Value {
 
 /// Whether the AP is beaconing, on what channel, under which country, and how
 /// many clients are associated (FR-NET-11).
+///
+/// `ssid` and `channel` both come from one `iw dev <ap> info` — one call, and
+/// **the radio's own answer**, which is what this object claims to be. It used
+/// to echo `config.ap.ssid` straight back (C10): labelled live status while
+/// actually being the document, so a profile that had not been re-activated
+/// since a rename reported the new name off an AP still beaconing the old one.
+/// The config value remains the fallback for the honest cases — no `iw`, or the
+/// radio down — because the schema says this field is always a string, and "the
+/// SSID it is configured to use" beats an empty one.
 fn ap_status(tools: &Tools, config: &NetworkConfig) -> Value {
     let running = run(
         &tools.nmcli,
@@ -238,11 +291,12 @@ fn ap_status(tools: &Tools, config: &NetworkConfig) -> Value {
         ],
     )
     .is_ok_and(|out| out.lines().any(|line| line == AP_PROFILE));
+    let info = iw_info(tools);
     json!({
         "running": running,
-        "ssid": config.ap.ssid,
+        "ssid": info.as_deref().and_then(parse_iw_ssid).unwrap_or_else(|| config.ap.ssid.clone()),
         "clients": associated_clients(tools),
-        "channel": iw_channel(tools),
+        "channel": info.as_deref().and_then(parse_iw_channel).map_or(Value::Null, |channel| json!(channel)),
         "country": iw_country(tools),
     })
 }
@@ -261,20 +315,32 @@ fn associated_clients(tools: &Tools) -> u32 {
     })
 }
 
-/// The channel the radio is actually on, from `iw dev <ap> info`.
-fn iw_channel(tools: &Tools) -> Value {
-    let Some(iw_bin) = tools.iw.as_ref() else {
-        return Value::Null;
-    };
-    let args = ["dev".to_owned(), ap_device(), "info".to_owned()];
-    let Ok(out) = run(iw_bin, &args) else {
-        return Value::Null;
-    };
-    out.lines()
+/// `iw dev <ap> info` once per request — it answers both the live SSID and the
+/// live channel, and the AP block used to spend two calls on it.
+fn iw_info(tools: &Tools) -> Option<String> {
+    let iw_bin = tools.iw.as_ref()?;
+    run(iw_bin, &["dev".to_owned(), ap_device(), "info".to_owned()]).ok()
+}
+
+/// The channel the radio is actually on. Pure half of [`iw_info`].
+fn parse_iw_channel(info: &str) -> Option<u32> {
+    info.lines()
         .find_map(|line| line.trim().strip_prefix("channel "))
         .and_then(|rest| rest.split_whitespace().next())
         .and_then(|number| number.parse::<u32>().ok())
-        .map_or(Value::Null, |channel| json!(channel))
+}
+
+/// The SSID the radio is actually beaconing. Pure half of [`iw_info`].
+///
+/// `iw` prints it as `\tssid ContextPilot-f10d`, one line, verbatim — an SSID
+/// may contain spaces, so everything after the keyword is the value. A radio
+/// that is up but not in AP mode has no `ssid` line at all, which is `None`.
+fn parse_iw_ssid(info: &str) -> Option<String> {
+    info.lines()
+        .find_map(|line| line.trim().strip_prefix("ssid "))
+        .map(str::trim)
+        .filter(|ssid| !ssid.is_empty())
+        .map(str::to_owned)
 }
 
 /// The **global** regulatory domain from `iw reg get`.
@@ -378,11 +444,45 @@ end0\t0001A8C0\t00000000\t0001\t0\t0\t100\t00FFFFFF\t0\t0\t0\n";
     fn status_is_well_formed_without_gates() {
         // O3.5's off-box half: a dev machine answers 200 with a well-formed
         // object whose optional halves are null, not an error.
-        let status = probe(&NetworkConfig::default());
-        for field in ["active_uplink", "wan", "wwan", "ap"] {
+        let status = probe(&NetworkConfig::default(), true);
+        for field in ["active_uplink", "wan", "wwan", "ap", "supervisor"] {
             assert!(status.get(field).is_some(), "{field} is present");
         }
         assert!(status.get("wwan").is_some_and(Value::is_null), "no mmcli gate ⇒ null bearer");
         assert!(status.get("ap").is_some_and(Value::is_null), "no nmcli gate ⇒ null AP");
+        assert!(status.get("supervisor").is_some_and(Value::is_null), "no state file ⇒ null supervisor");
+        // C10 — the hardware fact is the one the caller threaded in, not a
+        // second sysfs read that could disagree with the handler's own gate.
+        assert_eq!(status.get("modem_present"), Some(&json!(true)));
+        assert_eq!(probe(&NetworkConfig::default(), false).get("modem_present"), Some(&json!(false)));
+    }
+
+    /// B17 — the fall-through used to call **everything** it did not recognise
+    /// `wwan`, so a VPN, a container bridge or the second Wi-Fi radio holding
+    /// the default route told the cockpit the 5G bearer had taken over. That is
+    /// the one screen an admin watches during a failover.
+    #[test]
+    fn an_unrecognised_default_route_device_is_other_not_wwan() {
+        assert_eq!(active_uplink(Some("end0")), json!("wan"), "the configured WAN port");
+        assert_eq!(active_uplink(Some("eth0")), json!("wan"));
+        assert_eq!(active_uplink(Some("enp1s0")), json!("wan"));
+        assert_eq!(active_uplink(Some("wwu1u1i4")), json!("wwan"), "the QMI net port");
+        for stranger in ["tun0", "wg0", "docker0", "wlp1s0", "br-lan"] {
+            assert_eq!(active_uplink(Some(stranger)), json!("other"), "{stranger} is not the 5G bearer");
+        }
+        assert_eq!(active_uplink(None), json!("none"));
+    }
+
+    /// C10 — `ssid` and `channel` come off the radio, from one `iw dev … info`.
+    #[test]
+    fn the_live_ssid_and_channel_are_read_from_the_radio() {
+        let info = "Interface wlp1s0\n\tifindex 4\n\ttype AP\n\tssid ContextPilot f10d\n\tchannel 36 (5180 MHz), width: 80 MHz\n";
+        assert_eq!(parse_iw_ssid(info).as_deref(), Some("ContextPilot f10d"), "an SSID may contain spaces");
+        assert_eq!(parse_iw_channel(info), Some(36));
+        // A radio that is up but not beaconing has neither line — the caller
+        // falls back to the configured SSID rather than inventing one.
+        let managed = "Interface wlan0\n\tifindex 3\n\ttype managed\n";
+        assert_eq!(parse_iw_ssid(managed), None);
+        assert_eq!(parse_iw_channel(managed), None);
     }
 }

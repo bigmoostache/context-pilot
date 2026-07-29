@@ -378,6 +378,50 @@ orchestrator crash or an OTA restart, and it must be debuggable with
 - **Scope.** The supervisor runs only in `wan_5g`. In `wan` and `5g` the routing
   is static and the unit idles (it still reports state for `GET /api/it/network`).
 
+**Decided ≠ achieved (review R/B4).** `promoted` is what the supervisor *chose*;
+`achieved` is whether the actuation took. The first version set `promoted=yes`
+before actuating and ignored the failure, and since the promote branch requires
+`promoted=no`, a bearer that could not activate at that instant — modem still
+enumerating, transient no-coverage, the `--wait` cap — got **exactly one attempt
+for the whole outage**. The two are now separate, and a decision that has not
+landed is retried on later turns, cooldown-throttled, without a second
+`TRANSITION` line. Achievement is re-read from `nmcli`, not inferred from
+`connection up`'s exit status, because the `--wait` cap reports failure for a
+modem that registers one second late. The decision table:
+
+| condition | action | transition line |
+|---|---|---|
+| `promoted=no` + fail streak met | promote | yes |
+| `promoted=yes` + ok streak met | demote | yes |
+| `achieved=no` (either direction) | retry the actuation | no |
+
+- **Startup reconciliation (B5).** `promoted` used to reset to `no` on every
+  restart while the live route could still be at metric 50 — and the demote
+  branch requires `promoted=yes`, so the bearer stayed the default route
+  indefinitely against a healthy WAN. This fires on the backend's own
+  `systemctl restart cp-uplink` after any config change, so it was not a rare
+  path. The supervisor now seeds its decision from the kernel's current default
+  route before entering the loop.
+- **Two refusals to supervise (B6/B7).** An empty `CP_UPLINK_TARGETS` made every
+  probe "fail" and failed the box over permanently and silently; a missing `ping`
+  did the same. Either now logs an ERROR, leaves the WAN in place, and reports
+  the cause through `last_reason` so it reaches the cockpit rather than only the
+  journal.
+
+**The state file has a reader (review C1).** `/run/cp-uplink/state` was written
+every interval and read by **nobody**, while this section and
+`cp-uplink.service` both asserted the cockpit read it. `GET /api/it/network` now
+parses it (env `CP_UPLINK_STATE`) into `status.supervisor`, `null` when the unit
+is not running. It carries `promoted`, `achieved`, `last_reason`,
+`last_transition` and the streaks — precisely what `/proc/net/route` cannot
+express and what an admin needs mid-failover. `promoted: true` with
+`achieved: false` is the outage signature and the cockpit renders it as such.
+
+**`active_uplink` has four values, not three (B17).** `wan`, `wwan`, `none`, and
+now `other` — both implementations previously fell through to `wwan` for `tun0`,
+`wg0`, `docker0` or `wlp1s0`. The shell classifier and the Rust one are read side
+by side during a failover and are kept literally in step.
+
 This is what covers the case metrics alone cannot see: **cable plugged in, DHCP
 lease held, upstream dead** — the most common real-world client failure.
 
@@ -425,6 +469,23 @@ not be relied on. If per-SSID VLANs ever leave §14's out-of-scope list, they ne
   `iw reg set <CC>` from the state file, with `wireless-regdb` installed. Without
   it 5 GHz is unusable (§2). Enabling the AP with an empty country is a `400`
   (FR-NET-14).
+
+  **One implementation, two entry points (review C3).** The script claimed the
+  applier called it and the applier did not — it shelled out to `iw reg set`
+  itself, so the same job existed twice and only one copy was ever exercised on
+  the AP path. `cp-regdom` now takes an optional country as `$1`:
+
+  | caller | invocation | source of the country |
+  |---|---|---|
+  | `cp-regdom.service` at boot | `cp-regdom` | `sed` over `.network.json` |
+  | the backend applier, on every AP apply | `cp-regdom <CC>` | the validated document in hand |
+
+  With an argument the state file is not consulted. **Exit status is always 0**,
+  on every path including failure — the applier must not gate on it, since an
+  apply that rolled the whole network document back over a regulatory-domain
+  problem would trade a degraded AP for a dead box. The gate is `CP_REGDOM_BIN`;
+  unset (off-box, or a box where the script is not installed), the applier falls
+  back to `CP_IW_BIN`.
 
 ### M0 measurement — the AP works, with two caveats
 
@@ -495,6 +556,20 @@ All under `can_manage_it`, all following the established gate shape (`None` call
 unset ⇒ persistence only, no subprocess, no system mutation; each other gate
 degrades on its own. This is what makes the whole feature unit-testable off-box.
 
+**Two more, added by the review:** `CP_UPLINK_STATE` (the supervisor's state
+file, now read — C1) and `CP_REGDOM_BIN` (the regulatory script the applier now
+calls instead of duplicating — C3). Eleven in total, plus `CP_WWAN_PRESENT` and
+`CP_NETWORK_APPLIED`.
+
+**"Inert" is a property of the code, not of a provisioned box (B3).** The claim
+that `CP_NMCLI_BIN` unset makes the applier inert was true of the applier and
+false of every box: `context-pilot.service.j2` templated the gates
+unconditionally, before NetworkManager was even installed and regardless of
+`cp_net_enabled`. With `-e net_enabled=false` the applier believed it was live
+forever and **every** network POST answered `502`. Two fixes, both needed: the
+template now emits the gate block only under `cp_net_enabled`, and `resolve()`
+checks the binary actually exists rather than merely that the variable is set.
+
 **M3 correction to `status`:** `active_uplink` and `wan.has_default_route` are
 parsed from `/proc/net/route` and need **no gate at all**, so the two fields an
 admin watches during a failover stay truthful on a box missing every optional
@@ -507,6 +582,19 @@ at 5). Dispatch: four arms in `transport/mod.rs`. Spec: `tests/openapi/paths.rs`
 + schemas. Client: extend `web/src/lib/api/it.ts` **in place** — `web/src/lib/api/`
 is already at the 8-entry ceiling.
 
+**What execution and the review did to that plan.** The module is now 8 entries,
+*at* the NFR-NET-07 ceiling: `uplink.rs` was split out to own both ends of the
+`cp-uplink-watch` contract (the env file we render, the state file we read, and
+the probe validation that decides what the supervisor can honour), because
+`apply.rs` and `state.rs` had both passed 500 lines. The next addition here needs
+a plan, not a file. The spec likewise grew `tests/openapi/schemas_net.rs`. On the
+client, "extend `it.ts` in place" did not survive the review's C8: the shared,
+styling-free logic had to leave the mirrored component tree, and the 8-entry
+ceiling then forced `web/src/lib/api/it.ts` → `web/src/lib/api/it/`
+(`index.ts` + `network.ts` + `networkStatus.ts`), with `apiErrorMessage` landing
+in `web/src/lib/api/client/errors.ts` beside the singleton whose throws it
+interprets.
+
 ---
 
 ## §11 — Frontend
@@ -514,6 +602,17 @@ is already at the 8-entry ceiling.
 The IT pane gains two sections. `ItPane.tsx` is 257 lines; two more sections would
 approach the 500-line ceiling, so they land in a sibling
 `web/src/components/shell/config/ItNetworkPane.tsx` (that directory goes 7 → 8).
+
+> **Corrected after execution and review.** The PR created
+> `web/src/components/shell/config/it/`, and `ConfigPanes.tsx` mounts the panes
+> as **siblings** — the network pane is not "mounted inside `ItPane`", which the
+> file headers of both twins claimed. The review then split the AP form out
+> again (`ItApForm.tsx`), so the directory holds four twin pairs. Everything with
+> no styling in it — the mode table, the poll interval, the query key, the draft
+> shapes, the validation mirror and all status formatting — now lives under
+> `web/src/lib/api/it/`, outside the mirrored tree, because otherwise every
+> cockpit fix had to be made twice (C8: the two `ItWwanForm` twins differed by
+> exactly two `className` strings out of 108 lines).
 
 - **Internet uplink** — three-way mode selector, plus a live status card
   (active uplink, operator, technology, signal, IPs) polled at
@@ -558,6 +657,40 @@ keeps the toolbox only):
 | `cp_ap_password` | `""` | `<client>.local.yml` (secret) |
 | `cp_ap_country` | `FR` | `site.yml` |
 | `cp_ap_share` | `true` | `site.yml` |
+| `cp_net_probe_targets` | `["1.1.1.1","9.9.9.9"]` | `site.yml` |
+| `cp_net_probe_timeout_s` / `cp_net_cooldown_s` / `cp_net_nm_wait_s` | `3` / `60` / `20` | `site.yml` (review C2) |
+
+**Review corrections to the seeding path.** Four of them, and every one produced
+a run that ended `failed=0` with the box not doing what was asked:
+
+- **Nothing restarted the orchestrator after the seed (R7).** `tasks/start.yml`
+  starts `context-pilot` *before* `network.yml` writes `.network.json`, so
+  `apply_network_at_boot` ran against the **default** document and nothing
+  re-ran it. `-e ap_enabled=true` or `-e net_mode=wan_5g` finished green with
+  neither the AP nor the failover in force until someone rebooted. The seed task
+  now notifies handlers that restart `cp-regdom` (the country must be in the
+  kernel before `cp-ap` comes up — landmine 1), then `context-pilot`, then wait
+  on `/api/health`. Handler *definition* order is load-bearing; Ansible ignores
+  notification order.
+- **A re-seeded country was never pushed (B15).** `cp-regdom.service` was
+  restarted only when the *unit file* changed. Same handler fixes it —
+  `RemainAfterExit=yes` makes `restarted` the only verb that re-runs a oneshot.
+- **An invalid seed silently discarded the whole document (R4).** The backend
+  fails closed to defaults on any validation error, so `-e ap_enabled=true`
+  without `-e ap_password=…` cost the box its mode, APN, SIM PIN *and* probe
+  tuning — while Ansible reported `ok` and never re-read what it wrote. Two
+  layers now: `pre_tasks` asserts mirroring `state.rs`'s `validate_*` functions
+  rule for rule (the three enums were free strings with no check at all), and a
+  read-back that asserts the rendered file parses with the expected key set.
+  Neither ever prints the PSK or the PIN.
+- **`-e net_probe_targets=1.1.1.1,8.8.8.8` rendered a JSON *string*** where the
+  backend requires an array, which then triggered the discard above (B16). Now
+  coerced: a string is split on commas/whitespace, a real list passes through.
+  The `-e '{"net_probe_targets":[…]}'` form also works.
+
+`iputils-ping` joined the package list (B7): `cp-uplink-watch` **is** `ping`, and
+Debian's `Priority: important` making it near-certain in practice is exactly why
+its absence would never have been noticed.
 
 **M1 correction.** `deploy/ansible/tasks/` is at 8 entries and the `≤8` structure
 rule does **not** cover only the Rust and `web/src` trees: `check-structure.sh`
@@ -1272,3 +1405,523 @@ contradicted it. Each is expanded in situ above.
 Two "Done when" criteria remain unmet, both for reasons outside this design:
 **O0.1** (the 5G data path — antenna) and the 390 px half of **O4.3** (the mobile
 shell has no settings entry point yet).
+
+---
+---
+
+# Code review — diagnostic (2026-07-29)
+
+Full review of the branch `feat/network-uplink` (13 commits, 44 files,
++6972/−107) against this document. Read in scope: the six Rust modules under
+`transport/it/network/`, `transport/rest/config/network.rs`, the touched
+`caddy.rs`/`identity.rs`/`runtime`, the OpenAPI spec and the generated client,
+both cockpit twins, the five files under `deploy/photonicat/network/`, and the
+Ansible surface.
+
+**Verdict.** The design is sound and the execution is faithful to it — the seam,
+the strict-`5g` drop-in, the secret elision, the WPA3 answer and the
+serialisation fix are all correct and well evidenced. What follows is what a
+merge should not carry: seven defects that break a stated invariant, a set of
+serious issues, and the dead surface this branch ships.
+
+The measured findings folded into §2–§13 are not re-litigated here. The two
+already-declared gaps (O0.1 antenna, O4.3 viewport) are out of scope.
+
+---
+
+## A — Blocking
+
+### R1 — The rollback restores nothing (NFR-NET-05 does not hold)
+
+`apply.rs:182-188` short-circuits on a fingerprint match; `mod.rs:132-140` rolls
+back by calling `apply::apply(previous)`. The marker is only written on a
+*successful* full apply (`apply.rs:200`), so after `apply(next)` fails partway
+the marker still holds `fingerprint(previous)` — and the rollback's
+`apply(previous)` therefore matches, returns `Ok(true)` at line 187, and
+**performs no `nmcli`, no drop-in, no sysctl work at all**.
+
+Concretely: a box in `wan` accepts `POST …/mode {"5g"}`, `reconcile_wwan`
+succeeds, `networkctl reconfigure` fails. The document is restored to `wan`, the
+caller is told `502 "network settings rolled back — the box is unchanged"`, and
+the box keeps `cp-wwan` configured at metric 50 with the strict drop-in on disk
+until the next *different* POST or the next reboot. That is precisely the
+scenario O3.2's "Done when" claims to cover (`ip route` byte-identical after a
+`502`).
+
+Fix: delete the marker before the first mutation instead of only writing it
+after the last one — `let _ = std::fs::remove_file(applied_marker());` ahead of
+`reconcile_wwan`. Rollback then always reconciles for real.
+
+### R2 — A Caddy failure leaves the new document persisted
+
+`mod.rs:124-131`: `state::save(path, next)` runs first, then `sync_caddy(…)?`.
+The `?` returns early on a Caddy failure **without restoring the document**. The
+handler answers `502 "the box is unchanged"` — but `.network.json` now holds
+`next`, and `apply_network_at_boot` will apply it at the next start. The reply
+is untrue and the change is merely deferred, not rejected.
+
+Fix: on the `sync_caddy` error path, `state::save(path, previous)` before
+returning, exactly as the `apply` error arm does. (Also worth logging
+`let _restored` at line 135 when it fails — that path leaves the document and
+the system disagreeing.)
+
+### R3 — FR-NET-16 is enforced only in the HTTP handlers
+
+The "no modem ⇒ no 5G mode" guard lives at `mod.rs:236-238` and `mod.rs:326-328`
+only. `state::validate()` has no equivalent, and `apply_network_at_boot`
+(`mod.rs:352-363`) goes straight from `state::load` to `apply::apply`.
+
+In `routes::apply_mode` the strict drop-in is written at lines 103-110 and the
+`modem_present()` early-return is at line 119 — **after it**. So a document
+saying `5g` on a modem-less box suppresses `end0`'s default route at every boot,
+which is the exact failure FR-NET-16 exists to prevent. And it is reachable from
+provisioning: `network.json.j2:2` templates `cp_net_mode` verbatim, so
+`-e net_mode=5g` on a non-5G variant seeds it with nothing to object.
+
+Recoverable over the ULA (NFR-NET-01 holds), but the box has no internet and the
+cockpit offers no way back — the mode selector hides the mode it is stuck in
+(see R7). Fix: move the check into `state::validate` or into `apply`, not the
+transport layer.
+
+### R4 — An invalid seed silently discards the whole document
+
+`state.rs:202-210` falls back to `NetworkConfig::default()` on *any* validation
+failure, with no log line. The blast radius is the entire document, not the
+offending field.
+
+`-e ap_enabled=true` without `-e ap_password=…` renders `passphrase: null`
+(`network.json.j2:14`), which `state.rs:285` rejects — and the box then silently
+loses `cp_net_mode`, the APN, the SIM PIN and the probe tuning too. Same for
+`ap_channel=6` with `ap_band=a`, an APN containing a space or a `/`, an empty
+`ap_country` with the AP enabled, and any typo in `net_mode` / `ap_band` /
+`wwan_standby` (free strings, no enum check in the template). Ansible reports
+`ok` in every one of these cases, and `network.yml` never re-reads what it wrote.
+
+Fail-closed is the right posture; silence is not. Minimum fix: `eprintln!` the
+validation message in `load()`. Better: have `network.yml` assert the seeded
+file parses, and constrain the enum-valued variables in `site.yml`.
+
+### R5 — Every server error message is swallowed by the cockpit
+
+`ItNetworkPane.tsx:175`, `:373` and `ItWwanForm.tsx:101` (and all three mobile
+twins) render `save.error instanceof Error ? save.error.message : "Save failed"`.
+That test is **always false**: the generated client throws the parsed JSON body
+(`generated/client/client.gen.ts:199`, `throw jsonError ?? textError`) and the
+server sends `{"error": "…"}` (`rest/mod.rs:77`). The thrown value is a plain
+object, never an `Error`.
+
+So the operator never sees *"a passphrase is required before the access point can
+be enabled"*, *"channel is not valid for the selected band"*, *"ssid must be 1–32
+bytes"*, *"pin must be 4–8 digits"*, or the `502` rollback message. They see
+"Save failed". This matters more here than elsewhere in the repo because the
+client mirrors only two of the six AP rules (R6), so those messages are the only
+feedback that exists.
+
+Fix: `(e as { error?: string })?.error ?? "Save failed"`. The idiom is repo-wide
+(18 other sites) but this pane is where it costs something.
+
+### R6 — The pane has no failure state
+
+`ItNetworkPane.tsx:53-59` destructures `{ data, isLoading }` and never handles
+`isError`. When `GET /api/it/network` fails, `data` stays `undefined` and the
+guard at line 59 renders "Loading…" **forever** while the 5 s poll retries in
+silence. A 403, a 500 or an unreachable box all look like a slow load.
+
+### R7 — Provisioning completes green with nothing applied
+
+`site.yml:118` runs `tasks/start.yml` — which starts `context-pilot`, so
+`apply_network_at_boot` fires and renders `/etc/default/cp-uplink` from the
+*default* document. `tasks/net/network.yml` then seeds `.network.json` at line
+137, and **nothing restarts the orchestrator**: `network.yml:165-173`
+deliberately does not bounce `cp-uplink` either, and the backend only rewrites
+that file during an apply that never happens.
+
+A run with `-e ap_enabled=true` or `-e net_mode=wan_5g` therefore finishes
+`failed=0` with neither the AP nor the failover in force, until someone reboots
+or restarts the service by hand. Fix: have the seed task notify a handler that
+restarts `context-pilot`.
+
+---
+
+## B — Serious
+
+### The applier
+
+**B1 — The fingerprint is whole-document, so any mode change bounces the Wi-Fi.**
+`apply.rs:182`'s comment justifies the marker with "without this, an unrelated
+`POST …/mode` would rewrite `cp-ap` and bounce every associated client for
+nothing" — but a mode change *does* change the fingerprint, so `reconcile_ap` +
+`set_active(cp-ap, true)` run and `nmcli connection up` re-activates the AP.
+Every associated client is dropped on every uplink-mode change. The comment
+describes an intent the code does not implement; a per-section fingerprint
+(wwan / ap / mode) would.
+
+**B2 — An unrelated apply rewrites `cp-wwan`'s metric mid-failover.**
+`profiles.rs:177-197` unconditionally pushes `wwan_args`, which pins
+`ipv4.route-metric` to 700 in `wan_5g` (`profiles.rs:44-48`). Saving an SSID
+during an outage therefore resets the metric the supervisor just promoted, while
+`cp-uplink-watch` still believes `promoted=yes` and will not re-promote (B4).
+*Uncertain:* `reconcile_wwan` does not `device reapply`, so the kernel route
+probably does not move until NM's next reactivation — at which point the box
+loses its 5G uplink silently. Worth reproducing on hardware before fixing.
+
+**B3 — `CP_NMCLI_BIN` is set on every box, including where `nmcli` is absent.**
+`Tools::resolve()` (`apply.rs:150-160`) gates on the env var *existing*, not on
+the binary existing, and `tasks/deploy.yml:67-70` templates
+`context-pilot.service.j2` unconditionally — before `network.yml` installs
+NetworkManager, and regardless of `cp_net_enabled`. With `-e net_enabled=false`
+the applier believes it is live forever: `reconcile_ap` → spawn error → `Err` →
+rollback → **every network POST answers `502`**. `apply.rs:25-28`'s promise
+("with `CP_NMCLI_BIN` unset the applier is inert") is true of the code and false
+of every provisioned box. Fix: template the gates under `when: cp_net_enabled`,
+or have `resolve()` check the path exists.
+
+### The supervisor
+
+**B4 — A failed promotion is never retried.** `promote_wwan` sets
+`promoted=yes` (`cp-uplink-watch:152`) *before* actuating and ignores the failure
+at 154/160. The promote branch then requires `promoted = no` and the demote
+branch requires the WAN to come back. So a bearer that could not activate at that
+instant — modem still enumerating, transient no-coverage, the `--wait 20` cap —
+gets **exactly one attempt for the entire outage**. Worst in `cold` standby,
+where `nm connection up` at line 160 is the only thing that ever starts the
+bearer (`connection.autoconnect` is `no` there — `profiles.rs:56-60`). O5.1's
+"one decision, one transition line" is achievable without giving up retries;
+conflating *decided* with *achieved* is the bug.
+
+**B5 — No startup reconciliation: a stuck promotion cannot be undone.** `promoted`
+resets to `no` on every restart (line 65), while the live route may still be at
+metric 50. The demote branch requires `promoted = yes`, so the bearer stays the
+default route indefinitely even with a healthy WAN. `RuntimeDirectory=cp-uplink`
+(`cp-uplink.service:18`) wipes `/run/cp-uplink` on stop, so persistence cannot
+fix it — but `current_default_dev()` is already there at line 88 and would seed
+`promoted` correctly in one line. Note this fires on the backend's own
+`systemctl restart cp-uplink` (`apply.rs:240`).
+
+**B6 — An empty `CP_UPLINK_TARGETS` means permanent failover.** `probe_via`
+(lines 109-115) iterates zero times and falls through to `return 1`. The backend
+validates non-empty (`state.rs:323`), but `EnvironmentFile=-` is hand-editable
+and `render_uplink_env` quotes the join, so whitespace survives as empty. A
+startup guard ("no targets ⇒ do not supervise") turns a silent permanent-5G
+failure into a journal line.
+
+**B7 — `iputils-ping` is not a declared dependency.** `cp-uplink-watch:110` *is*
+the failover mechanism; `network.yml:45-53` pins `network-manager`,
+`dnsmasq-base`, `nftables`, `wireless-regdb` and `iw` — not `ping`. Debian
+`Priority: important` makes it near-certain in practice, which is exactly why it
+will not be noticed when it is missing.
+
+### The cockpit
+
+**B8 — Keyed remount on polled data eats in-progress edits.**
+`ItNetworkPane.tsx:86`/`:98` key `ApForm`/`WwanForm` off the 5 s-polled query
+(`:53-57`). Any persisted change from another session, the boot applier or a
+concurrent save remounts the form mid-typing and silently discards everything
+entered, including a half-typed passphrase. The identity form next door is
+immune only because its query is not polled.
+
+**B9 — The "Saved" confirmation is inverted.** Success → invalidate → refetch →
+the key changes *because the save changed a keyed field* → remount → the mutation
+state is destroyed and "Saved" vanishes. A passphrase-only save keeps it (the AP
+key omits `passphrase_set`), but `wwanKey` *does* include `password_set`/
+`pin_set`, so a first-time PIN or password save always loses its confirmation.
+This also makes `setPassphrase("")` (`:275`) and `setPassword`/`setPin`
+(`ItWwanForm.tsx:30-31`) unreachable in the remount path.
+
+**B10 — Three secrets are typed in cleartext.** `ItPane.tsx:248-257`'s
+`TextField` hardcodes `type="text"` with no `autoComplete`, and it is the input
+used for the AP passphrase (`ItNetworkPane.tsx:304-310`), the bearer password and
+the SIM PIN (`ItWwanForm.tsx:59-72`). Visible on screen and offered to browser
+autofill. The read contract is honoured — only `••••••••` placeholders come from
+`*_set` — so this is the client half alone. `TextField` needs `type`/
+`autoComplete` props; the PIN also wants `inputMode="numeric"`.
+
+**B11 — The client mirrors 2 of the server's 6 AP rules.** `:284-286` covers
+country and never-set passphrase. Missing, and therefore surfacing as R5's
+unexplained "Save failed": empty or >32-byte SSID (`state.rs:260` — unconditional,
+yet the submit button is live on an empty SSID); channel-vs-band (`state.rs:269`
+— the UI cheerfully offers 5 GHz + channel 6); passphrase >63 chars or 1–7 chars
+when one is already stored; a malformed country while `enabled` is false. The
+SIM PIN is sent entirely unvalidated (`ItWwanForm.tsx:66-72`) even though
+`state.rs:309-313`'s own comment notes a bad PIN "could burn one of the three
+unlock retries". `channel: Number(channel) || 0` (`:269`) also turns `"abc"` into
+"automatic" with no feedback.
+
+**B12 — A filtered-out persisted mode leaves no row selected.**
+`ItNetworkPane.tsx:146` correctly hides `wan_5g`/`5g` when `!modem_present`, but
+nothing handles `config.mode` *being* one of them — a box seeded `5g` and later
+stripped of its M.2 module, or one sysfs probe that misses. The list renders with
+nothing highlighted and no indication of what the box is actually doing. Render
+the active mode as a disabled row. (This is the UI half of R3.)
+
+### Contract, status, provisioning
+
+**B13 — The tri-state secret semantics exist only in Rust comments.** In
+`openapi.json` the four write-only fields are bare `{"type":"string",
+"nullable":true}` with no description; `paths.rs:105-107` documents
+absent/`null`/string in a `//` comment the generator strips. A non-TS consumer
+cannot know that `passphrase: null` **clears** the PSK — and on a *disabled* AP
+that succeeds silently, because `enabled_ap_prerequisites` only fires when
+`enabled` (`state.rs:272-274`). `pin: null` likewise costs the box its uplink at
+the next boot. Per-field `description`s are the whole fix.
+
+**B14 — `signal_dbm` reads modem index 0 while its caller discovers the path.**
+`status.rs:150` resolves the modem's D-Bus path from `mmcli -L`, then line 175
+hardcodes `-m 0`. ModemManager increments the index across re-enumerations, so
+after a modem reset the signal silently reads `null` while every other bearer
+field is correct. Pass the discovered path through.
+
+**B15 — A re-seeded country is never pushed.** `network.yml:158-163` restarts
+`cp-regdom.service` only when the *unit file* changed, never when
+`.network.json` changed. `-e cp_net_force=true -e ap_country=DE` writes the new
+country and leaves the kernel on the old one until reboot. The seed task should
+notify a handler (`RemainAfterExit=yes` means `restarted` is the only verb that
+re-runs it).
+
+**B16 — `cp_net_probe_targets` from the CLI is a string.** The `site.yml:99`
+default is a real Jinja list and round-trips, but `-e net_probe_targets=1.1.1.1,8.8.8.8`
+renders a JSON *string* where `Vec<String>` is required — and R4 then discards the
+whole document. Document the `-e '{"net_probe_targets":[…]}'` form or coerce it.
+
+**B17 — `active_uplink` mislabels any unrecognised device as `wwan`.**
+`status.rs:91-98` and `cp-uplink-watch:96-103` both fall through to "wwan" for
+`tun0`, `wg0`, `docker0`, `wlp1s0`. They at least agree with each other, but the
+honest answer is `other`/`none` — and `status.rs`'s copy is what the cockpit
+shows during a failover.
+
+**B18 — To verify on hardware: `nmcli … psk ""` on a factory-fresh box.**
+`apply()` calls `reconcile_ap` unconditionally, so on a box with `passphrase:
+None` (the Ansible default when `ap_password` is empty) `ap_args` sends an empty
+`802-11-wireless-security.psk` with `key-mgmt=wpa-psk`. If `nmcli` rejects that,
+`apply` returns `Err` and **every** network POST on such a box is a `502`, plus a
+WARN at every boot. O6.1's nine combinations were almost certainly run with a
+passphrase set, so this default path may be untested. One command settles it.
+
+---
+
+## C — Dead and unreachable surface
+
+This is what the branch ships that nothing consumes.
+
+**C1 — `/run/cp-uplink/state` is written every interval and read by nobody.**
+Grepped the repo: the only reader of uplink state is `status.rs:53-80`, which
+parses `/proc/net/route` directly. `write_state()`, `observed`, `active_uplink`
+and `last_reason` exist solely to produce a file no consumer opens — roughly a
+third of the script. Worse, `cp-uplink.service:17` states as fact that this is
+"the live state the cockpit's `GET /api/it/network` reads", and §8 of this
+document says the same. Either wire it into `status.rs` — it carries `promoted`,
+`last_reason`, `last_transition` and the streaks, which `/proc/net/route` cannot
+express and which are exactly what an admin wants during a failover — or delete
+`write_state` and both comments. Note `current_default_dev`/`classify_dev` should
+be *kept* either way: B5 needs them.
+
+**C2 — Three supervisor knobs the backend never renders.**
+`CP_UPLINK_PROBE_TIMEOUT_S`, `CP_UPLINK_COOLDOWN_S` and `CP_UPLINK_NM_WAIT_S`
+have no field in `ProbeConfig` (`state.rs:152-162`), no line in
+`network.json.j2:21-26` and no line in `render_uplink_env` (`apply.rs:250-264`),
+so they are permanently 3 s / 60 s / 20 s and unreachable from the cockpit. The
+60 s cooldown in particular becomes meaningless whenever `interval_s > 60`, which
+`state.rs:332` permits up to 3600. The reverse direction is clean — all eleven
+variables the backend writes are consumed.
+
+**C3 — `cp-regdom.sh` is a second implementation of `apply_regdom`.** The backend
+shells out to `iw reg set` directly (`apply.rs:212-219`); it never invokes
+`/usr/local/sbin/cp-regdom`, contrary to the script's own header ("WHO CALLS
+THIS: … and the backend applier on every AP apply", `cp-regdom.sh:16-18`) and to
+§9. The script additionally re-implements reading the country out of the state
+file in `sed`. Keep the boot oneshot — it is genuinely needed before NM starts —
+but the applier should call the script rather than duplicate its job, which would
+also fix B15 for free.
+
+**C4 — `applied` is returned by all three POSTs and never read.** The server sets
+it `false` when the applier is a no-op (`apply.rs:173-175`). The UI prints
+"Saved" identically for "persisted and applied to the hardware" and "persisted
+only" — which is the difference between a working AP and a stored intention.
+
+**C5 — Status fields fetched and never rendered.** `status.wan.gateway`,
+`status.wwan.registered`, `status.ap.country`, and the entire `config.probe`
+block — there is no probe-tuning UI at all, yet `probe` is `required` in the
+response schema and has no `readOnly: true`, so a generated client presents it as
+ordinary writable config. Either render them or drop them from the projection.
+
+**C6 — Over-declared nullability creating dead UI branches.** `status.wan`
+(`schemas_ext2.rs:374`) is always an object (`status.rs:103-118`);
+`ItNetworkApStatus.ssid` (`:353`) is always a `String` (`status.rs:245`);
+`active_uplink` (`:366`) is declared `nullable` but `status.rs:91-98` returns
+`"none"` and never null. So `{wan && …}` (`ItNetworkPane.tsx:202`) and
+`status.ap.ssid ?? "?"` (`:229`) can never take their else branch. Related
+drift: the generated client emits `active_uplink: 'wan' | 'wwan' | 'none'`
+with no `| null` (`types.gen.ts:373`) — it disagrees with the committed spec, and
+nothing in `tests/openapi/` asserts the two match. Dropping `nullable` fixes both
+in the right direction. (`status.wwan` and `status.ap` *are* correctly nullable.)
+
+**C7 — `it.ts:35-37`: three exported type aliases nobody imports.**
+`ItNetworkModeBody`/`ItNetworkApBody`/`ItNetworkWwanBody` are used only as the
+parameter types of the three functions directly below them; both panes pass
+object literals. The `NonNullable<…["body"]>` wrapper is also a no-op — `body` is
+non-optional on all three `…Data` types. Drop the `export`.
+
+**C8 — ~490 lines of hand-mirrored duplication.** `ItWwanForm.tsx` differs
+between the desktop and mobile twins by exactly **two `className` strings** out
+of 108 lines. In `ItNetworkPane`, `MODES`, `POLL_MS`, `apKey`, `wwanKey`, the
+`blocked` predicate and the whole `StatusCard`/`Row` string formatting contain no
+styling whatsoever. Every finding in section B that touches the cockpit has to be
+fixed twice, and B8–B12 are five of them. Hoisting the styling-free logic beside
+`@/lib/api` — the way the API layer already is — removes that tax without
+touching the mirror rule.
+
+**C9 — Duplicated schema fragments.** `["wan","wan_5g","5g"]` is written three
+times (`paths.rs:102`, `schemas_ext2.rs:315`, `:390`), `["hot","cold"]` twice,
+`["bg","a"]` twice; the two POST bodies are hand-copies of `ItNetworkAp`/
+`ItNetworkWwan` with the `*_set` booleans swapped out. A variant added in one
+place compiles everywhere and nothing catches the miss.
+
+**C10 — Redundant work per request.** `parse_default_route` runs twice per `GET`
+(`status.rs:53` then `:107`); `modem_present()` re-probes sysfs two to three
+times per request (`rest/config/network.rs:57`, then again inside
+`status::probe`). At a 5 s poll it is not a performance problem, but the status
+half probing independently of the value the transport threads in also means a
+test cannot drive both consistently. `ap_status.ssid` echoing `config.ap.ssid`
+rather than the radio (`status.rs:245`) belongs to the same pattern — it is
+labelled live status and is not.
+
+---
+
+## D — Documentation drift
+
+Every one of these is a comment asserting something the code does not do. They
+are cheap to fix and expensive to discover while debugging.
+
+| Where | Claims | Reality |
+|---|---|---|
+| `cp-uplink.service:17`, §8 | the cockpit reads `/run/cp-uplink/state` | nothing reads it (C1) |
+| `cp-regdom.sh:16-18`, §9 | the applier calls `cp-regdom` on every AP apply | it shells out to `iw` itself (C3) |
+| `apply.rs:25-28` | "with `CP_NMCLI_BIN` unset the applier is inert" | nothing ever leaves it unset on a provisioned box (B3) |
+| `apply.rs:182` | the marker stops an unrelated mode POST from bouncing `cp-ap` | it does not — the fingerprint is whole-document (B1) |
+| `mod.rs:192` | "the box is unchanged" on a `502` | true only when the rollback ran; see R1/R2 |
+| `schemas_ext2.rs:362-364` | "every field degrades to null when a tool is absent" | `modem_present` and `active_uplink` never do — deliberately |
+| §11 of this document, `ItNetworkPane.tsx:43`, mobile `:42`, mobile `ItPane.tsx:14-15` | `web/src/components/shell/config/ItNetworkPane.tsx`, "mounted inside `ItPane`" | the PR created `config/it/`, and `ConfigPanes.tsx:37-46` mounts the panes as siblings |
+| `openapi.json` GET summary | `config.wwan` is null "without `can_manage_secrets`" | also null on a non-5G box (`mod.rs:217`) — two causes, one documented |
+
+Two more, low: `cp-regdom.sh:52-53`'s `sed | head -1` takes the *first* `country`
+match in the file, so a `country` field added to an earlier block would silently
+win — anchor the pattern or pin the assumption in a comment. And
+`network.yml:130-135` creates the agents dir `0755` with no `owner`, which would
+*widen* it if the orchestrator ever creates it `0700`; it holds `.identity.json`
+and `.network.json`.
+
+---
+
+## E — Verified correct (so nobody re-checks)
+
+- **Gates.** 38 network unit tests pass. No file over 500 lines (largest:
+  `state.rs`, 420). `transport/it/network/` is 7 entries. `knip` reports no dead
+  frontend files or exports. `mirror:check` 118 twins / 0 orphans; `tsc` and
+  `eslint` clean.
+- **Desktop vs mobile: zero semantic divergence.** All three twin pairs diffed
+  line by line — every difference is a Tailwind class or a doc comment.
+  Validation, mutation bodies, secret omission, error handling, remount keys,
+  poll interval and `modem_present` gating are byte-identical.
+- **Secret elision holds end to end.** No read path returns a PSK, a bearer
+  password or a SIM PIN; the `redacted*` projections are built as fresh values,
+  which is the right direction of failure. The AP form omits an untouched
+  passphrase rather than sending `""` or `null` — correct.
+- **The AP enable gate matches the server exactly**, including the
+  "already stored" case.
+- **Polling stops on unmount** (`ConfigPanel.tsx:100-107` mounts only the selected
+  category) and all three mutations invalidate `["it-network"]`.
+- **`current_default_dev`'s awk** correctly treats a metric-less default route as
+  metric 0, verified against five route-table shapes. The `sleep & wait $!`
+  SIGTERM pattern is correct in dash.
+- **`cp-regdom.service` ordering is correct at boot** — `Before=NetworkManager`
+  with `WantedBy=multi-user.target` does order as intended.
+- **`network.json.j2` emits valid JSON for every variable combination** and its
+  field set matches `NetworkConfig` exactly (no `#[serde(default)]` anywhere, so a
+  missing field would have been fatal). `no_log: true` is on the one task that
+  touches secrets, and nowhere it would hurt.
+- **All nine env gates in `context-pilot.service.j2` are read by live code**; no
+  dead gates, and no unused variables in the `site.yml` block. `modem.yml`'s
+  sysfs probe works as written.
+- **Route exhaustiveness covers all four routes**, and the generated client
+  matches `openapi.json` field for field except `active_uplink` (C6).
+- **Tool paths** verified except `/usr/sbin/iw` — confirm with `command -v iw` on
+  the box.
+- **Not attributable to this branch:** `cargo clippy --all-targets` fails
+  massively on this checkout, but the same restriction-group lints fire in files
+  the PR never touches. I did not establish master's baseline; do not read it as a
+  regression here.
+
+---
+
+## F — Suggested order
+
+1. **R1, R2** — one-line fixes each, and they are the difference between
+   NFR-NET-05 holding and not.
+2. **R3, R4** — move the modem check out of the transport layer and give
+   `load()` a log line. Both are silent-failure classes.
+3. **R7, B3, B15** — the provisioning path: restart on seed, gate the env
+   template, notify `cp-regdom`. Without these a green run means little.
+4. **R5, R6** — two small cockpit edits that make every other validation
+   message visible; do these before B11, since they change what B11 is worth.
+5. **B4, B5** — the supervisor's retry and startup reconciliation. This is the
+   milestone's whole point, and both are reachable without hardware.
+6. **C1, C2, C3** — decide *wire up or delete*. C1 is the one that will mislead
+   the next reader.
+7. The rest, as capacity allows. **C8 first** among them if the cockpit findings
+   are being fixed, since it halves that work permanently.
+
+---
+---
+
+# Review resolution (2026-07-29)
+
+Every finding in the diagnostic above is fixed. The sections it contradicted
+(§8, §9, §10, §11, §12) were corrected in situ rather than annotated, so the
+design reads as one document; this section is the index, not the record.
+
+**Blocking (A).** All seven.
+
+| # | What closed it |
+|---|---|
+| R1 | The whole-document fingerprint became **five per-step hashes, each recorded the instant its own step succeeds**. Rollback is now correct by construction: a step that ran with `next` cannot match `previous`, and a step that never ran is correctly skipped. This also closed B1 — a mode change no longer bounces every associated AP client. |
+| R2 | The `sync_caddy` failure path restores the previous document before returning, so the `502` finally means what it says. Both restore paths log when the write-back itself fails. |
+| R3 | The modem check left the transport layer: `apply` coerces a 5G mode to `wan` with a loud WARN **before any mutation**, so `apply_mode` structurally cannot suppress `end0`'s default route on a modem-less box. The handler `400`s stay — they give the better message. |
+| R4 | `load()` logs a distinct reason per fallback arm, naming what the box just lost. An absent file stays silent: that is the normal unseeded state, and `load` runs on every `GET`. Ansible asserts as well (§12). |
+| R5 | `apiErrorMessage` replaces the `instanceof Error` test that was **always false**, at all five sites. The operator now sees the server's actual sentence instead of "Save failed". |
+| R6 | `isError` renders a real failure card with a retry; a failed poll on a pane that already has data degrades to a banner instead of tearing the pane down. |
+| R7 | Handlers restart `cp-regdom`, then `context-pilot`, then health-check it — see §12. |
+
+**Serious (B).** All eighteen. B1/B2 fell out of R1's per-step hashes plus giving
+the supervisor sole ownership of the bearer metric in `wan_5g`. B4/B5/B6/B7 are
+in §8. B3 is in §10. B8 was fixed by deleting the remount key and merging a
+partial draft over the server value at render — a touched field is the
+operator's and no poll can reclaim it, an untouched one keeps tracking the
+server — which fixed B9 for free. B10–B12, B18 and the client half of the
+validation mirror (B11) are transcribed from `state.rs` rather than reinvented.
+
+**Dead surface (C).** `/run/cp-uplink/state` was **wired up, not deleted** (C1):
+it carries the only view of the supervisor's *intent*, and `promoted && !achieved`
+— "5G was requested and did not come up" — is now a card in the cockpit. The
+three unreachable knobs became real config (C2); `cp-regdom` gained its second
+entry point (C3); `applied` is finally distinguished from "saved" in the UI (C4);
+`gateway`, `registered`, `country` and the probe block are rendered (C5); the
+over-declared nullability and its dead UI branches are gone (C6); C7's aliases
+are local; C8 moved ~490 lines of styling-free logic out of the mirrored tree.
+
+**Two things the review asked for and did not get.**
+
+- **B18 was closed by construction rather than by measurement.** The review
+  wanted one `nmcli … psk ""` command on a factory-fresh box. Instead the whole
+  `802-11-wireless-security.*` group is now omitted when there is no passphrase,
+  so the argv that might have been rejected is never built. The open question —
+  *does* `nmcli` reject it? — is still open, and no longer matters.
+- **B2's uncertainty is still uncertain.** Whether the kernel route actually
+  moves before NM's next reactivation was not reproduced on hardware. The fix
+  removes the trigger (the applier no longer writes the metric in `wan_5g`), so
+  the question is now academic unless someone re-introduces it.
+
+**Still out of scope, still true:** O0.1 (the 5G data path needs an antenna) and
+the 390 px half of O4.3 (the mobile shell has no settings entry point yet).
+Neither is a code defect. And the review's own note stands: `cargo clippy` fails
+massively on this checkout in files this branch never touched — do not read it
+as a regression here.

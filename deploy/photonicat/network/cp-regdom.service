@@ -11,6 +11,10 @@ Before=NetworkManager.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
+# No argument on purpose: this is the boot entry point, so the script reads the
+# country out of .network.json itself. The applier is the other entry point and
+# passes it as `cp-regdom <CC>`. RemainAfterExit means `restart` is the only verb
+# that re-runs this — `start` on an already-exited unit is a no-op.
 ExecStart=/usr/local/sbin/cp-regdom
 
 [Install]

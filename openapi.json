@@ -1060,9 +1060,11 @@
             "type": "string"
           },
           "channel": {
+            "description": "Channel number, or 0 for automatic. Must be legal on `band`.",
             "type": "integer"
           },
           "country": {
+            "description": "ISO-3166 two-letter regulatory code, or empty.",
             "type": "string"
           },
           "enabled": {
@@ -1072,24 +1074,26 @@
             "type": "boolean"
           },
           "passphrase_set": {
+            "description": "Whether a PSK is stored. The key itself is never returned.",
             "type": "boolean"
           },
           "share_internet": {
             "type": "boolean"
           },
           "ssid": {
+            "description": "Broadcast network name, 1–32 bytes.",
             "type": "string"
           }
         },
         "required": [
           "enabled",
           "ssid",
-          "passphrase_set",
           "band",
           "channel",
           "country",
           "hidden",
-          "share_internet"
+          "share_internet",
+          "passphrase_set"
         ],
         "type": "object"
       },
@@ -1125,7 +1129,6 @@
             "type": "boolean"
           },
           "ssid": {
-            "nullable": true,
             "type": "string"
           }
         },
@@ -1152,7 +1155,13 @@
             "type": "string"
           },
           "probe": {
-            "$ref": "#/components/schemas/ItNetworkProbe"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ItNetworkProbe"
+              }
+            ],
+            "description": "READ-ONLY. Seeded at provisioning time from `network.json.j2` and not writable from the cockpit: no endpoint accepts probe tuning, so a generated client must not present these as editable config. Returned so an admin can see what the supervisor is running with.",
+            "readOnly": true
           },
           "wwan": {
             "allOf": [
@@ -1160,6 +1169,7 @@
                 "$ref": "#/components/schemas/ItNetworkWwan"
               }
             ],
+            "description": "Null for two independent reasons: the caller lacks `can_manage_secrets` (the bearer's CONFIGURATION is vendor state), or this box is not a 5G variant at all (`status.modem_present` is false). `status.wwan` is not elided either way — registration, operator and signal are diagnostics the client's own admin needs when the box loses its uplink.",
             "nullable": true
           }
         },
@@ -1192,15 +1202,30 @@
         "type": "object"
       },
       "ItNetworkProbe": {
-        "description": "Failover probe tuning. The probe is interface-bound, so it tests the WAN path itself rather than whatever the default route currently prefers.",
+        "description": "Failover probe tuning. The probe is interface-bound, so it tests the WAN path itself rather than whatever the default route currently prefers. READ-ONLY throughout: these values are seeded at provisioning time and no endpoint accepts them (see `ItNetworkConfig.probe`).",
         "properties": {
+          "cooldown_s": {
+            "description": "Minimum seconds between failover transitions — the anti-flap floor. Seeded at 60. It has no effect once `interval_s` exceeds it, since a round can then never come back inside it.",
+            "type": "integer"
+          },
           "fail_threshold": {
+            "description": "Consecutive failed probes before the WAN is demoted.",
             "type": "integer"
           },
           "interval_s": {
+            "description": "Seconds between probe rounds.",
+            "type": "integer"
+          },
+          "nm_wait_s": {
+            "description": "Cap on any single `nmcli` call (`nmcli --wait`), in seconds. Seeded at 20. The supervisor is a single loop: an unbounded call against a modem with no coverage would stop it probing, so it could not notice the WAN coming back.",
             "type": "integer"
           },
           "ok_threshold": {
+            "description": "Consecutive successful probes before the WAN is restored.",
+            "type": "integer"
+          },
+          "probe_timeout_s": {
+            "description": "Per-target ping deadline in seconds (`ping -W`). Seeded at 3.",
             "type": "integer"
           },
           "targets": {
@@ -1214,7 +1239,10 @@
           "targets",
           "fail_threshold",
           "ok_threshold",
-          "interval_s"
+          "interval_s",
+          "probe_timeout_s",
+          "cooldown_s",
+          "nm_wait_s"
         ],
         "type": "object"
       },
@@ -1234,15 +1262,16 @@
         "type": "object"
       },
       "ItNetworkStatus": {
-        "description": "Live read-back from `ip route`, `nmcli`, `mmcli` and `iw`. Every field degrades to null rather than erroring when a tool is absent, so a dev machine with no env gates set still answers 200.",
+        "description": "Live read-back from `/proc/net/route`, sysfs, `nmcli`, `mmcli` and `iw`. The TOOL-BACKED halves — `wan.ip`, `wwan`, `ap` — degrade to null rather than erroring when the tool is absent, so a dev machine with no env gates set still answers 200. `active_uplink` and `modem_present` deliberately do NOT: they are answered from `/proc/net/route` and from sysfs, which need no gate, so the two fields an admin watches during a failover stay truthful on every box.",
         "properties": {
           "active_uplink": {
+            "description": "The device carrying the lowest-metric default route, classified: `wan` (the ethernet port), `wwan` (the 5G bearer), `other` (some other device holds it — a VPN, a container bridge), `none` (there is no default route). Never null: no default route is spelled `none`.",
             "enum": [
               "wan",
               "wwan",
+              "other",
               "none"
             ],
-            "nullable": true,
             "type": "string"
           },
           "ap": {
@@ -1256,13 +1285,17 @@
           "modem_present": {
             "type": "boolean"
           },
-          "wan": {
+          "supervisor": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/ItNetworkWanStatus"
+                "$ref": "#/components/schemas/ItNetworkSupervisor"
               }
             ],
+            "description": "Null when the failover supervisor is not running or its state file is absent.",
             "nullable": true
+          },
+          "wan": {
+            "$ref": "#/components/schemas/ItNetworkWanStatus"
           },
           "wwan": {
             "allOf": [
@@ -1278,7 +1311,64 @@
           "modem_present",
           "wan",
           "wwan",
-          "ap"
+          "ap",
+          "supervisor"
+        ],
+        "type": "object"
+      },
+      "ItNetworkSupervisor": {
+        "description": "What the failover supervisor itself believes, parsed from `/run/cp-uplink/state` (design §8). Null when `cp-uplink` is not running or has not yet written its first line. Everything else under `status` is observed from the system; this block is the only place the supervisor's INTENT and its streak counters are visible, and it is what makes a failover that did not happen diagnosable.",
+        "properties": {
+          "achieved": {
+            "description": "CARRIED OUT: the decision in `promoted` actually took effect on the bearer. `promoted: true` with `achieved: false` is the outage signature — the supervisor wanted 5G and could not activate it (no coverage, no SIM, modem still enumerating), so the box has no uplink at all rather than the 5G one the decision implies.",
+            "type": "boolean"
+          },
+          "active_uplink": {
+            "description": "OBSERVED: what the kernel's routing table actually shows, independent of the two fields above. `promoted: true` with `active_uplink: \"wan\"` means the promotion has not landed yet; with `\"none\"` it means it failed outright.",
+            "enum": [
+              "wan",
+              "wwan",
+              "other",
+              "none"
+            ],
+            "type": "string"
+          },
+          "fail_streak": {
+            "description": "Consecutive failed WAN probes; reset by a success and by a promotion.",
+            "type": "integer"
+          },
+          "last_reason": {
+            "description": "The reason logged with that transition, verbatim from the journal line. Null when there has never been one.",
+            "nullable": true,
+            "type": "string"
+          },
+          "last_transition": {
+            "description": "Unix seconds of the last promote/demote. Null when there has never been one since the supervisor started — it does not survive a restart (`/run` is wiped).",
+            "nullable": true,
+            "type": "integer"
+          },
+          "ok_streak": {
+            "description": "Consecutive successful WAN probes; reset by a failure and by a demotion.",
+            "type": "integer"
+          },
+          "promoted": {
+            "description": "DECIDED: the supervisor has concluded the bearer should be the uplink. This is its intent, not an observation — it says nothing about whether the bearer actually came up. Read it together with `achieved` and `active_uplink`.",
+            "type": "boolean"
+          },
+          "supervising": {
+            "description": "The supervisor is ARBITRATING (mode `wan_5g`). False in `wan` and `5g`, where the routing is static and the applier owns it — the daemon then only observes and reports.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "supervising",
+          "promoted",
+          "achieved",
+          "active_uplink",
+          "fail_streak",
+          "ok_streak",
+          "last_transition",
+          "last_reason"
         ],
         "type": "object"
       },
@@ -1311,18 +1401,22 @@
         "description": "5G bearer settings — VENDOR-MANAGED. Writing them needs `can_manage_secrets` (superadmin), not `can_manage_it`: the SIM and the data plan are the vendor's, so the APN that goes with them is a fleet-wide decision. `password_set`/`pin_set` stand in for the write-only credentials.",
         "properties": {
           "apn": {
+            "description": "Carrier access point name; empty lets ModemManager pick.",
             "type": "string"
           },
           "password_set": {
+            "description": "Whether a bearer password is stored.",
             "type": "boolean"
           },
           "pin_set": {
+            "description": "Whether a SIM PIN is stored.",
             "type": "boolean"
           },
           "roaming": {
             "type": "boolean"
           },
           "standby": {
+            "description": "How much of the 5G stack stays warm while ethernet is the uplink: `hot` keeps the bearer connected at a standby route metric (failover is a metric flip), `cold` keeps the modem registered with no bearer (failover pays the setup, but the SIM is not attached).",
             "enum": [
               "hot",
               "cold"
@@ -1336,11 +1430,11 @@
         },
         "required": [
           "apn",
+          "roaming",
+          "standby",
           "username",
           "password_set",
-          "pin_set",
-          "roaming",
-          "standby"
+          "pin_set"
         ],
         "type": "object"
       },
@@ -5626,7 +5720,7 @@
             "description": "Error"
           }
         },
-        "summary": "Uplink + access-point configuration (secrets elided; `config.wwan` null without can_manage_secrets) and live status",
+        "summary": "Uplink + access-point configuration (secrets elided) and live status. `config.wwan` is null for either of two independent reasons: a caller without `can_manage_secrets`, or a box with no modem (`status.modem_present` false). `config.probe` is read-only — it is seeded at provisioning time.",
         "tags": [
           "it"
         ]
@@ -5647,9 +5741,11 @@
                     "type": "string"
                   },
                   "channel": {
+                    "description": "Channel number, or 0 for automatic. Must be legal on `band`.",
                     "type": "integer"
                   },
                   "country": {
+                    "description": "ISO-3166 two-letter regulatory code, or empty.",
                     "type": "string"
                   },
                   "enabled": {
@@ -5659,6 +5755,7 @@
                     "type": "boolean"
                   },
                   "passphrase": {
+                    "description": "WPA2 pre-shared key, 8–63 characters. Write-only and TRI-STATE: **omit the field** to keep the stored key, send **null** to clear it, send a **string** to replace it. Clearing it is destructive and quiet: the passphrase prerequisite is only enforced while `enabled` is true, so `passphrase: null` on a disabled AP returns 200 and the access point can no longer be enabled until a new key is set. Never returned by any read path — see `passphrase_set`.",
                     "nullable": true,
                     "type": "string"
                   },
@@ -5666,6 +5763,7 @@
                     "type": "boolean"
                   },
                   "ssid": {
+                    "description": "Broadcast network name, 1–32 bytes.",
                     "type": "string"
                   }
                 },
@@ -5773,13 +5871,16 @@
               "schema": {
                 "properties": {
                   "apn": {
+                    "description": "Carrier access point name; empty lets ModemManager pick.",
                     "type": "string"
                   },
                   "password": {
+                    "description": "PAP/CHAP password. Write-only: never returned, see `password_set`. TRI-STATE: **omit** to keep the stored password, **null** to clear it, a **string** to replace it. Clearing it on a carrier that authenticates leaves the bearer unable to attach.",
                     "nullable": true,
                     "type": "string"
                   },
                   "pin": {
+                    "description": "SIM PIN, 4–8 digits. Write-only: never returned, see `pin_set`. TRI-STATE: **omit** to keep the stored PIN, **null** to clear it, a **string** to replace it. Sending null on a PIN-locked SIM costs the box its uplink at the next boot — the modem comes up locked and nothing unlocks it. A wrong value is worse: it burns one of the SIM's three unlock retries.",
                     "nullable": true,
                     "type": "string"
                   },
@@ -5787,6 +5888,7 @@
                     "type": "boolean"
                   },
                   "standby": {
+                    "description": "How much of the 5G stack stays warm while ethernet is the uplink: `hot` keeps the bearer connected at a standby route metric (failover is a metric flip), `cold` keeps the modem registered with no bearer (failover pays the setup, but the SIM is not attached).",
                     "enum": [
                       "hot",
                       "cold"
@@ -5794,6 +5896,7 @@
                     "type": "string"
                   },
                   "username": {
+                    "description": "PAP/CHAP username, when the carrier needs one. TRI-STATE: **omit** to keep the stored value, **null** to clear it, a **string** to replace it. Unlike the two below it is not a secret — it is returned as `config.wwan.username` — it is only tri-state on the way in.",
                     "nullable": true,
                     "type": "string"
                   }

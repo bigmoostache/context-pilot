@@ -23,7 +23,6 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 use super::apply::{Tools, WWAN_PROFILE, run, wan_iface};
-use super::profiles;
 use super::state::{NetworkConfig, Standby, UplinkMode};
 
 /// The drop-in file name inside `05-pcat-ula-<if>.network.d/`.
@@ -84,6 +83,46 @@ fn reconfigure_wan(networkctl: &OsStr) -> Result<(), String> {
     Ok(())
 }
 
+/// Seconds `nmcli` may spend bringing a profile up or down before we stop
+/// waiting on it. See [`set_active`] for why the default 90 s is unusable here.
+const ACTIVATION_TIMEOUT_S: u32 = 20;
+
+/// Bring a profile up or down, tolerating "already in that state".
+///
+/// `nmcli connection down` on an inactive profile and `up` on an active one both
+/// exit non-zero, and neither is a failure of ours. Activation failures on the
+/// bearer are also non-fatal by design — see [`super::apply`].
+///
+/// It lives here, beside its only two callers, rather than in
+/// [`profiles`](super::profiles): that module *renders* the two profiles, this
+/// one decides which of them should be running.
+fn set_active(nmcli: &OsStr, profile: &str, active: bool) -> Result<(), String> {
+    let verb = if active { "up" } else { "down" };
+    // `--wait` is not a nicety. nmcli's default activation timeout is 90 s, and
+    // a bearer with no coverage takes ALL of it — measured on hardware, where it
+    // held an HTTP request (and the applier lock) open long enough for the
+    // cockpit's button to look permanently frozen. Activation is best-effort
+    // anyway (see [`apply_mode`]), so a bounded wait loses nothing: the AP came
+    // up in 4 s in M0, and a modem that has not attached in 20 s was not going
+    // to.
+    let args = [
+        "--wait".to_owned(),
+        ACTIVATION_TIMEOUT_S.to_string(),
+        "connection".to_owned(),
+        verb.to_owned(),
+        profile.to_owned(),
+    ];
+    match run(nmcli, &args) {
+        Ok(_out) => Ok(()),
+        // `nmcli connection down` on a profile that is already inactive exits
+        // non-zero. That is the NORMAL state for both profiles on a box in
+        // `wan` with the AP off, so treating it as a failure would put two
+        // alarming lines in the journal on every single boot.
+        Err(failure) if !active && failure.contains("not an active connection") => Ok(()),
+        Err(failure) => Err(format!("{verb} {profile}: {failure}")),
+    }
+}
+
 /// Apply the mode: the ethernet gateway suppression, then the bearer's activation.
 ///
 /// **Bearer activation is best-effort and deliberately non-fatal.** Whether the
@@ -94,6 +133,15 @@ fn reconfigure_wan(networkctl: &OsStr) -> Result<(), String> {
 /// `GET /api/it/network`'s `wwan.state`, and NFR-NET-01 guarantees the cockpit
 /// stays reachable on the LAN address and the fleet ULA, so the choice is always
 /// reversible.
+///
+/// **FR-NET-16 is not enforced here** — `config.mode` has already been coerced
+/// to `wan` by `apply::effective_config` if this box has no modem (R3). It used
+/// to be enforced by the `modem_present()` early-return below, which sits
+/// *after* the drop-in is written: a document saying `5g` on a modem-less box
+/// therefore suppressed `end0`'s default route at every boot with nothing to
+/// replace it. Doing the coercion upstream makes that ordering bug structurally
+/// impossible rather than a thing to remember; the check below now only guards
+/// the activation of a profile that may not exist.
 ///
 /// # Errors
 ///
@@ -119,7 +167,7 @@ pub(crate) fn apply_mode(tools: &Tools, config: &NetworkConfig) -> Result<(), St
     if !super::apply::modem_present() {
         return Ok(()); // no modem on this variant — nothing to bring up or down.
     }
-    if let Err(failure) = profiles::set_active(&tools.nmcli, WWAN_PROFILE, wanted_up) {
+    if let Err(failure) = set_active(&tools.nmcli, WWAN_PROFILE, wanted_up) {
         // At boot this reliably says "No suitable device found": the applier runs
         // before ModemManager has enumerated the modem, so NM has nothing to
         // bind the profile to. The profile carries `autoconnect yes` in both
@@ -144,7 +192,7 @@ pub(crate) fn apply_mode(tools: &Tools, config: &NetworkConfig) -> Result<(), St
 ///
 /// Returns a message when the sysctl cannot be written.
 pub(crate) fn apply_ap_activation(tools: &Tools, config: &NetworkConfig) -> Result<(), String> {
-    if let Err(failure) = profiles::set_active(&tools.nmcli, super::apply::AP_PROFILE, config.ap.enabled) {
+    if let Err(failure) = set_active(&tools.nmcli, super::apply::AP_PROFILE, config.ap.enabled) {
         // Same reasoning as the bearer: an rfkilled or absent radio must not
         // roll back a legitimate setting.
         eprintln!("network: {} (non-fatal): {failure}", super::apply::AP_PROFILE);

@@ -159,6 +159,23 @@ pub(crate) struct ProbeConfig {
     pub(crate) ok_threshold: u32,
     /// Seconds between probe rounds.
     pub(crate) interval_s: u32,
+    /// `ping -W` — how long one probe waits for a reply.
+    ///
+    /// Paid once per target per round, so a value anywhere near `interval_s`
+    /// makes the rounds overlap and the streak counters stop meaning what they
+    /// say. Rendered as `CP_UPLINK_PROBE_TIMEOUT_S`.
+    pub(crate) probe_timeout_s: u32,
+    /// Seconds a transition holds before the opposite one may fire.
+    ///
+    /// The only thing standing between a WAN that flaps and a default route
+    /// that changes every round. Rendered as `CP_UPLINK_COOLDOWN_S`.
+    pub(crate) cooldown_s: u32,
+    /// `nmcli --wait` for the supervisor's own bearer activation.
+    ///
+    /// Bounded for the measured reason `routes::set_active` is: nmcli's default
+    /// is 90 s and a modem with no coverage takes all of it, which would stall a
+    /// whole probe round. Rendered as `CP_UPLINK_NM_WAIT_S`.
+    pub(crate) nm_wait_s: u32,
 }
 
 impl Default for ProbeConfig {
@@ -168,6 +185,9 @@ impl Default for ProbeConfig {
             fail_threshold: 3,
             ok_threshold: 2,
             interval_s: 10,
+            probe_timeout_s: 3,
+            cooldown_s: 60,
+            nm_wait_s: 20,
         }
     }
 }
@@ -199,15 +219,42 @@ pub(crate) fn network_path(agents_dir: &Path) -> PathBuf {
 /// a bogus country must never reach the applier. Falling back to defaults means
 /// falling back to `mode: wan` with the AP off — the safest possible posture, and
 /// one that keeps the cockpit reachable on the fleet ULA.
+///
+/// **But never silently** (R4). The blast radius of one bad field is the whole
+/// document — an Ansible seed with `ap_enabled=true` and no `ap_password`
+/// renders `passphrase: null`, which is refused here, and the box then also
+/// loses its mode, its APN, its SIM PIN and its probe tuning while Ansible
+/// reports `ok`. Each arm therefore names its own reason on stderr. An **absent**
+/// file is the one exception: that is the normal state of a box nobody has
+/// seeded yet, and this function runs on every `GET`, so logging it would be a
+/// line every five seconds saying nothing.
 pub(crate) fn load(path: &Path) -> NetworkConfig {
-    let Ok(raw) = std::fs::read(path) else {
-        return NetworkConfig::default();
+    let raw = match std::fs::read(path) {
+        Ok(raw) => raw,
+        Err(failure) if failure.kind() == std::io::ErrorKind::NotFound => return NetworkConfig::default(),
+        Err(failure) => {
+            eprintln!("WARN: network: {} is unreadable ({failure}) — {FALLBACK_COST}", path.display());
+            return NetworkConfig::default();
+        }
     };
-    let Ok(config) = serde_json::from_slice::<NetworkConfig>(&raw) else {
-        return NetworkConfig::default();
+    let config = match serde_json::from_slice::<NetworkConfig>(&raw) {
+        Ok(config) => config,
+        Err(failure) => {
+            eprintln!("WARN: network: {} is malformed ({failure}) — {FALLBACK_COST}", path.display());
+            return NetworkConfig::default();
+        }
     };
-    if validate(&config).is_err() { NetworkConfig::default() } else { config }
+    if let Err(reason) = validate(&config) {
+        eprintln!("WARN: network: {} is invalid ({reason}) — {FALLBACK_COST}", path.display());
+        return NetworkConfig::default();
+    }
+    config
 }
+
+/// The second half of every [`load`] warning: what falling back actually costs,
+/// spelled out so the journal line is enough to act on without reading this file.
+const FALLBACK_COST: &str = "falling back to defaults (mode=wan, AP off); \
+     the mode, APN, SIM PIN and probe tuning that file held are NOT in force";
 
 /// Persist the config atomically + durably, then tighten it to `0600` — it holds
 /// the Wi-Fi PSK and the SIM PIN.
@@ -246,7 +293,7 @@ fn restrict(_path: &Path) -> std::io::Result<()> {
 pub(crate) fn validate(config: &NetworkConfig) -> Result<(), String> {
     validate_ap(&config.ap)?;
     validate_wwan(&config.wwan)?;
-    validate_probe(&config.probe)
+    super::uplink::validate_probe(&config.probe)
 }
 
 /// Validate the AP half. The country check is deliberately conditional on
@@ -312,29 +359,6 @@ fn valid_pin(pin: &str) -> bool {
     (4..=8).contains(&pin.chars().count()) && pin.chars().all(|ch| ch.is_ascii_digit())
 }
 
-/// Validate the probe tuning. Zero thresholds would make the supervisor either
-/// never fail over or fail over on the first dropped packet; a zero interval
-/// would spin.
-///
-/// # Errors
-///
-/// Returns a human-readable reason when a field is out of range.
-fn validate_probe(probe: &ProbeConfig) -> Result<(), String> {
-    if probe.targets.is_empty() {
-        return Err("at least one probe target is required".to_owned());
-    }
-    if probe.targets.iter().any(|target| target.parse::<std::net::IpAddr>().is_err()) {
-        return Err("probe targets must be IP addresses".to_owned());
-    }
-    if probe.fail_threshold == 0 || probe.ok_threshold == 0 {
-        return Err("probe thresholds must be at least 1".to_owned());
-    }
-    if !(1..=3600).contains(&probe.interval_s) {
-        return Err("probe interval must be between 1 and 3600 seconds".to_owned());
-    }
-    Ok(())
-}
-
 /// A two-letter alphabetic country code (`FR`, `DE`, …).
 fn valid_country(country: &str) -> bool {
     country.chars().count() == 2 && country.chars().all(|ch| ch.is_ascii_alphabetic())
@@ -386,6 +410,9 @@ impl NetworkConfig {
                 "fail_threshold": self.probe.fail_threshold,
                 "ok_threshold": self.probe.ok_threshold,
                 "interval_s": self.probe.interval_s,
+                "probe_timeout_s": self.probe.probe_timeout_s,
+                "cooldown_s": self.probe.cooldown_s,
+                "nm_wait_s": self.probe.nm_wait_s,
             },
         })
     }

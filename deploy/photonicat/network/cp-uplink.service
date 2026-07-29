@@ -14,7 +14,14 @@ ExecStart=/usr/local/sbin/cp-uplink-watch
 # The supervisor is the thing that restores connectivity; it must come back.
 Restart=always
 RestartSec=5
-# /run/cp-uplink — the live state the cockpit's GET /api/it/network reads.
+# /run/cp-uplink/state — rewritten every probe interval and read by the backend
+# (env CP_UPLINK_STATE, same default path), which projects it as the `supervisor`
+# object of GET /api/it/network. It carries what /proc/net/route cannot express:
+# the decision, whether it was achieved, the streaks and the reason in English.
+# RuntimeDirectory wipes it on stop — deliberately, so a dead supervisor cannot
+# leave the cockpit reading a confident-looking snapshot of a daemon that is no
+# longer running. The supervisor reconciles from the live route at startup
+# instead of persisting anything.
 RuntimeDirectory=cp-uplink
 RuntimeDirectoryMode=0755
 

@@ -17,7 +17,7 @@ import type {
   PostApiItNetworkApData,
   PostApiItNetworkModeData,
   PostApiItNetworkWwanData,
-} from "./generated/types.gen"
+} from "../generated/types.gen"
 import {
   getApiItCaFingerprint,
   getApiItIdentity,
@@ -27,14 +27,17 @@ import {
   postApiItNetworkAp,
   postApiItNetworkMode,
   postApiItNetworkWwan,
-} from "./generated"
-import { sdk, getToken, BASE } from "./client"
+} from "../generated"
+import { sdk, getToken, BASE } from "../client"
 
-/** Body shapes for the three network writes, named so the pane can build them
- *  without reaching into the generated request envelopes. */
-export type ItNetworkModeBody = NonNullable<PostApiItNetworkModeData["body"]>
-export type ItNetworkApBody = NonNullable<PostApiItNetworkApData["body"]>
-export type ItNetworkWwanBody = NonNullable<PostApiItNetworkWwanData["body"]>
+// Body shapes for the three network writes. Local aliases, not exports: they
+// are only the parameter types of the three functions below — every caller
+// passes an object literal or a body built in `./network`, so
+// nothing ever named them (C7). The `NonNullable<…>` wrapper they used to carry
+// was a no-op too: `body` is non-optional on all three `…Data` types.
+type ItNetworkModeBody = PostApiItNetworkModeData["body"]
+type ItNetworkApBody = PostApiItNetworkApData["body"]
+type ItNetworkWwanBody = PostApiItNetworkWwanData["body"]
 
 // ── Endpoints (SDK) ──────────────────────────────────────────────────
 

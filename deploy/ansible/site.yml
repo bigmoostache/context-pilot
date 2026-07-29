@@ -96,10 +96,149 @@
     cp_ap_share: "{{ ap_share | default(true) | bool }}"
     # Failover probing (§8) — interface-bound, so it tests the WAN path itself
     # rather than whatever the default route currently prefers.
-    cp_net_probe_targets: "{{ net_probe_targets | default(['1.1.1.1', '9.9.9.9']) }}"
+    #
+    # TARGETS ARE COERCED, not merely documented. `-e net_probe_targets=1.1.1.1,8.8.8.8`
+    # arrives as a STRING, and a JSON string where the backend requires an array
+    # fails `validate_probe` — at which point `state::load` discards the WHOLE
+    # document back to defaults, silently, and Ansible still reports `ok`. So a
+    # real list passes through untouched and a comma- or whitespace-separated
+    # string is split into one. Both of these therefore work:
+    #   -e net_probe_targets=1.1.1.1,8.8.8.8
+    #   -e '{"net_probe_targets":["1.1.1.1","8.8.8.8"]}'
+    # Use the COMMA on the command line: `-e key=a b` is split into separate
+    # key=value pairs by Ansible itself before this ever sees it. The whitespace
+    # form is for a value that arrives from a vars file or an inventory.
+    _cp_net_probe_targets_in: "{{ net_probe_targets | default(['1.1.1.1', '9.9.9.9']) }}"
+    cp_net_probe_targets: >-
+      {{ (_cp_net_probe_targets_in | regex_findall('[^,\s]+'))
+         if (_cp_net_probe_targets_in is string) else _cp_net_probe_targets_in }}
     cp_net_probe_fail_threshold: "{{ net_probe_fail_threshold | default(3) | int }}"
     cp_net_probe_ok_threshold: "{{ net_probe_ok_threshold | default(2) | int }}"
     cp_net_probe_interval_s: "{{ net_probe_interval_s | default(10) | int }}"
+    # The three supervisor knobs that were hardcoded in cp-uplink-watch and had
+    # no field anywhere. They are REQUIRED fields of the backend's ProbeConfig:
+    # that struct carries no #[serde(default)] anywhere, deliberately, so a
+    # template that omits one makes the entire document unparseable — which is
+    # the same silent "fell back to defaults" failure as an invalid value.
+    cp_net_probe_timeout_s: "{{ net_probe_timeout_s | default(3) | int }}"      # per-target ping deadline
+    cp_net_probe_cooldown_s: "{{ net_probe_cooldown_s | default(60) | int }}"   # min seconds between transitions
+    cp_net_probe_nm_wait_s: "{{ net_probe_nm_wait_s | default(20) | int }}"     # cap on any single nmcli call
+
+  # ── preconditions ───────────────────────────────────────────────────────────
+  # WHY THE NETWORK VARIABLES ARE CHECKED BEFORE ANYTHING ELSE RUNS: the backend
+  # is fail-closed on this document — `state::load` falls back to
+  # `NetworkConfig::default()` on ANY validation failure, so the blast radius of
+  # one bad field is the WHOLE file. `-e ap_enabled=true` without a passphrase
+  # does not give you an AP without a passphrase; it silently gives you the
+  # vendor-default mode, no APN, no SIM PIN and no probe tuning — and the run
+  # still ends `failed=0`. Ansible never re-reads what it wrote.
+  #
+  # WHY HERE and not inside tasks/net/network.yml: that include is the LAST thing
+  # this play runs, so a typo in `-e net_mode=…` would only surface after the box
+  # has been re-deployed and restarted. Fail before touching it.
+  #
+  # Every assertion below mirrors one function in
+  # crates/cp-orchestrator/src/transport/it/network/state.rs. Keep them in step:
+  # a rule added there and not here is a silently-discarded document again.
+  # Skipped wholesale when the feature is off — nothing then reads the values.
+  pre_tasks:
+    - name: Assert the network enum variables use the spellings the backend knows
+      ansible.builtin.assert:
+        that:
+          - cp_net_mode in ['wan', 'wan_5g', '5g']
+          - cp_ap_band in ['bg', 'a']
+          - cp_wwan_standby in ['hot', 'cold']
+        fail_msg: >-
+          Unknown value in a network enum (state.rs UplinkMode / Band / Standby).
+          net_mode='{{ cp_net_mode }}' — legal: wan, wan_5g, 5g.
+          ap_band='{{ cp_ap_band }}' — legal: bg (2.4 GHz), a (5 GHz).
+          wwan_standby='{{ cp_wwan_standby }}' — legal: hot, cold.
+        success_msg: "network enums accepted (mode={{ cp_net_mode }}, band={{ cp_ap_band }}, standby={{ cp_wwan_standby }})"
+      when: cp_net_enabled | bool
+
+    - name: Assert the Wi-Fi AP variables are what the backend will accept
+      # Mirrors state.rs validate_ap + enabled_ap_prerequisites. The passphrase
+      # is never interpolated into either message — this task's output is a
+      # normal, logged play recap. Lengths are counted in characters where the
+      # backend counts SSID bytes; identical for the ASCII SSIDs we generate, and
+      # the backend remains the authority for anything else.
+      ansible.builtin.assert:
+        that:
+          - (cp_ap_ssid | length) >= 1 and (cp_ap_ssid | length) <= 32
+          - (cp_ap_password | length) == 0 or ((cp_ap_password | length) >= 8 and (cp_ap_password | length) <= 63)
+          - (cp_ap_country | length) == 0 or (cp_ap_country is match('^[A-Za-z]{2}$'))
+          - (cp_ap_channel | int) == 0 or ((cp_ap_channel | int) in _cp_ap_legal_channels)
+          - (not (cp_ap_enabled | bool)) or ((cp_ap_country | length) > 0)
+          - (not (cp_ap_enabled | bool)) or ((cp_ap_password | length) > 0)
+        fail_msg: >-
+          A Wi-Fi AP variable would be rejected by the backend, and a rejected
+          document is discarded WHOLE. ap_ssid must be 1–32 bytes (it is
+          {{ cp_ap_ssid | length }}). ap_password, when set, must be 8–63
+          characters, and is REQUIRED when ap_enabled=true (we ship no open
+          networks). ap_country must be two letters (it is
+          '{{ cp_ap_country }}') and is REQUIRED when ap_enabled=true — without a
+          regulatory domain every 5 GHz channel is no-IR and the AP cannot
+          beacon at all (landmine 1). ap_channel must be 0 (automatic) or one of
+          {{ _cp_ap_legal_channels | join(', ') }} for ap_band='{{ cp_ap_band }}'.
+        success_msg: >-
+          AP variables accepted (enabled={{ cp_ap_enabled }}, band={{ cp_ap_band }},
+          channel={{ cp_ap_channel }}, country={{ cp_ap_country | default('unset', true) }})
+      vars:
+        # The 5 GHz list is state.rs valid_channel's FIVE_GHZ verbatim — the union
+        # of the UNII channels nmcli accepts. Which of them are usable is the
+        # regulatory domain's business (cp-regdom), not this check's.
+        _cp_ap_legal_channels: >-
+          {{ range(1, 15) | list if cp_ap_band == 'bg'
+             else [36, 40, 44, 48, 52, 56, 60, 64, 100, 104, 108, 112, 116, 120,
+                   124, 128, 132, 136, 140, 144, 149, 153, 157, 161, 165] }}
+      when: cp_net_enabled | bool
+
+    - name: Assert the 5G bearer variables are what the backend will accept
+      # Mirrors state.rs validate_wwan. The PIN's VALUE is never printed: a wrong
+      # PIN can burn one of the SIM's three unlock retries, so it is worth
+      # catching here rather than at the modem.
+      ansible.builtin.assert:
+        that:
+          - (cp_wwan_apn | length) <= 100
+          - cp_wwan_apn is match('^[A-Za-z0-9._-]*$')
+          - (cp_wwan_pin | length) == 0 or (cp_wwan_pin is match('^[0-9]{4,8}$'))
+        fail_msg: >-
+          A 5G bearer variable would be rejected by the backend, and a rejected
+          document is discarded WHOLE. wwan_apn may only contain letters, digits,
+          '.', '-' and '_' (no spaces, no '/') and is at most 100 characters — it
+          is '{{ cp_wwan_apn }}'. wwan_pin must be 4–8 digits (value not shown).
+        success_msg: "5G bearer variables accepted (apn='{{ cp_wwan_apn }}', pin {{ 'set' if (cp_wwan_pin | length) > 0 else 'unset' }})"
+      when: cp_net_enabled | bool
+
+    - name: Assert the failover probe variables are what the backend will accept
+      # Mirrors state.rs validate_probe, plus the three knobs the supervisor
+      # reads. The IP test is deliberately looser than Rust's `IpAddr::parse` —
+      # it exists to catch a hostname or a still-unsplit "1.1.1.1,8.8.8.8" pasted
+      # into -e, not to re-implement the parser.
+      ansible.builtin.assert:
+        that:
+          - cp_net_probe_targets is sequence and cp_net_probe_targets is not string
+          - (cp_net_probe_targets | length) >= 1
+          - (cp_net_probe_targets | select('match', _cp_ip_re) | list | length) == (cp_net_probe_targets | length)
+          - (cp_net_probe_fail_threshold | int) >= 1
+          - (cp_net_probe_ok_threshold | int) >= 1
+          - (cp_net_probe_interval_s | int) >= 1 and (cp_net_probe_interval_s | int) <= 3600
+          - (cp_net_probe_timeout_s | int) >= 1 and (cp_net_probe_timeout_s | int) <= 60
+          - (cp_net_probe_cooldown_s | int) >= 1 and (cp_net_probe_cooldown_s | int) <= 3600
+          - (cp_net_probe_nm_wait_s | int) >= 1 and (cp_net_probe_nm_wait_s | int) <= 120
+        fail_msg: >-
+          A failover probe variable would be rejected by the backend, and a
+          rejected document is discarded WHOLE. net_probe_targets must be a
+          non-empty list of IP ADDRESSES (not hostnames) — it is
+          {{ cp_net_probe_targets | to_json }}. Both thresholds must be >= 1;
+          net_probe_interval_s 1–3600; net_probe_timeout_s 1–60 (it is paid once
+          per target per round, so anything near the interval makes the rounds
+          overlap); net_probe_cooldown_s 1–3600; net_probe_nm_wait_s 1–120.
+        success_msg: "probe variables accepted (targets={{ cp_net_probe_targets | join(' ') }}, every {{ cp_net_probe_interval_s }}s)"
+      vars:
+        _cp_ip_re: '^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)|[0-9A-Fa-f:]+)$'
+      when: cp_net_enabled | bool
+
   tasks:
     - name: Bring up box identity (hostname dh-<serial> + maintenance user)
       ansible.builtin.include_tasks: tasks/bringup.yml
@@ -126,3 +265,58 @@
     - name: Install the uplink (WAN/5G) + Wi-Fi AP foundation
       ansible.builtin.include_tasks: tasks/net/network.yml
       when: cp_net_enabled | bool
+
+  # ── handlers ────────────────────────────────────────────────────────────────
+  # Seeding .network.json is NOT self-applying. Two long-lived processes hold a
+  # copy of that document and neither re-reads it on its own:
+  #   * context-pilot — reads it once at startup (apply_network_at_boot) and is
+  #     the ONLY writer of system network config, including /etc/default/cp-uplink;
+  #   * cp-regdom.service — a oneshot that pushes the country into the kernel.
+  # tasks/start.yml starts the orchestrator BEFORE tasks/net/network.yml seeds the
+  # file, so without these handlers a run with `-e ap_enabled=true` or
+  # `-e net_mode=wan_5g` finishes failed=0 with neither the AP nor the failover in
+  # force until somebody reboots the box by hand.
+  #
+  # WHY HANDLERS AND NOT INLINE RESTARTS: they fire once, at the end of the play,
+  # and only if the seed actually changed — a re-run over an untouched state file
+  # must not bounce a live orchestrator (it would drop every cockpit session for
+  # nothing). By then both units are already running, so `restarted` is safe:
+  # start.yml started + health-checked context-pilot, and network.yml enabled and
+  # started cp-regdom. Restarting each a second time is idempotent — the
+  # orchestrator re-runs the same fail-closed apply against the same document, and
+  # cp-regdom re-`iw reg set`s the same country.
+  #
+  # ORDER IS LOAD-BEARING, and handlers run in the order they are DEFINED here,
+  # never in notification order: the regulatory country must be in force in the
+  # kernel BEFORE the applier brings `cp-ap` up, or the AP silently fails to
+  # beacon (landmine 1). Hence regdom, then orchestrator, then the health probe.
+  handlers:
+    - name: Push the seeded regulatory country into the kernel
+      # RemainAfterExit=yes on cp-regdom.service means a oneshot that already ran
+      # is "active": `started` is a no-op and `restarted` is the ONLY verb that
+      # re-runs it. Without this, `-e cp_net_force=true -e ap_country=DE` writes
+      # the new country and leaves the kernel on the old one until reboot.
+      listen: cp network state seeded
+      ansible.builtin.systemd_service:
+        name: cp-regdom.service
+        state: restarted
+
+    - name: Apply the seeded network document (restart the orchestrator)
+      listen: cp network state seeded
+      ansible.builtin.systemd_service:
+        name: context-pilot
+        state: restarted
+
+    - name: Wait for the product API to answer after the network apply
+      # The restart above is the moment the box reconfigures its own network. If
+      # the orchestrator does not come back, the operator must hear it here and
+      # not from a silent recap — that is the whole point of the two handlers
+      # above. Budget: StartLimitBurst=5/hour and this is restart #2 of the run.
+      listen: cp network state seeded
+      ansible.builtin.uri:
+        url: http://127.0.0.1:7878/api/health
+        status_code: 200
+      register: _cp_net_health
+      retries: 15
+      delay: 1
+      until: _cp_net_health.status == 200

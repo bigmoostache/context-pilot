@@ -12,22 +12,34 @@
 //! | `CP_NETWORKCTL_BIN` | `networkctl` — reload/reconfigure after the drop-in |
 //! | `CP_SYSTEMCTL_BIN` | `systemctl` — restart the failover supervisor |
 //! | `CP_NFT_BIN` | `nft` — drop NM's masquerade table for a cul-de-sac AP |
+//! | `CP_REGDOM_BIN` | `/usr/local/sbin/cp-regdom` — the one implementation of "push the country" |
 //! | `CP_NETWORKD_DIR` | where the strict-`5g` drop-in is written |
-//! | `CP_UPLINK_ENV` | `/etc/default/cp-uplink`, the supervisor's config |
+//! | `CP_UPLINK_ENV` | `/etc/default/cp-uplink` — what we tell the supervisor |
+//! | `CP_UPLINK_STATE` | `/run/cp-uplink/state` — what the supervisor tells us |
 //! | `CP_WAN_IFACE` / `CP_AP_IFACE` / `CP_WWAN_DEV` | hardware names, overridable |
 //! | `CP_WWAN_PRESENT` | `0`/`1` — override the "does this box have a modem" probe |
-//! | `CP_NETWORK_APPLIED` | where the applied-fingerprint marker lives |
+//! | `CP_NETWORK_APPLIED` | where the per-step applied marker lives |
 //!
-//! Two more are read by [`status`](super::status) rather than here, on the same
-//! terms: `CP_MMCLI_BIN` (modem facts) and `CP_IP_BIN` (`end0`'s address —
-//! `end0` is networkd's, so `nmcli` cannot answer for it).
+//! The last two of those live in [`uplink`](super::uplink), which owns both ends
+//! of the supervisor interface. Two more are read by [`status`](super::status)
+//! on the same terms: `CP_MMCLI_BIN` (modem facts) and `CP_IP_BIN` (`end0`'s
+//! address — `end0` is networkd's, so `nmcli` cannot answer for it).
 //!
-//! With `CP_NMCLI_BIN` unset the applier is a **no-op that reports `Ok(false)`**:
-//! the backend persists the document and performs no system call. That is what
-//! lets the whole feature be developed, unit-tested and reviewed off-hardware,
-//! and it is why `cargo test` on a laptop never touches the laptop's network.
-//! Each remaining gate degrades on its own, so a half-configured environment
-//! skips one step rather than failing the call.
+//! # What "inert" means, precisely
+//!
+//! [`Tools::resolve`] returns `None` — and [`apply`] then reports `Ok(false)`
+//! having performed no system call — when `CP_NMCLI_BIN` is **unset or names a
+//! path that does not exist**. Both halves matter (B3): every provisioned box
+//! gets the variable templated into its unit file whether or not NetworkManager
+//! was ever installed, so gating on the variable alone made a box deployed with
+//! `net_enabled=false` believe it was live and answer `502` to every network
+//! POST. Gating on the binary is what makes "no NetworkManager here" and "not
+//! configured for networking" the same, honest state.
+//!
+//! Off-box — a laptop, CI, every unit test — nothing sets the variable, which is
+//! why `cargo test` never touches the machine's network. Each remaining gate
+//! degrades on its own, so a half-configured environment skips one step rather
+//! than failing the call.
 //!
 //! # Ordering
 //!
@@ -43,11 +55,15 @@
 //! from [`commit`](super::commit) **before** the apply, so `10.42.0.1` is already
 //! a served name by the time the first AP client can associate (landmine 11).
 
+use std::borrow::Cow;
+use std::collections::BTreeMap;
 use std::ffi::{OsStr, OsString};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use super::state::NetworkConfig;
-use super::{profiles, routes};
+use serde::Serialize;
+
+use super::state::{NetworkConfig, UplinkMode};
+use super::{profiles, routes, uplink};
 
 /// The AP's own address — the gateway AP clients get from NetworkManager's
 /// dnsmasq, and (landmine 11) a name Caddy must serve for the cockpit to be
@@ -102,18 +118,32 @@ pub(crate) fn wwan_device() -> String {
 ///
 /// * `CP_WWAN_PRESENT=0|1` overrides the probe outright — for a variant the
 ///   probe reads wrong, and for tests.
-/// * With the applier inert (no `CP_NMCLI_BIN` — local dev, every unit test)
-///   this reports `true`: off-box there is no hardware to protect, and
-///   NFR-NET-04 already guarantees nothing is applied.
+/// * With the applier inert — [`nmcli_bin`] answering `None`: local dev, every
+///   unit test, a box with no NetworkManager — this reports `true`. Off-box
+///   there is no hardware to protect, and NFR-NET-04 already guarantees nothing
+///   is applied.
 pub(crate) fn modem_present() -> bool {
     if let Some(forced) = std::env::var_os("CP_WWAN_PRESENT") {
         return forced == "1";
     }
-    if std::env::var_os("CP_NMCLI_BIN").is_none() {
+    if nmcli_bin().is_none() {
         return true;
     }
     // The QMI control port, then the QMI net port — either is enough.
     entry_starting_with("/sys/class/usbmisc", "cdc-wdm") || entry_starting_with("/sys/class/net", "ww")
+}
+
+/// `nmcli`'s path, **only if that path exists**.
+///
+/// The whole applier hangs off this one answer, so it is the one place the
+/// distinction is made. Checking the file rather than the variable is B3's fix:
+/// `context-pilot.service.j2` templates `CP_NMCLI_BIN` onto every box, including
+/// one deployed with `net_enabled=false` where NetworkManager was never
+/// installed. Believing the variable there meant every `nmcli` spawn failed,
+/// every apply returned `Err`, and every network POST answered `502` forever.
+fn nmcli_bin() -> Option<OsString> {
+    let bin = std::env::var_os("CP_NMCLI_BIN")?;
+    if Path::new(&bin).exists() { Some(bin) } else { None }
 }
 
 /// Whether `dir` holds an entry whose name starts with `prefix`.
@@ -138,6 +168,10 @@ pub(crate) struct Tools {
     /// `nft`, to drop NetworkManager's masquerade table when the AP is a
     /// cul-de-sac (FR-NET-09).
     pub(crate) nft: Option<OsString>,
+    /// `cp-regdom`, the appliance's single implementation of "push the
+    /// regulatory country". Preferred over [`Self::iw`] when installed — see
+    /// [`apply_regdom`].
+    pub(crate) regdom: Option<OsString>,
     /// Directory holding the `end0` `.network` drop-in for strict `5g`.
     pub(crate) networkd_dir: Option<PathBuf>,
     /// `/etc/default/cp-uplink` — the failover supervisor's configuration.
@@ -145,15 +179,17 @@ pub(crate) struct Tools {
 }
 
 impl Tools {
-    /// Resolve the gates, or `None` when this environment has no `nmcli` —
-    /// i.e. local dev and every unit test.
+    /// Resolve the gates, or `None` when this environment has no usable `nmcli`
+    /// — i.e. local dev, every unit test, and a box provisioned with
+    /// `net_enabled=false` (see the module doc on what "inert" means).
     pub(crate) fn resolve() -> Option<Self> {
         Some(Self {
-            nmcli: std::env::var_os("CP_NMCLI_BIN")?,
+            nmcli: nmcli_bin()?,
             iw: std::env::var_os("CP_IW_BIN"),
             networkctl: std::env::var_os("CP_NETWORKCTL_BIN"),
             systemctl: std::env::var_os("CP_SYSTEMCTL_BIN"),
             nft: std::env::var_os("CP_NFT_BIN"),
+            regdom: std::env::var_os("CP_REGDOM_BIN"),
             networkd_dir: std::env::var_os("CP_NETWORKD_DIR").map(PathBuf::from),
             uplink_env: std::env::var_os("CP_UPLINK_ENV").map(PathBuf::from),
         })
@@ -162,55 +198,122 @@ impl Tools {
 
 /// Apply `config` to the system.
 ///
-/// Returns `Ok(true)` when the system was touched, `Ok(false)` when this
-/// environment has no `nmcli` gate set and the call was skipped cleanly.
+/// Returns `Ok(true)` when the applier was live for this call, `Ok(false)` when
+/// this environment has no usable `nmcli` and the call was skipped cleanly.
+/// Individual steps are still skipped when [`Marks`] says their inputs have not
+/// moved since they last succeeded.
+///
+/// The mode may be **coerced** before anything runs — see [`effective_config`].
 ///
 /// # Errors
 ///
 /// Returns a message describing the first step that failed. The caller
 /// ([`commit`](super::commit)) then rolls the document **and** the system back,
 /// so a bad setting can never wedge the box (NFR-NET-05).
-pub(crate) fn apply(config: &NetworkConfig) -> Result<bool, String> {
+pub(crate) fn apply(requested: &NetworkConfig) -> Result<bool, String> {
     let Some(tools) = Tools::resolve() else {
         return Ok(false); // no gate in this environment — persistence only.
     };
+    let effective = effective_config(requested);
+    let config = effective.as_ref();
     // Cheap and always safe, so it runs even when the profiles are up to date:
     // a radio that came up after the last call would otherwise keep the world
     // default and refuse to beacon.
     apply_regdom(&tools, config);
 
-    if fingerprint_matches(config) {
-        // Identical state ⇒ no `nmcli` mutation. Without this, an unrelated
-        // `POST …/mode` would rewrite `cp-ap` and bounce every associated
-        // client for nothing.
-        write_uplink_env(&tools, config)?;
-        return Ok(true);
-    }
-
+    let marker = applied_marker();
+    let mut marks = Marks::load(&marker);
+    let hashes = StepHashes::of(config);
     // No modem ⇒ no `cp-wwan` profile. Creating one bound to a device that does
     // not exist would leave a permanently-inactive connection for a human to
     // puzzle over on a box that simply is not a 5G variant.
     if modem_present() {
-        profiles::reconcile_wwan(&tools.nmcli, config)?;
+        step(&mut marks, STEP_WWAN, hashes.wwan, || profiles::reconcile_wwan(&tools.nmcli, config))?;
     }
-    profiles::reconcile_ap(&tools.nmcli, config)?;
-    routes::apply_ap_activation(&tools, config)?;
-    routes::apply_mode(&tools, config)?;
-    write_uplink_env(&tools, config)?;
-    record_fingerprint(config);
+    step(&mut marks, STEP_AP, hashes.access_point, || profiles::reconcile_ap(&tools.nmcli, config))?;
+    step(&mut marks, STEP_AP_ACTIVATION, hashes.ap_activation, || routes::apply_ap_activation(&tools, config))?;
+    step(&mut marks, STEP_MODE, hashes.mode, || routes::apply_mode(&tools, config))?;
+    step(&mut marks, STEP_UPLINK_ENV, hashes.uplink_env, || uplink::write_uplink_env(&tools, config))?;
     Ok(true)
+}
+
+/// The configuration the applier will actually enforce, which is not always the
+/// one that was asked for.
+///
+/// **FR-NET-16 belongs here, not in the HTTP handlers** (R3). The handlers'
+/// `400 "this box has no 5G modem"` is a much better answer for a human and it
+/// stays — but it is not the only way a `5g` document reaches the system.
+/// `apply_network_at_boot` reads the file straight off disk, and
+/// `network.json.j2` templates `cp_net_mode` verbatim, so `-e net_mode=5g` on a
+/// non-5G variant seeds a document that suppresses `end0`'s default route at
+/// **every boot** — precisely the failure FR-NET-16 exists to prevent, reachable
+/// from provisioning with nothing to object.
+///
+/// Coercing to `wan` rather than refusing the whole apply is the deliberate
+/// choice: a refusal would also take the access point down and leave the box
+/// with neither a route nor a Wi-Fi network. "Route over ethernet, keep
+/// everything else" is the honest posture. Doing it *before* any mutation is
+/// also what makes [`routes::apply_mode`] structurally unable to write the
+/// strict-`5g` drop-in on a modem-less box: by the time it runs, the mode it
+/// sees is already `wan`.
+///
+/// The document on disk is left untouched — the admin's stated intent survives,
+/// and the box starts honouring it the moment a modem is fitted.
+fn effective_config(requested: &NetworkConfig) -> Cow<'_, NetworkConfig> {
+    coerce_mode(requested, modem_present())
+}
+
+/// Pure half of [`effective_config`] — the hardware fact is a parameter so the
+/// coercion is testable without a modem, and without mutating the environment
+/// (which this workspace forbids `unsafe` for).
+pub(super) fn coerce_mode(requested: &NetworkConfig, has_modem: bool) -> Cow<'_, NetworkConfig> {
+    if matches!(requested.mode, UplinkMode::Wan) || has_modem {
+        return Cow::Borrowed(requested);
+    }
+    eprintln!(
+        "WARN: network: mode `{}` requires a 5G modem and this box has none — applying `wan` instead, \
+         routing over {} (FR-NET-16). The document is unchanged.",
+        requested.mode.as_str(),
+        wan_iface()
+    );
+    let mut coerced = requested.clone();
+    coerced.mode = UplinkMode::Wan;
+    Cow::Owned(coerced)
 }
 
 /// Push the regulatory country code before any radio comes up.
 ///
-/// Best-effort and never fatal: without a country the AP simply cannot be
-/// enabled (the state layer refuses it, FR-NET-14), so there is nothing here
-/// worth rolling an apply back over. `iw reg set` is issued even when the global
-/// domain already matches — it is a cheap netlink hint, and a self-managed phy
+/// Best-effort and never fatal in either path: without a country the AP simply
+/// cannot be enabled (the state layer refuses it, FR-NET-14), so there is
+/// nothing here worth rolling an apply back over. It is issued even when the
+/// global domain already matches — a cheap netlink hint, and a self-managed phy
 /// that came up since the last call would otherwise never receive it
 /// (landmine 12).
+///
+/// # `cp-regdom` first, `iw` only as a fallback (C3)
+///
+/// `deploy/photonicat/network/cp-regdom.sh` says in its own header that the
+/// applier calls it on every AP apply, and design §9 says the same. It did not:
+/// it shelled out to `iw reg set` itself, which made the script a **second
+/// implementation** of this function — two places to fix a landmine, and a
+/// script whose boot path and whose apply path could silently diverge. With
+/// `CP_REGDOM_BIN` set, the country goes through the one implementation, as a
+/// single argument.
+///
+/// The `iw` path stays because the script is not always there: off-box, in a
+/// container, and on any box where `network.yml` has not installed
+/// `/usr/local/sbin/cp-regdom` yet.
 fn apply_regdom(tools: &Tools, config: &NetworkConfig) {
-    let (Some(iw_bin), false) = (tools.iw.as_ref(), config.ap.country.is_empty()) else {
+    if config.ap.country.is_empty() {
+        return;
+    }
+    if let Some(regdom) = tools.regdom.as_ref() {
+        if let Err(failure) = run(regdom, &[config.ap.country.clone()]) {
+            eprintln!("network: cp-regdom {} failed (non-fatal): {failure}", config.ap.country);
+        }
+        return;
+    }
+    let Some(iw_bin) = tools.iw.as_ref() else {
         return;
     };
     if let Err(failure) = run(iw_bin, &["reg".to_owned(), "set".to_owned(), config.ap.country.clone()]) {
@@ -218,77 +321,145 @@ fn apply_regdom(tools: &Tools, config: &NetworkConfig) {
     }
 }
 
-/// Render `/etc/default/cp-uplink` and restart the supervisor when it changed.
-///
-/// Only on change (O5.3): the supervisor is the thing that restores
-/// connectivity, and bouncing it on every unrelated save would drop its
-/// hysteresis state and re-arm the cooldown for nothing.
-///
-/// # Errors
-///
-/// Returns a message when the file cannot be written.
-fn write_uplink_env(tools: &Tools, config: &NetworkConfig) -> Result<(), String> {
-    let Some(path) = tools.uplink_env.as_ref() else {
-        return Ok(());
-    };
-    let body = render_uplink_env(config);
-    if std::fs::read_to_string(path).is_ok_and(|current| current == body) {
-        return Ok(());
-    }
-    std::fs::write(path, &body).map_err(|e| format!("write {}: {e}", path.display()))?;
-    if let Some(systemctl) = tools.systemctl.as_ref() {
-        let args = ["restart".to_owned(), "cp-uplink.service".to_owned()];
-        if let Err(failure) = run(systemctl, &args) {
-            eprintln!("network: could not restart cp-uplink (non-fatal): {failure}");
-        }
-    }
-    Ok(())
-}
+// ── Per-step applied marks (R1 + B1) ────────────────────────────────────────
 
-/// The supervisor's environment file — a plain `KEY=value` list sourced by the
-/// unit, in the same spirit as `/etc/default/pcat-ula`.
-pub(crate) fn render_uplink_env(config: &NetworkConfig) -> String {
-    let mut out = String::from("# Generated by the Context Pilot orchestrator — do not edit by hand.\n");
-    out.push_str(&format!("CP_UPLINK_MODE={}\n", config.mode.as_str()));
-    out.push_str(&format!("CP_UPLINK_WAN_IF={}\n", wan_iface()));
-    out.push_str(&format!("CP_UPLINK_WWAN_PROFILE={WWAN_PROFILE}\n"));
-    out.push_str(&format!("CP_UPLINK_WWAN_DEV={}\n", wwan_device()));
-    out.push_str(&format!("CP_UPLINK_STANDBY={}\n", config.wwan.standby.as_str()));
-    out.push_str(&format!("CP_UPLINK_TARGETS=\"{}\"\n", config.probe.targets.join(" ")));
-    out.push_str(&format!("CP_UPLINK_FAIL_THRESHOLD={}\n", config.probe.fail_threshold));
-    out.push_str(&format!("CP_UPLINK_OK_THRESHOLD={}\n", config.probe.ok_threshold));
-    out.push_str(&format!("CP_UPLINK_INTERVAL_S={}\n", config.probe.interval_s));
-    out.push_str(&format!("CP_UPLINK_METRIC_PREFERRED={METRIC_PREFERRED}\n"));
-    out.push_str(&format!("CP_UPLINK_METRIC_STANDBY={METRIC_STANDBY}\n"));
-    out
-}
+/// Marker key for `reconcile_wwan`.
+pub(super) const STEP_WWAN: &str = "wwan";
+/// Marker key for `reconcile_ap`.
+pub(super) const STEP_AP: &str = "ap";
+/// Marker key for `apply_ap_activation`.
+pub(super) const STEP_AP_ACTIVATION: &str = "ap_activation";
+/// Marker key for `apply_mode`.
+pub(super) const STEP_MODE: &str = "mode";
+/// Marker key for `write_uplink_env`.
+pub(super) const STEP_UPLINK_ENV: &str = "uplink_env";
 
-// ── Applied-state fingerprint ───────────────────────────────────────────────
-
-/// Where the marker lives. `/run` by default, which is **cleared at every
-/// boot** — so `apply_network_at_boot` always reconciles for real, and only
-/// same-boot repeats are skipped. That is exactly the behaviour landmine 9
-/// documents: a human's `nmcli` edit is reverted at the next apply or boot.
+/// Where the marks live. `/run` by default, which is **cleared at every boot**
+/// — so `apply_network_at_boot` always reconciles for real, and only same-boot
+/// repeats are skipped. That is exactly the behaviour landmine 9 documents: a
+/// human's `nmcli` edit is reverted at the next apply or boot.
 fn applied_marker() -> PathBuf {
     std::env::var_os("CP_NETWORK_APPLIED").map_or_else(|| PathBuf::from("/run/cp-network-applied"), PathBuf::from)
 }
 
-/// Hex SHA-256 of the config as serialised — secrets included, so a PSK change
-/// with every other field identical still reconciles.
-fn fingerprint(config: &NetworkConfig) -> String {
-    let raw = serde_json::to_vec(config).unwrap_or_default();
+/// Hex SHA-256 of anything serialisable — secrets included, so a PSK change with
+/// every other field identical still reconciles.
+fn hash_of<T: Serialize>(inputs: &T) -> String {
+    let raw = serde_json::to_vec(inputs).unwrap_or_default();
     super::super::crypto::sha256(&raw).iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
-/// Whether this exact config has already been applied during this boot.
-fn fingerprint_matches(config: &NetworkConfig) -> bool {
-    std::fs::read_to_string(applied_marker()).is_ok_and(|stored| stored.trim() == fingerprint(config))
+/// One hash per apply step, over **exactly the inputs that step reads** — the
+/// single place the answer to "what does this step depend on?" is written down.
+///
+/// # Why this is not one whole-document fingerprint
+///
+/// It used to be, and that was two bugs at once (R1 + B1).
+///
+/// * **B1.** Any mode change moved the whole-document hash, so `reconcile_ap` +
+///   `nmcli connection up cp-ap` re-ran and **every associated Wi-Fi client was
+///   dropped** — while the comment sitting next to it claimed the marker existed
+///   to prevent exactly that.
+/// * **R1**, the serious one. The marker was written only after a *complete*
+///   successful apply, so a partial failure left it holding the hash of the
+///   PREVIOUS document. `commit`'s rollback then called `apply(previous)`, the
+///   fingerprint matched, and the rollback performed **no system work at all**:
+///   no `nmcli`, no drop-in, no sysctl. NFR-NET-05 did not hold, and the `502`'s
+///   "the box is unchanged" was false.
+///
+/// Recording each hash **immediately after its step succeeds** ([`Marks::record`])
+/// makes the rollback correct by construction rather than by care: a step that
+/// ran with `next` holds a hash that cannot match `previous`, so the rollback
+/// re-runs it; a step that never ran still holds `previous`' hash, so skipping it
+/// is right.
+pub(super) struct StepHashes {
+    /// `reconcile_wwan` — the bearer config **and** the mode, which is what
+    /// drives the route metric and the autoconnect flag.
+    pub(super) wwan: String,
+    /// `reconcile_ap` — the access-point config alone.
+    pub(super) access_point: String,
+    /// `apply_ap_activation` — the two fields it actually reads.
+    pub(super) ap_activation: String,
+    /// `apply_mode` — the mode **and** the standby policy, which together decide
+    /// the drop-in *and* whether the bearer is brought up or down. Standby is in
+    /// here deliberately: keying on the mode alone would silently stop honouring
+    /// a `hot` → `cold` switch, which is a regression the whole-document
+    /// fingerprint did not have.
+    pub(super) mode: String,
+    /// `write_uplink_env` — the rendered file body itself, which is the most
+    /// precise statement of that step's inputs available.
+    pub(super) uplink_env: String,
 }
 
-/// Record the config as applied. Best-effort: a marker we fail to write only
-/// costs a redundant reconcile next time.
-fn record_fingerprint(config: &NetworkConfig) {
-    let _written = std::fs::write(applied_marker(), fingerprint(config));
+impl StepHashes {
+    /// Hash every step's inputs for `config`.
+    pub(super) fn of(config: &NetworkConfig) -> Self {
+        Self {
+            wwan: hash_of(&(config.mode, &config.wwan)),
+            access_point: hash_of(&config.ap),
+            ap_activation: hash_of(&(config.ap.enabled, config.ap.share_internet)),
+            mode: hash_of(&(config.mode, config.wwan.standby)),
+            uplink_env: hash_of(&uplink::render_uplink_env(config)),
+        }
+    }
+}
+
+/// What each apply step last succeeded with: a `step=hash` line per step.
+pub(super) struct Marks {
+    /// Where the lines are read from and flushed to.
+    path: PathBuf,
+    /// Step name → hash. `BTreeMap` for a stable file order, so a human diffing
+    /// `/run/cp-network-applied` between two applies sees only what moved.
+    entries: BTreeMap<String, String>,
+}
+
+impl Marks {
+    /// Read the marks, tolerating an absent, truncated or hand-edited file —
+    /// anything unparseable simply reads as "this step has never run", which
+    /// costs a redundant reconcile and never a wrong skip.
+    pub(super) fn load(path: &Path) -> Self {
+        let mut entries = BTreeMap::new();
+        if let Ok(body) = std::fs::read_to_string(path) {
+            for line in body.lines() {
+                if let Some((step, hash)) = line.split_once('=') {
+                    drop(entries.insert(step.trim().to_owned(), hash.trim().to_owned()));
+                }
+            }
+        }
+        Self { path: path.to_path_buf(), entries }
+    }
+
+    /// Whether `step`'s inputs are exactly what it last succeeded with.
+    pub(super) fn unchanged(&self, step: &str, hash: &str) -> bool {
+        self.entries.get(step).is_some_and(|stored| stored == hash)
+    }
+
+    /// Record `step` as done, and flush **now**: the whole value of this file is
+    /// that it is accurate at the instant a *later* step fails.
+    fn record(&mut self, step: &str, hash: String) {
+        drop(self.entries.insert(step.to_owned(), hash));
+        let body: String = self.entries.iter().map(|(step, hash)| format!("{step}={hash}\n")).collect();
+        // Best-effort: a mark we fail to write only costs a redundant reconcile.
+        let _written = std::fs::write(&self.path, body);
+    }
+}
+
+/// Run one apply step unless its inputs are unchanged, then record it.
+///
+/// # Errors
+///
+/// Propagates `action`'s failure untouched, leaving the step's mark as it was —
+/// which is what tells the rollback this step must run again.
+pub(super) fn step<F>(marks: &mut Marks, name: &str, hash: String, action: F) -> Result<(), String>
+where
+    F: FnOnce() -> Result<(), String>,
+{
+    if marks.unchanged(name, &hash) {
+        return Ok(());
+    }
+    action()?;
+    marks.record(name, hash);
+    Ok(())
 }
 
 /// Run a tool and return its stdout, or the trimmed stderr as an error.

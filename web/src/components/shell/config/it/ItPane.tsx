@@ -225,19 +225,36 @@ function TrustSection() {
   )
 }
 
-/** A labelled single-line text input, matching the pane's card styling. */
+/**
+ * A labelled single-line text input, matching the pane's card styling.
+ *
+ * `type` and `autoComplete` default to today's behaviour — a plain visible text
+ * box with no autofill hint — so the identity fields above are unchanged. The
+ * three secrets the network pane collects (the AP passphrase, the bearer
+ * password, the SIM PIN) pass `type="password" autoComplete="new-password"`:
+ * they used to be typed in cleartext, on screen, and offered to the browser's
+ * autofill (B10). The read half of the contract was already honoured — only
+ * `••••••••` placeholders derived from the `*_set` booleans ever come back from
+ * the server — so this is the client half alone.
+ */
 export function TextField({
   label,
   hint,
   value,
   onChange,
   placeholder,
+  type = "text",
+  autoComplete,
+  inputMode,
 }: {
   label: string
   hint?: string
   value: string
   onChange: (v: string) => void
   placeholder?: string
+  type?: "text" | "password"
+  autoComplete?: string
+  inputMode?: "numeric" | "text"
 }) {
   return (
     <label className="flex flex-col gap-1">
@@ -246,10 +263,12 @@ export function TextField({
         {hint && <span className="text-[11px] text-muted-foreground/60">{hint}</span>}
       </span>
       <input
-        type="text"
+        type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        autoComplete={autoComplete}
+        inputMode={inputMode}
         className={cn(
           "w-full rounded-md border border-border bg-muted/50 px-2.5 py-1.5 font-mono text-[12px] text-foreground",
           "placeholder:text-muted-foreground/50 focus:ring-1 focus:ring-(--interactive) focus:outline-none",
