@@ -116,6 +116,9 @@ pub(crate) fn apply_mode(tools: &Tools, config: &NetworkConfig) -> Result<(), St
         // setup cost at failover time.
         UplinkMode::WanThen5g => matches!(config.wwan.standby, Standby::Hot),
     };
+    if !super::apply::modem_present() {
+        return Ok(()); // no modem on this variant — nothing to bring up or down.
+    }
     if let Err(failure) = profiles::set_active(&tools.nmcli, WWAN_PROFILE, wanted_up) {
         // At boot this reliably says "No suitable device found": the applier runs
         // before ModemManager has enumerated the modem, so NM has nothing to

@@ -11,10 +11,9 @@ import {
 import { cn } from "@/lib/utils"
 
 /**
- * IT settings pane (design §13.5) — mobile twin of `components/shell/config/
- * ItPane`. Gated on `can_manage_it` (admin+; the caller only renders it for that
- * role and the backend enforces 403 otherwise, NFR-05). The maintenance-plane
- * IT functions re-homed onto `:443`:
+ * IT settings pane (design §13.5) — gated on `can_manage_it` (admin+; the caller
+ * only renders it for that role and the backend enforces 403 otherwise, NFR-05).
+ * The maintenance-plane IT functions re-homed onto `:443`:
  *
  *  - **Network identity** — the box's DNS name + LAN IP. Saving re-issues the
  *    private-CA leaf and reloads Caddy (`POST /api/it/identity`).
@@ -26,11 +25,8 @@ import { cn } from "@/lib/utils"
  * `ItNetworkPane`, mounted next to this one by `ConfigPanes`. It reuses
  * {@link SectionLabel} and {@link TextField} from here.
  *
- * Divergence from desktop is touch-only: the text inputs carry a **16px font**
- * (iOS Safari auto-zooms the viewport on focus below 16px), and the action
- * buttons grow / swap `hover:` for `active:`. All mutation logic — identity
- * re-issue, CA download, fingerprint poll — is byte-identical to the desktop
- * twin (it lives in the shared `@/lib/api` layer, not forked).
+ * The UI bits are migrated from the maintenance wizard's `IdentityStep` +
+ * `TrustStep` (kept in place until M5 removes the plane).
  */
 export function ItPane() {
   return (
@@ -156,7 +152,7 @@ function IdentityForm({ initialName, initialIp }: { initialName: string; initial
           <button
             type="submit"
             disabled={ip.trim() === "" || save.isPending}
-            className="flex items-center gap-1.5 rounded-md bg-(--interactive) px-3.5 py-2 text-[13px] font-medium text-(--primary-foreground) transition-[filter] active:brightness-105 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-md bg-(--interactive) px-3 py-1.5 text-[12px] font-medium text-(--primary-foreground) transition-all hover:brightness-105 disabled:opacity-50"
           >
             {save.isPending && <Loader2 className="size-3.5 animate-spin" />}
             Save &amp; re-issue certificate
@@ -210,7 +206,7 @@ function TrustSection() {
         <button
           onClick={() => download.mutate()}
           disabled={download.isPending}
-          className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-[13px] font-medium text-foreground/80 transition-colors active:bg-muted/60 disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[12px] font-medium text-foreground/80 transition-colors hover:bg-muted/60 disabled:opacity-50"
         >
           {download.isPending ? (
             <Loader2 className="size-3.5 animate-spin" />
@@ -229,8 +225,7 @@ function TrustSection() {
   )
 }
 
-/** A labelled single-line text input, matching the pane's card styling. The
- *  input font is 16px so iOS Safari doesn't auto-zoom the viewport on focus. */
+/** A labelled single-line text input, matching the pane's card styling. */
 export function TextField({
   label,
   hint,
@@ -256,10 +251,35 @@ export function TextField({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         className={cn(
-          "w-full rounded-md border border-border bg-muted/50 px-2.5 py-2 font-mono text-[16px] text-foreground",
+          "w-full rounded-md border border-border bg-muted/50 px-2.5 py-1.5 font-mono text-[12px] text-foreground",
           "placeholder:text-muted-foreground/50 focus:ring-1 focus:ring-(--interactive) focus:outline-none",
         )}
       />
+    </label>
+  )
+}
+
+/** A labelled checkbox row, matching the pane's card styling. Lives here beside
+ *  the other field primitives so both `ItNetworkPane` and `ItWwanForm` can use
+ *  it without importing from each other — which would be a module cycle. */
+export function Toggle({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string
+  checked: boolean
+  onChange: (value: boolean) => void
+}) {
+  return (
+    <label className="flex items-center gap-2.5">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="size-3.5 accent-(--interactive)"
+      />
+      <span className="text-[12px] font-medium text-foreground/90">{label}</span>
     </label>
   )
 }

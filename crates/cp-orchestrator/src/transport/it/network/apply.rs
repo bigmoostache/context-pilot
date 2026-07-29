@@ -15,6 +15,7 @@
 //! | `CP_NETWORKD_DIR` | where the strict-`5g` drop-in is written |
 //! | `CP_UPLINK_ENV` | `/etc/default/cp-uplink`, the supervisor's config |
 //! | `CP_WAN_IFACE` / `CP_AP_IFACE` / `CP_WWAN_DEV` | hardware names, overridable |
+//! | `CP_WWAN_PRESENT` | `0`/`1` — override the "does this box have a modem" probe |
 //! | `CP_NETWORK_APPLIED` | where the applied-fingerprint marker lives |
 //!
 //! Two more are read by [`status`](super::status) rather than here, on the same
@@ -86,6 +87,41 @@ pub(crate) fn wwan_device() -> String {
     std::env::var("CP_WWAN_DEV").unwrap_or_else(|_unset| "cdc-wdm0".to_owned())
 }
 
+/// Whether this box physically carries a 5G modem.
+///
+/// The Photonicat 2 ships in variants, and a box without the M.2 modem must not
+/// be offered a 5G uplink at all: picking `5g` there suppresses the ethernet
+/// default route with nothing to replace it. (Recoverable — NFR-NET-01 keeps the
+/// cockpit on the LAN address and the fleet ULA — but it should never be
+/// reachable from the UI in the first place.)
+///
+/// Probed from **sysfs, not from ModemManager**. `mmcli` answering is a
+/// statement about a daemon's current view; `/sys/class/usbmisc/cdc-wdm*` and
+/// `/sys/class/net/ww*` are statements about hardware. Using the daemon would
+/// make the whole 5G surface appear and disappear while ModemManager restarts.
+///
+/// * `CP_WWAN_PRESENT=0|1` overrides the probe outright — for a variant the
+///   probe reads wrong, and for tests.
+/// * With the applier inert (no `CP_NMCLI_BIN` — local dev, every unit test)
+///   this reports `true`: off-box there is no hardware to protect, and
+///   NFR-NET-04 already guarantees nothing is applied.
+pub(crate) fn modem_present() -> bool {
+    if let Some(forced) = std::env::var_os("CP_WWAN_PRESENT") {
+        return forced == "1";
+    }
+    if std::env::var_os("CP_NMCLI_BIN").is_none() {
+        return true;
+    }
+    // The QMI control port, then the QMI net port — either is enough.
+    entry_starting_with("/sys/class/usbmisc", "cdc-wdm") || entry_starting_with("/sys/class/net", "ww")
+}
+
+/// Whether `dir` holds an entry whose name starts with `prefix`.
+fn entry_starting_with(dir: &str, prefix: &str) -> bool {
+    std::fs::read_dir(dir)
+        .is_ok_and(|entries| entries.flatten().any(|entry| entry.file_name().to_string_lossy().starts_with(prefix)))
+}
+
 /// The resolved tool paths for this environment.
 ///
 /// Built once per apply so a half-set environment degrades per-tool instead of
@@ -151,7 +187,12 @@ pub(crate) fn apply(config: &NetworkConfig) -> Result<bool, String> {
         return Ok(true);
     }
 
-    profiles::reconcile_wwan(&tools.nmcli, config)?;
+    // No modem ⇒ no `cp-wwan` profile. Creating one bound to a device that does
+    // not exist would leave a permanently-inactive connection for a human to
+    // puzzle over on a box that simply is not a 5G variant.
+    if modem_present() {
+        profiles::reconcile_wwan(&tools.nmcli, config)?;
+    }
     profiles::reconcile_ap(&tools.nmcli, config)?;
     routes::apply_ap_activation(&tools, config)?;
     routes::apply_mode(&tools, config)?;

@@ -173,7 +173,12 @@ volontairement : `-e cp_net_force=true`.
 
 ### Depuis le cockpit (IT → uplink / Wi-Fi / 5G)
 
-- **Uplink** — trois modes (admin IT du client). `Ethernet` (câble seul), `Ethernet + 5G` (le 5G prend
+- **Uplink** — trois modes (admin IT du client). Sur une variante **sans module
+  5G**, seul `Ethernet` est proposé : le cockpit masque les deux autres et l'API
+  les refuse (`400 this box has no 5G modem`). La détection se fait en **sysfs**
+  (`/sys/class/usbmisc/cdc-wdm*`, `/sys/class/net/ww*`), pas via ModemManager —
+  sinon toute la surface 5G apparaîtrait et disparaîtrait au gré des redémarrages
+  de MM. Forçable par `CP_WWAN_PRESENT=0|1` dans l'unité systemd. `Ethernet` (câble seul), `Ethernet + 5G` (le 5G prend
   le relais quand le câble cesse de porter du trafic), `5G seul` (la route par
   défaut du câble est **supprimée**, câble branché ou non).
 - **Point d'accès** (admin IT du client) — SSID, phrase secrète, bande, canal, **pays** (obligatoire),

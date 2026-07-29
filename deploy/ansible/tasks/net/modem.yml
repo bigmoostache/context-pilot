@@ -28,55 +28,79 @@
 # re-trigger add events (net subsystem included) so the live modem gets tagged,
 # then (re)start MM to re-probe. On a fresh boot this is a harmless no-op.
 #
-# Skip entirely with -e cp_install_modem=false.
+# Skipped automatically on a box with no modem (sysfs probe below), and
+# explicitly with -e cp_install_modem=false / forced with -e install_modem=true.
 
-- name: Install the 5G modem toolbox (ModemManager + libqmi/libmbim + serial term)
-  ansible.builtin.apt:
-    name:
-      - modemmanager
-      - libqmi-utils
-      - libmbim-utils
-      - usb-modeswitch
-      - picocom
-    state: present
-    update_cache: true
-  register: _modem_pkgs
-
-- name: Re-tag the already-enumerated modem for the freshly-installed MM udev rules
-  # Only needed the run that installs MM (the modem was already up before its rules
-  # existed). --action=add across the modem-relevant subsystems, net INCLUDED, so
-  # the QMI net port gets its ID_MM_CANDIDATE tag and MM can find it; settle waits
-  # for the events to drain before MM re-probes.
-  ansible.builtin.shell: >-
-    udevadm control --reload-rules &&
-    udevadm trigger --action=add
-    --subsystem-match=usb --subsystem-match=usbmisc
-    --subsystem-match=tty --subsystem-match=net &&
-    udevadm settle
-  when: _modem_pkgs is changed
+- name: Detect whether this box actually carries a 5G modem
+  # The Photonicat 2 ships in variants. On a box with no M.2 modem the whole
+  # toolbox is dead weight — four packages and a ModemManager daemon probing
+  # ports that do not exist — so probe before installing. sysfs, not mmcli: we
+  # are asking about hardware, and mmcli is not installed yet anyway.
+  ansible.builtin.find:
+    paths: [/sys/class/usbmisc, /sys/class/net]
+    patterns: ["cdc-wdm*", "ww*"]
+    file_type: any
+  register: _modem_probe
   changed_when: false
 
-- name: Enable + (re)start ModemManager so it probes the (now-tagged) modem
-  # Restart — not just start — when the package was newly installed, because the
-  # postinst already started MM once BEFORE the re-tag above, so it needs another
-  # probe pass to actually assemble the modem.
-  ansible.builtin.systemd_service:
-    name: ModemManager
-    state: "{{ 'restarted' if (_modem_pkgs is changed) else 'started' }}"
-    enabled: true
-    daemon_reload: true
-
-- name: Wait for ModemManager to detect the modem
-  ansible.builtin.command: mmcli -L
-  register: _mm_list
-  until: "'/Modem/' in _mm_list.stdout"
-  retries: 12
-  delay: 3
-  changed_when: false
-  failed_when: false
-
-- name: Report detected modems
+- name: Report a box with no 5G module
   ansible.builtin.debug:
     msg: >-
-      {{ _mm_list.stdout if ('/Modem/' in (_mm_list.stdout | default('')))
-         else 'No modem detected yet — check `mmcli -L` on the box (hardware/coverage).' }}
+      No 5G modem on this box (no cdc-wdm* / ww* in sysfs) — skipping the modem
+      toolbox. The cockpit hides the 5G uplink modes and the bearer settings on
+      its own, from the same probe. Force with -e install_modem=true.
+  when: _modem_probe.matched | int == 0 and (install_modem is not defined)
+
+- name: Modem toolbox (only on a box that has one)
+  when: _modem_probe.matched | int > 0 or (install_modem | default(false) | bool)
+  block:
+    - name: Install the 5G modem toolbox (ModemManager + libqmi/libmbim + serial term)
+      ansible.builtin.apt:
+        name:
+          - modemmanager
+          - libqmi-utils
+          - libmbim-utils
+          - usb-modeswitch
+          - picocom
+        state: present
+        update_cache: true
+      register: _modem_pkgs
+
+    - name: Re-tag the already-enumerated modem for the freshly-installed MM udev rules
+      # Only needed the run that installs MM (the modem was already up before its rules
+      # existed). --action=add across the modem-relevant subsystems, net INCLUDED, so
+      # the QMI net port gets its ID_MM_CANDIDATE tag and MM can find it; settle waits
+      # for the events to drain before MM re-probes.
+      ansible.builtin.shell: >-
+        udevadm control --reload-rules &&
+        udevadm trigger --action=add
+        --subsystem-match=usb --subsystem-match=usbmisc
+        --subsystem-match=tty --subsystem-match=net &&
+        udevadm settle
+      when: _modem_pkgs is changed
+      changed_when: false
+
+    - name: Enable + (re)start ModemManager so it probes the (now-tagged) modem
+      # Restart — not just start — when the package was newly installed, because the
+      # postinst already started MM once BEFORE the re-tag above, so it needs another
+      # probe pass to actually assemble the modem.
+      ansible.builtin.systemd_service:
+        name: ModemManager
+        state: "{{ 'restarted' if (_modem_pkgs is changed) else 'started' }}"
+        enabled: true
+        daemon_reload: true
+
+    - name: Wait for ModemManager to detect the modem
+      ansible.builtin.command: mmcli -L
+      register: _mm_list
+      until: "'/Modem/' in _mm_list.stdout"
+      retries: 12
+      delay: 3
+      changed_when: false
+      failed_when: false
+
+    - name: Report detected modems
+      ansible.builtin.debug:
+        msg: >-
+          {{ _mm_list.stdout if ('/Modem/' in (_mm_list.stdout | default('')))
+             else 'No modem detected yet — check `mmcli -L` on the box (hardware/coverage).' }}

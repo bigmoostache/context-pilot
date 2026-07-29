@@ -364,11 +364,18 @@ pub(super) fn deploy() -> Value {
                 machine with no env gates set still answers 200.",
             "properties": {
                 "active_uplink": { "type": "string", "enum": ["wan", "wwan", "none"], "nullable": true },
+                // HARDWARE fact, not a live one: this box either is a 5G variant
+                // or it is not. Probed from sysfs so it cannot flap while
+                // ModemManager restarts, and readable by any `can_manage_it`
+                // caller — choosing the uplink mode is the client admin's job
+                // even though the bearer's configuration is the vendor's. False
+                // ⇒ the cockpit offers only the ethernet mode.
+                "modem_present": { "type": "boolean" },
                 "wan": { "allOf": [r("ItNetworkWanStatus")], "nullable": true },
                 "wwan": { "allOf": [r("ItNetworkWwanStatus")], "nullable": true },
                 "ap": { "allOf": [r("ItNetworkApStatus")], "nullable": true }
             },
-            "required": ["active_uplink", "wan", "wwan", "ap"]
+            "required": ["active_uplink", "modem_present", "wan", "wwan", "ap"]
         },
         "ItNetworkResponse": {
             "type": "object",

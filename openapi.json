@@ -1253,6 +1253,9 @@
             ],
             "nullable": true
           },
+          "modem_present": {
+            "type": "boolean"
+          },
           "wan": {
             "allOf": [
               {
@@ -1272,6 +1275,7 @@
         },
         "required": [
           "active_uplink",
+          "modem_present",
           "wan",
           "wwan",
           "ap"

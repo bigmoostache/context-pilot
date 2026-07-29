@@ -162,6 +162,15 @@ fn sync_caddy(state: &Mutex<Backend>, previous: &NetworkConfig, next: &NetworkCo
     super::caddy::regenerate(provisioned, identity.as_ref(), &wanted).map(|_reloaded| ())
 }
 
+/// Whether this box physically carries a 5G modem — the hardware fact the whole
+/// 5G surface hangs off. Re-exported so the REST layer reads it once per request
+/// and threads it in, keeping the handlers pure with respect to the machine they
+/// happen to be running on (and therefore testable without mutating the
+/// environment, which this workspace forbids `unsafe` for).
+pub(crate) fn modem_present() -> bool {
+    apply::modem_present()
+}
+
 /// The Caddy site addresses the persisted network config needs, for the callers
 /// that render the Caddyfile for reasons of their own (boot, identity change).
 pub(crate) fn caddy_subjects_for(agents_dir: &Path) -> Vec<String> {
@@ -196,20 +205,22 @@ fn reply_for(outcome: Result<bool, String>, payload: serde_json::Value) -> HttpR
 /// Never fails on a missing state file or an absent tool: the config falls back
 /// to defaults (fail-closed — `wan`, AP off) and every tool-backed status field
 /// degrades to `null`, so a dev machine with no gates set answers `200` (O3.5).
-pub(crate) fn get_network(state: &Mutex<Backend>, bearer_visible: bool) -> HttpReply {
+pub(crate) fn get_network(state: &Mutex<Backend>, bearer_visible: bool, has_modem: bool) -> HttpReply {
     let path = match config_path(state) {
         Ok(path) => path,
         Err(reply) => return reply,
     };
     let config = state::load(&path);
+    // Two independent reasons to hide the bearer configuration: the caller is
+    // not the vendor, or this box is not a 5G variant at all.
     HttpReply::ok(&serde_json::json!({
-        "config": config.redacted(bearer_visible),
+        "config": config.redacted(bearer_visible && has_modem),
         "status": status::probe(&config),
     }))
 }
 
 /// `POST /api/it/network/mode` — select `wan`, `wan_5g` or `5g`.
-pub(crate) fn set_mode(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
+pub(crate) fn set_mode(state: &Mutex<Backend>, body: &[u8], has_modem: bool) -> HttpReply {
     /// Request body: the mode alone.
     #[derive(Deserialize)]
     struct Req {
@@ -219,6 +230,12 @@ pub(crate) fn set_mode(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     let Ok(req) = serde_json::from_slice::<Req>(body) else {
         return HttpReply::error(400, "expected {\"mode\":\"wan\"|\"wan_5g\"|\"5g\"}");
     };
+    // A box with no modem must not be able to reach a mode that depends on one.
+    // `5g` there would suppress the ethernet default route with nothing to
+    // replace it — recoverable (NFR-NET-01) but never something to offer.
+    if !matches!(req.mode, UplinkMode::Wan) && !has_modem {
+        return HttpReply::error(400, "this box has no 5G modem");
+    }
     mutate(state, |previous| {
         let mut next = previous.clone();
         next.mode = req.mode;
@@ -283,7 +300,7 @@ pub(crate) fn set_ap(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
 ///
 /// `password` and `pin` are write-only, with the same absent/`null`/string
 /// semantics as the AP passphrase.
-pub(crate) fn set_wwan(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
+pub(crate) fn set_wwan(state: &Mutex<Backend>, body: &[u8], has_modem: bool) -> HttpReply {
     /// Request body: the bearer form, with write-only credentials.
     #[derive(Deserialize)]
     struct Req {
@@ -306,6 +323,9 @@ pub(crate) fn set_wwan(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     let Ok(req) = serde_json::from_slice::<Req>(body) else {
         return HttpReply::error(400, "invalid wwan body");
     };
+    if !has_modem {
+        return HttpReply::error(400, "this box has no 5G modem");
+    }
     mutate(state, |previous| {
         let wwan = WwanConfig {
             apn: req.apn.trim().to_owned(),

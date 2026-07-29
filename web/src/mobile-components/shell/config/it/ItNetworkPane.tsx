@@ -7,23 +7,39 @@ import type {
   ItNetworkStatus,
   ItNetworkWwan,
 } from "@/lib/api/generated/types.gen"
-import { fetchItNetwork, setItNetworkAp, setItNetworkMode, setItNetworkWwan } from "@/lib/api"
+import { fetchItNetwork, setItNetworkAp, setItNetworkMode } from "@/lib/api"
 import { cn } from "@/lib/utils"
-import { SectionLabel, TextField } from "./ItPane"
+import { SectionLabel, TextField, Toggle } from "./ItPane"
+import { WwanForm } from "./ItWwanForm"
 
-/** Uplink modes, in the order an admin escalates through them. */
-const MODES: { id: ItNetworkConfig["mode"]; label: string; blurb: string }[] = [
-  { id: "wan", label: "Ethernet", blurb: "Cable only — the modem stays off" },
-  { id: "wan_5g", label: "Ethernet + 5G", blurb: "5G takes over when the cable stops working" },
-  { id: "5g", label: "5G only", blurb: "The cable's default route is suppressed" },
-]
+/** Uplink modes, in the order an admin escalates through them. `needsModem`
+ *  marks the two that a box without the 5G module cannot honour — picking `5g`
+ *  there would suppress the ethernet default route with nothing to replace it,
+ *  so they are not rendered at all on that variant. */
+const MODES: { id: ItNetworkConfig["mode"]; label: string; blurb: string; needsModem: boolean }[] =
+  [
+    { id: "wan", label: "Ethernet", blurb: "Cable only — the modem stays off", needsModem: false },
+    {
+      id: "wan_5g",
+      label: "Ethernet + 5G",
+      blurb: "5G takes over when the cable stops working",
+      needsModem: true,
+    },
+    {
+      id: "5g",
+      label: "5G only",
+      blurb: "The cable's default route is suppressed",
+      needsModem: true,
+    },
+  ]
 
 /** How often the status card re-reads the box while the pane is open. Fast
  *  enough that a failover is visible without a manual refresh (O4.1). */
 const POLL_MS = 5000
 
 /**
- * Internet uplink + Wi-Fi access point (docs/design-network-uplink.md §11).
+ * Internet uplink + Wi-Fi access point (docs/design-network-uplink.md §11) —
+ * mobile twin of `components/shell/config/ItNetworkPane`.
  *
  * Mounted inside {@link ItPane}, so it inherits the same `can_manage_it` gate:
  * the caller only renders the IT pane for admin+, and the backend answers 403
@@ -33,6 +49,14 @@ const POLL_MS = 5000
  * has to respect: the passphrase is **write-only**, so the server never sends it
  * back and the field starts empty on every load. Leaving it empty keeps the
  * stored key; typing replaces it (FR-NET-13).
+ *
+ * Divergence from desktop is touch-only: the `<select>` and the buttons carry a
+ * **16px font** (iOS Safari auto-zooms the viewport on focus below 16px) and a
+ * taller hit area, the band/channel/country row stacks instead of sitting in
+ * three columns (it does not fit a 390px viewport), and `hover:` becomes
+ * `active:`. Every mutation — mode change, AP save, the write-only passphrase
+ * handling — is byte-identical to the desktop twin; it lives in the shared
+ * `@/lib/api` layer, not forked.
  */
 export function ItNetworkPane() {
   const { data, isLoading } = useQuery({
@@ -122,18 +146,23 @@ function UplinkSection({
 
   return (
     <div className="flex flex-col gap-2.5 rounded-xl border border-border bg-card px-3.5 py-3">
+      {!status.modem_present && (
+        <p className="text-[11px] text-muted-foreground">
+          This box has no 5G module, so ethernet is its only uplink.
+        </p>
+      )}
       <div className="flex flex-col gap-1.5">
-        {MODES.map((option) => (
+        {MODES.filter((option) => !option.needsModem || status.modem_present).map((option) => (
           <button
             key={option.id}
             type="button"
             disabled={save.isPending}
             onClick={() => save.mutate(option.id)}
             className={cn(
-              "flex items-center gap-2.5 rounded-md border px-2.5 py-2 text-left transition-colors disabled:opacity-50",
+              "flex items-center gap-2.5 rounded-md border px-3 py-2.5 text-left transition-colors disabled:opacity-50",
               option.id === mode
                 ? "border-(--interactive) bg-(--interactive)/10"
-                : "border-border hover:bg-muted/60",
+                : "border-border active:bg-muted/60",
             )}
           >
             <span
@@ -288,19 +317,19 @@ function ApForm({ initial }: { initial: ItNetworkAp }) {
           onChange={setPassphrase}
           placeholder={initial.passphrase_set ? "••••••••" : "at least 8 characters"}
         />
-        <div className="flex gap-2.5">
-          <label className="flex flex-1 flex-col gap-1">
+        <div className="flex flex-col gap-2.5">
+          <label className="flex flex-col gap-1">
             <span className="text-[12px] font-medium text-foreground/90">Band</span>
             <select
               value={band}
               onChange={(event) => setBand(event.target.value === "bg" ? "bg" : "a")}
-              className="w-full rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-[12px] text-foreground focus:ring-1 focus:ring-(--interactive) focus:outline-none"
+              className="w-full rounded-md border border-border bg-muted/50 px-2.5 py-2 text-[16px] text-foreground focus:ring-1 focus:ring-(--interactive) focus:outline-none"
             >
               <option value="a">5 GHz</option>
               <option value="bg">2.4 GHz</option>
             </select>
           </label>
-          <div className="flex-1">
+          <div>
             <TextField
               label="Channel"
               hint="0 = auto"
@@ -309,7 +338,7 @@ function ApForm({ initial }: { initial: ItNetworkAp }) {
               placeholder="0"
             />
           </div>
-          <div className="flex-1">
+          <div>
             <TextField
               label="Country"
               hint="required"
@@ -335,7 +364,7 @@ function ApForm({ initial }: { initial: ItNetworkAp }) {
           <button
             type="submit"
             disabled={blocked || save.isPending}
-            className="flex items-center gap-1.5 rounded-md bg-(--interactive) px-3 py-1.5 text-[12px] font-medium text-(--primary-foreground) transition-all hover:brightness-105 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-md bg-(--interactive) px-3.5 py-2.5 text-[13px] font-medium text-(--primary-foreground) transition-all active:brightness-105 disabled:opacity-50"
           >
             {save.isPending && <Loader2 className="size-3.5 animate-spin" />}
             Save access point
@@ -347,131 +376,6 @@ function ApForm({ initial }: { initial: ItNetworkAp }) {
                 : "Set a passphrase of at least 8 characters."}
             </span>
           )}
-          {save.isSuccess && <span className="text-[11px] text-(--ok)">Saved</span>}
-          {save.isError && (
-            <span className="text-[11px] text-red-500">
-              {save.error instanceof Error ? save.error.message : "Save failed"}
-            </span>
-          )}
-        </div>
-      </form>
-    </div>
-  )
-}
-
-/** A labelled checkbox row, matching the pane's card styling. */
-function Toggle({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string
-  checked: boolean
-  onChange: (value: boolean) => void
-}) {
-  return (
-    <label className="flex items-center gap-2.5">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-        className="size-3.5 accent-(--interactive)"
-      />
-      <span className="text-[12px] font-medium text-foreground/90">{label}</span>
-    </label>
-  )
-}
-
-/** 5G bearer form (FR-NET-15). `password` and `pin` are write-only, with the
- *  same omit-to-keep rule as the AP passphrase. */
-function WwanForm({ initial }: { initial: ItNetworkWwan }) {
-  const qc = useQueryClient()
-  const [apn, setApn] = useState(initial.apn)
-  const [username, setUsername] = useState(initial.username ?? "")
-  const [password, setPassword] = useState("")
-  const [pin, setPin] = useState("")
-  const [roaming, setRoaming] = useState(initial.roaming)
-  const [standby, setStandby] = useState<ItNetworkWwan["standby"]>(initial.standby)
-
-  const save = useMutation({
-    mutationFn: () =>
-      setItNetworkWwan({
-        apn: apn.trim(),
-        username: username.trim() === "" ? null : username.trim(),
-        ...(password !== "" && { password }),
-        ...(pin !== "" && { pin }),
-        roaming,
-        standby,
-      }),
-    onSuccess: () => {
-      setPassword("")
-      setPin("")
-      void qc.invalidateQueries({ queryKey: ["it-network"] })
-    },
-  })
-
-  return (
-    <div className="rounded-xl border border-border bg-card px-3.5 py-3">
-      <form
-        className="flex flex-col gap-2.5"
-        onSubmit={(event) => {
-          event.preventDefault()
-          if (!save.isPending) save.mutate()
-        }}
-      >
-        <TextField
-          label="APN"
-          hint="from your carrier"
-          value={apn}
-          onChange={setApn}
-          placeholder="orange.fr"
-        />
-        <TextField
-          label="Username"
-          hint="optional"
-          value={username}
-          onChange={setUsername}
-          placeholder=""
-        />
-        <TextField
-          label="Password"
-          hint={initial.password_set ? "set — leave empty to keep it" : "optional"}
-          value={password}
-          onChange={setPassword}
-          placeholder={initial.password_set ? "••••••••" : ""}
-        />
-        <TextField
-          label="SIM PIN"
-          hint={initial.pin_set ? "set — leave empty to keep it" : "only if the SIM asks for one"}
-          value={pin}
-          onChange={setPin}
-          placeholder={initial.pin_set ? "••••" : ""}
-        />
-        <Toggle label="Allow roaming networks" checked={roaming} onChange={setRoaming} />
-        <label className="flex flex-col gap-1">
-          <span className="text-[12px] font-medium text-foreground/90">Standby</span>
-          <select
-            value={standby}
-            onChange={(event) => setStandby(event.target.value === "cold" ? "cold" : "hot")}
-            className="w-full rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-[12px] text-foreground focus:ring-1 focus:ring-(--interactive) focus:outline-none"
-          >
-            <option value="hot">Hot — instant failover, the SIM stays attached</option>
-            <option value="cold">Cold — slower failover, less data used</option>
-          </select>
-        </label>
-        <p className="text-[11px] text-muted-foreground">
-          Hot standby keeps the SIM attached and uses a little data on keep-alive. Choose cold on a
-          metered plan.
-        </p>
-        <div className="flex items-center gap-2">
-          <button
-            type="submit"
-            disabled={save.isPending}
-            className="flex items-center gap-1.5 rounded-md bg-(--interactive) px-3 py-1.5 text-[12px] font-medium text-(--primary-foreground) transition-all hover:brightness-105 disabled:opacity-50"
-          >
-            {save.isPending && <Loader2 className="size-3.5 animate-spin" />}
-            Save 5G settings
-          </button>
           {save.isSuccess && <span className="text-[11px] text-(--ok)">Saved</span>}
           {save.isError && (
             <span className="text-[11px] text-red-500">

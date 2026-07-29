@@ -129,6 +129,7 @@ the ethernet ports, and they inherit the netplan content verbatim plus `Address=
 | FR-NET-12 | A re-run of `site.yml` never overwrites settings the IT admin changed from the cockpit, unless explicitly forced | Must |
 | FR-NET-13 | The Wi-Fi passphrase and SIM PIN are never returned by any read API | Must |
 | FR-NET-14 | The AP refuses to be enabled without a regulatory country code | Must |
+| FR-NET-16 | **The whole 5G surface exists only on a box that carries the modem.** On a Photonicat variant without the M.2 module the cockpit offers neither `wan_5g` nor `5g`, shows no bearer settings, and the API refuses both with a `400`; the applier creates no `cp-wwan` profile. Picking `5g` there would suppress the ethernet default route with nothing to replace it. | Must |
 | FR-NET-15 | **The vendor** (`can_manage_secrets`, superadmin) can amend the 5G settings (APN, credentials, PIN, roaming, standby) from the cockpit. A client's `can_manage_it` admin can neither read nor write them — the SIM and the data plan are ours, so the APN is a fleet decision, not a per-site one. They keep the bearer's live **status**, which is what they need when the box loses its uplink. | Must |
 
 ---
@@ -477,6 +478,7 @@ All under `can_manage_it`, all following the established gate shape (`None` call
 ```jsonc
 {
   "active_uplink": "wan" | "wwan" | "none",
+  "modem_present": true,          // HARDWARE fact — see FR-NET-16
   "wan":  { "carrier": true, "ip": "192.168.1.38", "gateway": "192.168.1.1", "has_default_route": true },
   "wwan": { "state": "connected", "operator": "Orange F", "tech": "5gnr",
             "signal_dbm": -83, "ip": "10.183.4.22", "registered": true },
@@ -1206,6 +1208,47 @@ M0 ──► M1 ──► M2 ──► M3 ──► M4
 M0 → no PR (findings folded into this document). M1 its own PR, reviewed against
 O1.4 evidence. M2 one PR (state + API + contract are atomic — the contract check
 fails otherwise). M3 one PR. M4 one PR. M5 one PR. M6 one docs PR.
+
+---
+
+---
+
+# §15 — 5G is vendor kit, and it is optional kit
+
+Two constraints added after the first pass, both about *who* and *whether*
+rather than *how*.
+
+**Who — the bearer is the vendor's** (FR-NET-15, revised). We ship the SIM and
+own the fleet's data plan, so the APN is a fleet-wide decision, not a per-site
+setting: a client's IT admin changing it breaks their own connectivity on our
+bill. `POST /api/it/network/wwan` is therefore `can_manage_secrets`
+(superadmin), the same boundary that already protects the provider API keys, and
+`GET /api/it/network` returns `config.wwan: null` to anyone below it.
+
+`status.wwan` is deliberately **not** elided. Whether the modem is registered,
+on which operator and at what signal is diagnostics, not configuration, and it is
+exactly what a client admin reads out to us when the box loses its uplink.
+Hiding it would make that call useless and protect nothing.
+
+**Whether — not every box has a modem** (FR-NET-16). The Photonicat 2 ships in
+variants. The presence probe reads **sysfs** (`/sys/class/usbmisc/cdc-wdm*`,
+`/sys/class/net/ww*`), not ModemManager: `mmcli` answering is a statement about a
+daemon's current view, and using it would make the whole 5G surface appear and
+disappear across an MM restart. `CP_WWAN_PRESENT=0|1` overrides it for a variant
+the probe reads wrong; with the applier inert (no `CP_NMCLI_BIN`) it reports
+`true`, because off-box there is no hardware to protect.
+
+The fact is surfaced as `status.modem_present`, readable by any `can_manage_it`
+caller — choosing the uplink mode is the client admin's job even though the
+bearer's configuration is not. Ansible probes the same way and skips the modem
+toolbox entirely on a box without one.
+
+The two gates are independent and both are enforced server-side:
+
+| | non-5G variant | 5G variant |
+|---|---|---|
+| `admin` | ethernet only; no bearer settings | all three modes; no bearer settings |
+| `superadmin` | ethernet only; no bearer settings | all three modes; bearer settings |
 
 ---
 

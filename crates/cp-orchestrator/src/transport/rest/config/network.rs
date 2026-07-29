@@ -53,12 +53,13 @@ fn bearer_visible(auth_user: Option<&User>) -> bool {
 /// registered, on which operator and at what signal is diagnostics the client's
 /// own admin needs when the box loses its uplink.
 pub(crate) fn it_get_network(state: &Mutex<Backend>, auth_user: Option<&User>) -> HttpReply {
-    denied(auth_user).unwrap_or_else(|| network::get_network(state, bearer_visible(auth_user)))
+    denied(auth_user)
+        .unwrap_or_else(|| network::get_network(state, bearer_visible(auth_user), network::modem_present()))
 }
 
 /// `POST /api/it/network/mode` — select `wan`, `wan_5g` or `5g` (FR-NET-03).
 pub(crate) fn it_set_network_mode(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&User>) -> HttpReply {
-    denied(auth_user).unwrap_or_else(|| network::set_mode(state, body))
+    denied(auth_user).unwrap_or_else(|| network::set_mode(state, body, network::modem_present()))
 }
 
 /// `POST /api/it/network/ap` — the access-point settings (FR-NET-07/08/09).
@@ -71,7 +72,7 @@ pub(crate) fn it_set_network_ap(state: &Mutex<Backend>, body: &[u8], auth_user: 
 /// `POST /api/it/network/wwan` — the 5G bearer settings (FR-NET-15, revised).
 /// **Superadmin only** — see the module doc.
 pub(crate) fn it_set_network_wwan(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&User>) -> HttpReply {
-    denied_bearer(auth_user).unwrap_or_else(|| network::set_wwan(state, body))
+    denied_bearer(auth_user).unwrap_or_else(|| network::set_wwan(state, body, network::modem_present()))
 }
 
 #[cfg(test)]
@@ -177,6 +178,34 @@ mod tests {
 
         let superadmin = it_get_network(&state, Some(&vendor));
         assert!(superadmin.body.contains("vendor.apn.example"), "the vendor sees their own APN");
+    }
+
+    /// A box that is not a 5G variant must not be able to reach a mode that
+    /// needs one — `5g` there would suppress the ethernet default route with
+    /// nothing to replace it. Recoverable (NFR-NET-01) but never worth offering.
+    ///
+    /// The hardware fact is threaded in rather than probed inside the handler,
+    /// so this drives the no-modem variant without touching the environment.
+    #[test]
+    fn a_box_with_no_modem_refuses_the_5g_modes_and_hides_the_bearer() {
+        let state = backend();
+        let no_modem = false;
+
+        assert_eq!(network::set_mode(&state, br#"{"mode":"wan"}"#, no_modem).status, 200, "ethernet always works");
+        assert_eq!(network::set_mode(&state, br#"{"mode":"5g"}"#, no_modem).status, 400, "5g needs a modem");
+        assert_eq!(network::set_mode(&state, br#"{"mode":"wan_5g"}"#, no_modem).status, 400, "so does failover");
+        assert_eq!(
+            network::set_wwan(&state, br#"{"apn":"x.y","roaming":false,"standby":"hot"}"#, no_modem).status,
+            400,
+            "and so does configuring the bearer"
+        );
+
+        // Even the vendor sees no bearer block on a box that has no bearer.
+        let got = network::get_network(&state, true, no_modem);
+        assert!(got.body.contains("\"wwan\":null"), "the bearer config is hidden: {}", got.body);
+
+        let with_modem = network::get_network(&state, true, true);
+        assert!(with_modem.body.contains("\"apn\""), "…and present on a 5G variant: {}", with_modem.body);
     }
 
     /// Set → get round-trip, driven god-mode so it exercises the logic, not the

@@ -30,6 +30,13 @@ pub(crate) fn probe(config: &NetworkConfig) -> Value {
     let tools = Tools::resolve();
     json!({
         "active_uplink": active_uplink(default_dev.as_deref()),
+        // A HARDWARE fact, distinct from `wwan` below: this box either is a 5G
+        // variant or it is not, and the answer must not flap while ModemManager
+        // restarts. It is what tells the cockpit whether to offer the 5G uplink
+        // modes at all — and it is readable by any `can_manage_it` caller, since
+        // choosing the uplink mode is the client admin's job even though the
+        // bearer's configuration is the vendor's.
+        "modem_present": super::modem_present(),
         "wan": wan_status(default_dev.as_deref()),
         "wwan": tools.as_ref().and_then(wwan_status),
         "ap": tools.as_ref().map(|tools| ap_status(tools, config)),

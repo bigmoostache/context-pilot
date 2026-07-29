@@ -385,6 +385,7 @@ export type ItNetworkResponse = {
 export type ItNetworkStatus = {
     active_uplink: 'wan' | 'wwan' | 'none';
     ap: ItNetworkApStatus | null;
+    modem_present: boolean;
     wan: ItNetworkWanStatus | null;
     wwan: ItNetworkWwanStatus | null;
 };
