@@ -57,15 +57,33 @@ if [ -z "$country" ]; then
   exit 0
 fi
 
-current=$(iw reg get 2>/dev/null | sed -n 's/^country \([A-Z][A-Z]\):.*/\1/p' | head -1)
-if [ "$current" = "$country" ]; then
-  log "regulatory domain already $country"
+# Read the GLOBAL domain specifically, not the first `country` line in the file.
+# `iw reg get` prints one block per regulatory authority — `global`, then one per
+# self-managed phy — and on this hardware they legitimately disagree: measured,
+# phy#0 (ath11k) adopts the hint while phy#1 (aic8800) stays at `00` forever. A
+# naive "first country line" read picks whichever phy happens to be listed first
+# and reports a domain we never set.
+global_domain() {
+  iw reg get 2>/dev/null | awk '
+    /^global$/            { g = 1; next }
+    g && /^country /      { c = $2; sub(/:.*/, "", c); print c; exit }'
+}
+
+before=$(global_domain)
+
+# Issued unconditionally, even when the global domain already matches: `iw reg
+# set` is a cheap netlink hint, and a self-managed phy that came up after the
+# last call (firmware reload, a radio rfkill-cycled) would otherwise never
+# receive it. The applier calls this immediately before bringing `cp-ap` up, and
+# an AP that starts under a stale `00` does not beacon at all.
+if ! iw reg set "$country" 2>/dev/null; then
+  log "iw reg set $country FAILED — 5 GHz may stay unusable"
   exit 0
 fi
 
-if iw reg set "$country" 2>/dev/null; then
-  log "regulatory domain set to $country (was ${current:-00})"
+if [ "$before" = "$country" ]; then
+  log "regulatory domain already $country (hint re-issued)"
 else
-  log "iw reg set $country FAILED — 5 GHz may stay unusable"
+  log "regulatory domain set to $country (was ${before:-unknown})"
 fi
 exit 0

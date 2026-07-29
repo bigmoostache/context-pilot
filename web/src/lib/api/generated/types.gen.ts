@@ -325,6 +325,103 @@ export type ItIdentityResponse = {
     identity: Identity | null;
 };
 
+/**
+ * Wi-Fi access-point settings. `country` is a functional prerequisite, not a nicety: under the world-default regulatory domain every 5 GHz channel is `no IR` and the AP cannot start (FR-NET-14).
+ */
+export type ItNetworkAp = {
+    band: 'bg' | 'a';
+    channel: number;
+    country: string;
+    enabled: boolean;
+    hidden: boolean;
+    passphrase_set: boolean;
+    share_internet: boolean;
+    ssid: string;
+};
+
+export type ItNetworkApResult = {
+    ap: ItNetworkAp;
+    applied: boolean;
+};
+
+export type ItNetworkApStatus = {
+    channel: number | null;
+    clients: number;
+    country: string | null;
+    running: boolean;
+    ssid: string | null;
+};
+
+export type ItNetworkConfig = {
+    ap: ItNetworkAp;
+    mode: 'wan' | 'wan_5g' | '5g';
+    probe: ItNetworkProbe;
+    wwan: ItNetworkWwan;
+};
+
+export type ItNetworkModeResult = {
+    applied: boolean;
+    mode: 'wan' | 'wan_5g' | '5g';
+};
+
+/**
+ * Failover probe tuning. The probe is interface-bound, so it tests the WAN path itself rather than whatever the default route currently prefers.
+ */
+export type ItNetworkProbe = {
+    fail_threshold: number;
+    interval_s: number;
+    ok_threshold: number;
+    targets: Array<string>;
+};
+
+export type ItNetworkResponse = {
+    config: ItNetworkConfig;
+    status: ItNetworkStatus;
+};
+
+/**
+ * Live read-back from `ip route`, `nmcli`, `mmcli` and `iw`. Every field degrades to null rather than erroring when a tool is absent, so a dev machine with no env gates set still answers 200.
+ */
+export type ItNetworkStatus = {
+    active_uplink: 'wan' | 'wwan' | 'none';
+    ap: ItNetworkApStatus | null;
+    wan: ItNetworkWanStatus | null;
+    wwan: ItNetworkWwanStatus | null;
+};
+
+export type ItNetworkWanStatus = {
+    carrier: boolean;
+    gateway: string | null;
+    has_default_route: boolean;
+    ip: string | null;
+};
+
+/**
+ * 5G bearer settings. `password_set`/`pin_set` stand in for the write-only credentials.
+ */
+export type ItNetworkWwan = {
+    apn: string;
+    password_set: boolean;
+    pin_set: boolean;
+    roaming: boolean;
+    standby: 'hot' | 'cold';
+    username: string | null;
+};
+
+export type ItNetworkWwanResult = {
+    applied: boolean;
+    wwan: ItNetworkWwan;
+};
+
+export type ItNetworkWwanStatus = {
+    ip: string | null;
+    operator: string | null;
+    registered: boolean;
+    signal_dbm: number | null;
+    state: string | null;
+    tech: string | null;
+};
+
 export type ItSetIdentityResponse = {
     identity: Identity;
     reloaded: boolean;
@@ -2605,6 +2702,124 @@ export type PostApiItIdentityResponses = {
 };
 
 export type PostApiItIdentityResponse = PostApiItIdentityResponses[keyof PostApiItIdentityResponses];
+
+export type GetApiItNetworkData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/it/network';
+};
+
+export type GetApiItNetworkErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiItNetworkError = GetApiItNetworkErrors[keyof GetApiItNetworkErrors];
+
+export type GetApiItNetworkResponses = {
+    /**
+     * Success
+     */
+    200: ItNetworkResponse;
+};
+
+export type GetApiItNetworkResponse = GetApiItNetworkResponses[keyof GetApiItNetworkResponses];
+
+export type PostApiItNetworkApData = {
+    body: {
+        band: 'bg' | 'a';
+        channel: number;
+        country: string;
+        enabled: boolean;
+        hidden: boolean;
+        passphrase?: string | null;
+        share_internet: boolean;
+        ssid: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/it/network/ap';
+};
+
+export type PostApiItNetworkApErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiItNetworkApError = PostApiItNetworkApErrors[keyof PostApiItNetworkApErrors];
+
+export type PostApiItNetworkApResponses = {
+    /**
+     * Success
+     */
+    200: ItNetworkApResult;
+};
+
+export type PostApiItNetworkApResponse = PostApiItNetworkApResponses[keyof PostApiItNetworkApResponses];
+
+export type PostApiItNetworkModeData = {
+    body: {
+        mode: 'wan' | 'wan_5g' | '5g';
+    };
+    path?: never;
+    query?: never;
+    url: '/api/it/network/mode';
+};
+
+export type PostApiItNetworkModeErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiItNetworkModeError = PostApiItNetworkModeErrors[keyof PostApiItNetworkModeErrors];
+
+export type PostApiItNetworkModeResponses = {
+    /**
+     * Success
+     */
+    200: ItNetworkModeResult;
+};
+
+export type PostApiItNetworkModeResponse = PostApiItNetworkModeResponses[keyof PostApiItNetworkModeResponses];
+
+export type PostApiItNetworkWwanData = {
+    body: {
+        apn: string;
+        password?: string | null;
+        pin?: string | null;
+        roaming: boolean;
+        standby: 'hot' | 'cold';
+        username?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/it/network/wwan';
+};
+
+export type PostApiItNetworkWwanErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiItNetworkWwanError = PostApiItNetworkWwanErrors[keyof PostApiItNetworkWwanErrors];
+
+export type PostApiItNetworkWwanResponses = {
+    /**
+     * Success
+     */
+    200: ItNetworkWwanResult;
+};
+
+export type PostApiItNetworkWwanResponse = PostApiItNetworkWwanResponses[keyof PostApiItNetworkWwanResponses];
 
 export type GetApiItProvisionedData = {
     body?: never;

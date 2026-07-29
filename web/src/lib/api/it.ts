@@ -10,14 +10,31 @@ import type {
   ItFingerprint,
   ItIdentityResponse,
   ItSetIdentityResponse,
+  ItNetworkResponse,
+  ItNetworkApResult,
+  ItNetworkModeResult,
+  ItNetworkWwanResult,
+  PostApiItNetworkApData,
+  PostApiItNetworkModeData,
+  PostApiItNetworkWwanData,
 } from "./generated/types.gen"
 import {
   getApiItCaFingerprint,
   getApiItIdentity,
   postApiItIdentity,
   getApiItProvisioned,
+  getApiItNetwork,
+  postApiItNetworkAp,
+  postApiItNetworkMode,
+  postApiItNetworkWwan,
 } from "./generated"
 import { sdk, getToken, BASE } from "./client"
+
+/** Body shapes for the three network writes, named so the pane can build them
+ *  without reaching into the generated request envelopes. */
+export type ItNetworkModeBody = NonNullable<PostApiItNetworkModeData["body"]>
+export type ItNetworkApBody = NonNullable<PostApiItNetworkApData["body"]>
+export type ItNetworkWwanBody = NonNullable<PostApiItNetworkWwanData["body"]>
 
 // ── Endpoints (SDK) ──────────────────────────────────────────────────
 
@@ -40,6 +57,34 @@ export function setItIdentity(name: string, ip: string): Promise<ItSetIdentityRe
 /** Whether the box has been provisioned (`can_manage_it`). */
 export function fetchItProvisioned(): Promise<{ provisioned: boolean }> {
   return sdk(getApiItProvisioned())
+}
+
+// ── Internet uplink + Wi-Fi access point (design-network-uplink §10) ─
+
+/** Uplink + AP configuration (secrets elided) plus live status. Polled while
+ *  the network pane is open, so the status card tracks a failover without a
+ *  manual refresh. */
+export function fetchItNetwork(): Promise<ItNetworkResponse> {
+  return sdk(getApiItNetwork())
+}
+
+/** Select the uplink mode. `5g` suppresses the ethernet default route even with
+ *  a cable plugged in; a failed apply is rolled back and surfaces as a 502. */
+export function setItNetworkMode(body: ItNetworkModeBody): Promise<ItNetworkModeResult> {
+  return sdk(postApiItNetworkMode({ body }))
+}
+
+/** Set the access-point configuration. `passphrase` is write-only: omit the
+ *  field to keep the stored PSK, send null to clear it. Enabling the AP without
+ *  a regulatory country is a 400 (FR-NET-14). */
+export function setItNetworkAp(body: ItNetworkApBody): Promise<ItNetworkApResult> {
+  return sdk(postApiItNetworkAp({ body }))
+}
+
+/** Set the 5G bearer configuration. `password` and `pin` are write-only, with
+ *  the same omit-to-keep semantics as the AP passphrase. */
+export function setItNetworkWwan(body: ItNetworkWwanBody): Promise<ItNetworkWwanResult> {
+  return sdk(postApiItNetworkWwan({ body }))
 }
 
 // ── CA-root download (irreducible binary blob) ───────────────────────

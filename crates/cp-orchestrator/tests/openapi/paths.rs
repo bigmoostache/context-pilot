@@ -93,6 +93,43 @@ pub(super) fn paths() -> Value {
         "/api/it/provisioned": get("it", "Whether the box has been provisioned", json!({
             "type": "object", "properties": { "provisioned": { "type": "boolean" } }, "required": ["provisioned"]
         })),
+        // ── Internet uplink + Wi-Fi AP (docs/design-network-uplink.md §10) ──
+        "/api/it/network": get("it", "Uplink + access-point configuration (secrets elided) and live status",
+            r("ItNetworkResponse")),
+        "/api/it/network/mode": post("it", "Select the uplink mode (wan | wan_5g | 5g)", Some(json!({
+            "type": "object",
+            "properties": { "mode": { "type": "string", "enum": ["wan", "wan_5g", "5g"] } },
+            "required": ["mode"]
+        })), r("ItNetworkModeResult")),
+        // `passphrase` is write-only and tri-state: omit to keep the stored PSK,
+        // send null to clear it, send a string to replace it. Same for the wwan
+        // credentials below.
+        "/api/it/network/ap": post("it", "Set the Wi-Fi access-point configuration", Some(json!({
+            "type": "object",
+            "properties": {
+                "enabled": { "type": "boolean" },
+                "ssid": { "type": "string" },
+                "passphrase": { "type": "string", "nullable": true },
+                "band": { "type": "string", "enum": ["bg", "a"] },
+                "channel": { "type": "integer" },
+                "country": { "type": "string" },
+                "hidden": { "type": "boolean" },
+                "share_internet": { "type": "boolean" }
+            },
+            "required": ["enabled", "ssid", "band", "channel", "country", "hidden", "share_internet"]
+        })), r("ItNetworkApResult")),
+        "/api/it/network/wwan": post("it", "Set the 5G bearer configuration", Some(json!({
+            "type": "object",
+            "properties": {
+                "apn": { "type": "string" },
+                "username": { "type": "string", "nullable": true },
+                "password": { "type": "string", "nullable": true },
+                "pin": { "type": "string", "nullable": true },
+                "roaming": { "type": "boolean" },
+                "standby": { "type": "string", "enum": ["hot", "cold"] }
+            },
+            "required": ["apn", "roaming", "standby"]
+        })), r("ItNetworkWwanResult")),
         // ── Ticket ──────────────────────────────────────────────────
         "/api/ticket": post("ticket", "Mint SSE upgrade ticket", None, r("TicketResponse")),
         // ── Auth ────────────────────────────────────────────────────

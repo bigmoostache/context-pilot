@@ -1049,6 +1049,343 @@
         ],
         "type": "object"
       },
+      "ItNetworkAp": {
+        "description": "Wi-Fi access-point settings. `country` is a functional prerequisite, not a nicety: under the world-default regulatory domain every 5 GHz channel is `no IR` and the AP cannot start (FR-NET-14).",
+        "properties": {
+          "band": {
+            "enum": [
+              "bg",
+              "a"
+            ],
+            "type": "string"
+          },
+          "channel": {
+            "type": "integer"
+          },
+          "country": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "hidden": {
+            "type": "boolean"
+          },
+          "passphrase_set": {
+            "type": "boolean"
+          },
+          "share_internet": {
+            "type": "boolean"
+          },
+          "ssid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "enabled",
+          "ssid",
+          "passphrase_set",
+          "band",
+          "channel",
+          "country",
+          "hidden",
+          "share_internet"
+        ],
+        "type": "object"
+      },
+      "ItNetworkApResult": {
+        "properties": {
+          "ap": {
+            "$ref": "#/components/schemas/ItNetworkAp"
+          },
+          "applied": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ap",
+          "applied"
+        ],
+        "type": "object"
+      },
+      "ItNetworkApStatus": {
+        "properties": {
+          "channel": {
+            "nullable": true,
+            "type": "integer"
+          },
+          "clients": {
+            "type": "integer"
+          },
+          "country": {
+            "nullable": true,
+            "type": "string"
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "ssid": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "running",
+          "ssid",
+          "clients",
+          "channel",
+          "country"
+        ],
+        "type": "object"
+      },
+      "ItNetworkConfig": {
+        "properties": {
+          "ap": {
+            "$ref": "#/components/schemas/ItNetworkAp"
+          },
+          "mode": {
+            "enum": [
+              "wan",
+              "wan_5g",
+              "5g"
+            ],
+            "type": "string"
+          },
+          "probe": {
+            "$ref": "#/components/schemas/ItNetworkProbe"
+          },
+          "wwan": {
+            "$ref": "#/components/schemas/ItNetworkWwan"
+          }
+        },
+        "required": [
+          "mode",
+          "wwan",
+          "ap",
+          "probe"
+        ],
+        "type": "object"
+      },
+      "ItNetworkModeResult": {
+        "properties": {
+          "applied": {
+            "type": "boolean"
+          },
+          "mode": {
+            "enum": [
+              "wan",
+              "wan_5g",
+              "5g"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "applied"
+        ],
+        "type": "object"
+      },
+      "ItNetworkProbe": {
+        "description": "Failover probe tuning. The probe is interface-bound, so it tests the WAN path itself rather than whatever the default route currently prefers.",
+        "properties": {
+          "fail_threshold": {
+            "type": "integer"
+          },
+          "interval_s": {
+            "type": "integer"
+          },
+          "ok_threshold": {
+            "type": "integer"
+          },
+          "targets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "targets",
+          "fail_threshold",
+          "ok_threshold",
+          "interval_s"
+        ],
+        "type": "object"
+      },
+      "ItNetworkResponse": {
+        "properties": {
+          "config": {
+            "$ref": "#/components/schemas/ItNetworkConfig"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ItNetworkStatus"
+          }
+        },
+        "required": [
+          "config",
+          "status"
+        ],
+        "type": "object"
+      },
+      "ItNetworkStatus": {
+        "description": "Live read-back from `ip route`, `nmcli`, `mmcli` and `iw`. Every field degrades to null rather than erroring when a tool is absent, so a dev machine with no env gates set still answers 200.",
+        "properties": {
+          "active_uplink": {
+            "enum": [
+              "wan",
+              "wwan",
+              "none"
+            ],
+            "nullable": true,
+            "type": "string"
+          },
+          "ap": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ItNetworkApStatus"
+              }
+            ],
+            "nullable": true
+          },
+          "wan": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ItNetworkWanStatus"
+              }
+            ],
+            "nullable": true
+          },
+          "wwan": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ItNetworkWwanStatus"
+              }
+            ],
+            "nullable": true
+          }
+        },
+        "required": [
+          "active_uplink",
+          "wan",
+          "wwan",
+          "ap"
+        ],
+        "type": "object"
+      },
+      "ItNetworkWanStatus": {
+        "properties": {
+          "carrier": {
+            "type": "boolean"
+          },
+          "gateway": {
+            "nullable": true,
+            "type": "string"
+          },
+          "has_default_route": {
+            "type": "boolean"
+          },
+          "ip": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "carrier",
+          "ip",
+          "gateway",
+          "has_default_route"
+        ],
+        "type": "object"
+      },
+      "ItNetworkWwan": {
+        "description": "5G bearer settings. `password_set`/`pin_set` stand in for the write-only credentials.",
+        "properties": {
+          "apn": {
+            "type": "string"
+          },
+          "password_set": {
+            "type": "boolean"
+          },
+          "pin_set": {
+            "type": "boolean"
+          },
+          "roaming": {
+            "type": "boolean"
+          },
+          "standby": {
+            "enum": [
+              "hot",
+              "cold"
+            ],
+            "type": "string"
+          },
+          "username": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "apn",
+          "username",
+          "password_set",
+          "pin_set",
+          "roaming",
+          "standby"
+        ],
+        "type": "object"
+      },
+      "ItNetworkWwanResult": {
+        "properties": {
+          "applied": {
+            "type": "boolean"
+          },
+          "wwan": {
+            "$ref": "#/components/schemas/ItNetworkWwan"
+          }
+        },
+        "required": [
+          "wwan",
+          "applied"
+        ],
+        "type": "object"
+      },
+      "ItNetworkWwanStatus": {
+        "properties": {
+          "ip": {
+            "nullable": true,
+            "type": "string"
+          },
+          "operator": {
+            "nullable": true,
+            "type": "string"
+          },
+          "registered": {
+            "type": "boolean"
+          },
+          "signal_dbm": {
+            "nullable": true,
+            "type": "integer"
+          },
+          "state": {
+            "nullable": true,
+            "type": "string"
+          },
+          "tech": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "operator",
+          "tech",
+          "signal_dbm",
+          "ip",
+          "registered"
+        ],
+        "type": "object"
+      },
       "ItSetIdentityResponse": {
         "properties": {
           "identity": {
@@ -5251,6 +5588,241 @@
           }
         },
         "summary": "Set box network identity — re-issues the leaf & reloads Caddy",
+        "tags": [
+          "it"
+        ]
+      }
+    },
+    "/api/it/network": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItNetworkResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Uplink + access-point configuration (secrets elided) and live status",
+        "tags": [
+          "it"
+        ]
+      }
+    },
+    "/api/it/network/ap": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "band": {
+                    "enum": [
+                      "bg",
+                      "a"
+                    ],
+                    "type": "string"
+                  },
+                  "channel": {
+                    "type": "integer"
+                  },
+                  "country": {
+                    "type": "string"
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "hidden": {
+                    "type": "boolean"
+                  },
+                  "passphrase": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "share_internet": {
+                    "type": "boolean"
+                  },
+                  "ssid": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "enabled",
+                  "ssid",
+                  "band",
+                  "channel",
+                  "country",
+                  "hidden",
+                  "share_internet"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItNetworkApResult"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Set the Wi-Fi access-point configuration",
+        "tags": [
+          "it"
+        ]
+      }
+    },
+    "/api/it/network/mode": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "mode": {
+                    "enum": [
+                      "wan",
+                      "wan_5g",
+                      "5g"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "mode"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItNetworkModeResult"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Select the uplink mode (wan | wan_5g | 5g)",
+        "tags": [
+          "it"
+        ]
+      }
+    },
+    "/api/it/network/wwan": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "apn": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "pin": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "roaming": {
+                    "type": "boolean"
+                  },
+                  "standby": {
+                    "enum": [
+                      "hot",
+                      "cold"
+                    ],
+                    "type": "string"
+                  },
+                  "username": {
+                    "nullable": true,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "apn",
+                  "roaming",
+                  "standby"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItNetworkWwanResult"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Set the 5G bearer configuration",
         "tags": [
           "it"
         ]
