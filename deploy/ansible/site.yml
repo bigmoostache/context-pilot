@@ -64,8 +64,42 @@
     cp_display_battery_dimmer_seconds: "{{ display_battery_dimmer_seconds | default(86400) }}"
     # ── 5G modem toolbox (Quectel RM520N-GL) ──
     # Installs the modem tooling only (mmcli/qmicli/mbimcli/picocom) so we can talk
-    # to the modem. WAN config (APN, failover routing) is left for later.
+    # to the modem. The uplink itself (APN, routing, failover) is configured by
+    # tasks/net/network.yml + the backend applier — see docs/design-network-uplink.md.
     cp_install_modem: "{{ install_modem | default(true) | bool }}"
+    # ── internet uplink (WAN / 5G) + Wi-Fi access point ──
+    # docs/design-network-uplink.md §12. Ansible SEEDS the state file write-once
+    # and installs the machinery; the backend applier is the only writer of
+    # system network config, so a re-run never reverts an IT admin's cockpit
+    # choices (FR-NET-12). Re-seed deliberately with -e cp_net_force=true.
+    cp_net_enabled: "{{ net_enabled | default(true) | bool }}"
+    cp_net_mode: "{{ net_mode | default('wan') }}"            # wan | wan_5g | 5g
+    cp_net_force: "{{ net_force | default(false) | bool }}"
+    cp_net_state_path: "{{ cp_root }}/home/.context-pilot/agents/.network.json"
+    # 5G bearer — APN and credentials are client-specific, so they belong in
+    # <client>.local.yml, not here.
+    cp_wwan_apn: "{{ wwan_apn | default('') }}"
+    cp_wwan_user: "{{ wwan_user | default('') }}"
+    cp_wwan_password: "{{ wwan_password | default('') }}"
+    cp_wwan_pin: "{{ wwan_pin | default('') }}"
+    cp_wwan_roaming: "{{ wwan_roaming | default(false) | bool }}"
+    cp_wwan_standby: "{{ wwan_standby | default('hot') }}"    # hot | cold
+    # Wi-Fi AP — off by default: turning a client's appliance into a broadcasting
+    # router is the client IT's decision, not ours (landmine 6).
+    cp_ap_enabled: "{{ ap_enabled | default(false) | bool }}"
+    cp_ap_ssid: "{{ ap_ssid | default('ContextPilot-' + (box_serial | default('') | lower)[-4:]) }}"
+    cp_ap_password: "{{ ap_password | default('') }}"
+    cp_ap_band: "{{ ap_band | default('a') }}"                # a = 5 GHz, bg = 2.4 GHz
+    cp_ap_channel: "{{ ap_channel | default(0) | int }}"      # 0 = automatic
+    cp_ap_country: "{{ ap_country | default('FR') }}"
+    cp_ap_hidden: "{{ ap_hidden | default(false) | bool }}"
+    cp_ap_share: "{{ ap_share | default(true) | bool }}"
+    # Failover probing (§8) — interface-bound, so it tests the WAN path itself
+    # rather than whatever the default route currently prefers.
+    cp_net_probe_targets: "{{ net_probe_targets | default(['1.1.1.1', '9.9.9.9']) }}"
+    cp_net_probe_fail_threshold: "{{ net_probe_fail_threshold | default(3) | int }}"
+    cp_net_probe_ok_threshold: "{{ net_probe_ok_threshold | default(2) | int }}"
+    cp_net_probe_interval_s: "{{ net_probe_interval_s | default(10) | int }}"
   tasks:
     - name: Bring up box identity (hostname dh-<serial> + maintenance user)
       ansible.builtin.include_tasks: tasks/bringup.yml
@@ -87,5 +121,8 @@
       ansible.builtin.include_tasks: tasks/display.yml
       when: cp_install_display | bool
     - name: Install the 5G modem toolbox (Quectel RM520N-GL)
-      ansible.builtin.include_tasks: tasks/modem.yml
+      ansible.builtin.include_tasks: tasks/net/modem.yml
       when: cp_install_modem | bool
+    - name: Install the uplink (WAN/5G) + Wi-Fi AP foundation
+      ansible.builtin.include_tasks: tasks/net/network.yml
+      when: cp_net_enabled | bool

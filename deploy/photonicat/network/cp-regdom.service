@@ -1,0 +1,17 @@
+[Unit]
+Description=Apply the configured Wi-Fi regulatory domain (cp-regdom)
+Documentation=file:///usr/local/sbin/cp-regdom
+# Must run before any radio is brought up: an AP started while the domain is
+# still the world default `00` lands on a `no IR` channel and never beacons
+# (design-network-uplink §9, landmine 1).
+After=network-pre.target
+Wants=network-pre.target
+Before=NetworkManager.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/cp-regdom
+
+[Install]
+WantedBy=multi-user.target

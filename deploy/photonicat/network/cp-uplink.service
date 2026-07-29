@@ -1,0 +1,22 @@
+[Unit]
+Description=Context Pilot uplink failover supervisor (WAN ⇄ 5G)
+Documentation=file:///usr/local/sbin/cp-uplink-watch
+After=network.target NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=simple
+# Rendered by the backend applier from .network.json on every apply, exactly as
+# /etc/default/pcat-ula is pinned by Ansible. `-` prefix: a box that has never
+# applied a network config yet still starts the unit, which then idles.
+EnvironmentFile=-/etc/default/cp-uplink
+ExecStart=/usr/local/sbin/cp-uplink-watch
+# The supervisor is the thing that restores connectivity; it must come back.
+Restart=always
+RestartSec=5
+# /run/cp-uplink — the live state the cockpit's GET /api/it/network reads.
+RuntimeDirectory=cp-uplink
+RuntimeDirectoryMode=0755
+
+[Install]
+WantedBy=multi-user.target

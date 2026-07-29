@@ -1,0 +1,222 @@
+#!/bin/sh
+# cp-uplink-watch — the WAN ⇄ 5G failover supervisor (design-network-uplink §8).
+#
+# WHY A DEDICATED DAEMON, not a task inside the orchestrator: it must survive an
+# orchestrator crash or an OTA restart (the moments the box is MOST likely to
+# need its uplink), and it must be debuggable with `journalctl -u cp-uplink`.
+#
+# WHAT METRICS ALONE CANNOT SEE — the reason this exists at all: cable plugged
+# in, DHCP lease held, upstream dead. The kernel still has a perfectly healthy
+# default route via end0 and will happily blackhole every packet. Route metrics
+# react to CARRIER; only an end-to-end probe reacts to REACHABILITY.
+#
+# INTERFACE-BOUND PROBING is load-bearing: `ping -I end0` pins the probe to the
+# WAN port (SO_BINDTODEVICE) instead of following the default route. Probing
+# through the default route would be circular — once we failed over to 5G the
+# probe would start succeeding over 5G and we would immediately "recover" the
+# WAN we just demoted.
+#
+# SCOPE: active only in `wan_5g`. In `wan` and `5g` the routing is static and
+# there is nothing to arbitrate, so the loop only refreshes the state file that
+# `GET /api/it/network` reads (design §8).
+#
+# CONFIG: /etc/default/cp-uplink, rendered by the backend applier from
+# .network.json on every apply (the same pattern as /etc/default/pcat-ula).
+# Every value below has a defensible default so an unconfigured box idles
+# harmlessly rather than acting on garbage.
+set -u
+
+STATE_DIR=/run/cp-uplink
+STATE_FILE="$STATE_DIR/state"
+
+# ── Configuration (overridden by /etc/default/cp-uplink via the unit) ────────
+: "${CP_UPLINK_MODE:=wan}"                  # wan | wan_5g | 5g
+: "${CP_UPLINK_WAN_IF:=end0}"               # the ethernet uplink port to probe
+: "${CP_UPLINK_WWAN_PROFILE:=cp-wwan}"      # NetworkManager profile name
+: "${CP_UPLINK_WWAN_DEV:=cdc-wdm0}"         # NM device (the modem CONTROL port —
+                                            # NM drives the modem through MM and
+                                            # applies IP config to the net port)
+: "${CP_UPLINK_STANDBY:=hot}"               # hot | cold
+: "${CP_UPLINK_TARGETS:=1.1.1.1 9.9.9.9}"   # probed in order; any reply = up
+: "${CP_UPLINK_FAIL_THRESHOLD:=3}"          # consecutive failures before demoting
+: "${CP_UPLINK_OK_THRESHOLD:=2}"            # consecutive successes before restoring
+: "${CP_UPLINK_INTERVAL_S:=10}"             # seconds between probe rounds
+: "${CP_UPLINK_PROBE_TIMEOUT_S:=3}"         # per-target ping deadline
+: "${CP_UPLINK_COOLDOWN_S:=60}"             # minimum seconds between transitions
+: "${CP_UPLINK_METRIC_PREFERRED:=50}"       # wwan route metric when it is the uplink
+: "${CP_UPLINK_METRIC_STANDBY:=700}"        # wwan route metric while standing by
+
+log() { echo "cp-uplink: $*"; }
+
+# ── State file — what the cockpit reads ─────────────────────────────────────
+# Written on every loop turn so a stale file can never outlive the daemon's view
+# by more than one interval. Shell-sourceable KEY=value; the backend parses it
+# with the same tolerance it applies to `nmcli -t` output.
+active_uplink=none
+supervising=no
+last_transition=0
+last_reason=startup
+fail_streak=0
+ok_streak=0
+
+write_state() {
+  mkdir -p "$STATE_DIR" 2>/dev/null || return 0
+  tmp="$STATE_FILE.new"
+  {
+    echo "mode=$CP_UPLINK_MODE"
+    echo "supervising=$supervising"
+    echo "active_uplink=$active_uplink"
+    echo "fail_streak=$fail_streak"
+    echo "ok_streak=$ok_streak"
+    echo "last_transition=$last_transition"
+    echo "last_reason=$last_reason"
+  } >"$tmp" 2>/dev/null && mv -f "$tmp" "$STATE_FILE" 2>/dev/null
+  return 0
+}
+
+# ── Observation ─────────────────────────────────────────────────────────────
+
+# The device carrying the lowest-metric IPv4 default route — i.e. what the box
+# actually uses right now. Read from the kernel, never inferred from what we
+# believe we configured, so the state file stays honest even if a human ran
+# `nmcli` behind our back (landmine 9).
+current_default_dev() {
+  ip -4 route show default 2>/dev/null \
+    | awk '{ m = 0; for (i = 1; i < NF; i++) if ($i == "metric") m = $(i + 1);
+             for (i = 1; i < NF; i++) if ($i == "dev") d = $(i + 1);
+             if (d != "" && (best == "" || m < bestm)) { best = d; bestm = m } }
+           END { print best }'
+}
+
+classify_dev() {   # $1 = interface name → wan | wwan | none
+  case "${1:-}" in
+    "")                       echo none ;;
+    "$CP_UPLINK_WAN_IF")      echo wan ;;
+    end*|eth*|eno*|enp*|ens*) echo wan ;;
+    *)                        echo wwan ;;
+  esac
+}
+
+# End-to-end reachability THROUGH a named interface. Returns 0 on the first
+# target that answers. `-I` is what makes this a test of that path rather than
+# of whatever the routing table currently prefers.
+probe_via() {   # $1 = interface
+  for target in $CP_UPLINK_TARGETS; do
+    if ping -q -n -I "$1" -c 1 -W "$CP_UPLINK_PROBE_TIMEOUT_S" "$target" >/dev/null 2>&1; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# ── Actuation ───────────────────────────────────────────────────────────────
+# The failover itself is a metric change on the NM profile, applied with
+# `nmcli device reapply` — which pushes changed IP configuration WITHOUT
+# deactivating the connection, so a hot-standby bearer keeps its session and the
+# switch is sub-second. `con up` is the fallback for a bearer that is not up
+# (cold standby, or a reapply the driver refuses).
+nm() { nmcli "$@" >/dev/null 2>&1; }
+
+wwan_is_active() {
+  nmcli -t -f NAME connection show --active 2>/dev/null | grep -qx "$CP_UPLINK_WWAN_PROFILE"
+}
+
+set_wwan_metric() {   # $1 = metric
+  nm connection modify "$CP_UPLINK_WWAN_PROFILE" ipv4.route-metric "$1" ipv6.route-metric "$1" || return 1
+  if wwan_is_active; then
+    nm device reapply "$CP_UPLINK_WWAN_DEV" || nm connection up "$CP_UPLINK_WWAN_PROFILE" || return 1
+  fi
+  return 0
+}
+
+promote_wwan() {   # $1 = reason
+  if ! set_wwan_metric "$CP_UPLINK_METRIC_PREFERRED"; then
+    log "FAILED to set $CP_UPLINK_WWAN_PROFILE metric $CP_UPLINK_METRIC_PREFERRED"
+  fi
+  if ! wwan_is_active; then
+    # Cold standby, or a bearer that dropped. This is the expensive path the
+    # `hot` default exists to avoid.
+    log "bringing $CP_UPLINK_WWAN_PROFILE up (cold standby or dropped bearer)"
+    nm connection up "$CP_UPLINK_WWAN_PROFILE" || log "FAILED to activate $CP_UPLINK_WWAN_PROFILE"
+  fi
+  active_uplink=wwan
+  last_transition=$(date +%s)
+  last_reason="$1"
+  log "TRANSITION → 5G — $1"
+}
+
+demote_wwan() {   # $1 = reason
+  if ! set_wwan_metric "$CP_UPLINK_METRIC_STANDBY"; then
+    log "FAILED to set $CP_UPLINK_WWAN_PROFILE metric $CP_UPLINK_METRIC_STANDBY"
+  fi
+  if [ "$CP_UPLINK_STANDBY" = "cold" ] && wwan_is_active; then
+    nm connection down "$CP_UPLINK_WWAN_PROFILE" || log "FAILED to deactivate $CP_UPLINK_WWAN_PROFILE"
+  fi
+  active_uplink=wan
+  last_transition=$(date +%s)
+  last_reason="$1"
+  log "TRANSITION → WAN — $1"
+}
+
+# ── Main loop ───────────────────────────────────────────────────────────────
+running=1
+trap 'running=0' TERM INT
+
+log "starting: mode=$CP_UPLINK_MODE wan=$CP_UPLINK_WAN_IF wwan=$CP_UPLINK_WWAN_PROFILE" \
+    "standby=$CP_UPLINK_STANDBY targets='$CP_UPLINK_TARGETS'" \
+    "thresholds=${CP_UPLINK_FAIL_THRESHOLD}/${CP_UPLINK_OK_THRESHOLD} interval=${CP_UPLINK_INTERVAL_S}s"
+
+if [ "$CP_UPLINK_MODE" = "wan_5g" ]; then
+  supervising=yes
+else
+  log "mode $CP_UPLINK_MODE has static routing — reporting state only, not arbitrating"
+fi
+
+while [ "$running" = "1" ]; do
+  observed=$(classify_dev "$(current_default_dev)")
+
+  if [ "$supervising" != "yes" ]; then
+    # `wan` / `5g`: the applier owns the routes; we only observe.
+    active_uplink="$observed"
+    write_state
+    sleep "$CP_UPLINK_INTERVAL_S" &
+    wait $! 2>/dev/null || true
+    continue
+  fi
+
+  if probe_via "$CP_UPLINK_WAN_IF"; then
+    ok_streak=$((ok_streak + 1))
+    fail_streak=0
+  else
+    fail_streak=$((fail_streak + 1))
+    ok_streak=0
+  fi
+
+  now=$(date +%s)
+  cooled=$((now - last_transition))
+
+  if [ "$observed" != "wwan" ] && [ "$fail_streak" -ge "$CP_UPLINK_FAIL_THRESHOLD" ]; then
+    if [ "$cooled" -ge "$CP_UPLINK_COOLDOWN_S" ] || [ "$last_transition" = "0" ]; then
+      promote_wwan "$CP_UPLINK_WAN_IF unreachable for $fail_streak consecutive probes"
+      fail_streak=0
+    fi
+  elif [ "$observed" = "wwan" ] && [ "$ok_streak" -ge "$CP_UPLINK_OK_THRESHOLD" ]; then
+    if [ "$cooled" -ge "$CP_UPLINK_COOLDOWN_S" ]; then
+      demote_wwan "$CP_UPLINK_WAN_IF healthy for $ok_streak consecutive probes"
+      ok_streak=0
+    fi
+  else
+    # No transition this turn — keep the reported uplink in step with the kernel.
+    active_uplink="$observed"
+  fi
+
+  write_state
+  # Backgrounded sleep + wait so SIGTERM lands promptly instead of after a full
+  # interval: `sleep` in the foreground is not interrupted by a trapped signal
+  # in POSIX sh.
+  sleep "$CP_UPLINK_INTERVAL_S" &
+  wait $! 2>/dev/null || true
+done
+
+log "stopping"
+exit 0

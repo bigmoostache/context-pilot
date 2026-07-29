@@ -1,0 +1,27 @@
+{
+  "mode": {{ cp_net_mode | to_json }},
+  "wwan": {
+    "apn": {{ cp_wwan_apn | to_json }},
+    "username": {{ (cp_wwan_user if (cp_wwan_user | length > 0) else None) | to_json }},
+    "password": {{ (cp_wwan_password if (cp_wwan_password | length > 0) else None) | to_json }},
+    "pin": {{ (cp_wwan_pin if (cp_wwan_pin | length > 0) else None) | to_json }},
+    "roaming": {{ (cp_wwan_roaming | bool) | to_json }},
+    "standby": {{ cp_wwan_standby | to_json }}
+  },
+  "ap": {
+    "enabled": {{ (cp_ap_enabled | bool) | to_json }},
+    "ssid": {{ cp_ap_ssid | to_json }},
+    "passphrase": {{ (cp_ap_password if (cp_ap_password | length > 0) else None) | to_json }},
+    "band": {{ cp_ap_band | to_json }},
+    "channel": {{ cp_ap_channel | int }},
+    "country": {{ cp_ap_country | to_json }},
+    "hidden": {{ (cp_ap_hidden | bool) | to_json }},
+    "share_internet": {{ (cp_ap_share | bool) | to_json }}
+  },
+  "probe": {
+    "targets": {{ cp_net_probe_targets | to_json }},
+    "fail_threshold": {{ cp_net_probe_fail_threshold | int }},
+    "ok_threshold": {{ cp_net_probe_ok_threshold | int }},
+    "interval_s": {{ cp_net_probe_interval_s | int }}
+  }
+}

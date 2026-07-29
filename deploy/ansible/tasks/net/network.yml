@@ -1,0 +1,181 @@
+---
+# Internet uplink (WAN / 5G) + Wi-Fi access point — the system foundation.
+# Design: docs/design-network-uplink.md §5/§12 (M1).
+#
+# SCOPE, and what it deliberately is NOT: this file installs the machinery and
+# SEEDS the state file. It never creates an `nmcli` profile, never sets a route
+# and never brings a radio up. The backend applier is the ONLY writer of system
+# network config (design §6) — one source of truth, one code path to debug. A
+# second applier here is exactly how "Ansible configures it AND the UI
+# configures it" turns into "the next site.yml run silently reverted the
+# client's choices" (FR-NET-12).
+#
+# ORDER IS LOAD-BEARING. `10-cp-unmanaged.conf` ships BEFORE the network-manager
+# package, because NetworkManager purges addresses it did not install itself: if
+# it ever grabs end0/end1 it takes the fleet ULA with it, and the ULA is the ONLY
+# day-0 and break-glass path for the whole fleet (landmine 2). The already-shipped
+# `50-pcat-ula` NM dispatcher hook is the safety net if this is ever violated.
+#
+# Skip entirely with -e cp_net_enabled=false.
+
+# ── the seam: unmanaged ethernet, before NM exists ──────────────────────────
+- name: Ensure the NetworkManager conf.d directory exists
+  # Created before the package so the drop-in is already on disk when the
+  # postinst starts NetworkManager for the first time.
+  ansible.builtin.file:
+    path: /etc/NetworkManager/conf.d
+    state: directory
+    mode: "0755"
+
+- name: Ship the NetworkManager ↔ networkd seam (unmanaged ethernet + dns=systemd-resolved)
+  ansible.builtin.copy:
+    src: "{{ repo_root }}/deploy/photonicat/network/10-cp-unmanaged.conf"
+    dest: /etc/NetworkManager/conf.d/10-cp-unmanaged.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+# ── packages ────────────────────────────────────────────────────────────────
+- name: Install NetworkManager + the AP/NAT/regulatory toolchain
+  # dnsmasq-base (not dnsmasq): NM drives its own instance for `ipv4.method
+  # shared` — the standalone daemon would fight it for :53. nftables is NM's
+  # firewall backend for the shared-mode masquerade. wireless-regdb + iw are what
+  # make `iw reg set` actually change anything (measured present already on the
+  # test box, listed here so a bare image is not a surprise).
+  ansible.builtin.apt:
+    name:
+      - network-manager
+      - dnsmasq-base
+      - nftables
+      - wireless-regdb
+      - iw
+    state: present
+    update_cache: true
+
+# ── landmine 10: the unbounded boot stall ───────────────────────────────────
+- name: Mask NetworkManager-wait-online.service
+  # Installing network-manager ENABLES this unit. It is WantedBy=network-online
+  # .target and context-pilot.service is After=/Wants= that target, and its
+  # ExecStart is `nm-online -s` with TimeoutStartUSec=infinity. Today NM manages
+  # nothing that autoconnects so it settles instantly — but the moment `cp-wwan`
+  # gets `autoconnect yes` (modes wan_5g/5g) "NM startup complete" waits on a
+  # modem that, with no SIM or no coverage, may never connect. That is an
+  # unbounded delay in front of the cockpit. systemd-networkd-wait-online already
+  # covers the real uplink (5.475 s on the test box), so nothing is lost.
+  ansible.builtin.systemd_service:
+    name: NetworkManager-wait-online.service
+    masked: true
+    enabled: false
+  failed_when: false
+
+- name: Enable + start NetworkManager
+  ansible.builtin.systemd_service:
+    name: NetworkManager
+    state: started
+    enabled: true
+    daemon_reload: true
+
+# ── regulatory domain (FR-NET-14, landmine 1) ───────────────────────────────
+- name: Pin where the network state file lives (read by cp-regdom at boot)
+  ansible.builtin.copy:
+    dest: /etc/default/cp-network
+    content: |
+      # Managed by Ansible (tasks/net/network.yml) — do not edit by hand.
+      CP_NETWORK_STATE={{ cp_net_state_path }}
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Ship the regulatory-domain applier
+  ansible.builtin.copy:
+    src: "{{ repo_root }}/deploy/photonicat/network/cp-regdom.sh"
+    dest: /usr/local/sbin/cp-regdom
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Ship the regulatory-domain oneshot
+  ansible.builtin.copy:
+    src: "{{ repo_root }}/deploy/photonicat/network/cp-regdom.service"
+    dest: /etc/systemd/system/cp-regdom.service
+    owner: root
+    group: root
+    mode: "0644"
+  register: _cp_regdom_unit
+
+# ── failover supervisor (§8) ────────────────────────────────────────────────
+- name: Ship the uplink failover supervisor
+  ansible.builtin.copy:
+    src: "{{ repo_root }}/deploy/photonicat/network/cp-uplink-watch"
+    dest: /usr/local/sbin/cp-uplink-watch
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Ship the failover supervisor unit
+  ansible.builtin.copy:
+    src: "{{ repo_root }}/deploy/photonicat/network/cp-uplink.service"
+    dest: /etc/systemd/system/cp-uplink.service
+    owner: root
+    group: root
+    mode: "0644"
+  register: _cp_uplink_unit
+
+# ── state seeding: write-once, exactly like seed.env (FR-NET-12) ────────────
+- name: Check whether this box already has a network state file
+  ansible.builtin.stat:
+    path: "{{ cp_net_state_path }}"
+  register: _cp_net_state
+
+- name: Ensure the agents dir exists (the state file lives beside .identity.json)
+  ansible.builtin.file:
+    path: "{{ cp_net_state_path | dirname }}"
+    state: directory
+    mode: "0755"
+  when: (not _cp_net_state.stat.exists) or (cp_net_force | bool)
+
+- name: Seed .network.json (0600 — it holds the Wi-Fi PSK and the SIM PIN)
+  # Write-once. An IT admin's cockpit changes are the newer truth; a re-run of
+  # site.yml must never revert them (FR-NET-12). `-e cp_net_force=true` re-seeds
+  # deliberately, which is the documented way back to the vendor baseline.
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/templates/network.json.j2"
+    dest: "{{ cp_net_state_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  when: (not _cp_net_state.stat.exists) or (cp_net_force | bool)
+
+- name: Report a state file that was left untouched
+  ansible.builtin.debug:
+    msg: >-
+      {{ cp_net_state_path }} already exists — left untouched (the IT admin's
+      cockpit settings win). Re-seed with -e cp_net_force=true.
+  when: _cp_net_state.stat.exists and not (cp_net_force | bool)
+
+# ── enable the units ────────────────────────────────────────────────────────
+- name: Enable + run the regulatory-domain oneshot
+  ansible.builtin.systemd_service:
+    name: cp-regdom.service
+    daemon_reload: true
+    enabled: true
+    state: "{{ 'restarted' if (_cp_regdom_unit is changed) else 'started' }}"
+
+- name: Enable the failover supervisor
+  # Started, not restarted-on-every-run: the backend renders
+  # /etc/default/cp-uplink and restarts this unit when the config actually
+  # changes (O5.3). Bouncing it here on an unchanged box would be churn.
+  ansible.builtin.systemd_service:
+    name: cp-uplink.service
+    daemon_reload: true
+    enabled: true
+    state: "{{ 'restarted' if (_cp_uplink_unit is changed) else 'started' }}"
+
+- name: Report the network foundation
+  ansible.builtin.debug:
+    msg: >-
+      NetworkManager installed with end*/lan*/wan* unmanaged; cp-regdom and
+      cp-uplink enabled; state at {{ cp_net_state_path }} (mode {{ cp_net_mode }},
+      AP {{ 'enabled' if (cp_ap_enabled | bool) else 'disabled' }}). The backend
+      applier owns every nmcli/networkctl/iw/sysctl change from here on.
