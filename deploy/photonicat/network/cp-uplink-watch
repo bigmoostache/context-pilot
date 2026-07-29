@@ -43,6 +43,7 @@ STATE_FILE="$STATE_DIR/state"
 : "${CP_UPLINK_INTERVAL_S:=10}"             # seconds between probe rounds
 : "${CP_UPLINK_PROBE_TIMEOUT_S:=3}"         # per-target ping deadline
 : "${CP_UPLINK_COOLDOWN_S:=60}"             # minimum seconds between transitions
+: "${CP_UPLINK_NM_WAIT_S:=20}"              # cap on any single nmcli call
 : "${CP_UPLINK_METRIC_PREFERRED:=50}"       # wwan route metric when it is the uplink
 : "${CP_UPLINK_METRIC_STANDBY:=700}"        # wwan route metric while standing by
 
@@ -58,6 +59,9 @@ last_transition=0
 last_reason=startup
 fail_streak=0
 ok_streak=0
+# Whether WE have decided the bearer should be the uplink. Distinct from
+# `active_uplink`, which is what the kernel actually shows.
+promoted=no
 
 write_state() {
   mkdir -p "$STATE_DIR" 2>/dev/null || return 0
@@ -66,6 +70,7 @@ write_state() {
     echo "mode=$CP_UPLINK_MODE"
     echo "supervising=$supervising"
     echo "active_uplink=$active_uplink"
+    echo "promoted=$promoted"
     echo "fail_streak=$fail_streak"
     echo "ok_streak=$ok_streak"
     echo "last_transition=$last_transition"
@@ -115,7 +120,14 @@ probe_via() {   # $1 = interface
 # deactivating the connection, so a hot-standby bearer keeps its session and the
 # switch is sub-second. `con up` is the fallback for a bearer that is not up
 # (cold standby, or a reapply the driver refuses).
-nm() { nmcli "$@" >/dev/null 2>&1; }
+#
+# EVERY nmcli call is bounded by `--wait`. MEASURED: without it, a `connection
+# up` against a modem with no coverage blocks for nmcli's 90 s default, and
+# because this is a single-threaded loop that means the supervisor stops probing
+# entirely — it cannot notice the WAN coming back, which is precisely the moment
+# it matters most. A bounded attempt that fails is strictly better than a
+# blocking one that might succeed.
+nm() { nmcli --wait "$CP_UPLINK_NM_WAIT_S" "$@" >/dev/null 2>&1; }
 
 wwan_is_active() {
   nmcli -t -f NAME connection show --active 2>/dev/null | grep -qx "$CP_UPLINK_WWAN_PROFILE"
@@ -129,7 +141,15 @@ set_wwan_metric() {   # $1 = metric
   return 0
 }
 
+# The DECISION is logged before the actuation, not after: the journal has to
+# record why the supervisor chose to fail over even when the actuation then
+# fails (no coverage, no SIM). A transition line that only appears on success
+# would hide exactly the cases someone is reading the journal to understand.
 promote_wwan() {   # $1 = reason
+  log "TRANSITION → 5G — $1"
+  last_transition=$(date +%s)
+  last_reason="$1"
+  promoted=yes
   if ! set_wwan_metric "$CP_UPLINK_METRIC_PREFERRED"; then
     log "FAILED to set $CP_UPLINK_WWAN_PROFILE metric $CP_UPLINK_METRIC_PREFERRED"
   fi
@@ -137,25 +157,21 @@ promote_wwan() {   # $1 = reason
     # Cold standby, or a bearer that dropped. This is the expensive path the
     # `hot` default exists to avoid.
     log "bringing $CP_UPLINK_WWAN_PROFILE up (cold standby or dropped bearer)"
-    nm connection up "$CP_UPLINK_WWAN_PROFILE" || log "FAILED to activate $CP_UPLINK_WWAN_PROFILE"
+    nm connection up "$CP_UPLINK_WWAN_PROFILE" || log "$CP_UPLINK_WWAN_PROFILE did not activate — no uplink"
   fi
-  active_uplink=wwan
-  last_transition=$(date +%s)
-  last_reason="$1"
-  log "TRANSITION → 5G — $1"
 }
 
 demote_wwan() {   # $1 = reason
+  log "TRANSITION → WAN — $1"
+  last_transition=$(date +%s)
+  last_reason="$1"
+  promoted=no
   if ! set_wwan_metric "$CP_UPLINK_METRIC_STANDBY"; then
     log "FAILED to set $CP_UPLINK_WWAN_PROFILE metric $CP_UPLINK_METRIC_STANDBY"
   fi
   if [ "$CP_UPLINK_STANDBY" = "cold" ] && wwan_is_active; then
     nm connection down "$CP_UPLINK_WWAN_PROFILE" || log "FAILED to deactivate $CP_UPLINK_WWAN_PROFILE"
   fi
-  active_uplink=wan
-  last_transition=$(date +%s)
-  last_reason="$1"
-  log "TRANSITION → WAN — $1"
 }
 
 # ── Main loop ───────────────────────────────────────────────────────────────
@@ -195,20 +211,25 @@ while [ "$running" = "1" ]; do
   now=$(date +%s)
   cooled=$((now - last_transition))
 
-  if [ "$observed" != "wwan" ] && [ "$fail_streak" -ge "$CP_UPLINK_FAIL_THRESHOLD" ]; then
+  # The decision keys off `promoted` — what WE last chose — not off `observed`,
+  # which is what the kernel currently shows. They differ exactly when a
+  # promotion could not be carried out (no coverage, no SIM), and keying off the
+  # kernel there would re-promote and re-log on every single cooldown for as
+  # long as the outage lasted. One decision, one transition line (O5.1).
+  if [ "$promoted" = "no" ] && [ "$fail_streak" -ge "$CP_UPLINK_FAIL_THRESHOLD" ]; then
     if [ "$cooled" -ge "$CP_UPLINK_COOLDOWN_S" ] || [ "$last_transition" = "0" ]; then
       promote_wwan "$CP_UPLINK_WAN_IF unreachable for $fail_streak consecutive probes"
       fail_streak=0
     fi
-  elif [ "$observed" = "wwan" ] && [ "$ok_streak" -ge "$CP_UPLINK_OK_THRESHOLD" ]; then
+  elif [ "$promoted" = "yes" ] && [ "$ok_streak" -ge "$CP_UPLINK_OK_THRESHOLD" ]; then
     if [ "$cooled" -ge "$CP_UPLINK_COOLDOWN_S" ]; then
       demote_wwan "$CP_UPLINK_WAN_IF healthy for $ok_streak consecutive probes"
       ok_streak=0
     fi
-  else
-    # No transition this turn — keep the reported uplink in step with the kernel.
-    active_uplink="$observed"
   fi
+  # The REPORTED uplink is always the kernel's answer, never our intent: if a
+  # promotion did not take, the cockpit must say "no internet", not "5G".
+  active_uplink="$observed"
 
   write_state
   # Backgrounded sleep + wait so SIGTERM lands promptly instead of after a full
