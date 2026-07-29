@@ -64,6 +64,48 @@ fn config_path(state: &Mutex<Backend>) -> Result<PathBuf, HttpReply> {
     }
 }
 
+/// Serialises the read → save → apply critical section across the
+/// thread-per-request server.
+///
+/// MEASURED, not theoretical: two overlapping `POST …/mode` calls interleaved on
+/// hardware. A `5g` apply blocked for tens of seconds inside `nmcli connection
+/// up` (a modem with no coverage), a `wan` apply ran to completion in the
+/// meantime and removed the strict-mode drop-in, and then the first one finished
+/// and wrote the drop-in back — leaving the persisted document saying `wan`
+/// while the box had no default route. §6's "one owner, one applier" is about
+/// Ansible-vs-cockpit; it says nothing about two concurrent cockpit calls, and
+/// this is the missing half. A dedicated lock, never the backend `Mutex`, so it
+/// is safe to hold across the `nmcli` subprocesses — exactly like `CADDY_LOCK`.
+static APPLY_LOCK: Mutex<()> = Mutex::new(());
+
+/// Read the current document, let `build` derive the next one from it, then
+/// persist + apply — all under [`APPLY_LOCK`].
+///
+/// `build` returns the new document **and** the payload to echo back, or the
+/// `400` to send. Reading `previous` inside the lock is the point: doing it in
+/// the handler would let two requests derive their "next" from the same stale
+/// document and silently drop one of the two edits.
+fn mutate<F>(state: &Mutex<Backend>, build: F) -> HttpReply
+where
+    F: FnOnce(&NetworkConfig) -> Result<(NetworkConfig, serde_json::Value), HttpReply>,
+{
+    let path = match config_path(state) {
+        Ok(path) => path,
+        Err(reply) => return reply,
+    };
+    // A poisoned lock means a previous applier panicked mid-flight. Recovering
+    // the guard is right: refusing every later call would leave the box stuck in
+    // whatever half-state that panic produced, with no way to fix it from the
+    // cockpit.
+    let _guard = APPLY_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let previous = state::load(&path);
+    let (next, payload) = match build(&previous) {
+        Ok(built) => built,
+        Err(reply) => return reply,
+    };
+    reply_for(commit(state, &path, &previous, &next), payload)
+}
+
 /// Persist `next`, then apply it — rolling **both** back on failure.
 ///
 /// NFR-NET-05: a bad setting can never wedge the box. This mirrors
@@ -71,6 +113,8 @@ fn config_path(state: &Mutex<Backend>) -> Result<PathBuf, HttpReply> {
 /// shape of the error: the previous document is written back and re-applied, so
 /// the box is left exactly as it was found, and the caller turns the `Err` into
 /// a `502`.
+///
+/// Callers reach this through [`mutate`], which holds [`APPLY_LOCK`].
 ///
 /// # Errors
 ///
@@ -171,14 +215,11 @@ pub(crate) fn set_mode(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     let Ok(req) = serde_json::from_slice::<Req>(body) else {
         return HttpReply::error(400, "expected {\"mode\":\"wan\"|\"wan_5g\"|\"5g\"}");
     };
-    let path = match config_path(state) {
-        Ok(path) => path,
-        Err(reply) => return reply,
-    };
-    let previous = state::load(&path);
-    let mut next = previous.clone();
-    next.mode = req.mode;
-    reply_for(commit(state, &path, &previous, &next), serde_json::json!({ "mode": next.mode }))
+    mutate(state, |previous| {
+        let mut next = previous.clone();
+        next.mode = req.mode;
+        Ok((next, serde_json::json!({ "mode": req.mode })))
+    })
 }
 
 /// `POST /api/it/network/ap` — the access-point settings.
@@ -210,27 +251,23 @@ pub(crate) fn set_ap(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     let Ok(req) = serde_json::from_slice::<Req>(body) else {
         return HttpReply::error(400, "invalid access-point body");
     };
-    let path = match config_path(state) {
-        Ok(path) => path,
-        Err(reply) => return reply,
-    };
-    let previous = state::load(&path);
-    let access_point = ApConfig {
-        enabled: req.enabled,
-        ssid: req.ssid.trim().to_owned(),
-        passphrase: req.passphrase.unwrap_or_else(|| previous.ap.passphrase.clone()),
-        band: req.band,
-        channel: req.channel,
-        country: req.country.trim().to_uppercase(),
-        hidden: req.hidden,
-        share_internet: req.share_internet,
-    };
-    if let Err(reason) = state::validate_ap(&access_point) {
-        return HttpReply::error(400, &reason);
-    }
-    let mut next = previous.clone();
-    next.ap = access_point;
-    reply_for(commit(state, &path, &previous, &next), serde_json::json!({ "ap": next.redacted_ap() }))
+    mutate(state, |previous| {
+        let access_point = ApConfig {
+            enabled: req.enabled,
+            ssid: req.ssid.trim().to_owned(),
+            passphrase: req.passphrase.unwrap_or_else(|| previous.ap.passphrase.clone()),
+            band: req.band,
+            channel: req.channel,
+            country: req.country.trim().to_uppercase(),
+            hidden: req.hidden,
+            share_internet: req.share_internet,
+        };
+        state::validate_ap(&access_point).map_err(|reason| HttpReply::error(400, &reason))?;
+        let mut next = previous.clone();
+        next.ap = access_point;
+        let payload = serde_json::json!({ "ap": next.redacted_ap() });
+        Ok((next, payload))
+    })
 }
 
 /// `POST /api/it/network/wwan` — the 5G bearer settings (FR-NET-15).
@@ -260,25 +297,21 @@ pub(crate) fn set_wwan(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     let Ok(req) = serde_json::from_slice::<Req>(body) else {
         return HttpReply::error(400, "invalid wwan body");
     };
-    let path = match config_path(state) {
-        Ok(path) => path,
-        Err(reply) => return reply,
-    };
-    let previous = state::load(&path);
-    let wwan = WwanConfig {
-        apn: req.apn.trim().to_owned(),
-        username: req.username.unwrap_or_else(|| previous.wwan.username.clone()),
-        password: req.password.unwrap_or_else(|| previous.wwan.password.clone()),
-        pin: req.pin.unwrap_or_else(|| previous.wwan.pin.clone()),
-        roaming: req.roaming,
-        standby: req.standby,
-    };
-    if let Err(reason) = state::validate_wwan(&wwan) {
-        return HttpReply::error(400, &reason);
-    }
-    let mut next = previous.clone();
-    next.wwan = wwan;
-    reply_for(commit(state, &path, &previous, &next), serde_json::json!({ "wwan": next.redacted_wwan() }))
+    mutate(state, |previous| {
+        let wwan = WwanConfig {
+            apn: req.apn.trim().to_owned(),
+            username: req.username.unwrap_or_else(|| previous.wwan.username.clone()),
+            password: req.password.unwrap_or_else(|| previous.wwan.password.clone()),
+            pin: req.pin.unwrap_or_else(|| previous.wwan.pin.clone()),
+            roaming: req.roaming,
+            standby: req.standby,
+        };
+        state::validate_wwan(&wwan).map_err(|reason| HttpReply::error(400, &reason))?;
+        let mut next = previous.clone();
+        next.wwan = wwan;
+        let payload = serde_json::json!({ "wwan": next.redacted_wwan() });
+        Ok((next, payload))
+    })
 }
 
 /// Re-apply the persisted network configuration at boot, mirroring
@@ -291,6 +324,7 @@ pub(crate) fn apply_network_at_boot(state: &Mutex<Backend>) {
     let Ok(path) = config_path(state) else {
         return;
     };
+    let _guard = APPLY_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let config = state::load(&path);
     match apply::apply(&config) {
         Ok(true) => eprintln!("network: applied at boot (mode={})", config.mode.as_str()),

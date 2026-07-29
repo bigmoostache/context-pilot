@@ -22,6 +22,10 @@ use std::ffi::OsStr;
 use super::apply::{AP_PROFILE, WWAN_PROFILE, ap_device, run, wwan_device};
 use super::state::{NetworkConfig, Standby, UplinkMode};
 
+/// Seconds `nmcli` may spend bringing a profile up or down before we stop
+/// waiting on it. See [`set_active`] for why the default 90 s is unusable here.
+const ACTIVATION_TIMEOUT_S: u32 = 20;
+
 /// `nmcli`'s spelling of a boolean.
 const fn yes_no(value: bool) -> &'static str {
     if value { "yes" } else { "no" }
@@ -201,7 +205,20 @@ pub(crate) fn reconcile_ap(nmcli: &OsStr, config: &NetworkConfig) -> Result<(), 
 /// bearer are also non-fatal by design — see [`super::apply`].
 pub(crate) fn set_active(nmcli: &OsStr, profile: &str, active: bool) -> Result<(), String> {
     let verb = if active { "up" } else { "down" };
-    let args = ["connection".to_owned(), verb.to_owned(), profile.to_owned()];
+    // `--wait` is not a nicety. nmcli's default activation timeout is 90 s, and
+    // a bearer with no coverage takes ALL of it — measured on hardware, where it
+    // held an HTTP request (and the applier lock) open long enough for the
+    // cockpit's button to look permanently frozen. Activation is best-effort
+    // anyway (see `routes::apply_mode`), so a bounded wait loses nothing: the AP
+    // came up in 4 s in M0, and a modem that has not attached in 20 s was not
+    // going to.
+    let args = [
+        "--wait".to_owned(),
+        ACTIVATION_TIMEOUT_S.to_string(),
+        "connection".to_owned(),
+        verb.to_owned(),
+        profile.to_owned(),
+    ];
     match run(nmcli, &args) {
         Ok(_out) => Ok(()),
         // `nmcli connection down` on a profile that is already inactive exits

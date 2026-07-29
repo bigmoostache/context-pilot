@@ -144,6 +144,40 @@ mod tests {
         assert!(got.body.contains("\"passphrase_set\":true"), "but the UI is told one is set");
     }
 
+    /// Concurrent writes to different halves of the document must both survive.
+    ///
+    /// The bug this pins down was measured on hardware: two overlapping mode
+    /// applies each derived their "next" document from the same snapshot read
+    /// **before** the critical section, so the slower one wrote its stale view
+    /// back on top and the box ended up with a persisted `wan` and a suppressed
+    /// default route. Reading inside the lock is what makes the second writer
+    /// see the first writer's result.
+    #[test]
+    fn concurrent_writes_to_different_halves_both_survive() {
+        let state = std::sync::Arc::new(backend());
+        let ap = br#"{"enabled":false,"ssid":"concurrent","band":"a","channel":36,"country":"FR","hidden":false,"share_internet":true}"#;
+        let wwan = br#"{"apn":"concurrent.apn","roaming":true,"standby":"cold"}"#;
+        let threads: Vec<_> = (0..8)
+            .map(|worker| {
+                let state = std::sync::Arc::clone(&state);
+                std::thread::spawn(move || {
+                    if worker % 2 == 0 {
+                        assert_eq!(it_set_network_ap(&state, ap, None).status, 200);
+                    } else {
+                        assert_eq!(it_set_network_wwan(&state, wwan, None).status, 200);
+                    }
+                })
+            })
+            .collect();
+        for thread in threads {
+            thread.join().expect("worker");
+        }
+        let got = it_get_network(&state, None);
+        assert!(got.body.contains("\"ssid\":\"concurrent\""), "the AP write survived: {}", got.body);
+        assert!(got.body.contains("\"apn\":\"concurrent.apn\""), "the bearer write survived too: {}", got.body);
+        assert!(got.body.contains("\"standby\":\"cold\""), "…including its other fields");
+    }
+
     /// An omitted passphrase keeps the stored one; an explicit `null` clears it.
     #[test]
     fn an_omitted_secret_is_kept_and_an_explicit_null_clears_it() {
