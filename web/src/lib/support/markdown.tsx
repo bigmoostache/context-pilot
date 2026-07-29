@@ -345,8 +345,42 @@ function components(variant: MarkdownVariant): Components {
 
 const BULLET_RE = /^([ \t]*)[•◦▪‣][ \t]/gm
 
+// LaTeX inline/display delimiters the model emits. `remark-math` only knows
+// `$…$` / `$$…$$`, and CommonMark eats a bare `\(` (backslash-before-punctuation
+// escape) before any math plugin sees it — so `\(x\)` inline math renders as the
+// literal `(x)`. We lower the LaTeX delimiters to dollar forms in a preprocess
+// pass, then let `remark-math` (single-dollar enabled) + `rehype-katex` typeset.
+//
+// The lone-`$`-is-literal contract is preserved: BEFORE inserting our own
+// dollars, every pre-existing single `$` is backslash-escaped (so `remark-math`
+// treats it as text), while existing `$$…$$` display pairs are shielded through
+// the escape and pass through untouched.
+const DISPLAY_MATH_RE = /\\\[([\s\S]+?)\\\]/g
+const INLINE_MATH_RE = /\\\(([\s\S]+?)\\\)/g
+const DISPLAY_DOLLAR_SENTINEL = "\u0000CP_DISPLAY_DOLLAR\u0000"
+
+/**
+ * Preprocess raw message text before markdown parsing:
+ *  1. Unicode composer bullets (`• ◦ ▪ ‣`) → CommonMark `- ` markers (T369).
+ *  2. LaTeX `\(…\)` → inline `$…$`, `\[…\]` → display `$$…$$`, with existing
+ *     lone `$` escaped to stay literal and existing `$$` pairs preserved.
+ */
 function normalizeMarkdown(text: string): string {
-  return text.replaceAll(BULLET_RE, "$1- ")
+  let out = text.replaceAll(BULLET_RE, "$1- ")
+
+  // Shield existing `$$` display pairs, escape remaining lone `$` to literal,
+  // then restore the display pairs.
+  out = out
+    .replaceAll("$$", DISPLAY_DOLLAR_SENTINEL)
+    .replaceAll("$", "\\$")
+    .replaceAll(DISPLAY_DOLLAR_SENTINEL, "$$$$")
+
+  // Lower LaTeX delimiters to dollar math (display before inline).
+  out = out
+    .replace(DISPLAY_MATH_RE, (_match, body: string) => `$$${body}$$`)
+    .replace(INLINE_MATH_RE, (_match, body: string) => `$${body}$`)
+
+  return out
 }
 
 /**
@@ -365,7 +399,7 @@ export const Markdown = memo(function Markdown({
   return (
     <div className={cn("wrap-break-word", className)}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: false }]]}
+        remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: true }]]}
         rehypePlugins={[rehypeKatex]}
         components={components(variant)}
       >
