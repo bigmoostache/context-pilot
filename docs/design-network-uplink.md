@@ -1,6 +1,10 @@
 # Design Document — Internet Uplink (WAN / 5G) & Wi-Fi Access Point
 
-**Status:** v1.1 — M0 executed 2026-07-29; O0.2/O0.3/O0.4 closed, O0.1 blocked on RF
+**Status:** v1.2 — M0–M6 executed 2026-07-29. Shipped and validated on hardware
+except the 5G **data path**, which stays blocked on RF (O0.1), and the mobile
+pane's end-to-end check, which is blocked on a missing mobile settings entry
+point (pre-existing, out of scope here). Corrections found by execution are
+folded in below and marked **M1–M6 correction**.
 **Author:** Context Pilot
 **Date:** 2026-07-29
 **Hardware:** Photonicat 2 (RK3576) — Quectel RM520N-GL 5G modem, dual Wi-Fi radio
@@ -248,6 +252,15 @@ below makes that impossible by construction.
 - **The backend is the sole applier**, at boot (`apply_network_at_boot`, mirroring
   `apply_caddy_at_boot`) and on every `POST`. No `nmcli` profile is ever created
   by Ansible, so there is exactly one source of truth and one code path to debug.
+- **M3 addition — the applier also drives Caddy**, before the AP comes up
+  (landmine 11). The fifth arrow in the diagram above is not optional.
+- **M4 correction — one applier is not enough; it also has to serialise.** This
+  section is about Ansible vs the cockpit and says nothing about two concurrent
+  cockpit calls. Measured: a `5g` apply blocked inside `nmcli connection up` (a
+  modem with no coverage), a `wan` apply completed in the meantime and removed
+  the strict-mode drop-in, and then the first one finished and wrote it back —
+  persisted document saying `wan`, box with no default route. The read → save →
+  apply section now runs under a dedicated lock, with the read *inside* it.
 - **Location:** `<agents_dir>/.network.json`, beside `.identity.json` and
   `.provisioned` (i.e. `/opt/context-pilot/home/.context-pilot/agents/`), mode
   `0600` — it holds the Wi-Fi PSK and the SIM PIN.
@@ -385,8 +398,8 @@ not be relied on. If per-SSID VLANs ever leave §14's out-of-scope list, they ne
 |---|---|
 | `802-11-wireless.mode` | `ap` |
 | `802-11-wireless.ssid` / `.hidden` | from state |
-| `802-11-wireless.band` / `.channel` | `bg` \| `a`, channel `0` = auto |
-| `802-11-wireless-security.key-mgmt` | `wpa-psk` (WPA2); SAE/WPA3 evaluated in M6 |
+| `802-11-wireless.band` / `.channel` | `bg` \| `a`; **channel `0` must be sent as the EMPTY STRING** — `nmcli` rejects a literal `0` ("not a valid channel") and reads the empty value back as `0` |
+| `802-11-wireless-security.key-mgmt` | `wpa-psk` **+ `proto rsn` + `pairwise/group ccmp`** — see O6.4 |
 | `ipv4.method` | `shared` when `share_internet`, else `manual` |
 | `ipv4.addresses` | `10.42.0.1/24` |
 
@@ -394,10 +407,19 @@ not be relied on. If per-SSID VLANs ever leave §14's out-of-scope list, they ne
   for DHCP + DNS on the AP subnet and installs NAT through its firewall backend;
   the applier sets `net.ipv4.ip_forward=1`. Clients get the active uplink,
   whichever it is (FR-NET-08).
-- **`share_internet: false`** → `ipv4.method=manual` on the same address, no
-  forwarding, no NAT: the AP is a cul-de-sac whose only reachable service is the
-  cockpit (FR-NET-09). Turning sharing off must also clear the NAT rules and
-  restore `ip_forward=0` if nothing else needs it.
+- **`share_internet: false`** → the AP is a cul-de-sac whose only reachable
+  service is the cockpit (FR-NET-09).
+
+  **M3 correction — NOT `ipv4.method=manual`.** Measured: `manual` gives the
+  interface its address and nothing else, i.e. **no DHCP server**, so a client
+  cannot join the network at all without being hand-configured with a static
+  address — and O3.3's own criterion says "with sharing off, *the same client*
+  still loads the cockpit". NetworkManager has no "DHCP without NAT" method, so
+  the cul-de-sac is built the other way round: keep `ipv4.method=shared` for
+  dnsmasq, then set `ip_forward=0` and delete NM's `nm-shared-<if>` masquerade
+  table. Verified: the client keeps its lease, `ping 1.1.1.1` fails,
+  `sysctl net.ipv4.ip_forward` reads `0`, `nft list tables` is empty, NM does not
+  put the table back, and `https://10.42.0.1/` still answers `200`/5266 B.
 - **Country code.** `cp-regdom.service` (oneshot, `After=network-pre.target`) runs
   `iw reg set <CC>` from the state file, with `wireless-regdb` installed. Without
   it 5 GHz is unusable (§2). Enabling the AP with an empty country is a `400`
@@ -430,10 +452,11 @@ NetworkManager sets it and never restores it. §9's "restore `ip_forward=0` if
 nothing else needs it" is therefore not a nicety the applier may skip: it is the
 only thing that will ever put that sysctl back. Confirmed by measurement.
 
-Second caveat: NM 1.52.1 negotiated **WPA2 + WPA3 transition mode** from a plain
-`key-mgmt=wpa-psk` profile — the client's scan listed the SSID as `WPA2 WPA3`.
-WPA3 on ath11k is thus already reachable rather than a M6 unknown; §14 should be
-revisited with that in mind.
+Second caveat: M0 read `WPA2 WPA3` in nmcli's SECURITY column and concluded WPA3
+was already negotiated. **M6 correction — that column is not the beacon.** With a
+default `wpa-psk` profile the beacon carries an RSN element whose only AKM is
+`PSK`, *plus a legacy WPA1 element offering TKIP*. See O6.4 for what actually
+gets WPA3 here.
 
 ---
 
@@ -462,8 +485,18 @@ All under `can_manage_it`, all following the established gate shape (`None` call
 ```
 
 **Env gates (NFR-NET-04):** `CP_NMCLI_BIN`, `CP_MMCLI_BIN`, `CP_IW_BIN`,
-`CP_NETWORKD_DIR`, `CP_UPLINK_ENV`. Unset ⇒ persistence only, no subprocess, no
-system mutation. This is what makes the whole feature unit-testable off-box.
+`CP_NETWORKD_DIR`, `CP_UPLINK_ENV` — **plus, added in M3**, `CP_NETWORKCTL_BIN`
+(reconfigure after the drop-in), `CP_SYSTEMCTL_BIN` (restart the supervisor),
+`CP_NFT_BIN` (drop NM's masquerade table for a cul-de-sac AP), `CP_IP_BIN` (read
+`end0`'s address — it is networkd's, so `nmcli` cannot answer), and
+`CP_WAN_IFACE`/`CP_AP_IFACE`/`CP_WWAN_DEV` for hardware naming. `CP_NMCLI_BIN`
+unset ⇒ persistence only, no subprocess, no system mutation; each other gate
+degrades on its own. This is what makes the whole feature unit-testable off-box.
+
+**M3 correction to `status`:** `active_uplink` and `wan.has_default_route` are
+parsed from `/proc/net/route` and need **no gate at all**, so the two fields an
+admin watches during a failover stay truthful on a box missing every optional
+tool. O3.5's "a fully-null status" therefore understates it.
 
 **Placement (NFR-NET-07):** `crates/cp-orchestrator/src/transport/it/network/`
 (`mod.rs`, `state.rs`, `apply.rs`, `status.rs`) — one new entry in a directory
@@ -585,8 +618,9 @@ the Rust and `web/src` trees, so a new task file is fine.
 
 - Wi-Fi **client** uplink (box joins an existing SSID as a 4th mode) — the
   `wlan0` radio is reserved for it.
-- WPA3/SAE and 802.11r — evaluated in M6, shipped only if the ath11k firmware
-  behaves.
+- 802.11r. (**WPA3/SAE is no longer out of scope**: O6.4 ships WPA2/WPA3
+  transition mode. A WPA3-*only* option would need a UI switch, since NM can only
+  express it as `key-mgmt=sae`, which excludes WPA2 clients.)
 - Per-SSID VLANs, guest isolation, captive portal.
 - Bandwidth accounting / data caps on the 5G plan.
 - IPv6 prefix delegation from the 5G bearer to the AP subnet (v1 NATs IPv4 only).
@@ -644,6 +678,15 @@ threshold to camp, so the modem sits in limited service. The Orange rejection is
 the *expected* answer for a non-roaming domestic SIM and confirms the baseband,
 the SIM and the AT path all work. The remaining variable is the antenna.
 
+**M5/M6 update (2026-07-29, after `cp-wwan` existed).** With a real NM profile in
+place the modem got further than in M0 but still does not carry data: it reached
+`state: connected` with an IP (`192.0.0.2/27`) and a metric-50 default route on
+`wwu1u1i4`, while `packet service state` stayed **`detached`** and no packet
+egressed. It then fell back to `searching`. Tried and rejected as the cause: the
+APN — `""`, `mmsbouygtel.com` and `ebouygtel.com` all behave identically, and the
+`default-attach` bearer MM created is IPv6-only. The diagnosis is unchanged:
+signal, not configuration.
+
 **To unblock (physical, needs someone at the box):**
 1. Confirm the 5G main/diversity antennas are attached to the correct u.FL/SMA
    ports on the Photonicat 2 and are not swapped with the Wi-Fi pigtails.
@@ -657,6 +700,12 @@ Nothing downstream of M0 is blocked by this except the 5G half of M3/M5 — the
 **Done when:** `ping -I wwu1u1i4 1.1.1.1` succeeds from the box, `mmcli -m 0`
 reports `state: connected` with an operator and access technology, and the
 measured cold-start latency is written into §7 of this document.
+
+**Still open.** Everything that does not need packets to flow over the bearer is
+done: the profile is created and reconciled, the metrics move, the routes appear,
+the supervisor decides and logs correctly, and the mode matrix passes. What is
+untested is the one thing an antenna would unblock — an actual failover that
+restores connectivity.
 
 ### O0.2 — Prove the AP on `wlp1s0` — **[x] done, one gap found**
 
@@ -731,44 +780,77 @@ ULA, DNS working. Changes deliberately retained: `network-manager` +
 **The riskiest milestone.** It touches the box's network stack, i.e. the fleet's
 recovery path. Its acceptance test is not "the feature works" but "nothing broke".
 
-### O1.1 — `tasks/network.yml` — packages and the seam
+### O1.1 — `tasks/network.yml` — packages and the seam — **[x] done**
 
-- [ ] Ship `/etc/NetworkManager/conf.d/10-cp-unmanaged.conf` **before** installing NM
-- [ ] Install `network-manager`, `dnsmasq-base`, `nftables`, `wireless-regdb`, `iw`
-- [ ] Set `[main] dns=systemd-resolved` (decided and validated in O0.3)
-- [ ] `systemctl mask NetworkManager-wait-online.service` (landmine 10)
-- [ ] Enable + start `NetworkManager`
-- [ ] Wire the task into `site.yml` behind `cp_net_enabled` (default `true`)
+**M1 correction — the file is `tasks/net/network.yml`, and `modem.yml` moved
+beside it.** §12 claimed the ≤8-entry structure rule covers only the Rust and
+`web/src` trees; it does not — `check-structure.sh` walks the whole repo bar an
+explicit exclusion list, and `deploy/ansible/tasks/` was already at 8. A ninth
+task file fails CI. Grouping the two network-adjacent task files under `net/`
+takes the directory to 7 + 1.
+
+- [x] Ship `/etc/NetworkManager/conf.d/10-cp-unmanaged.conf` **before** installing NM
+- [x] Install `network-manager`, `dnsmasq-base`, `nftables`, `wireless-regdb`, `iw`
+- [x] Set `[main] dns=systemd-resolved` (decided and validated in O0.3)
+- [x] `systemctl mask NetworkManager-wait-online.service` (landmine 10)
+- [x] Enable + start `NetworkManager`
+- [x] Wire the task into `site.yml` behind `cp_net_enabled` (default `true`)
+
+**Measured:** full `site.yml` over the fleet ULA finished `failed=0`;
+`nmcli device status` reports `end0`/`end1` `unmanaged` and
+`wlp1s0`/`wlan0`/`cdc-wdm0` managed; `NetworkManager-wait-online.service` reads
+`masked`.
 
 **Done when:** on a re-run of the full playbook, `nmcli device status` reports
 `end0` and `end1` as `unmanaged` and `wlp1s0`/`cdc-wdm0` as managed, and a second
 run reports every task in this file as `ok` (idempotent, zero `changed`).
 
-### O1.2 — Regulatory domain unit
+### O1.2 — Regulatory domain unit — **[x] done**
 
-- [ ] `cp-regdom.service` (oneshot, `After=network-pre.target`, `RemainAfterExit`)
-- [ ] Reads the country from `.network.json`; no country ⇒ clean no-op exit 0
-- [ ] Enabled by Ansible
+- [x] `cp-regdom.service` (oneshot, `After=network-pre.target`, `RemainAfterExit`)
+- [x] Reads the country from `.network.json`; no country ⇒ clean no-op exit 0
+- [x] Enabled by Ansible
+
+**M1 correction — read the GLOBAL regulatory block, not the first `country`
+line.** `iw reg get` prints one block per authority and on this hardware they
+legitimately disagree: after `iw reg set 00`, `global` reads `00` while `phy#0`
+still reads `FR`. A first-match parse reported `FR` and skipped the work.
+Measured after the fix: `00` → `FR`, `no IR` count on `phy0` **0**, channels
+36–48 usable at 23 dBm, and a re-run says "already FR (hint re-issued)".
 
 **Done when:** after `reboot`, `iw reg get` reports the configured country and
 `iw phy phy0 info` shows channels 36–48 **without** `no IR`.
 
-### O1.3 — State seeding (write-once)
+### O1.3 — State seeding (write-once) — **[x] done**
 
-- [ ] Template `.network.json` from the `cp_net_*` / `cp_wwan_*` / `cp_ap_*` vars
-- [ ] `creates:`-style guard so an existing file is never overwritten
-- [ ] `-e cp_net_force=true` re-seeds
-- [ ] Mode `0600`, owner root
+Measured: `stat -c %a` returns `600`, owner root, content matches the template,
+and the "already exists — left untouched" branch fires on a re-run.
+
+- [x] Template `.network.json` from the `cp_net_*` / `cp_wwan_*` / `cp_ap_*` vars
+- [x] `creates:`-style guard so an existing file is never overwritten
+- [x] `-e cp_net_force=true` re-seeds
+- [x] Mode `0600`, owner root
 
 **Done when:** run 1 creates the file; editing `"mode"` by hand on the box and
 re-running `site.yml` leaves the edit intact and reports `ok`; re-running with
 `-e cp_net_force=true` reports `changed` and restores the templated content;
 `stat -c %a` returns `600`.
 
-### O1.4 — Day-0 non-regression gate (blocking)
+### O1.4 — Day-0 non-regression gate (blocking) — **[x] passed**
 
-- [ ] Reboot the box after M1 has been applied
-- [ ] Re-run the full `site.yml` **over the fleet ULA** (not the IPv4)
+- [x] Reboot the box after M1 has been applied
+- [x] Re-run the full `site.yml` **over the fleet ULA** (not the IPv4)
+
+**All four met.** `ssh root@<ula>` works after reboot; `ip -br addr` still shows
+the ULA on `end0` (and on `end1`, which has no carrier); the full `site.yml` over
+the ULA finished `failed=0`; and the cockpit answers `200`/**5266 B** on the ULA.
+
+*Caveat on the ULA path, unrelated to this work:* from the control node used here
+(a laptop on Wi-Fi) the ULA is intermittent — SSH connects and then stalls, and a
+100-byte `ping6` fails minutes after one succeeds. It is the AP's IPv6
+multicast/ND handling, not the box: from the box itself `https://[<ula>]/`
+answers `200`/5266 B consistently. `PROVISIONING.md` already warns to use a wired
+control node for ULA work; this is a second reason.
 
 **Done when, all four:** (a) `ssh root@<ula>` succeeds after reboot; (b)
 `ip -br addr` still shows the ULA on both `end0` and `end1`; (c) a full `site.yml`
@@ -783,41 +865,41 @@ a body of the expected size (≈5.3 kB — a bare `200` proves nothing, see
 Pure persistence + contract. Nothing here touches the network, so it can be
 developed and reviewed off-hardware.
 
-### O2.1 — State module
+### O2.1 — State module — **[x] done**
 
-- [ ] `transport/it/network/mod.rs` + `state.rs`: the §6 document, serde types,
+- [x] `transport/it/network/mod.rs` + `state.rs`: the §6 document, serde types,
       load/save via `state::write_atomic`, `0600`
-- [ ] Validation: mode enum; SSID 1–32 bytes; PSK 8–63 chars; country = 2 alpha;
+- [x] Validation: mode enum; SSID 1–32 bytes; PSK 8–63 chars; country = 2 alpha;
       channel valid for the band; APN charset
-- [ ] Fail-closed load (malformed/tampered file ⇒ defaults, mirroring `load_identity`)
-- [ ] Secret elision helper for read paths
+- [x] Fail-closed load (malformed/tampered file ⇒ defaults, mirroring `load_identity`)
+- [x] Secret elision helper for read paths
 
 **Done when:** `cargo test -p cp-orchestrator network::state` passes with unit
 tests covering round-trip, `0600` on the written file, each validation rejection,
 malformed-file fallback, and the proof that no serialised read-path output
 contains the PSK or the PIN.
 
-### O2.2 — REST handlers + gates
+### O2.2 — REST handlers + gates — **[x] done**
 
-- [ ] `transport/rest/config/network.rs` — four handlers, each `can_manage_it`
-- [ ] Re-export in `transport/rest/mod.rs`; four arms in `transport/mod.rs`
-- [ ] `400` on invalid body; `400` on enabling the AP with no country (FR-NET-14)
+- [x] `transport/rest/config/network.rs` — four handlers, each `can_manage_it`
+- [x] Re-export in `transport/rest/mod.rs`; four arms in `transport/mod.rs`
+- [x] `400` on invalid body; `400` on enabling the AP with no country (FR-NET-14)
 
 **Done when:** a test in the shape of `it_gated` asserts `403` for `Manager`/`User`
 and non-`403` for `Admin`/`Superadmin` on all four routes, plus a round-trip test
 (set mode → get reflects it) and the two `400` cases.
 
-### O2.3 — OpenAPI + TypeScript contract
+### O2.3 — OpenAPI + TypeScript contract — **[x] done**
 
-- [ ] Paths + schemas in `tests/openapi/paths.rs` (and `schemas*.rs`)
-- [ ] Regenerate `openapi.json`; regenerate the hey-api client
-- [ ] Extend `web/src/lib/api/it.ts` (no new file — `lib/api/` is at 8 entries)
+- [x] Paths + schemas in `tests/openapi/paths.rs` (and `schemas*.rs`)
+- [x] Regenerate `openapi.json`; regenerate the hey-api client
+- [x] Extend `web/src/lib/api/it.ts` (no new file — `lib/api/` is at 8 entries)
 
 **Done when:** `.github/checks/check-api-contract.sh` exits 0 — which requires the
 route-exhaustiveness test to pass and `git diff --exit-code` to be clean over
 `web/src/lib/api/generated/` after regeneration.
 
-### O2.4 — Structure budget
+### O2.4 — Structure budget — **[x] done**
 
 **Done when:** `.github/checks/check-structure.sh` exits 0 — no file over 500
 lines, no directory over 8 entries, in particular `transport/it/` (7 → 8 via the
@@ -830,22 +912,22 @@ single `network/` sub-dir) and `web/src/lib/api/` (unchanged at 8).
 Where state becomes system configuration. Every step is env-gated (NFR-NET-04)
 and rolls back on failure (NFR-NET-05).
 
-### O3.1 — `nmcli` profile rendering
+### O3.1 — `nmcli` profile rendering — **[x] done**
 
-- [ ] `network/apply.rs`: render/reconcile `cp-wwan` and `cp-ap` from state
-- [ ] Idempotent: identical state ⇒ no `nmcli` mutation
-- [ ] Secrets passed without ever appearing in a log line or an error message
+- [x] `network/apply.rs`: render/reconcile `cp-wwan` and `cp-ap` from state
+- [x] Idempotent: identical state ⇒ no `nmcli` mutation
+- [x] Secrets passed without ever appearing in a log line or an error message
 
 **Done when:** with env gates set to fake binaries, unit tests assert the exact
 argv sequence for a representative state; and `journalctl -u context-pilot | grep -c <psk>`
 returns 0 after a real apply on hardware.
 
-### O3.2 — Mode application
+### O3.2 — Mode application — **[x] done**
 
-- [ ] `wan`: `cp-wwan` down + `autoconnect no`; remove the drop-in; reconfigure
-- [ ] `wan_5g`: `cp-wwan` up at metric 700 (`hot`) or armed (`cold`); no drop-in
-- [ ] `5g`: `cp-wwan` up at metric 50; write the drop-in; `networkctl reload` + `reconfigure end0`
-- [ ] Rollback: on any failure restore the previous state file **and** the previous
+- [x] `wan`: `cp-wwan` down + `autoconnect no`; remove the drop-in; reconfigure
+- [x] `wan_5g`: `cp-wwan` up at metric 700 (`hot`) or armed (`cold`); no drop-in
+- [x] `5g`: `cp-wwan` up at metric 50; write the drop-in; `networkctl reload` + `reconfigure end0`
+- [x] Rollback: on any failure restore the previous state file **and** the previous
       system config, return `502`
 
 **Done when, on hardware, for each of the three modes:** `ip route` matches the
@@ -854,13 +936,13 @@ returns 0 after a real apply on hardware.
 intentionally invalid state (e.g. a bogus APN) returns `502` and leaves
 `ip route` byte-identical to what it was before the call.
 
-### O3.3 — AP application
+### O3.3 — AP application — **[x] done**
 
-- [ ] `share_internet: true` ⇒ `ipv4.method shared` + `ip_forward=1`
-- [ ] `share_internet: false` ⇒ `ipv4.method manual`, NAT rules cleared,
+- [x] `share_internet: true` ⇒ `ipv4.method shared` + `ip_forward=1`
+- [x] `share_internet: false` ⇒ `ipv4.method manual`, NAT rules cleared,
       `ip_forward` restored **by the applier** — NM does not restore it (measured, §9)
-- [ ] Country pushed to `cp-regdom` before the AP is brought up
-- [ ] **Enabling the AP adds `10.42.0.1` to the Caddy site list and re-runs
+- [x] Country pushed to `cp-regdom` before the AP is brought up
+- [x] **Enabling the AP adds `10.42.0.1` to the Caddy site list and re-runs
       `caddy::regenerate` before the AP is reported up; disabling removes it**
       (landmine 11 — without this the AP cannot reach the cockpit over HTTPS)
 
@@ -870,18 +952,18 @@ but `ping 1.1.1.1` fails and `sysctl net.ipv4.ip_forward` reads `0`. In **both**
 cases `https://10.42.0.1/` returns the SPA (`200`, ≈5.3 kB) rather than a TLS
 error — the check that failed in M0/O0.2.
 
-### O3.4 — Boot apply
+### O3.4 — Boot apply — **[x] done**
 
-- [ ] `apply_network_at_boot`, called from the same startup path as
+- [x] `apply_network_at_boot`, called from the same startup path as
       `apply_caddy_at_boot`; write-and-apply, never fails startup
 
 **Done when:** setting a mode, then `reboot`, leaves `ip route` and
 `nmcli con show --active` matching that mode with no manual intervention.
 
-### O3.5 — Live status
+### O3.5 — Live status — **[x] done**
 
-- [ ] `network/status.rs`: parse `nmcli -t`, `mmcli -J`, `ip -j route`, `iw dev`
-- [ ] Every field degrades to `null` rather than erroring when a tool is absent
+- [x] `network/status.rs`: parse `nmcli -t`, `mmcli -J`, `ip -j route`, `iw dev`
+- [x] Every field degrades to `null` rather than erroring when a tool is absent
 
 **Done when:** `GET /api/it/network` on hardware returns a `status` object whose
 `active_uplink`, `wan.has_default_route` and `wwan.state` match what `ip route`
@@ -892,53 +974,87 @@ dev machine with no gates set returns `200` with a fully-null status.
 
 ## M4 — Cockpit UI
 
-### O4.1 — Uplink section
+### O4.1 — Uplink section — **[x] done**
 
-- [ ] `ItNetworkPane.tsx`: three-mode selector + live status card, 5 s polling
-- [ ] Pending/success/error states mirroring `IdentityForm`
-- [ ] Mounted in `ItPane.tsx`; `categories.ts` blurb updated
+- [x] `ItNetworkPane.tsx`: three-mode selector + live status card, 5 s polling
+- [x] Pending/success/error states mirroring `IdentityForm`
+- [x] Mounted in `ItPane.tsx`; `categories.ts` blurb updated
 
 **Done when:** switching mode in the UI changes `ip route` on the box, the status
 card reflects the new active uplink within 10 s without a manual refresh, and a
 server `502` surfaces as a visible error rather than a silent no-op.
 
-### O4.2 — AP section
+### O4.2 — AP section — **[x] done**
 
-- [ ] Enable switch, SSID, passphrase, band, country, channel, hidden, share switch
-- [ ] Passphrase field write-only; the UI shows "set / not set", never a value
-- [ ] Enable disabled until a country is chosen (mirrors the server `400`)
+- [x] Enable switch, SSID, passphrase, band, country, channel, hidden, share switch
+- [x] Passphrase field write-only; the UI shows "set / not set", never a value
+- [x] Enable disabled until a country is chosen (mirrors the server `400`)
 
 **Done when:** an admin can bring up a working AP from a factory-fresh box using
 only the cockpit; reloading the pane never displays the passphrase; and the
 browser devtools network tab shows no PSK in any response body.
 
-### O4.3 — Mobile parity + gates
+### O4.3 — Mobile parity + gates — **[~] gates green, viewport check blocked**
 
-- [ ] Mirror into `web/src/mobile-components/shell/config/`
-- [ ] `pnpm mirror:check`, `pnpm lint`, `pnpm build`, `pnpm type-coverage`
+- [x] Mirror into `web/src/mobile-components/shell/config/`
+- [x] `pnpm mirror:check`, `pnpm lint`, `pnpm build`, `pnpm type-coverage`
 
 **Done when:** `.github/checks/check-mobile-mirror.sh`, `check-ts-lints.sh` and
 `check-structure.sh` all exit 0, and the pane is usable at a 390 px viewport.
+
+All three gates exit 0 (mirror: 117 twins; ts-lints: eslint · prettier ·
+stylelint · tsc · type-coverage · suppressions · census · knip).
+
+**The viewport half could not be exercised end to end, for a reason that predates
+this work: the mobile shell has no settings entry point at all.**
+`mobile-components/shell/config/ConfigModal.tsx` exists and is mirror-checked,
+but nothing in the mobile tree mounts it, so there is no route to the IT category
+below 768 px. The mobile pane is written for 390 px (16 px inputs and selects
+against iOS's auto-zoom, stacked band/channel/country row, `active:` for
+`hover:`) and its structure is enforced by the mirror check — but "usable at
+390 px" stays a claim about the code, not an observation. Forcing the DESKTOP
+tree to 390 px is not a substitute: the desktop `ConfigModal`'s own two-column
+shell overflows there, which is exactly why the mobile tree exists.
 
 ---
 
 ## M5 — Failover supervisor
 
-### O5.1 — The watcher
+### O5.1 — The watcher — **[~] built and validated by simulation; physical unplug + real bearer blocked**
 
-- [ ] `cp-uplink-watch` + `cp-uplink.service`, config from `/etc/default/cp-uplink`
-- [ ] Interface-bound probing; hysteresis (`fail_threshold` / `ok_threshold`); cooldown
-- [ ] Active only in `wan_5g`; idle elsewhere
-- [ ] Every transition logged with its reason
+- [x] `cp-uplink-watch` + `cp-uplink.service`, config from `/etc/default/cp-uplink`
+- [x] Interface-bound probing; hysteresis (`fail_threshold` / `ok_threshold`); cooldown
+- [x] Active only in `wan_5g`; idle elsewhere
+- [x] Every transition logged with its reason
 
 **Done when:** with the box in `wan_5g` and the 5G bearer up, **unplugging the
 ethernet cable** moves the default route to `wwu1u1i4` and connectivity is
 restored within the configured budget; **replugging** restores `end0`; and
 `journalctl -u cp-uplink` shows exactly one transition per event (no flapping).
 
-### O5.2 — The blackhole case
+**What was proven, and what was not.** The decision logic, the hysteresis, the
+cooldown and the "exactly one transition per event" property are all verified —
+by the O5.2 blackhole simulation, which is the *harder* case (metrics cannot see
+it at all, whereas a carrier drop they can). What is not verified is
+*connectivity actually being restored*, because that needs a bearer that carries
+packets (O0.1, RF). The physical unplug was also not performed: this box is
+administered over `end0`, so cutting it remotely would end the session that has
+to observe the result — it needs someone at the box.
 
-- [ ] Simulate "cable up, upstream dead" (block the probe targets upstream, or
+**M5 corrections, both found by running O5.2.** (a) Every `nmcli` call in the
+watcher is now `--wait`-bounded: without it a `connection up` against a modem
+with no coverage blocked for nmcli's 90 s default, and since this is a
+single-threaded loop the supervisor stopped probing entirely — it could not
+notice the WAN coming back. (b) The decision keys off `promoted` (what the
+supervisor chose) rather than `observed` (what the kernel shows); they differ
+exactly when a promotion could not be carried out, and keying off the kernel
+there re-promoted and re-logged on every cooldown for the whole outage. The
+transition line is also logged *before* the actuation, so the journal records the
+decision even when the actuation then fails.
+
+### O5.2 — The blackhole case — **[x] done**
+
+- [x] Simulate "cable up, upstream dead" (block the probe targets upstream, or
       point the box at a gateway that does not forward)
 
 **Done when:** the carrier stays up and the DHCP lease is held, yet the supervisor
@@ -946,55 +1062,104 @@ still fails over to 5G within `fail_threshold × interval_s` + one probe timeout
 and fails back when the upstream is restored. This is the case metric-only
 failover cannot see and is the reason this milestone exists.
 
-### O5.3 — Config plumbing
+**Measured** with an `nft` OUTPUT rule dropping both probe targets while
+`carrier=1` and the lease stayed at `192.168.1.38/24`: fail-over logged after 3
+consecutive probe failures, fail-back logged after recovery, **exactly 2
+`TRANSITION` lines for the whole cycle**, and the cockpit answering `200`/5266 B
+throughout.
 
-- [ ] Backend renders `/etc/default/cp-uplink` from `.network.json` on every apply
-- [ ] Changing probe settings from the API restarts the watcher
+### O5.3 — Config plumbing — **[x] done**
+
+- [x] Backend renders `/etc/default/cp-uplink` from `.network.json` on every apply
+- [x] Changing probe settings from the API restarts the watcher
 
 **Done when:** a probe-parameter change made through the API is visible in
 `/etc/default/cp-uplink` and in `systemctl show cp-uplink -p ExecMainStartTimestamp`
 (the unit restarted) without an SSH session.
 
+**Measured:** `POST …/mode` + `POST …/wwan` moved `CP_UPLINK_MODE` `wan` →
+`wan_5g` and `CP_UPLINK_STANDBY` `hot` → `cold` in the file, and
+`ExecMainStartTimestamp` moved `11:35:36` → `11:40:49`. Only on change: an
+unrelated save does not bounce the supervisor and lose its hysteresis state.
+
 ---
 
 ## M6 — Hardware validation & documentation
 
-### O6.1 — Full matrix on hardware
+### O6.1 — Full matrix on hardware — **[x] done**
 
-- [ ] 3 modes × {AP off, AP on + sharing, AP on no sharing} = 9 combinations
-- [ ] Each combination survives a reboot
+- [x] 3 modes × {AP off, AP on + sharing, AP on no sharing} = 9 combinations
+- [x] Each combination survives a reboot
 
 **Done when:** a results table is recorded in `PROVISIONING.md` with, per
 combination: `ip route`, `nmcli con show --active`, cockpit reachability on the
 ULA **and** the LAN IPv4, and AP-client internet reachability. Zero combination
 leaves the cockpit unreachable on the ULA.
 
-### O6.2 — Adversarial cases
+**All 9 pass** — table in `PROVISIONING.md` § "Phase 5". In every one, `end0`
+keeps its DHCP lease *and* the fleet ULA and the cockpit answers `200`/5266 B on
+both. A reboot in the most demanding combination (`5g` + AP on) came back
+unaided: mode, AP on channel 36, regulatory domain `FR`, `ip_forward` conforming,
+boot **13.7 s** total, cockpit `200` on the LAN IPv4, the ULA and `10.42.0.1`.
 
-- [ ] Modem removed / no SIM / wrong PIN → clean degradation, no boot hang, clear status
-- [ ] Country left empty → AP refuses to enable, with a legible error
-- [ ] Power cut during an apply → state file intact on reboot, box reachable
-- [ ] `pcat-ula` re-run while the strict drop-in is in place → drop-in survives (landmine 5)
+### O6.2 — Adversarial cases — **[x] done, one case deliberately not run**
+
+- [x] Modem removed / no SIM / wrong PIN → clean degradation, no boot hang, clear status
+- [x] Country left empty → AP refuses to enable, with a legible error
+- [x] Power cut during an apply → state file intact on reboot, box reachable
+- [x] `pcat-ula` re-run while the strict drop-in is in place → drop-in survives (landmine 5)
 
 **Done when:** each case is exercised on hardware and the observed behaviour is
 recorded; none of them leaves the box unreachable on the fleet ULA.
 
-### O6.3 — Documentation
+Modem gone (`CP_MMCLI_BIN` → a path that does not exist) ⇒ `wwan: null`, every
+other field still honest, no boot hang. Country empty ⇒ `400` with a legible
+message. `SIGKILL` mid-apply ⇒ the state file parses, no temp file left, box
+reachable on the LAN IPv4 and the ULA, and the half-written change was rolled
+back. `pcat-ula` re-run with the strict drop-in in place ⇒ the drop-in survives
+(landmine 5), addresses intact, default route still suppressed.
 
-- [ ] `PROVISIONING.md`: new phase for network config, the §13 landmines, the results table
-- [ ] This document: status → validated, with M0/M6 measurements folded in (bearer
+**Not run, deliberately: the wrong-PIN case.** The SIM in this box has three
+`sim-pin` retries and no PIN configured; deliberately sending a wrong one would
+spend a retry on real hardware for a path the validation layer already refuses
+(`pin must be 4–8 digits`) and that M0 established is not on the data path at all
+on this SIM. Worth doing on a scrap SIM before a client site that uses one.
+
+### O6.3 — Documentation — **[x] done**
+
+- [x] `PROVISIONING.md`: new phase for network config, the §13 landmines, the results table
+- [x] This document: status → validated, with M0/M6 measurements folded in (bearer
       latency, failover budget, the `dns=` decision)
-- [ ] `tasks/modem.yml` header updated — it currently states WAN config is "left for later"
+- [x] `tasks/modem.yml` header updated — it currently states WAN config is "left for later"
 
 **Done when:** a colleague can provision a box with 5G + AP from the docs alone,
 without reading this design document or asking a question.
 
-### O6.4 — WPA3 evaluation (optional)
+### O6.4 — WPA3 evaluation — **[x] done: WPA3 SHIPS, in transition mode**
 
-- [ ] Test `key-mgmt=sae` and WPA2/WPA3 mixed mode on ath11k
+- [x] Test `key-mgmt=sae` and WPA2/WPA3 mixed mode on ath11k
 
 **Done when:** either WPA3 is shipped with a recorded compatibility note, or it is
 explicitly rejected in §14 with the observed failure.
+
+**WPA3 ships**, and it came from an unexpected direction. The profile keeps
+`key-mgmt=wpa-psk`; what unlocks it is pinning `proto rsn` and both cipher slots
+to `ccmp`. Measured beacon before and after:
+
+| | `key-mgmt=wpa-psk`, NM defaults | + `proto rsn`, `pairwise/group ccmp` |
+|---|---|---|
+| WPA1 element | **present**, TKIP | gone |
+| RSN pairwise / group | CCMP TKIP / TKIP | CCMP / CCMP |
+| RSN AKM suites | `PSK` | **`PSK PSK/SHA-256 SAE`** |
+
+That is genuine WPA2/WPA3-Personal transition mode, and a WPA2 client still
+associated on 5 GHz (−33 dBm) and took a DHCP lease.
+
+`key-mgmt=sae` was the obvious route and is the wrong one: it works, but it makes
+the network **WPA3-only**, because NetworkManager cannot express transition mode
+that way — `pmf optional` alongside `sae` is refused outright ("pmf can only be
+'default' or 'required' when using … 'sae'"). Shipping it would silently lock out
+every WPA2-only device on a client's site.
 
 ---
 

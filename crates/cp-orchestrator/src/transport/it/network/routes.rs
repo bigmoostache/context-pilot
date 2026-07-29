@@ -117,8 +117,13 @@ pub(crate) fn apply_mode(tools: &Tools, config: &NetworkConfig) -> Result<(), St
         UplinkMode::WanThen5g => matches!(config.wwan.standby, Standby::Hot),
     };
     if let Err(failure) = profiles::set_active(&tools.nmcli, WWAN_PROFILE, wanted_up) {
+        // At boot this reliably says "No suitable device found": the applier runs
+        // before ModemManager has enumerated the modem, so NM has nothing to
+        // bind the profile to. The profile carries `autoconnect yes` in both
+        // modes that want it up, so NM brings it up by itself the moment the
+        // device appears — which is why this is a note, not a failure.
         let verb = if wanted_up { "activation" } else { "deactivation" };
-        eprintln!("network: {WWAN_PROFILE} {verb} (non-fatal): {failure}");
+        eprintln!("network: {WWAN_PROFILE} {verb} deferred to NetworkManager ({failure})");
     }
     Ok(())
 }

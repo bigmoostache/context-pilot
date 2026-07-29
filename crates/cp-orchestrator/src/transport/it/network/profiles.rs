@@ -129,8 +129,35 @@ pub(crate) fn ap_args(config: &NetworkConfig) -> Vec<String> {
         if config.ap.channel == 0 { String::new() } else { config.ap.channel.to_string() },
         "802-11-wireless.hidden".to_owned(),
         yes_no(config.ap.hidden).to_owned(),
+        // `wpa-psk` + RSN/CCMP — and O6.4's answer is that this IS how WPA3
+        // ships here. The four settings are one decision, not two.
+        //
+        // Left at NM's defaults, the AP advertised a legacy WPA1 information
+        // element with TKIP alongside an RSN element whose only AKM was `PSK`:
+        // deprecated crypto and a downgrade surface, on a network whose whole
+        // job is to reach the cockpit. Pinning the protocol to `rsn` and both
+        // cipher slots to `ccmp` removes the WPA1 element — and NM 1.52.1 then
+        // widens the RSN AKM list on its own. MEASURED beacon, after:
+        //
+        //     RSN: Group cipher: CCMP · Pairwise ciphers: CCMP
+        //          Authentication suites: PSK PSK/SHA-256 SAE
+        //
+        // That is genuine WPA2/WPA3-Personal transition mode, and a WPA2 client
+        // still associates on 5 GHz and takes a DHCP lease.
+        //
+        // `key-mgmt sae` was the obvious alternative and is the wrong one: it
+        // works, but it makes the network WPA3-ONLY, because NM cannot express
+        // transition mode that way — `pmf optional` alongside `sae` is refused
+        // outright ("pmf can only be 'default' or 'required' when using … 'sae'").
+        // That would silently lock out every WPA2-only device on a client's site.
         "802-11-wireless-security.key-mgmt".to_owned(),
         "wpa-psk".to_owned(),
+        "802-11-wireless-security.proto".to_owned(),
+        "rsn".to_owned(),
+        "802-11-wireless-security.pairwise".to_owned(),
+        "ccmp".to_owned(),
+        "802-11-wireless-security.group".to_owned(),
+        "ccmp".to_owned(),
         "802-11-wireless-security.psk".to_owned(),
         config.ap.passphrase.clone().unwrap_or_default(),
         "ipv4.method".to_owned(),
@@ -324,6 +351,18 @@ mod tests {
         assert_eq!(value_of(&ap_args(&auto), "802-11-wireless.channel"), Some(""));
     }
 
+    /// O6.4 — the four settings that together give WPA2/WPA3 transition mode
+    /// with no legacy TKIP. Measured beacon: `Authentication suites: PSK
+    /// PSK/SHA-256 SAE` over RSN/CCMP, with the WPA1 element gone.
+    #[test]
+    fn the_ap_advertises_rsn_ccmp_only_with_no_legacy_tkip() {
+        let argv = ap_args(&config(UplinkMode::Wan));
+        assert_eq!(value_of(&argv, "802-11-wireless-security.key-mgmt"), Some("wpa-psk"));
+        assert_eq!(value_of(&argv, "802-11-wireless-security.proto"), Some("rsn"), "no WPA1 element");
+        assert_eq!(value_of(&argv, "802-11-wireless-security.pairwise"), Some("ccmp"), "no TKIP");
+        assert_eq!(value_of(&argv, "802-11-wireless-security.group"), Some("ccmp"), "no TKIP");
+    }
+
     #[test]
     fn a_disabled_ap_does_not_autoconnect() {
         let mut off = config(UplinkMode::Wan);
@@ -338,7 +377,6 @@ mod tests {
     fn secrets_are_passed_as_their_own_argv_slots() {
         let argv = ap_args(&config(UplinkMode::Wan));
         assert_eq!(value_of(&argv, "802-11-wireless-security.psk"), Some("correct-horse-battery"));
-        assert_eq!(value_of(&argv, "802-11-wireless-security.key-mgmt"), Some("wpa-psk"));
         let bearer = wwan_args(&config(UplinkMode::Wan));
         assert_eq!(value_of(&bearer, "gsm.password"), Some("bearer-secret"));
         assert_eq!(value_of(&bearer, "gsm.pin"), Some("4271"));

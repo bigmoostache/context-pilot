@@ -158,6 +158,79 @@ Une box fraîchement déployée est **non provisionnée** : pas de certificat, d
 
 ---
 
+## Phase 5 — Réseau : uplink (WAN / 5G) et point d'accès Wi-Fi
+
+Optionnelle et **désactivée par défaut** côté Wi-Fi. Conception complète :
+`docs/design-network-uplink.md`. Ce qui est installé par `site.yml`
+(`tasks/net/network.yml`, sauté avec `-e cp_net_enabled=false`) :
+NetworkManager (avec l'ethernet **non géré**, cf. caveats), `cp-regdom.service`
+(domaine réglementaire) et `cp-uplink.service` (bascule WAN ⇄ 5G).
+
+**Ansible ne configure rien — il *sème*.** `.network.json` est écrit **une seule
+fois** (`0600`, à côté de `.identity.json`) ; ensuite l'admin IT est seul maître à
+bord depuis le cockpit, et un `site.yml` rejoué ne défait pas ses choix. Re-semer
+volontairement : `-e cp_net_force=true`.
+
+### Depuis le cockpit (IT → uplink / Wi-Fi / 5G)
+
+- **Uplink** — trois modes. `Ethernet` (câble seul), `Ethernet + 5G` (le 5G prend
+  le relais quand le câble cesse de porter du trafic), `5G seul` (la route par
+  défaut du câble est **supprimée**, câble branché ou non).
+- **Point d'accès** — SSID, phrase secrète, bande, canal, **pays** (obligatoire),
+  SSID masqué, et l'interrupteur « partager l'internet ». Sans partage le réseau
+  reste utilisable : les clients obtiennent une adresse et joignent le cockpit,
+  mais **rien n'est routé** vers l'extérieur.
+- **5G** — APN, identifiants, PIN, itinérance, veille `hot`/`cold`.
+
+Les secrets (phrase Wi-Fi, mot de passe porteur, PIN SIM) sont **en écriture
+seule** : aucune lecture ne les renvoie. Laisser le champ vide conserve la valeur
+enregistrée.
+
+### Variables Ansible (valeurs par défaut)
+
+`cp_net_mode=wan`, `cp_ap_enabled=false`, `cp_ap_country=FR`, `cp_ap_band=a`,
+`cp_ap_share=true`, `cp_wwan_standby=hot`. APN, identifiants et phrase secrète
+vont dans `<client>.local.yml` (secrets, non commités).
+
+### Matrice validée sur `dh-7681f2a227e0f10d` (2026-07-29)
+
+3 modes × {AP éteint, AP + partage, AP sans partage} = 9 combinaisons. Dans
+**toutes**, `end0` conserve son bail DHCP **et** l'ULA de flotte, et le cockpit
+répond `200`/5266 o sur l'IPv4 LAN **et** sur l'ULA.
+
+| mode | AP | route par défaut | `ip_forward` | tables `nft` | cockpit LAN / ULA / `10.42.0.1` |
+|---|---|---|---|---|---|
+| `wan` | éteint | `end0` (100) | 0 | 0 | 200 / 200 / — |
+| `wan` | + partage | `end0` (100) | 1 | 1 | 200 / 200 / 200 |
+| `wan` | sans partage | `end0` (100) | 0 | 0 | 200 / 200 / 200 |
+| `wan_5g` | éteint | `end0` (100) | 0 | 0 | 200 / 200 / — |
+| `wan_5g` | + partage | `end0` (100) | 1 | 1 | 200 / 200 / 200 |
+| `wan_5g` | sans partage | `end0` (100) | 0 | 0 | 200 / 200 / 200 |
+| `5g` | éteint | **aucune** | 0 | 0 | 200 / 200 / — |
+| `5g` | + partage | **aucune** | 1 | 1 | 200 / 200 / 200 |
+| `5g` | sans partage | **aucune** | 0 | 0 | 200 / 200 / 200 |
+
+Redémarrage en `5g` + AP allumé : tout revient seul (mode, AP sur le canal 36,
+domaine `FR`, `ip_forward` conforme), boot total **13,7 s**, cockpit `200` sur les
+trois adresses. Cas adverses rejoués : modem absent ⇒ `wwan: null` et le reste
+reste honnête ; pays vide ⇒ `400` explicite ; `SIGKILL` en plein `apply` ⇒
+fichier d'état intact et box joignable ; `pcat-ula` rejoué avec le drop-in strict
+en place ⇒ le drop-in survit.
+
+**Non validé, et pourquoi.** Le porteur 5G ne transporte pas de données sur cette
+box : le réseau nominal (Bouygues, `20820`) n'est vu qu'à **RSRP ≈ −113 dBm**, le
+modem s'attache par intermittence puis retombe en service limité. C'est un
+problème **d'antenne/couverture**, pas de logiciel — le SIM ne demande pas de PIN,
+la chaîne AT répond, et le refus d'Orange est la réponse *attendue* pour une SIM
+domestique sans itinérance. À vérifier sur site : antennes principale et diversité
+5G bien vissées sur les bons connecteurs u.FL/SMA (et pas interverties avec les
+queues de cochon Wi-Fi), puis re-mesurer `AT+QENG="servingcell"` — viser mieux que
+−100 dBm. La bascule de `cp-uplink` a donc été validée par **simulation de panne
+amont** (cible de sonde bloquée par `nft`, câble et bail intacts), qui est le cas
+que les métriques de route ne savent pas voir.
+
+---
+
 ## Exploitation courante
 
 - **Admin distant** : `tailscale ssh root@<unit>` (sans clé) ; re-run Ansible par le tailnet.
@@ -189,6 +262,12 @@ Une box fraîchement déployée est **non provisionnée** : pas de certificat, d
 - **Copie SPA lente.** Le déploiement ship+untar **un** tarball de \~19 Mo (`unarchive`) plutôt qu'une copie récursive par fichier (centaines de fonts KaTeX → round-trips SFTP + checksum, timeout 2 min). Lancer le playbook **en tâche de fond** (le foreground a un cap 2 min).
 - **Upgrade Tailscale.** `tailscale ssh` passe par une session gérée par `tailscaled` → redémarrer le daemon coupe la session SSH. Sous systemd, `systemctl restart tailscaled` **détache** le restart de ta session (il survit) ; via `tailscale up` interactif, préférer le LAN break-glass.
 - **Key-expiry.** Vérifier **« Key expiry disabled »** sur chaque nœud tagué (sinon il tombe du tailnet à \~180 j). C'est automatique pour les nœuds tagués mais à confirmer en console.
+- **NetworkManager ne doit JAMAIS toucher à l'ethernet.** NM purge les adresses qu'il n'a pas posées lui-même, exactement comme networkd : s'il attrape `end0`, il emporte l'ULA de flotte, c'est-à-dire le seul chemin de secours de toute la flotte. Le fichier `/etc/NetworkManager/conf.d/10-cp-unmanaged.conf` (`interface-name:end*;lan*;wan*`) est posé **avant** le paquet, et c'est un pré-requis dur de son installation. Le hook dispatcher `50-pcat-ula` déjà en place est le filet.
+- **`NetworkManager-wait-online.service` doit rester masqué.** Installer `network-manager` l'active ; il est `WantedBy=network-online.target`, `context-pilot.service` attend cette cible, et son `ExecStart` est `nm-online -s` avec `TimeoutStartUSec=infinity`. Dès que `cp-wwan` passe en `autoconnect yes` (modes `wan_5g`/`5g`), « NM startup complete » attend un modem qui, sans SIM ou sans couverture, peut ne jamais se connecter : délai **non borné** devant le cockpit. `systemd-networkd-wait-online` couvre déjà l'uplink réel.
+- **Pays réglementaire = pré-requis fonctionnel du Wi-Fi.** Sous le domaine mondial `00`, `iw phy phy0 info` marque **89** canaux `no IR` (toute la bande 5 GHz, plus 2.4 GHz ch. 12/13) et un AP ne peut pas démarrer dessus. `iw reg set FR` ramène ce compte à **0**. Les deux phys sont `(self-managed)`, ce qui laisse croire que l'indication sera ignorée : mesuré, `phy0` (ath11k) l'honore, `phy1` (aic8800) reste à `00` pour toujours — ne jamais lire le premier bloc `country` venu, lire celui de `global`.
+- **Le sous-réseau de l'AP a besoin de son propre site Caddy.** Caddy écoute sur `*:443` mais le Caddyfile généré **énumère des adresses de site explicites** : sans `10.42.0.1` dans la liste, un client Wi-Fi reçoit un `internal error` TLS alors que le HTTP nu répond `200`. L'applicateur régénère donc le Caddyfile **avant** d'allumer l'AP.
+- **NM remet `ip_forward` à 1 et ne le rebaisse jamais.** `ipv4.method shared` l'active ; repasser en mode cul-de-sac retire bien la table `nft` et arrête `dnsmasq`, mais le sysctl reste à `1` — mesuré. C'est l'applicateur qui le restaure, sinon la box reste un routeur sur le LAN client à l'insu de tout le monde.
+- **Un seul applicateur, et il sérialise.** Deux appels cockpit concurrents se sont entrelacés en test : un `apply` bloqué 90 s dans `nmcli connection up` (modem sans couverture) a réécrit le drop-in strict *après* qu'un autre l'ait retiré → état persisté `wan`, box sans route par défaut. D'où le verrou côté backend et le `--wait` sur chaque appel `nmcli`. Corollaire opérationnel inchangé : un humain qui lance `nmcli` sur la box sera défait au prochain apply ou au prochain boot.
 - **Firewall = responsabilité IT client.** Le périmètre réseau (qui atteint la box sur le LAN) est du ressort de l'IT. L'image Armbian nue n'ouvre que `:22` ; **après déploiement la box expose `:22`, `:80` et `:443`** — le backend, lui, est sur le loopback, donc rien n'écoute sur le LAN qui ne soit ni SSH ni Caddy.
 
 ## Reste à industrialiser (non bloquant)
