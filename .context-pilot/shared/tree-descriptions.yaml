@@ -3398,6 +3398,10 @@
   path: web/src/components/ui/scroll-area.tsx
   description: shadcn ScrollArea wrapper over Base UI scroll-area primitive (Root/Viewport/Scrollbar/Thumb/Corner). Vertical+horizontal orientations, focus-visible ring. Shared UI primitive.
   last_edited_ms: 1781814025269
+29449156763ad52c:
+  path: crates/cp-mod-console/src/types.rs
+  description: 'Console types. ProcessStatus enum #[non_exhaustive]. SessionMeta, ConsoleState, ConsoleWatcher (exit/pattern, easy_bash inline vs panel overflow). easy_bash inline-vs-panel now decided SOLELY by byte size (EASY_BASH_INLINE_MAX_BYTES=8KB); line-count gate removed. check_timeout preserves_tempo on both branches.'
+  last_edited_ms: 1785315904493
 2946d1410b115071:
   path: src/app/context/mod.rs
   description: Context prep + unified freeze. prepare_stream_context split build_reverie_stream_context/build_reverie_panel_content/build_main_stream_context; freeze machinery moved to sibling freeze_pass.rs (A2). Cache cost via prefix-match.
@@ -13682,6 +13686,10 @@ a445c40881ecc32a:
   path: src/ui/help/mod.rs
   description: Re-exports CommandPalette, config_overlay module
   last_edited_ms: 0
+a46768b14ecfbb7a:
+  path: crates/cp-mod-console/src/tools.rs
+  description: 'Console tools: create, send_keys, wait, watch, easy_bash. CONSOLE_WAIT_BLOCKING_SENTINEL const. Git/gh guardrails. console_wait max_wait default+cap = 60s. easy_bash inline if output ≤8KB else panel.'
+  last_edited_ms: 1785315904606
 a467728cf80828fe:
   path: web/tsconfig.app.json
   description: 'App-scope TS compiler config (bundler mode, react-jsx, es2023). Current strictness: noUnusedLocals/Parameters, erasableSyntaxOnly, noFallthroughCasesInSwitch, verbatimModuleSyntax. T505 target: add the full maximal strict superset (noUncheckedIndexedAccess, exactOptionalPropertyTypes, noImplicitReturns/Override, noPropertyAccessFromIndexSignature, etc.) — the rustc-forbid twin.'

@@ -143,11 +143,10 @@ pub fn format_wait_result(name: &str, exit_code: Option<i32>, panel_id: &str, la
 // Console Watcher — implements cp_base::state::watchers::Watcher trait
 // ============================================================
 
-/// Maximum lines for `easy_bash` inline output. Beyond this, a panel is created.
-const EASY_BASH_INLINE_MAX_LINES: usize = 150;
-
-/// Maximum raw bytes for `easy_bash` inline output (~2 000 tokens).
-/// Catches few-but-huge lines (e.g. minified JSON) that would bloat the conversation.
+/// Maximum raw bytes for `easy_bash` inline output (~2 000 tokens). This is the
+/// SOLE gate: output at or under this size returns inline, anything larger spills
+/// to a panel. Byte size (not line count) is what actually bloats the
+/// conversation — a few huge lines (e.g. minified JSON) cost as much as many.
 const EASY_BASH_INLINE_MAX_BYTES: usize = 8_000;
 
 /// A watcher that monitors a console session for a condition.
@@ -216,10 +215,9 @@ impl Watcher for ConsoleWatcher {
             let log_path = &handle.log_path;
             let output = std::fs::read_to_string(log_path).unwrap_or_default();
             let exit_code = handle.get_status().exit_code().unwrap_or(-1);
-            let line_count = output.lines().count();
 
-            // Short output → return inline, kill session, no panel
-            if line_count <= EASY_BASH_INLINE_MAX_LINES && output.len() <= EASY_BASH_INLINE_MAX_BYTES {
+            // Small output → return inline, kill session, no panel
+            if output.len() <= EASY_BASH_INLINE_MAX_BYTES {
                 let description = if output.trim().is_empty() {
                     format!("(no output, exit_code={exit_code})")
                 } else {
@@ -233,19 +231,22 @@ impl Watcher for ConsoleWatcher {
                 );
             }
 
-            // Long output (too many lines or too large) → create panel via deferred, keep session alive
+            // Output over the byte cap → create panel via deferred, keep session alive
             Some(
-                WatcherResult::new(format!("Output too long for inline ({line_count} lines, exit_code={exit_code})"))
-                    .tool_use_id_opt(self.tool_use_id.clone())
-                    .create_panel(
-                        DeferredPanel::new(
-                            self.session_name.clone(),
-                            truncate_str(&self.command, 30).to_owned(),
-                            self.command.clone(),
-                            truncate_str(&self.command, 60).to_owned(),
-                        )
-                        .cwd(self.cwd.clone()),
-                    ),
+                WatcherResult::new(format!(
+                    "Output too long for inline ({} bytes, exit_code={exit_code})",
+                    output.len()
+                ))
+                .tool_use_id_opt(self.tool_use_id.clone())
+                .create_panel(
+                    DeferredPanel::new(
+                        self.session_name.clone(),
+                        truncate_str(&self.command, 30).to_owned(),
+                        self.command.clone(),
+                        truncate_str(&self.command, 60).to_owned(),
+                    )
+                    .cwd(self.cwd.clone()),
+                ),
             )
         } else {
             let exit_code = handle.get_status().exit_code();

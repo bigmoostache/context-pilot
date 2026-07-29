@@ -343,7 +343,7 @@ pub fn execute_watch(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Handle `console_easy_bash`: spawn, block until exit or 10s timeout, return output inline
-/// if short (≤150 lines), or create a console panel if long/timeout.
+/// if small (≤8 KB), or create a console panel if large/timeout.
 pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("easy_bash");
     let command = match tool.input.get("command").and_then(|v| v.as_str()) {
