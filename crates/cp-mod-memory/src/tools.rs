@@ -1,4 +1,4 @@
-use super::MEMORY_TLDR_MAX_TOKENS;
+use super::{MEMORY_TLDR_ADVERTISED_TOKENS, MEMORY_TLDR_HARD_CAP};
 use cp_base::state::context::{Kind, estimate_tokens};
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
@@ -8,11 +8,17 @@ use crate::types::{MemoryImportance, MemoryItem, MemoryState};
 use std::fmt::Write as _;
 
 /// Validate that a tl;dr summary does not exceed the token limit.
+///
+/// Enforcement uses the real [`MEMORY_TLDR_HARD_CAP`] (120), but the rejection
+/// message quotes only the advertised [`MEMORY_TLDR_ADVERTISED_TOKENS`] (80).
+/// The gap is intentional: the model trims toward the number it's told, so
+/// telling it 80 keeps its output safely under the true 120 and a marginal
+/// overrun (say ~110) still succeeds instead of erroring. Never leak 120 here.
 fn validate_tldr(text: &str) -> Result<(), String> {
     let tokens = estimate_tokens(text);
-    if tokens > MEMORY_TLDR_MAX_TOKENS {
+    if tokens > MEMORY_TLDR_HARD_CAP {
         Err(format!(
-            "tl_dr too long: ~{tokens} tokens (max {MEMORY_TLDR_MAX_TOKENS}). Keep it to a short one-liner; put details in 'contents' instead."
+            "tl_dr too long: ~{tokens} tokens (max {MEMORY_TLDR_ADVERTISED_TOKENS}). Keep it to a short one-liner; put details in 'contents' instead."
         ))
     } else {
         Ok(())

@@ -272,6 +272,7 @@ impl Watcher for ConsoleWatcher {
             Some(
                 WatcherResult::new(format!("TIMED OUT after {elapsed_s}s, process may still be running"))
                     .tool_use_id_opt(self.tool_use_id.clone())
+                    .preserves_tempo()
                     .create_panel(
                         DeferredPanel::new(
                             self.session_name.clone(),
@@ -289,7 +290,8 @@ impl Watcher for ConsoleWatcher {
                     self.session_name, elapsed_s, self.panel_id
                 ))
                 .panel_id(self.panel_id.clone())
-                .tool_use_id_opt(self.tool_use_id.clone()),
+                .tool_use_id_opt(self.tool_use_id.clone())
+                .preserves_tempo(),
             )
         }
     }

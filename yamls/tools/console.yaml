@@ -21,7 +21,7 @@ tools:
       id: "Console panel ID (e.g., 'P11')"
       mode: "Wait mode: 'exit' for process completion, 'pattern' for regex match in output"
       pattern: "Regex pattern to match in output (required when mode='pattern'). Use alternation to catch success AND failure: 'Listening on \\d+|error|panic|EADDRINUSE'. Falls back to literal match if invalid regex."
-      max_wait: "Max wait in seconds, 1-30 (default: 30). On timeout, returns last output lines."
+      max_wait: "Max wait in seconds, 1-60 (default: 60). On timeout, returns last output lines."
 
   console_watch:
     description: |

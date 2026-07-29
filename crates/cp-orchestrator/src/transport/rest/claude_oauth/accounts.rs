@@ -13,6 +13,10 @@ use super::super::HttpReply;
 
 const ACCOUNTS_FILE: &str = "claude-accounts.json";
 
+/// Refresh a token once it drops within this window of expiry (1 hour). Shared
+/// by the account-switch path and the background sweep so both use one policy.
+pub(super) const REFRESH_THRESHOLD_MS: i64 = 3_600_000;
+
 // ── Stored file format ───────────────────────────────────────────────
 
 /// On-disk shape of `~/.context-pilot/claude-accounts.json`.
@@ -122,8 +126,9 @@ pub(crate) fn switch_account(body_bytes: &[u8]) -> HttpReply {
         return HttpReply::error(404, &format!("no stored account for {email}"));
     };
 
-    // If the access token expired, attempt a refresh before activating.
-    let target_creds = maybe_refresh(target_creds);
+    // If the access token is expired or within an hour of expiry, refresh it
+    // before activating so the switched-to account is comfortably usable.
+    let target_creds = maybe_refresh(target_creds, REFRESH_THRESHOLD_MS);
 
     // Save current active into the store (best-effort: if no active token
     // exists we still proceed with the switch).
@@ -164,22 +169,25 @@ pub(crate) fn delete_account(email: &str) -> HttpReply {
 
 // ── Token refresh ────────────────────────────────────────────────────
 
-/// If the stored token is expired but has a refresh token, attempt a
-/// refresh and return updated credentials. Falls back to the original
-/// on any failure.
-fn maybe_refresh(mut creds: serde_json::Value) -> serde_json::Value {
+/// True when `creds` will expire within `threshold_ms` (or already has) AND
+/// carries a non-empty refresh token to renew with. `threshold_ms == 0` is the
+/// classic "expired only" test; a positive value (e.g. 1h) refreshes early.
+pub(super) fn is_stale(creds: &serde_json::Value, threshold_ms: i64) -> bool {
     let expires_at = creds.get("expiresAt").and_then(|v| v.as_i64()).unwrap_or(0);
-    if expires_at > now_ms() {
-        return creds; // still valid
-    }
-    let refresh_token = creds.get("refreshToken").and_then(|v| v.as_str()).unwrap_or("").to_owned();
-    if refresh_token.is_empty() {
-        return creds; // nothing to refresh with
-    }
+    let has_refresh = creds.get("refreshToken").and_then(|v| v.as_str()).is_some_and(|s| !s.is_empty());
+    has_refresh && expires_at.saturating_sub(now_ms()) < threshold_ms
+}
 
+/// Exchange a refresh token for a fresh `claudeAiOauth` credential blob.
+///
+/// The single shared refresh-grant POST (previously copy-pasted across the
+/// switch and login paths). Returns the new `{accessToken, refreshToken,
+/// expiresAt}` fields folded onto `base`, or `None` on any failure (network,
+/// non-2xx, empty access token) so callers keep the old credentials intact.
+pub(super) fn try_refresh(base: &serde_json::Value, refresh_token: &str) -> Option<serde_json::Value> {
     let body = serde_json::json!({
         "grant_type": "refresh_token",
-        "refresh_token": &refresh_token,
+        "refresh_token": refresh_token,
         "client_id": super::CLIENT_ID,
     });
     let client = reqwest::blocking::Client::new();
@@ -189,23 +197,55 @@ fn maybe_refresh(mut creds: serde_json::Value) -> serde_json::Value {
         .header("User-Agent", super::TOKEN_USER_AGENT)
         .body(body.to_string())
         .timeout(std::time::Duration::from_secs(15))
-        .send();
-
-    let Ok(r) = resp else { return creds };
-    if !r.status().is_success() {
-        return creds;
+        .send()
+        .ok()?;
+    if !resp.status().is_success() {
+        return None;
     }
-    let Ok(val) = r.json::<serde_json::Value>() else { return creds };
+    let val = resp.json::<serde_json::Value>().ok()?;
 
     let access_token = val.get("access_token").and_then(|v| v.as_str()).unwrap_or("");
-    let new_refresh = val.get("refresh_token").and_then(|v| v.as_str()).unwrap_or(&refresh_token);
-    let expires_in = val.get("expires_in").and_then(|v| v.as_i64()).unwrap_or(0);
-    let new_expires_at = now_ms() + expires_in * 1000;
-
-    if !access_token.is_empty() {
-        creds["accessToken"] = serde_json::Value::String(access_token.to_owned());
-        creds["refreshToken"] = serde_json::Value::String(new_refresh.to_owned());
-        creds["expiresAt"] = serde_json::json!(new_expires_at);
+    if access_token.is_empty() {
+        return None;
     }
-    creds
+    let new_refresh = val.get("refresh_token").and_then(|v| v.as_str()).unwrap_or(refresh_token);
+    let expires_in = val.get("expires_in").and_then(|v| v.as_i64()).unwrap_or(0);
+
+    let mut creds = base.clone();
+    creds["accessToken"] = serde_json::Value::String(access_token.to_owned());
+    creds["refreshToken"] = serde_json::Value::String(new_refresh.to_owned());
+    creds["expiresAt"] = serde_json::json!(now_ms() + expires_in * 1000);
+    Some(creds)
+}
+
+/// If `creds` is stale (within `threshold_ms` of expiry), attempt a refresh and
+/// return the updated blob. Falls back to the original on any failure.
+fn maybe_refresh(creds: serde_json::Value, threshold_ms: i64) -> serde_json::Value {
+    if !is_stale(&creds, threshold_ms) {
+        return creds;
+    }
+    let refresh_token = creds.get("refreshToken").and_then(|v| v.as_str()).unwrap_or("").to_owned();
+    try_refresh(&creds, &refresh_token).unwrap_or(creds)
+}
+
+/// Refresh every STORED account whose token is within `threshold_ms` of expiry,
+/// rewriting `claude-accounts.json` only when at least one changed. Best-effort:
+/// an individual refresh failure leaves that account's credentials untouched.
+/// The active-slot token is refreshed separately (see `sweep`).
+pub(super) fn refresh_stored_accounts(threshold_ms: i64) {
+    let mut store = read_accounts();
+    let mut dirty = false;
+    for creds in store.accounts.values_mut() {
+        if !is_stale(creds, threshold_ms) {
+            continue;
+        }
+        let refresh_token = creds.get("refreshToken").and_then(|v| v.as_str()).unwrap_or("").to_owned();
+        if let Some(fresh) = try_refresh(creds, &refresh_token) {
+            *creds = fresh;
+            dirty = true;
+        }
+    }
+    if dirty {
+        let _w = write_accounts(&store);
+    }
 }

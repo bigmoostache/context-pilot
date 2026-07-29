@@ -104,27 +104,11 @@ export function useClaudeUsage(polling = true): ClaudeUsage {
     return session ? Math.min(session.percent, 100) : 0
   }, [usage.data?.limits])
 
-  // Auto-refresh when the token expires within 30 minutes. The ref pattern keeps
-  // the effect bound to [tokenStatus.data] without re-subscribing when the
-  // mutation object is recreated; the attempt guard fires once per expiry window.
-  const refreshMutateRef = useRef(refreshMutation.mutate)
-  useEffect(() => {
-    refreshMutateRef.current = refreshMutation.mutate
-  })
-  const autoRefreshAttemptedRef = useRef(false)
-  useEffect(() => {
-    const status = tokenStatus.data
-    if (!status?.valid || status.expires_at == null) return
-    const remaining = status.expires_at - Date.now()
-    if (remaining > 0 && remaining < 30 * 60_000) {
-      if (!autoRefreshAttemptedRef.current) {
-        autoRefreshAttemptedRef.current = true
-        refreshMutateRef.current()
-      }
-    } else {
-      autoRefreshAttemptedRef.current = false
-    }
-  }, [tokenStatus.data])
+  // Token auto-refresh is NOT done here anymore: the orchestrator runs a
+  // server-side sweep that keeps the active token AND every stored account
+  // fresh (within an hour of expiry), regardless of whether any UI is open.
+  // The old popover-scoped useEffect only fired while this surface was mounted,
+  // so it "basically never" ran — removed in favour of the always-on backend.
 
   return {
     tokenStatus,
