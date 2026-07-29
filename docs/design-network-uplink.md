@@ -529,10 +529,11 @@ approach the 500-line ceiling, so they land in a sibling
 
 ## §12 — Ansible
 
-`deploy/ansible/tasks/network.yml` (new; `modem.yml` keeps the toolbox only):
+`deploy/ansible/tasks/net/network.yml` (new; `modem.yml` moved beside it and
+keeps the toolbox only):
 
-1. Install `network-manager`, `dnsmasq-base`, `nftables`, `wireless-regdb`, `iw`.
-2. Ship `/etc/NetworkManager/conf.d/10-cp-unmanaged.conf` **before** NM starts.
+1. Ship `/etc/NetworkManager/conf.d/10-cp-unmanaged.conf` **before** the package.
+2. Install `network-manager`, `dnsmasq-base`, `nftables`, `wireless-regdb`, `iw`.
 3. **Mask `NetworkManager-wait-online.service`** (landmine 10).
 4. Ship `cp-regdom.service`, `cp-uplink-watch`, `cp-uplink.service`.
 5. Seed `.network.json` write-once (`0600`), from the variables below.
@@ -552,8 +553,11 @@ approach the 500-line ceiling, so they land in a sibling
 | `cp_ap_country` | `FR` | `site.yml` |
 | `cp_ap_share` | `true` | `site.yml` |
 
-`deploy/ansible/tasks/` is at 8 entries but the `≤8` structure rule covers only
-the Rust and `web/src` trees, so a new task file is fine.
+**M1 correction.** `deploy/ansible/tasks/` is at 8 entries and the `≤8` structure
+rule does **not** cover only the Rust and `web/src` trees: `check-structure.sh`
+walks the whole repo bar an explicit exclusion list that does not mention
+`deploy/`. A 9th task file fails CI. `modem.yml` and `network.yml` therefore live
+in a `net/` sub-directory, taking `tasks/` to 7 files + 1 directory.
 
 ---
 
