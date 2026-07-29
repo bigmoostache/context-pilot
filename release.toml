@@ -1,0 +1,48 @@
+# cargo-release configuration.
+#
+# Context Pilot ships as an APPLIANCE, not as crates.io packages. The release
+# act is a `v*` tag: .github/workflows/release.yml turns it into per-arch
+# tarballs plus a minisign-signed `stable.json` on the `channels` branch, which
+# the fleet polls (docs/update-policy.md §5.5). Boxes in `auto` mode apply it
+# in their next 03:00–05:00 window.
+#
+# THE FLOW. The `master-protected` ruleset takes changes into master only
+# through a pull request, so a release run cannot push its own bump commit —
+# an earlier revision of this file tried, and GH013 rejected it:
+#
+#     git checkout -b release/vX.Y.Z
+#     cargo release X.Y.Z --workspace --execute      # bump + commit, nothing more
+#     …open a PR, get it merged…
+#     git tag -a vX.Y.Z -m "Context Pilot vX.Y.Z" <merge-sha>
+#     git push origin vX.Y.Z                         # ← this is the release
+#
+# The tag push is what reaches the fleet. Tags are not covered by the ruleset
+# (it targets branches), so that push goes through where the branch push cannot.
+#
+# The workspace shares one version (`[workspace.package] version`), so all
+# crates move together and a single `v<version>` tag names the release.
+
+# Belt and braces. Every package also carries its own `publish = false`, which
+# is the real guard (cargo honours it whatever tool drives the release); this
+# line just stops cargo-release reaching the publish step at all.
+publish = false
+
+shared-version = true
+consolidate-commits = true
+
+pre-release-commit-message = "chore(release): v{{version}}"
+
+# No tag from the run. This is not tidiness: cargo-release would tag the
+# pre-merge commit, and master can move on between cutting the branch and
+# merging it — the tag would then name a tree missing whatever landed in
+# between. The tag belongs on the merge commit, placed after the fact.
+tag = false
+
+# No push either, because it cannot succeed. The ruleset rejects a direct push
+# to master, and git pushes refs atomically, so a rejected branch takes the tag
+# down with it — which is exactly how the v0.2.13 attempt failed.
+push = false
+
+# Bump on a release branch, never on master: a bump committed straight to
+# master is a commit that can never be pushed anywhere.
+allow-branch = ["release/*"]

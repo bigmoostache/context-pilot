@@ -8,6 +8,7 @@ repository.workspace = true
 keywords.workspace = true
 categories.workspace = true
 readme.workspace = true
+publish = false
 
 [dependencies]
 cp-wire = { path = "../cp-wire" }
