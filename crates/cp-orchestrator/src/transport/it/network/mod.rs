@@ -188,18 +188,22 @@ fn reply_for(outcome: Result<bool, String>, payload: serde_json::Value) -> HttpR
 /// `GET /api/it/network` — the current configuration (secrets elided) plus the
 /// live status the cockpit polls.
 ///
+/// `bearer_visible` is the caller's `can_manage_secrets`: without it the `wwan`
+/// **configuration** is `null`, because the 5G bearer is vendor kit (see
+/// [`NetworkConfig::redacted`]). `status.wwan` is unaffected — a client admin
+/// still needs to see whether the modem is registered and on what signal.
+///
 /// Never fails on a missing state file or an absent tool: the config falls back
-/// to defaults (fail-closed — `wan`, AP off) and every status field degrades to
-/// `null`, so a dev machine with no gates set answers `200` with a fully-null
-/// status (O3.5).
-pub(crate) fn get_network(state: &Mutex<Backend>) -> HttpReply {
+/// to defaults (fail-closed — `wan`, AP off) and every tool-backed status field
+/// degrades to `null`, so a dev machine with no gates set answers `200` (O3.5).
+pub(crate) fn get_network(state: &Mutex<Backend>, bearer_visible: bool) -> HttpReply {
     let path = match config_path(state) {
         Ok(path) => path,
         Err(reply) => return reply,
     };
     let config = state::load(&path);
     HttpReply::ok(&serde_json::json!({
-        "config": config.redacted(),
+        "config": config.redacted(bearer_visible),
         "status": status::probe(&config),
     }))
 }
@@ -270,7 +274,12 @@ pub(crate) fn set_ap(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     })
 }
 
-/// `POST /api/it/network/wwan` — the 5G bearer settings (FR-NET-15).
+/// `POST /api/it/network/wwan` — the 5G bearer settings.
+///
+/// **Superadmin only** (FR-NET-15, revised): the SIM is ours, the data plan is
+/// ours, and the APN that goes with them is a fleet-wide vendor decision — a
+/// client's IT admin changing it breaks their own connectivity and bills us for
+/// it. Same boundary as the provider API keys.
 ///
 /// `password` and `pin` are write-only, with the same absent/`null`/string
 /// semantics as the AP passphrase.

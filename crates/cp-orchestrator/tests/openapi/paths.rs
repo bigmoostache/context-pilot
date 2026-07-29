@@ -94,7 +94,8 @@ pub(super) fn paths() -> Value {
             "type": "object", "properties": { "provisioned": { "type": "boolean" } }, "required": ["provisioned"]
         })),
         // ── Internet uplink + Wi-Fi AP (docs/design-network-uplink.md §10) ──
-        "/api/it/network": get("it", "Uplink + access-point configuration (secrets elided) and live status",
+        "/api/it/network": get("it",
+            "Uplink + access-point configuration (secrets elided; `config.wwan` null without can_manage_secrets) and live status",
             r("ItNetworkResponse")),
         "/api/it/network/mode": post("it", "Select the uplink mode (wan | wan_5g | 5g)", Some(json!({
             "type": "object",
@@ -118,7 +119,9 @@ pub(super) fn paths() -> Value {
             },
             "required": ["enabled", "ssid", "band", "channel", "country", "hidden", "share_internet"]
         })), r("ItNetworkApResult")),
-        "/api/it/network/wwan": post("it", "Set the 5G bearer configuration", Some(json!({
+        // Superadmin only (`can_manage_secrets`) — the SIM and the data plan are
+        // the vendor's, so the APN is not a per-site setting.
+        "/api/it/network/wwan": post("it", "Set the 5G bearer configuration (superadmin — vendor-managed)", Some(json!({
             "type": "object",
             "properties": {
                 "apn": { "type": "string" },

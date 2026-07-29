@@ -173,14 +173,20 @@ volontairement : `-e cp_net_force=true`.
 
 ### Depuis le cockpit (IT → uplink / Wi-Fi / 5G)
 
-- **Uplink** — trois modes. `Ethernet` (câble seul), `Ethernet + 5G` (le 5G prend
+- **Uplink** — trois modes (admin IT du client). `Ethernet` (câble seul), `Ethernet + 5G` (le 5G prend
   le relais quand le câble cesse de porter du trafic), `5G seul` (la route par
   défaut du câble est **supprimée**, câble branché ou non).
-- **Point d'accès** — SSID, phrase secrète, bande, canal, **pays** (obligatoire),
+- **Point d'accès** (admin IT du client) — SSID, phrase secrète, bande, canal, **pays** (obligatoire),
   SSID masqué, et l'interrupteur « partager l'internet ». Sans partage le réseau
   reste utilisable : les clients obtiennent une adresse et joignent le cockpit,
   mais **rien n'est routé** vers l'extérieur.
-- **5G** — APN, identifiants, PIN, itinérance, veille `hot`/`cold`.
+- **5G — réservé au vendor (superadmin).** APN, identifiants, PIN, itinérance,
+  veille `hot`/`cold`. La SIM et le forfait data sont les nôtres : l'APN est une
+  décision de flotte, pas un réglage de site. L'admin IT du client ne voit même
+  pas la section — le serveur ne lui renvoie pas ce bloc (`config.wwan: null`).
+  Il conserve en revanche **l'état** du modem (enregistré ? quel opérateur ? quel
+  signal ?), qui est justement ce qu'il nous dira au téléphone quand la box perd
+  son uplink.
 
 Les secrets (phrase Wi-Fi, mot de passe porteur, PIN SIM) sont **en écriture
 seule** : aucune lecture ne les renvoie. Laisser le champ vide conserve la valeur

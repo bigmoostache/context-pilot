@@ -71,10 +71,18 @@ export function ItNetworkPane() {
         <ApForm key={apKey(data.config.ap)} initial={data.config.ap} />
       </section>
 
-      <section className="flex flex-col gap-2">
-        <SectionLabel label="5G bearer" hint="APN, SIM and standby policy" />
-        <WwanForm key={wwanKey(data.config.wwan)} initial={data.config.wwan} />
-      </section>
+      {/* Vendor-only. The server returns `config.wwan: null` to anyone without
+          `can_manage_secrets`, so the absence of the block IS the gate — the
+          client never has to be told which role it would take. */}
+      {data.config.wwan && (
+        <section className="flex flex-col gap-2">
+          <SectionLabel
+            label="5G bearer"
+            hint="APN, SIM and standby policy — managed by the vendor"
+          />
+          <WwanForm key={wwanKey(data.config.wwan)} initial={data.config.wwan} />
+        </section>
+      )}
     </>
   )
 }

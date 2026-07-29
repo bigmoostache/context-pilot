@@ -267,8 +267,10 @@ pub(super) fn deploy() -> Value {
         // `*_set` boolean in their place (FR-NET-13).
         "ItNetworkWwan": {
             "type": "object",
-            "description": "5G bearer settings. `password_set`/`pin_set` stand in for the \
-                write-only credentials.",
+            "description": "5G bearer settings — VENDOR-MANAGED. Writing them needs \
+                `can_manage_secrets` (superadmin), not `can_manage_it`: the SIM and the data plan \
+                are the vendor's, so the APN that goes with them is a fleet-wide decision. \
+                `password_set`/`pin_set` stand in for the write-only credentials.",
             "properties": {
                 "apn": { "type": "string" },
                 "username": { "type": "string", "nullable": true },
@@ -312,7 +314,11 @@ pub(super) fn deploy() -> Value {
             "type": "object",
             "properties": {
                 "mode": { "type": "string", "enum": ["wan", "wan_5g", "5g"] },
-                "wwan": r("ItNetworkWwan"),
+                // Null for a caller without `can_manage_secrets`: the bearer's
+                // CONFIGURATION is vendor state. `status.wwan` is not elided —
+                // registration, operator and signal are diagnostics the client's
+                // own admin needs when the box loses its uplink.
+                "wwan": { "allOf": [r("ItNetworkWwan")], "nullable": true },
                 "ap": r("ItNetworkAp"),
                 "probe": r("ItNetworkProbe")
             },

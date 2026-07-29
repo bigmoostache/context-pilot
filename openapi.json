@@ -1155,7 +1155,12 @@
             "$ref": "#/components/schemas/ItNetworkProbe"
           },
           "wwan": {
-            "$ref": "#/components/schemas/ItNetworkWwan"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ItNetworkWwan"
+              }
+            ],
+            "nullable": true
           }
         },
         "required": [
@@ -1299,7 +1304,7 @@
         "type": "object"
       },
       "ItNetworkWwan": {
-        "description": "5G bearer settings. `password_set`/`pin_set` stand in for the write-only credentials.",
+        "description": "5G bearer settings — VENDOR-MANAGED. Writing them needs `can_manage_secrets` (superadmin), not `can_manage_it`: the SIM and the data plan are the vendor's, so the APN that goes with them is a fleet-wide decision. `password_set`/`pin_set` stand in for the write-only credentials.",
         "properties": {
           "apn": {
             "type": "string"
@@ -5617,7 +5622,7 @@
             "description": "Error"
           }
         },
-        "summary": "Uplink + access-point configuration (secrets elided) and live status",
+        "summary": "Uplink + access-point configuration (secrets elided; `config.wwan` null without can_manage_secrets) and live status",
         "tags": [
           "it"
         ]
@@ -5822,7 +5827,7 @@
             "description": "Error"
           }
         },
-        "summary": "Set the 5G bearer configuration",
+        "summary": "Set the 5G bearer configuration (superadmin — vendor-managed)",
         "tags": [
           "it"
         ]

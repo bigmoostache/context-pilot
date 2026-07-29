@@ -163,7 +163,9 @@ fn apn_and_pin_charsets_are_enforced() {
 fn no_read_path_output_contains_a_secret() {
     let config = populated();
     let projections = [
-        serde_json::to_string(&config.redacted()).expect("serialize redacted"),
+        // `true` is the *worse* case for this test: the bearer block is present,
+        // so its secrets have somewhere to leak from.
+        serde_json::to_string(&config.redacted(true)).expect("serialize redacted"),
         serde_json::to_string(&config.redacted_ap()).expect("serialize ap"),
         serde_json::to_string(&config.redacted_wwan()).expect("serialize wwan"),
     ];

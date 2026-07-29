@@ -369,10 +369,17 @@ impl NetworkConfig {
     /// `self`, so a field added to the struct later is **absent** from the read
     /// path until someone deliberately adds it here. The failure mode of the
     /// other direction — forgetting to strip a newly-added secret — is a leak.
-    pub(crate) fn redacted(&self) -> serde_json::Value {
+    /// `bearer_visible` decides whether the `wwan` block is present at all. The
+    /// 5G bearer is **vendor kit** — we ship the SIM and we own the fleet's data
+    /// plan — so its configuration sits behind `can_manage_secrets`, the same
+    /// boundary as the provider API keys, not behind `can_manage_it`. A client's
+    /// IT admin gets `wwan: null` here and still sees `status.wwan`, which is
+    /// diagnostics (registered? which operator? what signal?) rather than
+    /// configuration.
+    pub(crate) fn redacted(&self, bearer_visible: bool) -> serde_json::Value {
         serde_json::json!({
             "mode": self.mode,
-            "wwan": self.redacted_wwan(),
+            "wwan": if bearer_visible { self.redacted_wwan() } else { serde_json::Value::Null },
             "ap": self.redacted_ap(),
             "probe": {
                 "targets": self.probe.targets,

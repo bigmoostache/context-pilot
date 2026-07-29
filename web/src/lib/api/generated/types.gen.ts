@@ -356,7 +356,7 @@ export type ItNetworkConfig = {
     ap: ItNetworkAp;
     mode: 'wan' | 'wan_5g' | '5g';
     probe: ItNetworkProbe;
-    wwan: ItNetworkWwan;
+    wwan: ItNetworkWwan | null;
 };
 
 export type ItNetworkModeResult = {
@@ -397,7 +397,7 @@ export type ItNetworkWanStatus = {
 };
 
 /**
- * 5G bearer settings. `password_set`/`pin_set` stand in for the write-only credentials.
+ * 5G bearer settings — VENDOR-MANAGED. Writing them needs `can_manage_secrets` (superadmin), not `can_manage_it`: the SIM and the data plan are the vendor's, so the APN that goes with them is a fleet-wide decision. `password_set`/`pin_set` stand in for the write-only credentials.
  */
 export type ItNetworkWwan = {
     apn: string;

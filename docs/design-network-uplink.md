@@ -129,7 +129,7 @@ the ethernet ports, and they inherit the netplan content verbatim plus `Address=
 | FR-NET-12 | A re-run of `site.yml` never overwrites settings the IT admin changed from the cockpit, unless explicitly forced | Must |
 | FR-NET-13 | The Wi-Fi passphrase and SIM PIN are never returned by any read API | Must |
 | FR-NET-14 | The AP refuses to be enabled without a regulatory country code | Must |
-| FR-NET-15 | An `can_manage_it` admin can amend the 5G settings (APN, PIN, roaming) from the cockpit | Should |
+| FR-NET-15 | **The vendor** (`can_manage_secrets`, superadmin) can amend the 5G settings (APN, credentials, PIN, roaming, standby) from the cockpit. A client's `can_manage_it` admin can neither read nor write them — the SIM and the data plan are ours, so the APN is a fleet decision, not a per-site one. They keep the bearer's live **status**, which is what they need when the box loses its uplink. | Must |
 
 ---
 
@@ -139,7 +139,7 @@ the ethernet ports, and they inherit the netplan content verbatim plus `Address=
 |----|-----------|
 | NFR-NET-01 | **No network mode ever alters an address on `end0`/`end1`.** Only default routes are touched. The fleet ULA, the DHCP lease, the LAN reachability of the cockpit and the day-0 access path are untouched in every mode. |
 | NFR-NET-02 | NetworkManager never manages an ethernet link. The `unmanaged-devices` seam (§5) is a hard precondition of installing it. |
-| NFR-NET-03 | Every route/gate is `can_manage_it`; the server is authoritative (NFR-05), client gating is cosmetic. |
+| NFR-NET-03 | Every route/gate is `can_manage_it` — **except the 5G bearer, which is `can_manage_secrets`** (FR-NET-15). The server is authoritative (NFR-05); client gating is cosmetic, and the UI hides the bearer form by simply not receiving it. |
 | NFR-NET-04 | The system applier is env-gated exactly like `CP_CADDYFILE`: with the env unset, the backend persists state and performs **no** system call. Tests and local dev run unmodified. |
 | NFR-NET-05 | A failed apply rolls back to the previous configuration and reports a `502`, mirroring `caddy::regenerate`. A bad setting can never wedge the box. |
 | NFR-NET-06 | State is persisted atomically + durably (`state::write_atomic`) and survives a power cut; it is re-applied at boot before the cockpit serves. |
@@ -467,10 +467,10 @@ All under `can_manage_it`, all following the established gate shape (`None` call
 
 | Method | Route | Body | Response |
 |---|---|---|---|
-| `GET` | `/api/it/network` | — | `{ config, status }` — config with secrets elided, status live |
+| `GET` | `/api/it/network` | — | `{ config, status }` — config with secrets elided, status live. **`config.wwan` is `null`** for a caller without `can_manage_secrets`; `status.wwan` is not elided |
 | `POST` | `/api/it/network/mode` | `{ "mode": "wan"\|"wan_5g"\|"5g" }` | `{ mode, applied }` |
 | `POST` | `/api/it/network/ap` | `{ enabled, ssid, passphrase?, band, channel, country, hidden, share_internet }` | `{ ap, applied }` |
-| `POST` | `/api/it/network/wwan` | `{ apn, username?, password?, pin?, roaming, standby }` | `{ wwan, applied }` |
+| `POST` | `/api/it/network/wwan` | `{ apn, username?, password?, pin?, roaming, standby }` | `{ wwan, applied }` — **`can_manage_secrets` (superadmin), not `can_manage_it`** |
 
 `status` (read from `nmcli -t`, `mmcli -J`, `ip route`, `iw dev`):
 
@@ -519,6 +519,10 @@ approach the 500-line ceiling, so they land in a sibling
 - **Wi-Fi access point** — enable switch, SSID, passphrase, band, country,
   channel, hidden SSID, and the "share internet" switch. Country is required
   before enable; the client mirrors the server's `400`.
+- **5G bearer** — APN, credentials, PIN, roaming, standby. **Rendered only when
+  the server sent a `config.wwan`**, i.e. only for a superadmin (FR-NET-15). The
+  absence of the block *is* the gate: a client admin is never shown a control
+  they cannot use, and never told which role it would take.
 - The `it` category blurb changes from "Network identity & TLS trust" to cover the
   network (`web/src/components/shell/config/categories.ts`).
 - **Mobile.** `web/src/mobile-components/shell/config/ItPane.tsx` is a hand-authored

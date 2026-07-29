@@ -555,7 +555,7 @@ export const postApiItIdentity = <ThrowOnError extends boolean = false>(options:
 });
 
 /**
- * Uplink + access-point configuration (secrets elided) and live status
+ * Uplink + access-point configuration (secrets elided; `config.wwan` null without can_manage_secrets) and live status
  */
 export const getApiItNetwork = <ThrowOnError extends boolean = false>(options?: Options<GetApiItNetworkData, ThrowOnError>): RequestResult<GetApiItNetworkResponses, GetApiItNetworkErrors, ThrowOnError> => (options?.client ?? client).get<GetApiItNetworkResponses, GetApiItNetworkErrors, ThrowOnError>({ url: '/api/it/network', ...options });
 
@@ -584,7 +584,7 @@ export const postApiItNetworkMode = <ThrowOnError extends boolean = false>(optio
 });
 
 /**
- * Set the 5G bearer configuration
+ * Set the 5G bearer configuration (superadmin — vendor-managed)
  */
 export const postApiItNetworkWwan = <ThrowOnError extends boolean = false>(options: Options<PostApiItNetworkWwanData, ThrowOnError>): RequestResult<PostApiItNetworkWwanResponses, PostApiItNetworkWwanErrors, ThrowOnError> => (options.client ?? client).post<PostApiItNetworkWwanResponses, PostApiItNetworkWwanErrors, ThrowOnError>({
     url: '/api/it/network/wwan',

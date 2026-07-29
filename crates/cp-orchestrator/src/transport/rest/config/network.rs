@@ -1,5 +1,13 @@
 //! Network REST handlers — the uplink + access-point surface (design
-//! `docs/design-network-uplink.md` §10), gated on `can_manage_it` (admin+).
+//! `docs/design-network-uplink.md` §10), gated on `can_manage_it` (admin+) —
+//! **except the 5G bearer, which is `can_manage_secrets` (superadmin).**
+//!
+//! The split is a business boundary, not a security one. The uplink mode and
+//! the Wi-Fi AP are the client's site to run. The 5G bearer is not: we ship the
+//! SIM, we own the data plan and the APN that goes with it, and a client's IT
+//! admin changing it breaks their own connectivity and bills us for it. That is
+//! the same boundary `can_manage_secrets` already draws around the provider API
+//! keys — the vendor-controlled billing boundary.
 //!
 //! Thin wrappers over [`network`](crate::transport::it::network), in the same
 //! shape as the identity handlers next door: enforce the capability, then
@@ -14,7 +22,7 @@ use super::super::{Backend, HttpReply};
 use crate::services::auth::types::User;
 use crate::transport::it::network;
 
-/// The one gate every route below shares. Returns the `403` reply to send, or
+/// The gate the site-level routes share. Returns the `403` reply to send, or
 /// `None` when the caller may proceed.
 fn denied(auth_user: Option<&User>) -> Option<HttpReply> {
     if auth_user.is_some_and(|user| !user.can_manage_it()) {
@@ -23,9 +31,29 @@ fn denied(auth_user: Option<&User>) -> Option<HttpReply> {
     None
 }
 
+/// The stricter gate, for the vendor's 5G bearer.
+fn denied_bearer(auth_user: Option<&User>) -> Option<HttpReply> {
+    if auth_user.is_some_and(|user| !user.can_manage_secrets()) {
+        return Some(HttpReply::error(403, "the 5G bearer is vendor-managed"));
+    }
+    None
+}
+
+/// Whether this caller may see the bearer configuration at all. A `None` caller
+/// is god-mode (access control off) and sees everything.
+fn bearer_visible(auth_user: Option<&User>) -> bool {
+    auth_user.is_none_or(User::can_manage_secrets)
+}
+
 /// `GET /api/it/network` — the configuration (secrets elided) plus live status.
+///
+/// `can_manage_it` is enough to read this, but a caller without
+/// `can_manage_secrets` gets `config.wwan: null`: the bearer's settings are
+/// vendor state. `status.wwan` is still returned — whether the modem is
+/// registered, on which operator and at what signal is diagnostics the client's
+/// own admin needs when the box loses its uplink.
 pub(crate) fn it_get_network(state: &Mutex<Backend>, auth_user: Option<&User>) -> HttpReply {
-    denied(auth_user).unwrap_or_else(|| network::get_network(state))
+    denied(auth_user).unwrap_or_else(|| network::get_network(state, bearer_visible(auth_user)))
 }
 
 /// `POST /api/it/network/mode` — select `wan`, `wan_5g` or `5g` (FR-NET-03).
@@ -40,9 +68,10 @@ pub(crate) fn it_set_network_ap(state: &Mutex<Backend>, body: &[u8], auth_user: 
     denied(auth_user).unwrap_or_else(|| network::set_ap(state, body))
 }
 
-/// `POST /api/it/network/wwan` — the 5G bearer settings (FR-NET-15).
+/// `POST /api/it/network/wwan` — the 5G bearer settings (FR-NET-15, revised).
+/// **Superadmin only** — see the module doc.
 pub(crate) fn it_set_network_wwan(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&User>) -> HttpReply {
-    denied(auth_user).unwrap_or_else(|| network::set_wwan(state, body))
+    denied_bearer(auth_user).unwrap_or_else(|| network::set_wwan(state, body))
 }
 
 #[cfg(test)]
@@ -86,28 +115,68 @@ mod tests {
         Mutex::new(backend)
     }
 
-    /// Every `/api/it/network*` handler is gated on `can_manage_it`:
-    /// `manager`/`user` → 403; `admin`/`superadmin` → the delegate's own status.
+    /// The site-level routes are gated on `can_manage_it`: `manager`/`user` →
+    /// 403; `admin`/`superadmin` → the delegate's own status.
     #[test]
     fn network_gated() {
         let state = backend();
         let mode = br#"{"mode":"wan"}"#;
         let access_point = br#"{"enabled":false,"ssid":"x","band":"a","channel":0,"country":"FR","hidden":false,"share_internet":true}"#;
-        let wwan = br#"{"apn":"orange.fr","roaming":false,"standby":"hot"}"#;
         for role in [Manager, Regular] {
             let caller = user(role);
             assert_eq!(it_get_network(&state, Some(&caller)).status, 403, "GET denied for {role:?}");
             assert_eq!(it_set_network_mode(&state, mode, Some(&caller)).status, 403, "mode denied for {role:?}");
             assert_eq!(it_set_network_ap(&state, access_point, Some(&caller)).status, 403, "ap denied for {role:?}");
-            assert_eq!(it_set_network_wwan(&state, wwan, Some(&caller)).status, 403, "wwan denied for {role:?}");
         }
         for role in [Admin, Superadmin] {
             let caller = user(role);
             assert_eq!(it_get_network(&state, Some(&caller)).status, 200, "GET ok for {role:?}");
             assert_eq!(it_set_network_mode(&state, mode, Some(&caller)).status, 200, "mode ok for {role:?}");
             assert_eq!(it_set_network_ap(&state, access_point, Some(&caller)).status, 200, "ap ok for {role:?}");
-            assert_eq!(it_set_network_wwan(&state, wwan, Some(&caller)).status, 200, "wwan ok for {role:?}");
         }
+    }
+
+    /// The 5G bearer is the vendor's, so it sits one rung higher than the rest
+    /// of the pane: **`can_manage_secrets`, not `can_manage_it`.** An `admin`
+    /// runs their own site — uplink mode, Wi-Fi — but the SIM, the data plan and
+    /// the APN are ours, and changing them breaks their connectivity on our bill.
+    #[test]
+    fn the_bearer_is_superadmin_only() {
+        let state = backend();
+        let wwan = br#"{"apn":"orange.fr","roaming":false,"standby":"hot"}"#;
+        for role in [Regular, Manager, Admin] {
+            let caller = user(role);
+            assert_eq!(it_set_network_wwan(&state, wwan, Some(&caller)).status, 403, "wwan denied for {role:?}");
+        }
+        let vendor = user(Superadmin);
+        assert_eq!(it_set_network_wwan(&state, wwan, Some(&vendor)).status, 200, "the vendor may set it");
+    }
+
+    /// …and an admin cannot READ it either. They keep `status.wwan` — whether
+    /// the modem is registered, on what operator, at what signal — because that
+    /// is what they need when the box loses its uplink and calls us.
+    #[test]
+    fn an_admin_sees_bearer_status_but_not_bearer_config() {
+        let state = backend();
+        let vendor = user(Superadmin);
+        assert_eq!(
+            it_set_network_wwan(
+                &state,
+                br#"{"apn":"vendor.apn.example","roaming":false,"standby":"hot"}"#,
+                Some(&vendor)
+            )
+            .status,
+            200
+        );
+
+        let admin = it_get_network(&state, Some(&user(Admin)));
+        assert_eq!(admin.status, 200, "an admin still reads the pane");
+        assert!(!admin.body.contains("vendor.apn.example"), "the vendor's APN leaked to an admin: {}", admin.body);
+        assert!(admin.body.contains("\"wwan\":null"), "the bearer CONFIG is elided: {}", admin.body);
+        assert!(admin.body.contains("\"status\""), "…but the status half is still there");
+
+        let superadmin = it_get_network(&state, Some(&vendor));
+        assert!(superadmin.body.contains("vendor.apn.example"), "the vendor sees their own APN");
     }
 
     /// Set → get round-trip, driven god-mode so it exercises the logic, not the
