@@ -136,7 +136,13 @@ fn bracketed(subject: &str) -> String {
 /// Compute the cert subjects for the current identity: `[ip, name]` when an
 /// identity is set, otherwise the auto-detected box IP (so the cockpit is
 /// reachable by IP before the operator names the box), plus **every fleet ULA the
-/// box carries**. Empty when nothing is known at all.
+/// box carries**, plus `extra`. Empty when nothing is known at all.
+///
+/// `extra` is how a feature that creates a NEW address on the box gets a cert
+/// for it. Today that is the Wi-Fi AP's `10.42.0.1`: Caddy listens on the
+/// wildcard `*:443` but the generated file enumerates explicit site addresses,
+/// so without this an AP client gets a TLS `internal error` while plain HTTP
+/// answers `200` (landmine 11, measured in M0/O0.2).
 ///
 /// The ULA is appended, never operator-entered: `Identity` holds a single `ip`,
 /// and that one belongs to the CLIENT (the address their staff and their DNS will
@@ -150,8 +156,10 @@ fn bracketed(subject: &str) -> String {
 /// IPv4 we return empty and the caller falls back to the cleartext `:80` cockpit,
 /// rather than standing up a `:443` that only we could reach.
 #[must_use]
-pub(crate) fn subjects_for(identity: Option<&Identity>) -> Vec<String> {
-    subjects_with(identity, detect_host_ip().as_deref(), &detect_ulas())
+pub(crate) fn subjects_for(identity: Option<&Identity>, extra: &[String]) -> Vec<String> {
+    let mut detected = detect_ulas();
+    detected.extend_from_slice(extra);
+    subjects_with(identity, detect_host_ip().as_deref(), &detected)
 }
 
 /// Pure composition half of [`subjects_for`] — every probe is passed in rather
@@ -260,12 +268,12 @@ static CADDY_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 /// # Errors
 ///
 /// Returns a message if the Caddyfile cannot be written.
-pub(crate) fn write_config(provisioned: bool, identity: Option<&Identity>) -> Result<bool, String> {
+pub(crate) fn write_config(provisioned: bool, identity: Option<&Identity>, extra: &[String]) -> Result<bool, String> {
     let Some(caddyfile) = std::env::var_os("CP_CADDYFILE") else {
         return Ok(false);
     };
     let _guard = CADDY_LOCK.lock();
-    let content = render_caddyfile(provisioned, &subjects_for(identity));
+    let content = render_caddyfile(provisioned, &subjects_for(identity, extra));
     write_atomic(Path::new(&caddyfile), content.as_bytes()).map_err(|e| format!("write Caddyfile: {e}"))?;
     Ok(true)
 }
@@ -281,13 +289,13 @@ pub(crate) fn write_config(provisioned: bool, identity: Option<&Identity>) -> Re
 /// # Errors
 ///
 /// Returns a message if the Caddyfile cannot be written or `caddy reload` fails.
-pub(crate) fn regenerate(provisioned: bool, identity: Option<&Identity>) -> Result<bool, String> {
+pub(crate) fn regenerate(provisioned: bool, identity: Option<&Identity>, extra: &[String]) -> Result<bool, String> {
     let Some(caddyfile) = std::env::var_os("CP_CADDYFILE") else {
         return Ok(false); // no Caddy in this environment — skip cleanly.
     };
     let path = Path::new(&caddyfile);
     let _guard = CADDY_LOCK.lock();
-    let content = render_caddyfile(provisioned, &subjects_for(identity));
+    let content = render_caddyfile(provisioned, &subjects_for(identity, extra));
     let backup = std::fs::read(path).ok();
 
     write_atomic(path, content.as_bytes()).map_err(|e| format!("write Caddyfile: {e}"))?;
@@ -485,6 +493,6 @@ fd00000000000000000000000000000a 04 40 00 80     end2
     fn regenerate_is_skipped_without_caddyfile_env() {
         // No CP_CADDYFILE in the test environment → clean skip, never errors.
         let id = Identity { name: "n".to_owned(), ip: "10.0.0.9".to_owned() };
-        assert_eq!(regenerate(true, Some(&id)), Ok(false));
+        assert_eq!(regenerate(true, Some(&id), &[]), Ok(false));
     }
 }

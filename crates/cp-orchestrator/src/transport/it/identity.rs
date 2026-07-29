@@ -118,11 +118,19 @@ pub(crate) fn get_identity(state: &Mutex<Backend>) -> HttpReply {
 /// legitimately-new render (e.g. a DHCP-changed IP). A no-op when Caddy isn't
 /// configured (`CP_CADDYFILE` unset — local dev). Never fails startup.
 pub(crate) fn apply_caddy_at_boot(state: &Mutex<Backend>) {
-    let (provisioned, identity) = match state.lock() {
-        Ok(b) => (super::is_provisioned(&b.provision_flag_path), load_identity(&identity_path(&b.agents_dir))),
+    let (provisioned, identity, extra) = match state.lock() {
+        Ok(b) => (
+            super::is_provisioned(&b.provision_flag_path),
+            load_identity(&identity_path(&b.agents_dir)),
+            // The Wi-Fi AP's address, when the AP is enabled: it is a site Caddy
+            // must serve, and this runs before the network applier brings the AP
+            // up, so the cert exists before the first client can associate
+            // (landmine 11).
+            super::network::caddy_subjects_for(&b.agents_dir),
+        ),
         Err(_) => return,
     };
-    match super::caddy::write_config(provisioned, identity.as_ref()) {
+    match super::caddy::write_config(provisioned, identity.as_ref(), &extra) {
         Ok(true) => eprintln!("caddy: config written at boot (provisioned={provisioned})"),
         Ok(false) => {} // Caddy not configured in this environment — skipped.
         Err(e) => eprintln!("WARN: caddy boot config write failed: {e}"),
@@ -160,8 +168,12 @@ pub(crate) fn set_identity(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     }
 
     let identity = Identity { name, ip };
-    let (path, flag_path) = match state.lock() {
-        Ok(b) => (identity_path(&b.agents_dir), b.provision_flag_path.clone()),
+    let (path, flag_path, extra) = match state.lock() {
+        Ok(b) => (
+            identity_path(&b.agents_dir),
+            b.provision_flag_path.clone(),
+            super::network::caddy_subjects_for(&b.agents_dir),
+        ),
         Err(_) => return HttpReply::error(500, "backend lock poisoned"),
     };
 
@@ -179,7 +191,9 @@ pub(crate) fn set_identity(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
 
     // Re-render + reload Caddy in provisioned mode so the leaf is re-issued for
     // the new subjects and `:443` serves the cockpit.
-    match super::caddy::regenerate(true, Some(&identity)) {
+    // `extra` carries the AP address so renaming the box does not drop the site
+    // the AP subnet reaches the cockpit on.
+    match super::caddy::regenerate(true, Some(&identity), &extra) {
         Ok(reloaded) => HttpReply::ok(&serde_json::json!({ "identity": identity, "reloaded": reloaded })),
         Err(e) => {
             eprintln!("identity: caddy reload failed: {e}");

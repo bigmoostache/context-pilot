@@ -209,11 +209,16 @@ fn mode_spellings_match_the_wire() {
 }
 
 #[test]
-fn status_is_all_null_without_gates() {
-    // O3.5's off-box half: a dev machine with no env gates gets a well-formed
-    // status object whose every field is null, not an error.
+fn status_degrades_to_null_for_every_gated_field() {
+    // O3.5's off-box half. The two halves that need a TOOL degrade to null; the
+    // two that only need `/proc/net/route` stay truthful, because they are what
+    // an admin watches during a failover and a box missing every optional tool
+    // still deserves an honest answer there.
     let status = status::probe(&NetworkConfig::default());
-    for field in ["active_uplink", "wan", "wwan", "ap"] {
-        assert!(status.get(field).is_some_and(serde_json::Value::is_null), "{field} degrades to null off-box");
-    }
+    assert!(status.get("wwan").is_some_and(serde_json::Value::is_null), "no CP_MMCLI_BIN ⇒ null bearer");
+    assert!(status.get("ap").is_some_and(serde_json::Value::is_null), "no CP_NMCLI_BIN ⇒ null AP");
+    assert!(status.get("active_uplink").is_some_and(|v| v.is_string()), "the active uplink needs no tool");
+    let wan = status.get("wan").expect("wan is always present");
+    assert!(wan.get("has_default_route").is_some_and(serde_json::Value::is_boolean), "read from /proc/net/route");
+    assert!(wan.get("ip").is_some_and(serde_json::Value::is_null), "no CP_IP_BIN ⇒ null address");
 }

@@ -23,8 +23,10 @@
 //! path.
 
 pub(crate) mod apply;
+mod profiles;
+mod routes;
 pub(crate) mod state;
-pub(crate) mod status;
+mod status;
 
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -74,16 +76,52 @@ fn config_path(state: &Mutex<Backend>) -> Result<PathBuf, HttpReply> {
 ///
 /// Returns a message when the document cannot be persisted, or when applying it
 /// fails (in which case the rollback has already run).
-fn commit(path: &Path, previous: &NetworkConfig, next: &NetworkConfig) -> Result<bool, String> {
+fn commit(state: &Mutex<Backend>, path: &Path, previous: &NetworkConfig, next: &NetworkConfig) -> Result<bool, String> {
     state::save(path, next).map_err(|e| format!("persist .network.json: {e}"))?;
+    // Caddy FIRST, before the AP can beacon: the generated Caddyfile enumerates
+    // explicit site addresses, so `10.42.0.1` must already be one of them when
+    // the first client associates or they meet a TLS `internal error` (landmine
+    // 11). Only when the address set actually changes — regenerating on every
+    // unrelated mode save would make a momentarily-unreachable Caddy fail a
+    // network call that has nothing to do with it.
+    sync_caddy(state, previous, next)?;
     match apply::apply(next) {
         Ok(applied) => Ok(applied),
         Err(failure) => {
             let _restored = state::save(path, previous);
+            let _uncaddied = sync_caddy(state, next, previous);
             let _reapplied = apply::apply(previous);
             Err(format!("network apply failed (rolled back): {failure}"))
         }
     }
+}
+
+/// Re-render the Caddy site list when `next` needs different site addresses
+/// from `previous` — today, when the AP is switched on or off.
+///
+/// # Errors
+///
+/// Returns Caddy's own message when the reload fails. `caddy::regenerate` has
+/// already restored the previous Caddyfile by then, so the TLS plane is intact
+/// and only this call is reported as failed.
+fn sync_caddy(state: &Mutex<Backend>, previous: &NetworkConfig, next: &NetworkConfig) -> Result<(), String> {
+    let wanted = apply::caddy_subjects(next);
+    if wanted == apply::caddy_subjects(previous) {
+        return Ok(());
+    }
+    let Ok(backend) = state.lock() else {
+        return Err("backend lock poisoned".to_owned());
+    };
+    let provisioned = super::is_provisioned(&backend.provision_flag_path);
+    let identity = super::identity::load_identity(&super::identity::identity_path(&backend.agents_dir));
+    drop(backend); // never hold the backend lock across the `caddy reload` subprocess.
+    super::caddy::regenerate(provisioned, identity.as_ref(), &wanted).map(|_reloaded| ())
+}
+
+/// The Caddy site addresses the persisted network config needs, for the callers
+/// that render the Caddyfile for reasons of their own (boot, identity change).
+pub(crate) fn caddy_subjects_for(agents_dir: &Path) -> Vec<String> {
+    apply::caddy_subjects(&state::load(&state::network_path(agents_dir)))
 }
 
 /// Turn a `commit` outcome into the handler's reply, with `payload` merged in.
@@ -140,7 +178,7 @@ pub(crate) fn set_mode(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     let previous = state::load(&path);
     let mut next = previous.clone();
     next.mode = req.mode;
-    reply_for(commit(&path, &previous, &next), serde_json::json!({ "mode": next.mode }))
+    reply_for(commit(state, &path, &previous, &next), serde_json::json!({ "mode": next.mode }))
 }
 
 /// `POST /api/it/network/ap` — the access-point settings.
@@ -192,7 +230,7 @@ pub(crate) fn set_ap(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     }
     let mut next = previous.clone();
     next.ap = access_point;
-    reply_for(commit(&path, &previous, &next), serde_json::json!({ "ap": next.redacted_ap() }))
+    reply_for(commit(state, &path, &previous, &next), serde_json::json!({ "ap": next.redacted_ap() }))
 }
 
 /// `POST /api/it/network/wwan` — the 5G bearer settings (FR-NET-15).
@@ -240,7 +278,7 @@ pub(crate) fn set_wwan(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     }
     let mut next = previous.clone();
     next.wwan = wwan;
-    reply_for(commit(&path, &previous, &next), serde_json::json!({ "wwan": next.redacted_wwan() }))
+    reply_for(commit(state, &path, &previous, &next), serde_json::json!({ "wwan": next.redacted_wwan() }))
 }
 
 /// Re-apply the persisted network configuration at boot, mirroring

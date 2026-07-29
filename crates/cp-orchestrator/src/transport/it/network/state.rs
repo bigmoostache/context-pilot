@@ -60,6 +60,16 @@ pub(crate) enum Standby {
     Cold,
 }
 
+impl Standby {
+    /// The wire spelling, for `/etc/default/cp-uplink`.
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Hot => "hot",
+            Self::Cold => "cold",
+        }
+    }
+}
+
 /// Wi-Fi band for the access point.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub(crate) enum Band {
@@ -70,6 +80,16 @@ pub(crate) enum Band {
     #[default]
     #[serde(rename = "a")]
     A,
+}
+
+impl Band {
+    /// The spelling `nmcli` expects for `802-11-wireless.band`.
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Bg => "bg",
+            Self::A => "a",
+        }
+    }
 }
 
 /// The 5G bearer settings.
