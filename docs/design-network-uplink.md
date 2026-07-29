@@ -1194,3 +1194,26 @@ M0 ──► M1 ──► M2 ──► M3 ──► M4
 M0 → no PR (findings folded into this document). M1 its own PR, reviewed against
 O1.4 evidence. M2 one PR (state + API + contract are atomic — the contract check
 fails otherwise). M3 one PR. M4 one PR. M5 one PR. M6 one docs PR.
+
+---
+
+# What execution changed (2026-07-29)
+
+A short index of the places where running this design against the hardware
+contradicted it. Each is expanded in situ above.
+
+| # | Where | The design said | The box said |
+|---|---|---|---|
+| 1 | §12 / O1.1 | a 9th file in `tasks/` is fine | `check-structure.sh` walks all of `deploy/`; it is not. Files moved to `tasks/net/` |
+| 2 | §9 / O3.3 | `share_internet:false` ⇒ `ipv4.method manual` | `manual` runs no DHCP server, so nobody can join the cul-de-sac. Keep `shared`, remove forwarding + the masquerade table instead |
+| 3 | §9 | channel `0` = automatic | `nmcli` rejects a literal `0`; the empty string is the only spelling it takes |
+| 4 | §9 | a plain `wpa-psk` profile already gives WPA3 | it gives `PSK` only — *and* a legacy WPA1/TKIP element. `proto rsn` + CCMP is what produces `PSK PSK/SHA-256 SAE` |
+| 5 | §6 | one owner, one applier | …which also has to serialise. Two concurrent cockpit calls interleaved and left the box's state lying about its routes |
+| 6 | §8 / O5.1 | (unstated) | every `nmcli` call needs `--wait`: a 90 s block in `connection up` stops the supervisor probing, exactly when it must not |
+| 7 | O1.2 | read the country from `iw reg get` | read it from the **global** block — the self-managed phys legitimately disagree |
+| 8 | O3.5 | status is fully null off-box | the default-route half needs no tool at all, and staying truthful there is worth more |
+| 9 | §10 | five env gates | nine: `networkctl`, `systemctl`, `nft` and `ip` each needed naming too |
+
+Two "Done when" criteria remain unmet, both for reasons outside this design:
+**O0.1** (the 5G data path — antenna) and the 390 px half of **O4.3** (the mobile
+shell has no settings entry point yet).

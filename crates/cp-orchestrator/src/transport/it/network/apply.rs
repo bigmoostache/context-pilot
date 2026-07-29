@@ -17,6 +17,10 @@
 //! | `CP_WAN_IFACE` / `CP_AP_IFACE` / `CP_WWAN_DEV` | hardware names, overridable |
 //! | `CP_NETWORK_APPLIED` | where the applied-fingerprint marker lives |
 //!
+//! Two more are read by [`status`](super::status) rather than here, on the same
+//! terms: `CP_MMCLI_BIN` (modem facts) and `CP_IP_BIN` (`end0`'s address —
+//! `end0` is networkd's, so `nmcli` cannot answer for it).
+//!
 //! With `CP_NMCLI_BIN` unset the applier is a **no-op that reports `Ok(false)`**:
 //! the backend persists the document and performs no system call. That is what
 //! lets the whole feature be developed, unit-tested and reviewed off-hardware,
