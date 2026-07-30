@@ -72,7 +72,12 @@ impl Panel for AgoraPanel {
     }
 
     fn max_freezes(&self) -> u8 {
-        0
+        // Identity mutates rarely (only on set_identity), so its bytes are
+        // stable turn-to-turn and never break the cache on their own. The
+        // freeze budget only matters WHEN an edit lands mid-cache-window: it
+        // lets the (now-changed) render defer up to 4 times so a single
+        // identity edit doesn't instantly evict the surrounding cache block.
+        4
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
