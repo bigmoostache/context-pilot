@@ -7658,6 +7658,10 @@
   path: web/src/lib/live/index.ts
   description: 'Live data hooks (TanStack Query + SSE). useAgentMeta/useThreads/useConversation/useLibrary/useFleet/useFleetMetrics/useMetrics + useSseConnected (reactive SSE connection state; render-phase seed via seededFor guard, effect only subscribes — no set-state-in-effect) + useRestartFlow (T566: on restart success sets agent status to client-only ''waiting'' via setQueryData; new agent''s Lifecycle::Running delta clears it through foldLifecycle — no state machine, no timers). ensureSync SSE watcher. sendCommand→REST. useLive+LiveQueryResult re-exported from ./core.'
   last_edited_ms: 1784213115617
+5b1ca2f5453cbdd2:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 5b1f65a3aab36b28:
   path: ui/src/App.tsx
   description: App shell with view state (threads|cockpit, default threads). TopBar switcher toggles between ThreadsView (3-pane chat) and cockpit (LeftRail+Conversation+RightInspector). StatusBar always shown.
@@ -11714,6 +11718,10 @@
   path: web/src/components/threads/ThreadList.tsx
   description: 'Left rail of threads view — ALWAYS OPEN. Working search filters by name+last-preview. Groups in order: User turn (THEIR_TURN/ACTIVE) FIRST, then Agent''s turn (MY_TURN) — reordered per T28. User-turn sorted by recency; Agent''s-turn sorted FOCUSED-FIRST then recency (T36, byFocusThenRecent — t.focused floats to top). Per-row hover Archive/Restore. Footer Archived toggle. New Thread button.'
   last_edited_ms: 1781786390770
+89f3dc99c083a1aa:
+  path: crates/cp-agora/src/panel.rs
+  description: 'AgoraPanel fixed panel. YAML-styled key: value per identity field. Empty placeholder when unset. needs_cache=false, max_freezes=0.'
+  last_edited_ms: 0
 89faef2488520d50:
   path: web/src/components/shell/TopBar.tsx
   description: 'Slim macOS-style title bar (T321 trimmed): app mark→fleet, agent switcher, per-agent view tabs (Threads/Finder/Cockpit/Costs), agent-config gear, UsageButton, account UserMenu. Costs tab dev-mode only. P8: view-tab cluster extracted into a ViewTabs subcomponent (moving the two devMode gates off TopBar''s complexity budget); TopBar fn now <150 lines / cx<15.'
@@ -12782,6 +12790,10 @@
   path: crates/cp-orchestrator/src/transport/rest/config/it.rs
   description: 'IT-infrastructure REST handlers: ca/fingerprint, identity get/set, provisioned flag. Gated on can_manage_it (admin+). Thin wrappers over it::ca/identity/state modules. Tests: V4.1a gate enforcement, V4.1b identity roundtrip.'
   last_edited_ms: 1783688809694
+96ab145b8ccd5963:
+  path: .context-pilot/shared/tree-descriptions.yaml
+  description: Persisted tree descriptions YAML. Synced to git alongside code commits per M15.
+  last_edited_ms: 0
 96ac48a122e0b0b3:
   path: crates/cp-base/src/ui/mod.rs
   description: 'Shared UI helpers. Align enum (Left/Right) #[expect(exhaustive_enums)] A4. render_table_text (plain-text for LLM), TextCell, pad_cell. Tree parsing helpers find_size_pattern/find_children_pattern.'

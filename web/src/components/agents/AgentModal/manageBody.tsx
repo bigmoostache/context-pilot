@@ -146,17 +146,26 @@ const IDENTITY_FIELDS: { key: keyof AgentIdentity; label: string }[] = [
 function IdentityTab({ agentId }: { agentId: string }) {
   const { data } = useIdentity(agentId)
   const [form, setForm] = useState<AgentIdentity | null>(null)
-  const [seeded, setSeeded] = useState(false)
+  // Fingerprint of the last server snapshot the form adopted. Lets the form
+  // track live server changes while pristine, without an effect.
+  const [serverSnapshot, setServerSnapshot] = useState<string | null>(null)
+  const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Seed once when the identity arrives — a render-phase adjust-state (NOT an
-  // effect, which would trip set-state-in-effect). After a save the SSE
-  // identity_changed delta refetches, but the guard keeps the user's edits in
-  // place (the form is authoritative while open).
-  if (!seeded && data) {
-    setSeeded(true)
-    setForm(data)
+  // Track the server identity while the form is PRISTINE — a render-phase
+  // adjust-state (NOT an effect, which would trip set-state-in-effect). The
+  // SSE identity_changed delta invalidates qk.identity and refetches `data`;
+  // as long as the user hasn't started editing (`!dirty`) the form mirrors it,
+  // so an external change (an AI tool edit) shows live. Once the user types,
+  // `dirty` freezes the form so in-progress edits are never clobbered; a save
+  // clears `dirty` and the next server snapshot re-syncs.
+  if (data) {
+    const fp = JSON.stringify(data)
+    if (!dirty && fp !== serverSnapshot) {
+      setServerSnapshot(fp)
+      setForm(data)
+    }
   }
 
   if (!form) {
@@ -167,14 +176,17 @@ function IdentityTab({ agentId }: { agentId: string }) {
     )
   }
 
-  const set = (k: keyof AgentIdentity, v: string) =>
+  const set = (k: keyof AgentIdentity, v: string) => {
+    setDirty(true)
     setForm((f) => (f ? { ...f, [k]: v } : f))
+  }
 
   const save = () => {
     if (saving) return
     setSaving(true)
     setError(null)
     sendCommand(agentId, { kind: "set_identity", ...form })
+      .then(() => setDirty(false))
       .catch((e: unknown) =>
         setError(e instanceof Error ? e.message : "Could not save the identity."),
       )
