@@ -4018,6 +4018,10 @@
   path: crates/cp-mod-github/Cargo.toml
   description: 'GitHub module deps: cp-base, cp-render, crossterm, regex, cp-mod-utilities, serde_json.'
   last_edited_ms: 0
+2f46a506644691c5:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 2f549657a1b2300b:
   path: src/app/actions/cursor.rs
   description: Cursor movement, text editing, selection management, command expansion. Selection helpers (delete/clear/extend). Sentinel detection + skip. Single-char and word movement with selection variants. handle_command_expansion, handle_input_backspace, handle_delete_word_left.
@@ -5234,6 +5238,10 @@
   path: yamls/tools/scratchpad.yaml
   description: 'Scratchpad tools YAML. 3 tools: scratchpad_create_cell, scratchpad_edit_cell, scratchpad_wipe.'
   last_edited_ms: 1781353959589
+3e4c6adc7562ff05:
+  path: .context-pilot/shared/tree-descriptions.yaml
+  description: Persisted tree descriptions YAML. Synced to git alongside code commits per M15.
+  last_edited_ms: 0
 3e57cf7450f47ec0:
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (IR blocks → blocks_to_lines: selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (scrollable messages via scroll_offset, author/timestamp headers, content). All content through IR pipeline. Tab/Shift+Tab nav.'
@@ -5377,6 +5385,10 @@
 3fcf7ba9f357b2db:
   path: ui/src/components/threads/ThreadList.tsx
   description: 'Left rail: grouped thread sidebar (''Needs you''=MY_TURN / ''In progress''=THEIR_TURN). Each row: status dot, name, last-msg preview, time, unread badge, selection bar. + New Thread button, search box.'
+  last_edited_ms: 0
+3fd3b3e66bb371b0:
+  path: web/src/components/shell/widgets/AgentSwitcher.tsx
+  description: TopBar workspace switcher dropdown (one agent=one folder); switch/create/fleet. AgentDot shows avatar image (T338) when hasAvatar is true, fallback to accent-tinted FolderGit2 icon.
   last_edited_ms: 0
 3fd7d9533cfa0b9b:
   path: web/src/components/finder/preview/FinderPreview.tsx

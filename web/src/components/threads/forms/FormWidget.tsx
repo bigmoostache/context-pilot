@@ -8,7 +8,7 @@
 // ```form-answer``` message via the EXISTING send path — no backend form state.
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Check, CheckCircle2, ClipboardList, AlertTriangle } from "lucide-react"
+import { Check, CheckCircle2, ClipboardList, AlertTriangle, CornerDownLeft } from "lucide-react"
 import { formatTs } from "@/lib/support/threadMessages"
 import { FieldInput } from "./FormFields"
 import type { AnswerValue, FormAnswer, FormAnswerEntry, FormField, FormSpec } from "./helpers"
@@ -76,13 +76,12 @@ function loadDraft(key: string, spec: FormSpec): Record<string, AnswerValue> {
   return base
 }
 
-/** A single labelled field row (numbered label + the type's input). When
- *  `highlight` is set (a blank mandatory field at the moment the incomplete
- *  submit arms) the row rings amber and its label turns amber, pointing the
- *  user straight at what's unfilled. `data-field-id` lets the widget scroll the
- *  first missing row into view. */
+/** A single labelled field row (Linear-style uppercase label above the type's
+ *  input). When `highlight` is set (a blank mandatory field at the moment the
+ *  incomplete submit arms) the label turns amber and the input rings amber,
+ *  pointing the user straight at what's unfilled. `data-field-id` lets the
+ *  widget scroll the first missing row into view. */
 function FieldRow({
-  index,
   field,
   value,
   onChange,
@@ -90,7 +89,6 @@ function FieldRow({
   highlight,
   agentId,
 }: {
-  index: number
   field: FormField
   value: AnswerValue
   onChange: (v: AnswerValue) => void
@@ -99,14 +97,13 @@ function FieldRow({
   agentId: string
 }) {
   return (
-    <div className="flex flex-col gap-1.5" data-field-id={field.id}>
-      <label className="flex items-baseline gap-2 text-[12px] font-medium text-foreground/85">
-        <span className="font-mono text-[10.5px] text-muted-foreground/60 tabular-nums">
-          {String(index + 1).padStart(2, "0")}
+    <div className="border-t border-border/50 px-4 pt-2.5 pb-3" data-field-id={field.id}>
+      <label className="block pb-1 text-[11px] font-medium tracking-wide uppercase">
+        <span className={highlight ? "text-(--warn)" : "text-muted-foreground/70"}>
+          {field.label}
         </span>
-        <span className={highlight ? "text-(--warn)" : undefined}>{field.label}</span>
       </label>
-      <div className={highlight ? "rounded-lg pl-[24px] ring-1 ring-(--warn)/50" : "pl-[24px]"}>
+      <div className={highlight ? "rounded-md ring-1 ring-(--warn)/40" : undefined}>
         <FieldInput
           field={field}
           value={value}
@@ -170,21 +167,21 @@ function LockedForm({ spec, answer }: { spec: FormSpec; answer: FormAnswer }) {
   )
 }
 
-/** The card header: an icon chip, the title, and the field count. */
+/** The card header — a Linear-style breadcrumb strip: an icon chip, a chevron,
+ *  the form title, and the field count pushed right. */
 function FormHeader({ title, count }: { title: string | undefined; count: number }) {
   return (
-    <div className="flex items-center gap-2 border-b border-border/60 bg-muted/25 px-3 py-2">
-      <span className="flex size-5 items-center justify-center rounded-full bg-(--signal)/12 text-(--signal)">
-        <ClipboardList className="size-3" />
+    <div className="flex items-center gap-2 px-4 pt-3 pb-2">
+      <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+        <span className="flex size-[15px] items-center justify-center rounded-sm bg-signal/15 text-(--signal)">
+          <ClipboardList className="size-2.5" />
+        </span>
+        <span className="text-muted-foreground/50">›</span>
+        <span className="font-medium text-foreground/80">{title ?? "Form"}</span>
       </span>
-      <div className="flex min-w-0 flex-col">
-        <span className="truncate text-[12px] font-semibold text-foreground/90">
-          {title ?? "Form"}
-        </span>
-        <span className="text-[10px] font-medium tracking-wide text-muted-foreground/60 uppercase">
-          {count} {count === 1 ? "field" : "fields"}
-        </span>
-      </div>
+      <span className="ml-auto text-[10.5px] font-medium tracking-wide text-muted-foreground/50 uppercase tabular-nums">
+        {count} {count === 1 ? "field" : "fields"}
+      </span>
     </div>
   )
 }
@@ -217,7 +214,7 @@ function FormFooter({
     ? "bg-(--warn) text-(--primary-foreground) hover:brightness-105"
     : "bg-(--signal) text-(--primary-foreground) hover:brightness-105"
   return (
-    <div className="flex items-center justify-between gap-3 border-t border-border/60 bg-muted/15 px-3 py-2">
+    <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-2.5">
       {/* Screen-reader announcement of the arm/disarm flip (the amber button
           change is otherwise visual-only). */}
       <span className="sr-only" role="status" aria-live="polite">
@@ -243,10 +240,11 @@ function FormFooter({
         type="button"
         onClick={onSubmit}
         disabled={disabled}
-        className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1 text-[12px] font-semibold shadow-sm transition-[filter,opacity,background-color] disabled:opacity-35 disabled:hover:brightness-100 ${button}`}
+        className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-medium shadow-sm transition-[filter,opacity,background-color] disabled:opacity-35 disabled:hover:brightness-100 ${button}`}
       >
         {armed && <AlertTriangle className="size-3.5" />}
         {label}
+        {!armed && <CornerDownLeft className="size-3.5 opacity-70" />}
       </button>
     </div>
   )
@@ -378,23 +376,20 @@ export function FormWidget({
   return (
     <div
       ref={cardRef}
-      className="rise card-shadow my-1.5 overflow-hidden rounded-xl border border-border/70 bg-card"
+      className="rise my-1.5 overflow-hidden rounded-xl border border-border/60 bg-card"
     >
       <FormHeader title={fullSpec.title} count={fullSpec.fields.length} />
-      <div className="flex flex-col gap-2.5 p-3">
-        {fullSpec.fields.map((f, i) => (
-          <FieldRow
-            key={f.id}
-            index={i}
-            field={f}
-            value={values[f.id] ?? ""}
-            onChange={(v) => setValue(f.id, v)}
-            disabled={sent}
-            highlight={armed && missingIds.includes(f.id)}
-            agentId={agentId}
-          />
-        ))}
-      </div>
+      {fullSpec.fields.map((f) => (
+        <FieldRow
+          key={f.id}
+          field={f}
+          value={values[f.id] ?? ""}
+          onChange={(v) => setValue(f.id, v)}
+          disabled={sent}
+          highlight={armed && missingIds.includes(f.id)}
+          agentId={agentId}
+        />
+      ))}
       <FormFooter
         filled={filled}
         total={fullSpec.fields.length}

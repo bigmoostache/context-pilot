@@ -6,7 +6,7 @@
 // draft persistence, and the submit gate. `files` is the sole async one: it
 // uploads on pick via the existing `.uploads/` path and answers with paths.
 
-import { useState } from "react"
+import { useLayoutEffect, useRef, useState } from "react"
 import { Check, Upload, Loader2, AlertTriangle, X, CalendarIcon } from "lucide-react"
 import { format, parse } from "date-fns"
 import { uploadUnique } from "@/lib/api"
@@ -36,6 +36,50 @@ function asList(v: AnswerValue): string[] {
   return v ? [v] : []
 }
 
+/** A textarea that grows with its content — like the thread composer. rows=1,
+ *  height recomputed from scrollHeight on every value change (useLayoutEffect,
+ *  so the first paint is already the right height), capped at maxH px beyond
+ *  which it scrolls. Backs every free-text answer so a long reply isn't trapped
+ *  in a one-line box. */
+function AutoGrowTextarea({
+  value,
+  onChange,
+  disabled,
+  placeholder,
+  className,
+  autoFocus,
+  maxH = 240,
+}: {
+  value: string
+  onChange: (v: string) => void
+  disabled: boolean
+  placeholder?: string
+  className?: string
+  autoFocus?: boolean
+  maxH?: number
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = "auto"
+    el.style.height = `${Math.min(el.scrollHeight, maxH)}px`
+  }, [value, maxH])
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      value={value}
+      disabled={disabled}
+      placeholder={placeholder}
+      autoFocus={autoFocus}
+      onChange={(e) => onChange(e.target.value)}
+      className={`${className ?? ""} scrollbar-none [&::-webkit-scrollbar]:hidden`}
+      style={{ maxHeight: maxH }}
+    />
+  )
+}
+
 /** One selectable option row (radio/checkbox). The control is a custom glyph so
  *  the checked state reads crisply against the signal-tinted selected surface. */
 function OptionRow({
@@ -55,10 +99,8 @@ function OptionRow({
 }) {
   return (
     <label
-      className={`group flex cursor-pointer items-start gap-2.5 rounded-xl border px-3 py-1.5 text-[12.5px] transition-all ${
-        on
-          ? "border-(--signal)/70 bg-(--signal)/8 shadow-[inset_0_0_0_1px_var(--signal)]"
-          : "border-border/70 hover:border-border hover:bg-muted/40"
+      className={`group flex cursor-pointer items-start gap-2.5 rounded-md px-2 py-1.5 text-[13px] transition-colors ${
+        on ? "bg-(--signal)/6" : "hover:bg-muted/40"
       } ${disabled ? "pointer-events-none opacity-60" : ""}`}
     >
       <input type={kind} checked={on} disabled={disabled} onChange={onPick} className="sr-only" />
@@ -90,7 +132,7 @@ function SingleField({ field, value, onChange, disabled }: FieldProps) {
   const labels = (field.options ?? []).map((o) => o.label)
   const isOther = field.allowOther === true && sel !== "" && !labels.includes(sel)
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col">
       {(field.options ?? []).map((o) => (
         <OptionRow
           key={o.label}
@@ -104,10 +146,8 @@ function SingleField({ field, value, onChange, disabled }: FieldProps) {
       ))}
       {field.allowOther === true && (
         <label
-          className={`group flex cursor-pointer items-start gap-2.5 rounded-xl border px-3 py-1.5 text-[12.5px] transition-all ${
-            isOther
-              ? "border-(--signal)/70 bg-(--signal)/8 shadow-[inset_0_0_0_1px_var(--signal)]"
-              : "border-border/70 hover:border-border hover:bg-muted/40"
+          className={`group flex cursor-pointer items-start gap-2.5 rounded-md px-2 py-1.5 text-[13px] transition-colors ${
+            isOther ? "bg-(--signal)/6" : "hover:bg-muted/40"
           } ${disabled ? "pointer-events-none opacity-60" : ""}`}
         >
           <input
@@ -125,14 +165,13 @@ function SingleField({ field, value, onChange, disabled }: FieldProps) {
           <span className="min-w-0 flex-1">
             <span className="block font-medium text-foreground/90">Other…</span>
             {isOther && (
-              <input
+              <AutoGrowTextarea
                 autoFocus
-                type="text"
                 value={sel === " " ? "" : sel}
                 disabled={disabled}
-                onChange={(e) => onChange(e.target.value || " ")}
+                onChange={(v) => onChange(v || " ")}
                 placeholder="Type your answer"
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-[12.5px] transition-shadow outline-none focus:border-(--signal) focus:shadow-[0_0_0_3px_var(--signal)]/15"
+                className="mt-1 w-full resize-none bg-transparent py-0.5 text-[13.5px] leading-relaxed text-foreground/90 outline-none placeholder:text-muted-foreground/40"
               />
             )}
           </span>
@@ -149,7 +188,7 @@ function MultiField({ field, value, onChange, disabled }: FieldProps) {
     onChange(sel.includes(label) ? sel.filter((l) => l !== label) : [...sel, label])
   }
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col">
       {(field.options ?? []).map((o) => (
         <OptionRow
           key={o.label}
@@ -166,19 +205,29 @@ function MultiField({ field, value, onChange, disabled }: FieldProps) {
 }
 
 const SCALAR_INPUT =
-  "w-full rounded-lg border border-border/80 bg-background px-3 py-1.5 text-[12.5px] text-foreground/90 outline-none transition-shadow focus:border-(--signal) focus:shadow-[0_0_0_3px_var(--signal)]/15 disabled:opacity-60"
+  "w-full resize-none bg-transparent py-0.5 text-[13.5px] leading-relaxed text-foreground/90 outline-none placeholder:text-muted-foreground/40 disabled:opacity-60"
 
-/** text / number — a single controlled input keyed off the field type (`date`
- *  is handled separately by {@link DateField}). */
+/** text / number — `text` grows with content (auto-grow textarea), `number` is
+ *  a single-line numeric input. `date` is handled separately by
+ *  {@link DateField}. */
 function ScalarField({ field, value, onChange, disabled }: FieldProps) {
-  const type = field.type === "number" ? "number" : "text"
+  if (field.type === "text") {
+    return (
+      <AutoGrowTextarea
+        value={asScalar(value)}
+        onChange={onChange}
+        disabled={disabled}
+        placeholder="Type your answer"
+        className={SCALAR_INPUT}
+      />
+    )
+  }
   return (
     <input
-      type={type}
+      type="number"
       value={asScalar(value)}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
-      placeholder={field.type === "text" ? "Type your answer" : undefined}
       className={SCALAR_INPUT}
     />
   )
@@ -207,8 +256,8 @@ function DateField({ value, onChange, disabled }: FieldProps) {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         disabled={disabled}
-        className={`flex w-full items-center gap-2 rounded-lg border border-border/80 bg-background px-3 py-1.5 text-left text-[12.5px] transition-shadow outline-none focus:border-(--signal) focus:shadow-[0_0_0_3px_var(--signal)]/15 disabled:opacity-60 ${
-          selected ? "text-foreground/90" : "text-muted-foreground/70"
+        className={`flex w-full items-center gap-2 bg-transparent py-0.5 text-left text-[13.5px] outline-none disabled:opacity-60 ${
+          selected ? "text-foreground/90" : "text-muted-foreground/40"
         }`}
       >
         <CalendarIcon className="size-3.5 shrink-0 text-muted-foreground/60" />
