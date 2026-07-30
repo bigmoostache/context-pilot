@@ -3274,6 +3274,10 @@
   path: src/ui/help/input.rs
   description: Autocomplete popup overlay adapter. render_autocomplete_popup + autocomplete_entry_line helper (A2). Renders Autocomplete IR to ratatui, no State access.
   last_edited_ms: 0
+2754d99740877441:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 276d30267df1b2e0:
   path: crates/cp-orchestrator/tests/end_to_end.rs
   description: Phase 30 end-to-end loopback capstone (3 tests). Backend::new takes 6 args (auth=None, session_ttl). Real agent stack ↔ real backend transport over real sockets. Command journals on agent and re-emerges as SSE delta. Spilled body hydrates over REST. 25 SSE connect/disconnect soak cycles.
@@ -4673,6 +4677,10 @@
 37e04c9835793229:
   path: web/src/lib/providers/DevModeProvider.tsx
   description: 'DevModeProvider component: dev-mode boolean persisted to localStorage ''cp-dev-mode''. web-lint P6: <DevModeContext value=> (React-19 provider idiom).'
+  last_edited_ms: 0
+38005bfbdb92df1e:
+  path: .context-pilot/shared/tree-descriptions.yaml
+  description: Persisted tree descriptions YAML. Synced to git alongside code commits per M15.
   last_edited_ms: 0
 381fd475bacd611d:
   path: ui/index.html

@@ -1,4 +1,4 @@
-import { Check, ChevronDown, FolderGit2, LayoutGrid, Settings2 } from "lucide-react"
+import { ChevronDown, FolderGit2, LayoutGrid } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -96,7 +96,7 @@ export function AgentSwitcher({
       </DropdownMenuTrigger>
 
       <DropdownMenuContent className="w-[280px]" align="start" sideOffset={6}>
-        {onManageAgent && activeId && (
+        {onManageAgent && active && (
           <>
             <DropdownMenuItem
               onClick={onManageAgent}
@@ -106,9 +106,23 @@ export function AgentSwitcher({
                 "data-highlighted:bg-[color-mix(in_oklab,var(--signal)_11%,transparent)]! data-highlighted:text-foreground!",
               )}
             >
-              <span className="flex size-7 shrink-0 items-center justify-center text-(--signal)">
-                <Settings2 className="size-3.5" />
-              </span>
+              {active.hasAvatar ? (
+                <img
+                  src={avatarUrl(active.id)}
+                  alt=""
+                  className="size-7 shrink-0 rounded-md object-cover"
+                />
+              ) : (
+                <span
+                  className="flex size-7 shrink-0 items-center justify-center rounded-md"
+                  style={{
+                    background: `color-mix(in oklab, ${accentVar[active.accent]} 16%, transparent)`,
+                    color: accentVar[active.accent],
+                  }}
+                >
+                  <FolderGit2 className="size-3.5" />
+                </span>
+              )}
               <span className="text-[12.5px] text-foreground/90 group-focus/dropdown-menu-item:text-foreground! group-data-highlighted/dropdown-menu-item:text-foreground!">
                 Manage agent
               </span>
@@ -138,6 +152,7 @@ export function AgentSwitcher({
         )}
         <DropdownMenuGroup>
           {agents
+            .filter((a) => a.id !== activeId)
             .toSorted((a, b) => statusOrder[a.status] - statusOrder[b.status])
             .map((a) => (
               <DropdownMenuItem
@@ -184,7 +199,6 @@ export function AgentSwitcher({
                 >
                   {statusMeta[a.status].label}
                 </span>
-                {a.id === activeId && <Check className="size-3.5 shrink-0 text-(--signal)" />}
               </DropdownMenuItem>
             ))}
         </DropdownMenuGroup>
