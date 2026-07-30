@@ -147,7 +147,7 @@ function SingleField({ field, value, onChange, disabled }: FieldProps) {
               <input
                 autoFocus
                 type="text"
-                value={sel.trim()}
+                value={sel === " " ? "" : sel}
                 disabled={disabled}
                 onChange={(e) => onChange(e.target.value || " ")}
                 placeholder="Type your answer"
