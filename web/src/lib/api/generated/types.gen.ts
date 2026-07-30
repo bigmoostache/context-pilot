@@ -41,6 +41,19 @@ export type Agent = {
     threads: number;
 };
 
+export type AgentIdentity = {
+    character: string;
+    direct_management: string;
+    expertise: string;
+    identity: string;
+    knowledge_responsibilities: string;
+    operational_responsibilities: string;
+    organic_responsibilities: string;
+    principles: string;
+    role: string;
+    values: string;
+};
+
 export type AgentMetrics = {
     id: string;
     lifecycle?: string | null;
@@ -1282,6 +1295,33 @@ export type PostApiAgentByIdFsWriteResponses = {
 };
 
 export type PostApiAgentByIdFsWriteResponse = PostApiAgentByIdFsWriteResponses[keyof PostApiAgentByIdFsWriteResponses];
+
+export type GetApiAgentByIdIdentityData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/agent/{id}/identity';
+};
+
+export type GetApiAgentByIdIdentityErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiAgentByIdIdentityError = GetApiAgentByIdIdentityErrors[keyof GetApiAgentByIdIdentityErrors];
+
+export type GetApiAgentByIdIdentityResponses = {
+    /**
+     * Success
+     */
+    200: AgentIdentity;
+};
+
+export type GetApiAgentByIdIdentityResponse = GetApiAgentByIdIdentityResponses[keyof GetApiAgentByIdIdentityResponses];
 
 export type GetApiAgentByIdLibraryData = {
     body?: never;

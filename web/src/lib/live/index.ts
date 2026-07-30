@@ -265,6 +265,20 @@ export function useLibrary(agentId: string): LiveQueryResult<LibraryItem[]> {
   })
 }
 
+// ── Identity (agent-scoped, T730) ─────────────────────────────────────
+//
+// Inspection resource: the ten-field self-identity is a tier-② config.json
+// read, invalidated by the `identity_changed` SSE delta (query/sync.ts), not
+// folded. Same shape as useLibrary — ensureSync wires the push plane so the
+// invalidate lands, and the backstop poll is the last-resort net.
+
+export function useIdentity(agentId: string): LiveQueryResult<api.AgentIdentity> {
+  return useLive(qk.identity(agentId), () => api.fetchIdentity(agentId), {
+    agentId,
+    enabled: !!agentId,
+  })
+}
+
 // ── Commands (imperative, not hooks) ──────────────────────────────────
 
 export { mintTicket } from "../api"

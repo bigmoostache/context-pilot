@@ -6,8 +6,9 @@
 
 /// Panel rendering + context generation for the identity.
 mod panel;
-/// Tool execution handler for `Agora_set_identity`.
-mod tools;
+/// Tool execution handler for `Agora_set_identity` plus the shared
+/// `set_identity` core (also driven by the bridge `SetIdentity` command).
+pub mod tools;
 /// Identity + `AgoraState` types.
 pub mod types;
 

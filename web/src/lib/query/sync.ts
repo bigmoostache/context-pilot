@@ -55,6 +55,7 @@ export const qk = {
   threads: (id: string) => ["threads", id] as const,
   metrics: (id: string) => ["metrics", id] as const,
   library: (id: string) => ["library", id] as const,
+  identity: (id: string) => ["identity", id] as const,
   fs: (id: string, path: string) => ["fs", id, path] as const,
   fsPreview: (id: string, path: string) => ["fs-preview", id, path] as const,
   fsSheet: (id: string, path: string) => ["fs-sheet", id, path] as const,
@@ -173,6 +174,13 @@ function applyDelta(client: QueryClient, agentId: string, entry: OpEntry): void 
   // the cached library (see foldBehaviourIntoLibrary).
   if (km.kind === "behaviour_changed") {
     foldBehaviourIntoLibrary(client, agentId, km)
+  } else if (km.kind === "identity_changed") {
+    // Identity change → invalidate the agent's identity query so the settings
+    // form refetches the fresh ten fields. Like behaviour_changed it is an
+    // event-driven twin of the config.json mtime backstop, but the identity
+    // delta carries NO payload (the observer refetches), so we INVALIDATE
+    // rather than fold — the agent-settings form re-reads tier-② ground truth.
+    void client.invalidateQueries({ queryKey: qk.identity(agentId) })
   }
 
   // Threads cache fold.

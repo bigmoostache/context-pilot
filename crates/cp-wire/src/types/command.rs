@@ -43,6 +43,40 @@ impl Command {
     }
 }
 
+/// The agent's durable self-identity — ten short free-text values.
+///
+/// Carried by the [`SetIdentity`](Kind::SetIdentity) command and mirrored by
+/// the Agora module's fixed-key store. Boxed inside the variant to keep `Kind`
+/// small (see [`SetIdentity`](Kind::SetIdentity)); the field order is the
+/// canonical billboard order (T730).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[expect(
+    clippy::exhaustive_structs,
+    reason = "wire value object: all ten fields are public, stable, and built by cross-crate consumers (the agent's SetIdentity handler) via a struct literal, so #[non_exhaustive] would forbid that construction and a 10-arg constructor would trip too_many_arguments"
+)]
+pub struct SelfIdentity {
+    /// Who the agent fundamentally is.
+    pub identity: String,
+    /// Core values the agent holds.
+    pub values: String,
+    /// Operating principles the agent follows.
+    pub principles: String,
+    /// Behavioural character / temperament.
+    pub character: String,
+    /// Domains of competence.
+    pub expertise: String,
+    /// The agent's functional role.
+    pub role: String,
+    /// Day-to-day operational duties.
+    pub operational_responsibilities: String,
+    /// Duties as a source of knowledge / truth.
+    pub knowledge_responsibilities: String,
+    /// Who the agent is responsible *for* (subordinates).
+    pub organic_responsibilities: String,
+    /// Who directs the agent — the source of authority.
+    pub direct_management: String,
+}
+
 /// The action a [`Command`] requests.
 ///
 /// Uses an internally-tagged representation (`"kind"` field) so that an
@@ -153,6 +187,22 @@ pub enum Kind {
         /// Prompt-library agent id to activate (empty = default).
         id: String,
     },
+
+    /// Set the agent's durable self-identity (the Agora module's fixed-key
+    /// value store) from the web agent-settings form. Every field is a short
+    /// free-text value; the agent re-validates the per-value word cap and
+    /// rejects an overflow, leaving the prior identity untouched (all-or-
+    /// nothing) — the same contract as the agent-side `Agora_set_identity`
+    /// tool, which this shares a core with (T730).
+    ///
+    /// The payload is boxed: its ten `String` fields dwarf every other variant,
+    /// so an unboxed struct-variant would bloat every `Kind` (and the enclosing
+    /// `Command`/`Frame`) to its size (`clippy::large_enum_variant`). Boxing the
+    /// rarely-built identity payload keeps the common command path small. The
+    /// internally-tagged newtype-of-struct flattens on the wire, so the shape is
+    /// still `{"kind":"set_identity","identity":…,"values":…,…}`.
+    #[serde(rename = "set_identity")]
+    SetIdentity(Box<SelfIdentity>),
 
     /// Catch-all for variants added in a newer protocol version.
     ///
@@ -268,6 +318,32 @@ mod tests {
             kind: Kind::Configure { provider: "anthropic".into(), model: "claude-opus45".into() },
         };
         let json = serde_json::to_string(&cmd).expect("serialize");
+        let back: Command = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(cmd, back);
+    }
+
+    #[test]
+    fn set_identity_round_trip_and_stable_tag() {
+        let cmd = Command {
+            schema_version: 1,
+            id: "cmd-005".into(),
+            seq: 6,
+            dedup_token: "id-1".into(),
+            kind: Kind::SetIdentity(Box::new(SelfIdentity {
+                identity: "Resident engineer.".into(),
+                values: "Correctness, honesty.".into(),
+                principles: "Verify, don't assume.".into(),
+                character: "Terse, thorough.".into(),
+                expertise: "Rust + strict frontend.".into(),
+                role: "Ships features end-to-end.".into(),
+                operational_responsibilities: "Deploy safely, gates green.".into(),
+                knowledge_responsibilities: "Source of truth.".into(),
+                organic_responsibilities: "None yet.".into(),
+                direct_management: "The user.".into(),
+            })),
+        };
+        let json = serde_json::to_string(&cmd).expect("serialize");
+        assert!(json.contains("\"kind\":\"set_identity\""), "stable tag: {json}");
         let back: Command = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(cmd, back);
     }

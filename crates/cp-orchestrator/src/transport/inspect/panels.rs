@@ -153,6 +153,58 @@ pub fn library(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     HttpReply::ok(&items)
 }
 
+/// `GET /api/agent/{id}/identity` — the agent's durable self-identity.
+///
+/// Reads the ten identity fields from the agent's tier-② `config.json` at
+/// `modules.agora.identity` (the Agora module is `is_global()`, so its
+/// `save_module_data` — `{"identity": …}` — is written under
+/// `Shared.modules["agora"]`). Uses the same mtime-cached inspector read as
+/// [`library`]/[`usage`], so the web agent-settings form fetches the live
+/// values on invalidation. Missing (never introduced / older state) yields the
+/// empty ten-field object, so the form always has a stable shape to render.
+pub fn identity(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
+    let folder = match agent_folder(state, agent_id) {
+        Ok(f) => f,
+        Err(reply) => return reply,
+    };
+
+    let live: serde_json::Value = {
+        match state.lock() {
+            Ok(mut b) => b
+                .inspect_mut()
+                .read_config(Path::new(&folder))
+                .ok()
+                .and_then(|cfg| {
+                    cfg.get("modules").and_then(|m| m.get("agora")).and_then(|a| a.get("identity")).cloned()
+                })
+                .unwrap_or(serde_json::Value::Null),
+            Err(_) => return HttpReply::error(500, "backend lock poisoned"),
+        }
+    };
+
+    // Normalise to the full ten-field shape so the form renders a stable set of
+    // inputs even before the identity has ever been set.
+    let source = live.as_object();
+    let mut obj = serde_json::Map::new();
+    for key in [
+        "identity",
+        "values",
+        "principles",
+        "character",
+        "expertise",
+        "role",
+        "operational_responsibilities",
+        "knowledge_responsibilities",
+        "organic_responsibilities",
+        "direct_management",
+    ] {
+        let val = source.and_then(|m| m.get(key)).and_then(serde_json::Value::as_str).unwrap_or("");
+        let _prev = obj.insert(key.to_owned(), serde_json::Value::String(val.to_owned()));
+    }
+
+    HttpReply::ok(&serde_json::Value::Object(obj))
+}
+
 /// The compiled-in seed entries for a library `kind` (`"agent"`/`"skill"`/
 /// `"command"`) — the same `yamls/library.yaml` source the tui loader uses, so
 /// the orchestrator's list mirrors the agent's own built-in set exactly.

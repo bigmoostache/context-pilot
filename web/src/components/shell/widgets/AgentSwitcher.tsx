@@ -1,4 +1,4 @@
-import { Check, ChevronDown, FolderGit2, LayoutGrid } from "lucide-react"
+import { Check, ChevronDown, FolderGit2, LayoutGrid, Settings2 } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +44,7 @@ export function AgentSwitcher({
   activeId,
   onSwitch,
   onManageAgents,
+  onManageAgent,
 }: {
   agents: Agent[]
   activeId?: string | undefined
@@ -51,6 +52,9 @@ export function AgentSwitcher({
   /** open the fleet dashboard — the sole place agents are created/managed
    *  (T685: this replaces the removed TopBar home button). */
   onManageAgents?: (() => void) | undefined
+  /** open the manage dialog for the ACTIVE agent (T730: the per-agent gear,
+   *  moved here from the TopBar). Shown only when an agent is focused. */
+  onManageAgent?: (() => void) | undefined
 }) {
   const active = agents.find((a) => a.id === activeId)
 
@@ -92,6 +96,26 @@ export function AgentSwitcher({
       </DropdownMenuTrigger>
 
       <DropdownMenuContent className="w-[280px]" align="start" sideOffset={6}>
+        {onManageAgent && activeId && (
+          <>
+            <DropdownMenuItem
+              onClick={onManageAgent}
+              className={cn(
+                "flex items-center gap-2.5 py-1.5 font-medium",
+                "focus:bg-[color-mix(in_oklab,var(--signal)_11%,transparent)]! focus:text-foreground!",
+                "data-highlighted:bg-[color-mix(in_oklab,var(--signal)_11%,transparent)]! data-highlighted:text-foreground!",
+              )}
+            >
+              <span className="flex size-7 shrink-0 items-center justify-center text-(--signal)">
+                <Settings2 className="size-3.5" />
+              </span>
+              <span className="text-[12.5px] text-foreground/90 group-focus/dropdown-menu-item:text-foreground! group-data-highlighted/dropdown-menu-item:text-foreground!">
+                Manage agent
+              </span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         {onManageAgents && (
           <>
             <DropdownMenuItem

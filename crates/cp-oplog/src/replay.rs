@@ -114,6 +114,7 @@ pub(crate) fn fold_entry(state: &mut Recovered, entry: &OpEntry) {
         | &OpEntryKind::ContextUsage { .. }
         | &OpEntryKind::ThreadFocusChanged { .. }
         | &OpEntryKind::BehaviourChanged { .. }
+        | &OpEntryKind::IdentityChanged
         | &OpEntryKind::MessageDeleted { .. }
         | &OpEntryKind::Unknown => {}
     });

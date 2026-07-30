@@ -193,6 +193,7 @@ impl AgentView {
             | OpEntryKind::SeenMark { .. }
             | OpEntryKind::MessageDeleted { .. }
             | OpEntryKind::BehaviourChanged { .. }
+            | OpEntryKind::IdentityChanged
             | OpEntryKind::Unknown => {}
         }
     }

@@ -165,6 +165,7 @@ pub(super) fn paths() -> Value {
         "/api/agent/{id}/threads": with_agent(get("agent", "Agent threads + conversation", r("ThreadsResponse"))),
         "/api/agent/{id}/usage": with_agent(get("agent", "Usage analytics", json!({ "type": "object" }))),
         "/api/agent/{id}/library": with_agent(get("agent", "Prompt library", arr(r("LibraryItem")))),
+        "/api/agent/{id}/identity": with_agent(get("agent", "Agent self-identity", r("AgentIdentity"))),
         "/api/agent/{id}/conversation": with_agent(get("agent", "Conversation feed", arr(r("ConversationMsg")))),
         // ── Filesystem ──────────────────────────────────────────────
         "/api/agent/{id}/fs": with_agent(json!({ "get": {

@@ -137,6 +137,53 @@
         ],
         "type": "object"
       },
+      "AgentIdentity": {
+        "properties": {
+          "character": {
+            "type": "string"
+          },
+          "direct_management": {
+            "type": "string"
+          },
+          "expertise": {
+            "type": "string"
+          },
+          "identity": {
+            "type": "string"
+          },
+          "knowledge_responsibilities": {
+            "type": "string"
+          },
+          "operational_responsibilities": {
+            "type": "string"
+          },
+          "organic_responsibilities": {
+            "type": "string"
+          },
+          "principles": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "values": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "identity",
+          "values",
+          "principles",
+          "character",
+          "expertise",
+          "role",
+          "operational_responsibilities",
+          "knowledge_responsibilities",
+          "organic_responsibilities",
+          "direct_management"
+        ],
+        "type": "object"
+      },
       "AgentMetrics": {
         "properties": {
           "id": {
@@ -3200,6 +3247,46 @@
         "summary": "Write file",
         "tags": [
           "fs"
+        ]
+      }
+    },
+    "/api/agent/{id}/identity": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentIdentity"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Agent self-identity",
+        "tags": [
+          "agent"
         ]
       }
     },

@@ -7616,3 +7616,58 @@ index c037044e..ec098a9e 100644
 +    strategy: >
 +      Irreducible — the exhaustive literal is the whole point; a ctor re-trips too_many_arguments.
 # --- End entry #82 ---
+83:2d2b3e6c9514b8d4743bd64f0fa82b9a9c9bff051db6da8f9c281c094892a61d:c16cba773eec7eac7bcef75f9a857f30f7423c414056fff3fd068e0bf199fab7:cb12b4c4956487b02289416b06c5a855efecf09b03eaa7f9d9f45b397e1a70ab
+# --- Diff for entry #83 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index ac948872..473da3c4 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,8 +1,8 @@
+ [workspace]
+-members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-threads", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities", "crates/cp-vault"]
++members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-threads", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities", "crates/cp-vault", "crates/cp-agora"]
+ 
+ [workspace.package]
+-version = "0.1.0"
++version = "0.2.13"
+ edition = "2024"
+ license = "MIT"
+ description = "Context Pilot — AI coding assistant TUI"
+@@ -1127,6 +1127,7 @@ description.workspace = true
+ repository.workspace = true
+ keywords.workspace = true
+ categories.workspace = true
++publish = false
+ 
+ [dependencies]
+ cp-base.workspace = true
+@@ -1156,6 +1157,7 @@ cp-mod-queue = { path = "crates/cp-mod-queue" }
+ cp-mod-ocr = { path = "crates/cp-mod-ocr" }
+ cp-mod-search = { path = "crates/cp-mod-search" }
+ cp-vault = { path = "crates/cp-vault", features = ["bridge"] }
++cp-agora = { path = "crates/cp-agora" }
+ crossterm.workspace = true
+ ratatui.workspace = true
+ serde.workspace = true
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index ec098a9e..c8d5683f 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -302,6 +302,16 @@ exceptions:
+     strategy: >
+       Irreducible — the Unknown variant already provides forward-compat.
+ 
++  - path: "crates/cp-wire/src/types/command.rs"
++    match: "wire value object: all ten fields are public, stable, and built by cross-crate consumers (the agent's SetIdentity handler) via a struct literal, so #[non_exhaustive] would forbid that construction and a 10-arg constructor would trip too_many_arguments"
++    reason: >
++      SelfIdentity is the ten-field identity value object carried by the SetIdentity
++      command, built by struct literal cross-crate (the agent's SetIdentity handler and
++      the Agora tool core). A constructor would take ten positional arguments (tripping
++      too_many_arguments) with no natural grouping, so #[non_exhaustive] is impossible.
++    strategy: >
++      Irreducible — a 10-arg constructor trips too_many_arguments; the exhaustive literal is honest.
++
+   - path: "crates/cp-wire/src/types/oplog.rs"
+     match: "OpEntryKind carries an Unknown catch-all for N-1 tolerance"
+     reason: >
+# --- End entry #83 ---
