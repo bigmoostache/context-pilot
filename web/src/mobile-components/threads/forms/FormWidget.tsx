@@ -16,7 +16,7 @@
 // desktop ones and bypass the touch sizing (design-mobile.md §3.3).
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Check, CheckCircle2, ClipboardList, AlertTriangle } from "lucide-react"
+import { Check, CheckCircle2, ClipboardList, AlertTriangle, CornerDownLeft } from "lucide-react"
 import { formatTs } from "@/lib/support/threadMessages"
 import { FieldInput } from "./FormFields"
 import type { AnswerValue, FormAnswer, FormAnswerEntry, FormField, FormSpec } from "./helpers"
@@ -253,6 +253,7 @@ function FormFooter({
       >
         {armed && <AlertTriangle className="size-3.5" />}
         {label}
+        {!armed && <CornerDownLeft className="size-3.5 opacity-70" />}
       </button>
     </div>
   )

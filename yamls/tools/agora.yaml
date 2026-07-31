@@ -1,0 +1,17 @@
+tools:
+  Agora_set_identity:
+    description: |
+      Sets the agent's durable self-identity — a fixed-key value store held in
+      global state (shared across every worker, not per-worker). Every key is
+      compulsory; each value should be a short phrase of under 8 words.
+    parameters:
+      identity: "Who you fundamentally are (<8 words)"
+      values: "Core values you hold (<8 words)"
+      principles: "Operating principles you follow (<8 words)"
+      character: "Your character / temperament (<8 words)"
+      expertise: "Your domains of competence (<8 words)"
+      role: "Your functional role (<8 words)"
+      operational_responsibilities: "Your day-to-day operational duties (<8 words)"
+      knowledge_responsibilities: "Your duties as a source of truth (<8 words)"
+      organic_responsibilities: "Who you are responsible for (<8 words)"
+      direct_management: "Who directs you / your source of authority (<8 words)"

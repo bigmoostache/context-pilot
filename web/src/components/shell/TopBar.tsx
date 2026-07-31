@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { MessagesSquare, FolderTree, Settings2, BarChart3 } from "lucide-react"
+import { MessagesSquare, FolderTree, BarChart3 } from "lucide-react"
 import { ThemeToggle } from "./widgets/ThemeToggle"
 import { AgentSwitcher } from "./widgets/AgentSwitcher"
 import { UsageButton } from "./widgets/UsageButton"
@@ -44,6 +44,7 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, agent
           agents={agents}
           activeId={inFleet ? undefined : activeAgentId}
           onManageAgents={() => onViewChange("fleet")}
+          onManageAgent={inFleet ? undefined : () => setManageOpen(true)}
           onSwitch={
             inFleet
               ? (id) => {
@@ -57,9 +58,7 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, agent
         {!inFleet && <ViewTabs view={view} onViewChange={onViewChange} devMode={devMode} />}
 
         <TopBarActions
-          inFleet={inFleet}
           isClaudeOAuth={isClaudeOAuth}
-          setManageOpen={setManageOpen}
           setConfigOpen={setConfigOpen}
           setProfileOpen={setProfileOpen}
           setUsersOpen={setUsersOpen}
@@ -84,16 +83,12 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, agent
  *  button, and the account avatar menu. Extracted from {@link TopBar} so both
  *  components stay within the P8 complexity budget. */
 function TopBarActions({
-  inFleet,
   isClaudeOAuth,
-  setManageOpen,
   setConfigOpen,
   setProfileOpen,
   setUsersOpen,
 }: {
-  inFleet: boolean
   isClaudeOAuth: boolean
-  setManageOpen: (v: boolean) => void
   setConfigOpen: (v: boolean) => void
   setProfileOpen: (v: boolean) => void
   setUsersOpen: (v: boolean) => void
@@ -106,21 +101,6 @@ function TopBarActions({
         </span>
       </Tip>
       <span className="h-5 w-px bg-border/70" />
-      {!inFleet && (
-        <Tip
-          title="Agent configuration"
-          body="Rename, switch model, or archive this agent — the same dialog as Manage."
-          side="bottom"
-        >
-          <button
-            onClick={() => setManageOpen(true)}
-            className="flex size-7 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted/60 hover:text-foreground"
-            aria-label="Configure this agent"
-          >
-            <Settings2 className="size-[17px]" />
-          </button>
-        </Tip>
-      )}
       {isClaudeOAuth && <UsageButton />}
       <UserMenu
         onOpenSettings={() => setConfigOpen(true)}

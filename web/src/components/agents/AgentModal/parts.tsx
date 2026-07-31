@@ -15,8 +15,7 @@ import type { Agent } from "@/lib/types"
 import { avatarUrl } from "@/lib/api"
 import { type ProviderDef } from "@/lib/support/models"
 import { ModelPicker } from "../ModelPicker"
-import { AgentAclSection } from "../../auth/AgentAclSection"
-import { SessionVitals } from "../../shell/SessionVitals"
+import { TabbedManageBody } from "./manageBody"
 import { cn } from "@/lib/utils"
 
 /** Everything the render subcomponents need — assembled in {@link AgentModal}. */
@@ -153,59 +152,53 @@ export function AgentModalHeader({
   )
 }
 
-/** Body: the agent form (name + realm preview + provider/model picker) on the
- *  left, and (manage only) vitals + ACL on the right. */
+/** Body: create mode = single form (name + realm preview + provider/model
+ *  picker); manage mode = a ConfigPanel-style tabbed pane (Identity / Model /
+ *  Vitals), delegated to {@link TabbedManageBody}. */
 export function AgentModalBody({ c }: { c: Controller }) {
-  const { isManage, agent, name, setName, realm, providers, provId, modelId, setSel } = c
+  if (c.isManage) return <TabbedManageBody c={c} />
+  return <CreateBody c={c} />
+}
+
+/** The create-mode single form: name + realm preview + provider/model picker. */
+function CreateBody({ c }: { c: Controller }) {
+  const { name, setName, realm, providers, provId, modelId, setSel } = c
   const nameRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
     const t = window.setTimeout(() => nameRef.current?.focus(), 60)
     return () => window.clearTimeout(t)
   }, [])
   return (
-    <div
-      className={cn(
-        "min-h-0 flex-1 overflow-y-auto px-6 py-5",
-        isManage ? "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-7" : "flex flex-col gap-5",
-      )}
-    >
-      <div className="flex flex-col gap-5">
-        <div className="flex flex-col gap-2">
-          <span className="text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
-            Agent name
-          </span>
-          <div className="group flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-2.5 transition-colors focus-within:border-(--interactive)/70 focus-within:ring-2 focus-within:ring-(--interactive)/15">
-            <FolderGit2 className="size-[18px] shrink-0 text-muted-foreground/55 transition-colors group-focus-within:text-(--interactive)" />
-            <input
-              ref={nameRef}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="my-project"
-              className="w-full bg-transparent text-[15px] font-medium text-foreground outline-none placeholder:font-normal placeholder:text-muted-foreground/45"
-            />
-          </div>
-          <div className="flex items-center gap-1.5 pl-0.5 text-[11.5px]">
-            <span className="text-muted-foreground/60">Realm</span>
-            <span className="text-muted-foreground/40">→</span>
-            <code className="rounded-md bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] text-foreground/75">
-              {realm}
-            </code>
-            {!isManage && <span className="text-muted-foreground/45">· created automatically</span>}
-          </div>
+    <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 py-5">
+      <div className="flex flex-col gap-2">
+        <span className="text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
+          Agent name
+        </span>
+        <div className="group flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-2.5 transition-colors focus-within:border-(--interactive)/70 focus-within:ring-2 focus-within:ring-(--interactive)/15">
+          <FolderGit2 className="size-[18px] shrink-0 text-muted-foreground/55 transition-colors group-focus-within:text-(--interactive)" />
+          <input
+            ref={nameRef}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="my-project"
+            className="w-full bg-transparent text-[15px] font-medium text-foreground outline-none placeholder:font-normal placeholder:text-muted-foreground/45"
+          />
         </div>
-        <div className="flex flex-col gap-2">
-          <span className="text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
-            Provider &amp; Model
-          </span>
-          <ModelPicker providers={providers} provider={provId} model={modelId} onChange={setSel} />
+        <div className="flex items-center gap-1.5 pl-0.5 text-[11.5px]">
+          <span className="text-muted-foreground/60">Realm</span>
+          <span className="text-muted-foreground/40">·</span>
+          <code className="rounded-md bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] text-foreground/75">
+            {realm}
+          </code>
+          <span className="text-muted-foreground/45">· created automatically</span>
         </div>
       </div>
-      {isManage && agent && (
-        <div className="flex flex-col gap-5 border-l border-border/50 pl-7">
-          <SessionVitals agentId={agent.id} />
-          {c.authEnabled && <AgentAclSection agentId={agent.id} />}
-        </div>
-      )}
+      <div className="flex flex-col gap-2">
+        <span className="text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
+          Provider &amp; Model
+        </span>
+        <ModelPicker providers={providers} provider={provId} model={modelId} onChange={setSel} />
+      </div>
     </div>
   )
 }

@@ -144,6 +144,26 @@ pub(super) fn core() -> Value {
                 "active": { "type": "boolean" }
             },
             "required": ["id", "name", "kind", "description"]
+        },
+        "AgentIdentity": {
+            "type": "object",
+            "properties": {
+                "identity": { "type": "string" },
+                "values": { "type": "string" },
+                "principles": { "type": "string" },
+                "character": { "type": "string" },
+                "expertise": { "type": "string" },
+                "role": { "type": "string" },
+                "operational_responsibilities": { "type": "string" },
+                "knowledge_responsibilities": { "type": "string" },
+                "organic_responsibilities": { "type": "string" },
+                "direct_management": { "type": "string" }
+            },
+            "required": [
+                "identity", "values", "principles", "character", "expertise", "role",
+                "operational_responsibilities", "knowledge_responsibilities",
+                "organic_responsibilities", "direct_management"
+            ]
         }
     })
 }

@@ -85,15 +85,16 @@ pub enum Durability {
 impl Durability {
     /// Classify a record by whether losing it would break correctness.
     ///
-    /// Only phase transitions, cost aggregates, focus changes, and behaviour
-    /// (active-agent) changes are best-effort — a dropped phase is re-derived on
-    /// replay and the stream carried its hint, cost samples re-aggregate, a
-    /// dropped focus change self-heals from the agent's tier-② `FocusState`, and
-    /// a dropped behaviour change self-heals from the agent's tier-② `config.json`
-    /// (all disposable UI state, not durable truth). Everything else is
-    /// durability-gated, and an `Unknown` record (from a newer schema this build
-    /// does not understand) is treated as `Durable` conservatively: it might be
-    /// effect-bearing, so it is never silently dropped.
+    /// Only phase transitions, cost aggregates, focus changes, behaviour
+    /// (active-agent) changes, and identity changes are best-effort — a dropped
+    /// phase is re-derived on replay and the stream carried its hint, cost
+    /// samples re-aggregate, a dropped focus change self-heals from the agent's
+    /// tier-② `FocusState`, and a dropped behaviour or identity change self-heals
+    /// from the agent's tier-② `config.json` (all disposable UI state, not
+    /// durable truth). Everything else is durability-gated, and an `Unknown`
+    /// record (from a newer schema this build does not understand) is treated as
+    /// `Durable` conservatively: it might be effect-bearing, so it is never
+    /// silently dropped.
     #[must_use]
     pub const fn of(kind: &OpEntryKind) -> Self {
         match *kind {
@@ -101,7 +102,8 @@ impl Durability {
             | OpEntryKind::CostAggregate { .. }
             | OpEntryKind::ContextUsage { .. }
             | OpEntryKind::ThreadFocusChanged { .. }
-            | OpEntryKind::BehaviourChanged { .. } => Self::BestEffort,
+            | OpEntryKind::BehaviourChanged { .. }
+            | OpEntryKind::IdentityChanged => Self::BestEffort,
             OpEntryKind::CommandEffect { .. }
             | OpEntryKind::SeenMark { .. }
             | OpEntryKind::MessageCreated { .. }

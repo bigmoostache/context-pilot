@@ -302,6 +302,16 @@ exceptions:
     strategy: >
       Irreducible — the Unknown variant already provides forward-compat.
 
+  - path: "crates/cp-wire/src/types/command.rs"
+    match: "wire value object: all ten fields are public, stable, and built by cross-crate consumers (the agent's SetIdentity handler) via a struct literal, so #[non_exhaustive] would forbid that construction and a 10-arg constructor would trip too_many_arguments"
+    reason: >
+      SelfIdentity is the ten-field identity value object carried by the SetIdentity
+      command, built by struct literal cross-crate (the agent's SetIdentity handler and
+      the Agora tool core). A constructor would take ten positional arguments (tripping
+      too_many_arguments) with no natural grouping, so #[non_exhaustive] is impossible.
+    strategy: >
+      Irreducible — a 10-arg constructor trips too_many_arguments; the exhaustive literal is honest.
+
   - path: "crates/cp-wire/src/types/oplog.rs"
     match: "OpEntryKind carries an Unknown catch-all for N-1 tolerance"
     reason: >

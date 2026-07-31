@@ -14,7 +14,7 @@
 // logic (option toggling, ISO date storage, confirm-word arming, immediate
 // upload) is byte-identical to the desktop twin.
 
-import { useState } from "react"
+import { useLayoutEffect, useRef, useState } from "react"
 import { Check, Upload, Loader2, AlertTriangle, X, CalendarIcon } from "lucide-react"
 import { format, parse } from "date-fns"
 import { uploadUnique } from "@/lib/api"
@@ -42,6 +42,50 @@ function asScalar(v: AnswerValue): string {
 function asList(v: AnswerValue): string[] {
   if (Array.isArray(v)) return v
   return v ? [v] : []
+}
+
+/** A textarea that grows with its content — like the thread composer. rows=1,
+ *  height recomputed from scrollHeight on every value change (useLayoutEffect,
+ *  so the first paint is already the right height), capped at maxH px beyond
+ *  which it scrolls. Backs every free-text answer so a long reply isn't trapped
+ *  in a one-line box. */
+function AutoGrowTextarea({
+  value,
+  onChange,
+  disabled,
+  placeholder,
+  className,
+  autoFocus,
+  maxH = 240,
+}: {
+  value: string
+  onChange: (v: string) => void
+  disabled: boolean
+  placeholder?: string
+  className?: string
+  autoFocus?: boolean
+  maxH?: number
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = "auto"
+    el.style.height = `${Math.min(el.scrollHeight, maxH)}px`
+  }, [value, maxH])
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      value={value}
+      disabled={disabled}
+      placeholder={placeholder}
+      autoFocus={autoFocus}
+      onChange={(e) => onChange(e.target.value)}
+      className={`${className ?? ""} scrollbar-none [&::-webkit-scrollbar]:hidden`}
+      style={{ maxHeight: maxH }}
+    />
+  )
 }
 
 /** A grouped-list container for option rows — the iOS "grouped inset list"
@@ -144,14 +188,13 @@ function SingleField({ field, value, onChange, disabled }: FieldProps) {
           <span className="min-w-0 flex-1">
             <span className="block font-medium text-foreground/90">Other…</span>
             {isOther && (
-              <input
+              <AutoGrowTextarea
                 autoFocus
-                type="text"
-                value={sel.trim()}
+                value={sel === " " ? "" : sel}
                 disabled={disabled}
-                onChange={(e) => onChange(e.target.value || " ")}
+                onChange={(v) => onChange(v || " ")}
                 placeholder="Type your answer"
-                className="mt-2 w-full rounded-lg border border-transparent bg-muted/50 px-3 py-2.5 text-[16px] transition-colors outline-none focus:border-(--signal)/60 focus:bg-background"
+                className="mt-2 w-full resize-none rounded-lg border border-transparent bg-muted/50 px-3 py-2.5 text-[16px] leading-relaxed transition-colors outline-none focus:border-(--signal)/60 focus:bg-background"
               />
             )}
           </span>
@@ -185,19 +228,29 @@ function MultiField({ field, value, onChange, disabled }: FieldProps) {
 }
 
 const SCALAR_INPUT =
-  "w-full rounded-xl border border-transparent bg-muted/50 px-3.5 py-3 text-[16px] text-foreground/90 outline-none transition-colors focus:border-(--signal)/60 focus:bg-background disabled:opacity-60"
+  "w-full resize-none rounded-xl border border-transparent bg-muted/50 px-3.5 py-3 text-[16px] leading-relaxed text-foreground/90 outline-none transition-colors focus:border-(--signal)/60 focus:bg-background disabled:opacity-60"
 
-/** text / number — a single controlled input keyed off the field type (`date`
- *  is handled separately by {@link DateField}). */
+/** text / number — `text` grows with content (auto-grow textarea), `number` is
+ *  a single-line numeric input. `date` is handled separately by
+ *  {@link DateField}. */
 function ScalarField({ field, value, onChange, disabled }: FieldProps) {
-  const type = field.type === "number" ? "number" : "text"
+  if (field.type === "text") {
+    return (
+      <AutoGrowTextarea
+        value={asScalar(value)}
+        onChange={onChange}
+        disabled={disabled}
+        placeholder="Type your answer"
+        className={SCALAR_INPUT}
+      />
+    )
+  }
   return (
     <input
-      type={type}
+      type="number"
       value={asScalar(value)}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
-      placeholder={field.type === "text" ? "Type your answer" : undefined}
       className={SCALAR_INPUT}
     />
   )

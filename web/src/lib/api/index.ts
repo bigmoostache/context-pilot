@@ -43,6 +43,7 @@ import {
   getApiAgentByIdMetrics,
   getApiAgentByIdVitals,
   getApiAgentByIdLibrary,
+  getApiAgentByIdIdentity,
   getApiAgentByIdLibraryAgentByItem,
   putApiAgentByIdLibraryAgentByItem,
   deleteApiAgentByIdLibraryAgentByItem,
@@ -165,6 +166,17 @@ export function fetchFleetMetrics(): Promise<AgentMetrics[]> {
 
 export function fetchLibrary(agentId: string): Promise<LibraryItem[]> {
   return sdk(getApiAgentByIdLibrary({ path: { id: agentId } }))
+}
+
+// ── Identity (SDK, T730 — the agent's durable self-identity) ──────────
+
+export type AgentIdentity = import("./generated/types.gen").AgentIdentity
+
+/** Fetch the agent's ten-field self-identity from `GET /api/agent/{id}/identity`.
+ *  Inspection resource (tier-② config.json read), invalidated on an
+ *  `identity_changed` SSE delta — mirrors the library query. */
+export function fetchIdentity(agentId: string): Promise<AgentIdentity> {
+  return sdk(getApiAgentByIdIdentity({ path: { id: agentId } }))
 }
 
 // ── Providers (SDK) ───────────────────────────────────────────────────

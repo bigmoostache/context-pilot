@@ -118,3 +118,58 @@ pub(in crate::app::run) fn emit_behaviour(app: &mut App) {
         app.state.ext_mut::<BridgeState>().last_behaviour = active;
     }
 }
+
+// ── Identity emission (self-identity — design doc I8, T730) ───────────────
+
+/// Emit an [`IdentityChanged`](OpEntryKind::IdentityChanged) the instant the
+/// agent's durable self-identity (the Agora module's fixed-key value store)
+/// changes, so the web agent-settings identity form reflects it in
+/// milliseconds instead of waiting on the coarse `config.json` mtime backstop
+/// plus the invalidate throttle.
+///
+/// A main-loop **observe-on-change chokepoint** — the exact idiom of
+/// [`emit_behaviour`] / [`emit_thread_focus`]: it diffs a stable JSON
+/// fingerprint of the live [`AgoraState`] identity against the snapshot held in
+/// [`BridgeState::last_identity`] and emits **only on an actual change**, so it
+/// captures an edit from *every* source with one uniform path — the local
+/// `Agora_set_identity` tool **and** a web `SetIdentity` command — rather than
+/// an emit call scattered at each mutation site.
+///
+/// The identity is disposable UI state (the same class as behaviour/focus), so
+/// it rides the **best-effort** path ([`emit_best_effort`]): a dropped delta
+/// self-heals via the mtime backstop and is superseded by the next change. The
+/// observer (the web bridge) does not fold it — it invalidates its identity
+/// query so the next read surfaces the fresh values from tier-② `config.json`.
+///
+/// The first pass after boot **seeds** the fingerprint without emitting, so a
+/// (re)started agent does not replay its current identity as a spurious change
+/// (the cold value rides the frontend's initial identity load).
+///
+/// No-op when the bridge is OFF.
+pub(in crate::app::run) fn emit_identity(app: &mut App) {
+    if !bridge_active(&app.state) {
+        return;
+    }
+
+    // Stable JSON fingerprint of the ten identity fields (serde struct order is
+    // deterministic). A String memo keeps `cp-mod-bridge` free of a `cp-agora`
+    // dependency — the serialisation lives here, in the agent binary.
+    let fingerprint = serde_json::to_string(&cp_agora::types::AgoraState::get(&app.state).identity).unwrap_or_default();
+
+    // First pass: snapshot the existing identity without emitting.
+    let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.identity());
+    if !seeded {
+        let bs = app.state.ext_mut::<BridgeState>();
+        bs.last_identity = Some(fingerprint);
+        bs.seeded.seed_identity();
+        return;
+    }
+
+    // Emit only on an actual change.
+    let changed =
+        app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.last_identity.as_deref() != Some(&fingerprint));
+    if changed {
+        emit_best_effort(&app.state, OpEntryKind::IdentityChanged);
+        app.state.ext_mut::<BridgeState>().last_identity = Some(fingerprint);
+    }
+}
