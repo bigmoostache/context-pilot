@@ -1,4 +1,4 @@
-import { ArchiveRestore, Bot, FolderGit2, Loader2 } from "lucide-react"
+import { ArchiveRestore, FolderGit2, Loader2 } from "lucide-react"
 import { useRetiredFleet, useUnretireAgent } from "@/lib/live"
 import type { Agent } from "@/lib/types"
 
@@ -54,10 +54,9 @@ function RetiredRow({ agent, onFlash }: { agent: Agent; onFlash: (m: string) => 
         {agent.folder}
       </span>
 
-      {/* Model — fixed column, aligned with active rows above. */}
-      <span className="hidden w-[136px] shrink-0 items-center justify-end gap-1.5 text-[11.5px] text-muted-foreground/60 sm:inline-flex">
-        <Bot className="size-3.5 text-muted-foreground/40" />
-        <span className="truncate">{agent.model}</span>
+      {/* Model — fixed column, aligned with active rows above (no per-row icon). */}
+      <span className="hidden w-[136px] shrink-0 justify-end truncate text-[11.5px] text-muted-foreground/60 sm:inline-flex">
+        {agent.model}
       </span>
 
       {/* Unretire — revealed on row hover. */}

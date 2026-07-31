@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { AlertTriangle, Bot, FolderGit2, Plus, Settings2 } from "lucide-react"
+import { AlertTriangle, FolderGit2, Plus, Settings2 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { accentVar, fmtCost, FLEET_MAX_W } from "@/lib/support/panelMeta"
 import { useMetrics, useAgentMeta } from "@/lib/live"
@@ -184,10 +184,10 @@ function AgentRow({
 
       <span className={agent.task ? "shrink-0" : "flex-1"} />
 
-      {/* Model — plain muted token, fixed column so rows align down the list. */}
-      <span className="hidden w-[136px] shrink-0 items-center justify-end gap-1.5 text-[11.5px] text-muted-foreground/70 sm:inline-flex">
-        <Bot className="size-3.5 text-muted-foreground/45" />
-        <span className="truncate">{agent.model}</span>
+      {/* Model — plain muted token in a fixed column so rows align down the
+          list; no per-row icon (the column position already reads as "model"). */}
+      <span className="hidden w-[136px] shrink-0 justify-end truncate text-[11.5px] text-muted-foreground/70 sm:inline-flex">
+        {agent.model}
       </span>
 
       {/* Cost — tabular, right-aligned in its own column, data-weight ink. */}
