@@ -40,7 +40,7 @@ function RetiredRow({ agent, onFlash }: { agent: Agent; onFlash: (m: string) => 
   }
 
   return (
-    <div className="group hover:card-shadow mb-0.5 flex items-center gap-3 rounded-lg px-2.5 py-2 transition-colors hover:bg-card">
+    <div className="group hover:card-shadow mb-px flex min-h-[40px] items-center gap-3 rounded-lg px-2.5 py-1.5 transition-colors duration-150 hover:bg-card">
       {/* Identity — muted folder chip + name + the kept realm path trailing. */}
       <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted/50 text-muted-foreground/70">
         <FolderGit2 className="size-3.5" />
@@ -52,10 +52,10 @@ function RetiredRow({ agent, onFlash }: { agent: Agent; onFlash: (m: string) => 
         {agent.folder}
       </span>
 
-      {/* Model */}
-      <span className="hidden shrink-0 items-center gap-1.5 text-[11.5px] text-muted-foreground/60 sm:inline-flex">
+      {/* Model — fixed column, aligned with active rows above. */}
+      <span className="hidden w-[136px] shrink-0 items-center justify-end gap-1.5 text-[11.5px] text-muted-foreground/60 sm:inline-flex">
         <Bot className="size-3.5 text-muted-foreground/40" />
-        {agent.model}
+        <span className="truncate">{agent.model}</span>
       </span>
 
       {/* Unretire — revealed on row hover. */}

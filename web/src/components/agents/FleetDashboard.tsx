@@ -63,9 +63,9 @@ export function FleetDashboard({
         <div className={cn("mx-auto flex w-full flex-col p-6", FLEET_MAX_W)}>
           {/* Understated toolbar: title + count on the left, a small New action
               on the right (mirrors the thread sidebar header). */}
-          <header className="flex h-8 items-center justify-between px-1">
+          <header className="flex items-center justify-between border-b border-border/60 px-1 pb-2.5">
             <div className="flex items-center gap-2">
-              <h1 className="text-[15px] font-semibold text-foreground">Agents</h1>
+              <h1 className="text-[15px] font-semibold tracking-tight text-foreground">Agents</h1>
               <span className="text-[12px] text-muted-foreground/60 tabular-nums">
                 {agents.length}
               </span>
@@ -79,7 +79,7 @@ export function FleetDashboard({
             </button>
           </header>
 
-          <div className="mt-2">
+          <div className="mt-3">
             {GROUP_ORDER.map((status) => {
               const members = agents.filter((a) => a.status === status)
               if (members.length === 0) return null
@@ -143,7 +143,7 @@ function AgentRow({
     // like a thread row.
     <div
       {...clickable(onOpen)}
-      className="group hover:card-shadow relative mb-0.5 flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 transition-colors select-none hover:bg-card"
+      className="group hover:card-shadow relative mb-px flex min-h-[40px] cursor-pointer items-center gap-3 rounded-lg px-2.5 py-1.5 transition-colors duration-150 select-none hover:bg-card"
     >
       {/* Identity — avatar (or accent folder chip) + name + a dim one-line task
           summary trailing on the same line so the row stays single-height. */}
@@ -151,11 +151,11 @@ function AgentRow({
         <img
           src={avatarUrl(agent.id)}
           alt={agent.name}
-          className="size-6 shrink-0 rounded-md object-cover"
+          className="size-6 shrink-0 rounded-md object-cover ring-1 ring-border/60 ring-inset"
         />
       ) : (
         <span
-          className="flex size-6 shrink-0 items-center justify-center rounded-md"
+          className="flex size-6 shrink-0 items-center justify-center rounded-md ring-1 ring-border/40 ring-inset"
           style={{ background: `color-mix(in oklab, ${accent} 16%, transparent)`, color: accent }}
         >
           <FolderGit2 className="size-3.5" />
@@ -165,9 +165,12 @@ function AgentRow({
         {agent.name}
       </span>
       {agent.task && (
-        <span className="min-w-0 flex-1 truncate text-[11.5px] text-muted-foreground/55">
-          {agent.task}
-        </span>
+        <>
+          <span className="shrink-0 text-muted-foreground/30">·</span>
+          <span className="min-w-0 flex-1 truncate text-[11.5px] text-muted-foreground/55">
+            {agent.task}
+          </span>
+        </>
       )}
       <span className={agent.task ? "shrink-0" : "flex-1"} />
 
@@ -175,14 +178,14 @@ function AgentRow({
           projection surfaces as a small badge, else nothing. */}
       <HealthBadge agentId={agent.id} />
 
-      {/* Model — plain muted token. */}
-      <span className="hidden shrink-0 items-center gap-1.5 text-[11.5px] text-muted-foreground/70 sm:inline-flex">
+      {/* Model — plain muted token, fixed column so rows align down the list. */}
+      <span className="hidden w-[136px] shrink-0 items-center justify-end gap-1.5 text-[11.5px] text-muted-foreground/70 sm:inline-flex">
         <Bot className="size-3.5 text-muted-foreground/45" />
-        {agent.model}
+        <span className="truncate">{agent.model}</span>
       </span>
 
-      {/* Cost — tabular, muted. */}
-      <span className="shrink-0 text-[11.5px] text-muted-foreground/70 tabular-nums">
+      {/* Cost — tabular, right-aligned in its own column, data-weight ink. */}
+      <span className="w-[68px] shrink-0 text-right text-[11.5px] text-foreground/70 tabular-nums">
         {fmtCost(a.costUsd)}
       </span>
 
@@ -271,7 +274,7 @@ function NewAgentRow({ onClick }: { onClick: () => void }) {
       <span className="text-[13px] font-medium text-muted-foreground/70 group-hover:text-foreground">
         New agent
       </span>
-      <span className="truncate text-[11.5px] text-muted-foreground/45">
+      <span className="truncate text-[11.5px] text-muted-foreground/45 opacity-0 transition-opacity group-hover:opacity-100">
         Initialize an agent in a folder — its realm for the whole session.
       </span>
     </button>
