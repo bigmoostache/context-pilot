@@ -36,6 +36,15 @@
   - bridge
   - feature-complete
   last_edited_ms: 1785160614255
+06ea32ca3ccb66b3:
+  tl_dr: ACTIVE WORKING BRANCH = 'nornor' (T735 user mandate 2026-07-31). ALL further changes push to nornor. Created from socializing, upstream origin/nornor set. Supersedes socializing as default push target until user says otherwise.
+  importance: critical
+  labels:
+  - workflow
+  - git
+  - branch
+  - nornor
+  last_edited_ms: 1785503013109
 07f9cb0fc782bcee:
   tl_dr: 'Meilisearch design complete. Embedded global server, cp-mod-search crate, tree-sitter chunking, unified search tool, log redesign. Full spec: docs/design-meilisearch.md.'
   importance: high

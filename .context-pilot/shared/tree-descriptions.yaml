@@ -6478,6 +6478,10 @@
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
+4cd43f9c18274f8a:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 4cd622fb2546a02e:
   path: crates/cp-mod-search/src/radar/mod.rs
   description: 'Context Radar. A6: query_signal decay routed via float_math (sub/mul/exp_decay), cast-only expects kept. Meili semantic query per signal, adaptive decay, refresh_inner bg thread.'
@@ -8494,6 +8498,10 @@
   path: web/src/components/panels/cockpit/StatsPanel.tsx
   description: Statistics panel — uses usePanels(agentId) for live context elements. Session stats/cache/tokenBudget remain mock (P16).
   last_edited_ms: 1781695334007
+656be0f49ba51712:
+  path: web/src/components/threads/forms/FormFields.tsx
+  description: '8 form field input renderers: single+allow-other, multi, text, number, date, toggle, confirm+confirm-word, files (immediate upload). FieldInput dispatcher.'
+  last_edited_ms: 0
 6578ec08b0335115:
   path: web/tsconfig.node.json
   description: 'Node-scope TS config (vite.config.ts + eslint.config.ts). web-lint P1: full maximal strict superset (same as tsconfig.app.json). tsc node = 0 errors.'
@@ -8586,6 +8594,10 @@
   path: crates/cp-mod-bridge/Cargo.toml
   description: 'Bridge module deps: cp-base, cp-render, cp-wire, serde_json. Workspace lints.'
   last_edited_ms: 1781617086605
+66a2ff9bf8ae971a:
+  path: web/src/mobile-components/threads/forms/FormFields.tsx
+  description: Mobile FormFields twin — 8 field renderers, 16px SCALAR_INPUT, py-2.5 option rows (≥40px tap), mobile ui/calendar+popover token. Field logic byte-identical.
+  last_edited_ms: 0
 66ab0aa1178096ea:
   path: src/app/run/threads/commands.rs
   description: Bridge command APPLICATION (K7 mutation half). apply_command dispatches SendMessage/CreateThread(paused:false)/ArchiveThread/RestoreThread/PauseThread(T371)/ResumeThread(T371)/DeleteThread(T371 permanent delete)/Stop|Interrupt/Configure. DeleteThread removes thread from ThreadsState, cleans focus+bridge memos, emits durable ThreadDeleted.
@@ -10418,6 +10430,10 @@
   path: web/src/components/shell/widgets/AgentSwitcher.tsx
   description: TopBar workspace switcher dropdown (one agent=one folder); switch/create/fleet.
   last_edited_ms: 1782117192082
+7b40eca894381f95:
+  path: .context-pilot/shared/tree-descriptions.yaml
+  description: Persisted tree descriptions YAML. Synced to git alongside code commits per M15.
+  last_edited_ms: 0
 7b697424ac38a5e5:
   path: web/src/components/shell/costs/parse.ts
   description: 'TSV parser for cost-tracking.tsv. CostRow (16 fields), parseCostTsv(), aggregations: computeSummary, culpritDistribution, costBreakdown, toolCostAttribution, culpritCostAttribution, maxFreezePerCulprit, crossTabToolCulprit. buildMarkdownReport (P8: was 86-statement monster) now a thin concat over per-section pure builders (reportHeader/Summary/Culprits/CostBreakdown/CostTable/Freezes/TokenLayout/CrossTab + avgTokenTable helper), each returning string[] (empty when its section is omitted).'
@@ -11525,6 +11541,10 @@
 87da38a8e1cf91ae:
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
+  last_edited_ms: 0
+87e6d32e83d1abc3:
+  path: web/src/mobile-components/threads/forms/FormWidget.tsx
+  description: Mobile FormWidget twin — routes mobile FormFields (its only fork). Draft persistence, two-click incomplete-submit gate, locked receipt — all byte-identical to desktop.
   last_edited_ms: 0
 87f32c2c2d88ea49:
   path: crates/cp-mod-callback/src/storage.rs
@@ -14085,6 +14105,10 @@ a5cf704f3cf6ef49:
 a5d638c214989600:
   path: src/app/run/mod.rs
   description: 'Sub-module declarations. 6 modules: input (constructor/autocomplete), lifecycle (main loop), reverie (sub-agent), streaming (LLM responses), tools (execution pipeline), watchers (file/GH).'
+  last_edited_ms: 0
+a5da0cbb9189aed1:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 a5dd8ec5ed22a47b:
   path: crates/cp-mod-tree/src/tools.rs
@@ -18358,6 +18382,10 @@ d972099bbfe18a10:
   path: crates/cp-mod-ocr/src/lib.rs
   description: 'OCR module. 1 tool: ocr. Datalab API integration. Non-blocking: returns immediately, fires spine notification on completion. Global, non-core.'
   last_edited_ms: 0
+d99fddc092af0063:
+  path: web/src/components/threads/forms/FormWidget.tsx
+  description: Interactive form widget rendered inline from ```form``` block. localStorage draft per form-id, fieldFilled client-side submit gate, LockedForm read-only view.
+  last_edited_ms: 0
 d9a479c4e86d1a63:
   path: openapi.json
   description: Generated OpenAPI 3.0.3 spec (70KB). Source of truth for TypeScript client codegen. Regenerated from Rust types via tests/openapi.rs.
@@ -18717,6 +18745,10 @@ df5c882cc6c6233e:
 df836dc0b7f168ca:
   path: .gitignore
   description: Git ignore rules. Includes *.sourced_pdf, .uploads, bridge runtime artifacts, harbor outputs, mitmproxy captures, .DS_Store, docs/slides build artifacts. devis-attali-context-pilot.md added after security incident. .context-pilot/* blocks messages/ (116K conversation YAMLs) from accidental commit.
+  last_edited_ms: 0
+df8ea7e8868428d1:
+  path: .context-pilot/shared/tree-descriptions.yaml
+  description: Persisted tree descriptions YAML. Synced to git alongside code commits per M15.
   last_edited_ms: 0
 dfa6b93cf90db078:
   path: web/src/components/agents/AgentModal.tsx

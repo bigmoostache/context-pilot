@@ -1,9 +1,10 @@
 import { useState } from "react"
-import { AlertTriangle, Bot, FolderGit2, FolderPlus, Rocket, Settings2 } from "lucide-react"
+import { AlertTriangle, Bot, FolderGit2, FolderPlus, Settings2 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { accentVar, fmtCost, FLEET_MAX_W } from "@/lib/support/panelMeta"
 import { useMetrics, useAgentMeta } from "@/lib/live"
 import { avatarUrl } from "@/lib/api"
+import { clickable } from "@/lib/support/a11y"
 import type { Agent, AgentStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { AgentModal } from "./AgentModal"
@@ -19,10 +20,16 @@ const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
 
 type Modal = { mode: "create" } | { mode: "manage"; agent: Agent } | null
 
+/** Shared row grid: name grows, then health · model · status · cost · action.
+ *  One template used by both the header strip and every data row so the columns
+ *  stay pixel-aligned (Linear projects-list convention). */
+const ROW_GRID = "grid grid-cols-[minmax(0,1fr)_130px_170px_130px_84px_32px] items-center gap-3"
+
 /**
  * Fleet welcome dashboard — mission control and the SOLE place agents are
- * managed. Aggregate stats, a card per agent (1 agent = 1 folder), and the
- * create / manage flows (the per-agent views no longer touch agent management).
+ * managed. A Linear-style dense list: a sticky-feeling column header over one
+ * row per agent (1 agent = 1 folder), plus the create / manage flows (the
+ * per-agent views no longer touch agent management).
  */
 export function FleetDashboard({
   agents,
@@ -42,10 +49,13 @@ export function FleetDashboard({
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       <ScrollArea className="min-h-0 flex-1 bg-background">
-        <div className={cn("mx-auto flex w-full flex-col gap-7 px-8 py-9", FLEET_MAX_W)}>
+        <div className={cn("mx-auto flex w-full flex-col gap-6 px-8 py-9", FLEET_MAX_W)}>
           <header className="flex items-end justify-between gap-4">
-            <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-2.5">
               <h1 className="text-[24px] font-semibold tracking-tight text-foreground">Agents</h1>
+              <span className="rounded-full bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground/70 tabular-nums">
+                {agents.length}
+              </span>
             </div>
             <button
               onClick={() => setModal({ mode: "create" })}
@@ -56,16 +66,21 @@ export function FleetDashboard({
             </button>
           </header>
 
-          <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
-            {agents.map((a) => (
-              <AgentCard
-                key={a.id}
-                agent={a}
-                onOpen={() => onOpenAgent(a.id)}
-                onManage={() => setModal({ mode: "manage", agent: a })}
-              />
-            ))}
-            <NewAgentCard onClick={() => setModal({ mode: "create" })} />
+          {/* Active fleet — one bordered list card with a column header and a
+              divider between every row (the Linear projects-list look). */}
+          <div className="card-shadow overflow-hidden rounded-xl border border-border bg-card">
+            <ColumnHeader />
+            <div className="divide-y divide-border/60">
+              {agents.map((a) => (
+                <AgentRow
+                  key={a.id}
+                  agent={a}
+                  onOpen={() => onOpenAgent(a.id)}
+                  onManage={() => setModal({ mode: "manage", agent: a })}
+                />
+              ))}
+              <NewAgentRow onClick={() => setModal({ mode: "create" })} />
+            </div>
           </div>
 
           <RetiredSection onFlash={flash} />
@@ -83,7 +98,27 @@ export function FleetDashboard({
   )
 }
 
-function AgentCard({
+/** The muted uppercase column-label strip above the agent rows. Mirrors
+ *  {@link ROW_GRID} so labels sit exactly over their cells. */
+function ColumnHeader() {
+  return (
+    <div
+      className={cn(
+        ROW_GRID,
+        "border-b border-border bg-muted/40 px-4 py-2 text-[10.5px] font-semibold tracking-wide text-muted-foreground/70 uppercase",
+      )}
+    >
+      <span>Agent</span>
+      <span>Health</span>
+      <span>Model</span>
+      <span>Status</span>
+      <span className="text-right">Cost</span>
+      <span />
+    </div>
+  )
+}
+
+function AgentRow({
   agent,
   onOpen,
   onManage,
@@ -101,74 +136,81 @@ function AgentCard({
   const accent = accentVar[a.accent]
 
   return (
-    <div className="group card-shadow flex flex-col gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-[color-mix(in_oklab,var(--signal)_45%,transparent)]">
-      <div className="flex items-center gap-3">
+    // Whole row opens the agent (keyboard-activatable via clickable()); the
+    // trailing gear manages it and stops propagation so it never also opens.
+    <div
+      {...clickable(onOpen)}
+      className={cn(
+        ROW_GRID,
+        "group cursor-pointer px-4 py-2.5 transition-colors hover:bg-muted/40",
+      )}
+    >
+      {/* Agent — avatar/icon + name over a dim one-line task summary. */}
+      <div className="flex min-w-0 items-center gap-3">
         {a.hasAvatar ? (
           <img
             src={avatarUrl(agent.id)}
             alt={agent.name}
-            className="size-10 shrink-0 rounded-lg object-cover"
+            className="size-8 shrink-0 rounded-lg object-cover"
           />
         ) : (
           <span
-            className="flex size-10 shrink-0 items-center justify-center rounded-lg"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg"
             style={{ background: `color-mix(in oklab, ${accent} 16%, transparent)`, color: accent }}
           >
-            <FolderGit2 className="size-5" />
+            <FolderGit2 className="size-4" />
           </span>
         )}
-        <div className="flex min-w-0 flex-1 flex-col leading-tight">
-          <span className="truncate text-[14px] font-semibold text-foreground/90">
+        <div className="flex min-w-0 flex-col leading-tight">
+          <span className="truncate text-[13.5px] font-semibold text-foreground/90">
             {agent.name}
           </span>
+          {agent.task && (
+            <span className="truncate text-[11px] text-muted-foreground/70">{agent.task}</span>
+          )}
         </div>
+      </div>
+
+      {/* §19 health — a degraded stream / lagging projection surfaces here so it
+          is VISIBLE, never a silent backend latch (T121). */}
+      <div className="min-w-0">
+        <HealthBadge agentId={agent.id} />
+      </div>
+
+      {/* Model */}
+      <span className="inline-flex min-w-0 items-center gap-1.5 text-[11.5px] text-muted-foreground">
+        <Bot className="size-3.5 shrink-0" />
+        <span className="truncate">{agent.model}</span>
+      </span>
+
+      {/* Status pill */}
+      <span
+        className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[10.5px] font-medium"
+        style={{ background: `color-mix(in oklab, ${s.color} 14%, transparent)`, color: s.color }}
+      >
         <span
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[10.5px] font-medium"
-          style={{ background: `color-mix(in oklab, ${s.color} 14%, transparent)`, color: s.color }}
-        >
-          <span
-            className={cn("size-1.5 rounded-full", a.status === "working" && "animate-pulse")}
-            style={{ background: s.color }}
-          />
-          {s.label}
-        </span>
-      </div>
+          className={cn("size-1.5 rounded-full", a.status === "working" && "animate-pulse")}
+          style={{ background: s.color }}
+        />
+        {s.label}
+      </span>
 
-      {/* §19 health — a degraded stream / lagging projection
-          surfaces here so it is VISIBLE, never a silent backend latch (T121). */}
-      <HealthBadge agentId={agent.id} />
+      {/* Cost */}
+      <span className="text-right text-[12px] font-semibold text-foreground/80 tabular-nums">
+        {fmtCost(a.costUsd)}
+      </span>
 
-      {/* one-line summary of what the agent is doing */}
-      <p className="line-clamp-2 min-h-[2.4em] text-[12px] leading-snug text-foreground/70">
-        {agent.task}
-      </p>
-
-      <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
-        <span className="inline-flex items-center gap-1">
-          <Bot className="size-3.5" />
-          {agent.model}
-        </span>
-        <span className="ml-auto font-semibold text-foreground/80 tabular-nums">
-          {fmtCost(a.costUsd)}
-        </span>
-      </div>
-
-      <div className="mt-0.5 flex items-center gap-2">
-        <button
-          onClick={onOpen}
-          className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-(--signal) px-3 py-2 text-[12.5px] font-medium text-(--primary-foreground) transition-[filter] hover:brightness-105"
-        >
-          <Rocket className="size-4" />
-          Open
-        </button>
-        <button
-          onClick={onManage}
-          className="flex items-center justify-center gap-1.5 rounded-lg border border-border bg-muted/40 px-3 py-2 text-[12.5px] font-medium text-foreground/70 transition-colors hover:border-(--interactive)/50 hover:text-(--interactive)"
-        >
-          <Settings2 className="size-3.5" />
-          Manage
-        </button>
-      </div>
+      {/* Manage — appears on row hover; stops propagation so it doesn't open. */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          onManage()
+        }}
+        title="Manage agent"
+        className="flex size-7 items-center justify-center rounded-md text-muted-foreground/60 opacity-0 transition-[opacity,color,background-color] group-hover:opacity-100 hover:bg-muted hover:text-(--interactive) focus-visible:opacity-100"
+      >
+        <Settings2 className="size-4" />
+      </button>
     </div>
   )
 }
@@ -178,7 +220,7 @@ function AgentCard({
  *  backend view is no longer tracking the oplog head (a real health signal). */
 const REV_LAG_WARN = 50
 
-/** The first non-nominal health condition to surface for an agent card, or null
+/** The first non-nominal health condition to surface for an agent row, or null
  *  when everything is nominal. A flat if-chain (not a nested ternary): a
  *  degraded stream first, then a lagging projection. */
 function healthCondition(
@@ -203,19 +245,16 @@ function healthCondition(
 }
 
 /**
- * §19 health badge for an agent card. Polls `/api/agent/{id}/metrics` and
- * surfaces the *first* non-nominal condition as a coloured pill — so a
- * degraded stream or a lagging projection is **visible at a
- * glance** on the fleet board rather than a silent backend latch (T121). When
- * everything is nominal (or metrics haven't loaded) it renders nothing, keeping
- * healthy cards uncluttered.
+ * §19 health badge for an agent row. Polls `/api/agent/{id}/metrics` and
+ * surfaces the *first* non-nominal condition as a coloured pill — so a degraded
+ * stream or a lagging projection is **visible at a glance** on the fleet board
+ * rather than a silent backend latch (T121). When everything is nominal (or
+ * metrics haven't loaded) it renders a dim dash, keeping the column aligned.
  */
 function HealthBadge({ agentId }: { agentId: string }) {
   const { data } = useMetrics(agentId)
-  if (!data) return null
-
-  const condition = healthCondition(data)
-  if (!condition) return null
+  const condition = data ? healthCondition(data) : null
+  if (!condition) return <span className="text-[12px] text-muted-foreground/40">—</span>
 
   return (
     <span
@@ -233,17 +272,19 @@ function HealthBadge({ agentId }: { agentId: string }) {
   )
 }
 
-function NewAgentCard({ onClick }: { onClick: () => void }) {
+/** The trailing dashed "create agent" row that closes the list (Linear's
+ *  add-row affordance). Spans the full width rather than sitting in the grid. */
+function NewAgentRow({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="flex min-h-[164px] flex-col items-center justify-center gap-2.5 rounded-xl border border-dashed border-border bg-transparent p-4 text-muted-foreground transition-colors hover:border-(--interactive)/60 hover:text-(--interactive)"
+      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-[12.5px] font-medium text-muted-foreground/70 transition-colors hover:bg-muted/40 hover:text-(--interactive)"
     >
-      <span className="flex size-11 items-center justify-center rounded-xl bg-muted/50">
-        <FolderPlus className="size-5" />
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-dashed border-border">
+        <FolderPlus className="size-4" />
       </span>
-      <span className="text-[13px] font-medium">New agent</span>
-      <span className="max-w-[220px] text-center text-[11px] text-muted-foreground/60">
+      New agent
+      <span className="truncate text-[11px] font-normal text-muted-foreground/50">
         Initialize an agent in a folder — its realm for the whole session.
       </span>
     </button>
