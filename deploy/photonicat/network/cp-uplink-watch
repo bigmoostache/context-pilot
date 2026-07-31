@@ -131,15 +131,44 @@ write_state() {
 
 # ── Observation ─────────────────────────────────────────────────────────────
 
-# The device carrying the lowest-metric IPv4 default route — i.e. what the box
-# actually uses right now. Read from the kernel, never inferred from what we
-# believe we configured, so the state file stays honest even if a human ran
-# `nmcli` behind our back. That human loses: the backend applier is the only
-# writer of system network config, so a hand-made profile or metric is reverted
-# at the next apply or the next boot. Documented, not defended against — but the
-# state file must at least report the truth while it lasts.
+# The device carrying the lowest-metric default route of EITHER address family —
+# i.e. what the box actually uses right now. Read from the kernel, never inferred
+# from what we believe we configured, so the state file stays honest even if a
+# human ran `nmcli` behind our back. That human loses: the backend applier is the
+# only writer of system network config, so a hand-made profile or metric is
+# reverted at the next apply or the next boot. Documented, not defended against —
+# but the state file must at least report the truth while it lasts.
+#
+# BOTH FAMILIES, and that is not tidiness: WHICH FAMILY A BEARER GETS IS NOT
+# OURS TO ASSUME. Same SIM, same APN, same operator (Bouygues `20820`), two
+# measurements a day apart on the same box:
+#   * attached in UMTS (weak-coverage fallback) — IPv6 address, IPv6 default
+#     route, no IPv4 anything. Every APN tried behaved identically, including a
+#     bogus one, so this is the network's doing and not a misconfiguration.
+#   * attached in LTE/5G-NR — dual-stack, with IPv4 arriving as the `192.0.0.2/27`
+#     CLAT address of 464XLAT (RFC 7335) over an IPv6 PDN.
+# This read was `-4` only, so on the first of those a promotion that WORKED left
+# `end0` as the only default route in the table it looked at: `classify_dev`
+# answered `wan` and the cockpit reported `active_uplink=wan` while every packet
+# was leaving through the modem.
+#
+# And the misreport is the smaller half. THE STARTUP RECONCILIATION BELOW ASKS
+# THIS SAME QUESTION to decide whether the bearer is already the uplink. Blind to
+# IPv6 it answered `none`, so `promoted` came back `no` across the restart the
+# backend performs after every apply — and the demote branch requires
+# `promoted=yes`. A box that had failed over to an IPv6-only bearer would
+# therefore keep it as its default route FOREVER, with a perfectly healthy WAN:
+# precisely the failure that block exists to prevent, reintroduced through the
+# one input it trusts.
+#
+# Metrics are compared ACROSS families, which is only meaningful because both
+# ends are kept in step here: `set_wwan_metric` writes ipv4.route-metric and
+# ipv6.route-metric to the same value, and networkd gives `end0` the same metric
+# in both tables (measured 100/100 on the test box). Should that ever drift, the
+# comparison degrades to "prefer whichever family got the smaller number" — still
+# strictly better than ignoring one of the two.
 current_default_dev() {
-  ip -4 route show default 2>/dev/null \
+  { ip -4 route show default 2>/dev/null; ip -6 route show default 2>/dev/null; } \
     | awk '{ m = 0; for (i = 1; i < NF; i++) if ($i == "metric") m = $(i + 1);
              for (i = 1; i < NF; i++) if ($i == "dev") d = $(i + 1);
              if (d != "" && (best == "" || m < bestm)) { best = d; bestm = m } }
@@ -167,6 +196,35 @@ classify_dev() {   # $1 = interface name → wan | wwan | none | other
   esac
 }
 
+# Does the bearer hold a default route of its own, in either family, WHATEVER
+# its metric?
+#
+# NOT `current_default_dev`, and the difference is the whole point: that one
+# answers "who wins", and it answers `end0` for a perfectly healthy hot-standby
+# bearer parked at metric 700. This one asks "does the bearer have IP
+# configuration at all", which is a different question and the one that caught
+# the failure below.
+#
+# WHY IT EXISTS. `nmcli device reapply` on this QMI modem returns SUCCESS and
+# silently drops the bearer's addresses AND routes, while NetworkManager keeps
+# reporting the connection `activated`. MEASURED twice on the test box, once
+# during a real failover (2026-07-31: two `op="device-reapply" result="success"`
+# audit lines, after which `wwu1u1i4` had no address and no route, with
+# `mmcli` still reporting the modem connected, registered and attached). So
+# `wwan_is_active` — which only greps `nmcli connection show --active` — is a
+# broken sensor for "the bearer is carrying": it says yes to a dead link.
+#
+# The `^ww` pattern is `classify_dev`'s, deliberately: same devices, same
+# spelling. Change one, change the other. `CP_UPLINK_WWAN_DEV` is NOT tested
+# here — it names the modem CONTROL port, which never carries a route.
+wwan_has_default_route() {
+  { ip -4 route show default 2>/dev/null; ip -6 route show default 2>/dev/null; } \
+    | awk '{ dev = ""
+             for (i = 1; i < NF; i++) if ($i == "dev") dev = $(i + 1)
+             if (dev ~ /^ww/) found = 1 }
+           END { exit found ? 0 : 1 }'
+}
+
 # End-to-end reachability THROUGH a named interface. Returns 0 on the first
 # target that answers. `-I` is what makes this a test of that path rather than
 # of whatever the routing table currently prefers.
@@ -181,10 +239,21 @@ probe_via() {   # $1 = interface
 
 # ── Actuation ───────────────────────────────────────────────────────────────
 # The failover itself is a metric change on the NM profile, applied with
-# `nmcli device reapply` — which pushes changed IP configuration WITHOUT
-# deactivating the connection, so a hot-standby bearer keeps its session and the
-# switch is sub-second. `con up` is the fallback for a bearer that is not up
-# (cold standby, or a reapply the driver refuses).
+# `nmcli device reapply` — which is SUPPOSED to push changed IP configuration
+# without deactivating the connection, so a hot-standby bearer keeps its session
+# and the switch is sub-second. `con up` is the fallback for a bearer that is not
+# up (cold standby, or a reapply the driver refuses).
+#
+# THAT PROMISE IS FALSE ON THIS PLATFORM, and this file used to state it as fact.
+# On a GSM device the IP configuration comes from ModemManager's bearer, not from
+# a DHCP client NetworkManager runs itself, and `reapply` re-runs the IP stage
+# against nothing: it returns success, leaves the connection `activated`, and
+# drops every address and route the bearer had. MEASURED on the test box during a
+# real WAN outage (2026-07-31) — the supervisor announced a clean transition to
+# 5G, `achieved=yes`, and the box was left with NO default route at all, which is
+# strictly worse than never having failed over. `repair_wwan_ip_config` below is
+# the answer: verify, and rebuild with `connection up` when the verification
+# fails. `up` reconstructs the configuration correctly — also measured, twice.
 #
 # EVERY nmcli call is bounded by `--wait`. MEASURED: without it, a `connection
 # up` against a modem with no coverage blocks for nmcli's 90 s default, and
@@ -204,6 +273,30 @@ set_wwan_metric() {   # $1 = metric
     nm device reapply "$CP_UPLINK_WWAN_DEV" || nm connection up "$CP_UPLINK_WWAN_PROFILE" || return 1
   fi
   return 0
+}
+
+# Put the bearer's IP configuration back when `reapply` has thrown it away.
+#
+# Deliberately narrow, because the cure is expensive: `connection up` is the one
+# nmcli call that can sit for the whole `--wait` budget on a modem with no
+# coverage, and this is a single-threaded loop. So it fires ONLY on the exact
+# pathological state — NetworkManager says `activated`, the kernel says the
+# bearer has no default route in either family. A bearer that is legitimately
+# down (cold standby, no coverage) is not active, so it is not touched here; a
+# healthy standby bearer has its route at metric 700 and is not touched either.
+#
+# Called from engage/disengage rather than from the loop, so the repair runs on
+# transitions and retries — never every ten seconds.
+#
+# The log line is unconditional because a repair is genuinely news: it means the
+# actuation path just silently destroyed the uplink it was asked to adjust, and
+# `journalctl -u cp-uplink` is where somebody will look for that.
+repair_wwan_ip_config() {
+  wwan_is_active || return 0
+  wwan_has_default_route && return 0
+  log "$CP_UPLINK_WWAN_PROFILE is active but carries no default route —" \
+      "'device reapply' dropped its IP configuration; rebuilding with 'connection up'"
+  nm connection up "$CP_UPLINK_WWAN_PROFILE" || true
 }
 
 # ── Actuation, split from the decision ──────────────────────────────────────
@@ -228,13 +321,24 @@ engage_wwan() {
     # starts the bearer (`connection.autoconnect` is `no` there).
     nm connection up "$CP_UPLINK_WWAN_PROFILE" || true
   fi
-  # ACHIEVEMENT IS RE-READ FROM nmcli, never inferred from the exit status of
-  # `connection up`: `--wait` caps that call at CP_UPLINK_NM_WAIT_S, so a modem
-  # that registers one second late returns failure and is up regardless. Asking
-  # the truth on the next turn is what closes the transition honestly instead of
-  # leaving us convinced of a failure that already resolved itself.
+  repair_wwan_ip_config
+  # ACHIEVEMENT IS RE-READ FROM THE SYSTEM, never inferred from the exit status
+  # of `connection up`: `--wait` caps that call at CP_UPLINK_NM_WAIT_S, so a
+  # modem that registers one second late returns failure and is up regardless.
+  # Asking the truth on the next turn is what closes the transition honestly
+  # instead of leaving us convinced of a failure that already resolved itself.
+  #
+  # TWO QUESTIONS, NOT ONE, and the second is the one that was missing. "Is the
+  # profile active" is NetworkManager's opinion of itself; it stayed `yes`
+  # through a failover that left the box with no default route, so `achieved`
+  # said yes to a dead uplink and `retry_actuation` — the machinery built
+  # precisely to grind away at a promotion that did not take — was never given
+  # anything to grind on. The kernel's routing table is the second opinion, and
+  # it is the one that decides whether packets leave.
   if ! wwan_is_active; then
     engage_detail="${engage_detail:+$engage_detail, }$CP_UPLINK_WWAN_PROFILE is not active"
+  elif ! wwan_has_default_route; then
+    engage_detail="${engage_detail:+$engage_detail, }$CP_UPLINK_WWAN_PROFILE is active but carries no default route"
   fi
   [ -z "$engage_detail" ]
 }
@@ -246,9 +350,27 @@ disengage_wwan() {
   if ! set_wwan_metric "$CP_UPLINK_METRIC_STANDBY"; then
     engage_detail="metric $CP_UPLINK_METRIC_STANDBY not applied"
   fi
-  if [ "$CP_UPLINK_STANDBY" = "cold" ] && wwan_is_active; then
-    nm connection down "$CP_UPLINK_WWAN_PROFILE" \
-      || engage_detail="${engage_detail:+$engage_detail, }$CP_UPLINK_WWAN_PROFILE would not deactivate"
+  if [ "$CP_UPLINK_STANDBY" = "cold" ]; then
+    if wwan_is_active; then
+      nm connection down "$CP_UPLINK_WWAN_PROFILE" \
+        || engage_detail="${engage_detail:+$engage_detail, }$CP_UPLINK_WWAN_PROFILE would not deactivate"
+    fi
+  else
+    # THE DEMOTION BREAKS THE BEARER TOO, and that is why this branch exists.
+    # Coming back to the standby metric is another `set_wwan_metric`, hence
+    # another `reapply`, hence the same silent teardown — measured: after the
+    # 2026-07-31 fail-back the bearer sat `activated` with no address and no
+    # route, and stayed that way. The box was then in `wan_5g` with a WAN that
+    # worked and a 5G standby that could not have carried anything, which is the
+    # worst of the three states and the only one nothing was watching for.
+    #
+    # A hot standby that is not up is not a standby, so this is a genuine
+    # `achieved=no`: it hands the failure to `retry_actuation`, which is exactly
+    # the machinery for a decision that could not be carried out.
+    repair_wwan_ip_config
+    if wwan_is_active && ! wwan_has_default_route; then
+      engage_detail="${engage_detail:+$engage_detail, }hot standby $CP_UPLINK_WWAN_PROFILE carries no default route"
+    fi
   fi
   [ -z "$engage_detail" ]
 }

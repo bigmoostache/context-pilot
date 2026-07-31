@@ -224,7 +224,7 @@ fn status_degrades_to_null_for_every_gated_field() {
     assert!(status.get("ap").is_some_and(serde_json::Value::is_null), "no CP_NMCLI_BIN ⇒ null AP");
     assert!(status.get("active_uplink").is_some_and(|v| v.is_string()), "the active uplink needs no tool");
     let wan = status.get("wan").expect("wan is always present");
-    assert!(wan.get("has_default_route").is_some_and(serde_json::Value::is_boolean), "read from /proc/net/route");
+    assert!(wan.get("has_default_route").is_some_and(serde_json::Value::is_boolean), "read from /proc/net/*route");
     assert!(wan.get("ip").is_some_and(serde_json::Value::is_null), "no CP_IP_BIN ⇒ null address");
 }
 

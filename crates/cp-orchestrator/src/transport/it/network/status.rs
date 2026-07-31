@@ -13,8 +13,9 @@
 //! null from them: `modem_present` is a sysfs hardware fact with a defined
 //! answer everywhere, and `active_uplink` is one of four strings — `none` is its
 //! spelling of "nothing to report", not `null`. Both need no gate at all,
-//! because the default-route half is parsed from `/proc/net/route`, and they are
-//! precisely the two fields an admin watches during a failover.
+//! because the default-route half is parsed from `/proc/net/route` and
+//! `/proc/net/ipv6_route`, and they are precisely the two fields an admin
+//! watches during a failover.
 //!
 //! `supervisor` is a third kind: `null` when `cp-uplink-watch` has published no
 //! state, an object when it has. That is a statement about the supervisor, not
@@ -36,11 +37,14 @@ use super::uplink::supervisor_status;
 /// and one answer, so the `modem_present` the cockpit reads is the same one the
 /// handlers gated on rather than an independent sysfs read that could disagree.
 pub(crate) fn probe(config: &NetworkConfig, has_modem: bool) -> Value {
-    // One `/proc/net/route` read per request, threaded into both consumers —
-    // it was parsed twice, and the two reads could straddle a failover.
+    // One default-route read per request, threaded into both consumers — it was
+    // parsed twice, and the two reads could straddle a failover.
     let route = default_route();
-    let default_dev = route.as_ref().map(|pair| pair.0.as_str());
-    let gateway = route.as_ref().map(|pair| pair.1.as_str());
+    let default_dev = route.as_ref().map(|found| found.0.as_str());
+    // `and_then`, not `map`: an IPv6 winner contributes a device and no gateway,
+    // so "no default route at all" and "a default route with no v4 gateway to
+    // show" collapse to the same `None` the cockpit already renders as null.
+    let gateway = route.as_ref().and_then(|found| found.1.as_deref());
     let tools = Tools::resolve();
     json!({
         "active_uplink": active_uplink(default_dev),
@@ -60,19 +64,58 @@ pub(crate) fn probe(config: &NetworkConfig, has_modem: bool) -> Value {
 
 // ── Default route, straight from /proc (no gate) ────────────────────────────
 
-/// `(iface, gateway)` of the lowest-metric IPv4 default route.
+/// `(iface, IPv4 gateway)` of the lowest-metric default route, **across both
+/// address families**.
 ///
-/// `/proc/net/route` columns are `Iface Destination Gateway Flags RefCnt Use
-/// Metric Mask …`, with the addresses as little-endian hex. A default route is
-/// destination `00000000` **and** mask `00000000`.
-fn default_route() -> Option<(String, String)> {
-    let table = std::fs::read_to_string("/proc/net/route").ok()?;
-    parse_default_route(&table)
+/// BOTH TABLES, because which family a mobile bearer gets is not ours to assume.
+/// Same SIM, same APN, same operator (Bouygues `20820`), measured a day apart on
+/// the test box: attached in UMTS it came up IPv6-only — an IPv6 address, an IPv6
+/// default route and no IPv4 anything, identically for every APN tried including
+/// a bogus one; attached in LTE/5G-NR it came up dual-stack, IPv4 arriving as the
+/// `192.0.0.2/27` CLAT address of 464XLAT over an IPv6 PDN. Reading
+/// `/proc/net/route` alone, a box that had failed over in the first of those
+/// showed `end0` as its only default route, so the cockpit rendered
+/// `active_uplink=wan` while every packet was leaving through the modem — and the
+/// supervisor's `classify_dev`, fixed in the same change, would have disagreed
+/// with it on the one screen where the two are read side by side.
+///
+/// The gateway stays IPv4-only on purpose: it is rendered as `wan.gateway`
+/// beside `wan.ip`, which `interface_ipv4` also answers in v4. A v6 winner
+/// therefore contributes its *device* and no gateway, which is why the second
+/// half of the pair is now an `Option`.
+fn default_route() -> Option<(String, Option<String>)> {
+    // `unwrap_or_default`, not `ok()?`: an absent table is an empty table, and
+    // the other family may still have the answer.
+    let v4 = std::fs::read_to_string("/proc/net/route").unwrap_or_default();
+    let v6 = std::fs::read_to_string("/proc/net/ipv6_route").unwrap_or_default();
+    best_default_route(&v4, &v6)
 }
 
-/// Pure half of the `/proc/net/route` read — `(iface, gateway)` of the
-/// lowest-metric default route.
-fn parse_default_route(table: &str) -> Option<(String, String)> {
+/// Pure half of the two `/proc` reads — the lower-metric winner of the two.
+///
+/// Metrics are compared across families, which is meaningful because both ends
+/// are kept in step on this platform: the applier writes `ipv4.route-metric` and
+/// `ipv6.route-metric` to the same value, and networkd gives `end0` the same
+/// metric in both tables (measured 100/100). A tie goes to IPv4, because that
+/// answer carries the gateway the cockpit renders.
+fn best_default_route(v4_table: &str, v6_table: &str) -> Option<(String, Option<String>)> {
+    let v4 = parse_default_route(v4_table).map(|(metric, dev, gateway)| (metric, dev, Some(gateway)));
+    let v6 = parse_default_route6(v6_table).map(|(metric, dev)| (metric, dev, None));
+    let best = match (v4, v6) {
+        (Some(from_v4), Some(from_v6)) => Some(if from_v6.0 < from_v4.0 { from_v6 } else { from_v4 }),
+        (Some(only), None) | (None, Some(only)) => Some(only),
+        (None, None) => None,
+    };
+    best.map(|(_metric, dev, gateway)| (dev, gateway))
+}
+
+/// Pure half of the `/proc/net/route` read — `(metric, iface, gateway)` of the
+/// lowest-metric IPv4 default route.
+///
+/// Columns are `Iface Destination Gateway Flags RefCnt Use Metric Mask …`, with
+/// the addresses as little-endian hex. A default route is destination
+/// `00000000` **and** mask `00000000`.
+fn parse_default_route(table: &str) -> Option<(u32, String, String)> {
     let mut best: Option<(u32, String, String)> = None;
     for line in table.lines().skip(1) {
         let cols: Vec<&str> = line.split_whitespace().collect();
@@ -91,7 +134,58 @@ fn parse_default_route(table: &str) -> Option<(String, String)> {
             best = Some((metric, (*iface).to_owned(), hex_le_ipv4(gateway).unwrap_or_default()));
         }
     }
-    best.map(|(_metric, dev, gateway)| (dev, gateway))
+    best
+}
+
+/// Pure half of the `/proc/net/ipv6_route` read — `(metric, iface)` of the
+/// lowest-metric IPv6 default route.
+///
+/// A DIFFERENT FILE WITH A DIFFERENT SHAPE, and every difference below is a way
+/// to get this wrong. Columns are `dest plen src plen next_hop metric refcnt use
+/// flags iface`; there is **no header line** (its IPv4 sibling has one, hence the
+/// `skip(1)` there and none here); the metric is **hex**, not decimal; and a
+/// default route is a 32-zero destination with prefix length `00`.
+///
+/// THE FLAG TEST IS LOAD-BEARING. Every box carries this row:
+///
+/// ```text
+/// 000…000 00 000…000 00 000…000 ffffffff 00000001 00000000 00200200 lo
+/// ```
+///
+/// — the kernel's unreachable `::/0`. Its metric is `0xffffffff`, so it loses
+/// every comparison and looks harmless, right up until it is the *only* default
+/// route in the table: then a parser that merely sorts by metric hands back `lo`,
+/// which `classify_device` dutifully reports as `other`, and the cockpit claims
+/// the box is routing through something it does not recognise while it in fact
+/// has no IPv6 uplink at all. So we require `RTF_UP` and reject `RTF_REJECT`
+/// rather than trusting the ordering.
+fn parse_default_route6(table: &str) -> Option<(u32, String)> {
+    const RTF_UP: u32 = 0x0001;
+    const RTF_REJECT: u32 = 0x0200;
+    const DEFAULT_DEST: &str = "00000000000000000000000000000000";
+
+    let mut best: Option<(u32, String)> = None;
+    for line in table.lines() {
+        let cols: Vec<&str> = line.split_whitespace().collect();
+        let (Some(dest), Some(prefix_len), Some(metric_hex), Some(flags_hex), Some(iface)) =
+            (cols.first(), cols.get(1), cols.get(5), cols.get(8), cols.get(9))
+        else {
+            continue;
+        };
+        if *dest != DEFAULT_DEST || *prefix_len != "00" {
+            continue;
+        }
+        let (Ok(flags), Ok(metric)) = (u32::from_str_radix(flags_hex, 16), u32::from_str_radix(metric_hex, 16)) else {
+            continue;
+        };
+        if flags & RTF_UP == 0 || flags & RTF_REJECT != 0 {
+            continue;
+        }
+        if best.as_ref().is_none_or(|seen| metric < seen.0) {
+            best = Some((metric, (*iface).to_owned()));
+        }
+    }
+    best
 }
 
 /// Decode the little-endian hex IPv4 `/proc/net/route` uses (`0101A8C0` →
@@ -139,9 +233,14 @@ fn classify_device(dev: &str) -> &'static str {
 
 /// Carrier + address + whether this port currently holds the default route.
 ///
-/// `default_dev`/`gateway` come from the single `/proc/net/route` read in
-/// [`probe`]; re-reading the table here made a `GET` parse it twice and let the
-/// two halves of one response straddle a failover.
+/// `default_dev`/`gateway` come from the single default-route read in [`probe`];
+/// re-reading the tables here made a `GET` parse them twice and let the two
+/// halves of one response straddle a failover.
+///
+/// `has_default_route` now also answers `true` for a port holding only an IPv6
+/// default route. That is the honest reading — the port IS the box's way out —
+/// and it is the same widening `active_uplink` gets, so the two cannot disagree
+/// about the same interface within one response.
 fn wan_status(default_dev: Option<&str>, gateway: Option<&str>) -> Value {
     let iface = wan_iface();
     let carrier =
@@ -389,9 +488,33 @@ end0\t0001A8C0\t00000000\t0001\t0\t0\t100\t00FFFFFF\t0\t0\t0
 wwu1u1i4\t00000000\t0100A80A\t0003\t0\t0\t700\t00000000\t0\t0\t0
 ";
 
+    /// `/proc/net/ipv6_route` captured from the test box, with the bearer merely
+    /// STANDING BY at 0x2bc = 700 and `end0` holding the default at 0x64 = 100.
+    ///
+    /// Verbatim, not approximated: this table has **no header line**, its metric
+    /// is **hex**, and its last row is the kernel's unreachable `::/0` on `lo` —
+    /// three separate ways to write a parser that looks right and is not. The
+    /// on-link rows are kept so the prefix-length filter has something to reject.
+    const ROUTE_TABLE6: &str = "\
+2a01cb088f5d22000000000000000000 40 00000000000000000000000000000000 00 00000000000000000000000000000000 00000064 00000002 00000000 08400001 end0
+fe800000000000000000000000000000 40 00000000000000000000000000000000 00 00000000000000000000000000000000 00000100 00000009 00000000 00000001 end0
+00000000000000000000000000000000 00 00000000000000000000000000000000 00 fe800000000000001adf26fffea05940 00000064 00000009 00000000 08400003 end0
+00000000000000000000000000000000 00 00000000000000000000000000000000 00 2a04cec01052309ecd4134fc1c7f07cf 000002bc 00000007 00000000 00000003 wwu1u1i4
+00000000000000000000000000000000 00 00000000000000000000000000000000 00 00000000000000000000000000000000 ffffffff 00000001 00000000 00200200 lo
+";
+
+    /// The IPv4 half of a box whose bearer is IPv6-only: `end0` is the ONLY
+    /// default route there, whatever the modem is doing.
+    const ROUTE_TABLE_WAN_ONLY: &str = "\
+Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT
+end0\t00000000\t0101A8C0\t0003\t0\t0\t100\t00000000\t0\t0\t0
+end0\t0001A8C0\t00000000\t0001\t0\t0\t100\t00FFFFFF\t0\t0\t0
+";
+
     #[test]
     fn the_lowest_metric_default_route_wins() {
-        let (dev, gateway) = parse_default_route(ROUTE_TABLE).expect("a default route");
+        let (metric, dev, gateway) = parse_default_route(ROUTE_TABLE).expect("a default route");
+        assert_eq!(metric, 100);
         assert_eq!(dev, "end0", "metric 100 beats metric 700");
         assert_eq!(gateway, "192.168.1.1", "little-endian hex decodes to the LAN gateway");
         assert_eq!(active_uplink(Some(&dev)), json!("wan"));
@@ -401,7 +524,7 @@ wwu1u1i4\t00000000\t0100A80A\t0003\t0\t0\t700\t00000000\t0\t0\t0
     fn a_promoted_bearer_becomes_the_active_uplink() {
         // What the supervisor produces at failover: the bearer drops to 50.
         let failed_over = ROUTE_TABLE.replace("\t700\t00000000", "\t50\t00000000");
-        let (dev, gateway) = parse_default_route(&failed_over).expect("a default route");
+        let (_metric, dev, gateway) = parse_default_route(&failed_over).expect("a default route");
         assert_eq!(dev, "wwu1u1i4", "metric 50 beats end0's 100");
         assert_eq!(gateway, "10.168.0.1");
         assert_eq!(active_uplink(Some(&dev)), json!("wwan"));
@@ -413,6 +536,65 @@ wwu1u1i4\t00000000\t0100A80A\t0003\t0\t0\t700\t00000000\t0\t0\t0
 end0\t0001A8C0\t00000000\t0001\t0\t0\t100\t00FFFFFF\t0\t0\t0\n";
         assert_eq!(parse_default_route(only_link_local), None);
         assert_eq!(active_uplink(None), json!("none"));
+    }
+
+    // ── The IPv6 table, and the failover it used to hide ─────────────────────
+
+    #[test]
+    fn the_ipv6_default_route_is_read_with_its_hex_metric() {
+        let (metric, dev) = parse_default_route6(ROUTE_TABLE6).expect("a v6 default route");
+        assert_eq!(metric, 100, "0x64, not the decimal 64 a copied v4 parser would produce");
+        assert_eq!(dev, "end0", "0x64 = 100 beats the bearer's 0x2bc = 700");
+    }
+
+    #[test]
+    fn the_unreachable_ipv6_default_on_lo_is_not_an_uplink() {
+        // Present on every box. It loses on metric whenever a real route exists,
+        // so it stays invisible until it is the only row left — and then a
+        // metric-only parser hands back `lo`, which `classify_device` renders as
+        // `other`: the cockpit claiming the box routes through something it does
+        // not recognise, when it simply has no IPv6 uplink at all.
+        let only_the_trap = "00000000000000000000000000000000 00 00000000000000000000000000000000 00 \
+00000000000000000000000000000000 ffffffff 00000001 00000000 00200200 lo\n";
+        assert_eq!(parse_default_route6(only_the_trap), None, "RTF_REJECT is not an uplink");
+        assert_eq!(best_default_route("", only_the_trap), None);
+    }
+
+    #[test]
+    fn an_ipv6_only_bearer_holding_the_default_route_is_seen() {
+        // THE REGRESSION THIS WHOLE CHANGE EXISTS FOR. Reading `/proc/net/route`
+        // alone, this box answered `end0`: there is no IPv4 default via the
+        // bearer and there never will be, because the operator hands out an
+        // IPv6-only PDN (measured on Bouygues, every APN tried). So the cockpit
+        // reported `active_uplink=wan` throughout a failover that had entirely
+        // succeeded — and `cp-uplink-watch`, asking the same question of the
+        // same kernel at startup, concluded it had never promoted and could
+        // therefore never demote back to a healthy WAN.
+        let promoted = ROUTE_TABLE6.replace(" 000002bc ", " 00000032 ");
+        let (dev, gateway) = best_default_route(ROUTE_TABLE_WAN_ONLY, &promoted).expect("a default route");
+        assert_eq!(dev, "wwu1u1i4", "metric 50 over IPv6 beats metric 100 over IPv4");
+        assert_eq!(gateway, None, "an IPv6 winner contributes no IPv4 gateway to render");
+        assert_eq!(active_uplink(Some(&dev)), json!("wwan"));
+    }
+
+    #[test]
+    fn a_standing_by_bearer_does_not_steal_the_default_route() {
+        // The other half of the widening, and the one that would turn the fix
+        // into a fresh bug: at the standby metric the bearer must lose in BOTH
+        // tables, or every healthy box reports a failover that never happened.
+        let (dev, gateway) = best_default_route(ROUTE_TABLE_WAN_ONLY, ROUTE_TABLE6).expect("a default route");
+        assert_eq!(dev, "end0", "metric 100 beats the 700 the applier parks the bearer at");
+        assert_eq!(gateway.as_deref(), Some("192.168.1.1"), "the IPv4 winner still carries its gateway");
+        assert_eq!(active_uplink(Some(&dev)), json!("wan"));
+    }
+
+    #[test]
+    fn a_missing_table_does_not_cost_the_answer_the_other_holds() {
+        // `default_route` reads two files and neither is guaranteed to exist —
+        // an IPv6-disabled kernel has no `ipv6_route` at all.
+        assert_eq!(best_default_route(ROUTE_TABLE_WAN_ONLY, "").map(|(dev, _gw)| dev), Some("end0".to_owned()));
+        assert_eq!(best_default_route("", ROUTE_TABLE6).map(|(dev, _gw)| dev), Some("end0".to_owned()));
+        assert_eq!(best_default_route("", ""), None);
     }
 
     #[test]

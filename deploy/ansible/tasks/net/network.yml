@@ -123,12 +123,19 @@
 
 # ── failover supervisor (WAN ⇄ 5G) ──────────────────────────────────────────
 - name: Ship the uplink failover supervisor
+  # REGISTERED, and the restart below keys off it as well as off the unit. This
+  # copy used to be unregistered, so only a changed *unit file* bounced the
+  # daemon: shipping a new supervisor SCRIPT landed it on disk and left the old
+  # code running in memory until somebody rebooted the box. A fix to the failover
+  # logic would have reported `changed` and done nothing — the worst possible
+  # combination, because the run looks like a successful deploy.
   ansible.builtin.copy:
     src: "{{ repo_root }}/deploy/photonicat/network/cp-uplink-watch"
     dest: /usr/local/sbin/cp-uplink-watch
     owner: root
     group: root
     mode: "0755"
+  register: _cp_uplink_script
 
 - name: Ship the failover supervisor unit
   ansible.builtin.copy:
@@ -245,11 +252,16 @@
   # changes. Bouncing it here on an unchanged box would be churn, and it would
   # cost the supervisor its hysteresis state (the streaks are in-memory) for
   # nothing.
+  #
+  # But a changed SCRIPT must bounce it too, not just a changed unit: the daemon
+  # holds its code in memory, so a shipped-but-not-restarted supervisor keeps
+  # running the version we just replaced. Losing the streaks is the correct price
+  # for actually running the code we shipped.
   ansible.builtin.systemd_service:
     name: cp-uplink.service
     daemon_reload: true
     enabled: true
-    state: "{{ 'restarted' if (_cp_uplink_unit is changed) else 'started' }}"
+    state: "{{ 'restarted' if ((_cp_uplink_unit is changed) or (_cp_uplink_script is changed)) else 'started' }}"
 
 - name: Report the network foundation
   ansible.builtin.debug:
