@@ -84,7 +84,7 @@ export function FleetDashboard({
               const members = agents.filter((a) => a.status === status)
               if (members.length === 0) return null
               return (
-                <section key={status} className="mb-1">
+                <section key={status} className="mb-2">
                   <GroupHeader status={status} count={members.length} />
                   {members.map((a) => openRow(a))}
                 </section>
@@ -191,7 +191,7 @@ function AgentRow({
       </span>
 
       {/* Cost — tabular, right-aligned in its own column, data-weight ink. */}
-      <span className="w-[68px] shrink-0 text-right text-[11.5px] text-foreground/70 tabular-nums">
+      <span className="w-[76px] shrink-0 text-right text-[11.5px] text-foreground/70 tabular-nums">
         {fmtCost(a.costUsd)}
       </span>
 
@@ -272,7 +272,7 @@ function NewAgentRow({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="group hover:card-shadow mt-1 flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-card"
+      className="group hover:card-shadow mt-2 flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-card"
     >
       <span className="flex size-6 shrink-0 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground/60 group-hover:text-(--interactive)">
         <Plus className="size-3.5" />
