@@ -18,7 +18,9 @@ export function RetiredSection({ onFlash }: { onFlash: (m: string) => void }) {
   return (
     <section className="mt-6">
       <div className="flex items-center gap-2 px-2.5 pt-3 pb-1.5">
-        <span className="text-[11px] font-semibold text-muted-foreground">Retired</span>
+        <span className="text-[10.5px] font-semibold tracking-[0.06em] text-muted-foreground/80 uppercase">
+          Retired
+        </span>
         <span className="text-[11px] text-muted-foreground/45 tabular-nums">{retired.length}</span>
       </div>
       {retired.map((a) => (

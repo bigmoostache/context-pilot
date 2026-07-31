@@ -114,8 +114,13 @@ function GroupHeader({ status, count }: { status: AgentStatus; count: number }) 
   const s = statusMeta[status]
   return (
     <div className="flex items-center gap-2 px-2.5 pt-3 pb-1.5 first:pt-1">
-      <span className="size-1.5 rounded-full" style={{ background: s.color }} />
-      <span className="text-[11px] font-semibold text-muted-foreground">{s.label}</span>
+      <span
+        className={cn("size-1.5 rounded-full", status === "working" && "animate-pulse")}
+        style={{ background: s.color }}
+      />
+      <span className="text-[10.5px] font-semibold tracking-[0.06em] text-muted-foreground/80 uppercase">
+        {s.label}
+      </span>
       <span className="text-[11px] text-muted-foreground/45 tabular-nums">{count}</span>
     </div>
   )
@@ -172,11 +177,12 @@ function AgentRow({
           </span>
         </>
       )}
-      <span className={agent.task ? "shrink-0" : "flex-1"} />
 
-      {/* Health — only when non-nominal (§19, T121): a degraded stream / lagging
-          projection surfaces as a small badge, else nothing. */}
+      {/* Health — only when non-nominal (§19, T121): rides beside the name so the
+          trailing model/cost columns stay aligned whether or not it's present. */}
       <HealthBadge agentId={agent.id} />
+
+      <span className={agent.task ? "shrink-0" : "flex-1"} />
 
       {/* Model — plain muted token, fixed column so rows align down the list. */}
       <span className="hidden w-[136px] shrink-0 items-center justify-end gap-1.5 text-[11.5px] text-muted-foreground/70 sm:inline-flex">
