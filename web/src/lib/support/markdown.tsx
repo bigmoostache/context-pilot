@@ -357,7 +357,9 @@ const BULLET_RE = /^([ \t]*)[•◦▪‣][ \t]/gm
 // the escape and pass through untouched.
 const DISPLAY_MATH_RE = /\\\[([\s\S]+?)\\\]/g
 const INLINE_MATH_RE = /\\\(([\s\S]+?)\\\)/g
-const DISPLAY_DOLLAR_SENTINEL = "\u0000CP_DISPLAY_DOLLAR\u0000"
+// Matches a `$$` display pair (greedy) or a lone `$`, so the shield pass can
+// tell them apart in one sweep (see normalizeMarkdown).
+const DOLLAR_RE = /\$\$?/g
 
 /**
  * Preprocess raw message text before markdown parsing:
@@ -368,17 +370,17 @@ const DISPLAY_DOLLAR_SENTINEL = "\u0000CP_DISPLAY_DOLLAR\u0000"
 function normalizeMarkdown(text: string): string {
   let out = text.replaceAll(BULLET_RE, "$1- ")
 
-  // Shield existing `$$` display pairs, escape remaining lone `$` to literal,
-  // then restore the display pairs.
-  out = out
-    .replaceAll("$$", DISPLAY_DOLLAR_SENTINEL)
-    .replaceAll("$", "\\$")
-    .replaceAll(DISPLAY_DOLLAR_SENTINEL, "$$$$")
+  // Shield existing `$$` display pairs, escape remaining lone `$` to literal.
+  // One pass over `DOLLAR_RE`: a `$$` pair passes through untouched, a lone `$`
+  // becomes `\$` so remark-math treats it as text (the lone-`$`-is-literal
+  // contract). A function replacement is used verbatim, so no `$`-pattern in
+  // the returned string is re-interpreted.
+  out = out.replaceAll(DOLLAR_RE, (m) => (m === "$$" ? "$$" : String.raw`\$`))
 
   // Lower LaTeX delimiters to dollar math (display before inline).
   out = out
-    .replace(DISPLAY_MATH_RE, (_match, body: string) => `$$${body}$$`)
-    .replace(INLINE_MATH_RE, (_match, body: string) => `$${body}$`)
+    .replaceAll(DISPLAY_MATH_RE, (_match, body: string) => `$$${body}$$`)
+    .replaceAll(INLINE_MATH_RE, (_match, body: string) => `$${body}$`)
 
   return out
 }
