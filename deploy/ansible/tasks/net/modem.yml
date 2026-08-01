@@ -103,3 +103,107 @@
         msg: >-
           {{ _mm_list.stdout if ('/Modem/' in (_mm_list.stdout | default('')))
              else 'No modem detected yet — check `mmcli -L` on the box (hardware/coverage).' }}
+
+    # ------------------------------------------------------------------------
+    # USB composition — keep the modem in MBIM, not QMI.
+    #
+    # WHY. The RM520N's QMI path (qmi_wwan, raw-ip) silently corrupts its
+    # downlink framing after 30 min–2 h: the modem stays `connected`/registered
+    # and uplink TX still leaves, but every downlink frame is rejected by the
+    # kernel (interface rx_errors flood while rx_packets stays flat) — no
+    # internet for the box OR its NATed Wi-Fi clients, and nothing in any log to
+    # say why. Diagnosed 2026-08-01; an `mmcli --reset` fixes it but it recurs.
+    # MBIM drives the data over a wholly different path (cdc_mbim / NCM-NTB) that
+    # does not exhibit the bug — verified stable >1h34 continuous where QMI never
+    # lasted its ~30 min. ModemManager drives an MBIM modem transparently, so
+    # `cp-wwan` stays a plain `gsm` connection bound to the cdc-wdm0 CONTROL port
+    # (unchanged); only the net-port name shifts (wwu1u1i4 → wwu1u1i8), which
+    # nothing in this repo hardcodes.
+    #
+    # The mode is stored in the MODEM's own NVRAM: this is a one-time switch that
+    # survives box reboots and reflashes. But a factory-fresh modem (or a new
+    # box) defaults to QMI and would hit the bug — which is exactly why the mode
+    # belongs in provisioning and not in a runbook. Idempotent: the switch only
+    # runs when the live driver disagrees with cp_modem_usbnet. Set
+    # cp_modem_usbnet=qmi to force back, or =skip to leave the mode untouched.
+    - name: Read the modem's live USB composition (driver bound to its net port)
+      # Non-disruptive on purpose: reads the driver symlink, does NOT stop
+      # ModemManager or touch the AT port. cdc_mbim => MBIM; qmi_wwan => QMI.
+      ansible.builtin.shell: |
+        set -o pipefail
+        mode=unknown
+        for link in /sys/class/net/ww*/device/driver; do
+          [ -e "$link" ] || continue
+          case "$(readlink -f "$link")" in
+            *cdc_mbim) mode=mbim ;;
+            *qmi_wwan) mode=qmi ;;
+          esac
+        done
+        echo "$mode"
+      args:
+        executable: /bin/bash
+      register: _modem_usbnet_now
+      changed_when: false
+
+    - name: "Switch the modem USB composition to {{ cp_modem_usbnet }}"
+      # Runs only when the live mode differs from the target and we were asked to
+      # manage it. Grabs the AT port (ModemManager must let the port go first),
+      # writes the NVRAM setting, and reboots the modem (AT+CFUN=1,1) so it
+      # re-enumerates under the new driver; then hands the ports back to MM.
+      when:
+        - cp_modem_usbnet in ['mbim', 'qmi']
+        - (_modem_usbnet_now.stdout | trim) != cp_modem_usbnet
+      vars:
+        _usbnet_code: "{{ '2' if cp_modem_usbnet == 'mbim' else '0' }}"
+      ansible.builtin.shell: |
+        set -u
+        PORT=/dev/ttyUSB2
+        [ -e "$PORT" ] || { echo "no AT port $PORT — cannot switch composition"; exit 1; }
+        systemctl stop ModemManager
+        sleep 2
+        exec 3<>"$PORT" || { echo "cannot open $PORT"; exit 1; }
+        stty -F "$PORT" 115200 clocal cread raw -echo 2>/dev/null || true
+        printf 'AT+QCFG="usbnet",%s\r' '{{ _usbnet_code }}' >&3
+        sleep 2
+        printf 'AT+CFUN=1,1\r' >&3            # reboot modem so the switch takes effect
+        sleep 2
+        exec 3>&-
+        # wait for USB re-enumeration under the new driver (cdc-wdm0 + a ww* net port)
+        for _ in $(seq 1 30); do
+          sleep 5
+          [ -e /dev/cdc-wdm0 ] && ls /sys/class/net 2>/dev/null | grep -q '^ww' && break
+        done
+        systemctl restart ModemManager
+      args:
+        executable: /bin/bash
+      register: _modem_usbnet_switch
+      changed_when: true
+
+    - name: Re-wait for ModemManager to reassemble the modem after the switch
+      ansible.builtin.command: mmcli -L
+      register: _mm_list_after
+      until: "'/Modem/' in _mm_list_after.stdout"
+      retries: 12
+      delay: 3
+      changed_when: false
+      failed_when: false
+      when: _modem_usbnet_switch is changed
+
+    - name: Confirm the modem came back in the requested composition
+      when: _modem_usbnet_switch is changed
+      ansible.builtin.shell: |
+        set -o pipefail
+        mode=unknown
+        for link in /sys/class/net/ww*/device/driver; do
+          [ -e "$link" ] || continue
+          case "$(readlink -f "$link")" in
+            *cdc_mbim) mode=mbim ;;
+            *qmi_wwan) mode=qmi ;;
+          esac
+        done
+        echo "$mode"
+      args:
+        executable: /bin/bash
+      register: _modem_usbnet_final
+      changed_when: false
+      failed_when: (_modem_usbnet_final.stdout | trim) != cp_modem_usbnet

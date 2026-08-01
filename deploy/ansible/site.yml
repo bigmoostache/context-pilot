@@ -68,6 +68,11 @@
     # to the modem. The uplink itself (APN, routing, failover) is configured by
     # tasks/net/network.yml + the backend applier.
     cp_install_modem: "{{ install_modem | default(true) | bool }}"
+    # USB composition the modem should run in: 'mbim' | 'qmi' | 'skip'. Default
+    # MBIM — the RM520N's QMI path silently corrupts its downlink framing after
+    # 30 min–2 h (rx_errors flood, no internet, nothing in the logs); MBIM uses a
+    # different data path that does not. 'skip' leaves whatever mode is set.
+    cp_modem_usbnet: "{{ modem_usbnet | default('mbim') }}"
     # ── internet uplink (WAN / 5G) + Wi-Fi access point ──
     # Ansible SEEDS the state file (.network.json) write-once and installs the
     # machinery; the backend applier is the only writer of system network config.
