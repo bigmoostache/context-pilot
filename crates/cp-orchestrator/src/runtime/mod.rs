@@ -333,6 +333,15 @@ impl Runtime {
         // configured (CP_CADDYFILE); never fatal.
         crate::transport::it::apply_caddy_at_boot(&self.backend);
 
+        // Re-apply the persisted uplink/AP configuration: it is written
+        // atomically and durably, so it must survive a power cut and be back in
+        // force before the cockpit serves. No-op unless the network gates are
+        // set (CP_NMCLI_BIN); never fatal — a box whose modem is missing, whose
+        // SIM is absent or whose radio is rfkilled must still boot into a
+        // reachable cockpit, so a failure here is a journal line, not a dead
+        // appliance.
+        crate::transport::it::apply_network_at_boot(&self.backend);
+
         let addr = self.config.listen_addr();
         eprintln!("serving on http://{addr}");
         crate::transport::serve(&addr, Arc::clone(&self.backend))

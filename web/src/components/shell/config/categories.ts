@@ -32,7 +32,7 @@ export const CATEGORIES: {
   {
     id: "it",
     label: "IT",
-    blurb: "Network identity & TLS trust",
+    blurb: "Identity, TLS, uplink & Wi-Fi",
     icon: ShieldCheck,
     adminOnly: true,
   },

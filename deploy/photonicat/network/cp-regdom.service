@@ -1,0 +1,23 @@
+[Unit]
+Description=Apply the configured Wi-Fi regulatory domain (cp-regdom)
+Documentation=file:///usr/local/sbin/cp-regdom
+# Must run before any radio is brought up: an AP started while the domain is
+# still the world default `00` lands on a `no IR` channel and never beacons.
+# Measured on this hardware: under `00` phy0 reports 89 `no IR` channels (the
+# whole 5 GHz band plus 2.4 GHz ch. 12/13); `iw reg set FR` takes that to 0.
+# Full rationale in the script itself, /usr/local/sbin/cp-regdom.
+After=network-pre.target
+Wants=network-pre.target
+Before=NetworkManager.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# No argument on purpose: this is the boot entry point, so the script reads the
+# country out of .network.json itself. The applier is the other entry point and
+# passes it as `cp-regdom <CC>`. RemainAfterExit means `restart` is the only verb
+# that re-runs this — `start` on an already-exited unit is a no-op.
+ExecStart=/usr/local/sbin/cp-regdom
+
+[Install]
+WantedBy=multi-user.target

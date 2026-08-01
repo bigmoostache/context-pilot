@@ -23,10 +23,46 @@ Environment=CP_ORCH_PORT=7878
 Environment=CP_ORCH_BIND=127.0.0.1
 # Caddy integration: the orchestrator regenerates this Caddyfile (name/IP,
 # provisioned gate — cockpit on cleartext :80 at day-0, private-CA :443 once
-# provisioned) and reloads Caddy through its admin API. No :9090 plane (§13.4).
+# provisioned) and reloads Caddy through its admin API. No :9090 plane
+# (docs/design-auth.md §13.4).
 Environment=CP_CADDYFILE={{ cp_root }}/caddy/Caddyfile
 Environment=CP_CADDY_BIN={{ cp_root }}/bin/caddy
 Environment=CP_CA_ROOT={{ cp_root }}/caddy/data/caddy/pki/authorities/local/root.crt
+{% if cp_net_enabled | bool %}
+# Network applier gates — the switch between "persist the document" and "actually
+# reconfigure this machine's network". Each names one tool; with CP_NMCLI_BIN
+# unset the applier is inert and the backend only persists, so a dev machine
+# never touches its own network. Absolute paths, because the unit has no PATH
+# worth relying on.
+#
+# THE WHOLE BLOCK IS CONDITIONAL ON cp_net_enabled, and that is load-bearing.
+# This unit is templated by tasks/deploy.yml, which runs BEFORE tasks/net/network.yml
+# installs NetworkManager and regardless of the feature switch. Setting the gates
+# unconditionally made `-e net_enabled=false` the worst of both worlds: the
+# applier believed it was live forever, so `reconcile_ap` hit a spawn error on a
+# missing nmcli, returned Err, rolled back, and EVERY network POST answered 502.
+# With the block absent the promise above ("with CP_NMCLI_BIN unset the applier
+# is inert") is true of the box and not just of the code.
+Environment=CP_NMCLI_BIN=/usr/bin/nmcli
+Environment=CP_MMCLI_BIN=/usr/bin/mmcli
+Environment=CP_IW_BIN=/usr/sbin/iw
+Environment=CP_IP_BIN=/usr/sbin/ip
+Environment=CP_NETWORKCTL_BIN=/usr/bin/networkctl
+Environment=CP_SYSTEMCTL_BIN=/usr/bin/systemctl
+Environment=CP_NFT_BIN=/usr/sbin/nft
+Environment=CP_NETWORKD_DIR=/etc/systemd/network
+Environment=CP_UPLINK_ENV=/etc/default/cp-uplink
+# The failover supervisor's live state — `promoted`, `last_reason`,
+# `last_transition` and the probe streaks, none of which /proc/net/route can
+# express. cp-uplink-watch rewrites it every interval and GET /api/it/network
+# projects it to the cockpit; the two sides read the SAME variable name with the
+# SAME default, so a box where they disagree cannot happen silently.
+Environment=CP_UPLINK_STATE=/run/cp-uplink/state
+# The regulatory-domain script, shipped by tasks/net/network.yml. The applier
+# CALLS it rather than duplicating `iw reg set` itself, so there is one
+# implementation of "put the country in force" shared with the boot oneshot.
+Environment=CP_REGDOM_BIN=/usr/local/sbin/cp-regdom
+{% endif %}
 # Served SPA — a `current` symlink the OTA updater atomically repoints at the
 # active release's bundled front (`releases/<tag>/web`). Day-0 it points at
 # `web/baseline` (the SPA Ansible shipped); a failed update never touches it.

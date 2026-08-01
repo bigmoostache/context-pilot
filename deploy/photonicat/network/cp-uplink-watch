@@ -1,0 +1,602 @@
+#!/bin/sh
+# cp-uplink-watch — the WAN ⇄ 5G failover supervisor.
+#
+# WHY A DEDICATED DAEMON, not a task inside the orchestrator: it must survive an
+# orchestrator crash or an OTA restart (the moments the box is MOST likely to
+# need its uplink), and it must be debuggable with `journalctl -u cp-uplink`.
+#
+# WHAT METRICS ALONE CANNOT SEE — the reason this exists at all: cable plugged
+# in, DHCP lease held, upstream dead. The kernel still has a perfectly healthy
+# default route via end0 and will happily blackhole every packet. Route metrics
+# react to CARRIER; only an end-to-end probe reacts to REACHABILITY.
+#
+# INTERFACE-BOUND PROBING IS NOT OPTIONAL, and it is the one thing in this file
+# that cannot be simplified away: `ping -I end0` pins the probe to the WAN port
+# (SO_BINDTODEVICE) instead of following the default route. Probing through the
+# default route would be CIRCULAR — the probe would test whichever uplink is
+# currently preferred, so the moment we failed over to 5G the probe would start
+# succeeding over 5G and we would immediately "recover" the very WAN we just
+# demoted, then fail over again, forever. The question this daemon asks is "is
+# THIS interface carrying traffic", never "does the box have internet".
+#
+# SCOPE: active only in `wan_5g`. In `wan` and `5g` the routing is static and
+# there is nothing to arbitrate, so the loop only refreshes the state file that
+# `GET /api/it/network` reads.
+#
+# NOT SUPERVISING IS A FIRST-CLASS OUTCOME, not an error path. Two startup guards
+# (below) can switch this daemon to observe-only even in `wan_5g`, because the
+# alternative — supervising with a broken probe — silently parks the box on 5G
+# forever. Observe-only leaves the WAN exactly where the applier put it, keeps
+# reporting state, and says why in `supervising`/`last_reason`, which the cockpit
+# shows. A journal line beats a silent permanent failover.
+#
+# CONFIG: /etc/default/cp-uplink, rendered by the backend applier from
+# .network.json on every apply (the same pattern as /etc/default/pcat-ula).
+# Every value below has a defensible default so an unconfigured box idles
+# harmlessly rather than acting on garbage.
+set -u
+
+# The state file path is a shared contract with the backend, which reads the same
+# `CP_UPLINK_STATE` variable (same name, same default) to find it. Keep the two
+# defaults identical: a box where they disagree reports a permanently stale
+# supervisor and nothing anywhere logs why.
+: "${CP_UPLINK_STATE:=/run/cp-uplink/state}"
+STATE_FILE="$CP_UPLINK_STATE"
+case "$STATE_FILE" in
+  */*) STATE_DIR="${STATE_FILE%/*}" ;;
+  *)   STATE_DIR=. ;;
+esac
+
+# ── Configuration (overridden by /etc/default/cp-uplink via the unit) ────────
+: "${CP_UPLINK_MODE:=wan}"                  # wan | wan_5g | 5g
+: "${CP_UPLINK_WAN_IF:=end0}"               # the ethernet uplink port to probe
+: "${CP_UPLINK_WWAN_PROFILE:=cp-wwan}"      # NetworkManager profile name
+: "${CP_UPLINK_WWAN_DEV:=cdc-wdm0}"         # NM device (the modem CONTROL port —
+                                            # NM drives the modem through MM and
+                                            # applies IP config to the net port)
+: "${CP_UPLINK_STANDBY:=hot}"               # hot | cold
+: "${CP_UPLINK_TARGETS:=1.1.1.1 9.9.9.9}"   # probed in order; any reply = up
+: "${CP_UPLINK_FAIL_THRESHOLD:=3}"          # consecutive failures before demoting
+: "${CP_UPLINK_OK_THRESHOLD:=2}"            # consecutive successes before restoring
+: "${CP_UPLINK_INTERVAL_S:=10}"             # seconds between probe rounds
+: "${CP_UPLINK_PROBE_TIMEOUT_S:=3}"         # per-target ping deadline
+: "${CP_UPLINK_COOLDOWN_S:=60}"             # minimum seconds between transitions
+: "${CP_UPLINK_NM_WAIT_S:=20}"              # cap on any single nmcli call
+: "${CP_UPLINK_METRIC_PREFERRED:=50}"       # wwan route metric when it is the uplink
+: "${CP_UPLINK_METRIC_STANDBY:=700}"        # wwan route metric while standing by
+
+log() { echo "cp-uplink: $*"; }
+
+# ── State file — what the cockpit reads ─────────────────────────────────────
+# Written on every loop turn so a stale file can never outlive the daemon's view
+# by more than one interval. Shell-sourceable KEY=value; the backend parses it
+# with the same tolerance it applies to `nmcli -t` output and projects it as the
+# `supervisor` object of `GET /api/it/network`.
+#
+# THE KEY SET IS A CONTRACT. All nine keys are written on EVERY turn, in this
+# order, unconditionally — never conditionally omitted — so the parser on the
+# other side never has to distinguish "absent" from "not applicable". What the
+# kernel cannot express is exactly what makes this file worth reading during an
+# outage: `promoted` (what we decided), `achieved` (whether it took), the two
+# streaks, and the reason in English.
+#
+#   mode             wan | wan_5g | 5g              — verbatim from the env file
+#   supervising      yes | no                       — no ⇒ we are only observing
+#   active_uplink    wan | wwan | none | other      — the KERNEL's answer
+#   promoted         yes | no                       — our DECISION
+#   achieved         yes | no                       — whether the decision took
+#   fail_streak      integer ≥ 0
+#   ok_streak        integer ≥ 0
+#   last_transition  epoch seconds; 0 means NEVER (the backend maps it to null)
+#   last_reason      free-text single line, never empty
+active_uplink=none
+supervising=no
+last_transition=0
+last_attempt=0
+last_reason=startup
+fail_streak=0
+ok_streak=0
+# `promoted` is the DECISION: whether we have chosen the bearer as the uplink.
+# `achieved` is whether that decision was actually carried out — the bearer is up
+# and carries the metric we asked for. Conflating the two is what gave a failed
+# promotion exactly one attempt per outage; keeping them apart is what lets the
+# loop retry without re-announcing a transition it already announced. Neither is
+# `active_uplink`, which is what the kernel shows regardless of what we intended.
+promoted=no
+achieved=yes
+
+write_state() {
+  mkdir -p "$STATE_DIR" 2>/dev/null || return 0
+  # No value may contain a newline: the file is parsed line by line and a
+  # multi-line value would silently turn its tail into bogus keys. `mode` and
+  # `last_reason` are the only two carrying anything from outside this script
+  # (the env file is hand-editable and WAN_IF ends up inside the reason), so both
+  # are flattened on the way out rather than trusted.
+  safe_mode=$(printf '%s' "$CP_UPLINK_MODE" | tr '\n\r' '  ')
+  safe_reason=$(printf '%s' "$last_reason" | tr '\n\r' '  ')
+  tmp="$STATE_FILE.new"
+  {
+    echo "mode=$safe_mode"
+    echo "supervising=$supervising"
+    echo "active_uplink=$active_uplink"
+    echo "promoted=$promoted"
+    echo "achieved=$achieved"
+    echo "fail_streak=$fail_streak"
+    echo "ok_streak=$ok_streak"
+    echo "last_transition=$last_transition"
+    echo "last_reason=$safe_reason"
+  } >"$tmp" 2>/dev/null && mv -f "$tmp" "$STATE_FILE" 2>/dev/null
+  return 0
+}
+
+# ── Observation ─────────────────────────────────────────────────────────────
+
+# The device carrying the lowest-metric default route of EITHER address family —
+# i.e. what the box actually uses right now. Read from the kernel, never inferred
+# from what we believe we configured, so the state file stays honest even if a
+# human ran `nmcli` behind our back. That human loses: the backend applier is the
+# only writer of system network config, so a hand-made profile or metric is
+# reverted at the next apply or the next boot. Documented, not defended against —
+# but the state file must at least report the truth while it lasts.
+#
+# BOTH FAMILIES, and that is not tidiness: WHICH FAMILY A BEARER GETS IS NOT
+# OURS TO ASSUME. Same SIM, same APN, same operator (Bouygues `20820`), two
+# measurements a day apart on the same box:
+#   * attached in UMTS (weak-coverage fallback) — IPv6 address, IPv6 default
+#     route, no IPv4 anything. Every APN tried behaved identically, including a
+#     bogus one, so this is the network's doing and not a misconfiguration.
+#   * attached in LTE/5G-NR — dual-stack, with IPv4 arriving as the `192.0.0.2/27`
+#     CLAT address of 464XLAT (RFC 7335) over an IPv6 PDN.
+# This read was `-4` only, so on the first of those a promotion that WORKED left
+# `end0` as the only default route in the table it looked at: `classify_dev`
+# answered `wan` and the cockpit reported `active_uplink=wan` while every packet
+# was leaving through the modem.
+#
+# And the misreport is the smaller half. THE STARTUP RECONCILIATION BELOW ASKS
+# THIS SAME QUESTION to decide whether the bearer is already the uplink. Blind to
+# IPv6 it answered `none`, so `promoted` came back `no` across the restart the
+# backend performs after every apply — and the demote branch requires
+# `promoted=yes`. A box that had failed over to an IPv6-only bearer would
+# therefore keep it as its default route FOREVER, with a perfectly healthy WAN:
+# precisely the failure that block exists to prevent, reintroduced through the
+# one input it trusts.
+#
+# Metrics are compared ACROSS families, which is only meaningful because both
+# ends are kept in step here: `set_wwan_metric` writes ipv4.route-metric and
+# ipv6.route-metric to the same value, and networkd gives `end0` the same metric
+# in both tables (measured 100/100 on the test box). Should that ever drift, the
+# comparison degrades to "prefer whichever family got the smaller number" — still
+# strictly better than ignoring one of the two.
+current_default_dev() {
+  { ip -4 route show default 2>/dev/null; ip -6 route show default 2>/dev/null; } \
+    | awk '{ m = 0; for (i = 1; i < NF; i++) if ($i == "metric") m = $(i + 1);
+             for (i = 1; i < NF; i++) if ($i == "dev") d = $(i + 1);
+             if (d != "" && (best == "" || m < bestm)) { best = d; bestm = m } }
+           END { print best }'
+}
+
+# FOUR values, and `other` is not a rounding error: this used to fall through to
+# `wwan` for anything unrecognised, so a `tun0`, a `wg0`, a `docker0` or the AP
+# radio holding the default route was reported as a 5G failover that never
+# happened — the single most misleading thing this file could say during the one
+# minute someone is reading it. Unrecognised means unrecognised.
+#
+# The backend's own projection classifies with the identical four values and the
+# identical patterns. THE TWO ARE READ SIDE BY SIDE during a failover, so they
+# must not drift: change one, change the other. `en*` deliberately covers the
+# predictable names (end0/eno1/enp1s0/ens3) as well as this platform's `end0`.
+classify_dev() {   # $1 = interface name → wan | wwan | none | other
+  case "${1:-}" in
+    "")                     echo none ;;
+    "$CP_UPLINK_WAN_IF")    echo wan ;;
+    "$CP_UPLINK_WWAN_DEV")  echo wwan ;;
+    en*|eth*)               echo wan ;;
+    ww*)                    echo wwan ;;
+    *)                      echo other ;;
+  esac
+}
+
+# Does the bearer hold a default route of its own, in either family, WHATEVER
+# its metric?
+#
+# NOT `current_default_dev`, and the difference is the whole point: that one
+# answers "who wins", and it answers `end0` for a perfectly healthy hot-standby
+# bearer parked at metric 700. This one asks "does the bearer have IP
+# configuration at all", which is a different question and the one that caught
+# the failure below.
+#
+# WHY IT EXISTS. `nmcli device reapply` on this QMI modem returns SUCCESS and
+# silently drops the bearer's addresses AND routes, while NetworkManager keeps
+# reporting the connection `activated`. MEASURED twice on the test box, once
+# during a real failover (2026-07-31: two `op="device-reapply" result="success"`
+# audit lines, after which `wwu1u1i4` had no address and no route, with
+# `mmcli` still reporting the modem connected, registered and attached). So
+# `wwan_is_active` — which only greps `nmcli connection show --active` — is a
+# broken sensor for "the bearer is carrying": it says yes to a dead link.
+#
+# The `^ww` pattern is `classify_dev`'s, deliberately: same devices, same
+# spelling. Change one, change the other. `CP_UPLINK_WWAN_DEV` is NOT tested
+# here — it names the modem CONTROL port, which never carries a route.
+wwan_has_default_route() {
+  { ip -4 route show default 2>/dev/null; ip -6 route show default 2>/dev/null; } \
+    | awk '{ dev = ""
+             for (i = 1; i < NF; i++) if ($i == "dev") dev = $(i + 1)
+             if (dev ~ /^ww/) found = 1 }
+           END { exit found ? 0 : 1 }'
+}
+
+# End-to-end reachability THROUGH a named interface. Returns 0 on the first
+# target that answers. `-I` is what makes this a test of that path rather than
+# of whatever the routing table currently prefers.
+probe_via() {   # $1 = interface
+  for target in $CP_UPLINK_TARGETS; do
+    if ping -q -n -I "$1" -c 1 -W "$CP_UPLINK_PROBE_TIMEOUT_S" "$target" >/dev/null 2>&1; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# ── Actuation ───────────────────────────────────────────────────────────────
+# The failover itself is a metric change on the NM profile, applied with
+# `nmcli device reapply` — which is SUPPOSED to push changed IP configuration
+# without deactivating the connection, so a hot-standby bearer keeps its session
+# and the switch is sub-second. `con up` is the fallback for a bearer that is not
+# up (cold standby, or a reapply the driver refuses).
+#
+# THAT PROMISE IS FALSE ON THIS PLATFORM, and this file used to state it as fact.
+# On a GSM device the IP configuration comes from ModemManager's bearer, not from
+# a DHCP client NetworkManager runs itself, and `reapply` re-runs the IP stage
+# against nothing: it returns success, leaves the connection `activated`, and
+# drops every address and route the bearer had. MEASURED on the test box during a
+# real WAN outage (2026-07-31) — the supervisor announced a clean transition to
+# 5G, `achieved=yes`, and the box was left with NO default route at all, which is
+# strictly worse than never having failed over. `repair_wwan_ip_config` below is
+# the answer: verify, and rebuild with `connection up` when the verification
+# fails. `up` reconstructs the configuration correctly — also measured, twice.
+#
+# EVERY nmcli call is bounded by `--wait`. MEASURED: without it, a `connection
+# up` against a modem with no coverage blocks for nmcli's 90 s default, and
+# because this is a single-threaded loop that means the supervisor stops probing
+# entirely — it cannot notice the WAN coming back, which is precisely the moment
+# it matters most. A bounded attempt that fails is strictly better than a
+# blocking one that might succeed.
+nm() { nmcli --wait "$CP_UPLINK_NM_WAIT_S" "$@" >/dev/null 2>&1; }
+
+wwan_is_active() {
+  nmcli -t -f NAME connection show --active 2>/dev/null | grep -qx "$CP_UPLINK_WWAN_PROFILE"
+}
+
+set_wwan_metric() {   # $1 = metric
+  nm connection modify "$CP_UPLINK_WWAN_PROFILE" ipv4.route-metric "$1" ipv6.route-metric "$1" || return 1
+  if wwan_is_active; then
+    nm device reapply "$CP_UPLINK_WWAN_DEV" || nm connection up "$CP_UPLINK_WWAN_PROFILE" || return 1
+  fi
+  return 0
+}
+
+# Put the bearer's IP configuration back when `reapply` has thrown it away.
+#
+# Deliberately narrow, because the cure is expensive: `connection up` is the one
+# nmcli call that can sit for the whole `--wait` budget on a modem with no
+# coverage, and this is a single-threaded loop. So it fires ONLY on the exact
+# pathological state — NetworkManager says `activated`, the kernel says the
+# bearer has no default route in either family. A bearer that is legitimately
+# down (cold standby, no coverage) is not active, so it is not touched here; a
+# healthy standby bearer has its route at metric 700 and is not touched either.
+#
+# Called from engage/disengage rather than from the loop, so the repair runs on
+# transitions and retries — never every ten seconds.
+#
+# The log line is unconditional because a repair is genuinely news: it means the
+# actuation path just silently destroyed the uplink it was asked to adjust, and
+# `journalctl -u cp-uplink` is where somebody will look for that.
+repair_wwan_ip_config() {
+  wwan_is_active || return 0
+  wwan_has_default_route && return 0
+  log "$CP_UPLINK_WWAN_PROFILE is active but carries no default route —" \
+      "'device reapply' dropped its IP configuration; rebuilding with 'connection up'"
+  nm connection up "$CP_UPLINK_WWAN_PROFILE" || true
+}
+
+# ── Actuation, split from the decision ──────────────────────────────────────
+# engage/disengage do the work and report whether it TOOK; they log nothing
+# themselves, they only describe the shortfall in `engage_detail`. The caller
+# decides what is worth a journal line — which is the whole trick that lets a
+# retry every cooldown stay quiet while a CHANGE in the failure mode still gets
+# one. A state change is worth a line; the same failure for the ninth time is not.
+engage_detail=""
+last_engage_detail=""
+
+# Target state for `promoted=yes`: the bearer is up AND the profile carries the
+# preferred metric. Returns 0 only when both hold.
+engage_wwan() {
+  engage_detail=""
+  if ! set_wwan_metric "$CP_UPLINK_METRIC_PREFERRED"; then
+    engage_detail="metric $CP_UPLINK_METRIC_PREFERRED not applied"
+  fi
+  if ! wwan_is_active; then
+    # Cold standby, or a bearer that dropped. This is the expensive path the
+    # `hot` default exists to avoid, and in `cold` it is the ONLY thing that ever
+    # starts the bearer (`connection.autoconnect` is `no` there).
+    nm connection up "$CP_UPLINK_WWAN_PROFILE" || true
+  fi
+  repair_wwan_ip_config
+  # ACHIEVEMENT IS RE-READ FROM THE SYSTEM, never inferred from the exit status
+  # of `connection up`: `--wait` caps that call at CP_UPLINK_NM_WAIT_S, so a
+  # modem that registers one second late returns failure and is up regardless.
+  # Asking the truth on the next turn is what closes the transition honestly
+  # instead of leaving us convinced of a failure that already resolved itself.
+  #
+  # TWO QUESTIONS, NOT ONE, and the second is the one that was missing. "Is the
+  # profile active" is NetworkManager's opinion of itself; it stayed `yes`
+  # through a failover that left the box with no default route, so `achieved`
+  # said yes to a dead uplink and `retry_actuation` — the machinery built
+  # precisely to grind away at a promotion that did not take — was never given
+  # anything to grind on. The kernel's routing table is the second opinion, and
+  # it is the one that decides whether packets leave.
+  if ! wwan_is_active; then
+    engage_detail="${engage_detail:+$engage_detail, }$CP_UPLINK_WWAN_PROFILE is not active"
+  elif ! wwan_has_default_route; then
+    engage_detail="${engage_detail:+$engage_detail, }$CP_UPLINK_WWAN_PROFILE is active but carries no default route"
+  fi
+  [ -z "$engage_detail" ]
+}
+
+# Target state for `promoted=no`: the bearer is back at the standby metric, and
+# down entirely if standby is `cold`. Returns 0 only when that took.
+disengage_wwan() {
+  engage_detail=""
+  if ! set_wwan_metric "$CP_UPLINK_METRIC_STANDBY"; then
+    engage_detail="metric $CP_UPLINK_METRIC_STANDBY not applied"
+  fi
+  if [ "$CP_UPLINK_STANDBY" = "cold" ]; then
+    if wwan_is_active; then
+      nm connection down "$CP_UPLINK_WWAN_PROFILE" \
+        || engage_detail="${engage_detail:+$engage_detail, }$CP_UPLINK_WWAN_PROFILE would not deactivate"
+    fi
+  else
+    # THE DEMOTION BREAKS THE BEARER TOO, and that is why this branch exists.
+    # Coming back to the standby metric is another `set_wwan_metric`, hence
+    # another `reapply`, hence the same silent teardown — measured: after the
+    # 2026-07-31 fail-back the bearer sat `activated` with no address and no
+    # route, and stayed that way. The box was then in `wan_5g` with a WAN that
+    # worked and a 5G standby that could not have carried anything, which is the
+    # worst of the three states and the only one nothing was watching for.
+    #
+    # A hot standby that is not up is not a standby, so this is a genuine
+    # `achieved=no`: it hands the failure to `retry_actuation`, which is exactly
+    # the machinery for a decision that could not be carried out.
+    repair_wwan_ip_config
+    if wwan_is_active && ! wwan_has_default_route; then
+      engage_detail="${engage_detail:+$engage_detail, }hot standby $CP_UPLINK_WWAN_PROFILE carries no default route"
+    fi
+  fi
+  [ -z "$engage_detail" ]
+}
+
+# The DECISION is logged before the actuation, not after: the journal has to
+# record why the supervisor chose to fail over even when the actuation then
+# fails (no coverage, no SIM). A transition line that only appears on success
+# would hide exactly the cases someone is reading the journal to understand.
+#
+# ONE DECISION, ONE TRANSITION LINE. This is an acceptance criterion, not a
+# preference: `journalctl -u cp-uplink` must show exactly one transition per
+# event, or nobody can tell a single failover from a flapping link. MEASURED on
+# the blackhole simulation (probe targets dropped upstream while the carrier and
+# the DHCP lease stayed up): exactly 2 `TRANSITION` lines for a full fail-over +
+# fail-back cycle.
+#
+# But a decision that could not be carried out is NOT abandoned. It stays on the
+# books as `promoted=yes achieved=no` and `retry_actuation` keeps pushing at it,
+# without ever re-announcing the transition. That distinction is the difference
+# between a bearer that gets one attempt for an entire outage — modem still
+# enumerating, transient no-coverage, the `--wait` cap — and one that eventually
+# comes up.
+promote_wwan() {   # $1 = reason
+  log "TRANSITION → 5G — $1"
+  last_transition=$(date +%s)
+  last_attempt="$last_transition"
+  last_reason="$1"
+  promoted=yes
+  if engage_wwan; then
+    achieved=yes
+    last_engage_detail=""
+  else
+    achieved=no
+    log "5G is not carrying yet — $engage_detail; retrying every ${CP_UPLINK_COOLDOWN_S}s"
+    last_engage_detail="$engage_detail"
+  fi
+}
+
+demote_wwan() {   # $1 = reason
+  log "TRANSITION → WAN — $1"
+  last_transition=$(date +%s)
+  last_attempt="$last_transition"
+  last_reason="$1"
+  promoted=no
+  if disengage_wwan; then
+    achieved=yes
+    last_engage_detail=""
+  else
+    achieved=no
+    log "the bearer did not stand down — $engage_detail; retrying every ${CP_UPLINK_COOLDOWN_S}s"
+    last_engage_detail="$engage_detail"
+  fi
+}
+
+# Re-push the CURRENT decision, whatever it is. Deliberately symmetric: a demote
+# whose `connection modify` failed leaves the bearer at the preferred metric with
+# a healthy WAN — the same stuck box as a failed promote, just the other way up —
+# and it would be odd to repair one and not the other.
+#
+# No TRANSITION line here, ever: nothing was decided, we are only finishing what
+# was. Success gets one line because it is a state change; a repeated identical
+# failure gets none, while a failure that CHANGED (metric applied, bearer still
+# down) does, because that is news.
+retry_actuation() {
+  last_attempt=$(date +%s)
+  if [ "$promoted" = "yes" ]; then
+    engage_wwan && achieved=yes
+  else
+    disengage_wwan && achieved=yes
+  fi
+  if [ "$achieved" = "yes" ]; then
+    log "retry: actuation finally took — $CP_UPLINK_WWAN_PROFILE settled for promoted=$promoted"
+    last_engage_detail=""
+  elif [ "$engage_detail" != "$last_engage_detail" ]; then
+    log "retry: still not there — $engage_detail"
+    last_engage_detail="$engage_detail"
+  fi
+}
+
+# ── Main loop ───────────────────────────────────────────────────────────────
+running=1
+trap 'running=0' TERM INT
+
+log "starting: mode=$CP_UPLINK_MODE wan=$CP_UPLINK_WAN_IF wwan=$CP_UPLINK_WWAN_PROFILE" \
+    "standby=$CP_UPLINK_STANDBY targets='$CP_UPLINK_TARGETS'" \
+    "thresholds=${CP_UPLINK_FAIL_THRESHOLD}/${CP_UPLINK_OK_THRESHOLD} interval=${CP_UPLINK_INTERVAL_S}s"
+
+if [ "$CP_UPLINK_MODE" = "wan_5g" ]; then
+  supervising=yes
+else
+  log "mode $CP_UPLINK_MODE has static routing — reporting state only, not arbitrating"
+fi
+
+# ── Startup guards ──────────────────────────────────────────────────────────
+# Both refuse to SUPERVISE rather than exiting. Exiting would spin against
+# `Restart=always`, and it would take the state file with it; observe-only keeps
+# reporting and leaves the WAN precisely where the applier put it. Each one turns
+# a silent permanent-5G failure into a journal line and a `last_reason` the
+# cockpit displays.
+
+# `ping` IS the failover mechanism. Without it every probe "fails" identically to
+# a dead upstream, the fail streak climbs on a perfectly healthy WAN, and the box
+# parks itself on 5G for good. Debian's `Priority: important` makes ping
+# near-certain here — which is exactly why nobody would ever suspect it.
+if [ "$supervising" = "yes" ] && ! command -v ping >/dev/null 2>&1; then
+  log "ERROR: ping is not on PATH — the probe IS the failover mechanism, so every" \
+      "probe would 'fail' and the box would sit on 5G forever. NOT supervising;" \
+      "install iputils-ping and restart cp-uplink."
+  supervising=no
+  last_reason="not supervising: ping is not installed"
+fi
+
+# An empty target list is the same disaster by another road: `probe_via` iterates
+# zero times and falls straight through to failure. The backend validates the
+# list non-empty, but `EnvironmentFile=-` is hand-editable and the rendered value
+# is quoted, so `CP_UPLINK_TARGETS=" "` survives as a list of nothing. Counted by
+# word-splitting the variable exactly as `probe_via` does, so the guard tests the
+# thing the prober will actually see.
+if [ "$supervising" = "yes" ]; then
+  have_targets=no
+  for target in $CP_UPLINK_TARGETS; do
+    have_targets=yes
+    break
+  done
+  if [ "$have_targets" = "no" ]; then
+    log "ERROR: CP_UPLINK_TARGETS is empty — every probe would 'fail' and the box" \
+        "would sit on 5G forever. NOT supervising; set at least one probe target" \
+        "in /etc/default/cp-uplink and restart cp-uplink."
+    supervising=no
+    last_reason="not supervising: no probe targets configured"
+  fi
+fi
+
+# ── Startup reconciliation ──────────────────────────────────────────────────
+# `promoted` is in-memory only — `RuntimeDirectory=cp-uplink` wipes /run on stop,
+# so it cannot be persisted — and it would otherwise come back as `no` on every
+# restart while the live route was still the bearer at the preferred metric. The
+# demote branch needs `promoted=yes`, so that box would keep 5G as its default
+# route FOREVER with a perfectly healthy WAN. And this is not a rare path: the
+# backend restarts this unit itself after every network apply.
+#
+# So ask the kernel instead of trusting a fresh variable. `last_transition` stays
+# 0 on purpose: no transition happened here, we merely recognised one, and the
+# cockpit must not be told we just failed over. It also makes the cooldown
+# vacuously satisfied, so a healthy WAN can demote on the very next ok streak —
+# which is the point.
+if [ "$supervising" = "yes" ]; then
+  boot_dev=$(current_default_dev)
+  if [ "$(classify_dev "$boot_dev")" = "wwan" ]; then
+    promoted=yes
+    achieved=yes
+    last_reason="startup-reconciliation: default route was already via $boot_dev"
+    log "startup reconciliation: the default route is already the bearer ($boot_dev)," \
+        "adopting promoted=yes so a healthy WAN can demote it"
+  fi
+fi
+
+while [ "$running" = "1" ]; do
+  observed=$(classify_dev "$(current_default_dev)")
+
+  if [ "$supervising" != "yes" ]; then
+    # `wan` / `5g`: the applier owns the routes; we only observe.
+    active_uplink="$observed"
+    write_state
+    sleep "$CP_UPLINK_INTERVAL_S" &
+    wait $! 2>/dev/null || true
+    continue
+  fi
+
+  if probe_via "$CP_UPLINK_WAN_IF"; then
+    ok_streak=$((ok_streak + 1))
+    fail_streak=0
+  else
+    fail_streak=$((fail_streak + 1))
+    ok_streak=0
+  fi
+
+  now=$(date +%s)
+  cooled=$((now - last_transition))
+
+  # THE DECISION TABLE, in priority order:
+  #
+  #   promoted=no  + fail streak met  → promote   (a new decision, one line)
+  #   promoted=yes + ok streak met    → demote    (a new decision, one line)
+  #   achieved=no                     → retry     (no new decision, no line)
+  #
+  # The decision keys off `promoted` — what WE last chose — not off `observed`,
+  # which is what the kernel currently shows. They differ exactly when a
+  # promotion could not be carried out (no coverage, no SIM), and keying off the
+  # kernel there would re-promote and re-log on every single cooldown for as
+  # long as the outage lasted. One decision, one transition line.
+  #
+  # The retry comes LAST on purpose: if the WAN came back while a promotion was
+  # still failing to take, demoting is strictly better than finishing a failover
+  # nobody needs any more. It is throttled off `last_attempt`, not
+  # `last_transition`, so hammering nmcli is bounded by the cooldown while
+  # `last_transition` keeps meaning what the cockpit thinks it means — the last
+  # time the supervisor changed its mind.
+  if [ "$promoted" = "no" ] && [ "$fail_streak" -ge "$CP_UPLINK_FAIL_THRESHOLD" ]; then
+    if [ "$cooled" -ge "$CP_UPLINK_COOLDOWN_S" ] || [ "$last_transition" = "0" ]; then
+      promote_wwan "$CP_UPLINK_WAN_IF unreachable for $fail_streak consecutive probes"
+      fail_streak=0
+    fi
+  elif [ "$promoted" = "yes" ] && [ "$ok_streak" -ge "$CP_UPLINK_OK_THRESHOLD" ]; then
+    if [ "$cooled" -ge "$CP_UPLINK_COOLDOWN_S" ]; then
+      demote_wwan "$CP_UPLINK_WAN_IF healthy for $ok_streak consecutive probes"
+      ok_streak=0
+    fi
+  elif [ "$achieved" = "no" ]; then
+    if [ $((now - last_attempt)) -ge "$CP_UPLINK_COOLDOWN_S" ]; then
+      retry_actuation
+    fi
+  fi
+  # The REPORTED uplink is always the kernel's answer, never our intent: if a
+  # promotion did not take, the cockpit must say `none` (or `other`), not `wwan`.
+  # `promoted` and `achieved` next to it in the state file are where the intent
+  # lives, and the three together are what make a failover readable at 2am.
+  active_uplink="$observed"
+
+  write_state
+  # Backgrounded sleep + wait so SIGTERM lands promptly instead of after a full
+  # interval: `sleep` in the foreground is not interrupted by a trapped signal
+  # in POSIX sh.
+  sleep "$CP_UPLINK_INTERVAL_S" &
+  wait $! 2>/dev/null || true
+done
+
+log "stopping"
+exit 0

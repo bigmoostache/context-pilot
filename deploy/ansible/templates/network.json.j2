@@ -1,0 +1,49 @@
+{#-
+  .network.json — the document the backend reads at every boot, and the single
+  source of truth for the uplink and the AP. Ansible writes it exactly once
+  (write-once, like seed.env); from then on the cockpit owns it and the backend
+  applier is the only thing that turns it into system configuration.
+
+  THE FIELD SET MUST MATCH `NetworkConfig` EXACTLY. Not one struct in
+  crates/cp-orchestrator/src/transport/it/network/state.rs carries
+  #[serde(default)] — deliberately — so a field this template omits does not
+  default: it makes the whole file unparseable, and `state::load` then falls back
+  to NetworkConfig::default() (mode wan, AP off) without a word. The same is true
+  of any value the validators reject. tasks/net/network.yml reads this file back
+  and asserts the four sections are there; site.yml's pre_tasks constrain the
+  values. Both exist because Ansible otherwise reports `ok` for all of it.
+
+  `| to_json` everywhere a string is emitted, so a quote or a backslash in an
+  SSID or a passphrase cannot break out of the JSON. Empty secrets render as
+  `null` (absent), never as `""` — the backend reads `None` as "not set".
+-#}
+{
+  "mode": {{ cp_net_mode | to_json }},
+  "wwan": {
+    "apn": {{ cp_wwan_apn | to_json }},
+    "username": {{ (cp_wwan_user if (cp_wwan_user | length > 0) else None) | to_json }},
+    "password": {{ (cp_wwan_password if (cp_wwan_password | length > 0) else None) | to_json }},
+    "pin": {{ (cp_wwan_pin if (cp_wwan_pin | length > 0) else None) | to_json }},
+    "roaming": {{ (cp_wwan_roaming | bool) | to_json }},
+    "standby": {{ cp_wwan_standby | to_json }}
+  },
+  "ap": {
+    "enabled": {{ (cp_ap_enabled | bool) | to_json }},
+    "ssid": {{ cp_ap_ssid | to_json }},
+    "passphrase": {{ (cp_ap_password if (cp_ap_password | length > 0) else None) | to_json }},
+    "band": {{ cp_ap_band | to_json }},
+    "channel": {{ cp_ap_channel | int }},
+    "country": {{ cp_ap_country | to_json }},
+    "hidden": {{ (cp_ap_hidden | bool) | to_json }},
+    "share_internet": {{ (cp_ap_share | bool) | to_json }}
+  },
+  "probe": {
+    "targets": {{ cp_net_probe_targets | to_json }},
+    "fail_threshold": {{ cp_net_probe_fail_threshold | int }},
+    "ok_threshold": {{ cp_net_probe_ok_threshold | int }},
+    "interval_s": {{ cp_net_probe_interval_s | int }},
+    "probe_timeout_s": {{ cp_net_probe_timeout_s | int }},
+    "cooldown_s": {{ cp_net_probe_cooldown_s | int }},
+    "nm_wait_s": {{ cp_net_probe_nm_wait_s | int }}
+  }
+}
