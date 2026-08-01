@@ -134,9 +134,10 @@ fn bracketed(subject: &str) -> String {
 }
 
 /// Compute the cert subjects for the current identity: `[ip, name]` when an
-/// identity is set, otherwise the auto-detected box IP (so the cockpit is
-/// reachable by IP before the operator names the box), plus **every fleet ULA the
-/// box carries**, plus `extra`. Empty when nothing is known at all.
+/// identity is set, **plus the address the box actually carries right now**,
+/// plus **every fleet ULA the box carries**, plus `extra`. With no identity set
+/// the auto-detected box IP stands alone, so the cockpit is reachable by IP
+/// before the operator names the box. Empty when nothing is known at all.
 ///
 /// `extra` is how a feature that creates a NEW address on the box gets a cert
 /// for it. Today that is the Wi-Fi AP's `10.42.0.1`: Caddy listens on the
@@ -148,8 +149,24 @@ fn bracketed(subject: &str) -> String {
 /// and that one belongs to the CLIENT (the address their staff and their DNS will
 /// use). Putting the ULA there would take the cockpit away from them. Conversely
 /// the ULA is a vendor constant the box can derive on its own, so it belongs on
-/// the auto-detected side — and it is the only subject that never changes, which
-/// makes it the recovery path when the pinned DHCP IPv4 drifts.
+/// the auto-detected side — and it is the only subject that never changes.
+///
+/// THE DETECTED IP IS INCLUDED EVEN WHEN AN IDENTITY IS SET, and that is the fix
+/// for a failure this file used to treat as acceptable. `Identity.ip` is captured
+/// once, when the operator names the box, and never revisited — but it is a DHCP
+/// LEASE, not an identity. MEASURED: the test box rebooted onto a new lease
+/// (`.38` → `.43`), the boot-time render faithfully reproduced the stored `.38`,
+/// and the cockpit became unreachable at the only address the box actually had:
+/// `https://…43` failed the handshake (no site matched, so no cert) while
+/// `http://…43` answered Caddy's empty `200` — the exact trap the day-0 branch
+/// below documents, reappearing after provisioning. The doc used to point at the
+/// ULA as "the recovery path when the pinned DHCP IPv4 drifts"; that is true of a
+/// technician who can put an address in `fd59:…:1::/64` on their laptop, and
+/// false of everyone else.
+///
+/// The stored `ip` is KEPT alongside it rather than replaced: it may be a
+/// reservation the client's DNS already points at, and it will come back. Two
+/// subjects cost one extra name on the leaf; a wrong one costs the cockpit.
 ///
 /// Appended only to a NON-empty base, so the "identity file removed" defence in
 /// `render_caddyfile` still fires: with no operator identity and no detectable
@@ -180,12 +197,29 @@ fn subjects_with(identity: Option<&Identity>, detected_ip: Option<&str>, ulas: &
     if v.is_empty() {
         return v;
     }
+    // The lease the box is on RIGHT NOW, after the identity's own subjects and
+    // before the ULAs. Deduplicated, so the overwhelmingly common case — the
+    // stored `ip` still is the current one — renders byte-identically to before
+    // and re-issues no certificate. It only adds a name on the run where the two
+    // have actually diverged, which is precisely the run where the cockpit would
+    // otherwise have gone dark.
+    push_unique(&mut v, detected_ip.unwrap_or_default());
     for ula in ulas {
-        if !v.contains(ula) {
-            v.push(ula.clone());
-        }
+        push_unique(&mut v, ula);
     }
     v
+}
+
+/// Append `candidate` to `subjects` unless it is empty or already present.
+///
+/// The empty check is what lets callers hand over an absent probe result
+/// (`Option::unwrap_or_default`) without a branch of their own — "nothing was
+/// detected" and "what was detected is already in the list" both mean "add
+/// nothing", and neither deserves its own control flow.
+fn push_unique(subjects: &mut Vec<String>, candidate: &str) {
+    if !candidate.is_empty() && !subjects.iter().any(|s| s == candidate) {
+        subjects.push(candidate.to_owned());
+    }
 }
 
 /// Best-effort primary LAN IP detection: open a UDP socket "connected" to an
@@ -409,6 +443,46 @@ mod tests {
         // An operator who typed the ULA into the IP field must not get it twice.
         let id_ula = Identity { name: String::new(), ip: port1.clone() };
         assert_eq!(subjects_with(Some(&id_ula), None, std::slice::from_ref(&port1)), vec![port1]);
+    }
+
+    #[test]
+    fn a_drifted_dhcp_lease_is_added_without_dropping_the_pinned_one() {
+        // THE REGRESSION THIS EXISTS FOR. `Identity.ip` is pinned when the operator
+        // names the box and never revisited, but it is a lease: the test box
+        // rebooted from .38 onto .43 and the render faithfully reproduced .38, so
+        // the cockpit had no site — and no cert — for the only address it had.
+        let id = Identity { name: "pilot.acme.corp".to_owned(), ip: "192.168.1.38".to_owned() };
+        assert_eq!(
+            subjects_with(Some(&id), Some("192.168.1.43"), &[]),
+            vec!["192.168.1.38".to_owned(), "pilot.acme.corp".to_owned(), "192.168.1.43".to_owned()],
+            "the pinned address is kept — the client's DNS may point at a reservation that comes back"
+        );
+    }
+
+    #[test]
+    fn an_undrifted_lease_renders_byte_identically() {
+        // The other half: on every boot where the lease has NOT moved — which is
+        // nearly all of them — the subject list must be exactly what it was, or
+        // each boot rewrites the Caddyfile and re-issues the leaf for nothing.
+        let id = Identity { name: "pilot.acme.corp".to_owned(), ip: "192.168.1.38".to_owned() };
+        let ula = "fd59:ec78:2da4:1:7681:f2a2:27e0:f10d".to_owned();
+        assert_eq!(
+            subjects_with(Some(&id), Some("192.168.1.38"), std::slice::from_ref(&ula)),
+            vec!["192.168.1.38".to_owned(), "pilot.acme.corp".to_owned(), ula],
+            "no duplicate, no reordering"
+        );
+    }
+
+    #[test]
+    fn a_drifted_lease_reaches_the_rendered_sites() {
+        // End to end: the new address must land in BOTH blocks, because the :80
+        // block is what redirects a browser to the https one. Missing there, a
+        // request to the box's own address gets Caddy's empty 200 instead.
+        let id = Identity { name: "pilot.acme.corp".to_owned(), ip: "192.168.1.38".to_owned() };
+        let cfg = render_caddyfile(true, &subjects_with(Some(&id), Some("192.168.1.43"), &[]));
+        assert!(cfg.contains("https://192.168.1.43"), "the current lease gets a TLS site + cert subject");
+        assert!(cfg.contains("http://192.168.1.43:80"), "and the :80 redirect that sends a browser there");
+        assert!(cfg.contains("https://192.168.1.38"), "the pinned one is not evicted");
     }
 
     #[test]
