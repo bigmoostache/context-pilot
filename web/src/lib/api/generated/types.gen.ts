@@ -325,6 +325,200 @@ export type ItIdentityResponse = {
     identity: Identity | null;
 };
 
+/**
+ * Wi-Fi access-point settings. `country` is a functional prerequisite, not a nicety: under the world-default regulatory domain every 5 GHz channel is `no IR` and the radio cannot start, so enabling the AP without a country code is refused.
+ */
+export type ItNetworkAp = {
+    band: 'bg' | 'a';
+    /**
+     * Channel number, or 0 for automatic. Must be legal on `band`.
+     */
+    channel: number;
+    /**
+     * ISO-3166 two-letter regulatory code, or empty.
+     */
+    country: string;
+    enabled: boolean;
+    hidden: boolean;
+    /**
+     * Whether a PSK is stored. The key itself is never returned.
+     */
+    passphrase_set: boolean;
+    share_internet: boolean;
+    /**
+     * Broadcast network name, 1–32 bytes.
+     */
+    ssid: string;
+};
+
+export type ItNetworkApResult = {
+    ap: ItNetworkAp;
+    applied: boolean;
+};
+
+export type ItNetworkApStatus = {
+    channel: number | null;
+    clients: number;
+    country: string | null;
+    running: boolean;
+    ssid: string;
+};
+
+export type ItNetworkConfig = {
+    ap: ItNetworkAp;
+    mode: 'wan' | 'wan_5g' | '5g';
+    /**
+     * READ-ONLY. Seeded at provisioning time from `network.json.j2` and not writable from the cockpit: no endpoint accepts probe tuning, so a generated client must not present these as editable config. Returned so an admin can see what the supervisor is running with.
+     */
+    probe: ItNetworkProbe;
+    /**
+     * Null for two independent reasons: the caller lacks `can_manage_secrets` (the bearer's CONFIGURATION is vendor state), or this box is not a 5G variant at all (`status.modem_present` is false). `status.wwan` is not elided either way — registration, operator and signal are diagnostics the client's own admin needs when the box loses its uplink.
+     */
+    wwan: ItNetworkWwan | null;
+};
+
+export type ItNetworkModeResult = {
+    applied: boolean;
+    mode: 'wan' | 'wan_5g' | '5g';
+};
+
+/**
+ * Failover probe tuning. The probe is interface-bound, so it tests the WAN path itself rather than whatever the default route currently prefers. READ-ONLY throughout: these values are seeded at provisioning time and no endpoint accepts them (see `ItNetworkConfig.probe`).
+ */
+export type ItNetworkProbe = {
+    /**
+     * Minimum seconds between failover transitions — the anti-flap floor. Seeded at 60. It has no effect once `interval_s` exceeds it, since a round can then never come back inside it.
+     */
+    cooldown_s: number;
+    /**
+     * Consecutive failed probes before the WAN is demoted.
+     */
+    fail_threshold: number;
+    /**
+     * Seconds between probe rounds.
+     */
+    interval_s: number;
+    /**
+     * Cap on any single `nmcli` call (`nmcli --wait`), in seconds. Seeded at 20. The supervisor is a single loop: an unbounded call against a modem with no coverage would stop it probing, so it could not notice the WAN coming back.
+     */
+    nm_wait_s: number;
+    /**
+     * Consecutive successful probes before the WAN is restored.
+     */
+    ok_threshold: number;
+    /**
+     * Per-target ping deadline in seconds (`ping -W`). Seeded at 3.
+     */
+    probe_timeout_s: number;
+    targets: Array<string>;
+};
+
+export type ItNetworkResponse = {
+    config: ItNetworkConfig;
+    status: ItNetworkStatus;
+};
+
+/**
+ * Live read-back from `/proc/net/route`, sysfs, `nmcli`, `mmcli` and `iw`. The TOOL-BACKED halves — `wan.ip`, `wwan`, `ap` — degrade to null rather than erroring when the tool is absent, so a dev machine with no env gates set still answers 200. `active_uplink` and `modem_present` deliberately do NOT: they are answered from `/proc/net/route` and from sysfs, which need no gate, so the two fields an admin watches during a failover stay truthful on every box.
+ */
+export type ItNetworkStatus = {
+    /**
+     * The device carrying the lowest-metric default route, classified: `wan` (the ethernet port), `wwan` (the 5G bearer), `other` (some other device holds it — a VPN, a container bridge), `none` (there is no default route). Never null: no default route is spelled `none`.
+     */
+    active_uplink: 'wan' | 'wwan' | 'other' | 'none';
+    ap: ItNetworkApStatus | null;
+    modem_present: boolean;
+    /**
+     * Null when the failover supervisor is not running or its state file is absent.
+     */
+    supervisor: ItNetworkSupervisor | null;
+    wan: ItNetworkWanStatus;
+    wwan: ItNetworkWwanStatus | null;
+};
+
+/**
+ * What the failover supervisor itself believes, parsed from the state line the `cp-uplink` daemon writes to `/run/cp-uplink/state` on every probe round. Null when `cp-uplink` is not running or has not yet written its first line. Everything else under `status` is observed from the system; this block is the only place the supervisor's INTENT and its streak counters are visible, and it is what makes a failover that did not happen diagnosable.
+ */
+export type ItNetworkSupervisor = {
+    /**
+     * CARRIED OUT: the decision in `promoted` actually took effect on the bearer. `promoted: true` with `achieved: false` is the outage signature — the supervisor wanted 5G and could not activate it (no coverage, no SIM, modem still enumerating), so the box has no uplink at all rather than the 5G one the decision implies.
+     */
+    achieved: boolean;
+    /**
+     * OBSERVED: what the kernel's routing table actually shows, independent of the two fields above. `promoted: true` with `active_uplink: "wan"` means the promotion has not landed yet; with `"none"` it means it failed outright.
+     */
+    active_uplink: 'wan' | 'wwan' | 'other' | 'none';
+    /**
+     * Consecutive failed WAN probes; reset by a success and by a promotion.
+     */
+    fail_streak: number;
+    /**
+     * The reason logged with that transition, verbatim from the journal line. Null when there has never been one.
+     */
+    last_reason: string | null;
+    /**
+     * Unix seconds of the last promote/demote. Null when there has never been one since the supervisor started — it does not survive a restart (`/run` is wiped).
+     */
+    last_transition: number | null;
+    /**
+     * Consecutive successful WAN probes; reset by a failure and by a demotion.
+     */
+    ok_streak: number;
+    /**
+     * DECIDED: the supervisor has concluded the bearer should be the uplink. This is its intent, not an observation — it says nothing about whether the bearer actually came up. Read it together with `achieved` and `active_uplink`.
+     */
+    promoted: boolean;
+    /**
+     * The supervisor is ARBITRATING (mode `wan_5g`). False in `wan` and `5g`, where the routing is static and the applier owns it — the daemon then only observes and reports.
+     */
+    supervising: boolean;
+};
+
+export type ItNetworkWanStatus = {
+    carrier: boolean;
+    gateway: string | null;
+    has_default_route: boolean;
+    ip: string | null;
+};
+
+/**
+ * 5G bearer settings — VENDOR-MANAGED. Writing them needs `can_manage_secrets` (superadmin), not `can_manage_it`: the SIM and the data plan are the vendor's, so the APN that goes with them is a fleet-wide decision. `password_set`/`pin_set` stand in for the write-only credentials.
+ */
+export type ItNetworkWwan = {
+    /**
+     * Carrier access point name; empty lets ModemManager pick.
+     */
+    apn: string;
+    /**
+     * Whether a bearer password is stored.
+     */
+    password_set: boolean;
+    /**
+     * Whether a SIM PIN is stored.
+     */
+    pin_set: boolean;
+    roaming: boolean;
+    /**
+     * How much of the 5G stack stays warm while ethernet is the uplink: `hot` keeps the bearer connected at a standby route metric (failover is a metric flip), `cold` keeps the modem registered with no bearer (failover pays the setup, but the SIM is not attached).
+     */
+    standby: 'hot' | 'cold';
+    username: string | null;
+};
+
+export type ItNetworkWwanResult = {
+    applied: boolean;
+    wwan: ItNetworkWwan;
+};
+
+export type ItNetworkWwanStatus = {
+    ip: string | null;
+    operator: string | null;
+    registered: boolean;
+    signal_dbm: number | null;
+    state: string | null;
+    tech: string | null;
+};
+
 export type ItSetIdentityResponse = {
     identity: Identity;
     reloaded: boolean;
@@ -601,6 +795,20 @@ export type Vital = {
 export type WriteResult = {
     path: string;
     written: number;
+};
+
+export type ItNetworkConfigWritable = {
+    ap: ItNetworkAp;
+    mode: 'wan' | 'wan_5g' | '5g';
+    /**
+     * Null for two independent reasons: the caller lacks `can_manage_secrets` (the bearer's CONFIGURATION is vendor state), or this box is not a 5G variant at all (`status.modem_present` is false). `status.wwan` is not elided either way — registration, operator and signal are diagnostics the client's own admin needs when the box loses its uplink.
+     */
+    wwan: ItNetworkWwan | null;
+};
+
+export type ItNetworkResponseWritable = {
+    config: ItNetworkConfigWritable;
+    status: ItNetworkStatus;
 };
 
 export type GetApiAgentByIdData = {
@@ -2605,6 +2813,151 @@ export type PostApiItIdentityResponses = {
 };
 
 export type PostApiItIdentityResponse = PostApiItIdentityResponses[keyof PostApiItIdentityResponses];
+
+export type GetApiItNetworkData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/it/network';
+};
+
+export type GetApiItNetworkErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiItNetworkError = GetApiItNetworkErrors[keyof GetApiItNetworkErrors];
+
+export type GetApiItNetworkResponses = {
+    /**
+     * Success
+     */
+    200: ItNetworkResponse;
+};
+
+export type GetApiItNetworkResponse = GetApiItNetworkResponses[keyof GetApiItNetworkResponses];
+
+export type PostApiItNetworkApData = {
+    body: {
+        band: 'bg' | 'a';
+        /**
+         * Channel number, or 0 for automatic. Must be legal on `band`.
+         */
+        channel: number;
+        /**
+         * ISO-3166 two-letter regulatory code, or empty.
+         */
+        country: string;
+        enabled: boolean;
+        hidden: boolean;
+        /**
+         * WPA2 pre-shared key, 8–63 characters. Write-only and TRI-STATE: **omit the field** to keep the stored key, send **null** to clear it, send a **string** to replace it. Clearing it is destructive and quiet: the passphrase prerequisite is only enforced while `enabled` is true, so `passphrase: null` on a disabled AP returns 200 and the access point can no longer be enabled until a new key is set. Never returned by any read path — see `passphrase_set`.
+         */
+        passphrase?: string | null;
+        share_internet: boolean;
+        /**
+         * Broadcast network name, 1–32 bytes.
+         */
+        ssid: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/it/network/ap';
+};
+
+export type PostApiItNetworkApErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiItNetworkApError = PostApiItNetworkApErrors[keyof PostApiItNetworkApErrors];
+
+export type PostApiItNetworkApResponses = {
+    /**
+     * Success
+     */
+    200: ItNetworkApResult;
+};
+
+export type PostApiItNetworkApResponse = PostApiItNetworkApResponses[keyof PostApiItNetworkApResponses];
+
+export type PostApiItNetworkModeData = {
+    body: {
+        mode: 'wan' | 'wan_5g' | '5g';
+    };
+    path?: never;
+    query?: never;
+    url: '/api/it/network/mode';
+};
+
+export type PostApiItNetworkModeErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiItNetworkModeError = PostApiItNetworkModeErrors[keyof PostApiItNetworkModeErrors];
+
+export type PostApiItNetworkModeResponses = {
+    /**
+     * Success
+     */
+    200: ItNetworkModeResult;
+};
+
+export type PostApiItNetworkModeResponse = PostApiItNetworkModeResponses[keyof PostApiItNetworkModeResponses];
+
+export type PostApiItNetworkWwanData = {
+    body: {
+        /**
+         * Carrier access point name; empty lets ModemManager pick.
+         */
+        apn: string;
+        /**
+         * PAP/CHAP password. Write-only: never returned, see `password_set`. TRI-STATE: **omit** to keep the stored password, **null** to clear it, a **string** to replace it. Clearing it on a carrier that authenticates leaves the bearer unable to attach.
+         */
+        password?: string | null;
+        /**
+         * SIM PIN, 4–8 digits. Write-only: never returned, see `pin_set`. TRI-STATE: **omit** to keep the stored PIN, **null** to clear it, a **string** to replace it. Sending null on a PIN-locked SIM costs the box its uplink at the next boot — the modem comes up locked and nothing unlocks it. A wrong value is worse: it burns one of the SIM's three unlock retries.
+         */
+        pin?: string | null;
+        roaming: boolean;
+        /**
+         * How much of the 5G stack stays warm while ethernet is the uplink: `hot` keeps the bearer connected at a standby route metric (failover is a metric flip), `cold` keeps the modem registered with no bearer (failover pays the setup, but the SIM is not attached).
+         */
+        standby: 'hot' | 'cold';
+        /**
+         * PAP/CHAP username, when the carrier needs one. TRI-STATE: **omit** to keep the stored value, **null** to clear it, a **string** to replace it. Unlike the two below it is not a secret — it is returned as `config.wwan.username` — it is only tri-state on the way in.
+         */
+        username?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/it/network/wwan';
+};
+
+export type PostApiItNetworkWwanErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiItNetworkWwanError = PostApiItNetworkWwanErrors[keyof PostApiItNetworkWwanErrors];
+
+export type PostApiItNetworkWwanResponses = {
+    /**
+     * Success
+     */
+    200: ItNetworkWwanResult;
+};
+
+export type PostApiItNetworkWwanResponse = PostApiItNetworkWwanResponses[keyof PostApiItNetworkWwanResponses];
 
 export type GetApiItProvisionedData = {
     body?: never;

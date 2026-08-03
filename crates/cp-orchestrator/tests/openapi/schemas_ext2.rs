@@ -261,5 +261,7 @@ pub(super) fn deploy() -> Value {
             },
             "required": ["hits"]
         }
+        // The `ItNetwork*` schemas live in [`schemas_net`](super::schemas_net),
+        // together with the request bodies they share their field lists with.
     })
 }

@@ -37,6 +37,7 @@ pub(crate) use claude_oauth::sweep::spawn as spawn_oauth_refresh;
 pub(crate) use claude_oauth::{claude_usage, login_complete, login_start, refresh_login, token_status};
 pub(crate) use config::env_keys::{env_key_reveal, env_key_update, env_keys_list, vault_snapshot};
 pub(crate) use config::it::{it_ca_fingerprint, it_get_identity, it_provisioned, it_set_identity};
+pub(crate) use config::network::{it_get_network, it_set_network_ap, it_set_network_mode, it_set_network_wwan};
 pub(crate) use config::settings::{allowed_models, onboarding_completed};
 pub use config::settings::{get_settings, update_settings};
 pub(crate) use config::update::{APPLY_IN_FLIGHT, update_apply, update_check, update_set_mode, update_status};
