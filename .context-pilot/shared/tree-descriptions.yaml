@@ -2490,6 +2490,10 @@
   path: crates/cp-orchestrator/tests/openapi/paths.rs
   description: OpenAPI path definitions — all REST endpoints grouped by tag (fleet, agent, fs, auth, env, ACL, providers, releases, claude-usage+login+refresh). Includes deploy + restart-orchestrator paths.
   last_edited_ms: 0
+1df3e75218c41f91:
+  path: crates/cp-orchestrator/src/transport/rest/lifecycle.rs
+  description: Agent lifecycle REST handlers. restart_agent (POST, kill+respawn via supervisor), retire_agent (POST, mark retired+stop), unretire_agent (POST, unmark+respawn). Merged from former restart.rs + retire.rs.
+  last_edited_ms: 0
 1dff7b8ca6a2e0d1:
   path: crates/cp-orchestrator/src/services/auth/tests.rs
   description: '21 auth unit tests: schema, hashing, token/UUID gen, user CRUD (create/get/list/delete cascade), session lifecycle (create/validate/revoke/expired sweep), ACL (grant/revoke/update role/list/auto-grant creator/cascade delete/overwrite).'
@@ -3118,6 +3122,10 @@
   path: docs/trust-center/trust.css
   description: Shared CSS for all Trust Center pages. Enterprise slate/navy palette, Inter + IBM Plex Mono fonts, fixed sidebar nav, breadcrumbs, cards, tables, badges, policy blocks, FAQ accordion, status dots, CTA buttons, responsive (sidebar hides <960px). 631 lines.
   last_edited_ms: 1782133438192
+258330826718a337:
+  path: crates/cp-mod-bridge/src/boot/mod.rs
+  description: 'Boot sequence: folder-lock→oplog→socket→identity→registry, retry-on-contention flock, Lifecycle Running/Stopping deltas. Split from boot.rs (X951).'
+  last_edited_ms: 0
 259993b5c0a816d3:
   path: web/src/lib/api/generated/client/index.ts
   description: 'Client barrel re-exports: createClient, createConfig, mergeHeaders, type exports (Client, Config, Options, RequestResult, TDataShape, etc).'
@@ -4362,6 +4370,10 @@
   path: web/src/lib/mock/index.ts
   description: 'Mock-data barrel: PROJECT/tokenBudget/panels/cacheStats/messages/threads/spine/stats/status/agents/library. Re-exports ./extra + ./fileTree. web-lint P2: fileTree literal moved to ./fileTree.ts + FsNode import dropped to stay ≤500 after Prettier reflow. Design-only fallback data approximating a live Context Pilot session.'
   last_edited_ms: 0
+3394806a8c829849:
+  path: .context-pilot/shared/memories.yaml
+  description: Agent-managed memory store (auto-synced from live state). Merge conflicts here are last_edited_ms churn only — resolve keeping real timestamps, preserve unique entries both sides.
+  last_edited_ms: 0
 33c60367852cda1f:
   path: rust_lints_compared_list.md
   description: Rustc lint comparison results
@@ -5082,6 +5094,10 @@
   path: crates/cp-base/src/state/flags.rs
   description: 'StreamPhase state machine enum #[expect(exhaustive_enums)] A4 (Idle/Receiving/ExecutingTools). StatusBools composite flags.'
   last_edited_ms: 1784496447781
+3c4e1431a5473610:
+  path: crates/cp-orchestrator/src/transport/rest/mod.rs
+  description: 'REST resource handlers. fleet() filtered by ACL. command() dispatches. rename/avatar/threads/body. vault_snapshot + env_keys + settings exports. claude_usage()/token_status()/login_start()/login_complete()/refresh_login() for Claude OAuth (T451). resolve_entry. Submodules: backend, claude_oauth, config, create, lifecycle, releases, thread_shape.'
+  last_edited_ms: 0
 3c51be7f4f0da8db:
   path: web/src/lib/support/auth.tsx
   description: 'Auth context (Phase 9): AuthProvider probes GET /api/auth/status, validates stored token via /me, exposes user/token/authEnabled/bootstrapped/loading + login/register/logout. Listens for cp-auth-expired events from the fetch wrapper. useAuth() hook.'
@@ -5982,6 +5998,10 @@
   path: web/eslint.config.ts
   description: 'Frontend ESLint flat config — Rust-parity strict stack (branch web-lint), RATCHET P0→P13. P3: js.recommended + typescript-eslint strictTypeChecked + stylisticTypeChecked + reactRefresh.vite, projectService type-aware. P4 anti-cheat: eslint-comments no-use+no-unlimited-disable, ban-ts-comment hardened all-4-true, reportUnusedDisableDirectives error. P5 unicorn.configs.recommended: 2 calibrations (filename-case camel/pascal, catch-error-name name:e ignore err/error) + 8 tree-wide disables (name-replacements, no-null, consistent-boolean-name, prefer-global-this, no-non-function-verb-prefix, no-array-reduce, prefer-await, no-nested-ternary—the last IRRECONCILABLE with Prettier which strips the parens unicorn demands) + scoped ui/** (filename-case, max-nested-calls) + finderFs.ts (no-incorrect-template-string-interpolation). react-hooks classic pair. globalIgnores dist+generated/**+e2e/**+playwright.config.ts.'
   last_edited_ms: 1783414902405
+45ce4bdfad33f2e6:
+  path: .context-pilot/shared/tree-descriptions.yaml
+  description: Persisted tree descriptions YAML. Synced to git alongside code commits per M15.
+  last_edited_ms: 0
 45e1e6e14dae1980:
   path: crates/cp-mod-search/src/radar.rs
   description: 'Context Radar. Adaptive log-count decay scoring, Meilisearch log queries via background thread. refresh_inner #[expect(cast_precision_loss,as_conversions)] (decay f64 math). Recent logs (10) deterministic + semantic top 40.'
@@ -16894,6 +16914,10 @@ c55dd96275144452:
   path: docs/talk/style.css
   description: 'Slide deck global styles: CSS vars, transitions, dark/light slide themes, sidebar, timer'
   last_edited_ms: 1781078806857
+c55ee249e49ef967:
+  path: crates/cp-mod-bridge/src/register/advert.rs
+  description: 'T739 registry record as a LIVE PROJECTION (not a boot snapshot). project(model,&booted,identity) re-derives Entry: status=Running, live model, identity (dropped to None when all 10 Agora fields blank via is_blank), slug/image pass through from booted. publish_if_changed(dir,&entry,&mut last) dirty-checks the serialisation against a memo, writes via registry::write_entry ONLY on change = idle agent costs zero syscalls. Module docs justify projection-over-chokepoint (missed mutation site becomes structurally impossible) and dirty-check-over-every-tick (agents dir has a live reader: AgentRegistry::scan poll + reap_tmp, so tmp+rename churn is the hazard the heartbeat module documents; plus 2 fsyncs per write). GOTCHA: is_blank lists fields explicitly because destructuring trips forbidden pattern_type_mismatch and its &-pattern remedy trips ref_patterns. 4 tests incl republished_record_keeps_owner_only_permissions (0600 survives every rewrite — record embeds cap_token).'
+  last_edited_ms: 0
 c56f28d49398a5e6:
   path: src/llms/claude_code/message_format.rs
   description: 'inject_system_reminder(): CC validation marker injection, string→array normalization, tool_result-aware fallback'
@@ -20226,6 +20250,10 @@ ef35e3e6bf20ad18:
   path: web/src/components/threads/ThreadList.tsx
   description: 'Thread sidebar list. ThreadList (search/filter/new-thread) + ThreadRow (dot/name/focused+paused badges/preview + hover-swap: timestamp fades out on row hover, Archive+Pause/Play buttons fade in at same position). Groups: User turn / Agent''s turn / Archived. Pause button only in active view (T371). Delete (Trash2) button in archived view (T371). T401: outer row element is <div> not <button> to avoid nested-button hydration error.'
   last_edited_ms: 1782340433130
+ef443c1cdd6acba6:
+  path: src/app/run/threads/observers.rs
+  description: 'Bridge observe-on-change emitters (main-loop chokepoints), split from bridge.rs for the 500-line cap. emit_thread_focus / emit_behaviour / emit_identity: diff a live value against a BridgeState snapshot, emit a durable delta ONLY on change, seed silently on the first pass so a restart never replays current state as a change. T739 adds emit_advert — the odd one out: it re-derives the whole discovery FILE rather than emitting a delta, has NO boot seed on purpose (the first tick must write, to correct the boot record''s placeholder status:Starting), and resolves model + identity BEFORE taking the mutable BridgeState borrow that reaches Boot (the borrow-conflict fix, same shape as T671''s pre-resolved creds). wire_identity converts cp-agora SelfIdentity to its cp-wire twin field-by-field so drift becomes a compile error.'
+  last_edited_ms: 0
 ef46b1787aeaae58:
   path: web/src/components/shell/config/ConfigPanel.tsx
   description: 'Settings surface shell — macOS System-Settings layout: category rail + detail pane. variant ''dialog'' (TopBar gear, DialogClose chrome) | ''inline'' (fleet Settings page). Owns rail + chrome only; panes + building blocks live in ./ConfigPanes (<500 split). Auth-based filtering: adminOnly categories hidden for non-admins; when auth is disabled, all categories shown (everyone treated as admin).'
@@ -20985,6 +21013,10 @@ f80737b7b24222fa:
 f8162028a837bf57:
   path: crates/cp-mod-entities/src/tools.rs
   description: SQL execution engine. classify() (SELECT/DML/DDL/CTE), split_statements() with string literal awareness. execute() dispatches to execute_select/dml/ddl. Error enrichment with Levenshtein fuzzy matching. Markdown table formatting, 50-row inline cap, RETURNING support.
+  last_edited_ms: 0
+f82e1477defcb908:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 f83ca97744482dff:
   path: web/src/lib/types.ts
