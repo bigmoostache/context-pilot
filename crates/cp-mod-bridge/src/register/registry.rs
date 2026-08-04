@@ -107,7 +107,7 @@ mod tests {
 
     fn sample(id: &str) -> Entry {
         Entry {
-            schema_version: 1,
+            schema_version: cp_wire::types::registry::SCHEMA_VERSION,
             id: id.to_owned(),
             folder: "/proj".to_owned(),
             pid: 42,
@@ -121,6 +121,9 @@ mod tests {
             cap_token: "secret".to_owned(),
             started_at_ms: 0,
             status: AgentStatus::Starting,
+            slug: "proj".to_owned(),
+            image: String::new(),
+            identity: None,
         }
     }
 

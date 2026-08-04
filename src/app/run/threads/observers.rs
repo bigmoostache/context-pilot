@@ -12,6 +12,7 @@
 //! disposable UI state, so a dropped delta self-heals from the agent's tier-②
 //! files on the next read.
 
+use cp_base::state::data::model_helpers::ModelPricing as _;
 use cp_mod_bridge::BridgeState;
 use cp_mod_threads::types::FocusState;
 use cp_wire::types::oplog::OpEntryKind;
@@ -171,5 +172,90 @@ pub(in crate::app::run) fn emit_identity(app: &mut App) {
     if changed {
         emit_best_effort(&app.state, OpEntryKind::IdentityChanged);
         app.state.ext_mut::<BridgeState>().last_identity = Some(fingerprint);
+    }
+}
+
+// ── Registry-advert projection (discovery record — §10, T739) ─────────────
+
+/// Re-project the agent's **discovery record** (`~/.context-pilot/agents/<id>.json`)
+/// from live state, rewriting it only when the projected bytes actually change.
+///
+/// This is the odd one out among the emitters above, and deliberately so. They
+/// each diff one value and emit an oplog delta on change; this one re-derives a
+/// whole record and writes a *file* — the artifact the backend's fleet scan
+/// discovers agents by.
+///
+/// # Why a projection rather than a chokepoint
+///
+/// The record used to be written once at boot and never again, so every mutable
+/// field it carried became a lie the moment it changed: `status` stayed
+/// `Starting` for the process's whole life, and the backend's
+/// `transport/inspect/meta.rs` documents `entry.model` as "unreliable" and
+/// reads `config.json` instead. The obvious fix — re-publish from every
+/// mutation site — only works if *every* site is found, which is
+/// audit-dependent; a forgotten one reintroduces exactly that silent staleness.
+///
+/// So nothing publishes. The record is re-derived here on the ordinary
+/// main-loop cadence and written only if it changed, which makes a missed
+/// mutation site impossible by construction. See
+/// [`register::advert`](cp_mod_bridge::register::advert) for the write-path
+/// reasoning (why the dirty check matters given the directory has a live
+/// reader).
+///
+/// # Cost
+///
+/// The dirty check lives inside the projection, so the steady state is **zero
+/// syscalls**: folder, sockets, token and identity simply do not change between
+/// ticks, and an identical projection writes nothing.
+///
+/// Unlike the emitters above there is no boot **seed**, on purpose: the first
+/// tick *should* write, because that is what corrects the boot record's
+/// placeholder `status: Starting` to `Running`.
+///
+/// Best-effort, like its siblings — a failed write leaves the previous record
+/// in place (still valid, one tick old) and the next tick retries.
+///
+/// No-op when the bridge is OFF.
+pub(in crate::app::run) fn emit_advert(app: &mut App) {
+    if !bridge_active(&app.state) {
+        return;
+    }
+
+    // Resolve both live inputs BEFORE taking the mutable `BridgeState` borrow
+    // that reaches the `Boot` — they read `app.state` immutably, so resolving
+    // them afterwards would conflict.
+    let model = app.state.current_model();
+    let identity = wire_identity(&cp_agora::types::AgoraState::get(&app.state).identity);
+
+    if let Some(boot) = app.state.ext_mut::<BridgeState>().boot.as_mut()
+        && let Err(e) = boot.republish_advert(model, identity)
+    {
+        log::debug!("advert republish failed (retried next tick): {e}");
+    }
+}
+
+/// Convert the agent's Agora self-identity into its wire twin.
+///
+/// The two structs are field-identical by design (the wire crate is
+/// dependency-free, so it cannot borrow the agent's type), and the conversion
+/// is written field-by-field rather than via a serde round-trip: it is cheaper,
+/// and it turns any future drift between the two definitions into a **compile
+/// error** instead of a silently dropped field.
+///
+/// A never-introduced agent converts to an all-empty value rather than to
+/// nothing; deciding that such an identity is not worth advertising belongs to
+/// the projection, not here.
+fn wire_identity(identity: &cp_agora::types::SelfIdentity) -> cp_wire::types::registry::SelfIdentity {
+    cp_wire::types::registry::SelfIdentity {
+        identity: identity.identity.clone(),
+        values: identity.values.clone(),
+        principles: identity.principles.clone(),
+        character: identity.character.clone(),
+        expertise: identity.expertise.clone(),
+        role: identity.role.clone(),
+        operational_responsibilities: identity.operational_responsibilities.clone(),
+        knowledge_responsibilities: identity.knowledge_responsibilities.clone(),
+        organic_responsibilities: identity.organic_responsibilities.clone(),
+        direct_management: identity.direct_management.clone(),
     }
 }

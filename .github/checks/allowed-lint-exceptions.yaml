@@ -373,6 +373,16 @@ exceptions:
     strategy: >
       Irreducible — a 13-arg constructor trips too_many_arguments; the exhaustive literal is honest.
 
+  - path: "crates/cp-wire/src/types/registry.rs"
+    match: "registry-record contract: SelfIdentity is a closed set of ten fixed keys"
+    reason: >
+      SelfIdentity is the ten-key self-identity advertised inside the registry record, mirroring the
+      Agora tool parameters 1:1; a constructor would take ten positional String arguments (tripping
+      too_many_arguments) with no natural grouping, so #[non_exhaustive] is impossible for the same
+      reason as its parent Entry.
+    strategy: >
+      Irreducible — a 10-arg constructor trips too_many_arguments; the exhaustive literal is honest.
+
   - path: "crates/cp-wire/src/types/stream.rs"
     match: "stream-frame contract: Frame is a 7-field ephemeral routing record"
     reason: >

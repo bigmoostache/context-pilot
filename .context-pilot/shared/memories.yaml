@@ -369,6 +369,40 @@
   - deadman
   - historical
   last_edited_ms: 1784202948992
+60991969a3d74f1d:
+  tl_dr: T739 registry record is now a LIVE PROJECTION (schema 2), not a boot snapshot. Re-derived + dirty-checked every main-loop tick via emit_advert. Fixes the two documented liars (status stuck Starting, model unreliable). Full design + gotchas in body.
+  contents: |-
+    T739 (branch threads, user ask: "agents declare themselves globally" with slug/image/identity).
+
+    THE SHIFT: ~/.context-pilot/agents/<id>.json used to be written ONCE at boot and never rewritten. Every mutable field it carried became a lie: status stayed AgentStatus::Starting for the process's whole life, and cp-orchestrator transport/inspect/meta.rs documents entry.model as "unreliable" and reads config.json instead. VERIFIED LIVE on this box pre-change: all 14 records showed schema_version 1 / status starting / model claude-opus-4-6 while agents actually ran opus-4-8.
+
+    DESIGN (user's idea, adopted over my chokepoint plan): the record is a PROJECTION of live state, re-derived on a cadence. A missed mutation site becomes structurally impossible because NO site advertises. My rejected alternative was re-publishing from each mutation chokepoint, which only works if every site is found = audit-dependent.
+
+    BUT rejected the literal "rewrite every tick" for 3 reasons: (1) DECISIVE, in-repo: cp-mod-bridge/src/heartbeat.rs module docs explain the Beacon uses in-place seek(0)+write_all+sync_data specifically to avoid "tmp+rename churn (which would thrash the directory and race a reader)" — and the agents dir HAS a live reader (AgentRegistry::scan poll + reap_tmp deleting *.tmp older than a grace window that must exceed the longest write window). (2) write_entry costs TWO fsyncs + a directory mutation per write, not the ~600 bytes. (3) bytes are almost always identical between ticks = pure SSD wear.
+
+    SYNTHESIS SHIPPED: projection + dirty-check. crates/cp-mod-bridge/src/register/advert.rs — project(model, &booted, identity) re-derives Entry (status=Running, live model, identity dropped to None when all 10 Agora fields blank, slug/image pass through); publish_if_changed(dir, &entry, &mut last_advert) compares the serialisation against a memo and calls write_entry ONLY on change. Idle agent = ZERO syscalls.
+
+    WIRING: Boot gained agents_dir: PathBuf + last_advert: Option<String>. Boot::republish_advert(model, identity) is the single entry point. src/app/run/threads/observers.rs::emit_advert is the tick, called LAST in emit_bridge_deltas (after the emitters that may have just changed the state it projects). NO boot seed on purpose — the first tick must write, to correct the placeholder status.
+
+    KEY GOTCHAS:
+    - BORROW: emit_advert must resolve model + identity BEFORE taking the mutable BridgeState borrow that reaches Boot. Same shape as T671's pre-resolved creds. That's why project() takes model by value instead of &State — it also drops cp-base coupling from the projection module.
+    - cp-base trait providing current_model() is ModelPricing, NOT ModelHelpers.
+    - is_blank() lists the 10 fields explicitly: destructuring trips forbidden clippy::pattern_type_mismatch and its &-pattern remedy trips ref_patterns.
+    - clippy::unnecessary_wraps forced dropping Option from wire_identity/republish_advert/project — the blank decision now lives in project(), which is the right home anyway.
+    - 0600 MUST survive every rewrite (record embeds cap_token). Test republished_record_keeps_owner_only_permissions asserts it. Plain fs::write would apply umask on CREATE (0644) — write_entry's tmp+rename+0600 is why it's kept.
+
+    cp-wire: SCHEMA_VERSION const = 2, Identity struct renamed SelfIdentity (mirrors cp-agora), slug/image/identity all serde default. N-1 safe both ways (schema_v1_record_decodes_with_defaults + registry_extra_fields_ignored).
+
+    STATE: 625 workspace tests green, all callbacks green, chain entry #84. NOT yet deployed — needs cargo build --release + binary copy + orchestrator restart (M172) for the live fleet to show schema 2.
+  importance: high
+  labels:
+  - T739
+  - registry
+  - advert
+  - projection
+  - bridge
+  - cp-wire
+  last_edited_ms: 1785846080821
 6c22bdb28d5dd166:
   tl_dr: 'CI Frontend red: exit-1 always prints after the LAST header (knip) because check-ts-lints.sh aggregates 8 sub-checks. Never infer the culprit from the error''s position — grep the whole log. knip falsely blamed twice; prettier was the real cause.'
   contents: |-

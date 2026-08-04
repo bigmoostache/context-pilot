@@ -7671,3 +7671,27 @@ index ec098a9e..c8d5683f 100644
      match: "OpEntryKind carries an Unknown catch-all for N-1 tolerance"
      reason: >
 # --- End entry #83 ---
+84:cb12b4c4956487b02289416b06c5a855efecf09b03eaa7f9d9f45b397e1a70ab:431484692029a29e9674929a5daefcdcdbb7debfb3614740a24eb223d84f95c9:4974d33daeada2fc7b2caf5cacd912aa4324913769129059a2241b2631e4b05c
+# --- Diff for entry #84 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index c8d5683f..f56bd13e 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -373,6 +373,16 @@ exceptions:
+     strategy: >
+       Irreducible — a 13-arg constructor trips too_many_arguments; the exhaustive literal is honest.
+ 
++  - path: "crates/cp-wire/src/types/registry.rs"
++    match: "registry-record contract: SelfIdentity is a closed set of ten fixed keys"
++    reason: >
++      SelfIdentity is the ten-key self-identity advertised inside the registry record, mirroring the
++      Agora tool parameters 1:1; a constructor would take ten positional String arguments (tripping
++      too_many_arguments) with no natural grouping, so #[non_exhaustive] is impossible for the same
++      reason as its parent Entry.
++    strategy: >
++      Irreducible — a 10-arg constructor trips too_many_arguments; the exhaustive literal is honest.
++
+   - path: "crates/cp-wire/src/types/stream.rs"
+     match: "stream-frame contract: Frame is a 7-field ephemeral routing record"
+     reason: >
+# --- End entry #84 ---
