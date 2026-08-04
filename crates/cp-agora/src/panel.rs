@@ -52,30 +52,6 @@ fn format_identity_for_context(state: &State) -> String {
     out.trim_end().to_owned()
 }
 
-/// Re-read the peers from disk, at most once per
-/// [`SCAN_INTERVAL_MS`](crate::fleet::SCAN_INTERVAL_MS).
-///
-/// Called from [`refresh`](Panel::refresh), never from `blocks`: `refresh` runs
-/// on the main loop's cadence while `blocks` runs on every frame, and a
-/// directory read per frame would be indefensible. The throttle exists because
-/// even the refresh cadence is far faster than the fleet actually changes —
-/// an agent appearing is a human pressing a button.
-///
-/// A scan that finds nothing still stamps the clock, so an empty or missing
-/// agents directory costs one read every two seconds rather than one per
-/// refresh.
-fn refresh_fleet(state: &mut State) {
-    let now = crate::fleet::now_ms();
-    let ag = AgoraState::get(state);
-    if ag.fleet_scanned_ms != 0 && now.saturating_sub(ag.fleet_scanned_ms) < crate::fleet::SCAN_INTERVAL_MS {
-        return;
-    }
-    let peers = crate::fleet::scan(&crate::fleet::self_folder());
-    let agora = AgoraState::get_mut(state);
-    agora.fleet = peers;
-    agora.fleet_scanned_ms = now;
-}
-
 /// One YAML-style `key: value` row, indented to `indent` spaces.
 ///
 /// Shared by the self-identity rows and the peer rows so both sides of the
@@ -155,8 +131,12 @@ impl Panel for AgoraPanel {
         "Agora".to_owned()
     }
 
+    /// Rebuild the context block. The fleet itself is **not** read here — it is
+    /// polled from the main loop's background phase
+    /// ([`fleet::poll`](crate::fleet::poll)), so this method has one job and the
+    /// peer cache has one owner. Two drivers mutating it would race with nobody
+    /// responsible for the result.
     fn refresh(&self, state: &mut State) {
-        refresh_fleet(state);
         let content = format_identity_for_context(state);
         let token_count = estimate_tokens(&content);
 

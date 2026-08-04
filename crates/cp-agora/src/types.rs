@@ -142,9 +142,17 @@ pub struct AgoraState {
     /// published, and writing it into this agent's own config would be storing
     /// someone else's truth under our name — stale the moment they change it.
     pub fleet: Vec<PeerAgent>,
-    /// When the fleet was last read, for throttling (see
-    /// [`SCAN_INTERVAL_MS`](crate::fleet::SCAN_INTERVAL_MS)).
+    /// When the fleet was last polled, for throttling (see
+    /// [`POLL_INTERVAL_MS`](crate::fleet::POLL_INTERVAL_MS)).
     pub fleet_scanned_ms: u64,
+    /// Fingerprint of the agents directory as of the last full read.
+    ///
+    /// The dirty check that keeps the poll cheap: an unchanged fingerprint
+    /// means the cached [`fleet`](Self::fleet) is still correct and no file
+    /// needs opening. `None` means "never read", so the first poll always
+    /// scans. Derived and never persisted, like the fleet itself — it
+    /// describes a directory at an instant, which a config file cannot.
+    pub fleet_fingerprint: Option<u64>,
 }
 
 impl AgoraState {
@@ -168,6 +176,7 @@ impl AgoraState {
             image: String::new(),
             fleet: Vec::new(),
             fleet_scanned_ms: 0,
+            fleet_fingerprint: None,
         }
     }
 

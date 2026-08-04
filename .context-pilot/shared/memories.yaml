@@ -579,25 +579,45 @@
   contents: |-
     T739c (branch threads, follows T739/M174 + T739b/M175). User ask: "update the agora panel so that this panel also shows other agents, with their slug, path and identity, and that's all. do not show retired agents".
 
-    SOURCE OF TRUTH: crates/cp-agora/src/fleet.rs scans ~/.context-pilot/agents/*.json directly (cp_wire::types::registry::Entry, schema 2 already carries slug/image/identity/folder thanks to T739+T739b). NO orchestrator HTTP call — a render path must not do network I/O, and this way the panel stays truthful even with no backend alive. This closes the loop on what T739/T739b built the advertisement FOR.
+    SOURCE OF TRUTH: crates/cp-agora/src/fleet.rs scans ~/.context-pilot/agents/*.json directly (cp_wire::types::registry::Entry, schema 2 already carries slug/image/identity/folder thanks to T739+T739b). NO orchestrator HTTP call — a render path must not do network I/O, and this way the panel stays truthful even with no backend alive.
 
-    DEAD AGENTS ARE DELIBERATELY INCLUDED, only retired ones filtered. Proper liveness needs pid + heartbeat + boot_id read together (that is the orchestrator's job); a naive kill(pid,0) check would be a NEW liar under pid reuse — exactly the bug class T739 eliminated. Retired is a real user intent, staleness is not.
+    DEAD AGENTS ARE DELIBERATELY INCLUDED, only retired ones filtered. Proper liveness needs pid + heartbeat + boot_id read together (the orchestrator's job); a naive kill(pid,0) check would be a NEW liar under pid reuse — exactly the bug class T739 eliminated.
 
-    RETIRED FILTER: retired.json is a JSON ARRAY of {id,name,folder,model,provider,retired_at_ms} (RetiredStore serializes its HashMap as Vec<RetiredRecord>). cp-agora decodes it with a LOCAL 2-field struct (id + folder) since serde ignores unknown fields — no dependency on cp-orchestrator. Both keys are matched because a retired record may outlive the id.
+    RETIRED FILTER: retired.json is a JSON ARRAY of {id,name,folder,model,provider,retired_at_ms}. cp-agora decodes it with a LOCAL 2-field struct (id + folder) since serde ignores unknown fields — no dependency on cp-orchestrator. Both keys matched because a retired record may outlive the id.
 
     SELF-EXCLUSION by canonicalised folder, NOT pid: the folder is stable across a reload whereas the record briefly carries the old pid.
 
-    THROTTLE: the fleet is re-scanned from Panel::refresh (main-loop cadence), NEVER from blocks() which runs every frame. SCAN_INTERVAL_MS = 2000; a scan that finds nothing still stamps fleet_scanned_ms so an empty dir does not re-scan every tick.
+    === T739d: THE POLL BECAME FINGERPRINT-GUARDED AND MOVED OFF THE PANEL ===
 
-    STATE: AgoraState.fleet + fleet_scanned_ms are DERIVED, never persisted — save_module_data still writes only identity/slug/image.
+    MEASURED FINDING that drove it: the two halves of the advertisement were BACKWARDS. Write side (emit_advert) ticks every 2ms, dirty-checks for 1.17us, works only on change. Read side ticked every 2-4s with NO check and re-parsed every record every time. Worse, the '2s throttle' was a lie: Panel::refresh is called from refresh_all_panels behind its OWN 2s gate, and the scanner added a second 2s throttle on top — two free-running drifting timers, real latency 2-4s.
+
+    MEASURED COSTS on the real 16-record dir: full read+parse = 434 us; scandir+stat only = 46 us (9.4x cheaper).
+
+    FIX (user chose option b): fleet::poll(&mut State) runs in run_background_phase, POLL_INTERVAL_MS = 250 (renamed from SCAN_INTERVAL_MS = 2000). Steady-state cost is LOWER than before (46us/250ms = 184us/s vs 434us/2s = 217us/s) while latency drops 8-16x. Strictly better on both axes.
+
+    fingerprint(dir) -> Option<u64>: scandir + DirEntry::metadata per entry, hash (file_name, mtime_nanos, len) with std DefaultHasher, folded with wrapping_add so it is ORDER-INDEPENDENT (scandir order is unspecified; hashing in traversal order would make an identical directory fingerprint differently and rescan forever).
+    - retired.json shares the directory, so retirement moves the fingerprint FOR FREE. Load-bearing: an 'optimisation' that fingerprinted only <id>.json records would make retirement invisible.
+    - mtime is sound ONLY BECAUSE write_entry is tmp->fsync->rename (fresh inode, fresh timestamp; no in-place overwrite can preserve it). If that ever goes in-place like the heartbeat beacon, this guard weakens. len is the second signal.
+    - DefaultHasher is NOT stable across Rust releases — legitimate only because the value never leaves the process. Never persist it.
+    - Unreadable dir yields None and falls THROUGH to a full scan. Deliberately no sticky last-known fleet: a deleted agents dir must empty the panel, not freeze a lie.
+
+    OWNERSHIP: refresh_fleet was DELETED from Panel::refresh. fleet::poll is now the ONLY writer of AgoraState.fleet — two drivers mutating one cache would race with nobody responsible. This also makes wiring self-proving: if poll were not called, fleet would stay empty and no fleet: section would render at all.
+
+    PLACEMENT: beside emit_bridge_deltas in run_background_phase but NOT inside it — that barge is contractually inert while the bridge is OFF, whereas reading peers must work bridge-off too (a standalone TUI still has an Agora panel and neighbours on disk). Symmetric in cadence, deliberately not in gating.
+
+    A FILE WATCHER WAS REJECTED with a stated reason: notify can silently stop delivering (dropped events, dead watch if the dir is replaced) and a panel that quietly freezes is the liar class T739/T739b/T739c removed. A safety poll would be needed underneath anyway; once that poll is 46us at 250ms the watcher only buys 250ms->5ms on a panel a human glances at.
+
+    STATE: AgoraState.fleet + fleet_scanned_ms + fleet_fingerprint are ALL derived, never persisted — save_module_data still writes only identity/slug/image.
+
+    CONTEXT LEAK (correction owed to the user, T739c reply was WRONG): format_identity_for_context DOES emit the whole fleet section including every peer's ten identity rows. I told the user 'identity stays out of the LLM context' — false. Cheap today (6 peers, mostly '(not set)') but scales with fleet size.
 
     GOTCHAS:
-    - `cp-wire.workspace = true` FAILS: the root Cargo.toml cp-wire line is a root-PACKAGE dependency, not a [workspace.dependencies] entry. Other crates use `cp-wire = { path = "../cp-wire" }`.
-    - cp_wire Entry has NO constructor and NO sample(): it is an exhaustive 17-field literal carrying an exhaustive_structs expect. So display_slug takes (slug, folder, id) as plain &str — the fallback rule is about a NAME, not about a registry record, and it is testable without fabricating a whole Entry.
-    - clippy: `let _r` twice in one scope trips shadow_reuse; rebinding `let ag = AgoraState::get_mut` after `let ag = AgoraState::get` trips it too; single-char lifetimes are forbidden (single-char-lifetime-names) and were unnecessary anyway; Panel::blocks blew its cognitive-complexity budget so peer rendering moved to a free fn fleet_blocks(), and the row closure became a free fn row(indent,key,val) shared by the self rows and the peer rows.
-    - Release-binary verification by string literal DOES NOT WORK here: "fleet:" appears 0 times in the binary (format-string literals are fragmented into the pool, e.g. "\n  - slug: " survives but the section header does not). Verify by BEHAVIOUR (unit tests + the live panel) instead.
+    - `cp-wire.workspace = true` FAILS: the root Cargo.toml cp-wire line is a root-PACKAGE dependency, not a [workspace.dependencies] entry. Same for tempfile — sibling crates write `tempfile = "3"` in plain [dev-dependencies].
+    - cp_wire Entry has NO constructor and NO sample(): exhaustive 17-field literal. display_slug takes (slug, folder, id) as plain &str so the NAME rule is testable without fabricating a record.
+    - clippy: `let _r` twice in one scope trips shadow_reuse; rebinding `let ag = get_mut` after `let ag = get` trips it too; single-char lifetimes forbidden; Panel::blocks blew its cognitive-complexity budget so peer rendering moved to free fn fleet_blocks(); `0_u128` trips separated_literal_suffix (write `0u128`).
+    - src/app/run/lifecycle.rs hit 502 lines adding one call, and src/app/run/ was at the 8-entry cap, so it became lifecycle/{mod,spine}.rs (M34: extract, never trim comments). spine.rs holds the auto-continuation policy. GOTCHA: ContinuationAction is PRIVATE to cp_mod_spine — it can be destructured in a match arm but never NAMED in a signature outside that crate, so the continuation arm had to stay inlined. BOTH new paths need allowed-lint-exceptions entries for multiple_inherent_impl, and that YAML is hash-chained (LINT_GUARD_PASSWORD env var, NOT a --password flag; ./chain.sh does not take --update).
 
-    LIVE VERIFIED: an independent python re-implementation of the filter over the real agents dir predicted exactly 6 peers (alpaca, carri-re, fpga, legal, personnal-blog, ruth-x-nickel-catalysis) with 6 retired filtered and self excluded; the reloaded panel renders exactly those 6.
+    VERIFICATION: release-binary string grep DOES NOT WORK (format-string literals fragment into the constant pool; 'fleet:' greps zero). Verify by BEHAVIOUR. T739d live proof: mutated a dead peer's slug in its record to 'alpaca-FINGERPRINT-PROBE'; the reloaded panel showed the new slug, proving the fingerprint detects a change and rescans rather than caching forever (a frozen cache would still render 6 peers, so only a MUTATION discriminates). Restored from backup after. 14 cp-agora tests.
   importance: high
   labels:
   - T739c
@@ -605,7 +625,7 @@
   - fleet
   - panel
   - registry
-  last_edited_ms: 1785850762998
+  last_edited_ms: 1785854808447
 7b858470e0ce17bf:
   tl_dr: Memory Architecture v2 Phase 1 PAUSED — stashed on memory-architecture-v2 branch. Resume later.
   contents: Memory Architecture v2 Phase 1 PAUSED on branch memory-architecture-v2. Storage engine complete (db, decay, types, tests). Resume later.

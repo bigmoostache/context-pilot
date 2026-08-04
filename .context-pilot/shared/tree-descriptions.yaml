@@ -2090,6 +2090,10 @@
   path: openapi.json
   description: Generated OpenAPI 3.0.3 spec (70KB). Source of truth for TypeScript client codegen. Regenerated from Rust types via tests/openapi.rs.
   last_edited_ms: 0
+18a77da18e083e51:
+  path: .context-pilot/shared/tree-descriptions.yaml
+  description: Persisted tree descriptions YAML. Synced to git alongside code commits per M15.
+  last_edited_ms: 0
 18a7fc26e1396d89:
   path: web/src/components/ui/sheet.tsx
   description: 'shadcn Sheet (drawer) on Base UI Dialog. Side-anchored (top/right/bottom/left) slide-in Popup, portaled, with backdrop + slide/fade animations via data-[side]/data-[starting|ending]-style classes. T288: SheetContent gained showOverlay?:boolean (default true) to skip the dimming backdrop for a NON-MODAL sheet whose background must stay interactive (Finder Quick Look — clicking another file updates the preview instead of dismissing). showCloseButton toggles the built-in X. GOTCHA: to override the base data-[side=right]:w-3/4 / sm:max-w-sm width you must use the SAME data-[side=right]: variant prefix (tailwind-merge only collapses same-prefix classes).'
@@ -2162,6 +2166,10 @@
   path: crates/cp-orchestrator/src/supervisor/mod.rs
   description: 'Phase 17 (X784) AgentSupervisor process manager + X896 pty spawn + restart support. new(allow_list) canonicalizes eagerly; validate_binary realpath-checks vs allow_list (R2-15). spawn(id,bin,folder,args)->pid: Command process_group(0), stdio null. spawn_pty(id,bin,folder,env)->pid: dup-check, validate, canonicalize folder, delegate to proc::spawn_pty_proc (cp TUI needs a real tty). is_supervised(key)->bool query. stop: SIGTERM→poll→SIGKILL→reap. restart=snapshot+stop+spawn. adopt=record live no-spawn (D7). check_liveness()->Vec<Event>. kill_pid(pid:u32) FREE fn: best-effort SIGTERM→grace→SIGKILL for an ARBITRARY (externally-launched) pid with no child handle to reap — used by the /restart route. Error::Pty variant. Proc/Supervised/spawn helper in sibling proc.rs.'
   last_edited_ms: 1781878967926
+19aef0b81e0ec836:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 19c137053640d446:
   path: crates/cp-mod-bridge/src/boot/tests.rs
   description: 'Boot sequence tests, split out of boot/mod.rs when the republish wiring pushed it past the 500-line cap (same prod/tests split the orchestrator supervisor uses). Boots into temp folders via the local boot() helper so a run never touches the real $HOME or the cwd''s bridge.lock. Covers: resource acquisition, single-process refusal, lock release on drop, registry record KEPT on drop (dead agent shows Disconnected, never vanishes), stale socket replacement, try_start fail-fast-then-recover, Lifecycle Running/Stopping journaling.'
@@ -3734,6 +3742,10 @@
   path: crates/cp-mod-prompt/src/lib.rs
   description: 'Prompt library module: Behaviour_create/agent_load/skill_load. pre_flight dispatch, is_prompt_file canonicalize.'
   last_edited_ms: 1784499343133
+2ba67e5e3659271f:
+  path: crates/cp-agora/src/panel.rs
+  description: 'AgoraPanel fixed panel. Renders slug + image rows, then the 10 identity rows, then the `fleet:` section (peer slug / path / identity, or `(not set)`). fleet_blocks() is a free fn because Panel::blocks blew its cognitive-complexity budget; row(indent,key,val) is shared by the self rows and the peer rows. refresh() does ONLY the context rebuild — the fleet is polled from the main loop (fleet::poll), never from here, so the peer cache has exactly one owner. CONTEXT LEAK worth knowing: format_identity_for_context DOES emit the whole fleet including every peer''s ten identity rows; only the profile (slug/image) is render-only. needs_cache=false.'
+  last_edited_ms: 1785854833773
 2ba9f4289fa5b3ce:
   path: crates/cp-mod-bridge/src/register/mod.rs
   description: 'register/ submodule hub: declares identity (folder_id/cap_token/boot_id minting) + registry (atomic 0600 registry record write). Grouped to free a src/ slot for body.rs (folder-size max 8). boot.rs uses crate::register::{identity,registry}.'
@@ -6422,6 +6434,10 @@
   path: web/src/components/finder/preview/SheetGrid.tsx
   description: 'Univer spreadsheet viewer/editor (95 lines). Full spreadsheet engine: range selection, formatting, formulas, sheet tabs, merge cells, context menus, undo/redo — all free Apache 2.0 tier. Mounts Univer via createUniver + UniverSheetsCorePreset into container ref. FR locale. Download XLSX button exports live state via ExcelJS (sheetState.ts).'
   last_edited_ms: 1784126136731
+4b75847d2aa2ff33:
+  path: crates/cp-agora/Cargo.toml
+  description: 'cp-agora deps: cp-base, cp-render, cp-wire (path dep — `cp-wire.workspace = true` FAILS, the root Cargo.toml entry is a root-PACKAGE dependency, not a [workspace.dependencies] one), crossterm, serde, serde_json.'
+  last_edited_ms: 0
 4b767884a16a3ebb:
   path: src/app/run/tools/pipeline.rs
   description: Main tool execution pipeline. Pre-flight → queue intercept (with auto-flush on trap defusal) → execute → callbacks → tempo break → sentinel deferral. History cleanup trap. Queue flush replay. Context Radar signals, Meilisearch log sync. No PendingForm guard or __QUESTION_PENDING__ block. flame!("tool_pipeline") + flame!("callbacks").
@@ -7622,6 +7638,10 @@
   path: ui/src/components/agents/AgentsView.tsx
   description: 'Agents launcher (mission control). 2-pane: FileBrowser | AgentDetail. Holds selected FsNode, defaults to active agent''s folder. findByPath DFS helper.'
   last_edited_ms: 1781514430693
+5859dc4ffad980d2:
+  path: src/app/run/lifecycle/spine.rs
+  description: 'Auto-continuation policy extracted from the lifecycle tick. check_spine dispatches SpineDecision: Blocked -> on_guard_rail_blocked (gated on the reason being NEW, else ~125 saves/sec while persistently blocked), Continue -> apply + on_continuation, Idle -> no-op tail (non_exhaustive forbids a cross-crate exhaustive match). GOTCHA: ContinuationAction is PRIVATE to cp_mod_spine — destructurable in a match arm but NOT nameable in a signature outside that crate, so the Continue arm stays inlined rather than passed to a helper. on_continuation honours Auto-Read: when a synthetic Read is injected it must NOT start a stream nor clear pending_tools (that would wipe the injected Read); the Read rides the normal tool pipeline instead (T322). check_todo_continuation reports only the COUNT + FIRST incomplete todo, never the full list (T361).'
+  last_edited_ms: 1785854833555
 586b439e0054cbd0:
   path: web/src/components/shell/TopBar.tsx
   description: 'Slim macOS-style title bar (T321 trimmed): app mark→fleet, agent switcher, per-agent view tabs (Threads/Finder/Cockpit), agent-config gear, account UserMenu. Header token cost + Session Vitals button/StatsPopup REMOVED (cost lives in footer; vitals folded into AgentModal manage mode).'
@@ -8050,6 +8070,10 @@
   path: web/src/components/shell/config/ConfigPanes.tsx
   description: 'Config category panes + building blocks: CATEGORIES, CategoryBody, GeneralPane (useProviders() hook + ModelPicker + apply-to-all via sendCommand configure), KeyRow (live reveal/edit via API, T446: pencil button for unset keys), StatusRow, ToggleRow, DevModeToggle. Key panes lock when company-managed OR non-admin.'
   last_edited_ms: 1782842052076
+5ecc14cff268193a:
+  path: .github/checks/allowed-lint-exceptions.yaml
+  description: 'Curated #[expect]/#[allow] registry (16 entries). Every occurrence in codebase MUST have an entry. radar entries repointed radar.rs→radar/mod.rs. Fields: path, match, reason, strategy.'
+  last_edited_ms: 0
 5ed3d202e78968d1:
   path: .git/index
   description: Git index (binary). Not source.
@@ -8306,6 +8330,10 @@
   path: crates/cp-mod-github/src/tools.rs
   description: 'GitHub CLI tool. Unified inline-vs-panel: short/fast results (≤150 lines, ≤8KB, ≤10s) returned inline with tempo; long/slow results create static github_result panels. spawn_async_tool for all commands. Token redaction. Cache invalidation of affected panels.'
   last_edited_ms: 0
+619a737d45e987b2:
+  path: crates/cp-agora/src/types.rs
+  description: 'SelfIdentity 10-key struct (closed set, pairs()->[(&str,&str);10] mirrored by IDENTITY_KEYS/IDENTITY_PARAMS/tool YAML/cp-wire twin) + is_empty(). AgoraState holds identity + the T739b agent-owned profile (slug, image) + the derived fleet: Vec<PeerAgent>{slug,path,identity} with fleet_scanned_ms (throttle) and fleet_fingerprint (Option<u64>, the dirty check; None = never read, so the first poll always scans). All three fleet fields are DERIVED, never persisted — save_module_data still writes only identity/slug/image. Profile kept OUTSIDE SelfIdentity on purpose: an 11th key would break the fixed array + wire struct, and identity is LLM-facing prose while the profile is human-facing render data. Caps: 8 words advertised / 10 hard, SLUG_MAX_CHARS=128, IMAGE_MAX_CHARS=2048.'
+  last_edited_ms: 1785854833866
 61a14b9b495f26ae:
   path: Cargo.toml
   description: Workspace root. 22 crate members. Binary 'tui'. Edition 2024. Strict lint config (hundreds of forbid-level clippy/rust lints). openssl vendored for cross-compilation.
@@ -8502,6 +8530,10 @@
   path: crates/cp-base/src/ui/mod.rs
   description: 'Shared UI helpers for panel rendering. Align enum + TextCell + render_table_text() (plain-text for LLM context). Tree output parsing helpers (find_size_pattern, find_children_pattern). Sub-modules: render_cache. No question_form module.'
   last_edited_ms: 1781391612163
+63e7603c5d7f42f9:
+  path: .github/checks/lint-config.chain
+  description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
+  last_edited_ms: 0
 6418d8f702b9149f:
   path: crates/cp-mod-search/src/meili/server.rs
   description: Meilisearch server lifecycle. Download, start, health-check global server (~/.context-pilot/meilisearch/). PID/port/key file management. read_pid() pub(super) for overlay access. Projects registry + orphan index cleanup. Geometric backoff health polling (50ms→500ms cap, 15s budget).
@@ -11606,6 +11638,10 @@
   path: crates/cp-wire/src/types/oplog.rs
   description: 'OpEntry + OpEntryKind internally-tagged enum: CommandEffect, SeenMark, PhaseTransition, MessageCreated{...,inline_body}, ThreadCreated/Archived/Restored/Paused/Resumed/StatusChanged, ThreadFocusChanged, Lifecycle, CostAggregate, ContextUsage{used,threshold,budget,hit_tokens,miss_tokens (T297 cache split, #[serde(default)] N-1)}, Checkpoint, Unknown. Framed (len+CRC). round-trip + tolerant-decode + roster + stable-tag tests.'
   last_edited_ms: 1782311326774
+872907414e139863:
+  path: .context-pilot/shared/memories.yaml
+  description: Agent-managed memory store (auto-synced from live state). Merge conflicts here are last_edited_ms churn only — resolve keeping real timestamps, preserve unique entries both sides.
+  last_edited_ms: 0
 87496429f6346a6f:
   path: crates/cp-wire/src/types/stream.rs
   description: Frame (agent/worker/thread/message_id, seq) + Kind (MessageStartHint, Token, ToolArgs, PhaseHint, Unknown).
@@ -13442,6 +13478,10 @@
   path: ui/src/lib/mock.ts
   description: 'Mock session data: panels, tokenBudget, messages, threads, threadDetails, agents, fileTree, library, usagePoints+USAGE_RATES, cockpit panel maquette data (T16), and currentUser (T30 — company-managed account for the avatar menu/Profile modal).'
   last_edited_ms: 1781596817778
+9cdbec19fd1152d7:
+  path: crates/cp-agora/src/fleet.rs
+  description: 'T739c/T739d fleet scanner + poll. reads ~/.context-pilot/agents/*.json (cp_wire Entry) straight from disk, NO orchestrator HTTP, so the panel stays truthful with no backend alive. poll(&mut State) is the main-loop entry point (run_background_phase) and the SOLE writer of AgoraState.fleet — refresh_fleet was deleted from Panel::refresh so the cache has one owner. Two guards cheapest-first: POLL_INTERVAL_MS=250 wall-clock throttle, then fingerprint(dir) — scandir + one stat per entry (46us) guarding the full read+parse (434us). The fingerprint hashes (file_name, mtime_nanos, len) per entry and folds with wrapping_add so it is ORDER-INDEPENDENT (scandir order is unspecified); retired.json shares the dir so retirement moves it for free; mtime is trustworthy ONLY because write_entry is tmp->fsync->rename (fresh inode). DefaultHasher is fine only because the value never leaves the process. Unreadable dir yields None and falls THROUGH to a full scan — no sticky last-known fleet, a deleted dir must empty the panel. scan() filters self (canonicalised folder, not pid — stable across reload) and retired (local 2-field struct, serde ignores the rest, so no cp-orchestrator dep). DEAD agents deliberately KEPT: real liveness needs pid+heartbeat+boot_id (the orchestrator''s job) and kill(pid,0) would be a NEW liar under pid reuse.'
+  last_edited_ms: 1785854833680
 9cdf151641317d79:
   path: crates/cp-orchestrator/src/transport/inspect/panels.rs
   description: 'Cockpit inspection-panel endpoints: memory/todos/spine/queue/scratchpad/tree/callbacks/usage/library/panel_list = tier-③ disk reads reshaped to maquette JSON. Tree descriptions truncated to 120-char preview (T492 perf fix, full text via /fs/descriptions). library() returns command body for /cmd suggestion (T350). tools/radar/entities = DERIVED-state endpoints returning normal empty shape by design.'
@@ -19014,6 +19054,10 @@ e02c11ea99a4480a:
   path: web/src/lib/types.ts
   description: 'Domain types barrel. Re-exports backend types from generated/types.gen. web-lint P1: ThreadQuestion ADDED to the `import type` block (was only re-exported, causing TS2304 when used in ThreadMsg redecl); ThreadMsg = Omit<GenThreadMsg,''ts''|''questions''> & { ts?, streaming?, questions?: ThreadQuestion[]|undefined }. Optional props widened to `| undefined` throughout for exactOptionalPropertyTypes.'
   last_edited_ms: 1783354821150
+e02d85b27de691f8:
+  path: Cargo.lock
+  description: Workspace lockfile
+  last_edited_ms: 0
 e0352c6a703737b4:
   path: src/app/run/watchers.rs
   description: File/cache watcher loop. flame!("cache_updates") + flame!("watcher_events"). sync_file_watchers (module→inotify/kqueue). timer_based_deprecation (poll intervals). GH sync every 5s. FD cleanup (stale watch removal). suicide() auto-close.

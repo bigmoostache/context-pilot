@@ -303,6 +303,7 @@ dependencies = [
  "crossterm",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
