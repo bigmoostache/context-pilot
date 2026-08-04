@@ -438,6 +438,10 @@
   path: web/src/mobile-components/threads/ThreadList.tsx
   description: 'Mobile ThreadList twin. iMessage list. Leading status dot, title+time+2-line preview, swipe-left Archive+Pause/Delete (useSwipeRow). Top-left CornerButton (LayoutGrid, onGoToAgents) to fleet; top-right archived toggle. Bottom field DOUBLES as search+create (T633): typing filters live AND is new-thread name; round + button + Enter gated on query.trim()!=='''' && !showArchived; onNewThread(name).'
   last_edited_ms: 0
+04e0bb38fcca8c31:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 04e8425ae9fe986c:
   path: crates/cp-orchestrator/src/transport/maint/mod.rs
   description: 'IT maintenance plane (:9090) router — LAN-only + Admin-gated, no CORS (same-origin SPA). handle(): LAN guard → SPA static serve → Admin auth gate → route. Routes: status/login (public), me/password/me-patch/logout, identity get/set, ca/fingerprint + ca.crt raw, finalize. Product routes structurally absent (404). is_lan_addr predicate (loopback/RFC-1918/link-local/ULA). Full test suite (role gate, finalize pre-reqs, LAN predicate).'
@@ -4262,6 +4266,10 @@
   path: Cargo.lock
   description: Workspace lockfile
   last_edited_ms: 0
+31a654ef0453aa91:
+  path: .context-pilot/shared/tree-descriptions.yaml
+  description: Persisted tree descriptions YAML. Synced to git alongside code commits per M15.
+  last_edited_ms: 0
 31b8a6bebfde249b:
   path: web/src/components/threads/ThreadsView.tsx
   description: 'Desktop ThreadsView — master-detail (list rail + conversation). railOpen collapse (T669) now animates (T670): rail stays mounted, slides in/out via transitioned negative left-margin (root overflow-hidden clips it), conversation reclaims width; floating PanelLeft reopen button fades+nudges in when collapsed; motion-reduce snaps. Shared useThreadSelection+useThreadActions from lib/live/threadView. Mobile twin = stack nav.'
@@ -4866,6 +4874,10 @@
   path: .github/checks/check-frontend-suppressions.sh
   description: 'Frontend anti-suppression guard (web-lint P4, twin of check-vault-bypass.sh). Two invariants, CI-side, independent of ESLint config: (1) STOWAWAY — no inline eslint-disable/@ts-ignore/@ts-nocheck/@ts-expect-error/@ts-check in web/src (excl generated/**); the BANNED regex anchors to real directive position `(//|/*)<ws>keyword` so backtick-wrapped mentions in prose don''t false-positive. (2) bidirectional config⇄registry audit — every `"<rule>": "off"` scoped override in eslint.config.ts must have a matching entry in allowed-eslint-exceptions.yaml and vice-versa (the ''*'' wildcard globalIgnore doc is exempt). Dual-mode: no args = full CI scan (both invariants); with args = callback stowaway-grep on given files. BSD/macOS-safe ([[:space:]] not \s). Wired in ci.yml Structure job.'
   last_edited_ms: 0
+396224ef972d3665:
+  path: crates/cp-agora/src/fleet.rs
+  description: 'T739c fleet scanner — reads ~/.context-pilot/agents/*.json (cp_wire Entry) straight from disk, NO orchestrator HTTP, so the panel stays truthful with no backend alive. scan() filters: self (canonicalised folder, not pid — the folder is stable across a reload whereas the record briefly carries the old pid) and retired (retired.json, a JSON array decoded with a local 2-field id+folder struct; serde ignores the other 4 fields, so cp-agora needs no cp-orchestrator dependency). DEAD agents are deliberately KEPT: proper liveness needs pid+heartbeat+boot_id together (the orchestrator''s job) and a naive kill(pid,0) would be a NEW liar under pid reuse. display_slug(slug,folder,id) takes plain &str, not an Entry, because Entry is an exhaustive 17-field literal with no constructor — the fallback rule is about a name, not a record. SCAN_INTERVAL_MS=2000.'
+  last_edited_ms: 1785850762486
 396a7b95e2355a50:
   path: crates/cp-mod-console/src/pollers.rs
   description: FilePoller (tails log file every 100ms into RingBuffer, grace read on stop) + StatusPoller (polls server status every 500ms, marks dead on exit/unreachable).
@@ -5014,6 +5026,10 @@
   path: crates/cp-mod-console/src/lib.rs
   description: 'Console module. 5 tools. Dynamic console panels. init: find/create Unix socket server. save/load: session reconnection + orphan cleanup. Leaks stdin on save to prevent EOF. Tool visualizer for colored output.'
   last_edited_ms: 0
+3af4e465421ff361:
+  path: crates/cp-agora/src/lib.rs
+  description: Agora module. 1 tool Agora_set_identity (10 compulsory identity params). Fixed AGORA panel, global state, fixed_order 10, non-core. Declares `pub mod fleet` (T739c peer scan). save/load_module_data persist identity + slug + image under modules.agora with tolerant absent-key handling, so a config.json written before the T739b profile existed still loads (absent key = empty = unset).
+  last_edited_ms: 1785850762812
 3af6a933503f48f3:
   path: .git/index
   description: Git index (binary). Not source.
@@ -6654,6 +6670,10 @@
   path: docs/trust-center/index.html
   description: 'Full trust center page modeled after Vanta. Sections: hero + status banner, 3 core principles (local-first/open-source/zero-telemetry), security architecture (ASCII data flow diagram), 7 privacy controls, data handling, third-party services table (10 services), compliance (GDPR/SOC2/MIT), 6 FAQ accordions.'
   last_edited_ms: 1782129931161
+4dcb032493bbe20f:
+  path: crates/cp-agora/Cargo.toml
+  description: 'cp-agora deps: cp-base, cp-render, cp-wire (path dep — `cp-wire.workspace = true` FAILS, the root Cargo.toml entry is a root-PACKAGE dependency, not a [workspace.dependencies] one), crossterm, serde, serde_json.'
+  last_edited_ms: 1785850762905
 4de16bcb394dbf2e:
   path: crates/cp-mod-spine/src/lib.rs
   description: Spine module. Auto-continuation, notifications (10 processed kept), guard rails, coucou timers. Manages WatcherRegistry. on_user_message resets counters. on_stream_stop prevents re-launch.
@@ -9218,6 +9238,10 @@
   path: src/modules/overview/tools/close_context.rs
   description: 'Close_panel execution. Partial close: valid panels close, undescribed/stale-description file panels are skipped (not blocked). Module on_close_context hooks. Output: closed/skipped/not_found/errors sections. T355: the describe-before-close gate now also requires Path::exists(file_path) — a file that''s gone from disk is EXEMPT from the gate (tree_describe rejects ''path not found'', so demanding a description would block the close forever), making deleted/branch-switched file panels freely closable. Also owns has_pending_tree_describe(state,rel_path) — the queue-introspection helper (queued tree_describe in flight ⇒ allow close) used both locally and re-exported to the overview module''s pre_flight.'
   last_edited_ms: 1782296816078
+6c9fadd7c2417342:
+  path: Cargo.lock
+  description: Workspace lockfile
+  last_edited_ms: 0
 6ca15fb1bd2ff28f:
   path: crates/cp-orchestrator/src/transport/rest/claude_oauth.rs
   description: Claude Code OAuth helpers — usage proxy, token status (incl account_email via /api/oauth/profile), PKCE login (start/complete), token refresh. Delegates read_credentials_json to cp_vault::oauth::load_claude_oauth_raw, read_access_token to vault().get("claude_oauth"). store_credentials writes to Keychain + ~/.claude/.credentials.json.
@@ -10374,6 +10398,10 @@
   path: web/src/components/finder/internal/helpers.ts
   description: 'Finder shared types + pure helpers: Tab/PinnedFolder interfaces, CLICK_SETTLE_MS, NEW_FOLDER_SENTINEL, pinsKey/loadPins (localStorage), buildCrumbs, pathName. web-lint P3: req<T>(arr,i) invariant accessor (arr.at(i), throws on absent) — encodes a length-guard-proven invariant with a runtime check instead of a banned non-null assertion (!); used by useFinderActions back/forward.'
   last_edited_ms: 1783376840602
+798c4b7e7d5c2008:
+  path: crates/cp-agora/src/panel.rs
+  description: 'AgoraPanel fixed panel. Renders slug + image rows, then the 10 identity rows, then the T739c `fleet:` section (peer slug / path / identity, or `(not set)`). fleet_blocks() is a free fn because Panel::blocks blew its cognitive-complexity budget; row(indent,key,val) is shared by the self rows and the peer rows. The fleet is re-scanned from refresh() (main-loop cadence, throttled by fleet_scanned_ms + SCAN_INTERVAL_MS), NEVER from blocks() which runs every frame. DELIBERATE ASYMMETRY kept: format_identity_for_context feeds the LLM only the identity — profile and fleet are human-facing render data. needs_cache=false.'
+  last_edited_ms: 1785850762626
 798feda0554319c0:
   path: web/src/components/shell/widgets/StoredAccounts.tsx
   description: Multi-account Claude OAuth stored accounts list. StoredAccountRow (email + valid dot + expiry + Switch/Delete). StoredAccounts (store current, list stored, switch/delete mutations, query invalidation on switch). Extracted from UsageButton for P8 line budget.
@@ -11886,6 +11914,10 @@
   path: src/ui/ir/render_sidebar.rs
   description: 'Sidebar ratatui renderer — render_sidebar_from_ir(). Normal mode: token bar box, fixed/dynamic entries with pagination, PR card, token stats. Collapsed mode: icon strip. Entry rendering: indicator+icon+shortcut+label+tokens. Token color gradient (grey→red).'
   last_edited_ms: 0
+8a54ed5c5dcf5f3a:
+  path: crates/cp-orchestrator/src/transport/rest/config/mod.rs
+  description: config/ hub — per-agent and central configuration REST handlers, grouped here so the rest/ directory stays within its 8-entry budget. settings (central defaults), env_keys (vault inspection/editing), it (box identity + CA), update (self-update), profile (T739b agent-owned display name + avatar). All re-exported from rest so callers still write rest::get_settings, rest::rename_agent, etc.
+  last_edited_ms: 1785849861437
 8a696b2ae126f57f:
   path: web/src/components/shell/TopBar.tsx
   description: 'macOS title bar. Accepts agents prop for AgentSwitcher + activeAgent lookup. View switcher Threads·Finder·Cockpit. Right cluster: cost, Activity→StatsPopup(agentId), theme, agent config (AgentModal), UserMenu (Profile+Settings).'
@@ -17902,6 +17934,10 @@ d18def4b79e96906:
   path: web/sse_capture.py
   description: 'T123 backend SSE probe. Mints a ticket, opens the SSE stream, sends a user message, prints every delta frame with send-relative latency — isolates the backend push plane from the frontend. Proved message_created rides the wire at 34-52ms with inline_body+text, so any slow paint is a frontend apply defect (it was: the burst-clobber, now fixed).'
   last_edited_ms: 1781858556164
+d1a337fbf80c4e62:
+  path: crates/cp-agora/src/types.rs
+  description: 'SelfIdentity 10-key struct (closed set, pairs()->[(&str,&str);10] mirrored by IDENTITY_KEYS/IDENTITY_PARAMS/tool YAML/cp-wire twin) + is_empty(). AgoraState holds identity + the T739b agent-owned profile (slug, image) + the T739c derived fleet: Vec<PeerAgent>{slug,path,identity} and fleet_scanned_ms. The fleet is DERIVED, never persisted — save_module_data still writes only identity/slug/image. Profile kept OUTSIDE SelfIdentity on purpose: an 11th key would break the fixed array + wire struct, and identity is LLM-facing prose while the profile is human-facing render data. Caps: 8 words advertised / 10 hard, SLUG_MAX_CHARS=128, IMAGE_MAX_CHARS=2048.'
+  last_edited_ms: 1785850762719
 d1a7857270c8c552:
   path: web/src/lib/api/generated/sdk.gen.ts
   description: Auto-generated typed SDK functions from openapi.json. One function per REST endpoint (getApiFleetMeta, getApiAgentByIdThreads, postApiAuthLogin, etc). Uses @hey-api client runtime, NOT the manual request() wrapper.

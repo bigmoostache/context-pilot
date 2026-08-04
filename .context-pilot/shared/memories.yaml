@@ -574,6 +574,38 @@
   - cost
   - documentation
   last_edited_ms: 0
+7b607965028d5a48:
+  tl_dr: 'T739c: Agora panel now shows peer agents (slug/path/identity), read straight from ~/.context-pilot/agents/*.json. Dead agents INCLUDED, only retired filtered. Design + gotchas in body.'
+  contents: |-
+    T739c (branch threads, follows T739/M174 + T739b/M175). User ask: "update the agora panel so that this panel also shows other agents, with their slug, path and identity, and that's all. do not show retired agents".
+
+    SOURCE OF TRUTH: crates/cp-agora/src/fleet.rs scans ~/.context-pilot/agents/*.json directly (cp_wire::types::registry::Entry, schema 2 already carries slug/image/identity/folder thanks to T739+T739b). NO orchestrator HTTP call — a render path must not do network I/O, and this way the panel stays truthful even with no backend alive. This closes the loop on what T739/T739b built the advertisement FOR.
+
+    DEAD AGENTS ARE DELIBERATELY INCLUDED, only retired ones filtered. Proper liveness needs pid + heartbeat + boot_id read together (that is the orchestrator's job); a naive kill(pid,0) check would be a NEW liar under pid reuse — exactly the bug class T739 eliminated. Retired is a real user intent, staleness is not.
+
+    RETIRED FILTER: retired.json is a JSON ARRAY of {id,name,folder,model,provider,retired_at_ms} (RetiredStore serializes its HashMap as Vec<RetiredRecord>). cp-agora decodes it with a LOCAL 2-field struct (id + folder) since serde ignores unknown fields — no dependency on cp-orchestrator. Both keys are matched because a retired record may outlive the id.
+
+    SELF-EXCLUSION by canonicalised folder, NOT pid: the folder is stable across a reload whereas the record briefly carries the old pid.
+
+    THROTTLE: the fleet is re-scanned from Panel::refresh (main-loop cadence), NEVER from blocks() which runs every frame. SCAN_INTERVAL_MS = 2000; a scan that finds nothing still stamps fleet_scanned_ms so an empty dir does not re-scan every tick.
+
+    STATE: AgoraState.fleet + fleet_scanned_ms are DERIVED, never persisted — save_module_data still writes only identity/slug/image.
+
+    GOTCHAS:
+    - `cp-wire.workspace = true` FAILS: the root Cargo.toml cp-wire line is a root-PACKAGE dependency, not a [workspace.dependencies] entry. Other crates use `cp-wire = { path = "../cp-wire" }`.
+    - cp_wire Entry has NO constructor and NO sample(): it is an exhaustive 17-field literal carrying an exhaustive_structs expect. So display_slug takes (slug, folder, id) as plain &str — the fallback rule is about a NAME, not about a registry record, and it is testable without fabricating a whole Entry.
+    - clippy: `let _r` twice in one scope trips shadow_reuse; rebinding `let ag = AgoraState::get_mut` after `let ag = AgoraState::get` trips it too; single-char lifetimes are forbidden (single-char-lifetime-names) and were unnecessary anyway; Panel::blocks blew its cognitive-complexity budget so peer rendering moved to a free fn fleet_blocks(), and the row closure became a free fn row(indent,key,val) shared by the self rows and the peer rows.
+    - Release-binary verification by string literal DOES NOT WORK here: "fleet:" appears 0 times in the binary (format-string literals are fragmented into the pool, e.g. "\n  - slug: " survives but the section header does not). Verify by BEHAVIOUR (unit tests + the live panel) instead.
+
+    LIVE VERIFIED: an independent python re-implementation of the filter over the real agents dir predicted exactly 6 peers (alpaca, carri-re, fpga, legal, personnal-blog, ruth-x-nickel-catalysis) with 6 retired filtered and self excluded; the reloaded panel renders exactly those 6.
+  importance: high
+  labels:
+  - T739c
+  - agora
+  - fleet
+  - panel
+  - registry
+  last_edited_ms: 1785850762998
 7b858470e0ce17bf:
   tl_dr: Memory Architecture v2 Phase 1 PAUSED — stashed on memory-architecture-v2 branch. Resume later.
   contents: Memory Architecture v2 Phase 1 PAUSED on branch memory-architecture-v2. Storage engine complete (db, decay, types, tests). Resume later.

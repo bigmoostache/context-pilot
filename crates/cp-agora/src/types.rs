@@ -96,6 +96,25 @@ pub const SLUG_MAX_CHARS: usize = 128;
 /// the record, only this reference.
 pub const IMAGE_MAX_CHARS: usize = 2048;
 
+/// One *other* agent, as read from its own advertisement in the shared
+/// registry directory.
+///
+/// Carries only what the Agora shows — who the agent is, where it lives, and
+/// what it says about itself. The record holds a great deal more (sockets,
+/// tokens, pids); none of it belongs in a panel about identity, and a bearer
+/// token in particular has no business being rendered.
+#[derive(Debug, Clone, Default)]
+pub struct PeerAgent {
+    /// The peer's display name, already resolved (an empty slug in the record
+    /// has been replaced by the folder basename, matching the dashboard).
+    pub slug: String,
+    /// The peer's realm — the absolute canonical folder it runs in.
+    pub path: String,
+    /// The peer's self-identity. Empty for an agent that has never introduced
+    /// itself, or whose record predates identity being advertised at all.
+    pub identity: SelfIdentity,
+}
+
 /// Module-owned state for the Agora module: the agent's self-identity plus the
 /// public profile (slug + image) it advertises to the fleet.
 ///
@@ -116,6 +135,16 @@ pub struct AgoraState {
     /// Image reference — a realm-relative path or an `http(s)` URL, never the
     /// bytes. Empty means no picture.
     pub image: String,
+    /// The other agents currently advertising themselves, refreshed from disk
+    /// on a throttle.
+    ///
+    /// Derived state, never persisted: it is a cache of what the neighbours
+    /// published, and writing it into this agent's own config would be storing
+    /// someone else's truth under our name — stale the moment they change it.
+    pub fleet: Vec<PeerAgent>,
+    /// When the fleet was last read, for throttling (see
+    /// [`SCAN_INTERVAL_MS`](crate::fleet::SCAN_INTERVAL_MS)).
+    pub fleet_scanned_ms: u64,
 }
 
 impl AgoraState {
@@ -137,6 +166,8 @@ impl AgoraState {
             },
             slug: String::new(),
             image: String::new(),
+            fleet: Vec::new(),
+            fleet_scanned_ms: 0,
         }
     }
 

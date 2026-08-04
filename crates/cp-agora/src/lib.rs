@@ -4,6 +4,8 @@
 //! state (shared across every worker, not per-worker), rendered as a YAML block
 //! in the fixed Agora panel. Agent-side only: no orchestrator or frontend leg.
 
+/// Reading other agents' advertisements from the shared registry directory.
+pub mod fleet;
 /// Panel rendering + context generation for the identity.
 mod panel;
 /// Tool execution handler for `Agora_set_identity` plus the shared
