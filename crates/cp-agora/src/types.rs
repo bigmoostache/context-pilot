@@ -83,11 +83,39 @@ impl SelfIdentity {
     }
 }
 
-/// Module-owned state for the Agora module: the single [`SelfIdentity`] record.
+/// Maximum accepted length of a display [`slug`](AgoraState::slug).
+///
+/// Generous for a display name while keeping the registry record small — that
+/// record is `0600`, re-read on every fleet scan, and a runaway slug would be
+/// paid for on each pass.
+pub const SLUG_MAX_CHARS: usize = 128;
+
+/// Maximum accepted length of an [`image`](AgoraState::image) reference.
+///
+/// Sized for a long URL rather than a path; the bytes themselves never live in
+/// the record, only this reference.
+pub const IMAGE_MAX_CHARS: usize = 2048;
+
+/// Module-owned state for the Agora module: the agent's self-identity plus the
+/// public profile (slug + image) it advertises to the fleet.
+///
+/// The two halves are deliberately separate. [`identity`](Self::identity) is
+/// *prose the agent holds about itself* and rides the LLM context; the profile
+/// is *how humans see the agent* in the dashboard and rides the registry
+/// record. Keeping the profile out of [`SelfIdentity`] preserves that type's
+/// closed ten-key shape (mirrored 1:1 by the tool parameters and the `cp-wire`
+/// twin) and keeps two unrelated concerns from sharing one struct.
 #[derive(Debug, Default)]
 pub struct AgoraState {
     /// The agent's current self-identity.
     pub identity: SelfIdentity,
+    /// Display slug — the agent's public name. Empty means "unset": consumers
+    /// fall back to the folder-derived basename, so clearing this reverts to
+    /// the default rather than blanking the name.
+    pub slug: String,
+    /// Image reference — a realm-relative path or an `http(s)` URL, never the
+    /// bytes. Empty means no picture.
+    pub image: String,
 }
 
 impl AgoraState {
@@ -107,6 +135,8 @@ impl AgoraState {
                 organic_responsibilities: String::new(),
                 direct_management: String::new(),
             },
+            slug: String::new(),
+            image: String::new(),
         }
     }
 

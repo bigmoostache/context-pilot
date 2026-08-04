@@ -131,23 +131,65 @@ pub(super) fn handle_raw(request: Request, state: &Arc<Mutex<Backend>>, id: &str
     }
 }
 
-/// Serve an agent's avatar image inline (Content-Type from the avatar store).
+/// Serve an agent's avatar image inline.
+///
+/// Resolution order mirrors the read path in
+/// [`meta`](super::inspect::meta) (T739b): the **agent-owned reference** in its
+/// registry record wins, and the legacy orchestrator-side [`AvatarStore`] is
+/// only consulted when the record carries no image — an agent that has not
+/// booted since the rewire, or one whose binary predates it.
+///
+/// A reference that is a URL is answered with a `302` to it rather than
+/// proxied: the bytes live on someone else's server, and fetching them here
+/// would turn a static file handler into an outbound HTTP client (an SSRF
+/// surface reachable from an unauthenticated route — this endpoint is public
+/// by design so a plain `<img src>` works, T345).
+///
+/// [`AvatarStore`]: crate::services::AvatarStore
 pub(super) fn handle_avatar(request: Request, state: &Arc<Mutex<Backend>>, id: &str) {
-    let avatar = state.lock().ok().and_then(|b| b.avatars.get(id));
-    match avatar {
-        Some((bytes, ctype)) => {
-            let mut response = Response::from_data(bytes).with_status_code(200);
-            if let Ok(h) = Header::from_bytes(&b"Content-Type"[..], ctype.as_bytes()) {
-                response = response.with_header(h);
-            }
-            if let Ok(h) = Header::from_bytes(&b"Cache-Control"[..], &b"public, max-age=3600"[..]) {
+    // Agent-owned reference first.
+    if let Ok(entry) = rest::resolve_entry(state, id)
+        && !entry.image.is_empty()
+    {
+        if entry.image.starts_with("http://") || entry.image.starts_with("https://") {
+            let mut response = Response::from_data(Vec::new()).with_status_code(302);
+            if let Ok(h) = Header::from_bytes(&b"Location"[..], entry.image.as_bytes()) {
                 response = response.with_header(h);
             }
             for header in cors_headers() {
                 response = response.with_header(header);
             }
             let _sent = request.respond(response);
+            return;
         }
+        if let Some((bytes, ctype)) = crate::services::agent_meta::read_realm_avatar(&entry.folder, &entry.image) {
+            respond_image(request, bytes, &ctype);
+            return;
+        }
+    }
+
+    // Fallback: the legacy orchestrator-side store.
+    let avatar = state.lock().ok().and_then(|b| b.avatars.get(id));
+    match avatar {
+        Some((bytes, ctype)) => respond_image(request, bytes, &ctype),
         None => respond_json(request, &rest::HttpReply::error(404, "no avatar")),
     }
+}
+
+/// Respond with raw image `bytes` inline, briefly cacheable.
+///
+/// Shared by both avatar resolution paths so the response shape (content type,
+/// cache policy, CORS) cannot drift between them.
+fn respond_image(request: Request, bytes: Vec<u8>, ctype: &str) {
+    let mut response = Response::from_data(bytes).with_status_code(200);
+    if let Ok(h) = Header::from_bytes(&b"Content-Type"[..], ctype.as_bytes()) {
+        response = response.with_header(h);
+    }
+    if let Ok(h) = Header::from_bytes(&b"Cache-Control"[..], &b"public, max-age=3600"[..]) {
+        response = response.with_header(h);
+    }
+    for header in cors_headers() {
+        response = response.with_header(header);
+    }
+    let _sent = request.respond(response);
 }

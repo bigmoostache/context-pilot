@@ -286,9 +286,9 @@ impl Boot {
     /// advertises. The steady state is free — an unchanged projection performs
     /// no I/O at all.
     ///
-    /// The live inputs (`model`, `identity`) arrive by value because the caller
-    /// necessarily holds a mutable borrow of the agent state to reach this
-    /// `Boot`, so it resolves them beforehand.
+    /// The live inputs (`profile`, `identity`) arrive by value because the
+    /// caller necessarily holds a mutable borrow of the agent state to reach
+    /// this `Boot`, so it resolves them beforehand.
     ///
     /// Advertising is **best-effort**: a failed write leaves the previous
     /// record in place (still valid, merely one tick old) and the next tick
@@ -300,10 +300,10 @@ impl Boot {
     /// Returns [`Error::Io`] when the record cannot be serialised or written.
     pub fn republish_advert(
         &mut self,
-        model: String,
+        profile: crate::register::advert::Profile,
         identity: cp_wire::types::registry::SelfIdentity,
     ) -> BootResult<bool> {
-        let projected = crate::register::advert::project(model, &self.entry, identity);
+        let projected = crate::register::advert::project(profile, &self.entry, identity);
         let wrote = crate::register::advert::publish_if_changed(&self.agents_dir, &projected, &mut self.last_advert)?;
         if wrote {
             self.entry = projected;

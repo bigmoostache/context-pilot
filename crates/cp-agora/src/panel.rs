@@ -37,21 +37,35 @@ impl Panel for AgoraPanel {
         use cp_render::{Block, Semantic, Span as S};
 
         let ag = AgoraState::get(state);
-        if ag.identity.is_empty() {
-            return vec![Block::Line(vec![S::muted("  Identity not set - use Agora_set_identity.".into()).italic()])];
+
+        // One YAML-style `key: value` row.
+        let row = |key: String, val: &str| {
+            Block::KeyValue(vec![(
+                vec![S::muted(format!("  {key}: "))],
+                vec![S::styled(val.to_owned(), Semantic::Code)],
+            )])
+        };
+
+        // Profile first (slug + image), then the identity prose. Each profile
+        // field is skipped when unset so a fresh agent shows no empty rows.
+        let mut blocks: Vec<Block> = Vec::new();
+        if !ag.slug.is_empty() {
+            blocks.push(row("slug".to_owned(), &ag.slug));
+        }
+        if !ag.image.is_empty() {
+            blocks.push(row("image".to_owned(), &ag.image));
         }
 
-        // One YAML-style `key: value` line per identity field.
-        ag.identity
-            .pairs()
-            .into_iter()
-            .map(|(key, val)| {
-                Block::KeyValue(vec![(
-                    vec![S::muted(format!("  {key}: "))],
-                    vec![S::styled(val.to_owned(), Semantic::Code)],
-                )])
-            })
-            .collect()
+        if ag.identity.is_empty() {
+            if blocks.is_empty() {
+                return vec![Block::Line(vec![
+                    S::muted("  Identity not set - use Agora_set_identity.".into()).italic(),
+                ])];
+            }
+            return blocks;
+        }
+        blocks.extend(ag.identity.pairs().into_iter().map(|(key, val)| row(key.to_owned(), val)));
+        blocks
     }
 
     fn title(&self, _state: &State) -> String {

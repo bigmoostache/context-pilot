@@ -204,6 +204,37 @@ pub enum Kind {
     #[serde(rename = "set_identity")]
     SetIdentity(Box<SelfIdentity>),
 
+    /// Set the agent's public **profile** — its display slug and its image
+    /// reference — which the agent owns and advertises in its registry record
+    /// (T739b).
+    ///
+    /// Both fields are **patch-shaped**: `None` leaves the current value
+    /// untouched, `Some` replaces it. That is load-bearing rather than
+    /// cosmetic, because renaming and setting an avatar are independent user
+    /// actions arriving on the same command — a `PUT`-shaped payload would make
+    /// a rename silently clear the image whenever the sender forgot to echo it
+    /// back. `Some("")` is a deliberate *clear* (an empty slug reverts to the
+    /// folder-derived default, an empty image drops the picture), so absence
+    /// and emptiness stay distinguishable.
+    ///
+    /// `image` is a **reference** — a path inside the agent's realm or a URL —
+    /// never the bytes. The registry record is `0600` and read on every fleet
+    /// scan; a multi-megabyte blob has no business in it. The orchestrator
+    /// remains the byte transport (it receives an upload, writes the file, then
+    /// sends this command naming it), but the *authority* over what the image
+    /// is now lives with the agent.
+    #[serde(rename = "set_profile")]
+    SetProfile {
+        /// New display slug, or `None` to leave it unchanged. `Some("")`
+        /// clears the override, reverting to the folder-derived default.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        slug: Option<String>,
+        /// New image reference (realm-relative path or URL), or `None` to
+        /// leave it unchanged. `Some("")` removes the image.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        image: Option<String>,
+    },
+
     /// Catch-all for variants added in a newer protocol version.
     ///
     /// An N-1 receiver deserialises any unrecognised `"kind"` tag here

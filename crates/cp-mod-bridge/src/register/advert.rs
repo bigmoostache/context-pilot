@@ -51,15 +51,23 @@ use cp_wire::types::registry::{AgentStatus, Entry, SelfIdentity};
 /// * `identity` mirrors the Agora self-identity, whatever last wrote it — the
 ///   `Agora_set_identity` tool or the web `SetIdentity` command.
 ///
-/// Both live inputs arrive **by value** rather than being read from a `&State`
+/// * `slug` and `image` mirror the agent's own public profile, which it now
+///   **owns** (T739b): a dashboard rename or avatar change arrives as a
+///   `SetProfile` command, lands in the agent's Agora state, and reaches the
+///   record through this projection like every other live field.
+///
+/// Every live input arrives **by value** rather than being read from a `&State`
 /// here. That is deliberate: the caller holds a mutable borrow of the agent
 /// state (to reach the `Boot` that owns this record), so it must resolve them
 /// before taking it. Passing them in also keeps this module pure data-in /
 /// data-out, with no dependency on the agent's state tree.
 ///
-/// `slug` and `image` pass through from `booted`: the agent has no authority
-/// over either yet (the backend owns the name override and the avatar bytes),
-/// so the projection must not clobber whatever seeded them.
+/// An **empty** slug falls back to the boot record's folder-derived basename
+/// rather than advertising nothing. That is what makes clearing a rename mean
+/// "revert to the default name" instead of "blank the name", and it keeps the
+/// fallback in one place — every reader can then trust `slug` to be populated.
+/// An empty `image` is passed through as empty, because "no picture" is a
+/// legitimate final state with no default to fall back to.
 ///
 /// The advertised `identity` is dropped to `None` while every Agora field is
 /// still empty, so a fresh agent that has never introduced itself serialises to
@@ -68,9 +76,50 @@ use cp_wire::types::registry::{AgentStatus, Entry, SelfIdentity};
 /// produce an identity (a blank one is still a value), so making it choose
 /// would push a projection rule out into the observer.
 #[must_use]
-pub fn project(model: String, booted: &Entry, identity: SelfIdentity) -> Entry {
+pub fn project(profile: Profile, booted: &Entry, identity: SelfIdentity) -> Entry {
     let advertised = if is_blank(&identity) { None } else { Some(identity) };
-    Entry { model, status: AgentStatus::Running, identity: advertised, ..booted.clone() }
+    let slug = if profile.slug.is_empty() { booted.slug.clone() } else { profile.slug };
+    Entry {
+        model: profile.model,
+        status: AgentStatus::Running,
+        slug,
+        image: profile.image,
+        identity: advertised,
+        ..booted.clone()
+    }
+}
+
+/// The live, agent-owned values a projection tick folds into the record.
+///
+/// Grouped into one struct rather than passed as three loose `String`
+/// arguments because they share a single origin (the agent's own state,
+/// resolved together just before the projection) and because naming them at
+/// the construction site is the only defence against silent transposition —
+/// every field is a `String`, so the compiler could not catch a swapped `slug`
+/// and `image`.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct Profile {
+    /// The model the agent is *currently* configured with.
+    pub model: String,
+    /// The agent's display slug — empty means "unset", and the projection then
+    /// falls back to the boot record's folder-derived default.
+    pub slug: String,
+    /// The agent's image reference (realm-relative path or URL), never bytes.
+    /// Empty means no picture.
+    pub image: String,
+}
+
+impl Profile {
+    /// Bundle the live profile values for a projection tick.
+    ///
+    /// A constructor keeps [`Profile`] `#[non_exhaustive]` while still letting
+    /// the agent crate build one, so a field added here later is a compile
+    /// error at this signature rather than a silently defaulted record field.
+    #[must_use]
+    pub const fn new(model: String, slug: String, image: String) -> Self {
+        Self { model, slug, image }
+    }
 }
 
 /// Whether every identity field is empty — an agent that has never introduced

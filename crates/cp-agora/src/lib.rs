@@ -85,7 +85,7 @@ impl Module for AgoraModule {
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         let ag = AgoraState::get(state);
-        json!({ "identity": ag.identity })
+        json!({ "identity": ag.identity, "slug": ag.slug, "image": ag.image })
     }
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
@@ -94,6 +94,14 @@ impl Module for AgoraModule {
             && let Ok(identity) = serde_json::from_value(v.clone())
         {
             ag.identity = identity;
+        }
+        // A config written before the profile existed simply has no such keys;
+        // an absent key leaves the field empty, which is exactly "unset".
+        if let Some(slug) = data.get("slug").and_then(serde_json::Value::as_str) {
+            slug.clone_into(&mut ag.slug);
+        }
+        if let Some(image) = data.get("image").and_then(serde_json::Value::as_str) {
+            image.clone_into(&mut ag.image);
         }
     }
 

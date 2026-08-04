@@ -221,14 +221,16 @@ pub(in crate::app::run) fn emit_advert(app: &mut App) {
         return;
     }
 
-    // Resolve both live inputs BEFORE taking the mutable `BridgeState` borrow
+    // Resolve every live input BEFORE taking the mutable `BridgeState` borrow
     // that reaches the `Boot` — they read `app.state` immutably, so resolving
     // them afterwards would conflict.
     let model = app.state.current_model();
-    let identity = wire_identity(&cp_agora::types::AgoraState::get(&app.state).identity);
+    let agora = cp_agora::types::AgoraState::get(&app.state);
+    let profile = cp_mod_bridge::register::advert::Profile::new(model, agora.slug.clone(), agora.image.clone());
+    let identity = wire_identity(&agora.identity);
 
     if let Some(boot) = app.state.ext_mut::<BridgeState>().boot.as_mut()
-        && let Err(e) = boot.republish_advert(model, identity)
+        && let Err(e) = boot.republish_advert(profile, identity)
     {
         log::debug!("advert republish failed (retried next tick): {e}");
     }

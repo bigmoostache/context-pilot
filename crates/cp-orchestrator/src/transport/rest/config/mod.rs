@@ -5,5 +5,6 @@
 
 pub(crate) mod env_keys;
 pub(crate) mod it;
+pub(crate) mod profile;
 pub(crate) mod settings;
 pub(crate) mod update;
