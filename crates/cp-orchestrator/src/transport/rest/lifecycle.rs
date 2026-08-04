@@ -157,8 +157,17 @@ pub fn retire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     };
     let folder = entry.folder.clone();
     let key = std::path::PathBuf::from(&folder).to_string_lossy().into_owned();
-    let name =
-        std::path::Path::new(&folder).file_name().and_then(std::ffi::OsStr::to_str).unwrap_or(agent_id).to_owned();
+    // Display name, record-first (T739b). The agent owns its slug and
+    // advertises it, so that is the authority for the snapshot. Retirement
+    // kills the process, and the record may vanish on a clean shutdown — so
+    // capturing the slug HERE is the only chance to preserve the agent's own
+    // name. Falling back to the folder basename keeps a pre-rewire agent (whose
+    // record carries no slug) behaving exactly as before.
+    let name = if entry.slug.is_empty() {
+        std::path::Path::new(&folder).file_name().and_then(std::ffi::OsStr::to_str).unwrap_or(agent_id).to_owned()
+    } else {
+        entry.slug.clone()
+    };
 
     // Provider snapshot (best-effort) before the process dies.
     let provider = crate::transport::inspect::meta::read_provider(state, &folder);

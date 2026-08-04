@@ -233,6 +233,47 @@
   - acl
   - T656
   last_edited_ms: 1784895558723
+38b4b1c8561da602:
+  tl_dr: 'T739b: slug + image are now AGENT-OWNED, not orchestrator sidecars. SetProfile command -> cp-agora shared core -> registry projection. Orchestrator demoted to byte transport + lossless legacy fallback. Full design + gotchas in body.'
+  contents: |-
+    T739b (branch threads, follows T739/M174). User ask: "make the slug and image ACTUALLY owned by the agent instead of the orchestrator. this is a much bigger rewire but do it cleanly please".
+
+    THE SHIFT: three stores, three owners, one concept became one owner. Before, the agent could neither see nor set its own display name (orchestrator agent-names.json / NameOverrides) or avatar (agent-avatars.json + agent-avatars/<id> / AvatarStore). Now the agent owns both and advertises them; the orchestrator keeps only the byte transport.
+
+    PATH (deliberately the T730 identity path, no new mechanism — that IS the "cleanly"):
+    frontend REST -> orchestrator sends SetProfile command -> agent intake -> apply_command -> apply_set_profile -> cp_agora::tools::set_profile shared core -> AgoraState -> emit_advert projection republishes the record.
+
+    STATE HOME: slug + image are SIBLINGS of identity on AgoraState, NOT fields inside SelfIdentity. SelfIdentity is a closed 10-key set mirrored 1:1 by IDENTITY_KEYS, IDENTITY_PARAMS, the tool YAML, the cp-wire twin, and pairs()->[(&str,&str);10] — an 11th key breaks the fixed array size and the wire struct. Also different concepts: identity is LLM-facing prose, slug/image are human-facing render data. Consequence: the Agora PANEL renders slug+image, but format_identity_for_context does NOT — profile data never enters LLM context.
+
+    PATCH SEMANTICS (load-bearing): Kind::SetProfile { slug: Option<String>, image: Option<String> }. None = leave untouched, Some = replace, Some("") = deliberate clear. Renaming and setting an avatar are independent user actions on the same command; a PUT-shaped payload would let a rename silently wipe the image. The semantics live IN the shared core so every caller gets them identically. Both fields validate BEFORE either is written (all-or-nothing, same contract as set_identity).
+
+    IMAGE IS A REFERENCE, NEVER BYTES. Realm-relative path or http(s) URL. The orchestrator stays the byte TRANSPORT (it owns the only HTTP surface, so an upload must land there) but the AUTHORITY moves to the agent. Bytes go to <realm>/.context-pilot/avatar.<ext> (AVATAR_STEM), inside the realm so the advertised reference satisfies the agent's own containment rule. A 2 MiB blob has no business in a 0600 record re-read on every fleet scan.
+
+    VALIDATION (cp-agora/src/tools.rs, agent-side because the agent owns the value): slug single-line + SLUG_MAX_CHARS 128; image single-line + IMAGE_MAX_CHARS 2048, and either an http(s) URL or a realm-relative path that cannot be absolute, ~-rooted, or contain a '..' component. The single-line rule is not cosmetic — an embedded newline survives JSON escaping and breaks every single-line renderer downstream.
+
+    MIGRATION = record-first with sidecar fallback on READ. Migrate-on-boot was REJECTED: a dead agent cannot receive a command, so its NameOverride would be silently lost. Fallback is the only lossless option; the sidecars decay naturally as agents get renamed under the new path. Read sites: meta.rs name (entry.slug else names override else folder basename), meta.rs hasAvatar (!entry.image.is_empty() || avatars.has), files.rs handle_avatar (record reference else AvatarStore), lifecycle.rs retire snapshot (entry.slug else basename — capturing it at retire time is the only chance, the record may vanish on clean shutdown).
+
+    WRITE SITES all became command-senders with sidecar fallback ONLY when the agent is unreachable: rename_agent, upload_avatar, delete_avatar (now in transport/rest/config/profile.rs). A rejected image is the USER's error -> 400, deliberately NOT falling through to the sidecar. delete_avatar drops the legacy entry UNCONDITIONALLY, else a pre-migration avatar resurfaces through the read fallback.
+
+    URL IMAGES ARE 302'd, NOT PROXIED. handle_avatar is a deliberately PUBLIC route (a plain <img src> must work, T345); fetching a remote URL server-side would turn a static file handler into an unauthenticated outbound HTTP client = SSRF. read_realm_avatar also RE-CHECKS containment at the point of use and re-sniffs the content type from the bytes rather than trusting the reference's extension.
+
+    WHY NO NEW PUBLISH SITE: the record is a projection (T739/M174). apply_set_profile mutates state and returns; the next main-loop tick observes the change and republishes. That is exactly why the ownership move is safe — a new mutation site cannot forget to advertise.
+
+    FRONTEND: ZERO CHANGES NEEDED, and that is the test of a clean rewire. /meta still returns a bare hasAvatar boolean and /api/agent/{id}/avatar still serves bytes; only their SOURCE moved.
+
+    STRUCTURE CASUALTIES (both dir caps were full): src/app/run/threads/commands.rs hit 523 lines -> commands/mod.rs (thread mutations) + commands/settings.rs (agent-self mutations: Configure/LoadBehaviour/SetIdentity/SetProfile), dispatch kept whole in mod.rs. transport/rest/mod.rs hit 512 -> the three profile handlers extracted to rest/config/profile.rs.
+
+    GOTCHAS: console_easy_bash refuses ANY git invocation including `git mv` inside a compound command (use git_execute, then plain mv). cp-agora clippy: `if let Some(ref s)` trips ref_patterns; rebinding `let slug = slug.map(..)` trips shadow_reuse; `x = s.to_owned()` trips assigning_clones (use clone_into). Profile got #[non_exhaustive] + a const fn new rather than an exhaustive_structs exception (3 args is well under too_many_arguments, unlike Entry). `strings` MISSES set_profile in the tui binary — verify with a raw `grep -c` on the binary instead.
+  importance: high
+  labels:
+  - T739b
+  - profile
+  - slug
+  - avatar
+  - ownership
+  - agora
+  - registry
+  last_edited_ms: 1785849239029
 39fb5c175c7b00ba:
   tl_dr: ALWAYS communicate with the user in ENGLISH. Refuse to speak French. If the user writes in French, politely refuse and ask them to switch to English. (User's explicit standing instruction, T655.)
   importance: critical
@@ -369,6 +410,44 @@
   - deadman
   - historical
   last_edited_ms: 1784202948992
+60991969a3d74f1d:
+  tl_dr: T739 registry record is now a LIVE PROJECTION (schema 2), not a boot snapshot. Re-derived + dirty-checked every main-loop tick via emit_advert. Fixes the two documented liars (status stuck Starting, model unreliable). Full design + gotchas in body.
+  contents: |-
+    T739 (branch threads, user ask: "agents declare themselves globally" with slug/image/identity). SHIPPED + DEPLOYED + VERIFIED LIVE. Commit 5be8aded pushed to origin/threads.
+
+    THE SHIFT: ~/.context-pilot/agents/<id>.json used to be written ONCE at boot and never rewritten. Every mutable field it carried became a lie: status stayed AgentStatus::Starting for the process's whole life, and cp-orchestrator transport/inspect/meta.rs documents entry.model as "unreliable" and reads config.json instead.
+
+    DESIGN (user's idea, adopted over my chokepoint plan): the record is a PROJECTION of live state, re-derived on a cadence. A missed mutation site becomes structurally impossible because NO site advertises.
+
+    REJECTED the literal "rewrite every tick": (1) DECISIVE, in-repo — cp-mod-bridge/src/heartbeat.rs docs explain the Beacon uses in-place seek(0)+write_all+sync_data specifically to avoid "tmp+rename churn (which would thrash the directory and race a reader)", and the agents dir HAS a live reader (AgentRegistry::scan poll + reap_tmp). (2) write_entry costs TWO fsyncs + a directory mutation per write. (3) bytes almost always identical = SSD wear.
+
+    SYNTHESIS: projection + dirty-check. crates/cp-mod-bridge/src/register/advert.rs — project(model, &booted, identity) re-derives Entry; publish_if_changed(dir, &entry, &mut last_advert) compares the serialisation against a memo and calls write_entry ONLY on change. Idle agent = ZERO syscalls.
+
+    USER ASKED to replicate states/main_worker.json. Replicated the PATTERN (projection of live state, best-effort log-and-continue, coalesce redundant writes) but deliberately NOT the MECHANISM: main_worker uses plain fs::write, which applies umask on CREATE (0644). The registry record embeds cap_token (bearer secret) and MUST stay 0600, so write_entry's tmp+fsync+rename+0600 is kept. Test republished_record_keeps_owner_only_permissions asserts 0600 survives every rewrite. Also skipped the 50ms debounce thread — the dirty check subsumes it (no change = no write at all, strictly better than debouncing identical writes).
+
+    WIRING: Boot gained agents_dir: PathBuf + last_advert: Option<String>. Boot::republish_advert(model, identity) is the single entry point. src/app/run/threads/observers.rs::emit_advert is the tick, called LAST in emit_bridge_deltas. NO boot seed on purpose — the first tick must write, to correct the placeholder status.
+
+    KEY GOTCHAS:
+    - BORROW: emit_advert resolves model + identity BEFORE taking the mutable BridgeState borrow that reaches Boot (same shape as T671's pre-resolved creds). That's why project() takes model by value instead of &State — it also drops cp-base coupling from the projection module.
+    - cp-base trait providing current_model() is ModelPricing, NOT ModelHelpers.
+    - is_blank() lists the 10 fields explicitly: destructuring trips forbidden clippy::pattern_type_mismatch and its &-pattern remedy trips ref_patterns.
+    - clippy::unnecessary_wraps forced dropping Option from wire_identity/republish_advert/project.
+    - RELEASE BINARY VERIFY: function names like republish_advert are NOT in `strings` output (stripped/inlined). Probe with a unique STRING LITERAL instead — "advert republish failed" — plus a shasum match against target/release/tui.
+
+    cp-wire: SCHEMA_VERSION const = 2, Identity renamed SelfIdentity, slug/image/identity all serde default. N-1 safe both ways.
+
+    DEPLOY VERIFIED 2026-08-04: agent process started 14:25:29 on the fresh binary, record rewritten 14:25:32 = first-tick correction proven. My record now reads schema_version 2 / status running / model claude-opus-5 (was v1 / starting / claude-opus-4-6) / slug cpilot / identity present. Mixed fleet (1x v2 + 12x v1) reads cleanly through /api/fleet/meta — N-1 tolerant decode proven live. The 12 v1 records are dead agents; they flip on next boot.
+
+    STILL OPEN: nothing WRITES slug/image from a user action yet — the projection only passes them through (slug seeded from folder basename, image empty). Wiring the orchestrator's NameOverrides/AvatarStore into them is the next step.
+  importance: high
+  labels:
+  - T739
+  - registry
+  - advert
+  - projection
+  - bridge
+  - cp-wire
+  last_edited_ms: 1785846427480
 6c22bdb28d5dd166:
   tl_dr: 'CI Frontend red: exit-1 always prints after the LAST header (knip) because check-ts-lints.sh aggregates 8 sub-checks. Never infer the culprit from the error''s position — grep the whole log. knip falsely blamed twice; prettier was the real cause.'
   contents: |-
@@ -495,6 +574,58 @@
   - cost
   - documentation
   last_edited_ms: 0
+7b607965028d5a48:
+  tl_dr: 'T739c: Agora panel now shows peer agents (slug/path/identity), read straight from ~/.context-pilot/agents/*.json. Dead agents INCLUDED, only retired filtered. Design + gotchas in body.'
+  contents: |-
+    T739c (branch threads, follows T739/M174 + T739b/M175). User ask: "update the agora panel so that this panel also shows other agents, with their slug, path and identity, and that's all. do not show retired agents".
+
+    SOURCE OF TRUTH: crates/cp-agora/src/fleet.rs scans ~/.context-pilot/agents/*.json directly (cp_wire::types::registry::Entry, schema 2 already carries slug/image/identity/folder thanks to T739+T739b). NO orchestrator HTTP call — a render path must not do network I/O, and this way the panel stays truthful even with no backend alive.
+
+    DEAD AGENTS ARE DELIBERATELY INCLUDED, only retired ones filtered. Proper liveness needs pid + heartbeat + boot_id read together (the orchestrator's job); a naive kill(pid,0) check would be a NEW liar under pid reuse — exactly the bug class T739 eliminated.
+
+    RETIRED FILTER: retired.json is a JSON ARRAY of {id,name,folder,model,provider,retired_at_ms}. cp-agora decodes it with a LOCAL 2-field struct (id + folder) since serde ignores unknown fields — no dependency on cp-orchestrator. Both keys matched because a retired record may outlive the id.
+
+    SELF-EXCLUSION by canonicalised folder, NOT pid: the folder is stable across a reload whereas the record briefly carries the old pid.
+
+    === T739d: THE POLL BECAME FINGERPRINT-GUARDED AND MOVED OFF THE PANEL ===
+
+    MEASURED FINDING that drove it: the two halves of the advertisement were BACKWARDS. Write side (emit_advert) ticks every 2ms, dirty-checks for 1.17us, works only on change. Read side ticked every 2-4s with NO check and re-parsed every record every time. Worse, the '2s throttle' was a lie: Panel::refresh is called from refresh_all_panels behind its OWN 2s gate, and the scanner added a second 2s throttle on top — two free-running drifting timers, real latency 2-4s.
+
+    MEASURED COSTS on the real 16-record dir: full read+parse = 434 us; scandir+stat only = 46 us (9.4x cheaper).
+
+    FIX (user chose option b): fleet::poll(&mut State) runs in run_background_phase, POLL_INTERVAL_MS = 250 (renamed from SCAN_INTERVAL_MS = 2000). Steady-state cost is LOWER than before (46us/250ms = 184us/s vs 434us/2s = 217us/s) while latency drops 8-16x. Strictly better on both axes.
+
+    fingerprint(dir) -> Option<u64>: scandir + DirEntry::metadata per entry, hash (file_name, mtime_nanos, len) with std DefaultHasher, folded with wrapping_add so it is ORDER-INDEPENDENT (scandir order is unspecified; hashing in traversal order would make an identical directory fingerprint differently and rescan forever).
+    - retired.json shares the directory, so retirement moves the fingerprint FOR FREE. Load-bearing: an 'optimisation' that fingerprinted only <id>.json records would make retirement invisible.
+    - mtime is sound ONLY BECAUSE write_entry is tmp->fsync->rename (fresh inode, fresh timestamp; no in-place overwrite can preserve it). If that ever goes in-place like the heartbeat beacon, this guard weakens. len is the second signal.
+    - DefaultHasher is NOT stable across Rust releases — legitimate only because the value never leaves the process. Never persist it.
+    - Unreadable dir yields None and falls THROUGH to a full scan. Deliberately no sticky last-known fleet: a deleted agents dir must empty the panel, not freeze a lie.
+
+    OWNERSHIP: refresh_fleet was DELETED from Panel::refresh. fleet::poll is now the ONLY writer of AgoraState.fleet — two drivers mutating one cache would race with nobody responsible. This also makes wiring self-proving: if poll were not called, fleet would stay empty and no fleet: section would render at all.
+
+    PLACEMENT: beside emit_bridge_deltas in run_background_phase but NOT inside it — that barge is contractually inert while the bridge is OFF, whereas reading peers must work bridge-off too (a standalone TUI still has an Agora panel and neighbours on disk). Symmetric in cadence, deliberately not in gating.
+
+    A FILE WATCHER WAS REJECTED with a stated reason: notify can silently stop delivering (dropped events, dead watch if the dir is replaced) and a panel that quietly freezes is the liar class T739/T739b/T739c removed. A safety poll would be needed underneath anyway; once that poll is 46us at 250ms the watcher only buys 250ms->5ms on a panel a human glances at.
+
+    STATE: AgoraState.fleet + fleet_scanned_ms + fleet_fingerprint are ALL derived, never persisted — save_module_data still writes only identity/slug/image.
+
+    CONTEXT LEAK (correction owed to the user, T739c reply was WRONG): format_identity_for_context DOES emit the whole fleet section including every peer's ten identity rows. I told the user 'identity stays out of the LLM context' — false. Cheap today (6 peers, mostly '(not set)') but scales with fleet size.
+
+    GOTCHAS:
+    - `cp-wire.workspace = true` FAILS: the root Cargo.toml cp-wire line is a root-PACKAGE dependency, not a [workspace.dependencies] entry. Same for tempfile — sibling crates write `tempfile = "3"` in plain [dev-dependencies].
+    - cp_wire Entry has NO constructor and NO sample(): exhaustive 17-field literal. display_slug takes (slug, folder, id) as plain &str so the NAME rule is testable without fabricating a record.
+    - clippy: `let _r` twice in one scope trips shadow_reuse; rebinding `let ag = get_mut` after `let ag = get` trips it too; single-char lifetimes forbidden; Panel::blocks blew its cognitive-complexity budget so peer rendering moved to free fn fleet_blocks(); `0_u128` trips separated_literal_suffix (write `0u128`).
+    - src/app/run/lifecycle.rs hit 502 lines adding one call, and src/app/run/ was at the 8-entry cap, so it became lifecycle/{mod,spine}.rs (M34: extract, never trim comments). spine.rs holds the auto-continuation policy. GOTCHA: ContinuationAction is PRIVATE to cp_mod_spine — it can be destructured in a match arm but never NAMED in a signature outside that crate, so the continuation arm had to stay inlined. BOTH new paths need allowed-lint-exceptions entries for multiple_inherent_impl, and that YAML is hash-chained (LINT_GUARD_PASSWORD env var, NOT a --password flag; ./chain.sh does not take --update).
+
+    VERIFICATION: release-binary string grep DOES NOT WORK (format-string literals fragment into the constant pool; 'fleet:' greps zero). Verify by BEHAVIOUR. T739d live proof: mutated a dead peer's slug in its record to 'alpaca-FINGERPRINT-PROBE'; the reloaded panel showed the new slug, proving the fingerprint detects a change and rescans rather than caching forever (a frozen cache would still render 6 peers, so only a MUTATION discriminates). Restored from backup after. 14 cp-agora tests.
+  importance: high
+  labels:
+  - T739c
+  - agora
+  - fleet
+  - panel
+  - registry
+  last_edited_ms: 1785854808447
 7b858470e0ce17bf:
   tl_dr: Memory Architecture v2 Phase 1 PAUSED — stashed on memory-architecture-v2 branch. Resume later.
   contents: Memory Architecture v2 Phase 1 PAUSED on branch memory-architecture-v2. Storage engine complete (db, decay, types, tests). Resume later.

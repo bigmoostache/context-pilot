@@ -324,6 +324,11 @@ mod tests {
             cap_token: "tok".to_owned(),
             started_at_ms: 0,
             status,
+            // Scan-and-diff keys on id + liveness, never on the projection
+            // fields, so they stay at their never-advertised defaults.
+            slug: String::new(),
+            image: String::new(),
+            identity: None,
         }
     }
 

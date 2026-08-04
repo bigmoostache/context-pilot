@@ -38,6 +38,7 @@ pub(crate) use claude_oauth::{claude_usage, login_complete, login_start, refresh
 pub(crate) use config::env_keys::{env_key_reveal, env_key_update, env_keys_list, vault_snapshot};
 pub(crate) use config::it::{it_ca_fingerprint, it_get_identity, it_provisioned, it_set_identity};
 pub(crate) use config::network::{it_get_network, it_set_network_ap, it_set_network_mode, it_set_network_wwan};
+pub(crate) use config::profile::{delete_avatar, rename_agent, upload_avatar};
 pub(crate) use config::settings::{allowed_models, onboarding_completed};
 pub use config::settings::{get_settings, update_settings};
 pub(crate) use config::update::{APPLY_IN_FLIGHT, update_apply, update_check, update_set_mode, update_status};
@@ -214,53 +215,6 @@ pub fn command(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> HttpReply
             HttpReply::error(502, "agent unreachable")
         }
     }
-}
-
-/// `POST /api/agent/{id}/rename` — set or clear a custom display name.
-///
-/// Body: `{ "name": "My Custom Name" }`.  An empty or whitespace-only name
-/// reverts to the folder-derived default.  The override is persisted in the
-/// orchestrator's `agent-names.json` (independent of the agent process).
-pub fn rename_agent(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> HttpReply {
-    #[derive(serde::Deserialize)]
-    struct Req {
-        name: String,
-    }
-    let Ok(req) = serde_json::from_slice::<Req>(body_bytes) else {
-        return HttpReply::error(400, "expected {\"name\":\"...\"}");
-    };
-    let Ok(mut b) = state.lock() else {
-        return HttpReply::error(500, "backend lock poisoned");
-    };
-    let _prev = b.names.set(id, &req.name);
-    HttpReply::ok(&serde_json::json!({ "ok": true }))
-}
-
-/// `POST /api/agent/{id}/avatar` — upload or replace an agent's profile picture.
-///
-/// Body: raw image bytes (PNG/JPEG/GIF/WebP/SVG). Content type is sniffed from
-/// magic bytes — the `Content-Type` header is not required. Max 2 MiB
-/// ([`MAX_AVATAR_BYTES`](crate::services::agent_meta::MAX_AVATAR_BYTES)).
-pub fn upload_avatar(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> HttpReply {
-    if body_bytes.is_empty() {
-        return HttpReply::error(400, "empty body");
-    }
-    let Ok(mut b) = state.lock() else {
-        return HttpReply::error(500, "backend lock poisoned");
-    };
-    match b.avatars.set(id, body_bytes) {
-        Ok(()) => HttpReply::ok(&serde_json::json!({ "ok": true })),
-        Err(msg) => HttpReply::error(400, &msg),
-    }
-}
-
-/// `DELETE /api/agent/{id}/avatar` — remove an agent's profile picture.
-pub fn delete_avatar(state: &Mutex<Backend>, id: &str) -> HttpReply {
-    let Ok(mut b) = state.lock() else {
-        return HttpReply::error(500, "backend lock poisoned");
-    };
-    let _existed = b.avatars.remove(id);
-    HttpReply::ok(&serde_json::json!({ "ok": true }))
 }
 
 /// Load an agent's registry [`Entry`] from the configured agents directory.

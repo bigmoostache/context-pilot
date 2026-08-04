@@ -177,16 +177,28 @@ exceptions:
 
   # ── app/run/*: multiple_inherent_impl for App ────────────────────────
 
-  - path: "src/app/run/lifecycle.rs"
+  - path: "src/app/run/lifecycle/mod.rs"
     match: 'App methods split across run/ submodules for readability'
     reason: >
-      App methods are split across 7 submodules in src/app/run/ for
+      App methods are split across submodules in src/app/run/ for
       readability. Each file contributes an impl App block covering a
       distinct concern (input, lifecycle, streaming, etc.). The lint
       fires on all impl blocks except the first (input.rs).
     strategy: >
       Could merge all impl blocks into a single file, but that would
       create a 2500+ line file. The split is intentional for navigation.
+
+  - path: "src/app/run/lifecycle/spine.rs"
+    match: 'App methods split across run/ submodules for readability'
+    reason: >
+      The lifecycle tick outgrew the 500-line cap, so auto-continuation
+      policy moved to this sibling. It contributes its own impl App
+      block, which the lint flags exactly as it flags every other
+      run/ submodule.
+    strategy: >
+      Merging it back is what breached the file-length cap in the first
+      place. The two constraints are only jointly satisfiable by an
+      impl block per file.
 
   - path: "src/llms/mod.rs"
     match: "type_id/cause/provide are unstable or deprecated"
@@ -372,6 +384,16 @@ exceptions:
       (tripping too_many_arguments) with no natural grouping, so #[non_exhaustive] is impossible.
     strategy: >
       Irreducible — a 13-arg constructor trips too_many_arguments; the exhaustive literal is honest.
+
+  - path: "crates/cp-wire/src/types/registry.rs"
+    match: "registry-record contract: SelfIdentity is a closed set of ten fixed keys"
+    reason: >
+      SelfIdentity is the ten-key self-identity advertised inside the registry record, mirroring the
+      Agora tool parameters 1:1; a constructor would take ten positional String arguments (tripping
+      too_many_arguments) with no natural grouping, so #[non_exhaustive] is impossible for the same
+      reason as its parent Entry.
+    strategy: >
+      Irreducible — a 10-arg constructor trips too_many_arguments; the exhaustive literal is honest.
 
   - path: "crates/cp-wire/src/types/stream.rs"
     match: "stream-frame contract: Frame is a 7-field ephemeral routing record"

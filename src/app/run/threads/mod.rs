@@ -16,7 +16,7 @@ mod query;
 pub(super) use archived::emit_thread_archived;
 pub(super) use bridge::{bridge_active, emit_thread_status, emit_vitals, poll_bridge_commands};
 pub(super) use messages::emit_messages;
-pub(super) use observers::{emit_behaviour, emit_identity, emit_thread_focus};
+pub(super) use observers::{emit_advert, emit_behaviour, emit_identity, emit_thread_focus};
 pub(super) use paused::emit_thread_paused;
 
 use crate::app::App;
@@ -26,11 +26,13 @@ use cp_mod_spine::types::{NotificationType, SpineState};
 use cp_mod_threads::types::{FocusState, ThreadMessage, ThreadStatus, ThreadsState};
 
 /// Run every bridge live-emission chokepoint for one main-loop tick — the
-/// vitals, message, roster-status, focus, behaviour, archived, and paused
-/// observe-on-change emitters, grouped behind one call so the loop keeps a
-/// single entry point (and `lifecycle.rs` stays under the 500-line cap). Each
-/// emitter is a no-op when the bridge is OFF, so this whole barge is free at
-/// anchor. Order mirrors the historical inline sequence.
+/// vitals, message, roster-status, focus, behaviour, identity, archived, and
+/// paused observe-on-change emitters, plus the registry-advert projection,
+/// grouped behind one call so the loop keeps a single entry point (and
+/// `lifecycle.rs` stays under the 500-line cap). Each emitter is a no-op when
+/// the bridge is OFF, so this whole barge is free at anchor. Order mirrors the
+/// historical inline sequence, with the advert projection last: it re-derives
+/// the discovery record from state the emitters above may have just changed.
 pub(super) fn emit_bridge_deltas(app: &mut App) {
     emit_vitals(app);
     emit_messages(app);
@@ -40,6 +42,7 @@ pub(super) fn emit_bridge_deltas(app: &mut App) {
     emit_identity(app);
     emit_thread_archived(app);
     emit_thread_paused(app);
+    emit_advert(app);
 }
 
 /// Inject a synthetic `Read` tool call when auto-continuation fires for a

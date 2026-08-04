@@ -96,6 +96,12 @@ fn make_entry(id: &str, dir: &Path, cap_token: &str) -> Entry {
         cap_token: cap_token.to_owned(),
         started_at_ms: 0,
         status: AgentStatus::Running,
+        // The projection fields (slug/image/identity, schema 2) carry no weight
+        // in this test's plumbing — it exercises discovery/transport, not the
+        // advertisement's content — so they stay at never-advertised defaults.
+        slug: String::new(),
+        image: String::new(),
+        identity: None,
     }
 }
 

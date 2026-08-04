@@ -117,6 +117,11 @@ fn adopt_and_detect_vanish() {
         cap_token: String::new(),
         started_at_ms: 0,
         status: cp_wire::types::registry::AgentStatus::Running,
+        // Adoption keys on pid + folder; the projection fields are irrelevant
+        // to it and stay at their never-advertised defaults.
+        slug: String::new(),
+        image: String::new(),
+        identity: None,
     };
 
     sup.adopt("a2".into(), &entry, PathBuf::from("/bin/sleep")).unwrap_or_else(|e| panic!("adopt: {e}"));

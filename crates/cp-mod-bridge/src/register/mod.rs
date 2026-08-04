@@ -11,6 +11,12 @@
 //!
 //! [`crate::boot`] orchestrates both: it mints identity, acquires resources,
 //! then publishes the registry record last.
+//!
+//! That first write is only the record's *first frame*: [`advert`] re-derives
+//! it from live state and republishes it whenever the projected bytes change,
+//! so mutable fields (status, model, self-identity) never go stale the way they
+//! did when the record was a one-shot boot snapshot.
 
+pub mod advert;
 pub mod identity;
 pub mod registry;
