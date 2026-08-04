@@ -7398,6 +7398,10 @@
   path: .github/checks/check-lint-config.sh
   description: 'Lint integrity hash chain checker. --verify (CI default), --update (append entry + git diffs, needs password), --deep-verify (reverse-walk diffs to verify historical content hashes), --history, --show. Readers skip non-entry lines via ^[0-9]+: guard.'
   last_edited_ms: 1781348721585
+56c3e420bebfe5a2:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 56d71fe8d88e2036:
   path: ui/src/components/shell/TopBar.tsx
   description: 'macOS title bar. App mark (Home)→fleet. ALWAYS renders / + AgentSwitcher: inside an agent shows workspace + per-agent switcher Threads·Cockpit·Finder + cost; at fleet altitude passes activeId undefined (placeholder) and picking an agent enters it. onNewAgent prop (T21) forwarded to AgentSwitcher ''New agent''. Far-right: Activity→StatsPopup (hidden at fleet) + ThemeToggle + Settings gear→ConfigModal. Git branch chip removed.'
@@ -9538,6 +9542,10 @@
   path: crates/cp-mod-search/src/panel.rs
   description: Search result panel + YAML formatter. format_results groups chunks by path + logs + entities via build_chunk_value/build_log_value/build_entity_value. search_line_semantic classifier.
   last_edited_ms: 0
+71d2faf7ed52fe7d:
+  path: .context-pilot/shared/memories.yaml
+  description: Agent-managed memory store (auto-synced from live state). Merge conflicts here are last_edited_ms churn only — resolve keeping real timestamps, preserve unique entries both sides.
+  last_edited_ms: 0
 71d6e23297b202a3:
   path: crates/cp-oplog/src/service.rs
   description: 'OplogService — off-loop group-commit thread + GAP2/I2 asymmetric backpressure. Durability::of: PhaseTransition|CostAggregate|ContextUsage|ThreadFocusChanged=BestEffort (disposable/self-healing), all else (roster mutations incl ThreadPaused/ThreadResumed/ThreadDeleted + MessageDeleted + Lifecycle + Unknown)=Durable. THREE submit paths: append_durable (blocks+awaits sync — intake/I11), submit_durable (non-blocking durable, detached ack — I2 main loop), append_best_effort (try_send drop-on-full — phase/cost/focus). commit_loop drains batch, ONE fdatasync. Tests in sibling service_tests.rs.'
@@ -10686,6 +10694,10 @@
   path: deploy/ansible/examples/secrets.example.yml
   description: Runtime secrets template (never committed with real values). Copy to gitignored <client>.local.yml, fill cp_provider_keys (ANTHROPIC/DEEPSEEK/GROQ/etc), pass via -e @file at launch. One file per --limit <client> run.
   last_edited_ms: 1785081471603
+7e32085e8e008bd9:
+  path: web/src/lib/support/markdown.tsx
+  description: 'GFM markdown renderer (react-markdown+remark-gfm+math+katex). onAccent/default variants. clipboard() guard. extractText iterative. web-lint P7: CopyButton now imported from @/components/conversation/CopyButton (its own leaf module) instead of Message — breaks the Message↔markdown import-x/no-cycle.'
+  last_edited_ms: 0
 7e32f59747bec15a:
   path: web/src/lib/api/index.ts
   description: 'REST API client barrel. SDK layer: 28 endpoints via generated SDK. Re-exports ./auth+./finder+./body+./envKeys (env-keys.ts renamed envKeys.ts in web-lint P5 filename-case).'
@@ -11002,6 +11014,10 @@
   path: web/src/components/threads/ThreadList.tsx
   description: 'Thread sidebar list. P8: ThreadRow hover-actions → RowActions, line-2 badges/preview → RowMeta; ListHeader + EmptyState extracted so ThreadList (cx17→≤15) and ThreadRow (cx24→≤15) meet budgets. flattenMarkdown+previewOf moved to lib/support/threadMessages.ts. dotColor flat if-chain. Grouped by turn-status (Needs you/Working) + Archived view.'
   last_edited_ms: 1783496991100
+81cfb8f56ce9c4ea:
+  path: .context-pilot/shared/tree-descriptions.yaml
+  description: Persisted tree descriptions YAML. Synced to git alongside code commits per M15.
+  last_edited_ms: 0
 81d3cb45903e08c4:
   path: crates/cp-oplog/src/segment.rs
   description: Segment files seg-{n}.log zero-padded sortable. Scan{entries,valid_len,torn_tail}. scan_bytes torn-tail walk. A11 shadow clean.
@@ -11630,6 +11646,10 @@
   path: src/app/run/streaming.rs
   description: Stream event processing. process_stream_events + handle_stream_error_event (A2). Chunk/ToolUse/Done/Error. Retry up to MAX_API_RETRIES. finalize_stream resets spine counters, updates cache engine.
   last_edited_ms: 1784493504645
+88ab474f38dbfeb4:
+  path: web/src/components/agents/FleetDashboard.tsx
+  description: Fleet welcome dashboard (live). AgentCard reads useAgentMeta (delta-folded status dot + cost). statusMeta includes 'waiting' (Restarting). §19 HealthBadge (useMetrics). RetiredSection/RetiredCard (unretire). Create/manage via AgentModal.
+  last_edited_ms: 0
 88ad51e5fbc03110:
   path: web/src/components/finder/internal/useFinderKeyboard.ts
   description: 'Finder surface keyboard map hook. onKeyDown (P8: was one 39-complexity handler) now a thin loop over a HANDLERS array of small pure (KeyCtx)=>boolean concerns (handleNav/Rename/Open/Trash/GoUp/QuickLook/SelectAll/Escape/TypeAhead); array ORDER is precedence (⌘⌫ Trash before plain-Backspace go-up; ⌘O/⌘A before type-ahead). Type-ahead buffer in a private React.RefObject (not deprecated MutableRefObject). Arrow nav, type-ahead, Space QuickLook, Enter→rename, ⌘⌘/Ctrl+O open, ⌘⌫ Trash, Backspace up, ⌘A select-all, Esc clear.'
@@ -15589,6 +15609,10 @@ b725676c9a92f19d:
 b72e91359bc352c2:
   path: crates/cp-mod-brave/src/panel.rs
   description: Brave result panel. Static content persisted in metadata (META_CONTENT). Cache restore from metadata post-reload. Pagination support. BRAVE_PANEL_TYPE constant.
+  last_edited_ms: 0
+b72eafa745908441:
+  path: .context-pilot/shared/tree-descriptions.yaml
+  description: Persisted tree descriptions YAML. Synced to git alongside code commits per M15.
   last_edited_ms: 0
 b73b6789b41c113d:
   path: ui/src/lib/types.ts
