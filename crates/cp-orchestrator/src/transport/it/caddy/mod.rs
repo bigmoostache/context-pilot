@@ -134,24 +134,49 @@ fn bracketed(subject: &str) -> String {
 }
 
 /// Compute the cert subjects for the current identity: `[ip, name]` when an
-/// identity is set, otherwise the auto-detected box IP (so the cockpit is
-/// reachable by IP before the operator names the box), plus **every fleet ULA the
-/// box carries**. Empty when nothing is known at all.
+/// identity is set, **plus the address the box actually carries right now**,
+/// plus **every fleet ULA the box carries**, plus `extra`. With no identity set
+/// the auto-detected box IP stands alone, so the cockpit is reachable by IP
+/// before the operator names the box. Empty when nothing is known at all.
+///
+/// `extra` is how a feature that creates a NEW address on the box gets a cert
+/// for it. Today that is the Wi-Fi AP's `10.42.0.1`: Caddy listens on the
+/// wildcard `*:443` but the generated file enumerates explicit site addresses,
+/// so without this an AP client gets a TLS `internal error` while plain HTTP
+/// answers `200` — measured on hardware, not deduced.
 ///
 /// The ULA is appended, never operator-entered: `Identity` holds a single `ip`,
 /// and that one belongs to the CLIENT (the address their staff and their DNS will
 /// use). Putting the ULA there would take the cockpit away from them. Conversely
 /// the ULA is a vendor constant the box can derive on its own, so it belongs on
-/// the auto-detected side — and it is the only subject that never changes, which
-/// makes it the recovery path when the pinned DHCP IPv4 drifts.
+/// the auto-detected side — and it is the only subject that never changes.
+///
+/// THE DETECTED IP IS INCLUDED EVEN WHEN AN IDENTITY IS SET, and that is the fix
+/// for a failure this file used to treat as acceptable. `Identity.ip` is captured
+/// once, when the operator names the box, and never revisited — but it is a DHCP
+/// LEASE, not an identity. MEASURED: the test box rebooted onto a new lease
+/// (`.38` → `.43`), the boot-time render faithfully reproduced the stored `.38`,
+/// and the cockpit became unreachable at the only address the box actually had:
+/// `https://…43` failed the handshake (no site matched, so no cert) while
+/// `http://…43` answered Caddy's empty `200` — the exact trap the day-0 branch
+/// below documents, reappearing after provisioning. The doc used to point at the
+/// ULA as "the recovery path when the pinned DHCP IPv4 drifts"; that is true of a
+/// technician who can put an address in `fd59:…:1::/64` on their laptop, and
+/// false of everyone else.
+///
+/// The stored `ip` is KEPT alongside it rather than replaced: it may be a
+/// reservation the client's DNS already points at, and it will come back. Two
+/// subjects cost one extra name on the leaf; a wrong one costs the cockpit.
 ///
 /// Appended only to a NON-empty base, so the "identity file removed" defence in
 /// `render_caddyfile` still fires: with no operator identity and no detectable
 /// IPv4 we return empty and the caller falls back to the cleartext `:80` cockpit,
 /// rather than standing up a `:443` that only we could reach.
 #[must_use]
-pub(crate) fn subjects_for(identity: Option<&Identity>) -> Vec<String> {
-    subjects_with(identity, detect_host_ip().as_deref(), &detect_ulas())
+pub(crate) fn subjects_for(identity: Option<&Identity>, extra: &[String]) -> Vec<String> {
+    let mut detected = detect_ulas();
+    detected.extend_from_slice(extra);
+    subjects_with(identity, detect_host_ip().as_deref(), &detected)
 }
 
 /// Pure composition half of [`subjects_for`] — every probe is passed in rather
@@ -172,12 +197,29 @@ fn subjects_with(identity: Option<&Identity>, detected_ip: Option<&str>, ulas: &
     if v.is_empty() {
         return v;
     }
+    // The lease the box is on RIGHT NOW, after the identity's own subjects and
+    // before the ULAs. Deduplicated, so the overwhelmingly common case — the
+    // stored `ip` still is the current one — renders byte-identically to before
+    // and re-issues no certificate. It only adds a name on the run where the two
+    // have actually diverged, which is precisely the run where the cockpit would
+    // otherwise have gone dark.
+    push_unique(&mut v, detected_ip.unwrap_or_default());
     for ula in ulas {
-        if !v.contains(ula) {
-            v.push(ula.clone());
-        }
+        push_unique(&mut v, ula);
     }
     v
+}
+
+/// Append `candidate` to `subjects` unless it is empty or already present.
+///
+/// The empty check is what lets callers hand over an absent probe result
+/// (`Option::unwrap_or_default`) without a branch of their own — "nothing was
+/// detected" and "what was detected is already in the list" both mean "add
+/// nothing", and neither deserves its own control flow.
+fn push_unique(subjects: &mut Vec<String>, candidate: &str) {
+    if !candidate.is_empty() && !subjects.iter().any(|s| s == candidate) {
+        subjects.push(candidate.to_owned());
+    }
 }
 
 /// Best-effort primary LAN IP detection: open a UDP socket "connected" to an
@@ -260,12 +302,12 @@ static CADDY_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 /// # Errors
 ///
 /// Returns a message if the Caddyfile cannot be written.
-pub(crate) fn write_config(provisioned: bool, identity: Option<&Identity>) -> Result<bool, String> {
+pub(crate) fn write_config(provisioned: bool, identity: Option<&Identity>, extra: &[String]) -> Result<bool, String> {
     let Some(caddyfile) = std::env::var_os("CP_CADDYFILE") else {
         return Ok(false);
     };
     let _guard = CADDY_LOCK.lock();
-    let content = render_caddyfile(provisioned, &subjects_for(identity));
+    let content = render_caddyfile(provisioned, &subjects_for(identity, extra));
     write_atomic(Path::new(&caddyfile), content.as_bytes()).map_err(|e| format!("write Caddyfile: {e}"))?;
     Ok(true)
 }
@@ -281,13 +323,13 @@ pub(crate) fn write_config(provisioned: bool, identity: Option<&Identity>) -> Re
 /// # Errors
 ///
 /// Returns a message if the Caddyfile cannot be written or `caddy reload` fails.
-pub(crate) fn regenerate(provisioned: bool, identity: Option<&Identity>) -> Result<bool, String> {
+pub(crate) fn regenerate(provisioned: bool, identity: Option<&Identity>, extra: &[String]) -> Result<bool, String> {
     let Some(caddyfile) = std::env::var_os("CP_CADDYFILE") else {
         return Ok(false); // no Caddy in this environment — skip cleanly.
     };
     let path = Path::new(&caddyfile);
     let _guard = CADDY_LOCK.lock();
-    let content = render_caddyfile(provisioned, &subjects_for(identity));
+    let content = render_caddyfile(provisioned, &subjects_for(identity, extra));
     let backup = std::fs::read(path).ok();
 
     write_atomic(path, content.as_bytes()).map_err(|e| format!("write Caddyfile: {e}"))?;
@@ -321,170 +363,4 @@ fn reload(bin: &OsStr, path: &Path) -> Result<(), String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn subjects() -> Vec<String> {
-        vec!["192.168.1.116".to_owned(), "pilot.acme.corp".to_owned()]
-    }
-
-    #[test]
-    fn unprovisioned_render_serves_cockpit_over_cleartext_80() {
-        let cfg = render_caddyfile(false, &subjects());
-        // Day-0: the cockpit is served on :80 cleartext, proxying the product
-        // upstream — no cert, no :443, no redirect.
-        assert!(cfg.contains(PRODUCT_UPSTREAM), "cockpit is served on day-0");
-        assert!(!cfg.contains("https://"), "no https site until provisioned");
-        assert!(!cfg.contains("redir https"), "no :80→:443 redirect when unprovisioned");
-        // The removed maintenance plane leaves no trace.
-        assert!(!cfg.contains("9090"), "no maintenance plane upstream/port");
-    }
-
-    #[test]
-    fn unprovisioned_render_matches_any_host_so_the_ula_gets_in() {
-        // The whole point of day-0: the operator's FIRST connection arrives on the
-        // fleet ULA, because the DHCP IPv4 is not known to anyone yet. A host-scoped
-        // site address would answer that request with an empty 200 (no site matched),
-        // so the day-0 block must be port-only — subjects are deliberately ignored.
-        let cfg = render_caddyfile(false, &subjects());
-        assert!(cfg.contains("\n:80 {"), "day-0 uses a port-only :80 site address");
-        assert!(!cfg.contains("192.168.1.116"), "day-0 does not scope to the detected IPv4");
-        assert!(!cfg.contains("pilot.acme.corp"), "day-0 does not scope to the name either");
-    }
-
-    #[test]
-    fn provisioned_render_serves_cockpit_on_443_and_redirects_80() {
-        let cfg = render_caddyfile(true, &subjects());
-        assert!(cfg.contains(PRODUCT_UPSTREAM), "cockpit upstream present once provisioned");
-        assert!(cfg.contains("tls internal"), "cockpit uses the private CA once provisioned");
-        assert!(cfg.contains("https://pilot.acme.corp"), "name is a cert subject");
-        assert!(cfg.contains("https://192.168.1.116"), "ip is a cert subject");
-        assert!(cfg.contains("redir https://{host}{uri} 308"), ":80 → :443 redirect present");
-        // The cockpit is no longer reverse-proxied on :80 once provisioned — only
-        // the redirect block references :80.
-        assert!(!cfg.contains("9090"), "no maintenance plane upstream/port");
-    }
-
-    #[test]
-    fn empty_subjects_fall_back_to_cleartext_80_cockpit() {
-        // No subjects → treated as day-0: cockpit on a port-only :80 site.
-        let cfg = render_caddyfile(true, &[]);
-        assert!(cfg.contains(":80"), "cockpit falls back to a port-only :80 site");
-        assert!(cfg.contains(PRODUCT_UPSTREAM), "cockpit is still served");
-        assert!(!cfg.contains("https://"), "no https site without subjects for a trustworthy leaf");
-    }
-
-    #[test]
-    fn subjects_for_orders_ip_then_name() {
-        // No ULAs passed in: the client's identity alone, in order. (Uses the pure
-        // half so the result does not depend on the test machine's addresses.)
-        let id = Identity { name: "pilot.acme.corp".to_owned(), ip: "10.0.0.9".to_owned() };
-        assert_eq!(subjects_with(Some(&id), None, &[]), vec!["10.0.0.9".to_owned(), "pilot.acme.corp".to_owned()]);
-        // A blank name is dropped.
-        let id2 = Identity { name: "  ".to_owned(), ip: "10.0.0.9".to_owned() };
-        assert_eq!(subjects_with(Some(&id2), None, &[]), vec!["10.0.0.9".to_owned()]);
-    }
-
-    #[test]
-    fn ulas_are_appended_after_the_client_identity() {
-        // The client's IP/name come first — they are the identity the client's staff
-        // and DNS use. Our ULAs ride along so the cockpit is also reachable on the
-        // one address that never changes.
-        let id = Identity { name: "pilot.acme.corp".to_owned(), ip: "10.0.0.9".to_owned() };
-        let port1 = "fd59:ec78:2da4:1:7681:f2a2:27e0:f10d".to_owned();
-        let port2 = "fd59:ec78:2da4:2:7681:f2a2:27e0:f10d".to_owned();
-        let ulas = vec![port1.clone(), port2.clone()];
-        assert_eq!(
-            subjects_with(Some(&id), None, &ulas),
-            vec!["10.0.0.9".to_owned(), "pilot.acme.corp".to_owned(), port1.clone(), port2]
-        );
-        // An operator who typed the ULA into the IP field must not get it twice.
-        let id_ula = Identity { name: String::new(), ip: port1.clone() };
-        assert_eq!(subjects_with(Some(&id_ula), None, std::slice::from_ref(&port1)), vec![port1]);
-    }
-
-    #[test]
-    fn no_identity_and_no_detectable_ip_stays_empty_even_with_ulas() {
-        // Defence-in-depth: a removed identity file must fall back to the cleartext
-        // :80 cockpit, NOT to a :443 that only we could reach. So a ULA never turns
-        // an empty subject list into a non-empty one.
-        assert!(subjects_with(None, None, &["fd00::1".to_owned()]).is_empty());
-    }
-
-    #[test]
-    fn parse_ulas_keeps_global_fd00_only() {
-        // Real `/proc/net/if_inet6` shape: 32 hex chars, ifindex, prefixlen, scope,
-        // flags, device. Scope 00 = global, 20 = link-local.
-        let text = "\
-fd59ec782da400017681f2a227e0f10d 02 40 00 80     end0
-fd59ec782da400027681f2a227e0f10d 03 40 00 80     end1
-fe80000000000000402f19fffe8ff932 02 40 20 80     end0
-2a01cb088f5d2200402f19fffe8ff932 02 40 00 80     end0
-00000000000000000000000000000001 01 80 10 80       lo
-fd00000000000000000000000000abcd 01 80 00 80       lo
-";
-        assert_eq!(
-            parse_ulas(text),
-            vec!["fd59:ec78:2da4:1:7681:f2a2:27e0:f10d".to_owned(), "fd59:ec78:2da4:2:7681:f2a2:27e0:f10d".to_owned()],
-            "global fd00::/8 on real devices only — link-local, GUA and loopback dropped"
-        );
-    }
-
-    #[test]
-    fn parse_ulas_is_canonical_sorted_and_deduped() {
-        // Emitted form must match what `ip -6 addr` prints back (RFC 5952), or the
-        // Caddyfile would churn against the kernel's spelling of the same address.
-        let text = "\
-fd0000000000000000000000000000ff 03 40 00 80     end1
-fd00000000000000000000000000000a 02 40 00 80     end0
-fd00000000000000000000000000000a 04 40 00 80     end2
-";
-        assert_eq!(parse_ulas(text), vec!["fd00::a".to_owned(), "fd00::ff".to_owned()]);
-    }
-
-    #[test]
-    fn parse_ulas_ignores_malformed_lines() {
-        let text = "not a line\nfd59ec78 02 40 00 80 end0\n\nfd59ec782da400017681f2a227e0f10d 02 40 00 80 end0\n";
-        assert_eq!(parse_ulas(text), vec!["fd59:ec78:2da4:1:7681:f2a2:27e0:f10d".to_owned()]);
-    }
-
-    #[test]
-    fn every_block_binds_all_interfaces() {
-        // `bind 0.0.0.0 ::` on every block avoids the IP-vs-hostname conflicting
-        // listener problem and survives a DHCP IP change.
-        let provisioned = render_caddyfile(true, &subjects());
-        assert_eq!(provisioned.matches("bind 0.0.0.0 ::").count(), 2, "cockpit + redirect bind all interfaces");
-        // Day-0 renders a single cleartext cockpit block.
-        let day0 = render_caddyfile(false, &subjects());
-        assert_eq!(day0.matches("bind 0.0.0.0 ::").count(), 1, "the day-0 :80 cockpit binds all interfaces");
-    }
-
-    #[test]
-    fn ipv6_subjects_are_bracketed() {
-        let cfg = render_caddyfile(true, &["fd00::1".to_owned()]);
-        assert!(cfg.contains("https://[fd00::1]"), "ipv6 cockpit address is bracketed");
-        assert!(cfg.contains("http://[fd00::1]:80"), "ipv6 redirect address is bracketed");
-        // IPv4 is never bracketed. Rendered PROVISIONED on purpose: the day-0 block
-        // is port-only now, so it would pass this trivially and prove nothing.
-        let v4 = render_caddyfile(true, &["10.0.0.9".to_owned()]);
-        assert!(!v4.contains('['), "ipv4 is not bracketed");
-    }
-
-    #[test]
-    fn provisioned_but_no_subjects_keeps_443_gated() {
-        // Defence against a removed identity file: provisioned flag set but no
-        // subjects → no `:443`/TLS block; fall back to the cleartext `:80` cockpit
-        // rather than exposing an untrusted leaf.
-        let cfg = render_caddyfile(true, &[]);
-        assert!(!cfg.contains("https://"), "no https cockpit without subjects");
-        assert!(!cfg.contains("redir https"), "no redirect without a :443 to redirect to");
-        assert!(cfg.contains(PRODUCT_UPSTREAM) && cfg.contains(":80"), "cockpit stays reachable on :80");
-    }
-
-    #[test]
-    fn regenerate_is_skipped_without_caddyfile_env() {
-        // No CP_CADDYFILE in the test environment → clean skip, never errors.
-        let id = Identity { name: "n".to_owned(), ip: "10.0.0.9".to_owned() };
-        assert_eq!(regenerate(true, Some(&id)), Ok(false));
-    }
-}
+mod tests;

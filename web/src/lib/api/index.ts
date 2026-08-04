@@ -68,6 +68,7 @@ import {
 import { buildCommandEnvelope, sdk } from "./client"
 
 export { getToken, setToken } from "./client"
+export * from "./client/errors"
 export * from "./auth"
 export * from "./finder"
 export * from "./body"

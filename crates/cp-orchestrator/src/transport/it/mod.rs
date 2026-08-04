@@ -11,6 +11,7 @@
 //! * [`crypto`] — self-contained SHA-256 / base64 for the CA fingerprint.
 //! * [`health`] — the loopback-only `/healthz` readiness probe.
 //! * [`identity`] — box name/IP + boot-time Caddy apply.
+//! * [`network`] — the internet uplink (WAN / 5G) and the Wi-Fi access point.
 //! * [`state`] — durable `provisioned` flag.
 //!
 //! This module root carries no request router of its own any more: there is a
@@ -21,9 +22,11 @@ mod caddy;
 mod crypto;
 pub(crate) mod health;
 pub(crate) mod identity;
+pub(crate) mod network;
 pub(crate) mod state;
 
 pub(crate) use identity::apply_caddy_at_boot;
+pub(crate) use network::apply_network_at_boot;
 pub(crate) use state::is_provisioned;
 
 // Re-exported for the retained submodules (`identity`, `ca`), which reach the

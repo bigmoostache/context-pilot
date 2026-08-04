@@ -24,7 +24,6 @@ use cp_mod_spine::types::{NotificationType, SpineState};
 /// continue are separate concerns (and because this file hit its size cap).
 mod spine;
 
-
 /// Bundles the I/O channels polled by the main event loop.
 pub(crate) struct EventChannels<'ch> {
     /// Sends stream events to the LLM provider thread.

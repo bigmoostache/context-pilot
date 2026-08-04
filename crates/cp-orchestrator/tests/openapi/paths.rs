@@ -2,6 +2,7 @@
 
 use serde_json::{Value, json};
 
+use super::schemas_net::{ap_body, mode_body, wwan_body};
 use super::{arr, del, err, get, merge, ok, post, r, with_agent};
 
 /// Required query parameter shorthand.
@@ -93,6 +94,24 @@ pub(super) fn paths() -> Value {
         "/api/it/provisioned": get("it", "Whether the box has been provisioned", json!({
             "type": "object", "properties": { "provisioned": { "type": "boolean" } }, "required": ["provisioned"]
         })),
+        // ── Internet uplink + Wi-Fi AP ────────────────────────────────────
+        // The three bodies come from `schemas_net`, which builds each of them
+        // from the same field list as the read schema it mirrors (review C9),
+        // and carries the tri-state contract of every write-only secret as a
+        // per-field `description` (review B13).
+        "/api/it/network": get("it",
+            "Uplink + access-point configuration (secrets elided) and live status. `config.wwan` is null for \
+             either of two independent reasons: a caller without `can_manage_secrets`, or a box with no modem \
+             (`status.modem_present` false). `config.probe` is read-only — it is seeded at provisioning time.",
+            r("ItNetworkResponse")),
+        "/api/it/network/mode": post("it", "Select the uplink mode (wan | wan_5g | 5g)",
+            Some(mode_body()), r("ItNetworkModeResult")),
+        "/api/it/network/ap": post("it", "Set the Wi-Fi access-point configuration",
+            Some(ap_body()), r("ItNetworkApResult")),
+        // Superadmin only (`can_manage_secrets`) — the SIM and the data plan are
+        // the vendor's, so the APN is not a per-site setting.
+        "/api/it/network/wwan": post("it", "Set the 5G bearer configuration (superadmin — vendor-managed)",
+            Some(wwan_body()), r("ItNetworkWwanResult")),
         // ── Ticket ──────────────────────────────────────────────────
         "/api/ticket": post("ticket", "Mint SSE upgrade ticket", None, r("TicketResponse")),
         // ── Auth ────────────────────────────────────────────────────

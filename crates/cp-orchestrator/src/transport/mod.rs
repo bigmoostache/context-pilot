@@ -275,6 +275,12 @@ fn route_rest(
         (Method::Post, ["api", "it", "identity"]) => rest::it_set_identity(state, body_bytes, auth_user),
         (Method::Get, ["api", "it", "provisioned"]) => rest::it_provisioned(state, auth_user),
 
+        // ── Internet uplink + Wi-Fi AP (can_manage_it) ──────────────────────────
+        (Method::Get, ["api", "it", "network"]) => rest::it_get_network(state, auth_user),
+        (Method::Post, ["api", "it", "network", "mode"]) => rest::it_set_network_mode(state, body_bytes, auth_user),
+        (Method::Post, ["api", "it", "network", "ap"]) => rest::it_set_network_ap(state, body_bytes, auth_user),
+        (Method::Post, ["api", "it", "network", "wwan"]) => rest::it_set_network_wwan(state, body_bytes, auth_user),
+
         (Method::Get, ["api", "agent", id]) => rest::agent(state, id),
         (Method::Get, ["api", "agent", id, "meta"]) => inspect::meta::agent_meta(state, id),
         (Method::Get, ["api", "agent", id, "metrics"]) => inspect::metrics::agent_metrics(state, id),
