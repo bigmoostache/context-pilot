@@ -63,6 +63,21 @@ body {
 
 a { color: inherit; text-decoration: none; }
 
+/* ─── The Voronoi backdrop ─────────────────────────────────
+   Fixed behind the whole document: one partition the page scrolls over,
+   rather than a decoration bolted to the hero. Panels and the paper-coloured
+   box section are opaque and simply cover it; the dark bands are translucent
+   so it stays faintly present all the way down. */
+.veil {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.topbar, main, .foot { position: relative; z-index: 1; }
+
 ::selection { background: var(--warm); color: #17120a; }
 
 :focus-visible {
@@ -190,13 +205,15 @@ a { color: inherit; text-decoration: none; }
 
 /* ─── Hero ─────────────────────────────────────────────── */
 
-.hero { padding: clamp(64px, 11vw, 128px) 0 clamp(40px, 6vw, 72px); }
+/* Tuned so the desk and the machine both sit above the fold on a laptop:
+   the whole promise — agents at work, and where they run — in one look. */
+.hero { padding: clamp(44px, 6vw, 76px) 0 clamp(40px, 6vw, 72px); }
 
 .hero-h1 {
   font-family: var(--serif);
   font-weight: 400;
-  font-size: clamp(3rem, 8.4vw, 6rem);
-  line-height: .98;
+  font-size: clamp(2.7rem, 6.6vw, 4.9rem);
+  line-height: 1;
   letter-spacing: -.028em;
   max-width: 16ch;
 }
@@ -207,13 +224,13 @@ a { color: inherit; text-decoration: none; }
 
 .hero-sub {
   color: var(--text-2);
-  font-size: clamp(1.05rem, 1.6vw, 1.24rem);
-  line-height: 1.62;
+  font-size: clamp(1.02rem, 1.5vw, 1.18rem);
+  line-height: 1.6;
   max-width: 54ch;
-  margin-top: 30px;
+  margin-top: 22px;
 }
 
-.hero-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 38px; }
+.hero-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
 
 .hero-note {
   font-family: var(--mono);
@@ -222,14 +239,86 @@ a { color: inherit; text-decoration: none; }
   margin-top: 20px;
 }
 
+/* ─── Hero stage: the software and the machine, side by side ──── */
+
+.hero-stage {
+  margin-top: clamp(34px, 4.2vw, 52px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 19rem);
+  gap: clamp(20px, 2.6vw, 34px);
+  align-items: stretch;
+}
+
+.hero-host {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--ink-2) 100%);
+  padding: 20px 20px 18px;
+}
+.hero-host-k {
+  font-family: var(--mono);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.hosts { list-style: none; padding: 14px 0 4px; display: flex; flex-direction: column; gap: 9px; }
+.hosts li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: .78rem;
+  color: var(--text-3);
+}
+.host-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--line-hi);
+  flex: none;
+}
+.hosts .is-on { color: var(--warm); font-weight: 700; }
+.hosts .is-on .host-dot { background: var(--warm); box-shadow: 0 0 0 3px var(--warm-soft); }
+
+.hero-host-note {
+  margin-top: auto;
+  padding-top: 14px;
+  font-family: var(--mono);
+  font-size: .7rem;
+  line-height: 1.6;
+  color: var(--text-3);
+}
+.hero-host-note a { color: var(--warm); white-space: nowrap; }
+.hero-host-note a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* Hero-sized device: same object, smaller, on ink instead of paper. */
+.device-sm { padding-top: 18px; margin: 16px 0 4px; }
+.device-sm .device-body { padding: 15px; border-radius: 11px; }
+.device-sm .device-ant { height: 30px; width: 5px; }
+.device-sm .device-screen { padding: 10px 11px 9px; }
+.device-sm .dsc-big b { font-size: 1.5rem; }
+.device-sm .dsc-big { margin: 5px 0 4px; }
+.device-sm .device-ports { margin-top: 13px; padding-top: 11px; }
+.device-sm .port { height: 9px; }
+.device-sm .port-eth { width: 19px; }
+.device-sm .port-usb { width: 12px; }
+.device-sm .port-pwr { width: 9px; }
+
 /* ─── The board (signature) ────────────────────────────── */
 
 .board {
-  margin-top: clamp(48px, 7vw, 80px);
   background: linear-gradient(180deg, var(--surface) 0%, var(--ink-2) 100%);
   border: 1px solid var(--line);
   border-radius: 12px;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .board-bar {
   display: flex;
@@ -250,13 +339,13 @@ a { color: inherit; text-decoration: none; }
 .board-stat  { color: var(--text-3); }
 .board-stat b { color: var(--warm); font-weight: 700; }
 
-.board-rows { display: flex; flex-direction: column; }
+.board-rows { display: flex; flex-direction: column; flex: 1; }
 
 .row {
   display: grid;
-  grid-template-columns: 18px minmax(0,15rem) minmax(0,1fr) auto;
+  grid-template-columns: 18px minmax(0,11.5rem) minmax(0,1fr) auto;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
   padding: 15px 18px;
   border-bottom: 1px solid var(--line);
 }
@@ -326,40 +415,74 @@ a { color: inherit; text-decoration: none; }
 /* ─── Bands ────────────────────────────────────────────── */
 
 .band { padding: clamp(76px, 10vw, 132px) 0; border-top: 1px solid var(--line); }
-.band-alt { background: var(--ink-2); }
+/* Translucent, so the partition behind stays just visible through the bands. */
+.band-alt { background: rgba(15, 15, 20, .82); }
 .band-head { max-width: 68ch; }
 
-/* ─── Tasks ────────────────────────────────────────────── */
+/* ─── Work: five worlds, one instruction each ──────────── */
 
-.tasks {
-  list-style: none;
-  margin-top: clamp(44px, 6vw, 68px);
+.work { list-style: none; margin-top: clamp(40px, 5.5vw, 62px); }
+
+.work-row {
+  position: relative;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-  gap: 1px;
-  background: var(--line);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  overflow: hidden;
+  grid-template-columns: minmax(0, 9.5rem) minmax(0, 1fr);
+  gap: clamp(20px, 4vw, 56px);
+  align-items: baseline;
+  padding: clamp(22px, 2.6vw, 30px) 0 clamp(22px, 2.6vw, 30px) 22px;
+  border-top: 1px solid var(--line);
+  transition: background .25s var(--ease);
 }
-.tasks li {
-  background: var(--ink);
-  padding: 26px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  transition: background .18s var(--ease);
+.work-row:last-child { border-bottom: 1px solid var(--line); }
+
+/* The bar is the hover: it fills from the top, like a row taking focus. */
+.work-row::before {
+  content: "";
+  position: absolute;
+  left: 0; top: -1px; bottom: 0;
+  width: 2px;
+  background: var(--warm);
+  transform: scaleY(0);
+  transform-origin: top;
+  transition: transform .28s var(--ease);
 }
-.tasks li:hover { background: var(--surface); }
-.tasks b {
+.work-row:hover { background: linear-gradient(90deg, var(--warm-soft), transparent 62%); }
+.work-row:hover::before { transform: scaleY(1); }
+
+.work-domain {
+  font-family: var(--serif);
+  font-size: clamp(1.55rem, 2.9vw, 2.15rem);
+  line-height: 1;
+  letter-spacing: -.015em;
+  color: var(--text);
+  transition: color .2s var(--ease);
+}
+.work-row:hover .work-domain { color: var(--warm); }
+
+/* Set as a typed instruction, not a caption — the caret says "this is the
+   whole of what you hand over". */
+.work-said {
   font-family: var(--mono);
-  font-size: .78rem;
-  font-weight: 700;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--warm);
+  font-size: clamp(.86rem, 1.15vw, .97rem);
+  line-height: 1.62;
+  color: #cfcfd8;
+  transition: color .2s var(--ease);
 }
-.tasks span { color: var(--text-2); font-size: .95rem; line-height: 1.55; }
+.work-said::before {
+  content: "› ";
+  color: var(--warm);
+  font-weight: 700;
+}
+.work-row:hover .work-said { color: var(--text); }
+
+.work-close {
+  margin-top: clamp(32px, 4vw, 46px);
+  font-family: var(--serif);
+  font-size: clamp(1.35rem, 2.4vw, 1.85rem);
+  line-height: 1.3;
+  color: var(--text-3);
+}
+.work-close em { font-style: italic; color: var(--warm); }
 
 /* ─── Models: rent vs keep ─────────────────────────────── */
 
@@ -626,7 +749,7 @@ a { color: inherit; text-decoration: none; }
   padding: clamp(80px, 11vw, 140px) 0;
   background:
     radial-gradient(80% 130% at 50% 0%, rgba(245,165,36,.09) 0%, transparent 62%),
-    var(--ink);
+    rgba(10, 10, 12, .84);
 }
 .start-in { text-align: center; }
 .start-h2 { margin-inline: auto; }
@@ -698,6 +821,21 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* ─── Responsive ───────────────────────────────────────── */
+
+@media (max-width: 760px) {
+  .work-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding-left: 18px;
+  }
+}
+
+@media (max-width: 940px) {
+  /* The machine drops under the desk rather than squeezing beside it. */
+  .hero-stage { grid-template-columns: 1fr; }
+  .hero-host { flex-direction: column; }
+  .device-sm { max-width: 320px; margin-inline: auto; }
+}
 
 @media (max-width: 900px) {
   .box-hero, .trust-in { grid-template-columns: 1fr; }

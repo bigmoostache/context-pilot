@@ -1,8 +1,13 @@
 /* Daharness landing — the board, the model swap, scroll reveal.
    No dependencies. Without JS the page still reads; without motion it still works. */
 
+import { mountVeil } from './veil.js';
+
 const reduceMotion =
   window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ── Page backdrop: a partition that reshapes itself around the cursor ── */
+mountVeil(document.getElementById('veil'));
 
 /* ── The board ───────────────────────────────────────────
    Six tasks from six different worlds, five different models,
@@ -120,7 +125,7 @@ if (chipsEl) {
 
 if (!reduceMotion && 'IntersectionObserver' in window) {
   const targets = document.querySelectorAll(
-    '.band-head, .tasks, .swap, .pull, .ways, .box-hero, .box-grid, .box-spec, .trust-in, .steps, .start-cta'
+    '.band-head, .work-row, .work-close, .swap, .pull, .ways, .box-hero, .box-grid, .box-spec, .trust-in, .steps, .start-cta'
   );
   targets.forEach((el) => el.classList.add('reveal'));
 
