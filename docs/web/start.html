@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Start testing — Daharness</title>
+  <meta name="description" content="Enter your email, add a card, and your first Daharness agents start working on our cloud.">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="gate-body">
+
+<header class="topbar">
+  <div class="shell topbar-in">
+    <a href="/" class="brand"><span class="brand-mark" aria-hidden="true">▮</span>Daharness</a>
+    <a href="/" class="topnav-back">← Back to the site</a>
+  </div>
+</header>
+
+<main class="gate">
+  <div class="gate-card">
+
+    <ol class="gate-rail" aria-label="Steps">
+      <li class="is-now"><span>1</span>Email</li>
+      <li><span>2</span>Card</li>
+      <li><span>3</span>Agents running</li>
+    </ol>
+
+    <h1 class="gate-h1">Start testing.</h1>
+    <p class="gate-sub">
+      We'll email you a sign-in link — no password to invent. Next step is checkout,
+      then your workspace is up on our cloud.
+    </p>
+
+    <form class="gate-form" id="gate-form" novalidate>
+      <label class="gate-label" for="email">Work email</label>
+      <input
+        class="gate-input"
+        type="email"
+        id="email"
+        name="email"
+        autocomplete="email"
+        placeholder="you@company.com"
+        required>
+      <p class="gate-error" id="gate-error" hidden>Enter a valid email address.</p>
+      <button type="submit" class="btn btn-go btn-block">Send my sign-in link <span aria-hidden="true">→</span></button>
+    </form>
+
+    <p class="gate-done" id="gate-done" hidden></p>
+
+    <p class="gate-fine">
+      Cancel any time from your account page. Testing runs on our servers — when
+      you move to <a href="/#run">your own servers or the box</a>, nothing leaves
+      your premises.
+    </p>
+
+  </div>
+</main>
+
+<!-- Integration points, in order:
+     1. POST this email to the auth service → magic-link email.
+     2. Link lands on the session callback → Stripe Checkout session.
+     3. Stripe webhook (checkout.session.completed) → provision the cloud realm.
+     None of the three exist yet; the form below is front-end only. -->
+<script type="module" src="/start.js"></script>
+</body>
+</html>

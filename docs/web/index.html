@@ -3,309 +3,317 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Daharness — an agent for every project you're juggling</title>
-  <meta name="description" content="Daharness is a team of AI agents you can leave in charge — one per project, each staying sharp for hours while you work elsewhere. Built on the open-source Context Pilot core; runs on your own machines.">
+  <title>Daharness — an agentic OS for all your tasks</title>
+  <meta name="description" content="One agent per task, working while you're away. Pick any model and swap it whenever. Run Daharness on our cloud, on your own servers, or on a box you plug in.">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 
-  <!-- ── Topbar ─────────────────────────────────────────────── -->
-  <header class="topbar">
-    <div class="topbar-inner">
-      <a href="/" class="brand">
-        <span class="brand-glyph" aria-hidden="true">▮</span>
-        Daharness
-      </a>
-      <nav class="topnav" aria-label="Primary">
-        <a href="#work">How it works</a>
-        <a href="#context">Staying sharp</a>
-        <a href="#box">The box</a>
-        <a href="/trust-center/">Trust</a>
-        <a href="#contact">Contact</a>
-      </nav>
-      <div class="topnav-cta">
-        <a href="https://github.com/bigmoostache/context-pilot" target="_blank" rel="noopener" class="ghost-link">GitHub&nbsp;↗</a>
+<a class="skip" href="#main">Skip to content</a>
+
+<!-- ─── Topbar ───────────────────────────────────────────── -->
+<header class="topbar">
+  <div class="shell topbar-in">
+    <a href="/" class="brand"><span class="brand-mark" aria-hidden="true">▮</span>Daharness</a>
+    <nav class="topnav" aria-label="Primary">
+      <a href="#tasks">Tasks</a>
+      <a href="#models">Models</a>
+      <a href="#run">Where it runs</a>
+      <a href="#box">The box</a>
+      <a href="/trust-center/">Trust</a>
+    </nav>
+    <a href="/start.html" class="btn btn-go btn-sm topbar-cta">Start testing</a>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ─── Hero ───────────────────────────────────────────── -->
+  <section class="hero">
+    <div class="shell">
+      <p class="eyebrow">Agentic operating system</p>
+      <h1 class="hero-h1">An agentic OS for<br><em>all</em> your tasks.</h1>
+      <p class="hero-sub">
+        One agent per task, working while you're away. Pick any model and swap it
+        whenever. Run it on our cloud, on your own servers, or on a box you plug in.
+      </p>
+      <div class="hero-cta">
+        <a href="/start.html" class="btn btn-go">Start testing <span aria-hidden="true">→</span></a>
+        <a href="#tasks" class="btn btn-line">See how it runs</a>
+      </div>
+      <p class="hero-note">Email, card, and your first agents are running. No call, no demo queue.</p>
+    </div>
+
+    <!-- Signature: concurrent agents, one per task, each on its own model -->
+    <div class="shell">
+      <div class="board" id="board">
+        <div class="board-bar">
+          <span class="board-label">Your desk</span>
+          <span class="board-stat" id="board-stat">&nbsp;</span>
+        </div>
+        <div class="board-rows" id="board-rows"></div>
+        <div class="board-foot">
+          <span><i class="dot dot-work" aria-hidden="true"></i> working</span>
+          <span><i class="dot dot-turn" aria-hidden="true"></i> waiting on you</span>
+          <span><i class="dot" aria-hidden="true"></i> resting</span>
+          <span class="board-foot-note">six tasks · five models · one system</span>
+        </div>
       </div>
     </div>
-  </header>
+  </section>
 
-  <main>
-
-    <!-- ── Hero: the companion ──────────────────────────────── -->
-    <section class="hero">
-      <div class="hero-copy">
-        <div class="eyebrow">YOUR REMOTE-WORK COMPANION</div>
-        <h1 class="hero-title">One agent per&nbsp;project.<br><span class="accent">All of them working while you're&nbsp;away.</span></h1>
-        <p class="hero-sub">
-          Daharness is a team of AI agents you can leave in charge — research,
-          writing, data, ops, whatever the project needs. Post one to each of yours,
-          then step away: they keep working, checking their own results, and making
-          progress. Check in from your terminal or your browser, whenever you like.
-        </p>
-        <div class="hero-actions">
-          <a href="#contact" class="btn btn-primary">Request access <span aria-hidden="true">→</span></a>
-          <a href="#work" class="btn btn-ghost">See how it works</a>
-        </div>
-        <div class="hero-meta">
-          <span><span class="dot dot-live" aria-hidden="true"></span> one agent per project</span>
-          <span><span class="dot" aria-hidden="true"></span> keeps going while you're away</span>
-          <span><span class="dot" aria-hidden="true"></span> terminal or browser</span>
-        </div>
-      </div>
-
-      <!-- Signature: a focused agent inside a live team of projects -->
-      <div class="cockpit" aria-hidden="true">
-        <div class="fleet" id="fleet"><!-- tiles injected by app.js --></div>
-
-        <div class="term" role="img" aria-label="A Daharness agent working on a project">
-          <div class="term-bar">
-            <span class="term-dots"><i></i><i></i><i></i></span>
-            <span class="term-title">~/support-triage</span>
-            <span class="term-status"><span class="dot dot-live"></span> working</span>
-          </div>
-          <div class="term-body" id="term-body"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ── How it works: the workflow ───────────────────────── -->
-    <section class="band" id="work">
+  <!-- ─── Tasks ──────────────────────────────────────────── -->
+  <section class="band" id="tasks">
+    <div class="shell">
       <div class="band-head">
-        <div class="eyebrow">A COWORKER, NOT A CHATBOT</div>
-        <h2>Delegate a project. Walk away. Come back to progress.</h2>
-        <p>Working with Daharness feels less like prompting a tool and more like handing work to a teammate who keeps going after you log off.</p>
+        <p class="eyebrow">One agent per task</p>
+        <h2 class="h2">Not a coding tool that also<br>does other things.</h2>
+        <p class="lede">
+          Point an agent at a folder and hand it the work. Nothing in the system
+          assumes what's in that folder — the same agent triages a support inbox,
+          reviews a stack of leases, reconciles a dataset, or ships a feature. It
+          sets up its own workspace, keeps going while you're elsewhere, and stops
+          when it needs a decision from you.
+        </p>
       </div>
+
+      <ul class="tasks">
+        <li><b>Research</b><span>Gather sources, read them, write up what holds.</span></li>
+        <li><b>Documents</b><span>Draft, review, cross-check against your own rules.</span></li>
+        <li><b>Data</b><span>Reconcile, clean, query, and explain the leftovers.</span></li>
+        <li><b>Code</b><span>Build, run the checks, fix what the checks catch.</span></li>
+        <li><b>Ops</b><span>Watch, triage, escalate the things that need a human.</span></li>
+        <li><b>Whatever's next</b><span>If it lives in a folder, an agent can take it.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ─── Models ─────────────────────────────────────────── -->
+  <section class="band band-alt" id="models">
+    <div class="shell">
+      <div class="band-head">
+        <p class="eyebrow cool">No model locked in</p>
+        <h2 class="h2">Models expire.<br>Your system doesn't.</h2>
+        <p class="lede">
+          Seven providers are wired in and switchable while running — and every
+          agent can be on a different one. Put your sensitive work on one model and
+          your bulk work on a cheaper one. Change your mind next month and nothing
+          else moves.
+        </p>
+      </div>
+
+      <div class="swap">
+        <div class="swap-side swap-rent">
+          <p class="swap-cap cool">What you rent</p>
+          <div class="swap-chip-stack" id="swap-chips"></div>
+          <p class="swap-note">Swap it whenever. One click, per agent.</p>
+        </div>
+        <div class="swap-rule" aria-hidden="true"></div>
+        <div class="swap-side swap-keep">
+          <p class="swap-cap warm">What you keep</p>
+          <ul class="swap-list">
+            <li>Your agents, exactly as configured</li>
+            <li>Everything they've learned about your work</li>
+            <li>The rules you set for them</li>
+            <li>Every thread and every file</li>
+          </ul>
+          <p class="swap-note">Untouched when the model changes.</p>
+        </div>
+      </div>
+
+      <p class="pull">You rent the model.<br>You keep everything else.</p>
+    </div>
+  </section>
+
+  <!-- ─── Where it runs ──────────────────────────────────── -->
+  <section class="band" id="run">
+    <div class="shell">
+      <div class="band-head">
+        <p class="eyebrow">Where it runs</p>
+        <h2 class="h2">Try it on ours. Move it to yours.<br>Or plug in the box.</h2>
+        <p class="lede">
+          Every step gives you something without taking anything away. Start where
+          it's easiest and move when you're ready — the system is the same one.
+        </p>
+      </div>
+
+      <div class="ways">
+        <article class="way">
+          <p class="way-k">On our cloud</p>
+          <h3 class="way-h">To try it</h3>
+          <p class="way-b">
+            Nothing to install. Sign up and your first agents are working the same
+            day, for as long as you want to find out whether this is useful.
+          </p>
+          <a href="/start.html" class="way-link">Start testing <span aria-hidden="true">→</span></a>
+        </article>
+
+        <article class="way">
+          <p class="way-k">On your servers</p>
+          <h3 class="way-h">To adopt it</h3>
+          <p class="way-b">
+            Your VMs, your network, your security rules. The software installs and
+            then nothing leaves: your files, your history, your keys, your models.
+          </p>
+          <a href="#contact" class="way-link">Talk to us <span aria-hidden="true">→</span></a>
+        </article>
+
+        <article class="way way-lit">
+          <p class="way-k">On the box</p>
+          <h3 class="way-h">To stop managing it</h3>
+          <p class="way-b">
+            A small dedicated machine, delivered ready. For teams with no
+            infrastructure to spare — or work that travels.
+          </p>
+          <a href="#box" class="way-link">See the box <span aria-hidden="true">→</span></a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── The box (the one lit surface) ──────────────────── -->
+  <section class="box" id="box">
+    <div class="shell">
+
+      <div class="box-hero">
+        <div class="box-head">
+          <p class="eyebrow">The box</p>
+          <h2 class="h2 box-h2">Everything above,<br>delivered plugged&nbsp;in.</h2>
+          <p class="lede box-lede">
+            A small fanless machine that holds your whole team of agents. It fits in
+            a bag, draws less than a lightbulb, and needs nothing from you but a
+            power socket. Turn it on and the agents are already there.
+          </p>
+        </div>
+
+        <!-- The device itself: slab, status screen, antennas -->
+        <figure class="device" aria-label="The Daharness box: a small fanless appliance with a status screen and two antennas.">
+          <div class="device-ant device-ant-l" aria-hidden="true"></div>
+          <div class="device-ant device-ant-r" aria-hidden="true"></div>
+          <div class="device-body">
+            <div class="device-screen" aria-hidden="true">
+              <div class="dsc-row dsc-top">
+                <span class="dsc-brand">daharness</span>
+                <span class="dsc-sig"><i></i><i></i><i></i><i></i></span>
+              </div>
+              <div class="dsc-big"><b id="dsc-count">6</b><span>agents</span></div>
+              <div class="dsc-row dsc-bot">
+                <span>5G · up</span>
+                <span class="dsc-net">wifi on</span>
+              </div>
+            </div>
+            <div class="device-ports" aria-hidden="true">
+              <i class="port port-eth"></i><i class="port port-eth"></i>
+              <i class="port port-usb"></i><i class="port port-pwr"></i>
+            </div>
+          </div>
+          <figcaption class="device-cap">Fanless · silent · 12&nbsp;V · fits in a bag</figcaption>
+        </figure>
+      </div>
+
+      <div class="box-grid">
+        <article class="box-item">
+          <h3>Your data stays on it</h3>
+          <p>
+            Agents, memory, history, files — all of it lives on the box, on your
+            premises. No account to hand your work to, and nothing phones home.
+          </p>
+        </article>
+        <article class="box-item">
+          <h3>It travels with you</h3>
+          <p>
+            Built-in 5G, and it broadcasts its own secured Wi-Fi. On a site with no
+            network, your agents <em>and</em> your connection arrive in the same bag.
+          </p>
+        </article>
+        <article class="box-item">
+          <h3>It joins your network</h3>
+          <p>
+            Back at the office it's one more machine on the LAN, reachable over your
+            company VPN like anything else you run.
+          </p>
+        </article>
+        <article class="box-item">
+          <h3>Plug and play</h3>
+          <p>
+            Power and go. Nothing to rack, nothing to configure, no IT department
+            required to get the first agent working.
+          </p>
+        </article>
+      </div>
+
+      <ul class="box-spec">
+        <li><b>5G</b><span>Online anywhere there's signal</span></li>
+        <li><b>Wi-Fi AP</b><span>Broadcasts its own secured network</span></li>
+        <li><b>Encrypted</b><span>Private certificate authority, HTTPS on your LAN</span></li>
+        <li><b>Multi-user</b><span>Accounts and per-agent access for your team</span></li>
+      </ul>
+
+    </div>
+  </section>
+
+  <!-- ─── Trust ──────────────────────────────────────────── -->
+  <section class="band band-alt" id="trust">
+    <div class="shell trust-in">
+      <div>
+        <p class="eyebrow">Yours</p>
+        <h2 class="h2">No account. No telemetry.<br>Open core.</h2>
+      </div>
+      <div class="trust-copy">
+        <p>
+          Run it yourself and Daharness keeps its state in your own folders. There
+          is no analytics, no tracking, and no phone-home to switch off — the only
+          thing that leaves is the model call, to the provider you picked.
+        </p>
+        <p>
+          It's built on <a href="https://github.com/bigmoostache/context-pilot" target="_blank" rel="noopener">Context&nbsp;Pilot</a>,
+          the open-source core, under the MIT license. Every file operation and
+          every network call is there to read.
+        </p>
+        <a href="/trust-center/" class="btn btn-line">Trust Center <span aria-hidden="true">→</span></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Start ──────────────────────────────────────────── -->
+  <section class="start" id="contact">
+    <div class="shell start-in">
+      <p class="eyebrow">Start</p>
+      <h2 class="h2 start-h2">Your first agents,<br>running in minutes.</h2>
 
       <ol class="steps">
-        <li class="step">
-          <div class="step-num">01</div>
-          <h3>Post an agent to a project</h3>
-          <p>Point an agent at a project folder and hand it the work — research to gather, a document to draft, a backlog to clear. It sets up its own workspace and gets going, no babysitting required.</p>
-        </li>
-        <li class="step">
-          <div class="step-num">02</div>
-          <h3>Step away</h3>
-          <p>Head into a meeting, or start another project of your own. Your agents keep working and checking their own results, pausing only when they genuinely need a decision from you.</p>
-        </li>
-        <li class="step">
-          <div class="step-num">03</div>
-          <h3>Check in from anywhere</h3>
-          <p>Glance at the whole team from the browser cockpit, or drop into any single agent from your terminal. Review, nudge, redirect — then leave them to it again.</p>
-        </li>
+        <li><span class="step-n">1</span><b>Your email</b><span>No password to invent. We send you a link.</span></li>
+        <li><span class="step-n">2</span><b>Your card</b><span>Checkout by Stripe. Cancel from the same page.</span></li>
+        <li><span class="step-n">3</span><b>Your agents</b><span>A workspace on our cloud, ready to take work.</span></li>
       </ol>
-    </section>
 
-    <!-- ── Context: the differentiator ──────────────────────── -->
-    <section class="band band-alt" id="context">
-      <div class="band-head">
-        <div class="eyebrow">WHY THEY DON'T LOSE THE THREAD</div>
-        <h2>Most assistants forget where they started. These stay sharp.</h2>
-        <p>Give a typical AI assistant a long task and it slowly drowns — every message piles onto the last until its head is too full to think clearly, and the answers drift. Daharness works differently.</p>
-      </div>
-
-      <div class="ctx">
-        <div class="ctx-compare">
-          <div class="ctx-card ctx-bad">
-            <div class="ctx-card-head">
-              <span class="ctx-label">Most agents</span>
-              <span class="ctx-tag ctx-tag-warn">context overflow</span>
-            </div>
-            <p class="ctx-card-sub">Everything they've ever seen, kept all at once.</p>
-            <div class="ctx-stack" id="ctx-bad"><!-- rows injected --></div>
-          </div>
-
-          <div class="ctx-card ctx-good">
-            <div class="ctx-card-head">
-              <span class="ctx-label">Daharness</span>
-              <span class="ctx-tag ctx-tag-ok">curated in real time</span>
-            </div>
-            <p class="ctx-card-sub">Only what matters to the task, right now.</p>
-            <div class="ctx-panels">
-              <div class="ctx-panel"><span class="ctx-dot"></span> The goal it was given</div>
-              <div class="ctx-panel"><span class="ctx-dot"></span> The file it's changing</div>
-              <div class="ctx-panel"><span class="ctx-dot"></span> What it just learned</div>
-              <div class="ctx-panel ctx-panel-muted">everything else — set aside, recalled on demand</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="ctx-note">
-          <p>
-            Daharness's agents are ruthless about what they keep in view,
-            curating their own attention moment to moment. The important things
-            stay in focus — which is why they hold the thread hours into a project,
-            not just for the first few minutes.
-          </p>
-          <blockquote class="ctx-quote">Every token is gold.</blockquote>
-        </div>
-      </div>
-    </section>
-
-    <!-- ── Proof band ───────────────────────────────────────── -->
-    <section class="proof">
-      <div class="proof-inner">
-        <div class="eyebrow">PROOF IT HOLDS UP</div>
-        <p class="proof-line">
-          Daharness has put in <span class="accent">months</span> of
-          sustained, self-directed work — enough to build most of itself.
-          It holds the thread on long, real projects, not just quick asks.
+      <div class="start-cta">
+        <a href="/start.html" class="btn btn-go btn-lg">Start testing <span aria-hidden="true">→</span></a>
+        <p class="start-alt">
+          Want it on your own servers or on a box instead?
+          <a href="mailto:hello@daharness.com">Write to us</a> — same system, different address.
         </p>
       </div>
-    </section>
-
-    <!-- ── Private strip ────────────────────────────────────── -->
-    <section class="band sovereign">
-      <div class="sovereign-inner">
-        <div class="eyebrow">YOURS, AND ONLY YOURS</div>
-        <h2>Your coworkers answer to you alone.</h2>
-        <p>
-          Every agent runs on your own machines and keeps its work in your own
-          folders. Nothing is sent anywhere except the requests you choose to make.
-          No account to hand your work to, no telemetry, no middleman.
-        </p>
-        <a href="/trust-center/" class="btn btn-ghost">See the Trust Center <span aria-hidden="true">→</span></a>
-      </div>
-    </section>
-
-    <!-- ── The appliance: software + two modes ──────────────── -->
-    <section class="band" id="box">
-      <div class="appliance">
-        <div class="appliance-copy">
-          <div class="eyebrow">SOFTWARE, MEET HARDWARE</div>
-          <h2>Run <span class="accent">Daharness</span> on your machines — or on a box of its&nbsp;own.</h2>
-          <p>
-            Daharness is built on <strong>Context Pilot</strong>, the open-source
-            harness that keeps its agents sharp. Run it on your own machines, or let
-            the <strong>Daharness appliance</strong> — a small dedicated box — host
-            the whole team for you, alongside ready-to-use work environments.
-            Nothing to rack, nothing to configure.
-          </p>
-          <p>
-            The appliance fits wherever your team already is, in <strong>two&nbsp;modes</strong>.
-          </p>
-          <div class="appliance-flow">
-            <span>Plug in</span><span class="sep" aria-hidden="true">→</span>
-            <span>Connect</span><span class="sep" aria-hidden="true">→</span>
-            <span>Delegate</span>
-          </div>
-        </div>
-
-        <div class="modes" aria-hidden="true">
-          <div class="mode-card">
-            <div class="mode-head">
-              <span class="mode-badge">MODE 1</span>
-              <span class="mode-name">On your network</span>
-            </div>
-            <p class="mode-desc">
-              Drop it on your home or company network. It joins the LAN and puts
-              Daharness and its work environments within reach of everyone
-              already connected.
-            </p>
-            <ul class="device-specs">
-              <li><span class="dot dot-live"></span> Joins your existing network</li>
-              <li><span class="dot dot-live"></span> Agents &amp; work environments, shared</li>
-              <li><span class="dot dot-live"></span> Reach it from any device on the LAN</li>
-            </ul>
-          </div>
-
-          <div class="mode-card">
-            <div class="mode-head">
-              <span class="mode-badge">MODE 2</span>
-              <span class="mode-name">Its own network</span>
-            </div>
-            <div class="device-signal">
-              <span class="wave"></span><span class="wave"></span><span class="wave"></span>
-              <span class="device-net">5G · private Wi-Fi</span>
-            </div>
-            <p class="mode-desc">
-              No network to join? Built-in 5G brings it online anywhere there's
-              signal, and it broadcasts its own Wi-Fi — connectivity and
-              Daharness from the same box.
-            </p>
-            <ul class="device-specs">
-              <li><span class="dot dot-live"></span> 5G uplink — online anywhere</li>
-              <li><span class="dot dot-live"></span> Broadcasts its own Wi-Fi</li>
-              <li><span class="dot dot-live"></span> Daharness on a private network</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ── Contact ──────────────────────────────────────────── -->
-    <section class="band band-alt" id="contact">
-      <div class="contact">
-        <div class="contact-copy">
-          <div class="eyebrow">GET STARTED</div>
-          <h2>Put a team of agents on your projects.</h2>
-          <p>
-            Trying it on a side project, rolling it out to your team, or curious
-            how it would fit your workflow? Tell us what you're building and we'll
-            get back to you.
-          </p>
-          <ul class="contact-points">
-            <li><span class="dot dot-live"></span> Set up your first agents</li>
-            <li><span class="dot"></span> Run a whole team, privately</li>
-            <li><span class="dot"></span> Questions &amp; contributing</li>
-          </ul>
-        </div>
-
-        <form class="contact-form" id="contact-form" novalidate>
-          <div class="form-row">
-            <label class="field">
-              <span class="field-label">Name</span>
-              <input type="text" name="name" autocomplete="name" required placeholder="Ada Lovelace">
-            </label>
-            <label class="field">
-              <span class="field-label">Email</span>
-              <input type="email" name="email" autocomplete="email" required placeholder="ada@yourteam.dev">
-            </label>
-          </div>
-          <label class="field">
-            <span class="field-label">Organization <span class="opt">optional</span></span>
-            <input type="text" name="org" autocomplete="organization" placeholder="Analytical Engines Ltd.">
-          </label>
-          <label class="field">
-            <span class="field-label">What brings you here?</span>
-            <div class="select-wrap">
-              <select name="interest">
-                <option value="side-project">Trying it on a side project</option>
-                <option value="team">Rolling it out to a team</option>
-                <option value="contributing">Contributing to the project</option>
-                <option value="other">Something else</option>
-              </select>
-            </div>
-          </label>
-          <label class="field">
-            <span class="field-label">Message</span>
-            <textarea name="message" rows="4" required placeholder="I'd love an agent keeping my side projects moving while I'm at work…"></textarea>
-          </label>
-
-          <button type="submit" class="btn btn-primary btn-block">Send message</button>
-
-          <div class="form-result" id="form-result" hidden aria-live="polite"></div>
-          <p class="form-note">Design mockup — submissions aren't wired to a backend yet.</p>
-        </form>
-      </div>
-    </section>
-
-  </main>
-
-  <!-- ── Footer ─────────────────────────────────────────────── -->
-  <footer class="site-footer">
-    <div class="footer-inner">
-      <span class="footer-brand"><span class="brand-glyph" aria-hidden="true">▮</span> Daharness</span>
-      <nav class="footer-links" aria-label="Footer">
-        <a href="https://github.com/bigmoostache/context-pilot" target="_blank" rel="noopener">Context Pilot core</a>
-        <a href="/trust-center/">Trust Center</a>
-        <a href="https://github.com/bigmoostache/context-pilot/blob/master/LICENSE" target="_blank" rel="noopener">MIT License</a>
-      </nav>
     </div>
-    <p class="footer-fine">Built on the open-source Context Pilot core · runs on your machines · answers to you · fully auditable</p>
-  </footer>
+  </section>
 
-  <script type="module" src="app.js"></script>
+</main>
+
+<footer class="foot">
+  <div class="shell foot-in">
+    <a href="/" class="brand"><span class="brand-mark" aria-hidden="true">▮</span>Daharness</a>
+    <nav class="foot-nav" aria-label="Footer">
+      <a href="https://github.com/bigmoostache/context-pilot" target="_blank" rel="noopener">Context Pilot core ↗</a>
+      <a href="/trust-center/">Trust Center</a>
+      <a href="mailto:hello@daharness.com">hello@daharness.com</a>
+    </nav>
+    <p class="foot-note">Built on the open-source Context Pilot core · MIT License</p>
+  </div>
+</footer>
+
+<script type="module" src="/app.js"></script>
 </body>
 </html>

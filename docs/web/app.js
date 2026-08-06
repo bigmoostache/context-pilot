@@ -1,199 +1,134 @@
-/* Daharness landing — fleet render, hero typewriter, reveal, contact form.
-   No dependencies. Degrades to a static, readable page without JS or motion. */
-(function () {
-  'use strict';
+/* Daharness landing — the board, the model swap, scroll reveal.
+   No dependencies. Without JS the page still reads; without motion it still works. */
 
-  var reduceMotion = window.matchMedia &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const reduceMotion =
+  window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  function esc(str) {
-    return String(str).replace(/[&<>"]/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
-    });
-  }
+/* ── The board ───────────────────────────────────────────
+   Six tasks from six different worlds, five different models,
+   all at once. This is the pitch, not an illustration. */
 
-  /* ── Fleet: a team of agents, one per project ─────────── */
-  var fleet = [
-    { realm: '~/support-triage',  status: 'live', line: 'flagging recurring issues', active: true },
-    { realm: '~/q3-report',       status: 'turn', line: 'draft ready for your review' },
-    { realm: '~/market-research', status: 'idle', line: 'sources gathered · resting' },
-    { realm: '~/data-cleanup',    status: 'live', line: 'reconciling records in the background' },
-    { realm: '~/onboarding-docs', status: 'idle', line: 'published 2m ago' },
-    { realm: '~/vendor-contracts',status: 'turn', line: 'needs a decision from you' }
-  ];
+const AGENTS = [
+  { path: '~/support-triage',   line: 'grouping 214 tickets into three recurring issues', model: 'claude-opus-5',   state: 'work' },
+  { path: '~/lease-review',     line: 'cross-checking 40 leases against the new clause',  model: 'deepseek-v4-pro', state: 'work' },
+  { path: '~/etl-reconcile',    line: '1.2M rows matched · 3 mismatches left',            model: 'llama-3.3-70b',   state: 'work' },
+  { path: '~/q3-report',        line: 'draft ready — needs your call on the forecast',    model: 'minimax-m2.7',    state: 'turn' },
+  { path: '~/vendor-contracts', line: 'summarising the renewal terms',                    model: 'grok-4-1-fast',   state: 'work' },
+  { path: '~/onboarding-docs',  line: 'published 2 min ago',                              model: 'claude-opus-5',   state: 'idle' },
+];
 
-  function statusDot(s) {
-    if (s === 'live') return '<span class="dot dot-live ' + (reduceMotion ? '' : 'pulse') + '"></span>';
-    if (s === 'turn') return '<span class="dot dot-turn"></span>';
-    return '<span class="dot"></span>';
-  }
+const DOT = { work: 'dot dot-work', turn: 'dot dot-turn', idle: 'dot' };
 
-  var fleetEl = document.getElementById('fleet');
-  if (fleetEl) {
-    fleetEl.innerHTML = fleet.map(function (a) {
-      return '<div class="tile' + (a.active ? ' is-active' : '') + '">' +
-        '<div class="tile-top">' + statusDot(a.status) +
-        '<span class="realm">' + esc(a.realm) + '</span></div>' +
-        '<div class="tile-line">' + esc(a.line) + '</div>' +
-      '</div>';
-    }).join('');
-  }
+function buildRow(a) {
+  const row = document.createElement('div');
+  row.className = 'row' + (a.state === 'turn' ? ' row-turn' : '');
 
-  /* ── "Context overflow" rows (left comparison card) ───── */
-  var ctxBad = document.getElementById('ctx-bad');
-  if (ctxBad) {
-    var rows = '';
-    for (var r = 0; r < 11; r++) {
-      rows += '<div class="ctx-row" style="opacity:' + (1 - r * 0.06).toFixed(2) + '"></div>';
+  const dot = document.createElement('i');
+  dot.className = DOT[a.state];
+  dot.setAttribute('aria-hidden', 'true');
+
+  const path = document.createElement('span');
+  path.className = 'row-path';
+  path.textContent = a.path;
+
+  const line = document.createElement('span');
+  line.className = 'row-line';
+  line.textContent = a.line;
+
+  const chip = document.createElement('span');
+  chip.className = 'chip';
+  chip.textContent = a.model;
+
+  row.append(dot, path, line, chip);
+  return row;
+}
+
+const rowsEl = document.getElementById('board-rows');
+const statEl = document.getElementById('board-stat');
+
+if (rowsEl) {
+  const working = AGENTS.filter((a) => a.state === 'work').length;
+
+  AGENTS.forEach((a, i) => {
+    const row = buildRow(a);
+    if (!reduceMotion) {
+      row.style.opacity = '0';
+      row.style.transform = 'translateY(8px)';
+      row.style.transition = 'opacity .45s cubic-bezier(.22,.68,.24,1), transform .45s cubic-bezier(.22,.68,.24,1)';
+      window.setTimeout(() => {
+        row.style.opacity = '1';
+        row.style.transform = 'none';
+      }, 140 + i * 110);
     }
-    ctxBad.innerHTML = rows + '<span class="ctx-overflow">⚠ too much to hold</span>';
+    rowsEl.appendChild(row);
+  });
+
+  if (statEl) {
+    const write = () => {
+      statEl.innerHTML = `<b>${AGENTS.length}</b> agents · <b>${working}</b> working`;
+    };
+    if (reduceMotion) write();
+    else window.setTimeout(write, 140 + AGENTS.length * 110);
   }
+}
 
-  /* ── Hero terminal typewriter (a delegated task) ──────── */
-  var script = [
-    { cls: 'prompt', text: '› ', follow: 'user', followText: 'flag the recurring problems in last month\'s support tickets' },
-    { cls: 'muted',  text: 'daharness · on it' },
-    { cls: 'tool',   text: '⚙ read   tickets/2026-06  (214 items)' },
-    { cls: 'tool',   text: '⚙ search common themes' },
-    { cls: 'asst',   text: 'Three issues account for most of the' },
-    { cls: 'asst',   text: 'volume — writing up the breakdown…' },
-    { cls: 'tool',   text: '⚙ write  findings.md' },
-    { cls: 'ok',     text: '✓ done · ready for your review' }
-  ];
+/* ── Rent vs keep ────────────────────────────────────────
+   The chips cycle; the list beside them never moves. That
+   contrast is the whole section. */
 
-  var body = document.getElementById('term-body');
+// Real model ids from the shipped provider roster. Nothing aspirational here —
+// if it's on this list, you can pick it today.
+const MODELS = [
+  'claude-opus-5',
+  'claude-sonnet-5',
+  'grok-4-1-fast',
+  'deepseek-v4-pro',
+  'llama-3.3-70b',
+  'minimax-m2.7',
+];
 
-  function renderStatic() {
-    if (!body) return;
-    body.innerHTML = script.map(function (l) {
-      if (l.follow) {
-        return '<div class="term-line"><span class="' + l.cls + '">' + esc(l.text) +
-          '</span><span class="user">' + esc(l.followText) + '</span></div>';
-      }
-      return '<div class="term-line"><span class="' + l.cls + '">' + esc(l.text) + '</span></div>';
-    }).join('') + '<div class="term-line"><span class="prompt">› </span><span class="caret"></span></div>';
-  }
+const chipsEl = document.getElementById('swap-chips');
 
-  function typeInto(el, text, speed, done) {
-    var i = 0;
-    (function step() {
-      el.textContent = text.slice(0, i);
-      if (i++ <= text.length) { window.setTimeout(step, speed); }
-      else { done(); }
-    })();
-  }
+if (chipsEl) {
+  const chips = MODELS.map((m, i) => {
+    const el = document.createElement('span');
+    el.className = 'chip ' + (i === 0 ? 'is-on' : 'is-off');
+    el.textContent = m;
+    chipsEl.appendChild(el);
+    return el;
+  });
 
-  function typewriter() {
-    if (!body) return;
-    body.innerHTML = '';
-    var li = 0;
-
-    function typeLine() {
-      if (li >= script.length) {
-        var done = document.createElement('div');
-        done.className = 'term-line';
-        done.innerHTML = '<span class="prompt">› </span><span class="caret"></span>';
-        body.appendChild(done);
-        return;
-      }
-      var l = script[li];
-      var lineEl = document.createElement('div');
-      lineEl.className = 'term-line';
-      var head = document.createElement('span');
-      head.className = l.cls;
-      lineEl.appendChild(head);
-      body.appendChild(lineEl);
-
-      if (l.follow) {
-        head.textContent = l.text;
-        var tail = document.createElement('span');
-        tail.className = l.follow;
-        lineEl.appendChild(tail);
-        typeInto(tail, l.followText, 26, next);
-      } else if (l.cls === 'user' || l.cls === 'asst') {
-        typeInto(head, l.text, 16, next);
-      } else {
-        head.textContent = l.text;
-        window.setTimeout(next, 300);
-      }
-    }
-
-    function next() { li++; typeLine(); }
-    typeLine();
-  }
-
-  if (body) {
-    if (reduceMotion) {
-      renderStatic();
-    } else {
-      var started = false;
-      var start = function () { if (!started) { started = true; typewriter(); } };
-      if ('IntersectionObserver' in window) {
-        var io = new IntersectionObserver(function (entries) {
-          if (entries[0].isIntersecting) { start(); io.disconnect(); }
-        }, { threshold: 0.4 });
-        io.observe(body);
-      } else {
-        start();
-      }
-      window.setTimeout(start, 1200); // safety net
-    }
-  }
-
-  /* ── Scroll reveal ────────────────────────────────────── */
-  var revealTargets = document.querySelectorAll('.band-head, .step, .ctx, .proof-inner, .sovereign-inner, .appliance, .contact');
-  if (!reduceMotion && 'IntersectionObserver' in window) {
-    revealTargets.forEach(function (el) { el.classList.add('reveal'); });
-    var ro = new IntersectionObserver(function (entries, obs) {
-      entries.forEach(function (e) {
-        if (e.isIntersecting) { e.target.classList.add('in'); obs.unobserve(e.target); }
+  if (!reduceMotion && chips.length > 1) {
+    let active = 0;
+    const cycle = () => {
+      chips[active].className = 'chip is-off';
+      active = (active + 1) % chips.length;
+      chips[active].className = 'chip is-on';
+    };
+    let timer = null;
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting && !timer) timer = window.setInterval(cycle, 1600);
+        else if (!e.isIntersecting && timer) { window.clearInterval(timer); timer = null; }
       });
-    }, { threshold: 0.12 });
-    revealTargets.forEach(function (el) { ro.observe(el); });
+    }, { threshold: 0.3 });
+    io.observe(chipsEl);
   }
+}
 
-  /* ── Contact form ─────────────────────────────────────── */
-  var form = document.getElementById('contact-form');
-  var result = document.getElementById('form-result');
+/* ── Scroll reveal ───────────────────────────────────── */
 
-  if (form) {
-    form.addEventListener('submit', function (ev) {
-      ev.preventDefault();
+if (!reduceMotion && 'IntersectionObserver' in window) {
+  const targets = document.querySelectorAll(
+    '.band-head, .tasks, .swap, .pull, .ways, .box-hero, .box-grid, .box-spec, .trust-in, .steps, .start-cta'
+  );
+  targets.forEach((el) => el.classList.add('reveal'));
 
-      var name = form.elements.name;
-      var email = form.elements.email;
-      var message = form.elements.message;
-      var ok = true;
-
-      [name, email, message].forEach(function (f) {
-        var field = f.closest('.field');
-        var valid = f.value.trim() !== '' &&
-          (f.type !== 'email' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.value));
-        if (!valid) { ok = false; if (field) field.classList.add('invalid'); }
-        else if (field) { field.classList.remove('invalid'); }
-      });
-
-      if (!ok) {
-        if (result) {
-          result.hidden = false;
-          result.innerHTML = '<span class="accent">✗ check the highlighted fields</span> — name, a valid email, and a message are required.';
-        }
-        return;
-      }
-
-      var who = name.value.trim();
-      var addr = email.value.trim();
-
-      if (result) {
-        result.hidden = false;
-        result.innerHTML =
-          '<span class="ok">✓ message queued</span>\n' +
-          '<span class="muted">daharness › thanks, </span>' +
-          '<span class="accent">' + esc(who) + '</span>\n' +
-          '<span class="muted">we\'ll reply to </span><span class="accent">' + esc(addr) + '</span>';
-      }
-      form.querySelector('button[type="submit"]').textContent = 'Sent ✓';
-      window.setTimeout(function () { if (result) result.scrollIntoView({ block: 'nearest' }); }, 0);
+  const ro = new IntersectionObserver((entries, obs) => {
+    entries.forEach((e) => {
+      if (e.isIntersecting) { e.target.classList.add('in'); obs.unobserve(e.target); }
     });
-  }
-})();
+  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+  targets.forEach((el) => ro.observe(el));
+}

@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "Daharness marketing landing + trust center — static Vite MPA build.",
+  "description": "Daharness marketing landing + trial gate + trust center — static Vite MPA build.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
