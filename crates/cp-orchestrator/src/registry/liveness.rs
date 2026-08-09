@@ -127,6 +127,12 @@ mod tests {
             cap_token: "tok".to_owned(),
             started_at_ms: 0,
             status: AgentStatus::Running,
+            // The projection fields play no part in a liveness verdict (which
+            // reads only pid + boot_id + heartbeat), so they stay at their
+            // never-advertised defaults.
+            slug: String::new(),
+            image: String::new(),
+            identity: None,
         }
     }
 

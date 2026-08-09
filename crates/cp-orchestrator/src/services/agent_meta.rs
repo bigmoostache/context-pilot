@@ -23,6 +23,9 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use cp_wire::types::command::Command;
+use cp_wire::types::registry::Entry;
+
 // ── Display-name overrides ──────────────────────────────────────────────
 
 /// In-memory + on-disk map of agent id → custom display name.
@@ -231,9 +234,185 @@ fn sniff_image_type(bytes: &[u8]) -> Option<&'static str> {
     None
 }
 
+// ── Agent-owned profile (T739b) ─────────────────────────────────────────
+
+/// Realm-relative path (minus extension) an uploaded avatar is written to.
+///
+/// Inside the agent's own realm, under its existing `.context-pilot` directory,
+/// so the reference the agent advertises satisfies its own containment rule (a
+/// realm-relative path that cannot climb out) and travels with the folder if it
+/// is ever moved.
+const AVATAR_STEM: &str = ".context-pilot/avatar";
+
+/// The file extension to store an image of `content_type` under.
+///
+/// The extension is cosmetic for serving (the content type is re-sniffed from
+/// the bytes on read) but keeps the file recognisable to a human browsing the
+/// realm, and lets the stored reference name a single concrete file.
+fn extension_for(content_type: &str) -> &'static str {
+    match content_type {
+        "image/jpeg" => "jpg",
+        "image/gif" => "gif",
+        "image/webp" => "webp",
+        "image/bmp" => "bmp",
+        "image/x-icon" => "ico",
+        "image/svg+xml" => "svg",
+        // PNG is both the common case and the safe default: an unrecognised
+        // type never reaches here (`sniff_image_type` rejects it first).
+        _ => "png",
+    }
+}
+
+/// Write uploaded avatar `bytes` into the agent's realm and return the
+/// **realm-relative reference** to advertise.
+///
+/// This is the byte half of the ownership split (T739b): the orchestrator stays
+/// the transport (it is the only party with an HTTP surface, so an upload must
+/// land here) while the *authority* over what the image is moves to the agent,
+/// which receives only this reference. Keeping multi-megabyte bytes out of the
+/// `0600` registry record matters because that record is re-read on every fleet
+/// scan.
+///
+/// Any previously stored avatar file is removed first, so switching format
+/// (`avatar.png` → `avatar.jpg`) cannot leave the old file orphaned in the
+/// realm.
+///
+/// # Errors
+///
+/// Returns a human-readable message when the upload exceeds
+/// [`MAX_AVATAR_BYTES`], is not a recognised image, or cannot be written.
+pub fn write_avatar_into_realm(folder: &str, bytes: &[u8]) -> Result<String, String> {
+    if bytes.len() > MAX_AVATAR_BYTES {
+        return Err(format!("avatar too large ({} bytes, max {})", bytes.len(), MAX_AVATAR_BYTES));
+    }
+    let ctype = sniff_image_type(bytes).ok_or("unrecognised image format")?;
+    let rel = format!("{AVATAR_STEM}.{ext}", ext = extension_for(ctype));
+    let abs = Path::new(folder).join(&rel);
+
+    if let Some(parent) = abs.parent()
+        && let Err(e) = std::fs::create_dir_all(parent)
+    {
+        return Err(format!("create realm avatar dir: {e}"));
+    }
+    // Drop any prior avatar in a different format before writing the new one.
+    remove_realm_avatars(folder);
+
+    std::fs::write(&abs, bytes).map_err(|e| format!("write avatar: {e}"))?;
+    Ok(rel)
+}
+
+/// Remove every stored avatar file from the agent's realm (all extensions).
+///
+/// Best-effort and format-agnostic: the caller does not know which extension a
+/// previous upload used, and a missing file is the expected case rather than an
+/// error.
+pub fn remove_realm_avatars(folder: &str) {
+    for ext in ["png", "jpg", "gif", "webp", "bmp", "ico", "svg"] {
+        let _removed = std::fs::remove_file(Path::new(folder).join(format!("{AVATAR_STEM}.{ext}")));
+    }
+}
+
+/// Read an agent-owned avatar back out of its realm, given the reference the
+/// agent advertises.
+///
+/// Returns the bytes plus a content type **re-sniffed from those bytes** rather
+/// than trusted from the reference's extension: the reference is a value the
+/// agent owns and could name anything, so deriving the type from the content is
+/// the only honest source. A URL reference yields `None` (there are no local
+/// bytes to serve — the caller redirects instead), as does a reference that
+/// escapes the realm, is missing, or is not an image.
+///
+/// The containment re-check is deliberate belt-and-braces. The agent already
+/// rejects an escaping path when it accepts the value, but this reads a file
+/// from a path that ultimately arrived over the wire, so it re-establishes the
+/// boundary at the point of use rather than trusting a check made elsewhere.
+#[must_use]
+pub fn read_realm_avatar(folder: &str, image: &str) -> Option<(Vec<u8>, String)> {
+    if image.is_empty() || image.starts_with("http://") || image.starts_with("https://") {
+        return None;
+    }
+    let rel = Path::new(image);
+    if rel.is_absolute() || rel.components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+        return None;
+    }
+    let bytes = std::fs::read(Path::new(folder).join(rel)).ok()?;
+    let ctype = sniff_image_type(&bytes)?;
+    Some((bytes, ctype.to_owned()))
+}
+
+/// Send a [`SetProfile`](cp_wire::types::command::Kind::SetProfile) command to a
+/// live agent — the write half of the T739b ownership move.
+///
+/// Both fields are patch-shaped and forwarded verbatim, so a rename
+/// (`slug: Some`, `image: None`) cannot clear an avatar and vice versa. The
+/// agent re-validates before applying, which is the point of the move: the
+/// containment rules for an image reference are enforced by the party that owns
+/// the value, not by each reader.
+///
+/// # Errors
+///
+/// Returns a message when the agent is unreachable (a dead or retired agent has
+/// no process to command) or rejects the command. Callers treat that as the
+/// signal to fall back to the legacy orchestrator-side sidecar rather than
+/// failing the user's request.
+pub fn send_profile(entry: &Entry, slug: Option<String>, image: Option<String>) -> Result<(), String> {
+    let dedup = format!("profile-{id}-{now}", id = entry.id, now = now_ms());
+    let command =
+        Command::new(format!("cmd-{dedup}"), 1, dedup, cp_wire::types::command::Kind::SetProfile { slug, image });
+    let ack = crate::channel::AgentChannel::from_entry(entry).send(command).map_err(|e| format!("{e}"))?;
+    match ack.status {
+        cp_wire::types::ack::Status::Accepted => Ok(()),
+        _ => Err("agent rejected the profile command".to_owned()),
+    }
+}
+
+/// Wall-clock milliseconds, for a unique dedup token per profile command.
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn avatar_written_into_realm_is_relative_and_contained() {
+        let realm = std::env::temp_dir().join(format!("cp-realm-avatar-{}", std::process::id()));
+        drop(std::fs::create_dir_all(&realm));
+        let folder = realm.to_string_lossy().into_owned();
+
+        let png: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00];
+        let rel = write_avatar_into_realm(&folder, png).expect("write");
+
+        assert_eq!(rel, ".context-pilot/avatar.png");
+        assert!(!rel.starts_with('/'), "the advertised reference must be realm-relative");
+        assert!(realm.join(&rel).is_file(), "the bytes land inside the realm");
+
+        // A second upload in another format replaces rather than orphans.
+        let gif: &[u8] = b"GIF89a-------";
+        let rel2 = write_avatar_into_realm(&folder, gif).expect("write gif");
+        assert_eq!(rel2, ".context-pilot/avatar.gif");
+        assert!(!realm.join(".context-pilot/avatar.png").exists(), "the previous format is cleaned up");
+
+        remove_realm_avatars(&folder);
+        assert!(!realm.join(&rel2).exists(), "removal clears every format");
+
+        drop(std::fs::remove_dir_all(&realm));
+    }
+
+    #[test]
+    fn realm_avatar_rejects_oversized_and_non_images() {
+        let realm = std::env::temp_dir().join(format!("cp-realm-bad-{}", std::process::id()));
+        drop(std::fs::create_dir_all(&realm));
+        let folder = realm.to_string_lossy().into_owned();
+
+        assert!(write_avatar_into_realm(&folder, &vec![0u8; MAX_AVATAR_BYTES + 1]).is_err());
+        assert!(write_avatar_into_realm(&folder, b"not an image at all").is_err());
+
+        drop(std::fs::remove_dir_all(&realm));
+    }
 
     #[test]
     fn name_set_get_roundtrip() {

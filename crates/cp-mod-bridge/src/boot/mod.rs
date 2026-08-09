@@ -102,6 +102,17 @@ pub struct Boot {
     /// The liveness beacon thread — stopped and joined on drop. The leading
     /// underscore documents that it is owned for its `Drop`, not read.
     _heartbeat: Beacon,
+
+    /// The agents directory the discovery record lives in, kept so the record
+    /// can be **republished** after boot: it is a projection of live state, not
+    /// a one-shot snapshot (see [`register::advert`](crate::register::advert)).
+    agents_dir: PathBuf,
+
+    /// Serialisation of the record as last written, for the projection's dirty
+    /// check. `None` until the first republish — the boot write is deliberately
+    /// not memoised, so the first projection tick always publishes and thereby
+    /// corrects the boot record's placeholder `status: Starting`.
+    last_advert: Option<String>,
 }
 
 impl Boot {
@@ -181,9 +192,14 @@ impl Boot {
         let cap_token = mint_cap_token()?;
         let boot_id = mint_boot_id()?;
 
-        // 5. Registry record, written last and atomically.
+        // 5. Registry record, written last and atomically. This is the FIRST
+        //    frame of a projection, not a one-shot snapshot: the `advert`
+        //    module re-derives and rewrites it whenever the projected bytes
+        //    change. `slug` seeds from the realm folder's basename (the same
+        //    default the backend derives); `image` and `identity` start unset
+        //    and are filled by the projection once the agent's modules are up.
         let entry = Entry {
-            schema_version: 1,
+            schema_version: cp_wire::types::registry::SCHEMA_VERSION,
             id,
             folder: canonical.to_string_lossy().into_owned(),
             pid: std::process::id(),
@@ -197,6 +213,9 @@ impl Boot {
             cap_token,
             started_at_ms: now_ms(),
             status: AgentStatus::Starting,
+            slug: canonical.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
+            image: String::new(),
+            identity: None,
         };
         let _written = registry::write_entry(agents_dir, &entry)?;
 
@@ -215,7 +234,16 @@ impl Boot {
         // `Lifecycle::Stopping` emitted on `Drop`.
         oplog.submit_durable(OpEntryKind::Lifecycle { state: LifecycleState::Running });
 
-        Ok(Self { _lock: lock, oplog, listener, entry, socket_path, _heartbeat: heartbeat })
+        Ok(Self {
+            _lock: lock,
+            oplog,
+            listener,
+            entry,
+            socket_path,
+            _heartbeat: heartbeat,
+            agents_dir: agents_dir.to_path_buf(),
+            last_advert: None,
+        })
     }
 
     /// The agent's stable registry id (FNV-1a of its canonical folder path).
@@ -246,6 +274,41 @@ impl Boot {
     #[must_use]
     pub const fn listener(&self) -> &UnixListener {
         &self.listener
+    }
+
+    /// Re-derive the discovery record from live state and rewrite it **only if
+    /// the projected bytes changed** — the projection tick described in
+    /// [`register::advert`](crate::register::advert).
+    ///
+    /// Called from the agent's ordinary persistence cadence rather than from
+    /// each mutation site, which is the whole point: a field cannot go stale
+    /// because a mutation site forgot to re-advertise, since no site
+    /// advertises. The steady state is free — an unchanged projection performs
+    /// no I/O at all.
+    ///
+    /// The live inputs (`profile`, `identity`) arrive by value because the
+    /// caller necessarily holds a mutable borrow of the agent state to reach
+    /// this `Boot`, so it resolves them beforehand.
+    ///
+    /// Advertising is **best-effort**: a failed write leaves the previous
+    /// record in place (still valid, merely one tick old) and the next tick
+    /// retries, so the error is returned for logging rather than propagated
+    /// into the caller's control flow.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Io`] when the record cannot be serialised or written.
+    pub fn republish_advert(
+        &mut self,
+        profile: crate::register::advert::Profile,
+        identity: cp_wire::types::registry::SelfIdentity,
+    ) -> BootResult<bool> {
+        let projected = crate::register::advert::project(profile, &self.entry, identity);
+        let wrote = crate::register::advert::publish_if_changed(&self.agents_dir, &projected, &mut self.last_advert)?;
+        if wrote {
+            self.entry = projected;
+        }
+        Ok(wrote)
     }
 }
 
@@ -291,157 +354,4 @@ fn now_ms() -> u64 {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::tempdir;
-
-    /// Boot into temp folders so tests never touch the real home or cwd.
-    fn boot(folder: &Path, agents: &Path) -> BootResult<Boot> {
-        Boot::start_in(folder, agents, "test-model")
-    }
-
-    #[test]
-    fn boot_acquires_all_resources() {
-        let folder = tempdir().expect("folder");
-        let agents = tempdir().expect("agents");
-        let booted = boot(folder.path(), agents.path()).expect("boot");
-
-        // Registry record exists, 0600, and round-trips.
-        let registry = registry::path(agents.path(), booted.id());
-        assert!(registry.exists(), "registry record written");
-
-        // Socket bound, oplog dir created.
-        assert!(folder.path().join(SOCKET_FILE).exists(), "socket bound");
-        assert!(folder.path().join(OPLOG_DIR).exists(), "oplog dir created");
-
-        // The advertised paths are inside the canonical folder.
-        assert!(booted.entry().oplog_path.ends_with(OPLOG_DIR));
-        assert_eq!(booted.entry().protocol_version, PROTOCOL_VERSION);
-        assert_eq!(booted.cap_token().len(), 64, "256-bit token");
-    }
-
-    #[test]
-    fn second_boot_same_folder_refuses() {
-        let folder = tempdir().expect("folder");
-        let agents = tempdir().expect("agents");
-        let _first = boot(folder.path(), agents.path()).expect("first boot");
-
-        let second = boot(folder.path(), agents.path());
-        assert!(
-            matches!(second, Err(Error::AlreadyRunning { .. })),
-            "a second instance in the same folder must be refused, got {second:?}",
-        );
-    }
-
-    #[test]
-    fn boot_releases_lock_on_drop() {
-        let folder = tempdir().expect("folder");
-        let agents = tempdir().expect("agents");
-        {
-            let _first = boot(folder.path(), agents.path()).expect("first boot");
-        } // dropped here → lock released, registry + socket removed.
-
-        // A fresh boot in the same folder now succeeds.
-        let again = boot(folder.path(), agents.path());
-        assert!(again.is_ok(), "lock must be released on drop, got {again:?}");
-    }
-
-    #[test]
-    fn drop_keeps_registry_record() {
-        let folder = tempdir().expect("folder");
-        let agents = tempdir().expect("agents");
-        let registry;
-        {
-            let booted = boot(folder.path(), agents.path()).expect("boot");
-            registry = registry::path(agents.path(), booted.id());
-            assert!(registry.exists());
-        }
-        assert!(registry.exists(), "registry record must survive graceful drop (agent shows as Disconnected)");
-    }
-
-    #[test]
-    fn stale_socket_is_replaced() {
-        let folder = tempdir().expect("folder");
-        let agents = tempdir().expect("agents");
-        // Simulate a crash leaving a stale socket file.
-        fs::create_dir_all(folder.path()).expect("mkdir");
-        fs::write(folder.path().join(SOCKET_FILE), b"stale").expect("stale socket");
-
-        let booted = boot(folder.path(), agents.path());
-        assert!(booted.is_ok(), "a stale socket must be unlinked and rebound, got {booted:?}");
-    }
-
-    #[test]
-    fn try_start_fails_fast_when_locked_then_recovers_when_freed() {
-        use std::time::Instant;
-
-        let folder = tempdir().expect("folder");
-        let agents = tempdir().expect("agents");
-
-        // A patient boot holds the lock.
-        let first = boot(folder.path(), agents.path()).expect("first boot");
-
-        // A fail-fast `try_start` against the same folder must refuse
-        // *immediately* (no ~2s retry wait) with `AlreadyRunning` — this is the
-        // background recovery path that must never stall the main loop.
-        let started = Instant::now();
-        let contended = Boot::start_inner(folder.path(), agents.path(), "test-model", 0);
-        let elapsed = started.elapsed();
-        assert!(
-            matches!(contended, Err(Error::AlreadyRunning { .. })),
-            "a contended fail-fast attempt must refuse, got {contended:?}",
-        );
-        assert!(
-            elapsed < lock::LOCK_RETRY_BACKOFF,
-            "fail-fast must return well under one backoff ({elapsed:?}), not sleep out the retry window",
-        );
-
-        // Once the holder releases the lock, the next fail-fast attempt wins —
-        // modelling the bridge recovering mid-session after a dying predecessor
-        // finally frees the lock.
-        drop(first);
-        let recovered = Boot::start_inner(folder.path(), agents.path(), "test-model", 0);
-        assert!(recovered.is_ok(), "fail-fast must succeed once the lock is free, got {recovered:?}");
-    }
-
-    /// Read every cleanly-decoded oplog entry across all segments in `dir`.
-    fn read_all_entries(dir: &Path) -> Vec<cp_wire::types::oplog::OpEntry> {
-        let mut out = Vec::new();
-        for idx in cp_oplog::segment::indices(dir).unwrap_or_default() {
-            if let Ok(scan) = cp_oplog::segment::read(&cp_oplog::segment::path(dir, idx)) {
-                out.extend(scan.entries);
-            }
-        }
-        out
-    }
-
-    #[test]
-    fn lifecycle_running_on_boot_and_stopping_on_drop() {
-        let folder = tempdir().expect("folder");
-        let agents = tempdir().expect("agents");
-        let oplog_dir = fs::canonicalize(folder.path()).expect("canon").join(OPLOG_DIR);
-
-        // Boot emits Lifecycle::Running; dropping it emits Lifecycle::Stopping.
-        // The drop joins the oplog commit thread, draining + fsyncing both
-        // records before it returns, so reading after the drop is race-free.
-        let booted = boot(folder.path(), agents.path()).expect("boot");
-        drop(booted);
-
-        let lifecycles: Vec<LifecycleState> = read_all_entries(&oplog_dir)
-            .iter()
-            .filter_map(|e| match &e.kind {
-                OpEntryKind::Lifecycle { state } => Some(*state),
-                _ => None,
-            })
-            .collect();
-
-        assert!(
-            lifecycles.contains(&LifecycleState::Running),
-            "Lifecycle::Running must be journaled at boot, got {lifecycles:?}",
-        );
-        assert!(
-            lifecycles.contains(&LifecycleState::Stopping),
-            "Lifecycle::Stopping must be journaled on graceful drop, got {lifecycles:?}",
-        );
-    }
-}
+mod tests;

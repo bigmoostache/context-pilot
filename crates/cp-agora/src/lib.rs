@@ -4,6 +4,8 @@
 //! state (shared across every worker, not per-worker), rendered as a YAML block
 //! in the fixed Agora panel. Agent-side only: no orchestrator or frontend leg.
 
+/// Reading other agents' advertisements from the shared registry directory.
+pub mod fleet;
 /// Panel rendering + context generation for the identity.
 mod panel;
 /// Tool execution handler for `Agora_set_identity` plus the shared
@@ -85,7 +87,7 @@ impl Module for AgoraModule {
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         let ag = AgoraState::get(state);
-        json!({ "identity": ag.identity })
+        json!({ "identity": ag.identity, "slug": ag.slug, "image": ag.image })
     }
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
@@ -94,6 +96,14 @@ impl Module for AgoraModule {
             && let Ok(identity) = serde_json::from_value(v.clone())
         {
             ag.identity = identity;
+        }
+        // A config written before the profile existed simply has no such keys;
+        // an absent key leaves the field empty, which is exactly "unset".
+        if let Some(slug) = data.get("slug").and_then(serde_json::Value::as_str) {
+            slug.clone_into(&mut ag.slug);
+        }
+        if let Some(image) = data.get("image").and_then(serde_json::Value::as_str) {
+            image.clone_into(&mut ag.image);
         }
     }
 

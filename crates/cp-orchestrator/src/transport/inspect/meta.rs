@@ -119,9 +119,16 @@ pub fn fleet_retired(state: &Mutex<Backend>, auth_user: Option<&crate::services:
 /// Build the enriched agent JSON for one agent.
 fn build_agent_meta(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> serde_json::Value {
     let folder = &entry.folder;
+    // Display name, record-first (T739b). The agent OWNS its slug and
+    // advertises it in the record, so that is the authority. The legacy
+    // `agent-names.json` override is only consulted when the record carries no
+    // slug — which happens for an agent that has not booted since the rewire,
+    // or one whose binary predates it. Keeping that fallback is what makes the
+    // migration lossless: a dead agent cannot be commanded to adopt its own
+    // name, so its pre-existing override must keep resolving.
     let name_override = state.lock().ok().and_then(|b| b.names.get(agent_id).map(str::to_owned));
     let default_name = std::path::Path::new(folder).file_name().and_then(std::ffi::OsStr::to_str).unwrap_or(agent_id);
-    let name = name_override.as_deref().unwrap_or(default_name);
+    let name = if entry.slug.is_empty() { name_override.as_deref().unwrap_or(default_name) } else { &entry.slug };
 
     // Phase + lifecycle + cost + cumulative tokens from the materialized view
     // (brief lock). These ride the push plane (PhaseTransition / CostAggregate
@@ -156,7 +163,11 @@ fn build_agent_meta(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> se
 
     let status = derive_status(phase, lifecycle, has_my_turn, is_stale);
     let accent = derive_accent(&status);
-    let has_avatar = state.lock().is_ok_and(|b| b.avatars.has(agent_id));
+    // Avatar presence, record-first for the same reason as the name. The shape
+    // stays a bare boolean rather than exposing the reference: the frontend
+    // loads the picture from `/api/agent/{id}/avatar` either way, so the
+    // ownership move is invisible to it — which is the test of a clean rewire.
+    let has_avatar = !entry.image.is_empty() || state.lock().is_ok_and(|b| b.avatars.has(agent_id));
 
     serde_json::json!({
         "id": agent_id,

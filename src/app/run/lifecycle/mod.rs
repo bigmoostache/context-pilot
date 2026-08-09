@@ -9,7 +9,7 @@ use ratatui::prelude::{CrosstermBackend, Terminal};
 use crate::app::actions::{Action, ActionResult, apply_action};
 use crate::app::events::handle_event;
 use crate::app::panels::now_ms;
-use crate::infra::api::{StreamEvent, start_streaming};
+use crate::infra::api::StreamEvent;
 use crate::infra::constants::{EVENT_POLL_MS, RENDER_THROTTLE_MS};
 use crate::state::Kind;
 use crate::state::cache::CacheUpdate;
@@ -17,9 +17,12 @@ use crate::state::persistence::{check_ownership, save_state};
 use crate::ui;
 
 use crate::app::App;
-use crate::app::context::{build_stream_params, get_active_agent_content, prepare_stream_context};
-use cp_mod_spine::engine::{SpineDecision, apply_continuation, check_spine};
 use cp_mod_spine::types::{NotificationType, SpineState};
+
+/// Auto-continuation policy — whether the agent should start talking again on
+/// its own. Split out because a tick's *mechanics* and the *decision* to
+/// continue are separate concerns (and because this file hit its size cap).
+mod spine;
 
 /// Bundles the I/O channels polled by the main event loop.
 pub(crate) struct EventChannels<'ch> {
@@ -222,6 +225,13 @@ impl App {
         super::threads::poll_bridge_commands(self);
         super::tools::watchdog::mark(super::tools::watchdog::Step::ThreadsEmit);
         super::threads::emit_bridge_deltas(self);
+        // The READ half of the agent advertisement, deliberately beside the
+        // bridge emitters rather than inside them: `emit_bridge_deltas` is
+        // contractually inert while the bridge is off, whereas peers must still
+        // be visible then — an agent run without a bridge has an Agora panel and
+        // neighbours on disk all the same. Self-throttled and fingerprint-guarded,
+        // so a tick that changes nothing costs one `scandir`.
+        cp_agora::fleet::poll(&mut self.state);
         super::tools::watchdog::mark(super::tools::watchdog::Step::Stream);
         super::streaming::process_stream_events(self, ch.rx);
         super::streaming::handle_retry(self, ch.tx);
@@ -349,92 +359,6 @@ impl App {
             self.save_message_async(msg);
         }
         self.save_state_async();
-    }
-
-    /// Check the spine for auto-continuation decisions.
-    /// Evaluates guard rails and auto-continuation logic.
-    /// If a continuation fires, starts streaming.
-    fn check_spine(&mut self, tx: &Sender<StreamEvent>) {
-        // Check if incomplete todos should trigger auto-continuation
-        self.check_todo_continuation();
-
-        // Idle is the implicit no-op tail — a non_exhaustive enum forbids a
-        // cross-crate exhaustive match, so the two actionable variants are
-        // handled via if-let and Idle simply falls through.
-        let decision = check_spine(&mut self.state);
-        if let SpineDecision::Blocked(reason) = decision {
-            // Guard rail blocked — notification already created by engine.
-            // Only mark dirty and save if this is a NEW block reason, to avoid
-            // burning CPU/disk on every tick (~125/sec) when persistently blocked.
-            if self.state.guard_rail_blocked.as_ref() != Some(&reason) {
-                self.state.guard_rail_blocked = Some(reason);
-                self.state.flags.ui.dirty = true;
-                self.save_state_async();
-            }
-        } else if let SpineDecision::Continue(action) = decision {
-            // Auto-continuation fired — apply it and start streaming
-            self.state.guard_rail_blocked = None;
-            let should_stream = apply_continuation(&mut self.state, action);
-            if should_stream {
-                // Auto-Read: if unfocused with a MY_TURN thread, inject a
-                // synthetic Read tool call. When injected, the Read rides the
-                // NORMAL tool pipeline (handle_tool_execution on the next
-                // tick) — which executes it, breaks tempo, and drives the
-                // follow-up stream via continue_streaming itself. So when it
-                // injected we must NOT start a stream here, nor clear
-                // pending_tools (that would wipe the injected Read).
-                // Behaviourally identical to the LLM emitting a Read as its
-                // first action (T322).
-                if !super::threads::maybe_inject_auto_read(self) {
-                    self.typewriter.reset();
-                    self.pending_tools.clear();
-                    let ctx = prepare_stream_context(&mut self.state, false, None);
-                    let system_prompt = get_active_agent_content(&self.state);
-                    let params = build_stream_params(&self.state, ctx, Some(system_prompt));
-                    start_streaming(params, tx.clone());
-                }
-                self.save_state_async();
-                self.state.flags.ui.dirty = true;
-            }
-        } else {
-            // SpineDecision::Idle — no auto-continuation, nothing to do.
-        }
-    }
-
-    /// Check if todos need auto-continuation. Creates a single deduplicated
-    /// notification — the spine's normal flow handles the rest.
-    fn check_todo_continuation(&mut self) {
-        if !SpineState::get(&self.state).config.continue_until_todos_done {
-            return;
-        }
-        if self.state.flags.stream.phase.is_streaming() {
-            return;
-        }
-        // Deduplicate: don't create if one already exists unprocessed
-        let already = SpineState::get(&self.state)
-            .notifications
-            .iter()
-            .any(|n| !n.is_processed() && n.source == "todo_continuation");
-        if already {
-            return;
-        }
-        let ts = cp_mod_todo::types::TodoState::get(&self.state);
-        if !ts.has_incomplete_todos() {
-            return;
-        }
-        // Report only the COUNT plus the FIRST incomplete item — never the full
-        // list. On a large roadmap (hundreds of todos) dumping every remaining
-        // entry floods the model with redundant tokens on every auto-continuation
-        // tick; the count conveys the scale and the first item points at what to
-        // pick up next, which is all the continuation nudge needs (T361).
-        let summary = ts.incomplete_todos_summary();
-        let first = summary.first().map_or("", String::as_str);
-        let _r = SpineState::create_notification(
-            &mut self.state,
-            NotificationType::Custom,
-            "todo_continuation".to_owned(),
-            format!("Non-completed todo items ({}). First: {first}", summary.len()),
-        );
     }
 
     /// Tick the dirty flag at 10fps **only while something on-screen is actually

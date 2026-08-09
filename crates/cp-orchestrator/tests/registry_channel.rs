@@ -101,6 +101,12 @@ fn entry(id: &str, hb_path: &Path, oplog_path: &Path, socket_path: &Path) -> Ent
         cap_token: "tok".to_owned(),
         started_at_ms: 0,
         status: AgentStatus::Running,
+        // The projection fields (slug/image/identity, schema 2) carry no weight
+        // in this test's plumbing — it exercises discovery/transport, not the
+        // advertisement's content — so they stay at never-advertised defaults.
+        slug: String::new(),
+        image: String::new(),
+        identity: None,
     }
 }
 
