@@ -13,6 +13,9 @@ providers.env
 deploy/ansible/out/
 # Ansible-built appliance artifacts (downloaded caddy, etc.).
 deploy/ansible/.artifacts/
+# Docker: locally built bundles, and the generated first-boot credentials.
+deploy/docker/.artifacts/
+deploy/docker/secrets/
 /.context-pilot/*
 snake
 tldr_debug.log
