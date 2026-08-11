@@ -2,10 +2,12 @@
 #
 # The cloud/self-hosted counterpart of deploy/ansible + deploy/photonicat: the
 # same release bundle, the same binaries, packaged instead of provisioned. The
-# product is NEVER patched here — everything below is packaging and first-boot
-# policy.
+# product is NEVER patched here — everything below is packaging.
 #
 #   docker build -t context-pilot:0.2.13 deploy/docker/
+#
+# There is no entrypoint script: the image is configured entirely by environment
+# variables (see .env.example) and the orchestrator is pid 1's only child.
 #
 # Two bundle sources, selected by --build-arg BUNDLE_SOURCE=:
 #   release (default) — downloads the `cpilot-linux-x86_64` asset of a published
@@ -54,10 +56,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN useradd --uid 10001 --create-home --home-dir /data --shell /bin/bash cp
 
 COPY --from=bundle /tmp/bundle.tar.gz /tmp/bundle.tar.gz
+# The $HOME skeleton is baked, not created at boot: docker seeds an EMPTY named
+# volume from whatever the image has at the mount point, so /data content built
+# here survives `volumes: [cp-data:/data]` and needs no entrypoint script.
+#
+# Meilisearch is the reason this matters. cp-mod-search expects the binary at
+# ~/.context-pilot/meilisearch/bin/ and DOWNLOADS it from github.com on first use
+# when absent (cp-mod-search/src/meili/server/download.rs) — a surprise 125 MB
+# egress call at the first search, and a hang wherever egress is filtered. The
+# bundle already ships the pinned build, so hardlink it into place: same inode,
+# so the image does not carry it twice.
 RUN mkdir -p /opt/cp \
  && tar -xzf /tmp/bundle.tar.gz -C /opt/cp \
  && rm /tmp/bundle.tar.gz \
- && chmod 755 /opt/cp/cpilot /opt/cp/cp-console-server /opt/cp/cp-orchestrator /opt/cp/meilisearch
+ && chmod 755 /opt/cp/cpilot /opt/cp/cp-console-server /opt/cp/cp-orchestrator /opt/cp/meilisearch \
+ && mkdir -p /data/.context-pilot/meilisearch/bin /data/.context-pilot/agents /data/code \
+ && ln /opt/cp/meilisearch /data/.context-pilot/meilisearch/bin/meilisearch \
+ && chown -R cp:cp /data
 
 ENV HOME=/data \
     CP_AUTH_ENABLED=1 \
@@ -84,9 +99,6 @@ ENV CP_ORCH_BIND=0.0.0.0
 # machine". A container has no business rewriting its host's network, and with
 # them absent the applier is inert.
 
-COPY entrypoint.sh /usr/local/bin/cp-entrypoint
-RUN chmod 755 /usr/local/bin/cp-entrypoint
-
 USER cp
 WORKDIR /data
 EXPOSE 7878
@@ -98,4 +110,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
 
 # tini reaps what the orchestrator spawns — agents, Meilisearch, console servers.
 # Without a real pid 1 they accumulate as zombies against --pids-limit.
-ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/cp-entrypoint"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/opt/cp/cp-orchestrator"]

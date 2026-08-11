@@ -13,8 +13,11 @@ providers.env
 deploy/ansible/out/
 # Ansible-built appliance artifacts (downloaded caddy, etc.).
 deploy/ansible/.artifacts/
-# Docker: locally built bundles, and the generated first-boot credentials.
+# Docker: locally built bundles. The instance config (deploy/docker/.env, which
+# holds the seed passwords and the provider keys) is covered by `.env` above.
 deploy/docker/.artifacts/
+# Legacy: the mounted-secrets layout the .env replaced. Kept ignored so an
+# instance still holding its passwords there cannot leak them into a commit.
 deploy/docker/secrets/
 /.context-pilot/*
 snake

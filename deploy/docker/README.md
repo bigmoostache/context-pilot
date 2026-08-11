@@ -5,43 +5,50 @@ same release bundle, the same binaries, packaged instead of provisioned. One
 container runs the whole product — orchestrator, agent, console server and
 Meilisearch — and serves the cockpit on `:7878`.
 
+Four files, no scripts: the image, the compose file, your `.env`, this page.
+
 ## First run
 
 ```sh
 cd deploy/docker
-./gen-secrets.sh                 # writes secrets/*.pw and prints them once
-$EDITOR secrets/providers.env    # add at least one model provider key
+cp .env.example .env && chmod 600 .env
+openssl rand -hex 16                      # paste as CP_SEED_SUPERADMIN_PASSWORD
+$EDITOR .env                              # + at least one model provider key
 docker compose up -d --build
 ```
 
-Open <http://127.0.0.1:7878> and log in as the superadmin. Both seeded accounts
-must change their password at first login.
+Open <http://127.0.0.1:7878> and log in as the superadmin. The first login forces
+a password change. `docker compose logs -f` shows the seed and the boot.
 
-## What it needs on first boot
+## Configuration
 
-Accounts are seeded **only while the user table is empty**, exactly as on the
-appliance. After that these values are ignored, and the entrypoint stops
-checking them.
+`.env` is the whole surface. Compose passes it into the container's environment,
+which is where the binaries already look — the seed reads its accounts from
+`CP_SEED_*` (`runtime/seed.rs`) and the vault reads provider keys from the
+environment (`cp-vault/src/local.rs:45`). Any `CP_*` variable the product
+understands can be added the same way.
 
 | | Required | |
 |---|---|---|
-| `CP_SEED_SUPERADMIN_EMAIL` + password | **yes** | Vendor account: provider secrets, IT settings. The only role that can create another superadmin. |
-| `CP_SEED_ADMIN_EMAIL` + password | no | The customer's top account. A superadmin can create it later from the cockpit. |
-| `CP_PROVIDERS_ENV_FILE` | no | API keys. Without a model provider key the cockpit works but no agent can answer. |
+| `CP_SEED_SUPERADMIN_EMAIL` + `_PASSWORD` | **yes** | Vendor account: provider secrets, IT settings. The only role that can create another superadmin. |
+| `CP_SEED_ADMIN_EMAIL` + `_PASSWORD` | no | The customer's top account. A superadmin can create it later from the cockpit. |
+| `ANTHROPIC_API_KEY`, `BRAVE_API_KEY`, … | no | Without a model provider key the cockpit works but no agent can answer. |
 
-Omitting the superadmin on first boot is **not reversible**: only a superadmin
-can create a superadmin, and the seed never runs again once any account exists.
-The entrypoint refuses to start rather than let that happen silently.
+Accounts are seeded **only while the user table is empty**, exactly as on the
+appliance; after that the values are ignored, so leaving them in `.env` is safe.
+Omitting the superadmin on the first boot is **not reversible** — only a
+superadmin can create a superadmin — so `docker compose up` refuses to start
+without one rather than let that happen silently.
 
-Passwords go in via `*_PASSWORD_FILE`, not `*_PASSWORD`. `docker inspect` shows
-every environment variable to anyone who can reach the daemon, and the agents
-running inside the container can read their own environment. The binary reads
-either (`runtime/seed.rs`), so the plain variable is there for throwaway runs.
+Keys are read at every start and never written to the volume: rotating one is
+editing `.env` and `docker compose up -d`. Keys set from the cockpit UI live in
+the volume and are not touched by this file.
 
-`providers.env` is one `KEY=value` per line. It is loaded into the process
-environment at every start and never written to the volume, so rotating a key is
-editing the file and restarting. Keys set from the cockpit UI are stored
-separately and are not touched by it.
+Anything in `.env` is visible in `docker inspect` to whoever can reach the
+daemon, and to the agents running inside the container — that is the cost of the
+single-file form. Keep `.env` at `0600`, and if that trade-off is not acceptable,
+use `CP_SEED_*_PASSWORD_FILE` with a mounted file instead (the binary reads
+either, `runtime/seed.rs`).
 
 ## Exposure
 
@@ -61,6 +68,19 @@ LAN-facing surface; in a container the isolation boundary is the network
 namespace and the published ports. Bound to loopback, the orchestrator would be
 unreachable through `-p` while the in-container healthcheck still passed.
 
+## State
+
+Everything that must survive a re-create is in the `cp-data` volume mounted at
+`/data` (`$HOME`): `auth.db`, agent realms under `/data/code`, the Meilisearch
+index. Back it up, and expect a `docker compose down -v` to be a factory reset.
+
+The image ships that directory tree pre-built, including the Meilisearch binary,
+because Docker seeds an empty named volume from the image's content at the mount
+point. That is what removes the need for a boot-time copy — and it only works for
+a named volume: bind-mount a host directory over `/data` instead and Meilisearch
+will download its own binary from github.com at the first search
+(`cp-mod-search/src/meili/server/download.rs`).
+
 ## Building against an unreleased commit
 
 The default build downloads a pinned, checksum-verified release asset. To run a
@@ -70,7 +90,8 @@ local build instead, produce the bundle in the same flat layout
 ```sh
 mkdir -p deploy/docker/.artifacts
 cp cpilot-linux-x86_64.tar.gz deploy/docker/.artifacts/
-docker compose build --build-arg BUNDLE_SOURCE=local
+echo BUNDLE_SOURCE=local >> deploy/docker/.env
+docker compose build
 ```
 
 Bumping the released version means bumping `VERSION` **and** `BUNDLE_SHA256` in

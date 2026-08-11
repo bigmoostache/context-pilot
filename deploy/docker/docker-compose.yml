@@ -1,21 +1,37 @@
 # Context Pilot — single-instance deployment.
 #
 #   cd deploy/docker
-#   ./gen-secrets.sh                     # writes secrets/*.pw, prints them once
-#   cp secrets/providers.env.example secrets/providers.env && $EDITOR secrets/providers.env
+#   cp .env.example .env && $EDITOR .env     # credentials + provider keys
 #   docker compose up -d
 #
-# Then open http://127.0.0.1:7878 and log in as the superadmin below; the first
-# login forces a password change.
+# Then open http://127.0.0.1:7878 and log in as the superadmin from your .env;
+# the first login forces a password change.
 services:
   context-pilot:
     build:
       context: .
-      # BUNDLE_SOURCE: local + a tarball in .artifacts/ to run an unreleased build.
+      # BUNDLE_SOURCE=local + a tarball in .artifacts/ to run an unreleased build.
       args:
-        BUNDLE_SOURCE: release
+        BUNDLE_SOURCE: ${BUNDLE_SOURCE:-release}
     image: context-pilot:0.2.13
     restart: unless-stopped
+
+    # The whole configuration surface: seed accounts, provider API keys, anything
+    # CP_*. Passed straight into the process environment, which is where the vault
+    # looks for provider keys (cp-vault/src/local.rs:45) and where the seed reads
+    # its accounts (runtime/seed.rs) — so no file parsing and no entrypoint script.
+    # Compose also reads this same file for the ${...} substitutions below.
+    env_file: .env
+
+    # Restated here only for the `:?` guard: unset or empty, `docker compose up`
+    # refuses with this message instead of starting. That refusal is load-bearing.
+    # Accounts are seeded only while the user table is empty, and only a superadmin
+    # can create a superadmin — so a first boot without one yields a deployment
+    # that can never have one, by any in-product path. Better to fail here than at
+    # the login screen. Ignored on every later start, hence safe to keep set.
+    environment:
+      CP_SEED_SUPERADMIN_EMAIL: ${CP_SEED_SUPERADMIN_EMAIL:?set it in .env — see .env.example}
+      CP_SEED_SUPERADMIN_PASSWORD: ${CP_SEED_SUPERADMIN_PASSWORD:?set it in .env — see .env.example}
 
     # LOOPBACK ON PURPOSE. Publishing on 0.0.0.0 serves the cockpit over plain
     # http:// to other machines, where crypto.randomUUID is undefined and every
@@ -23,29 +39,11 @@ services:
     # from another machine, put a TLS-terminating proxy in front and point it at
     # this container; do not widen this line.
     ports:
-      - "127.0.0.1:7878:7878"
+      - "127.0.0.1:${CP_PORT:-7878}:7878"
 
-    environment:
-      # First boot only — ignored once the user table is non-empty.
-      CP_SEED_SUPERADMIN_EMAIL: vendor@example.com
-      CP_SEED_SUPERADMIN_NAME: Vendor
-      CP_SEED_SUPERADMIN_PASSWORD_FILE: /run/secrets/superadmin.pw
-      # Optional: the customer's top account. Drop these three lines and a
-      # superadmin can create it from the cockpit instead.
-      CP_SEED_ADMIN_EMAIL: admin@example.com
-      CP_SEED_ADMIN_NAME: Admin
-      CP_SEED_ADMIN_PASSWORD_FILE: /run/secrets/admin.pw
-      # Provider / integration API keys, read at every start (never persisted).
-      CP_PROVIDERS_ENV_FILE: /run/secrets/providers.env
-
-    # Passwords as files, never as environment variables: `docker inspect` shows
-    # every env var to anyone who can reach the daemon, and the agents running
-    # inside this container can read their own environment.
-    secrets:
-      - superadmin.pw
-      - admin.pw
-      - providers.env
-
+    # $HOME. Everything that must survive a re-create lives here: auth.db, agent
+    # realms, the Meilisearch index. Docker seeds it from the image on first up,
+    # which is how Meilisearch gets its binary without a boot-time copy.
     volumes:
       - cp-data:/data
 
@@ -58,14 +56,6 @@ services:
     pids_limit: 512
     mem_limit: 4g
     cpus: 2.0
-
-secrets:
-  superadmin.pw:
-    file: ./secrets/superadmin.pw
-  admin.pw:
-    file: ./secrets/admin.pw
-  providers.env:
-    file: ./secrets/providers.env
 
 volumes:
   cp-data:
