@@ -53,6 +53,15 @@ pub(crate) const SYSTEM_REMINDER: &str =
     "<system-reminder>\nThe following skills are available for use with the Skill tool:\n</system-reminder>";
 
 /// API endpoint with beta flag required for Claude 4.5 access
+///
+/// Direct for now: `CP_LLM_GATEWAY` ([`gateway`](crate::llms::gateway)) is
+/// ignored here. The pass-through route would preserve the body and the
+/// `anthropic-beta` header, and [`passthrough_url`] already keeps the
+/// `?beta=true` query — but it substitutes its own key for the client's
+/// `x-api-key`, so whether the Claude Code request survives has to be measured
+/// before it is offered. Until then this stays on the path that is known to work.
+///
+/// [`passthrough_url`]: crate::llms::gateway
 pub(crate) const CLAUDE_CODE_ENDPOINT: &str = "https://api.anthropic.com/v1/messages?beta=true";
 
 /// Beta header with all required flags for Claude Code access (API key mode)

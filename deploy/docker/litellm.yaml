@@ -1,0 +1,56 @@
+# LiteLLM gateway configuration — the model routing table for CP_LLM_GATEWAY.
+#
+# Only the OpenAI-compatible providers need to be here. The Anthropic client
+# takes LiteLLM's pass-through route (/anthropic/v1/messages), which forwards the
+# body to Anthropic unmodified and does not consult this table at all — that is
+# what keeps `cache_control` and the anthropic-beta header intact.
+#
+# `model_name` must match, character for character, the string the product puts
+# in the request body: the `api_name` values in crates/cp-base/src/config/models.rs.
+# A model missing from this list is a 400 at the first message, not a fallback.
+model_list:
+  - model_name: grok-4-1-fast
+    litellm_params:
+      model: xai/grok-4-1-fast
+      api_key: os.environ/XAI_API_KEY
+  - model_name: grok-4-fast
+    litellm_params:
+      model: xai/grok-4-fast
+      api_key: os.environ/XAI_API_KEY
+
+  - model_name: deepseek-v4-flash
+    litellm_params:
+      model: deepseek/deepseek-v4-flash
+      api_key: os.environ/DEEPSEEK_API_KEY
+  - model_name: deepseek-v4-pro
+    litellm_params:
+      model: deepseek/deepseek-v4-pro
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+  - model_name: llama-3.3-70b-versatile
+    litellm_params:
+      model: groq/llama-3.3-70b-versatile
+      api_key: os.environ/GROQ_API_KEY
+  - model_name: llama-3.1-8b-instant
+    litellm_params:
+      model: groq/llama-3.1-8b-instant
+      api_key: os.environ/GROQ_API_KEY
+  # These two carry a slash in their own name (`openai/gpt-oss-*` is what Groq
+  # calls them). To LiteLLM a slash means "provider/model", so without these
+  # explicit entries the requests would be sent to OpenAI instead of Groq — and a
+  # wildcard entry would not save them, it would route them wrong faster.
+  - model_name: openai/gpt-oss-120b
+    litellm_params:
+      model: groq/openai/gpt-oss-120b
+      api_key: os.environ/GROQ_API_KEY
+  - model_name: openai/gpt-oss-20b
+    litellm_params:
+      model: groq/openai/gpt-oss-20b
+      api_key: os.environ/GROQ_API_KEY
+
+litellm_settings:
+  # drop_params MUST stay false (the default, restated because it matters): it
+  # silently removes parameters the provider is not known to support, which is
+  # how tool definitions and cache fields disappear without an error.
+  drop_params: false
+  num_retries: 2

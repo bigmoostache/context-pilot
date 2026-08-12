@@ -5,7 +5,8 @@ same release bundle, the same binaries, packaged instead of provisioned. One
 container runs the whole product — orchestrator, agent, console server and
 Meilisearch — and serves the cockpit on `:7878`.
 
-Four files, no scripts: the image, the compose file, your `.env`, this page.
+No scripts: the image, the compose file, your `.env`, and this page — plus
+`litellm.yaml` and `providers.env` if you turn the optional gateway on.
 
 ## First run
 
@@ -49,6 +50,53 @@ daemon, and to the agents running inside the container — that is the cost of t
 single-file form. Keep `.env` at `0600`, and if that trade-off is not acceptable,
 use `CP_SEED_*_PASSWORD_FILE` with a mounted file instead (the binary reads
 either, `runtime/seed.rs`).
+
+## Optional: an LLM gateway
+
+`CP_LLM_GATEWAY` points the API-key providers at a LiteLLM proxy instead of their
+own domains. Empty or absent — the default — every provider is called directly
+with the keys in `.env`, and none of this code runs.
+
+```sh
+cp providers.env.example providers.env && chmod 600 providers.env
+$EDITOR providers.env                       # the model keys move here
+$EDITOR .env                                 # CP_LLM_GATEWAY + CP_LLM_GATEWAY_KEY
+docker compose --profile gateway up -d
+```
+
+Both halves are required: the variable without the profile leaves the agent
+posting to a host that does not exist. In exchange, the model keys are read only
+by the gateway container — the agents and `docker inspect` on the product no
+longer see them.
+
+Two routes are used, and the difference matters:
+
+- Anthropic-format requests go to `/anthropic/v1/messages`, LiteLLM's
+  **pass-through**, which forwards the body unmodified. Nothing is normalized, so
+  provider-specific fields survive.
+- OpenAI-compatible requests (Grok, Groq, DeepSeek) go to `/v1/chat/completions`,
+  where LiteLLM routes on the body's `model`. **Every model string the product
+  sends must be declared in `litellm.yaml`** — a missing one is a 400 on the
+  first message. The two Groq `openai/gpt-oss-*` entries are the trap: LiteLLM
+  reads their slash as a provider prefix, so without their explicit entries the
+  requests go to OpenAI instead of Groq.
+
+Never enable `drop_params` in `litellm.yaml`. It removes parameters silently,
+which is how tool definitions and cache fields vanish without an error.
+
+Reading the failures, all four measured against this compose file:
+
+| What you see | What it means |
+|---|---|
+| `401 invalid x-api-key` with an Anthropic `request_id` | the route works; the key **inside the gateway** is wrong |
+| `400 XaiException - Incorrect API key provided` | same, for an OpenAI-compatible provider |
+| `400 Invalid model name passed in model=…` | that model has no `model_list` entry |
+| `400 {"message":"No connected db."}` | `CP_LLM_GATEWAY_KEY` does not match the gateway's master key — it reads like a broken proxy and is really a bad key (LiteLLM has no database here to look keys up in) |
+
+Unaffected on purpose: the two Claude Code providers (a subscription OAuth token
+cannot survive a proxy that substitutes its own key) and MiniMax (no route
+forwards an Anthropic-shaped body to a third party). They keep calling their own
+API whatever `CP_LLM_GATEWAY` says — see `src/llms/gateway.rs`.
 
 ## Exposure
 

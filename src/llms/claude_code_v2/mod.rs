@@ -24,6 +24,13 @@ use crate::infra::constants::{API_VERSION, library};
 use crate::infra::tools::build_api;
 
 /// API endpoint with beta query parameter.
+///
+/// Always direct: this provider deliberately ignores `CP_LLM_GATEWAY`
+/// ([`gateway`](crate::llms::gateway)). Its credential is a Claude Code
+/// subscription OAuth token, and `LiteLLM`'s pass-through substitutes its own
+/// configured key for whatever the client sent — the OAuth path cannot survive
+/// the proxy. The prompt-cache breakpoint engine rides on this provider, so
+/// routing it through a proxy is also what would put the cache at risk.
 const ENDPOINT: &str = "https://api.anthropic.com/v1/messages?beta=true";
 
 /// Base beta flags captured live from Claude Code CLI v2.1.220 (main-agent set).

@@ -8,6 +8,8 @@ pub(crate) mod cache;
 pub(crate) mod claude_code_api_key;
 /// Claude Code V2 provider (OAuth, updated request format with Opus 4.8).
 pub(crate) mod claude_code_v2;
+/// Optional LiteLLM gateway routing (`CP_LLM_GATEWAY`).
+pub(crate) mod gateway;
 /// MiniMax provider (Anthropic-compatible API via Token Plan).
 pub(crate) mod minimax;
 /// OpenAI-compatible provider implementations (Grok, Groq, DeepSeek).

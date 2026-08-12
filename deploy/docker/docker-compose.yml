@@ -57,5 +57,53 @@ services:
     mem_limit: 4g
     cpus: 2.0
 
+  # Optional LLM gateway. Off by default; start it with:
+  #
+  #   docker compose --profile gateway up -d
+  #
+  # and point the product at it with CP_LLM_GATEWAY=http://litellm:4000 in .env.
+  # With CP_LLM_GATEWAY unset the product talks to each provider directly and
+  # this service is never started — the two halves of the switch are independent,
+  # so setting the variable without enabling the profile leaves the agent posting
+  # to a host that does not exist.
+  litellm:
+    image: docker.litellm.ai/berriai/litellm:main-latest
+    profiles: [gateway]
+    restart: unless-stopped
+    command: ["--config", "/app/config.yaml"]
+
+    # No `ports:`. The gateway is reachable from the product over the compose
+    # network and from nowhere else; publishing it would expose an endpoint that
+    # spends money to anything that can reach the host.
+    volumes:
+      - ./litellm.yaml:/app/config.yaml:ro
+
+    # The model keys live HERE, not in the product's environment — that is the
+    # point of running a gateway: the agents, and `docker inspect` on the product
+    # container, no longer see them. required:false so the default (gateway-less)
+    # deployment does not need the file to exist at all.
+    env_file:
+      - path: providers.env
+        required: false
+    environment:
+      # The key the product presents as `CP_LLM_GATEWAY_KEY`. One value, one
+      # place: no database here, so the master key *is* the accepted credential.
+      LITELLM_MASTER_KEY: ${CP_LLM_GATEWAY_KEY:?set it in .env to run the gateway}
+
+    # Liveliness, not /health: the latter needs a token and issues real requests
+    # to every configured model, so using it here would bill tokens every 30s.
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request as u; u.urlopen('http://127.0.0.1:4000/health/liveliness')\""]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 2g
+
 volumes:
   cp-data:
