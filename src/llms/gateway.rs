@@ -23,14 +23,8 @@
 //! The two Claude Code providers ignore all of this on purpose; the reason is
 //! documented where they build their requests.
 
+use cp_base::config::llm_gateway;
 use cp_mod_utilities::secret::Redacted;
-
-/// Gateway base URL. Absent or empty means "no gateway".
-const GATEWAY_URL_ENV: &str = "CP_LLM_GATEWAY";
-
-/// Key presented to the gateway — `LiteLLM`'s master key, or a virtual key when
-/// it runs with a database.
-const GATEWAY_KEY_ENV: &str = "CP_LLM_GATEWAY_KEY";
 
 /// Unified chat-completions path, appended to the base URL for every
 /// `OpenAI`-compatible provider whatever its own path happens to be.
@@ -57,13 +51,13 @@ pub(crate) struct OaiTarget {
     pub key: Redacted,
 }
 
-/// The configured gateway base URL, trailing slashes trimmed, or `None` when
-/// unset or empty. Empty counts as unset so an operator can disable the gateway
-/// by blanking the variable rather than deleting the line.
+/// The configured gateway base URL, or `None` when unset or empty.
+///
+/// Delegates to [`cp_base::config::llm_gateway`], which the orchestrator also
+/// reads to decide which providers the cockpit may offer. One definition, so the
+/// picker and the request path cannot disagree.
 fn base_url() -> Option<String> {
-    let raw = std::env::var(GATEWAY_URL_ENV).ok()?;
-    let trimmed = raw.trim().trim_end_matches('/');
-    if trimmed.is_empty() { None } else { Some(trimmed.to_owned()) }
+    llm_gateway::base_url()
 }
 
 /// The key to present to the gateway, falling back to the provider's own key
@@ -77,7 +71,7 @@ fn base_url() -> Option<String> {
 /// match on, which is why this fallback tries to send something plausible rather
 /// than nothing.
 fn gateway_key(direct_key: Option<&Redacted>) -> Redacted {
-    if let Some(key) = std::env::var(GATEWAY_KEY_ENV).ok().filter(|value| !value.trim().is_empty()) {
+    if let Some(key) = std::env::var(llm_gateway::GATEWAY_KEY_ENV).ok().filter(|value| !value.trim().is_empty()) {
         return Redacted::new(key);
     }
     direct_key.map_or_else(|| Redacted::new("sk-no-gateway-key-set".to_owned()), Clone::clone)

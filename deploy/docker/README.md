@@ -59,8 +59,10 @@ with the keys in `.env`, and none of this code runs.
 
 ```sh
 cp providers.env.example providers.env && chmod 600 providers.env
-$EDITOR providers.env                       # the model keys move here
-$EDITOR .env                                 # CP_LLM_GATEWAY + CP_LLM_GATEWAY_KEY
+cp litellm.yaml.example litellm.yaml
+$EDITOR providers.env      # the model keys move here
+$EDITOR litellm.yaml       # keep only the providers whose keys you just set
+$EDITOR .env               # CP_LLM_GATEWAY + CP_LLM_GATEWAY_KEY
 docker compose --profile gateway up -d
 ```
 
@@ -83,6 +85,32 @@ Two routes are used, and the difference matters:
 
 Never enable `drop_params` in `litellm.yaml`. It removes parameters silently,
 which is how tool definitions and cache fields vanish without an error.
+
+### `litellm.yaml` drives the model picker
+
+Under a gateway the orchestrator has no provider keys of its own, so it cannot
+decide availability from a key check. It asks the gateway instead — `GET
+/v1/models`, cached five minutes, no tokens — and offers only the intersection
+with its catalogue. **Comment out the providers whose keys you do not have**: a
+model declared there but keyless is offered and then fails with a provider 401.
+
+Two deliberate gaps in that filter:
+
+- **Anthropic is never filtered.** It takes the pass-through route, which does not
+  consult `model_list`, so its models are absent from `/v1/models` by
+  construction — filtering on that list would remove a provider that works.
+- **An unreachable gateway filters nothing.** The full catalogue is offered rather
+  than an empty picker, because a proxy that is briefly down should not look like
+  a product that lost its models.
+
+For the exact truth — which declared models have a *working* key — ask the proxy
+itself. It issues one real request per model, so run it by hand, never on a timer:
+
+```sh
+KEY=$(grep '^CP_LLM_GATEWAY_KEY=' .env | cut -d= -f2)
+docker compose exec context-pilot curl -sS http://litellm:4000/health \
+  -H "Authorization: Bearer $KEY" | jq -r '.healthy_endpoints[].model'
+```
 
 Reading the failures, all four measured against this compose file:
 

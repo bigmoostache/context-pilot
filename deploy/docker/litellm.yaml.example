@@ -8,6 +8,11 @@
 # `model_name` must match, character for character, the string the product puts
 # in the request body: the `api_name` values in crates/cp-base/src/config/models.rs.
 # A model missing from this list is a 400 at the first message, not a fallback.
+#
+# This list is also what the cockpit offers: the orchestrator reads it back
+# through `GET /v1/models` and shows only the intersection with its catalogue.
+# COMMENT OUT the providers whose keys are not in providers.env — a model declared
+# here without a working key is offered and then answers 401.
 model_list:
   - model_name: grok-4-1-fast
     litellm_params:
