@@ -1,4 +1,14 @@
 import { X, FileText } from "lucide-react"
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core"
+import { SortableContext, horizontalListSortingStrategy, useSortable } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 import type { FinderNode } from "@/lib/types"
 import { FinderPreview } from "../preview/FinderPreview"
 import { VsCodeFileIcon } from "../support/VsCodeFileIcon"
@@ -60,18 +70,35 @@ function toNode(tab: OpenTab): FinderNode {
  * under the pointer. VS Code scrolls for the same reason.
  */
 function TabStrip({ tabs }: { tabs: TabsState }) {
+  // A 4px activation distance so a plain click (activate / close / middle-close)
+  // is NOT swallowed as a drag: the pointer must travel before a reorder starts,
+  // which leaves every existing click affordance on the tab intact.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
+
+  const onDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e
+    if (over && active.id !== over.id) tabs.reorder(String(active.id), String(over.id))
+  }
+
   return (
-    <div className="flex h-9 shrink-0 items-stretch overflow-x-auto overflow-y-hidden border-b border-(--border-strong)/70 bg-surface">
-      {tabs.tabs.map((tab) => (
-        <Tab
-          key={tab.path}
-          tab={tab}
-          active={tab.path === tabs.activePath}
-          onActivate={() => tabs.activate(tab.path)}
-          onClose={() => tabs.close(tab.path)}
-        />
-      ))}
-    </div>
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+      <SortableContext
+        items={tabs.tabs.map((t) => t.path)}
+        strategy={horizontalListSortingStrategy}
+      >
+        <div className="flex h-9 shrink-0 items-stretch overflow-x-auto overflow-y-hidden border-b border-(--border-strong)/70 bg-surface">
+          {tabs.tabs.map((tab) => (
+            <Tab
+              key={tab.path}
+              tab={tab}
+              active={tab.path === tabs.activePath}
+              onActivate={() => tabs.activate(tab.path)}
+              onClose={() => tabs.close(tab.path)}
+            />
+          ))}
+        </div>
+      </SortableContext>
+    </DndContext>
   )
 }
 
@@ -94,8 +121,22 @@ function Tab({
   onActivate: () => void
   onClose: () => void
 }) {
+  // The whole tab is the drag handle. `useSortable` keyed by the tab's path (its
+  // stable identity); `isDragging` dims the lifted tab so the gap it leaves reads
+  // as the drop target.
+  const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
+    id: tab.path,
+  })
+
   return (
     <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      {...attributes}
+      {...listeners}
+      // After the dnd-kit spread so they WIN: `useSortable`'s attributes carry a
+      // generic `role="button"` + `tabIndex`, but this element is a tab in a
+      // tablist, so its own role/selected-state must override them.
       role="tab"
       aria-selected={active}
       tabIndex={0}
@@ -115,6 +156,7 @@ function Tab({
       }}
       className={cn(
         "group flex max-w-[220px] min-w-[120px] shrink-0 cursor-default items-center gap-1.5 border-r border-(--border-strong)/70 px-3 text-[12.5px] transition-colors outline-none",
+        isDragging && "z-10 opacity-60",
         active
           ? "bg-background text-foreground"
           : "bg-surface text-muted-foreground hover:text-foreground/90",
@@ -128,6 +170,10 @@ function Tab({
       <button
         type="button"
         aria-label={`Close ${tab.name}`}
+        // Stop the sortable listeners from claiming a drag that starts on the
+        // close button — otherwise a press-drag on the ✕ would lift the tab
+        // instead of arming the close.
+        onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           // The tab behind is clickable; without this, closing would also
           // activate the tab on its way out.

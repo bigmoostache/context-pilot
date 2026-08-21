@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react"
+import { arrayMove } from "@dnd-kit/sortable"
 import type { FinderNode } from "@/lib/types"
 
 /**
@@ -43,6 +44,8 @@ export interface TabsState {
   close: (path: string) => void
   closeAll: () => void
   activate: (path: string) => void
+  /** Drag-reorder: move the tab at `fromPath` to `toPath`'s slot (T630). */
+  reorder: (fromPath: string, toPath: string) => void
 }
 
 export function useTabsState(): TabsState {
@@ -102,8 +105,28 @@ export function useTabsState(): TabsState {
     setActivePath(null)
   }, [])
 
+  const reorder = useCallback((fromPath: string, toPath: string) => {
+    setTabs((prev) => {
+      const from = prev.findIndex((t) => t.path === fromPath)
+      const to = prev.findIndex((t) => t.path === toPath)
+      // Either tab gone (closed mid-drag) or a no-op drop onto itself: leave the
+      // order untouched rather than splice a −1 index into a phantom move.
+      if (from === -1 || to === -1 || from === to) return prev
+      return arrayMove([...prev], from, to)
+    })
+  }, [])
+
   return useMemo(
-    () => ({ tabs, activePath, openPreview, openPinned, close, closeAll, activate: setActivePath }),
-    [tabs, activePath, openPreview, openPinned, close, closeAll],
+    () => ({
+      tabs,
+      activePath,
+      openPreview,
+      openPinned,
+      close,
+      closeAll,
+      activate: setActivePath,
+      reorder,
+    }),
+    [tabs, activePath, openPreview, openPinned, close, closeAll, reorder],
   )
 }
