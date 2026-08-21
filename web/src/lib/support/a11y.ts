@@ -121,22 +121,6 @@ export function useModifierShortcuts(actions: Record<string, () => void>): boole
 }
 
 /**
- * Whether the caret currently sits in a text-entry surface — a plain input, a
- * textarea, or a contenteditable. {@link useLoopNav} bails on its arrow keys in
- * that case so ⌘/Ctrl+Up/Down keeps its native "caret to line start/end"
- * meaning while the user is typing, instead of yanking the sidebar selection
- * out from under them.
- */
-function inTextField(): boolean {
-  const el = document.activeElement
-  return (
-    el instanceof HTMLInputElement ||
-    el instanceof HTMLTextAreaElement ||
-    (el instanceof HTMLElement && el.isContentEditable)
-  )
-}
-
-/**
  * The two items ⌘/Ctrl+Up and ⌘/Ctrl+Down would move TO, given the current
  * selection index — the data behind the arrow hint badges.
  *
@@ -174,8 +158,9 @@ function loopBadges(
  *
  * Bound through {@link useModifierShortcuts}, so the listener lives exactly as
  * long as the calling rail is mounted (only one of Threads / Settings is ever
- * on screen, so their bindings never overlap). The arrow keys bail while a text
- * field is focused (see {@link inTextField}), and a selection that is not in the
+ * on screen, so their bindings never overlap). The arrows loop the sidebar even
+ * while a text field is focused (T634 — the native caret-to-edge is suppressed
+ * by the shortcut's own `preventDefault`), and a selection that is not in the
  * list (index −1) jumps to the first item rather than doing nothing.
  *
  * @returns `modHeld` to gate the badges, plus the `prevId` / `nextId` to draw
@@ -190,7 +175,12 @@ export function useLoopNav(
   const idx = orderedIds.indexOf(selectedId)
 
   const go = (dir: 1 | -1) => {
-    if (n === 0 || inTextField()) return
+    // No text-field bail (T634): the shortcut must loop the sidebar even while
+    // the caret sits in the composer. `useModifierShortcuts` already
+    // `preventDefault`s the bound arrows, so the native ⌘/Ctrl+Up/Down
+    // caret-to-edge is suppressed regardless — a guard here only left the keys
+    // dead (native move blocked AND no nav), which is the bug being fixed.
+    if (n === 0) return
     const target = orderedIds[idx === -1 ? 0 : (idx + dir + n) % n]
     if (target !== undefined) onSelect(target)
   }
