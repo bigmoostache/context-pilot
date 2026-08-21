@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useLibrary, sendCommand, useDeleteLibraryAgent } from "@/lib/live"
 import { fetchLibraryAgent } from "@/lib/api"
+import { Tip } from "@/components/ui/tip"
 import type { LibraryItem } from "@/lib/types"
 import { AgentEditorDialog, type AgentEditorMode } from "./AgentEditorDialog"
 
@@ -266,30 +267,44 @@ function BehaviourRow({
   // user agents always show it. (Backstop: the backend 404s a fileless delete.)
   const showDelete = item.builtin !== true
 
+  // The label's classes must carry the text-only hover highlight (T635), so
+  // whether it is wrapped in a Tip or rendered bare, the same string is used.
+  const labelClass =
+    "flex min-w-0 flex-1 items-center gap-2 group-focus/dropdown-menu-item:text-foreground! group-data-highlighted/dropdown-menu-item:text-foreground!"
+  const labelInner = (
+    <>
+      {item.active ? (
+        <span className="size-1.5 rounded-full bg-(--ok)" />
+      ) : (
+        <span className="size-1.5" />
+      )}
+      {item.builtin === true && (
+        <Lock className="size-3 shrink-0 text-muted-foreground/50" aria-label="built-in" />
+      )}
+      {item.name || item.id}
+    </>
+  )
+
   return (
     <DropdownMenuItem
       onClick={onSelect}
-      // The agent's description as a tooltip (T635). Native `title`, not the
-      // styled `Tip`: wrapping a base-ui menuitem (or nesting a focusable Tip
-      // trigger inside one) fights the menu's roving-focus + typeahead, and a
-      // portalled popup per row is heavy chrome on an 8-row menu. The quiet
-      // native tooltip is the same call ExplorerRow makes for its dense tree.
-      title={item.description || undefined}
       className={`group/row justify-between ${ROW_HILITE} ${
         item.active ? "font-semibold text-foreground" : "text-foreground/70"
       }`}
     >
-      <span className="flex items-center gap-2 group-focus/dropdown-menu-item:text-foreground! group-data-highlighted/dropdown-menu-item:text-foreground!">
-        {item.active ? (
-          <span className="size-1.5 rounded-full bg-(--ok)" />
-        ) : (
-          <span className="size-1.5" />
-        )}
-        {item.builtin === true && (
-          <Lock className="size-3 shrink-0 text-muted-foreground/50" aria-label="built-in" />
-        )}
-        {item.name || item.id}
-      </span>
+      {/* The agent's description as the app's styled Tip (T635 revision — was a
+          native `title`). `side="right"` keeps the popup clear of the rows
+          stacked below it. Tip renders its trigger as a plain <span> and opens
+          on hover, so it coexists with base-ui's menu roving-focus + typeahead;
+          the label classes ride on `triggerClassName` so the wrapper span IS the
+          label. No description → a bare span, since Tip needs a title. */}
+      {item.description ? (
+        <Tip title={item.description} side="right" triggerClassName={labelClass}>
+          {labelInner}
+        </Tip>
+      ) : (
+        <span className={labelClass}>{labelInner}</span>
+      )}
       <span className="flex items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover/row:opacity-100">
         <RowButton title="Edit" onClick={stopAnd(onEdit)}>
           <Pencil className="size-3" />
