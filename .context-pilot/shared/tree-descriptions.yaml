@@ -21316,8 +21316,8 @@ f6191ad6ed8ba76a:
   last_edited_ms: 0
 f61c6fa71d54d3cd:
   path: web/src/components/shell/TopBar.tsx
-  description: 'Slim macOS-style title bar (T321 trimmed): app mark→fleet, agent switcher, per-agent view tabs (Threads/Finder/Cockpit/Costs), agent-config gear, UsageButton, account UserMenu. Costs tab dev-mode only. P8: view-tab cluster extracted into a ViewTabs subcomponent (moving the two devMode gates off TopBar''s complexity budget); TopBar fn now <150 lines / cx<15.'
-  last_edited_ms: 0
+  description: Slim macOS-style title bar. app mark→fleet, agent switcher, per-agent view tabs (Threads/Finder/Costs), config gear, UsageButton, UserMenu. Costs tab dev-mode only. ViewTabs subcomponent holds the view tabs; useViewShortcuts hook binds ⌘/Ctrl view-switch shortcuts (C=Threads off-Threads / K=Finder off-Finder / S=Settings always) + drives per-tab HintBadge while modifier held. C gated on !onThreads so it never collides with ThreadActions' new-thread C.
+  last_edited_ms: 1787321982484
 f61e3df67e228736:
   path: crates/cp-wire/tests/protocol.rs
   description: 'Phase 21 (X788): cp-wire protocol coverage at public-API boundary. Every OpEntryKind variant JSON round-trip incl Checkpoint{Snapshot} (the inline tests skip CommandEffect/SeenMark/Lifecycle/CostAggregate/Checkpoint), checkpoint-carries-faithful-snapshot (GAP1 fast-replay reseed integrity), accepts() N-1 window sweep 0..PV+4, ContentHash to_hex/from_hex bijection + uppercase-accepted + malformed-rejected-never-panic, SeenSet evict_through retires exactly acked tokens + rev_of preserved, Heads upsert last-write-wins-per-thread (I3 bounded). serde_json used directly; crc32c/serde/sha2 acked as _. 7 tests.'
