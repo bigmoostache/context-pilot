@@ -5754,6 +5754,10 @@
   path: web/src/components/auth/maint/parts.tsx
   description: 'Shared presentational building blocks for the IT maintenance wizard: Shell (centered CP-branded step shell + progress dots), Field (labelled text/password input), PrimaryButton/GhostButton, ErrorNote. Token-styled to match the auth-screen idiom.'
   last_edited_ms: 1783349019459
+410f8fe546edf128:
+  path: web/src/components/shell/behaviour/BehaviourChip.tsx
+  description: 'Footer behaviour-agent chip + selector dropdown. useLibrary filter kind=agent, active item, switch via sendCommand load_behaviour. Per-item Edit/Export/Delete + Create/Import rows (AgentEditorDialog). parseAgentMd frontmatter parser. ROW_HILITE text-only hover highlight. T635: agent description shown via styled Tip (side=right, hover-opening span coexists with base-ui menu roving-focus+typeahead), bare span when no description.'
+  last_edited_ms: 1787327025846
 4126575345c01e53:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
