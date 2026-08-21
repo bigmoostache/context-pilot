@@ -25,6 +25,13 @@ export function InfoBadge({ description }: { description?: string | undefined })
     <Tip title={description} side="top" triggerClassName="inline-flex shrink-0">
       <span
         aria-label="Show description"
+        // Empty native `title` SUPPRESSES the one inherited from the row button
+        // (which carries `title={node.name}` for truncated filenames). Without
+        // this, hovering the badge shows TWO tooltips at once — the row's native
+        // filename bubble and this component's styled Tip. The browser resolves
+        // a native tooltip from the element under the pointer, and an empty
+        // string there yields none, so only the Tip remains (T633).
+        title=""
         // CAPTURE-phase swallowers, deliberately. Plain `onClick`/`onPointerDown`
         // on a static <span> trip jsx-a11y (click-events-have-key-events +
         // no-static-element-interactions) because they read as an interactive
