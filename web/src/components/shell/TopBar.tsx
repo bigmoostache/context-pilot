@@ -85,17 +85,12 @@ export function TopBar({
   return (
     <>
       {/* No border, no fill: the rail sits directly on `--background`. It used
-          to carry `.vibrancy` (a translucent `--surface` wash + backdrop blur)
-          and a `border-r`; both are gone, so the rail reads as bare chrome
-          floating on the desk rather than as a panel. Nothing is painted behind
-          it, so dropping the backdrop-filter costs no visual depth — and it
-          also removes the containing block that filter created.
-
-          The inset is 0.5rem on ALL FOUR sides (`p-2`). It was briefly
-          horizontal-only, which left the top control flush against the window
-          edge and the bottom cluster flush against the footer — too tight.
-          `gap-3` is a separate concern: rhythm BETWEEN rail items, not an edge
-          inset. */}
+          to carry `.vibrancy` (translucent `--surface` + backdrop blur) and a
+          `border-r`; both gone, so it reads as bare chrome, not a panel —
+          nothing is painted behind it, so the dropped backdrop-filter costs no
+          depth and removes the containing block it created. `p-2` insets all
+          four sides (horizontal-only left the top/bottom controls flush — too
+          tight); `gap-3` is separate: rhythm BETWEEN items, not an edge inset. */}
       <header className="flex w-14 shrink-0 flex-col items-center gap-3 p-2">
         <Tip
           title="Workspace"
@@ -331,9 +326,10 @@ function ViewTab({
  * Build the three view-tab click handlers AND bind them as ⌘/Ctrl shortcuts —
  * one definition for both, so a shortcut is "as if you clicked the tab". Each
  * is DUAL-PURPOSE like the tab click: off the view navigate there, on the view
- * toggle that view's rail (L/K/S stay live on their own view). L not C drives
- * Threads — C is the new-thread shortcut in sibling {@link ThreadActions}. All
- * bound, so one `modHeld` gates every hint. Args one object (max-params 4);
+ * toggle that view's rail (L/K/I stay live on their own view). L not C drives
+ * Threads — C is the new-thread shortcut in sibling {@link ThreadActions}; I not
+ * S drives Settings (⌘S is the browser's Save; the user asked for ⌘I, T639).
+ * All bound, so one `modHeld` gates every hint. Args one object (max-params 4);
  * `useModifierShortcuts` reads the map via latest-ref so rebuilds don't re-add
  * the listener.
  */
@@ -355,7 +351,7 @@ function useViewShortcuts(a: {
   const settingsClick =
     a.view === "settings" ? a.onToggleSettingsRail : () => a.onViewChange("settings")
 
-  const modHeld = useModifierShortcuts({ l: threadsClick, k: finderClick, s: settingsClick })
+  const modHeld = useModifierShortcuts({ l: threadsClick, k: finderClick, i: settingsClick })
 
   return { modHeld, threadsClick, finderClick, settingsClick }
 }
@@ -396,7 +392,7 @@ function ViewTabs({
   const onSettings = view === "settings"
   const onFinder = view === "finder"
 
-  // ⌘/Ctrl shortcuts (L Threads · K Finder · S Settings) share ONE handler each
+  // ⌘/Ctrl shortcuts (L Threads · K Finder · I Settings) share ONE handler each
   // with the tab click — the hook builds them, so a shortcut and a click are
   // the same action. All three stay bound on their own view (toggle the rail).
   const { modHeld, threadsClick, finderClick, settingsClick } = useViewShortcuts({
@@ -490,8 +486,9 @@ function ViewTabs({
           expanded={onSettings ? settingsRailOpen : undefined}
           icon={SlidersHorizontal}
           label="Settings"
-          // S navigates to Settings, or toggles the category rail once here.
-          hint="S"
+          // I navigates to Settings, or toggles the category rail once here
+          // (⌘S is the browser Save shortcut; the user chose ⌘I, T639).
+          hint="I"
           hintShown={modHeld}
         />
       </Tip>
