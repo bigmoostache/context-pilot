@@ -1,11 +1,38 @@
 import type { Agent, FinderNode } from "@/lib/types"
-import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core"
+import {
+  DndContext,
+  PointerSensor,
+  pointerWithin,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type CollisionDetection,
+} from "@dnd-kit/core"
 import { clickable } from "@/lib/support/a11y"
 import { useFsDescriptions } from "@/lib/live"
 import { ExplorerTree } from "../explorer/ExplorerTree"
 import { TabHost } from "../editor/TabHost"
 import type { TreeState } from "../explorer/treeState"
 import type { GroupsState } from "../editor/tabState"
+
+/**
+ * Pointer-first collision: drop WHERE THE POINTER IS, falling back to
+ * closest-center only when the pointer is over no droppable.
+ *
+ * Plain `closestCenter` is unambiguous with ONE editor group (the single old
+ * P2 case, which worked) but breaks the moment there are two or more: a small
+ * explorer row dragged into split B can have its rect-center nearest to group
+ * A's (or a tab's) center, so the file opened in the wrong pane — or, if the
+ * center landed between panes, in none, and the drop silently no-op'd. That is
+ * exactly "can't drag into the split view". `pointerWithin` keys off the cursor
+ * position instead, so the file lands in the pane under the pointer; the
+ * `closestCenter` tail keeps tab-reorder forgiving when the cursor slips just
+ * past a strip.
+ */
+const pointerFirst: CollisionDetection = (args) => {
+  const hits = pointerWithin(args)
+  return hits.length > 0 ? hits : closestCenter(args)
+}
 
 /**
  * The Finder's two-pane render: the explorer tree on the left, the split
@@ -49,11 +76,7 @@ export function FinderShell({
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragEnd={groups.applyDragEnd}
-    >
+    <DndContext sensors={sensors} collisionDetection={pointerFirst} onDragEnd={groups.applyDragEnd}>
       <div
         className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background"
         style={
