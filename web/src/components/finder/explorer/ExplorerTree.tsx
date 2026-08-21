@@ -28,7 +28,6 @@ import { relOf, sortTreeNodes, type TreeState } from "./treeState"
 export function ExplorerTree({
   agentId,
   agentFolder,
-  agentName,
   tree,
   descriptions,
   activePath,
@@ -39,7 +38,6 @@ export function ExplorerTree({
   agentId: string
   /** Absolute realm root. Every path below is derived against it. */
   agentFolder: string
-  agentName: string
   tree: TreeState
   descriptions: Record<string, string> | undefined
   /** Absolute path of the active tab, highlighted in the tree. */
@@ -58,16 +56,6 @@ export function ExplorerTree({
         className="flex h-full flex-col"
         style={{ width: "var(--sidebar-w)", minWidth: "var(--sidebar-w)" }}
       >
-        {/* VS Code's "EXPLORER" header, carrying the realm name — the tree's
-            rows are relative paths, so without it there is nothing on screen
-            saying WHICH agent's files these are. */}
-        <div className="flex flex-col gap-0.5 px-4 pt-3 pb-2">
-          <span className="text-[11px] font-semibold tracking-[0.06em] text-muted-foreground uppercase">
-            Explorer
-          </span>
-          <span className="truncate text-[12.5px] font-medium text-foreground/85">{agentName}</span>
-        </div>
-
         <ScrollArea className="min-h-0 flex-1">
           {/* Vertical padding only. A tree row spans the FULL rail width — its
               highlight is a band, exactly as in VS Code — so horizontal padding

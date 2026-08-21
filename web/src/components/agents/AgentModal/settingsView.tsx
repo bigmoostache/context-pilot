@@ -77,7 +77,7 @@ export function SettingsView({
         className="flex shrink-0 transition-[margin-left] duration-300 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none"
         style={{ marginLeft: railOpen ? 0 : "calc(-1 * var(--sidebar-w))" }}
       >
-        <CategoryRail tab={tab} onSelect={setTab} agentName={agent.name} />
+        <CategoryRail tab={tab} onSelect={setTab} />
       </div>
 
       <SettingsPane c={c} tab={tab} agentId={agent.id} />
@@ -146,15 +146,7 @@ function useAgentController(agent: Agent): Controller {
  * hover lift). Uniformity is the point of the ask — a second settings-specific
  * rail vocabulary would make the app feel like two apps.
  */
-function CategoryRail({
-  tab,
-  onSelect,
-  agentName,
-}: {
-  tab: TabId
-  onSelect: (t: TabId) => void
-  agentName: string
-}) {
+function CategoryRail({ tab, onSelect }: { tab: TabId; onSelect: (t: TabId) => void }) {
   // ⌘/Ctrl+Up/Down loop through the categories (T634), same as the thread list.
   // TABS is the on-screen order; the hook wraps and reports the two rows to
   // badge while the modifier is held.
@@ -168,16 +160,6 @@ function CategoryRail({
         className="flex h-full flex-col"
         style={{ width: "var(--sidebar-w)", minWidth: "var(--sidebar-w)" }}
       >
-        {/* The rail names the agent being configured. The thread list can get
-            away without a title — its rows ARE the subject — but "Identity"
-            with no owner is ambiguous the moment more than one agent exists. */}
-        <div className="flex flex-col gap-0.5 px-4 pt-3 pb-1">
-          <span className="text-[11px] font-semibold tracking-[0.06em] text-muted-foreground uppercase">
-            Settings
-          </span>
-          <span className="truncate text-[12.5px] font-medium text-foreground/85">{agentName}</span>
-        </div>
-
         <div className="p-2">
           {TABS.map((t) => {
             const on = t.id === tab

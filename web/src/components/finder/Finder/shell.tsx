@@ -68,7 +68,6 @@ export function FinderShell({
         <ExplorerTree
           agentId={agent.id}
           agentFolder={agent.folder}
-          agentName={agent.name}
           tree={tree}
           descriptions={descriptions}
           activePath={tabs.activePath}
