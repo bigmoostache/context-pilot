@@ -2,7 +2,7 @@
 
 **An AI coding agent that lives in your terminal — and a fleet orchestrator and web cockpit to run many of them at once.**
 
-Context Pilot is a ~47,000-line Rust project (18 module crates + a main binary + an orchestration backend) plus a React web client. It started as a single self-hosting TUI in which an AI agent develops the very tool it runs inside, and grew an orchestration layer so that a *fleet* of such agents can be discovered, observed, commanded, and supervised — from the terminal or from a browser.
+Context Pilot is a \~47,000-line Rust project (18 module crates + a main binary + an orchestration backend) plus a React web client. It started as a single self-hosting TUI in which an AI agent develops the very tool it runs inside, and grew an orchestration layer so that a *fleet* of such agents can be discovered, observed, commanded, and supervised — from the terminal or from a browser.
 
 This document describes how the whole thing fits together: the agent's main loop, the module system, the three-tier durability model, the orchestrator, the bridge that joins an agent to a fleet, the web frontend, and the sidecar services (console server, Meilisearch, SQLite entities).
 
@@ -20,10 +20,10 @@ Context Pilot is not one process. It is a small constellation of cooperating sur
                                          │  REST + Server-Sent Events
                                          │  (HTTP :7878)
                          ┌───────────────▼───────────────────────────┐
-                         │        Orchestrator  (cp-orchestrator)     │
-                         │  registry · materialized view ·             │
-                         │  stream hub · supervisor · REST/SSE        │
-                         └───┬───────────────┬───────────────┬────────┘
+                         │        Orchestrator  (cp-orchestrator)    │
+                         │  registry · materialized view ·           │
+                         │  stream hub · supervisor · REST/SSE       │
+                         └───┬───────────────┬───────────────┬───────┘
             oplog tail       │   commands     │   stream tap  │   spawn / signals
             (inotify)        │  (Unix socket) │  (Unix socket)│   (pty)
                          ┌───▼───────────────▼───────────────▼────────┐
@@ -42,7 +42,7 @@ Context Pilot is not one process. It is a small constellation of cooperating sur
 **One agent = one folder.** Every agent owns a *realm* (a working directory) and stores all its state under `<folder>/.context-pilot/`. Switching agents is switching folders. The orchestrator manages many such realms; the web cockpit renders them.
 
 | Surface | Crate / dir | Role |
-|---|---|---|
+| --- | --- | --- |
 | **Agent (TUI)** | `src/` (`tui` binary) | The interactive coding agent: event loop, tools, LLM streaming, panels, persistence. |
 | **Orchestrator** | `crates/cp-orchestrator` | Fleet control plane: discover, observe, command, supervise; serves REST + SSE on `:7878` (loopback — on the appliance Caddy fronts it on `:80`/`:443`). |
 | **Web frontend** | `web/` | Browser cockpit: fleet dashboard, per-agent threads / panels / file manager. |
@@ -57,7 +57,7 @@ The agent is a blocking, single-threaded **Elm/Redux-style** application built o
 
 ### Main loop
 
-`src/app/run/lifecycle.rs` is the heart. Each iteration is **input-first** (a non-blocking poll), then it advances background work: stream events, the tool pipeline, cache updates, file/GitHub watchers, the spine (notifications), and reverie (the context optimizer). The loop runs on an **adaptive cadence** — ~8 ms while streaming or when panels are dirty, ~2 ms when an orchestrator is connected (so a web command applies within a tick), ~50 ms when idle — and renders at ~28 fps.
+`src/app/run/lifecycle.rs` is the heart. Each iteration is **input-first** (a non-blocking poll), then it advances background work: stream events, the tool pipeline, cache updates, file/GitHub watchers, the spine (notifications), and reverie (the context optimizer). The loop runs on an **adaptive cadence** — \~8 ms while streaming or when panels are dirty, \~2 ms when an orchestrator is connected (so a web command applies within a tick), \~50 ms when idle — and renders at \~28 fps.
 
 State changes flow through a central **action dispatcher** (`src/app/actions/`), Redux-style: an action mutates `State`, the next render reflects it. Key pipelines:
 
@@ -71,8 +71,8 @@ Because the loop is **single-threaded**, every step runs inline on the one threa
 
 Two cooperating detectors run off cheap atomic markers the loop updates each pass:
 
-- **Heartbeat** — *is the loop alive?* The loop stamps a timestamp at the top of every iteration; since it ticks at least every ~50 ms even when idle, a timestamp gone **>15 s stale** means a genuine wedge.
-- **Activity marker** — *which step wedged?* Before each phase (input, bridge, stream drain, cache, watchers, tool execution, panel refresh, spine, reverie, render, save) the loop sets a one-byte marker; a single step in flight **>12 s** is named as the culprit.
+- **Heartbeat** — *is the loop alive?* The loop stamps a timestamp at the top of every iteration; since it ticks at least every \~50 ms even when idle, a timestamp gone **&gt;15 s stale** means a genuine wedge.
+- **Activity marker** — *which step wedged?* Before each phase (input, bridge, stream drain, cache, watchers, tool execution, panel refresh, spine, reverie, render, save) the loop sets a one-byte marker; a single step in flight **&gt;12 s** is named as the culprit.
 
 A detached monitor thread polls every 2 s and, on a trip, dumps `.context-pilot/errors/watchdog-<timestamp>.log` with the wedged step + duration, the process **CPU%** (high ≈ a busy-loop, low ≈ a blocked syscall or deadlock), and per-thread states (Linux `/proc/self/task` wait-channels, or a macOS `sample` backtrace). The heartbeat/marker writes are single relaxed atomic stores (a few nanoseconds), so the happy path is untouched and the monitor merely sleeps until something actually freezes.
 
@@ -115,7 +115,7 @@ When an agent joins a fleet, its observable state rides a **three-tier durabilit
 
 These tiers feed **two planes** that the rest of the system is built around:
 
-- **The push plane (live).** `oplog → backend Tailer (one inotify watch per agent) → in-memory MaterializedView → rev-numbered SSE deltas → the frontend applies the delta in place.` This is the fast path: command-to-visible is ~14 ms median. No polling, no disk re-read.
+- **The push plane (live).** `oplog → backend Tailer (one inotify watch per agent) → in-memory MaterializedView → rev-numbered SSE deltas → the frontend applies the delta in place.` This is the fast path: command-to-visible is \~14 ms median. No polling, no disk re-read.
 - **The inspection plane (read-only).** For state that has no oplog delta (memory cards, todos, the file tree, the tools catalog), the backend reads the agent's tier-② files on demand and reshapes them to JSON, with mtime memoization. Lower-churn, pull-based, explicitly second-class.
 
 A single resource is owned by exactly one plane, so the two never fight over freshness.
@@ -129,7 +129,7 @@ A single resource is owned by exactly one plane, so the two never fight over fre
 - **Registry** (`registry/`) — `AgentRegistry` poll-scans the agents directory (`~/.context-pilot/agents/<id>.json`) and diffs it into events (Appeared / Disappeared / StatusChanged / Stale). Liveness is a three-factor verdict (registry record + heartbeat freshness + lock ownership). `Tailer` is the incremental, gap-free oplog consumer; `AgentChannel` hydrates and sends; `TeeReader` taps an agent's stream plane.
 - **Services** (`services/`) — `MaterializedView` is the in-memory fleet projection: one `AgentView` per agent (rev, heads, thread roster, focused thread, phase, lifecycle, cost), folded purely from `OpEntry`. `StreamHub` fans an agent's stream out to N bounded subscribers. `RetiredStore` records stopped-but-kept agents.
 - **Supervisor** (`supervisor/`) — `AgentSupervisor` owns process lifecycle: spawn an agent on a real **pty** (the TUI needs a tty), stop (SIGTERM → grace → SIGKILL → reap), restart, and adopt externally-launched agents. Spawns are gated by a binary allow-list.
-- **Transport** (`transport/`) — REST + SSE. The driver loop runs two cadences: a slow scan (~2 s: registry diff + a `config.json` mtime backstop) and a fast tail (~100 ms: poll each Tailer → fold into the view → observe cost). Notable routes:
+- **Transport** (`transport/`) — REST + SSE. The driver loop runs two cadences: a slow scan (\~2 s: registry diff + a `config.json` mtime backstop) and a fast tail (\~100 ms: poll each Tailer → fold into the view → observe cost). Notable routes:
   - `GET /api/fleet/meta`, `/api/fleet/retired`, `/api/metrics`
   - `GET /api/agent/{id}/{meta,threads,panels,memory,todos,tree,callbacks,tools,radar,entities,conversation,metrics,vitals}`
   - `GET /api/agent/{id}/fs[...]` — the realm file manager (`fs`, `fs/preview`, `fs/download`)
@@ -190,11 +190,11 @@ The `entities` module gives each agent a private SQLite database (`shared/entiti
 
 `cp-wire` is the I/O-free, transport-agnostic contract shared by the agent, the oplog, and the orchestrator. It carries `PROTOCOL_VERSION` with N-1 compatibility and tolerant decoding (unknown variants degrade gracefully). Core types:
 
-- **`Command`** — `SendMessage`, `CreateThread`, `ArchiveThread`, `RestoreThread`, `InterruptStream`, `Stop`, `Configure`.
-- **`OpEntry` / `OpEntryKind`** — the oplog deltas: `CommandEffect`, `MessageCreated`, `ThreadCreated` / `Archived` / `Restored` / `StatusChanged`, `ThreadFocusChanged`, `PhaseTransition`, `CostAggregate`, `Lifecycle`, `Checkpoint`.
-- **`StreamFrame`** — ephemeral hints: `MessageStartHint`, `Token`, `ToolArgs`, `PhaseHint`.
-- **`Heartbeat`** — the fixed 60-byte liveness record.
-- **`Snapshot` / `RosterThread`**, **`Entry`** (registry record), **`ContentHash`** (SHA-256, for content-addressed message bodies).
+- `Command` — `SendMessage`, `CreateThread`, `ArchiveThread`, `RestoreThread`, `InterruptStream`, `Stop`, `Configure`.
+- `OpEntry` **/** `OpEntryKind` — the oplog deltas: `CommandEffect`, `MessageCreated`, `ThreadCreated` / `Archived` / `Restored` / `StatusChanged`, `ThreadFocusChanged`, `PhaseTransition`, `CostAggregate`, `Lifecycle`, `Checkpoint`.
+- `StreamFrame` — ephemeral hints: `MessageStartHint`, `Token`, `ToolArgs`, `PhaseHint`.
+- `Heartbeat` — the fixed 60-byte liveness record.
+- `Snapshot` **/** `RosterThread`, `Entry` (registry record), `ContentHash` (SHA-256, for content-addressed message bodies).
 
 ---
 
@@ -229,12 +229,12 @@ docs/                    Design docs (notably design-orchestration-backend.md)
 The codebase is maintained under unusually strict static-analysis discipline, and those constraints shape the architecture as much as any design decision:
 
 - **Structure caps** — every Rust file ≤ 500 lines, every directory ≤ 8 entries, enforced by CI. Growth forces decomposition rather than accretion (this is why so many modules are split into `mod.rs` + siblings).
-- **Lints** — ~961 active clippy/rustc lints (the vast majority at `forbid`). `#[allow]` is banned; only a handful of individually-justified `#[expect]` annotations remain.
+- **Lints** — \~961 active clippy/rustc lints (the vast majority at `forbid`). `#[allow]` is banned; only a handful of individually-justified `#[expect]` annotations remain.
 - **A cryptographic hash chain** guards the lint config, CI scripts, and exception registry — the agent that develops this project can write code and fix lints, but cannot lower the bar.
 
 ### Flame-graph telemetry
 
-The agent ships built-in flame-graph instrumentation (~60 spans, zero cost when disabled). Run with `./run.sh --telemetry`, use the app normally (spans persist across reloads), then render:
+The agent ships built-in flame-graph instrumentation (\~60 spans, zero cost when disabled). Run with `./run.sh --telemetry`, use the app normally (spans persist across reloads), then render:
 
 ```bash
 cargo install inferno   # one-time
@@ -246,6 +246,4 @@ Self-time accounting (total minus children) keeps nested spans from double-count
 
 ---
 
-<p align="center">
-  <i>One agent per folder. A fleet in a browser. Built by an AI, inside itself.</i>
-</p>
+&lt;p align="center"&gt; &lt;i&gt;One agent per folder. A fleet in a browser. Built by an AI, inside itself.&lt;/i&gt; &lt;/p&gt;
