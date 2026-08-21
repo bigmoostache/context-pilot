@@ -37,7 +37,7 @@ export function FileSidebar({
   }, [files])
 
   return (
-    <aside className="flex w-[210px] shrink-0 flex-col border-l border-border/70 bg-muted/10">
+    <aside className="flex w-[210px] shrink-0 flex-col border-l border-border/70">
       <div className="flex items-center gap-1.5 border-b border-border/60 px-3 py-2">
         <Paperclip className="size-3 text-muted-foreground/55" />
         <span className="text-[10.5px] font-semibold tracking-wide text-muted-foreground/65 uppercase">
