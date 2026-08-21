@@ -14634,6 +14634,10 @@ a6520818bd7f39ea:
   path: crates/cp-mod-console/src/types.rs
   description: 'Console types. ProcessStatus enum #[expect(exhaustive_enums)] A4. SessionMeta, ConsoleState, ConsoleWatcher (exit/pattern, easy_bash inline vs panel overflow).'
   last_edited_ms: 0
+a652c5ec11a8908f:
+  path: web/src/components/Root.tsx
+  description: 'Desktop tree root — extracted from former App.tsx body. Provider-contract boundary + AppShell (view-router fleet/threads/finder/settings/costs, TopBar+StatusBar, live vitals/SSE, disconnect overlay). Mirror twin of mobile Root. T636: useNavHistory wires browser Back/Next to the (view, agent) pair via History API (no router) — push effect records nav changes (deduped, replaceState-seeds base entry), popstate applies, applyingRef swallows the echo. Coarse (view+agent only); thread/finder state rides along via per-agent localStorage on remount. readNav narrows any-typed history.state at one boundary; sameNav pure dedupe.'
+  last_edited_ms: 1787327879193
 a65f3bc45f4dc1d2:
   path: crates/cp-orchestrator/tests/openapi/schemas_ext.rs
   description: Transport-layer OpenAPI schemas — receipts, auth, env-keys, filesystem, FinderKind enum, LLM registry (ModelDef/ProviderDef), SSE delta protocol, release management, Claude Code usage+login (ClaudeTokenStatus/LoginStart/LoginComplete schemas).
