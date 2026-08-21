@@ -183,7 +183,7 @@ function DeleteButton({ align, onDelete }: { align: "start" | "end"; onDelete: (
 function UserMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete, fresh }: MessageProps) {
   const bubbleRef = useBubblePop(fresh)
   return (
-    <div className="rise flex flex-col items-end gap-1 py-2">
+    <div className="flex flex-col items-end gap-1 py-2">
       {/* wider bubble than desktop (78%) — a phone needs the horizontal room */}
       <div
         ref={bubbleRef}
@@ -219,7 +219,7 @@ function AssistantMessage({
 }: MessageProps) {
   const bubbleRef = useBubblePop(fresh)
   return (
-    <div className="rise flex flex-col gap-1.5 py-2">
+    <div className="flex flex-col gap-1.5 py-2">
       {/* No author header on mobile (T611) — the orange mark + "Context Pilot"
           label were pure vertical-space cost. The assistant bubble is already
           identifiable by its left alignment; the timestamp moves down into the
@@ -255,7 +255,7 @@ function ToolMessage({ msg }: { msg: ChatMessage }) {
   if (!msg.tool) return null
   const t = msg.tool
   return (
-    <div className="rise py-2 pl-1">
+    <div className="py-2 pl-1">
       <div
         className={cn(
           "card-shadow max-w-[92%] overflow-hidden rounded-xl border bg-card",

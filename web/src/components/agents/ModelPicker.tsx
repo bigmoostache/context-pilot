@@ -66,14 +66,13 @@ export function ModelPicker({
 
       {/* model cards for the active provider */}
       <div className="flex flex-col gap-2">
-        {activeProv.models.map((m, i) => {
+        {activeProv.models.map((m) => {
           const on = m.id === model
           return (
             <ModelCard
               key={m.id}
               model={m}
               active={on}
-              delay={i * 40}
               onClick={() => onChange(activeProv.id, m.id)}
             />
           )
@@ -112,21 +111,18 @@ function ProviderPill({
 function ModelCard({
   model: m,
   active,
-  delay,
   onClick,
 }: {
   model: ModelDef
   active: boolean
-  delay: number
   onClick: () => void
 }) {
   const Icon = m.icon
   return (
     <button
       onClick={onClick}
-      style={{ animationDelay: `${delay}ms` }}
       className={cn(
-        "opt-rise group flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all",
+        "group flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all",
         active
           ? "border-(--interactive) bg-(--interactive)/[0.07] ring-2 ring-(--interactive)/15"
           : "border-border bg-card hover:border-(--interactive)/40 hover:bg-muted/30",

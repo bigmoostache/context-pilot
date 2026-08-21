@@ -898,6 +898,17 @@ d9a2e890ab98776f:
   - waiting-status
   - T566
   last_edited_ms: 1784213091300
+e18233161752e7d8:
+  tl_dr: NO ENTRY ANIMATION on main content, EVER (user mandate T631). Overlays exempt.
+  contents: 'Never add rise/opt-rise/finder-pop/ql-pop/fill-sweep or any opacity+translate/scale mount animation to main-content elements (messages, forms, model cards, previews, settings rows, page bodies). OVERLAYS are the only exception: modal-pop, sheet-pop-in/out, menu-pop, backdrop-fade stay. Also fine: ants (drag border), blink (caret), hover/focus transitions. T631 removed all five entry keyframes from index.css + every call site desktop+mobile.'
+  importance: critical
+  labels:
+  - user-preference
+  - web-frontend
+  - animation
+  - forbidden
+  - T631
+  last_edited_ms: 1787320918286
 e22b1ea921ff9aec:
   tl_dr: 'Datalab documentation site: documentation.datalab.to (Mintlify-hosted). API reference at documentation.datalab.to/api-reference/health. Has sections on limits, supported file types, SDK, on-prem, webhooks, billing.'
   importance: low

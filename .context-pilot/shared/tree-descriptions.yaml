@@ -434,6 +434,10 @@
   path: web/src/components/shell/widgets/TelemetryHud.tsx
   description: 'Dev-mode performance HUD (corner-docked, Developer-mode gated). Live telemetry snapshot: Real blocks (worker heartbeat, authoritative freeze signal), Task totals Σ, Main-thread stalls (rAF), Named tasks, Web Vitals, Long frames, slow React commits. Copy-as-markdown emits a richer report (all worst-list entries + userAgent). P8: extracted generic HudList<T> (title/meta/items/empty/row — the per-section length===0 ternary lives here once), VitalsRow, and HudBody so TelemetryHud stays under the cx15 budget. Reads coalesced snapshot so HUD never sources the churn it measures.'
   last_edited_ms: 0
+04b52e0e682349e9:
+  path: web/src/mobile-components/conversation/Message.tsx
+  description: Mobile message renderer twin. Wider bubbles (user 85%, assistant/tool 92%) for phone width, always-readable copy/delete (opacity-70 + active-press, no hover). Assistant author header removed (T611) — no orange dot/'Context Pilot' label; timestamp sits in the action row beneath the body. Body + tool card indent pl-1. Same 3 renderers + inline file-upload chip splicing; MessageFileChip + splitMessageSegments from @/mobile-components/threads/fileUpload (leak guard).
+  last_edited_ms: 0
 04c08e799b8e944d:
   path: crates/cp-base/src/config/accessors.rs
   description: Theme state (AtomicU8 index), color/icon/char accessors, library + prompt template getters
@@ -1646,6 +1650,10 @@
   path: crates/cp-mod-callback/src/lib.rs
   description: 'Callback module. 3 tools: upsert/open/close editor. Depends on console. CallbackState: definitions (shared) + editor_open (per-worker). Glob-matched auto-fire on file edits. Callbacks always active.'
   last_edited_ms: 0
+125f1080a0c026ef:
+  path: web/src/mobile-components/shell/config/ConfigPanes.tsx
+  description: 'Mobile ConfigPanes twin — real (ancestor-promotion): routes mobile UpdatePane/SecretsPane/ItPane (relative) + mobile UsagePage (token). Touch tap padding on option/service/model-allowlist rows. Logic shared @/lib.'
+  last_edited_ms: 0
 12630d3a418a21eb:
   path: ui/src/index.css
   description: 'Phosphor Cockpit theme: warm near-black base, amber phosphor signal (primary), cyan interactive accent, instrument red/green. IBM Plex Mono/Sans, hairline borders, grain+scanline atmosphere, utility classes (glow-signal, etch, label, rise, fill-sweep).'
@@ -2361,6 +2369,10 @@
 1ade9fcb344ece17:
   path: crates/cp-orchestrator/tests/fleet_soak.rs
   description: Phase 9.4 (X869) multi-agent soak + fleet-scale fault-matrix slice (2 tests). 16 agents concurrent contended workloads, gap-free+isolated projections. Flooded reordered subscriber coalesces then reconciles.
+  last_edited_ms: 0
+1ae4b0bbd1cda305:
+  path: web/src/mobile-components/threads/forms/FormWidget.tsx
+  description: Mobile FormWidget twin — routes mobile FormFields (its only fork). Draft persistence, two-click incomplete-submit gate, locked receipt — all byte-identical to desktop.
   last_edited_ms: 0
 1af574d9755cb302:
   path: web/src/components/agents/AgentModal/actions.ts
@@ -9514,6 +9526,10 @@
   path: crates/cp-orchestrator/src/transport/rest/env_keys.rs
   description: 'On-demand env-key inspection (T399) and editing (T404). KNOWN_KEYS whitelist prevents arbitrary env-var enum. resolve_env() checks runtime overrides before std::env. env_keys_list(): GET /api/env-keys returns [{env,label,exists}]. env_key_reveal(name): GET /api/env-keys/{name} returns full value + masked — admin-only when auth active. env_key_update(name): PUT /api/env-keys/{name} persists to ~/.context-pilot/.env + in-memory override for immediate visibility. mask_key helper. persist_to_global_env + format_env_line. 10 unit tests.'
   last_edited_ms: 1782342442769
+6ddaadd920491186:
+  path: web/src/components/threads/forms/FormMessageRow.tsx
+  description: Un-memoized message row for form-bearing messages. form-answer msg renders summary line only; form msg renders stripped prose + one FormWidget per block.
+  last_edited_ms: 0
 6df12cce867df544:
   path: src/modules/overview/context.rs
   description: estimate_tool_definitions_tokens(), generate_context_content() — plain-text LLM context (usage, sorted panels, stats)
@@ -11598,6 +11614,10 @@
   path: crates/cp-mod-bridge/src/boot.rs
   description: 'Phase 10 (X777): Boot — agent boot sequence + held resources. start_in(folder,agents_dir,model): (1) flock <folder>/bridge.lock EXCLUSIVE|NONBLOCK FIRST (single-process gate I1/D2, EAGAIN→AlreadyRunning); (2) OplogService::spawn(oplog dir); (3) bind stream.sock (unlink stale first); (4) mint cap_token+boot_id; (5) write registry <id>.json LAST (atomic, after all resources). Drop removes registry+socket; lock+oplog release via own Drop. H5 FD-inherit deferred (CLOEXEC kept). 6 tests: all-resources, second-boot-refuses, lock-released-on-drop, registry-removed, stale-socket-replaced.'
   last_edited_ms: 1781625056680
+8516e23983319849:
+  path: web/src/components/agents/ModelPicker.tsx
+  description: Shared two-level LLM provider+model picker. Receives providers[] as prop (pure component). Provider rail (pills) above model cards. Guards against empty providers (returns null while API loading). Used by AgentModal (manage) and ConfigPanel (defaults).
+  last_edited_ms: 0
 852931587d049008:
   path: src/llms/claude_code_api_key/helpers.rs
   description: 'CC API-key helpers: constants (endpoint/headers), map_model_name(), inject_system_reminder(), apply_claude_code_headers()'
@@ -13522,6 +13542,10 @@
   path: crates/cp-mod-bridge/src/boot/activate.rs
   description: Live BridgeState assembly + recovery + stream-publish. activate() binds tee.sock, seeds Intake, opens body Store via or_log<T,E> helper (log+None on Err, A2 flatten). try_recover() fail-fast re-boot when pending. publish_frame() tags StreamFrame with active streaming message id.
   last_edited_ms: 0
+9ad1bb1bb924c8b9:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 9adb916e38ea7180:
   path: openapi.json
   description: Generated OpenAPI 3.0.3 spec (70KB). Source of truth for TypeScript client codegen. Regenerated from Rust types via tests/openapi.rs.
@@ -13790,6 +13814,10 @@
   path: crates/cp-base/src/lib.rs
   description: 'Foundation crate entry. Inline flame graph telemetry module (Guard RAII, folded-stack output, CP_FLAMEGRAPH=1 toggle). 7 modules: cast, config, flame, modules, panels, state, tools, ui. Tests: compile-time YAML validation (19 tool + 6 config YAML files) with #[expect(clippy::panic)].'
   last_edited_ms: 1780568982750
+9e26f449f4ed02c2:
+  path: web/src/components/shell/config/ConfigPanes.tsx
+  description: 'Config category panes + building blocks: CATEGORIES, CategoryBody, GeneralPane (useProviders() hook + ModelPicker + apply-to-all via sendCommand configure), KeyRow (live reveal/edit via API, T446: pencil button for unset keys), StatusRow, ToggleRow, DevModeToggle. Key panes lock when company-managed OR non-admin.'
+  last_edited_ms: 0
 9e2910174b2bbcf5:
   path: crates/cp-wire/src/heartbeat.rs
   description: 'Phase 11 (X778): fixed 60-byte binary liveness record. Heartbeat{schema_version,timestamp_ms,sequence,pid,boot_id} + encode/decode (LE: ver4+ts8+seq8+pid4+boot_id32+crc4) + is_fresh(now,max_age, saturating) + matches_boot (pid-reuse defence). Error enum (renamed off HeartbeatError for module_name_repetitions). Manual u32/u64 to_le/from_le (little_endian_bytes forbids to_le_bytes). HEARTBEAT_LEN=60, DEFAULT_CADENCE=1s, DEFAULT_MAX_AGE=5s. I/O-free. 11 tests.'
@@ -14061,6 +14089,10 @@ a08fe4f347ae0b65:
 a096c48cf57c3d00:
   path: crates/cp-oplog/src/replay.rs
   description: 'Oplog replay. Recovered struct #[non_exhaustive] A5. fold_entry via ref_match!. A11 shadow clean.'
+  last_edited_ms: 0
+a0972b9b11cf1c55:
+  path: web/src/mobile-components/threads/forms/FormMessageRow.tsx
+  description: Mobile FormMessageRow twin — un-memoized form-bearing row. Routes mobile conversation/Message + FormWidget token. Parse helpers shared (./helpers stub).
   last_edited_ms: 0
 a09757b61a0a55ed:
   path: .context-pilot/shared/entities/schema.sql
@@ -16905,6 +16937,10 @@ c15a0ff49eae9097:
 c16480ad12de8da5:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
+  last_edited_ms: 0
+c16be1f69cfcb02e:
+  path: web/src/index.css
+  description: Tailwind v4 + tw-animate. Two palettes (:root Cream light / .dark Dungeon Forge) as CSS token blocks; semantic tokens (signal/ok/warn/danger/surface). Finder micro-motion keyframes (finder-pop/ql-pop/menu-pop/ants/checker), modal-pop, highlight.js .hljs-* theme mapped to tokens (T280).
   last_edited_ms: 0
 c16f14c57e1a7e0c:
   path: ui/src/components/shell/AgentSwitcher.tsx
@@ -19978,6 +20014,10 @@ e7c6cd3f1a4d9e46:
   path: crates/cp-mod-callback/src/types.rs
   description: 'Callback types. CallbackDefinition (name, pattern, script, blocking, timeout, success_message, cwd, is_global). CallbackState (definitions, editor_open, active_sessions). active_sessions: HashMap<callback_id, session_key> for dedup — same callback never runs twice in parallel.'
   last_edited_ms: 1784195488491
+e7ce8a71543649fa:
+  path: web/src/mobile-components/finder/preview/FinderPreview.tsx
+  description: Mobile Quick Look preview shell twin. Taller h-11 touch header, 40px IconBtn download/close. Kind routing (inlinePreview/livePreview/Body) byte-identical to desktop. "pane" variant hosted in mobile QuickLookSheet bottom sheet.
+  last_edited_ms: 0
 e7d8c153800a47ae:
   path: src/app/run/lifecycle.rs
   description: 'Main event loop with flame!("loop"). Input-first (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. poll_bridge_commands every tick. cp_mod_bridge::try_recover throttled ~2s = bridge self-heal. X18 adaptive idle poll (8ms streaming/dirty, 2ms bridge_active, 50ms otherwise). T309: update_spinner_animation now gates its forced 100ms dirty on has_active_animation (streaming/tooling | timed-watcher WAITING | loading panel | running console) — a genuinely idle agent produces ZERO periodic renders (was a permanent 10fps full-redraw floor forever), falling to ~0% CPU; event-driven redraws untouched.'
@@ -20662,6 +20702,10 @@ ef5adb67ffe9c560:
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. Backend re-exported from rest::Backend. route_rest dispatches all /api routes incl auth/ACL/env-keys (T399). handle() has centralized Bearer gate + per-agent ACL check. handle_stream = SSE with Phase 7 ticket-based ACL. serve/serve_bound acceptor loop.
   last_edited_ms: 1782340148352
+ef866f2d95a4534f:
+  path: web/src/components/finder/preview/FinderPreview.tsx
+  description: 'Quick Look preview shell + kind router. P8 refactor: the Body kind-router (cx22) split into inlinePreview (node.* inlined maquette payloads → mockPreviews/shared parts) + livePreview (agentId-gated live fetchers, early-returns null without agentId) — Body = inlinePreview(node) ?? livePreview(node,agentId) ?? <Generic>, each helper under cx15. Header slimmed h-8, edge-to-edge body. Download wired to downloadFile(agentId, node.path).'
+  last_edited_ms: 0
 ef88c139f0bdac2b:
   path: yamls/tools/threads.yaml
   description: 'Threads tools YAML. 2 tools: Send (thread_id, markdown, file_path, questions), Read (thread_id, count).'
@@ -21098,6 +21142,10 @@ f4eda4d211f781ad:
   path: crates/cp-oplog/src/replay.rs
   description: 'Oplog replay. Recovered struct #[non_exhaustive] A5. fold_entry uses ThreadCreation::new ctor.'
   last_edited_ms: 1784499344458
+f4f1a513d4997b31:
+  path: web/src/components/threads/forms/FormWidget.tsx
+  description: Interactive form widget rendered inline from ```form``` block. localStorage draft per form-id, fieldFilled client-side submit gate, LockedForm read-only view.
+  last_edited_ms: 0
 f4f3bef2579012ab:
   path: src/app/actions/config.rs
   description: 'Config bar handlers: context budget, cleaning threshold, theme cycling. 2 bars (max cost removed).'
@@ -21358,6 +21406,10 @@ f72d65c31b6e75c4:
   path: tmp/v2/src/table/tableView.ts
   description: The table's node view. columnResizing instantiates it as `new View(node, defaultCellMinWidth, view)` — 3 args — so TableView's 4th HTMLAttributes param defaults to {} and the LIVE <table> carried none of the node's attributes. data-border/data-border-scope reached the file and the PDF but never the screen, so every generated border and guide rule matched nothing in the editor. This subclass mirrors them onto the DOM, reusing upstream updateColumns.
   last_edited_ms: 1785772682560
+f7448d89d2772277:
+  path: web/src/components/conversation/Message.tsx
+  description: 'Thread/conversation message renderer. Markdown body, inline file-upload chips, CopyButton(imported from ./CopyButton)+DeleteButton, ToolMessage card. web-lint P7: CopyButton definition extracted to its own module (cycle break); Message no longer exports it.'
+  last_edited_ms: 0
 f74b76107e495ddc:
   path: crates/cp-orchestrator/src/transport/rest/mod.rs
   description: 'REST resource handlers. fleet() filtered by ACL. command() dispatches. rename/avatar/threads/body. vault_snapshot + env_keys + settings exports. claude_usage()/token_status()/login_start()/login_complete()/refresh_login() for Claude OAuth (T451). resolve_entry. Submodules: backend, claude_oauth, config, create, lifecycle, releases, thread_shape.'

@@ -144,7 +144,7 @@ function LockedForm({ spec, answer }: { spec: FormSpec; answer: FormAnswer }) {
     return typeof v === "string" && v.trim().length > 0
   })
   return (
-    <div className="rise my-1.5 overflow-hidden rounded-2xl border border-(--signal)/25 bg-linear-to-b from-(--signal)/10 to-(--signal)/2 shadow-(--shadow-pop) backdrop-blur-xl backdrop-saturate-150">
+    <div className="my-1.5 overflow-hidden rounded-2xl border border-(--signal)/25 bg-linear-to-b from-(--signal)/10 to-(--signal)/2 shadow-(--shadow-pop) backdrop-blur-xl backdrop-saturate-150">
       <div className="flex items-center gap-2 border-b border-signal/15 px-3 py-2">
         <span className="flex size-5 items-center justify-center rounded-full bg-(--signal) text-(--primary-foreground)">
           <Check className="size-3" strokeWidth={3} />
@@ -385,7 +385,7 @@ export function FormWidget({
   return (
     <div
       ref={cardRef}
-      className="rise my-1.5 overflow-hidden rounded-2xl border border-border/40 bg-card/55 shadow-(--shadow-pop) backdrop-blur-xl backdrop-saturate-150"
+      className="my-1.5 overflow-hidden rounded-2xl border border-border/40 bg-card/55 shadow-(--shadow-pop) backdrop-blur-xl backdrop-saturate-150"
     >
       <FormHeader title={fullSpec.title} count={fullSpec.fields.length} />
       <div className="flex flex-col gap-4 p-3.5">

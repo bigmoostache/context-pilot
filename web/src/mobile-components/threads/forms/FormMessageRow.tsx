@@ -61,7 +61,7 @@ export function FormMessageRow({
   // A form-answer message: render only the summary line, never the YAML.
   if (answerBlock) {
     return (
-      <div className="rise flex flex-col items-end py-1.5">
+      <div className="flex flex-col items-end py-1.5">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-(--signal)/40 bg-(--signal)/10 px-3 py-1 text-[11.5px] text-(--signal)">
           ✓ You answered form <span className="font-mono">{answerBlock.formId}</span>
         </span>
