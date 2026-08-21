@@ -15,16 +15,14 @@ import type { LibraryItem } from "@/lib/types"
 import { AgentEditorDialog, type AgentEditorMode } from "./AgentEditorDialog"
 
 /**
- * Standard dropdown-row highlight — the SAME soft signal wash the AgentSwitcher
- * uses (T697), so every menu in the app reads identically on hover/keyboard
- * focus. `color-mix` over transparent darkens correctly in dark mode and
- * lightens from the popover surface in light mode; the `!` beats base-ui's stock
- * `focus:bg-accent` / `data-highlighted` defaults, and `transition-colors`
- * gives the Linear-smooth fade. Text is pinned to `foreground` so the wash never
- * washes the label out.
+ * Dropdown-row highlight — TEXT-COLOUR ONLY (T635). Hover/keyboard focus
+ * brightens the row's ink to full `foreground` but never shifts its background:
+ * base-ui's stock `focus:bg-accent` default is overridden to `bg-transparent!`
+ * on BOTH highlight signals (pointer `data-highlighted` + keyboard `focus`) so
+ * no wash creeps back in, and `transition-colors` keeps the ink fade smooth.
  */
 const ROW_HILITE =
-  "transition-colors focus:bg-[color-mix(in_oklab,var(--signal)_11%,transparent)]! focus:text-foreground! data-highlighted:bg-[color-mix(in_oklab,var(--signal)_11%,transparent)]! data-highlighted:text-foreground!"
+  "transition-colors focus:bg-transparent! focus:text-foreground! data-highlighted:bg-transparent! data-highlighted:text-foreground!"
 
 /** The editor dialog's open state: closed, or open in one of its three flows. */
 type EditorState =
@@ -271,6 +269,12 @@ function BehaviourRow({
   return (
     <DropdownMenuItem
       onClick={onSelect}
+      // The agent's description as a tooltip (T635). Native `title`, not the
+      // styled `Tip`: wrapping a base-ui menuitem (or nesting a focusable Tip
+      // trigger inside one) fights the menu's roving-focus + typeahead, and a
+      // portalled popup per row is heavy chrome on an 8-row menu. The quiet
+      // native tooltip is the same call ExplorerRow makes for its dense tree.
+      title={item.description || undefined}
       className={`group/row justify-between ${ROW_HILITE} ${
         item.active ? "font-semibold text-foreground" : "text-foreground/70"
       }`}
@@ -322,8 +326,8 @@ function RowButton({
       onClick={onClick}
       className={`flex size-5 items-center justify-center rounded-md transition-colors ${
         danger
-          ? "text-muted-foreground/70 hover:bg-muted hover:text-(--danger)"
-          : "text-muted-foreground/70 hover:bg-muted hover:text-foreground"
+          ? "text-muted-foreground/70 hover:text-(--danger)"
+          : "text-muted-foreground/70 hover:text-foreground"
       }`}
     >
       {children}
