@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import { TopBar } from "@/components/shell/TopBar"
 import { CostsView } from "@/components/shell/costs/CostsView"
 import { StatusBar } from "@/components/shell/StatusBar"
@@ -54,6 +54,102 @@ function Root() {
       </AuthProvider>
     </ThemeProvider>
   )
+}
+
+/** The coarse navigation atoms browser Back / Next restore (T636). View +
+ *  agent only, deliberately: the finer state each surface carries (which thread
+ *  is selected, the finder tab/split layout) is already remembered per agent in
+ *  localStorage, so restoring the agent naturally brings its thread + layout
+ *  back on the keyed remount. Pushing every rail toggle or thread click as its
+ *  own entry would make Back take a dozen presses to leave a view. */
+interface NavState {
+  view: ViewMode
+  agentId: string
+}
+
+/** Narrow the `any`-typed `history.state` / `PopStateEvent.state` down to a
+ *  {@link NavState}, containing the `any` at this one boundary so no unsafe
+ *  access leaks into the hook. A shape that isn't ours (a foreign history entry,
+ *  or none) yields undefined. `view` is asserted to {@link ViewMode} after the
+ *  string check — an unknown value would just fall through the view router's
+ *  fleet fallback, so it needs no exhaustive membership test. */
+function readNav(state: unknown): NavState | undefined {
+  if (typeof state !== "object" || state === null) return undefined
+  const nav: unknown = (state as { nav?: unknown }).nav
+  if (typeof nav !== "object" || nav === null) return undefined
+  const { view, agentId } = nav as { view?: unknown; agentId?: unknown }
+  if (typeof view !== "string" || typeof agentId !== "string") return undefined
+  return { view: view as ViewMode, agentId }
+}
+
+/** Whether two nav entries point at the same surface — the dedupe test that
+ *  keeps a redundant push (which would make one Back a no-op) off the stack. */
+function sameNav(a: NavState, b: NavState): boolean {
+  return a.view === b.view && a.agentId === b.agentId
+}
+
+/**
+ * Wire the browser's Back / Next buttons to the app's view + agent, using the
+ * History API directly (no router — the app was never built on one, and does
+ * not need to be for this).
+ *
+ * THREE MECHANISMS, one effect each:
+ *
+ * 1. PUSH on change. Every time the (view, agent) pair changes, a new history
+ *    entry is pushed carrying it — UNLESS this render is itself the result of
+ *    applying a popstate (see the guard) or the pair already matches the top
+ *    entry (a redundant push would make one Back a no-op). The first run
+ *    `replaceState`s instead of pushing, so the app does not start with a
+ *    duplicate entry the user must Back through to leave.
+ *
+ * 2. APPLY on popstate. Back / Next fire `popstate` with the entry's `nav`
+ *    payload; it is handed to `apply`, which sets the view + agent atoms.
+ *
+ * 3. THE LOOP GUARD. Applying a popstate sets the atoms, which re-renders and
+ *    would re-fire the push effect — pushing the entry we just navigated to and
+ *    corrupting the stack. `applyingRef` marks that the next push-effect run is
+ *    a popstate echo and must be swallowed, not pushed. Same one-shot-ref trick
+ *    the SSE reducers and the doc editor use for remote-applied state.
+ *
+ * URLs are left untouched (state-only `pushState`): a hard refresh has no path
+ * to restore from and simply falls back to the localStorage-persisted view +
+ * agent, which is exactly the pre-existing behaviour.
+ */
+function useNavHistory(view: ViewMode, agentId: string, apply: (s: NavState) => void) {
+  const applyingRef = useRef(false)
+  const bootRef = useRef(false)
+
+  useEffect(() => {
+    // A popstate echo: the atoms changed because we just applied a history
+    // entry, so there is nothing new to record. Swallow exactly one run.
+    if (applyingRef.current) {
+      applyingRef.current = false
+      return
+    }
+    const nav: NavState = { view, agentId }
+    if (!bootRef.current) {
+      // Seed the current location as the base entry rather than pushing a
+      // second one on top of it.
+      bootRef.current = true
+      history.replaceState({ nav }, "")
+      return
+    }
+    const cur = readNav(history.state)
+    if (cur && sameNav(cur, nav)) return
+    history.pushState({ nav }, "")
+  }, [view, agentId])
+
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => {
+      const nav = readNav(e.state)
+      if (!nav) return
+      // Mark the coming push-effect run as a popstate echo (mechanism 3).
+      applyingRef.current = true
+      apply(nav)
+    }
+    window.addEventListener("popstate", onPop)
+    return () => window.removeEventListener("popstate", onPop)
+  }, [apply])
 }
 
 function AppShell() {
@@ -161,6 +257,17 @@ function AppShell() {
     setFinderRailOpen(true)
     setView("finder")
   }, [])
+
+  // Browser Back / Next restore the (view, agent) pair (T636). Declared after
+  // `effectiveView` so the entry we record is the surface the user actually
+  // sees (the gated one), not the raw pre-gate `view`. `applyNav` sets the raw
+  // atoms; since the recorded view is already post-gate, no re-gating occurs on
+  // restore. Setters are stable, so the callback never changes identity.
+  const applyNav = useCallback((s: NavState) => {
+    setView(s.view)
+    setActiveAgentId(s.agentId)
+  }, [])
+  useNavHistory(effectiveView, activeAgentId, applyNav)
 
   // Route the active view to its surface. A flat if-chain (not a nested ternary)
   // so each branch reads cleanly and the fleet fallthrough is explicit.
