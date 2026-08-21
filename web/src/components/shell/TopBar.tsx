@@ -175,10 +175,8 @@ function TopBarActions({
           <ThemeToggle vertical />
         </span>
       </Tip>
-      {/* The hairline separator that used to sit here was painted with the
-          `--border` token — a border in all but name — so it went with the
-          rail's other borders. The `gap-3` stack is what separates the
-          clusters now. */}
+      {/* The old hairline separator was a `--border` token — gone with the
+          rail's other borders; the `gap-3` stack separates the clusters now. */}
       {isClaudeOAuth && <UsageButton />}
       <Tip title="Account" body="Your profile, app settings, and sign-out." side="right">
         <UserMenu
@@ -330,33 +328,36 @@ function ViewTab({
 }
 
 /**
- * Bind the ⌘/Ctrl view-switch shortcuts and report which hint badges to show.
- * A hook so the map build + hint gating don't count against {@link ViewTabs}'
- * complexity budget.
- *
- * C and K are bound ONLY while their view is NOT active — on Threads the
- * sibling {@link ThreadActions} owns C (new thread), so `!onThreads` keeps the
- * two from colliding. S is always bound, mirroring the tab's own click.
- * `useModifierShortcuts` reads the map through a latest-ref, so rebuilding it
- * each render does not re-add the window listener.
+ * Build the three view-tab click handlers AND bind them as ⌘/Ctrl shortcuts —
+ * one definition for both, so a shortcut is "as if you clicked the tab". Each
+ * is DUAL-PURPOSE like the tab click: off the view navigate there, on the view
+ * toggle that view's rail (L/K/S stay live on their own view). L not C drives
+ * Threads — C is the new-thread shortcut in sibling {@link ThreadActions}. All
+ * bound, so one `modHeld` gates every hint. Args one object (max-params 4);
+ * `useModifierShortcuts` reads the map via latest-ref so rebuilds don't re-add
+ * the listener.
  */
-function useViewShortcuts(
-  view: ViewMode,
-  onViewChange: (v: ViewMode) => void,
-  onToggleSettingsRail: () => void,
-): { modHeld: boolean; showThreadsHint: boolean; showFinderHint: boolean } {
-  const onThreads = view === "threads"
-  const onSettings = view === "settings"
-  const onFinder = view === "finder"
+function useViewShortcuts(a: {
+  view: ViewMode
+  onViewChange: (v: ViewMode) => void
+  onToggleThreadsRail: () => void
+  onToggleFinderRail: () => void
+  onToggleSettingsRail: () => void
+}): {
+  modHeld: boolean
+  threadsClick: () => void
+  finderClick: () => void
+  settingsClick: () => void
+} {
+  const threadsClick =
+    a.view === "threads" ? a.onToggleThreadsRail : () => a.onViewChange("threads")
+  const finderClick = a.view === "finder" ? a.onToggleFinderRail : () => a.onViewChange("finder")
+  const settingsClick =
+    a.view === "settings" ? a.onToggleSettingsRail : () => a.onViewChange("settings")
 
-  const shortcuts: Record<string, () => void> = {
-    s: onSettings ? onToggleSettingsRail : () => onViewChange("settings"),
-  }
-  if (!onThreads) shortcuts["c"] = () => onViewChange("threads")
-  if (!onFinder) shortcuts["k"] = () => onViewChange("finder")
-  const modHeld = useModifierShortcuts(shortcuts)
+  const modHeld = useModifierShortcuts({ l: threadsClick, k: finderClick, s: settingsClick })
 
-  return { modHeld, showThreadsHint: modHeld && !onThreads, showFinderHint: modHeld && !onFinder }
+  return { modHeld, threadsClick, finderClick, settingsClick }
 }
 
 /** Per-agent view switcher (Threads · Finder · Costs). Costs
@@ -395,13 +396,16 @@ function ViewTabs({
   const onSettings = view === "settings"
   const onFinder = view === "finder"
 
-  // ⌘/Ctrl view-switch shortcuts — the map build + hint gating live in a hook
-  // so their branches don't count against ViewTabs' complexity budget.
-  const { modHeld, showThreadsHint, showFinderHint } = useViewShortcuts(
+  // ⌘/Ctrl shortcuts (L Threads · K Finder · S Settings) share ONE handler each
+  // with the tab click — the hook builds them, so a shortcut and a click are
+  // the same action. All three stay bound on their own view (toggle the rail).
+  const { modHeld, threadsClick, finderClick, settingsClick } = useViewShortcuts({
     view,
     onViewChange,
+    onToggleThreadsRail,
+    onToggleFinderRail,
     onToggleSettingsRail,
-  )
+  })
 
   return (
     // One of the two deliberate exceptions to "no borders" (the other is the
@@ -420,18 +424,17 @@ function ViewTabs({
       >
         <ViewTab
           active={onThreads}
-          // Already here → the click toggles the list rail. Elsewhere → it
-          // navigates, and leaves the rail's state alone.
-          onClick={onThreads ? onToggleThreadsRail : () => onViewChange("threads")}
+          // Same handler as the ⌘/Ctrl+L shortcut: navigate here, or toggle the
+          // list rail once already here.
+          onClick={threadsClick}
           // Only meaningful while this tab controls the rail; on the other
           // views the button is a plain navigation control.
           expanded={onThreads ? threadsRailOpen : undefined}
           icon={MessagesSquare}
           label="Threads"
-          // C switches to Threads only when NOT already here (on Threads, C is
-          // the new-thread shortcut owned by ThreadActions).
-          hint="C"
-          hintShown={showThreadsHint}
+          // L (not C — C is the new-thread shortcut in ThreadActions).
+          hint="L"
+          hintShown={modHeld}
         />
       </Tip>
       <Tip
@@ -445,13 +448,13 @@ function ViewTabs({
       >
         <ViewTab
           active={onFinder}
-          onClick={onFinder ? onToggleFinderRail : () => onViewChange("finder")}
+          onClick={finderClick}
           expanded={onFinder ? finderRailOpen : undefined}
           icon={FolderTree}
           label="Finder"
-          // K switches to Finder, active only when not already here.
+          // K navigates to Finder, or toggles the explorer once already here.
           hint="K"
-          hintShown={showFinderHint}
+          hintShown={modHeld}
         />
       </Tip>
       {devMode && (
@@ -483,12 +486,11 @@ function ViewTabs({
       >
         <ViewTab
           active={onSettings}
-          onClick={onSettings ? onToggleSettingsRail : () => onViewChange("settings")}
+          onClick={settingsClick}
           expanded={onSettings ? settingsRailOpen : undefined}
           icon={SlidersHorizontal}
           label="Settings"
-          // S always bound; mirrors the tab's own click (navigate, or toggle
-          // the category rail when already on settings).
+          // S navigates to Settings, or toggles the category rail once here.
           hint="S"
           hintShown={modHeld}
         />
