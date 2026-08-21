@@ -30,7 +30,7 @@ export function InfoBadge({ description }: { description?: string | undefined })
           onClick={stop}
           onDoubleClick={stop}
           onPointerDown={stop}
-          className="flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:bg-(--signal)/15 hover:text-(--signal)"
+          className="flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:text-(--signal)"
         >
           <Info className="size-3.5" />
         </TooltipTrigger>
