@@ -1362,6 +1362,10 @@
   path: crates/cp-orchestrator/tests/openapi/main.rs
   description: OpenAPI spec generator (integration test, --ignored). build_spec assembles schemas + paths. generate_openapi writes openapi.json. Acknowledges lib-only deps (incl reqwest, openssl).
   last_edited_ms: 0
+0fbad41db8f4b19f:
+  path: web/package.json
+  description: 'Frontend deps. scripts: dev/build(tsc -b && vite build)/lint/preview + P2 format/format:check (prettier). engines.node ''^22.16.0 || >=24.0.0'' (P7 n/no-unsupported-features: exact code-driven floor for import.meta.dirname — n credits the ^22.16 backport + >=24, the 23.x gap is dead). @tanstack/react-query, react 19.2, tailwindcss 4.3, shadcn, vite 8, playwright, full eslint ratchet plugin roster + prettier + web-vitals.'
+  last_edited_ms: 0
 0fc2068d82f8accd:
   path: src/app/run/watchers.rs
   description: File/cache watcher loop. flame!("cache_updates") + flame!("watcher_events"). sync_file_watchers (module→inotify/kqueue). timer_based_deprecation (poll intervals). FD cleanup (stale watch removal). suicide() auto-close.
@@ -9870,6 +9874,10 @@
   path: crates/cp-mod-memory/src/tools.rs
   description: Memory tools with flame!("memory_create") and flame!("memory_update"). tl_dr validation (80 token cap). Importance/labels. Batch create/update/delete.
   last_edited_ms: 0
+71e691b3acf9c3f6:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 7206c7d64ee6095b:
   path: web/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: thread conversation + composer. T510 FREEZE FIX: MessageRow React.memo (comparator msg===+agentId===) + AutoRun memo + useMemo(segmentLog) + content-visibility:auto per row. useConversationDrop hook (T367/T471 OS-file drag+zip). scrollIntoView measure-wrapped, 6-frame converge. FileSidebar rail for thread attachments.'
@@ -10377,6 +10385,10 @@
 7730943d0ea6dc7d:
   path: .git/index
   description: Git index (binary). Not source.
+  last_edited_ms: 0
+7732e227c109bdfa:
+  path: web/src/components/finder/explorer/ExplorerRow.tsx
+  description: One explorer tree line (T624). Purely presentational — handed depth+flags, no recursion (ExplorerTree recurses). INDENT GUIDES = per-ancestor left-border spacers in the flex row (indent by construction, not padding). Chevron column present on files too (empty spacer) so icons align. Single click onActivate (toggle folder / open file), double click onPin (files only), onContextMenu. native title, not Tip (100 rows = 100 portals).
   last_edited_ms: 0
 773304dff5ee878e:
   path: web/src/App.tsx
@@ -12922,6 +12934,10 @@
   path: src/ui/ir/render_conversation.rs
   description: 'Conversation IR chrome: border, title, scrollbar, auto-scroll. Delegates content to build_content_cached. Autocomplete overlay.'
   last_edited_ms: 1784477020164
+931a651791f8ca1c:
+  path: web/src/components/finder/editor/TabHost.tsx
+  description: 'Tab strip + body (T624 content half). Body IS the existing FinderPreview variant=full, KEYED BY PATH so switching tabs remounts (per-file scroll/sheet-cell/half-loaded-image never leaks across). TabStrip: overflow-x scroll never wrap (wrapping moves file under pointer). Tab is a <div> (contains close button — button-in-button illegal), middle-click closes via onAuxClick, italic while preview, X always-visible on active. EmptyEditor hint when nothing open.'
+  last_edited_ms: 0
 9324f3d14575af7d:
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. Backend struct holds view/breaker/hub/tickets/inspect/agents_dir/dirty/supervisor/retired/names(T328)/avatars(T338)/auth(T341)/session_ttl. route_rest dispatches all /api routes incl auth/ACL. handle() has centralized Bearer gate + per-agent ACL check. handle_stream = SSE.

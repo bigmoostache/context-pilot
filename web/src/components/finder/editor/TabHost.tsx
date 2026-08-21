@@ -1,8 +1,7 @@
 import { X, FileText } from "lucide-react"
 import type { FinderNode } from "@/lib/types"
 import { FinderPreview } from "../preview/FinderPreview"
-import { FileIcon } from "../support/macIcons"
-import { extOf } from "../support/kind"
+import { VsCodeFileIcon } from "../support/VsCodeFileIcon"
 import { cn } from "@/lib/utils"
 import type { OpenTab, TabsState } from "./tabState"
 
@@ -121,7 +120,7 @@ function Tab({
           : "bg-surface text-muted-foreground hover:text-foreground/90",
       )}
     >
-      <FileIcon kind={tab.kind} ext={extOf(tab.name)} size={14} />
+      <VsCodeFileIcon name={tab.name} isFolder={tab.kind === "folder"} size={14} />
       {/* Italic while transient. It is the ONLY signal that this tab is about
           to be replaced by the next single click, and VS Code uses exactly
           this — inventing a different one would teach a wrong reflex. */}

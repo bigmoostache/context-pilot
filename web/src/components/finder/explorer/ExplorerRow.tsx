@@ -1,7 +1,6 @@
 import type { FinderNode } from "@/lib/types"
 import { ChevronRight } from "lucide-react"
-import { FileIcon } from "../support/macIcons"
-import { extOf } from "../support/kind"
+import { VsCodeFileIcon } from "../support/VsCodeFileIcon"
 import { InfoBadge } from "../support/InfoBadge"
 import { cn } from "@/lib/utils"
 
@@ -82,7 +81,10 @@ export function ExplorerRow({
         )}
       </span>
 
-      <FileIcon kind={node.kind} ext={extOf(node.name)} size={15} />
+      {/* Folders show NO icon — the chevron above already states open/closed,
+          so a folder glyph is redundant (T629). Files wear the exact VS Code
+          Seti icon for their type. */}
+      {!isFolder && <VsCodeFileIcon name={node.name} size={15} />}
 
       <span className="min-w-0 flex-1 truncate">{node.name}</span>
 
