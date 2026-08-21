@@ -9114,6 +9114,10 @@
   path: crates/cp-base/src/tools/mod.rs
   description: 'Tool system: ToolUse/ToolResult (display/tldr/preserves_tempo), ToolDefinition + YAML-driven ToolDefBuilder, ParamType recursive JSON Schema. RESERVED_PARAM_NAMES intent/verb.'
   last_edited_ms: 1784476429203
+68df05e2b6022dbc:
+  path: web/src/lib/live/threadView.ts
+  description: 'Shared thread view orchestration (non-forked) — useThreadSelection (selection+localStorage+auto-select) + useThreadActions (archive/pause/delete/create/send/attach + notice). Zero component imports; both desktop+mobile ThreadsView consume. T636 part 2: Notice is now { message, undo?, tone:''info''|''error'' } (was bare string) — archive/pause push a Gmail-style undo toast whose Undo re-issues the inverse command (restore<->archive, resume<->pause) via sendCommand, backend stays source of truth (M141), 7s dwell vs 6s errors. offerUndo helper. delete/file-edit undo deferred (need backend).'
+  last_edited_ms: 1787328624889
 68e0ec33d108f90e:
   path: crates/cp-wire/Cargo.toml
   description: 'Wire protocol crate manifest. deps: crc32c, serde, serde_json, sha2 (0.10, for ContentHash::of SHA-256). Optional: utoipa (openapi feature for ToSchema derives). I/O-free. Workspace lints.'
