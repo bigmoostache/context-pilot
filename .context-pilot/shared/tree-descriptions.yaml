@@ -8394,6 +8394,10 @@
   path: src/modules/pre_flight.rs
   description: 'Pre-flight validation: Phase 0 trap block, Phase 0.5 duplicate Close_conversation_history queue check (panels[].panel_id extraction, skipped during trap), Phase 1 schema validation, Phase 2 module semantic checks.'
   last_edited_ms: 0
+6098b806146fef7e:
+  path: web/src/components/finder/support/VsCodeFileIcon.tsx
+  description: VS Code default file-icon bank (Seti theme) via seti-icons pkg (T629). Renders the icon SVG string as a CSS mask tinted with VS Code's own Seti palette hex — no dangerouslySetInnerHTML, no eslint scope-off (Seti icons are single-colour so mask+color is lossless). themeIcons resolver built once at module load. Folders render an empty same-size spacer (chevron states open/closed, folder glyph dropped). Used by ExplorerRow + TabHost; mobile twin re-exports.
+  last_edited_ms: 1787322386396
 609f9263d5690f78:
   path: web/src/mobile-components/finder/Finder/index.tsx
   description: Mobile Finder seam twin — resolves active tab, wires shared state/listing/controller stubs into mobile FinderShell. Ancestor promoted to route mobile children.
@@ -10388,8 +10392,8 @@
   last_edited_ms: 0
 7732e227c109bdfa:
   path: web/src/components/finder/explorer/ExplorerRow.tsx
-  description: One explorer tree line (T624). Purely presentational — handed depth+flags, no recursion (ExplorerTree recurses). INDENT GUIDES = per-ancestor left-border spacers in the flex row (indent by construction, not padding). Chevron column present on files too (empty spacer) so icons align. Single click onActivate (toggle folder / open file), double click onPin (files only), onContextMenu. native title, not Tip (100 rows = 100 portals).
-  last_edited_ms: 0
+  description: 'One explorer tree line (T624). Purely presentational — handed depth+flags, no recursion (ExplorerTree recurses). INDENT GUIDES = per-ancestor left-border spacers in the flex row. Chevron column present on files too (empty spacer) so icons align. T629: file icon = VsCodeFileIcon (Seti bank); folders render NO icon (chevron suffices). Single click onActivate, double click onPin (files), onContextMenu. native title, not Tip.'
+  last_edited_ms: 1787322386527
 773304dff5ee878e:
   path: web/src/App.tsx
   description: 'Root shell. activeAgent = useAgentMeta(activeAgentId) ?? fleetAgent. sseConnected = useSseConnected(activeAgentId) tracks SSE push plane health. useRestartFlow(activeAgentId) provides restart + restarting for both footer and dialog. agentLoading from useAgentMeta shows loader on agent switch. view/agent persisted to localStorage via write-through effects. effectiveView gates cockpit+costs behind devMode, falls back to fleet when no agent. StatusBar receives connected + onRestart + restarting + loading. Routes: fleet/threads/cockpit/costs/finder. renderView wrapped in <TelemetryProfiler id={effectiveView}>; mounts <TelemetryHud/> (dev-mode gated).'
@@ -12936,8 +12940,8 @@
   last_edited_ms: 1784477020164
 931a651791f8ca1c:
   path: web/src/components/finder/editor/TabHost.tsx
-  description: 'Tab strip + body (T624 content half). Body IS the existing FinderPreview variant=full, KEYED BY PATH so switching tabs remounts (per-file scroll/sheet-cell/half-loaded-image never leaks across). TabStrip: overflow-x scroll never wrap (wrapping moves file under pointer). Tab is a <div> (contains close button — button-in-button illegal), middle-click closes via onAuxClick, italic while preview, X always-visible on active. EmptyEditor hint when nothing open.'
-  last_edited_ms: 0
+  description: 'Tab strip + body (T624 content half). Body IS FinderPreview variant=full KEYED BY PATH so switching tabs remounts. TabStrip overflow-x scroll never wrap. Tab is a <div> (contains close button), middle-click closes via onAuxClick, italic while preview, X always-visible on active. T629: tab icon = VsCodeFileIcon (Seti bank). EmptyEditor hint when nothing open.'
+  last_edited_ms: 1787322386658
 9324f3d14575af7d:
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. Backend struct holds view/breaker/hub/tickets/inspect/agents_dir/dirty/supervisor/retired/names(T328)/avatars(T338)/auth(T341)/session_ttl. route_rest dispatches all /api routes incl auth/ACL. handle() has centralized Bearer gate + per-agent ACL check. handle_stream = SSE.
