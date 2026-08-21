@@ -6410,6 +6410,10 @@
   path: crates/cp-mod-search/src/types.rs
   description: Core types + config constants. SearchPersistData (recompute tracking + task_signals ring), SearchState (SharedRadarCache Arc<Mutex> + T295 watchdog:Option<WatchdogHandle> — dropped on reload to stop the old meili supervisor), Chunk, SearchResult, SearchMetrics, SearchOverlayInfo (meili_cpu_pct/memory_bytes), MeiliLiveStats, IndexerCmd, WatcherHandle. logs_index_settings.
   last_edited_ms: 1782041936574
+48aa8f6670a5b620:
+  path: web/src/components/finder/Finder/shell.tsx
+  description: 'Finder two-pane render (T624/T630). ONE DndContext spanning explorer + every editor group; onDragEnd delegates to groups.applyDragEnd (thin shell). collisionDetection=pointerFirst (T630 fix 49151374): pointerWithin drop-where-cursor-is, closestCenter fallback — closestCenter alone mis-resolved with 2+ split groups so explorer/tab drops into a pane silently no-op''d. PointerSensor 4px activation keeps click affordances intact. ExplorerTree left (slide-collapse via negative margin, stays mounted), TabHost (split groups) right, disconnect overlay over both. useFsDescriptions for ⓘ badges.'
+  last_edited_ms: 1787328245753
 48adef6164d29e4e:
   path: web/src/lib/query/sse.ts
   description: 'Reconnecting SSE client for one agent''s event stream. EventSource with ticket auth, last_rev resume param (T268 fix), exponential backoff (1s→30s). Singleton per agent via getOrCreateSseClient. Named event listeners: delta/stream/resync/invalidate. Wildcard ''*'' subscriber support. subscribeConnection(callback) for reactive connection state (open/error transitions). web-lint P3: `closed` flag read through an isClosed() getter at the onerror + catch sites — a direct !closed is CFA-narrowed to always-true (its only mutation is in the deferred close()), a function call is opaque to CFA.'
