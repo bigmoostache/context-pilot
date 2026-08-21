@@ -6574,6 +6574,10 @@
   path: crates/cp-orchestrator/tests/openapi/schemas.rs
   description: OpenAPI core schemas — domain types (Agent, ThreadDetail, ThreadMsg, ToolCall, ContextPanel, MemoryCard, TodoItem, etc.) + shared enums (PanelKind, AccentToken). Referenced by the spec.
   last_edited_ms: 0
+4b39b3e0c1b4431f:
+  path: web/src/components/finder/Finder/shell.tsx
+  description: Finder two-pane render (T624/T630). ONE DndContext spanning explorer + every editor group; onDragEnd delegates to groups.applyDragEnd (thin shell). PointerSensor 4px activation keeps click affordances intact. ExplorerTree left (slide-collapse via negative margin, stays mounted), TabHost (split groups) right, disconnect overlay over both. useFsDescriptions for ⓘ badges.
+  last_edited_ms: 1787326442355
 4b3f6bd9675aba4d:
   path: src/modules/pre_flight.rs
   description: 'Pre-flight validation: Phase 0 trap block, Phase 0.5 duplicate Close_conversation_history queue check (panels[].panel_id extraction, skipped during trap), Phase 1 schema validation, Phase 2 module semantic checks.'
@@ -13110,6 +13114,10 @@
   path: crates/cp-orchestrator/src/services/releases/self_update.rs
   description: Orchestrator self-update (adopt downloaded cp-orchestrator). stage_orchestrator_update (atomic rename + .bak/.pending markers), boot_check (crash-loop rollback after MAX_BOOT_ATTEMPTS=2), boot_commit_when_healthy (/healthz gate). Off-task for T581.
   last_edited_ms: 0
+9522a1bda0ac7ee3:
+  path: web/src/components/finder/editor/tabState.ts
+  description: 'VS Code editor model with SPLIT VIEW (T630 P3). useEditorGroups: flat horizontal EditorGroup[] (id/tabs/activePath) + activeGroupId cursor. Preview-tab invariant now PER GROUP (one transient italic tab, replaced by next single click). Explorer facade preserved: openPreview/openPinned/activePath target active group. splitActive clones active tab into new group right; moveTab cross-group (drops emptied non-last group); applyDragEnd central dnd dispatch (explorer-open/in-group reorder/cross-group move) so shell is thin. Pure helpers withPreview/withPinned/withoutTab/reorderTabs/withMovedInto keep callbacks under nesting cap; group-id counter in IIFE closure (dodges unicorn/no-top-level-assignment). dnd ids: tab=${groupId}::${path}, group drop=group:${groupId}.'
+  last_edited_ms: 1787326442088
 95269bb02ecad3b3:
   path: src/app/actions/mod.rs
   description: Central action dispatch (Elm/Redux). apply_action split handle_input_char/handle_stop_streaming/handle_copy_index_overlay (A2). CycleViewMode resets scroll. Thread actions in threads.rs.
@@ -13910,6 +13918,10 @@
   path: web/src/components/panels/cockpit/RadarPanel.tsx
   description: Context Radar panel — uses useRadar(agentId) for live anchors + scored results. Importance dots, score meters.
   last_edited_ms: 1781695333962
+9eb87fad9238d4c3:
+  path: web/src/components/finder/editor/TabHost.tsx
+  description: 'Editor GROUPS laid side by side (T630 P3). One GroupView per group in a flex row — each a droppable (group:<id>) with its own TabStrip + FinderPreview body (variant=full, KEYED BY PATH so switching tabs remounts). Active group ringed; pointer-down focuses it so explorer opens there. TabStrip: horizontal SortableContext (dnd-kit) reorder, split button (SplitSquareHorizontal), overflow-x scroll never wrap. Tab is a <div> (contains close button), namespaced sortable id, middle-click closes (onAuxClick), italic while preview, X always-visible on active. VsCodeFileIcon (Seti). EmptyEditor hint when a group holds nothing.'
+  last_edited_ms: 1787326442222
 9ef52cb9c50c2ed2:
   path: src/ui/ir/conversation.rs
   description: 'Conversation + overlay IR builder. Messages, history sections, streaming tools, input area. Overlays: Autocomplete, PerfOverlay (build_perf_overlay with frame budgets, CPU/Meili stats, FD count, op table), Config, SearchIndex. No QuestionForm overlay. Perf builder calls PERF.snapshot() and cp_mod_search::overlay_info().'
@@ -17106,6 +17118,10 @@ c309ae68ac22f0f5:
   path: crates/cp-orchestrator/src/runtime.rs
   description: 'Runtime — env Config (port/agents_dir/budget/scan_interval + X896 agents_root/agent_binary + T341 auth_enabled/session_ttl/auth_db_path) + driver loop with TWO decoupled cadences: slow scan_interval (2s) registry scan + config.json mtime backstop + tmp reap + auth backup tick; fast TAIL_INTERVAL (100ms) tail_all_agents. Runtime::new opens AuthStore when auth enabled, builds Backend with 6 args. BackupScheduler wired into slow cadence (NFR-19/20).'
   last_edited_ms: 0
+c3156d71a3095d7e:
+  path: web/src/components/finder/Finder/index.tsx
+  description: Finder seam (T624/T630). Owns useTreeState + useEditorGroups, threads Show-in-Finder reveal into the tree (expand ancestors + groups.openPinned), hands to FinderShell. Reveal effect lists memoised bundles in deps, fires once per fresh revealPath (parent nulls on consume).
+  last_edited_ms: 1787326442484
 c31dbf43c07b1639:
   path: crates/cp-mod-firecrawl/src/api.rs
   description: Firecrawl v2 HTTP client. FirecrawlClient with 5xx retry (3 attempts, 1s delay). ScrapeParams/SearchParams/MapParams/CrawlParams structs. post_json() + get_json() generic helpers. start_crawl() + poll_crawl() for async crawl jobs. 30s timeout. Bearer auth. Rate limit + forbidden error handling.
