@@ -1,20 +1,11 @@
-import {
-  Plus,
-  Search,
-  Archive,
-  ArchiveRestore,
-  ChevronLeft,
-  PanelLeftClose,
-  Pause,
-  Play,
-  Trash2,
-} from "lucide-react"
-import { useRef, useState } from "react"
+import { Archive, ArchiveRestore, ChevronLeft, Pause, Play, Trash2 } from "lucide-react"
+import { useRef } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Tip } from "@/components/ui/tip"
 import type { ThreadDetail } from "@/lib/types"
 import { cn, prefersReducedMotion } from "@/lib/utils"
 import { clickable } from "@/lib/support/a11y"
-import { previewOf } from "@/lib/support/threadMessages"
+import { byRecent, dotColor, previewOf, ROW_ACTION_COPY } from "@/lib/support/threadMessages"
 import { ThreadSearchPalette } from "./dialogs/ThreadSearchPalette"
 
 interface ThreadListProps {
@@ -31,18 +22,11 @@ interface ThreadListProps {
   onDelete: (id: string) => void
   /** pause ↔ resume a single thread (T371) */
   onPause: (id: string) => void
-  onNewThread: () => void
-  onToggleSidebar: () => void
-  /** optional controlled search-palette open state — when omitted the list owns
-   *  it internally (T713: ThreadsView drives it so the floating collapsed-rail
-   *  cluster can open search too). */
-  searchOpen?: boolean | undefined
-  onSearchOpenChange?: ((v: boolean) => void) | undefined
-}
-
-/** Sort threads by most recent activity first. */
-function byRecent(a: ThreadDetail, b: ThreadDetail): number {
-  return (b.lastActivityMs ?? 0) - (a.lastActivityMs ?? 0)
+  /** Search-palette open state. CONTROLLED, always: the trigger lives in the
+   *  header rail (a sibling of this whole view), while the palette renders here
+   *  because it needs the thread list + agent. */
+  searchOpen: boolean
+  onSearchOpenChange: (v: boolean) => void
 }
 
 /**
@@ -63,16 +47,9 @@ export function ThreadList({
   onArchive,
   onDelete,
   onPause,
-  onNewThread,
-  onToggleSidebar,
-  searchOpen: searchOpenProp,
+  searchOpen,
   onSearchOpenChange,
 }: ThreadListProps) {
-  const [searchOpenLocal, setSearchOpenLocal] = useState(false)
-  // Controlled when the parent supplies both; otherwise the list owns it.
-  const searchOpen = searchOpenProp ?? searchOpenLocal
-  const setSearchOpen = onSearchOpenChange ?? setSearchOpenLocal
-
   const live = threads.filter((t) => !t.archived)
   const archived = threads.filter((t) => t.archived)
   const archivedCount = archived.length
@@ -111,7 +88,24 @@ export function ThreadList({
   )
 
   return (
-    <aside className="flex w-(--sidebar-w) shrink-0 flex-col overflow-hidden border-r border-border bg-surface">
+    // `bg-surface-2`, not `bg-card`: the rail must not read as the same surface
+    // as the header chrome. `--card` is reserved for what sits ON this panel —
+    // the selected thread row — so using it here too flattened the two into one
+    // tone. See the sibling FinderSidebar, still on `--surface`, if the two
+    // rails are ever unified.
+    //
+    // NO HORIZONTAL MARGIN (`my-2` only): the panel spans the full width of its
+    // column. It still does not touch the header rail — that carries its own
+    // `p-2`, so 8px of its padding falls to the left — and on the right the
+    // `card-shadow` is what separates it from the conversation, since the
+    // border is transparent (T605). The vertical `my-2` stays, so the panel
+    // floats top and bottom but runs flush side to side.
+    //
+    // ONE HAPPY CONSEQUENCE: ThreadsView's collapse offset used to be
+    // `--sidebar-w` PLUS this element's horizontal margins, a sum kept by hand
+    // in another file that had already drifted twice. With no horizontal margin
+    // left there is nothing to add, so the offset is now just the width.
+    <aside className="card-shadow my-2 flex w-(--sidebar-w) shrink-0 flex-col overflow-hidden rounded-none border border-border bg-surface-2">
       {/* fixed-width inner shell pinned to the rail width */}
       <div
         className="flex h-full flex-col"
@@ -121,13 +115,16 @@ export function ThreadList({
           showArchived={showArchived}
           onToggleArchived={onToggleArchived}
           archivedCount={archivedCount}
-          onOpenSearch={() => setSearchOpen(true)}
-          onToggleSidebar={onToggleSidebar}
-          onNewThread={onNewThread}
         />
 
         <ScrollArea className="min-h-0 flex-1">
-          <div className="px-2 pb-1">
+          {/* The panel's inner inset lives HERE and nowhere else — one value,
+              all four sides. It used to be split three ways — a padded header
+              band, this element's `pb-1`, and a first-Group `pt-1.5` — so no
+              single element stated the rhythm and the total was an accident.
+              The padding sits on the CONTENT rather than on the ScrollArea so
+              the scrollbar still runs flush to the panel edge. */}
+          <div className="p-2">
             {visible.length === 0 && <EmptyState showArchived={showArchived} />}
 
             {!showArchived && (
@@ -161,74 +158,45 @@ export function ThreadList({
 
       <ThreadSearchPalette
         open={searchOpen}
-        onClose={() => setSearchOpen(false)}
+        onClose={() => onSearchOpenChange(false)}
         threads={threads}
         agentId={agentId}
         onSelect={(id) => {
           onSelect(id)
-          setSearchOpen(false)
+          onSearchOpenChange(false)
         }}
       />
     </aside>
   )
 }
 
-/** Context-sensitive top bar: the live thread count + parallelism pill, or an
- *  "Archived ‹back›" header while viewing the archived set. */
+/** The "‹ Archived" back-link band, shown ONLY while viewing the archived set.
+ *
+ * This once carried a New-thread / Search / collapse cluster; all of it moved to
+ * the header rail, leaving the back-link as its only content. It then rendered
+ * an empty padded div on the normal view — a 16px band of nothing — which was
+ * defended at the time as "the panel's top padding". That padding now belongs to
+ * the scroll content, so the band has no remaining job and returns null instead. */
 function ListHeader({
   showArchived,
   onToggleArchived,
   archivedCount,
-  onOpenSearch,
-  onToggleSidebar,
-  onNewThread,
 }: {
   showArchived: boolean
   onToggleArchived: (v: boolean) => void
   archivedCount: number
-  onOpenSearch: () => void
-  onToggleSidebar: () => void
-  onNewThread: () => void
 }) {
+  if (!showArchived) return null
+
   return (
-    <div className="flex items-center gap-2 px-3 pt-3 pb-1">
-      {showArchived ? (
-        <button
-          onClick={() => onToggleArchived(false)}
-          className="flex items-center gap-1.5 text-[12px] font-medium text-foreground/80 transition-colors hover:text-foreground"
-        >
-          <ChevronLeft className="size-3.5" />
-          Archived
-          <span className="text-muted-foreground/50 tabular-nums">{archivedCount}</span>
-        </button>
-      ) : null}
-      {/* left-aligned chrome: new thread + open search palette (sit right after
-          the archived back-button when it is shown) */}
-      <div className="flex items-center gap-1">
-        {!showArchived && (
-          <button
-            onClick={onNewThread}
-            title="New thread"
-            className="flex size-6 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <Plus className="size-3.5" />
-          </button>
-        )}
-        <button
-          onClick={onOpenSearch}
-          title="Search threads"
-          className="flex size-6 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <Search className="size-3.5" />
-        </button>
-      </div>
-      {/* right-aligned: collapse the rail — pushed to the far right, unmoved */}
+    <div className="flex items-center px-3 pt-2">
       <button
-        onClick={onToggleSidebar}
-        title="Hide sidebar"
-        className="ml-auto flex size-6 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
+        onClick={() => onToggleArchived(false)}
+        className="flex items-center gap-1.5 text-[12px] font-medium text-foreground/80 transition-colors hover:text-foreground"
       >
-        <PanelLeftClose className="size-3.5" />
+        <ChevronLeft className="size-3.5" />
+        Archived
+        <span className="text-muted-foreground/50 tabular-nums">{archivedCount}</span>
       </button>
     </div>
   )
@@ -241,9 +209,16 @@ function EmptyState({ showArchived }: { showArchived: boolean }) {
   return <p className="px-2.5 py-6 text-center text-[11.5px] text-muted-foreground/55">{message}</p>
 }
 
+/** A turn-status band above a run of rows.
+ *
+ * `pt-3` on every band EXCEPT the first: that gap separates one group from the
+ * one before it, so on the first band there is nothing to separate from and the
+ * scroll content's own inset already provides the space. The first band used to
+ * carry a 6px trim instead, which existed only to compensate for the padded
+ * header band above it. */
 function Group({ label, count, first }: { label: string; count: number; first?: boolean }) {
   return (
-    <div className={cn("flex items-center gap-2 px-2.5 pb-1", first ? "pt-1.5" : "pt-3")}>
+    <div className={cn("flex items-center gap-2 px-2.5 pb-1", first ? "pt-0" : "pt-3")}>
       <span className="text-[11px] font-semibold text-muted-foreground">{label}</span>
       <span className="text-[11px] text-muted-foreground/45 tabular-nums">{count}</span>
     </div>
@@ -290,14 +265,6 @@ function MarqueeTitle({ name, trackRef }: { name: string; trackRef: React.Ref<HT
   )
 }
 
-/** Status-dot colour: green focused/active, signal on your turn, else muted. Flat if-chain. */
-function dotColor(isFocused: boolean, status: ThreadDetail["status"]): string {
-  if (isFocused) return "var(--ok)"
-  if (status === "MY_TURN") return "var(--signal)"
-  if (status === "ACTIVE") return "var(--ok)"
-  return "var(--muted-foreground)"
-}
-
 function ThreadRow({
   t,
   selected,
@@ -325,12 +292,23 @@ function ThreadRow({
     <div
       onMouseEnter={marquee.onMouseEnter}
       onMouseLeave={marquee.onMouseLeave}
+      // `py-1.5`, not `py-2`: the row's two text lines come to roughly 33px, so
+      // 16px of padding was nearly half the content height again. 12px still
+      // reads as a padded row rather than a table line.
+      //
+      // No `gap-*` here — this element has exactly ONE child, so a gap had
+      // nothing to space. The real line-to-line gap lives on that child.
       className={cn(
-        "group relative mb-0.5 flex w-full flex-col gap-1 rounded-lg px-2.5 py-2 text-left transition-colors select-none",
+        "group relative mb-0.5 flex w-full flex-col rounded-lg px-2.5 py-1.5 text-left transition-colors select-none",
         selected ? "card-shadow bg-card" : "hover:card-shadow hover:bg-card",
       )}
     >
-      <div {...clickable(() => onSelect(t.id))} className="flex flex-col gap-1 text-left">
+      {/* `gap-0.5` binds the title and its preview into ONE unit. What keeps
+          rows apart is the padding plus `mb-0.5` — 14px between one row's last
+          line and the next row's first — so tightening here sharpens the
+          hierarchy rather than blurring it: 2px within a row against 14px
+          between them. */}
+      <div {...clickable(() => onSelect(t.id))} className="flex flex-col gap-0.5 text-left">
         {/* line 1 — dot + name + time + hover actions */}
         <div className="flex items-center gap-2">
           <span
@@ -387,41 +365,80 @@ function RowActions({
 }) {
   return (
     <span className="absolute inset-0 flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          onArchive(id)
-        }}
-        className="flex size-5 items-center justify-center rounded-md text-muted-foreground/60 group-hover:text-foreground hover:bg-muted"
-        title={archived ? "Restore" : "Archive"}
-      >
-        {archived ? <ArchiveRestore className="size-3" /> : <Archive className="size-3" />}
-      </button>
+      <RowAction
+        copy={ROW_ACTION_COPY[archived ? "restore" : "archive"]}
+        icon={archived ? ArchiveRestore : Archive}
+        onClick={() => onArchive(id)}
+      />
       {archived && onDelete && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onDelete(id)
-          }}
-          className="flex size-5 items-center justify-center rounded-md text-muted-foreground/60 group-hover:text-foreground hover:bg-muted hover:text-(--danger)"
-          title="Delete permanently"
-        >
-          <Trash2 className="size-3" />
-        </button>
+        <RowAction
+          copy={ROW_ACTION_COPY.remove}
+          icon={Trash2}
+          danger
+          onClick={() => onDelete(id)}
+        />
       )}
       {!archived && onPause && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onPause(id)
-          }}
-          className="flex size-5 items-center justify-center rounded-md text-muted-foreground/60 group-hover:text-foreground hover:bg-muted"
-          title={isPaused ? "Resume" : "Pause"}
-        >
-          {isPaused ? <Play className="size-3" /> : <Pause className="size-3" />}
-        </button>
+        <RowAction
+          copy={ROW_ACTION_COPY[isPaused ? "resume" : "pause"]}
+          icon={isPaused ? Play : Pause}
+          onClick={() => onPause(id)}
+        />
       )}
     </span>
+  )
+}
+
+/**
+ * One hover-revealed row action, with its tooltip.
+ *
+ * THE REST COLOUR HAD NEVER RENDERED. These carried `text-muted-foreground/60
+ * group-hover:text-foreground`, but `group-hover` keys off the ROW — and the
+ * span holding them is itself `opacity-0 group-hover:opacity-100`, so they are
+ * only on screen while the row is hovered, exactly when that colour applies.
+ * Moving the hover onto the BUTTON is what gives them a rest state at all:
+ * `muted-foreground/70`, the same grey as the row's preview line
+ * ({@link RowMeta}), so an idle action reads as metadata rather than as a
+ * control competing with the title. No hover fill — at 20px inside an already
+ * highlighted row it only added a second nested rectangle.
+ *
+ * @param danger Hovers to `--danger` instead of ink. Picked by TERNARY, never
+ *               two classes: same-specificity `hover:text-*` utilities resolve
+ *               by stylesheet order, not class-attribute order, so emitting
+ *               both would make the winner incidental.
+ */
+function RowAction({
+  copy,
+  icon: Icon,
+  danger,
+  onClick,
+}: {
+  copy: { readonly title: string; readonly body: string }
+  icon: typeof Archive
+  danger?: boolean
+  onClick: () => void
+}) {
+  return (
+    // `top`: these sit at the right edge of the rail, so `right` would open
+
+    // over the conversation and `left` back over the rail itself.
+    <Tip title={copy.title} body={copy.body} side="top" triggerClassName="inline-flex">
+      <button
+        onClick={(e) => {
+          // The row behind is clickable; without this, using an action would
+          // also select the thread.
+          e.stopPropagation()
+          onClick()
+        }}
+        aria-label={copy.title}
+        className={cn(
+          "flex size-5 items-center justify-center rounded-md text-muted-foreground/70 transition-colors",
+          danger ? "hover:text-(--danger)" : "hover:text-foreground",
+        )}
+      >
+        <Icon className="size-3" />
+      </button>
+    </Tip>
   )
 }
 

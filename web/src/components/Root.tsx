@@ -4,6 +4,7 @@ import { CostsView } from "@/components/shell/costs/CostsView"
 import { StatusBar } from "@/components/shell/StatusBar"
 import { ThreadsView } from "@/components/threads/ThreadsView"
 import { FleetDashboard } from "@/components/agents/FleetDashboard"
+import { SettingsView } from "@/components/agents/AgentModal/settingsView"
 import { Finder } from "@/components/finder/Finder"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { AuthGuard } from "@/components/auth/AuthGuard"
@@ -115,10 +116,49 @@ function AppShell() {
     setView("threads")
   }
 
+  // Whether the threads view's list rail is open. It lives HERE, not in
+  // ThreadsView, because the control that toggles it is the header rail's
+  // Threads tab — a sibling of the view, not a descendant. AppShell is the
+  // nearest common ancestor, and it already owns the other cross-cutting shell
+  // state (view, active agent, reveal path).
+  //
+  // Side effect of lifting it: the rail no longer resets when you switch agent
+  // (ThreadsView is keyed by agent id, AppShell is not), so a collapsed rail
+  // stays collapsed across the switch. Deliberate — it is panel state, not
+  // per-agent state. Not persisted to localStorage.
+  const [threadsRailOpen, setThreadsRailOpen] = useState(true)
+
+  // The settings view's category rail. A SEPARATE flag from the threads rail
+  // above, not a shared one: collapsing the thread list is a statement about
+  // the thread list, and having it silently collapse the settings categories
+  // too would make each panel's state depend on a panel the user cannot see.
+  // Same ownership reasoning — the control that toggles it is the header
+  // rail's Settings tab, a sibling of the view rather than a descendant.
+  const [settingsRailOpen, setSettingsRailOpen] = useState(true)
+
+  // The finder view's explorer rail. Its OWN flag, same reasoning as the two
+  // rails above: the control that toggles it is the header rail's Finder tab
+  // (a sibling of the view), and collapsing one panel must never silently
+  // collapse another the user cannot see. Re-clicking the Finder tab while
+  // finder is already the active view flips this (the activity-bar idiom the
+  // Threads and Settings tabs already use).
+  const [finderRailOpen, setFinderRailOpen] = useState(true)
+
+  // The two thread-list ACTIONS, hoisted for the same reason as the rail above:
+  // their buttons now live in the header rail, a sibling of the threads view.
+  // Only the flags live here — the New Thread dialog and the search palette
+  // both still render down in the view, where the threads + agent they operate
+  // on are in scope.
+  const [newThreadOpen, setNewThreadOpen] = useState(false)
+  const [threadSearchOpen, setThreadSearchOpen] = useState(false)
+
   // T334: "Show in Finder" — switch to finder view and reveal a specific file.
   const [finderRevealPath, setFinderRevealPath] = useState<string | null>(null)
   const showInFinder = useCallback((path: string) => {
     setFinderRevealPath(path)
+    // A reveal that lands on a collapsed rail would hide the very row it just
+    // expanded to — so force the explorer open on the way in.
+    setFinderRailOpen(true)
     setView("finder")
   }, [])
 
@@ -137,11 +177,23 @@ function AppShell() {
         />
       )
     }
+    if (effectiveView === "settings" && activeAgent) {
+      return (
+        <SettingsView
+          key={activeAgent.id}
+          agent={activeAgent}
+          railOpen={settingsRailOpen}
+          disconnected={showDisconnectOverlay}
+          onReconnect={restartAgent}
+        />
+      )
+    }
     if (effectiveView === "finder" && activeAgent) {
       return (
         <Finder
           key={activeAgent.id}
           agent={activeAgent}
+          railOpen={finderRailOpen}
           revealPath={finderRevealPath}
           onRevealConsumed={() => setFinderRevealPath(null)}
           disconnected={showDisconnectOverlay}
@@ -154,6 +206,11 @@ function AppShell() {
         key={activeAgentId}
         activeAgentId={activeAgentId}
         onShowInFinder={showInFinder}
+        railOpen={threadsRailOpen}
+        newOpen={newThreadOpen}
+        onNewOpenChange={setNewThreadOpen}
+        searchOpen={threadSearchOpen}
+        onSearchOpenChange={setThreadSearchOpen}
         disconnected={showDisconnectOverlay}
         onReconnect={restartAgent}
       />
@@ -171,16 +228,39 @@ function AppShell() {
     (!sseConnected || agentStale) && effectiveView !== "fleet" && !agentRestarting
 
   return (
+    // Column, not row: the FOOTER is the full-width floor of the window, and
+    // everything else sits in the band above it. That band is the row holding
+    // the header rail and the view, so the rail's height is the window minus
+    // the footer — it stops where the footer starts rather than running past it
+    // to the bottom edge.
+    //
+    // The inner row needs `min-h-0`: a flex item's automatic minimum size is
+    // its content, so a tall view would refuse to shrink and would push the
+    // footer off the bottom of the screen instead of scrolling internally.
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
-      <TopBar
-        view={effectiveView}
-        onViewChange={setView}
-        activeAgentId={activeAgentId}
-        onSwitchAgent={setActiveAgentId}
-        agents={agents}
-      />
+      <div className="flex min-h-0 flex-1 flex-row overflow-hidden">
+        <TopBar
+          view={effectiveView}
+          onViewChange={setView}
+          activeAgentId={activeAgentId}
+          onSwitchAgent={setActiveAgentId}
+          agents={agents}
+          threadsRailOpen={threadsRailOpen}
+          onToggleThreadsRail={() => setThreadsRailOpen((o) => !o)}
+          onNewThread={() => setNewThreadOpen(true)}
+          onSearchThreads={() => setThreadSearchOpen(true)}
+          settingsRailOpen={settingsRailOpen}
+          onToggleSettingsRail={() => setSettingsRailOpen((o) => !o)}
+          finderRailOpen={finderRailOpen}
+          onToggleFinderRail={() => setFinderRailOpen((o) => !o)}
+        />
 
-      <TelemetryProfiler id={effectiveView}>{renderView()}</TelemetryProfiler>
+        {/* The view's own box, unchanged: every view roots itself on
+            `flex min-h-0 flex-1`, so it still resolves against a COLUMN. */}
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <TelemetryProfiler id={effectiveView}>{renderView()}</TelemetryProfiler>
+        </div>
+      </div>
 
       <StatusBar
         fleet={effectiveView === "fleet"}
@@ -193,7 +273,8 @@ function AppShell() {
         loading={agentLoading}
       />
 
-      {/* Dev-mode performance HUD (gated on the Developer-mode flag inside). */}
+      {/* Dev-mode performance HUD (gated on the Developer-mode flag inside).
+          `fixed`-positioned, so where it sits in the tree is immaterial. */}
       <TelemetryHud />
     </div>
   )

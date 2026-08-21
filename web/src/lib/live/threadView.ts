@@ -101,14 +101,37 @@ export interface Selection {
  * threads clears staged uploads via a render-phase reset (React's documented
  * adjust-state-on-prop-change pattern — not an effect, which would cost an extra
  * commit and trip set-state-in-effect).
+ *
+ * @param newThreadDialog Optional caller-owned open flag for the New Thread
+ *                        dialog. Supply it when the trigger lives OUTSIDE the
+ *                        thread view (the desktop header rail); omit it to keep
+ *                        the flag local (mobile).
  */
-export function useThreadSelection(activeAgentId: string, threads: ThreadDetail[]): Selection {
+export function useThreadSelection(
+  activeAgentId: string,
+  threads: ThreadDetail[],
+  newThreadDialog?: { open: boolean; setOpen: (v: boolean) => void },
+): Selection {
   const threadKey = `cp-thread-${activeAgentId}`
   const [selectedId, setSelectedId] = useState(() => localStorage.getItem(threadKey) ?? "")
   const [query, setQuery] = useState("")
   const [showArchived, setShowArchived] = useState(false)
-  const [newOpen, setNewOpen] = useState(false)
   const [pendingFiles, setPendingFiles] = useState<UploadedFile[]>([])
+
+  // The new-thread dialog's open flag, optionally OWNED BY THE CALLER.
+  //
+  // The desktop shell moved the "New thread" button into the header rail, which
+  // is a SIBLING of the threads view rather than a descendant — so the flag has
+  // to live above both, and the caller hands it in here. Injecting it (rather
+  // than letting the caller bypass `sel.newOpen`) is what keeps `handleCreate`
+  // working: that closes the dialog through `sel.setNewOpen(false)`, and it must
+  // close the same flag the button opened.
+  //
+  // Omitting the argument keeps the state local, which is what the mobile tree
+  // does — its own trigger sits inside the view.
+  const [ownNewOpen, setOwnNewOpen] = useState(false)
+  const newOpen = newThreadDialog?.open ?? ownNewOpen
+  const setNewOpen = newThreadDialog?.setOpen ?? setOwnNewOpen
 
   // Auto-select a just-created thread once its server-assigned id lands.
   const pendingSelectRef = useRef(false)

@@ -168,7 +168,10 @@ export function UsageButton() {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <Tip title="Usage limits" body="Claude Code session & weekly rate limits." side="bottom">
+      {/* `side="right"`: this button lives in the vertical left rail, where every
+          sibling tooltip opens to the right. A "bottom" tooltip here would be the
+          only one in the column pointing the wrong way. */}
+      <Tip title="Usage limits" body="Claude Code session & weekly rate limits." side="right">
         <PopoverTrigger
           className="flex size-7 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted/60 hover:text-foreground"
           aria-label="Claude Code usage"

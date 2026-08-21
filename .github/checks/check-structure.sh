@@ -36,10 +36,15 @@ while IFS= read -r f; do
     echo "FAIL: $f has $n lines (max $MAX_LINES) — extract into a sibling module." >&2
     fail=1
   fi
-done < <(find . -name '*.rs' -not -path './target/*' -not -path '*/target/*')
+done < <(find . -name '*.rs' -not -path './target/*' -not -path '*/target/*' \
+  -not -path './deploy/ansible/.venv' -not -path './deploy/ansible/.venv/*' \
+  -not -path './deploy/ansible/.artifacts' -not -path './deploy/ansible/.artifacts/*')
 
 while IFS= read -r dir; do
-  count=$(find "$dir" -maxdepth 1 -mindepth 1 | wc -l | tr -d '[:space:]')
+  count=$(find "$dir" -maxdepth 1 -mindepth 1 \
+    -not -path './deploy/ansible/.venv' \
+    -not -path './deploy/ansible/.artifacts' \
+    -not -path './deploy/ansible/out' | wc -l | tr -d '[:space:]')
   if [ "$count" -gt "$MAX_ENTRIES" ]; then
     echo "::error::$dir has $count entries (max $MAX_ENTRIES)"
     echo "FAIL: $dir has $count entries (max $MAX_ENTRIES) — group into a sub-dir." >&2
@@ -67,6 +72,9 @@ done < <(find . -mindepth 1 -type d \
   -not -path './sandbox' -not -path './sandbox/*' \
   -not -path './tmp' -not -path './tmp/*' \
   -not -path './gaia' -not -path './gaia/*' \
+  -not -path './deploy/ansible/.venv' -not -path './deploy/ansible/.venv/*' \
+  -not -path './deploy/ansible/.artifacts' -not -path './deploy/ansible/.artifacts/*' \
+  -not -path './deploy/ansible/out' -not -path './deploy/ansible/out/*' \
   -not -path './test-results' -not -path './test-results/*' \
   -not -path './report' -not -path './report/*')
 

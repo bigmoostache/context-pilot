@@ -1,5 +1,6 @@
 import { Boxes, Loader2, MessagesSquare, RefreshCw, Wallet } from "lucide-react"
 import { fmtCost, fmtTokens } from "@/lib/support/panelMeta"
+import { Tip } from "@/components/ui/tip"
 import { BehaviourChip } from "./behaviour/BehaviourChip"
 import type { Agent, StreamPhase } from "@/lib/types"
 
@@ -66,25 +67,50 @@ function FleetStatus({ agents }: { agents: Agent[] }) {
   const totalThreads = agents.reduce((sum, a) => sum + a.threads, 0)
 
   return (
-    <footer className="vibrancy flex h-8 shrink-0 items-center gap-4 border-t border-border px-4 text-[12px]">
-      <span className="font-medium text-foreground/70">Fleet</span>
-      <span className="h-3.5 w-px bg-border" />
+    // Bare chrome, like the header rail: no fill, no `border-t`, no margin —
+    // the footer stays flush against the window's bottom and side edges. `px-2`
+    // is the same 0.5rem horizontal padding the header rail carries, so the two
+    // pieces of chrome inset their contents by the same amount.
+    <footer className="flex h-8 shrink-0 items-center gap-4 px-2 text-[12px]">
+      <Tip
+        title="Fleet view"
+        body="Aggregates across every agent you run. Open an agent to see its own vitals here instead."
+        side="top"
+      >
+        <span className="font-medium text-foreground/70">Fleet</span>
+      </Tip>
 
-      <Metric icon={Boxes} label="Agents" value={String(agents.length)} />
-      <Metric icon={MessagesSquare} label="Threads" value={String(totalThreads)} />
+      <Tip title="Agents" body="How many agents exist in the fleet." side="top">
+        <Metric icon={Boxes} label="Agents" value={String(agents.length)} />
+      </Tip>
+      <Tip title="Threads" body="Open threads, summed across every agent." side="top">
+        <Metric icon={MessagesSquare} label="Threads" value={String(totalThreads)} />
+      </Tip>
 
       {needsYou > 0 && (
-        <span className="flex items-center gap-1.5 text-muted-foreground">
-          <span className="size-2 rounded-full" style={{ background: "var(--signal)" }} />
-          <span className="text-foreground/80 tabular-nums">{needsYou}</span>
-          <span>need{needsYou === 1 ? "s" : ""} you</span>
-        </span>
+        <Tip title="Waiting on you" body="Agents whose turn it is to hear from you." side="top">
+          <span className="flex items-center gap-1.5 text-muted-foreground">
+            <span className="size-2 rounded-full" style={{ background: "var(--signal)" }} />
+            <span className="text-foreground/80 tabular-nums">{needsYou}</span>
+            <span>need{needsYou === 1 ? "s" : ""} you</span>
+          </span>
+        </Tip>
       )}
 
-      <span className="ml-auto flex items-center gap-1.5 text-muted-foreground">
-        <Wallet className="size-3.5" />
-        <span>Total spend</span>
-        <span className="font-medium text-foreground/85 tabular-nums">{fmtCost(totalSpend)}</span>
+      <span className="ml-auto flex items-center">
+        <Tip
+          title="Total spend"
+          body="Cumulative API cost across the whole fleet for this session."
+          side="top"
+        >
+          <span className="flex items-center gap-1.5 text-muted-foreground">
+            <Wallet className="size-3.5" />
+            <span>Total spend</span>
+            <span className="font-medium text-foreground/85 tabular-nums">
+              {fmtCost(totalSpend)}
+            </span>
+          </span>
+        </Tip>
       </span>
     </footer>
   )
@@ -143,21 +169,41 @@ function AgentStatus({
   const { costUsd, used, budget, threshold, hit, miss } = agentVitals(agent)
 
   return (
-    <footer className="vibrancy flex h-8 shrink-0 items-center gap-3 border-t border-border px-4 text-[12px]">
-      <StatusIndicator
-        phase={p}
-        connected={connected}
-        restarting={restarting}
-        loading={loading}
-        onRestart={onRestart}
-      />
+    // Same bare treatment as the fleet footer above and the header rail: no
+    // fill, no top border, no margin, 0.5rem of horizontal padding.
+    <footer className="flex h-8 shrink-0 items-center gap-3 px-2 text-[12px]">
+      <Tip
+        title="Agent status"
+        body="Live execution phase — Ready, Streaming, Working or Blocked. When it reads Disconnected, click to restart the agent."
+        side="top"
+      >
+        <StatusIndicator
+          phase={p}
+          connected={connected}
+          restarting={restarting}
+          loading={loading}
+          onRestart={onRestart}
+        />
+      </Tip>
 
-      {agentId ? <BehaviourChip agentId={agentId} /> : null}
+      {agentId ? (
+        <Tip
+          title="System prompt"
+          body="The behaviour agent driving this one. Switch, edit, create or import one."
+          side="top"
+        >
+          <BehaviourChip agentId={agentId} />
+        </Tip>
+      ) : null}
 
       <span className="ml-auto flex items-center gap-3">
+        {/* No `Tip` here on purpose — the meter draws its own richer hover card
+            (per-segment hit/miss/threshold/free token figures), and a second
+            tooltip on the same element would fight it. */}
         <ContextBar used={used} threshold={threshold} budget={budget} hit={hit} miss={miss} />
-        <span className="h-3.5 w-px bg-border" />
-        <span className="text-muted-foreground tabular-nums">{fmtCost(costUsd)}</span>
+        <Tip title="Session cost" body="API spend for this agent since it started." side="top">
+          <span className="text-muted-foreground tabular-nums">{fmtCost(costUsd)}</span>
+        </Tip>
       </span>
     </footer>
   )

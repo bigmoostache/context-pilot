@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Check, Copy, Pause, Play } from "lucide-react"
+import { Pause, Play } from "lucide-react"
 import type { FinderNode } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -30,34 +30,9 @@ const KEYWORDS = new Set([
   "edition",
 ])
 
-export function CodePreview({ lang, lines }: { lang: string; lines: string[] }) {
-  const [copied, setCopied] = useState(false)
-  const copy = () => {
-    ;(navigator.clipboard as Clipboard | undefined)?.writeText(lines.join("\n")).catch(() => {
-      /* clipboard write may reject on insecure origin — ignore, the tick just won't flash */
-    })
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 1400)
-  }
+export function CodePreview({ lines }: { lines: string[] }) {
   return (
     <div className="card-shadow overflow-hidden rounded-lg border border-border bg-card">
-      <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-3 py-1.5">
-        <span className="flex gap-1.5">
-          <span className="size-2.5 rounded-full bg-[#ff5f57]" />
-          <span className="size-2.5 rounded-full bg-[#febc2e]" />
-          <span className="size-2.5 rounded-full bg-[#28c840]" />
-        </span>
-        <span className="ml-1 font-mono text-[10.5px] tracking-wide text-muted-foreground uppercase">
-          {lang}
-        </span>
-        <button
-          onClick={copy}
-          className="ml-auto flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px] text-muted-foreground/80 transition-colors hover:bg-muted hover:text-foreground"
-        >
-          {copied ? <Check className="size-3 text-(--ok)" /> : <Copy className="size-3" />}
-          {copied ? "Copied" : "Copy"}
-        </button>
-      </div>
       <pre className="overflow-x-auto px-3 py-2.5 font-mono text-[11px] leading-relaxed">
         {lines.map((line, i) => (
           <div key={i} className="group flex gap-3 rounded-sm hover:bg-(--signal)/6">

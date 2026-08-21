@@ -101,7 +101,7 @@ export function FinderPreview({
  */
 function inlinePreview(node: FinderNode): ReactElement | null {
   if (node.kind === "folder") return <FolderPreview node={node} />
-  if (node.code) return <CodePreview lang={node.code.lang} lines={node.code.lines} />
+  if (node.code) return <CodePreview lines={node.code.lines} />
   if (node.sheet) return <SheetPreview sheet={node.sheet} />
   if (node.slides) return <SlidesPreview slides={node.slides} />
   if (node.pdf) return <PdfPreview pdf={node.pdf} />

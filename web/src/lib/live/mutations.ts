@@ -31,49 +31,6 @@ function invalidateBothFleets(client: QueryClient) {
 // resource, so it rides a `useMutation`. On success the current directory's
 // listing query is invalidated so the new files appear immediately.
 
-/** Max upload size per file (32 MiB) — matches the backend transport's
- *  `MAX_BODY`; a larger body would be silently truncated server-side, so we
- *  reject it client-side with a clear message instead. */
-export const MAX_UPLOAD_BYTES = 32 * 1024 * 1024
-
-/**
- * Mutation to upload one or more files into a realm directory. Files are sent
- * concurrently (one POST each); any over {@link MAX_UPLOAD_BYTES} are rejected
- * before sending.
- *
- * Uploads ride `Promise.allSettled`, not `Promise.all`, so one failure no longer
- * hides the files that DID land — the listing is invalidated in `onSettled`
- * (success OR partial failure) so every succeeded upload surfaces immediately
- * instead of waiting on the 15s backstop, and a partial failure names exactly
- * which files were rejected (M7).
- */
-export function useUploadFiles(agentId: string) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ dir, files }: { dir: string; files: File[] }) => {
-      const tooBig = files.filter((f) => f.size > MAX_UPLOAD_BYTES)
-      if (tooBig.length > 0) {
-        throw new Error(`${tooBig.map((f) => f.name).join(", ")} exceeds the 32 MB upload limit`)
-      }
-      const results = await Promise.allSettled(files.map((f) => api.uploadFile(agentId, dir, f)))
-      const failed = results
-        .map((r, i) => (r.status === "rejected" ? (files[i]?.name ?? null) : null))
-        .filter((n): n is string => n !== null)
-      if (failed.length > 0) {
-        throw new Error(
-          `Failed to upload ${failed.join(", ")} (${files.length - failed.length} of ${files.length} succeeded)`,
-        )
-      }
-      return { count: files.length, dir }
-    },
-    // Invalidate on settle — succeeded uploads must appear even when a sibling
-    // failed, without waiting on the backstop poll.
-    onSettled: (_data, _err, { dir }) => {
-      void client.invalidateQueries({ queryKey: qk.fs(agentId, dir) })
-    },
-  })
-}
-
 /**
  * Mutation to overwrite an existing realm file (the Finder's in-place editor —
  * e.g. saving the WYSIWYG markdown editor back to its `.md`). Not a delta-covered
@@ -88,74 +45,6 @@ export function useWriteFile(agentId: string) {
       api.writeFile(agentId, path, content),
     onSuccess: (_res, { path }) => {
       void client.invalidateQueries({ queryKey: qk.fsPreview(agentId, path) })
-      void client.invalidateQueries({ queryKey: ["fs", agentId] })
-    },
-  })
-}
-
-/**
- * Mutation to create a new folder inside a realm directory (the Finder's
- * "New Folder" action). Not a delta-covered resource → a `useMutation`. On
- * success the destination directory's `useFs` listing is invalidated so the
- * new folder appears at once.
- */
-export function useCreateFolder(agentId: string) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: ({ dir, name }: { dir: string; name: string }) =>
-      api.createFolder(agentId, dir, name),
-    onSuccess: (_res, { dir }) => {
-      void client.invalidateQueries({ queryKey: qk.fs(agentId, dir) })
-    },
-  })
-}
-
-/**
- * Mutation to move one or more entries into a realm directory (the Finder's
- * internal drag-and-drop). Not a delta-covered resource → a `useMutation`. On
- * success the WHOLE `fs` query family for the agent is invalidated (both the
- * source and destination listings changed) so the move is reflected at once.
- */
-export function useMoveItems(agentId: string) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: ({ items, dest }: { items: string[]; dest: string }) =>
-      api.moveItems(agentId, items, dest),
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: ["fs", agentId] })
-    },
-  })
-}
-
-/**
- * Mutation to rename one entry in place (the Finder's inline rename). Not a
- * delta-covered resource → a `useMutation`. On success the WHOLE `fs` query
- * family for the agent is invalidated so the renamed entry surfaces under its
- * new name at once (the containing directory's listing changed).
- */
-export function useRenameItem(agentId: string) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: ({ path, name }: { path: string; name: string }) =>
-      api.renameItem(agentId, path, name),
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: ["fs", agentId] })
-    },
-  })
-}
-
-/**
- * Mutation to move one or more entries to the realm trash (the Finder's
- * right-click "Move to Trash"). Not a delta-covered resource → a `useMutation`.
- * On success the WHOLE `fs` query family for the agent is invalidated so the
- * trashed entries vanish from the current listing at once (they move into a
- * hidden `.cp-trash/` the listing never shows).
- */
-export function useTrashItems(agentId: string) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: ({ items }: { items: string[] }) => api.trashItems(agentId, items),
-    onSuccess: () => {
       void client.invalidateQueries({ queryKey: ["fs", agentId] })
     },
   })

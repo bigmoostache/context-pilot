@@ -1,11 +1,9 @@
-import { useState } from "react"
-import { FolderGit2, AlertTriangle, Plus, PanelLeft, Search } from "lucide-react"
+import { FolderGit2, AlertTriangle, Plus } from "lucide-react"
 import { ThreadList } from "./ThreadList"
 import { ThreadConversation } from "./ThreadConversation"
 import { NewThreadDialog } from "./dialogs/NewThreadDialog"
 import { useFleet, useThreads } from "@/lib/live"
 import { useThreadSelection, useThreadActions } from "@/lib/live/threadView"
-import { cn } from "@/lib/utils"
 
 /**
  * Thread-centered view — the conversation-first layout: thread list (left) |
@@ -19,18 +17,36 @@ import { cn } from "@/lib/utils"
  * state) and {@link useThreadActions} (mutation handlers + notice) — so the
  * render body itself stays within the P8 budgets.
  *
- * The thread list is **always open** — there is no collapse/expand affordance
- * (removed per T23); the rail is a permanent fixture of the threads view.
+ * The thread list rail collapses from the header rail's Threads tab, and its
+ * two actions — New thread, Search — live up there beside it, so neither
+ * depends on the rail being visible.
  */
 export function ThreadsView({
   activeAgentId,
   onShowInFinder,
+  railOpen,
+  newOpen,
+  onNewOpenChange,
+  searchOpen,
+  onSearchOpenChange,
   disconnected,
   onReconnect,
 }: {
   activeAgentId: string
   /** navigate the Finder to a file's parent directory and select it (T334) */
   onShowInFinder?: (path: string) => void
+  /** Whether the thread-list rail is shown. Owned by the shell (Root.tsx), not
+   *  here: the only control that toggles it is the header rail's Threads tab,
+   *  which is a SIBLING of this view rather than a descendant. */
+  railOpen: boolean
+  /** New Thread dialog open flag — shell-owned for the same reason as
+   *  `railOpen`: its button sits in the header rail. The DIALOG still renders
+   *  here, where the agent it creates against is in scope. */
+  newOpen: boolean
+  onNewOpenChange: (v: boolean) => void
+  /** Search palette open flag — shell-owned, palette rendered down in the list. */
+  searchOpen: boolean
+  onSearchOpenChange: (v: boolean) => void
   disconnected?: boolean
   onReconnect?: () => void
 }) {
@@ -38,10 +54,14 @@ export function ThreadsView({
   const { data: threads = [] } = useThreads(activeAgentId)
   const agent = agents.find((a) => a.id === activeAgentId)
 
-  const sel = useThreadSelection(activeAgentId, threads)
+  // The dialog flag is INJECTED into the selection hook rather than used
+  // alongside it, so `handleCreate`'s own `setNewOpen(false)` closes the very
+  // flag the rail's button opened.
+  const sel = useThreadSelection(activeAgentId, threads, {
+    open: newOpen,
+    setOpen: onNewOpenChange,
+  })
   const actions = useThreadActions(activeAgentId, threads, sel)
-  const [railOpen, setRailOpen] = useState(true)
-  const [searchOpen, setSearchOpen] = useState(false)
 
   // Only bail to a bare empty state when there is genuinely no agent. A fresh
   // agent with zero threads MUST still render the sidebar — that is where the
@@ -72,7 +92,14 @@ export function ThreadsView({
           left-margin (the root's overflow-hidden clips it off-screen when
           closed); the sibling conversation grows to fill the reclaimed space.
           A margin transition — not a transform — is what actually reclaims the
-          layout width, so the pane truly widens as the rail leaves. */}
+          layout width, so the pane truly widens as the rail leaves.
+
+          The offset is exactly the rail's width, with nothing added: ThreadList's
+          aside carries no horizontal margin (`my-2` only). It used to be width
+          PLUS those margins — a sum kept by hand here while the margins lived in
+          another file, and it drifted twice. Should the aside ever regain a
+          horizontal margin, this has to grow by the same amount or collapsing
+          will leave a dead gutter where the rail used to be. */}
       <div
         // `flex` so the wrapped <aside> (which sizes itself from flex-stretch,
         // not an explicit height) still fills the row's full height — a plain
@@ -90,32 +117,14 @@ export function ThreadsView({
           onArchive={actions.handleArchive}
           onDelete={actions.handleDelete}
           onPause={actions.handlePause}
-          onNewThread={() => sel.setNewOpen(true)}
-          onToggleSidebar={() => setRailOpen(false)}
           searchOpen={searchOpen}
-          onSearchOpenChange={setSearchOpen}
+          onSearchOpenChange={onSearchOpenChange}
         />
       </div>
 
-      {/* Floating cluster — fades in only once the rail is hidden. The
-          show-sidebar button leads; New-thread + Search sit under it so the two
-          primary list actions stay reachable with the rail collapsed (T713). */}
-      <div
-        className={cn(
-          "absolute top-3 left-3 z-30 flex flex-col gap-1.5 transition-[opacity,transform] duration-200",
-          railOpen ? "pointer-events-none -translate-x-1 opacity-0" : "opacity-100",
-        )}
-      >
-        <FloatingRailButton title="Show sidebar" onClick={() => setRailOpen(true)}>
-          <PanelLeft className="size-4" />
-        </FloatingRailButton>
-        <FloatingRailButton title="New thread" onClick={() => sel.setNewOpen(true)}>
-          <Plus className="size-4" />
-        </FloatingRailButton>
-        <FloatingRailButton title="Search threads" onClick={() => setSearchOpen(true)}>
-          <Search className="size-4" />
-        </FloatingRailButton>
-      </div>
+      {/* The floating collapsed-rail cluster that used to sit here is gone: it
+          existed only to keep New thread + Search reachable while the rail was
+          hidden, and both now live permanently in the header rail. */}
 
       {/* The conversation pane shows the selected thread, or — for a realm with
           no thread selected/created yet — a hint pointing at the sidebar's New
@@ -155,28 +164,6 @@ export function ThreadsView({
         </div>
       )}
     </div>
-  )
-}
-
-/** One button in the collapsed-rail floating cluster (T713) — shared card-lift
- *  styling so the show-sidebar / new-thread / search glyphs read as a set. */
-function FloatingRailButton({
-  title,
-  onClick,
-  children,
-}: {
-  title: string
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      onClick={onClick}
-      title={title}
-      className="card-shadow flex size-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground"
-    >
-      {children}
-    </button>
   )
 }
 

@@ -44,7 +44,7 @@ export function AgentSwitcher({
   activeId,
   onSwitch,
   onManageAgents,
-  onManageAgent,
+  rail = false,
 }: {
   agents: Agent[]
   activeId?: string | undefined
@@ -52,15 +52,18 @@ export function AgentSwitcher({
   /** open the fleet dashboard — the sole place agents are created/managed
    *  (T685: this replaces the removed TopBar home button). */
   onManageAgents?: (() => void) | undefined
-  /** open the manage dialog for the ACTIVE agent (T730: the per-agent gear,
-   *  moved here from the TopBar). Shown only when an agent is focused. */
-  onManageAgent?: (() => void) | undefined
+  /** Vertical-rail variant: the trigger collapses to the agent glyph alone.
+   *  The rail is 56px wide, so the workspace NAME and the chevron have nowhere
+   *  to go — and truncating a name to three letters conveys less than the
+   *  avatar already does. The menu itself is unchanged. */
+  rail?: boolean
 }) {
   const active = agents.find((a) => a.id === activeId)
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
+        aria-label={active ? `Workspace: ${active.name}` : "Select an agent"}
         className={cn(
           "flex h-8 items-center gap-2 rounded-lg px-1.5 text-left transition-colors outline-none",
           // Exact same hover as a threads-sidebar row (T676): soft card lift.
@@ -70,66 +73,17 @@ export function AgentSwitcher({
         {/* Single-line trigger: just the workspace name (the folder path was
             redundant noise — it lives in the menu rows + Finder). The fixed
             `h-8` locks the trigger to the exact height of the sibling
-            Threads/Finder/Cockpit view-toggle pill group (also `h-8`). */}
-        {active ? (
-          <>
-            <AgentDot
-              accent={active.accent}
-              status={active.status}
-              agentId={active.id}
-              hasAvatar={active.hasAvatar}
-              compact
-            />
-            <span className="truncate text-[12.5px] font-semibold text-foreground/90">
-              {active.name}
-            </span>
-          </>
-        ) : (
-          <>
-            <PlaceholderDot />
-            <span className="truncate text-[12.5px] font-semibold text-foreground/80">
-              Select an agent
-            </span>
-          </>
-        )}
-        <ChevronDown className="ml-0.5 size-3.5 shrink-0 text-muted-foreground/50" />
+            Threads/Finder/Cockpit view-toggle pill group (also `h-8`).
+            In `rail` mode only the glyph survives — see the prop's doc. */}
+        <TriggerFace active={active} rail={rail} />
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent className="w-[280px]" align="start" sideOffset={6}>
-        {onManageAgent && active && (
-          <>
-            <DropdownMenuItem
-              onClick={onManageAgent}
-              className={cn(
-                "flex items-center gap-2.5 py-1.5 font-medium",
-                "focus:bg-[color-mix(in_oklab,var(--signal)_11%,transparent)]! focus:text-foreground!",
-                "data-highlighted:bg-[color-mix(in_oklab,var(--signal)_11%,transparent)]! data-highlighted:text-foreground!",
-              )}
-            >
-              {active.hasAvatar ? (
-                <img
-                  src={avatarUrl(active.id)}
-                  alt=""
-                  className="size-7 shrink-0 rounded-md object-cover"
-                />
-              ) : (
-                <span
-                  className="flex size-7 shrink-0 items-center justify-center rounded-md"
-                  style={{
-                    background: `color-mix(in oklab, ${accentVar[active.accent]} 16%, transparent)`,
-                    color: accentVar[active.accent],
-                  }}
-                >
-                  <FolderGit2 className="size-3.5" />
-                </span>
-              )}
-              <span className="text-[12.5px] text-foreground/90 group-focus/dropdown-menu-item:text-foreground! group-data-highlighted/dropdown-menu-item:text-foreground!">
-                Manage agent
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-          </>
-        )}
+      <DropdownMenuContent
+        className="w-[280px]"
+        align="start"
+        side={rail ? "right" : "bottom"}
+        sideOffset={6}
+      >
         {onManageAgents && (
           <>
             <DropdownMenuItem
@@ -204,6 +158,43 @@ export function AgentSwitcher({
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
+  )
+}
+
+/** The switcher trigger's contents: agent glyph, workspace name, chevron. In
+ *  `rail` mode the name and chevron are dropped — the 56px rail has no room for
+ *  either, and the avatar already identifies the workspace. Extracted from
+ *  {@link AgentSwitcher} so that component stays within the 150-line budget. */
+function TriggerFace({ active, rail }: { active: Agent | undefined; rail: boolean }) {
+  return (
+    <>
+      {active ? (
+        <>
+          <AgentDot
+            accent={active.accent}
+            status={active.status}
+            agentId={active.id}
+            hasAvatar={active.hasAvatar}
+            compact
+          />
+          {!rail && (
+            <span className="truncate text-[12.5px] font-semibold text-foreground/90">
+              {active.name}
+            </span>
+          )}
+        </>
+      ) : (
+        <>
+          <PlaceholderDot />
+          {!rail && (
+            <span className="truncate text-[12.5px] font-semibold text-foreground/80">
+              Select an agent
+            </span>
+          )}
+        </>
+      )}
+      {!rail && <ChevronDown className="ml-0.5 size-3.5 shrink-0 text-muted-foreground/50" />}
+    </>
   )
 }
 

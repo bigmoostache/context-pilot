@@ -7671,3 +7671,93 @@ index ec098a9e..c8d5683f 100644
      match: "OpEntryKind carries an Unknown catch-all for N-1 tolerance"
      reason: >
 # --- End entry #83 ---
+84:cb12b4c4956487b02289416b06c5a855efecf09b03eaa7f9d9f45b397e1a70ab:b4c177f18497ce7f2772fc2e2e3efcb84b80d8e1576312a8fa3b65e0c582ac51:c881244e2f92eab5a22eb032c3e36f0859cc66838ba3b7c5c5820808abc6d334
+# --- Diff for entry #84 ---
+diff --git a/.github/checks/check-structure.sh b/.github/checks/check-structure.sh
+index e71deb68..e2c27155 100755
+--- a/.github/checks/check-structure.sh
++++ b/.github/checks/check-structure.sh
+@@ -36,7 +36,9 @@ while IFS= read -r f; do
+     echo "FAIL: $f has $n lines (max $MAX_LINES) — extract into a sibling module." >&2
+     fail=1
+   fi
+-done < <(find . -name '*.rs' -not -path './target/*' -not -path '*/target/*')
++done < <(find . -name '*.rs' -not -path './target/*' -not -path '*/target/*' \
++  -not -path './deploy/ansible/.venv' -not -path './deploy/ansible/.venv/*' \
++  -not -path './deploy/ansible/.artifacts' -not -path './deploy/ansible/.artifacts/*')
+ 
+ while IFS= read -r dir; do
+   count=$(find "$dir" -maxdepth 1 -mindepth 1 | wc -l | tr -d '[:space:]')
+@@ -67,6 +69,8 @@ done < <(find . -mindepth 1 -type d \
+   -not -path './sandbox' -not -path './sandbox/*' \
+   -not -path './tmp' -not -path './tmp/*' \
+   -not -path './gaia' -not -path './gaia/*' \
++  -not -path './deploy/ansible/.venv' -not -path './deploy/ansible/.venv/*' \
++  -not -path './deploy/ansible/.artifacts' -not -path './deploy/ansible/.artifacts/*' \
+   -not -path './test-results' -not -path './test-results/*' \
+   -not -path './report' -not -path './report/*')
+ 
+# --- End entry #84 ---
+85:c881244e2f92eab5a22eb032c3e36f0859cc66838ba3b7c5c5820808abc6d334:7a7c3c5187f506cee347cf85d17a569f15ae285cf49ac9be34ee6f42c750c757:dff8101b53cf1cccae848bf92147850da2039b068e56766f46a800b8b1ad146b
+# --- Diff for entry #85 ---
+diff --git a/.github/checks/check-structure.sh b/.github/checks/check-structure.sh
+index e71deb68..79c707f8 100755
+--- a/.github/checks/check-structure.sh
++++ b/.github/checks/check-structure.sh
+@@ -36,7 +36,9 @@ while IFS= read -r f; do
+     echo "FAIL: $f has $n lines (max $MAX_LINES) — extract into a sibling module." >&2
+     fail=1
+   fi
+-done < <(find . -name '*.rs' -not -path './target/*' -not -path '*/target/*')
++done < <(find . -name '*.rs' -not -path './target/*' -not -path '*/target/*' \
++  -not -path './deploy/ansible/.venv' -not -path './deploy/ansible/.venv/*' \
++  -not -path './deploy/ansible/.artifacts' -not -path './deploy/ansible/.artifacts/*')
+ 
+ while IFS= read -r dir; do
+   count=$(find "$dir" -maxdepth 1 -mindepth 1 | wc -l | tr -d '[:space:]')
+@@ -67,6 +69,9 @@ done < <(find . -mindepth 1 -type d \
+   -not -path './sandbox' -not -path './sandbox/*' \
+   -not -path './tmp' -not -path './tmp/*' \
+   -not -path './gaia' -not -path './gaia/*' \
++  -not -path './deploy/ansible/.venv' -not -path './deploy/ansible/.venv/*' \
++  -not -path './deploy/ansible/.artifacts' -not -path './deploy/ansible/.artifacts/*' \
++  -not -path './deploy/ansible/out' -not -path './deploy/ansible/out/*' \
+   -not -path './test-results' -not -path './test-results/*' \
+   -not -path './report' -not -path './report/*')
+ 
+# --- End entry #85 ---
+86:dff8101b53cf1cccae848bf92147850da2039b068e56766f46a800b8b1ad146b:b38dfa21514ec254a2aeece3faf810ed31fd4d7085aafb38f2b45eb1ef178253:b13d9bf46c86787f28f7d452b9f1c5c22b99fb5178699dff4fa23e3284be87d3
+# --- Diff for entry #86 ---
+diff --git a/.github/checks/check-structure.sh b/.github/checks/check-structure.sh
+index e71deb68..4ba7d008 100755
+--- a/.github/checks/check-structure.sh
++++ b/.github/checks/check-structure.sh
+@@ -36,10 +36,15 @@ while IFS= read -r f; do
+     echo "FAIL: $f has $n lines (max $MAX_LINES) — extract into a sibling module." >&2
+     fail=1
+   fi
+-done < <(find . -name '*.rs' -not -path './target/*' -not -path '*/target/*')
++done < <(find . -name '*.rs' -not -path './target/*' -not -path '*/target/*' \
++  -not -path './deploy/ansible/.venv' -not -path './deploy/ansible/.venv/*' \
++  -not -path './deploy/ansible/.artifacts' -not -path './deploy/ansible/.artifacts/*')
+ 
+ while IFS= read -r dir; do
+-  count=$(find "$dir" -maxdepth 1 -mindepth 1 | wc -l | tr -d '[:space:]')
++  count=$(find "$dir" -maxdepth 1 -mindepth 1 \
++    -not -path './deploy/ansible/.venv' \
++    -not -path './deploy/ansible/.artifacts' \
++    -not -path './deploy/ansible/out' | wc -l | tr -d '[:space:]')
+   if [ "$count" -gt "$MAX_ENTRIES" ]; then
+     echo "::error::$dir has $count entries (max $MAX_ENTRIES)"
+     echo "FAIL: $dir has $count entries (max $MAX_ENTRIES) — group into a sub-dir." >&2
+@@ -67,6 +72,9 @@ done < <(find . -mindepth 1 -type d \
+   -not -path './sandbox' -not -path './sandbox/*' \
+   -not -path './tmp' -not -path './tmp/*' \
+   -not -path './gaia' -not -path './gaia/*' \
++  -not -path './deploy/ansible/.venv' -not -path './deploy/ansible/.venv/*' \
++  -not -path './deploy/ansible/.artifacts' -not -path './deploy/ansible/.artifacts/*' \
++  -not -path './deploy/ansible/out' -not -path './deploy/ansible/out/*' \
+   -not -path './test-results' -not -path './test-results/*' \
+   -not -path './report' -not -path './report/*')
+ 
+# --- End entry #86 ---

@@ -7,11 +7,7 @@
 import type {
   FinderNode,
   FsPreview,
-  MkdirResult,
-  MoveResult,
-  RenameResult,
   SheetData,
-  TrashResult,
   UploadResult,
   UploadUniqueResult,
   WriteResult,
@@ -21,10 +17,6 @@ import {
   getApiAgentByIdFsDescriptions,
   getApiAgentByIdFsPreview,
   getApiAgentByIdFsSheet,
-  postApiAgentByIdFsMkdir,
-  postApiAgentByIdFsMove,
-  postApiAgentByIdFsRename,
-  postApiAgentByIdFsTrash,
   postApiAgentByIdFsUpload,
   postApiAgentByIdFsUploadUnique,
   postApiAgentByIdFsWrite,
@@ -35,7 +27,6 @@ import { BASE, getToken, sdk } from "./client"
 
 export type { FinderNode, FsPreview, SheetData } from "./generated/types.gen"
 export type { WriteResult, UploadResult, UploadUniqueResult } from "./generated/types.gen"
-export type { MkdirResult, RenameResult, MoveResult, TrashResult } from "./generated/types.gen"
 
 // ── GET endpoints (SDK) ──────────────────────────────────────────────
 
@@ -83,22 +74,6 @@ export function uploadUnique(
       body: file,
     }),
   )
-}
-
-export function createFolder(agentId: string, dir: string, name: string): Promise<MkdirResult> {
-  return sdk(postApiAgentByIdFsMkdir({ path: { id: agentId }, query: { path: dir, name } }))
-}
-
-export function renameItem(agentId: string, path: string, newName: string): Promise<RenameResult> {
-  return sdk(postApiAgentByIdFsRename({ path: { id: agentId }, query: { path, name: newName } }))
-}
-
-export function moveItems(agentId: string, items: string[], dest: string): Promise<MoveResult> {
-  return sdk(postApiAgentByIdFsMove({ path: { id: agentId }, body: { items, dest } }))
-}
-
-export function trashItems(agentId: string, items: string[]): Promise<TrashResult> {
-  return sdk(postApiAgentByIdFsTrash({ path: { id: agentId }, body: { items } }))
 }
 
 // ── Manual endpoints (irreducible — URL builder + binary download) ───

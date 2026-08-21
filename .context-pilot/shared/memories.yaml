@@ -646,6 +646,46 @@
   - ops
   - mac-mini
   last_edited_ms: 1785137059764
+92101885f8dad615:
+  tl_dr: 'T605 web frontend "no borders, only shadows": --border token set to transparent in both palettes (NOT a border-width reset). --border-strong holds the real hairline for opt-ins. --input untouched (form fields keep outlines).'
+  contents: |-
+    T605 (thread "No item should have a border, ever"), web/src/index.css.
+
+    THE DECISION: set `--border: transparent` in BOTH `:root` and `.dark`, rather than blanket `border-width: 0 !important` (which is what T601 did for border-radius).
+
+    WHY NOT THE T601 BLANKET RESET — this is the load-bearing reasoning:
+    1. border-radius is purely decorative; border-width is often LOAD-BEARING. A blanket width reset shrinks every bordered element by 2px = reflow everywhere. The token flip keeps width at 1px, so NOTHING moves. Purely visual.
+    2. An `!important` blanket can only be exempted by another `!important` at higher specificity = whack-a-mole, and every future component that legitimately needs a border silently loses it. A maintenance trap.
+    3. The token flip ALSO kills the ~21 hairline dividers painted `bg-border` (dropdown separators, toolbar ticks, the thread-open rule) — these are borders in all but name and a border-width reset would have MISSED them entirely.
+    4. FREE WIN: rules that swap border-color on interaction (`focus:border-ring`, `focus-within:border-(--signal)/60`) still work — invisible at rest, coloured on focus. A width reset would have destroyed every one.
+
+    NEW TOKEN: `--border-strong` (light #ecdfce / dark #4d4d49 = the old --border values), exposed to Tailwind via `--color-border-strong` in `@theme inline`. This is the opt-back-in mechanism: `border-(--border-strong)`.
+
+    THE TWO USER-NAMED EXCEPTIONS (both now on --border-strong):
+    - ViewTabs pill group, components/shell/TopBar.tsx
+    - ThemeToggle root, components/shell/widgets/ThemeToggle.tsx
+    Both need an outline to read as a segmented control rather than loose glyphs.
+
+    DELIBERATELY NOT FLIPPED:
+    - `--input` — shadcn Input/Textarea/Calendar/button-outline use `border-input`, a SEPARATE token. Form fields keep their outline; an invisible text box is a usability bug, not clean design. Reversible if the user wants absolutism.
+    - 69 explicitly-coloured accent borders (border-(--signal|danger|interactive|warn|ok) and the 16 border-dashed) survive by construction — the marquee selection band, drop zones and the UnarchiveBar are affordances, not chrome.
+
+    ONE REPAIR THE FLIP FORCED: components/ui/scroll-area.tsx `<Thumb>` was painted `bg-border`, so the flip would have made the scrollbar thumb INVISIBLE. Repointed to `color-mix(in oklab, var(--muted-foreground) 35%, transparent)`, matching the native `::-webkit-scrollbar-thumb` rule already in index.css. It is a real grabbable control, not chrome.
+
+    CENSUS AT THE TIME: 342 `border-border`, 21 `bg-border`, 6 `border-input`, 16 `border-dashed`, 69 explicit-colour borders.
+
+    REVERT = restore the two `--border` hex values. Nothing else.
+
+    RELATED: M-level sibling decision T601 (square corners) DID use the blanket `*` reset with !important, because radius has none of the above hazards. The two are deliberately different mechanisms for deliberately different reasons.
+  importance: high
+  labels:
+  - T605
+  - web-frontend
+  - design-tokens
+  - borders
+  - index.css
+  - architecture
+  last_edited_ms: 1787304017548
 941a5df6fd1afc9a:
   tl_dr: 'stylelint --fix on Tailwind v4 entry point is DANGEROUS: import-notation + property-no-vendor-prefix both damage it. Both disabled in web/.stylelintrc.json, NEVER re-enable.'
   contents: |-

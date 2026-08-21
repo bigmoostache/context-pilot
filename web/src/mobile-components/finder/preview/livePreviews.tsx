@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, lazy, Suspense } from "react"
-import { Check, Copy, Save } from "lucide-react"
+import { Check, Save } from "lucide-react"
 import type { FinderNode } from "@/lib/types"
 import { useFsPreview, useFsSheet, useWriteFile } from "@/lib/live"
 import { rawUrl } from "@/lib/api"
@@ -173,35 +173,10 @@ function HighlightedCode({
   code: string
   truncated?: boolean
 }) {
-  const { html, language } = useMemo(() => highlightCode(code, name), [code, name])
+  const { html } = useMemo(() => highlightCode(code, name), [code, name])
   const lines = useMemo(() => html.split("\n"), [html])
-  const [copied, setCopied] = useState(false)
-  const copy = () => {
-    ;(navigator.clipboard as Clipboard | undefined)?.writeText(code).catch(() => {
-      /* clipboard write may reject on insecure origin — ignore, the tick just won't flash */
-    })
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 1400)
-  }
   return (
     <div className="bg-card">
-      <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-3 py-2">
-        <span className="flex gap-1.5">
-          <span className="size-2.5 rounded-full bg-[#ff5f57]" />
-          <span className="size-2.5 rounded-full bg-[#febc2e]" />
-          <span className="size-2.5 rounded-full bg-[#28c840]" />
-        </span>
-        <span className="ml-1 font-mono text-[10.5px] tracking-wide text-muted-foreground uppercase">
-          {language}
-        </span>
-        <button
-          onClick={copy}
-          className="ml-auto flex items-center gap-1 rounded-md px-2.5 py-1.5 text-[12px] text-muted-foreground/80 transition-colors active:bg-muted active:text-foreground"
-        >
-          {copied ? <Check className="size-3.5 text-(--ok)" /> : <Copy className="size-3.5" />}
-          {copied ? "Copied" : "Copy"}
-        </button>
-      </div>
       <pre className="hljs overflow-x-auto bg-transparent px-3 py-2.5 font-mono text-[12px] leading-relaxed">
         {lines.map((line, i) => (
           <div key={i} className="flex gap-3 rounded-sm">

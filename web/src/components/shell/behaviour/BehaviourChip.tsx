@@ -156,7 +156,9 @@ export function BehaviourChip({ agentId }: { agentId: string }) {
 
   return (
     <>
-      <span className="h-3.5 w-px bg-border" />
+      {/* The leading hairline that used to sit here was painted with the
+          `--border` token — a border in all but name — and the footer it lives
+          in no longer draws any. The parent's `gap-3` separates the chip now. */}
       <DropdownMenu>
         <DropdownMenuTrigger className="flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground/85 focus:outline-none">
           <Bot className="size-3.5" />

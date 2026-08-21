@@ -2,67 +2,18 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { lineBounds, resolveEnter, resolveTab } from "@/lib/utils"
 import { measure } from "@/lib/support/telemetry"
 import { ArrowUp, Paperclip, Loader2, Clock, Pause } from "lucide-react"
+import { Tip } from "@/components/ui/tip"
 import type { ThreadStatus } from "@/lib/types"
 import { ComposerBubbles } from "./fileUpload"
 import type { UploadedFile, CommandSuggestion } from "./fileUpload/helpers"
-import { parseDraft } from "@/lib/support/threadMessages"
+import { parseDraft, resolveComposerBanner } from "@/lib/support/threadMessages"
+import type { Banner } from "@/lib/support/threadMessages"
 
 // CommandSuggestion now lives beside the file-chip abstraction in ./fileUpload
 // (both composer pill families share ONE module + ONE rendered row). Re-exported
 // here for the existing `import { type CommandSuggestion } from "./ThreadComposer"`
 // consumers (ThreadConversation).
 export type { CommandSuggestion } from "./fileUpload/helpers"
-
-/** The turn-status banner shown above the composer input, or null. */
-interface Banner {
-  working: boolean
-  paused: boolean
-  color: string | undefined
-  text: string
-}
-
-/**
- * Resolve the composer's turn-status banner from the thread state (T39/T371).
- *
- * A flat precedence chain (not a nested ternary): a paused thread shows the
- * amber pause notice; otherwise, only when the agent owes this thread a
- * response, an active spinner while streaming / working the FOCUSED thread, or
- * a static "will pick up soon" clock for a queued (non-focused) agent-turn
- * thread. Returns null on the user's turn (no banner).
- */
-function resolveComposerBanner(
-  paused: boolean,
-  agentBusy: boolean,
-  streaming: boolean,
-  focused: boolean,
-): Banner | null {
-  if (paused) {
-    return {
-      working: false,
-      paused: true,
-      color: undefined,
-      text: "Thread paused — the agent won't respond until resumed.",
-    }
-  }
-  if (!agentBusy) return null
-  if (streaming) {
-    return { working: true, paused: false, color: "var(--ok)", text: "Agent is streaming…" }
-  }
-  if (focused) {
-    return {
-      working: true,
-      paused: false,
-      color: "var(--signal)",
-      text: "Agent is working this thread…",
-    }
-  }
-  return {
-    working: false,
-    paused: false,
-    color: undefined,
-    text: "Agent will pick up this thread soon.",
-  }
-}
 
 /** Everything the composer render needs from its draft/keyboard logic. Flat
  *  (not nested under one object) so the render passes `textareaRef` to `ref=`
@@ -334,22 +285,61 @@ function ComposerInputRow({
         rows={1}
         className="max-h-[200px] min-h-[24px] w-full resize-none bg-transparent px-1 pt-1 text-[13.5px] leading-relaxed text-foreground/90 outline-none placeholder:text-muted-foreground/60"
       />
+      {/* BOTH BUTTONS ARE WRAPPED IN `Tip`, AND THAT CHANGES THE LAYOUT: Tip
+          renders its own trigger <span> around the child, so the SPAN — not the
+          button — is what this flex row lays out. Two consequences are handled
+          on `triggerClassName` rather than on the buttons:
+            * `inline-flex`, or the span is an inline box and the 28px button
+              inside it is mis-sized;
+            * `ml-auto` MOVES onto the send trigger. It used to sit on the send
+              button, which was the flex item; left there it would now be on a
+              child of the flex item and do nothing, and send would slide left
+              until it touched the paperclip.
+          The native `title=` attributes are gone with the same edit — leaving
+          them would show the browser's tooltip on top of ours. */}
       <div className="flex items-center gap-1">
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={!onAttach}
+        {/* Colour-only hover, no fill. This sits INSIDE the composer pill,
+            which is itself a filled surface — a second filled rectangle on
+            hover reads as a box inside a box. The `disabled:hover:bg-transparent`
+            that used to sit here went with the fill: there is no longer a
+            background to cancel. */}
+        <Tip
           title="Attach files"
-          className="flex size-7 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-muted hover:text-(--interactive) disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground/60"
+          body="Upload files into this thread for the agent to read. Pick several at once, or paste an image straight into the box."
+          triggerClassName="inline-flex"
         >
-          <Paperclip className="size-4" />
-        </button>
-        <button
-          onClick={onSubmit}
-          disabled={!sendable}
-          className="ml-auto flex size-7 items-center justify-center rounded-full bg-(--signal) text-(--primary-foreground) transition-[filter] hover:brightness-105 disabled:opacity-40 disabled:hover:brightness-100"
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={!onAttach}
+            className="flex size-7 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:text-(--interactive) disabled:cursor-default disabled:opacity-40 disabled:hover:text-muted-foreground/60"
+          >
+            <Paperclip className="size-4" />
+          </button>
+        </Tip>
+        {/* The body states the REAL Enter rule, which is not the usual one:
+            `resolveEnter` sends only when the caret is at the end AND the last
+            line is blank, so a first Enter after text opens a new line and the
+            second one sends. Documenting it as plain "Enter to send" would be
+            wrong, and a tooltip that misstates a keybinding trains the wrong
+            reflex. Wording follows the state, since the trigger span still
+            hovers while the button itself is disabled. */}
+        <Tip
+          title="Send"
+          body={
+            sendable
+              ? "Or press Enter on an empty last line — after typing, that means Enter twice. Shift+Enter always inserts a newline."
+              : "Nothing to send yet — type a message first."
+          }
+          triggerClassName="ml-auto inline-flex"
         >
-          <ArrowUp className="size-4" strokeWidth={2.5} />
-        </button>
+          <button
+            onClick={onSubmit}
+            disabled={!sendable}
+            className="flex size-7 items-center justify-center rounded-full bg-(--signal) text-(--primary-foreground) transition-[filter] hover:brightness-105 disabled:opacity-40 disabled:hover:brightness-100"
+          >
+            <ArrowUp className="size-4" strokeWidth={2.5} />
+          </button>
+        </Tip>
       </div>
     </div>
   )
@@ -471,7 +461,10 @@ export function ThreadComposer({
   }
 
   return (
-    <div className="shrink-0 px-5 pb-4">
+    // No padding — the composer runs flush to its column. `shrink-0` stays: the
+    // conversation above is the flex child that scrolls, so without it the
+    // composer would compress as the log grows instead of holding its height.
+    <div className="shrink-0">
       {/* Unified bubble row (T350) — file-upload chips + /command suggestions +
           the create-command pill, all in ONE transparent, normal-flow container
           between the conversation and the textarea. */}
