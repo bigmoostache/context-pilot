@@ -9,6 +9,8 @@ import { useAgentModalActions } from "./actions"
 import type { Controller } from "./parts"
 import { IdentityTab, LlmTab, VitalsTab } from "./manageBody"
 import { TABS, type TabId } from "./tabs"
+import { useLoopNav } from "@/lib/support/a11y"
+import { HintBadge } from "@/components/shell/chrome/HintBadge"
 
 /**
  * Agent configuration as a VIEW — the third surface in the header rail, beside
@@ -153,6 +155,13 @@ function CategoryRail({
   onSelect: (t: TabId) => void
   agentName: string
 }) {
+  // ⌘/Ctrl+Up/Down loop through the categories (T634), same as the thread list.
+  // TABS is the on-screen order; the hook wraps and reports the two rows to
+  // badge while the modifier is held.
+  const orderedIds = TABS.map((t) => t.id)
+  const { modHeld, prevId, nextId } = useLoopNav(orderedIds, tab, (id) => onSelect(id as TabId))
+  const navHintOf = (id: string): "up" | "down" | undefined =>
+    id === prevId ? "up" : id === nextId ? "down" : undefined
   return (
     <aside className="card-shadow my-2 flex w-(--sidebar-w) shrink-0 flex-col overflow-hidden rounded-none border border-border bg-surface-2">
       <div
@@ -172,16 +181,20 @@ function CategoryRail({
         <div className="p-2">
           {TABS.map((t) => {
             const on = t.id === tab
+            const navHint = navHintOf(t.id)
             return (
               <button
                 key={t.id}
                 type="button"
                 onClick={() => onSelect(t.id)}
                 className={cn(
-                  "group mb-0.5 flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left transition-colors",
+                  "group relative mb-0.5 flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left transition-colors",
                   on ? "card-shadow bg-card" : "hover:card-shadow hover:bg-card",
                 )}
               >
+                {navHint && (
+                  <HintBadge label={navHint === "up" ? "↑" : "↓"} shown={modHeld} side="left" />
+                )}
                 <span
                   className={cn(
                     "flex size-6 shrink-0 items-center justify-center rounded-md transition-colors",

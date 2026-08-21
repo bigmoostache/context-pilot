@@ -33,7 +33,18 @@ import { prefersReducedMotion } from "@/lib/utils"
  *
  * The host must be `relative`; the badge positions against it.
  */
-export function HintBadge({ label, shown }: { label: string; shown: boolean }) {
+export function HintBadge({
+  label,
+  shown,
+  side = "right",
+}: {
+  label: string
+  shown: boolean
+  /** Which bottom corner the badge hugs. The ⌘/Ctrl letter badges sit
+   *  bottom-right; the loop-nav arrow badges sit bottom-left so the two systems
+   *  never overlap on a row that shows both. */
+  side?: "left" | "right"
+}) {
   const ref = useRef<HTMLSpanElement>(null)
   const firstRef = useRef(true)
 
@@ -83,7 +94,7 @@ export function HintBadge({ label, shown }: { label: string; shown: boolean }) {
     <span
       ref={ref}
       aria-hidden
-      className="pointer-events-none absolute right-0 bottom-0 rounded-full bg-muted px-[4px] text-[9px] leading-[13px] font-semibold text-foreground/70"
+      className={`pointer-events-none absolute bottom-0 rounded-full bg-muted px-[4px] text-[9px] leading-[13px] font-semibold text-foreground/70 ${side === "left" ? "left-0" : "right-0"}`}
     >
       {label}
     </span>

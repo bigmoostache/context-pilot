@@ -4,8 +4,9 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tip } from "@/components/ui/tip"
 import type { ThreadDetail } from "@/lib/types"
 import { cn, prefersReducedMotion } from "@/lib/utils"
-import { clickable } from "@/lib/support/a11y"
+import { clickable, useLoopNav } from "@/lib/support/a11y"
 import { byRecent, dotColor, previewOf, ROW_ACTION_COPY } from "@/lib/support/threadMessages"
+import { HintBadge } from "@/components/shell/chrome/HintBadge"
 import { ThreadSearchPalette } from "./dialogs/ThreadSearchPalette"
 
 interface ThreadListProps {
@@ -74,6 +75,20 @@ export function ThreadList({
     .filter((t) => t.status === "THEIR_TURN" || t.status === "ACTIVE")
     .toSorted(byRecent)
 
+  // The on-screen order, flattened for ⌘/Ctrl+Up/Down loop nav (T634). Matches
+  // the render exactly: live view = the two groups top-to-bottom, archived view
+  // = the archived set newest-first. The hook wraps at both ends and reports
+  // which two rows to badge while the modifier is held.
+  const archivedSorted = showArchived ? [...visible].toSorted(byRecent) : []
+  const orderedIds = (showArchived ? archivedSorted : [...mine, ...working]).map((t) => t.id)
+  const { modHeld: navHeld, prevId, nextId } = useLoopNav(orderedIds, selectedId, onSelect)
+
+  // The ↑ badge sits on the row Up would move to, ↓ on the row Down would move
+  // to; both null on a one-item list, one of them null on a two-item list (see
+  // useLoopNav / loopBadges for the edge rules).
+  const navHintOf = (id: string): "up" | "down" | undefined =>
+    id === prevId ? "up" : id === nextId ? "down" : undefined
+
   const row = (t: ThreadDetail, archivedRow?: boolean) => (
     <ThreadRow
       key={t.id}
@@ -84,27 +99,19 @@ export function ThreadList({
       onPause={archivedRow ? undefined : onPause}
       onDelete={archivedRow ? onDelete : undefined}
       archived={archivedRow}
+      navHint={navHintOf(t.id)}
+      navHeld={navHeld}
     />
   )
 
   return (
-    // `bg-surface-2`, not `bg-card`: the rail must not read as the same surface
-    // as the header chrome. `--card` is reserved for what sits ON this panel —
-    // the selected thread row — so using it here too flattened the two into one
-    // tone. See the sibling FinderSidebar, still on `--surface`, if the two
-    // rails are ever unified.
-    //
-    // NO HORIZONTAL MARGIN (`my-2` only): the panel spans the full width of its
-    // column. It still does not touch the header rail — that carries its own
-    // `p-2`, so 8px of its padding falls to the left — and on the right the
-    // `card-shadow` is what separates it from the conversation, since the
-    // border is transparent (T605). The vertical `my-2` stays, so the panel
-    // floats top and bottom but runs flush side to side.
-    //
-    // ONE HAPPY CONSEQUENCE: ThreadsView's collapse offset used to be
-    // `--sidebar-w` PLUS this element's horizontal margins, a sum kept by hand
-    // in another file that had already drifted twice. With no horizontal margin
-    // left there is nothing to add, so the offset is now just the width.
+    // `bg-surface-2`, not `bg-card`: `--card` is reserved for what sits ON this
+    // panel (the selected row), so painting the rail with it too would flatten
+    // the two into one tone. No horizontal margin (`my-2` only): the panel runs
+    // flush side to side — the header rail's own `p-2` keeps it off the left,
+    // and the `card-shadow` (not a border — transparent since T605) separates
+    // it from the conversation on the right. One happy consequence: ThreadsView's
+    // collapse offset is now just `--sidebar-w`, with no margins to add on.
     <aside className="card-shadow my-2 flex w-(--sidebar-w) shrink-0 flex-col overflow-hidden rounded-none border border-border bg-surface-2">
       {/* fixed-width inner shell pinned to the rail width */}
       <div
@@ -139,7 +146,7 @@ export function ThreadList({
 
             {showArchived &&
               // Latest-archived first (T277) — most recently active on top.
-              [...visible].toSorted(byRecent).map((t) => row(t, true))}
+              archivedSorted.map((t) => row(t, true))}
           </div>
         </ScrollArea>
 
@@ -273,6 +280,8 @@ function ThreadRow({
   onPause,
   onDelete,
   archived,
+  navHint,
+  navHeld,
 }: {
   t: ThreadDetail
   selected: boolean
@@ -281,6 +290,10 @@ function ThreadRow({
   onPause?: ((id: string) => void) | undefined
   onDelete?: ((id: string) => void) | undefined
   archived?: boolean | undefined
+  /** Which loop-nav arrow badge this row shows while ⌘/Ctrl is held (T634). */
+  navHint?: "up" | "down" | undefined
+  /** Whether ⌘/Ctrl is currently held — gates the badge's visibility. */
+  navHeld?: boolean | undefined
 }) {
   const isFocused = !archived && t.focused
   const isPaused = !archived && t.paused
@@ -292,22 +305,20 @@ function ThreadRow({
     <div
       onMouseEnter={marquee.onMouseEnter}
       onMouseLeave={marquee.onMouseLeave}
-      // `py-1.5`, not `py-2`: the row's two text lines come to roughly 33px, so
-      // 16px of padding was nearly half the content height again. 12px still
-      // reads as a padded row rather than a table line.
-      //
-      // No `gap-*` here — this element has exactly ONE child, so a gap had
-      // nothing to space. The real line-to-line gap lives on that child.
+      // `py-1.5` (12px), not `py-2`: the row's two text lines are ~33px, so
+      // 16px padding was nearly half the content height. No `gap-*` — one child
+      // only; the line-to-line gap lives on that child.
       className={cn(
         "group relative mb-0.5 flex w-full flex-col rounded-lg px-2.5 py-1.5 text-left transition-colors select-none",
         selected ? "card-shadow bg-card" : "hover:card-shadow hover:bg-card",
       )}
     >
-      {/* `gap-0.5` binds the title and its preview into ONE unit. What keeps
-          rows apart is the padding plus `mb-0.5` — 14px between one row's last
-          line and the next row's first — so tightening here sharpens the
-          hierarchy rather than blurring it: 2px within a row against 14px
-          between them. */}
+      {navHint && (
+        <HintBadge label={navHint === "up" ? "↑" : "↓"} shown={Boolean(navHeld)} side="left" />
+      )}
+      {/* `gap-0.5` binds title + preview into ONE unit; rows are kept apart by
+          padding + `mb-0.5` (~14px between rows vs 2px within), sharpening the
+          hierarchy. */}
       <div {...clickable(() => onSelect(t.id))} className="flex flex-col gap-0.5 text-left">
         {/* line 1 — dot + name + time + hover actions */}
         <div className="flex items-center gap-2">
@@ -392,20 +403,16 @@ function RowActions({
 /**
  * One hover-revealed row action, with its tooltip.
  *
- * THE REST COLOUR HAD NEVER RENDERED. These carried `text-muted-foreground/60
- * group-hover:text-foreground`, but `group-hover` keys off the ROW — and the
- * span holding them is itself `opacity-0 group-hover:opacity-100`, so they are
- * only on screen while the row is hovered, exactly when that colour applies.
- * Moving the hover onto the BUTTON is what gives them a rest state at all:
- * `muted-foreground/70`, the same grey as the row's preview line
- * ({@link RowMeta}), so an idle action reads as metadata rather than as a
- * control competing with the title. No hover fill — at 20px inside an already
- * highlighted row it only added a second nested rectangle.
+ * These live inside a span that is itself `opacity-0 group-hover:opacity-100`,
+ * so the hover that reveals them is the ROW's. The rest colour is therefore on
+ * the BUTTON: `muted-foreground/70` (the preview line's grey) so an idle action
+ * reads as metadata, not a control rivalling the title. No hover fill — at 20px
+ * inside an already-highlighted row it only stacks a second rectangle.
  *
  * @param danger Hovers to `--danger` instead of ink. Picked by TERNARY, never
  *               two classes: same-specificity `hover:text-*` utilities resolve
- *               by stylesheet order, not class-attribute order, so emitting
- *               both would make the winner incidental.
+ *               by stylesheet order, so emitting both makes the winner
+ *               incidental.
  */
 function RowAction({
   copy,
@@ -420,7 +427,6 @@ function RowAction({
 }) {
   return (
     // `top`: these sit at the right edge of the rail, so `right` would open
-
     // over the conversation and `left` back over the rail itself.
     <Tip title={copy.title} body={copy.body} side="top" triggerClassName="inline-flex">
       <button
