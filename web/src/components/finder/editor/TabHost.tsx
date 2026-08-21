@@ -1,12 +1,5 @@
 import { X, FileText } from "lucide-react"
-import {
-  DndContext,
-  PointerSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core"
+import { useDroppable } from "@dnd-kit/core"
 import { SortableContext, horizontalListSortingStrategy, useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import type { FinderNode } from "@/lib/types"
@@ -14,6 +7,11 @@ import { FinderPreview } from "../preview/FinderPreview"
 import { VsCodeFileIcon } from "../support/VsCodeFileIcon"
 import { cn } from "@/lib/utils"
 import type { OpenTab, TabsState } from "./tabState"
+
+/** The id of the editor drop zone — a file dragged from the explorer and
+ *  released anywhere over the editor opens here (T630 P2). Shared with the
+ *  {@link FinderShell} `onDragEnd` that owns the spanning DndContext. */
+export const EDITOR_DROPZONE_ID = "editor-dropzone"
 
 /**
  * The tab strip and the body beneath it — the content half of the Finder.
@@ -27,8 +25,19 @@ import type { OpenTab, TabsState } from "./tabState"
 export function TabHost({ tabs, agentId }: { tabs: TabsState; agentId: string }) {
   const active = tabs.tabs.find((t) => t.path === tabs.activePath) ?? null
 
+  // The whole editor is a drop target for files dragged out of the explorer
+  // (T630 P2). The spanning DndContext lives in FinderShell; here we only mark
+  // the zone and light a ring while a drag hovers it.
+  const { setNodeRef, isOver } = useDroppable({ id: EDITOR_DROPZONE_ID })
+
   return (
-    <div className="m-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "m-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md transition-shadow",
+        isOver && "ring-2 ring-(--interactive)/60 ring-inset",
+      )}
+    >
       {tabs.tabs.length > 0 && <TabStrip tabs={tabs} />}
       {active ? (
         <FinderPreview
@@ -68,37 +77,26 @@ function toNode(tab: OpenTab): FinderNode {
  * `overflow-x-auto` and never wrapping: a strip that wraps to a second row
  * changes the height of the content area as tabs open, which moves the file
  * under the pointer. VS Code scrolls for the same reason.
+ *
+ * The DndContext that powers reorder lives UP in {@link FinderShell}, spanning
+ * the explorer and the editor so a file can be dragged from the tree into here;
+ * this strip only declares the sortable list of tabs within it.
  */
 function TabStrip({ tabs }: { tabs: TabsState }) {
-  // A 4px activation distance so a plain click (activate / close / middle-close)
-  // is NOT swallowed as a drag: the pointer must travel before a reorder starts,
-  // which leaves every existing click affordance on the tab intact.
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
-
-  const onDragEnd = (e: DragEndEvent) => {
-    const { active, over } = e
-    if (over && active.id !== over.id) tabs.reorder(String(active.id), String(over.id))
-  }
-
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-      <SortableContext
-        items={tabs.tabs.map((t) => t.path)}
-        strategy={horizontalListSortingStrategy}
-      >
-        <div className="flex h-9 shrink-0 items-stretch overflow-x-auto overflow-y-hidden border-b border-(--border-strong)/70 bg-surface">
-          {tabs.tabs.map((tab) => (
-            <Tab
-              key={tab.path}
-              tab={tab}
-              active={tab.path === tabs.activePath}
-              onActivate={() => tabs.activate(tab.path)}
-              onClose={() => tabs.close(tab.path)}
-            />
-          ))}
-        </div>
-      </SortableContext>
-    </DndContext>
+    <SortableContext items={tabs.tabs.map((t) => t.path)} strategy={horizontalListSortingStrategy}>
+      <div className="flex h-9 shrink-0 items-stretch overflow-x-auto overflow-y-hidden border-b border-(--border-strong)/70 bg-surface">
+        {tabs.tabs.map((tab) => (
+          <Tab
+            key={tab.path}
+            tab={tab}
+            active={tab.path === tabs.activePath}
+            onActivate={() => tabs.activate(tab.path)}
+            onClose={() => tabs.close(tab.path)}
+          />
+        ))}
+      </div>
+    </SortableContext>
   )
 }
 

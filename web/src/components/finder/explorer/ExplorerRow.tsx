@@ -1,5 +1,6 @@
 import type { FinderNode } from "@/lib/types"
 import { ChevronRight } from "lucide-react"
+import { useDraggable } from "@dnd-kit/core"
 import { VsCodeFileIcon } from "../support/VsCodeFileIcon"
 import { InfoBadge } from "../support/InfoBadge"
 import { cn } from "@/lib/utils"
@@ -44,9 +45,21 @@ export function ExplorerRow({
 }) {
   const isFolder = node.kind === "folder"
 
+  // Files are drag sources: drag one onto the editor to open it (T630 P2). The
+  // hook runs UNCONDITIONALLY (rules of hooks) but its listeners are spread only
+  // for files, so folders keep their plain click-to-toggle. `data.node` rides
+  // along for the shell's `onDragEnd`, which opens it pinned. The 4px activation
+  // distance (shell's PointerSensor) means a click still opens/toggles as before.
+  const { setNodeRef, attributes, listeners, isDragging } = useDraggable({
+    id: `explorer:${node.path}`,
+    data: { type: "explorer-file", node },
+  })
+  const dragProps = isFolder ? {} : { ref: setNodeRef, ...attributes, ...listeners }
+
   return (
     <button
       type="button"
+      {...dragProps}
       onClick={onActivate}
       onDoubleClick={onPin}
       onContextMenu={onContext}
@@ -56,6 +69,7 @@ export function ExplorerRow({
       title={node.name}
       className={cn(
         "group relative flex h-[22px] w-full items-center gap-1 pr-2 text-left text-[13px] transition-colors",
+        isDragging && "opacity-50",
         active ? "bg-(--interactive)/12 text-foreground" : "text-foreground/80 hover:bg-muted/60",
       )}
     >
