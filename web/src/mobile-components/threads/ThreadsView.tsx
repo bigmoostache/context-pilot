@@ -5,7 +5,7 @@ import { ThreadList } from "@/mobile-components/threads/ThreadList"
 import { ThreadConversation } from "@/mobile-components/threads/ThreadConversation"
 import { CornerButton } from "@/mobile-components/shell/chrome/CornerButton"
 import { useFleet, useThreads } from "@/lib/live"
-import { useThreadSelection, useThreadActions } from "@/lib/live/threadView"
+import { useThreadSelection, useThreadActions, type Notice } from "@/lib/live/threadView"
 import { useTopButtons } from "@/lib/providers/topButtons"
 import { prefersReducedMotion } from "@/lib/utils"
 
@@ -207,15 +207,7 @@ export function ThreadsView({
         />
       </aside>
 
-      {actions.notice && (
-        <div
-          role="alert"
-          className="card-shadow fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-(--danger)/40 bg-card px-4 py-2.5 text-[12.5px] text-foreground/90"
-        >
-          <AlertTriangle className="size-4 shrink-0 text-(--danger)" />
-          <span>{actions.notice}</span>
-        </div>
-      )}
+      <UndoNotice notice={actions.notice} />
     </div>
   )
 }
@@ -252,6 +244,33 @@ function EmptyRealm({
         >
           <Plus className="size-4" />
           New Thread
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** Bottom transient toast — an error banner, or a Gmail-style undo prompt after
+ *  a reversible action (T636). Extracted from the view body so its tone/undo
+ *  branches don't count against ThreadsView's complexity + line budgets. */
+function UndoNotice({ notice }: { notice: Notice | null }) {
+  if (!notice) return null
+  return (
+    <div
+      role="alert"
+      className={
+        "card-shadow fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-xl border bg-card px-4 py-2.5 text-[12.5px] text-foreground/90 " +
+        (notice.tone === "error" ? "border-(--danger)/40" : "border-border")
+      }
+    >
+      {notice.tone === "error" && <AlertTriangle className="size-4 shrink-0 text-(--danger)" />}
+      <span>{notice.message}</span>
+      {notice.undo && (
+        <button
+          onClick={notice.undo}
+          className="ml-1 shrink-0 rounded-md px-2 py-0.5 text-[12px] font-medium text-(--signal) transition-colors hover:bg-(--signal)/10"
+        >
+          Undo
         </button>
       )}
     </div>

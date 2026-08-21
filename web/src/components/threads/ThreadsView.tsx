@@ -157,10 +157,23 @@ export function ThreadsView({
       {actions.notice && (
         <div
           role="alert"
-          className="card-shadow fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-(--danger)/40 bg-card px-4 py-2.5 text-[12.5px] text-foreground/90"
+          className={
+            "card-shadow fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-xl border bg-card px-4 py-2.5 text-[12.5px] text-foreground/90 " +
+            (actions.notice.tone === "error" ? "border-(--danger)/40" : "border-border")
+          }
         >
-          <AlertTriangle className="size-4 shrink-0 text-(--danger)" />
-          <span>{actions.notice}</span>
+          {actions.notice.tone === "error" && (
+            <AlertTriangle className="size-4 shrink-0 text-(--danger)" />
+          )}
+          <span>{actions.notice.message}</span>
+          {actions.notice.undo && (
+            <button
+              onClick={actions.notice.undo}
+              className="ml-1 shrink-0 rounded-md px-2 py-0.5 text-[12px] font-medium text-(--signal) transition-colors hover:bg-(--signal)/10"
+            >
+              Undo
+            </button>
+          )}
         </div>
       )}
     </div>

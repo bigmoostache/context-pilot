@@ -191,9 +191,23 @@ export function useThreadSelection(
   }
 }
 
-/** The command handlers + failure notice returned by {@link useThreadActions}. */
+/**
+ * A transient toast: an error banner, or a Gmail-style **undo** prompt after a
+ * reversible action (T636). `tone` picks the styling (danger vs neutral); when
+ * `undo` is present the view renders an Undo button that re-issues the inverse
+ * backend command. Kept in this shared hook (not a component) so desktop and
+ * mobile drive the exact same undo behaviour off one source.
+ */
+export interface Notice {
+  message: string
+  /** Present on an undoable action — runs the inverse command and dismisses. */
+  undo?: (() => void) | undefined
+  tone: "info" | "error"
+}
+
+/** The command handlers + transient notice returned by {@link useThreadActions}. */
 export interface Actions {
-  notice: string | null
+  notice: Notice | null
   handleArchive: (id: string) => void
   handlePause: (id: string) => void
   handleDelete: (id: string) => void
@@ -218,13 +232,40 @@ export function useThreadActions(
 ): Actions {
   const { selectedId, setSelectedId, effectiveSelectedId, pendingFiles, setPendingFiles } = sel
 
-  const [notice, setNotice] = useState<string | null>(null)
+  const [notice, setNotice] = useState<Notice | null>(null)
   const noticeTimerRef = useRef<number | null>(null)
-  const flash = useCallback((msg: string) => {
+  // Show a toast, replacing any current one, and auto-dismiss it. An undo
+  // prompt lingers a touch longer than an error (the user has to decide to act
+  // on it), matching the Gmail dwell.
+  const show = useCallback((n: Notice) => {
     if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current)
-    setNotice(msg)
-    noticeTimerRef.current = window.setTimeout(() => setNotice(null), 6000)
+    setNotice(n)
+    noticeTimerRef.current = window.setTimeout(() => setNotice(null), n.undo ? 7000 : 6000)
   }, [])
+  const flash = useCallback((msg: string) => show({ message: msg, tone: "error" }), [show])
+  /**
+   * Push a Gmail-style undo toast for a reversible action. `inverseKind` is the
+   * command that reverses it (restore↔archive, resume↔pause); the Undo button
+   * re-issues it through the backend — no local state is rewound, so the
+   * backend stays the single source of truth (M141). A failed inverse surfaces
+   * its own error toast.
+   */
+  const offerUndo = useCallback(
+    (message: string, id: string, inverseKind: string, inverseVerb: string) => {
+      show({
+        message,
+        tone: "info",
+        undo: () => {
+          if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current)
+          setNotice(null)
+          sendCommand(activeAgentId, { kind: inverseKind, thread_id: id }).catch((e: unknown) =>
+            flash(describeCommandError(inverseVerb, e)),
+          )
+        },
+      })
+    },
+    [activeAgentId, show, flash],
+  )
   useEffect(
     () => () => {
       if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current)
@@ -240,11 +281,17 @@ export function useThreadActions(
       const verb = t.archived ? "restore the thread" : "archive the thread"
       // Deselect the archived thread so the view falls through to the next one.
       if (!t.archived && id === selectedId) setSelectedId("")
-      sendCommand(activeAgentId, { kind, thread_id: id }).catch((e: unknown) =>
-        flash(describeCommandError(verb, e)),
-      )
+      sendCommand(activeAgentId, { kind, thread_id: id })
+        .then(() =>
+          // The action's own inverse, offered as an undo (T636). Archiving is
+          // undone by restoring and vice-versa.
+          t.archived
+            ? offerUndo("Thread restored", id, "archive_thread", "re-archive the thread")
+            : offerUndo("Thread archived", id, "restore_thread", "restore the thread"),
+        )
+        .catch((e: unknown) => flash(describeCommandError(verb, e)))
     },
-    [threads, activeAgentId, flash, selectedId, setSelectedId],
+    [threads, activeAgentId, flash, offerUndo, selectedId, setSelectedId],
   )
 
   const handlePause = useCallback(
@@ -253,11 +300,15 @@ export function useThreadActions(
       if (!t) return
       const kind = t.paused ? "resume_thread" : "pause_thread"
       const verb = t.paused ? "resume the thread" : "pause the thread"
-      sendCommand(activeAgentId, { kind, thread_id: id }).catch((e: unknown) =>
-        flash(describeCommandError(verb, e)),
-      )
+      sendCommand(activeAgentId, { kind, thread_id: id })
+        .then(() =>
+          t.paused
+            ? offerUndo("Thread resumed", id, "pause_thread", "re-pause the thread")
+            : offerUndo("Thread paused", id, "resume_thread", "resume the thread"),
+        )
+        .catch((e: unknown) => flash(describeCommandError(verb, e)))
     },
-    [threads, activeAgentId, flash],
+    [threads, activeAgentId, flash, offerUndo],
   )
 
   const handleDelete = useCallback(
