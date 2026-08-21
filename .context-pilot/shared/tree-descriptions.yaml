@@ -14642,6 +14642,10 @@ a66181c697cd1145:
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switch, message create, notifications) + ClearConversation. Thread input routing via visible_indices. handle_thread_create. expand_paste_sentinels split expand_one_sentinel (A2). /command replacement.
   last_edited_ms: 1784487042423
+a66242c6ce40c936:
+  path: web/src/components/finder/editor/tabState.ts
+  description: 'VS Code editor model with SPLIT VIEW + PERSISTENCE (T630). useEditorGroups(agentId): flat horizontal EditorGroup[] (id/tabs/activePath) + activeGroupId cursor. Layout {groups,activeGroupId} persisted to localStorage per agent (cp:finder:groups:<id>), lazy-hydrated at mount, write-through effect — survives reload + view switch. Group ids = crypto.randomUUID (collision-proof vs restored ids). Preview-tab invariant PER GROUP. Explorer facade: openPreview/openPinned/activePath target active group. splitActive clones active tab into new group right; moveTab cross-group; applyDragEnd central dnd dispatch. Pure helpers withPreview/withPinned/withoutTab/reorderTabs/withMovedInto. dnd ids: tab=${groupId}::${path}, group drop=group:${groupId}.'
+  last_edited_ms: 1787327394996
 a6872fbd5f53c6e7:
   path: .context-pilot/commands/boss-hunt.md
   description: '/boss-hunt command: slow, methodical #[expect] elimination one boss at a time. Body is the prompt seeded into the composer when the suggestion bubble is clicked (T350).'
@@ -15494,6 +15498,10 @@ b09d3f648d35d051:
   path: .git/index
   description: Git index (binary). Not source.
   last_edited_ms: 0
+b09e0f582ef3ab04:
+  path: web/src/components/finder/Finder/index.tsx
+  description: Finder seam (T624/T630). Finder = thin wrapper keying FinderBody by agent.id so each agent + each reload remounts clean and hydrates its own saved layout (no cross-agent bleed, no persist race). FinderBody owns useTreeState + useEditorGroups(agent.id), threads Show-in-Finder reveal (expand ancestors + groups.openPinned), hands to FinderShell.
+  last_edited_ms: 1787327395128
 b0a660da308fbec4:
   path: web/src/components/finder/preview/sheetState.ts
   description: 'Univer sheet helpers (~280 lines). SheetPayload interface (name, rows, optional formulas from backend). toWorkbookData(): converts calamine rows+formulas to IWorkbookData with cell.f formula strings. generateXlsxBlob(): reads Univer snapshot, maps styles (bold/italic/underline/strike/colors/bg/alignment/borders) + formulas to ExcelJS. exportToXlsx(): browser download. saveToRealm(): generates XLSX blob + uploads to agent realm. toBorderStyle(): maps 13 Univer BorderStyleTypes to ExcelJS.'
