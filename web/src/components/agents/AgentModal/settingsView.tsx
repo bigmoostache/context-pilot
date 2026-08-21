@@ -46,7 +46,7 @@ export function SettingsView({
   disconnected?: boolean
   onReconnect?: () => void
 }) {
-  const [tab, setTab] = useState<TabId>("identity")
+  const [tab, setTab] = useState<TabId>("llm")
   const c = useAgentController(agent)
 
   return (

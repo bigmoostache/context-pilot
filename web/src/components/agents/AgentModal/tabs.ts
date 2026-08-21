@@ -19,7 +19,7 @@ export type TabId = "identity" | "llm" | "vitals"
  * alone.
  */
 export const TABS: { id: TabId; label: string; icon: typeof Bot; blurb: string }[] = [
-  { id: "identity", label: "Identity", icon: Bot, blurb: "How the agent sees itself" },
   { id: "llm", label: "Model", icon: Cpu, blurb: "Name, realm, provider and model" },
   { id: "vitals", label: "Vitals", icon: BadgeCheck, blurb: "Service health and lifecycle" },
+  { id: "identity", label: "Identity", icon: Bot, blurb: "How the agent sees itself" },
 ]

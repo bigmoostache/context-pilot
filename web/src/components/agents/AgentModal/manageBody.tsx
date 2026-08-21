@@ -16,7 +16,7 @@ import { TABS, type TabId } from "./tabs"
  * bodies stay within the P8 complexity budget.
  */
 export function TabbedManageBody({ c }: { c: Controller }) {
-  const [tab, setTab] = useState<TabId>("identity")
+  const [tab, setTab] = useState<TabId>("llm")
   return (
     <div className="grid min-h-0 flex-1 grid-cols-[190px_minmax(0,1fr)] overflow-hidden">
       {/* category rail */}
