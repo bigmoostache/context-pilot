@@ -70,6 +70,10 @@
   path: src/app/actions/helpers.rs
   description: Utility functions + switch_to_panel (scroll-preserving panel switch). clean_llm_id_prefix, parse_context_pattern, find_context_by_id, eject_cursor_from_sentinel.
   last_edited_ms: 0
+00f53c0ed852f4c6:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 010229990e2e592f:
   path: src/llms/claude_code/stream_types.rs
   description: 'SSE stream types: StreamContentBlock, StreamDelta, StreamMessage, StreamUsage deserialization structs'
@@ -2717,6 +2721,10 @@
 1f33d0916757c90b:
   path: .git/index
   description: Git index (binary). Not source.
+  last_edited_ms: 0
+1f4a76b004f501ba:
+  path: web/src/components/agents/AgentModal/manageBody.tsx
+  description: 'AgentModal manage-mode body (T617): ConfigPanel-style rail (Identity/Model/Vitals from tabs.ts) + detail pane. IdentityTab = 10 Agora fields, render-phase pristine-sync (not effect), saves via set_identity bridge command. LlmTab = name/realm/ModelPicker. VitalsTab = SessionVitals + AgentAclSection.'
   last_edited_ms: 0
 1f4ab74aac96a7dc:
   path: web/README.md
@@ -8353,6 +8361,10 @@
 6065f2dfb7032e7b:
   path: src/app/context/detach.rs
   description: 'Splits old messages into frozen ConversationHistory panels. flame!("detach"). Turn-boundary detection. Min-messages/tokens constraints for chunk+tip. Freeze-aware: skips detach when queue active or tempo holding. Deletes detached messages from disk. Loop for multi-chunk detach.'
+  last_edited_ms: 0
+60683157712f3371:
+  path: web/src/components/agents/AgentModal/tabs.ts
+  description: The three agent-config panes (id/label/icon/blurb) in canonical order — own module because manageBody.tsx exports components and react-refresh forbids components+values in one file. Shared by the manage DIALOG rail and the settings VIEW rail so they can't drift.
   last_edited_ms: 0
 606dbf0115106230:
   path: crates/cp-base/src/state/runtime.rs
@@ -14646,6 +14658,10 @@ a73ad7544498bcd8:
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (IR blocks → blocks_to_lines: selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (scrollable messages via scroll_offset, author/timestamp headers, content). All content through IR pipeline. Tab/Shift+Tab nav.'
   last_edited_ms: 0
+a76b266bccadbd48:
+  path: web/src/components/agents/AgentModal/settingsView.tsx
+  description: Agent config as a VIEW — third header-rail surface beside Threads/Finder (T617). Replaces the manage DIALOG (AgentModal still used by FleetDashboard for CREATE + fleet-card gear). Deliberate copy of ThreadsView shape (rail geometry/collapse/disconnect overlay repeated, not abstracted). CategoryRail (Identity/Model/Vitals) + SettingsPane; SaveBar/LifecycleBar replace the old dialog footer.
+  last_edited_ms: 0
 a76cc7d59c5acf6e:
   path: web/src/components/finder/Finder/shell.tsx
   description: Finder chrome + content render (P8 split). role=application keyboard widget. Renders FinderTabs+FinderToolbar+FinderBody+FinderPathBar+FinderOverlays from vs/listing/ctrl. Owns Favorites pins (useFinderPins). Disconnected reconnect overlay uses clickable() a11y helper (role=button+keyboard, jsx-a11y compliant) instead of bare div onClick.
@@ -14841,6 +14857,10 @@ a98846f59bed0bea:
 a9945ad52fca5540:
   path: crates/cp-base/src/config/constants.rs
   description: Layout/timing constants. SIDEBAR_HELP_HEIGHT=10 (9 help hints + separator). MAX_SIDEBAR_LABEL_LEN, INPUT_RESERVE, TEMPO_*, token thresholds, typing indicator timing.
+  last_edited_ms: 0
+a99552e5b76500be:
+  path: web/src/components/threads/fileUpload/FileSidebar.tsx
+  description: Right-rail sidebar listing thread file attachments. ThreadFile type (file+role). Deduplicates by file.path via useMemo+Set (same file attached multiple times shows once). Renders FileIcon + name + role label per attachment. Click opens Quick Look drawer via onOpen callback. Only shown when thread has file-upload blocks.
   last_edited_ms: 0
 a9a05a7e9a12843e:
   path: web/src/components/shell/costs/format.ts
@@ -21294,6 +21314,10 @@ f6191ad6ed8ba76a:
   path: crates/cp-mod-threads/src/tools.rs
   description: 'Thread tool handlers. execute_send: MAX_CONTENT_BYTES=100K, MAX_FILE_PATH_BYTES=1K, MAX_STORED_QUESTIONS=50 caps. execute_read: single-pass unack count+previews via inspect(). build_panel_content: MAX_PANEL_MESSAGES=50 cap. format_age helper.'
   last_edited_ms: 0
+f61c6fa71d54d3cd:
+  path: web/src/components/shell/TopBar.tsx
+  description: 'Slim macOS-style title bar (T321 trimmed): app mark→fleet, agent switcher, per-agent view tabs (Threads/Finder/Cockpit/Costs), agent-config gear, UsageButton, account UserMenu. Costs tab dev-mode only. P8: view-tab cluster extracted into a ViewTabs subcomponent (moving the two devMode gates off TopBar''s complexity budget); TopBar fn now <150 lines / cx<15.'
+  last_edited_ms: 0
 f61e3df67e228736:
   path: crates/cp-wire/tests/protocol.rs
   description: 'Phase 21 (X788): cp-wire protocol coverage at public-API boundary. Every OpEntryKind variant JSON round-trip incl Checkpoint{Snapshot} (the inline tests skip CommandEffect/SeenMark/Lifecycle/CostAggregate/Checkpoint), checkpoint-carries-faithful-snapshot (GAP1 fast-replay reseed integrity), accepts() N-1 window sweep 0..PV+4, ContentHash to_hex/from_hex bijection + uppercase-accepted + malformed-rejected-never-panic, SeenSet evict_through retires exactly acked tokens + rev_of preserved, Heads upsert last-write-wins-per-thread (I3 bounded). serde_json used directly; crc32c/serde/sha2 acked as _. 7 tests.'
@@ -21550,6 +21574,10 @@ f8da9563a5f056ab:
   path: web/src/App.tsx
   description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Uses useFleet() for live agents. Persists activeAgentId + view in localStorage (cp-agent, cp-view). Mounts AccountProvider + TooltipProvider. Passes agents to TopBar/FleetShell/StatusBar. Passes activeAgent to StatusBar.
   last_edited_ms: 1781774995995
+f8e23539fc49d73b:
+  path: web/src/components/finder/support/InfoBadge.tsx
+  description: 'Finder per-node info badge — hover-only ⓘ affordance shown when a file/folder has a tree description (T289). Base UI Tooltip (not Popover: never opens on click, no help cursor). Renders as <span> so it nests inside a row <button> legally; all pointer events stopped so brushing it never selects/opens/drags the node.'
+  last_edited_ms: 0
 f8e2851da34e0bb3:
   path: crates/cp-orchestrator/src/transport/rest/mod.rs
   description: 'REST resource handlers. fleet() filtered by auth_user ACL (FR-12). command() dispatches commands. rename_agent (T328), upload/delete avatar (T338). threads() prefers view roster. mint_ticket embeds auth_user.id (Phase 7). resolve_entry. Backend re-exported from backend.rs. Submodules: create, restart, retire, library, thread_shape, backend, env_keys. Re-exports env_key_reveal, env_key_update, env_keys_list.'

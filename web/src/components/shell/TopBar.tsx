@@ -290,6 +290,8 @@ function ViewTab({
   icon: Icon,
   label,
   expanded,
+  hint,
+  hintShown = false,
 }: {
   active: boolean
   onClick: () => void
@@ -300,6 +302,12 @@ function ViewTab({
    *  claiming `aria-expanded` there would describe a control this button does
    *  not have. */
   expanded?: boolean | undefined
+  /** The ⌘/Ctrl shortcut letter, shown bottom-right while the modifier is held
+   *  AND this tab's shortcut is currently bound (see {@link ViewTabs}). Omit on
+   *  a tab with no shortcut (Costs). */
+  hint?: string | undefined
+  /** Whether to reveal the hint badge right now. */
+  hintShown?: boolean
 }) {
   return (
     <button
@@ -309,15 +317,46 @@ function ViewTab({
       aria-label={label}
       aria-expanded={expanded}
       className={cn(
-        "flex size-8 items-center justify-center rounded-md transition-all",
+        "relative flex size-8 items-center justify-center rounded-md transition-all",
         active
           ? "card-shadow bg-card text-foreground"
           : "text-muted-foreground hover:text-foreground",
       )}
     >
       <Icon className="size-4" />
+      {hint && <HintBadge label={hint} shown={hintShown} />}
     </button>
   )
+}
+
+/**
+ * Bind the ⌘/Ctrl view-switch shortcuts and report which hint badges to show.
+ * A hook so the map build + hint gating don't count against {@link ViewTabs}'
+ * complexity budget.
+ *
+ * C and K are bound ONLY while their view is NOT active — on Threads the
+ * sibling {@link ThreadActions} owns C (new thread), so `!onThreads` keeps the
+ * two from colliding. S is always bound, mirroring the tab's own click.
+ * `useModifierShortcuts` reads the map through a latest-ref, so rebuilding it
+ * each render does not re-add the window listener.
+ */
+function useViewShortcuts(
+  view: ViewMode,
+  onViewChange: (v: ViewMode) => void,
+  onToggleSettingsRail: () => void,
+): { modHeld: boolean; showThreadsHint: boolean; showFinderHint: boolean } {
+  const onThreads = view === "threads"
+  const onSettings = view === "settings"
+  const onFinder = view === "finder"
+
+  const shortcuts: Record<string, () => void> = {
+    s: onSettings ? onToggleSettingsRail : () => onViewChange("settings"),
+  }
+  if (!onThreads) shortcuts["c"] = () => onViewChange("threads")
+  if (!onFinder) shortcuts["k"] = () => onViewChange("finder")
+  const modHeld = useModifierShortcuts(shortcuts)
+
+  return { modHeld, showThreadsHint: modHeld && !onThreads, showFinderHint: modHeld && !onFinder }
 }
 
 /** Per-agent view switcher (Threads · Finder · Costs). Costs
@@ -356,6 +395,14 @@ function ViewTabs({
   const onSettings = view === "settings"
   const onFinder = view === "finder"
 
+  // ⌘/Ctrl view-switch shortcuts — the map build + hint gating live in a hook
+  // so their branches don't count against ViewTabs' complexity budget.
+  const { modHeld, showThreadsHint, showFinderHint } = useViewShortcuts(
+    view,
+    onViewChange,
+    onToggleSettingsRail,
+  )
+
   return (
     // One of the two deliberate exceptions to "no borders" (the other is the
     // light/dark toggle): the pill group needs its own outline to read as a
@@ -381,6 +428,10 @@ function ViewTabs({
           expanded={onThreads ? threadsRailOpen : undefined}
           icon={MessagesSquare}
           label="Threads"
+          // C switches to Threads only when NOT already here (on Threads, C is
+          // the new-thread shortcut owned by ThreadActions).
+          hint="C"
+          hintShown={showThreadsHint}
         />
       </Tip>
       <Tip
@@ -398,6 +449,9 @@ function ViewTabs({
           expanded={onFinder ? finderRailOpen : undefined}
           icon={FolderTree}
           label="Finder"
+          // K switches to Finder, active only when not already here.
+          hint="K"
+          hintShown={showFinderHint}
         />
       </Tip>
       {devMode && (
@@ -433,6 +487,10 @@ function ViewTabs({
           expanded={onSettings ? settingsRailOpen : undefined}
           icon={SlidersHorizontal}
           label="Settings"
+          // S always bound; mirrors the tab's own click (navigate, or toggle
+          // the category rail when already on settings).
+          hint="S"
+          hintShown={modHeld}
         />
       </Tip>
     </div>
