@@ -1,7 +1,7 @@
 import { useEffect } from "react"
 import type { Agent, FinderNode } from "@/lib/types"
 import { useTreeState } from "../explorer/treeState"
-import { useTabsState } from "../editor/tabState"
+import { useEditorGroups } from "../editor/tabState"
 import { kindOf } from "../support/kind"
 import { FinderShell } from "./shell"
 
@@ -42,12 +42,12 @@ export function Finder({
   onReconnect?: () => void
 }) {
   const tree = useTreeState()
-  const tabs = useTabsState()
+  const groups = useEditorGroups()
 
   // "Show in Finder": expand every ancestor of the target so its row renders,
   // then open it pinned (the user asked to SEE this file, not to glance at it).
-  // `tree` and `tabs` are memoised bundles and `onRevealConsumed` is guarded by
-  // the `revealPath` check, so listing them all keeps exhaustive-deps happy
+  // `tree` and `groups` are memoised bundles and `onRevealConsumed` is guarded
+  // by the `revealPath` check, so listing them all keeps exhaustive-deps happy
   // while the effect still fires only when a fresh path arrives — the parent
   // nulls `revealPath` on consume, so the reveal runs exactly once.
   useEffect(() => {
@@ -55,15 +55,15 @@ export function Finder({
     tree.reveal(revealPath, agent.folder)
     const name = revealPath.split("/").at(-1) ?? revealPath
     const node: FinderNode = { name, path: revealPath, kind: kindOf(name), modified: "" }
-    tabs.openPinned(node)
+    groups.openPinned(node)
     onRevealConsumed?.()
-  }, [revealPath, agent.folder, tree, tabs, onRevealConsumed])
+  }, [revealPath, agent.folder, tree, groups, onRevealConsumed])
 
   return (
     <FinderShell
       agent={agent}
       tree={tree}
-      tabs={tabs}
+      groups={groups}
       railOpen={railOpen}
       disconnected={disconnected}
       onReconnect={onReconnect}

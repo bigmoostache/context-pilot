@@ -1,22 +1,16 @@
 import type { Agent, FinderNode } from "@/lib/types"
-import {
-  DndContext,
-  PointerSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core"
+import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core"
 import { clickable } from "@/lib/support/a11y"
 import { useFsDescriptions } from "@/lib/live"
 import { ExplorerTree } from "../explorer/ExplorerTree"
-import { TabHost, EDITOR_DROPZONE_ID } from "../editor/TabHost"
+import { TabHost } from "../editor/TabHost"
 import type { TreeState } from "../explorer/treeState"
-import type { TabsState } from "../editor/tabState"
+import type { GroupsState } from "../editor/tabState"
 
 /**
- * The Finder's two-pane render: the explorer tree on the left, the tabbed file
- * viewer on the right, with the disconnect overlay layered over both.
+ * The Finder's two-pane render: the explorer tree on the left, the split
+ * editor (one or more groups side by side) on the right, with the disconnect
+ * overlay layered over both.
  *
  * Extracted from {@link Finder} so the seam component stays a thin wiring layer.
  * Deliberately spare — the macOS chrome (toolbar, path bar, status bar, marquee
@@ -26,16 +20,16 @@ import type { TabsState } from "../editor/tabState"
 export function FinderShell({
   agent,
   tree,
-  tabs,
+  groups,
   railOpen = true,
   disconnected,
   onReconnect,
 }: {
   agent: Agent
   tree: TreeState
-  tabs: TabsState
+  groups: GroupsState
   /** Whether the explorer rail is expanded. When false the tree slides off the
-   *  left edge (the {@link FinderShell} root clips it) and the tab host reclaims
+   *  left edge (the {@link FinderShell} root clips it) and the editor reclaims
    *  the width — the Finder twin of the Threads/Settings rail collapse. */
   railOpen?: boolean
   disconnected?: boolean | undefined
@@ -45,33 +39,21 @@ export function FinderShell({
   // on described rows. One fetch per agent, shared across the whole tree.
   const { data: descriptions } = useFsDescriptions(agent.id)
 
-  // ONE DndContext spanning BOTH panes (T630 P1+P2). It hosts two drag systems:
-  // the tab strip's SortableContext (reorder) and the explorer's file-row
-  // draggables, plus the editor drop zone. A 4px activation distance keeps every
-  // click affordance (open, toggle, close) intact — a plain click never drags.
+  // ONE DndContext spanning the explorer AND every editor group (T630 P1–P3).
+  // It hosts three drag systems: each group's tab SortableContext (reorder),
+  // cross-group tab moves, and the explorer's file-row draggables. The whole
+  // dispatch lives in the groups model — `applyDragEnd` sorts explorer-open vs
+  // in-group reorder vs cross-group move — so the shell stays a thin delegate.
+  // A 4px activation distance keeps every click affordance (open, toggle,
+  // close) intact: a plain click never starts a drag.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
 
-  const onDragEnd = (e: DragEndEvent) => {
-    const { active, over } = e
-    if (!over) return
-    const data = active.data.current
-
-    // Explorer file dragged onto the editor (the drop zone OR any open tab, both
-    // "the editor"): open it PINNED — a drag is a deliberate act, not a browse.
-    if (data?.["type"] === "explorer-file") {
-      const inEditor = over.id === EDITOR_DROPZONE_ID || tabs.tabs.some((t) => t.path === over.id)
-      if (inEditor) tabs.openPinned(data["node"] as FinderNode)
-      return
-    }
-
-    // Otherwise a tab was dragged: reorder within the strip. Dropping a tab onto
-    // the editor body resolves `over` to the drop zone, whose findIndex is −1 —
-    // the reorder guard treats that as a no-op, so a stray drop never scrambles.
-    if (active.id !== over.id) tabs.reorder(String(active.id), String(over.id))
-  }
-
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={groups.applyDragEnd}
+    >
       <div
         className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background"
         style={
@@ -104,9 +86,9 @@ export function FinderShell({
             agentFolder={agent.folder}
             tree={tree}
             descriptions={descriptions}
-            activePath={tabs.activePath}
-            onOpenFile={(node: FinderNode) => tabs.openPreview(node)}
-            onPinFile={(node: FinderNode) => tabs.openPinned(node)}
+            activePath={groups.activePath}
+            onOpenFile={(node: FinderNode) => groups.openPreview(node)}
+            onPinFile={(node: FinderNode) => groups.openPinned(node)}
             // A context menu is a follow-up (T624 P-later); the tree is fully
             // usable by click alone in the meantime, so the handler is a no-op
             // rather than a half-built menu.
@@ -116,7 +98,7 @@ export function FinderShell({
           />
         </div>
 
-        <TabHost tabs={tabs} agentId={agent.id} />
+        <TabHost groups={groups} agentId={agent.id} />
       </div>
     </DndContext>
   )

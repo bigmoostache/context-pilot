@@ -1,4 +1,4 @@
-import { X, FileText } from "lucide-react"
+import { X, FileText, SplitSquareHorizontal } from "lucide-react"
 import { useDroppable } from "@dnd-kit/core"
 import { SortableContext, horizontalListSortingStrategy, useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
@@ -6,39 +6,82 @@ import type { FinderNode } from "@/lib/types"
 import { FinderPreview } from "../preview/FinderPreview"
 import { VsCodeFileIcon } from "../support/VsCodeFileIcon"
 import { cn } from "@/lib/utils"
-import type { OpenTab, TabsState } from "./tabState"
-
-/** The id of the editor drop zone — a file dragged from the explorer and
- *  released anywhere over the editor opens here (T630 P2). Shared with the
- *  {@link FinderShell} `onDragEnd` that owns the spanning DndContext. */
-export const EDITOR_DROPZONE_ID = "editor-dropzone"
+import { type EditorGroup, type GroupsState, tabDragId, groupDropId } from "./tabState"
 
 /**
- * The tab strip and the body beneath it — the content half of the Finder.
+ * The editor half of the Finder: the open editor GROUPS laid side by side
+ * (T630 P3). Was a single tab strip + body; is now one {@link GroupView} per
+ * group in a flex row, each an independent split with its own tabs and active
+ * file. The active group is ringed; clicking anywhere in a group focuses it, so
+ * the next file opened from the explorer lands there.
  *
  * THE BODY IS THE EXISTING {@link FinderPreview}, unchanged. That is the seam
- * this whole rework was built around: how a file is REACHED (a tree, a tab) is
- * orthogonal to how it is RENDERED (syntax highlighting, sheet grids, live
- * image/PDF fetches). So the ~1500 lines under `preview/` were carried across
- * untouched, and a tab body is one `variant="full"` preview.
+ * this whole rework was built around: how a file is REACHED (a tree, a tab, a
+ * split) is orthogonal to how it is RENDERED. So the ~1500 lines under
+ * `preview/` are still untouched, and a tab body is one `variant="full"`
+ * preview.
  */
-export function TabHost({ tabs, agentId }: { tabs: TabsState; agentId: string }) {
-  const active = tabs.tabs.find((t) => t.path === tabs.activePath) ?? null
+export function TabHost({ groups, agentId }: { groups: GroupsState; agentId: string }) {
+  return (
+    <div className="m-2 flex min-h-0 min-w-0 flex-1 gap-2 overflow-hidden">
+      {groups.groups.map((group) => (
+        <GroupView
+          key={group.id}
+          group={group}
+          groups={groups}
+          agentId={agentId}
+          isActive={group.id === groups.activeGroupId}
+          // The last remaining group cannot be split away into nothing, but any
+          // group can always be split; the split button is unconditional.
+          canSplit
+        />
+      ))}
+    </div>
+  )
+}
 
-  // The whole editor is a drop target for files dragged out of the explorer
-  // (T630 P2). The spanning DndContext lives in FinderShell; here we only mark
-  // the zone and light a ring while a drag hovers it.
-  const { setNodeRef, isOver } = useDroppable({ id: EDITOR_DROPZONE_ID })
+/**
+ * One editor group — its tab strip and the body beneath it.
+ *
+ * A drop target (`group:<id>`) so a tab dragged from another group and released
+ * anywhere over this one lands here, and an explorer file dropped here opens
+ * here. The whole group is click-to-focus: mousing into its body sets it active
+ * so the explorer opens into the split the user is looking at.
+ */
+function GroupView({
+  group,
+  groups,
+  agentId,
+  isActive,
+  canSplit,
+}: {
+  group: EditorGroup
+  groups: GroupsState
+  agentId: string
+  isActive: boolean
+  canSplit: boolean
+}) {
+  const active = group.tabs.find((t) => t.path === group.activePath) ?? null
+  const { setNodeRef, isOver } = useDroppable({ id: groupDropId(group.id) })
 
   return (
     <div
       ref={setNodeRef}
+      // Focus-on-pointer-down (not click) so the group is already active by the
+      // time a drag out of the explorer resolves its target.
+      onPointerDownCapture={() => groups.setActiveGroup(group.id)}
       className={cn(
-        "m-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md transition-shadow",
+        "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md transition-shadow",
         isOver && "ring-2 ring-(--interactive)/60 ring-inset",
+        // Only ring the active group when more than one exists — a lone group
+        // needs no "which pane has focus" cue.
+        !isOver &&
+          isActive &&
+          groups.groups.length > 1 &&
+          "ring-1 ring-(--interactive)/30 ring-inset",
       )}
     >
-      {tabs.tabs.length > 0 && <TabStrip tabs={tabs} />}
+      {group.tabs.length > 0 && <TabStrip group={group} groups={groups} canSplit={canSplit} />}
       {active ? (
         <FinderPreview
           // KEYED BY PATH so switching tabs REMOUNTS the preview. Without it,
@@ -49,7 +92,7 @@ export function TabHost({ tabs, agentId }: { tabs: TabsState; agentId: string })
           node={toNode(active)}
           agentId={agentId}
           variant="full"
-          onClose={() => tabs.close(active.path)}
+          onClose={() => groups.close(group.id, active.path)}
         />
       ) : (
         <EmptyEditor />
@@ -67,63 +110,94 @@ export function TabHost({ tabs, agentId }: { tabs: TabsState; agentId: string })
  * state would be shown as fact. The preview re-reads what it needs from the
  * realm anyway.
  */
-function toNode(tab: OpenTab): FinderNode {
+function toNode(tab: { path: string; name: string; kind: FinderNode["kind"] }): FinderNode {
   return { name: tab.name, path: tab.path, kind: tab.kind, modified: "" }
 }
 
 /**
- * The horizontal tab strip.
+ * One group's horizontal tab strip, with the split button pinned to its right.
  *
  * `overflow-x-auto` and never wrapping: a strip that wraps to a second row
  * changes the height of the content area as tabs open, which moves the file
  * under the pointer. VS Code scrolls for the same reason.
  *
- * The DndContext that powers reorder lives UP in {@link FinderShell}, spanning
- * the explorer and the editor so a file can be dragged from the tree into here;
- * this strip only declares the sortable list of tabs within it.
+ * The DndContext that powers reorder + cross-group moves lives UP in the
+ * {@link FinderShell}, spanning the explorer and every group; this strip only
+ * declares the sortable list of ITS tabs. Sortable ids are namespaced by group
+ * ({@link tabDragId}) so the same file open in two splits keeps two identities.
  */
-function TabStrip({ tabs }: { tabs: TabsState }) {
+function TabStrip({
+  group,
+  groups,
+  canSplit,
+}: {
+  group: EditorGroup
+  groups: GroupsState
+  canSplit: boolean
+}) {
   return (
-    <SortableContext items={tabs.tabs.map((t) => t.path)} strategy={horizontalListSortingStrategy}>
-      <div className="flex h-9 shrink-0 items-stretch overflow-x-auto overflow-y-hidden border-b border-(--border-strong)/70 bg-surface">
-        {tabs.tabs.map((tab) => (
-          <Tab
-            key={tab.path}
-            tab={tab}
-            active={tab.path === tabs.activePath}
-            onActivate={() => tabs.activate(tab.path)}
-            onClose={() => tabs.close(tab.path)}
-          />
-        ))}
-      </div>
-    </SortableContext>
+    <div className="flex h-9 shrink-0 items-stretch border-b border-(--border-strong)/70 bg-surface">
+      <SortableContext
+        items={group.tabs.map((t) => tabDragId(group.id, t.path))}
+        strategy={horizontalListSortingStrategy}
+      >
+        <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto overflow-y-hidden">
+          {group.tabs.map((tab) => (
+            <Tab
+              key={tab.path}
+              id={tabDragId(group.id, tab.path)}
+              tab={tab}
+              active={tab.path === group.activePath}
+              onActivate={() => groups.activate(group.id, tab.path)}
+              onClose={() => groups.close(group.id, tab.path)}
+            />
+          ))}
+        </div>
+      </SortableContext>
+      {canSplit && (
+        <button
+          type="button"
+          aria-label="Split editor right"
+          title="Split editor right"
+          onClick={() => {
+            groups.setActiveGroup(group.id)
+            groups.splitActive()
+          }}
+          className="flex w-8 shrink-0 items-center justify-center border-l border-(--border-strong)/70 text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <SplitSquareHorizontal className="size-3.5" />
+        </button>
+      )}
+    </div>
   )
 }
 
 /**
  * One tab.
  *
- * A `<div>` with {@link clickableTab} semantics rather than a `<button>`,
- * because it CONTAINS the close button — a button inside a button is invalid
- * HTML and the browser reparents it, which breaks the close click in a way that
- * only shows up at runtime.
+ * A `<div>` with tab semantics rather than a `<button>`, because it CONTAINS
+ * the close button — a button inside a button is invalid HTML and the browser
+ * reparents it, which breaks the close click in a way that only shows up at
+ * runtime. Its drag id ({@link tabDragId}) is namespaced by group so a
+ * cross-group move can tell which split it came from.
  */
 function Tab({
+  id,
   tab,
   active,
   onActivate,
   onClose,
 }: {
-  tab: OpenTab
+  id: string
+  tab: OpenTabView
   active: boolean
   onActivate: () => void
   onClose: () => void
 }) {
-  // The whole tab is the drag handle. `useSortable` keyed by the tab's path (its
-  // stable identity); `isDragging` dims the lifted tab so the gap it leaves reads
-  // as the drop target.
+  // The whole tab is the drag handle. `useSortable` keyed by the namespaced id;
+  // `isDragging` dims the lifted tab so the gap it leaves reads as the target.
   const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
-    id: tab.path,
+    id,
   })
 
   return (
@@ -192,8 +266,18 @@ function Tab({
   )
 }
 
-/** Shown when no file is open — VS Code's blank editor, with the one hint that
- *  actually resolves it. */
+/** The shape {@link Tab} reads off an open tab — a structural subset of the
+ *  editor's `OpenTab` (path/name/kind/preview), kept local so this file does
+ *  not re-import the whole state type just for a leaf render. */
+interface OpenTabView {
+  path: string
+  name: string
+  kind: FinderNode["kind"]
+  preview: boolean
+}
+
+/** Shown when a group holds no file — VS Code's blank editor, with the one hint
+ *  that actually resolves it. */
 function EmptyEditor() {
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 text-center">
