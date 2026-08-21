@@ -369,6 +369,38 @@
   - deadman
   - historical
   last_edited_ms: 1784202948992
+66c65b2514fd54ac:
+  tl_dr: 'T593 tmp/v2 document persistence: pretty-printed normal form on disk, hand-editable file with live push over Vite HMR, word-level diff3 merge on concurrent edit, conflict = save refused + nothing written. Architecture + gotchas in body.'
+  contents: |-
+    T593 (tmp/v2 Word-clone editor) — three asks, all shipped.
+
+    1. PRETTY-PRINTED STORAGE. src/server/format.ts wraps js-beautify with wrap_line_length:0, preserve_newlines:false, explicit `inline` list. TWO PROPERTIES ARE LOAD-BEARING: (a) IDEMPOTENT — every conflict check compares hashes of FORMATTED text, so a churning formatter would report a phantom external edit on every save; (b) SEMANTICS-PRESERVING — HTML collapses whitespace, so wrapping a line INSIDE a paragraph INSERTS A SPACE that was not in the document (`<em>a</em><strong>b</strong>` reflowed reparses as `a b`). Hence never wrap, indent block elements only. Verified on the real document: idempotent true, zero bare-text lines.
+
+    2. HAND-EDITABLE FILE. GET normalises whatever is on disk and writes it back if it was not already in normal form (else the client's hash and the file would disagree and the next save would look like a phantom edit). A separate narrow fs.watch on the document's directory (Vite's own watcher must keep ignoring **/data/** or every autosave full-page-reloads the editor) sends a CUSTOM HMR event `demo-doc:changed` via server.hot.send — no second port, no polling. Client applies it silently when nothing is pending, else flags 'external' and lets the next save merge.
+
+    3. WORD-LEVEL 3-WAY MERGE. src/server/merge.ts, node-diff3 diff3Merge with excludeFalseConflicts. WORD-level not line-level because the document is pretty-printed HTML where one paragraph is one very long line — git's line diff3 would conflict on two people fixing different typos in the same paragraph. Tokenizer splits on /(\s+)/ and KEEPS whitespace as its own token so joining reproduces exact spacing (a dropped-whitespace tokenizer would have to guess spaces back, and a guessed space in HTML is a changed document). Tags travel as whole tokens so a merge can never land mid-tag. ALL-OR-NOTHING: a partial merge with `<<<<<<<` markers would be handed back to the editor AS CONTENT.
+
+    CONFLICT SEMANTICS: nothing is written, so the file already holds the on-disk version — the 'revert to previous version' requirement needs no rollback step that could itself fail. 409 carries message + hash + the disk html; frontend shows a red 'Conflict — not saved' chip with the reason and a 'Use file' button.
+
+    BASE-VERSION STORE (src/server/history.ts): merging needs the TEXT of the version the editor started from (the O of diff3), which is gone from disk by the time the conflicting save arrives. Content-addressed .history/<hash>.html, KEEP=40 trimmed oldest-first, hex-validated on recall (the hash comes from the request body straight into a path). Unknown base = 409 telling the user to reload.
+
+    Writes are ATOMIC: write to <target>.tmp then rename (atomic within one filesystem), so a GET landing mid-write or a crash sees old or new, never half.
+
+    API: GET /api/doc -> {html,hash}; PUT {html,baseHash} -> 200 {status:'saved'|'merged',hash,html?} | 400 (small-body guard, <20 chars) | 409 {status:'conflict',message,hash,html}.
+
+    Tiptap v3 GOTCHA: setContent(content, options) takes an OPTIONS OBJECT — `{emitUpdate:false}` — not v2's positional boolean. Used with an `applying` ref so a remote apply is never echoed back as a user edit.
+
+    TESTING GOTCHA (cost a live-document corruption): driving the merge through the real API RACES the browser's own autosave and wrote a test string into the user's document. scripts/test-merge.ts now exercises mergeWords/formatDocument DIRECTLY — 6 checks, all pass, no live document involved. Run: node --experimental-strip-types scripts/test-merge.ts.
+  importance: high
+  labels:
+  - T593
+  - tmp
+  - v2
+  - persistence
+  - merge
+  - diff3
+  - vite-plugin
+  last_edited_ms: 1785768141784
 6c22bdb28d5dd166:
   tl_dr: 'CI Frontend red: exit-1 always prints after the LAST header (knip) because check-ts-lints.sh aggregates 8 sub-checks. Never infer the culprit from the error''s position — grep the whole log. knip falsely blamed twice; prettier was the real cause.'
   contents: |-
@@ -537,6 +569,44 @@
   - utf8
   - issue-113
   last_edited_ms: 1784202931997
+8a3615f5171e122c:
+  tl_dr: 'T592 tmp/v2 Word-clone Tiptap editor: Vite 7 + React 19 + TS strict on :5199, Office ribbon (File/Home/Insert/Layout/View), live A4 pagination via tiptap-pagination-plus, PDF export via Paged.js+print, .docx export via the `docx` OOXML writer. Stack facts + gotchas in body.'
+  contents: |-
+    T592 tmp/v2 — clone of Word/Office as a Tiptap editor. Entirely under tmp/ (gitignored, zero repo side effects, no callbacks fire there).
+
+    STACK: Vite 7.3.6 + React 19.2.8 + TS strict (tsc --noEmit clean), port 5199 strictPort, pnpm 11.6.0, node v26 (export PATH=/opt/homebrew/bin:$PATH needed). Tiptap 3.29.2, tiptap-pagination-plus 3.1.0, lucide-react, docx 9.7.1, pagedjs 0.4.3.
+
+    WHY PaginationPlus AND NOT Paged.js FOR THE LIVE EDITOR: Paged.js renders STATIC page boxes and cannot coexist with a live editable document (this is what blew up on tmp/doc). PaginationPlus is a ProseMirror decoration layer, so text stays editable ACROSS page breaks. Official @tiptap-pro/extension-pages is PAID; this is the free OSS equivalent.
+
+    EXPORT (File tab, added later):
+    - PDF (src/export/pdf.ts): Paged.js Previewer renders editor.getHTML() into a HIDDEN throwaway container (#pdf-export-host, fixed at left:-10000px), then window.print() with an injected print stylesheet that hides every other body child. Vector selectable text + real running header/page number. NOT the tmp/doc failure mode: there both libraries fought over the SAME live DOM; here Paged.js gets a read-only throwaway the editor never sees, removed in a finally.
+      * Rejected: plain window.print() (Chromium does NOT implement @page margin boxes = no header/page number), html2canvas+jsPDF (raster, blurry, unselectable).
+      * pagedjs preview(content, stylesheets, renderTo): stylesheets MUST be passed explicitly — falsy runs removeStyles() which STRIPS the host document's own stylesheets. polisher.add takes a URL string OR a {pseudo-url: cssText} map, which is how raw CSS text is fed in.
+      * pagedjs ships NO types; src/types/pagedjs.d.ts declares the Previewer surface.
+      * src/styles/print-doc.css imported ?raw, every rule rooted at .print-doc so the export is self-contained and cannot break when an app wrapper moves.
+    - DOCX (src/export/docx.ts): walks editor.getJSON() (typed ProseMirror model) with the `docx` library = real OOXML. Rejected html-docx-js (Word-flavoured HTML renamed .docx; Pages/Google Docs/LibreOffice choke).
+      * docx API: Packer.toBlob NOT toBuffer (Buffer is Node-only). RegularImageOptions.type is 'jpg'|'png'|'gif'|'bmp' — SVG would need {type:'svg',fallback:...}, so src/export/images.ts rasterises every image to PNG on a canvas (2x supersample, white backfill, crossOrigin='anonymous', failures skipped so one broken figure never fails the export). transformation:{width,height} required. ExternalHyperlink WRAPS runs. Ordered lists must reference a declared numbering definition. Headings come from document STYLES so the file stays editable in Word.
+
+    TIPTAP v3 GOTCHAS:
+    - StarterKit ALREADY bundles Underline, Link, TrailingNode. Importing them separately = duplicate-name throw.
+    - v3 consolidated packages: TableKit (@tiptap/extension-table), TaskList+TaskItem (@tiptap/extension-list), TextStyleKit (@tiptap/extension-text-style — color/fontFamily/fontSize/lineHeight).
+    - StarterKit.configure key renamed history -> undoRedo.
+    - immediatelyRender:true required, else the first paint has no document and pagination measures an empty flow.
+
+    SEED CONTENT: imported ?raw from ../../../doc/content/contents.html (THREE hops from src/editor/). READ-ONLY BY DESIGN. GOTCHA: a wrong ?raw path TYPECHECKS CLEAN — the suffix makes it a Vite virtual module typed by ambient `declare module '*?raw'`, matched on suffix alone, never resolved against the filesystem. Fails only at dev-server resolution.
+
+    pnpm 11 GOTCHA: the `pnpm` key in package.json is IGNORED. Build-script permission moved to pnpm-workspace.yaml `allowBuilds: {esbuild: true}` + `packages: [.]`.
+
+    FILES: src/editor/{extensions,initialContent}.ts, src/export/{pdf,docx,images}.ts, src/types/pagedjs.d.ts, src/ribbon/{controls,Ribbon,FileTab,HomeTab,InsertTab,LayoutTab,ViewTab}.tsx, src/{App,StatusBar,main}.tsx, src/styles/{shell,page,print-doc}.css, public/images/*.svg.
+  importance: medium
+  labels:
+  - T592
+  - tiptap
+  - vite
+  - editor
+  - tmp
+  - pagination
+  last_edited_ms: 1785765698981
 8e07129a2a85fdb2:
   tl_dr: 'DOCUMENTATION STYLE: Keep docs SYNTHETIC. No useless verbosity, no trivial obvious statements. Every word must earn its place. Bad: ''/// Returns the result of the operation''. Good: ''/// Saturating cast — clamps to target range on overflow''.'
   importance: critical
@@ -699,6 +769,34 @@ bc38d2fd0bcf015a:
   - gotcha
   - bridge
   last_edited_ms: 1782121419937
+c5a5c4ef0553bd7b:
+  tl_dr: 'T584 tool-call UI SHIPPED: commit eada5764 on branch t584-tool-call-ui, PR #157 to master. Verb->icon dict + drop tool-name + click-to-fetch adaptive detail bubble, content-addressed toolcall persist. Details in body.'
+  contents: |-
+    T584 three asks all done:
+    1. verb->lucide icon dict + Levenshtein nearest-key fallback (frontend static: lib/support/threadMessages.ts iconForVerb/VerbIcon, ~60 gerunds).
+    2. drop tool-name column (AutoRun grid = icon + intent, clickable rows).
+    3. click -> adaptive ToolCallBubble, fetch-on-click GET /api/agent/{id}/toolcall/{hash}, never prefetched.
+
+    Backend:
+    - cp-mod-threads types.rs: ThreadMessage.tool_ref field + auto_trace(content, tool_ref) signature.
+    - src/app/run/threads/mod.rs: persist_tool_call content-addressed to .context-pilot/toolcalls/<hash>.json (ContentHash::of.to_hex, idempotent, best-effort None on fail).
+    - pipeline.rs: trace emitted AFTER result known, both direct + queue-flushed loops.
+    - orchestrator inspect/panels.rs toolcall(): hex-validated hash (blocks ../ traversal), reads blob. Route in transport/mod.rs. thread_shape.rs reshape_message emits toolRef. openapi paths.rs+schemas.rs (ToolCallDetail, ThreadMsg.toolRef) + regen.
+
+    Frontend:
+    - ToolCallBubble.tsx (desktop + mobile twin): EditDiff/TerminalView/QueryResult/KvResult dispatch on detail.name.
+    - useToolCall hook (live/index.ts, pollMs:0 enabled-gated), qk.toolcall (sync.ts), fetchToolCall + ToolCallDetail (api/index.ts).
+    - LiveQueryResult field is `loading` NOT isLoading.
+
+    Verified: tsc+eslint green, cargo build release green (cp-mod-threads/orchestrator/tui), all callbacks green, endpoint smoke-tested live (valid hash returns blob, ../ = 404). tui reloaded, orchestrator restarted.
+  importance: high
+  labels:
+  - T584
+  - tool-call-ui
+  - shipped
+  - threads
+  - content-addressed
+  last_edited_ms: 0
 c70e24f88c9a3e60:
   tl_dr: 'Mac Mini ''gilbert'' user/password: gilbert/gilbert. Used for sudo and Keychain unlock.'
   importance: high
