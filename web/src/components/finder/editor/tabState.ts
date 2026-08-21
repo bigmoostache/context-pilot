@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { arrayMove } from "@dnd-kit/sortable"
 import type { DragEndEvent } from "@dnd-kit/core"
 import type { FinderNode } from "@/lib/types"
@@ -77,19 +77,62 @@ export interface GroupsState {
   applyDragEnd: (e: DragEndEvent) => void
 }
 
-/** A monotonic group-id source — unique per session, stable across renders.
- *  The counter lives inside the closure (not a module `let`) so incrementing it
- *  is not a top-level-variable assignment from within a function. */
-const nextGroupId = (() => {
-  let seq = 0
-  return () => `g${String((seq += 1))}`
-})()
+/** A unique group id. A random suffix (not a session-monotonic counter) so ids
+ *  restored from localStorage on reload can never collide with ids minted after
+ *  it — a counter resets to zero each page load and would re-mint `g1` on the
+ *  first split, clashing with a restored `g1`. `crypto.randomUUID` is available
+ *  in every target browser and needs no top-level mutable counter. */
+const nextGroupId = () => `g${crypto.randomUUID().slice(0, 8)}`
 
 /** The dnd id for a tab, namespaced by its group so the same file open in two
  *  groups still has two distinct draggable identities. */
 export const tabDragId = (groupId: string, path: string) => `${groupId}::${path}`
 /** The dnd id for a whole group's drop area (a tab released over empty strip). */
 export const groupDropId = (groupId: string) => `group:${groupId}`
+
+// ── persistence ──────────────────────────────────────────────────────
+//
+// The open tabs, splits, and active cursor are a per-agent VIEW preference, not
+// business logic — the class of state App already keeps in localStorage (view +
+// active agent). Persisting it here is what makes the layout survive both a
+// view switch (the Finder unmounts, so its `useState` would otherwise be lost)
+// and a full page reload. Keyed per agent: agent A's open files mean nothing in
+// agent B's realm.
+
+const STORAGE_PREFIX = "cp:finder:groups:"
+
+interface PersistedGroups {
+  readonly groups: readonly EditorGroup[]
+  readonly activeGroupId: string
+}
+
+/** Read a saved layout for `agentId`, or null when absent/unparseable. A stored
+ *  layout with no groups is treated as absent so hydration always yields at
+ *  least one group. */
+function loadGroups(agentId: string): PersistedGroups | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_PREFIX + agentId)
+    if (raw === null) return null
+    const parsed = JSON.parse(raw) as PersistedGroups
+    if (!Array.isArray(parsed.groups) || parsed.groups.length === 0) return null
+    return parsed
+  } catch {
+    // A corrupt or unreadable entry must never break the editor — fall back to
+    // a fresh empty layout.
+    return null
+  }
+}
+
+/** Best-effort write of the current layout for `agentId`. A full or denied
+ *  localStorage is swallowed: persistence is a convenience, not a requirement. */
+function saveGroups(agentId: string, value: PersistedGroups): void {
+  try {
+    localStorage.setItem(STORAGE_PREFIX + agentId, JSON.stringify(value))
+  } catch {
+    // quota exceeded / storage denied — nothing to do, the layout simply
+    // won't survive this session.
+  }
+}
 
 /** Insert a fresh preview tab into a group, replacing its existing preview in
  *  place (so the strip does not reshuffle under the pointer) or appending. */
@@ -147,11 +190,25 @@ function withMovedInto(group: EditorGroup, tab: OpenTab, beforePath: string | nu
   return { ...group, tabs, activePath: tab.path }
 }
 
-export function useEditorGroups(): GroupsState {
-  const [groups, setGroups] = useState<readonly EditorGroup[]>(() => [
-    { id: nextGroupId(), tabs: [], activePath: null },
-  ])
-  const [activeGroupId, setActiveGroupId] = useState<string>(() => groups[0]?.id ?? "g1")
+/**
+ * @param agentId The owning agent — the persistence key. The consumer MUST
+ *   remount this hook when the agent changes (Finder keys its body by
+ *   `agent.id`), so `agentId` is stable for the hook's whole life and the
+ *   saved layout is hydrated once, at mount, from a clean slate.
+ */
+export function useEditorGroups(agentId: string): GroupsState {
+  const [groups, setGroups] = useState<readonly EditorGroup[]>(
+    () => loadGroups(agentId)?.groups ?? [{ id: nextGroupId(), tabs: [], activePath: null }],
+  )
+  const [activeGroupId, setActiveGroupId] = useState<string>(
+    () => loadGroups(agentId)?.activeGroupId ?? groups[0]?.id ?? nextGroupId(),
+  )
+
+  // Write-through persist. `agentId` is stable for the mount (keyed remount), so
+  // it never races a save under the wrong key; listing it keeps deps honest.
+  useEffect(() => {
+    saveGroups(agentId, { groups, activeGroupId })
+  }, [agentId, groups, activeGroupId])
 
   /** Map over one group by id, leaving the rest untouched. */
   const mapGroup = useCallback((id: string, fn: (g: EditorGroup) => EditorGroup) => {
