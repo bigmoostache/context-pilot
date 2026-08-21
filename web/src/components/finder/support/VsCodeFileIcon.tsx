@@ -61,10 +61,19 @@ export function VsCodeFileIcon({
   // for a folder is a cheap no-op we tolerate to keep the hook order stable.
   const style = useMemo(() => {
     const { svg, color } = getThemedIcon(name)
+    // seti-icons emits a NAMESPACE-LESS `<svg viewBox=…>`. That is fine inline
+    // (React/DOM infers the SVG namespace), but a data-URI loaded through
+    // `mask-image` is parsed as a STANDALONE document — without
+    // `xmlns="http://www.w3.org/2000/svg"` the browser does not recognise it as
+    // SVG and the mask renders NOTHING (every file icon shows blank). Inject the
+    // namespace before building the URI.
+    const namespaced = svg.includes("xmlns")
+      ? svg
+      : svg.replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" ')
     // The SVG string as a data-URI mask; `encodeURIComponent` (not base64) keeps
     // it human-diffable and is what the `#` / `<` in the markup require to be
     // URL-safe inside `url("…")`.
-    const uri = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
+    const uri = `url("data:image/svg+xml,${encodeURIComponent(namespaced)}")`
     return {
       width: size,
       height: size,
