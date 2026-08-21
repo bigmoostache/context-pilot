@@ -18,7 +18,7 @@ export function TabHost({ tabs, agentId }: { tabs: TabsState; agentId: string })
   const active = tabs.tabs.find((t) => t.path === tabs.activePath) ?? null
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+    <div className="m-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       {tabs.tabs.length > 0 && <TabStrip tabs={tabs} />}
       {active ? (
         <FinderPreview

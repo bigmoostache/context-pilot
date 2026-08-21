@@ -108,7 +108,7 @@ export function LivePdfPreview({ agentId, node }: { agentId: string; node: Finde
     // had no effect because the scroll parent is a plain block, not a flex
     // column, so the object collapsed to its min-height.
     <div className="flex h-full min-h-0 flex-col gap-2">
-      <object data={src} type="application/pdf" className="min-h-0 w-full flex-1 bg-card">
+      <object data={src} type="application/pdf" className="min-h-0 w-full flex-1">
         <div className="flex flex-col items-center gap-3 py-10 text-center">
           <FileIcon kind="pdf" size={64} />
           <span className="text-[12.5px] text-muted-foreground">
@@ -183,7 +183,7 @@ function HighlightedCode({
   const { html } = useMemo(() => highlightCode(code, name), [code, name])
   const lines = useMemo(() => html.split("\n"), [html])
   return (
-    <div className="bg-card">
+    <div>
       <pre className="hljs overflow-x-auto bg-transparent px-3 py-2.5 font-mono text-[11px] leading-relaxed">
         {lines.map((line, i) => (
           <div key={i} className="flex gap-3 rounded-sm hover:bg-(--signal)/6">

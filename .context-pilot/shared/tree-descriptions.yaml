@@ -734,6 +734,10 @@
   path: crates/cp-mod-tree/src/render.rs
   description: Read-only tree-string rendering (directory walk), split from tools.rs for line budget. generate_tree_string + normalize_path. TreeContext/TreeNode/Row structs. build_tree_new via render_dir/render_file.
   last_edited_ms: 1784487040669
+07b3bfc5fa1eefcf:
+  path: web/src/components/finder/editor/TabHost.tsx
+  description: 'Tab strip + body (T624 content half). Body IS FinderPreview variant=full KEYED BY PATH so switching tabs remounts. TabStrip overflow-x scroll never wrap. Tab is a <div> (contains close button), middle-click closes via onAuxClick, italic while preview, X always-visible on active. T629: tab icon = VsCodeFileIcon (Seti bank). EmptyEditor hint when nothing open.'
+  last_edited_ms: 0
 07c144ddda3ec013:
   path: src/app/run/threads/archived.rs
   description: 'Live thread-archived emission chokepoint: diffs each thread''s archived flag vs memo, emits durable ThreadArchived/ThreadRestored deltas. Seeds from oplog roster on first pass.'
@@ -1890,6 +1894,10 @@
   path: crates/cp-mod-entities/Cargo.toml
   description: 'Entities module deps: cp-base, cp-render, cp-mod-utilities, cp-mod-search, rusqlite (bundled), crossterm, serde_json, log.'
   last_edited_ms: 1780592402505
+14e12e956d2e017a:
+  path: web/src/mobile-components/finder/preview/FinderPreview.tsx
+  description: Mobile Quick Look preview shell twin. Taller h-11 touch header, 40px IconBtn download/close. Kind routing (inlinePreview/livePreview/Body) byte-identical to desktop. "pane" variant hosted in mobile QuickLookSheet bottom sheet.
+  last_edited_ms: 0
 14e3cfc073c65d51:
   path: web/src/mobile-components/conversation/Message.tsx
   description: Mobile message renderer twin. Wider bubbles (user 85%, assistant/tool 92%) for phone width, always-readable copy/delete (opacity-70 + active-press, no hover). Assistant author header removed (T611) — no orange dot/'Context Pilot' label; timestamp sits in the action row beneath the body. Body + tool card indent pl-1. Same 3 renderers + inline file-upload chip splicing; MessageFileChip + splitMessageSegments from @/mobile-components/threads/fileUpload (leak guard).
@@ -16930,6 +16938,10 @@ c0b9f0743fbca9be:
   path: .github/checks/lint-config.chain
   description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
   last_edited_ms: 0
+c0c01a8b39b0211d:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 c0eb09ba38b75b19:
   path: crates/cp-base/src/state/flags.rs
   description: 'StreamPhase state machine enum #[expect(exhaustive_enums)] A4 (Idle/Receiving/ExecutingTools). StatusBools composite flags.'
@@ -17817,6 +17829,10 @@ caf2ca4d3f48b4d6:
 caf4747c6ce281f9:
   path: crates/cp-oplog/src/replay.rs
   description: 'Oplog replay. Recovered struct #[non_exhaustive] A5. fold_entry via ref_match!. A11 shadow clean.'
+  last_edited_ms: 0
+cb1e751e1e17cdd0:
+  path: web/src/components/finder/preview/FinderPreview.tsx
+  description: 'Quick Look preview shell + kind router. P8 refactor: the Body kind-router (cx22) split into inlinePreview (node.* inlined maquette payloads → mockPreviews/shared parts) + livePreview (agentId-gated live fetchers, early-returns null without agentId) — Body = inlinePreview(node) ?? livePreview(node,agentId) ?? <Generic>, each helper under cx15. Header slimmed h-8, edge-to-edge body. Download wired to downloadFile(agentId, node.path).'
   last_edited_ms: 0
 cb25f09fa3660254:
   path: crates/cp-mod-files/src/tools/write.rs
@@ -21150,6 +21166,10 @@ f48f18e6e4e75e59:
   path: web/src/components/shell/costs/CostsView.tsx
   description: Cost Analysis dashboard page. Summary cards, culprit donut, cost timeline, cost/tool bars, two token distribution bars (panel-estimated before/culprit/after + API-reported hit/miss/output for comparison), Tool×Culprit cross-tab with heat-map. Both token bars filter on !noPanelBroken. Tempo/queue/no-break AND-filters. TanStack useQuery + fetchFsPreview 15s refetch.
   last_edited_ms: 1782923607904
+f49440902499608c:
+  path: web/src/components/finder/preview/previewParts.tsx
+  description: 'Shared Finder preview leaf renderers: IconBtn, PreviewStatus, TruncatedNote, MarkdownPreview, TextPreview, FolderPreview, Generic, Meta/Row, Empty. T329: card chrome (rounded-lg/border/card-shadow) stripped from TextPreview and MarkdownPreview. 173 lines.'
+  last_edited_ms: 0
 f4a76a9f2347f00e:
   path: src/app/actions/mod.rs
   description: Central action dispatch (Elm/Redux). apply_action split handle_input_char/handle_stop_streaming/handle_copy_index_overlay/handle_input_submit_action (A2). CycleViewMode resets scroll. Thread actions in threads.rs.
@@ -21769,6 +21789,10 @@ fab9d9351e516ffc:
 facee2199f39362a:
   path: Cargo.toml
   description: Workspace root. 22 crate members. Binary 'tui'. Edition 2024. Strict lint config (hundreds of forbid-level clippy/rust lints). openssl vendored for cross-compilation.
+  last_edited_ms: 0
+fad2093acea8da67:
+  path: web/src/components/finder/preview/livePreviews.tsx
+  description: 'Live-data Finder previews: LivePreview/LiveImagePreview/LivePdfPreview/LiveSheetPreview/HighlightedCode/EditableMarkdown + TEXT_KINDS. Fetch via useFsPreview/useFsSheet/useWriteFile + rawUrl + highlightCode. T329: all card chrome (rounded-lg/border/card-shadow) stripped from every preview type for true full-bleed. 398 lines.'
   last_edited_ms: 0
 fad776c4dfccb118:
   path: docs/design-entities.md

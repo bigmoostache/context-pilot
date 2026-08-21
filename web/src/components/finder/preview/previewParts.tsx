@@ -47,7 +47,7 @@ export function TruncatedNote() {
 // ── markdown (rendered) ───────────────────────────────────────────
 export function MarkdownPreview({ text, truncated }: { text: string; truncated?: boolean }) {
   return (
-    <div className="bg-card p-4">
+    <div className="p-4">
       <Markdown text={text} className="text-[12.5px] text-foreground/85" />
       {truncated && <TruncatedNote />}
     </div>
@@ -66,7 +66,7 @@ export function TextPreview({
 }) {
   const mono = kind === "json" || kind === "code"
   return (
-    <div className="bg-card p-3.5">
+    <div className="p-3.5">
       <pre
         className={cn(
           "text-[11.5px] leading-relaxed wrap-break-word whitespace-pre-wrap text-foreground/85",
