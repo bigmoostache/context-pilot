@@ -194,6 +194,10 @@
   path: crates/cp-base/src/state/runtime.rs
   description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
   last_edited_ms: 0
+0226d1718e3d33e4:
+  path: web/src/components/finder/explorer/ExplorerTree.tsx
+  description: 'The VS Code explorer tree (T624). Lazily-fetched: ExplorerChildren MOUNTED only while its folder expanded, so useFs fires on open and tears down on close (10k-file realm costs only opened folders; collapsed folder can''t be stale; reopen re-reads). Rail is a deliberate twin of the thread list (card-shadow my-2 w-(--sidebar-w) bg-surface-2). Recursion lives in ExplorerChildren, keeping ExplorerRow a leaf.'
+  last_edited_ms: 0
 0227420ccb59bbec:
   path: ui/src/components/finder/Finder.tsx
   description: Top-level Finder orchestrator. buildRealm(agent) memo, heterogeneous tabs (folder tabs w/ per-tab back/fwd history + file tabs via FinderPreview variant='full'); dbl-click file→openInNewTab (reuses tab), dbl-click folder→navigate. File-tab hides explorer sidebar. Keyboard nav (arrows/Enter/Backspace/Space/⌘A/⌘I/type-ahead), additive+range select, ContextMenu, GetInfo, 4 view modes, icon-size slider, path bar, drag-drop overlay, status bar, toast.
@@ -1850,6 +1854,10 @@
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadsState + FocusState with TypeMap accessors.'
   last_edited_ms: 0
+146b811f75ae1e83:
+  path: web/src/components/agents/AgentModal/settingsView.tsx
+  description: Agent config as a VIEW — third header-rail surface beside Threads/Finder (T617). Replaces the manage DIALOG (AgentModal still used by FleetDashboard for CREATE + fleet-card gear). Deliberate copy of ThreadsView shape (rail geometry/collapse/disconnect overlay repeated, not abstracted). CategoryRail (Identity/Model/Vitals) + SettingsPane; SaveBar/LifecycleBar replace the old dialog footer.
+  last_edited_ms: 0
 146d0e11427c5454:
   path: web/src/lib/support/finderFs.ts
   description: 'Finder mock filesystem — one rich realm re-rooted per agent. buildRealm(folder,name) grafts a detailed sample tree (code/pdf/image/slides/sheet/media nodes w/ preview payloads). Helpers: findNode, pathChain, collectStarred, fmtBytes, nodeSize, childCounts, sortNodes (folders-first + key sort).'
@@ -2401,6 +2409,10 @@
 1b119b965e3333f4:
   path: crates/cp-orchestrator/src/services/releases/updater/scheduler.rs
   description: 'Updater scheduler tick logic (pure). run_tick: every mode checks, only auto+in-window+verified applies. TickOutcome enum. current_version, local_now_minutes. Off-task for T581.'
+  last_edited_ms: 0
+1b1efc69ad420a98:
+  path: web/src/components/threads/ThreadsView.tsx
+  description: 'Desktop ThreadsView — master-detail (list rail + conversation). railOpen collapse (T669) animates (T670): rail stays mounted, slides via transitioned negative left-margin; slide wrapper is flex (T670 fix 7117931e — a plain block wrapper broke the aside''s flex-stretch, collapsing it to content height); root overflow-hidden clips the off-screen rail; floating PanelLeft reopen button fades+nudges in when collapsed; motion-reduce snaps. Shared useThreadSelection+useThreadActions from lib/live/threadView. Mobile twin = stack nav.'
   last_edited_ms: 0
 1b221bb79e508a45:
   path: web/src/mobile-components/finder/views/ColumnsView.tsx
@@ -3922,6 +3934,10 @@
   path: web/src/switch/useIsMobile.ts
   description: Device-switch hook — matchMedia '(max-width:768px),(pointer:coarse)', switch-once at first paint (frozen, no live-resize remount), SSR-safe. Drives the one App.tsx tree chooser.
   last_edited_ms: 1784666644510
+2c3482b126212797:
+  path: web/src/lib/live/threadView.ts
+  description: 'Shared thread view orchestration (non-forked) — useThreadSelection (selection+localStorage+auto-select) + useThreadActions (archive/pause/delete/create/send/attach + notice). Zero component imports; both desktop+mobile ThreadsView consume. T636 part 2: Notice = {message,undo?,tone} — archive/pause push Gmail undo (offerUndo re-issues inverse command, backend source of truth M141, 7s). T636 finer-nav: useThreadSelection takes optional 4th arg controlledSelection {selectedId,setSelectedId}; when present it defers selection value + persistence to the owner (desktop AppShell, so Back/Next can carry the thread), when absent keeps its own localStorage-backed state (mobile). Persist effect gated on !controlled.'
+  last_edited_ms: 1787504258894
 2c3938985a889203:
   path: web/src/lib/types.ts
   description: Maquette domain types. FinderNode gained count?:number (backend folder child count). ThreadDetail.lastActivityMs now optional (mock fallback lacks it; sort tolerates undefined via ?? 0). User/Agent/Finder/Thread/Library/Usage/cockpit types.
@@ -7190,6 +7206,10 @@
   path: crates/cp-vault/src/lib.rs
   description: 'Crate root. LazyLock global vault instance, vault() accessor. pub modules: local, oauth, registry, types. bridge module behind cfg(feature=bridge). Backend selection: CP_BRIDGE → BridgeVault, else LocalVault.'
   last_edited_ms: 1783255845992
+510b56aa33d58a6c:
+  path: web/src/components/shell/chrome/HintBadge.tsx
+  description: 'Shortcut-letter badge at a control''s bottom-right while ⌘/Ctrl held (T619). Own module (not TopBar) to avoid TopBar↔ThemeToggle import cycle. Three traps: firstRef paints-not-animates on mount (else springs on every rail re-render); animation owns opacity+transform so no Tailwind transition-* may touch them; pointer-events-none or it swallows the click it advertises. anime.js outQuad 150/110ms, no spring (overshoot reads as boing).'
+  last_edited_ms: 0
 512805df7bc218df:
   path: src/modules/conversation/mod.rs
   description: 'Conversation display module. Core/global. Context types: ''conversation'' + ''system''. No tools — purely display/rendering. Sub-modules: list, markdown_ir, panel, refresh, render_blocks, render_input_blocks, render_json.'
@@ -8790,6 +8810,10 @@
   path: src/modules/overview/tools/preflight.rs
   description: Core module pre_flight validation. Dispatches preflight_close_panel/check_tree_description_gate/preflight_tool_manage/preflight_panel_goto_page (A2). Warns on missing/stale tree descriptions, unknown tools, out-of-range pages.
   last_edited_ms: 0
+64fff6c8c615b837:
+  path: web/src/components/agents/AgentModal/settingsView.tsx
+  description: Agent config as a VIEW — third header-rail surface beside Threads/Finder (T617). Replaces the manage DIALOG (AgentModal still used by FleetDashboard for CREATE + fleet-card gear). Deliberate copy of ThreadsView shape (rail geometry/collapse/disconnect overlay repeated, not abstracted). CategoryRail (Identity/Model/Vitals) + SettingsPane; SaveBar/LifecycleBar replace the old dialog footer.
+  last_edited_ms: 0
 650a0ba5c8a439e2:
   path: ui/src/components/threads/ThreadDetailRail.tsx
   description: 'Right rail: thread metadata (status badge, agent, message count, created, last activity, id) + ''Open agent cockpit'' bridge to the panel-centered view.'
@@ -9038,6 +9062,10 @@
   path: crates/cp-orchestrator/src/transport/rest/claude_oauth/accounts.rs
   description: 'Multi-account Claude OAuth token vault. 4 endpoints: list/store/switch/delete. Storage ~/.context-pilot/claude-accounts.json (BTreeMap by email). REFRESH_THRESHOLD_MS=1h. Shared refresh POST extracted to try_refresh (de-dupes 3 call sites); is_stale(threshold), refresh_stored_accounts(threshold) for the sweep; maybe_refresh(threshold) refreshes on switch.'
   last_edited_ms: 1785266142510
+67d54bc4fb5ec24b:
+  path: web/src/components/finder/explorer/ExplorerRow.tsx
+  description: 'One explorer tree line (T624). Purely presentational — handed depth+flags, no recursion (ExplorerTree recurses). INDENT GUIDES = per-ancestor left-border spacers in the flex row. Chevron column present on files too (empty spacer) so icons align. T629: file icon = VsCodeFileIcon (Seti bank); folders render NO icon (chevron suffices). Single click onActivate, double click onPin (files), onContextMenu. native title, not Tip.'
+  last_edited_ms: 0
 67f09cfa05b1c9f8:
   path: web/src/components/shell/widgets/UsageButton.tsx
   description: 'Claude Code OAuth usage limits button. Anthropic "A" logomark trigger opens popover with token status (valid/expired + expiry), session/weekly usage bars (color-coded by severity), and LoginFlow (PKCE: open browser → auto-detect via polling → fallback manual code paste). Lazy-fetches on open, 30s auto-refresh.'
@@ -11494,6 +11522,10 @@
   path: yamls/tools/threads.yaml
   description: 'Threads tools YAML. 2 tools: Send (thread_id, markdown, file_path, questions), Read (thread_id, count).'
   last_edited_ms: 0
+82db14460760f9d9:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 82de98b3eca92b91:
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders. A6: hit/miss percent + total_cost sum3 routed via float_math. Canonical context_usage+context_hit_miss source (T297).'
@@ -11878,6 +11910,10 @@
   path: crates/cp-wire/src/types/oplog.rs
   description: 'OpEntry + OpEntryKind internally-tagged enum: CommandEffect, SeenMark, PhaseTransition, MessageCreated{...,inline_body}, ThreadCreated/Archived/Restored/Paused/Resumed/StatusChanged, ThreadFocusChanged, Lifecycle, CostAggregate, ContextUsage{used,threshold,budget,hit_tokens,miss_tokens (T297 cache split, #[serde(default)] N-1)}, Checkpoint, Unknown. Framed (len+CRC). round-trip + tolerant-decode + roster + stable-tag tests.'
   last_edited_ms: 1782311326774
+873393a379a38b0a:
+  path: web/package.json
+  description: 'Frontend deps. scripts: dev/build(tsc -b && vite build)/lint/preview + P2 format/format:check (prettier). engines.node ''^22.16.0 || >=24.0.0'' (P7 n/no-unsupported-features: exact code-driven floor for import.meta.dirname — n credits the ^22.16 backport + >=24, the 23.x gap is dead). @tanstack/react-query, react 19.2, tailwindcss 4.3, shadcn, vite 8, playwright, full eslint ratchet plugin roster + prettier + web-vitals.'
+  last_edited_ms: 0
 87496429f6346a6f:
   path: crates/cp-wire/src/types/stream.rs
   description: Frame (agent/worker/thread/message_id, seq) + Kind (MessageStartHint, Token, ToolArgs, PhaseHint, Unknown).
@@ -12154,6 +12190,10 @@
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. route_rest dispatches all /api routes incl auth/ACL/env-keys/providers/releases/claude-usage+login(T451). handle() has centralized Bearer gate + per-agent ACL check. handle_stream = SSE with ticket-based ACL.
   last_edited_ms: 1782845619743
+899b936b582d60cf:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 899bd5744c7df36e:
   path: web/src/components/agents/AgentModal/parts.tsx
   description: 'AgentModal render subcomponents (P8 split): AgentModalHeader (avatar file-picker label in manage mode, gradient hero), AgentModalBody (name+realm+ModelPicker form, manage adds SessionVitals+AgentAclSection), AgentModalFooter (Retire/Restart with ''Restarting…'' text while busy/submit). Controller interface bundles all props; submitLabel covers create/manage×idle/pending.'
@@ -13950,6 +13990,10 @@
   path: CHANGELOG.md
   description: Release changelog
   last_edited_ms: 0
+9efe1ddd34fb3d83:
+  path: README.md
+  description: 'Project README — global ARCHITECTURE overview (rewritten from the old philosophy/marketing copy, T278). 10 sections + ASCII topology diagram: system overview (5 surfaces), the agent TUI (main loop/modules/panels/LLM providers/tier-② persistence), three-tier durability + push-vs-inspection planes, the orchestrator (registry/services/supervisor/transport routes), the bridge (CP_BRIDGE=1 boot sequence), the web frontend (TanStack Query + SSE push), sidecars (console server, Meilisearch, SQLite entities), the cp-wire protocol types, repo layout, engineering constraints (500-line/8-entry caps, lints, hash chain) + flame telemetry.'
+  last_edited_ms: 0
 9effa4a6bcaa21d6:
   path: crates/cp-wire/src/heartbeat.rs
   description: '60-byte liveness record. Heartbeat struct #[non_exhaustive] A5 + Heartbeat::new ctor. Error enum #[expect(exhaustive_enums)] A4. u32/u64_to_le #[expect(as_conversions)].'
@@ -14658,6 +14702,10 @@ a66242c6ce40c936:
   path: web/src/components/finder/editor/tabState.ts
   description: 'VS Code editor model with SPLIT VIEW + PERSISTENCE (T630). useEditorGroups(agentId): flat horizontal EditorGroup[] (id/tabs/activePath) + activeGroupId cursor. Layout {groups,activeGroupId} persisted to localStorage per agent (cp:finder:groups:<id>), lazy-hydrated at mount, write-through effect — survives reload + view switch. Group ids = crypto.randomUUID (collision-proof vs restored ids). Preview-tab invariant PER GROUP. Explorer facade: openPreview/openPinned/activePath target active group. splitActive clones active tab into new group right; moveTab cross-group; applyDragEnd central dnd dispatch. Pure helpers withPreview/withPinned/withoutTab/reorderTabs/withMovedInto. dnd ids: tab=${groupId}::${path}, group drop=group:${groupId}.'
   last_edited_ms: 1787327394996
+a68721caed44862b:
+  path: web/src/lib/support/a11y.ts
+  description: 'Accessibility helper: clickable(onActivate) returns {role:''button'',tabIndex:0,onClick,onKeyDown} so a non-<button> element (rows that already contain nested buttons — Finder tabs, thread rows — where a real <button> would nest buttons illegally) is keyboard-activatable on Enter/Space. web-lint P6: exists so jsx-a11y interaction rules stay at error with zero suppressions.'
+  last_edited_ms: 0
 a6872fbd5f53c6e7:
   path: .context-pilot/commands/boss-hunt.md
   description: '/boss-hunt command: slow, methodical #[expect] elimination one boss at a time. Body is the prompt seeded into the composer when the suggestion bubble is clicked (T350).'
@@ -15713,6 +15761,10 @@ b2783b3948678143:
 b2877c9874665600:
   path: crates/cp-mod-firecrawl/src/panel.rs
   description: 'Firecrawl result panel. Same pattern as brave: static content in metadata, cache restore, pagination. update_if_changed via let _changed (T586).'
+  last_edited_ms: 0
+b28b172d606b4767:
+  path: web/src/components/shell/TopBar.tsx
+  description: Slim macOS-style title bar. app mark→fleet, agent switcher, per-agent view tabs (Threads/Finder/Costs), config gear, UsageButton, UserMenu. Costs tab dev-mode only. ViewTabs subcomponent holds the view tabs; useViewShortcuts hook binds ⌘/Ctrl view-switch shortcuts (C=Threads off-Threads / K=Finder off-Finder / S=Settings always) + drives per-tab HintBadge while modifier held. C gated on !onThreads so it never collides with ThreadActions' new-thread C.
   last_edited_ms: 0
 b28cfc4e27bddb0b:
   path: crates/cp-mod-files/src/panel.rs
@@ -16906,6 +16958,10 @@ c01db1aba3fa9632:
   path: crates/cp-mod-search/src/meili/tasks.rs
   description: 'Meilisearch task polling (wait_for_task) + paged document fetch: fetch_projection (fields-only, for reconcile) and fetch_all_with_vectors (retrieveVectors, for embedding backup export). extract_task_uid helper.'
   last_edited_ms: 1784476428385
+c022841c3257862d:
+  path: web/src/components/finder/support/InfoBadge.tsx
+  description: 'Finder per-node info badge — hover-only ⓘ affordance shown when a file/folder has a tree description (T289). Base UI Tooltip (not Popover: never opens on click, no help cursor). Renders as <span> so it nests inside a row <button> legally; all pointer events stopped so brushing it never selects/opens/drags the node.'
+  last_edited_ms: 0
 c0339995be42c2ed:
   path: crates/cp-mod-bridge/src/boot/mod.rs
   description: 'Boot sequence: folder-lock→oplog→socket→identity→registry, retry-on-contention flock, Lifecycle Running/Stopping deltas. Split from boot.rs (X951).'
@@ -17221,6 +17277,10 @@ c39dbf4edd54c1cb:
 c39fb465b5443a3f:
   path: crates/cp-oplog/tests/crash_replay.rs
   description: 'Phase 9 (X776) MILESTONE M0 crash-replay harness. Unix-only (#![cfg(unix)]). Self-re-exec pattern: env-gated #[test] crash_child_entrypoint re-runs the test binary as a child via current_exe(); parent/child handshake through a fdatasync''d marker file (libtest stdout is noisy). V1 v1_real_sigkill_leaves_a_clean_replayable_oplog: child spams durable MessageCreated appends, parent kill()s (real SIGKILL), fresh process replay() never errors + every announced-durable rev survives + torn tail truncated (announce-after-durable K9 across real crash). V2 v2_journalled_command_is_exactly_once_after_deadman_reexec: child journals CommandEffect then dies, fresh process recovers seen-set token, duplicate SeenMark delivery folds to no-op (exactly-once across process boundary). V12 v12_barrier_is_pending_the_body_store: asserts body_gc_eligible rule, explicit placeholder until body store lands Phase 14. 4 tests green.'
+  last_edited_ms: 0
+c3a0bd73627af451:
+  path: web/src/mobile-components/threads/ThreadsView.tsx
+  description: Mobile ThreadsView twin — conversation-primary + left drawer (T609). Drawer toggled by fixed top-left CornerButton, anime.js spring settle. onNewThread creates directly + closes drawer (T633, NewThreadDialog removed). onGoToAgents passed to ThreadList. Logic from shared @/lib/live/threadView.
   last_edited_ms: 0
 c3cec48a83f06e1c:
   path: ui/src/index.css
@@ -18130,6 +18190,10 @@ ce9ea2332a8e0cdf:
   path: yamls/tools/spine.yaml
   description: 'Spine tool YAML. 3 tools: notification_mark_processed, spine_configure (guard rails: max_output_tokens, max_duration_secs, max_messages, max_auto_retries), coucou (timer/datetime scheduling). max_cost removed.'
   last_edited_ms: 1784196908643
+ce9f47bcb51f406c:
+  path: web/src/components/Root.tsx
+  description: 'Desktop tree root — Provider-contract boundary + AppShell (view-router fleet/threads/finder/settings/costs, TopBar+StatusBar, live vitals/SSE, disconnect overlay). Mirror twin of mobile Root. T636 nav-history: useNavHistory wires browser Back/Next via History API (no router). ONE DEGREE FINER (T636 follow-up): NavState now {view,agentId,threadId?,settingsTab?}; AppShell OWNS selectedThreadId (single writer of cp-thread-<id> localStorage, sync-read seed in openAgent/applyNav — no seed effect, avoids racing a nav restore) + settingsTab, feeds both to ThreadsView/SettingsView controlled. useNavHistory(view,agentId,threadId,settingsTab,apply) builds nav INSIDE the push effect (no eslint-disable), records threadId only in threads view + settingsTab only in settings view. readNav/sameNav cover all four. applyingRef swallows popstate echo.'
+  last_edited_ms: 1787504258739
 cea7e9a051c40b61:
   path: tmp/v2/src/App.tsx
   description: 'App shell: title bar + Ribbon + zoomable canvas + StatusBar. useEditor with immediatelyRender:true so pagination never measures an empty flow.'
@@ -18337,6 +18401,10 @@ d0efc39407dca0c9:
 d0f1b0749754b98e:
   path: web/src/index.css
   description: Tailwind v4 + tw-animate. Two palettes (:root Cream light / .dark Dungeon Forge) as CSS token blocks; semantic tokens (signal/ok/warn/danger/surface). Finder micro-motion keyframes (finder-pop/ql-pop/menu-pop/ants/checker), modal-pop, highlight.js .hljs-* theme mapped to tokens (T280).
+  last_edited_ms: 0
+d0fd263e4aa19827:
+  path: web/src/components/threads/ThreadsView.tsx
+  description: 'Desktop ThreadsView — master-detail (list rail + conversation). railOpen collapse (T669) animates (T670): rail stays mounted, slides via transitioned negative left-margin; slide wrapper is flex (T670 fix 7117931e — a plain block wrapper broke the aside''s flex-stretch, collapsing it to content height); root overflow-hidden clips the off-screen rail; floating PanelLeft reopen button fades+nudges in when collapsed; motion-reduce snaps. Shared useThreadSelection+useThreadActions from lib/live/threadView. Mobile twin = stack nav.'
   last_edited_ms: 0
 d1002291148c8efd:
   path: crates/cp-orchestrator/src/registry/channel.rs
@@ -20274,6 +20342,10 @@ e9d63dbe04b4ddb4:
   path: src/modules/conversation_history/recompute_toggled_tree_folders.rs
   description: 'Rebuilds tree open_folders after Close_conversation_history: ancestor folders of open file panels + explicitly-opened folders (collect_from_tool_use helper) from current + remaining history convos + root. 5 unit tests.'
   last_edited_ms: 0
+e9d82be3cf880b6b:
+  path: web/src/components/threads/ThreadList.tsx
+  description: Thread sidebar list. Grouped by turn-status (Agent's turn / User turn) + Archived view. Search now lives in ThreadSearchPalette (T669) opened from ListHeader's Search button; ListHeader also has a PanelLeftClose sidebar-collapse button. Row-hover title marquee via useTitleMarquee (WAA). Subcomponents RowActions/RowMeta/ListHeader/EmptyState keep budgets. Exactly 500 lines (cap).
+  last_edited_ms: 0
 e9f079d0175d2f98:
   path: crates/cp-orchestrator/tests/transport_http.rs
   description: 'Phase 30 (X797) transport surface over a real tiny_http server on an ephemeral port (4 tests, green ~2s). Harness(agent_id,n_msgs) seeds OplogWriter + Entry json + Backend.apply_batch, spawns serve_bound on 127.0.0.1:0. (1) REST /fleet+/agent/{id} carry rev envelope, unknown agent 404; (2) POST /ticket mints, /command malformed=400 + tripped-breaker fail-closed 503; (3) SSE ticket gate: no/bogus ticket=401, valid=200+delta, redeemed ticket single-use 401; (4) Last-Event-ID resume: only deltas rev>2 delivered, each delta.data carries serialized OpEntry. Top `use cp_mod_bridge/nix/serde as _;`.'
@@ -22061,6 +22133,10 @@ fcc26df09619a38a:
 fccf2ba3f0f1d8ae:
   path: crates/cp-mod-bridge/tests/tee_intake_body.rs
   description: 'Phase 26 (X793): cp-mod-bridge tee+intake+body integration suite (4 tests, second tests/ target). Cross-component properties the inline tests can''t show: (1) a_command_round_trips...across_reexec — framed command over UnixStream::pair → Intake::handle_connection journals via live OplogService, acked; tear down + respawn + redeliver SAME dedup → applied.is_empty (exactly-once across deadman re-exec), replay seen.len==1. (2) one_connection_applies_distinct_and_dedups — 3 frames (dt-a,dt-b,dt-a) one connection → applied.len==2, 3 Accepted acks, seen.len==2. (3) the_i13_barrier_and_orphan_gc_hold_across_a_real_journal — Store::open_with_threshold(4): orphan body spills durably + integrity-checked but never journalled (crash-in-gap), replay heads empty; referenced body journalled via OplogService.append_durable(MessageCreated{head}), replay heads→live HashSet<ContentHash>, store.gc(&live,Duration::ZERO) reclaims the 1 orphan keeps referenced (replay-heads-driven GC = how agent reclaims). (4) the_tee_streams_an_ordered_multi_frame_burst — Tee over real UnixListener, observer reads 16 frames back via framing::decode_raw in seq order. HANG FIX: handle_connection blocks on read-until-EOF; shutdown(Shutdown::Write) on a socketpair end did NOT reliably propagate EOF to the peer → tests #1/#2 hung >60s. Fix: read_acks(stream,expected:usize) reads exactly N acks then drop(client) → EOF → server returns (mirrors the proven inline handle_connection pattern; NEVER rely on shutdown(Write)→peer-EOF for UnixStream::pair). NAMES cp_mod_bridge+cp_wire+cp_oplog+serde_json+tempfile; `use cp_base/cp_render/nix as _;` (Stored import dropped — only methods used). 48 cp-mod-bridge green (40 inline+4 boot_heartbeat+4 tee_intake_body).'
+  last_edited_ms: 0
+fccff9d9eb05a86f:
+  path: web/src/components/finder/support/VsCodeFileIcon.tsx
+  description: VS Code default file-icon bank (Seti theme) via seti-icons pkg (T629). Renders the icon SVG string as a CSS mask tinted with VS Code's own Seti palette hex — no dangerouslySetInnerHTML, no eslint scope-off (Seti icons are single-colour so mask+color is lossless). themeIcons resolver built once at module load. Folders render an empty same-size spacer (chevron states open/closed, folder glyph dropped). Used by ExplorerRow + TabHost; mobile twin re-exports.
   last_edited_ms: 0
 fcd6176f68a07169:
   path: src/modules/overview/mod.rs

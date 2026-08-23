@@ -37,6 +37,8 @@ import { HintBadge } from "@/components/shell/chrome/HintBadge"
 export function SettingsView({
   agent,
   railOpen,
+  tab,
+  onTab,
   disconnected,
   onReconnect,
 }: {
@@ -45,10 +47,13 @@ export function SettingsView({
    *  here: the only control that toggles it is the header rail's Settings tab,
    *  which is a SIBLING of this view rather than a descendant. */
   railOpen: boolean
+  /** Selected category — CONTROLLED by the shell (Root.tsx) so browser Back/Next
+   *  can step through the settings pages visited (T636). */
+  tab: TabId
+  onTab: (t: TabId) => void
   disconnected?: boolean
   onReconnect?: () => void
 }) {
-  const [tab, setTab] = useState<TabId>("llm")
   const c = useAgentController(agent)
 
   return (
@@ -77,7 +82,7 @@ export function SettingsView({
         className="flex shrink-0 transition-[margin-left] duration-300 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none"
         style={{ marginLeft: railOpen ? 0 : "calc(-1 * var(--sidebar-w))" }}
       >
-        <CategoryRail tab={tab} onSelect={setTab} />
+        <CategoryRail tab={tab} onSelect={onTab} />
       </div>
 
       <SettingsPane c={c} tab={tab} agentId={agent.id} />

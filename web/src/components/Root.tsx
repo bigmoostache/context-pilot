@@ -5,6 +5,7 @@ import { StatusBar } from "@/components/shell/StatusBar"
 import { ThreadsView } from "@/components/threads/ThreadsView"
 import { FleetDashboard } from "@/components/agents/FleetDashboard"
 import { SettingsView } from "@/components/agents/AgentModal/settingsView"
+import type { TabId } from "@/components/agents/AgentModal/tabs"
 import { Finder } from "@/components/finder/Finder"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { AuthGuard } from "@/components/auth/AuthGuard"
@@ -56,36 +57,56 @@ function Root() {
   )
 }
 
-/** The coarse navigation atoms browser Back / Next restore (T636). View +
- *  agent only, deliberately: the finer state each surface carries (which thread
- *  is selected, the finder tab/split layout) is already remembered per agent in
- *  localStorage, so restoring the agent naturally brings its thread + layout
- *  back on the keyed remount. Pushing every rail toggle or thread click as its
- *  own entry would make Back take a dozen presses to leave a view. */
+/** The navigation atoms browser Back / Next restore (T636). One degree finer
+ *  than the original view+agent: the accessed THREAD (in the threads view) and
+ *  the accessed settings CATEGORY (in the settings view) ride along too, so Back
+ *  steps through the threads and settings pages you actually visited — not just
+ *  the top-level surface. Still coarse below that: the finder tab/split layout
+ *  stays remembered per agent in localStorage (restored on the keyed remount),
+ *  and rail toggles are never their own entry. `threadId`/`settingsTab` are
+ *  optional — only the field relevant to `view` is recorded, and a foreign or
+ *  older history entry lacking them decodes fine. */
 interface NavState {
   view: ViewMode
   agentId: string
+  threadId?: string | undefined
+  settingsTab?: TabId | undefined
 }
 
 /** Narrow the `any`-typed `history.state` / `PopStateEvent.state` down to a
  *  {@link NavState}, containing the `any` at this one boundary so no unsafe
  *  access leaks into the hook. A shape that isn't ours (a foreign history entry,
- *  or none) yields undefined. `view` is asserted to {@link ViewMode} after the
- *  string check — an unknown value would just fall through the view router's
- *  fleet fallback, so it needs no exhaustive membership test. */
+ *  or none) yields undefined. `view`/`settingsTab` are asserted after the string
+ *  check — an unknown value just falls through the view router's fleet fallback
+ *  or the settings default, so neither needs an exhaustive membership test. */
 function readNav(state: unknown): NavState | undefined {
   if (typeof state !== "object" || state === null) return undefined
   const nav: unknown = (state as { nav?: unknown }).nav
   if (typeof nav !== "object" || nav === null) return undefined
-  const { view, agentId } = nav as { view?: unknown; agentId?: unknown }
+  const { view, agentId, threadId, settingsTab } = nav as {
+    view?: unknown
+    agentId?: unknown
+    threadId?: unknown
+    settingsTab?: unknown
+  }
   if (typeof view !== "string" || typeof agentId !== "string") return undefined
-  return { view: view as ViewMode, agentId }
+  return {
+    view: view as ViewMode,
+    agentId,
+    threadId: typeof threadId === "string" ? threadId : undefined,
+    settingsTab: typeof settingsTab === "string" ? (settingsTab as TabId) : undefined,
+  }
 }
 
 /** Whether two nav entries point at the same surface — the dedupe test that
  *  keeps a redundant push (which would make one Back a no-op) off the stack. */
 function sameNav(a: NavState, b: NavState): boolean {
-  return a.view === b.view && a.agentId === b.agentId
+  return (
+    a.view === b.view &&
+    a.agentId === b.agentId &&
+    a.threadId === b.threadId &&
+    a.settingsTab === b.settingsTab
+  )
 }
 
 /**
@@ -115,7 +136,13 @@ function sameNav(a: NavState, b: NavState): boolean {
  * to restore from and simply falls back to the localStorage-persisted view +
  * agent, which is exactly the pre-existing behaviour.
  */
-function useNavHistory(view: ViewMode, agentId: string, apply: (s: NavState) => void) {
+function useNavHistory(
+  view: ViewMode,
+  agentId: string,
+  threadId: string | undefined,
+  settingsTab: TabId | undefined,
+  apply: (s: NavState) => void,
+) {
   const applyingRef = useRef(false)
   const bootRef = useRef(false)
 
@@ -126,7 +153,15 @@ function useNavHistory(view: ViewMode, agentId: string, apply: (s: NavState) => 
       applyingRef.current = false
       return
     }
-    const nav: NavState = { view, agentId }
+    // Record only the atom relevant to the current view: a threads entry
+    // carries its thread, a settings entry its category, and neither leaks a
+    // stale value into the other's entries (which would break dedupe + restore).
+    const nav: NavState = {
+      view,
+      agentId,
+      ...(view === "threads" && threadId ? { threadId } : {}),
+      ...(view === "settings" ? { settingsTab } : {}),
+    }
     if (!bootRef.current) {
       // Seed the current location as the base entry rather than pushing a
       // second one on top of it.
@@ -137,7 +172,7 @@ function useNavHistory(view: ViewMode, agentId: string, apply: (s: NavState) => 
     const cur = readNav(history.state)
     if (cur && sameNav(cur, nav)) return
     history.pushState({ nav }, "")
-  }, [view, agentId])
+  }, [view, agentId, threadId, settingsTab])
 
   useEffect(() => {
     const onPop = (e: PopStateEvent) => {
@@ -165,6 +200,24 @@ function AppShell() {
     return modes[localStorage.getItem("cp-view") ?? ""] ?? "fleet"
   })
   const [activeAgentId, setActiveAgentId] = useState(() => localStorage.getItem("cp-agent") ?? "")
+
+  // The accessed THREAD and settings CATEGORY — one degree finer than view+agent
+  // — are OWNED HERE so browser Back/Next can step through them (T636). The
+  // thread selection used to live inside ThreadsView's useThreadSelection; it is
+  // lifted so a history entry can carry it and a popstate can restore it. Thread
+  // selection stays persisted per agent under the SAME `cp-thread-<id>` key the
+  // hook used, so a reload still returns to the last thread; the shell is now
+  // simply the single writer of that key (the hook defers to it when controlled).
+  const threadKeyFor = (id: string) => `cp-thread-${id}`
+  const [selectedThreadId, setSelectedThreadId] = useState(
+    () => localStorage.getItem(threadKeyFor(activeAgentId)) ?? "",
+  )
+  const [settingsTab, setSettingsTab] = useState<TabId>("llm")
+
+  // Persist the selected thread per agent (single writer — see above).
+  useEffect(() => {
+    if (selectedThreadId) localStorage.setItem(threadKeyFor(activeAgentId), selectedThreadId)
+  }, [activeAgentId, selectedThreadId])
 
   // Persist view + agent selection across reloads (write-through effects rather
   // than setter wrappers, so the useState setters keep their canonical names).
@@ -206,9 +259,13 @@ function AppShell() {
         : view
 
   // Open an agent → drop into its threads. Switching agent from the fleet
-  // dashboard is the ONLY place an agent is chosen/managed.
+  // dashboard is the ONLY place an agent is chosen/managed. Load that agent's
+  // last-selected thread synchronously (a direct localStorage read, not a
+  // seed effect — an effect would race a nav restore that sets the thread
+  // explicitly).
   const openAgent = (id: string) => {
     setActiveAgentId(id)
+    setSelectedThreadId(localStorage.getItem(threadKeyFor(id)) ?? "")
     setView("threads")
   }
 
@@ -258,16 +315,21 @@ function AppShell() {
     setView("finder")
   }, [])
 
-  // Browser Back / Next restore the (view, agent) pair (T636). Declared after
-  // `effectiveView` so the entry we record is the surface the user actually
-  // sees (the gated one), not the raw pre-gate `view`. `applyNav` sets the raw
-  // atoms; since the recorded view is already post-gate, no re-gating occurs on
-  // restore. Setters are stable, so the callback never changes identity.
+  // Browser Back / Next restore the (view, agent, thread, settings-category)
+  // tuple (T636). Declared after `effectiveView` so the entry we record is the
+  // surface the user actually sees (the gated one), not the raw pre-gate `view`.
+  // `applyNav` sets the raw atoms; for the finer fields it falls back to the
+  // agent's persisted thread (a settings/finder entry carries no threadId) and
+  // keeps the current settings tab (a threads entry carries no settingsTab), so
+  // a restore never blanks a field the entry simply didn't record. Setters are
+  // stable, so the callback never changes identity.
   const applyNav = useCallback((s: NavState) => {
     setView(s.view)
     setActiveAgentId(s.agentId)
+    setSelectedThreadId(s.threadId ?? localStorage.getItem(`cp-thread-${s.agentId}`) ?? "")
+    if (s.settingsTab) setSettingsTab(s.settingsTab)
   }, [])
-  useNavHistory(effectiveView, activeAgentId, applyNav)
+  useNavHistory(effectiveView, activeAgentId, selectedThreadId || undefined, settingsTab, applyNav)
 
   // Route the active view to its surface. A flat if-chain (not a nested ternary)
   // so each branch reads cleanly and the fleet fallthrough is explicit.
@@ -290,6 +352,8 @@ function AppShell() {
           key={activeAgent.id}
           agent={activeAgent}
           railOpen={settingsRailOpen}
+          tab={settingsTab}
+          onTab={setSettingsTab}
           disconnected={showDisconnectOverlay}
           onReconnect={restartAgent}
         />
@@ -312,6 +376,8 @@ function AppShell() {
       <ThreadsView
         key={activeAgentId}
         activeAgentId={activeAgentId}
+        selectedThreadId={selectedThreadId}
+        onThreadChange={setSelectedThreadId}
         onShowInFinder={showInFinder}
         railOpen={threadsRailOpen}
         newOpen={newThreadOpen}

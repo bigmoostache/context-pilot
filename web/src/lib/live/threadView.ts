@@ -106,14 +106,28 @@ export interface Selection {
  *                        dialog. Supply it when the trigger lives OUTSIDE the
  *                        thread view (the desktop header rail); omit it to keep
  *                        the flag local (mobile).
+ * @param controlledSelection Optional caller-owned selection (id + setter).
+ *                        Supply it when an ancestor must OWN which thread is
+ *                        active — the desktop shell does, so browser Back/Next
+ *                        can step through the threads visited (T636). When
+ *                        given, this hook stops seeding/persisting the
+ *                        selection itself (the owner does both); when omitted
+ *                        (mobile), it keeps its own localStorage-backed state.
  */
 export function useThreadSelection(
   activeAgentId: string,
   threads: ThreadDetail[],
   newThreadDialog?: { open: boolean; setOpen: (v: boolean) => void },
+  controlledSelection?: { selectedId: string; setSelectedId: (id: string) => void },
 ): Selection {
   const threadKey = `cp-thread-${activeAgentId}`
-  const [selectedId, setSelectedId] = useState(() => localStorage.getItem(threadKey) ?? "")
+  // Internal fallback state — used ONLY when the caller does not control the
+  // selection (mobile). A controlled caller owns the value + its persistence,
+  // so this state (and the seed/persist effects below) sit inert.
+  const [ownSelectedId, setOwnSelectedId] = useState(() => localStorage.getItem(threadKey) ?? "")
+  const controlled = controlledSelection !== undefined
+  const selectedId = controlled ? controlledSelection.selectedId : ownSelectedId
+  const setSelectedId = controlled ? controlledSelection.setSelectedId : setOwnSelectedId
   const [query, setQuery] = useState("")
   const [showArchived, setShowArchived] = useState(false)
   const [pendingFiles, setPendingFiles] = useState<UploadedFile[]>([])
@@ -157,10 +171,13 @@ export function useThreadSelection(
     ? selectedId
     : (threads.find((t) => !t.archived)?.id ?? threads[0]?.id ?? "")
 
-  // Persist the RESOLVED selection so a reload returns to a still-existing thread.
+  // Persist the RESOLVED selection so a reload returns to a still-existing
+  // thread — but ONLY when uncontrolled. A controlled owner (the desktop shell)
+  // persists per-agent itself, so writing here too would be a second writer to
+  // the same key.
   useEffect(() => {
-    if (effectiveSelectedId) localStorage.setItem(threadKey, effectiveSelectedId)
-  }, [effectiveSelectedId, threadKey])
+    if (!controlled && effectiveSelectedId) localStorage.setItem(threadKey, effectiveSelectedId)
+  }, [controlled, effectiveSelectedId, threadKey])
 
   // Clear staged uploads when the thread changes (render-phase reset).
   const [pendingThread, setPendingThread] = useState(effectiveSelectedId)

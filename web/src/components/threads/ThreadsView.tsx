@@ -23,6 +23,8 @@ import { useThreadSelection, useThreadActions } from "@/lib/live/threadView"
  */
 export function ThreadsView({
   activeAgentId,
+  selectedThreadId,
+  onThreadChange,
   onShowInFinder,
   railOpen,
   newOpen,
@@ -33,6 +35,11 @@ export function ThreadsView({
   onReconnect,
 }: {
   activeAgentId: string
+  /** Selected thread — CONTROLLED by the shell (Root.tsx) so browser Back/Next
+   *  can step through the threads visited (T636). The shell owns the value and
+   *  its per-agent persistence; this view feeds it into useThreadSelection. */
+  selectedThreadId: string
+  onThreadChange: (id: string) => void
   /** navigate the Finder to a file's parent directory and select it (T334) */
   onShowInFinder?: (path: string) => void
   /** Whether the thread-list rail is shown. Owned by the shell (Root.tsx), not
@@ -57,10 +64,15 @@ export function ThreadsView({
   // The dialog flag is INJECTED into the selection hook rather than used
   // alongside it, so `handleCreate`'s own `setNewOpen(false)` closes the very
   // flag the rail's button opened.
-  const sel = useThreadSelection(activeAgentId, threads, {
-    open: newOpen,
-    setOpen: onNewOpenChange,
-  })
+  const sel = useThreadSelection(
+    activeAgentId,
+    threads,
+    {
+      open: newOpen,
+      setOpen: onNewOpenChange,
+    },
+    { selectedId: selectedThreadId, setSelectedId: onThreadChange },
+  )
   const actions = useThreadActions(activeAgentId, threads, sel)
 
   // Only bail to a bare empty state when there is genuinely no agent. A fresh
