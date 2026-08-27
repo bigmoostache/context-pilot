@@ -7954,6 +7954,10 @@
   path: .git/index
   description: Git index (binary). Not source.
   last_edited_ms: 0
+5a01b9bf2c4676c9:
+  path: web/src/components/shell/TopBar.tsx
+  description: 'Slim macOS-style side rail — app mark→fleet, agent switcher, per-agent view tabs (Threads/Finder/Settings/Costs), theme, usage, account. Costs dev-mode only. ViewTabs subcomponent + useViewShortcuts hook (⌘/Ctrl L=Threads K=Finder I=Settings, per-tab HintBadge). ThreadActions (C=new-thread P=search, threads view only). T646: switcherRef + useModifierShortcuts({a: click switcher trigger}) binds ⌘/Ctrl+A to open the workspace switcher from any view. Exactly 500 lines (cap).'
+  last_edited_ms: 1787826915948
 5a08e3e9effbdbe7:
   path: crates/cp-orchestrator/tests/openapi/schemas.rs
   description: OpenAPI core schemas — domain types (Agent, ThreadDetail, ThreadMsg, ToolCall, etc.) referenced by the spec.
@@ -12426,6 +12430,10 @@
   path: src/app/run/threads/archived.rs
   description: 'Live thread-archived emission chokepoint: diffs each thread''s archived flag vs memo, emits durable ThreadArchived/ThreadRestored deltas. Seeds from oplog roster on first pass. MemoSeeds bitfield accessors (seeded.archived()/seed_archived()).'
   last_edited_ms: 0
+8bdf5a74914629d7:
+  path: web/src/components/shell/widgets/AgentSwitcher.tsx
+  description: 'TopBar workspace switcher dropdown (one agent=one folder); switch/create/fleet. AgentDot shows avatar image (T338) when hasAvatar, else accent-tinted FolderGit2. T646: optional triggerRef prop forwarded to DropdownMenuTrigger''s ref so an ancestor (TopBar) can open the menu programmatically for the ⌘/Ctrl+A shortcut.'
+  last_edited_ms: 1787826915811
 8c0867d815410d9d:
   path: docs/console-server.md
   description: Console server protocol and process management
@@ -17458,6 +17466,10 @@ c516d10d60a59326:
   path: src/app/prompt/builder.rs
   description: 'Wire message assembly: panel injection → conversation → alternation → Phase-4 repair call. Single funnel every provider streams through. Pairing guards here are EXISTENCE-only; adjacency enforced by repair.rs.'
   last_edited_ms: 0
+c5197811bbc04e19:
+  path: web/src/lib/support/a11y.ts
+  description: Accessibility helpers. clickable(onActivate) makes a non-<button> keyboard-activatable (Enter/Space). useModifierShortcuts(actions) binds ⌘/Ctrl+letter shortcuts (latest-ref, clears on blur/visibilitychange) + returns modHeld for hint badges; `c`/`a` are guarded so real Copy/Select-All are never stolen — copyWouldBeNoop tests the SELECTION, selectAllWouldBeNoop (T646) tests FOCUS (yields inside input/textarea/contenteditable). useLoopNav loops a selection list with ⌘/Ctrl+Up/Down + badges neighbours.
+  last_edited_ms: 1787826915880
 c536cc93ca389363:
   path: tmp/v2/src/image/wrap.ts
   description: 'Image-in-text layout: ONE definition, three renderings (editor CSS / Paged.js PDF / OOXML docx). 6 wraps (inline/center/block-left/right/float-left/right); data-wrap attribute survives getHTML. wrapCss(root) generated (editor+export can''t share a file). Owns all <img> layout; float capped narrow + headings clear.'

@@ -369,6 +369,17 @@
   - deadman
   - historical
   last_edited_ms: 1784202948992
+5905bf08a95f2017:
+  tl_dr: 'T646 SHIPPED: ⌘/Ctrl+A opens the workspace AgentSwitcher from any view. Commit fdfa0990 on branch t646-agent-selector-shortcut. Details in body.'
+  contents: 'AgentSwitcher gained optional triggerRef→DropdownMenuTrigger ref; TopBar holds switcherRef + useModifierShortcuts({a:()=>switcherRef.current?.click()}); a11y.ts added selectAllWouldBeNoop() (mirror of copyWouldBeNoop but tests FOCUS not selection) so `a` yields inside input/textarea/contenteditable and real Select-All is never stolen. TopBar trimmed back to exactly 500 lines (condensed 3 prose comments). Full frontend gate green (eslint/prettier/stylelint/tsc/type-coverage/suppressions/census/knip). Branch off master @ e539b9a1 (PR #182 merged). Needs push + new PR per M163.'
+  importance: medium
+  labels:
+  - T646
+  - shortcut
+  - agent-switcher
+  - shipped
+  - web
+  last_edited_ms: 1787826928017
 66c65b2514fd54ac:
   tl_dr: 'T593 tmp/v2 document persistence: pretty-printed normal form on disk, hand-editable file with live push over Vite HMR, word-level diff3 merge on concurrent edit, conflict = save refused + nothing written. Architecture + gotchas in body.'
   contents: |-
