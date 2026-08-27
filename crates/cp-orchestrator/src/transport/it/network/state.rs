@@ -98,46 +98,46 @@ impl Band {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub(crate) struct WwanConfig {
     /// Access point name for the carrier (empty = let `ModemManager` pick).
-    pub(crate) apn: String,
+    pub apn: String,
     /// PAP/CHAP username, when the carrier needs one.
-    pub(crate) username: Option<String>,
+    pub username: Option<String>,
     /// PAP/CHAP password — secret, never read back.
-    pub(crate) password: Option<String>,
+    pub password: Option<String>,
     /// SIM PIN — secret, never read back. `None` for a SIM with no PIN lock,
     /// which is the case on the test box: it reports `lock: sim-pin2`, but that
     /// is the fixed-dialing lock and does not gate data — MEASURED, `AT+CPIN?`
     /// answers `READY` and `mmcli -m 0 --enable` succeeds with no PIN. The field
     /// stays for the SIMs that do lock.
-    pub(crate) pin: Option<String>,
+    pub pin: Option<String>,
     /// Whether the bearer may attach to a roaming network.
-    pub(crate) roaming: bool,
+    pub roaming: bool,
     /// Standby policy while ethernet is the active uplink.
-    pub(crate) standby: Standby,
+    pub standby: Standby,
 }
 
 /// The Wi-Fi access point settings.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct ApConfig {
     /// Whether the AP should be running.
-    pub(crate) enabled: bool,
+    pub enabled: bool,
     /// Broadcast network name, 1–32 bytes.
-    pub(crate) ssid: String,
+    pub ssid: String,
     /// WPA2 pre-shared key, 8–63 characters — secret, never read back.
-    pub(crate) passphrase: Option<String>,
+    pub passphrase: Option<String>,
     /// 2.4 or 5 `GHz`.
-    pub(crate) band: Band,
+    pub band: Band,
     /// Channel number, or `0` for automatic selection.
-    pub(crate) channel: u16,
+    pub channel: u16,
     /// ISO-3166 regulatory country code. Under the world-default domain `00`
     /// every 5 `GHz` channel is `no IR` (no initiating radiation) and the AP
     /// cannot start at all, so this is a functional prerequisite, not a nicety.
-    pub(crate) country: String,
+    pub country: String,
     /// Suppress the SSID from beacons.
-    pub(crate) hidden: bool,
+    pub hidden: bool,
     /// NAT + DHCP + DNS the active uplink to AP clients. Off leaves the AP a
     /// cul-de-sac whose only reachable service is the cockpit — NAT would make
     /// the box a router on the client's LAN, and that is their IT's call.
-    pub(crate) share_internet: bool,
+    pub share_internet: bool,
 }
 
 impl Default for ApConfig {
@@ -159,30 +159,30 @@ impl Default for ApConfig {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct ProbeConfig {
     /// Addresses probed through the WAN interface; any reply counts as up.
-    pub(crate) targets: Vec<String>,
+    pub targets: Vec<String>,
     /// Consecutive failures before the WAN is demoted.
-    pub(crate) fail_threshold: u32,
+    pub fail_threshold: u32,
     /// Consecutive successes before the WAN is restored.
-    pub(crate) ok_threshold: u32,
+    pub ok_threshold: u32,
     /// Seconds between probe rounds.
-    pub(crate) interval_s: u32,
+    pub interval_s: u32,
     /// `ping -W` — how long one probe waits for a reply.
     ///
     /// Paid once per target per round, so a value anywhere near `interval_s`
     /// makes the rounds overlap and the streak counters stop meaning what they
     /// say. Rendered as `CP_UPLINK_PROBE_TIMEOUT_S`.
-    pub(crate) probe_timeout_s: u32,
+    pub probe_timeout_s: u32,
     /// Seconds a transition holds before the opposite one may fire.
     ///
     /// The only thing standing between a WAN that flaps and a default route
     /// that changes every round. Rendered as `CP_UPLINK_COOLDOWN_S`.
-    pub(crate) cooldown_s: u32,
+    pub cooldown_s: u32,
     /// `nmcli --wait` for the supervisor's own bearer activation.
     ///
     /// Bounded for the measured reason `routes::set_active` is: nmcli's default
     /// is 90 s and a modem with no coverage takes all of it, which would stall a
     /// whole probe round. Rendered as `CP_UPLINK_NM_WAIT_S`.
-    pub(crate) nm_wait_s: u32,
+    pub nm_wait_s: u32,
 }
 
 impl Default for ProbeConfig {
@@ -203,13 +203,13 @@ impl Default for ProbeConfig {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub(crate) struct NetworkConfig {
     /// Which uplink the box routes through.
-    pub(crate) mode: UplinkMode,
+    pub mode: UplinkMode,
     /// The 5G bearer.
-    pub(crate) wwan: WwanConfig,
+    pub wwan: WwanConfig,
     /// The Wi-Fi access point.
-    pub(crate) ap: ApConfig,
+    pub ap: ApConfig,
     /// Failover probe tuning.
-    pub(crate) probe: ProbeConfig,
+    pub probe: ProbeConfig,
 }
 
 /// On-disk location of the network document, beside `.identity.json`.
