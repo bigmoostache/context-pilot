@@ -36,7 +36,7 @@ impl From<rusqlite::Error> for AuthError {
 /// single source of truth the whole matrix derives from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum UserRole {
+pub enum UserRole {
     /// Vendor god-mode (rank 4): everything, including provider secrets;
     /// invisible to the client (FR-v3-05).
     Superadmin,
@@ -129,24 +129,24 @@ impl AgentRole {
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct User {
     /// UUID v4 (hex-formatted, 36 chars with dashes).
-    pub(crate) id: String,
+    pub id: String,
     /// Unique, case-insensitive email address.
-    pub(crate) email: String,
+    pub email: String,
     /// Display name.
-    pub(crate) name: String,
+    pub name: String,
     /// Argon2id PHC string — **never** serialised to the frontend.
     #[serde(skip)]
-    pub(crate) password_hash: String,
+    pub password_hash: String,
     /// System-level role.
-    pub(crate) role: UserRole,
+    pub role: UserRole,
     /// When `true`, the user must change their password before using the app —
     /// set on seeded/admin-provisioned accounts whose initial password is known
     /// to the provisioner. Cleared on the next successful password change.
-    pub(crate) must_change_password: bool,
+    pub must_change_password: bool,
     /// Creation timestamp (ms since Unix epoch).
-    pub(crate) created_at: u64,
+    pub created_at: u64,
     /// Last-update timestamp (ms since Unix epoch).
-    pub(crate) updated_at: u64,
+    pub updated_at: u64,
 }
 
 /// An access-control list entry — one user's permission on one agent,
@@ -154,19 +154,19 @@ pub struct User {
 #[derive(Clone, Debug, serde::Serialize)]
 pub(crate) struct AclEntry {
     /// The agent this entry grants access to.
-    pub(crate) agent_id: String,
+    pub agent_id: String,
     /// The authorized user's UUID.
-    pub(crate) user_id: String,
+    pub user_id: String,
     /// Per-agent role (FR-14a).
-    pub(crate) role: AgentRole,
+    pub role: AgentRole,
     /// When access was granted (ms since Unix epoch).
-    pub(crate) granted_at: u64,
+    pub granted_at: u64,
     /// UUID of the user who granted access (nullable).
-    pub(crate) granted_by: Option<String>,
+    pub granted_by: Option<String>,
     /// Authorized user's email (joined from `users`).
-    pub(crate) user_email: String,
+    pub user_email: String,
     /// Authorized user's display name (joined from `users`).
-    pub(crate) user_name: String,
+    pub user_name: String,
 }
 
 /// One device session for the "active sessions" profile list — never exposes
@@ -174,15 +174,15 @@ pub(crate) struct AclEntry {
 #[derive(Clone, Debug, serde::Serialize)]
 pub(crate) struct SessionInfo {
     /// Opaque per-session id (safe to send to the client; not the token).
-    pub(crate) id: String,
+    pub id: String,
     /// Creation timestamp (ms since Unix epoch).
-    pub(crate) created_at: u64,
+    pub created_at: u64,
     /// Absolute expiry (ms since Unix epoch).
-    pub(crate) expires_at: u64,
+    pub expires_at: u64,
     /// User-agent string captured at login, if any.
-    pub(crate) user_agent: Option<String>,
+    pub user_agent: Option<String>,
     /// Whether this is the session making the request (the current device).
-    pub(crate) current: bool,
+    pub current: bool,
 }
 
 /// Map a `rusqlite::Row` from the canonical `SELECT` column order into a

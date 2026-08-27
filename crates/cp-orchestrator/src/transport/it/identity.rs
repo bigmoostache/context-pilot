@@ -19,9 +19,9 @@ use super::state::write_atomic;
 pub(crate) struct Identity {
     /// DNS name the operator gives the box (e.g. `pilot.acme.corp`). May be
     /// empty if the operator only pins an IP.
-    pub(crate) name: String,
+    pub name: String,
     /// The box's LAN IP (e.g. `192.168.1.116`).
-    pub(crate) ip: String,
+    pub ip: String,
 }
 
 /// On-disk location of the identity record, beside the provisioned flag in the

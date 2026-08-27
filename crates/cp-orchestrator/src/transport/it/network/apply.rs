@@ -157,24 +157,24 @@ fn entry_starting_with(dir: &str, prefix: &str) -> bool {
 /// failing the whole call.
 pub(crate) struct Tools {
     /// `nmcli`, and with it the whole applier: unset ⇒ the applier is inert.
-    pub(crate) nmcli: OsString,
+    pub nmcli: OsString,
     /// `iw`, for the regulatory domain. Absent ⇒ the country is not pushed.
-    pub(crate) iw: Option<OsString>,
+    pub iw: Option<OsString>,
     /// `networkctl`, to make the strict-`5g` drop-in take effect.
-    pub(crate) networkctl: Option<OsString>,
+    pub networkctl: Option<OsString>,
     /// `systemctl`, to restart the failover supervisor after a config change.
-    pub(crate) systemctl: Option<OsString>,
+    pub systemctl: Option<OsString>,
     /// `nft`, to drop `NetworkManager`'s masquerade table when the AP is a
     /// cul-de-sac — internet sharing off, cockpit access only.
-    pub(crate) nft: Option<OsString>,
+    pub nft: Option<OsString>,
     /// `cp-regdom`, the appliance's single implementation of "push the
     /// regulatory country". Preferred over [`Self::iw`] when installed — see
     /// [`apply_regdom`].
-    pub(crate) regdom: Option<OsString>,
+    pub regdom: Option<OsString>,
     /// Directory holding the `end0` `.network` drop-in for strict `5g`.
-    pub(crate) networkd_dir: Option<PathBuf>,
+    pub networkd_dir: Option<PathBuf>,
     /// `/etc/default/cp-uplink` — the failover supervisor's configuration.
-    pub(crate) uplink_env: Option<PathBuf>,
+    pub uplink_env: Option<PathBuf>,
 }
 
 impl Tools {
@@ -378,20 +378,20 @@ fn hash_of<T>(inputs: &T) -> String where T: Serialize {
 pub(super) struct StepHashes {
     /// `reconcile_wwan` — the bearer config **and** the mode, which is what
     /// drives the route metric and the autoconnect flag.
-    pub(super) wwan: String,
+    pub wwan: String,
     /// `reconcile_ap` — the access-point config alone.
-    pub(super) access_point: String,
+    pub access_point: String,
     /// `apply_ap_activation` — the two fields it actually reads.
-    pub(super) ap_activation: String,
+    pub ap_activation: String,
     /// `apply_mode` — the mode **and** the standby policy, which together decide
     /// the drop-in *and* whether the bearer is brought up or down. Standby is in
     /// here deliberately: keying on the mode alone would silently stop honouring
     /// a `hot` → `cold` switch, which is a regression the whole-document
     /// fingerprint did not have.
-    pub(super) mode: String,
+    pub mode: String,
     /// `write_uplink_env` — the rendered file body itself, which is the most
     /// precise statement of that step's inputs available.
-    pub(super) uplink_env: String,
+    pub uplink_env: String,
 }
 
 impl StepHashes {

@@ -26,62 +26,65 @@ const DEFAULT_SUB_CAPACITY: usize = 256;
 #[derive(Debug)]
 pub struct Backend {
     /// Per-agent projected fleet state.
-    pub(crate) view: MaterializedView,
+    pub view: MaterializedView,
     /// Per-agent ephemeral stream fan-out.
-    pub(crate) hub: StreamHub,
+    pub hub: StreamHub,
     /// Single-use SSE upgrade tickets.
-    pub(crate) tickets: TicketStore,
+    pub tickets: TicketStore,
     /// Read-only, mtime-cached reader of agent persistence files.
-    pub(crate) inspect: StateReader,
+    pub inspect: StateReader,
     /// Directory of agent registry records (`<id>.json`).
-    pub(crate) agents_dir: PathBuf,
+    pub agents_dir: PathBuf,
     /// Agents whose tier-② state has changed since the last SSE sweep.
     /// SSE producers drain this per-agent to emit `invalidate` events.
-    pub(crate) dirty_agents: HashSet<String>,
+    pub dirty_agents: HashSet<String>,
     /// Per-agent registry liveness, updated by the driver loop's registry
     /// scan. Stale agents surface as "disconnected" in the fleet meta.
-    pub(crate) liveness: HashMap<String, crate::liveness::Liveness>,
+    pub liveness: HashMap<String, crate::liveness::Liveness>,
     /// Process-lifecycle manager — spawns dashboard-created agents (PTY) under
     /// a binary allow-list (R2-15).
-    pub(crate) supervisor: AgentSupervisor,
+    pub supervisor: AgentSupervisor,
     /// Root directory new agents' realm folders are created under.
-    pub(crate) agents_root: PathBuf,
+    pub agents_root: PathBuf,
     /// The `cp` TUI binary the supervisor spawns (also the sole allow-list
     /// entry).
-    pub(crate) agent_binary: PathBuf,
+    pub agent_binary: PathBuf,
     /// Orchestrator-owned set of retired agents (T271) — stopped-but-kept
     /// agents, persisted independently of the agent-written registry records.
-    pub(crate) retired: RetiredStore,
+    pub retired: RetiredStore,
     /// Custom display-name overrides set via the dashboard (T328).
-    pub(crate) names: NameOverrides,
+    pub names: NameOverrides,
     /// Agent profile picture store (T338).
-    pub(crate) avatars: AvatarStore,
+    pub avatars: AvatarStore,
     /// Auth store — `None` when auth is disabled (`CP_AUTH_ENABLED=false`).
     /// Contains the SQLite-backed user/session/ACL database (design doc §5).
-    pub(crate) auth: Option<AuthStore>,
+    pub auth: Option<AuthStore>,
     /// Access-control master flag (design §13.10), cached from the central config
     /// at boot and updated by the settings toggle. When `false` (default) the
     /// enforcement pipeline supplies no authenticated user — everyone is
     /// effectively superadmin, no login (FR-v3-08). Server-authoritative.
-    pub(crate) access_control: bool,
+    pub access_control: bool,
     /// Session lifetime for newly created sessions (FR-15).
-    pub(crate) session_ttl: Duration,
+    pub session_ttl: Duration,
     /// Local release manager — download, select, and delete release binaries
     /// from `~/.context-pilot/releases/` (T427).
-    pub(crate) releases: ReleaseStore,
+    pub releases: ReleaseStore,
     /// Path to the durable `provisioned` flag file (M2). Read by the maintenance
     /// plane's `status`/`finalize` and at boot; written atomically on finalize.
     /// Defaults to `<agents_dir>/.provisioned`, overridable via
     /// `CP_PROVISION_FLAG` for deployments that keep it elsewhere on the data
     /// partition. Kept distinct from the `onboarding_completed` UI setting.
-    pub(crate) provision_flag_path: PathBuf,
+    pub provision_flag_path: PathBuf,
     /// In-flight PKCE session for the Claude Code OAuth login flow (T451).
-    /// At most one login can be in progress at a time.
-    pub(crate) pkce_session: Option<super::claude_oauth::PkceSession>,
+    /// At most one login can be in progress at a time. Private — the OAuth
+    /// handlers reach it through [`Backend::set_pkce_session`] /
+    /// [`Backend::take_pkce_session`] so its non-`pub` type never leaks into a
+    /// `pub` field.
+    pkce_session: Option<super::claude_oauth::PkceSession>,
     /// Path of the auth `SQLite` database — the update-apply flow backs it up
     /// around the binary swap (update-policy §5.5 step 2 / §5.8). Derived from
     /// the same env default as `runtime::Config` (`AuthStore::default_db_path`).
-    pub(crate) auth_db_path: PathBuf,
+    pub auth_db_path: PathBuf,
 }
 
 impl Backend {
@@ -171,6 +174,20 @@ impl Backend {
     /// agent was dirty (the caller should emit an `invalidate` SSE event).
     pub fn take_dirty(&mut self, agent_id: &str) -> bool {
         self.dirty_agents.remove(agent_id)
+    }
+
+    /// Store the in-flight PKCE login session (set by `/claude-login/start`).
+    ///
+    /// The OAuth handlers live in a sibling module, so the field is private and
+    /// reached through this accessor — keeping `PkceSession` (a `pub(crate)`
+    /// type) out of a `pub` field on this `pub` struct.
+    pub(crate) fn set_pkce_session(&mut self, session: super::claude_oauth::PkceSession) {
+        self.pkce_session = Some(session);
+    }
+
+    /// Take (consume) the in-flight PKCE login session (`/claude-login/complete`).
+    pub(crate) fn take_pkce_session(&mut self) -> Option<super::claude_oauth::PkceSession> {
+        self.pkce_session.take()
     }
 
     /// Construct a backend from explicit services — used by tests.

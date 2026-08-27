@@ -47,15 +47,15 @@ pub(super) enum Proc {
 /// A single supervised agent process.
 pub(super) struct Supervised {
     /// The OS-process handle (spawned-std / spawned-pty / adopted).
-    pub(super) proc: Proc,
+    pub proc: Proc,
     /// OS pid of the agent process.
-    pub(super) pid: u32,
+    pub pid: u32,
     /// Canonical binary path (for restart).
-    pub(super) binary: PathBuf,
+    pub binary: PathBuf,
     /// Working directory = agent's realm folder.
-    pub(super) folder: PathBuf,
+    pub folder: PathBuf,
     /// Extra CLI arguments passed at spawn (for restart).
-    pub(super) args: Vec<String>,
+    pub args: Vec<String>,
 }
 
 // Manual Debug — `Box<dyn Child>` / `Box<dyn MasterPty>` are not `Debug`.

@@ -24,7 +24,7 @@ use super::types::{AuthError, User, UserRole, row_to_user};
 #[derive(Debug)]
 pub struct AuthStore {
     /// The `SQLite` connection — WAL mode, foreign keys enforced.
-    pub(crate) conn: Connection,
+    pub conn: Connection,
 }
 
 impl AuthStore {

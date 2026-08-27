@@ -110,29 +110,29 @@ const fn default_poll_interval_hours() -> u32 {
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct ReleaseConfig {
     /// Platform architecture string (e.g. `"linux-aarch64"`).
-    pub(crate) arch: String,
+    pub arch: String,
     /// `true` when `arch` was auto-detected, `false` when manually set.
-    pub(crate) arch_auto: bool,
+    pub arch_auto: bool,
     /// Tag of the currently selected (active) release, if any.
-    pub(crate) active_tag: Option<String>,
+    pub active_tag: Option<String>,
     /// Auto-update posture (default `auto` — update-policy v3 decision 3).
     #[serde(default)]
-    pub(crate) update_mode: UpdateMode,
+    pub update_mode: UpdateMode,
     /// Channel this box follows (`stable` or `nightly`).
     #[serde(default = "default_channel")]
-    pub(crate) channel: String,
+    pub channel: String,
     /// Set the moment an admin switches `channel`; makes the next check adopt
     /// the new channel's head regardless of version ordering (a `stable`
     /// `v0.2.x` box moving to a `nightly` `v0.1.0-<sha>` would otherwise read as
     /// a downgrade). Cleared once a check on the new channel resolves.
     #[serde(default)]
-    pub(crate) pending_channel_switch: bool,
+    pub pending_channel_switch: bool,
     /// Hours between channel polls (a boot poll always happens too).
     #[serde(default = "default_poll_interval_hours")]
-    pub(crate) poll_interval_hours: u32,
+    pub poll_interval_hours: u32,
     /// Box-local nightly window auto-applies are confined to.
     #[serde(default)]
-    pub(crate) window: MaintenanceWindow,
+    pub window: MaintenanceWindow,
 }
 
 impl Default for ReleaseConfig {

@@ -145,8 +145,7 @@ pub(crate) fn login_start(state: &Mutex<Backend>) -> HttpReply {
 
     // Store PKCE session for the /complete step.
     if let Ok(mut b) = state.lock() {
-        b.pkce_session =
-            Some(PkceSession { code_verifier, state: state_param, created_at: Instant::now() });
+        b.set_pkce_session(PkceSession { code_verifier, state: state_param, created_at: Instant::now() });
     }
 
     // Check whether there's already a valid token (multi-account scenario).
@@ -182,7 +181,7 @@ pub(crate) fn login_complete(state: &Mutex<Backend>, body_bytes: &[u8]) -> HttpR
     }
 
     // Retrieve and consume the PKCE session.
-    let pending = state.lock().ok().and_then(|mut b| b.pkce_session.take());
+    let pending = state.lock().ok().and_then(|mut b| b.take_pkce_session());
     let Some(session) = pending else {
         return HttpReply::error(400, "no pending login \u{2014} call /start first");
     };
