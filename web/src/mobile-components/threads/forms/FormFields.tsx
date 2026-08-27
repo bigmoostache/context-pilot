@@ -8,13 +8,12 @@
 // on pick via the existing `.uploads/` path and answers with paths.
 //
 // Divergence from desktop is touch-only: every text control uses a **16px
-// font** (below 16px iOS Safari auto-zooms the viewport on focus), and the
-// shadcn Calendar/Popover resolve through the `@/mobile-components/ui` token so
-// they can adopt a bottom-sheet presentation once `ui/` is recoded. All field
-// logic (option toggling, ISO date storage, confirm-word arming, immediate
-// upload) is byte-identical to the desktop twin.
+// font** (below 16px iOS Safari auto-zooms the viewport on focus), and options
+// sit in an iOS grouped-inset {@link OptionGroup} card. Deliberately effect-free
+// like the desktop twin (T643): text answers use a plain `resize-y` textarea,
+// no `scrollHeight` layout effect.
 
-import { useLayoutEffect, useRef, useState } from "react"
+import { useState } from "react"
 import { Check, Upload, Loader2, AlertTriangle, X, CalendarIcon } from "lucide-react"
 import { format, parse } from "date-fns"
 import { uploadUnique } from "@/lib/api"
@@ -44,54 +43,9 @@ function asList(v: AnswerValue): string[] {
   return v ? [v] : []
 }
 
-/** A textarea that grows with its content — like the thread composer. rows=1,
- *  height recomputed from scrollHeight on every value change (useLayoutEffect,
- *  so the first paint is already the right height), capped at maxH px beyond
- *  which it scrolls. Backs every free-text answer so a long reply isn't trapped
- *  in a one-line box. */
-function AutoGrowTextarea({
-  value,
-  onChange,
-  disabled,
-  placeholder,
-  className,
-  autoFocus,
-  maxH = 240,
-}: {
-  value: string
-  onChange: (v: string) => void
-  disabled: boolean
-  placeholder?: string
-  className?: string
-  autoFocus?: boolean
-  maxH?: number
-}) {
-  const ref = useRef<HTMLTextAreaElement>(null)
-  useLayoutEffect(() => {
-    const el = ref.current
-    if (!el) return
-    el.style.height = "auto"
-    el.style.height = `${Math.min(el.scrollHeight, maxH)}px`
-  }, [value, maxH])
-  return (
-    <textarea
-      ref={ref}
-      rows={1}
-      value={value}
-      disabled={disabled}
-      placeholder={placeholder}
-      autoFocus={autoFocus}
-      onChange={(e) => onChange(e.target.value)}
-      className={`${className ?? ""} scrollbar-none [&::-webkit-scrollbar]:hidden`}
-      style={{ maxHeight: maxH }}
-    />
-  )
-}
-
 /** A grouped-list container for option rows — the iOS "grouped inset list"
  *  idiom: one rounded card with hairline row dividers, so a set of choices reads
- *  as a single discrete block instead of a stack of individually-bordered pills
- *  (the "more discrete boxing" the mobile form was asked for). */
+ *  as a single discrete block instead of a stack of individually-bordered pills. */
 function OptionGroup({ children }: { children: React.ReactNode }) {
   return (
     <div className="divide-y divide-border/50 overflow-hidden rounded-xl border border-border/60 bg-card">
@@ -188,13 +142,14 @@ function SingleField({ field, value, onChange, disabled }: FieldProps) {
           <span className="min-w-0 flex-1">
             <span className="block font-medium text-foreground/90">Other…</span>
             {isOther && (
-              <AutoGrowTextarea
+              <textarea
                 autoFocus
+                rows={2}
                 value={sel === " " ? "" : sel}
                 disabled={disabled}
-                onChange={(v) => onChange(v || " ")}
+                onChange={(e) => onChange(e.target.value || " ")}
                 placeholder="Type your answer"
-                className="mt-2 w-full resize-none rounded-lg border border-transparent bg-muted/50 px-3 py-2.5 text-[16px] leading-relaxed transition-colors outline-none focus:border-(--signal)/60 focus:bg-background"
+                className="mt-2 w-full resize-y rounded-lg border border-transparent bg-muted/50 px-3 py-2.5 text-[16px] leading-relaxed transition-colors outline-none focus:border-(--signal)/60 focus:bg-background"
               />
             )}
           </span>
@@ -228,20 +183,21 @@ function MultiField({ field, value, onChange, disabled }: FieldProps) {
 }
 
 const SCALAR_INPUT =
-  "w-full resize-none rounded-xl border border-transparent bg-muted/50 px-3.5 py-3 text-[16px] leading-relaxed text-foreground/90 outline-none transition-colors focus:border-(--signal)/60 focus:bg-background disabled:opacity-60"
+  "w-full rounded-xl border border-transparent bg-muted/50 px-3.5 py-3 text-[16px] leading-relaxed text-foreground/90 outline-none transition-colors focus:border-(--signal)/60 focus:bg-background disabled:opacity-60"
 
-/** text / number — `text` grows with content (auto-grow textarea), `number` is
- *  a single-line numeric input. `date` is handled separately by
- *  {@link DateField}. */
+/** text / number — `text` is a plain `resize-y` textarea (no auto-grow layout
+ *  effect), `number` is a single-line numeric input. `date` is handled
+ *  separately by {@link DateField}. */
 function ScalarField({ field, value, onChange, disabled }: FieldProps) {
   if (field.type === "text") {
     return (
-      <AutoGrowTextarea
+      <textarea
+        rows={2}
         value={asScalar(value)}
-        onChange={onChange}
         disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
         placeholder="Type your answer"
-        className={SCALAR_INPUT}
+        className={`${SCALAR_INPUT} resize-y`}
       />
     )
   }

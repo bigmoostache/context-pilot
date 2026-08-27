@@ -3842,6 +3842,10 @@
   path: src/modules/conversation/render_json.rs
   description: 'extract_json_fields: serde-first (fields_from_object) + hand-parser fallback (hand_parse_fields) split read_json_string/read_nested_structure/read_json_scalar/read_json_value (A2) for incomplete streaming JSON.'
   last_edited_ms: 0
+2b7b5a60c1370d9d:
+  path: web/src/mobile-components/threads/forms/FormFields.tsx
+  description: 'Mobile FormFields twin — 8 field renderers, 16px SCALAR_INPUT (iOS no-zoom), OptionGroup grouped-inset rows (≥44px tap), mobile ui/calendar+popover. T643: effect-free, plain resize-y textarea (no auto-grow layout effect). Field logic byte-identical to desktop.'
+  last_edited_ms: 1787820613877
 2b82353c4b32a9ac:
   path: src/app/run/lifecycle.rs
   description: 'Main event loop with flame!("loop"). Input-first (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. poll_bridge_commands runs every tick. X18 LATENCY: adaptive idle poll — 8ms streaming/dirty, 2ms when bridge_active (web UI connected, keeps command→apply latency ≤ a few ms), 50ms otherwise. Ownership checks. Render ~28fps. Thread helpers in run/threads.rs.'
@@ -6146,6 +6150,10 @@
   path: src/app/run/tools/watchdog.rs
   description: 'Interactive main-loop watchdog (T358) — PURELY OBSERVATIONAL wedge detector + auto-diagnostics, never terminates/signals (human at keyboard). Two cooperating detectors on the single-threaded TUI loop: (1) heartbeat — beat() stored at loop top each iteration; stale > WEDGE_STALL_MS(15s) ⇒ total wedge; (2) activity marker — mark(Step) before each loop phase (Step enum 0..12 Idle/Input/Bridge/ThreadsEmit/Stream/Cache/Watchers/Tools/Spine/Reverie/PanelRefresh/Render/Save); a step in flight > SLOW_STEP_MS(12s) ⇒ names the wedged culprit. spawn() launches a detached monitor_loop()->! polling every 2s; on a trip dump_diagnostic(&Wedge) writes .context-pilot/errors/watchdog-<ts>.log with CPU% (high=busy-loop, low=blocked/deadlock) + per-thread states (Linux /proc/self/task wchan) / macOS `sample` backtrace. beat/mark = AtomicU64/U8 Relaxed (~ns, zero happy-path cost). Episode-dedup via last heartbeat. CPU_SAMPLE_MS cfg-gated to linux.'
   last_edited_ms: 0
+451b3653c41a0e2c:
+  path: sandbox/manigod_snow_2025_2026.py
+  description: Matplotlib script plotting Manigod (La Clusaz-Manigod) weekly snow depth winter 2025-26; data from freeride.com daily binned weekly, peak 300cm 19 Feb. Outputs sibling .png. DONE task (T642).
+  last_edited_ms: 1787820502017
 45220cab1f11c592:
   path: crates/cp-mod-threads/src/panel.rs
   description: 'ThreadsPanel: thread list with [MY_TURN]/[THEIR_TURN] badges, last 5 messages per thread, message count. Context: MY_TURN threads with messages, THEIR_TURN summary only. max_freeze=3.'
@@ -6870,6 +6878,10 @@
   path: crates/cp-wire/src/types/oplog.rs
   description: 'OpEntry + OpEntryKind internally-tagged enum #[expect(exhaustive_enums)] A4 (Unknown catch-all). CommandEffect/MessageCreated/Thread*/ContextUsage/Checkpoint.'
   last_edited_ms: 1784496446463
+4dffa0a7389ee7e2:
+  path: web/src/components/threads/forms/FormFields.tsx
+  description: '8 form field input renderers: single+allow-other, multi, text, number, date, toggle, confirm+confirm-word, files (immediate upload). FieldInput dispatcher. T643: effect-free — text answers use plain resize-y textarea, dropped the scrollHeight auto-grow useLayoutEffect (freeze suspect).'
+  last_edited_ms: 1787820613741
 4e1229fe305d43b4:
   path: crates/cp-mod-search/src/meili/download.rs
   description: Meilisearch binary download. Pinned v1.13.3. Platform detection (macOS/Linux, amd64/aarch64). GitHub releases download to ~/.context-pilot/meilisearch/bin/. Skips if already present. 5-min timeout.
@@ -15674,6 +15686,10 @@ b1cafb4647761a69:
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadsState + FocusState with TypeMap accessors.'
   last_edited_ms: 0
+b1cd9f2eafb126a9:
+  path: web/src/components/threads/forms/FormWidget.tsx
+  description: 'Interactive form widget rendered inline from ```form``` block. localStorage draft per form-id, single-click submit (blank mandatory sends empty seed — backend holds no form state), LockedForm read-only receipt. T643: effect-light — removed two-click arm, 3s revert timer, scrollIntoView+CSS.escape, comment-field inject. Only useState+useMemo, no layout effects.'
+  last_edited_ms: 1787820613625
 b1d805767ab664eb:
   path: web/src/components/threads/ThreadComposer.tsx
   description: Thread input composer. Always active regardless of turn status — textarea always visible. Non-MY_TURN shows a subtle 'working' hint above input (ACTIVE green vs THEIR_TURN signal). onSend callback, Enter=submit, Shift+Enter=newline.
@@ -15778,6 +15794,10 @@ b2e83839701f681b:
   path: crates/cp-orchestrator/src/transport/inspect/finder/sheet.rs
   description: 'Finder spreadsheet→table JSON (T282): fs_sheet (GET /fs/sheet?path=). csv/tsv via the `csv` reader (quote+embedded-newline aware); xlsx/xls/xlsb/ods/xlsm via calamine open_workbook_auto. Both collapse to {sheets:[{name,rows:[[cell]],formulas?:[[formula|null]]}],truncated}, every cell stringified (cell_to_string: integral floats lose the .0 tail). Formula extraction via worksheet_formula (graceful degradation for formats without formula support). Bounded MAX_ROWS=1000 × MAX_COLS=50 × MAX_SHEETS=20; csv read-capped 8MiB. Confined via support:: (escape 403, non-file 404, unsupported/unparseable 415, missing param 400).'
   last_edited_ms: 1784131361789
+b2eedb9e638a87f1:
+  path: web/src/mobile-components/threads/forms/FormWidget.tsx
+  description: 'Mobile FormWidget twin — routes mobile FormFields (its only fork). Draft persistence, single-click submit, locked receipt — logic byte-identical to desktop. T643: effect-light, same fragile machinery removed.'
+  last_edited_ms: 1787820613811
 b2efbee25bb64c0f:
   path: web/src/components/finder/internal/helpers.ts
   description: 'Finder shared types + pure helpers: Tab/PinnedFolder interfaces, CLICK_SETTLE_MS, NEW_FOLDER_SENTINEL, pinsKey/loadPins (localStorage), buildCrumbs, pathName. web-lint P3: req<T>(arr,i) invariant accessor (arr.at(i), throws on absent) — encodes a length-guard-proven invariant with a runtime check instead of a banned non-null assertion (!); used by useFinderActions back/forward.'

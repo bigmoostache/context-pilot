@@ -1,34 +1,27 @@
 // ── FormWidget — the interactive form rendered in place of a ```form``` block ─
 //
 // One widget per ```form``` block (docs/forms.md §2/§4). Unanswered → an
-// interactive form (draft persisted per form-id in localStorage, all fields
-// mandatory, client-gated submit). Answered → a locked read-only receipt
-// derived from the matching ```form-answer``` message (§5). On submit it hands
-// the composed {id, answer} entries to the parent, which sends the
-// ```form-answer``` message via the EXISTING send path — no backend form state.
+// interactive form (draft persisted per form-id in localStorage). Answered → a
+// locked read-only receipt derived from the matching ```form-answer``` message
+// (§5). On submit it hands the composed {id, answer} entries to the parent,
+// which sends the ```form-answer``` message via the EXISTING send path — no
+// backend form state.
+//
+// DELIBERATELY EFFECT-LIGHT (T643). An earlier version carried a two-click
+// "confirm incomplete" arming flow with a 3-second auto-revert timer, a
+// `scrollIntoView` + `CSS.escape` effect that reached into the DOM on arm, an
+// auto-appended comment field, and auto-grow textareas measuring `scrollHeight`
+// on every keystroke. That machinery was fragile and a standing freeze/crash
+// suspect; it is gone. The widget now holds ONE piece of state (the value map)
+// and no layout effects — submitting is a single click, and a blank mandatory
+// field simply sends its empty seed (the backend holds no form state, so the
+// gate was always advisory).
 
-import { useEffect, useMemo, useRef, useState } from "react"
-import { Check, CheckCircle2, ClipboardList, AlertTriangle, CornerDownLeft } from "lucide-react"
+import { useMemo, useState } from "react"
+import { Check, CheckCircle2, ClipboardList } from "lucide-react"
 import { formatTs } from "@/lib/support/threadMessages"
 import { FieldInput } from "./FormFields"
 import type { AnswerValue, FormAnswer, FormAnswerEntry, FormField, FormSpec } from "./helpers"
-
-/** Reserved id for the always-appended optional free-text comment field. */
-const COMMENT_ID = "__comment"
-const COMMENT_FIELD: FormField = {
-  id: COMMENT_ID,
-  label: "Anything to add? (optional)",
-  type: "text",
-}
-
-/** Append the optional comment field to a spec (unless the form already carries
- *  one under the reserved id). Every rendered form ends with a free-text box so
- *  the user can leave a note — it never blocks submit and is omitted from the
- *  locked receipt when left blank. */
-function withComment(spec: FormSpec): FormSpec {
-  if (spec.fields.some((f) => f.id === COMMENT_ID)) return spec
-  return { ...spec, fields: [...spec.fields, COMMENT_FIELD] }
-}
 
 /** A form field that answers with a list (multi/files) — needs ≥1 to be valid. */
 function isListField(f: FormField): boolean {
@@ -76,42 +69,32 @@ function loadDraft(key: string, spec: FormSpec): Record<string, AnswerValue> {
   return base
 }
 
-/** A single labelled field row (Linear-style uppercase label above the type's
- *  input). When `highlight` is set (a blank mandatory field at the moment the
- *  incomplete submit arms) the label turns amber and the input rings amber,
- *  pointing the user straight at what's unfilled. `data-field-id` lets the
- *  widget scroll the first missing row into view. */
+/** A single labelled field row (uppercase label above the type's input). */
 function FieldRow({
   field,
   value,
   onChange,
   disabled,
-  highlight,
   agentId,
 }: {
   field: FormField
   value: AnswerValue
   onChange: (v: AnswerValue) => void
   disabled: boolean
-  highlight: boolean
   agentId: string
 }) {
   return (
-    <div className="border-t border-border/50 px-4 pt-2.5 pb-3" data-field-id={field.id}>
-      <label className="block pb-1 text-[11px] font-medium tracking-wide uppercase">
-        <span className={highlight ? "text-(--warn)" : "text-muted-foreground/70"}>
-          {field.label}
-        </span>
+    <div className="border-t border-border/50 px-4 pt-2.5 pb-3">
+      <label className="block pb-1 text-[11px] font-medium tracking-wide text-muted-foreground/70 uppercase">
+        {field.label}
       </label>
-      <div className={highlight ? "rounded-md ring-1 ring-(--warn)/40" : undefined}>
-        <FieldInput
-          field={field}
-          value={value}
-          onChange={onChange}
-          disabled={disabled}
-          agentId={agentId}
-        />
-      </div>
+      <FieldInput
+        field={field}
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        agentId={agentId}
+      />
     </div>
   )
 }
@@ -127,13 +110,6 @@ function showAnswer(v: AnswerValue | undefined): string {
  *  a definition list of each field's label and submitted value, no inputs. */
 function LockedForm({ spec, answer }: { spec: FormSpec; answer: FormAnswer }) {
   const byId = new Map(answer.answers.map((a) => [a.id, a.answer]))
-  // Skip the synthetic comment field when the user left it blank — an empty
-  // "Anything to add?" row is pure noise in the receipt.
-  const rows = spec.fields.filter((f) => {
-    if (f.id !== COMMENT_ID) return true
-    const v = byId.get(f.id)
-    return typeof v === "string" && v.trim().length > 0
-  })
   return (
     <div className="card-shadow my-1.5 overflow-hidden rounded-xl border border-(--signal)/25 bg-linear-to-b from-(--signal)/8 to-(--signal)/2">
       <div className="flex items-center gap-2 border-b border-signal/15 px-3 py-2">
@@ -152,7 +128,7 @@ function LockedForm({ spec, answer }: { spec: FormSpec; answer: FormAnswer }) {
         </div>
       </div>
       <dl className="divide-y divide-(--signal)/10">
-        {rows.map((f) => (
+        {spec.fields.map((f) => (
           <div key={f.id} className="flex flex-col gap-0.5 px-3 py-1.5">
             <dt className="text-[10px] font-semibold tracking-wide text-muted-foreground/70 uppercase">
               {f.label}
@@ -167,8 +143,7 @@ function LockedForm({ spec, answer }: { spec: FormSpec; answer: FormAnswer }) {
   )
 }
 
-/** The card header — a Linear-style breadcrumb strip: an icon chip, a chevron,
- *  the form title, and the field count pushed right. */
+/** The card header — an icon chip, the form title, and the field count. */
 function FormHeader({ title, count }: { title: string | undefined; count: number }) {
   return (
     <div className="flex items-center gap-2 px-4 pt-3 pb-2">
@@ -186,47 +161,25 @@ function FormHeader({ title, count }: { title: string | undefined; count: number
   )
 }
 
-/** The card footer: a live progress hint on the left, the submit on the right.
- *  Confirm fields are soft — when `unconfirmed` > 0 an amber warning shows but
- *  the submit stays enabled (the gate ignores confirm fields). Submitting an
- *  INCOMPLETE form is a two-click action: the first click arms (`armed`), the
- *  button turns amber and reads "Confirm incomplete form"; the second submits. */
+/** The card footer: a live progress hint on the left, the submit on the right. */
 function FormFooter({
   filled,
   total,
   label,
   disabled,
-  unconfirmed,
-  armed,
   onSubmit,
 }: {
   filled: number
   total: number
   label: string
   disabled: boolean
-  unconfirmed: number
-  /** the incomplete-submit confirm is armed (button shows the confirm label). */
-  armed: boolean
   onSubmit: () => void
 }) {
   const complete = filled >= total
-  const button = armed
-    ? "bg-(--warn) text-(--primary-foreground) hover:brightness-105"
-    : "bg-(--signal) text-(--primary-foreground) hover:brightness-105"
   return (
     <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-2.5">
-      {/* Screen-reader announcement of the arm/disarm flip (the amber button
-          change is otherwise visual-only). */}
-      <span className="sr-only" role="status" aria-live="polite">
-        {armed ? "Form incomplete — click submit again to confirm." : ""}
-      </span>
       <span className="flex items-center gap-1.5 text-[11px] font-medium">
-        {unconfirmed > 0 ? (
-          <span className="flex items-center gap-1.5 text-(--warn)">
-            <AlertTriangle className="size-3.5" />
-            {unconfirmed} confirmation{unconfirmed === 1 ? "" : "s"} not armed
-          </span>
-        ) : complete ? (
+        {complete ? (
           <span className="flex items-center gap-1.5 text-muted-foreground/70">
             <CheckCircle2 className="size-3.5 text-(--signal)" /> All set
           </span>
@@ -240,11 +193,9 @@ function FormFooter({
         type="button"
         onClick={onSubmit}
         disabled={disabled}
-        className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-medium shadow-sm transition-[filter,opacity,background-color] disabled:opacity-35 disabled:hover:brightness-100 ${button}`}
+        className="flex items-center gap-1.5 rounded-md bg-(--signal) px-3 py-1.5 text-[12.5px] font-medium text-(--primary-foreground) shadow-sm transition-[filter,opacity] hover:brightness-105 disabled:opacity-35 disabled:hover:brightness-100"
       >
-        {armed && <AlertTriangle className="size-3.5" />}
         {label}
-        {!armed && <CornerDownLeft className="size-3.5 opacity-70" />}
       </button>
     </div>
   )
@@ -254,10 +205,10 @@ function FormFooter({
  * Interactive or locked form widget for one ```form``` block.
  *
  * `answer` is the derived matching ```form-answer``` (or null): when present the
- * form renders a locked receipt; otherwise it is an editable form whose submit
- * is disabled until every field is filled (client-side gate — the backend holds
- * no form state, docs/forms.md §7). `onSubmit` hands the composed entries to the
- * parent, which sends the answer message through the existing send path.
+ * form renders a locked receipt; otherwise it is an editable form. `onSubmit`
+ * hands the composed entries to the parent, which sends the answer message
+ * through the existing send path. Submit is a single click — a blank mandatory
+ * field sends its empty seed (the backend holds no form state, docs/forms.md §7).
  */
 export function FormWidget({
   spec,
@@ -273,74 +224,19 @@ export function FormWidget({
   draftKey: string
   onSubmit: (formId: string, entries: FormAnswerEntry[]) => void
 }) {
-  // Every form gets a trailing optional free-text comment field appended, so
-  // the user can always leave a note — see withComment (never blocks submit,
-  // hidden from the receipt when blank).
-  const fullSpec = useMemo(() => withComment(spec), [spec])
   const [values, setValues] = useState<Record<string, AnswerValue>>(() =>
-    loadDraft(draftKey, fullSpec),
+    loadDraft(draftKey, spec),
   )
   const [sent, setSent] = useState(false)
-  // Two-click guard for submitting an INCOMPLETE form: the first click arms
-  // (button turns amber, reads "Confirm incomplete form"), the second submits.
-  const [armed, setArmed] = useState(false)
 
   const filled = useMemo(
-    () => fullSpec.fields.filter((f) => fieldFilled(f, values[f.id])).length,
-    [fullSpec.fields, values],
+    () => spec.fields.filter((f) => fieldFilled(f, values[f.id])).length,
+    [spec.fields, values],
   )
-  // The submit is ALWAYS clickable (only a post-submit `sent` guard applies):
-  // no field blocks it. Unfilled fields answer their empty seed, and an un-armed
-  // `confirm` answers "false" — the footer surfaces progress + an amber warning
-  // for any un-armed confirm as information, never as a block (docs/forms.md §7).
-  const unconfirmed = useMemo(
-    () => fullSpec.fields.filter((f) => f.type === "confirm" && values[f.id] !== "true").length,
-    [fullSpec.fields, values],
-  )
-  // A form is "incomplete" when a MANDATORY field is unfilled. The optional
-  // trailing comment (__comment) and the soft `confirm` fields (un-armed answers
-  // "false" by design) are NOT mandatory, so they never mark a form incomplete.
-  // `missingIds` is the ordered list of those unfilled mandatory fields, used
-  // both for the two-click gate (non-empty = incomplete) and to ring/scroll the
-  // blank fields when the incomplete-submit confirm arms.
-  const missingIds = useMemo(
-    () =>
-      fullSpec.fields
-        .filter((f) => f.id !== COMMENT_ID && f.type !== "confirm" && !fieldFilled(f, values[f.id]))
-        .map((f) => f.id),
-    [fullSpec.fields, values],
-  )
-  const incomplete = missingIds.length > 0
 
-  const cardRef = useRef<HTMLDivElement>(null)
-
-  // Armed incomplete-submit confirm auto-reverts after 3s of inactivity — if the
-  // user doesn't make the second (confirming) click in time, the button drops
-  // back to its normal label so a stale "Confirm incomplete form" never lingers.
-  useEffect(() => {
-    if (!armed) return
-    const t = setTimeout(() => setArmed(false), 3000)
-    return () => clearTimeout(t)
-  }, [armed])
-
-  // On arm, scroll the FIRST missing mandatory field into view so the two-click
-  // confirm points the user straight at what's unfilled (the rows also ring
-  // amber via `highlight`).
-  useEffect(() => {
-    if (!armed) return
-    const firstMissing = missingIds[0]
-    if (firstMissing === undefined) return
-    cardRef.current
-      ?.querySelector(`[data-field-id="${CSS.escape(firstMissing)}"]`)
-      ?.scrollIntoView({ block: "center", behavior: "smooth" })
-  }, [armed, missingIds])
-
-  if (answer) return <LockedForm spec={fullSpec} answer={answer} />
+  if (answer) return <LockedForm spec={spec} answer={answer} />
 
   const setValue = (id: string, v: AnswerValue) => {
-    // Any edit disarms the incomplete-submit confirm — the user changed the
-    // form, so the next submit re-evaluates completeness from scratch.
-    setArmed(false)
     setValues((prev) => {
       const next = { ...prev, [id]: v }
       try {
@@ -354,12 +250,7 @@ export function FormWidget({
 
   const submit = () => {
     if (sent) return
-    // Incomplete form: first click arms the confirm, second click submits.
-    if (incomplete && !armed) {
-      setArmed(true)
-      return
-    }
-    const entries: FormAnswerEntry[] = fullSpec.fields.map((f) => {
+    const entries: FormAnswerEntry[] = spec.fields.map((f) => {
       // An un-armed confirm sends a clean "false" rather than its empty seed.
       if (f.type === "confirm" && values[f.id] !== "true") return { id: f.id, answer: "false" }
       return { id: f.id, answer: values[f.id] ?? (isListField(f) ? [] : "") }
@@ -370,33 +261,27 @@ export function FormWidget({
     } catch {
       // ignore — draft cleanup is best-effort
     }
-    onSubmit(fullSpec.formId, entries)
+    onSubmit(spec.formId, entries)
   }
 
   return (
-    <div
-      ref={cardRef}
-      className="my-1.5 overflow-hidden rounded-xl border border-border/60 bg-card"
-    >
-      <FormHeader title={fullSpec.title} count={fullSpec.fields.length} />
-      {fullSpec.fields.map((f) => (
+    <div className="my-1.5 overflow-hidden rounded-xl border border-border/60 bg-card">
+      <FormHeader title={spec.title} count={spec.fields.length} />
+      {spec.fields.map((f) => (
         <FieldRow
           key={f.id}
           field={f}
           value={values[f.id] ?? ""}
           onChange={(v) => setValue(f.id, v)}
           disabled={sent}
-          highlight={armed && missingIds.includes(f.id)}
           agentId={agentId}
         />
       ))}
       <FormFooter
         filled={filled}
-        total={fullSpec.fields.length}
-        label={armed && incomplete ? "Confirm incomplete form" : (fullSpec.submit ?? "Submit")}
+        total={spec.fields.length}
+        label={spec.submit ?? "Submit"}
         disabled={sent}
-        unconfirmed={unconfirmed}
-        armed={armed && incomplete}
         onSubmit={submit}
       />
     </div>
