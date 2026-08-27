@@ -39,22 +39,30 @@ const COLLECT_DEADLINE: Duration = Duration::from_secs(9);
 /// A resolved key check: the display label, its category tag, the canonical
 /// vault key name, and the probe function to run when the key is present.
 struct KeyProbe {
+    /// Human-readable service label shown on the vitals board.
     label: &'static str,
+    /// Category tag grouping this vital (`vcs`, `service`).
     category: &'static str,
+    /// Canonical vault key name the secret is resolved under.
     canonical: &'static str,
+    /// The probe to run when the key is present.
     probe: fn(&str) -> ProbeResult,
 }
 
 /// Outcome of one authenticated probe: a status string plus a human detail.
 struct ProbeResult {
+    /// The vital status string (`ok` / `error`).
     status: &'static str,
+    /// Human-readable detail (identity, quota, or failure reason).
     detail: String,
 }
 
 impl ProbeResult {
+    /// A successful probe carrying an identity/quota detail.
     fn ok(detail: impl Into<String>) -> Self {
         Self { status: "ok", detail: detail.into() }
     }
+    /// A failed probe carrying the honest failure detail.
     fn error(detail: impl Into<String>) -> Self {
         Self { status: "error", detail: detail.into() }
     }
@@ -79,27 +87,27 @@ pub(super) fn probe_keyed_services() -> Vec<serde_json::Value> {
     for (idx, kp) in probes.into_iter().enumerate() {
         // Resolve the key on the collecting thread (vault access is lock-free).
         let key = cp_vault::vault().get(kp.canonical).map(|s| s.expose().to_owned());
-        let tx = tx.clone();
+        let tx_thread = tx.clone();
         let _handle = thread::spawn(move || {
-            let v = match key {
-                None => vital(kp.label, kp.category, "unavailable", None, "no API key configured"),
-                Some(k) => {
+            let v = key.map_or_else(
+                || vital(kp.label, kp.category, "unavailable", None, "no API key configured"),
+                |k| {
                     let started = Instant::now();
                     let r = (kp.probe)(&k);
                     let latency = u64::try_from(started.elapsed().as_millis()).ok();
                     vital(kp.label, kp.category, r.status, latency, &r.detail)
-                }
-            };
-            let _sent = tx.send((idx, v));
+                },
+            );
+            let _sent = tx_thread.send((idx, v));
         });
     }
     drop(tx);
 
-    let mut slots: Vec<Option<serde_json::Value>> = (0..total).map(|_| None).collect();
-    let deadline = Instant::now() + COLLECT_DEADLINE;
-    let mut received = 0;
+    let mut slots: Vec<Option<serde_json::Value>> = vec![None; total];
+    let deadline = Instant::now().checked_add(COLLECT_DEADLINE);
+    let mut received = 0usize;
     while received < total {
-        let remaining = deadline.saturating_duration_since(Instant::now());
+        let remaining = deadline.map_or(Duration::ZERO, |d| d.saturating_duration_since(Instant::now()));
         if remaining.is_zero() {
             break;
         }
@@ -107,7 +115,7 @@ pub(super) fn probe_keyed_services() -> Vec<serde_json::Value> {
             Ok((idx, v)) => {
                 if let Some(slot) = slots.get_mut(idx) {
                     *slot = Some(v);
-                    received += 1;
+                    received = received.saturating_add(1);
                 }
             }
             Err(_) => break,
@@ -116,7 +124,7 @@ pub(super) fn probe_keyed_services() -> Vec<serde_json::Value> {
 
     slots
         .into_iter()
-        .map(|s| s.unwrap_or_else(|| vital("Service", "service", "unavailable", None, "probe timed out")))
+        .map(|slot| slot.unwrap_or_else(|| vital("Service", "service", "unavailable", None, "probe timed out")))
         .collect()
 }
 
@@ -147,13 +155,13 @@ fn github_check(token: &str) -> ProbeResult {
     let Some(c) = client() else {
         return ProbeResult::error("client init failed");
     };
-    let resp = c
+    let sent = c
         .get("https://api.github.com/user")
         .header("Authorization", format!("Bearer {token}"))
         .header("User-Agent", "context-pilot-orchestrator")
         .header("Accept", "application/vnd.github+json")
         .send();
-    let resp = match resp {
+    let resp = match sent {
         Ok(r) => r,
         Err(e) => return ProbeResult::error(format!("unreachable: {e}")),
     };
@@ -166,8 +174,8 @@ fn github_check(token: &str) -> ProbeResult {
     let login = json.get("login").and_then(serde_json::Value::as_str);
     let email = json.get("email").and_then(serde_json::Value::as_str);
     match (login, email) {
-        (Some(l), Some(e)) => ProbeResult::ok(format!("@{l} · {e}")),
-        (Some(l), _) => ProbeResult::ok(format!("@{l}")),
+        (Some(name), Some(mail)) => ProbeResult::ok(format!("@{name} · {mail}")),
+        (Some(name), _) => ProbeResult::ok(format!("@{name}")),
         _ => ProbeResult::ok("key valid"),
     }
 }
@@ -177,11 +185,11 @@ fn firecrawl_check(token: &str) -> ProbeResult {
     let Some(c) = client() else {
         return ProbeResult::error("client init failed");
     };
-    let resp = c
+    let sent = c
         .get("https://api.firecrawl.dev/v2/team/credit-usage")
         .header("Authorization", format!("Bearer {token}"))
         .send();
-    let resp = match resp {
+    let resp = match sent {
         Ok(r) => r,
         Err(e) => return ProbeResult::error(format!("unreachable: {e}")),
     };
@@ -197,10 +205,10 @@ fn firecrawl_check(token: &str) -> ProbeResult {
         .and_then(|d| d.get("remaining_credits"))
         .or_else(|| json.get("remaining_credits"))
         .and_then(serde_json::Value::as_i64);
-    match credits {
-        Some(n) => ProbeResult::ok(format!("valid · {n} credits left")),
-        None => ProbeResult::ok("key valid"),
-    }
+    credits.map_or_else(
+        || ProbeResult::ok("key valid"),
+        |n| ProbeResult::ok(format!("valid · {n} credits left")),
+    )
 }
 
 /// Voyage: a minimal authenticated embedding proves the key (no whoami exists).
@@ -209,27 +217,22 @@ fn voyage_check(token: &str) -> ProbeResult {
         return ProbeResult::error("client init failed");
     };
     let body = serde_json::json!({ "model": "voyage-3-lite", "input": ["ping"] });
-    let resp = c
+    let sent = c
         .post("https://api.voyageai.com/v1/embeddings")
         .header("Authorization", format!("Bearer {token}"))
         .header("Content-Type", "application/json")
         .json(&body)
         .send();
-    let resp = match resp {
+    let resp = match sent {
         Ok(r) => r,
         Err(e) => return ProbeResult::error(format!("unreachable: {e}")),
     };
     if let Some(fail) = classify_failure(resp.status()) {
         return ProbeResult::error(fail);
     }
-    let total_tokens = resp
-        .json::<serde_json::Value>()
-        .ok()
-        .and_then(|j| j.get("usage").and_then(|u| u.get("total_tokens")).and_then(serde_json::Value::as_i64));
-    match total_tokens {
-        Some(_) => ProbeResult::ok("key valid"),
-        None => ProbeResult::ok("key valid"),
-    }
+    // A 2xx with the auth header accepted is all that proves the key; Voyage
+    // exposes no account identity, so there is nothing further to report.
+    ProbeResult::ok("key valid")
 }
 
 /// Brave: a minimal authenticated search proves the key; the `X-RateLimit-*`
@@ -238,12 +241,12 @@ fn brave_check(token: &str) -> ProbeResult {
     let Some(c) = client() else {
         return ProbeResult::error("client init failed");
     };
-    let resp = c
+    let sent = c
         .get("https://api.search.brave.com/res/v1/web/search?q=ping&count=1")
         .header("X-Subscription-Token", token)
         .header("Accept", "application/json")
         .send();
-    let resp = match resp {
+    let resp = match sent {
         Ok(r) => r,
         Err(e) => return ProbeResult::error(format!("unreachable: {e}")),
     };
@@ -272,11 +275,11 @@ fn datalab_check(token: &str) -> ProbeResult {
     };
     // A bogus request-id under the auth-gated results path: a valid key yields a
     // 4xx that is NOT 401/403 (e.g. 404 "not found"); a bad key yields 401/403.
-    let resp = c
+    let sent = c
         .get("https://www.datalab.to/api/v1/marker/00000000-0000-0000-0000-000000000000")
         .header("X-Api-Key", token)
         .send();
-    let resp = match resp {
+    let resp = match sent {
         Ok(r) => r,
         Err(e) => return ProbeResult::error(format!("unreachable: {e}")),
     };
