@@ -146,7 +146,10 @@ mod tests {
         let masked = mask_key("sk-ant-abcdef123456789xyz");
         assert!(masked.starts_with("sk-a"), "prefix mismatch: {masked}");
         assert!(masked.ends_with("9xyz"), "suffix mismatch: {masked}");
-        assert!(masked.contains("\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}"), "middle not masked: {masked}");
+        assert!(
+            masked.contains("\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}"),
+            "middle not masked: {masked}"
+        );
     }
 
     #[test]

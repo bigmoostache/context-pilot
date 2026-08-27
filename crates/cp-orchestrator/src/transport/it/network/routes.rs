@@ -154,9 +154,10 @@ pub(crate) fn apply_mode(tools: &Tools, config: &NetworkConfig) -> Result<(), St
     if let Some(dir) = tools.networkd_dir.as_ref() {
         let strict = matches!(config.mode, UplinkMode::FiveG);
         if sync_dropin(dir, strict)?
-            && let Some(networkctl) = tools.networkctl.as_ref() {
-                reconfigure_wan(networkctl)?;
-            }
+            && let Some(networkctl) = tools.networkctl.as_ref()
+        {
+            reconfigure_wan(networkctl)?;
+        }
     }
     let wanted_up = match config.mode {
         UplinkMode::Wan => false,

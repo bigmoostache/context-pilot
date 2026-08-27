@@ -132,7 +132,10 @@ pub fn boot_commit_when_healthy<F>(
     mut healthy: F,
     deadline: std::time::Duration,
     interval: std::time::Duration,
-) -> bool where F: FnMut() -> bool {
+) -> bool
+where
+    F: FnMut() -> bool,
+{
     if !pending_path(install).exists() {
         return false; // Nothing staged; normal boot.
     }

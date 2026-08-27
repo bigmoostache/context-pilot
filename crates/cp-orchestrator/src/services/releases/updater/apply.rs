@@ -70,12 +70,7 @@ pub(crate) struct AuthDb<'db> {
 /// Returns an error (with the in-flight record cleaned up) if the release
 /// does not ship both binaries, the backup fails, or staging fails. The
 /// install path is left as it was on any error.
-pub(crate) fn stage_apply(
-    store: &ReleaseStore,
-    db: &AuthDb<'_>,
-    install: &Path,
-    to_tag: &str,
-) -> Result<(), String> {
+pub(crate) fn stage_apply(store: &ReleaseStore, db: &AuthDb<'_>, install: &Path, to_tag: &str) -> Result<(), String> {
     // Both binaries must ship in the release — they move together (§5.1).
     let new_orchestrator = store.orchestrator_binary_path(to_tag);
     if !new_orchestrator.exists() {
@@ -185,21 +180,22 @@ pub fn boot_reconcile(releases_dir: &Path, auth_db_path: &Path, install: &Path) 
 
     // The staged binary was rolled back — restore the matching database.
     if let Some(backup) = pending.db_backup.as_ref()
-        && backup.exists() {
-            match std::fs::copy(backup, auth_db_path) {
-                Ok(_bytes) => {
-                    // Stale WAL/SHM would shadow the restored file's content.
-                    for suffix in ["-wal", "-shm"] {
-                        let mut os = auth_db_path.as_os_str().to_owned();
-                        os.push(suffix);
-                        let _rm = std::fs::remove_file(PathBuf::from(os));
-                    }
-                    let _rm = std::fs::remove_file(backup);
-                    crate::oerr!("updater: rollback — auth.db restored from {}", backup.display());
+        && backup.exists()
+    {
+        match std::fs::copy(backup, auth_db_path) {
+            Ok(_bytes) => {
+                // Stale WAL/SHM would shadow the restored file's content.
+                for suffix in ["-wal", "-shm"] {
+                    let mut os = auth_db_path.as_os_str().to_owned();
+                    os.push(suffix);
+                    let _rm = std::fs::remove_file(PathBuf::from(os));
                 }
-                Err(e) => crate::oerr!("updater: rollback db restore FAILED ({e}) — backup kept at {}", backup.display()),
+                let _rm = std::fs::remove_file(backup);
+                crate::oerr!("updater: rollback — auth.db restored from {}", backup.display());
             }
+            Err(e) => crate::oerr!("updater: rollback db restore FAILED ({e}) — backup kept at {}", backup.display()),
         }
+    }
     let _rm = std::fs::remove_file(&path);
 
     let mut st = UpdateState::load(releases_dir);

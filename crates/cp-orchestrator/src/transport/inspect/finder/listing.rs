@@ -41,9 +41,11 @@ pub fn fs_descriptions(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
             let path = value.get("path").and_then(serde_yaml::Value::as_str);
             let desc = value.get("description").and_then(serde_yaml::Value::as_str);
             if let (Some(p), Some(d)) = (path, desc)
-                && !p.is_empty() && !d.is_empty() {
-                    let _prev = map.insert(p.to_owned(), serde_json::Value::String(d.to_owned()));
-                }
+                && !p.is_empty()
+                && !d.is_empty()
+            {
+                let _prev = map.insert(p.to_owned(), serde_json::Value::String(d.to_owned()));
+            }
         }
     }
 
@@ -175,9 +177,10 @@ pub fn fs_preview(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpRe
     // Reject binary content (check for null bytes in first 8KB).
     let check_len = slice.len().min(8192);
     if let Some(sample) = slice.get(..check_len)
-        && sample.contains(&0) {
-            return HttpReply::error(415, "binary file");
-        }
+        && sample.contains(&0)
+    {
+        return HttpReply::error(415, "binary file");
+    }
 
     let content = String::from_utf8_lossy(slice);
     HttpReply::ok(&serde_json::json!({

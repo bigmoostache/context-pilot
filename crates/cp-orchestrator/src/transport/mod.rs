@@ -150,10 +150,11 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
     // bypass (FR-09); regular users need an ACL entry (FR-10).
     if let Some(agent_id) = auth::extract_agent_id(&segments)
         && let Some(ref user) = auth_user
-            && !auth::authorize_agent(state, agent_id, user) {
-                respond_json(request, &rest::HttpReply::error(403, "no access to this agent"));
-                return;
-            }
+        && !auth::authorize_agent(state, agent_id, user)
+    {
+        respond_json(request, &rest::HttpReply::error(403, "no access to this agent"));
+        return;
+    }
 
     // SSE stream is the one route that takes ownership of the request to stream.
     if method == Method::Get && segments.as_slice() == ["api", "stream"] {

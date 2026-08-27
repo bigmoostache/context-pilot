@@ -151,13 +151,12 @@ pub(crate) fn login_start(state: &Mutex<Backend>) -> HttpReply {
     // Check whether there's already a valid token (multi-account scenario).
     // When `already_valid` is true, the auto-poller MUST stay disabled — the
     // user intends to switch accounts and needs to paste the new code.
-    let already_valid = read_credentials_json()
-        .is_some_and(|c| {
-            let expires_at = c.get("expiresAt").and_then(serde_json::Value::as_i64).unwrap_or(0);
-            let now_ms = cp_mod_utilities::time::now_epoch_ms();
-            let token = c.get("accessToken").and_then(|v| v.as_str()).unwrap_or("");
-            expires_at > now_ms && !token.is_empty()
-        });
+    let already_valid = read_credentials_json().is_some_and(|c| {
+        let expires_at = c.get("expiresAt").and_then(serde_json::Value::as_i64).unwrap_or(0);
+        let now_ms = cp_mod_utilities::time::now_epoch_ms();
+        let token = c.get("accessToken").and_then(|v| v.as_str()).unwrap_or("");
+        expires_at > now_ms && !token.is_empty()
+    });
 
     HttpReply::ok(&LoginStartResponse { url, already_valid: Some(already_valid) })
 }

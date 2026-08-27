@@ -240,7 +240,10 @@ fn a_mode_change_does_not_touch_the_access_points_hash() {
     strict.mode = UplinkMode::FiveG;
     let (before, after) = (StepHashes::of(&ethernet), StepHashes::of(&strict));
 
-    assert_eq!(before.access_point, after.access_point, "the AP is untouched by a mode change \u{2014} no client bounces");
+    assert_eq!(
+        before.access_point, after.access_point,
+        "the AP is untouched by a mode change \u{2014} no client bounces"
+    );
     assert_eq!(before.ap_activation, after.ap_activation, "\u{2026}and neither is its activation");
     assert_ne!(before.mode, after.mode, "the mode step must re-run");
     assert_ne!(before.wwan, after.wwan, "\u{2026}and so must the bearer: the mode drives its metric and autoconnect");

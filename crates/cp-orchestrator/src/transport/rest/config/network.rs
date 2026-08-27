@@ -225,7 +225,11 @@ mod tests {
     #[test]
     fn invalid_bodies_are_400() {
         let state = backend();
-        assert_eq!(it_set_network_mode(&state, br#"{"mode":"satellite"}"#, None).status, 400, "unknown mode \u{2192} 400");
+        assert_eq!(
+            it_set_network_mode(&state, br#"{"mode":"satellite"}"#, None).status,
+            400,
+            "unknown mode \u{2192} 400"
+        );
         let no_country = br#"{"enabled":true,"ssid":"cp","passphrase":"abcdefghij","band":"a","channel":0,"country":"","hidden":false,"share_internet":true}"#;
         assert_eq!(it_set_network_ap(&state, no_country, None).status, 400, "enabling with no country \u{2192} 400");
     }

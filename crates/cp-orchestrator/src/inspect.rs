@@ -138,9 +138,10 @@ fn read_cached_json(path: &Path, slot: &mut Option<CachedJson>) -> io::Result<Va
 
     // Cache hit: mtime unchanged → return the existing parse.
     if let Some(cached) = slot.as_ref()
-        && cached.mtime == current_mtime {
-            return Ok(cached.data.clone());
-        }
+        && cached.mtime == current_mtime
+    {
+        return Ok(cached.data.clone());
+    }
 
     // Cache miss: read + parse.
     match read_json(path) {

@@ -188,10 +188,9 @@ pub fn retire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     kill_console_server(&folder);
 
     // Drop any stale supervised record so a later unretire respawn key is free.
-    if was_supervised
-        && let Ok(mut b) = state.lock() {
-            let _stopped = b.supervisor.stop(&key);
-        }
+    if was_supervised && let Ok(mut b) = state.lock() {
+        let _stopped = b.supervisor.stop(&key);
+    }
 
     // Record retired (persisted).
     {

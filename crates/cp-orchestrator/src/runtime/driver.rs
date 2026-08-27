@@ -247,9 +247,7 @@ fn check_config_mtimes(backend: &Arc<Mutex<Backend>>, ds: &mut DriverState) {
         let changed = config_mtimes.get(id).is_some_and(|prev| *prev != current);
         let _: Option<SystemTime> = config_mtimes.insert(id.clone(), current);
 
-        if changed
-            && let Ok(mut b) = backend.lock()
-        {
+        if changed && let Ok(mut b) = backend.lock() {
             b.mark_dirty(id);
         }
     }

@@ -72,12 +72,13 @@ pub(crate) fn get(tag: &str, summary: &str, response: Value) -> Value {
 pub(crate) fn post(tag: &str, summary: &str, body: Option<Value>, response: Value) -> Value {
     let mut op = json!({ "tags": [tag], "summary": summary, "responses": merge(ok(response), err()) });
     if let Some(b) = body
-        && let Some(obj) = op.as_object_mut() {
-            drop(obj.insert(
-                "requestBody".into(),
-                json!({ "required": true, "content": { "application/json": { "schema": b } } }),
-            ));
-        }
+        && let Some(obj) = op.as_object_mut()
+    {
+        drop(obj.insert(
+            "requestBody".into(),
+            json!({ "required": true, "content": { "application/json": { "schema": b } } }),
+        ));
+    }
     json!({ "post": op })
 }
 

@@ -135,9 +135,10 @@ pub(crate) fn switch_account(body_bytes: &[u8]) -> HttpReply {
     if let Some(current) = super::read_credentials_json() {
         let current_token = current.get("accessToken").and_then(|v| v.as_str()).unwrap_or("");
         if !current_token.is_empty()
-            && let Some(current_email) = super::fetch_account_email(current_token) {
-                let _prev = store.accounts.insert(current_email, current);
-            }
+            && let Some(current_email) = super::fetch_account_email(current_token)
+        {
+            let _prev = store.accounts.insert(current_email, current);
+        }
     }
 
     // Write updated store (with old active added, target removed).

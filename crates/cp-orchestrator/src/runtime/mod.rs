@@ -230,8 +230,7 @@ impl Runtime {
         let backend = Arc::clone(&self.backend);
         let agents_dir = self.config.agents_dir.clone();
         let interval = self.config.scan_interval;
-        let backup_scheduler =
-            self.config.auth_enabled.then(|| BackupScheduler::new(self.config.auth_db_path.clone()));
+        let backup_scheduler = self.config.auth_enabled.then(|| BackupScheduler::new(self.config.auth_db_path.clone()));
 
         thread::spawn(move || driver::driver_loop(&backend, agents_dir, interval, backup_scheduler))
     }

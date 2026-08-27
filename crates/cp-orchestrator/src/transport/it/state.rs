@@ -69,9 +69,10 @@ pub(super) fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     drop(file);
     std::fs::rename(&tmp, path)?;
     if let Some(parent) = path.parent()
-        && let Ok(dir) = std::fs::File::open(parent) {
-            let _synced = dir.sync_all(); // best-effort: persist the rename in the dir entry
-        }
+        && let Ok(dir) = std::fs::File::open(parent)
+    {
+        let _synced = dir.sync_all(); // best-effort: persist the rename in the dir entry
+    }
     Ok(())
 }
 

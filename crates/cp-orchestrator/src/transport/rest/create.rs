@@ -103,11 +103,12 @@ pub fn create_agent(state: &Mutex<Backend>, body_bytes: &[u8], auth_user: Option
             // immediately see and manage the agent they just created.
             if let Some(user) = auth_user
                 && let Ok(b) = state.lock()
-                    && let Some(auth) = b.auth.as_ref() {
-                        let canonical = folder.canonicalize().unwrap_or_else(|_| folder.clone());
-                        let agent_id = folder_id(&canonical.to_string_lossy());
-                        let _grant = auth.grant_access(&agent_id, &user.id, AgentRole::AgentAdmin, None);
-                    }
+                && let Some(auth) = b.auth.as_ref()
+            {
+                let canonical = folder.canonicalize().unwrap_or_else(|_| folder.clone());
+                let agent_id = folder_id(&canonical.to_string_lossy());
+                let _grant = auth.grant_access(&agent_id, &user.id, AgentRole::AgentAdmin, None);
+            }
 
             HttpReply::json(
                 202,

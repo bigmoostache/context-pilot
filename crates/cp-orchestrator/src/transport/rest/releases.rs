@@ -298,7 +298,9 @@ pub(crate) fn deploy_fleet(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     let agents_dir_str = agents_dir.to_string_lossy().into_owned();
 
     for id in &agent_ids {
-        let entry = if let Ok(e) = super::resolve_entry(state, id) { e } else {
+        let entry = if let Ok(e) = super::resolve_entry(state, id) {
+            e
+        } else {
             errors.push(format!("{id}: not found in registry"));
             continue;
         };
@@ -310,9 +312,10 @@ pub(crate) fn deploy_fleet(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
 
         // Drop stale supervised record.
         if let Ok(mut b) = state.lock()
-            && b.supervisor.is_supervised(&key) {
-                let _stopped = b.supervisor.stop(&key);
-            }
+            && b.supervisor.is_supervised(&key)
+        {
+            let _stopped = b.supervisor.stop(&key);
+        }
 
         // Respawn on the same folder with the (potentially new) binary.
         let env: [(&str, &str); 2] = [("CP_BRIDGE", "1"), ("CP_AGENTS_DIR", &agents_dir_str)];
@@ -380,14 +383,15 @@ pub(crate) fn restart_orchestrator(state: &Mutex<Backend>) -> HttpReply {
             }
         };
         if let Some((tag, src)) = src
-            && src.exists() {
-                match crate::services::releases::stage_orchestrator_update(install, &src) {
-                    Ok(()) => updated_tag = Some(tag),
-                    Err(e) => {
-                        crate::oerr!("restart_orchestrator: staging update {tag} failed: {e}; restarting current binary");
-                    }
+            && src.exists()
+        {
+            match crate::services::releases::stage_orchestrator_update(install, &src) {
+                Ok(()) => updated_tag = Some(tag),
+                Err(e) => {
+                    crate::oerr!("restart_orchestrator: staging update {tag} failed: {e}; restarting current binary");
                 }
             }
+        }
     }
 
     let _restart = std::thread::spawn(move || {
@@ -401,7 +405,10 @@ pub(crate) fn restart_orchestrator(state: &Mutex<Backend>) -> HttpReply {
             // `exec` only ever returns on failure — on success it never comes
             // back because the process image is replaced.
             let err = std::process::Command::new(&exe).args(&args).exec();
-            crate::oerr!("restart_orchestrator: exec of {} failed: {err}; exiting for supervisor respawn", exe.display());
+            crate::oerr!(
+                "restart_orchestrator: exec of {} failed: {err}; exiting for supervisor respawn",
+                exe.display()
+            );
         } else {
             crate::oerr!("restart_orchestrator: current_exe() unavailable; exiting for supervisor respawn");
         }

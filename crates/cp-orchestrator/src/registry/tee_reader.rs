@@ -306,10 +306,11 @@ mod tests {
         let mut delivered = false;
         for _ in 0..50 {
             if let Some(frames) = backend.lock().expect("lock").hub_mut().drain("late", sub)
-                && !frames.is_empty() {
-                    delivered = true;
-                    break;
-                }
+                && !frames.is_empty()
+            {
+                delivered = true;
+                break;
+            }
             sleep(Duration::from_millis(20));
         }
         reader.stop();

@@ -65,9 +65,10 @@ fn tick(backend: &Arc<Mutex<Backend>>, auth_db: &PathBuf, install: &PathBuf) -> 
             // A verified answer on the new channel retires the crossgrade window
             // (mirrors the REST check handler).
             if result.is_ok()
-                && let Ok(mut b) = backend.lock() {
-                    b.releases.clear_pending_switch();
-                }
+                && let Ok(mut b) = backend.lock()
+            {
+                b.releases.clear_pending_switch();
+            }
             result.map(|eval| match eval {
                 UpdateEvaluation::Available(manifest) => Some(*manifest),
                 UpdateEvaluation::UpToDate => None,

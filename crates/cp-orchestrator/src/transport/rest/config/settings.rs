@@ -88,8 +88,7 @@ fn can_manage_config(state: &Mutex<Backend>, auth_user: Option<&User>) -> bool {
 /// providers have a key configured (never the key values). Drives both the
 /// onboarding gate and the profile/config panes.
 pub fn get_settings(state: &Mutex<Backend>, auth_user: Option<&User>) -> HttpReply {
-    let (auth_enabled, access_control) =
-        state.lock().map_or((false, false), |b| (b.auth.is_some(), b.access_control));
+    let (auth_enabled, access_control) = state.lock().map_or((false, false), |b| (b.auth.is_some(), b.access_control));
     let providers: Vec<serde_json::Value> =
         // Resolve via the vault (not `global::has_api_key`) so a key added at
         // runtime through the settings page shows as configured without an

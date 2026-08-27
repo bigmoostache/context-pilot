@@ -195,7 +195,6 @@ mod tests {
 
         backup_store_to(&store, &tmp).expect("backup_to");
 
-
         // The backup file should exist and be a valid SQLite database.
         assert!(tmp.exists(), "backup file should exist");
         let restored = rusqlite::Connection::open(&tmp).expect("open backup");

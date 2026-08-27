@@ -149,7 +149,12 @@ pub(crate) fn update_apply(state: &Mutex<Backend>) -> HttpReply {
             APPLY_IN_FLIGHT.store(false, Ordering::SeqCst);
             return HttpReply::error(500, "backend lock poisoned");
         };
-        if let Err(e) = stage_apply(&b.releases, &AuthDb { store: b.auth.as_ref(), path: &b.auth_db_path }, &install, &manifest.version) {
+        if let Err(e) = stage_apply(
+            &b.releases,
+            &AuthDb { store: b.auth.as_ref(), path: &b.auth_db_path },
+            &install,
+            &manifest.version,
+        ) {
             drop(b);
             APPLY_IN_FLIGHT.store(false, Ordering::SeqCst);
             return HttpReply::error(500, &format!("stage failed: {e}"));
@@ -200,13 +205,15 @@ pub(crate) fn update_set_mode(state: &Mutex<Backend>, body: &[u8]) -> HttpReply 
         return HttpReply::error(500, "backend lock poisoned");
     };
     if let Some(window) = req.window
-        && let Err(e) = b.releases.set_window(window) {
-            return HttpReply::error(400, &e);
-        }
+        && let Err(e) = b.releases.set_window(window)
+    {
+        return HttpReply::error(400, &e);
+    }
     if let Some(channel) = req.channel
-        && let Err(e) = b.releases.set_channel(channel.as_str()) {
-            return HttpReply::error(400, &e);
-        }
+        && let Err(e) = b.releases.set_channel(channel.as_str())
+    {
+        return HttpReply::error(400, &e);
+    }
     if let Some(mode) = req.mode {
         b.releases.set_update_mode(mode);
     }

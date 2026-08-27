@@ -250,14 +250,20 @@ mod tests {
     fn nightly_head_tracking() {
         assert!(
             matches!(
-                evaluate_parsed(manifest("nightly", "v0.1.0-def5678", FRESH, "v0.1.0"), &ctx("v0.1.0-abc1234", "nightly", false)),
+                evaluate_parsed(
+                    manifest("nightly", "v0.1.0-def5678", FRESH, "v0.1.0"),
+                    &ctx("v0.1.0-abc1234", "nightly", false)
+                ),
                 Ok(UpdateEvaluation::Available(_))
             ),
             "a new nightly sha at the same semver must be Available"
         );
         assert!(
             matches!(
-                evaluate_parsed(manifest("nightly", "v0.1.0-abc1234", FRESH, "v0.1.0"), &ctx("v0.1.0-abc1234", "nightly", false)),
+                evaluate_parsed(
+                    manifest("nightly", "v0.1.0-abc1234", FRESH, "v0.1.0"),
+                    &ctx("v0.1.0-abc1234", "nightly", false)
+                ),
                 Ok(UpdateEvaluation::UpToDate)
             ),
             "the same nightly build is up to date"
@@ -270,14 +276,20 @@ mod tests {
     fn nightly_ignores_floor_but_not_freshness() {
         assert!(
             matches!(
-                evaluate_parsed(manifest("nightly", "v0.1.0-def5678", FRESH, "v9.9.9"), &ctx("v0.0.1-old", "nightly", false)),
+                evaluate_parsed(
+                    manifest("nightly", "v0.1.0-def5678", FRESH, "v9.9.9"),
+                    &ctx("v0.0.1-old", "nightly", false)
+                ),
                 Ok(UpdateEvaluation::Available(_))
             ),
             "nightly skips the min_from floor"
         );
         assert!(
             matches!(
-                evaluate_parsed(manifest("nightly", "v0.1.0-def5678", "2020-01-01T00:00:00Z", "v0.1.0"), &ctx("v0.1.0-abc1234", "nightly", false)),
+                evaluate_parsed(
+                    manifest("nightly", "v0.1.0-def5678", "2020-01-01T00:00:00Z", "v0.1.0"),
+                    &ctx("v0.1.0-abc1234", "nightly", false)
+                ),
                 Err(VerifyError::Expired { .. })
             ),
             "an expired nightly manifest is refused"
@@ -290,7 +302,10 @@ mod tests {
     fn cross_channel_manifest_refused() {
         assert!(
             matches!(
-                evaluate_parsed(manifest("stable", "v0.2.12", FRESH, "v0.1.0"), &ctx("v0.1.0-abc1234", "nightly", false)),
+                evaluate_parsed(
+                    manifest("stable", "v0.2.12", FRESH, "v0.1.0"),
+                    &ctx("v0.1.0-abc1234", "nightly", false)
+                ),
                 Err(VerifyError::ChannelMismatch { .. })
             ),
             "a cross-channel manifest must be refused"

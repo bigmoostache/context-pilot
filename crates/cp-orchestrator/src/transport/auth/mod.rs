@@ -54,8 +54,7 @@ pub(crate) fn authenticate(
     // sites already short-circuit to full access on `auth_user == None`. Also a
     // no-op when there is no auth store to enforce against (NFR-09). Both are read
     // from the cached [`Backend::access_control`] flag — no per-request disk I/O.
-    let (access_control, auth_enabled) =
-        state.lock().map_or((false, false), |b| (b.access_control, b.auth.is_some()));
+    let (access_control, auth_enabled) = state.lock().map_or((false, false), |b| (b.access_control, b.auth.is_some()));
     if !access_control || !auth_enabled {
         return Ok(None);
     }
@@ -84,9 +83,7 @@ pub(crate) fn authenticate(
 fn is_public_route(segments: &[&str]) -> bool {
     matches!(
         segments,
-        ["api", "health" | "stream"] |
-["api", "auth", "login" | "register" | "status"] |
-["api", "agent", _, "avatar"]
+        ["api", "health" | "stream"] | ["api", "auth", "login" | "register" | "status"] | ["api", "agent", _, "avatar"]
     )
 }
 
@@ -95,13 +92,11 @@ fn is_public_route(segments: &[&str]) -> bool {
 /// decide whether to show a login vs bootstrap-register page before any
 /// Bearer token is available).
 pub(crate) fn auth_status(state: &Mutex<Backend>) -> HttpReply {
-    let (enabled, bootstrapped) = state
-        .lock()
-        .map_or((false, false), |b| {
-            let enabled = b.auth.is_some();
-            let bootstrapped = b.auth.as_ref().and_then(|a| a.count_users().ok()).is_some_and(|n| n > 0);
-            (enabled, bootstrapped)
-        });
+    let (enabled, bootstrapped) = state.lock().map_or((false, false), |b| {
+        let enabled = b.auth.is_some();
+        let bootstrapped = b.auth.as_ref().and_then(|a| a.count_users().ok()).is_some_and(|n| n > 0);
+        (enabled, bootstrapped)
+    });
     HttpReply::ok(&serde_json::json!({
         "enabled": enabled,
         "bootstrapped": bootstrapped,
@@ -251,8 +246,7 @@ pub(crate) fn me(state: &Mutex<Backend>, auth_user: Option<&User>) -> HttpReply 
     let Some(user) = auth_user else {
         return HttpReply::error(501, "auth not enabled");
     };
-    let provisioned =
-        state.lock().is_ok_and(|b| crate::transport::it::is_provisioned(&b.provision_flag_path));
+    let provisioned = state.lock().is_ok_and(|b| crate::transport::it::is_provisioned(&b.provision_flag_path));
     let mut value = serde_json::to_value(user).unwrap_or_default();
     if let Some(obj) = value.as_object_mut() {
         drop(obj.insert("next_action".to_owned(), next_action(user, provisioned).into()));

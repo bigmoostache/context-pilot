@@ -38,7 +38,9 @@ pub fn usage(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
     };
 
     let worker_id = extract_worker_param(query);
-    let wid = if let Some(id) = worker_id { id } else {
+    let wid = if let Some(id) = worker_id {
+        id
+    } else {
         let workers = match backend.inspect_mut().list_workers(folder_path) {
             Ok(w) => w,
             Err(_) => return HttpReply::error(404, "cannot list workers"),

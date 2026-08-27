@@ -42,18 +42,20 @@ fn extract_router_routes() -> BTreeSet<Route> {
         // ── Match arms in route_rest(): (Method::Get, ["api", ...]) ──
         if let Some(rest) = t.strip_prefix("(Method::")
             && let Some((method_raw, after)) = rest.split_once(',')
-                && let Some(segs) = extract_bracket_segments(after) {
-                    let path = segments_to_path(&segs);
-                    let _new = routes.insert((method_raw.trim().to_uppercase(), path));
-                }
+            && let Some(segs) = extract_bracket_segments(after)
+        {
+            let path = segments_to_path(&segs);
+            let _new = routes.insert((method_raw.trim().to_uppercase(), path));
+        }
 
         // ── Special routes in handle(): if let ["api", ...] = segments ──
         // These live inside `if method == Method::Get { ... }` so are all GET.
         if t.starts_with("if let [\"api\"")
-            && let Some(segs) = extract_bracket_segments(t) {
-                let path = segments_to_path(&segs);
-                let _new = routes.insert(("GET".to_owned(), path));
-            }
+            && let Some(segs) = extract_bracket_segments(t)
+        {
+            let path = segments_to_path(&segs);
+            let _new = routes.insert(("GET".to_owned(), path));
+        }
     }
 
     // Remove intentionally excluded routes.

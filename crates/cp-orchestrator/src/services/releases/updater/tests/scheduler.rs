@@ -69,7 +69,12 @@ fn scheduler_tick_decisions() {
 fn assert_check_failed() {
     let gate = AtomicBool::new(false);
     let outcome = run_tick(
-        &TickCtx { mode: UpdateMode::Auto, window: &MaintenanceWindow::default(), now_minutes: IN_WINDOW, apply_gate: &gate },
+        &TickCtx {
+            mode: UpdateMode::Auto,
+            window: &MaintenanceWindow::default(),
+            now_minutes: IN_WINDOW,
+            apply_gate: &gate,
+        },
         || Err("boom".to_owned()),
         |_m| Ok(String::new()),
     );
@@ -98,7 +103,12 @@ fn scheduler_serialises_applies() {
 fn assert_retry_after_failure() {
     let gate = AtomicBool::new(false);
     let failed = run_tick(
-        &TickCtx { mode: UpdateMode::Auto, window: &MaintenanceWindow::default(), now_minutes: IN_WINDOW, apply_gate: &gate },
+        &TickCtx {
+            mode: UpdateMode::Auto,
+            window: &MaintenanceWindow::default(),
+            now_minutes: IN_WINDOW,
+            apply_gate: &gate,
+        },
         || Ok(Some(fixture_manifest())),
         |_m| Err("download broke".to_owned()),
     );

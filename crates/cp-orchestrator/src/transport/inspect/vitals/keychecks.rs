@@ -205,10 +205,7 @@ fn firecrawl_check(token: &str) -> ProbeResult {
         .and_then(|d| d.get("remaining_credits"))
         .or_else(|| json.get("remaining_credits"))
         .and_then(serde_json::Value::as_i64);
-    credits.map_or_else(
-        || ProbeResult::ok("key valid"),
-        |n| ProbeResult::ok(format!("valid · {n} credits left")),
-    )
+    credits.map_or_else(|| ProbeResult::ok("key valid"), |n| ProbeResult::ok(format!("valid · {n} credits left")))
 }
 
 /// Voyage: a minimal authenticated embedding proves the key (no whoami exists).

@@ -43,7 +43,11 @@ fn main() {
     for arg in std::env::args().skip(1) {
         match arg.as_str() {
             "--version" | "-V" => {
-                cp_orchestrator::oout!("cp-orchestrator v{} (protocol v{})", env!("CARGO_PKG_VERSION"), cp_wire::PROTOCOL_VERSION);
+                cp_orchestrator::oout!(
+                    "cp-orchestrator v{} (protocol v{})",
+                    env!("CARGO_PKG_VERSION"),
+                    cp_wire::PROTOCOL_VERSION
+                );
                 return;
             }
             other => {
@@ -90,7 +94,11 @@ fn main() {
     if let Some(install) = install.as_deref() {
         let releases_dir = cp_orchestrator::services::ReleaseStore::default_dir()
             .unwrap_or_else(|| config.agents_dir.join("releases"));
-        cp_orchestrator::services::releases::updater::apply::boot_reconcile(&releases_dir, &config.auth_db_path, install);
+        cp_orchestrator::services::releases::updater::apply::boot_reconcile(
+            &releases_dir,
+            &config.auth_db_path,
+            install,
+        );
     }
 
     cp_orchestrator::oerr!("agents directory: {}", config.agents_dir.display());

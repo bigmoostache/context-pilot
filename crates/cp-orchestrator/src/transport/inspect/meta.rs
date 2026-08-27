@@ -128,19 +128,16 @@ fn build_agent_meta(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> se
     // deltas folded into the view), so serving them here keeps a COLD load /
     // backstop poll consistent with the live SSE deltas the frontend folds —
     // the same value arrives over both planes (T297 live HUD reactivity).
-    let (phase, lifecycle, cost_usd, input_tokens, output_tokens, context, is_stale) =
-        state.lock().map_or_else(
-            |_| (None, None, 0.0f64, 0u64, 0u64, ContextSnapshot::default(), false),
-            |b| {
-                let dead = b.liveness.get(agent_id).is_some_and(|l| !l.is_live());
-                b.view.get(agent_id).map_or_else(
-                    || (None, None, 0.0f64, 0u64, 0u64, ContextSnapshot::default(), dead),
-                    |v| {
-                        (v.phase, v.lifecycle, v.cost.cost_usd, v.cost.input_tokens, v.cost.output_tokens, v.context, dead)
-                    },
-                )
-            },
-        );
+    let (phase, lifecycle, cost_usd, input_tokens, output_tokens, context, is_stale) = state.lock().map_or_else(
+        |_| (None, None, 0.0f64, 0u64, 0u64, ContextSnapshot::default(), false),
+        |b| {
+            let dead = b.liveness.get(agent_id).is_some_and(|l| !l.is_live());
+            b.view.get(agent_id).map_or_else(
+                || (None, None, 0.0f64, 0u64, 0u64, ContextSnapshot::default(), dead),
+                |v| (v.phase, v.lifecycle, v.cost.cost_usd, v.cost.input_tokens, v.cost.output_tokens, v.context, dead),
+            )
+        },
+    );
 
     // Thread count + any-MY_TURN + last activity from config.json.
     let (threads_count, has_my_turn, last_activity_ms, task) = inspect_threads(state, folder);

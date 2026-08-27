@@ -466,10 +466,9 @@ fn parse_global_country(output: &str) -> Option<String> {
             in_global = true;
             continue;
         }
-        if in_global
-            && let Some(rest) = line.strip_prefix("country ") {
-                return rest.split(':').next().map(str::to_owned);
-            }
+        if in_global && let Some(rest) = line.strip_prefix("country ") {
+            return rest.split(':').next().map(str::to_owned);
+        }
     }
     None
 }
