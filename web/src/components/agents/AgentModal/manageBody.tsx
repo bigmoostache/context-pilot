@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { BadgeCheck, Bot, Cpu, Loader2, FolderGit2, ScrollText } from "lucide-react"
+import { Loader2, FolderGit2, ScrollText } from "lucide-react"
 import { useIdentity, sendCommand } from "@/lib/live"
 import type { AgentIdentity } from "@/lib/api"
 import { ModelPicker } from "../ModelPicker"
@@ -7,15 +7,7 @@ import { AgentAclSection } from "../../auth/AgentAclSection"
 import { SessionVitals } from "../../shell/SessionVitals"
 import { cn } from "@/lib/utils"
 import type { Controller } from "./parts"
-
-/** The three manage-mode panes. */
-type TabId = "identity" | "llm" | "vitals"
-
-const TABS: { id: TabId; label: string; icon: typeof Bot }[] = [
-  { id: "identity", label: "Identity", icon: Bot },
-  { id: "llm", label: "Model", icon: Cpu },
-  { id: "vitals", label: "Vitals", icon: BadgeCheck },
-]
+import { TABS, type TabId } from "./tabs"
 
 /**
  * Manage-mode body — a ConfigPanel-style left rail (Identity / Model / Vitals) +
@@ -24,7 +16,7 @@ const TABS: { id: TabId; label: string; icon: typeof Bot }[] = [
  * bodies stay within the P8 complexity budget.
  */
 export function TabbedManageBody({ c }: { c: Controller }) {
-  const [tab, setTab] = useState<TabId>("identity")
+  const [tab, setTab] = useState<TabId>("llm")
   return (
     <div className="grid min-h-0 flex-1 grid-cols-[190px_minmax(0,1fr)] overflow-hidden">
       {/* category rail */}
@@ -70,8 +62,9 @@ export function TabbedManageBody({ c }: { c: Controller }) {
 // ── Model tab ─────────────────────────────────────────────────────────
 
 /** Name (rename) + realm preview + provider/model picker — the fields the
- *  footer's Save button persists (configure + rename). */
-function LlmTab({ c }: { c: Controller }) {
+ *  footer's Save button persists (configure + rename). In the settings VIEW
+ *  there is no footer, so that surface renders its own save bar beside this. */
+export function LlmTab({ c }: { c: Controller }) {
   const { name, setName, realm, providers, provId, modelId, setSel } = c
   return (
     <div className="flex flex-col gap-5 px-6 py-5">
@@ -109,7 +102,7 @@ function LlmTab({ c }: { c: Controller }) {
 // ── Vitals tab ────────────────────────────────────────────────────────
 
 /** Service vitals + (when auth is on) the per-agent ACL section. */
-function VitalsTab({ c, agentId }: { c: Controller; agentId: string }) {
+export function VitalsTab({ c, agentId }: { c: Controller; agentId: string }) {
   return (
     <div className="flex flex-col gap-5 px-6 py-5">
       <SessionVitals agentId={agentId} />
@@ -143,7 +136,7 @@ const IDENTITY_FIELDS: { key: keyof AgentIdentity; label: string }[] = [
  * agent re-validates the per-value word cap and the SSE delta refetches). The
  * borderless field styling mirrors {@link AgentEditorDialog}.
  */
-function IdentityTab({ agentId }: { agentId: string }) {
+export function IdentityTab({ agentId }: { agentId: string }) {
   const { data } = useIdentity(agentId)
   const [form, setForm] = useState<AgentIdentity | null>(null)
   // Fingerprint of the last server snapshot the form adopted. Lets the form

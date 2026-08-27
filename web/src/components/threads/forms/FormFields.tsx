@@ -5,8 +5,14 @@
 // They are presentational — the owning FormWidget holds the value map, the
 // draft persistence, and the submit gate. `files` is the sole async one: it
 // uploads on pick via the existing `.uploads/` path and answers with paths.
+//
+// Deliberately effect-free. An earlier version measured `scrollHeight` in a
+// `useLayoutEffect` to auto-grow the text boxes; that layout read on every
+// keystroke, inside a long conversation using `content-visibility:auto`, was a
+// standing crash/freeze suspect (T643). Text answers now use a plain
+// `resize-y` textarea — no layout effect, nothing to loop.
 
-import { useLayoutEffect, useRef, useState } from "react"
+import { useState } from "react"
 import { Check, Upload, Loader2, AlertTriangle, X, CalendarIcon } from "lucide-react"
 import { format, parse } from "date-fns"
 import { uploadUnique } from "@/lib/api"
@@ -36,50 +42,6 @@ function asList(v: AnswerValue): string[] {
   return v ? [v] : []
 }
 
-/** A textarea that grows with its content — like the thread composer. rows=1,
- *  height recomputed from scrollHeight on every value change (useLayoutEffect,
- *  so the first paint is already the right height), capped at maxH px beyond
- *  which it scrolls. Backs every free-text answer so a long reply isn't trapped
- *  in a one-line box. */
-function AutoGrowTextarea({
-  value,
-  onChange,
-  disabled,
-  placeholder,
-  className,
-  autoFocus,
-  maxH = 240,
-}: {
-  value: string
-  onChange: (v: string) => void
-  disabled: boolean
-  placeholder?: string
-  className?: string
-  autoFocus?: boolean
-  maxH?: number
-}) {
-  const ref = useRef<HTMLTextAreaElement>(null)
-  useLayoutEffect(() => {
-    const el = ref.current
-    if (!el) return
-    el.style.height = "auto"
-    el.style.height = `${Math.min(el.scrollHeight, maxH)}px`
-  }, [value, maxH])
-  return (
-    <textarea
-      ref={ref}
-      rows={1}
-      value={value}
-      disabled={disabled}
-      placeholder={placeholder}
-      autoFocus={autoFocus}
-      onChange={(e) => onChange(e.target.value)}
-      className={`${className ?? ""} scrollbar-none [&::-webkit-scrollbar]:hidden`}
-      style={{ maxHeight: maxH }}
-    />
-  )
-}
-
 /** One selectable option row (radio/checkbox). The control is a custom glyph so
  *  the checked state reads crisply against the signal-tinted selected surface. */
 function OptionRow({
@@ -99,11 +61,25 @@ function OptionRow({
 }) {
   return (
     <label
-      className={`group flex cursor-pointer items-start gap-2.5 rounded-md px-2 py-1.5 text-[13px] transition-colors ${
+      className={`group relative flex cursor-pointer items-start gap-2.5 rounded-md px-2 py-1.5 text-[13px] transition-colors ${
         on ? "bg-(--signal)/6" : "hover:bg-muted/40"
       } ${disabled ? "pointer-events-none opacity-60" : ""}`}
     >
-      <input type={kind} checked={on} disabled={disabled} onChange={onPick} className="sr-only" />
+      {/* Positioned AT the label (parent is `relative`), size-0 + opacity-0 —
+          invisible but IN VIEW. A Tailwind `sr-only` input is
+          `position:absolute` with no local positioned ancestor, so it resolves
+          against a far-up ancestor; clicking the label focuses that off-screen
+          input and Firefox scroll-into-views the ~100k-px conversation scroller
+          to it, painting <main> blank (T644). Keeping focus on-screen fixes it.
+          Selecting an allow-other option instead autoFocuses its visible
+          textarea, which is why "Other…" never blanked. */}
+      <input
+        type={kind}
+        checked={on}
+        disabled={disabled}
+        onChange={onPick}
+        className="absolute top-0 left-0 size-0 opacity-0"
+      />
       <span
         className={`mt-0.5 flex size-4 shrink-0 items-center justify-center border transition-colors ${
           kind === "radio" ? "rounded-full" : "rounded-sm"
@@ -123,6 +99,9 @@ function OptionRow({
     </label>
   )
 }
+
+const SCALAR_INPUT =
+  "w-full rounded-md bg-transparent py-0.5 text-[13.5px] leading-relaxed text-foreground/90 outline-none placeholder:text-muted-foreground/40 disabled:opacity-60"
 
 /** single — radio over `{label, detail}` options, plus an optional free-text
  *  "Other…" choice (`allow-other`). The answer is the chosen label or the typed
@@ -146,7 +125,7 @@ function SingleField({ field, value, onChange, disabled }: FieldProps) {
       ))}
       {field.allowOther === true && (
         <label
-          className={`group flex cursor-pointer items-start gap-2.5 rounded-md px-2 py-1.5 text-[13px] transition-colors ${
+          className={`group relative flex cursor-pointer items-start gap-2.5 rounded-md px-2 py-1.5 text-[13px] transition-colors ${
             isOther ? "bg-(--signal)/6" : "hover:bg-muted/40"
           } ${disabled ? "pointer-events-none opacity-60" : ""}`}
         >
@@ -155,7 +134,7 @@ function SingleField({ field, value, onChange, disabled }: FieldProps) {
             checked={isOther}
             disabled={disabled}
             onChange={() => onChange(" ")}
-            className="sr-only"
+            className="absolute top-0 left-0 size-0 opacity-0"
           />
           <span
             className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border transition-colors ${isOther ? "border-(--signal) bg-(--signal) text-(--primary-foreground)" : "border-border/80 bg-background"}`}
@@ -165,13 +144,14 @@ function SingleField({ field, value, onChange, disabled }: FieldProps) {
           <span className="min-w-0 flex-1">
             <span className="block font-medium text-foreground/90">Other…</span>
             {isOther && (
-              <AutoGrowTextarea
+              <textarea
                 autoFocus
+                rows={2}
                 value={sel === " " ? "" : sel}
                 disabled={disabled}
-                onChange={(v) => onChange(v || " ")}
+                onChange={(e) => onChange(e.target.value || " ")}
                 placeholder="Type your answer"
-                className="mt-1 w-full resize-none bg-transparent py-0.5 text-[13.5px] leading-relaxed text-foreground/90 outline-none placeholder:text-muted-foreground/40"
+                className="mt-1 w-full resize-y bg-transparent py-0.5 text-[13.5px] leading-relaxed text-foreground/90 outline-none placeholder:text-muted-foreground/40"
               />
             )}
           </span>
@@ -204,21 +184,19 @@ function MultiField({ field, value, onChange, disabled }: FieldProps) {
   )
 }
 
-const SCALAR_INPUT =
-  "w-full resize-none bg-transparent py-0.5 text-[13.5px] leading-relaxed text-foreground/90 outline-none placeholder:text-muted-foreground/40 disabled:opacity-60"
-
-/** text / number — `text` grows with content (auto-grow textarea), `number` is
- *  a single-line numeric input. `date` is handled separately by
- *  {@link DateField}. */
+/** text / number — `text` is a plain `resize-y` textarea (no auto-grow layout
+ *  effect), `number` is a single-line numeric input. `date` is handled
+ *  separately by {@link DateField}. */
 function ScalarField({ field, value, onChange, disabled }: FieldProps) {
   if (field.type === "text") {
     return (
-      <AutoGrowTextarea
+      <textarea
+        rows={2}
         value={asScalar(value)}
-        onChange={onChange}
         disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
         placeholder="Type your answer"
-        className={SCALAR_INPUT}
+        className={`${SCALAR_INPUT} resize-y`}
       />
     )
   }

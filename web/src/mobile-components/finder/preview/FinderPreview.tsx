@@ -47,9 +47,7 @@ export function FinderPreview({
 }) {
   const full = variant === "full"
   return (
-    <aside
-      className={cn("flex min-h-0 flex-col bg-surface", full ? "min-w-0 flex-1" : "size-full")}
-    >
+    <aside className={cn("flex min-h-0 flex-col", full ? "min-w-0 flex-1" : "size-full")}>
       {!full && (
         <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
           <span className="text-[13px] font-semibold text-muted-foreground">Quick Look</span>
@@ -67,7 +65,7 @@ export function FinderPreview({
       )}
 
       {node ? (
-        <div key={node.path} className="ql-pop flex min-h-0 flex-1 flex-col">
+        <div key={node.path} className="flex min-h-0 flex-1 flex-col">
           <div className="flex min-h-0 flex-1 flex-col overflow-auto">
             <Body node={node} agentId={agentId} />
           </div>
@@ -87,7 +85,7 @@ export function FinderPreview({
  */
 function inlinePreview(node: FinderNode): ReactElement | null {
   if (node.kind === "folder") return <FolderPreview node={node} />
-  if (node.code) return <CodePreview lang={node.code.lang} lines={node.code.lines} />
+  if (node.code) return <CodePreview lines={node.code.lines} />
   if (node.sheet) return <SheetPreview sheet={node.sheet} />
   if (node.slides) return <SlidesPreview slides={node.slides} />
   if (node.pdf) return <PdfPreview pdf={node.pdf} />

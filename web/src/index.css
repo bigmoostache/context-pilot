@@ -48,6 +48,7 @@
   --color-destructive: var(--danger);
   --color-destructive-foreground: var(--primary-foreground);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-input: var(--input);
   --color-ring: var(--ring);
 
@@ -61,26 +62,64 @@
   --color-grid: var(--grid);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
-  --radius-sm: 5px;
-  --radius-md: 7px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
+
+  /* Square corners, everywhere. The scale is kept (rather than deleted) so
+     every `rounded-sm|md|lg|xl` call site still resolves — they simply all
+     resolve to 0. Restoring the old look is a four-value edit here, not a
+     hunt through several hundred class names. The blanket reset at the end of
+     this file covers what tokens cannot reach: `rounded-full`, arbitrary
+     `rounded-[2px]` values, raw CSS radii and inline styles. */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
 }
 
-/* ─── LIGHT · "Cream" ──────────────────────────────────────────────────── */
+/* ─── LIGHT · "Cream" ──────────────────────────────────────────────────────
+   THE SAME LADDER, MIRRORED — and deliberately NOT darkened (T612).
+
+   Dark mode got its panels pushed down because a dark theme reads as tooling
+   when its surfaces stay low. Light mode's depth convention is the OPPOSITE:
+   raised means LIGHTER, because the mental model is paper lit from above, so
+   the white card floats on the tinted ground. Darkening light panels does not
+   read as professional, it reads as dirty — so light takes the STRUCTURAL half
+   of the change (even steps, and the popover/card split) and none of the
+   darkening.
+
+     background   #fdfaf1   the desk
+     surface      #f7f2e8   docked chrome
+     surface-2    #f1e9dd   floating panel — the threads rail
+     popover      #fbf8f1   overlays (SPLIT from card, see the dark note)
+     card         #ffffff   the raised plane, pure white
+
+   Note the mirror: dark ELEVATES a panel ~6 L* above the desk, light RECESSES
+   it ~6 L* below. Same depth, opposite direction, because each follows its own
+   convention rather than one being a numeric inversion of the other. */
 :root {
   /* Single source of truth for every primary sidebar / rail width.
-     All top-level sidebars (fleet, threads, cockpit, finder) read this. */
-  --sidebar-w: 240px;
-  --background: #fefcf3;
-  --surface: #faf6ec; /* sidebars / chrome */
-  --surface-2: #f5ebe0; /* nested surface */
-  --card: #fff;
-  --popover: #fff;
+     All top-level sidebars (fleet, threads, settings, finder) read this.
+
+     312px is 240 × 1.3. Widened because the two content rails outgrew it: a
+     thread row carries a title AND a preview line, and the settings rail's
+     rows carry a label AND a blurb, so at 240 both were truncating the second
+     line on almost every row. The Finder rail rides along deliberately —
+     making it the one narrow rail would break the uniformity the rails are
+     built to have. */
+  --sidebar-w: 312px;
+  --background: #fdfaf1;
+  --surface: #f7f2e8; /* docked chrome — Finder bars, sidebars */
+  --surface-2: #f1e9dd; /* floating panel — the threads rail */
+  --card: #fff; /* the raised plane */
+  --popover: #fbf8f1; /* overlays — split from `card` so cards lift off them */
   --foreground: #3d342b;
-  --muted: #f3ece1;
-  --muted-foreground: #9c8d79;
-  --border: #ecdfce;
+  --muted: #f0e9de;
+  --muted-foreground: #7f7260; /* lifted from #9c8d79 — 3.2:1 failed AA at 10-11px */
+
+  /* Borders are OFF — see the "No borders, only shadows" note further down.
+     `--border-strong` keeps the real hairline colour for the few places that
+     still draw one on purpose. */
+  --border: transparent;
+  --border-strong: #ecdfce;
   --input: #ecdfce;
   --grid: #f1e8da;
   --primary: #be7a6e; /* clay rose — primary actions */
@@ -107,19 +146,61 @@
    charcoal dungeon lit by a single torch-orange accent. Greys carry the
    structure, orange carries every active/primary signal, near-white is the
    ink. Forest-green / gold / blood-red round out ok·warn·danger.
-   Source greys: #222220 · #333331 · #424240 — accent torch #DA7659. */
+   Source greys: #222220 · #333331 · #424240 — accent torch #DA7659.
+
+   ── THE GREY LADDER (T612) ────────────────────────────────────────────────
+   The greys below are no longer three source values plus improvised
+   in-betweens; they are ONE ordered ladder, each rung a near-equal step in
+   perceptual lightness (CIE L*, not hex arithmetic — hex is not linear in
+   perception, which is why evenly-spaced hex codes look unevenly spaced):
+
+     background     #222220   L* 13.1   the desk, nothing is behind it
+     grid           #262624   L* 15.1   rules drawn ON the desk
+     surface        #2c2c2a   L* 18.0   docked chrome (Finder bars, sidebar)
+     surface-2      #2f2f2c   L* 19.3   floating panel (threads rail)
+     popover        #2f2f2c   L* 19.3   anything that OPENS over the app
+     muted          #343432   L* 21.6   inline fills, hover washes
+     card           #3a3a38   L* 24.4   the raised plane: rows, tiles, tabs
+     border-strong  #3d3d3a   L* 25.7   the opt-in hairline
+     input          #414140   L* 27.5   form outlines, the brightest rung
+
+   Two properties are load-bearing, and both were violated before:
+
+   1. MONOTONIC. Read top to bottom, lightness only ever increases, so a
+      token's rung IS its depth — an element painted `card` is above one
+      painted `surface-2` by construction, in every view, without anyone
+      checking.
+
+   2. POPOVER ≠ CARD. These held the SAME value (#424240), so a card inside a
+      dialog had zero tonal lift off the dialog's own surface and depended
+      entirely on a border — which has been transparent since T605. Content in
+      AgentModal and NewThreadDialog was flat against its container and nobody
+      had noticed. Splitting the two repairs it and is why a dialog can now
+      hold cards that visibly sit on top of it.
+
+   The whole ladder also sits LOWER than it did (top rung 27.9 → 24.4 L*). A
+   dark theme whose panels crowd the upper-middle greys reads washed out; the
+   restraint is what makes it read as tooling rather than as a dimmed light
+   theme. Range 13.1–24.4 is in the same territory as VS Code Dark+ and GitHub
+   dark. The accents are untouched, so they now carry MORE of the eye's
+   attention, not less.
+
+   Reverting is a nine-value edit in this block. Nothing outside it moved. */
 .dark {
   --background: #222220; /* dark dungeon — app background (TUI bg_base) */
-  --surface: #333331; /* sidebars / chrome (TUI bg_surface) */
-  --surface-2: #3a3a38; /* nested surface — derived step */
-  --card: #424240; /* raised card (TUI bg_elevated) */
-  --popover: #424240;
+  --surface: #2c2c2a; /* docked chrome — Finder bars, sidebars (TUI bg_surface) */
+  --surface-2: #2f2f2c; /* floating panel — the threads rail */
+  --card: #3a3a38; /* raised card (TUI bg_elevated) */
+  --popover: #2f2f2c; /* overlays: dialog · dropdown · sheet · tooltip · menu */
   --foreground: #f0f0f0; /* near-white ink (TUI text) */
-  --muted: #383835; /* subtle warm-grey fill */
-  --muted-foreground: #909090; /* dimmed labels (TUI text_muted) */
-  --border: #4d4d49; /* lifted warm grey — visible against the card */
-  --input: #4d4d49;
-  --grid: #2c2c2a;
+  --muted: #343432; /* subtle warm-grey fill */
+  --muted-foreground: #9a9a9a; /* dimmed labels — lifted from #909090 for AA */
+
+  /* Borders are OFF — see the "No borders, only shadows" note further down. */
+  --border: transparent;
+  --border-strong: #3d3d3a; /* the opt-in hairline — rung above `card` */
+  --input: #414140; /* form outlines — the ladder's brightest rung */
+  --grid: #262624; /* rules drawn ON the desk, so BELOW every chrome rung */
   --primary: #da7659; /* torch orange — primary actions / your-turn (TUI accent) */
   --primary-foreground: #241a12; /* deep roast-brown text on the orange */
   --accent: #b26245; /* dim torch — secondary accent (TUI accent_dim) */
@@ -283,75 +364,13 @@ html.mobile.standalone .mobile-shell {
   animation: blink 1.1s step-end infinite;
 }
 
-/* gentle entrance */
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.rise {
-  animation: rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-@keyframes fill-sweep {
-  from {
-    transform: scaleX(0);
-  }
-
-  to {
-    transform: scaleX(1);
-  }
-}
-
-.fill-sweep {
-  transform-origin: left;
-  animation: fill-sweep 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
 /*
   ── Finder polish ────────────────────────────────────────────────────────
-  Apple-grade micro-motion: staggered item entrance, QuickLook pop, a soft
-  checkerboard for image transparency, and a marching-ants drop border.
+  Apple-grade micro-motion: QuickLook pop, a soft checkerboard for image
+  transparency, and a marching-ants drop border. (Entry/staggered-item
+  animations were removed per the "no entry animation on main content" rule —
+  see the note by the modal keyframes.)
 */
-
-@keyframes finder-pop {
-  from {
-    opacity: 0;
-    transform: translateY(7px) scale(0.97);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.finder-pop {
-  animation: finder-pop 0.36s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-@keyframes ql-pop {
-  from {
-    opacity: 0;
-    transform: scale(0.96);
-  }
-
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.ql-pop {
-  animation: ql-pop 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
 
 @keyframes menu-pop {
   from {
@@ -491,23 +510,6 @@ html.mobile.standalone .mobile-shell {
   }
 }
 
-/* gentle per-item rise for stacked option cards */
-@keyframes opt-rise {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.opt-rise {
-  animation: opt-rise 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
 /* finder icon-size slider — slim macOS track + accent thumb */
 .finder-slider {
   appearance: none;
@@ -605,6 +607,61 @@ html.mobile.standalone .mobile-shell {
 
 .hljs-strong {
   font-weight: 600;
+}
+
+/* ── No borders, only shadows ────────────────────────────────────────────
+   Depth is carried by elevation (`card-shadow` / `pop-shadow`), never by a
+   hairline. Rather than delete ~340 `border-border` class names across the
+   tree, the TOKEN is set to `transparent` in both palettes above. Three
+   things follow, and all three are the reason it is done this way:
+
+     * `border-width` stays 1px, so NOTHING reflows — the change is purely
+       visual, with no element resizing by 2px and no layout shift;
+     * the ~20 hairline DIVIDERS painted with `bg-border` (a border in all but
+       name — dropdown separators, toolbar ticks, the thread-open rule) go too,
+       in the same stroke, which a `border-width` reset would have missed;
+     * a rule that swaps the border to an explicit colour on interaction —
+       `focus:border-ring`, `focus-within:border-(--signal)/60` — still works.
+       The border is invisible at rest and appears on focus, which is exactly
+       the behaviour wanted and is free here.
+
+   NOT affected, deliberately:
+     * `--input` — form fields keep their outline. An invisible text box is a
+       usability bug, not a clean design.
+     * explicitly-coloured borders (`border-(--signal)`, `border-(--danger)/40`,
+       the marquee band, dashed drop zones) — those are accents and
+       affordances, not chrome.
+
+   To opt a component back IN, point it at `border-(--border-strong)`, which
+   holds each palette's real hairline colour. The view-tab group and the
+   light/dark toggle do exactly that.
+
+   Reverting the whole decision = restoring the two `--border` values. */
+
+/* ── Square corners — the blanket reset ──────────────────────────────────
+   Zeroing the `--radius-*` scale above kills every token-driven utility
+   (`rounded-sm|md|lg|xl`), but three classes of radius do NOT read those
+   tokens and would otherwise survive:
+
+     * `rounded-full` — Tailwind emits a literal `9999px`, not a token;
+     * arbitrary values (`rounded-[2px]`) and raw CSS radii — the scrollbar
+       thumb, the Finder slider track/thumb, the Univer container;
+     * inline `style={{ borderRadius }}` on any component.
+
+   One universal rule catches all three. `!important` is load-bearing rather
+   than lazy: it is the only thing that outranks an inline style, and without
+   it every `rounded-full` pill would stay a pill.
+
+   Position is NOT free: `no-descending-specificity` requires the bare `*` to
+   appear BEFORE any more-specific selector that sets the same property, so
+   this sits ahead of the `.univer-container` block below (which sets its own
+   `border-radius`) rather than at the end of the file. `!important` — not
+   source order — is what makes it win, so placing it earlier costs nothing.
+   Kept as one block so the whole decision reverts by deleting it. */
+*,
+*::before,
+*::after {
+  border-radius: 0 !important;
 }
 
 /* ── Univer spreadsheet — theme integration ───────────────────────── */

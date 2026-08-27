@@ -140,21 +140,16 @@ function GeneralPane() {
     <Stack>
       <AllowedModelsSection />
 
+      <ToggleRow name="Auto-continuation" detail="Let the agent keep working without a nudge" />
       <ToggleRow
-        i={0}
-        name="Auto-continuation"
-        detail="Let the agent keep working without a nudge"
-      />
-      <ToggleRow
-        i={1}
         name="Reverie (context optimizer)"
         detail="Background cleaner reshapes context when it grows"
         on
       />
-      <ToggleRow i={2} name="Think reminders" detail="Periodic nudge to reason before acting" on />
-      <DevModeToggle i={3} />
-      <ShowOverlayToggle i={4} />
-      <AccessControlToggle i={5} />
+      <ToggleRow name="Think reminders" detail="Periodic nudge to reason before acting" on />
+      <DevModeToggle />
+      <ShowOverlayToggle />
+      <AccessControlToggle />
     </Stack>
   )
 }
@@ -172,7 +167,7 @@ function GeneralPane() {
  * OFF, FR-v3-11). In god-mode (`authEnabled === false`) the viewer is treated
  * as superadmin.
  */
-function AccessControlToggle({ i }: { i: number }) {
+function AccessControlToggle() {
   const qc = useQueryClient()
   const { user: authUser, authEnabled } = useAuth()
   const { data: settings } = useQuery({ queryKey: ["settings"], queryFn: fetchSettings })
@@ -189,7 +184,6 @@ function AccessControlToggle({ i }: { i: number }) {
 
   return (
     <ToggleRow
-      i={i}
       name="Access control"
       detail="Require login and enforce role-based access (RBAC)"
       value={enabled}
@@ -303,11 +297,10 @@ function AllowedModelsSection() {
  * tab in the TopBar in real time (App gates the view on the same flag). Off by
  * default.
  */
-function DevModeToggle({ i }: { i: number }) {
+function DevModeToggle() {
   const { devMode, setDevMode } = useDevMode()
   return (
     <ToggleRow
-      i={i}
       name="Developer mode"
       detail="Reveal developer-only surfaces (Cost Analysis) and diagnostics"
       value={devMode}
@@ -323,11 +316,10 @@ function DevModeToggle({ i }: { i: number }) {
  * overlay in real time without exposing the rest of the developer surface. Off
  * by default.
  */
-function ShowOverlayToggle({ i }: { i: number }) {
+function ShowOverlayToggle() {
   const { showOverlay, setShowOverlay } = useShowOverlay()
   return (
     <ToggleRow
-      i={i}
       name="Show Overlay"
       detail="Corner performance HUD — Web Vitals, long frames, worst React commits"
       value={showOverlay}
@@ -364,14 +356,12 @@ function FieldGroup({
 }
 
 function ToggleRow({
-  i,
   name,
   detail,
   on: initial = false,
   value,
   onChange,
 }: {
-  i: number
   name: string
   detail: string
   on?: boolean
@@ -391,8 +381,7 @@ function ToggleRow({
   return (
     <button
       onClick={handleToggle}
-      style={{ animationDelay: `${i * 40}ms` }}
-      className="opt-rise card-shadow flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-3 text-left"
+      className="card-shadow flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-3 text-left"
     >
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-[13px] font-medium text-foreground/90">{name}</span>

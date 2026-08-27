@@ -11,20 +11,19 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useLibrary, sendCommand, useDeleteLibraryAgent } from "@/lib/live"
 import { fetchLibraryAgent } from "@/lib/api"
+import { Tip } from "@/components/ui/tip"
 import type { LibraryItem } from "@/lib/types"
 import { AgentEditorDialog, type AgentEditorMode } from "./AgentEditorDialog"
 
 /**
- * Standard dropdown-row highlight — the SAME soft signal wash the AgentSwitcher
- * uses (T697), so every menu in the app reads identically on hover/keyboard
- * focus. `color-mix` over transparent darkens correctly in dark mode and
- * lightens from the popover surface in light mode; the `!` beats base-ui's stock
- * `focus:bg-accent` / `data-highlighted` defaults, and `transition-colors`
- * gives the Linear-smooth fade. Text is pinned to `foreground` so the wash never
- * washes the label out.
+ * Dropdown-row highlight — TEXT-COLOUR ONLY (T635). Hover/keyboard focus
+ * brightens the row's ink to full `foreground` but never shifts its background:
+ * base-ui's stock `focus:bg-accent` default is overridden to `bg-transparent!`
+ * on BOTH highlight signals (pointer `data-highlighted` + keyboard `focus`) so
+ * no wash creeps back in, and `transition-colors` keeps the ink fade smooth.
  */
 const ROW_HILITE =
-  "transition-colors focus:bg-[color-mix(in_oklab,var(--signal)_11%,transparent)]! focus:text-foreground! data-highlighted:bg-[color-mix(in_oklab,var(--signal)_11%,transparent)]! data-highlighted:text-foreground!"
+  "transition-colors focus:bg-transparent! focus:text-foreground! data-highlighted:bg-transparent! data-highlighted:text-foreground!"
 
 /** The editor dialog's open state: closed, or open in one of its three flows. */
 type EditorState =
@@ -156,7 +155,9 @@ export function BehaviourChip({ agentId }: { agentId: string }) {
 
   return (
     <>
-      <span className="h-3.5 w-px bg-border" />
+      {/* The leading hairline that used to sit here was painted with the
+          `--border` token — a border in all but name — and the footer it lives
+          in no longer draws any. The parent's `gap-3` separates the chip now. */}
       <DropdownMenu>
         <DropdownMenuTrigger className="flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground/85 focus:outline-none">
           <Bot className="size-3.5" />
@@ -266,6 +267,24 @@ function BehaviourRow({
   // user agents always show it. (Backstop: the backend 404s a fileless delete.)
   const showDelete = item.builtin !== true
 
+  // The label's classes must carry the text-only hover highlight (T635), so
+  // whether it is wrapped in a Tip or rendered bare, the same string is used.
+  const labelClass =
+    "flex min-w-0 flex-1 items-center gap-2 group-focus/dropdown-menu-item:text-foreground! group-data-highlighted/dropdown-menu-item:text-foreground!"
+  const labelInner = (
+    <>
+      {item.active ? (
+        <span className="size-1.5 rounded-full bg-(--ok)" />
+      ) : (
+        <span className="size-1.5" />
+      )}
+      {item.builtin === true && (
+        <Lock className="size-3 shrink-0 text-muted-foreground/50" aria-label="built-in" />
+      )}
+      {item.name || item.id}
+    </>
+  )
+
   return (
     <DropdownMenuItem
       onClick={onSelect}
@@ -273,17 +292,19 @@ function BehaviourRow({
         item.active ? "font-semibold text-foreground" : "text-foreground/70"
       }`}
     >
-      <span className="flex items-center gap-2 group-focus/dropdown-menu-item:text-foreground! group-data-highlighted/dropdown-menu-item:text-foreground!">
-        {item.active ? (
-          <span className="size-1.5 rounded-full bg-(--ok)" />
-        ) : (
-          <span className="size-1.5" />
-        )}
-        {item.builtin === true && (
-          <Lock className="size-3 shrink-0 text-muted-foreground/50" aria-label="built-in" />
-        )}
-        {item.name || item.id}
-      </span>
+      {/* The agent's description as the app's styled Tip (T635 revision — was a
+          native `title`). `side="right"` keeps the popup clear of the rows
+          stacked below it. Tip renders its trigger as a plain <span> and opens
+          on hover, so it coexists with base-ui's menu roving-focus + typeahead;
+          the label classes ride on `triggerClassName` so the wrapper span IS the
+          label. No description → a bare span, since Tip needs a title. */}
+      {item.description ? (
+        <Tip title={item.description} side="right" triggerClassName={labelClass}>
+          {labelInner}
+        </Tip>
+      ) : (
+        <span className={labelClass}>{labelInner}</span>
+      )}
       <span className="flex items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover/row:opacity-100">
         <RowButton title="Edit" onClick={stopAnd(onEdit)}>
           <Pencil className="size-3" />
@@ -320,8 +341,8 @@ function RowButton({
       onClick={onClick}
       className={`flex size-5 items-center justify-center rounded-md transition-colors ${
         danger
-          ? "text-muted-foreground/70 hover:bg-muted hover:text-(--danger)"
-          : "text-muted-foreground/70 hover:bg-muted hover:text-foreground"
+          ? "text-muted-foreground/70 hover:text-(--danger)"
+          : "text-muted-foreground/70 hover:text-foreground"
       }`}
     >
       {children}

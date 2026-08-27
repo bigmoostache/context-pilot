@@ -160,16 +160,13 @@ export type FinderNode = Omit<GenFinderNode, "modified"> & {
   text?: string
 }
 
-export type FinderViewMode = "grid" | "list" | "columns" | "gallery"
-export type FinderSortKey = "name" | "size" | "modified" | "kind"
-
 // ── View modes ────────────────────────────────────────────────────
 
 /**
  * Top-level surfaces. `fleet` = the mission-control dashboard (the ONLY place
  * agents are managed). The other three are the per-agent views.
  */
-export type ViewMode = "fleet" | "threads" | "finder" | "costs"
+export type ViewMode = "fleet" | "threads" | "finder" | "costs" | "settings"
 
 // ── Usage / cost analytics (Usage page) ──────────────────────────
 

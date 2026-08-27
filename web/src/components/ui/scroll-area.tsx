@@ -41,7 +41,11 @@ function ScrollBar({
     >
       <ScrollAreaPrimitive.Thumb
         data-slot="scroll-area-thumb"
-        className="relative flex-1 rounded-full bg-border"
+        // NOT `bg-border`: that token is transparent (see the "no borders"
+        // note in index.css) and this is a real, grabbable control, not
+        // chrome — painting it with the border token would erase it. Matches
+        // the native `::-webkit-scrollbar-thumb` colour in index.css.
+        className="relative flex-1 rounded-full bg-[color-mix(in_oklab,var(--muted-foreground)_35%,transparent)]"
       />
     </ScrollAreaPrimitive.Scrollbar>
   )

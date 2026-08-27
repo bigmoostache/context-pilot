@@ -50,7 +50,7 @@ export function FinderPreview({
   return (
     <aside
       className={cn(
-        "flex min-h-0 flex-col bg-surface",
+        "flex min-h-0 flex-col",
         // "full" = a file tab's main area; otherwise the QuickLook pane fills
         // its host. Inside the shadcn Sheet drawer (the only place the pane
         // variant is used) that means it spans the drawer's full width — the
@@ -81,7 +81,7 @@ export function FinderPreview({
       )}
 
       {node ? (
-        <div key={node.path} className="ql-pop flex min-h-0 flex-1 flex-col">
+        <div key={node.path} className="flex min-h-0 flex-1 flex-col">
           <div className="flex min-h-0 flex-1 flex-col overflow-auto">
             <Body node={node} agentId={agentId} />
           </div>
@@ -101,7 +101,7 @@ export function FinderPreview({
  */
 function inlinePreview(node: FinderNode): ReactElement | null {
   if (node.kind === "folder") return <FolderPreview node={node} />
-  if (node.code) return <CodePreview lang={node.code.lang} lines={node.code.lines} />
+  if (node.code) return <CodePreview lines={node.code.lines} />
   if (node.sheet) return <SheetPreview sheet={node.sheet} />
   if (node.slides) return <SlidesPreview slides={node.slides} />
   if (node.pdf) return <PdfPreview pdf={node.pdf} />

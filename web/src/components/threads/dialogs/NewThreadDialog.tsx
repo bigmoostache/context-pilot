@@ -276,9 +276,11 @@ export function NewThreadDialog({
 
             {/* footer — attach + start-paused toggle (left), Create (right) */}
             <div className="flex items-center gap-3 border-t border-border px-3.5 py-2.5">
+              {/* Colour-only hover, matching the composer's attach button —
+                  the same control must not behave two ways. */}
               <label
                 title="Attach files"
-                className="flex size-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground"
+                className="flex size-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:text-foreground"
               >
                 {busy ? (
                   <Loader2 className="size-4 animate-spin" />

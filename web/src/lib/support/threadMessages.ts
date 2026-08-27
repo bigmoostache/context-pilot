@@ -177,3 +177,97 @@ export function parseDraft(key: string | undefined): Draft {
   }
   return { text: raw, selStart: raw.length, selEnd: raw.length }
 }
+
+/** Sort threads by most recent activity first. */
+export function byRecent(a: ThreadDetail, b: ThreadDetail): number {
+  return (b.lastActivityMs ?? 0) - (a.lastActivityMs ?? 0)
+}
+
+/**
+ * A thread's status-dot colour: green while focused or active, the signal
+ * accent when it is your turn, muted otherwise. A flat if-chain rather than
+ * nested ternaries — four outcomes read as four lines.
+ */
+export function dotColor(isFocused: boolean, status: ThreadDetail["status"]): string {
+  if (isFocused) return "var(--ok)"
+  if (status === "MY_TURN") return "var(--signal)"
+  if (status === "ACTIVE") return "var(--ok)"
+  return "var(--muted-foreground)"
+}
+
+/**
+ * Every thread row-action tooltip, in one place.
+ *
+ * Lives here rather than inline in the row markup for two reasons: reviewing
+ * user-facing copy should not mean reading component JSX, and a sentence this
+ * long inside a JSX prop forces the formatter to explode the call site across
+ * six lines. Each entry names what the action DOES, not what its icon depicts.
+ */
+export const ROW_ACTION_COPY = {
+  archive: {
+    title: "Archive",
+    body: "Move this thread out of the active list. You can restore it later.",
+  },
+  restore: { title: "Restore", body: "Move this thread back into the active list." },
+  remove: {
+    title: "Delete permanently",
+    body: "Remove this thread and its whole conversation. This cannot be undone.",
+  },
+  pause: { title: "Pause", body: "Stop the agent picking this thread up. Queued messages wait." },
+  resume: { title: "Resume", body: "Let the agent work on this thread again." },
+} as const
+
+/** The turn-status banner shown above the composer input, or null. */
+export interface Banner {
+  working: boolean
+  paused: boolean
+  color: string | undefined
+  text: string
+}
+
+/**
+ * Resolve the composer's turn-status banner from the thread state (T39/T371).
+ *
+ * A flat precedence chain (not a nested ternary): a paused thread shows the
+ * amber pause notice; otherwise, only when the agent owes this thread a
+ * response, an active spinner while streaming / working the FOCUSED thread, or
+ * a static "will pick up soon" clock for a queued (non-focused) agent-turn
+ * thread. Returns null on the user's turn (no banner).
+ *
+ * Lives here, beside {@link ROW_ACTION_COPY}, for the same reason: it is a pure
+ * thread-state → copy derivation with no JSX in it, and the sentences it picks
+ * are user-facing copy that should be reviewable without opening a component.
+ */
+export function resolveComposerBanner(
+  paused: boolean,
+  agentBusy: boolean,
+  streaming: boolean,
+  focused: boolean,
+): Banner | null {
+  if (paused) {
+    return {
+      working: false,
+      paused: true,
+      color: undefined,
+      text: "Thread paused — the agent won't respond until resumed.",
+    }
+  }
+  if (!agentBusy) return null
+  if (streaming) {
+    return { working: true, paused: false, color: "var(--ok)", text: "Agent is streaming…" }
+  }
+  if (focused) {
+    return {
+      working: true,
+      paused: false,
+      color: "var(--signal)",
+      text: "Agent is working this thread…",
+    }
+  }
+  return {
+    working: false,
+    paused: false,
+    color: undefined,
+    text: "Agent will pick up this thread soon.",
+  }
+}

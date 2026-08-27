@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, lazy, Suspense } from "react"
-import { Check, Copy, Save } from "lucide-react"
+import { Check, Save } from "lucide-react"
 import type { FinderNode } from "@/lib/types"
 import { useFsPreview, useFsSheet, useWriteFile } from "@/lib/live"
 import { rawUrl } from "@/lib/api"
@@ -108,7 +108,7 @@ export function LivePdfPreview({ agentId, node }: { agentId: string; node: Finde
     // had no effect because the scroll parent is a plain block, not a flex
     // column, so the object collapsed to its min-height.
     <div className="flex h-full min-h-0 flex-col gap-2">
-      <object data={src} type="application/pdf" className="min-h-0 w-full flex-1 bg-card">
+      <object data={src} type="application/pdf" className="min-h-0 w-full flex-1">
         <div className="flex flex-col items-center gap-3 py-10 text-center">
           <FileIcon kind="pdf" size={64} />
           <span className="text-[12.5px] text-muted-foreground">
@@ -180,35 +180,10 @@ function HighlightedCode({
   code: string
   truncated?: boolean
 }) {
-  const { html, language } = useMemo(() => highlightCode(code, name), [code, name])
+  const { html } = useMemo(() => highlightCode(code, name), [code, name])
   const lines = useMemo(() => html.split("\n"), [html])
-  const [copied, setCopied] = useState(false)
-  const copy = () => {
-    ;(navigator.clipboard as Clipboard | undefined)?.writeText(code).catch(() => {
-      /* clipboard write may reject on insecure origin — ignore, the tick just won't flash */
-    })
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 1400)
-  }
   return (
-    <div className="bg-card">
-      <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-3 py-1.5">
-        <span className="flex gap-1.5">
-          <span className="size-2.5 rounded-full bg-[#ff5f57]" />
-          <span className="size-2.5 rounded-full bg-[#febc2e]" />
-          <span className="size-2.5 rounded-full bg-[#28c840]" />
-        </span>
-        <span className="ml-1 font-mono text-[10.5px] tracking-wide text-muted-foreground uppercase">
-          {language}
-        </span>
-        <button
-          onClick={copy}
-          className="ml-auto flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px] text-muted-foreground/80 transition-colors hover:bg-muted hover:text-foreground"
-        >
-          {copied ? <Check className="size-3 text-(--ok)" /> : <Copy className="size-3" />}
-          {copied ? "Copied" : "Copy"}
-        </button>
-      </div>
+    <div>
       <pre className="hljs overflow-x-auto bg-transparent px-3 py-2.5 font-mono text-[11px] leading-relaxed">
         {lines.map((line, i) => (
           <div key={i} className="flex gap-3 rounded-sm hover:bg-(--signal)/6">

@@ -59,15 +59,12 @@ export function useThreadForms(log: ThreadMsg[], agentId: string, threadId: stri
  * or when a new NON-auto message lands (`nonAutoCount`). Extracted from
  * ThreadConversation to keep its body within budget.
  *
- * Converges rather than firing once: with `content-visibility:auto` every
- * off-screen row reports only its `contain-intrinsic-size` placeholder height
- * until scrolled into view, so on open the container's scrollHeight is an
- * ESTIMATE and a single `scrollIntoView` lands short of the true bottom (T512).
- * Re-scrolling across a bounded 6-frame loop reveals each chunk's real heights,
- * correcting the estimate until the position settles on the actual bottom.
- * `scrollIntoView` forces sync layout, so it's wrapped in `measure()` for freeze
- * attribution; the ~100ms bounded loop on open is imperceptible and off any hot
- * path.
+ * A single `scrollIntoView` on the next frame (T643). The earlier version ran a
+ * bounded 6-frame re-scroll loop to correct for `content-visibility:auto` height
+ * estimates settling as rows scrolled into view; that CSS layout-skip is gone
+ * (rows now carry their real height at all times), so one scroll lands on the
+ * true bottom and the repeated loop — which could fight the user's own scroll —
+ * is no longer needed.
  */
 export function useScrollPin(
   bottomRef: React.RefObject<HTMLDivElement | null>,
@@ -77,14 +74,9 @@ export function useScrollPin(
   useEffect(() => {
     const el = bottomRef.current
     if (!el) return
-    let raf = 0
-    let tries = 0
-    const settle = () => {
+    const raf = requestAnimationFrame(() => {
       measure("threads:scrollIntoView", () => el.scrollIntoView({ block: "end" }))
-      tries += 1
-      if (tries < 6) raf = requestAnimationFrame(settle)
-    }
-    raf = requestAnimationFrame(settle)
+    })
     return () => cancelAnimationFrame(raf)
   }, [bottomRef, threadId, nonAutoCount])
 }

@@ -127,7 +127,7 @@ function DeleteButton({ align, onDelete }: { align: "start" | "end"; onDelete: (
 
 function UserMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete }: MessageProps) {
   return (
-    <div className="rise flex flex-col items-end gap-1 py-2">
+    <div className="flex flex-col items-end gap-1 py-2">
       <div className="card-shadow max-w-[78%] rounded-2xl rounded-br-md bg-(--signal) px-3.5 py-2 text-[13px] leading-relaxed text-(--primary-foreground)">
         <MessageBody
           text={msg.text ?? ""}
@@ -151,7 +151,7 @@ function UserMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete }: Mes
 
 function AssistantMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete }: MessageProps) {
   return (
-    <div className="rise flex flex-col gap-1.5 py-2">
+    <div className="flex flex-col gap-1.5 py-2">
       <div className="flex items-center gap-2">
         <span className="flex size-5 items-center justify-center rounded-full bg-(--signal)/15">
           <span className="size-2 rounded-full bg-(--signal)" />
@@ -185,7 +185,7 @@ function ToolMessage({ msg }: { msg: ChatMessage }) {
   if (!msg.tool) return null
   const t = msg.tool
   return (
-    <div className="rise py-2 pl-7">
+    <div className="py-2 pl-7">
       <div
         className={cn(
           "card-shadow max-w-[88%] overflow-hidden rounded-xl border bg-card",
