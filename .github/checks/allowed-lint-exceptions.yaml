@@ -433,4 +433,20 @@ exceptions:
     strategy: >
       Irreducible — the exhaustive literal is the whole point; a ctor re-trips too_many_arguments.
 
+  # ── multiple_inherent_impl: ReleaseStore split for the 500-line cap ──
+
+  - path: "crates/cp-orchestrator/src/services/releases/mod.rs"
+    match: "ReleaseStore inherent methods are split across mod.rs and the sibling channel.rs to respect the 500-line file cap"
+    reason: >
+      ReleaseStore's inherent methods are split across mod.rs (the primary impl:
+      arch, local releases, GitHub API, download, select/delete, persistence) and
+      the sibling channel.rs (the OTA-channel methods: channel, set_channel,
+      pending_channel_switch, clear_pending_switch). mod.rs already sits at 477
+      lines; folding channel.rs's ~45 lines back in would push it over the 500-line
+      file cap. clippy::multiple_inherent_impl (forbid) fires on the second block,
+      so the primary impl carries the #[expect].
+    strategy: >
+      Irreducible under the 500-line file cap — the two impl blocks are the honest
+      shape once the type's methods exceed one file's budget.
+
 

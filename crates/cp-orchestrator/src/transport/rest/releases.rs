@@ -239,7 +239,7 @@ pub(crate) fn select_release(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
 
 /// `DELETE /api/releases/{tag}` — remove a locally downloaded release.
 pub(crate) fn delete_release(state: &Mutex<Backend>, tag: &str) -> HttpReply {
-    let Ok(mut b) = state.lock() else {
+    let Ok(b) = state.lock() else {
         return HttpReply::error(500, "backend lock poisoned");
     };
 

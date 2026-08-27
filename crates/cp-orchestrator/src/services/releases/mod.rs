@@ -83,6 +83,10 @@ pub struct ReleaseStore {
     config_path: PathBuf,
 }
 
+#[expect(
+    clippy::multiple_inherent_impl,
+    reason = "ReleaseStore inherent methods are split across mod.rs and the sibling channel.rs to respect the 500-line file cap; merging channel's OTA-channel methods back here would push mod.rs over the limit"
+)]
 impl ReleaseStore {
     /// Load (or create) the release store from the given directory.
     ///
@@ -120,7 +124,7 @@ impl ReleaseStore {
 
     /// Manually override the architecture and persist.
     pub fn set_arch(&mut self, arch: &str) {
-        self.config.arch = arch.to_owned();
+        arch.clone_into(&mut self.config.arch);
         self.config.arch_auto = false;
         self.persist();
     }
@@ -154,7 +158,7 @@ impl ReleaseStore {
             let binary_size = std::fs::metadata(&binary).map_or(0, |m| m.len());
             releases.push(LocalRelease { tag, binary_size });
         }
-        releases.sort_by(|a, b| semver_sort_key(&b.tag).cmp(&semver_sort_key(&a.tag)));
+        releases.sort_by_key(|r| std::cmp::Reverse(semver_sort_key(&r.tag)));
         releases
     }
 
@@ -251,7 +255,7 @@ impl ReleaseStore {
     ///
     /// Returns an error if the tag is the currently active release, or if
     /// the directory cannot be removed.
-    pub fn delete(&mut self, tag: &str) -> Result<(), String> {
+    pub fn delete(&self, tag: &str) -> Result<(), String> {
         if self.config.active_tag.as_deref() == Some(tag) {
             return Err("cannot delete the currently active release".to_owned());
         }
@@ -346,7 +350,7 @@ impl ReleaseStore {
 
         if !tar_status.success() {
             // Clean up the partial extraction.
-            let _rm = std::fs::remove_dir_all(&dest);
+            let _rm_partial = std::fs::remove_dir_all(&dest);
             return Err("tar extraction failed".to_owned());
         }
 
@@ -379,12 +383,12 @@ impl ReleaseStore {
             crate::oerr!("releases: create dir failed");
             return;
         }
-        let tmp = self.config_path.with_extension("json.tmp");
-        if std::fs::write(&tmp, &bytes).is_err() {
-            crate::oerr!("releases: write tmp failed: {}", tmp.display());
+        let tmp_path = self.config_path.with_extension("json.tmp");
+        if std::fs::write(&tmp_path, &bytes).is_err() {
+            crate::oerr!("releases: write tmp failed: {}", tmp_path.display());
             return;
         }
-        if let Err(e) = std::fs::rename(&tmp, &self.config_path) {
+        if let Err(e) = std::fs::rename(&tmp_path, &self.config_path) {
             crate::oerr!("releases: rename failed: {e}");
         }
     }
@@ -392,18 +396,27 @@ impl ReleaseStore {
 
 // ── GitHub API types (deserialization only) ──────────────────────────────
 
+/// A GitHub release entry (subset of the API response we consume).
 #[derive(Debug, Deserialize)]
 struct GitHubRelease {
+    /// The release git tag (e.g. `"v0.3.0-abc1234"`).
     tag_name: String,
+    /// Human-readable release name, if set.
     name: Option<String>,
+    /// ISO-8601 publication timestamp, if present.
     published_at: Option<String>,
+    /// Downloadable assets attached to the release.
     assets: Vec<GitHubAsset>,
 }
 
+/// A single downloadable asset on a [`GitHubRelease`].
 #[derive(Debug, Deserialize)]
 struct GitHubAsset {
+    /// Asset filename (used to match the arch + `.tar.gz` suffix).
     name: String,
+    /// Direct browser download URL.
     browser_download_url: String,
+    /// Asset size in bytes.
     size: u64,
 }
 
