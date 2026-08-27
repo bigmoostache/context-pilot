@@ -20370,6 +20370,10 @@ e9c2b3e80b92bb28:
   path: web/src/mobile-components/shell/config/ConfigModal.tsx
   description: Mobile ConfigModal twin — full-screen sheet (w-screen h-screen, no gutters) vs desktop centered 88vh×1100px. mobile ui/dialog token. Wraps mobile ConfigPanel.
   last_edited_ms: 1784666643015
+e9c6dc0ec57996be:
+  path: web/src/main.tsx
+  description: 'React entry point. Imports client/setup, initTelemetry() before first paint, createRoot → StrictMode → RootErrorBoundary → QueryClientProvider → App. RootErrorBoundary (T644): app-wide class error boundary inlined here (not own file, to respect src/ 8-entry cap + dodge mobile-twin) — catches uncaught render throws that previously blanked the whole root silently, renders recoverable fallback SHOWING error.message + component stack + Reload, and console.errors it. Both a fix (no silent blank) and a diagnostic (surfaces the exact throw).'
+  last_edited_ms: 1787822982089
 e9d63dbe04b4ddb4:
   path: src/modules/conversation_history/recompute_toggled_tree_folders.rs
   description: 'Rebuilds tree open_folders after Close_conversation_history: ancestor folders of open file panels + explicitly-opened folders (collect_from_tool_use helper) from current + remaining history convos + root. 5 unit tests.'
