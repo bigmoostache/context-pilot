@@ -56,14 +56,17 @@
 //! a served name when the first AP client associates — or it meets a TLS error.
 
 use std::borrow::Cow;
-use std::collections::BTreeMap;
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
-use serde::Serialize;
-
 use super::state::{NetworkConfig, UplinkMode};
 use super::{profiles, routes, uplink};
+
+mod marks;
+use marks::applied_marker;
+pub(in crate::transport::it::network) use marks::{
+    Marks, STEP_AP, STEP_AP_ACTIVATION, STEP_MODE, STEP_UPLINK_ENV, STEP_WWAN, StepHashes, step,
+};
 
 /// The AP's own address — the gateway AP clients get from `NetworkManager`'s
 /// dnsmasq, and a name Caddy must serve for HTTPS to work from the AP subnet.
@@ -322,147 +325,6 @@ fn apply_regdom(tools: &Tools, config: &NetworkConfig) {
     if let Err(failure) = run(iw_bin, &["reg".to_owned(), "set".to_owned(), config.ap.country.clone()]) {
         crate::oerr!("network: iw reg set {} failed (non-fatal): {failure}", config.ap.country);
     }
-}
-
-// ── Per-step applied marks ──────────────────────────────────────────────────
-
-/// Marker key for `reconcile_wwan`.
-pub(super) const STEP_WWAN: &str = "wwan";
-/// Marker key for `reconcile_ap`.
-pub(super) const STEP_AP: &str = "ap";
-/// Marker key for `apply_ap_activation`.
-pub(super) const STEP_AP_ACTIVATION: &str = "ap_activation";
-/// Marker key for `apply_mode`.
-pub(super) const STEP_MODE: &str = "mode";
-/// Marker key for `write_uplink_env`.
-pub(super) const STEP_UPLINK_ENV: &str = "uplink_env";
-
-/// Where the marks live. `/run` by default, which is **cleared at every boot**
-/// — so `apply_network_at_boot` always reconciles for real, and only same-boot
-/// repeats are skipped. That is intended: only the backend writes system network
-/// config, so a human's `nmcli` edit is reverted at the next apply or boot.
-fn applied_marker() -> PathBuf {
-    std::env::var_os("CP_NETWORK_APPLIED").map_or_else(|| PathBuf::from("/run/cp-network-applied"), PathBuf::from)
-}
-
-/// Hex SHA-256 of anything serialisable — secrets included, so a PSK change with
-/// every other field identical still reconciles.
-fn hash_of<T>(inputs: &T) -> String where T: Serialize {
-    let raw = serde_json::to_vec(inputs).unwrap_or_default();
-    super::super::crypto::sha256(&raw).iter().map(|byte| format!("{byte:02x}")).collect()
-}
-
-/// One hash per apply step, over **exactly the inputs that step reads** — the
-/// single place the answer to "what does this step depend on?" is written down.
-///
-/// # Why this is not one whole-document fingerprint
-///
-/// It used to be, and that was two bugs at once.
-///
-/// * Any mode change moved the whole-document hash, so `reconcile_ap` +
-///   `nmcli connection up cp-ap` re-ran and **every associated Wi-Fi client was
-///   dropped** — while the comment sitting next to it claimed the marker existed
-///   to prevent exactly that.
-/// * The serious one: the marker was written only after a *complete*
-///   successful apply, so a partial failure left it holding the hash of the
-///   PREVIOUS document. `commit`'s rollback then called `apply(previous)`, the
-///   fingerprint matched, and the rollback performed **no system work at all**:
-///   no `nmcli`, no drop-in, no sysctl. The guarantee that a failed apply leaves
-///   the box as it was found did not hold, and the `502` was lying.
-///
-/// Recording each hash **immediately after its step succeeds** ([`Marks::record`])
-/// makes the rollback correct by construction rather than by care: a step that
-/// ran with `next` holds a hash that cannot match `previous`, so the rollback
-/// re-runs it; a step that never ran still holds `previous`' hash, so skipping it
-/// is right.
-pub(super) struct StepHashes {
-    /// `reconcile_wwan` — the bearer config **and** the mode, which is what
-    /// drives the route metric and the autoconnect flag.
-    pub wwan: String,
-    /// `reconcile_ap` — the access-point config alone.
-    pub access_point: String,
-    /// `apply_ap_activation` — the two fields it actually reads.
-    pub ap_activation: String,
-    /// `apply_mode` — the mode **and** the standby policy, which together decide
-    /// the drop-in *and* whether the bearer is brought up or down. Standby is in
-    /// here deliberately: keying on the mode alone would silently stop honouring
-    /// a `hot` → `cold` switch, which is a regression the whole-document
-    /// fingerprint did not have.
-    pub mode: String,
-    /// `write_uplink_env` — the rendered file body itself, which is the most
-    /// precise statement of that step's inputs available.
-    pub uplink_env: String,
-}
-
-impl StepHashes {
-    /// Hash every step's inputs for `config`.
-    pub(super) fn of(config: &NetworkConfig) -> Self {
-        Self {
-            wwan: hash_of(&(config.mode, &config.wwan)),
-            access_point: hash_of(&config.ap),
-            ap_activation: hash_of(&(config.ap.enabled, config.ap.share_internet)),
-            mode: hash_of(&(config.mode, config.wwan.standby)),
-            uplink_env: hash_of(&uplink::render_uplink_env(config)),
-        }
-    }
-}
-
-/// What each apply step last succeeded with: a `step=hash` line per step.
-pub(super) struct Marks {
-    /// Where the lines are read from and flushed to.
-    path: PathBuf,
-    /// Step name → hash. `BTreeMap` for a stable file order, so a human diffing
-    /// `/run/cp-network-applied` between two applies sees only what moved.
-    entries: BTreeMap<String, String>,
-}
-
-impl Marks {
-    /// Read the marks, tolerating an absent, truncated or hand-edited file —
-    /// anything unparseable simply reads as "this step has never run", which
-    /// costs a redundant reconcile and never a wrong skip.
-    pub(super) fn load(path: &Path) -> Self {
-        let mut entries = BTreeMap::new();
-        if let Ok(body) = std::fs::read_to_string(path) {
-            for line in body.lines() {
-                if let Some((step, hash)) = line.split_once('=') {
-                    drop(entries.insert(step.trim().to_owned(), hash.trim().to_owned()));
-                }
-            }
-        }
-        Self { path: path.to_path_buf(), entries }
-    }
-
-    /// Whether `step`'s inputs are exactly what it last succeeded with.
-    pub(super) fn unchanged(&self, step: &str, hash: &str) -> bool {
-        self.entries.get(step).is_some_and(|stored| stored == hash)
-    }
-
-    /// Record `step` as done, and flush **now**: the whole value of this file is
-    /// that it is accurate at the instant a *later* step fails.
-    fn record(&mut self, step: &str, hash: String) {
-        drop(self.entries.insert(step.to_owned(), hash));
-        let body: String = self.entries.iter().map(|(step, hash)| format!("{step}={hash}\n")).collect();
-        // Best-effort: a mark we fail to write only costs a redundant reconcile.
-        let _written = std::fs::write(&self.path, body);
-    }
-}
-
-/// Run one apply step unless its inputs are unchanged, then record it.
-///
-/// # Errors
-///
-/// Propagates `action`'s failure untouched, leaving the step's mark as it was —
-/// which is what tells the rollback this step must run again.
-pub(super) fn step<F>(marks: &mut Marks, name: &str, hash: String, action: F) -> Result<(), String>
-where
-    F: FnOnce() -> Result<(), String>,
-{
-    if marks.unchanged(name, &hash) {
-        return Ok(());
-    }
-    action()?;
-    marks.record(name, hash);
-    Ok(())
 }
 
 /// Run a tool and return its stdout, or the trimmed stderr as an error.
