@@ -45,7 +45,7 @@ pub fn agent_metrics(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
 /// `GET /api/metrics` — the §19 snapshot for every agent in the registry.
 ///
 /// When auth is enabled the list is filtered to the caller's ACL-granted agents
-/// (FR-12), mirroring [`fleet_meta`](super::meta::fleet_meta): a regular user
+/// (FR-12), mirroring [`fleet`](super::meta::fleet): a regular user
 /// must not be able to enumerate every agent's id, cost, and budget via the
 /// Usage page. System admins see all; auth-disabled passes everything.
 pub fn fleet_metrics(state: &Mutex<Backend>, auth_user: Option<&crate::services::auth::types::User>) -> HttpReply {

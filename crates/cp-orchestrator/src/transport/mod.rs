@@ -252,7 +252,7 @@ fn route_rest(
 
         // ── Fleet + agent routes ────────────────────────────────────
         (Method::Get, ["api", "fleet"]) => rest::fleet(state, auth_user),
-        (Method::Get, ["api", "fleet", "meta"]) => inspect::meta::fleet_meta(state, auth_user),
+        (Method::Get, ["api", "fleet", "meta"]) => inspect::meta::fleet(state, auth_user),
         (Method::Get, ["api", "fleet", "retired"]) => inspect::meta::fleet_retired(state, auth_user),
         (Method::Get, ["api", "metrics"]) => inspect::metrics::fleet_metrics(state, auth_user),
 
@@ -280,7 +280,7 @@ fn route_rest(
         (Method::Post, ["api", "it", "network", "wwan"]) => rest::it_set_network_wwan(state, body_bytes, auth_user),
 
         (Method::Get, ["api", "agent", id]) => rest::agent(state, id),
-        (Method::Get, ["api", "agent", id, "meta"]) => inspect::meta::agent_meta(state, id),
+        (Method::Get, ["api", "agent", id, "meta"]) => inspect::meta::agent(state, id),
         (Method::Get, ["api", "agent", id, "metrics"]) => inspect::metrics::agent_metrics(state, id),
         (Method::Get, ["api", "agent", id, "vitals"]) => inspect::vitals::agent_vitals(state, id),
         (Method::Get, ["api", "agent", id, "body", hash]) => rest::body(state, id, hash),
