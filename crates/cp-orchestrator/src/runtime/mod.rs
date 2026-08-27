@@ -293,7 +293,7 @@ impl Runtime {
                 crate::oerr!("updater: promote skipped \u{2014} backend lock poisoned");
                 return;
             };
-            match crate::services::releases::updater::promote_committed(&mut b.releases, &auth_db) {
+            match crate::services::releases::updater::apply::promote_committed(&mut b.releases, &auth_db) {
                 Ok(Some(agent_binary)) => {
                     b.agent_binary = agent_binary.clone();
                     b.supervisor = crate::supervisor::AgentSupervisor::new(&[agent_binary]);

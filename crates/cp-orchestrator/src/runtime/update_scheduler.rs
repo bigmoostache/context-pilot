@@ -15,9 +15,10 @@ use std::thread;
 use std::time::Duration;
 
 use crate::services::ReleaseStore;
-use crate::services::releases::updater::{
-    UpdateEvaluation, check_channel, download_artifact, restart_self, scheduler, stage_apply,
-};
+use crate::services::releases::updater::apply::{AuthDb, restart_self, stage_apply};
+use crate::services::releases::updater::download::download_artifact;
+use crate::services::releases::updater::verify::UpdateEvaluation;
+use crate::services::releases::updater::{check_channel, scheduler};
 use crate::transport::Backend;
 // The process-wide apply gate is shared with `POST /api/update/apply` so the
 // scheduler and an admin click can never race two applies.
@@ -58,10 +59,7 @@ fn tick(backend: &Arc<Mutex<Backend>>, auth_db: &PathBuf, install: &PathBuf) -> 
 
     let now_minutes = scheduler::local_now_minutes();
     let outcome = scheduler::run_tick(
-        mode,
-        &window,
-        now_minutes,
-        &APPLY_IN_FLIGHT,
+        &scheduler::TickCtx { mode, window: &window, now_minutes, apply_gate: &APPLY_IN_FLIGHT },
         || {
             let result = check_channel(&releases_dir, &channel, &current, crossgrade);
             // A verified answer on the new channel retires the crossgrade window
@@ -71,7 +69,7 @@ fn tick(backend: &Arc<Mutex<Backend>>, auth_db: &PathBuf, install: &PathBuf) -> 
                     b.releases.clear_pending_switch();
                 }
             result.map(|eval| match eval {
-                UpdateEvaluation::Available(manifest) => Some(manifest),
+                UpdateEvaluation::Available(manifest) => Some(*manifest),
                 UpdateEvaluation::UpToDate => None,
             })
         },
@@ -83,7 +81,7 @@ fn tick(backend: &Arc<Mutex<Backend>>, auth_db: &PathBuf, install: &PathBuf) -> 
             let Ok(b) = backend.lock() else {
                 return Err("backend lock poisoned".to_owned());
             };
-            stage_apply(&b.releases, b.auth.as_ref(), auth_db, install, &manifest.version)?;
+            stage_apply(&b.releases, &AuthDb { store: b.auth.as_ref(), path: auth_db }, install, &manifest.version)?;
             drop(b);
             restart_self(install);
             Ok(current.clone())

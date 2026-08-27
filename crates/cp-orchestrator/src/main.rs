@@ -90,7 +90,7 @@ fn main() {
     if let Some(install) = install.as_deref() {
         let releases_dir = cp_orchestrator::services::ReleaseStore::default_dir()
             .unwrap_or_else(|| config.agents_dir.join("releases"));
-        cp_orchestrator::services::releases::updater::boot_reconcile(&releases_dir, &config.auth_db_path, install);
+        cp_orchestrator::services::releases::updater::apply::boot_reconcile(&releases_dir, &config.auth_db_path, install);
     }
 
     cp_orchestrator::oerr!("agents directory: {}", config.agents_dir.display());

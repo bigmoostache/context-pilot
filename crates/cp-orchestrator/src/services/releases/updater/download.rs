@@ -20,7 +20,7 @@ use super::super::{Manifest, ReleaseStore};
 ///
 /// Returns an error on a missing arch artifact, network failure, `sha256`
 /// mismatch (nothing extracted), or extraction failure (directory cleaned).
-pub fn download_artifact(store: &ReleaseStore, manifest: &Manifest, arch: &str) -> Result<(), String> {
+pub(crate) fn download_artifact(store: &ReleaseStore, manifest: &Manifest, arch: &str) -> Result<(), String> {
     let artifact = super::artifact_for(manifest, arch)?;
     let tag = &manifest.version;
     if store.binary_path(tag).exists() {

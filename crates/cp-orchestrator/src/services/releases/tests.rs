@@ -106,7 +106,7 @@ fn store_set_channel_roundtrip() {
     assert!(!store.pending_channel_switch());
 
     // A stale availability hint from the old channel must be dropped on switch.
-    let mut st = updater::UpdateState::load(&releases);
+    let mut st = updater::state::UpdateState::load(&releases);
     st.available = Some("v9.9.9".to_owned());
     st.save(&releases);
 
@@ -114,7 +114,7 @@ fn store_set_channel_roundtrip() {
     store.set_channel("nightly").expect("nightly accepted");
     assert_eq!(store.channel(), "nightly");
     assert!(store.pending_channel_switch(), "switch arms the crossgrade flag");
-    assert!(updater::UpdateState::load(&releases).available.is_none(), "stale available cleared");
+    assert!(updater::state::UpdateState::load(&releases).available.is_none(), "stale available cleared");
 
     // Persisted: a reload sees the switch and the armed flag.
     let reloaded = ReleaseStore::load(releases.clone());

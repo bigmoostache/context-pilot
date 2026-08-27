@@ -6,7 +6,7 @@
 //! plain monotonic comparison would refuse the move as a rollback.
 
 use super::ReleaseStore;
-use super::updater::UpdateState;
+use super::updater::state::UpdateState;
 
 impl ReleaseStore {
     /// The channel this box follows (`stable` or `nightly`).

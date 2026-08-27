@@ -15,7 +15,7 @@ const STATE_FILE: &str = "update-state.json";
 /// How the last apply attempt ended.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-pub enum UpdateResult {
+pub(crate) enum UpdateResult {
     /// The staged version booted healthy and was committed.
     Success {
         /// Version running before the update (`None` on a first install).
@@ -45,7 +45,7 @@ pub enum UpdateResult {
 
 /// The durable updater state.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct UpdateState {
+pub(crate) struct UpdateState {
     /// Epoch-ms of the last channel check (successful or not).
     pub last_check_ms: Option<u64>,
     /// Version the channel offers, as of the last *verified* check.
@@ -59,12 +59,12 @@ pub struct UpdateState {
 impl UpdateState {
     /// Load the state from `releases_dir`, defaulting on absence/corruption.
     #[must_use]
-    pub fn load(releases_dir: &Path) -> Self {
+    pub(crate) fn load(releases_dir: &Path) -> Self {
         std::fs::read(state_path(releases_dir)).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
     }
 
     /// Atomically persist the state under `releases_dir` (best-effort).
-    pub fn save(&self, releases_dir: &Path) {
+    pub(crate) fn save(&self, releases_dir: &Path) {
         let Ok(bytes) = serde_json::to_vec_pretty(self) else {
             return;
         };
@@ -72,9 +72,9 @@ impl UpdateState {
             return;
         }
         let path = state_path(releases_dir);
-        let tmp = path.with_extension("json.tmp");
-        if std::fs::write(&tmp, &bytes).is_ok() {
-            let _renamed = std::fs::rename(&tmp, &path);
+        let staged = path.with_extension("json.tmp");
+        if std::fs::write(&staged, &bytes).is_ok() {
+            let _renamed = std::fs::rename(&staged, &path);
         }
     }
 }

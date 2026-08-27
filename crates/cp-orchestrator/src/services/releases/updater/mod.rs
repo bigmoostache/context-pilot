@@ -18,16 +18,14 @@
 //! * [`state`] — durable `update-state.json` (last check / last result) the
 //!   cockpit surfaces.
 
-pub(crate) mod apply;
+pub mod apply;
 pub(crate) mod download;
 pub(crate) mod scheduler;
 pub(crate) mod state;
 pub(crate) mod verify;
 
-pub use apply::{boot_reconcile, promote_committed, restart_self, stage_apply};
-pub use download::download_artifact;
-pub use state::{UpdateResult, UpdateState};
-pub use verify::{UpdateEvaluation, VerifyError, evaluate_manifest};
+use state::UpdateState;
+use verify::{UpdateEvaluation, evaluate_manifest};
 
 use std::path::Path;
 
@@ -68,7 +66,9 @@ pub fn fetch_channel_manifest(channel: &str) -> Result<(Vec<u8>, String), String
 
 /// One full **check** (read-only): fetch the configured channel's manifest,
 /// verify it, and record the outcome in `update-state.json` under
-/// `releases_dir`. `allow_crossgrade` is set right after an explicit channel
+/// `releases_dir`.
+///
+/// `allow_crossgrade` is set right after an explicit channel
 /// switch so the box adopts the new channel's head regardless of version order.
 ///
 /// A failed signature / freshness / anti-rollback check returns `Err` and the
@@ -78,7 +78,7 @@ pub fn fetch_channel_manifest(channel: &str) -> Result<(Vec<u8>, String), String
 /// # Errors
 ///
 /// Returns an error string on fetch failure or any failed verification.
-pub fn check_channel(
+pub(crate) fn check_channel(
     releases_dir: &Path,
     channel: &str,
     current: &str,
@@ -88,11 +88,16 @@ pub fn check_channel(
     st.last_check_ms = Some(state::now_ms());
 
     let outcome = fetch_channel_manifest(channel).and_then(|(bytes, sig)| {
-        evaluate_manifest(&bytes, &sig, current, state::now_epoch_secs(), channel, allow_crossgrade)
-            .map_err(|e| e.to_string())
+        let ctx = verify::EvalContext {
+            current,
+            now_epoch_secs: state::now_epoch_secs(),
+            expected_channel: channel,
+            allow_crossgrade,
+        };
+        evaluate_manifest(&bytes, &sig, &ctx).map_err(|e| e.to_string())
     });
-    match &outcome {
-        Ok(UpdateEvaluation::Available(manifest)) => {
+    cp_base::deref_match!(&outcome, {
+        Ok(UpdateEvaluation::Available(ref manifest)) => {
             st.available = Some(manifest.version.clone());
             st.available_notes_url = Some(manifest.notes_url.clone());
         }
@@ -101,16 +106,17 @@ pub fn check_channel(
             st.available_notes_url = None;
         }
         Err(_) => {} // keep last-known `available` — never regress on a bad fetch
-    }
+    });
     st.save(releases_dir);
     outcome
 }
 
 /// Evaluate a fetched manifest and, **only** when it verifies as a newer
-/// applicable version, run `download` on it. This is the single seam between
-/// "checked" and "acting": a manifest that fails signature, freshness,
-/// anti-rollback or schema checks returns `Err` here and the download hook is
-/// provably never invoked (V3.1b).
+/// applicable version, run `download` on it.
+///
+/// This is the single seam between "checked" and "acting": a manifest that
+/// fails signature, freshness, anti-rollback or schema checks returns `Err`
+/// here and the download hook is provably never invoked (V3.1b).
 ///
 /// Returns `Ok(Some(manifest))` when an update was verified + downloaded,
 /// `Ok(None)` when the box is up to date.
@@ -118,22 +124,20 @@ pub fn check_channel(
 /// # Errors
 ///
 /// Any failed verification (as [`VerifyError`] text) or download failure.
-pub fn check_and_prepare<D>(
+#[cfg(test)]
+pub(crate) fn check_and_prepare<D>(
     manifest_bytes: &[u8],
     signature: &str,
-    current: &str,
-    now_epoch_secs: u64,
-    expected_channel: &str,
-    allow_crossgrade: bool,
+    ctx: &verify::EvalContext<'_>,
     download: D,
 ) -> Result<Option<Manifest>, String>
 where
     D: FnOnce(&Manifest) -> Result<(), String>,
 {
-    match evaluate_manifest(manifest_bytes, signature, current, now_epoch_secs, expected_channel, allow_crossgrade) {
+    match evaluate_manifest(manifest_bytes, signature, ctx) {
         Ok(UpdateEvaluation::Available(manifest)) => {
             download(&manifest)?;
-            Ok(Some(manifest))
+            Ok(Some(*manifest))
         }
         Ok(UpdateEvaluation::UpToDate) => Ok(None),
         Err(e) => Err(e.to_string()),
@@ -141,10 +145,10 @@ where
 }
 
 /// Resolve the manifest artifact for `arch`, or explain what is on offer.
-pub(crate) fn artifact_for<'m>(
-    manifest: &'m Manifest,
+pub(crate) fn artifact_for<'manifest>(
+    manifest: &'manifest Manifest,
     arch: &str,
-) -> Result<&'m super::manifest::ManifestArtifact, String> {
+) -> Result<&'manifest super::manifest::ManifestArtifact, String> {
     manifest.artifacts.get(arch).ok_or_else(|| {
         let offered: Vec<&str> = manifest.artifacts.keys().map(String::as_str).collect();
         format!("manifest {} has no artifact for arch {arch} (offers: {})", manifest.version, offered.join(", "))

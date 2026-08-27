@@ -22,9 +22,11 @@ use serde::Deserialize;
 
 use super::super::{Backend, HttpReply};
 use crate::services::ReleaseStore;
-use crate::services::releases::updater::{
-    UpdateEvaluation, UpdateState, check_channel, download_artifact, restart_self, scheduler, stage_apply,
-};
+use crate::services::releases::updater::apply::{AuthDb, restart_self, stage_apply};
+use crate::services::releases::updater::download::download_artifact;
+use crate::services::releases::updater::state::UpdateState;
+use crate::services::releases::updater::verify::UpdateEvaluation;
+use crate::services::releases::updater::{check_channel, scheduler};
 use crate::services::releases::{MaintenanceWindow, UpdateMode};
 
 /// Process-wide apply serialisation (T4.2.3): the REST `apply` route and the
@@ -121,7 +123,7 @@ pub(crate) fn update_apply(state: &Mutex<Backend>) -> HttpReply {
             }
             return HttpReply::ok(&serde_json::json!({ "status": "up_to_date", "current": current }));
         }
-        Ok(UpdateEvaluation::Available(manifest)) => manifest,
+        Ok(UpdateEvaluation::Available(manifest)) => *manifest,
     };
     // The switch resolved to a concrete target; retire the crossgrade window
     // now so a mid-apply failure doesn't re-trigger head-tracking next poll.
@@ -147,7 +149,7 @@ pub(crate) fn update_apply(state: &Mutex<Backend>) -> HttpReply {
             APPLY_IN_FLIGHT.store(false, Ordering::SeqCst);
             return HttpReply::error(500, "backend lock poisoned");
         };
-        if let Err(e) = stage_apply(&b.releases, b.auth.as_ref(), &b.auth_db_path, &install, &manifest.version) {
+        if let Err(e) = stage_apply(&b.releases, &AuthDb { store: b.auth.as_ref(), path: &b.auth_db_path }, &install, &manifest.version) {
             drop(b);
             APPLY_IN_FLIGHT.store(false, Ordering::SeqCst);
             return HttpReply::error(500, &format!("stage failed: {e}"));
