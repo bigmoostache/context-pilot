@@ -137,7 +137,7 @@ fn store_select_rejects_missing() {
     drop(std::fs::create_dir_all(&dir));
 
     let mut store = ReleaseStore::load(dir.clone());
-    store.select("v0.0.1-ghost").unwrap_err();
+    let _err: String = store.select("v0.0.1-ghost").unwrap_err();
 
     drop(std::fs::remove_dir_all(&dir));
 }
