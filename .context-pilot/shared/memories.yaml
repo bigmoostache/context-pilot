@@ -370,8 +370,18 @@
   - historical
   last_edited_ms: 1784202948992
 5905bf08a95f2017:
-  tl_dr: 'T646 SHIPPED: ⌘/Ctrl+A opens the workspace AgentSwitcher from any view. Commit fdfa0990 on branch t646-agent-selector-shortcut. Details in body.'
-  contents: 'AgentSwitcher gained optional triggerRef→DropdownMenuTrigger ref; TopBar holds switcherRef + useModifierShortcuts({a:()=>switcherRef.current?.click()}); a11y.ts added selectAllWouldBeNoop() (mirror of copyWouldBeNoop but tests FOCUS not selection) so `a` yields inside input/textarea/contenteditable and real Select-All is never stolen. TopBar trimmed back to exactly 500 lines (condensed 3 prose comments). Full frontend gate green (eslint/prettier/stylelint/tsc/type-coverage/suppressions/census/knip). Branch off master @ e539b9a1 (PR #182 merged). Needs push + new PR per M163.'
+  tl_dr: 'T646 SHIPPED + FIXED: ⌘/Ctrl+A opens the workspace AgentSwitcher from any view, shows an ''A'' HintBadge on ⌘-hold, and respects empty-vs-filled text fields. Branch t646-agent-selector-shortcut, PR #183, fix commit 9b189ce1. Details in body.'
+  contents: |-
+    FIRST ATTEMPT (fdfa0990) WAS BROKEN — do not restore that pattern: it used switcherRef.current?.click() on the base-ui DropdownMenu trigger (a synthetic click does NOT open a base-ui menu) and never rendered a HintBadge (no 'A' on ⌘-hold). User caught both.
+
+    CORRECT IMPLEMENTATION (commit 9b189ce1, replicates the ViewTabs/ThemeToggle idiom exactly):
+    - AgentSwitcher.tsx: removed triggerRef prop. Added CONTROLLED open?/onOpenChange? forwarded to <DropdownMenu open onOpenChange> (base-ui Menu.Root). Added shortcutHint?/hintShown? props; trigger className gets `relative`; renders {shortcutHint && <HintBadge label={shortcutHint} shown={hintShown ?? false} />} after TriggerFace. All optionals typed `| undefined` (exactOptionalPropertyTypes).
+    - TopBar.tsx: dropped useRef; `const [switcherOpen,setSwitcherOpen]=useState(false)` + `const switcherModHeld=useModifierShortcuts({a:()=>setSwitcherOpen(true)})`; passes open/onOpenChange/shortcutHint="A"/hintShown to AgentSwitcher. Held at exactly 500 lines by condensing 3 prose comments.
+    - a11y.ts selectAllWouldBeNoop: rewritten to test CONTENT not focus — returns el.value==="" for input/textarea, el.textContent==="" for contenteditable, true otherwise. So ⌘/Ctrl+A FIRES in an empty field (native Select-All is a no-op there) but YIELDS the moment the field holds text (real Select-All preserved). NOTE: `el.textContent ?? ""` trips @typescript-eslint/no-unnecessary-condition (HTMLElement.textContent typed non-null) — use bare `el.textContent === ""`.
+
+    MECHANISM LESSON: to open a base-ui (@base-ui/react/menu) Menu programmatically, CONTROL its open state — never dispatch a click on the trigger. HintBadge requires a `relative` host and pointer-events-none (it is).
+
+    Full frontend gate green (eslint/prettier/stylelint/tsc/type-coverage 99.82%/suppressions/census/knip). User confirmed 'it works now' then requested the empty-field refinement, also delivered. NEVER commit the stray .context-pilot/agents/default.md.
   importance: medium
   labels:
   - T646
@@ -379,7 +389,9 @@
   - agent-switcher
   - shipped
   - web
-  last_edited_ms: 1787826928017
+  - base-ui
+  - gotcha
+  last_edited_ms: 1787827958507
 66c65b2514fd54ac:
   tl_dr: 'T593 tmp/v2 document persistence: pretty-printed normal form on disk, hand-editable file with live push over Vite HMR, word-level diff3 merge on concurrent edit, conflict = save refused + nothing written. Architecture + gotchas in body.'
   contents: |-
