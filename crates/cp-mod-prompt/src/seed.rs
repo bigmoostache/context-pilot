@@ -6,6 +6,11 @@ use crate::types::{PromptState, PromptType};
 /// Ensure there's always a valid active agent ID.
 /// Dynamically loads agents from disk + built-ins to verify.
 pub fn ensure_default_agent(state: &mut State) {
+    // Fold any per-realm behaviour files into the fleet-shared home dir before
+    // the first load, so migrated agents are visible to the check below (T651).
+    // Idempotent — after the first boot the local dirs are empty.
+    crate::storage::migrate_local_to_shared();
+
     let agents = crate::storage::load_prompts_for(PromptType::Agent);
     let default_id = library::default_agent_id();
 

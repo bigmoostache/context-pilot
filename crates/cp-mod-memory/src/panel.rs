@@ -6,87 +6,50 @@ use cp_base::state::context::Entry;
 use cp_base::state::context::{Kind, estimate_tokens};
 use cp_base::state::runtime::State;
 
-use crate::types::{MemoryImportance, MemoryState};
+use crate::types::{MemorySlot, MemoryState, Tier};
 use cp_base::panels::scroll_key_action;
 use std::fmt::Write as _;
 
-/// Importance sort key (critical first).
-const fn importance_rank(imp: MemoryImportance) -> i32 {
-    match imp {
-        MemoryImportance::Critical => 0i32,
-        MemoryImportance::High => 1i32,
-        MemoryImportance::Medium => 2i32,
-        MemoryImportance::Low => 3i32,
-    }
+/// Occupied slots of `tier`, sorted by importance (critical first) then slot
+/// index (stable insertion order within an importance band).
+fn occupied_of(state: &MemoryState, tier: Tier) -> Vec<&MemorySlot> {
+    let mut v: Vec<&MemorySlot> = state.slots.iter().filter(|s| s.occupied && s.tier == tier).collect();
+    v.sort_by_key(|s| s.importance.rank());
+    v
 }
 
-/// Push the rendered blocks for one memory item (header + key/values +
-/// optional contents body) onto `blocks`.
-fn push_memory_blocks(blocks: &mut Vec<cp_render::Block>, memory: &crate::types::MemoryItem) {
-    use cp_render::{Block, Semantic, Span as S};
-
-    let imp_sem = match memory.importance {
-        MemoryImportance::Critical => Semantic::Warning,
-        MemoryImportance::High => Semantic::Accent,
-        MemoryImportance::Medium => Semantic::Code,
-        MemoryImportance::Low => Semantic::Muted,
-    };
-    blocks.push(Block::Line(vec![S::new(" ".into()), S::accent(format!("{}:", memory.id)).bold()]));
-    blocks.push(Block::KeyValue(vec![
-        (vec![S::muted("   tl_dr: ".into())], vec![S::new(memory.tl_dr.clone())]),
-        (vec![S::muted("   importance: ".into())], vec![S::styled(memory.importance.as_str().into(), imp_sem)]),
-    ]));
-    if !memory.labels.is_empty() {
-        blocks.push(Block::KeyValue(vec![(
-            vec![S::muted("   labels: ".into())],
-            vec![S::styled(format!("[{}]", memory.labels.join(", ")), Semantic::Code)],
-        )]));
-    }
-    if !memory.contents.is_empty() {
-        blocks.push(Block::Line(vec![S::muted("   contents: |".into())]));
-        for line in memory.contents.lines() {
-            blocks.push(Block::Line(vec![S::new("     ".into()), S::styled(line.to_owned(), Semantic::Code)]));
-        }
-    }
-}
-
-/// Panel that renders memory items and provides LLM context.
+/// Panel that renders the fixed memory budget and provides LLM context.
 pub(crate) struct MemoryPanel;
 
 impl MemoryPanel {
-    /// Format memories for LLM context.
-    /// All memories are rendered as YAML with full contents.
-    fn format_memories_for_context(state: &State) -> String {
+    /// Format the fixed slot budget for LLM context, grouped by tier.
+    ///
+    /// Each tier shows a `used/total` header, its occupied slots (importance
+    /// first), and a single line for the free slots — so the ceiling is always
+    /// in view without paying one row per empty slot.
+    fn format_for_context(state: &State) -> String {
         let ms = MemoryState::get(state);
-        if ms.memories.is_empty() {
-            return "No memories".to_owned();
-        }
+        let mut out = String::new();
 
-        // Sort by importance (critical first)
-        let mut sorted: Vec<_> = ms.memories.iter().collect();
-        sorted.sort_by_key(|m| importance_rank(m.importance));
-
-        let mut output = String::new();
-
-        for (i, memory) in sorted.iter().enumerate() {
-            if i > 0 {
-                output.push('\n');
-            }
-            let _r1 = writeln!(output, "{}:", memory.id);
-            let _r2 = writeln!(output, "  tl_dr: {}", memory.tl_dr);
-            let _r3 = writeln!(output, "  importance: {}", memory.importance.as_str());
-            if !memory.labels.is_empty() {
-                let _r4 = writeln!(output, "  labels: [{}]", memory.labels.join(", "));
-            }
-            if !memory.contents.is_empty() {
-                output.push_str("  contents: |\n");
-                for line in memory.contents.lines() {
-                    let _r5 = writeln!(output, "    {line}");
+        for tier in Tier::ALL {
+            let occ = occupied_of(ms, tier);
+            let total = tier.slot_count();
+            let _h = writeln!(out, "{} ({}/{}):", tier.slug(), occ.len(), total);
+            for slot in &occ {
+                let _r = writeln!(out, "  {} [{}] {}", slot.id, slot.importance.as_str(), slot.title);
+                if !slot.contents.is_empty() {
+                    for line in slot.contents.lines() {
+                        let _l = writeln!(out, "      {line}");
+                    }
                 }
             }
+            let free = total.saturating_sub(occ.len());
+            if free > 0 {
+                let _f = writeln!(out, "  … {free} empty slots free");
+            }
         }
 
-        output.trim_end().to_owned()
+        out.trim_end().to_owned()
     }
 }
 
@@ -96,42 +59,54 @@ impl Panel for MemoryPanel {
     }
 
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
-        use cp_render::{Block, Span as S};
+        use cp_render::{Block, Semantic, Span as S};
 
         let ms = MemoryState::get(state);
-
-        if ms.memories.is_empty() {
-            return vec![Block::Line(vec![S::muted("  No memories".into()).italic()])];
-        }
-
-        // Sort by importance (critical first)
-        let mut sorted: Vec<_> = ms.memories.iter().collect();
-        sorted.sort_by_key(|m| importance_rank(m.importance));
-
         let mut blocks = Vec::new();
 
-        // All memories rendered as key-value blocks with full contents
-        for (i, memory) in sorted.iter().enumerate() {
-            if i > 0 {
-                blocks.push(Block::Empty);
+        for tier in Tier::ALL {
+            let occ = occupied_of(ms, tier);
+            let total = tier.slot_count();
+            blocks.push(Block::Line(vec![
+                S::accent(format!(" {}", tier.slug())).bold(),
+                S::muted(format!(" ({}/{})", occ.len(), total)),
+            ]));
+            for slot in &occ {
+                let imp_sem = match slot.importance {
+                    crate::types::MemoryImportance::Critical => Semantic::Warning,
+                    crate::types::MemoryImportance::High => Semantic::Accent,
+                    crate::types::MemoryImportance::Medium => Semantic::Code,
+                    crate::types::MemoryImportance::Low => Semantic::Muted,
+                };
+                blocks.push(Block::Line(vec![
+                    S::muted(format!("   {} ", slot.id)),
+                    S::styled(format!("[{}] ", slot.importance.as_str()), imp_sem),
+                    S::new(slot.title.clone()).bold(),
+                ]));
+                for line in slot.contents.lines() {
+                    blocks.push(Block::Line(vec![S::new("      ".into()), S::styled(line.to_owned(), Semantic::Code)]));
+                }
             }
-            push_memory_blocks(&mut blocks, memory);
+            let free = total.saturating_sub(occ.len());
+            if free > 0 {
+                blocks.push(Block::Line(vec![S::muted(format!("   … {free} empty slots free")).italic()]));
+            }
         }
 
         blocks
     }
+
     fn title(&self, _state: &State) -> String {
         "Memory".to_owned()
     }
 
     fn refresh(&self, state: &mut State) {
-        let memory_content = Self::format_memories_for_context(state);
-        let token_count = estimate_tokens(&memory_content);
-
+        let content = Self::format_for_context(state);
+        let token_count = estimate_tokens(&content);
         for ctx in &mut state.context {
             if ctx.context_type.as_str() == Kind::MEMORY {
                 ctx.token_count = token_count;
-                let _changed = cp_base::panels::update_if_changed(ctx, &memory_content);
+                let _changed = cp_base::panels::update_if_changed(ctx, &content);
                 break;
             }
         }
@@ -142,7 +117,7 @@ impl Panel for MemoryPanel {
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
-        let content = Self::format_memories_for_context(state);
+        let content = Self::format_for_context(state);
         let (id, last_refresh_ms) = state
             .context
             .iter()

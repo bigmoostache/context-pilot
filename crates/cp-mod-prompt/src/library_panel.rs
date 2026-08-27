@@ -48,7 +48,7 @@ fn push_commands_table(content: &mut String, commands: &[crate::types::PromptIte
 
 /// Append the "how to manage behaviours" cheat sheet for the LLM.
 fn push_crud_cheatsheet(content: &mut String) {
-    content.push_str("\nHow to manage behaviours:\n");
+    content.push_str("\nHow to manage behaviours (fleet-shared \u{2014} stored under ~/.context-pilot/behaviours/):\n");
     content.push_str("- Create: Behaviour_create(name, type, content) \u{2014} type: 'agent', 'skill', or 'command'\n");
     let _wd = writeln!(
         content,

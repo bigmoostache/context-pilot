@@ -14,10 +14,84 @@ const fn subdir_for(pt: PromptType) -> &'static str {
     }
 }
 
-/// Full path to the directory for a prompt type
+/// Fleet-shared directory for a prompt type (`~/.context-pilot/behaviours/<subdir>`).
+///
+/// Every agent-side reader/writer funnels through here, so this single resolver
+/// is what makes behaviours fleet-shared (T651).
 #[must_use]
 pub fn dir_for(pt: PromptType) -> PathBuf {
+    constants::home_behaviours_dir().join(subdir_for(pt))
+}
+
+/// The OLD per-realm behaviour dir a prompt type used to live in
+/// (`./.context-pilot/<subdir>`, relative to the agent's realm). Migration
+/// reads FROM here into the shared [`dir_for`] location.
+fn legacy_local_dir(pt: PromptType) -> PathBuf {
     PathBuf::from(constants::STORE_DIR).join(subdir_for(pt))
+}
+
+/// Migrate any per-realm behaviour `.md` files into the fleet-shared home dir,
+/// once, at boot (T651). Idempotent: after it runs the local dirs hold no `.md`
+/// files, so re-runs are no-ops.
+///
+/// Per file: move it to `~/.context-pilot/behaviours/<subdir>/<id>.md`. On an
+/// id collision with an already-shared file, compare bytes — identical means
+/// the shared copy already IS this file (just drop the local one); differing
+/// means the incoming local file is written under the next free `-<n>` suffix,
+/// so the already-shared file keeps the plain id, untouched. The now-empty
+/// local dirs are left in place (harmless; avoids dir-removal races).
+pub fn migrate_local_to_shared() {
+    for pt in [PromptType::Agent, PromptType::Skill, PromptType::Command] {
+        let local = legacy_local_dir(pt);
+        let Ok(entries) = fs::read_dir(&local) else { continue };
+        let shared = dir_for(pt);
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("md") {
+                continue;
+            }
+            let Some(id) = path.file_stem().and_then(|s| s.to_str()) else { continue };
+            migrate_one_file(&path, &shared, id);
+        }
+    }
+}
+
+/// Move one local behaviour file into `shared`, applying the byte-compare
+/// collision rule. Best-effort: any I/O error leaves the local file in place
+/// (a later boot retries).
+fn migrate_one_file(local_path: &Path, shared: &Path, id: &str) {
+    let Ok(local_bytes) = fs::read(local_path) else { return };
+    let target = shared.join(format!("{id}.md"));
+
+    let dest = if target.exists() {
+        match fs::read(&target) {
+            // Same file already shared — just drop the local copy.
+            Ok(existing) if existing == local_bytes => {
+                drop(fs::remove_file(local_path));
+                return;
+            }
+            // Differing collision — the incoming local file gets the suffix.
+            _ => next_suffixed_path(shared, id),
+        }
+    } else {
+        target
+    };
+
+    if fs::create_dir_all(shared).is_err() {
+        return;
+    }
+    if fs::write(&dest, &local_bytes).is_ok() {
+        drop(fs::remove_file(local_path));
+    }
+}
+
+/// The lowest-free `<id>-<n>.md` path in `shared` (n starts at 1). Bounded to
+/// `u32::MAX` candidates; the fallback is unreachable in practice.
+fn next_suffixed_path(shared: &Path, id: &str) -> PathBuf {
+    (1u32..=u32::MAX)
+        .map(|n| shared.join(format!("{id}-{n}.md")))
+        .find(|p| !p.exists())
+        .unwrap_or_else(|| shared.join(format!("{id}-x.md")))
 }
 
 /// Parse a prompt .md file with YAML frontmatter.

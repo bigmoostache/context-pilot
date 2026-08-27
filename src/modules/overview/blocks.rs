@@ -338,13 +338,13 @@ pub(super) fn statistics_blocks(state: &State) -> Vec<Block> {
     }
 
     // Memories
-    let mems = &MemoryState::get(state).memories;
-    let total_memories = mems.len();
+    let ms = MemoryState::get(state);
+    let total_memories = ms.occupied_count();
     if total_memories > 0 {
-        let critical = mems.iter().filter(|m| m.importance == MemoryImportance::Critical).count();
-        let high = mems.iter().filter(|m| m.importance == MemoryImportance::High).count();
-        let medium = mems.iter().filter(|m| m.importance == MemoryImportance::Medium).count();
-        let low = mems.iter().filter(|m| m.importance == MemoryImportance::Low).count();
+        let critical = ms.slots.iter().filter(|s| s.occupied && s.importance == MemoryImportance::Critical).count();
+        let high = ms.slots.iter().filter(|s| s.occupied && s.importance == MemoryImportance::High).count();
+        let medium = ms.slots.iter().filter(|s| s.occupied && s.importance == MemoryImportance::Medium).count();
+        let low = ms.slots.iter().filter(|s| s.occupied && s.importance == MemoryImportance::Low).count();
 
         out.push(Block::line(vec![
             Span::muted(" Memories: ".to_owned()),
