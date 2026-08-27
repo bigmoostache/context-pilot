@@ -64,13 +64,13 @@ pub struct HttpReply {
 
 impl HttpReply {
     /// A `200 OK` carrying `value` serialized as JSON.
-    pub(crate) fn ok<T: Serialize>(value: &T) -> Self {
+    pub(crate) fn ok<T>(value: &T) -> Self where T: Serialize {
         Self::json(200, value)
     }
 
     /// A reply with `status` carrying `value` serialized as JSON. Serialization
     /// is infallible for our own types; a failure degrades to a `500`.
-    fn json<T: Serialize>(status: u16, value: &T) -> Self {
+    fn json<T>(status: u16, value: &T) -> Self where T: Serialize {
         match serde_json::to_string(value) {
             Ok(body) => Self { status, body },
             Err(_) => Self::error(500, "serialization failed"),
@@ -333,13 +333,12 @@ pub fn threads(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
 
         // Read focused_thread_id from the first worker's FocusState.
         let focused = reader.list_workers(folder).unwrap_or_default().into_iter().find_map(|wid| {
-            reader.read_worker(folder, &wid).ok().and_then(|w| {
-                w.get("modules")
-                    .and_then(|m| m.get("threads_worker"))
-                    .and_then(|tw| tw.get("focused_thread_id"))
-                    .and_then(serde_json::Value::as_str)
-                    .map(String::from)
-            })
+            let w = reader.read_worker(folder, &wid).ok()?;
+            w.get("modules")
+                                .and_then(|m| m.get("threads_worker"))
+                                .and_then(|tw| tw.get("focused_thread_id"))
+                                .and_then(serde_json::Value::as_str)
+                                .map(String::from)
         });
         // The `reader` borrow ends with `cfg`/`focused` (both owned); now read
         // the live roster + focused thread from the view under the same lock.

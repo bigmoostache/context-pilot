@@ -32,7 +32,7 @@ fn rich_entry(rev: u64) -> OpEntry {
     OpEntry::new(
         1,
         rev,
-        1_718_000_000_000_u64.wrapping_add(rev),
+        1_718_000_000_000u64.wrapping_add(rev),
         OpEntryKind::MessageCreated {
             thread_id: format!("T{rev}"),
             message_id: format!("m{rev}-body"),

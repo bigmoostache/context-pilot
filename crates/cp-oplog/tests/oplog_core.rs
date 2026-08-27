@@ -125,9 +125,9 @@ fn every_rolled_segment_opens_with_a_checkpoint_and_seg0_does_not() {
         let first = scan.entries.first().expect("a rolled/seeded segment is never empty");
         let opens_with_checkpoint = matches!(first.kind, OpEntryKind::Checkpoint { .. });
         if index == 0 {
-            assert!(!opens_with_checkpoint, "seg-0 has no prior state, so it must NOT open with a checkpoint",);
+            assert!(!opens_with_checkpoint, "seg-0 has no prior state, so it must NOT open with a checkpoint");
         } else {
-            assert!(opens_with_checkpoint, "rolled segment {index} must open with a leading checkpoint",);
+            assert!(opens_with_checkpoint, "rolled segment {index} must open with a leading checkpoint");
         }
     }
 }
@@ -143,7 +143,7 @@ fn segment_indices_are_ascending_and_contiguous_from_zero() {
     }
     let indices = segment::indices(dir.path()).expect("indices");
     let expected: Vec<u64> = (0..u64::try_from(indices.len()).unwrap_or(0)).collect();
-    assert_eq!(indices, expected, "segment indices must be 0,1,2,… in order");
+    assert_eq!(indices, expected, "segment indices must be 0,1,2,\u{2026} in order");
 }
 
 // ── replay rebuilds ground truth ────────────────────────────────────────────
@@ -206,14 +206,14 @@ fn replay_rebuilds_ground_truth_heads_and_seen_over_a_rolled_reopened_log() {
             "thread {thread} head must be its last write",
         );
     }
-    assert_eq!(recovered.heads.threads.len(), expected_last.len(), "no phantom threads in recovered heads",);
+    assert_eq!(recovered.heads.threads.len(), expected_last.len(), "no phantom threads in recovered heads");
 
     // Every committed dedup token must be in the recovered seen-set, and none
     // beyond them.
     for token in &expected_tokens {
         assert!(recovered.seen.contains(token), "token {token} must survive replay");
     }
-    assert_eq!(recovered.seen.len(), expected_tokens.len(), "recovered seen-set holds exactly the committed tokens",);
+    assert_eq!(recovered.seen.len(), expected_tokens.len(), "recovered seen-set holds exactly the committed tokens");
 }
 
 // ── torn-tail recovery at every byte offset (V1) ─────────────────────────────
@@ -257,7 +257,7 @@ fn torn_tail_recovery_is_correct_at_every_byte_offset() {
 
         let cut_u64 = u64::try_from(cut).unwrap_or(u64::MAX);
         let want = expected_rev_head(&boundaries, cut_u64);
-        assert_eq!(recovered.rev_head, want, "cut {cut}: recovered rev_head must be the last intact record",);
+        assert_eq!(recovered.rev_head, want, "cut {cut}: recovered rev_head must be the last intact record");
 
         // next_rev resumes one past the recovered head (or 0 from empty).
         let want_next = want.map_or(0, |rev| rev.wrapping_add(1));

@@ -190,7 +190,7 @@ impl AvatarStore {
 
 /// Sniff the MIME content type from the first bytes of an image.
 ///
-/// Recognises PNG, JPEG, GIF, WebP, BMP, ICO, and SVG (text-based, detected
+/// Recognises PNG, JPEG, GIF, `WebP`, BMP, ICO, and SVG (text-based, detected
 /// by a leading `<svg` or `<?xml` + `<svg`).
 fn sniff_image_type(bytes: &[u8]) -> Option<&'static str> {
     if bytes.len() < 4 {

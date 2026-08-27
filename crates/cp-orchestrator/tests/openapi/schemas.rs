@@ -1,4 +1,4 @@
-//! Core OpenAPI schemas — domain types that the spec references.
+//! Core `OpenAPI` schemas — domain types that the spec references.
 
 use serde_json::{Value, json};
 

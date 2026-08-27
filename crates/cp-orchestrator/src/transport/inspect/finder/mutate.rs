@@ -206,8 +206,8 @@ pub fn fs_move(state: &Mutex<Backend>, agent_id: &str, body: &[u8]) -> HttpReply
         return HttpReply::error(404, "destination directory not found");
     }
 
-    let mut moved = 0_usize;
-    let mut skipped = 0_usize;
+    let mut moved = 0usize;
+    let mut skipped = 0usize;
     for item in &items {
         let src = match confined_path(&folder, item) {
             Some(p) => p,
@@ -297,8 +297,8 @@ pub fn fs_trash(state: &Mutex<Backend>, agent_id: &str, body: &[u8]) -> HttpRepl
         return HttpReply::error(502, "could not create trash directory");
     }
 
-    let mut trashed = 0_usize;
-    let mut skipped = 0_usize;
+    let mut trashed = 0usize;
+    let mut skipped = 0usize;
     for item in &items {
         let src = match confined_path(&folder, item) {
             Some(p) => p,

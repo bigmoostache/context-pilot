@@ -56,13 +56,13 @@ impl Tailer {
     /// returns every entry in the log (a full catch-up); use
     /// [`seed`](Tailer::seed) first to skip already-processed history.
     #[must_use]
-    pub fn new(oplog_dir: PathBuf) -> Self {
+    pub const fn new(oplog_dir: PathBuf) -> Self {
         Self { dir: oplog_dir, last_index: None, last_offset: 0, last_rev: None }
     }
 
     /// Advance the cursor to `rev` so the next poll skips everything at or
     /// below it. Call after replaying the log to a known point.
-    pub fn seed(&mut self, rev: u64) {
+    pub const fn seed(&mut self, rev: u64) {
         self.last_rev = Some(rev);
     }
 
@@ -208,7 +208,7 @@ mod tests {
         let mut tailer = Tailer::new(dir.path().to_path_buf());
         let _catch_up = tailer.poll().expect("poll");
         let empty = tailer.poll().expect("poll");
-        assert!(empty.is_empty(), "no new writes → empty poll");
+        assert!(empty.is_empty(), "no new writes \u{2192} empty poll");
 
         let _r = writer.append(msg("T1", 0xAA)).expect("append");
         let new = tailer.poll().expect("poll");

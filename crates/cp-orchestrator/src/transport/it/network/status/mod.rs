@@ -257,7 +257,7 @@ fn wan_status(default_dev: Option<&str>, gateway: Option<&str>) -> Value {
 /// The first global IPv4 on `iface`, via `ip -4 -o addr show dev <iface>`.
 ///
 /// `CP_IP_BIN`-gated like every other tool. `end0` is networkd's, not
-/// NetworkManager's, so `nmcli` cannot answer this one.
+/// `NetworkManager`'s, so `nmcli` cannot answer this one.
 fn interface_ipv4(iface: &str) -> Value {
     let Some(ip_bin) = std::env::var_os("CP_IP_BIN") else {
         return Value::Null;
@@ -310,7 +310,7 @@ fn wwan_status(tools: &Tools) -> Option<Value> {
 /// something an apply turns on behind the admin's back.
 ///
 /// `modem` is the D-Bus path [`wwan_status`] already discovered from `mmcli -L`,
-/// not the index `0` this used to hardcode. ModemManager increments the
+/// not the index `0` this used to hardcode. `ModemManager` increments the
 /// index across re-enumerations, so after a modem reset every other bearer field
 /// was correct and the signal alone silently read `null`.
 fn signal_dbm(mmcli: &OsStr, modem: &str) -> Value {
@@ -346,10 +346,10 @@ fn plausible_dbm(raw: &str) -> Option<i64> {
     // need a lossy cast back that the lint config rightly forbids.
     let whole = raw.split_once('.').map_or(raw, |(before, _after)| before);
     let value = whole.trim().parse::<i64>().ok()?;
-    if (-160..=0).contains(&value) { Some(value) } else { None }
+    (-160..=0).contains(&value).then_some(value)
 }
 
-/// The first IPv4 address NetworkManager assigned to `profile`, without its
+/// The first IPv4 address `NetworkManager` assigned to `profile`, without its
 /// prefix length. Null when the profile is not active.
 fn nmcli_first_address(nmcli: &OsStr, profile: &str) -> Value {
     let args =
@@ -466,11 +466,10 @@ fn parse_global_country(output: &str) -> Option<String> {
             in_global = true;
             continue;
         }
-        if in_global {
-            if let Some(rest) = line.strip_prefix("country ") {
+        if in_global
+            && let Some(rest) = line.strip_prefix("country ") {
                 return rest.split(':').next().map(str::to_owned);
             }
-        }
     }
     None
 }

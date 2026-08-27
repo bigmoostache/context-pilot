@@ -111,13 +111,11 @@ pub(super) fn driver_loop(
         let _reaped = registry.reap_tmp(crate::registry::DEFAULT_TMP_GRACE);
 
         // 4. Auth database backup (NFR-19/20) — rolling + daily snapshots.
-        if let Some(ref mut scheduler) = backup_scheduler {
-            if let Ok(b) = backend.lock() {
-                if let Some(ref auth) = b.auth {
+        if let Some(ref mut scheduler) = backup_scheduler
+            && let Ok(b) = backend.lock()
+                && let Some(ref auth) = b.auth {
                     scheduler.tick(auth);
                 }
-            }
-        }
 
         // ── Fast cadence: fold every agent's oplog tail into the view ──
         //
@@ -232,13 +230,12 @@ fn check_config_mtimes(
             Err(_) => continue,
         };
 
-        let changed = mtimes.get(id).map_or(false, |prev| *prev != current);
+        let changed = mtimes.get(id).is_some_and(|prev| *prev != current);
         let _prev = mtimes.insert(id.clone(), current);
 
-        if changed {
-            if let Ok(mut b) = backend.lock() {
+        if changed
+            && let Ok(mut b) = backend.lock() {
                 b.mark_dirty(id);
             }
-        }
     }
 }

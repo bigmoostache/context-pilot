@@ -1,10 +1,10 @@
-//! The two NetworkManager profiles — `cp-wwan` (the 5G bearer) and `cp-ap`
+//! The two `NetworkManager` profiles — `cp-wwan` (the 5G bearer) and `cp-ap`
 //! (the access point) — rendered from [`NetworkConfig`].
 //!
-//! # Why NetworkManager at all
+//! # Why `NetworkManager` at all
 //!
-//! ModemManager does not configure interfaces — that is the connection
-//! manager's job, and systemd-networkd has no ModemManager integration. Going
+//! `ModemManager` does not configure interfaces — that is the connection
+//! manager's job, and systemd-networkd has no `ModemManager` integration. Going
 //! without NM means hand-writing bearer setup, IP application, DNS merge and
 //! reconnect/backoff, plus hostapd, plus a DHCP server, plus nftables NAT. NM
 //! ships all of it declaratively, driven by a CLI the backend can call. What it
@@ -27,7 +27,7 @@ const fn yes_no(value: bool) -> &'static str {
     if value { "yes" } else { "no" }
 }
 
-/// Whether `name` is a connection NetworkManager already knows.
+/// Whether `name` is a connection `NetworkManager` already knows.
 fn exists(nmcli: &OsStr, name: &str) -> bool {
     run(nmcli, &["-t".to_owned(), "-f".to_owned(), "NAME".to_owned(), "connection".to_owned(), "show".to_owned()])
         .is_ok_and(|out| out.lines().any(|line| line == name))
@@ -51,7 +51,7 @@ fn exists(nmcli: &OsStr, name: &str) -> bool {
 /// Pushing it unconditionally meant that saving an SSID during an outage
 /// reset the metric the supervisor had just promoted, while the supervisor still
 /// believed `promoted=yes` and would therefore never re-promote — a silent loss
-/// of the 5G uplink at NetworkManager's next reactivation.
+/// of the 5G uplink at `NetworkManager`'s next reactivation.
 pub(crate) const fn wwan_metric(mode: UplinkMode) -> u32 {
     match mode {
         UplinkMode::FiveG => super::apply::METRIC_PREFERRED,
@@ -85,7 +85,7 @@ const fn wwan_autoconnect(config: &NetworkConfig) -> bool {
 /// The full `nmcli connection modify cp-wwan …` argument vector.
 ///
 /// Split out from [`reconcile_wwan`] so a unit test can assert the exact argv
-/// for a representative state without a NetworkManager anywhere near it.
+/// for a representative state without a `NetworkManager` anywhere near it.
 ///
 /// In `wan_5g` the two route-metric properties are **absent** — the supervisor
 /// owns them there, and an unrelated save must not walk on a live failover.
@@ -131,7 +131,7 @@ pub(crate) fn wwan_args(config: &NetworkConfig) -> Vec<String> {
 /// network, unreachable in practice: with sharing off, **the same client** must
 /// still be able to load the cockpit.
 ///
-/// NetworkManager has no "DHCP server without NAT" method, so the cul-de-sac is
+/// `NetworkManager` has no "DHCP server without NAT" method, so the cul-de-sac is
 /// built the other way round: keep `shared` for dnsmasq's DHCP + DNS, then take
 /// away forwarding and the masquerade in [`super::routes::apply_ap_activation`].
 /// `ip_forward=0` is what "no forwarding" actually means, and it is enforced at
@@ -230,7 +230,7 @@ fn security_args(config: &NetworkConfig) -> Vec<String> {
 ///
 /// Split out from [`reconcile_wwan`] for the same reason [`wwan_args`] is: it
 /// is now the **only** place `wan_5g`'s route metric is ever written, so a test
-/// has to be able to see it without a NetworkManager.
+/// has to be able to see it without a `NetworkManager`.
 fn wwan_create_args(config: &NetworkConfig) -> Vec<String> {
     let metric = wwan_metric(config.mode).to_string();
     vec![
@@ -335,12 +335,12 @@ mod tests {
     }
 
     /// The exact argv for a representative state, asserted with no
-    /// NetworkManager anywhere near it.
+    /// `NetworkManager` anywhere near it.
     #[test]
     fn wwan_argv_matches_the_mode() {
         let standby = wwan_args(&config(UplinkMode::WanThen5g));
         assert_eq!(value_of(&standby, "gsm.apn"), Some("orange.fr"));
-        assert_eq!(value_of(&standby, "gsm.home-only"), Some("yes"), "roaming false ⇒ home-only yes");
+        assert_eq!(value_of(&standby, "gsm.home-only"), Some("yes"), "roaming false \u{21d2} home-only yes");
         assert_eq!(value_of(&standby, "connection.autoconnect"), Some("yes"), "hot standby autoconnects");
 
         let strict = wwan_args(&config(UplinkMode::FiveG));
@@ -361,7 +361,7 @@ mod tests {
     fn the_supervisor_owns_the_metric_in_wan_5g() {
         let failover = wwan_args(&config(UplinkMode::WanThen5g));
         assert_eq!(value_of(&failover, "ipv4.route-metric"), None, "an unrelated apply must not touch it");
-        assert_eq!(value_of(&failover, "ipv6.route-metric"), None, "…in either family");
+        assert_eq!(value_of(&failover, "ipv6.route-metric"), None, "\u{2026}in either family");
         assert!(
             failover.iter().all(|arg| !arg.contains("route-metric")),
             "no route-metric property survives in wan_5g: {failover:?}"
@@ -403,7 +403,7 @@ mod tests {
         cul_de_sac.ap.share_internet = false;
         let solo = ap_args(&cul_de_sac);
         assert_eq!(value_of(&solo, "ipv4.method"), Some("shared"), "dnsmasq must keep serving DHCP");
-        assert_eq!(value_of(&solo, "ipv4.addresses"), Some("10.42.0.1/24"), "…on the same address");
+        assert_eq!(value_of(&solo, "ipv4.addresses"), Some("10.42.0.1/24"), "\u{2026}on the same address");
     }
 
     /// MEASURED on hardware: `802-11-wireless.channel 0` is rejected outright.

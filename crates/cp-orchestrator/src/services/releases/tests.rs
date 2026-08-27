@@ -65,7 +65,7 @@ fn update_config_legacy_migrates_with_defaults() {
     assert_eq!(store.update_mode(), UpdateMode::Auto, "default mode is auto");
     assert_eq!(store.channel(), "stable");
     assert_eq!(store.poll_interval_hours(), 6);
-    assert_eq!(store.window(), &MaintenanceWindow::default(), "default window 03:00–05:00");
+    assert_eq!(store.window(), &MaintenanceWindow::default(), "default window 03:00\u{2013}05:00");
 
     drop(std::fs::remove_dir_all(&dir));
 }
@@ -137,7 +137,7 @@ fn store_select_rejects_missing() {
     drop(std::fs::create_dir_all(&dir));
 
     let mut store = ReleaseStore::load(dir.clone());
-    assert!(store.select("v0.0.1-ghost").is_err());
+    store.select("v0.0.1-ghost").unwrap_err();
 
     drop(std::fs::remove_dir_all(&dir));
 }

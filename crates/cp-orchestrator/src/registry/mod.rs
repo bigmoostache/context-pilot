@@ -55,7 +55,7 @@ const TMP_SUFFIX: &str = ".tmp";
 /// in flight right now is never mistaken for a crash-orphan and deleted. A
 /// single small-file write + rename is sub-millisecond; 60 s is vastly larger,
 /// so only genuine crash-orphans are ever collected.
-pub const DEFAULT_TMP_GRACE: Duration = Duration::from_secs(60);
+pub const DEFAULT_TMP_GRACE: Duration = Duration::from_mins(1);
 
 /// A change in the fleet observed between two [`scan`](AgentRegistry::scan)es.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -305,7 +305,7 @@ mod tests {
     /// A boot id of the exact 32-hex-char width the heartbeat record requires.
     const BOOT_A: &str = "0123456789abcdef0123456789abcdef";
 
-    /// A pid that cannot name a live process (above any platform's pid_max).
+    /// A pid that cannot name a live process (above any platform's `pid_max`).
     const DEAD_PID: u32 = 4_000_000_000;
 
     fn entry(id: &str, pid: u32, hb_path: &Path, status: AgentStatus) -> Entry {
@@ -414,7 +414,7 @@ mod tests {
         let mut reg = AgentRegistry::new(dir.path().to_path_buf());
         let events = reg.scan().expect("scan");
         assert!(matches!(events.first(), Some(Event::Appeared(_))));
-        assert_eq!(reg.liveness("a"), Some(Liveness::StalePid), "dead pid → stale, not live");
+        assert_eq!(reg.liveness("a"), Some(Liveness::StalePid), "dead pid \u{2192} stale, not live");
     }
 
     #[test]

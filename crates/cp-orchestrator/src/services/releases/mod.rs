@@ -99,6 +99,7 @@ impl ReleaseStore {
     }
 
     /// The default releases directory (`~/.context-pilot/releases/`).
+    #[must_use]
     pub fn default_dir() -> Option<PathBuf> {
         std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".context-pilot/releases"))
     }
@@ -113,7 +114,7 @@ impl ReleaseStore {
 
     /// Whether the architecture was auto-detected.
     #[must_use]
-    pub fn is_arch_auto(&self) -> bool {
+    pub const fn is_arch_auto(&self) -> bool {
         self.config.arch_auto
     }
 
@@ -141,7 +142,7 @@ impl ReleaseStore {
         };
         let mut releases = Vec::new();
         for entry in entries.flatten() {
-            if !entry.file_type().map_or(false, |ft| ft.is_dir()) {
+            if !entry.file_type().is_ok_and(|ft| ft.is_dir()) {
                 continue;
             }
             let tag = entry.file_name().to_string_lossy().into_owned();
@@ -150,7 +151,7 @@ impl ReleaseStore {
                 continue;
             }
             let binary = entry.path().join("cpilot");
-            let binary_size = std::fs::metadata(&binary).map(|m| m.len()).unwrap_or(0);
+            let binary_size = std::fs::metadata(&binary).map_or(0, |m| m.len());
             releases.push(LocalRelease { tag, binary_size });
         }
         releases.sort_by(|a, b| semver_sort_key(&b.tag).cmp(&semver_sort_key(&a.tag)));
@@ -190,7 +191,7 @@ impl ReleaseStore {
 
     /// The box's auto-update posture (`auto` / `manual` / `paused`).
     #[must_use]
-    pub fn update_mode(&self) -> UpdateMode {
+    pub const fn update_mode(&self) -> UpdateMode {
         self.config.update_mode
     }
 
@@ -205,13 +206,13 @@ impl ReleaseStore {
 
     /// Hours between channel polls.
     #[must_use]
-    pub fn poll_interval_hours(&self) -> u32 {
+    pub const fn poll_interval_hours(&self) -> u32 {
         self.config.poll_interval_hours
     }
 
     /// The box-local maintenance window auto-applies are confined to.
     #[must_use]
-    pub fn window(&self) -> &MaintenanceWindow {
+    pub const fn window(&self) -> &MaintenanceWindow {
         &self.config.window
     }
 
@@ -352,7 +353,7 @@ impl ReleaseStore {
         // Set executable permission on the binary (Unix).
         #[cfg(unix)]
         {
-            use std::os::unix::fs::PermissionsExt;
+            use std::os::unix::fs::PermissionsExt as _;
             let binary = dest.join("cpilot");
             if binary.exists() {
                 let _r = std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o755));
@@ -439,6 +440,7 @@ pub const KNOWN_ARCHS: &[&str] =
 ///
 /// Non-numeric or missing components default to 0. This gives correct
 /// *descending* order when used with `.reverse()` or `Reverse(...)`.
+#[must_use]
 pub fn semver_sort_key(tag: &str) -> (u32, u32, u32) {
     let stripped = tag.strip_prefix('v').unwrap_or(tag);
     let mut parts = stripped.splitn(3, '.');
@@ -447,7 +449,7 @@ pub fn semver_sort_key(tag: &str) -> (u32, u32, u32) {
     // Patch may trail non-numeric chars (e.g. "10-rc1") — parse prefix digits.
     let patch = parts
         .next()
-        .and_then(|s| s.chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse().ok())
+        .and_then(|s| s.chars().take_while(char::is_ascii_digit).collect::<String>().parse().ok())
         .unwrap_or(0);
     (major, minor, patch)
 }

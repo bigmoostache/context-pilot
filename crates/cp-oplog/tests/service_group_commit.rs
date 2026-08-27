@@ -49,7 +49,7 @@ fn effect(token: &str) -> OpEntryKind {
 }
 
 /// A disposable best-effort phase record.
-fn phase() -> OpEntryKind {
+const fn phase() -> OpEntryKind {
     OpEntryKind::PhaseTransition { phase: Phase::Streaming }
 }
 

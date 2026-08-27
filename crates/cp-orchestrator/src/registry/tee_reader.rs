@@ -244,7 +244,7 @@ mod tests {
             PathBuf::from("/tmp/cp-test-realms"),
             PathBuf::from("/tmp/cp-test-bin"),
             None,
-            Duration::from_secs(3600),
+            Duration::from_hours(1),
         )));
         let sub = backend.lock().expect("lock").hub_mut().subscribe(agent_id);
         (backend, sub)
@@ -305,12 +305,11 @@ mod tests {
 
         let mut delivered = false;
         for _ in 0..50 {
-            if let Some(frames) = backend.lock().expect("lock").hub_mut().drain("late", sub) {
-                if !frames.is_empty() {
+            if let Some(frames) = backend.lock().expect("lock").hub_mut().drain("late", sub)
+                && !frames.is_empty() {
                     delivered = true;
                     break;
                 }
-            }
             sleep(Duration::from_millis(20));
         }
         reader.stop();

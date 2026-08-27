@@ -111,7 +111,7 @@ mod tests {
             PathBuf::from("/tmp/cp-net-test-realms"),
             PathBuf::from("/tmp/cp-net-test-bin"),
             Some(store),
-            Duration::from_secs(3600),
+            Duration::from_hours(1),
         );
         std::mem::forget(dir);
         Mutex::new(backend)
@@ -175,7 +175,7 @@ mod tests {
         assert_eq!(admin.status, 200, "an admin still reads the pane");
         assert!(!admin.body.contains("vendor.apn.example"), "the vendor's APN leaked to an admin: {}", admin.body);
         assert!(admin.body.contains("\"wwan\":null"), "the bearer CONFIG is elided: {}", admin.body);
-        assert!(admin.body.contains("\"status\""), "…but the status half is still there");
+        assert!(admin.body.contains("\"status\""), "\u{2026}but the status half is still there");
 
         let superadmin = it_get_network(&state, Some(&vendor));
         assert!(superadmin.body.contains("vendor.apn.example"), "the vendor sees their own APN");
@@ -225,9 +225,9 @@ mod tests {
     #[test]
     fn invalid_bodies_are_400() {
         let state = backend();
-        assert_eq!(it_set_network_mode(&state, br#"{"mode":"satellite"}"#, None).status, 400, "unknown mode → 400");
+        assert_eq!(it_set_network_mode(&state, br#"{"mode":"satellite"}"#, None).status, 400, "unknown mode \u{2192} 400");
         let no_country = br#"{"enabled":true,"ssid":"cp","passphrase":"abcdefghij","band":"a","channel":0,"country":"","hidden":false,"share_internet":true}"#;
-        assert_eq!(it_set_network_ap(&state, no_country, None).status, 400, "enabling with no country → 400");
+        assert_eq!(it_set_network_ap(&state, no_country, None).status, 400, "enabling with no country \u{2192} 400");
     }
 
     /// Secret elision at the transport boundary: a PSK that was just written is not
@@ -275,7 +275,7 @@ mod tests {
         let got = it_get_network(&state, None);
         assert!(got.body.contains("\"ssid\":\"concurrent\""), "the AP write survived: {}", got.body);
         assert!(got.body.contains("\"apn\":\"concurrent.apn\""), "the bearer write survived too: {}", got.body);
-        assert!(got.body.contains("\"standby\":\"cold\""), "…including its other fields");
+        assert!(got.body.contains("\"standby\":\"cold\""), "\u{2026}including its other fields");
     }
 
     /// An omitted passphrase keeps the stored one; an explicit `null` clears it.

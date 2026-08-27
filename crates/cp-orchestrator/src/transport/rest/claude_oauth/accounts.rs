@@ -47,7 +47,7 @@ fn write_accounts(store: &AccountsFile) -> Result<(), String> {
 // ── Helpers ──────────────────────────────────────────────────────────
 
 fn now_ms() -> i64 {
-    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis() as i64)
 }
 
 // ── Response types ───────────────────────────────────────────────────
@@ -79,7 +79,7 @@ pub(crate) fn list_accounts() -> HttpReply {
         .accounts
         .iter()
         .map(|(email, creds)| {
-            let expires_at = creds.get("expiresAt").and_then(|v| v.as_i64());
+            let expires_at = creds.get("expiresAt").and_then(serde_json::Value::as_i64);
             let token = creds.get("accessToken").and_then(|v| v.as_str()).unwrap_or("");
             let valid = expires_at.is_some_and(|e| e > now) && !token.is_empty();
             AccountSummary { email: email.clone(), expires_at, valid }
@@ -134,11 +134,10 @@ pub(crate) fn switch_account(body_bytes: &[u8]) -> HttpReply {
     // exists we still proceed with the switch).
     if let Some(current) = super::read_credentials_json() {
         let current_token = current.get("accessToken").and_then(|v| v.as_str()).unwrap_or("");
-        if !current_token.is_empty() {
-            if let Some(current_email) = super::fetch_account_email(current_token) {
+        if !current_token.is_empty()
+            && let Some(current_email) = super::fetch_account_email(current_token) {
                 let _prev = store.accounts.insert(current_email, current);
             }
-        }
     }
 
     // Write updated store (with old active added, target removed).
@@ -173,7 +172,7 @@ pub(crate) fn delete_account(email: &str) -> HttpReply {
 /// carries a non-empty refresh token to renew with. `threshold_ms == 0` is the
 /// classic "expired only" test; a positive value (e.g. 1h) refreshes early.
 pub(super) fn is_stale(creds: &serde_json::Value, threshold_ms: i64) -> bool {
-    let expires_at = creds.get("expiresAt").and_then(|v| v.as_i64()).unwrap_or(0);
+    let expires_at = creds.get("expiresAt").and_then(serde_json::Value::as_i64).unwrap_or(0);
     let has_refresh = creds.get("refreshToken").and_then(|v| v.as_str()).is_some_and(|s| !s.is_empty());
     has_refresh && expires_at.saturating_sub(now_ms()) < threshold_ms
 }
@@ -209,7 +208,7 @@ pub(super) fn try_refresh(base: &serde_json::Value, refresh_token: &str) -> Opti
         return None;
     }
     let new_refresh = val.get("refresh_token").and_then(|v| v.as_str()).unwrap_or(refresh_token);
-    let expires_in = val.get("expires_in").and_then(|v| v.as_i64()).unwrap_or(0);
+    let expires_in = val.get("expires_in").and_then(serde_json::Value::as_i64).unwrap_or(0);
 
     let mut creds = base.clone();
     creds["accessToken"] = serde_json::Value::String(access_token.to_owned());

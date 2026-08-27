@@ -44,7 +44,7 @@ pub(crate) fn spawn(backend: Arc<Mutex<Backend>>, auth_db: PathBuf, install: Pat
 fn tick(backend: &Arc<Mutex<Backend>>, auth_db: &PathBuf, install: &PathBuf) -> Duration {
     // Snapshot everything the tick needs under one short lock.
     let Ok(b) = backend.lock() else {
-        return Duration::from_secs(60);
+        return Duration::from_mins(1);
     };
     let mode = b.releases.update_mode();
     let window = b.releases.window().clone();
@@ -66,11 +66,10 @@ fn tick(backend: &Arc<Mutex<Backend>>, auth_db: &PathBuf, install: &PathBuf) -> 
             let result = check_channel(&releases_dir, &channel, &current, crossgrade);
             // A verified answer on the new channel retires the crossgrade window
             // (mirrors the REST check handler).
-            if result.is_ok() {
-                if let Ok(mut b) = backend.lock() {
+            if result.is_ok()
+                && let Ok(mut b) = backend.lock() {
                     b.releases.clear_pending_switch();
                 }
-            }
             result.map(|eval| match eval {
                 UpdateEvaluation::Available(manifest) => Some(manifest),
                 UpdateEvaluation::UpToDate => None,

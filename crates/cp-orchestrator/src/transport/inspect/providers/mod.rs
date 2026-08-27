@@ -6,7 +6,7 @@
 //! here (rather than in `cp-wire`) avoids coupling the shared protocol crate to
 //! pricing/display metadata that only the orchestrator and frontend need.
 //!
-//! The frontend imports `ProviderDef` and `ModelDef` from the generated OpenAPI
+//! The frontend imports `ProviderDef` and `ModelDef` from the generated `OpenAPI`
 //! client and fetches the data via `GET /api/providers` — zero hardcoded model
 //! lists in TypeScript.
 
@@ -55,7 +55,7 @@ fn all_providers() -> Vec<ProviderDef> {
         ProviderDef {
             id: "claudecodev2",
             name: "Claude Code",
-            description: "OAuth — Opus 5 · 4.8 · 4.6 · Sonnet 5 · Fable 5 · Haiku 4.5",
+            description: "OAuth \u{2014} Opus 5 \u{b7} 4.8 \u{b7} 4.6 \u{b7} Sonnet 5 \u{b7} Fable 5 \u{b7} Haiku 4.5",
             models: vec![
                 ModelDef {
                     id: "claude-opus5",
@@ -128,7 +128,7 @@ fn all_providers() -> Vec<ProviderDef> {
         ProviderDef {
             id: "anthropic",
             name: "Anthropic (API Key)",
-            description: "Direct API — Opus 4.5 · Sonnet 4.5 · Haiku 4.5",
+            description: "Direct API \u{2014} Opus 4.5 \u{b7} Sonnet 4.5 \u{b7} Haiku 4.5",
             models: vec![
                 ModelDef {
                     id: "claude-opus45",
@@ -168,7 +168,7 @@ fn all_providers() -> Vec<ProviderDef> {
         ProviderDef {
             id: "grok",
             name: "xAI Grok",
-            description: "Fast tool-calling · 2M context",
+            description: "Fast tool-calling \u{b7} 2M context",
             models: vec![
                 ModelDef {
                     id: "grok41-fast",
@@ -197,7 +197,7 @@ fn all_providers() -> Vec<ProviderDef> {
         ProviderDef {
             id: "groq",
             name: "Groq",
-            description: "Ultra-fast inference · GPT-OSS · Llama",
+            description: "Ultra-fast inference \u{b7} GPT-OSS \u{b7} Llama",
             models: vec![
                 ModelDef {
                     id: "gpt-oss120b",
@@ -248,7 +248,7 @@ fn all_providers() -> Vec<ProviderDef> {
         ProviderDef {
             id: "deepseek",
             name: "DeepSeek",
-            description: "V4 Flash & Pro · 1M context",
+            description: "V4 Flash & Pro \u{b7} 1M context",
             models: vec![
                 ModelDef {
                     id: "v4-flash",
@@ -277,7 +277,7 @@ fn all_providers() -> Vec<ProviderDef> {
         ProviderDef {
             id: "minimax",
             name: "MiniMax",
-            description: "M2.7 — Anthropic-compatible API",
+            description: "M2.7 \u{2014} Anthropic-compatible API",
             models: vec![
                 ModelDef {
                     id: "m27",

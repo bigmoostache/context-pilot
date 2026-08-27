@@ -188,11 +188,10 @@ pub fn retire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     kill_console_server(&folder);
 
     // Drop any stale supervised record so a later unretire respawn key is free.
-    if was_supervised {
-        if let Ok(mut b) = state.lock() {
+    if was_supervised
+        && let Ok(mut b) = state.lock() {
             let _stopped = b.supervisor.stop(&key);
         }
-    }
 
     // Record retired (persisted).
     {
@@ -277,8 +276,7 @@ fn kill_console_server(folder: &str) {
 fn now_ms() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
-        .unwrap_or(0)
+        .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
 }
 
 /// The receipt returned when an agent has been retired.

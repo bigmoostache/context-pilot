@@ -1,4 +1,4 @@
-//! Network OpenAPI schemas — uplink mode, 5G bearer, Wi-Fi AP, live status and
+//! Network `OpenAPI` schemas — uplink mode, 5G bearer, Wi-Fi AP, live status and
 //! the failover supervisor's state block.
 //!
 //! Split out of [`schemas_ext2`](super::schemas_ext2) when the supervisor block
@@ -70,7 +70,7 @@ fn required(shared: &[&str], own: &[&str]) -> Value {
 fn ap_properties() -> Value {
     json!({
         "enabled": { "type": "boolean" },
-        "ssid": { "type": "string", "description": "Broadcast network name, 1–32 bytes." },
+        "ssid": { "type": "string", "description": "Broadcast network name, 1\u{2013}32 bytes." },
         "band": band(),
         "channel": { "type": "integer", "description": "Channel number, or 0 for automatic. Must be legal on `band`." },
         "country": { "type": "string", "description": "ISO-3166 two-letter regulatory code, or empty." },
@@ -90,11 +90,11 @@ pub(super) fn ap_body() -> Value {
         "type": "object",
         "properties": merge(ap_properties(), json!({
             "passphrase": write_only(
-                "WPA2 pre-shared key, 8–63 characters. Write-only and TRI-STATE: **omit the field** to keep \
+                "WPA2 pre-shared key, 8\u{2013}63 characters. Write-only and TRI-STATE: **omit the field** to keep \
                  the stored key, send **null** to clear it, send a **string** to replace it. Clearing it is \
                  destructive and quiet: the passphrase prerequisite is only enforced while `enabled` is true, \
                  so `passphrase: null` on a disabled AP returns 200 and the access point can no longer be \
-                 enabled until a new key is set. Never returned by any read path — see `passphrase_set`."
+                 enabled until a new key is set. Never returned by any read path \u{2014} see `passphrase_set`."
             )
         })),
         "required": required(AP_SHARED, &[])
@@ -129,8 +129,8 @@ pub(super) fn wwan_body() -> Value {
         "properties": merge(wwan_properties(), json!({
             "username": write_only(
                 "PAP/CHAP username, when the carrier needs one. TRI-STATE: **omit** to keep the stored value, \
-                 **null** to clear it, a **string** to replace it. Unlike the two below it is not a secret — \
-                 it is returned as `config.wwan.username` — it is only tri-state on the way in."
+                 **null** to clear it, a **string** to replace it. Unlike the two below it is not a secret \u{2014} \
+                 it is returned as `config.wwan.username` \u{2014} it is only tri-state on the way in."
             ),
             "password": write_only(
                 "PAP/CHAP password. Write-only: never returned, see `password_set`. TRI-STATE: **omit** to keep \
@@ -138,9 +138,9 @@ pub(super) fn wwan_body() -> Value {
                  that authenticates leaves the bearer unable to attach."
             ),
             "pin": write_only(
-                "SIM PIN, 4–8 digits. Write-only: never returned, see `pin_set`. TRI-STATE: **omit** to keep the \
+                "SIM PIN, 4\u{2013}8 digits. Write-only: never returned, see `pin_set`. TRI-STATE: **omit** to keep the \
                  stored PIN, **null** to clear it, a **string** to replace it. Sending null on a PIN-locked SIM \
-                 costs the box its uplink at the next boot — the modem comes up locked and nothing unlocks it. \
+                 costs the box its uplink at the next boot \u{2014} the modem comes up locked and nothing unlocks it. \
                  A wrong value is worse: it burns one of the SIM's three unlock retries."
             )
         })),
@@ -162,13 +162,13 @@ pub(super) fn mode_body() -> Value {
 /// Uplink, access-point, probe, status and supervisor schemas.
 ///
 /// Secrets are write-only: the bearer password, the SIM PIN and the Wi-Fi PSK
-/// are POSTed but never returned, so every read schema carries a `*_set`
+/// are `POSTed` but never returned, so every read schema carries a `*_set`
 /// boolean in their place.
 pub(super) fn network() -> Value {
     json!({
         "ItNetworkWwan": {
             "type": "object",
-            "description": "5G bearer settings — VENDOR-MANAGED. Writing them needs \
+            "description": "5G bearer settings \u{2014} VENDOR-MANAGED. Writing them needs \
                 `can_manage_secrets` (superadmin), not `can_manage_it`: the SIM and the data plan \
                 are the vendor's, so the APN that goes with them is a fleet-wide decision. \
                 `password_set`/`pin_set` stand in for the write-only credentials.",
@@ -203,7 +203,7 @@ pub(super) fn network() -> Value {
                 "probe_timeout_s": { "type": "integer", "description": "Per-target ping deadline in seconds (`ping -W`). Seeded at 3." },
                 "cooldown_s": {
                     "type": "integer",
-                    "description": "Minimum seconds between failover transitions — the anti-flap floor. Seeded at 60. \
+                    "description": "Minimum seconds between failover transitions \u{2014} the anti-flap floor. Seeded at 60. \
                         It has no effect once `interval_s` exceeds it, since a round can then never come back inside it."
                 },
                 "nm_wait_s": {
@@ -224,7 +224,7 @@ pub(super) fn network() -> Value {
                     "nullable": true,
                     "description": "Null for two independent reasons: the caller lacks `can_manage_secrets` (the \
                         bearer's CONFIGURATION is vendor state), or this box is not a 5G variant at all \
-                        (`status.modem_present` is false). `status.wwan` is not elided either way — registration, \
+                        (`status.modem_present` is false). `status.wwan` is not elided either way \u{2014} registration, \
                         operator and signal are diagnostics the client's own admin needs when the box loses its uplink."
                 },
                 "ap": r("ItNetworkAp"),
@@ -285,18 +285,18 @@ pub(super) fn network() -> Value {
                 "supervising": {
                     "type": "boolean",
                     "description": "The supervisor is ARBITRATING (mode `wan_5g`). False in `wan` and `5g`, where \
-                        the routing is static and the applier owns it — the daemon then only observes and reports."
+                        the routing is static and the applier owns it \u{2014} the daemon then only observes and reports."
                 },
                 "promoted": {
                     "type": "boolean",
                     "description": "DECIDED: the supervisor has concluded the bearer should be the uplink. This is \
-                        its intent, not an observation — it says nothing about whether the bearer actually came up. \
+                        its intent, not an observation \u{2014} it says nothing about whether the bearer actually came up. \
                         Read it together with `achieved` and `active_uplink`."
                 },
                 "achieved": {
                     "type": "boolean",
                     "description": "CARRIED OUT: the decision in `promoted` actually took effect on the bearer. \
-                        `promoted: true` with `achieved: false` is the outage signature — the supervisor wanted 5G \
+                        `promoted: true` with `achieved: false` is the outage signature \u{2014} the supervisor wanted 5G \
                         and could not activate it (no coverage, no SIM, modem still enumerating), so the box has no \
                         uplink at all rather than the 5G one the decision implies."
                 },
@@ -311,7 +311,7 @@ pub(super) fn network() -> Value {
                     "type": "integer",
                     "nullable": true,
                     "description": "Unix seconds of the last promote/demote. Null when there has never been one \
-                        since the supervisor started — it does not survive a restart (`/run` is wiped)."
+                        since the supervisor started \u{2014} it does not survive a restart (`/run` is wiped)."
                 },
                 "last_reason": {
                     "type": "string",
@@ -324,14 +324,14 @@ pub(super) fn network() -> Value {
         "ItNetworkStatus": {
             "type": "object",
             "description": "Live read-back from `/proc/net/route`, sysfs, `nmcli`, `mmcli` and `iw`. The \
-                TOOL-BACKED halves — `wan.ip`, `wwan`, `ap` — degrade to null rather than erroring when the \
+                TOOL-BACKED halves \u{2014} `wan.ip`, `wwan`, `ap` \u{2014} degrade to null rather than erroring when the \
                 tool is absent, so a dev machine with no env gates set still answers 200. `active_uplink` and \
                 `modem_present` deliberately do NOT: they are answered from `/proc/net/route` and from sysfs, \
                 which need no gate, so the two fields an admin watches during a failover stay truthful on every box.",
             "properties": {
                 "active_uplink": active_uplink(
                     "The device carrying the lowest-metric default route, classified: `wan` (the ethernet port), \
-                     `wwan` (the 5G bearer), `other` (some other device holds it — a VPN, a container bridge), \
+                     `wwan` (the 5G bearer), `other` (some other device holds it \u{2014} a VPN, a container bridge), \
                      `none` (there is no default route). Never null: no default route is spelled `none`."
                 ),
                 // HARDWARE fact, not a live one: this box either is a 5G variant

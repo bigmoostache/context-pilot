@@ -137,11 +137,10 @@ fn read_cached_json(path: &Path, slot: &mut Option<CachedJson>) -> io::Result<Va
     let current_mtime = file_mtime(path)?;
 
     // Cache hit: mtime unchanged → return the existing parse.
-    if let Some(cached) = slot.as_ref() {
-        if cached.mtime == current_mtime {
+    if let Some(cached) = slot.as_ref()
+        && cached.mtime == current_mtime {
             return Ok(cached.data.clone());
         }
-    }
 
     // Cache miss: read + parse.
     match read_json(path) {
@@ -151,7 +150,7 @@ fn read_cached_json(path: &Path, slot: &mut Option<CachedJson>) -> io::Result<Va
         }
         Err(_) if slot.is_some() => {
             // Torn read while the agent is mid-write → return last good value.
-            Ok(slot.as_ref().map(|c| c.data.clone()).unwrap_or(Value::Null))
+            Ok(slot.as_ref().map_or(Value::Null, |c| c.data.clone()))
         }
         Err(e) => Err(e),
     }

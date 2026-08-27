@@ -67,7 +67,7 @@ fn every_opentry_kind_round_trips() {
 
     for (i, kind) in kinds.into_iter().enumerate() {
         let rev = u64::try_from(i).unwrap_or(0);
-        round_trips(&OpEntry::new(1, rev, 1_000_u64.wrapping_add(rev), kind));
+        round_trips(&OpEntry::new(1, rev, 1_000u64.wrapping_add(rev), kind));
     }
 }
 
@@ -101,7 +101,7 @@ fn accepts_window_is_exactly_n_minus_one() {
     // bump that widened or inverted the window would fail here.
     for their in 0..=PROTOCOL_VERSION.wrapping_add(4) {
         let expected = their <= PROTOCOL_VERSION && their >= PROTOCOL_VERSION.saturating_sub(1);
-        assert_eq!(accepts(their), expected, "accepts({their}) wrong for PROTOCOL_VERSION {PROTOCOL_VERSION}",);
+        assert_eq!(accepts(their), expected, "accepts({their}) wrong for PROTOCOL_VERSION {PROTOCOL_VERSION}");
     }
 }
 

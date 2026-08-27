@@ -82,7 +82,7 @@ impl Session {
     /// Return a human-readable status string for use in responses.
     fn status_str(&self) -> String {
         match &self.status {
-            SessionStatus::Running => "running".to_string(),
+            SessionStatus::Running => "running".to_owned(),
             SessionStatus::Exited(code) => format!("exited({code})"),
         }
     }
@@ -197,7 +197,7 @@ fn handle_send(sessions: &Sessions, key: &str, input: &str) -> Response {
         }
         Some(session) => match session.stdin.take() {
             Some(s) => s,
-            None => return Response::err("No stdin available".to_string()),
+            None => return Response::err("No stdin available".to_owned()),
         },
     };
 

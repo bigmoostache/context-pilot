@@ -20,12 +20,12 @@
 //! supplies the wire encoding ([`SseMessage::encode`]), the blocking reader
 //! ([`SseBody`]), and the channel that joins them ([`channel`]).
 
-use std::io::{self, Read, Write};
+use std::io::{self, Read, Write as _};
 use std::path::Path;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::time::Duration;
 
-use notify::{RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{RecommendedWatcher, RecursiveMode, Watcher as _};
 use tiny_http::Request;
 
 /// Blocks an SSE producer until its agent's oplog changes — the event-driven
@@ -260,7 +260,7 @@ pub fn channel() -> (SseSink, SseBody) {
 
 /// Stream an SSE body to the client, flushing **after every event**.
 ///
-/// tiny_http's `Response`/`respond` path copies the whole body through a 1 KiB
+/// `tiny_http`'s `Response`/`respond` path copies the whole body through a 1 KiB
 /// `BufWriter` and only flushes when that buffer fills or the response *ends* —
 /// fatal for an unbounded event stream, where small events would sit unsent in
 /// the buffer forever. So we take the raw connection writer, emit the status
@@ -348,7 +348,7 @@ mod tests {
         let (sink, mut body) = channel();
         drop(sink);
         let mut buf = [0u8; 16];
-        assert_eq!(body.read(&mut buf).expect("read"), 0, "dropped sink ⇒ EOF");
+        assert_eq!(body.read(&mut buf).expect("read"), 0, "dropped sink \u{21d2} EOF");
     }
 
     #[test]
@@ -375,6 +375,6 @@ mod tests {
     fn send_after_body_dropped_errors() {
         let (sink, body) = channel();
         drop(body);
-        assert!(sink.send(&SseMessage::resync()).is_err(), "client gone ⇒ send errors");
+        assert!(sink.send(&SseMessage::resync()).is_err(), "client gone \u{21d2} send errors");
     }
 }

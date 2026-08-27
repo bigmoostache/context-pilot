@@ -172,8 +172,8 @@ pub fn boot_reconcile(releases_dir: &Path, auth_db_path: &Path, install: &Path) 
     };
 
     // The staged binary was rolled back — restore the matching database.
-    if let Some(backup) = &pending.db_backup {
-        if backup.exists() {
+    if let Some(backup) = &pending.db_backup
+        && backup.exists() {
             match std::fs::copy(backup, auth_db_path) {
                 Ok(_bytes) => {
                     // Stale WAL/SHM would shadow the restored file's content.
@@ -188,7 +188,6 @@ pub fn boot_reconcile(releases_dir: &Path, auth_db_path: &Path, install: &Path) 
                 Err(e) => eprintln!("updater: rollback db restore FAILED ({e}) — backup kept at {}", backup.display()),
             }
         }
-    }
     let _rm = std::fs::remove_file(&path);
 
     let mut st = UpdateState::load(releases_dir);
@@ -256,7 +255,7 @@ pub(crate) fn promote_web(store: &ReleaseStore, tag: &str, web_symlink: Option<&
 
 /// True when `dir` has no entries (or cannot be read).
 fn dir_is_empty(dir: &Path) -> bool {
-    std::fs::read_dir(dir).map(|mut e| e.next().is_none()).unwrap_or(true)
+    std::fs::read_dir(dir).map_or(true, |mut e| e.next().is_none())
 }
 
 /// A hidden sibling of `path`: `.<name>.<suffix>` in the same directory, so a
@@ -299,7 +298,7 @@ fn swap_web_symlink(link: &Path, target: &Path) -> Result<(), String> {
 
     // 2. Legacy layout: `link` is a real directory. Move it aside so the rename
     //    can land — the old SPA stays intact under `aside` until we're done.
-    let is_real_dir = link.symlink_metadata().map(|m| m.file_type().is_dir()).unwrap_or(false);
+    let is_real_dir = link.symlink_metadata().is_ok_and(|m| m.file_type().is_dir());
     let aside = is_real_dir.then(|| dot_sibling(link, "legacy"));
     if let Some(aside) = &aside {
         let _rm = std::fs::remove_dir_all(aside);

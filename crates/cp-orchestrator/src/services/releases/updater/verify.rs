@@ -222,7 +222,7 @@ mod tests {
     const FRESH: &str = "2126-01-01T00:00:00Z";
 
     /// Bare manifest for the pure-decision tests — `evaluate_parsed` ignores
-    /// artifacts, so only channel/version/expires/min_from need to be real. No
+    /// artifacts, so only `channel/version/expires/min_from` need to be real. No
     /// signature is involved, so this exercises the channel matrix without the
     /// real release key the signed fixtures require.
     fn manifest(channel: &str, version: &str, expires_at: &str, min_from: &str) -> Manifest {

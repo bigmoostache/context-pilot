@@ -119,7 +119,7 @@ impl Default for TicketStore {
 
 /// Milliseconds since the Unix epoch, saturating at 0 on a pre-epoch clock.
 fn now_ms() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| saturating_millis(d))
+    SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, saturating_millis)
 }
 
 /// A `Duration` as `u64` milliseconds, saturating on overflow.

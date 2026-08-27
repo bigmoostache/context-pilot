@@ -128,7 +128,7 @@ mod tests {
     fn override_takes_precedence() {
         let vault = Backend::new();
         let result = vault.set("anthropic", "sk-override-123");
-        assert!(result.is_ok());
+        result.unwrap();
 
         let val = vault.get("anthropic");
         assert!(val.is_some());
@@ -141,7 +141,7 @@ mod tests {
         let _r = vault.set("anthropic", "sk-temp");
         let _r = vault.delete("anthropic");
 
-        let guard = vault.overrides.read().unwrap_or_else(|e| e.into_inner());
+        let guard = vault.overrides.read().unwrap_or_else(std::sync::PoisonError::into_inner);
         assert!(!guard.contains_key("anthropic"));
     }
 

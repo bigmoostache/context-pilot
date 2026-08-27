@@ -20,14 +20,14 @@ use crate::transport::rest::{Backend, HttpReply};
 /// `GET /healthz` — `200` when every readiness check passes, else `503`.
 ///
 /// Checks (socket-bound is inherent — this handler ran):
-/// * `auth_db` — when auth is enabled, the SQLite store answers a query
+/// * `auth_db` — when auth is enabled, the `SQLite` store answers a query
 ///   (an unconfigured store passes: no database is required to be open);
 /// * `registry` — the agents directory is readable.
 pub(crate) fn healthz(state: &Mutex<Backend>) -> HttpReply {
     let Ok(b) = state.lock() else {
         return HttpReply { status: 503, body: "{\"status\":\"unavailable\"}".to_owned() };
     };
-    let auth_db = b.auth.as_ref().map_or(true, |auth| auth.count_users().is_ok());
+    let auth_db = b.auth.as_ref().is_none_or(|auth| auth.count_users().is_ok());
     let registry = std::fs::read_dir(&b.agents_dir).is_ok();
     drop(b);
 
@@ -48,7 +48,7 @@ mod tests {
     use std::time::Duration;
 
     /// A backend over a real tempdir (readable registry) with auth enabled on
-    /// a real SQLite file. The tempdir is leaked so paths outlive the test.
+    /// a real `SQLite` file. The tempdir is leaked so paths outlive the test.
     fn backend_with_auth() -> (Mutex<Backend>, PathBuf) {
         let dir = tempfile::tempdir().expect("tempdir");
         let db_path = dir.path().join("auth.db");
@@ -58,7 +58,7 @@ mod tests {
             PathBuf::from("/tmp/cp-health-test-realms"),
             PathBuf::from("/tmp/cp-health-test-bin"),
             Some(store),
-            Duration::from_secs(3600),
+            Duration::from_hours(1),
         );
         std::mem::forget(dir);
         (Mutex::new(backend), db_path)

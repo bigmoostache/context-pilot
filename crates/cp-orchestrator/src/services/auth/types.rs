@@ -5,7 +5,7 @@
 /// Errors returned by auth operations.
 #[derive(Debug)]
 pub(crate) enum AuthError {
-    /// SQLite failure.
+    /// `SQLite` failure.
     Database(rusqlite::Error),
     /// Argon2 hashing / verification failure.
     Hash(String),
@@ -61,7 +61,7 @@ impl UserRole {
 
     /// Parse from the stored SQL text.  Falls back to [`User`](Self::User) on
     /// unknown values (forward-compat, design §13.6).
-    pub(crate) fn from_sql(value: &str) -> Self {
+    pub(crate) const fn from_sql(value: &str) -> Self {
         if value.eq_ignore_ascii_case("superadmin") {
             Self::Superadmin
         } else if value.eq_ignore_ascii_case("admin") {
@@ -120,7 +120,7 @@ impl AgentRole {
 
     /// Parse from the stored SQL text.  Falls back to
     /// [`AgentUser`](Self::AgentUser) on unknown values.
-    pub(crate) fn from_sql(value: &str) -> Self {
+    pub(crate) const fn from_sql(value: &str) -> Self {
         if value.eq_ignore_ascii_case("agent-admin") { Self::AgentAdmin } else { Self::AgentUser }
     }
 }
@@ -186,8 +186,8 @@ pub(crate) struct SessionInfo {
 }
 
 /// Map a `rusqlite::Row` from the canonical `SELECT` column order into a
-/// [`User`].  Column indices: 0=id, 1=email, 2=name, 3=password_hash,
-/// 4=role, 5=created_at, 6=updated_at, 7=must_change_password.
+/// [`User`].  Column indices: 0=id, 1=email, 2=name, `3=password_hash`,
+/// 4=role, `5=created_at`, `6=updated_at`, `7=must_change_password`.
 pub(crate) fn row_to_user(row: &rusqlite::Row<'_>) -> Result<User, rusqlite::Error> {
     let role_str: String = row.get(4)?;
     Ok(User {

@@ -178,5 +178,5 @@ fn a_real_beat_drives_the_freshness_and_boot_match_verdict() {
 
     // Bound to its own boot only — the pid-reuse defence.
     assert!(beat.matches_boot(&entry.boot_id), "matches its own boot_id");
-    assert!(!beat.matches_boot("ffffffffffffffffffffffffffffffff"), "rejects a different boot_id",);
+    assert!(!beat.matches_boot("ffffffffffffffffffffffffffffffff"), "rejects a different boot_id");
 }

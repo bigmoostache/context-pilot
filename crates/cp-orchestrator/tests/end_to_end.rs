@@ -113,7 +113,7 @@ fn serve_backend(agents_dir: &Path) -> (String, Arc<Mutex<Backend>>) {
         std::path::PathBuf::from("/tmp/cp-test-realms"),
         std::path::PathBuf::from("/tmp/cp-test-bin"),
         None,
-        Duration::from_secs(3600),
+        Duration::from_hours(1),
     )));
     let server = Server::http("127.0.0.1:0").expect("bind ephemeral");
     let addr = server.server_addr().to_string();
@@ -208,7 +208,7 @@ fn a_command_journals_on_the_agent_and_re_emerges_as_an_sse_delta() {
     assert_eq!(status, 200, "the stream opens");
     let delta = events.iter().find(|e| e.event == "delta").expect("the command effect streams back as a delta");
     assert_eq!(delta.id, Some(1), "the delta is tagged with the rev it reflects (id = rev framing)");
-    assert!(delta.data.contains("d-e2e"), "the streamed delta carries the command's dedup token (full loop closed)",);
+    assert!(delta.data.contains("d-e2e"), "the streamed delta carries the command's dedup token (full loop closed)");
 }
 
 // ── 2. a spilled body hydrates over REST ────────────────────────────────────

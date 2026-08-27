@@ -101,12 +101,12 @@ fn thread_created(thread: &str) -> OpEntryKind {
 }
 
 /// A droppable best-effort cost aggregate of `cost_usd`.
-fn cost(cost_usd: f64) -> OpEntryKind {
+const fn cost(cost_usd: f64) -> OpEntryKind {
     OpEntryKind::CostAggregate { input_tokens: 0, output_tokens: 0, cost_usd }
 }
 
 /// A droppable best-effort phase transition.
-fn phase() -> OpEntryKind {
+const fn phase() -> OpEntryKind {
     OpEntryKind::PhaseTransition { phase: Phase::Streaming }
 }
 
@@ -209,7 +209,7 @@ fn n_agents_under_concurrent_load_stay_gap_free_and_isolated() {
             ContentHash::new([RECORDS_PER_AGENT - 1; 32]),
             "{agent_id}: head is this agent's own last message, not a neighbour's",
         );
-        assert!(agent.roster.iter().any(|t| t.thread_id == "T1"), "{agent_id}: roster carries its own thread",);
+        assert!(agent.roster.iter().any(|t| t.thread_id == "T1"), "{agent_id}: roster carries its own thread");
     }
 }
 

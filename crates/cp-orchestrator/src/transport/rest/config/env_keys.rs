@@ -122,7 +122,7 @@ fn mask_key(key: &str) -> String {
     let chars: Vec<char> = key.chars().collect();
     let len = chars.len();
     if len <= 8 {
-        return "••••••••".to_owned();
+        return "\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}".to_owned();
     }
     let prefix: String = chars.get(..4).map_or_else(String::new, |s| s.iter().collect());
     let start = len.wrapping_sub(4);
@@ -137,8 +137,8 @@ mod tests {
 
     #[test]
     fn mask_key_short_is_fully_redacted() {
-        assert_eq!(mask_key("abc"), "••••••••");
-        assert_eq!(mask_key("12345678"), "••••••••");
+        assert_eq!(mask_key("abc"), "\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}");
+        assert_eq!(mask_key("12345678"), "\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}");
     }
 
     #[test]
@@ -146,7 +146,7 @@ mod tests {
         let masked = mask_key("sk-ant-abcdef123456789xyz");
         assert!(masked.starts_with("sk-a"), "prefix mismatch: {masked}");
         assert!(masked.ends_with("9xyz"), "suffix mismatch: {masked}");
-        assert!(masked.contains("••••••••••"), "middle not masked: {masked}");
+        assert!(masked.contains("\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}"), "middle not masked: {masked}");
     }
 
     #[test]

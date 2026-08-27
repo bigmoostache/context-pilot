@@ -48,7 +48,7 @@ pub struct Subscriber {
 
 impl Subscriber {
     /// Create an empty subscriber with the given buffer `capacity`.
-    fn new(id: u64, capacity: usize) -> Self {
+    const fn new(id: u64, capacity: usize) -> Self {
         Self { id, buffer: VecDeque::new(), capacity, degraded: false, dropped: 0 }
     }
 
@@ -105,7 +105,7 @@ impl Subscriber {
 
     /// Clear the degraded state after the caller has delivered an authoritative
     /// snapshot resync to this subscriber.
-    fn mark_reconciled(&mut self) {
+    const fn mark_reconciled(&mut self) {
         self.degraded = false;
         self.dropped = 0;
     }

@@ -150,7 +150,7 @@ fn a_real_agent_is_discovered_live_then_survives_graceful_shutdown() {
         assert_eq!(reg.liveness(&id), Some(Liveness::Live), "real pid + fresh beat = live");
 
         // A quiet scan emits nothing while the agent keeps beating.
-        assert!(reg.scan().expect("scan").is_empty(), "no change → no events");
+        assert!(reg.scan().expect("scan").is_empty(), "no change \u{2192} no events");
 
         // Tear the agent down: Drop keeps the registry record (the agent
         // shows as Disconnected rather than vanishing). The test process's
@@ -158,7 +158,7 @@ fn a_real_agent_is_discovered_live_then_survives_graceful_shutdown() {
         // change is observed — no event emitted.
         drop(boot);
         let after = reg.scan().expect("scan");
-        assert!(after.is_empty(), "no Disappeared — record survives graceful drop");
+        assert!(after.is_empty(), "no Disappeared \u{2014} record survives graceful drop");
         assert!(!reg.is_empty(), "the agent remains in the fleet");
     }
 }
@@ -277,7 +277,7 @@ fn a_command_round_trips_to_a_real_intake_and_stays_exactly_once() {
     };
 
     // The backend side: build a channel from a record advertising this socket.
-    let record = Entry { cap_token: token.clone(), ..entry("a", &dir.path().join("hb"), &oplog_dir, &sock) };
+    let record = Entry { cap_token: token, ..entry("a", &dir.path().join("hb"), &oplog_dir, &sock) };
     let ch = AgentChannel::from_entry(&record);
 
     // First send is accepted; the same command redelivered is still acked

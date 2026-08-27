@@ -32,7 +32,7 @@ use crate::channel::Tailer;
 /// Tight tail re-poll cadence for the SSE producer.
 ///
 /// The [`OplogWaiter`](sse::OplogWaiter) wakes the producer the instant the
-/// agent appends — single-digit ms on Linux (inotify) — but macOS FSEvents
+/// agent appends — single-digit ms on Linux (inotify) — but macOS `FSEvents`
 /// coalesces filesystem notifications with a ~300 ms latency window, which
 /// would otherwise floor visible latency at hundreds of ms. Capping the wait at
 /// this tight value makes the producer re-poll its tailer every few ms
@@ -145,7 +145,7 @@ pub(crate) fn run_stream(
         // this agent's inspection-plane data as stale. Push an `invalidate`
         // event so connected frontends refetch immediately.
         {
-            let is_dirty = state.lock().ok().map_or(false, |mut b| b.take_dirty(agent_id));
+            let is_dirty = state.lock().ok().is_some_and(|mut b| b.take_dirty(agent_id));
             if is_dirty && sink.send(&sse::SseMessage::invalidate()).is_err() {
                 return cleanup(state, agent_id, sub_id);
             }
@@ -198,7 +198,8 @@ fn cleanup(state: &Arc<Mutex<Backend>>, agent_id: &str, sub_id: Option<u64>) {
 /// read even for a long-lived log — it does NOT parse the whole history (which
 /// is exactly the cost we are avoiding by not replaying it to the subscriber).
 fn oplog_head_rev(oplog_dir: &std::path::Path) -> Option<u64> {
-    cp_oplog::replay::replay(oplog_dir).ok().and_then(|r| r.rev_head)
+    let r = cp_oplog::replay::replay(oplog_dir).ok()?;
+    r.rev_head
 }
 
 #[cfg(test)]
@@ -249,7 +250,7 @@ mod tests {
 
         // Cold connect now seeds at the head (Some), skipping the backlog.
         let head = oplog_head_rev(&oplog).expect("non-empty log has a head");
-        let mut tailer = Tailer::new(oplog.clone());
+        let mut tailer = Tailer::new(oplog);
         tailer.seed(head);
         assert!(tailer.poll().expect("poll").is_empty(), "backlog is not replayed");
 

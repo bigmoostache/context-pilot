@@ -172,7 +172,7 @@ pub(crate) fn update_set_mode(state: &Mutex<Backend>, body: &[u8]) -> HttpReply 
         Nightly,
     }
     impl Channel {
-        fn as_str(&self) -> &'static str {
+        const fn as_str(&self) -> &'static str {
             match self {
                 Self::Stable => "stable",
                 Self::Nightly => "nightly",
@@ -197,16 +197,14 @@ pub(crate) fn update_set_mode(state: &Mutex<Backend>, body: &[u8]) -> HttpReply 
     let Ok(mut b) = state.lock() else {
         return HttpReply::error(500, "backend lock poisoned");
     };
-    if let Some(window) = req.window {
-        if let Err(e) = b.releases.set_window(window) {
+    if let Some(window) = req.window
+        && let Err(e) = b.releases.set_window(window) {
             return HttpReply::error(400, &e);
         }
-    }
-    if let Some(channel) = req.channel {
-        if let Err(e) = b.releases.set_channel(channel.as_str()) {
+    if let Some(channel) = req.channel
+        && let Err(e) = b.releases.set_channel(channel.as_str()) {
             return HttpReply::error(400, &e);
         }
-    }
     if let Some(mode) = req.mode {
         b.releases.set_update_mode(mode);
     }

@@ -18,7 +18,7 @@ impl ReleaseStore {
     /// Whether an admin channel switch is awaiting its first check — the next
     /// evaluation adopts the new channel's head regardless of version ordering.
     #[must_use]
-    pub fn pending_channel_switch(&self) -> bool {
+    pub const fn pending_channel_switch(&self) -> bool {
         self.config.pending_channel_switch
     }
 

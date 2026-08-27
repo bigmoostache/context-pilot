@@ -30,10 +30,10 @@
 //! [`Tools::resolve`] returns `None` — and [`apply`] then reports `Ok(false)`
 //! having performed no system call — when `CP_NMCLI_BIN` is **unset or names a
 //! path that does not exist**. Both halves matter: every provisioned box
-//! gets the variable templated into its unit file whether or not NetworkManager
+//! gets the variable templated into its unit file whether or not `NetworkManager`
 //! was ever installed, so gating on the variable alone made a box deployed with
 //! `net_enabled=false` believe it was live and answer `502` to every network
-//! POST. Gating on the binary is what makes "no NetworkManager here" and "not
+//! POST. Gating on the binary is what makes "no `NetworkManager` here" and "not
 //! configured for networking" the same, honest state.
 //!
 //! Off-box — a laptop, CI, every unit test — nothing sets the variable, which is
@@ -65,7 +65,7 @@ use serde::Serialize;
 use super::state::{NetworkConfig, UplinkMode};
 use super::{profiles, routes, uplink};
 
-/// The AP's own address — the gateway AP clients get from NetworkManager's
+/// The AP's own address — the gateway AP clients get from `NetworkManager`'s
 /// dnsmasq, and a name Caddy must serve for HTTPS to work from the AP subnet.
 pub(crate) const AP_ADDRESS: &str = "10.42.0.1";
 
@@ -94,8 +94,8 @@ pub(crate) fn ap_device() -> String {
     std::env::var("CP_AP_IFACE").unwrap_or_else(|_unset| "wlp1s0".to_owned())
 }
 
-/// The modem's NetworkManager device: the QMI **control** port `cdc-wdm0`, not
-/// the net port. NM drives the modem through ModemManager on the control port
+/// The modem's `NetworkManager` device: the QMI **control** port `cdc-wdm0`, not
+/// the net port. NM drives the modem through `ModemManager` on the control port
 /// and applies the resulting IP config to `wwu1u1i4` itself, which is not an NM
 /// device at all — MEASURED: `nmcli device status` lists `cdc-wdm0  gsm`.
 pub(crate) fn wwan_device() -> String {
@@ -110,15 +110,15 @@ pub(crate) fn wwan_device() -> String {
 /// an address on the ethernet ports, so the cockpit stays on the LAN address and
 /// the fleet ULA — but it should never be reachable from the UI at all.)
 ///
-/// Probed from **sysfs, not from ModemManager**. `mmcli` answering is a
+/// Probed from **sysfs, not from `ModemManager`**. `mmcli` answering is a
 /// statement about a daemon's current view; `/sys/class/usbmisc/cdc-wdm*` and
 /// `/sys/class/net/ww*` are statements about hardware. Using the daemon would
-/// make the whole 5G surface appear and disappear while ModemManager restarts.
+/// make the whole 5G surface appear and disappear while `ModemManager` restarts.
 ///
 /// * `CP_WWAN_PRESENT=0|1` overrides the probe outright — for a variant the
 ///   probe reads wrong, and for tests.
 /// * With the applier inert — [`nmcli_bin`] answering `None`: local dev, every
-///   unit test, a box with no NetworkManager — this reports `true`. Off-box
+///   unit test, a box with no `NetworkManager` — this reports `true`. Off-box
 ///   there is no hardware to protect, and the env gate already guarantees
 ///   nothing is applied.
 pub(crate) fn modem_present() -> bool {
@@ -137,12 +137,12 @@ pub(crate) fn modem_present() -> bool {
 /// The whole applier hangs off this one answer, so it is the one place the
 /// distinction is made. Checking the file rather than the variable matters:
 /// `context-pilot.service.j2` templates `CP_NMCLI_BIN` onto every box, including
-/// one deployed with `net_enabled=false` where NetworkManager was never
+/// one deployed with `net_enabled=false` where `NetworkManager` was never
 /// installed. Believing the variable there meant every `nmcli` spawn failed,
 /// every apply returned `Err`, and every network POST answered `502` forever.
 fn nmcli_bin() -> Option<OsString> {
     let bin = std::env::var_os("CP_NMCLI_BIN")?;
-    if Path::new(&bin).exists() { Some(bin) } else { None }
+    Path::new(&bin).exists().then_some(bin)
 }
 
 /// Whether `dir` holds an entry whose name starts with `prefix`.
@@ -164,7 +164,7 @@ pub(crate) struct Tools {
     pub(crate) networkctl: Option<OsString>,
     /// `systemctl`, to restart the failover supervisor after a config change.
     pub(crate) systemctl: Option<OsString>,
-    /// `nft`, to drop NetworkManager's masquerade table when the AP is a
+    /// `nft`, to drop `NetworkManager`'s masquerade table when the AP is a
     /// cul-de-sac — internet sharing off, cockpit access only.
     pub(crate) nft: Option<OsString>,
     /// `cp-regdom`, the appliance's single implementation of "push the
@@ -292,7 +292,7 @@ pub(super) fn coerce_mode(requested: &NetworkConfig, has_modem: bool) -> Cow<'_,
 /// MEASURED, `iw reg set FR` took `phy0` (ath11k) from the world default `00` to
 /// `FR: DFS-ETSI` and its **`no IR` channel count from 89 to 0** — channels
 /// 36–48 from unusable to 23 dBm, channel 100 to 30 dBm with radar detection.
-/// Without this call there is no 5 GHz AP at all.
+/// Without this call there is no 5 `GHz` AP at all.
 ///
 /// # `cp-regdom` first, `iw` only as a fallback
 ///
@@ -311,7 +311,7 @@ fn apply_regdom(tools: &Tools, config: &NetworkConfig) {
         return;
     }
     if let Some(regdom) = tools.regdom.as_ref() {
-        if let Err(failure) = run(regdom, &[config.ap.country.clone()]) {
+        if let Err(failure) = run(regdom, std::slice::from_ref(&config.ap.country)) {
             eprintln!("network: cp-regdom {} failed (non-fatal): {failure}", config.ap.country);
         }
         return;
@@ -347,7 +347,7 @@ fn applied_marker() -> PathBuf {
 
 /// Hex SHA-256 of anything serialisable — secrets included, so a PSK change with
 /// every other field identical still reconciles.
-fn hash_of<T: Serialize>(inputs: &T) -> String {
+fn hash_of<T>(inputs: &T) -> String where T: Serialize {
     let raw = serde_json::to_vec(inputs).unwrap_or_default();
     super::super::crypto::sha256(&raw).iter().map(|byte| format!("{byte:02x}")).collect()
 }

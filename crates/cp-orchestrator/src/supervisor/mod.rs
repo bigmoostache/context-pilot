@@ -143,22 +143,26 @@ impl AgentSupervisor {
     ///
     /// Each path is canonicalised eagerly; entries that fail to resolve are
     /// silently skipped (the binary may not exist yet on disk).
+    #[must_use]
     pub fn new(allow_list: &[PathBuf]) -> Self {
         let resolved = allow_list.iter().filter_map(|p| std::fs::canonicalize(p).ok()).collect();
         Self { allow_list: resolved, known: HashMap::new() }
     }
 
     /// Number of supervised agents.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.known.len()
     }
 
     /// Whether the supervisor tracks zero agents.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.known.is_empty()
     }
 
     /// Whether an agent with this key is currently supervised.
+    #[must_use]
     pub fn is_supervised(&self, agent_id: &str) -> bool {
         self.known.contains_key(agent_id)
     }

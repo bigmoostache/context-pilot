@@ -11,7 +11,7 @@ fn unprovisioned_render_serves_cockpit_over_cleartext_80() {
     // upstream — no cert, no :443, no redirect.
     assert!(cfg.contains(PRODUCT_UPSTREAM), "cockpit is served on day-0");
     assert!(!cfg.contains("https://"), "no https site until provisioned");
-    assert!(!cfg.contains("redir https"), "no :80→:443 redirect when unprovisioned");
+    assert!(!cfg.contains("redir https"), "no :80\u{2192}:443 redirect when unprovisioned");
     // The removed maintenance plane leaves no trace.
     assert!(!cfg.contains("9090"), "no maintenance plane upstream/port");
 }
@@ -35,7 +35,7 @@ fn provisioned_render_serves_cockpit_on_443_and_redirects_80() {
     assert!(cfg.contains("tls internal"), "cockpit uses the private CA once provisioned");
     assert!(cfg.contains("https://pilot.acme.corp"), "name is a cert subject");
     assert!(cfg.contains("https://192.168.1.116"), "ip is a cert subject");
-    assert!(cfg.contains("redir https://{host}{uri} 308"), ":80 → :443 redirect present");
+    assert!(cfg.contains("redir https://{host}{uri} 308"), ":80 \u{2192} :443 redirect present");
     // The cockpit is no longer reverse-proxied on :80 once provisioned — only
     // the redirect block references :80.
     assert!(!cfg.contains("9090"), "no maintenance plane upstream/port");
@@ -89,7 +89,7 @@ fn a_drifted_dhcp_lease_is_added_without_dropping_the_pinned_one() {
     assert_eq!(
         subjects_with(Some(&id), Some("192.168.1.43"), &[]),
         vec!["192.168.1.38".to_owned(), "pilot.acme.corp".to_owned(), "192.168.1.43".to_owned()],
-        "the pinned address is kept — the client's DNS may point at a reservation that comes back"
+        "the pinned address is kept \u{2014} the client's DNS may point at a reservation that comes back"
     );
 }
 
@@ -142,7 +142,7 @@ fd00000000000000000000000000abcd 01 80 00 80       lo
     assert_eq!(
         parse_ulas(text),
         vec!["fd59:ec78:2da4:1:7681:f2a2:27e0:f10d".to_owned(), "fd59:ec78:2da4:2:7681:f2a2:27e0:f10d".to_owned()],
-        "global fd00::/8 on real devices only — link-local, GUA and loopback dropped"
+        "global fd00::/8 on real devices only \u{2014} link-local, GUA and loopback dropped"
     );
 }
 

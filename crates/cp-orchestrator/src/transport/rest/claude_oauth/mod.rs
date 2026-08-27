@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use sha2::{Digest as _, Sha256};
 
 use super::{Backend, HttpReply};
 
@@ -26,7 +26,7 @@ const REDIRECT_URI: &str = "https://console.anthropic.com/oauth/code/callback";
 /// User-Agent required by Anthropic's OAuth token endpoint. The canonical
 /// Claude Code OAuth contract expects a Claude Code identity here; a default
 /// `reqwest/x.y` UA is rejected/misrouted by the edge, breaking both the
-/// authorization_code exchange and refresh.
+/// `authorization_code` exchange and refresh.
 pub(super) const TOKEN_USER_AGENT: &str = "claude-cli/2.1.196 (external, cli)";
 const SCOPES: &str =
     "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload";
@@ -79,17 +79,16 @@ pub(crate) fn token_status() -> HttpReply {
     let creds = read_credentials_json();
     match creds {
         Some(oauth) => {
-            let expires_at = oauth.get("expiresAt").and_then(|v| v.as_i64()).unwrap_or(0);
+            let expires_at = oauth.get("expiresAt").and_then(serde_json::Value::as_i64).unwrap_or(0);
             let now_ms = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_millis() as i64)
-                .unwrap_or(0);
+                .map_or(0, |d| d.as_millis() as i64);
             let token = oauth.get("accessToken").and_then(|v| v.as_str()).unwrap_or("");
             let valid = expires_at > now_ms && !token.is_empty();
             let account_email = if valid { fetch_account_email(token) } else { None };
             HttpReply::ok(&TokenStatusResponse {
                 valid,
-                expires_at: if expires_at > 0 { Some(expires_at) } else { None },
+                expires_at: (expires_at > 0).then_some(expires_at),
                 subscription_type: oauth.get("subscriptionType").and_then(|v| v.as_str()).map(str::to_owned),
                 rate_limit_tier: oauth.get("rateLimitTier").and_then(|v| v.as_str()).map(str::to_owned),
                 account_email,
@@ -137,23 +136,21 @@ pub(crate) fn login_start(state: &Mutex<Backend>) -> HttpReply {
     // Store PKCE session for the /complete step.
     if let Ok(mut b) = state.lock() {
         b.pkce_session =
-            Some(PkceSession { code_verifier: code_verifier.clone(), state: state_param, created_at: Instant::now() });
+            Some(PkceSession { code_verifier, state: state_param, created_at: Instant::now() });
     }
 
     // Check whether there's already a valid token (multi-account scenario).
     // When `already_valid` is true, the auto-poller MUST stay disabled — the
     // user intends to switch accounts and needs to paste the new code.
     let already_valid = read_credentials_json()
-        .map(|c| {
-            let expires_at = c.get("expiresAt").and_then(|v| v.as_i64()).unwrap_or(0);
+        .is_some_and(|c| {
+            let expires_at = c.get("expiresAt").and_then(serde_json::Value::as_i64).unwrap_or(0);
             let now_ms = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_millis() as i64)
-                .unwrap_or(0);
+                .map_or(0, |d| d.as_millis() as i64);
             let token = c.get("accessToken").and_then(|v| v.as_str()).unwrap_or("");
             expires_at > now_ms && !token.is_empty()
-        })
-        .unwrap_or(false);
+        });
 
     HttpReply::ok(&LoginStartResponse { url, already_valid: Some(already_valid) })
 }
@@ -179,10 +176,10 @@ pub(crate) fn login_complete(state: &Mutex<Backend>, body_bytes: &[u8]) -> HttpR
     // Retrieve and consume the PKCE session.
     let session = state.lock().ok().and_then(|mut b| b.pkce_session.take());
     let Some(session) = session else {
-        return HttpReply::error(400, "no pending login — call /start first");
+        return HttpReply::error(400, "no pending login \u{2014} call /start first");
     };
     if session.created_at.elapsed().as_secs() > PKCE_TTL_SECS {
-        return HttpReply::error(400, "login session expired — please start again");
+        return HttpReply::error(400, "login session expired \u{2014} please start again");
     }
 
     match exchange_and_store(code, &session.code_verifier, &session.state) {
@@ -203,7 +200,7 @@ pub(crate) fn refresh_login() -> HttpReply {
     let creds = read_credentials_json();
     let refresh_token = creds.as_ref().and_then(|c| c.get("refreshToken")).and_then(|v| v.as_str()).unwrap_or("");
     if refresh_token.is_empty() {
-        return HttpReply::error(400, "no refresh token stored — please log in first");
+        return HttpReply::error(400, "no refresh token stored \u{2014} please log in first");
     }
 
     let body = serde_json::json!({
@@ -249,11 +246,10 @@ pub(crate) fn refresh_login() -> HttpReply {
 
             let access_token = val.get("access_token").and_then(|v| v.as_str()).unwrap_or("");
             let new_refresh = val.get("refresh_token").and_then(|v| v.as_str()).unwrap_or(refresh_token);
-            let expires_in = val.get("expires_in").and_then(|v| v.as_i64()).unwrap_or(0);
+            let expires_in = val.get("expires_in").and_then(serde_json::Value::as_i64).unwrap_or(0);
             let now_ms = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_millis() as i64)
-                .unwrap_or(0);
+                .map_or(0, |d| d.as_millis() as i64);
             let expires_at = now_ms + expires_in * 1000;
 
             let new_creds = serde_json::json!({
@@ -314,9 +310,9 @@ fn exchange_and_store(code: &str, code_verifier: &str, state: &str) -> Result<i6
 
     let access_token = val.get("access_token").and_then(|v| v.as_str()).unwrap_or("");
     let refresh_token = val.get("refresh_token").and_then(|v| v.as_str()).unwrap_or("");
-    let expires_in = val.get("expires_in").and_then(|v| v.as_i64()).unwrap_or(0);
+    let expires_in = val.get("expires_in").and_then(serde_json::Value::as_i64).unwrap_or(0);
     let now_ms =
-        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
+        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis() as i64);
     let expires_at = now_ms + expires_in * 1000;
 
     let creds = serde_json::json!({
@@ -379,8 +375,7 @@ pub(super) fn store_credentials(creds: &serde_json::Value) -> Result<(), String>
             &json,
         ])
         .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false);
+        .is_ok_and(|o| o.status.success());
 
     // Always write the credentials file as fallback.
     let home = std::env::var("HOME").map_err(|_| "HOME not set")?;
@@ -437,7 +432,7 @@ fn urlencoded(s: &str) -> String {
 
 /// Read random bytes from `/dev/urandom`.
 fn read_random(buf: &mut [u8]) -> Result<(), std::io::Error> {
-    use std::io::Read;
+    use std::io::Read as _;
     std::fs::File::open("/dev/urandom")?.read_exact(buf)
 }
 

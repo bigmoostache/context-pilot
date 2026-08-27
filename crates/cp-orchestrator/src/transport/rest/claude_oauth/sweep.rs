@@ -18,7 +18,7 @@ use super::accounts::{self, REFRESH_THRESHOLD_MS};
 
 /// How often the sweep runs. A token entering its final hour is therefore
 /// renewed within at most one interval — well before it can expire.
-const SWEEP_INTERVAL: Duration = Duration::from_secs(600);
+const SWEEP_INTERVAL: Duration = Duration::from_mins(10);
 
 /// Settle delay before the first sweep — lets the transport bind and the boot
 /// sequence land so a refresh never races startup.

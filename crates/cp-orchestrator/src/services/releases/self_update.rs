@@ -33,7 +33,7 @@ pub(crate) fn pending_path(install: &std::path::Path) -> PathBuf {
 /// Append a `.suffix` to a path's file name (not `with_extension`, which would
 /// clobber an existing extension — the binary has none, but be explicit).
 fn with_suffix(path: &std::path::Path, suffix: &str) -> PathBuf {
-    let mut name = path.file_name().map(|n| n.to_os_string()).unwrap_or_default();
+    let mut name = path.file_name().map(std::ffi::OsStr::to_os_string).unwrap_or_default();
     name.push(".");
     name.push(suffix);
     path.with_file_name(name)
@@ -127,12 +127,12 @@ pub fn boot_check(install: &std::path::Path) {
 /// tolerance is exhausted. Returns `true` iff the update was committed.
 ///
 /// No-op (`false`) when nothing is staged — a normal boot never polls.
-pub fn boot_commit_when_healthy<F: FnMut() -> bool>(
+pub fn boot_commit_when_healthy<F>(
     install: &std::path::Path,
     mut healthy: F,
     deadline: std::time::Duration,
     interval: std::time::Duration,
-) -> bool {
+) -> bool where F: FnMut() -> bool {
     if !pending_path(install).exists() {
         return false; // Nothing staged; normal boot.
     }

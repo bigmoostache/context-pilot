@@ -56,7 +56,7 @@ const DEFAULT_PORT: u16 = 7878;
 const DEFAULT_BIND: &str = "127.0.0.1";
 
 /// Default registry + oplog poll interval.
-const DEFAULT_SCAN_INTERVAL: Duration = Duration::from_millis(2000);
+const DEFAULT_SCAN_INTERVAL: Duration = Duration::from_secs(2);
 
 /// Parsed runtime configuration, sourced from environment variables.
 #[derive(Debug)]
@@ -85,9 +85,9 @@ pub struct Config {
     /// Session lifetime (`CP_SESSION_TTL_SECS`, default 30 days). Absolute
     /// expiry — a session cannot be refreshed past its original TTL (Q6).
     pub session_ttl: Duration,
-    /// Path to the auth SQLite database (`CP_AUTH_DB`, default
+    /// Path to the auth `SQLite` database (`CP_AUTH_DB`, default
     /// `~/.context-pilot/orchestrator/auth.db`). Orchestrator-level storage,
-    /// not inside agents_dir (D7/Q9).
+    /// not inside `agents_dir` (D7/Q9).
     pub auth_db_path: PathBuf,
 }
 
@@ -139,12 +139,12 @@ impl Config {
 
         // Auth configuration (§8 of design doc).
         let auth_enabled =
-            std::env::var("CP_AUTH_ENABLED").ok().map(|s| s.eq_ignore_ascii_case("true") || s == "1").unwrap_or(false);
+            std::env::var("CP_AUTH_ENABLED").ok().is_some_and(|s| s.eq_ignore_ascii_case("true") || s == "1");
 
         let session_ttl = std::env::var("CP_SESSION_TTL_SECS")
             .ok()
             .and_then(|s| s.parse::<u64>().ok())
-            .map_or(Duration::from_secs(2_592_000), Duration::from_secs); // 30 days
+            .map_or(Duration::from_hours(720), Duration::from_secs); // 30 days
 
         let auth_db_path = crate::services::auth::store::AuthStore::default_db_path();
 
@@ -225,12 +225,13 @@ impl Runtime {
     ///
     /// Returns the [`JoinHandle`](thread::JoinHandle) (the thread runs until
     /// the process exits).
+    #[must_use]
     pub fn start_driver(&self) -> thread::JoinHandle<()> {
         let backend = Arc::clone(&self.backend);
         let agents_dir = self.config.agents_dir.clone();
         let interval = self.config.scan_interval;
         let backup_scheduler =
-            if self.config.auth_enabled { Some(BackupScheduler::new(self.config.auth_db_path.clone())) } else { None };
+            self.config.auth_enabled.then(|| BackupScheduler::new(self.config.auth_db_path.clone()));
 
         thread::spawn(move || driver::driver_loop(backend, agents_dir, interval, backup_scheduler))
     }
@@ -240,6 +241,7 @@ impl Runtime {
     /// maintenance window, drive the download → stage → restart pipeline.
     /// `manual`/`paused` only refresh the visible state. See
     /// [`update_scheduler`].
+    #[must_use]
     pub fn start_update_scheduler(&self, install: PathBuf) -> thread::JoinHandle<()> {
         update_scheduler::spawn(Arc::clone(&self.backend), self.config.auth_db_path.clone(), install)
     }
@@ -249,6 +251,7 @@ impl Runtime {
     /// within an hour of expiry. Needs no backend state (OAuth lives on disk /
     /// Keychain), so it takes nothing and holds no locks. See
     /// [`crate::transport::rest::spawn_oauth_refresh`].
+    #[must_use]
     pub fn start_oauth_sweeper(&self) -> thread::JoinHandle<()> {
         crate::transport::rest::spawn_oauth_refresh()
     }
@@ -265,6 +268,7 @@ impl Runtime {
     /// `boot_check` counts the failure and can roll back.
     ///
     /// No-op thread on a normal (nothing-staged) boot.
+    #[must_use]
     pub fn start_update_committer(&self, install: PathBuf) -> thread::JoinHandle<()> {
         let backend = Arc::clone(&self.backend);
         let url = format!("http://127.0.0.1:{}/healthz", self.config.port);
@@ -274,11 +278,11 @@ impl Runtime {
                 .timeout(Duration::from_secs(2))
                 .build()
                 .unwrap_or_else(|_| reqwest::blocking::Client::new());
-            let healthy = || client.get(&url).send().map(|r| r.status().as_u16() == 200).unwrap_or(false);
+            let healthy = || client.get(&url).send().is_ok_and(|r| r.status().as_u16() == 200);
             let committed = crate::services::releases::boot_commit_when_healthy(
                 &install,
                 healthy,
-                Duration::from_secs(60),
+                Duration::from_mins(1),
                 Duration::from_secs(2),
             );
             if !committed {
@@ -286,7 +290,7 @@ impl Runtime {
             }
             // The new binary is blessed — flip the release state to match it.
             let Ok(mut b) = backend.lock() else {
-                eprintln!("updater: promote skipped — backend lock poisoned");
+                eprintln!("updater: promote skipped \u{2014} backend lock poisoned");
                 return;
             };
             match crate::services::releases::updater::promote_committed(&mut b.releases, &auth_db) {
@@ -321,9 +325,9 @@ impl Runtime {
             eprintln!(
                 "provisioning state: {} (flag: {})",
                 if provisioned {
-                    "provisioned — cockpit on :443"
+                    "provisioned \u{2014} cockpit on :443"
                 } else {
-                    "UNPROVISIONED — cockpit on :80 (day-0)"
+                    "UNPROVISIONED \u{2014} cockpit on :80 (day-0)"
                 },
                 b.provision_flag_path.display()
             );

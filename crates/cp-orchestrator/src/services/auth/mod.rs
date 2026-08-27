@@ -2,7 +2,7 @@
 //! management, session handling, and per-agent access control (design doc
 //! `docs/design-auth.md`).
 //!
-//! The auth subsystem is backed by a dedicated SQLite database stored at
+//! The auth subsystem is backed by a dedicated `SQLite` database stored at
 //! `~/.context-pilot/orchestrator/auth.db` (configurable via `CP_AUTH_DB`),
 //! separate from agent data. Three tables: `users`, `sessions`, `agent_acl`.
 //!

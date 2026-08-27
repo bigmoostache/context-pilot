@@ -32,7 +32,7 @@
 //! because it is running, and the round-trip latency of this very request), so
 //! the rendered table covers all twelve services.
 
-use std::net::{TcpStream, ToSocketAddrs};
+use std::net::{TcpStream, ToSocketAddrs as _};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::mpsc;
@@ -274,7 +274,7 @@ fn provider_host(provider: &str) -> (&'static str, &'static str) {
 }
 
 /// Wire label for a folded [`Phase`](cp_wire::types::Phase).
-fn phase_label(phase: cp_wire::types::Phase) -> &'static str {
+const fn phase_label(phase: cp_wire::types::Phase) -> &'static str {
     match phase {
         cp_wire::types::Phase::Idle => "idle",
         cp_wire::types::Phase::Streaming => "streaming",
@@ -286,7 +286,7 @@ fn phase_label(phase: cp_wire::types::Phase) -> &'static str {
 }
 
 /// Wire label for a folded [`LifecycleState`](cp_wire::types::LifecycleState).
-fn lifecycle_label(state: cp_wire::types::LifecycleState) -> &'static str {
+const fn lifecycle_label(state: cp_wire::types::LifecycleState) -> &'static str {
     match state {
         cp_wire::types::LifecycleState::Starting => "starting",
         cp_wire::types::LifecycleState::Running => "running",

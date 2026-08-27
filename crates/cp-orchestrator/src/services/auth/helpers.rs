@@ -62,9 +62,7 @@ impl super::store::AuthStore {
     pub fn default_db_path() -> std::path::PathBuf {
         match std::env::var_os("CP_AUTH_DB") {
             Some(p) => std::path::PathBuf::from(p),
-            None => std::env::var_os("HOME")
-                .map(|h| std::path::PathBuf::from(h).join(".context-pilot/orchestrator/auth.db"))
-                .unwrap_or_else(|| std::path::PathBuf::from("auth.db")),
+            None => std::env::var_os("HOME").map_or_else(|| std::path::PathBuf::from("auth.db"), |h| std::path::PathBuf::from(h).join(".context-pilot/orchestrator/auth.db")),
         }
     }
 }

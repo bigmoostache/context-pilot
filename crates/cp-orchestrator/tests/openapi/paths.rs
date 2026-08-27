@@ -1,4 +1,4 @@
-//! OpenAPI path definitions — all REST endpoints.
+//! `OpenAPI` path definitions — all REST endpoints.
 
 use serde_json::{Value, json};
 
@@ -85,7 +85,7 @@ pub(super) fn paths() -> Value {
         "/api/it/ca/fingerprint": get("it", "CA root SHA-256 fingerprint", r("ItFingerprint")),
         "/api/it/identity": merge(
             get("it", "Current box network identity (name/IP), or null", r("ItIdentityResponse")),
-            post("it", "Set box network identity — re-issues the leaf & reloads Caddy", Some(json!({
+            post("it", "Set box network identity \u{2014} re-issues the leaf & reloads Caddy", Some(json!({
                 "type": "object",
                 "properties": { "name": { "type": "string" }, "ip": { "type": "string" } },
                 "required": ["name", "ip"]
@@ -102,7 +102,7 @@ pub(super) fn paths() -> Value {
         "/api/it/network": get("it",
             "Uplink + access-point configuration (secrets elided) and live status. `config.wwan` is null for \
              either of two independent reasons: a caller without `can_manage_secrets`, or a box with no modem \
-             (`status.modem_present` false). `config.probe` is read-only — it is seeded at provisioning time.",
+             (`status.modem_present` false). `config.probe` is read-only \u{2014} it is seeded at provisioning time.",
             r("ItNetworkResponse")),
         "/api/it/network/mode": post("it", "Select the uplink mode (wan | wan_5g | 5g)",
             Some(mode_body()), r("ItNetworkModeResult")),
@@ -110,7 +110,7 @@ pub(super) fn paths() -> Value {
             Some(ap_body()), r("ItNetworkApResult")),
         // Superadmin only (`can_manage_secrets`) — the SIM and the data plan are
         // the vendor's, so the APN is not a per-site setting.
-        "/api/it/network/wwan": post("it", "Set the 5G bearer configuration (superadmin — vendor-managed)",
+        "/api/it/network/wwan": post("it", "Set the 5G bearer configuration (superadmin \u{2014} vendor-managed)",
             Some(wwan_body()), r("ItNetworkWwanResult")),
         // ── Ticket ──────────────────────────────────────────────────
         "/api/ticket": post("ticket", "Mint SSE upgrade ticket", None, r("TicketResponse")),

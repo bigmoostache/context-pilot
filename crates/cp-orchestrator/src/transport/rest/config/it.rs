@@ -93,7 +93,7 @@ mod tests {
     }
 
     /// A `Mutex<Backend>` with auth enabled over a leaked temp dir (so the
-    /// SQLite file + identity/flag paths outlive the test body), mirroring the
+    /// `SQLite` file + identity/flag paths outlive the test body), mirroring the
     /// fixture in `transport/maint/mod.rs`.
     fn backend() -> Mutex<Backend> {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -103,7 +103,7 @@ mod tests {
             PathBuf::from("/tmp/cp-it-test-realms"),
             PathBuf::from("/tmp/cp-it-test-bin"),
             Some(store),
-            Duration::from_secs(3600),
+            Duration::from_hours(1),
         );
         std::mem::forget(dir);
         Mutex::new(backend)
@@ -158,11 +158,11 @@ mod tests {
         );
 
         // Invalid IP and invalid name are each a 400.
-        assert_eq!(it_set_identity(&state, br#"{"name":"box","ip":"nope"}"#, None).status, 400, "bad IP → 400");
+        assert_eq!(it_set_identity(&state, br#"{"name":"box","ip":"nope"}"#, None).status, 400, "bad IP \u{2192} 400");
         assert_eq!(
             it_set_identity(&state, br#"{"name":"-bad.example","ip":"10.0.0.1"}"#, None).status,
             400,
-            "bad name → 400"
+            "bad name \u{2192} 400"
         );
     }
 }

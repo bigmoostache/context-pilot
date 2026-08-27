@@ -135,7 +135,7 @@ fn harness(agent_id: &str, n_msgs: u8) -> Harness {
         std::path::PathBuf::from("/tmp/cp-test-realms"),
         std::path::PathBuf::from("/tmp/cp-test-bin"),
         None,
-        Duration::from_secs(3600),
+        Duration::from_hours(1),
     );
     backend.view_mut().apply_batch(agent_id, &replay_entries(oplog.path()));
     let state = Arc::new(Mutex::new(backend));

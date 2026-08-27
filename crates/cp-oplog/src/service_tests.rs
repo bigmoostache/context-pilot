@@ -195,5 +195,5 @@ fn v11_emit_burst_never_blocks_the_loop_on_fsync() {
     service.shutdown().expect("shutdown");
     let state = replay(dir.path()).expect("replay");
     assert_eq!(state.rev_head, Some(rev), "the durable barrier is the latest rev");
-    assert!(state.seen.contains("post-burst-barrier"), "the durable barrier survived the best-effort burst",);
+    assert!(state.seen.contains("post-burst-barrier"), "the durable barrier survived the best-effort burst");
 }

@@ -28,7 +28,7 @@ pub fn download_artifact(store: &ReleaseStore, manifest: &Manifest, arch: &str) 
     }
 
     let client = reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_secs(600))
+        .timeout(std::time::Duration::from_mins(10))
         .build()
         .map_err(|e| format!("http client: {e}"))?;
     let resp = client

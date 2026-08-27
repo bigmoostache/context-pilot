@@ -170,9 +170,7 @@ fn wait_for_marker_lines(dir: &Path, n: usize) -> Vec<String> {
         if lines.len() >= n {
             return lines;
         }
-        if Instant::now() > deadline {
-            panic!("child never produced {n} marker lines (got {})", lines.len());
-        }
+        assert!(Instant::now() <= deadline, "child never produced {n} marker lines (got {})", lines.len());
         sleep(Duration::from_millis(5));
     }
 }

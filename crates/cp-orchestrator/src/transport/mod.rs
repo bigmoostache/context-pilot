@@ -54,7 +54,7 @@ pub use rest::Backend;
 /// large paste (e.g. a big log or file), turning it into invalid JSON that the
 /// command handler then rejected with `400` — the "big messages don't go
 /// through" symptom (T274). 32 MiB allows ~32M characters, effectively no limit
-/// for text, yet still a finite DoS guard. Kept in lockstep with the agent
+/// for text, yet still a finite `DoS` guard. Kept in lockstep with the agent
 /// intake's `MAX_CONNECTION_BUFFER` (the other cap on the same path).
 const MAX_BODY: u64 = 32 * 1024 * 1024;
 
@@ -137,7 +137,7 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
 
     // Centralised auth gate (Phase 5, NFR-16). Validates the session for
     // protected routes when auth is enabled; no-op when disabled (NFR-09).
-    let auth_user = match auth::authenticate(&state, &segments, auth_token.as_deref()) {
+    let auth_user = match auth::authenticate(state, &segments, auth_token.as_deref()) {
         Ok(user) => user,
         Err(reply) => {
             respond_json(request, &reply);
@@ -148,14 +148,12 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
     // Per-agent ACL check (Phase 6). When auth is enabled and the route
     // targets a specific agent, verify the caller has access. System admins
     // bypass (FR-09); regular users need an ACL entry (FR-10).
-    if let Some(agent_id) = auth::extract_agent_id(&segments) {
-        if let Some(ref user) = auth_user {
-            if !auth::authorize_agent(state, agent_id, user) {
+    if let Some(agent_id) = auth::extract_agent_id(&segments)
+        && let Some(ref user) = auth_user
+            && !auth::authorize_agent(state, agent_id, user) {
                 respond_json(request, &rest::HttpReply::error(403, "no access to this agent"));
                 return;
             }
-        }
-    }
 
     // SSE stream is the one route that takes ownership of the request to stream.
     if method == Method::Get && segments.as_slice() == ["api", "stream"] {
@@ -347,7 +345,7 @@ fn route_rest(
         | (Method::Delete, ["api", "releases", _])
             if !rest::releases_break_glass() =>
         {
-            rest::HttpReply::error(410, "retired — auto-update owns versions (set CP_RELEASES_BREAK_GLASS=1)")
+            rest::HttpReply::error(410, "retired \u{2014} auto-update owns versions (set CP_RELEASES_BREAK_GLASS=1)")
         }
         (Method::Get, ["api", "releases"]) => rest::list_releases(state),
         (Method::Put, ["api", "releases", "arch"]) => rest::set_arch(state, body_bytes),

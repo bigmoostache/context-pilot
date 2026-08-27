@@ -1,4 +1,4 @@
-//! Deploy-plane OpenAPI schemas — release management, app settings/profile,
+//! Deploy-plane `OpenAPI` schemas — release management, app settings/profile,
 //! and Claude Code OAuth usage + login.
 //!
 //! Split out of [`schemas_ext`](super::schemas_ext) to keep each file within

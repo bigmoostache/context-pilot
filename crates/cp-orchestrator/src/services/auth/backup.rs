@@ -3,7 +3,7 @@
 //! [`BackupScheduler`] is driven by the runtime's slow-cadence loop. On each
 //! tick it checks whether enough time has elapsed since the last rolling
 //! backup (~5 min) or whether a daily snapshot slot (AM / PM) is unfilled,
-//! and performs the backup via the SQLite online backup API (consistent,
+//! and performs the backup via the `SQLite` online backup API (consistent,
 //! lock-free reads).
 //!
 //! File layout (all siblings of the auth database):
@@ -45,7 +45,7 @@ impl BackupScheduler {
     /// Create a scheduler for the database at `db_path`.
     ///
     /// The first rolling backup fires on the first tick (no initial delay).
-    pub(crate) fn new(db_path: PathBuf) -> Self {
+    pub(crate) const fn new(db_path: PathBuf) -> Self {
         Self { db_path, last_rolling_ms: 0, last_daily_tag: String::new() }
     }
 
@@ -122,7 +122,7 @@ impl BackupScheduler {
 // ─────────────── AuthStore backup method ─────────────────────────────
 
 impl AuthStore {
-    /// Create a consistent backup of the database to `dest` using the SQLite
+    /// Create a consistent backup of the database to `dest` using the `SQLite`
     /// online backup API.
     ///
     /// Safe to call while other threads read the same connection (WAL mode).
@@ -136,7 +136,7 @@ impl AuthStore {
     pub(crate) fn backup_to(&self, dest: &Path) -> Result<(), AuthError> {
         if let Some(parent) = dest.parent() {
             std::fs::create_dir_all(parent)
-                .map_err(|_io_err| AuthError::Database(rusqlite::Error::InvalidPath(parent.to_path_buf().into())))?;
+                .map_err(|_io_err| AuthError::Database(rusqlite::Error::InvalidPath(parent.to_path_buf())))?;
         }
         let mut dst = rusqlite::Connection::open(dest)?;
         let backup = rusqlite::backup::Backup::new(&self.conn, &mut dst)?;
@@ -161,7 +161,7 @@ fn epoch_to_ymd_h(secs: u64) -> (i32, u32, u32, u32) {
     let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
     let doe = (z - era * 146_097) as u32; // day-of-era  [0, 146096]
     let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
-    let y = yoe as i64 + era * 400;
+    let y = i64::from(yoe) + era * 400;
     let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
     let mp = (5 * doy + 2) / 153;
     let d = doy - (153 * mp + 2) / 5 + 1;
@@ -247,7 +247,7 @@ mod tests {
             .create_user("sched@test.com", "Sched", "password1234", super::super::types::UserRole::User)
             .expect("create");
 
-        let mut sched = BackupScheduler::new(db_path.clone());
+        let mut sched = BackupScheduler::new(db_path);
         sched.tick(&store);
 
         // Rolling backup should have been created (first tick always fires).

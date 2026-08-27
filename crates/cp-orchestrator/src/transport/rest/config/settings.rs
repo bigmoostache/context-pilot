@@ -77,7 +77,7 @@ fn may_set_access_control(want: bool, caller: Option<&User>) -> bool {
 /// `can_manage_users` (manager+). When access control is disabled (single-user
 /// appliance) everyone is.
 fn can_manage_config(state: &Mutex<Backend>, auth_user: Option<&User>) -> bool {
-    let access_control = state.lock().map(|b| b.access_control).unwrap_or(false);
+    let access_control = state.lock().is_ok_and(|b| b.access_control);
     if !access_control {
         return true;
     }
@@ -89,7 +89,7 @@ fn can_manage_config(state: &Mutex<Backend>, auth_user: Option<&User>) -> bool {
 /// onboarding gate and the profile/config panes.
 pub fn get_settings(state: &Mutex<Backend>, auth_user: Option<&User>) -> HttpReply {
     let (auth_enabled, access_control) =
-        state.lock().map(|b| (b.auth.is_some(), b.access_control)).unwrap_or((false, false));
+        state.lock().map_or((false, false), |b| (b.auth.is_some(), b.access_control));
     let providers: Vec<serde_json::Value> =
         // Resolve via the vault (not `global::has_api_key`) so a key added at
         // runtime through the settings page shows as configured without an
@@ -209,10 +209,10 @@ mod tests {
     /// explicit `"true"`); only an explicit `"false"` turns it off.
     #[test]
     fn flag_default_on() {
-        assert!(access_control_from_raw(None), "unset ⇒ on (default)");
-        assert!(access_control_from_raw(Some("")), "empty ⇒ on");
-        assert!(access_control_from_raw(Some("true")), "explicit true ⇒ on");
-        assert!(!access_control_from_raw(Some("false")), "explicit false ⇒ off");
+        assert!(access_control_from_raw(None), "unset \u{21d2} on (default)");
+        assert!(access_control_from_raw(Some("")), "empty \u{21d2} on");
+        assert!(access_control_from_raw(Some("true")), "explicit true \u{21d2} on");
+        assert!(!access_control_from_raw(Some("false")), "explicit false \u{21d2} off");
     }
 
     /// V0.4c — enabling is allowed for anyone; disabling requires superadmin.

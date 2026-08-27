@@ -55,7 +55,7 @@ pub(crate) fn authenticate(
     // no-op when there is no auth store to enforce against (NFR-09). Both are read
     // from the cached [`Backend::access_control`] flag — no per-request disk I/O.
     let (access_control, auth_enabled) =
-        state.lock().map(|b| (b.access_control, b.auth.is_some())).unwrap_or((false, false));
+        state.lock().map_or((false, false), |b| (b.access_control, b.auth.is_some()));
     if !access_control || !auth_enabled {
         return Ok(None);
     }
@@ -84,21 +84,9 @@ pub(crate) fn authenticate(
 fn is_public_route(segments: &[&str]) -> bool {
     matches!(
         segments,
-        ["api", "health"]
-            | ["api", "auth", "login"]
-            | ["api", "auth", "register"]
-            | ["api", "auth", "status"]
-            // SSE uses ticket-based auth, not Bearer (Phase 7 enriches tickets
-            // with user_id; until then the ticket mechanism is the sole gate).
-            | ["api", "stream"]
-            // Agent avatars are loaded by a plain `<img src>` element, which
-            // cannot attach an `Authorization: Bearer` header — so the route
-            // must be public or every avatar 401s once auth is on (T345).
-            // Profile pictures are non-sensitive (shown in the switcher to any
-            // authenticated viewer), so public access is safe. Marking it
-            // public here also skips the per-agent ACL check in `handle`
-            // (which only runs when `auth_user` is `Some`).
-            | ["api", "agent", _, "avatar"]
+        ["api", "health" | "stream"] |
+["api", "auth", "login" | "register" | "status"] |
+["api", "agent", _, "avatar"]
     )
 }
 
@@ -109,12 +97,11 @@ fn is_public_route(segments: &[&str]) -> bool {
 pub(crate) fn auth_status(state: &Mutex<Backend>) -> HttpReply {
     let (enabled, bootstrapped) = state
         .lock()
-        .map(|b| {
+        .map_or((false, false), |b| {
             let enabled = b.auth.is_some();
-            let bootstrapped = b.auth.as_ref().and_then(|a| a.count_users().ok()).map_or(false, |n| n > 0);
+            let bootstrapped = b.auth.as_ref().and_then(|a| a.count_users().ok()).is_some_and(|n| n > 0);
             (enabled, bootstrapped)
-        })
-        .unwrap_or((false, false));
+        });
     HttpReply::ok(&serde_json::json!({
         "enabled": enabled,
         "bootstrapped": bootstrapped,
@@ -265,7 +252,7 @@ pub(crate) fn me(state: &Mutex<Backend>, auth_user: Option<&User>) -> HttpReply 
         return HttpReply::error(501, "auth not enabled");
     };
     let provisioned =
-        state.lock().map(|b| crate::transport::it::is_provisioned(&b.provision_flag_path)).unwrap_or(false);
+        state.lock().is_ok_and(|b| crate::transport::it::is_provisioned(&b.provision_flag_path));
     let mut value = serde_json::to_value(user).unwrap_or_default();
     if let Some(obj) = value.as_object_mut() {
         drop(obj.insert("next_action".to_owned(), next_action(user, provisioned).into()));
@@ -415,7 +402,7 @@ mod tests {
     use super::*;
 
     /// Build a `Mutex<Backend>` with an auth store present, and the access-control
-    /// flag forced to `access_control`. The tempdir is leaked so the SQLite file
+    /// flag forced to `access_control`. The tempdir is leaked so the `SQLite` file
     /// outlives the test body.
     fn backend(access_control: bool) -> Mutex<Backend> {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -425,7 +412,7 @@ mod tests {
             PathBuf::from("/tmp/cp-auth-test-realms"),
             PathBuf::from("/tmp/cp-auth-test-bin"),
             Some(store),
-            Duration::from_secs(3600),
+            Duration::from_hours(1),
         );
         b.access_control = access_control;
         std::mem::forget(dir);
@@ -439,7 +426,7 @@ mod tests {
     fn flag_off_is_god_mode() {
         let state = backend(false);
         let outcome = authenticate(&state, &["api", "agent", "some-agent"], None);
-        assert!(matches!(outcome, Ok(None)), "flag off ⇒ no authenticated user (god mode)");
+        assert!(matches!(outcome, Ok(None)), "flag off \u{21d2} no authenticated user (god mode)");
     }
 
     /// With the flag ON, the same tokenless request to a protected route is
@@ -448,7 +435,7 @@ mod tests {
     fn flag_on_enforces() {
         let state = backend(true);
         let protected = authenticate(&state, &["api", "agent", "some-agent"], None);
-        assert!(matches!(protected, Err(reply) if reply.status == 401), "flag on + no token ⇒ 401");
+        assert!(matches!(protected, Err(reply) if reply.status == 401), "flag on + no token \u{21d2} 401");
         let public = authenticate(&state, &["api", "health"], None);
         assert!(matches!(public, Ok(None)), "public route bypasses the gate");
     }
@@ -493,6 +480,6 @@ mod tests {
         assert!(!done.contains("\"next_action\":\"set_identity\""), "provisioned clears day-0: {done}");
         // A regular user skips the IT step; no user-mgmt cap → onboarding short-circuits → ready.
         set(false);
-        assert!(na(&user(Regular, false)).contains("\"next_action\":\"ready\""), "non-IT user ⇒ ready");
+        assert!(na(&user(Regular, false)).contains("\"next_action\":\"ready\""), "non-IT user \u{21d2} ready");
     }
 }

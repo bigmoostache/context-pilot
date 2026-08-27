@@ -223,7 +223,7 @@ fn reply_for(outcome: Result<bool, String>, payload: serde_json::Value) -> HttpR
         }
         Err(failure) => {
             eprintln!("network: {failure}");
-            HttpReply::error(502, "network settings rolled back — the box is unchanged")
+            HttpReply::error(502, "network settings rolled back \u{2014} the box is unchanged")
         }
     }
 }
@@ -293,7 +293,7 @@ pub(crate) fn set_ap(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
         /// WPA2 PSK — absent keeps, `null` clears, a string replaces.
         #[serde(default, deserialize_with = "double_option")]
         passphrase: Option<Option<String>>,
-        /// 2.4 (`bg`) or 5 GHz (`a`).
+        /// 2.4 (`bg`) or 5 `GHz` (`a`).
         band: Band,
         /// Channel number, `0` for automatic.
         channel: u16,

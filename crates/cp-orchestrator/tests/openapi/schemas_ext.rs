@@ -1,4 +1,4 @@
-//! Transport-layer OpenAPI schemas — receipts, auth, env-keys, filesystem.
+//! Transport-layer `OpenAPI` schemas — receipts, auth, env-keys, filesystem.
 
 use serde_json::{Value, json};
 

@@ -52,7 +52,7 @@ fn seed_one(store: &AuthStore, role_sql: &str, prefix: &str) {
                 eprintln!(
                     "seed: provisioned initial {role_sql} {} (password change required on first login)",
                     user.email
-                )
+                );
             }
             Err(e) => eprintln!("seed: created {} but could not set must-change flag: {e}", user.email),
         },

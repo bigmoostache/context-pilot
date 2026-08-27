@@ -224,7 +224,7 @@ fn updater_download_extracts_on_sha_match() {
 // ── O3.3 — atomic apply, promote, rollback ──────────────────────────────────
 
 /// One staged-apply fixture: releases vX (active) + vY on disk, an install
-/// binary, an auth.db. Returns (base, store, install, auth_db).
+/// binary, an auth.db. Returns (base, store, install, `auth_db`).
 fn apply_fixture(label: &str) -> (std::path::PathBuf, ReleaseStore, std::path::PathBuf, std::path::PathBuf) {
     let base = temp_dir(label);
     let releases = base.join("releases");
@@ -387,7 +387,7 @@ fn tick(mode: UpdateMode, now_minutes: u16, gate: &AtomicBool, available: bool) 
         gate,
         || {
             checked = true;
-            Ok(if available { Some(fixture_manifest()) } else { None })
+            Ok(available.then(|| fixture_manifest()))
         },
         |m| {
             assert_eq!(m.version, "v9.9.9");

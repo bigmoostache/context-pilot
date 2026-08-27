@@ -69,7 +69,7 @@ fn message(thread: &str, byte: u8) -> OpEntryKind {
 }
 
 /// A cumulative-since-boot cost aggregate of `cost_usd`.
-fn cost(cost_usd: f64) -> OpEntryKind {
+const fn cost(cost_usd: f64) -> OpEntryKind {
     OpEntryKind::CostAggregate { input_tokens: 0, output_tokens: 0, cost_usd }
 }
 

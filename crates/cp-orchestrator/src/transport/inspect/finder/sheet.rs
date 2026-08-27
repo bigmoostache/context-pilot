@@ -13,7 +13,7 @@
 
 use std::sync::Mutex;
 
-use calamine::{Data, Reader, open_workbook_auto};
+use calamine::{Data, Reader as _, open_workbook_auto};
 
 use crate::transport::Backend;
 use crate::transport::rest::HttpReply;
@@ -125,7 +125,7 @@ fn parse_delimited(path: &std::path::Path, delimiter: u8) -> Option<Workbook> {
 /// Returns `None` if the workbook can't be opened at all.
 fn parse_workbook(path: &std::path::Path) -> Option<Workbook> {
     let mut workbook = open_workbook_auto(path).ok()?;
-    let names = workbook.sheet_names().to_owned();
+    let names = workbook.sheet_names();
 
     let mut sheets: Vec<serde_json::Value> = Vec::new();
     let mut truncated = names.len() > MAX_SHEETS;

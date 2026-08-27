@@ -150,7 +150,7 @@ fn apn_and_pin_charsets_are_enforced() {
     config.wwan.apn = "orange fr; rm -rf /".to_owned();
     assert!(state::validate_wwan(&config.wwan).is_err(), "an APN with spaces/semicolons is rejected");
     config.wwan.apn = "internet.sfr".to_owned();
-    assert!(state::validate_wwan(&config.wwan).is_ok());
+    state::validate_wwan(&config.wwan).unwrap();
     config.wwan.pin = Some("12".to_owned());
     assert!(state::validate_wwan(&config.wwan).is_err(), "a 2-digit PIN is rejected");
     config.wwan.pin = Some("abcd".to_owned());
@@ -220,12 +220,12 @@ fn status_degrades_to_null_for_every_gated_field() {
     // an admin watches during a failover and a box missing every optional tool
     // still deserves an honest answer there.
     let status = status::probe(&NetworkConfig::default(), true);
-    assert!(status.get("wwan").is_some_and(serde_json::Value::is_null), "no CP_MMCLI_BIN ⇒ null bearer");
-    assert!(status.get("ap").is_some_and(serde_json::Value::is_null), "no CP_NMCLI_BIN ⇒ null AP");
-    assert!(status.get("active_uplink").is_some_and(|v| v.is_string()), "the active uplink needs no tool");
+    assert!(status.get("wwan").is_some_and(serde_json::Value::is_null), "no CP_MMCLI_BIN \u{21d2} null bearer");
+    assert!(status.get("ap").is_some_and(serde_json::Value::is_null), "no CP_NMCLI_BIN \u{21d2} null AP");
+    assert!(status.get("active_uplink").is_some_and(serde_json::Value::is_string), "the active uplink needs no tool");
     let wan = status.get("wan").expect("wan is always present");
     assert!(wan.get("has_default_route").is_some_and(serde_json::Value::is_boolean), "read from /proc/net/*route");
-    assert!(wan.get("ip").is_some_and(serde_json::Value::is_null), "no CP_IP_BIN ⇒ null address");
+    assert!(wan.get("ip").is_some_and(serde_json::Value::is_null), "no CP_IP_BIN \u{21d2} null address");
 }
 
 // ── The per-step applied marks ──────────────────────────────────────────────
@@ -240,10 +240,10 @@ fn a_mode_change_does_not_touch_the_access_points_hash() {
     strict.mode = UplinkMode::FiveG;
     let (before, after) = (StepHashes::of(&ethernet), StepHashes::of(&strict));
 
-    assert_eq!(before.access_point, after.access_point, "the AP is untouched by a mode change — no client bounces");
-    assert_eq!(before.ap_activation, after.ap_activation, "…and neither is its activation");
+    assert_eq!(before.access_point, after.access_point, "the AP is untouched by a mode change \u{2014} no client bounces");
+    assert_eq!(before.ap_activation, after.ap_activation, "\u{2026}and neither is its activation");
     assert_ne!(before.mode, after.mode, "the mode step must re-run");
-    assert_ne!(before.wwan, after.wwan, "…and so must the bearer: the mode drives its metric and autoconnect");
+    assert_ne!(before.wwan, after.wwan, "\u{2026}and so must the bearer: the mode drives its metric and autoconnect");
     assert_ne!(before.uplink_env, after.uplink_env, "the supervisor is told the new mode");
 }
 
@@ -258,7 +258,7 @@ fn each_step_keys_on_its_own_inputs() {
     let after = StepHashes::of(&renamed);
     assert_ne!(StepHashes::of(&base).access_point, after.access_point, "the profile must be rewritten");
     assert_eq!(StepHashes::of(&base).ap_activation, after.ap_activation, "but the AP is not bounced");
-    assert_eq!(StepHashes::of(&base).wwan, after.wwan, "and the bearer is not touched at all — the other half");
+    assert_eq!(StepHashes::of(&base).wwan, after.wwan, "and the bearer is not touched at all \u{2014} the other half");
     assert_eq!(StepHashes::of(&base).mode, after.mode);
 
     // Probe tuning is the supervisor's business and nothing else's.
@@ -266,14 +266,14 @@ fn each_step_keys_on_its_own_inputs() {
     retuned.probe.cooldown_s = 15;
     let tuned = StepHashes::of(&retuned);
     assert_ne!(StepHashes::of(&base).uplink_env, tuned.uplink_env, "the env file is re-rendered");
-    assert_eq!(StepHashes::of(&base).access_point, tuned.access_point, "…and nothing on the radio moves");
+    assert_eq!(StepHashes::of(&base).access_point, tuned.access_point, "\u{2026}and nothing on the radio moves");
     assert_eq!(StepHashes::of(&base).mode, tuned.mode);
 
     // A standby switch is what `apply_mode` acts on, so it must re-run: `hot`
     // keeps the bearer up, `cold` takes it down.
     let mut cold = populated();
     cold.wwan.standby = Standby::Cold;
-    assert_ne!(StepHashes::of(&base).mode, StepHashes::of(&cold).mode, "hot → cold must bring the bearer down");
+    assert_ne!(StepHashes::of(&base).mode, StepHashes::of(&cold).mode, "hot \u{2192} cold must bring the bearer down");
 
     // A secret change with every other field identical still reconciles.
     let mut rekeyed = populated();
@@ -366,7 +366,7 @@ fn a_mark_is_recorded_the_instant_its_step_succeeds() {
         Ok(())
     })
     .expect("second ap");
-    assert!(!ran, "an unchanged step is skipped — that is what stops the Wi-Fi bouncing");
+    assert!(!ran, "an unchanged step is skipped \u{2014} that is what stops the Wi-Fi bouncing");
 
     // …and a step that has never run is not skipped by another step's mark.
     assert!(!reloaded.unchanged(STEP_AP_ACTIVATION, &hashes.ap_activation));

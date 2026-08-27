@@ -4,7 +4,7 @@ use super::super::types::AgentRole;
 use super::*;
 
 /// A throwaway password for tests. Generated at runtime (never a string
-/// literal) so CodeQL's hard-coded-credential scan has nothing to flag — the
+/// literal) so `CodeQL`'s hard-coded-credential scan has nothing to flag — the
 /// exact value is irrelevant since no test re-authenticates with it.
 fn test_password() -> String {
     AuthStore::generate_token()
@@ -193,7 +193,7 @@ fn delete_user_cascades() {
         .create_user("del@x.com", "Del", &test_password(), UserRole::User)
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     let token = store
-        .create_session(&user.id, None, Duration::from_secs(3600))
+        .create_session(&user.id, None, Duration::from_hours(1))
         .unwrap_or_else(|err| panic!("session failed: {err}"));
     assert!(store.delete_user(&user.id).unwrap_or(false));
     // Session must be cascade-deleted.
@@ -211,7 +211,7 @@ fn session_lifecycle() {
         .create_user("sess@x.com", "Sess", &test_password(), UserRole::User)
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     let token = store
-        .create_session(&user.id, Some("test-agent"), Duration::from_secs(3600))
+        .create_session(&user.id, Some("test-agent"), Duration::from_hours(1))
         .unwrap_or_else(|err| panic!("session failed: {err}"));
     // Valid session returns the correct user.
     let found_user = store

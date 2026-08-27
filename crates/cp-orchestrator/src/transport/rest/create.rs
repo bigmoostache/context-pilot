@@ -74,7 +74,7 @@ pub fn create_agent(state: &Mutex<Backend>, body_bytes: &[u8], auth_user: Option
         // Requirement 4 (T271): a folder still owned by a RETIRED agent must
         // not accept a fresh agent — the realm is reserved until unretired.
         if backend.retired.is_folder_retired(&folder.to_string_lossy()) {
-            return HttpReply::error(409, "a retired agent owns this realm folder — unretire it instead");
+            return HttpReply::error(409, "a retired agent owns this realm folder \u{2014} unretire it instead");
         }
         (folder, backend.agent_binary.clone(), backend.agents_dir.clone())
     };
@@ -101,15 +101,13 @@ pub fn create_agent(state: &Mutex<Backend>, body_bytes: &[u8], auth_user: Option
         Ok(pid) => {
             // Auto-grant the creator agent-admin access so they can
             // immediately see and manage the agent they just created.
-            if let Some(user) = auth_user {
-                if let Ok(b) = state.lock() {
-                    if let Some(auth) = b.auth.as_ref() {
+            if let Some(user) = auth_user
+                && let Ok(b) = state.lock()
+                    && let Some(auth) = b.auth.as_ref() {
                         let canonical = folder.canonicalize().unwrap_or_else(|_| folder.clone());
                         let agent_id = folder_id(&canonical.to_string_lossy());
                         let _grant = auth.grant_access(&agent_id, &user.id, AgentRole::AgentAdmin, None);
                     }
-                }
-            }
 
             HttpReply::json(
                 202,

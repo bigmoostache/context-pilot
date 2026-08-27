@@ -15,7 +15,7 @@ impl AuthStore {
     /// # Errors
     ///
     /// Returns [`AuthError::Database`] on foreign-key violation (unknown
-    /// `user_id`) or other SQLite failure.
+    /// `user_id`) or other `SQLite` failure.
     pub(crate) fn grant_access(
         &self,
         agent_id: &str,
@@ -37,7 +37,7 @@ impl AuthStore {
     ///
     /// # Errors
     ///
-    /// Returns [`AuthError::Database`] on SQLite failure.
+    /// Returns [`AuthError::Database`] on `SQLite` failure.
     pub(crate) fn revoke_access(&self, agent_id: &str, user_id: &str) -> Result<bool, AuthError> {
         let deleted = self.conn.execute(
             "DELETE FROM agent_acl WHERE agent_id = ?1 AND user_id = ?2",
@@ -51,7 +51,7 @@ impl AuthStore {
     ///
     /// # Errors
     ///
-    /// Returns [`AuthError::Database`] on SQLite failure.
+    /// Returns [`AuthError::Database`] on `SQLite` failure.
     pub(crate) fn update_agent_role(
         &self,
         agent_id: &str,
@@ -70,7 +70,7 @@ impl AuthStore {
     ///
     /// # Errors
     ///
-    /// Returns [`AuthError::Database`] on SQLite failure.
+    /// Returns [`AuthError::Database`] on `SQLite` failure.
     pub(crate) fn check_access(&self, agent_id: &str, user_id: &str) -> Result<Option<AgentRole>, AuthError> {
         let mut stmt = self.conn.prepare("SELECT role FROM agent_acl WHERE agent_id = ?1 AND user_id = ?2")?;
         let mut rows = stmt.query_map(rusqlite::params![agent_id, user_id], |row| {
@@ -88,7 +88,7 @@ impl AuthStore {
     ///
     /// # Errors
     ///
-    /// Returns [`AuthError::Database`] on SQLite failure.
+    /// Returns [`AuthError::Database`] on `SQLite` failure.
     pub(crate) fn list_agent_users(&self, agent_id: &str) -> Result<Vec<AclEntry>, AuthError> {
         let mut stmt = self.conn.prepare(
             "SELECT a.agent_id, a.user_id, a.role, a.granted_at, a.granted_by, \
@@ -121,7 +121,7 @@ impl AuthStore {
     ///
     /// # Errors
     ///
-    /// Returns [`AuthError::Database`] on SQLite failure.
+    /// Returns [`AuthError::Database`] on `SQLite` failure.
     pub(crate) fn list_user_agents(&self, user_id: &str) -> Result<Vec<String>, AuthError> {
         let mut stmt =
             self.conn.prepare("SELECT agent_id FROM agent_acl WHERE user_id = ?1 ORDER BY granted_at ASC")?;
@@ -137,7 +137,7 @@ impl AuthStore {
     ///
     /// # Errors
     ///
-    /// Returns [`AuthError::Database`] on SQLite failure.
+    /// Returns [`AuthError::Database`] on `SQLite` failure.
     pub(crate) fn is_agent_admin(&self, agent_id: &str, user_id: &str) -> Result<bool, AuthError> {
         Ok(self.check_access(agent_id, user_id)? == Some(AgentRole::AgentAdmin))
     }

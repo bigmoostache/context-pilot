@@ -217,7 +217,7 @@ fn read_ack(stream: &mut UnixStream) -> io::Result<Ack> {
 /// ([`AgentChannel::query`]) — both speak the same envelope, differing only in
 /// the payload type. `what` names the expected payload in error messages so a
 /// decode failure says which half of the protocol broke.
-fn read_framed<T: serde::de::DeserializeOwned>(stream: &mut UnixStream, what: &str) -> io::Result<T> {
+fn read_framed<T>(stream: &mut UnixStream, what: &str) -> io::Result<T> where T: serde::de::DeserializeOwned {
     let mut buf: Vec<u8> = Vec::new();
     let mut chunk = [0u8; READ_CHUNK];
 
@@ -305,7 +305,7 @@ mod tests {
         Command::new(format!("cmd-{dedup}"), 1, dedup.to_owned(), cp_wire::types::command::Kind::Stop)
     }
 
-    /// A minimal echo-ack server: reads one framed CommandFrame, writes back
+    /// A minimal echo-ack server: reads one framed `CommandFrame`, writes back
     /// a canned Accepted Ack with rev=42, then closes.
     fn echo_ack_server(listener: UnixListener) {
         let (mut conn, _addr) = listener.accept().expect("accept");

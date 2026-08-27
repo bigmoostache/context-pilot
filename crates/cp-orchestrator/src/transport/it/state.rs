@@ -21,7 +21,7 @@ use std::path::Path;
 /// fail-closed, so a damaged or absent flag keeps the cockpit gated rather than
 /// exposing it by default.
 pub(crate) fn is_provisioned(flag_path: &Path) -> bool {
-    std::fs::read_to_string(flag_path).map(|s| s.trim() == "true").unwrap_or(false)
+    std::fs::read_to_string(flag_path).is_ok_and(|s| s.trim() == "true")
 }
 
 /// Persist the `provisioned` flag **atomically and durably**.
@@ -29,7 +29,7 @@ pub(crate) fn is_provisioned(flag_path: &Path) -> bool {
 /// Write-tmp → `fsync` the file → rename → `fsync` the parent directory. The
 /// rename gives concurrent readers an all-or-nothing view (never a torn write),
 /// and the two `fsync`s make the change survive an abrupt power loss — important
-/// on the OpenWrt appliance, where a finalize the operator was told succeeded
+/// on the `OpenWrt` appliance, where a finalize the operator was told succeeded
 /// must not silently revert after a yank of the power. (ext4's delayed-allocation
 /// flush heuristic does not reliably cover a rename onto a *new* name, which is
 /// exactly the first-ever finalize, so we fsync explicitly rather than rely on
@@ -68,11 +68,10 @@ pub(super) fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     file.sync_all()?;
     drop(file);
     std::fs::rename(&tmp, path)?;
-    if let Some(parent) = path.parent() {
-        if let Ok(dir) = std::fs::File::open(parent) {
+    if let Some(parent) = path.parent()
+        && let Ok(dir) = std::fs::File::open(parent) {
             let _synced = dir.sync_all(); // best-effort: persist the rename in the dir entry
         }
-    }
     Ok(())
 }
 

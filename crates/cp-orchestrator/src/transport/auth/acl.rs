@@ -33,7 +33,7 @@ pub(crate) fn authorize_agent(state: &Mutex<Backend>, agent_id: &str, user: &Use
     }
     let Ok(b) = state.lock() else { return false };
     let Some(auth) = b.auth.as_ref() else { return true };
-    auth.check_access(agent_id, &user.id).map(|role| role.is_some()).unwrap_or(false)
+    auth.check_access(agent_id, &user.id).is_ok_and(|role| role.is_some())
 }
 
 /// Check whether the caller can manage ACL on an agent (system admin OR
@@ -87,7 +87,7 @@ pub(crate) fn acl_grant(state: &Mutex<Backend>, agent_id: &str, body: &[u8], aut
         #[serde(default = "default_agent_role")]
         role: crate::services::auth::types::AgentRole,
     }
-    fn default_agent_role() -> crate::services::auth::types::AgentRole {
+    const fn default_agent_role() -> crate::services::auth::types::AgentRole {
         crate::services::auth::types::AgentRole::AgentUser
     }
 

@@ -38,17 +38,14 @@ pub fn usage(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
     };
 
     let worker_id = extract_worker_param(query);
-    let wid = match worker_id {
-        Some(id) => id,
-        None => {
-            let workers = match backend.inspect_mut().list_workers(folder_path) {
-                Ok(w) => w,
-                Err(_) => return HttpReply::error(404, "cannot list workers"),
-            };
-            match workers.first() {
-                Some(w) => w.clone(),
-                None => return HttpReply::error(404, "no workers found"),
-            }
+    let wid = if let Some(id) = worker_id { id } else {
+        let workers = match backend.inspect_mut().list_workers(folder_path) {
+            Ok(w) => w,
+            Err(_) => return HttpReply::error(404, "cannot list workers"),
+        };
+        match workers.first() {
+            Some(w) => w.clone(),
+            None => return HttpReply::error(404, "no workers found"),
         }
     };
 

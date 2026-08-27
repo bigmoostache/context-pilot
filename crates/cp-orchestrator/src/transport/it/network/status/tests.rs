@@ -150,9 +150,9 @@ fn status_is_well_formed_without_gates() {
     for field in ["active_uplink", "wan", "wwan", "ap", "supervisor"] {
         assert!(status.get(field).is_some(), "{field} is present");
     }
-    assert!(status.get("wwan").is_some_and(Value::is_null), "no mmcli gate ⇒ null bearer");
-    assert!(status.get("ap").is_some_and(Value::is_null), "no nmcli gate ⇒ null AP");
-    assert!(status.get("supervisor").is_some_and(Value::is_null), "no state file ⇒ null supervisor");
+    assert!(status.get("wwan").is_some_and(Value::is_null), "no mmcli gate \u{21d2} null bearer");
+    assert!(status.get("ap").is_some_and(Value::is_null), "no nmcli gate \u{21d2} null AP");
+    assert!(status.get("supervisor").is_some_and(Value::is_null), "no state file \u{21d2} null supervisor");
     // The hardware fact is the one the caller threaded in, not a
     // second sysfs read that could disagree with the handler's own gate.
     assert_eq!(status.get("modem_present"), Some(&json!(true)));

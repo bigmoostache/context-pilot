@@ -120,7 +120,8 @@ fn build_metrics(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> serde
 /// Replay uses the bounded checkpoint fast-path, so this is a cheap read even
 /// for a long-lived log.
 fn oplog_head_rev(oplog_path: &str) -> Option<u64> {
-    cp_oplog::replay::replay(Path::new(oplog_path)).ok().and_then(|r| r.rev_head)
+    let r = cp_oplog::replay::replay(Path::new(oplog_path)).ok()?;
+    r.rev_head
 }
 
 /// List all registry entries in a directory (same scan as the meta endpoint).

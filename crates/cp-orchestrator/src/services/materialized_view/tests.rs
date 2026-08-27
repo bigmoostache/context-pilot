@@ -45,7 +45,7 @@ fn checkpoint_resets_heads_authoritatively() {
 
     let agent = view.get("a1").expect("agent present");
     assert_eq!(agent.rev, 5);
-    assert!(agent.heads.threads.iter().all(|h| h.thread_id != "T1"), "checkpoint must drop the pre-checkpoint head",);
+    assert!(agent.heads.threads.iter().all(|h| h.thread_id != "T1"), "checkpoint must drop the pre-checkpoint head");
     assert_eq!(agent.heads.threads.len(), 1);
     assert_eq!(agent.heads.threads.first().expect("T2").thread_id, "T2");
 }
@@ -88,7 +88,7 @@ fn checkpoint_restores_roster_wholesale() {
     assert_eq!(e.status, ThreadTurn::MyTurn);
     assert!(e.archived);
     assert_eq!(e.msg_count, 4);
-    assert!(agent.roster.iter().all(|r| r.thread_id != "T-stale"), "the pre-checkpoint roster entry is dropped",);
+    assert!(agent.roster.iter().all(|r| r.thread_id != "T-stale"), "the pre-checkpoint roster entry is dropped");
 }
 
 #[test]
@@ -232,7 +232,7 @@ fn thread_created_folds_idempotently_on_replay() {
     };
     view.apply("a1", &entry(0, created.clone()));
     view.apply("a1", &entry(0, created)); // duplicate delivery / replay
-    assert_eq!(view.get("a1").expect("agent").roster.len(), 1, "a re-seen creation must refresh, never duplicate",);
+    assert_eq!(view.get("a1").expect("agent").roster.len(), 1, "a re-seen creation must refresh, never duplicate");
 }
 
 #[test]

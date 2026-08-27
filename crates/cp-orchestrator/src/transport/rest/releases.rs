@@ -27,14 +27,14 @@ use crate::supervisor;
 /// `CP_RELEASES_BREAK_GLASS=1` (e.g. over Tailscale SSH for a recovery). The
 /// auto-updater and its *Update* pane own version choice now.
 pub(crate) fn releases_break_glass() -> bool {
-    std::env::var("CP_RELEASES_BREAK_GLASS").map(|v| v == "1" || v.eq_ignore_ascii_case("true")).unwrap_or(false)
+    std::env::var("CP_RELEASES_BREAK_GLASS").is_ok_and(|v| v == "1" || v.eq_ignore_ascii_case("true"))
 }
 
 /// `GET /api/releases` — list all releases (local + remote merged), current
 /// architecture, and selected version.
 ///
 /// Fetches the remote release list from GitHub on every call (cached by
-/// TanStack on the frontend). Local releases are scanned from the releases
+/// `TanStack` on the frontend). Local releases are scanned from the releases
 /// directory. The response merges both: each release carries `local` (bool)
 /// and `selected` (bool) flags alongside the remote metadata.
 pub(crate) fn list_releases(state: &Mutex<Backend>) -> HttpReply {
@@ -153,7 +153,7 @@ pub(crate) fn set_arch(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
 /// `POST /api/releases/download` — download a specific release by tag.
 ///
 /// Body: `{ "tag": "v0.3.0-abc1234" }`. The handler blocks while downloading
-/// and extracting (runs on a tiny_http thread, not the main loop).
+/// and extracting (runs on a `tiny_http` thread, not the main loop).
 pub(crate) fn download_release(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     #[derive(Deserialize)]
     struct Req {
@@ -179,7 +179,10 @@ pub(crate) fn download_release(state: &Mutex<Backend>, body: &[u8]) -> HttpReply
         let remotes = b.releases.fetch_remote_releases();
         drop(b);
 
-        let url = remotes.ok().and_then(|rs| rs.into_iter().find(|r| r.tag == req.tag).and_then(|r| r.asset_url));
+        let url = remotes.ok().and_then(|rs| {
+            let r = rs.into_iter().find(|r| r.tag == req.tag)?;
+            r.asset_url
+        });
         (arch, url)
     };
 
@@ -225,7 +228,7 @@ pub(crate) fn select_release(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
 
     // Update the agent binary and supervisor allow-list.
     b.agent_binary = binary_path.clone();
-    b.supervisor = supervisor::AgentSupervisor::new(&[binary_path.clone()]);
+    b.supervisor = supervisor::AgentSupervisor::new(std::slice::from_ref(&binary_path));
 
     HttpReply::ok(&serde_json::json!({
         "status": "selected",
@@ -295,12 +298,9 @@ pub(crate) fn deploy_fleet(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     let agents_dir_str = agents_dir.to_string_lossy().into_owned();
 
     for id in &agent_ids {
-        let entry = match super::resolve_entry(state, id) {
-            Ok(e) => e,
-            Err(_) => {
-                errors.push(format!("{id}: not found in registry"));
-                continue;
-            }
+        let entry = if let Ok(e) = super::resolve_entry(state, id) { e } else {
+            errors.push(format!("{id}: not found in registry"));
+            continue;
         };
         let folder = PathBuf::from(&entry.folder);
         let key = folder.to_string_lossy().into_owned();
@@ -309,11 +309,10 @@ pub(crate) fn deploy_fleet(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
         supervisor::kill_pid(entry.pid);
 
         // Drop stale supervised record.
-        if let Ok(mut b) = state.lock() {
-            if b.supervisor.is_supervised(&key) {
+        if let Ok(mut b) = state.lock()
+            && b.supervisor.is_supervised(&key) {
                 let _stopped = b.supervisor.stop(&key);
             }
-        }
 
         // Respawn on the same folder with the (potentially new) binary.
         let env: [(&str, &str); 2] = [("CP_BRIDGE", "1"), ("CP_AGENTS_DIR", &agents_dir_str)];
@@ -380,16 +379,15 @@ pub(crate) fn restart_orchestrator(state: &Mutex<Backend>) -> HttpReply {
                 Err(_) => None,
             }
         };
-        if let Some((tag, src)) = src {
-            if src.exists() {
+        if let Some((tag, src)) = src
+            && src.exists() {
                 match crate::services::releases::stage_orchestrator_update(install, &src) {
                     Ok(()) => updated_tag = Some(tag),
                     Err(e) => {
-                        eprintln!("restart_orchestrator: staging update {tag} failed: {e}; restarting current binary")
+                        eprintln!("restart_orchestrator: staging update {tag} failed: {e}; restarting current binary");
                     }
                 }
             }
-        }
     }
 
     let _restart = std::thread::spawn(move || {

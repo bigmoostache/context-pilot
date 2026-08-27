@@ -55,7 +55,7 @@ pub struct CostSnapshot {
 /// [`CostSnapshot`] the latest entry supersedes earlier ones (cumulative state,
 /// not summed). Ephemeral — not carried in a checkpoint, so a cold backend
 /// shows zeros until the agent re-emits (the meter self-heals).
-#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize, utoipa::ToSchema)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, utoipa::ToSchema)]
 pub struct ContextSnapshot {
     /// Tokens currently occupying the context window.
     pub used_tokens: u64,

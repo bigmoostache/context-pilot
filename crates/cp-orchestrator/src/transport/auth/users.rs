@@ -61,7 +61,7 @@ pub(crate) fn create_user(state: &Mutex<Backend>, body: &[u8], auth_user: Option
         #[serde(default = "default_user_role")]
         role: UserRole,
     }
-    fn default_user_role() -> UserRole {
+    const fn default_user_role() -> UserRole {
         UserRole::User
     }
 
@@ -213,7 +213,7 @@ mod tests {
         std::iter::repeat_n('x', 12).collect()
     }
 
-    /// Build a `Mutex<Backend>` with auth enabled over a leaked-tempdir SQLite
+    /// Build a `Mutex<Backend>` with auth enabled over a leaked-tempdir `SQLite`
     /// file, pre-seeding one caller of each manageable rank. Returns the backend
     /// plus the seeded `superadmin`, `admin`, and `manager` `User`s — handlers
     /// take `Option<&User>`, so these double as the callers.
@@ -228,7 +228,7 @@ mod tests {
             PathBuf::from("/tmp/cp-users-test-realms"),
             PathBuf::from("/tmp/cp-users-test-bin"),
             Some(store),
-            Duration::from_secs(3600),
+            Duration::from_hours(1),
         );
         std::mem::forget(dir); // outlive the test body
         (Mutex::new(backend), root, admin, manager)

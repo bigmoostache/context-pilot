@@ -263,7 +263,7 @@ mod tests {
     #[test]
     fn content_hash_rejects_short_hex() {
         let result = serde_json::from_str::<ContentHash>("\"abcd\"");
-        assert!(result.is_err());
+        result.unwrap_err();
     }
 
     #[test]

@@ -65,7 +65,7 @@ mod tests {
 
     #[test]
     fn accepts_one_major_below() {
-        assert!(accepts(PROTOCOL_VERSION.saturating_sub(1)), "the N-1 window must admit the immediately-older major",);
+        assert!(accepts(PROTOCOL_VERSION.saturating_sub(1)), "the N-1 window must admit the immediately-older major");
     }
 
     #[test]
@@ -81,7 +81,7 @@ mod tests {
         // Only meaningful once the protocol has advanced past its first major;
         // below that, saturating arithmetic collapses the window to {0, 1}.
         if PROTOCOL_VERSION >= 2 {
-            assert!(!accepts(PROTOCOL_VERSION - 2), "anything older than N-1 falls outside the support window",);
+            assert!(!accepts(PROTOCOL_VERSION - 2), "anything older than N-1 falls outside the support window");
         }
     }
 }

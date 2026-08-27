@@ -50,7 +50,7 @@ pub(in crate::transport) fn handle_stream(request: Request, state: &Arc<Mutex<Ba
     // bypass (FR-09). When auth is disabled (user_id is None) the check is
     // skipped entirely (NFR-09).
     if let Some(ref user_id) = ticket.user_id {
-        let authorized = state.lock().ok().map_or(false, |b| {
+        let authorized = state.lock().ok().is_some_and(|b| {
             match b.auth.as_ref() {
                 Some(auth) => match auth.get_user_by_id(user_id) {
                     Ok(Some(user)) => {
@@ -59,7 +59,7 @@ pub(in crate::transport) fn handle_stream(request: Request, state: &Arc<Mutex<Ba
                         if user.can_manage_all_agents() {
                             true
                         } else {
-                            auth.check_access(agent_id, user_id).map(|role| role.is_some()).unwrap_or(false)
+                            auth.check_access(agent_id, user_id).is_ok_and(|role| role.is_some())
                         }
                     }
                     _ => false,

@@ -78,7 +78,7 @@ pub struct Backend {
     /// In-flight PKCE session for the Claude Code OAuth login flow (T451).
     /// At most one login can be in progress at a time.
     pub(crate) pkce_session: Option<super::claude_oauth::PkceSession>,
-    /// Path of the auth SQLite database — the update-apply flow backs it up
+    /// Path of the auth `SQLite` database — the update-apply flow backs it up
     /// around the binary swap (update-policy §5.5 step 2 / §5.8). Derived from
     /// the same env default as `runtime::Config` (`AuthStore::default_db_path`).
     pub(crate) auth_db_path: PathBuf,
@@ -137,7 +137,7 @@ impl Backend {
             agents_dir,
             dirty_agents: HashSet::new(),
             liveness: HashMap::new(),
-            supervisor: AgentSupervisor::new(&[agent_binary.clone()]),
+            supervisor: AgentSupervisor::new(std::slice::from_ref(&agent_binary)),
             agents_root,
             agent_binary,
             auth,
@@ -147,17 +147,17 @@ impl Backend {
     }
 
     /// Mutable access to the materialized view (for the runtime loop's fold).
-    pub fn view_mut(&mut self) -> &mut MaterializedView {
+    pub const fn view_mut(&mut self) -> &mut MaterializedView {
         &mut self.view
     }
 
     /// Mutable access to the stream hub (for the runtime loop's publish).
-    pub fn hub_mut(&mut self) -> &mut StreamHub {
+    pub const fn hub_mut(&mut self) -> &mut StreamHub {
         &mut self.hub
     }
 
     /// Mutable access to the state reader (for inspection endpoints).
-    pub fn inspect_mut(&mut self) -> &mut StateReader {
+    pub const fn inspect_mut(&mut self) -> &mut StateReader {
         &mut self.inspect
     }
 
@@ -192,7 +192,7 @@ impl Backend {
             agent_binary: PathBuf::from("/tmp/cp-test-bin"),
             auth: None,
             access_control: false,
-            session_ttl: Duration::from_secs(3600),
+            session_ttl: Duration::from_hours(1),
             releases: ReleaseStore::load(PathBuf::from("/tmp/cp-test-releases")),
             provision_flag_path: PathBuf::from("/tmp/cp-test-provisioned"),
             pkce_session: None,

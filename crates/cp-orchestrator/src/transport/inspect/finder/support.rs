@@ -32,7 +32,7 @@ pub(super) fn confined_path(root: &str, relative: &str) -> Option<PathBuf> {
 
     let candidate = root_path.join(relative);
     let canonical = candidate.canonicalize().ok()?;
-    if canonical.starts_with(&root_canonical) { Some(canonical) } else { None }
+    canonical.starts_with(&root_canonical).then_some(canonical)
 }
 
 /// Count the non-hidden direct children of a directory.
@@ -75,12 +75,7 @@ pub(super) fn infer_kind(name: &str) -> &'static str {
 pub(super) fn extract_param(query: &str, key: &str) -> Option<String> {
     query.split('&').filter(|s| !s.is_empty()).find_map(|pair| {
         let (k, v) = pair.split_once('=')?;
-        if k == key {
-            // Percent-decode the value (basic: %20 → space, %2F → /).
-            Some(percent_decode(v))
-        } else {
-            None
-        }
+        (k == key).then(|| percent_decode(v))
     })
 }
 
@@ -167,15 +162,15 @@ mod tests {
     #[test]
     fn percent_decode_handles_multibyte_utf8() {
         // é = U+00E9 = UTF-8 bytes C3 A9
-        assert_eq!(percent_decode("t%C3%A9st"), "tést");
+        assert_eq!(percent_decode("t%C3%A9st"), "t\u{e9}st");
         // ñ = U+00F1 = UTF-8 bytes C3 B1
-        assert_eq!(percent_decode("espa%C3%B1ol"), "español");
+        assert_eq!(percent_decode("espa%C3%B1ol"), "espa\u{f1}ol");
         // 日 = U+65E5 = UTF-8 bytes E6 97 A5
-        assert_eq!(percent_decode("%E6%97%A5%E6%9C%AC"), "日本");
+        assert_eq!(percent_decode("%E6%97%A5%E6%9C%AC"), "\u{65e5}\u{672c}");
         // Mixed: spaces + accents
-        assert_eq!(percent_decode("caf%C3%A9%20latt%C3%A9"), "café latté");
+        assert_eq!(percent_decode("caf%C3%A9%20latt%C3%A9"), "caf\u{e9} latt\u{e9}");
         // emoji: 🎉 = U+1F389 = UTF-8 bytes F0 9F 8E 89
-        assert_eq!(percent_decode("%F0%9F%8E%89"), "🎉");
+        assert_eq!(percent_decode("%F0%9F%8E%89"), "\u{1f389}");
     }
 
     #[test]
@@ -184,6 +179,6 @@ mod tests {
         assert_eq!(extract_param("path=src%2Flib&format=json", "format"), Some("json".to_owned()));
         assert_eq!(extract_param("path=src", "missing"), None);
         // Multi-byte UTF-8: é in a filename
-        assert_eq!(extract_param("name=t%C3%A9st.xlsx", "name"), Some("tést.xlsx".to_owned()));
+        assert_eq!(extract_param("name=t%C3%A9st.xlsx", "name"), Some("t\u{e9}st.xlsx".to_owned()));
     }
 }

@@ -327,7 +327,7 @@ fn git_branch(folder: &str) -> String {
 /// a graceful-shutdown lifecycle (`Stopping`/`Stopped`, I8) can never be
 /// "working": the authoritative oplog signal wins over a stale phase that a
 /// torn shutdown might have left behind. Otherwise the live `phase` decides
-/// "working", falling back to "needs-you" (any MY_TURN thread) or "idle".
+/// "working", falling back to "needs-you" (any `MY_TURN` thread) or "idle".
 fn derive_status(
     phase: Option<cp_wire::types::Phase>,
     lifecycle: Option<cp_wire::types::LifecycleState>,
@@ -352,7 +352,7 @@ fn derive_status(
 /// (`idle`/`streaming`/`tooling`) — the exact serde form the frontend's
 /// `applyAgentDelta` phase fold uses, so the cold-load `/meta` value and the
 /// live SSE `PhaseTransition` delta resolve to the same string (T297).
-fn phase_label(phase: cp_wire::types::Phase) -> &'static str {
+const fn phase_label(phase: cp_wire::types::Phase) -> &'static str {
     use cp_wire::types::Phase;
     match phase {
         Phase::Idle => "idle",

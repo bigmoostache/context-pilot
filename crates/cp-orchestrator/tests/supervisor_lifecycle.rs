@@ -113,7 +113,7 @@ fn a_stubborn_agent_that_ignores_sigterm_is_killed_by_escalation() {
 
     assert!(sup.is_empty(), "the supervisor dropped the stopped agent");
     assert!(!pid_present(pid), "SIGKILL escalation removed the stubborn process");
-    assert!(elapsed < ESCALATION_BUDGET, "stop completed within the grace+kill budget (took {elapsed:?})",);
+    assert!(elapsed < ESCALATION_BUDGET, "stop completed within the grace+kill budget (took {elapsed:?})");
 }
 
 // ── 2. a supervised fleet is tracked and fully torn down ────────────────────

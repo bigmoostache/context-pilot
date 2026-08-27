@@ -27,7 +27,7 @@ pub enum UpdateMode {
 impl UpdateMode {
     /// Stable lowercase name (mirrors the serde encoding).
     #[must_use]
-    pub fn as_str(self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::Auto => "auto",
             Self::Manual => "manual",
@@ -102,7 +102,7 @@ fn default_channel() -> String {
 }
 
 /// Serde default: poll the channel every 6 hours (plus the boot poll).
-fn default_poll_interval_hours() -> u32 {
+const fn default_poll_interval_hours() -> u32 {
     6
 }
 
@@ -172,7 +172,7 @@ mod tests {
         let w = MaintenanceWindow { start: "23:00".to_owned(), end: "01:00".to_owned() };
         assert!(w.contains(23 * 60 + 30));
         assert!(w.contains(0));
-        assert!(!w.contains(1 * 60));
+        assert!(!w.contains(60));
         assert!(!w.contains(12 * 60));
 
         let bad = MaintenanceWindow { start: "25:00".to_owned(), end: "05:00".to_owned() };
@@ -185,7 +185,7 @@ mod tests {
     fn window_minutes_until_open() {
         let w = MaintenanceWindow::default(); // 03:00–05:00
         assert_eq!(w.minutes_until_open(3 * 60 + 30), 0, "already open");
-        assert_eq!(w.minutes_until_open(60), 120, "01:00 → 03:00");
-        assert_eq!(w.minutes_until_open(23 * 60), 4 * 60, "23:00 → 03:00 next day");
+        assert_eq!(w.minutes_until_open(60), 120, "01:00 \u{2192} 03:00");
+        assert_eq!(w.minutes_until_open(23 * 60), 4 * 60, "23:00 \u{2192} 03:00 next day");
     }
 }

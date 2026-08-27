@@ -62,7 +62,7 @@ fn main() {
         let _global = dotenvy::from_path_override(&global_env).ok();
     }
 
-    eprintln!("cp-orchestrator v{} (protocol v{})", env!("CARGO_PKG_VERSION"), cp_wire::PROTOCOL_VERSION,);
+    eprintln!("cp-orchestrator v{} (protocol v{})", env!("CARGO_PKG_VERSION"), cp_wire::PROTOCOL_VERSION);
 
     // Self-update guard. If a staged update replaced the binary on our install
     // path, a `.pending` marker is present. Account for this boot attempt

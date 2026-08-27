@@ -117,7 +117,7 @@ mod tests {
         held_rx.recv().expect("holder signalled");
 
         // While the holder still owns the lock, a contender starts retrying.
-        let contender_path = canonical.clone();
+        let contender_path = canonical;
         let contender = std::thread::spawn(move || acquire_lock(&contender_path, LOCK_RETRY_ATTEMPTS));
 
         // Let the contender spin on contention for a couple of cycles, then
@@ -127,6 +127,6 @@ mod tests {
 
         let acquired = contender.join().expect("contender thread");
         holder.join().expect("holder thread");
-        assert!(acquired.is_ok(), "the contender must win the lock once the holder releases, got {acquired:?}",);
+        assert!(acquired.is_ok(), "the contender must win the lock once the holder releases, got {acquired:?}");
     }
 }

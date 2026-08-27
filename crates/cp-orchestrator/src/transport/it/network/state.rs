@@ -75,10 +75,10 @@ impl Standby {
 /// Wi-Fi band for the access point.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub(crate) enum Band {
-    /// 2.4 GHz (`nmcli` spells it `bg`).
+    /// 2.4 `GHz` (`nmcli` spells it `bg`).
     #[serde(rename = "bg")]
     Bg,
-    /// 5 GHz (`nmcli` spells it `a`).
+    /// 5 `GHz` (`nmcli` spells it `a`).
     #[default]
     #[serde(rename = "a")]
     A,
@@ -97,7 +97,7 @@ impl Band {
 /// The 5G bearer settings.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub(crate) struct WwanConfig {
-    /// Access point name for the carrier (empty = let ModemManager pick).
+    /// Access point name for the carrier (empty = let `ModemManager` pick).
     pub(crate) apn: String,
     /// PAP/CHAP username, when the carrier needs one.
     pub(crate) username: Option<String>,
@@ -124,12 +124,12 @@ pub(crate) struct ApConfig {
     pub(crate) ssid: String,
     /// WPA2 pre-shared key, 8–63 characters — secret, never read back.
     pub(crate) passphrase: Option<String>,
-    /// 2.4 or 5 GHz.
+    /// 2.4 or 5 `GHz`.
     pub(crate) band: Band,
     /// Channel number, or `0` for automatic selection.
     pub(crate) channel: u16,
     /// ISO-3166 regulatory country code. Under the world-default domain `00`
-    /// every 5 GHz channel is `no IR` (no initiating radiation) and the AP
+    /// every 5 `GHz` channel is `no IR` (no initiating radiation) and the AP
     /// cannot start at all, so this is a functional prerequisite, not a nicety.
     pub(crate) country: String,
     /// Suppress the SSID from beacons.
@@ -311,11 +311,11 @@ pub(crate) fn validate(config: &NetworkConfig) -> Result<(), String> {
 ///
 /// Returns a human-readable reason when a field is out of range.
 pub(crate) fn validate_ap(access_point: &ApConfig) -> Result<(), String> {
-    if !(1..=32).contains(&access_point.ssid.as_bytes().len()) {
-        return Err("ssid must be 1–32 bytes".to_owned());
+    if !(1..=32).contains(&access_point.ssid.len()) {
+        return Err("ssid must be 1\u{2013}32 bytes".to_owned());
     }
     if access_point.passphrase.as_ref().is_some_and(|psk| !(8..=63).contains(&psk.chars().count())) {
-        return Err("passphrase must be 8–63 characters".to_owned());
+        return Err("passphrase must be 8\u{2013}63 characters".to_owned());
     }
     if !access_point.country.is_empty() && !valid_country(&access_point.country) {
         return Err("country must be a two-letter ISO-3166 code".to_owned());
@@ -330,7 +330,7 @@ pub(crate) fn validate_ap(access_point: &ApConfig) -> Result<(), String> {
 }
 
 /// The two things an AP needs before it can legally beacon: a regulatory country
-/// (without it every 5 GHz channel is `no IR` and the radio never starts) and a
+/// (without it every 5 `GHz` channel is `no IR` and the radio never starts) and a
 /// passphrase (we do not ship open networks).
 fn enabled_ap_prerequisites(access_point: &ApConfig) -> Result<(), String> {
     if access_point.country.is_empty() {
@@ -355,7 +355,7 @@ pub(crate) fn validate_wwan(wwan: &WwanConfig) -> Result<(), String> {
         return Err("apn may only contain letters, digits, '.', '-' and '_'".to_owned());
     }
     if wwan.pin.as_ref().is_some_and(|pin| !valid_pin(pin)) {
-        return Err("pin must be 4–8 digits".to_owned());
+        return Err("pin must be 4\u{2013}8 digits".to_owned());
     }
     Ok(())
 }
@@ -373,7 +373,7 @@ fn valid_country(country: &str) -> bool {
 
 /// Whether `channel` is legal on `band`. `0` always means "let the driver pick".
 ///
-/// The 5 GHz list is the union of the UNII bands `nmcli` will accept; the
+/// The 5 `GHz` list is the union of the UNII bands `nmcli` will accept; the
 /// regulatory domain decides which of them are actually usable at run time, and
 /// that is `cp-regdom`'s job, not this function's.
 fn valid_channel(band: Band, channel: u16) -> bool {
