@@ -151,12 +151,6 @@ fn apply_limits(tool: &ToolUse, state: &mut State, changes: &mut Vec<String>) ->
 pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut changes: Vec<String> = Vec::new();
 
-    // === Auto-continuation toggles ===
-    if let Some(v) = tool.input.get("continue_until_todos_done").and_then(serde_json::Value::as_bool) {
-        SpineState::get_mut(state).config.continue_until_todos_done = v;
-        changes.push(format!("continue_until_todos_done = {v}"));
-    }
-
     // === Guard rail limits (null disables, zero rejected) ===
     if let Some(err) = apply_limits(tool, state, &mut changes) {
         return err;

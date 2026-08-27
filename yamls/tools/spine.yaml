@@ -9,7 +9,6 @@ tools:
     description: |
       Configures the spine module's auto-continuation behavior and guard rail limits. All parameters are optional — only provided values are changed. Guard rail limits accept null to disable.
     parameters:
-      continue_until_todos_done: "Keep auto-continuing until all todos are done (default: false)"
       max_output_tokens: "Guard rail: max total output tokens before blocking. Null to disable."
       max_duration_secs: "Guard rail: max autonomous duration in seconds. Null to disable."
       max_messages: "Guard rail: max conversation messages before blocking. Null to disable."

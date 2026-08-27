@@ -219,7 +219,6 @@ impl Module for SpineModule {
             ToolDefinition::from_yaml("spine_configure", t)
                 .short_desc("Configure auto-continuation and guard rails")
                 .category("Spine")
-                .param("continue_until_todos_done", ParamType::Boolean, false)
                 .param("max_output_tokens", ParamType::Integer, false)
                 .param("max_duration_secs", ParamType::Integer, false)
                 .param("max_messages", ParamType::Integer, false)

@@ -73,13 +73,114 @@ pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         ts.consecutive_count
     };
 
-    let status = format!(
+    // Optional recursive task-forest upsert for the focused thread (FR6/FR8).
+    let todo_line = tool.input.get("todo").map(|todo_val| apply_todo_upsert(todo_val, state));
+
+    let mut status = format!(
         "Thought number {count} called in a row, you may continue thinking if you think it is necessary, \
          you shall be rewarded for it as thinking more improves your performances. \
          Remark: thinking is quite cheap in tokens, so think as much as you need."
     );
+    if let Some(line) = todo_line {
+        status.push('\n');
+        status.push_str(&line);
+    }
 
     let mut result = ToolResult::new(tool.id.clone(), status, false);
     result.preserves_tempo = true;
+    result
+}
+
+/// Apply the `Think.todo` recursive upsert to the focused thread's tasks.
+///
+/// Resolves the focused thread from `FocusState`; rejects when none is focused
+/// (all task-tracking must live in a thread — design §5/§9-#7). On any change,
+/// the Todo panel is **deprecated but tempo preserved** (FR8): `touch_panel`
+/// marks it stale so the fresh tree emits at tempo exhaustion (bounded by the
+/// panel's `max_freeze = 5`), never forced immediately. Returns a one-line
+/// summary folded into the Think result.
+fn apply_todo_upsert(todo_val: &serde_json::Value, state: &mut State) -> String {
+    let Some(tid) = cp_mod_threads::types::FocusState::get(state).focused_thread_id.clone() else {
+        return "todo: rejected \u{2014} no focused thread (tasks must live in a thread; Read a thread first)."
+            .to_owned();
+    };
+    let nodes: Vec<cp_mod_todo::tools::TodoNode> = match serde_json::from_value(todo_val.clone()) {
+        Ok(n) => n,
+        Err(e) => return format!("todo: parse error \u{2014} {e}"),
+    };
+    let outcome = cp_mod_todo::tools::upsert_task_forest(state, &tid, &nodes);
+    if outcome.changed() {
+        // Deprecate the Todo panel but preserve tempo (FR8) — no forced refresh.
+        state.touch_panel(crate::state::Kind::TODO);
+    }
+    let mut parts = Vec::new();
+    if !outcome.created.is_empty() {
+        parts.push(format!("created {}", outcome.created.join(", ")));
+    }
+    if !outcome.updated.is_empty() {
+        parts.push(format!("updated {}", outcome.updated.join(", ")));
+    }
+    if !outcome.errors.is_empty() {
+        parts.push(format!("errors: {}", outcome.errors.join("; ")));
+    }
+    if parts.is_empty() { "todo: no changes.".to_owned() } else { format!("todo: {}", parts.join(" \u{b7} ")) }
+}
+
+/// Execute the `todo_mark` tool — batch status flips on the focused thread.
+///
+/// Tempo-preserving and panel-cheap (FR7): it flips status via the pure
+/// `mark_tasks` op and returns, **without** deprecating the Todo panel — a
+/// status change is too frequent to pay a rebuild each time, so the new status
+/// surfaces on the panel's next natural rebuild (focus change / `Think.todo`).
+pub(super) fn execute_todo_mark(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let Some(tid) = cp_mod_threads::types::FocusState::get(state).focused_thread_id.clone() else {
+        return ToolResult::new(
+            tool.id.clone(),
+            "todo_mark: no focused thread \u{2014} marks apply to the focused thread's tasks only.".to_owned(),
+            true,
+        );
+    };
+
+    let Some(marks_val) = tool.input.get("marks").and_then(|v| v.as_array()) else {
+        return ToolResult::new(tool.id.clone(), "todo_mark: missing 'marks' array.".to_owned(), true);
+    };
+
+    let mut marks: Vec<(String, cp_mod_todo::types::TodoStatus)> = Vec::new();
+    let mut parse_errors: Vec<String> = Vec::new();
+    for m in marks_val {
+        let id = m.get("id").and_then(serde_json::Value::as_str).unwrap_or("").to_owned();
+        let raw = m.get("status").and_then(serde_json::Value::as_str).unwrap_or("");
+        if id.is_empty() {
+            parse_errors.push("mark missing 'id'".to_owned());
+            continue;
+        }
+        match raw.parse::<cp_mod_todo::types::TodoStatus>() {
+            Ok(status) => marks.push((id, status)),
+            Err(()) => parse_errors.push(format!("'{id}': unknown status '{raw}'")),
+        }
+    }
+
+    let outcome = cp_mod_todo::tools::mark_tasks(state, &tid, &marks);
+
+    let mut parts = Vec::new();
+    if !outcome.marked.is_empty() {
+        parts.push(format!("marked {}", outcome.marked.join(", ")));
+    }
+    let mut errs = parse_errors;
+    errs.extend(outcome.errors);
+    let had_errors = !errs.is_empty();
+    if had_errors {
+        parts.push(format!("errors: {}", errs.join("; ")));
+    }
+    let body = if parts.is_empty() {
+        "todo_mark: no changes.".to_owned()
+    } else {
+        format!("todo_mark: {}", parts.join(" \u{b7} "))
+    };
+
+    // Error only when nothing succeeded AND something failed.
+    let is_error = outcome.marked.is_empty() && had_errors;
+    let mut result = ToolResult::new(tool.id.clone(), body, is_error);
+    result.preserves_tempo = true; // FR7 — never break tempo, never deprecate the panel
     result
 }

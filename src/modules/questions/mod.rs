@@ -3,7 +3,7 @@ mod think;
 pub(crate) use think::ThinkState;
 
 use crate::app::panels::Panel;
-use crate::infra::tools::{ParamType, ToolDefinition, ToolTexts};
+use crate::infra::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
 use crate::infra::tools::{ToolResult, ToolUse};
 use crate::state::{Kind, State};
 
@@ -15,6 +15,41 @@ static CORE_TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Module that provides the Think reasoning tool.
 pub(crate) struct QuestionsModule;
+
+/// Scalar fields shared by every `Think.todo` node (no `children`).
+///
+/// `children` is added on top of these to build one nesting level of the schema
+/// (see [`todo_node_object`]). The Rust-side `TodoNode` deserializes arbitrary
+/// depth regardless of how many levels the advertised JSON schema declares — the
+/// schema depth only documents nesting for the model.
+fn todo_node_scalar_fields() -> Vec<ToolParam> {
+    vec![
+        ToolParam::new("id", ParamType::String).desc("Existing id \u{2192} update; absent \u{2192} create"),
+        ToolParam::new("name", ParamType::String).desc("Title (required on create)"),
+        ToolParam::new("description", ParamType::String).desc("Detailed description"),
+        ToolParam::new("status", ParamType::String).desc("planned | in_progress | done | cancelled").enum_vals(&[
+            "planned",
+            "in_progress",
+            "done",
+            "cancelled",
+        ]),
+        ToolParam::new("parent_id", ParamType::String).desc("Reparent to an already-existing id (rare)"),
+    ]
+}
+
+/// The `Think.todo` node object type: scalar fields + a `children` array of
+/// (one level of) the same shape. Deeper nesting is parsed recursively at
+/// runtime even though the schema only advertises a couple of levels.
+fn todo_node_object() -> ParamType {
+    // Inner level: scalar fields + a `children` array of plain scalar nodes.
+    let mut inner_fields = todo_node_scalar_fields();
+    inner_fields
+        .push(ToolParam::new("children", ParamType::Array(Box::new(ParamType::Object(todo_node_scalar_fields())))));
+    // Outer level: scalar fields + `children` of the inner (2-deep) shape.
+    let mut outer_fields = todo_node_scalar_fields();
+    outer_fields.push(ToolParam::new("children", ParamType::Array(Box::new(ParamType::Object(inner_fields)))));
+    ParamType::Object(outer_fields)
+}
 
 impl Module for QuestionsModule {
     fn id(&self) -> &'static str {
@@ -34,7 +69,10 @@ impl Module for QuestionsModule {
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
-        vec![("Context", "Manage conversation context and system prompts")]
+        vec![
+            ("Context", "Manage conversation context and system prompts"),
+            ("Todo", "Track tasks and progress during the session"),
+        ]
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
@@ -45,6 +83,22 @@ impl Module for QuestionsModule {
                 .category("Context")
                 .param("thought_body", ParamType::String, true)
                 .param("task_context", ParamType::String, false)
+                .param_array("todo", todo_node_object(), false)
+                .build(),
+            ToolDefinition::from_yaml("todo_mark", core_t)
+                .short_desc("Mark task statuses")
+                .category("Todo")
+                .param_array(
+                    "marks",
+                    ParamType::Object(vec![
+                        ToolParam::new("id", ParamType::String).desc("Task id (e.g. X1)").required(),
+                        ToolParam::new("status", ParamType::String)
+                            .desc("planned | in_progress | done | cancelled")
+                            .enum_vals(&["planned", "in_progress", "done", "cancelled"])
+                            .required(),
+                    ]),
+                    true,
+                )
                 .build(),
         ]
     }
@@ -52,6 +106,7 @@ impl Module for QuestionsModule {
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
             "Think" => Some(think::execute(tool, state)),
+            "todo_mark" => Some(think::execute_todo_mark(tool, state)),
             _ => None,
         }
     }

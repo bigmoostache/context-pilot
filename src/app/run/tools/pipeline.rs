@@ -353,6 +353,11 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
     super::callbacks::fire_edit_callbacks(app, &tools, &mut tool_results);
     apply_tempo_break(app, &tool_results);
 
+    // Sync the Todo panel's focus filter to the focused thread (forces a fresh
+    // Todo panel on focus change), then evaluate the fire-once hygiene nudge.
+    super::checks::sync_todo_focus(app);
+    super::checks::maybe_hygiene_nudge(app);
+
     // Check if any tool triggered a console blocking wait
     let has_console_wait = tool_results.iter().any(|r| r.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL));
     if has_console_wait {

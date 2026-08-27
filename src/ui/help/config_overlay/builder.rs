@@ -166,20 +166,11 @@ fn build_budget_bars(state: &State) -> Vec<ConfigBudgetBar> {
 
 /// Build the toggle entries.
 fn build_toggles(state: &State) -> Vec<ConfigToggle> {
-    let spine_cfg = &cp_mod_spine::types::SpineState::get(state).config;
-    let auto_on = spine_cfg.continue_until_todos_done;
     let rev_on = state.flags.config.reverie_enabled;
     let think_threshold =
         state.get_ext::<crate::modules::questions::ThinkState>().map_or(-5i32, |ts| ts.reminder_threshold);
 
     vec![
-        ConfigToggle {
-            label: "Auto-continue".into(),
-            enabled: auto_on,
-            value_display: if auto_on { "ON".into() } else { "OFF".into() },
-            key_hint: "s".into(),
-            adjust_keys: None,
-        },
         ConfigToggle {
             label: "Reverie".into(),
             enabled: rev_on,

@@ -346,12 +346,6 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         Action::ConfigDecreaseSelectedBar => return config::handle_config_decrease_bar(state),
         Action::ConfigNextTheme => return config::handle_config_next_theme(state),
         Action::ConfigPrevTheme => return config::handle_config_prev_theme(state),
-        Action::ConfigToggleAutoContinue => {
-            let spine = cp_mod_spine::types::SpineState::get_mut(state);
-            spine.config.continue_until_todos_done = !spine.config.continue_until_todos_done;
-            state.flags.ui.dirty = true;
-            return ActionResult::Save;
-        }
         Action::ConfigThinkThresholdUp => {
             think_threshold(state, true);
             return ActionResult::Save;
