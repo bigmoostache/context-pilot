@@ -133,6 +133,21 @@ pub const MAX_RESULT_CONTENT_BYTES: usize = 1_000_000; // 1 MB
 /// The shared directory path within .context-pilot.
 pub const SHARED_DIR: &str = ".context-pilot/shared";
 
+/// `~/.context-pilot/behaviours` — the fleet-shared behaviour root (agents,
+/// skills, commands), shared by every agent AND the orchestrator on the host.
+///
+/// Resolves `$HOME` the same way the discovery registry's `default_agents_dir`
+/// does (single-host assumption: agent + orchestrator share `$HOME`). Falls
+/// back to a realm-relative `./.context-pilot/behaviours` only when `$HOME` is
+/// unset (dev/test), so the path is always well-defined.
+#[must_use]
+pub fn home_behaviours_dir() -> std::path::PathBuf {
+    std::env::var_os("HOME").map_or_else(
+        || std::path::PathBuf::from("./.context-pilot/behaviours"),
+        |home| std::path::PathBuf::from(home).join(".context-pilot").join("behaviours"),
+    )
+}
+
 /// Ensure the `.context-pilot/shared/` directory exists and is un-gitignored.
 ///
 /// If a `.gitignore` file exists at the project root and contains a rule that

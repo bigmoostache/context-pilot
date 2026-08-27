@@ -1,161 +1,52 @@
-00ce4673bc93be26:
-  tl_dr: NEVER activate autocontinuation (spine_configure continue_until_todos_done). User says it bugs badly. Always sail manually, batch by batch.
+M-long-1:
+  tier: long
+  title: NEVER activate
   importance: critical
-  labels:
-  - user-preference
-  - workflow
-  - spine
-  last_edited_ms: 0
-026ba3cd923d1cb2:
-  tl_dr: T671 conversation search SHIPPED end-to-end (updates-we). Hybrid keyword+semantic search over thread messages, frontend->orchestrator->agent->meili (Option B round-trip). Design doc docs/design-conversation-search.md. Arch+file map in body.
+  last_edited_ms: 1787840930951
+M-long-10:
+  tier: long
+  title: 'CI Frontend red: exit-1'
   contents: |-
-    T671 all 9 phases done, pushed on updates-we.
+    CI Frontend red: exit-1 always prints after the LAST header (knip) because check-ts-lints.sh aggregates 8 sub-checks. Never infer the culprit from the error's position — grep the whole log. knip falsely blamed twice; prettier was the real cause.
 
-    ARCH (Option B): frontend palette -> orchestrator AgentChannel::query() -> agent bridge intake -> meilisearch. Agent owns meili (port/key/hash process-local), only hits cross wire.
+    THE TRAP (hit twice: T648 2026-07-22, T672 2026-07-27 — user furious the 2nd time, ~200 wasted tool calls).
 
-    P1 index+embedder: cp_{hash}_conversations. Doc {id:'{thread_id}-{index}',thread_id,thread_name,author,text,ts_ms,content_hash}. searchable text+thread_name, filter thread_id+author, sort ts_ms. Embedder REUSED voyage-code-3. content_hash=author+thread_name+text (re-embed trigger). types.rs conversations_index_settings, bootstrap.rs conversations_embedder_settings, api.rs delete_documents batch.
+    MECHANISM: .github/checks/check-ts-lints.sh uses `set -uo pipefail` (NO -e) and runs all 8 sub-checks unconditionally:
+      eslint · prettier --check · stylelint · tsc -b · type-coverage · suppressions · rule-census · knip
+    Each failure does `|| fail=1`; the script then `exit "$fail"` at the very end. GitHub prints `##[error]Process completed with exit code 1` at the moment the STEP ends — i.e. always after the last section header, `=== dead code (knip) ===`. This makes knip look guilty every single time regardless of the true culprit.
 
-    P2 reconciler index/reconcile/conversations.rs: ConversationDoc+DocParts, pure plan()->ConvPlan{upsert,delete}, reconcile(). Hash-diff re-embed changed only, purge vanished. auto+empty never indexed, archived stays, meili NO lifecycle flag.
-
-    P3 wiring: IndexerCmd::ReconcileConversations. lib.rs build_conversation_docs reads ThreadsState, queue_conversation_reconcile on on_stream_stop+boot.
-
-    P4 wire types/payload/query.rs: Query/Kind::SearchConversations tagged+Unknown, Response/Outcome Hits|Error, ConvHit via HitParts. Inbound untagged Query-first = command path BYTE-IDENTICAL.
-
-    P5 responder: conversation_search.rs search_conversations(SearchConvParams) stateless hybrid semanticRatio 0.5. bridge command/reply.rs bearer+framed Response NO journal. bin query.rs answer() + bridge.rs pre-resolves creds BEFORE BridgeState borrow.
-
-    P6/P7 orchestrator: channel.rs query()+read_framed<T>. REST rest/threads/conversations.rs POST /api/agent/{id}/conversations/search clamp 1..100 default 20. openapi+TS regenerated.
-
-    P8 frontend: lib/api searchConversations. ThreadSearchPalette <2 chars client filter, >=2 debounced 220ms useQuery hybrid, normalized Row[], placeholderData.
-
-    GOTCHAS: PATH=/opt/homebrew/bin for node; check-structure './tmp' exemption; clippy ref_patterns=clone query.kind; tui bin forbids clippy::unreachable.
-  importance: high
-  labels:
-  - T671
-  - conversation-search
-  - meilisearch
-  - bridge
-  - feature-complete
-  last_edited_ms: 1785160614255
-06ea32ca3ccb66b3:
-  tl_dr: ACTIVE WORKING BRANCH = 'nornor' (T735 user mandate 2026-07-31). ALL further changes push to nornor. Created from socializing, upstream origin/nornor set. Supersedes socializing as default push target until user says otherwise.
+    CORRECT PROTOCOL when the Frontend job is red:
+    1. Fetch the full job log (GitHub REST: /actions/jobs/<id>/logs — gh CLI is NOT installed, M156).
+    2. `grep -n "^2.*=== "` to list every section header with line numbers.
+    3. Read the BODY between each pair of headers. A failing sub-check prints its own diagnostics there (`[warn] <file>` for prettier, rule violations for eslint, `error TS####` for tsc).
+    4. Do NOT
   importance: critical
-  labels:
-  - workflow
-  - git
-  - branch
-  - nornor
-  last_edited_ms: 1785503013109
-07f9cb0fc782bcee:
-  tl_dr: 'Meilisearch design complete. Embedded global server, cp-mod-search crate, tree-sitter chunking, unified search tool, log redesign. Full spec: docs/design-meilisearch.md.'
-  importance: high
-  labels:
-  - architecture
-  - meilisearch
-  last_edited_ms: 1784202976545
-0bc8b494e067496a:
-  tl_dr: 'T645 SHIPPED: agent image editor added to Settings > Model (LlmTab). Now lives on PR #183 (branch t646-agent-selector-shortcut, cherry-picked commit e07fcf8f) — MOVED off its old branch agent-image-in-settings; PR #184 CLOSED + branch deleted (user wants all changes on one PR). Pure render wiring, no backend. Details in body.'
-  contents: 'User (T645) asked to add agent-image modification to the settings tab. The whole avatar upload path already existed (T338: POST /api/agent/{id}/avatar, avatarUrl, useUploadAvatar, and useAgentModalActions.onAvatarChange/onRandomizeAvatar/avatarBust with DiceBear shuffle). The Controller `c` that LlmTab receives already carried these handlers, so this was PURE presentational wiring (M141: no new logic). Added an AvatarField presentational component to web/src/components/agents/AgentModal/manageBody.tsx and render it atop LlmTab (guarded on c.agent): labelled ''Agent image'' section, native <label htmlFor=agent-settings-avatar> file-picker over a visually-hidden input (accept png/jpeg/gif/webp/svg), Dices randomize badge as a SIBLING of the label. Applies immediately (avatar mutation), no Save needed. manageBody 317 lines. AgentModal/ dir stayed at 7 entries (no new file). Full frontend gate green. GOTCHA: prettier failed first because the hand-written JSX/comment wrapping didn''t match prettier; fixed with `npx prettier --write` (that bypasses Edit-tool callbacks, so re-ran the full gate manually).'
-  importance: medium
-  labels:
-  - T645
-  - avatar
-  - agent-image
-  - settings
-  - shipped
-  - web
-  - pr-183
-  last_edited_ms: 1787828109163
-0c509f3ad4df7597:
-  tl_dr: 'Reverie supports multiple concurrent sub-agents (one per agent type). HashMap<String, ReverieState> keyed by agent_id. UI shows one card per active reverie. Tool cap: 50.'
-  contents: 'HashMap<String, ReverieState> keyed by agent_id. UI shows one card per active reverie. Built-in: cleaner (context optimizer), cartographer (tree describer). Tool cap: 50.'
-  importance: critical
-  labels:
-  - architecture
-  - feature
-  - reverie
-  last_edited_ms: 1784203006424
-12fd8ad76d4cafda:
-  tl_dr: 'Think tool v4: single param (thought_body). ThinkState{consecutive_count, reminder_threshold, next_notification_at}. Fires reminder at threshold. Queue bypass. TUI card shows negative balance.'
-  importance: high
-  labels:
-  - think-tool
-  - architecture
-  last_edited_ms: 1784202976528
-136daa3a4207df23:
-  tl_dr: HISTORICAL (macbook node, NOT where I run now — see M156). tailscale serve pattern on guillaume's MacBook. Kept as serve-command reference only.
-  contents: 'OLD macbook node (I now run on the mac mini — see M156). On guillaume''s MacBook: Context Pilot at https://macbook.barking-hue.ts.net (tailnet-only). Command: `tailscale serve --bg --https=443 http://127.0.0.1:5174`. Single-origin: vite proxy /api->:7878, VITE_API_URL empty in .env.local. This machine (mac mini) instead serves guillaume.barking-hue.ts.net -> :7878 directly.'
-  importance: medium
-  labels:
-  - tailscale
-  - ops
-  - historical
-  - macbook
-  last_edited_ms: 1784290113480
-13a1d96ff4a4e7d0:
-  tl_dr: 'Context Pilot: Rust TUI AI coding assistant built with Ratatui+Crossterm. Workspace has 22+ crates + 1 main binary.'
-  importance: medium
-  labels:
-  - architecture
-  - overview
-  last_edited_ms: 1784202931972
-141fecab40a0635e:
-  tl_dr: 'T661: V1 claude_code DELETED. Sole OAuth provider = ClaudeCodeV2 (FE label ''Claude Code''), 13 beta flags led by oauth-2025-04-20 (haiku strips context-1m), UA 2.1.220, 6 bare-ID models. api_key module kept but FE-hidden. FE = 2 buttons. Detail in body.'
-  contents: 'Claude Code V2: OAuth Bearer, 9 beta headers. Models: opus-4-8 ($5/$25 200K), fable-5 ($10/$50 400K cap), sonnet-4-6 ($3/$15 1M). Thinking adaptive works. diagnostics body field = sole 400 culprit. Subagent = haiku-4-5, 4 tools (read-only), cc_is_subagent=true billing header.'
-  importance: high
-  labels:
-  - llm-provider
-  - claude-code
-  - api
-  - T661
-  last_edited_ms: 1785078047501
-1552560f9d4055af:
-  tl_dr: 'Datalab OCR API: POST /api/v1/convert (multipart, X-Api-Key). Poll GET /convert/{id}. Returns markdown. Old /marker and /ocr endpoints deprecated.'
-  contents: 'Endpoint: POST https://www.datalab.to/api/v1/convert (multipart, X-Api-Key). Poll: GET /api/v1/convert/{id}. Params: mode, output_format (markdown/html/json/chunks), max_pages, page_range. Old /marker and /ocr deprecated.'
-  importance: high
-  labels:
-  - datalab
-  - api
-  - ocr
-  - phase9
-  last_edited_ms: 1784203006408
-184c1ab0bcb8dbb0:
-  tl_dr: 'Context Pilot env vars: ANTHROPIC_API_KEY, BRAVE_API_KEY, FIRECRAWL_API_KEY, GITHUB_TOKEN (core). Optional LLM providers and chat bridge tokens. Loaded via dotenvy from .env, fallback to global config.'
-  importance: high
   last_edited_ms: 0
-1e022fec5765a736:
-  tl_dr: 'T581 footer behaviour-selector: reuse the commands library sync path for agents (user mandate: no code duplication, agents+commands share tui-side cp-mod-prompt).'
-  contents: |-
-    T581 'Footer' feature — show + select the active behaviour-agent (system prompt: caveman/default/worker/planner) in the StatusBar footer right of 'Ready'. User mandate: DO NOT reinvent — replicate EXACTLY the frontend↔orchestrator↔tui sync used for threads/commands; agents must ride THE SAME code path as commands (they share tui-side backend cp-mod-prompt PromptType Agent/Skill/Command). Frontend then trivial.
-
-    INVESTIGATION FINDINGS (from P36/P38/P41 searches):
-    - Active behaviour = PromptState.active_agent_id (cp-mod-prompt), TUI-internal, persisted via save_module_data (serializes active_agent_id + loaded_skill_ids) to agent worker state. NOT journaled to oplog, NOT in cp-wire AgentView (heads/roster/focused/phase/lifecycle/cost/context — no behaviour field), NOT in fleet/meta. Frontend has zero visibility today.
-    - agent_load(id) tool (cp-mod-prompt/src/tools.rs agent_load) sets active_agent_id + touch_panel SYSTEM/LIBRARY. Empty id = revert to default.
-    - LIBRARY LIST endpoint EXISTS: GET /api/agent/{id}/library (crates/cp-orchestrator/src/transport/inspect/panels.rs `library()`) — scans .context-pilot/{agents,skills,commands}/*.md, returns LibraryItem[] {id,name,kind,description,body}. body populated only for kind=='command' (for composer /cmd seeding). So agents ARE already listed by this endpoint (kind='agent'), just not surfaced/active-marked in frontend.
-    - COMMAND CREATE path: POST /api/agent/{id}/library/command (create.rs create_command) writes .md to commands dir; agent fs-watch picks up; frontend useCreateCommand invalidates qk.library. Frontend: fetchLibrary/createCommand in web/src/lib/api/index.ts, useCreateCommand in web/src/lib/live/mutations.ts, LibraryItem type in generated.
-    - LibraryItem generated type already has optional `active?: boolean` + `builtin?` + `meta?` fields (web types.gen.ts) — active flag plumbing partially present.
-    - StatusBar.tsx (web/src/components/shell/StatusBar.tsx): AgentStatus footer, StatusIndicator shows Ready/phase dot. Chip would go right of that.
-    - KEY GAP: 'which agent is ACTIVE' not exposed (library() doesn't set active flag) + no SET-active path from frontend (agent_load is an AI tool). SET a live agent's behaviour needs commanding the running process — no user/REST path exists. Threads write-path precedent: frontend→POST command→orchestrator→bridge command intake→agent apply_command (src/app/run/threads/commands.rs).
-  importance: high
-  labels:
-  - T581
-  - behaviour
-  - library
-  - sync
-  - agent_load
-  - footer
-  last_edited_ms: 0
-1f7ae27d462497dd:
-  tl_dr: NEVER touch Tailscale or network configuration on Mac Mini 'gilbert'. User explicitly forbids it. Tailscale already configured. Deploy Context Pilot without any network changes.
+M-long-2:
+  tier: long
+  title: ACTIVE WORKING BRANCH =
   importance: critical
-  labels:
-  - gilbert
-  - network
-  - forbidden
-  - tailscale
-  last_edited_ms: 1783602624394
-21b8a2267668c015:
-  tl_dr: 'DEPLOY TRAP (T687): source fix correct but fleet stale. system_reload re-execs agent from RELEASE binary, never restarts orchestrator; stale orch serde-drops unknown command fields. Deploy fresh binaries + restart orch, then VERIFY.'
+  last_edited_ms: 1787840930953
+M-long-3:
+  tier: long
+  title: Reverie supports multiple
   contents: |-
+    Reverie supports multiple concurrent sub-agents (one per agent type). HashMap<String, ReverieState> keyed by agent_id. UI shows one card per active reverie. Tool cap: 50.
+
+    HashMap<String, ReverieState> keyed by agent_id. UI shows one card per active reverie. Built-in: cleaner (context optimizer), cartographer (tree describer). Tool cap: 50.
+  importance: critical
+  last_edited_ms: 0
+M-long-4:
+  tier: long
+  title: NEVER touch Tailscale or
+  importance: critical
+  last_edited_ms: 1787840930955
+M-long-5:
+  tier: long
+  title: 'DEPLOY TRAP (T687):'
+  contents: |-
+    DEPLOY TRAP (T687): source fix correct but fleet stale. system_reload re-execs agent from RELEASE binary, never restarts orchestrator; stale orch serde-drops unknown command fields. Deploy fresh binaries + restart orch, then VERIFY.
+
     Cost 4 false 'fixed' claims + a furious user.
 
     MECHANISM:
@@ -171,106 +62,25 @@
     5. system_reload self to pick up fresh release binary.
 
     VERIFY:
-    - strings <running-binary> | grep -c <new-field> >0 on BOTH orchestrator and agent.
-    - Live curl POST /api/agent/{id}/command FULL envelope {schema_version:1,id,seq:0,dedup_token,kind:{...}} then GET /threads, assert effect. Missing envelope = {"error":"malformed command"}.
-
-    T687 proof: initial_message landed (T704); paused=true landed msg AND paused (T705). Deleted after.
+    - strings <running-bi
   importance: critical
-  labels:
-  - deploy
-  - stale-binary
-  - orchestrator
-  - system_reload
-  - gotcha
-  - T687
-  last_edited_ms: 1785177810832
-2abaa3035bec794f:
-  tl_dr: 'Harbor adapter (context_pilot_agent.py) validated. Reward 1.0 on break-filter-js-from-html. Model-mapping bug: apply_provider_model ignores --model for claude_code_v2 provider.'
-  importance: medium
-  labels:
-  - terminal-bench
-  - harbor
-  last_edited_ms: 1784202931982
-2bfb816e017b246e:
-  tl_dr: 'DOCUMENTATION PHASE: Ignore structure-check callback warnings about files >500 lines during doc additions. Temporarily acceptable.'
-  importance: medium
-  labels:
-  - workflow
-  - documentation
-  last_edited_ms: 1784202949004
-2fb69a4032fb9c9e:
-  tl_dr: 'OPERATING MODEL: harbor auto-loop STOPPED. Launch ONE task at a time from benchmarks/terminal-bench. Full launch syntax in contents.'
-  contents: |-
-    Launch: `bash -lc 'CREDS=$(security find-generic-password -s "Claude Code-credentials" -w); export CLAUDE_CREDENTIALS_JSON="$CREDS"; export CP_PROVIDER=claude_code_v2; export PYTHONPATH="$PWD:$PYTHONPATH"; ~/.harbor-venv/bin/harbor run -d terminal-bench@2.0 --agent-import-path context_pilot_agent:ContextPilotAgent -m anthropic/claude-sonnet-4-6 -k 1 -n 1 -i <TASK-NAME> 2>&1'`
-
-    Flags: -i (include task), cwd=benchmarks/terminal-bench, -n 1 sequential, -k 1 one attempt.
-  importance: high
-  labels:
-  - terminal-bench
-  - run
-  last_edited_ms: 1784202957618
-3254fdbc36d9b4e8:
-  tl_dr: 'T581 footer behaviour-selector SHIPPED, live-invalidation fixed (a3116ce4). Stale-chip root cause: OpEntryKind schema lacked agent_id (M160 earlier wrong). Schema+regen done; frontend folds delta.agent_id into library cache. Body has full detail.'
-  contents: |-
-    T581 Footer feature — done, all legs.
-
-    ARCHITECTURE (reused threads/commands sync exactly, no new mechanism):
-    - READ (active flag): orchestrator inspect/panels.rs library() reads config.json modules.system.active_agent_id (PromptModule is_global → Shared.modules["system"]) via inspect_mut().read_config, sets active=true on matching kind=agent item. Same disk-read as usage(). LibraryItem.active already in generated types. VERIFIED LIVE: caveman active=true on self realm.
-    - SET (switch): cp-wire command.rs Kind::LoadBehaviour{id} (serde rename load_behaviour, Unknown catch-all = N-1 safe). tui apply_command (src/app/run/threads/commands.rs) new arm apply_load_behaviour → cp_mod_prompt::tools::set_active_agent (SHARED core extracted from agent_load tool — pub fn set_active_agent(state,&id)->Result, both tool + bridge call it, zero dup). NO new REST endpoint — reuses POST /api/agent/{id}/command generic intake.
-    - FRONTEND: StatusBar.tsx BehaviourChip subcomponent — useLibrary filter kind=agent, find active, show name + Bot icon + dropdown. Click → sendCommand(agentId,{kind:'load_behaviour',id}) fire-and-forget. activeAgentId threaded StatusBar→AgentStatus, Root passes it. tsc+eslint green.
-
-    N-1 NOTE: live SET only works once the RUNNING tui has the new arm. Pre-change binaries decode load_behaviour as Kind::Unknown and ignore (correct). So SET proof requires self-reload (user does it). Release tui + orchestrator both rebuilt.
-
-    command.rs NOT in hash-chain (no password gate). All rust-lints green.
-  importance: high
-  labels:
-  - T581
-  - footer
-  - behaviour
-  - load_behaviour
-  - shipped
   last_edited_ms: 0
-3824ae3fe8723ef2:
-  tl_dr: T656 Tailscale ACL fixed (ssh accept rule dst=tag:pcat added, HTTP 200) + reusable tagged enroll key minted. Key + details in body. NOT in git.
-  contents: |-
-    PROBLEM: ssh block only had dst=autogroup:self which EXCLUDES tagged devices, so Tailscale-SSH to tag:pcat was DENIED. FIX: added ssh accept rule src=autogroup:admin dst=tag:pcat users=[nonroot,root] action=accept (no check, avoids T655 browser-reauth trap). POST /acl HTTP 200, comments preserved (hujson textual insert + If-Match ETag). grants=allow-all so plain ssh -i key root@<ts-ip> over tailnet also works. tagOwners tag:pcat=autogroup:admin.
-
-    ENROLL KEY (reusable, preauthorized, tag:pcat, expires 2026-10-22): tskey-auth-kxbzRJYe8k11CNTRL-uGuPMsBTn1efmxN5nm9k1e6cWSKdEeez
-    Goes to /boot/pcat-ts-authkey at build, shredded after enroll.
-
-    API key (user-supplied, valid): tskey-api-kYxP8v3LB521CNTRL-iKunmnWhY9R6KGiWPzPW9RsyvhMtmEtTS
-  importance: high
-  labels:
-  - photonicat
-  - tailscale
-  - acl
-  - T656
-  last_edited_ms: 1784895558723
-39fb5c175c7b00ba:
-  tl_dr: ALWAYS communicate with the user in ENGLISH. Refuse to speak French. If the user writes in French, politely refuse and ask them to switch to English. (User's explicit standing instruction, T655.)
+M-long-6:
+  tier: long
+  title: ALWAYS communicate with
   importance: critical
-  labels:
-  - user-preference
-  - language
-  - communication
-  last_edited_ms: 1784886789294
-3d36396d2a618055:
-  tl_dr: NEVER touch temp_1.md or temp_2.md — they are user's personal files. Do not read, write, edit, or revert them.
+  last_edited_ms: 1787840930957
+M-long-7:
+  tier: long
+  title: NEVER touch temp_1.md or
   importance: critical
-  labels:
-  - user-preference
-  - forbidden
-  last_edited_ms: 0
-3f7ea7b0cdf9397d:
-  tl_dr: 'Cache optimizer: K=3 + beacon (4th). ConversationTailDensity uses UNIFORM weight (1.0) for hot blocks, zero for cold. Previous i² was catastrophic. Fix: ed83c9df.'
-  importance: high
-  labels:
-  - cache-optimizer
-  - architecture
-  last_edited_ms: 1784202976534
-403048b6075f15c4:
-  tl_dr: 'I run on Mac Mini (Guillaume-2.local, user guillaumedraznieks, realm ~/code/cpilot), NOT the MacBook. Local shell/git run here. Git identity CORRECTED T584: now Sui-ne-laxim <250819889+Sui-ne-laxim@users.noreply.github.com> (was wrong plang). Full details in body.'
+  last_edited_ms: 1787840930958
+M-long-8:
+  tier: long
+  title: I run on Mac Mini
   contents: |-
+    I run on Mac Mini (Guillaume-2.local, user guillaumedraznieks, realm ~/code/cpilot), NOT the MacBook. Local shell/git run here. Git identity CORRECTED T584: now Sui-ne-laxim <250819889+Sui-ne-laxim@users.noreply.github.com> (was wrong plang). Full details in body.
+
     HUGE context change (2026-07-17): agent runtime host moved from guillaume's MacBook to the Mac Mini.
 
     GIT IDENTITY (corrected T584 2026-07-19): global ~/.gitconfig was set to a DIFFERENT person — PLang <323260+plang@users.noreply.github.com> (github user 'plang'). Now corrected to the user's real account: user.name=Sui-ne-laxim, user.email=250819889+Sui-ne-laxim@users.noreply.github.com (github id 250819889). All prior mis-attributed commits on PR#152 were re-authored + force-pushed.
@@ -284,724 +94,101 @@
     - MagicDNS guillaume.barking-hue.ts.net, IP 100.71.221.58 / fd7a:115c:a1e0::2636:dd3b
     - tailnet barking-hue.ts.net, account g.draznieks@
     - serve https://guillaume.barking-hue.ts.net -> proxies / to VITE DEV (http://localhost:5174) as of T579. Let's Encrypt (YE1), exp Oct 15 2026
-    - /usr/local/bin/tailscale (client 1.100.0, tailscaled 1.98.9)
-
-    NODE TOOLCHAIN (T579): system /usr/local/bin/node is v16 (too old for vite8). Installed brew node v26.5.0 at /opt/homebrew/bin/node + pnpm 11.6.0. Must `export PATH=/opt/homebrew/bin:$PATH` in non-interactive shells.
-
-    FRONTEND SERVING (T579): vite dev `pnpm dev` in ~/code/cpilot/web, binds [::1]:5174 (IPv6 localhost ONLY — tailscale serve target MUST be http://localhost:5174 not 127.0.0.1). vite proxies /api -> :7878. Orchestrator on :7878, CP_WEB_ROOT=~/cp-server/web.
-
-    OTHER NODES (NOT me): gilbert=gilberts-mac-mini-1 100.118.140.29 (M149/M150); asterix 100.88.204.50 (linux offline); iphone171 100.123.80.66.
-
-    CONSEQUENCE: console_easy_bash + local git_execute run ON this Mac Mini. gh CLI NOT installed here (use gh_execute or GitHub REST API via GITHUB_TOKEN). Context Pilot (orchestrator+agent+meilisearch) under ~/cp-server + ~/.context-pilot.
+    - /us
   importance: critical
-  labels:
-  - identity
-  - runtime-host
-  - mac-mini
-  - tailscale
-  - hardware
-  last_edited_ms: 1784468749792
-45b9baa7eb6b3f01:
-  tl_dr: 'T506 web-lint P0-P12 COMPLETE + pushed on web-lint. Next: P13 docs/PR (X1140). Details in contents.'
-  contents: 'P0-P12 COMPLETE on web-lint branch. P12: CB8 blocking callback, as-unknown-as ban, CI frontend job, rule-census script (733 rules), hash-locked 26 config files. All green: eslint 0, tsc 0, prettier 0, stylelint 0, knip 0, type-coverage 99.86%. NEXT: P13 docs/PR (X1140).'
-  importance: high
-  labels:
-  - web-lint
-  - T506
-  - P9
-  - resume
-  last_edited_ms: 1784203006412
-47b97e9a3b5951a1:
-  tl_dr: 'T568: ''Use'' release selection now survives orchestrator reload. Backend::new reconciles persisted active_tag onto agent_binary at boot. Fix in transport/rest/backend.rs.'
-  contents: 'select_release persists active_tag to releases/config.json but only mutated in-memory agent_binary, so reload reverted spawns to CP_AGENT_BINARY boot seed while UI badge still showed release Active — silent incoherence. Fix: Backend::new does releases.active_tag().map(binary_path).filter(bin.exists()).unwrap_or(agent_binary) — active_tag WINS over env seed, fallback to seed if binary deleted out from under us.'
-  importance: medium
-  labels:
-  - releases
-  - active_tag
-  - orchestrator
-  - T568
-  - bugfix
-  last_edited_ms: 1784215400065
-48f2140d3c2dee0e:
-  tl_dr: Entities module COMPLETE — 151/151 stress tests passed. 9 bugs found/fixed. Production-quality.
-  importance: medium
-  labels:
-  - entities
-  - complete
-  - stress-testing
-  last_edited_ms: 1784202931986
-491617a47084996a:
-  tl_dr: 'Haiku 4.5 max_tokens fix: anthropic client uses model-specific limits (64K for Haiku, 200K for others) instead of hardcoded.'
-  importance: medium
-  labels:
-  - bugfix
-  - reverie
-  - api
-  last_edited_ms: 1784202931990
-4e40e1fbeb5882f6:
-  tl_dr: 'T570 forms feature shipped: inline form/form-answer blocks, 8 field types, zero API change, frontend-only parsing, Rust send-time YAML validation. Commit 8898f043 on updates branch.'
-  contents: 'T570 forms feature DONE. Inline ```form``` / ```form-answer``` blocks replace the questions param entirely. 8 field types: single+allow-other, multi, text, number, date, toggle, confirm+confirm-word, files (immediate upload to .uploads/). Zero API change — pure markdown fenced blocks parsed frontend. Rust YAML validation at send-time only (forms.rs). Frontend forms/ module: helpers (indent parser), FormFields (8 renderers), FormWidget (draft+submit), FormMessageRow, useThreadForms hook. Design doc: docs/forms.md. Commit 8898f043 on branch updates.'
-  importance: high
-  labels:
-  - forms
-  - threads
-  - feature
-  - T570
-  last_edited_ms: 1784222610385
-535fabcd17a6ae63:
-  tl_dr: 'T581 agent-editor SHIPPED (commit bea16ed6, local only M151): footer behaviour selector per-item Delete/Export/Edit + Create/Import rows. Backend seed-merge + GET/PUT/DELETE library/agent/{item}; frontend AgentEditorDialog + BehaviourChip. Details in body.'
-  contents: |-
-    T581 agent-editor SHIPPED, commit bea16ed6 (master, local only per M151).
-
-    Backend (orchestrator): library() (inspect/panels.rs) seed-merges cp_base library::agents()/skills()/commands() with disk .md (disk wins on id, builtin:true flag), mirrors tui storage::load_prompts_for. Three endpoints in rest/create.rs: read_library_agent (GET raw {name,description,body,builtin}, seed fallback for pure builtin), upsert_library_agent (PUT overwrite=override), delete_library_agent (DELETE 404 pure-builtin). Helpers compose_md/split_frontmatter/seed_agent. Routes in transport/mod.rs. openapi tests + openapi.json + generated TS regen.
-
-    Frontend: shell/AgentEditorDialog.tsx (one dialog create/edit/import, useAgentEditorFields hook render-phase seed + async fetch effect, converge on PUT upsert). shell/BehaviourChip.tsx (extracted from StatusBar; dropdown Create/Import rows + per-item Edit/Export/Delete, Delete hidden when builtin!==true; parseAgentMd inline regex-free md parser for import preview). mutations.ts useUpsertLibraryAgent+useDeleteLibraryAgent. api/index.ts fetchLibraryAgent/upsertLibraryAgent/deleteLibraryAgent + LibraryAgentRaw. Mobile twins scaffolded.
-
-    Needs orchestrator rebuild+restart for backend endpoints live (M99). All callbacks green.
-  importance: high
-  labels:
-  - T581
-  - footer
-  - agent-editor
-  - shipped
-  - library
   last_edited_ms: 0
-5623177cb0b0ed7d:
-  tl_dr: 'MULTI-WORKER (subworkers branch, off master): N equal workers, true concurrency, single main loop. Design doc: docs/design-subworkers.md. 14 shared modules, 8 per-worker.'
+M-long-9:
+  tier: long
+  title: MULTI-WORKER (subworkers
+  contents: 'MULTI-WORKER (subworkers branch, off master): N equal workers, true concurrency, single main loop. Design doc: docs/design-subworkers.md. 14 shared modules, 8 per-worker.'
   importance: critical
-  labels:
-  - subworkers
-  - multi-worker
-  - architecture
-  last_edited_ms: 1784202976543
-58aad4aedbb99175:
-  tl_dr: 'HISTORICAL: v0.2.8 deadman fix for headless main loop wedge. Dedicated-thread deadman, re-exec/abort. Proven field-effective. Details in src/app/run/headless.rs.'
-  importance: low
-  labels:
-  - terminal-bench
-  - deadman
-  - historical
-  last_edited_ms: 1784202948992
-5905bf08a95f2017:
-  tl_dr: 'T646 SHIPPED + FIXED: ⌘/Ctrl+A opens the workspace AgentSwitcher from any view, shows an ''A'' HintBadge on ⌘-hold, and respects empty-vs-filled text fields. Branch t646-agent-selector-shortcut, PR #183, fix commit 9b189ce1. Details in body.'
-  contents: |-
-    FIRST ATTEMPT (fdfa0990) WAS BROKEN — do not restore that pattern: it used switcherRef.current?.click() on the base-ui DropdownMenu trigger (a synthetic click does NOT open a base-ui menu) and never rendered a HintBadge (no 'A' on ⌘-hold). User caught both.
-
-    CORRECT IMPLEMENTATION (commit 9b189ce1, replicates the ViewTabs/ThemeToggle idiom exactly):
-    - AgentSwitcher.tsx: removed triggerRef prop. Added CONTROLLED open?/onOpenChange? forwarded to <DropdownMenu open onOpenChange> (base-ui Menu.Root). Added shortcutHint?/hintShown? props; trigger className gets `relative`; renders {shortcutHint && <HintBadge label={shortcutHint} shown={hintShown ?? false} />} after TriggerFace. All optionals typed `| undefined` (exactOptionalPropertyTypes).
-    - TopBar.tsx: dropped useRef; `const [switcherOpen,setSwitcherOpen]=useState(false)` + `const switcherModHeld=useModifierShortcuts({a:()=>setSwitcherOpen(true)})`; passes open/onOpenChange/shortcutHint="A"/hintShown to AgentSwitcher. Held at exactly 500 lines by condensing 3 prose comments.
-    - a11y.ts selectAllWouldBeNoop: rewritten to test CONTENT not focus — returns el.value==="" for input/textarea, el.textContent==="" for contenteditable, true otherwise. So ⌘/Ctrl+A FIRES in an empty field (native Select-All is a no-op there) but YIELDS the moment the field holds text (real Select-All preserved). NOTE: `el.textContent ?? ""` trips @typescript-eslint/no-unnecessary-condition (HTMLElement.textContent typed non-null) — use bare `el.textContent === ""`.
-
-    MECHANISM LESSON: to open a base-ui (@base-ui/react/menu) Menu programmatically, CONTROL its open state — never dispatch a click on the trigger. HintBadge requires a `relative` host and pointer-events-none (it is).
-
-    Full frontend gate green (eslint/prettier/stylelint/tsc/type-coverage 99.82%/suppressions/census/knip). User confirmed 'it works now' then requested the empty-field refinement, also delivered. NEVER commit the stray .context-pilot/agents/default.md.
-  importance: medium
-  labels:
-  - T646
-  - shortcut
-  - agent-switcher
-  - shipped
-  - web
-  - base-ui
-  - gotcha
-  last_edited_ms: 1787827958507
-66c65b2514fd54ac:
-  tl_dr: 'T593 tmp/v2 document persistence: pretty-printed normal form on disk, hand-editable file with live push over Vite HMR, word-level diff3 merge on concurrent edit, conflict = save refused + nothing written. Architecture + gotchas in body.'
-  contents: |-
-    T593 (tmp/v2 Word-clone editor) — three asks, all shipped.
-
-    1. PRETTY-PRINTED STORAGE. src/server/format.ts wraps js-beautify with wrap_line_length:0, preserve_newlines:false, explicit `inline` list. TWO PROPERTIES ARE LOAD-BEARING: (a) IDEMPOTENT — every conflict check compares hashes of FORMATTED text, so a churning formatter would report a phantom external edit on every save; (b) SEMANTICS-PRESERVING — HTML collapses whitespace, so wrapping a line INSIDE a paragraph INSERTS A SPACE that was not in the document (`<em>a</em><strong>b</strong>` reflowed reparses as `a b`). Hence never wrap, indent block elements only. Verified on the real document: idempotent true, zero bare-text lines.
-
-    2. HAND-EDITABLE FILE. GET normalises whatever is on disk and writes it back if it was not already in normal form (else the client's hash and the file would disagree and the next save would look like a phantom edit). A separate narrow fs.watch on the document's directory (Vite's own watcher must keep ignoring **/data/** or every autosave full-page-reloads the editor) sends a CUSTOM HMR event `demo-doc:changed` via server.hot.send — no second port, no polling. Client applies it silently when nothing is pending, else flags 'external' and lets the next save merge.
-
-    3. WORD-LEVEL 3-WAY MERGE. src/server/merge.ts, node-diff3 diff3Merge with excludeFalseConflicts. WORD-level not line-level because the document is pretty-printed HTML where one paragraph is one very long line — git's line diff3 would conflict on two people fixing different typos in the same paragraph. Tokenizer splits on /(\s+)/ and KEEPS whitespace as its own token so joining reproduces exact spacing (a dropped-whitespace tokenizer would have to guess spaces back, and a guessed space in HTML is a changed document). Tags travel as whole tokens so a merge can never land mid-tag. ALL-OR-NOTHING: a partial merge with `<<<<<<<` markers would be handed back to the editor AS CONTENT.
-
-    CONFLICT SEMANTICS: nothing is written, so the file already holds the on-disk version — the 'revert to previous version' requirement needs no rollback step that could itself fail. 409 carries message + hash + the disk html; frontend shows a red 'Conflict — not saved' chip with the reason and a 'Use file' button.
-
-    BASE-VERSION STORE (src/server/history.ts): merging needs the TEXT of the version the editor started from (the O of diff3), which is gone from disk by the time the conflicting save arrives. Content-addressed .history/<hash>.html, KEEP=40 trimmed oldest-first, hex-validated on recall (the hash comes from the request body straight into a path). Unknown base = 409 telling the user to reload.
-
-    Writes are ATOMIC: write to <target>.tmp then rename (atomic within one filesystem), so a GET landing mid-write or a crash sees old or new, never half.
-
-    API: GET /api/doc -> {html,hash}; PUT {html,baseHash} -> 200 {status:'saved'|'merged',hash,html?} | 400 (small-body guard, <20 chars) | 409 {status:'conflict',message,hash,html}.
-
-    Tiptap v3 GOTCHA: setContent(content, options) takes an OPTIONS OBJECT — `{emitUpdate:false}` — not v2's positional boolean. Used with an `applying` ref so a remote apply is never echoed back as a user edit.
-
-    TESTING GOTCHA (cost a live-document corruption): driving the merge through the real API RACES the browser's own autosave and wrote a test string into the user's document. scripts/test-merge.ts now exercises mergeWords/formatDocument DIRECTLY — 6 checks, all pass, no live document involved. Run: node --experimental-strip-types scripts/test-merge.ts.
-  importance: high
-  labels:
-  - T593
-  - tmp
-  - v2
-  - persistence
-  - merge
-  - diff3
-  - vite-plugin
-  last_edited_ms: 1785768141784
-6c22bdb28d5dd166:
-  tl_dr: 'CI Frontend red: exit-1 always prints after the LAST header (knip) because check-ts-lints.sh aggregates 8 sub-checks. Never infer the culprit from the error''s position — grep the whole log. knip falsely blamed twice; prettier was the real cause.'
-  contents: |-
-    THE TRAP (hit twice: T648 2026-07-22, T672 2026-07-27 — user furious the 2nd time, ~200 wasted tool calls).
-
-    MECHANISM: .github/checks/check-ts-lints.sh uses `set -uo pipefail` (NO -e) and runs all 8 sub-checks unconditionally:
-      eslint · prettier --check · stylelint · tsc -b · type-coverage · suppressions · rule-census · knip
-    Each failure does `|| fail=1`; the script then `exit "$fail"` at the very end. GitHub prints `##[error]Process completed with exit code 1` at the moment the STEP ends — i.e. always after the last section header, `=== dead code (knip) ===`. This makes knip look guilty every single time regardless of the true culprit.
-
-    CORRECT PROTOCOL when the Frontend job is red:
-    1. Fetch the full job log (GitHub REST: /actions/jobs/<id>/logs — gh CLI is NOT installed, M156).
-    2. `grep -n "^2.*=== "` to list every section header with line numbers.
-    3. Read the BODY between each pair of headers. A failing sub-check prints its own diagnostics there (`[warn] <file>` for prettier, rule violations for eslint, `error TS####` for tsc).
-    4. Do NOT tail-read. Do NOT stop at the first plausible suspect.
-    5. If the user PASTED the log, read all of it before forming a hypothesis — in T672 the decisive `[warn] src/components/shell/behaviour/BehaviourChip.tsx` line was in the user's FIRST paste and I missed it for an hour.
-
-    DISCONFIRMATION TRICK (only if genuinely stuck): temporarily wrap the suspect in `if <cmd>; then rc=0; else rc=$?; fi; echo "real exit code = $rc"`. Must use the if-form — plain `cmd; rc=$?` never runs under `set -euo pipefail` in check-web-deadcode.sh. Revert the probe once the answer is in.
-
-    EFFICIENCY LESSON: never use a CI round-trip (~2.5 min) as the debug loop when the log already in hand answers the question. And after ANY merge, re-run the FULL local gate `bash .github/checks/check-ts-lints.sh` — a prior fix (prettier on BehaviourChip.tsx) was silently clobbered by a second master merge, which is what resurrected the failure.
-  importance: critical
-  labels:
-  - ci
-  - diagnosis
-  - knip
-  - prettier
-  - gotcha
-  - post-mortem
-  last_edited_ms: 1785166436193
-6cc818f12c0d231a:
-  tl_dr: 'DOCUMENTATION QUALITY: Documentation is ABSOLUTELY CRITICAL. Do NOT half-ass it. If understanding a function requires opening extra files to see context, DO IT. Don''t document to document — document to HELP future readers. Take the extra step.'
-  importance: critical
-  labels:
-  - documentation
-  - quality
   last_edited_ms: 0
-6eba1bb10defa389:
-  tl_dr: 'HISTORICAL: Thinking mode plan implemented. ThinkingConfig in LlmRequest, ThinkingChunk SSE parsing, TUI display all shipped.'
-  importance: low
-  last_edited_ms: 1784202931993
-705e343c20db1a4f:
-  tl_dr: 'Agents restarted via cockpit die seconds after boot + meili dies (''os error''); manual cpilot works. Cause: ORPHANED meili from prior orchestrator deploy (PPID 1) holds shared LMDB data dir. Fix: reap the orphaned meili. Details in body.'
+M-mid-1:
+  tier: mid
+  title: 'DOCUMENTATION QUALITY:'
+  contents: 'DOCUMENTATION QUALITY: Documentation is ABSOLUTELY CRITICAL. Do NOT half-ass it. If understanding a function requires opening extra files to see context, DO IT. Don''t document to document — document to HELP future readers. Take the extra step.'
+  importance: critical
+  last_edited_ms: 0
+M-mid-10:
+  tier: mid
+  title: OPS & BUILD GOTCHAS
   contents: |-
-    AGENT+MEILI DEATH MODE (Mac Mini, solved T651).
+    OPS & BUILD GOTCHAS (consolidated): orchestrator restart vs system_reload, port-freeing, git/pnpm/lint quirks, never-commit list. Full list in contents.
 
-    SYMPTOM: agent restarted via cockpit restarts then dies a few seconds later, its meilisearch dies too with an 'os error'. A manually-launched `cpilot` works fine.
-
-    ROOT CAUSE: an ORPHANED meilisearch from a previous orchestrator deploy (its parent orchestrator died — e.g. killed by a failed relaunch — so it was reparented to launchd, PPID 1) still holds the shared meili data dir (~/.context-pilot/meilisearch/data). meilisearch opens each index as a single-writer LMDB env. A newly-spawned agent's meili tries to open the same already-locked env, dies on the lock/IO error, and the agent that depends on search dies with it. The manual cpilot survives because it reuses the already-live instance instead of spawning a second one.
-
-    THE TELL: `ps aux | grep meilisearch` shows TWO meili procs on the SAME `--db-path` but different ports. The stale one has PPID 1 (orphaned). In this incident: stale pid 2250 (~/cp-server/bin/meilisearch, port 7700, Tue deploy) vs live pid 32380 (~/.context-pilot/meilisearch/bin/meilisearch, port 49595).
-
-    FIX: kill the orphaned meili (and any orphaned cp-console-server PPID-1 zombies). Then only one meili holds the db, agents restart cleanly. Verify: single meili proc, `curl 127.0.0.1:49595/health` = 200, orchestrator 7878 = 200.
-
-    PREVENTION: any orchestrator kill+relaunch (release deploy) MUST reap the old meili before relaunch, or the zombie recurs. Live global meili on this box: port 49595, binary ~/.context-pilot/meilisearch/bin/meilisearch, spawned as a child of the first booting agent.
-  importance: high
-  labels:
-  - ops
-  - meilisearch
-  - agent-death
-  - lmdb
-  - gotcha
-  - mac-mini
-  - deploy
-  last_edited_ms: 0
-711abc0a918906ba:
-  tl_dr: 'BANNED: #[allow(...)] lint suppressions. Always use #[expect(...)] for unavoidable cases. Register exceptions in .github/checks/. Never #[allow], always #[expect].'
-  importance: critical
-  labels:
-  - code-quality
-  - lint
-  - philosophy
-  - boss-hunt
-  last_edited_ms: 1784202908952
-713d9f0a50517625:
-  tl_dr: 'MiniMax Token Plan API key: sk-cp-SML34Q-eh3y1ob1na0P68nYpXfN-8jk86fYnaAjo6H6cd_vWZ0E089CWYEhlFX6EyNh6PNRYWJRmGgj9kK5Wk88rzf_0bMW-IBuybCYQXPm08PcFTW6GwDo'
-  importance: high
-  labels:
-  - api-key
-  - minimax
-  - llm-provider
-  last_edited_ms: 0
-7208259eeb2a67b6:
-  tl_dr: 'CI web-install fix: web/pnpm-workspace.yaml needs `packages: [.]` + `allowBuilds: {unrs-resolver: true}`; pin CI+release pnpm to 11.6.0.'
-  contents: 'pnpm 11 needs `packages: [.]` in pnpm-workspace.yaml + `allowBuilds: {unrs-resolver: true}` for postinstall. CI/release pinned pnpm to 11.6.0 to match lockfile.'
-  importance: medium
-  labels:
-  - ci
-  - pnpm
-  - web-lint
-  - gotcha
-  - ops
-  last_edited_ms: 1784203015355
-72815d89ebb8cd4b:
-  tl_dr: 'User preference: factor code out into new files rather than trimming comments to stay under line limits.'
-  importance: medium
-  last_edited_ms: 0
-75ab5b1b33b6add3:
-  tl_dr: 'Thinking between ticks needs adaptive thinking (type: adaptive) on 4.6+ or interleaved-thinking beta header. Manual budget_tokens is deprecated on newer models. Fix: switch to adaptive + add Opus 4.7.'
-  importance: high
-  labels:
-  - thinking
-  - llm-provider
-  last_edited_ms: 0
-76bca3b377df349e:
-  tl_dr: 'SSE freeze v0.2.4-v0.2.7: 4 watchdogs layered (idle-body 120s, send-header 60s, first-content 90s, catch-all TTFB 100s) in streaming.rs + mod.rs. All still in binary.'
-  importance: medium
-  labels:
-  - llm-provider
-  - sse-freeze
-  - watchdogs
-  last_edited_ms: 1784202948996
-77a6639f89352d52:
-  tl_dr: 'Hardcoded prompt audit: user wants EVERY occurrence of LLM-facing text noted, no matter how minor. No ''clean enough'' dismissals. User decides what''s behavioral steering vs. not. Be exhaustive — if the LLM sees it, log it as a finding.'
-  importance: critical
-  labels:
-  - audit
-  - user-preference
-  - workflow
-  last_edited_ms: 0
-77c0e9053167f28a:
-  tl_dr: 'DOCUMENTATION PHASE: Use tool queuing (Queue_activate/Queue_execute) for all file edits during doc work — otherwise cost explodes from cache breaks on every single edit.'
-  importance: critical
-  labels:
-  - workflow
-  - cost
-  - documentation
-  last_edited_ms: 0
-7b858470e0ce17bf:
-  tl_dr: Memory Architecture v2 Phase 1 PAUSED — stashed on memory-architecture-v2 branch. Resume later.
-  contents: Memory Architecture v2 Phase 1 PAUSED on branch memory-architecture-v2. Storage engine complete (db, decay, types, tests). Resume later.
-  importance: high
-  labels:
-  - memory-v2
-  - paused
-  - branch-stashed
-  last_edited_ms: 1784203006417
-7c6035d323faf713:
-  tl_dr: 'Cryptographic hash chain protects 12 critical files (Cargo.toml lint sections, clippy.toml, rustfmt.toml, CI scripts, lint exceptions YAML, deploy scripts). Password: Totordu1789. Updates via chain.sh --update.'
-  importance: critical
-  last_edited_ms: 1782121419937
-803fa2aac4f0489a:
-  tl_dr: NEVER commit or push .context-pilot/shared/entities/ files (entities.db, schema.sql, migrations/). These are local-only. Added to .gitignore.
-  importance: critical
-  labels:
-  - git
-  - entities
-  - workflow
-  last_edited_ms: 1780613144244
-8185ce57712b238d:
-  tl_dr: 'ALWAYS push memories (memories.yaml) and tree descriptions (tree-descriptions.yaml) alongside code commits. When committing work, include a ''chore: sync memories and tree descriptions'' commit and push everything together. Never leave these unsync''d.'
-  importance: critical
-  labels:
-  - workflow
-  - git
-  - persistence
-  last_edited_ms: 1780567164228
-82fd73098bb46d75:
-  tl_dr: 'Queue module design: fixed panel, 5 tools, pipeline intercept, shared queue (reverie + main), reverie auto-activates queue on start, Report blocks if unflushed, Queue_empty on reverie destroy/timeout.'
-  importance: high
-  last_edited_ms: 1784202976537
-83e84589e8deaf29:
-  tl_dr: 'entity_sql SQL splitter bugs fixed: UTF-8 truncation, comment/identifier mis-splitting, DML-batch-with-SELECT dispatch. Mini-tokenizer in sql/parse.rs.'
-  importance: medium
-  labels:
-  - entities
-  - bugfix
-  - utf8
-  - issue-113
-  last_edited_ms: 1784202931997
-8a3615f5171e122c:
-  tl_dr: 'T592 tmp/v2 Word-clone Tiptap editor: Vite 7 + React 19 + TS strict on :5199, Office ribbon (File/Home/Insert/Layout/View), live A4 pagination via tiptap-pagination-plus, PDF export via Paged.js+print, .docx export via the `docx` OOXML writer. Stack facts + gotchas in body.'
-  contents: |-
-    T592 tmp/v2 — clone of Word/Office as a Tiptap editor. Entirely under tmp/ (gitignored, zero repo side effects, no callbacks fire there).
-
-    STACK: Vite 7.3.6 + React 19.2.8 + TS strict (tsc --noEmit clean), port 5199 strictPort, pnpm 11.6.0, node v26 (export PATH=/opt/homebrew/bin:$PATH needed). Tiptap 3.29.2, tiptap-pagination-plus 3.1.0, lucide-react, docx 9.7.1, pagedjs 0.4.3.
-
-    WHY PaginationPlus AND NOT Paged.js FOR THE LIVE EDITOR: Paged.js renders STATIC page boxes and cannot coexist with a live editable document (this is what blew up on tmp/doc). PaginationPlus is a ProseMirror decoration layer, so text stays editable ACROSS page breaks. Official @tiptap-pro/extension-pages is PAID; this is the free OSS equivalent.
-
-    EXPORT (File tab, added later):
-    - PDF (src/export/pdf.ts): Paged.js Previewer renders editor.getHTML() into a HIDDEN throwaway container (#pdf-export-host, fixed at left:-10000px), then window.print() with an injected print stylesheet that hides every other body child. Vector selectable text + real running header/page number. NOT the tmp/doc failure mode: there both libraries fought over the SAME live DOM; here Paged.js gets a read-only throwaway the editor never sees, removed in a finally.
-      * Rejected: plain window.print() (Chromium does NOT implement @page margin boxes = no header/page number), html2canvas+jsPDF (raster, blurry, unselectable).
-      * pagedjs preview(content, stylesheets, renderTo): stylesheets MUST be passed explicitly — falsy runs removeStyles() which STRIPS the host document's own stylesheets. polisher.add takes a URL string OR a {pseudo-url: cssText} map, which is how raw CSS text is fed in.
-      * pagedjs ships NO types; src/types/pagedjs.d.ts declares the Previewer surface.
-      * src/styles/print-doc.css imported ?raw, every rule rooted at .print-doc so the export is self-contained and cannot break when an app wrapper moves.
-    - DOCX (src/export/docx.ts): walks editor.getJSON() (typed ProseMirror model) with the `docx` library = real OOXML. Rejected html-docx-js (Word-flavoured HTML renamed .docx; Pages/Google Docs/LibreOffice choke).
-      * docx API: Packer.toBlob NOT toBuffer (Buffer is Node-only). RegularImageOptions.type is 'jpg'|'png'|'gif'|'bmp' — SVG would need {type:'svg',fallback:...}, so src/export/images.ts rasterises every image to PNG on a canvas (2x supersample, white backfill, crossOrigin='anonymous', failures skipped so one broken figure never fails the export). transformation:{width,height} required. ExternalHyperlink WRAPS runs. Ordered lists must reference a declared numbering definition. Headings come from document STYLES so the file stays editable in Word.
-
-    TIPTAP v3 GOTCHAS:
-    - StarterKit ALREADY bundles Underline, Link, TrailingNode. Importing them separately = duplicate-name throw.
-    - v3 consolidated packages: TableKit (@tiptap/extension-table), TaskList+TaskItem (@tiptap/extension-list), TextStyleKit (@tiptap/extension-text-style — color/fontFamily/fontSize/lineHeight).
-    - StarterKit.configure key renamed history -> undoRedo.
-    - immediatelyRender:true required, else the first paint has no document and pagination measures an empty flow.
-
-    SEED CONTENT: imported ?raw from ../../../doc/content/contents.html (THREE hops from src/editor/). READ-ONLY BY DESIGN. GOTCHA: a wrong ?raw path TYPECHECKS CLEAN — the suffix makes it a Vite virtual module typed by ambient `declare module '*?raw'`, matched on suffix alone, never resolved against the filesystem. Fails only at dev-server resolution.
-
-    pnpm 11 GOTCHA: the `pnpm` key in package.json is IGNORED. Build-script permission moved to pnpm-workspace.yaml `allowBuilds: {esbuild: true}` + `packages: [.]`.
-
-    FILES: src/editor/{extensions,initialContent}.ts, src/export/{pdf,docx,images}.ts, src/types/pagedjs.d.ts, src/ribbon/{controls,Ribbon,FileTab,HomeTab,InsertTab,LayoutTab,ViewTab}.tsx, src/{App,StatusBar,main}.tsx, src/styles/{shell,page,print-doc}.css, public/images/*.svg.
-  importance: medium
-  labels:
-  - T592
-  - tiptap
-  - vite
-  - editor
-  - tmp
-  - pagination
-  last_edited_ms: 1785765698981
-8e07129a2a85fdb2:
-  tl_dr: 'DOCUMENTATION STYLE: Keep docs SYNTHETIC. No useless verbosity, no trivial obvious statements. Every word must earn its place. Bad: ''/// Returns the result of the operation''. Good: ''/// Saturating cast — clamps to target range on overflow''.'
-  importance: critical
-  labels:
-  - documentation
-  - style
-  last_edited_ms: 0
-906d895f70759254:
-  tl_dr: 'SSH to gilbert works non-interactively: `ssh gilbert@gilberts-mac-mini-1.barking-hue.ts.net`. Auth = Tailscale SSH (method "none"), no key, no password, BatchMode-safe. M149 still applies: never change network config there.'
-  contents: |-
-    Verified T665 from the guillaume Mac Mini.
-
-    COMMAND: ssh -o BatchMode=yes -o ConnectTimeout=5 gilbert@gilberts-mac-mini-1.barking-hue.ts.net '<cmd>'
-    Works with BatchMode=yes, i.e. zero interactive prompts — safe for console_easy_bash (10s blocking limit) and for scripting.
-
-    AUTH PATH (important): NOT OpenSSH. Debug output:
-      debug1: Remote protocol version 2.0, remote software version Tailscale
-      Authenticated to gilberts-mac-mini-1.barking-hue.ts.net ([100.118.140.29]:22) using "none".
-    tailscaled on gilbert intercepts port 22 (box runs `tailscale up --ssh`). Identity comes from the WireGuard tunnel, authorization from the tailnet ACL. Hence auth method "none" at the SSH layer — no public key offered, no password. The gilbert/gilbert password (M150) is irrelevant for SSH; it stays relevant for sudo / Keychain unlock.
-
-    No sshpass on the guillaume box (`command -v sshpass` empty) — never needed for gilbert.
-    Local key inventory: only ~/.ssh/id_ed25519_asterix.pub (that's the photonicat/asterix key, not used here).
-
-    PEER FACTS (T665 probe):
-    - 100.118.140.29, MagicDNS gilberts-mac-mini-1.barking-hue.ts.net resolves clean
-    - tailscale status: `active; direct 153.53.101.222:65424` — DIRECT connection, not DERP-relayed
-    - port 22 open (nc succeeded)
-    - hostname Gilberts-Mac-mini.local, user gilbert, macOS 26.2, arm64, up 5 days
-    - 1 line in ~/.ssh/authorized_keys
-
-    CONSTRAINT: M149 unchanged — never touch Tailscale or network configuration ON gilbert. Logging in and running commands is fine; mutating tailscale/network state is not.
-  importance: high
-  labels:
-  - gilbert
-  - ssh
-  - tailscale
-  - ops
-  - mac-mini
-  last_edited_ms: 1785137059764
-92101885f8dad615:
-  tl_dr: 'T605 web frontend "no borders, only shadows": --border token set to transparent in both palettes (NOT a border-width reset). --border-strong holds the real hairline for opt-ins. --input untouched (form fields keep outlines).'
-  contents: |-
-    T605 (thread "No item should have a border, ever"), web/src/index.css.
-
-    THE DECISION: set `--border: transparent` in BOTH `:root` and `.dark`, rather than blanket `border-width: 0 !important` (which is what T601 did for border-radius).
-
-    WHY NOT THE T601 BLANKET RESET — this is the load-bearing reasoning:
-    1. border-radius is purely decorative; border-width is often LOAD-BEARING. A blanket width reset shrinks every bordered element by 2px = reflow everywhere. The token flip keeps width at 1px, so NOTHING moves. Purely visual.
-    2. An `!important` blanket can only be exempted by another `!important` at higher specificity = whack-a-mole, and every future component that legitimately needs a border silently loses it. A maintenance trap.
-    3. The token flip ALSO kills the ~21 hairline dividers painted `bg-border` (dropdown separators, toolbar ticks, the thread-open rule) — these are borders in all but name and a border-width reset would have MISSED them entirely.
-    4. FREE WIN: rules that swap border-color on interaction (`focus:border-ring`, `focus-within:border-(--signal)/60`) still work — invisible at rest, coloured on focus. A width reset would have destroyed every one.
-
-    NEW TOKEN: `--border-strong` (light #ecdfce / dark #4d4d49 = the old --border values), exposed to Tailwind via `--color-border-strong` in `@theme inline`. This is the opt-back-in mechanism: `border-(--border-strong)`.
-
-    THE TWO USER-NAMED EXCEPTIONS (both now on --border-strong):
-    - ViewTabs pill group, components/shell/TopBar.tsx
-    - ThemeToggle root, components/shell/widgets/ThemeToggle.tsx
-    Both need an outline to read as a segmented control rather than loose glyphs.
-
-    DELIBERATELY NOT FLIPPED:
-    - `--input` — shadcn Input/Textarea/Calendar/button-outline use `border-input`, a SEPARATE token. Form fields keep their outline; an invisible text box is a usability bug, not clean design. Reversible if the user wants absolutism.
-    - 69 explicitly-coloured accent borders (border-(--signal|danger|interactive|warn|ok) and the 16 border-dashed) survive by construction — the marquee selection band, drop zones and the UnarchiveBar are affordances, not chrome.
-
-    ONE REPAIR THE FLIP FORCED: components/ui/scroll-area.tsx `<Thumb>` was painted `bg-border`, so the flip would have made the scrollbar thumb INVISIBLE. Repointed to `color-mix(in oklab, var(--muted-foreground) 35%, transparent)`, matching the native `::-webkit-scrollbar-thumb` rule already in index.css. It is a real grabbable control, not chrome.
-
-    CENSUS AT THE TIME: 342 `border-border`, 21 `bg-border`, 6 `border-input`, 16 `border-dashed`, 69 explicit-colour borders.
-
-    REVERT = restore the two `--border` hex values. Nothing else.
-
-    RELATED: M-level sibling decision T601 (square corners) DID use the blanket `*` reset with !important, because radius has none of the above hazards. The two are deliberately different mechanisms for deliberately different reasons.
-  importance: high
-  labels:
-  - T605
-  - web-frontend
-  - design-tokens
-  - borders
-  - index.css
-  - architecture
-  last_edited_ms: 1787304017548
-941a5df6fd1afc9a:
-  tl_dr: 'stylelint --fix on Tailwind v4 entry point is DANGEROUS: import-notation + property-no-vendor-prefix both damage it. Both disabled in web/.stylelintrc.json, NEVER re-enable.'
-  contents: |-
-    Two stylelint rules damage a Tailwind v4 CSS entry point when --fix runs:
-    1. import-notation: rewrites `@import "tailwindcss"` into `@import url("tailwindcss")`. Tailwind's PostCSS plugin only recognizes the BARE-STRING form; url() form yields ZERO utility classes = total styling loss ('2005 look', only inline styles + CSS vars survive).
-    2. property-no-vendor-prefix: DELETES load-bearing -webkit- prefixes (-webkit-backdrop-filter on .vibrancy, -webkit-appearance on finder slider) turning them into duplicate plain props = Safari breakage.
-    Both set to null in web/.stylelintrc.json. selector-class-pattern also relaxed for hljs-built_in underscore. NEVER re-enable the two.
-  importance: critical
-  labels:
-  - web-lint
-  - stylelint
-  - tailwind
-  - gotcha
-  - P10d
-  last_edited_ms: 1783501986296
-986adb56b40b2b32:
-  tl_dr: 'OPS & BUILD GOTCHAS (consolidated): orchestrator restart vs system_reload, port-freeing, git/pnpm/lint quirks, never-commit list. Full list in contents.'
-  contents: |-
     Key gotchas: TUI change = cargo build+reload; orchestrator change = rebuild+restart (not reload); frontend = vite hot-reloads. Kill orchestrator: lsof -ti:7878 + parent sh. git via git_execute only. web/ uses pnpm. CB3 is lib-only. oplog/bodies folder-sizes failure = benign.
 
-    Orchestrator launch: separate binary `cp-orchestrator` (crate cp-orchestrator), NOT the TUI binary. Build: `cargo build --release -p cp-orchestrator`. Run: `./target/release/cp-orchestrator`. Serves on :7878. Kill stale: `kill -9 $(lsof -ti:7878)`. The TUI binary (`cargo run --release` / `target/release/tui`) is the AGENT — needs CP_BRIDGE=1 for headless mode, fails with 'failed to enable raw mode' without a real TTY. Full stack script: web/run-stack.sh (orchestrator + web dev + optional TUI).
+    Orchestrator launch: separate binary `cp-orchestrator` (crate cp-orchestrator), NOT the TUI binary. Build: `cargo build --release -p cp-orchestrator`. Run: `./target/release/cp-orchestrator`. Serves on :7878. Kill stale: `kill -9
   importance: critical
-  labels:
-  - workflow
-  - gotchas
-  - build
-  - deploy
-  - git
-  last_edited_ms: 1784204581022
-9a2449142b04169a:
-  tl_dr: Freeze RESOLVED at infra level (v0.2.8 deadman + v0.2.9 stream timeout + v0.2.10 deadman-aware-of-retry). gpt2 dribble = throttle-induced, not fundamental. Normal tasks pass.
-  importance: low
-  labels:
-  - terminal-bench
-  - sse-freeze
-  - resolved
-  last_edited_ms: 1784202949001
-a330cfc0a3c317f2:
-  tl_dr: 'EVEN IF A RED CALLBACK IS PRE-EXISTING: ALWAYS TAKE OWNERSHIP OF IT AND SOLVE IT. PERIOD. EVERYONE IS RESPONSIBLE, ESPECIALLY YOU. No dismissing failures as ''pre-existing'' — fix them.'
-  importance: critical
-  labels:
-  - callback
-  - workflow
-  - ownership
-  - philosophy
-  last_edited_ms: 1784195611669
-a8b1054e0a11c2fe:
-  tl_dr: 'Cache engine v2: gap-decomposition DP replaces greedy. F(Ω'')=ΣT[pₖ]×gap. DP per gap O(k×|gap|²) + enumerate across ≤5 gaps. In cache_engine.rs.'
-  importance: high
   last_edited_ms: 0
-b0c2cf76e35d0b9e:
-  tl_dr: IR Architecture Phases 1-6 COMPLETE. cp-render crate with typed IR primitives. Panel::blocks() trait, build_frame() centralized builder. egui-frontend abandoned.
-  importance: medium
-  last_edited_ms: 1784202932000
-b14e6817a83938b5:
-  tl_dr: 'Search module: Voyage AI REST embedder (voyage-code-3) for hybrid search, zero local CPU. VOYAGE_API_KEY in ~/.context-pilot/.env. --max-indexing-threads 2. Port reconnects on reload.'
-  contents: 'Project hash: c7f7b6db, ~4196 chunks ~1399 files. Embedder: voyage-code-3, 1024 dims. VOYAGE_API_KEY in ~/.context-pilot/.env. Server flags: --max-indexing-threads 2. File watcher: RecommendedWatcher (event-driven, not poll).'
-  importance: high
-  labels:
-  - meilisearch
-  - search
-  - operational
-  last_edited_ms: 1784203006419
-b5af3513e41563ec:
-  tl_dr: 'T604 + FIGHT: exhaustive_enums/structs allow workspace-wide, re-denied only in cp-wire. FIGHT batch 1: 1 clean kill (RosterEntryInit removed via RosterThread builder). Registry 28 entries. Commits e3fdd855, 8787e8b6. Chain #71. Body has full triage.'
+M-mid-11:
+  tier: mid
+  title: EVEN IF A RED CALLBACK IS
+  contents: 'EVEN IF A RED CALLBACK IS PRE-EXISTING: ALWAYS TAKE OWNERSHIP OF IT AND SOLVE IT. PERIOD. EVERYONE IS RESPONSIBLE, ESPECIALLY YOU. No dismissing failures as ''pre-existing'' — fix them.'
+  importance: critical
+  last_edited_ms: 0
+M-mid-12:
+  tier: mid
+  title: 'T604 + FIGHT:'
   contents: |-
+    T604 + FIGHT: exhaustive_enums/structs allow workspace-wide, re-denied only in cp-wire. FIGHT batch 1: 1 clean kill (RosterEntryInit removed via RosterThread builder). Registry 28 entries. Commits e3fdd855, 8787e8b6. Chain #71. Body has full triage.
+
     T604 (user-driven, supersedes the boss-hunt 81->36 enum-flip scoreboard): exhaustive_enums + exhaustive_structs are library-SemVer lints, WRONG as blanket workspace deny (internal crates recompile atomically with consumers, so E0004-on-add is a FEATURE not a break). RIGHT only for cp-wire (real agent/orchestrator version boundary, unknown variant/field at runtime).
 
-    FINAL STATE: root Cargo.toml both lints deny->allow. cp-wire/src/lib.rs re-denies both via crate-level inner #![deny] attrs (before `pub mod framing;`). Stripped ~64 non_exhaustive tags OUTSIDE cp-wire (internal types back to compiler-checked exhaustive). Removed 7 exhaustive_* expect blocks + 7 yaml entries + TypeMeta + cp-render orphan yaml. Dropped downstream `_` wildcard arms boss-hunt had added for now-closed Semantic/Block/Overlay enums (unreachable_patterns + wildcard_in_or_patterns both forbid): ui/mod.rs x3 Overlay, render_conversation.rs Overlay, ui/ir/mod.rs Semantic+Block, render_blocks.rs Block, render_status_bar.rs badge Semantic (had to ADD Semantic::Accent when dropping `_`). Fixed field_reassign_with_default in oai_check_api (struct literal). cp-wire keeps 37 non_exhaustive + 9 expects.
-
-    GOTCHA: registry check greps `#[expect(` / `#[non_exhaustive]` substrings even in COMMENTS — a doc comment mentioning the literal token trips 'unregistered lint exception'; reword prose. chain.sh takes --password FLAG not stdin. Commit e3fdd855, chain #70, we-dev.
-
-    Boss-hunt r1-r21 history (824f6075...prior) still valid as context but enum-flip is retired as a goal.
+    FINAL STATE: root Cargo.toml both lints
   importance: critical
-  labels:
-  - T588
-  - lints
-  - A5-A13
-  - workflow
-  - philosophy
-  last_edited_ms: 1784576922310
-b63f42389e433d93:
-  tl_dr: T656/T658 Photonicat zero-touch eMMC install system BUILT (deploy/photonicat/emmc-install/). Self-provisions Context Pilot on-box (Model A). tag:pcat in ACL. T658 tailscale-enrol fix shipped 2b34dca6. Full design/facts/file-map in body.
-  contents: |-
-    T656 — zero-touch Debian-to-eMMC install for Photonicat 2 fleet.
-
-    DESIGN: drop armbian-install (interactive, no unattended). Clone asterix's proven Debian SD into a shrunk golden eMMC image, dd it onto eMMC from an init-SD on first boot, verify, poweroff. Pull init-SD, insert prod-SD, boot eMMC Debian.
-
-    LOCKED: clone asterix Debian; backup factory OpenWrt first; LCD 4-state progress; reusable tagged tailscale key; operator ssh key baked in (asterix key ssh-ed25519 AAAAC3...jpEjg cpilot-agent@guillaume-macmini); hostname pcat-<serial>.
-
-    BOARD FACTS (probed asterix): RK3568 aarch64, Debian 13 trixie kernel 6.18.28. boot.scr SELF-LOCATING (part uuid mmc ${devnum}:2 uuid; root=PARTUUID=${uuid}) so clone needs NO fstab/PARTUUID rewrite. serial=21d5aefad944808f. rootfs 18G used. LCD GC9307 172x320 rot180 MADCTL 0x48 coloffset 34, SPI1.0 mode0 8bit 50MHz, RST=GPIO122 DC=GPIO121. removable flag USELESS (both mmc=0); discriminator = /sys/block/mmcblkN/device/type (MMC vs SD) + mmcblkNboot0 sibling. growpart/resize2fs/e2fsck/sgdisk present.
-
-    FILES (deploy/photonicat/emmc-install/):
-    - lcd/pcat_lcd.py: python spidev+libgpiod GC9307 painter, states flashing/verify/provisioning/done/error. v2+v1 libgpiod adapter, RK bank arithmetic chip=gpio//32 off=gpio%32 (122->chip3 off26). Deps python3-spidev python3-libgpiod.
-    - firstboot/firstboot-emmc.sh: eMMC first boot — regen ssh host keys, new machine-id, wipe /var/lib/tailscale, sgdisk -e + growpart + resize2fs fill 58G, hostname pcat-$SER, sshd+avahi (LAN plane), tailscale up --authkey=/boot/pcat-ts-authkey --ssh (5x retry+clock-wait), shred key, ACCESS.txt breadcrumb, stamp+self-disable.
-    - installer/init-sd-install.sh: init-SD flasher — stamp /run tmpfs (reusable N boxes), optional OpenWrt backup, zstd -dc golden.img.zst|dd of=eMMC (detect by device/type), bg LCD progress via /proc fdinfo pos, sha256 readback verify, poweroff.
-    - installer/pcat-provision.sh + .service: MODEL A self-provision (T658). Runs on eMMC box first boot AFTER firstboot. ansible-playbook -c local -i localhost, /opt/pcat-provision/ansible/site.yml -e @/boot/pcat-provision.yml. Own phase (slow: release dl + Caddy + GC9307 driver compile), TimeoutStartSec=2400, LCD 'INSTALLING'. Success: shred yml + stamp /var/lib/pcat-provision.done + self-disable. Fail: box stays up+reachable, log /var/log/pcat-provision.log. Public artifacts=no GitHub token.
-    - installer/pcat-provision.yml.example: ansible extra-vars YAML. cp_admin_email + cp_provider_keys dict (ANTHROPIC/BRAVE/DATALAB/VOYAGE/FIRECRAWL) + release + install_display.
-    - build/build-golden-image.sh: clone SRC_DISK, resize2fs -M shrink+slack, seed firstboot+keys, sgdisk resize+truncate, sha256, zstd. NEW: PROVISION_VARS= bakes deploy/ansible tree + ansible runtime (chroot apt) + provision payload + writes secrets on boot partition. Linux-only (asterix).
-    - build/build-init-sd.sh: write base Debian, grow, seed installer payload+golden, strip firstboot unit, mask vendor LCD (frees gpio for painter).
-
-    SECRETS: tailscale authkey + provision.yml NOT in git — runtime on /boot, shredded after use.
-
-    MODEL A picked over B (control-node push): mirrors ts-key trust model (inject /boot, shred after). User also wants BRAVE/DATALAB/VOYAGE/FIRECRAWL keys — all fit cp_provider_keys dict, zero design change, providers.env.j2 passes through.
-  importance: high
-  labels:
-  - photonicat
-  - emmc
-  - install
-  - T656
-  - deploy
-  - tailscale
-  last_edited_ms: 1784915661373
-bc38d2fd0bcf015a:
-  tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
-  importance: high
-  labels:
-  - rust
-  - unix-socket
-  - testing
-  - gotcha
-  - bridge
-  last_edited_ms: 1782121419937
-c5a5c4ef0553bd7b:
-  tl_dr: 'T584 tool-call UI SHIPPED: commit eada5764 on branch t584-tool-call-ui, PR #157 to master. Verb->icon dict + drop tool-name + click-to-fetch adaptive detail bubble, content-addressed toolcall persist. Details in body.'
-  contents: |-
-    T584 three asks all done:
-    1. verb->lucide icon dict + Levenshtein nearest-key fallback (frontend static: lib/support/threadMessages.ts iconForVerb/VerbIcon, ~60 gerunds).
-    2. drop tool-name column (AutoRun grid = icon + intent, clickable rows).
-    3. click -> adaptive ToolCallBubble, fetch-on-click GET /api/agent/{id}/toolcall/{hash}, never prefetched.
-
-    Backend:
-    - cp-mod-threads types.rs: ThreadMessage.tool_ref field + auto_trace(content, tool_ref) signature.
-    - src/app/run/threads/mod.rs: persist_tool_call content-addressed to .context-pilot/toolcalls/<hash>.json (ContentHash::of.to_hex, idempotent, best-effort None on fail).
-    - pipeline.rs: trace emitted AFTER result known, both direct + queue-flushed loops.
-    - orchestrator inspect/panels.rs toolcall(): hex-validated hash (blocks ../ traversal), reads blob. Route in transport/mod.rs. thread_shape.rs reshape_message emits toolRef. openapi paths.rs+schemas.rs (ToolCallDetail, ThreadMsg.toolRef) + regen.
-
-    Frontend:
-    - ToolCallBubble.tsx (desktop + mobile twin): EditDiff/TerminalView/QueryResult/KvResult dispatch on detail.name.
-    - useToolCall hook (live/index.ts, pollMs:0 enabled-gated), qk.toolcall (sync.ts), fetchToolCall + ToolCallDetail (api/index.ts).
-    - LiveQueryResult field is `loading` NOT isLoading.
-
-    Verified: tsc+eslint green, cargo build release green (cp-mod-threads/orchestrator/tui), all callbacks green, endpoint smoke-tested live (valid hash returns blob, ../ = 404). tui reloaded, orchestrator restarted.
-  importance: high
-  labels:
-  - T584
-  - tool-call-ui
-  - shipped
-  - threads
-  - content-addressed
   last_edited_ms: 0
-c70e24f88c9a3e60:
-  tl_dr: 'Mac Mini ''gilbert'' user/password: gilbert/gilbert. Used for sudo and Keychain unlock.'
-  importance: high
-  labels:
-  - gilbert
-  - credentials
-  - mac-mini
-  last_edited_ms: 1783603900964
-caf6de1cb65ac661:
-  tl_dr: 'DEMAQUETTING COMPLETE: branch merged to master (f1de2e65) and deleted (local + remote). Working on master from now on. All demaquetting work is on master.'
-  contents: 'Demaquetting merged to master (f1de2e65). Stack: orchestrator :7878, web dev :5174.'
+M-mid-13:
+  tier: mid
+  title: 'DEMAQUETTING COMPLETE:'
   importance: critical
-  labels:
-  - demaquetting
-  - complete
-  - master
-  last_edited_ms: 1784203006422
-ceac945d9376fcf2:
-  tl_dr: 'FEATURE COMPLETION SEQUENCE: build → reload → commit+push (with memories/tree-descs) → clean context. Always, every time.'
+  last_edited_ms: 1787840930939
+M-mid-14:
+  tier: mid
+  title: FEATURE COMPLETION
+  contents: 'FEATURE COMPLETION SEQUENCE: build → reload → commit+push (with memories/tree-descs) → clean context. Always, every time.'
   importance: critical
-  labels:
-  - workflow
-  - feature-completion
-  - sequence
-  last_edited_ms: 1782121419936
-d1e512c8273ba340:
-  tl_dr: Thinking blocks echoed as ContentBlock::Text (prefix '🧠 [Thinking]') in prompt_builder, NOT native Thinking. Signatures removed — prefix changes break them.
-  importance: high
   last_edited_ms: 0
-d421b9943691f60e:
-  tl_dr: 'OAuth architecture (T504 final): ALL consumers read the Claude token via vault().get("claude_oauth") — single entry, overrides→Keychain→file. Bypass is now a compile error. Commits dd9d2c54 + d2dde2cc.'
-  contents: 'ALL consumers read Claude token via cp_vault::vault().get("claude_oauth") — cascade: overrides, Keychain, file. load_claude_oauth_token() is pub(crate) — bypass = compile error. Write authority: delete-then-add Keychain in claude_oauth.rs (fixes ACL-locked stale item). Commits dd9d2c54 + d2dde2cc.'
-  importance: high
-  labels:
-  - architecture
-  - oauth
-  - vault
-  - credentials
-  - T504
-  last_edited_ms: 1784203006410
-d76e1f4576d9458a:
-  tl_dr: 'Context Pilot is a SIDE PROJECT. In <3 months: became #1 tool for all professional + personal life, enables 2-4 simultaneous projects, helps family gain weeks of time.'
+M-mid-15:
+  tier: mid
+  title: Context Pilot is a SIDE
+  contents: 'Context Pilot is a SIDE PROJECT. In <3 months: became #1 tool for all professional + personal life, enables 2-4 simultaneous projects, helps family gain weeks of time.'
   importance: critical
-  labels:
-  - talk
-  - wow
-  - context-pilot
-  last_edited_ms: 1784202976539
-d7a30d2f21fd675a:
-  tl_dr: 'Dream layer decided: Groq API with tiny model (Llama 3.2 3B), ~200-token prompts, 30-50 token completions, fires every 2-3 min, writes to soul.journal. Cost ~$0.02/day. Local models reserved for future non-text sensing.'
-  importance: high
   last_edited_ms: 0
-d9a2e890ab98776f:
-  tl_dr: 'T566 restart flow: useRestartFlow uses client-only ''waiting'' AgentStatus. Set ONLY on restart success (setQueryData). New agent Lifecycle::Running delta clears it via foldLifecycle. No state machine, no timers. Committed 33099872 on branch updates.'
-  importance: medium
-  labels:
-  - web
-  - restart
-  - waiting-status
-  - T566
-  last_edited_ms: 1784213091300
-e18233161752e7d8:
-  tl_dr: NO ENTRY ANIMATION on main content, EVER (user mandate T631). Overlays exempt.
-  contents: 'Never add rise/opt-rise/finder-pop/ql-pop/fill-sweep or any opacity+translate/scale mount animation to main-content elements (messages, forms, model cards, previews, settings rows, page bodies). OVERLAYS are the only exception: modal-pop, sheet-pop-in/out, menu-pop, backdrop-fade stay. Also fine: ants (drag border), blink (caret), hover/focus transitions. T631 removed all five entry keyframes from index.css + every call site desktop+mobile.'
-  importance: critical
-  labels:
-  - user-preference
-  - web-frontend
-  - animation
-  - forbidden
-  - T631
-  last_edited_ms: 1787320918286
-e22b1ea921ff9aec:
-  tl_dr: 'Datalab documentation site: documentation.datalab.to (Mintlify-hosted). API reference at documentation.datalab.to/api-reference/health. Has sections on limits, supported file types, SDK, on-prem, webhooks, billing.'
-  importance: low
-  last_edited_ms: 0
-e836c43fddc2af12:
-  tl_dr: 'Rust 1.97.1 upgrade DONE (T585). Was pinned 1.95.0. Bumped rust-toolchain.toml + ci.yml + release.yml RUST_VERSION. Chain entry #35. Details in body.'
+M-mid-16:
+  tier: mid
+  title: NO ENTRY ANIMATION on
   contents: |-
-    T585 rust 1.97.1 upgrade (from 1.95.0).
+    NO ENTRY ANIMATION on main content, EVER (user mandate T631). Overlays exempt.
 
-    Version refs bumped (all): rust-toolchain.toml channel, ci.yml RUST_VERSION, release.yml RUST_VERSION. No MSRV/rust-version in any Cargo.toml. Cross.toml has no pin (cross uses rust-toolchain.toml in-container). deploy/ has no rust pins.
-
-    1.97 lint surface changes (Cargo.toml [workspace.lints]):
-    1. inline_always_mismatching_target_features REMOVED from rust table (1.97 replaced it with a hard error). renamed_and_removed_lints + warnings both forbid => a removed lint listed = hard compile error, cannot relax via RUSTFLAGS. Deleted the line.
-    2. missing_trait_methods deny->allow (clippy table). 1.97 added unstable `pin_drop` provided method to Drop; the restriction lint then demands it on EVERY Drop impl, impossible on stable. Comment added. warn won't work (warnings=forbid promotes to error).
-    3. useless_borrows_in_formatting new/stricter: 'redundant reference in format! argument'. 14 sites fixed workspace-wide (drop leading & on .get().unwrap_or("") inside format!): cp-mod-git/result_panel.rs, cp-mod-github/panel.rs, cp-mod-memory/tools.rs x2, cp-mod-scratchpad/tools.rs, cp-mod-files/lib.rs + edit_file.rs x2, src/app/actions/input.rs, src/modules/overview/blocks.rs x2, src/ui/help/commands.rs x2.
-
-    SCOPE FINDING: CI clippy gate = `cargo clippy --all-targets -- -D warnings` from repo ROOT = tui package only (root has [package] tui; no --workspace). cp-orchestrator has [lints] workspace=true but is NEVER clippy-gated by CI (only built). `cargo clippy --workspace` surfaces 1298 PRE-EXISTING orchestrator clippy errors (expect/unwrap in tests, pub_use, wildcard) identical 1.95 AND 1.97 = NOT regressions, OUT of gate scope. DO NOT CHASE (historical 'don't chase 411' pattern).
-
-    Hash chain #35 updated (Cargo.toml lint edits protected). Password Totordu1789. api-contract callback 'npx: command not found' = PATH artifact (M156, export PATH=/opt/homebrew/bin), not code. All 6 callbacks green after PATH fix + chain update.
-  importance: high
-  labels:
-  - rust
-  - toolchain
-  - '1.97'
-  - upgrade
-  - T585
-  - lint
-  last_edited_ms: 1784472185167
-ef0637f705a1a17d:
-  tl_dr: 'T643 iOS standalone edge-to-edge BOTH ends (d8477482): status-bar black-translucent + shell 100vh standalone / 100dvh tab. NEVER opaque black (loses top), NEVER 100%/100dvh for standalone fill (safe-area-shrunk = 34px chin gap). Full recipe + lessons in body.'
+    Never add rise/opt-rise/finder-pop/ql-pop/fill-sweep or any opacity+translate/scale mount animation to main-content elements (messages, forms, model cards, previews, settings rows, page bodies). OVERLAYS are the only exception: modal-pop, sheet-pop-in/out, menu-pop, backdrop-fade stay. Also fine: ants (drag border), blink (caret), hover/focus transitions. T631 removed all five entry keyframes from index.css + every call site desktop+mobile.
+  importance: critical
+  last_edited_ms: 0
+M-mid-17:
+  tier: mid
+  title: T643 iOS standalone
   contents: |-
+    T643 iOS standalone edge-to-edge BOTH ends (d8477482): status-bar black-translucent + shell 100vh standalone / 100dvh tab. NEVER opaque black (loses top), NEVER 100%/100dvh for standalone fill (safe-area-shrunk = 34px chin gap). Full recipe + lessons in body.
+
     Confirmed working on iOS 26.5.2 standalone (Add-to-Home-Screen), user verified.
 
     FIX: web/index.html apple-mobile-web-app-status-bar-style = black (opaque), NOT black-translucent. Keep viewport-fit=cover. Keep manifest UNLINKED (T639: linked manifest forces opaque-bar PWA path). h-dvh shell + blur-on-send base untouched.
 
     LESSONS:
-    1. Keyboard-stuck viewport (dvh/visualViewport stays short after keyboard dismiss) = WebKit bug 301857, FIXED iOS 26.1 (cordova-ios#1575). Devices 26.1+ don't have it — don't fight it in CSS/JS.
-    2. black-translucent + viewport-fit=cover combo = chin gap in standalone (r/PWA field study). Opaque style: webview bottom touches true screen bottom; env(safe-area-inset-top) becomes 0 (top pads degrade harmlessly); opaque black bar blends with .dark.mobile #000.
-    3. Failed approaches (never retry): focusout scrollTo reset, visualViewport.height pinning (feeds broken value), position:fixed inset:0 shell (resolves to safe-area viewport, 34px short), 100vh-when-standalone (worse), interactive-widget=resizes-content (unsupported iOS).
-    4. iOS caches standalone config AT install — any meta change requires delete + re-add home-screen icon to test.
-    5. Debug protocol that worked: ask device OS version FIRST, find upstream bug trackers (cordova/WebKit), distinguish OS bug vs config bug before touching code.
-  importance: critical
-  labels:
-  - ios
-  - standalone
-  - pwa
-  - viewport
-  - T643
-  - gotcha
-  last_edited_ms: 1784740971771
-efe78c079599d3d0:
-  tl_dr: 'User workflow preference: when exploring/describing files, MUST follow strict order: open files → describe in tree → close files → iterate to next batch. Never close before describing.'
+    1. Keyboard-stuck viewport (dvh/visualViewport stays short after k
   importance: critical
   last_edited_ms: 0
-f3090cd5b6320bde:
-  tl_dr: 'ARCHITECTURE: ALL logic in Rust backend. Frontend = dumb render layer, zero business logic. Backend is sole source of truth.'
+M-mid-18:
+  tier: mid
+  title: 'User workflow preference:'
+  contents: 'User workflow preference: when exploring/describing files, MUST follow strict order: open files → describe in tree → close files → iterate to next batch. Never close before describing.'
+  importance: critical
+  last_edited_ms: 0
+M-mid-19:
+  tier: mid
+  title: 'ARCHITECTURE: ALL logic'
   contents: |-
+    ARCHITECTURE: ALL logic in Rust backend. Frontend = dumb render layer, zero business logic. Backend is sole source of truth.
+
     Reasons:
     1. Frontend may run on completely separate VM — no OS/filesystem/env access
     2. Frontend is disposable. Backend is source of truth. One backend: Rust.
@@ -1013,72 +200,507 @@ f3090cd5b6320bde:
     - No env variable management in frontend
     - No data transformation/reshaping in frontend (backend returns exactly what UI needs)
     - Frontend only renders what the backend gives it
-    - Any new feature = Rust endpoint first, then thin SDK call in frontend
+    - Any new feat
   importance: critical
-  labels:
-  - architecture
-  - frontend
-  - backend
-  - SEV
-  - principle
-  last_edited_ms: 1782426985989
-f5d97b1e7a01c317:
-  tl_dr: Alignment epic (X818/T120) and HUD push-feed (T297) DONE. Context helpers in src/modules/overview/context.rs. OpEntryKind::ContextUsage carries used/threshold/budget + hit/miss.
-  importance: medium
-  labels:
-  - latency
-  - architecture
-  - demaquetting
-  - active
-  last_edited_ms: 1784202931977
-f73736833df4e426:
-  tl_dr: 'web-lint: generated/ @ts-nocheck header now emitted NATIVELY by web/openapi-ts.config.ts output.header; the old post-codegen stamp loop is REMOVED. NEVER reintroduce hand-stamping. Commit 2dd641c4.'
+  last_edited_ms: 0
+M-mid-2:
+  tier: mid
+  title: 'BANNED: #[allow(...)]'
+  contents: 'BANNED: #[allow(...)] lint suppressions. Always use #[expect(...)] for unavoidable cases. Register exceptions in .github/checks/. Never #[allow], always #[expect].'
+  importance: critical
+  last_edited_ms: 0
+M-mid-20:
+  tier: mid
+  title: 'WORKFLOW RULE (T581):'
+  contents: 'WORKFLOW RULE (T581): NEVER push to master. Always new branch + new PR. Commit locally, branch off master, push the branch, open PR to master via gh. Augments M151 (don''t push unless asked) with the delivery mechanism when push IS asked.'
+  importance: critical
+  last_edited_ms: 0
+M-mid-3:
+  tier: mid
+  title: 'Hardcoded prompt audit:'
+  contents: 'Hardcoded prompt audit: user wants EVERY occurrence of LLM-facing text noted, no matter how minor. No ''clean enough'' dismissals. User decides what''s behavioral steering vs. not. Be exhaustive — if the LLM sees it, log it as a finding.'
+  importance: critical
+  last_edited_ms: 0
+M-mid-4:
+  tier: mid
+  title: 'DOCUMENTATION PHASE: Use'
+  contents: 'DOCUMENTATION PHASE: Use tool queuing (Queue_activate/Queue_execute) for all file edits during doc work — otherwise cost explodes from cache breaks on every single edit.'
+  importance: critical
+  last_edited_ms: 0
+M-mid-5:
+  tier: mid
+  title: Cryptographic hash chain
+  importance: critical
+  last_edited_ms: 1787840930923
+M-mid-6:
+  tier: mid
+  title: NEVER commit or push
+  contents: NEVER commit or push .context-pilot/shared/entities/ files (entities.db, schema.sql, migrations/). These are local-only. Added to .gitignore.
+  importance: critical
+  last_edited_ms: 0
+M-mid-7:
+  tier: mid
+  title: ALWAYS push memories
+  contents: 'ALWAYS push memories (memories.yaml) and tree descriptions (tree-descriptions.yaml) alongside code commits. When committing work, include a ''chore: sync memories and tree descriptions'' commit and push everything together. Never leave these unsync''d.'
+  importance: critical
+  last_edited_ms: 0
+M-mid-8:
+  tier: mid
+  title: 'DOCUMENTATION STYLE: Keep'
+  contents: 'DOCUMENTATION STYLE: Keep docs SYNTHETIC. No useless verbosity, no trivial obvious statements. Every word must earn its place. Bad: ''/// Returns the result of the operation''. Good: ''/// Saturating cast — clamps to target range on overflow''.'
+  importance: critical
+  last_edited_ms: 0
+M-mid-9:
+  tier: mid
+  title: stylelint --fix on
   contents: |-
+    stylelint --fix on Tailwind v4 entry point is DANGEROUS: import-notation + property-no-vendor-prefix both damage it. Both disabled in web/.stylelintrc.json, NEVER re-enable.
+
+    Two stylelint rules damage a Tailwind v4 CSS entry point when --fix runs:
+    1. import-notation: rewrites `@import "tailwindcss"` into `@import url("tailwindcss")`. Tailwind's PostCSS plugin only recognizes the BARE-STRING form; url() form yields ZERO utility classes = total styling loss ('2005 look', only inline styles + CSS vars survive).
+    2. property-no-vendor-prefix: DELETES load-bearing -webkit- prefixes (-webkit-backdrop-filter on .vibrancy, -webkit-appearance on finder slider)
+  importance: critical
+  last_edited_ms: 0
+M-safe-1:
+  tier: safe
+  title: Hash chain password
+  contents: 'chain.sh --update password: Totordu1789. Cryptographic hash chain protects 12 files: Cargo.toml lint sections, clippy.toml, rustfmt.toml, CI check scripts, lint-exception YAMLs, deploy scripts.'
+  importance: critical
+  last_edited_ms: 1787840930912
+M-safe-2:
+  tier: safe
+  title: MiniMax API key
+  contents: sk-cp-SML34Q-eh3y1ob1na0P68nYpXfN-8jk86fYnaAjo6H6cd_vWZ0E089CWYEhlFX6EyNh6PNRYWJRmGgj9kK5Wk88rzf_0bMW-IBuybCYQXPm08PcFTW6GwDo
+  importance: high
+  last_edited_ms: 1787840930917
+M-safe-3:
+  tier: safe
+  title: gilbert creds
+  contents: 'gilbert Mac Mini (deploy target) login user/pw: gilbert/gilbert. Used for sudo + Keychain unlock. SSH via Tailscale SSH (no key/pw, BatchMode-safe).'
+  importance: high
+  last_edited_ms: 1787840930920
+M-short-1:
+  tier: short
+  title: T671 conversation search
+  contents: |-
+    T671 conversation search SHIPPED end-to-end (updates-we). Hybrid keyword+semantic search over thread messages, frontend->orchestrator->agent->meili (Option B round-trip). Design doc docs/design-conversation-search.md. Arch+file map in body.
+
+    T671 all 9 phases done, pushed on updates-we.
+
+    ARCH (Option B): frontend palette -> orchestrator AgentChannel::query() -> agent bridge intake -> meilisear
+  importance: high
+  last_edited_ms: 0
+M-short-10:
+  tier: short
+  title: T656 Tailscale ACL fixed
+  contents: |-
+    T656 Tailscale ACL fixed (ssh accept rule dst=tag:pcat added, HTTP 200) + reusable tagged enroll key minted. Key + details in body. NOT in git.
+
+    PROBLEM: ssh block only had dst=autogroup:self which EXCLUDES tagged devices, so Tailscale-SSH to tag:pcat was DENIED. FIX: added ssh accept rule src=autogroup:admin dst=tag:pcat users=[nonroot,root] action=accept (no check, avoids T655 browser-reauth
+  importance: high
+  last_edited_ms: 0
+M-short-11:
+  tier: short
+  title: 'Cache optimizer: K=3 +'
+  contents: 'Cache optimizer: K=3 + beacon (4th). ConversationTailDensity uses UNIFORM weight (1.0) for hot blocks, zero for cold. Previous i² was catastrophic. Fix: ed83c9df.'
+  importance: high
+  last_edited_ms: 0
+M-short-12:
+  tier: short
+  title: T506 web-lint P0-P12
+  contents: 'T506 web-lint P0-P12 COMPLETE on web-lint branch: full Rust-parity lint ratchet (eslint 0 / tsc 0 / prettier 0 / stylelint 0 / knip 0 / type-coverage 99.86%), CB8 blocking callback, as-unknown-as ban, CI frontend job, rule-census (733 rules), 26 config files hash-locked. P13 docs/PR pending (X1140).'
+  importance: high
+  last_edited_ms: 1787840964650
+M-short-13:
+  tier: short
+  title: T570 forms feature
+  contents: 'T570 forms SHIPPED (commit 8898f043): inline ```form```/```form-answer``` blocks replace questions param entirely. 8 field types. Zero API change, frontend-only parse, Rust send-time YAML validation. Spec: docs/forms.md.'
+  importance: high
+  last_edited_ms: 1787840964659
+M-short-14:
+  tier: short
+  title: T581 agent-editor SHIPPED
+  importance: high
+  last_edited_ms: 1787840930963
+M-short-15:
+  tier: short
+  title: T593 tmp/v2 document
+  importance: high
+  last_edited_ms: 1787840930964
+M-short-16:
+  tier: short
+  title: Agents restarted via
+  contents: |-
+    Agents restarted via cockpit die seconds after boot + meili dies ('os error'); manual cpilot works. Cause: ORPHANED meili from prior orchestrator deploy (PPID 1) holds shared LMDB data dir. Fix: reap the orphaned meili. Details in body.
+
+    AGENT+MEILI DEATH MODE (Mac Mini, solved T651).
+
+    SYMPTOM: agent restarted via cockpit restarts then dies a few seconds later, its meilisearch dies too with an
+  importance: high
+  last_edited_ms: 0
+M-short-17:
+  tier: short
+  title: MiniMax Token Plan API
+  importance: high
+  last_edited_ms: 1787840930926
+M-short-18:
+  tier: short
+  title: Thinking between ticks
+  contents: 'Thinking between ticks needs adaptive thinking (type: adaptive) on 4.6+ or interleaved-thinking beta header. Manual budget_tokens is deprecated on newer models. Fix: switch to adaptive + add Opus 4.7.'
+  importance: high
+  last_edited_ms: 0
+M-short-19:
+  tier: short
+  title: Memory Architecture v2
+  importance: high
+  last_edited_ms: 1787840930932
+M-short-2:
+  tier: short
+  title: Meilisearch design
+  contents: 'Meilisearch design complete. Embedded global server, cp-mod-search crate, tree-sitter chunking, unified search tool, log redesign. Full spec: docs/design-meilisearch.md.'
+  importance: high
+  last_edited_ms: 0
+M-short-20:
+  tier: short
+  title: 'Queue module design:'
+  contents: 'Queue module design: fixed panel, 5 tools, pipeline intercept, shared queue (reverie + main), reverie auto-activates queue on start, Report blocks if unflushed, Queue_empty on reverie destroy/timeout.'
+  importance: high
+  last_edited_ms: 0
+M-short-21:
+  tier: short
+  title: SSH to gilbert works
+  contents: |-
+    SSH to gilbert works non-interactively: `ssh gilbert@gilberts-mac-mini-1.barking-hue.ts.net`. Auth = Tailscale SSH (method "none"), no key, no password, BatchMode-safe. M149 still applies: never change network config there.
+
+    Verified T665 from the guillaume Mac Mini.
+
+    COMMAND: ssh -o BatchMode=yes -o ConnectTimeout=5 gilbert@gilberts-mac-mini-1.barking-hue.ts.net '<cmd>'
+    Works with BatchMode=y
+  importance: high
+  last_edited_ms: 0
+M-short-22:
+  tier: short
+  title: T605 web frontend "no
+  contents: |-
+    T605 web frontend "no borders, only shadows": --border token set to transparent in both palettes (NOT a border-width reset). --border-strong holds the real hairline for opt-ins. --input untouched (form fields keep outlines).
+
+    T605 (thread "No item should have a border, ever"), web/src/index.css.
+
+    THE DECISION: set `--border: transparent` in BOTH `:root` and `.dark`, rather than blanket `border
+  importance: high
+  last_edited_ms: 0
+M-short-23:
+  tier: short
+  title: 'Cache engine v2:'
+  contents: 'Cache engine v2: gap-decomposition DP replaces greedy. F(Ω'')=ΣT[pₖ]×gap. DP per gap O(k×|gap|²) + enumerate across ≤5 gaps. In cache_engine.rs.'
+  importance: high
+  last_edited_ms: 0
+M-short-24:
+  tier: short
+  title: 'Search module: Voyage AI'
+  contents: |-
+    Search module: Voyage AI REST embedder (voyage-code-3) for hybrid search, zero local CPU. VOYAGE_API_KEY in ~/.context-pilot/.env. --max-indexing-threads 2. Port reconnects on reload.
+
+    Project hash: c7f7b6db, ~4196 chunks ~1399 files. Embedder: voyage-code-3, 1024 dims. VOYAGE_API_KEY in ~/.context-pilot/.env. Server flags: --max-indexing-threads 2. File watcher: RecommendedWatcher (event-driv
+  importance: high
+  last_edited_ms: 0
+M-short-25:
+  tier: short
+  title: T656/T658 Photonicat
+  contents: |-
+    T656/T658 Photonicat zero-touch eMMC install system BUILT (deploy/photonicat/emmc-install/). Self-provisions Context Pilot on-box (Model A). tag:pcat in ACL. T658 tailscale-enrol fix shipped 2b34dca6. Full design/facts/file-map in body.
+
+    T656 — zero-touch Debian-to-eMMC install for Photonicat 2 fleet.
+
+    DESIGN: drop armbian-install (interactive, no unattended). Clone asterix's proven Debian S
+  importance: high
+  last_edited_ms: 0
+M-short-26:
+  tier: short
+  title: UnixStream::pair() test
+  contents: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
+  importance: high
+  last_edited_ms: 0
+M-short-27:
+  tier: short
+  title: T584 tool-call UI
+  contents: 'T584 tool-call UI SHIPPED (commit eada5764, branch t584-tool-call-ui, PR #157): verb→lucide icon dict + Levenshtein fallback, dropped tool-name, click-to-fetch adaptive detail bubble backed by content-addressed toolcall persist.'
+  importance: high
+  last_edited_ms: 1787840964652
+M-short-28:
+  tier: short
+  title: Mac Mini 'gilbert'
+  importance: high
+  last_edited_ms: 1787840930929
+M-short-29:
+  tier: short
+  title: Thinking blocks echoed as
+  contents: Thinking blocks echoed as ContentBlock::Text (prefix '🧠 [Thinking]') in prompt_builder, NOT native Thinking. Signatures removed — prefix changes break them.
+  importance: high
+  last_edited_ms: 0
+M-short-3:
+  tier: short
+  title: 'Think tool v4: single'
+  contents: 'Think tool v4: single param (thought_body). ThinkState{consecutive_count, reminder_threshold, next_notification_at}. Fires reminder at threshold. Queue bypass. TUI card shows negative balance.'
+  importance: high
+  last_edited_ms: 0
+M-short-30:
+  tier: short
+  title: OAuth architecture (T504
+  contents: |-
+    OAuth architecture (T504 final): ALL consumers read the Claude token via vault().get("claude_oauth") — single entry, overrides→Keychain→file. Bypass is now a compile error. Commits dd9d2c54 + d2dde2cc.
+
+    ALL consumers read Claude token via cp_vault::vault().get("claude_oauth") — cascade: overrides, Keychain, file. load_claude_oauth_token() is pub(crate) — bypass = compile error. Write
+  importance: high
+  last_edited_ms: 0
+M-short-31:
+  tier: short
+  title: 'Dream layer decided: Groq'
+  importance: high
+  last_edited_ms: 1787840964644
+M-short-32:
+  tier: short
+  title: Rust 1.97.1 upgrade DONE
+  importance: high
+  last_edited_ms: 1787840930967
+M-short-33:
+  tier: short
+  title: 'web-lint: generated/'
+  contents: |-
+    web-lint: generated/ @ts-nocheck header now emitted NATIVELY by web/openapi-ts.config.ts output.header; the old post-codegen stamp loop is REMOVED. NEVER reintroduce hand-stamping. Commit 2dd641c4.
+
     web/openapi-ts.config.ts output.header (fn → 2 lines: @ts-nocheck generated-bindings line + '// This file is auto-generated by @hey-api/openapi-ts').
 
-    Both check-typescript-contract.sh AND CB5 ts-contract callback call `npx @hey-api/openapi-ts -f openapi-ts.config.ts` (config-driven). No stamping step.
-
-    Committed generated/ tree is byte-identical to a fresh config-driven codegen → contract drift check = clean regenerate + git diff --exit-code (local = CI). This answers T508's concern: hand-modifying generated/ risks the contract; emitting the header from hey-api itself keeps it drift-clean.
-
-    Migration also normalized a trailing newline onto the 16 generated files (config output ends files with a newline). One-time, then stable.
+    Both check-typescript-contract.sh AND CB5 ts
   importance: high
-  labels:
-  - web-lint
-  - hey-api
-  - generated-bindings
-  - contract
-  - ts-nocheck
-  last_edited_ms: 1783418954418
-f94cc1928a2d1feb:
-  tl_dr: 'WORKFLOW RULE (T581): NEVER push to master. Always new branch + new PR. Commit locally, branch off master, push the branch, open PR to master via gh. Augments M151 (don''t push unless asked) with the delivery mechanism when push IS asked.'
-  importance: critical
-  labels:
-  - workflow
-  - git
-  - branch
-  - pr
-  - no-master-push
   last_edited_ms: 0
-fb262826c899b682:
-  tl_dr: 'check-rust-tests.sh now `cargo test --workspace` (was tui-only, blind to 26 crates). Fixed 3 pre-existing breakages exposed by it. Chain #30.'
-  contents: 'T518. Switched check-rust-tests.sh to `cargo test --workspace`. Fixed 3 pre-existing breakages: cp-wire snapshot missing `paused` field, 8 test binaries with drifted use-extern silencer blocks, command() REST handler lost cost-breaker gate. Chain #30.'
+M-short-34:
+  tier: short
+  title: check-rust-tests.sh now
+  contents: |-
+    check-rust-tests.sh now `cargo test --workspace` (was tui-only, blind to 26 crates). Fixed 3 pre-existing breakages exposed by it. Chain #30.
+
+    T518. Switched check-rust-tests.sh to `cargo test --workspace`. Fixed 3 pre-existing breakages: cp-wire snapshot missing `paused` field, 8 test binaries with drifted use-extern silencer blocks, command() REST handler lost cost-breaker gate. Chain #30.
   importance: high
-  labels:
-  - ci
-  - rust-tests
-  - workspace
-  - breaker
-  - T518
-  last_edited_ms: 1784203015353
-fe4cc25edbfbea1f:
-  tl_dr: 'User hardware: ThinkPad T14s Gen 6, Ryzen AI 7 PRO 350 (Zen 5, 8c/16t), 24GB LPDDR5x 7500MT/s, Radeon 860M iGPU, ~48 GB/s bandwidth.'
+  last_edited_ms: 0
+M-short-35:
+  tier: short
+  title: 'SUPERSEDED (T588): user'
+  importance: high
+  last_edited_ms: 1787840930935
+M-short-36:
+  tier: short
+  title: T645 agent image
+  contents: 'T645 SHIPPED: agent image editor in Settings > Model (LlmTab). Lives on PR #183 (branch t646-agent-selector-shortcut, cherry-picked e07fcf8f). Pure render wiring, no backend.'
+  importance: medium
+  last_edited_ms: 1787840964656
+M-short-37:
+  tier: short
+  title: HISTORICAL (macbook node,
+  importance: medium
+  last_edited_ms: 1787840930937
+M-short-38:
+  tier: short
+  title: 'Context Pilot: Rust TUI'
+  importance: medium
+  last_edited_ms: 1787840964661
+M-short-39:
+  tier: short
+  title: Harbor adapter
+  contents: 'Harbor adapter (context_pilot_agent.py) validated. Reward 1.0 on break-filter-js-from-html. Model-mapping bug: apply_provider_model ignores --model for claude_code_v2 provider.'
   importance: medium
   last_edited_ms: 0
-ffb84e0bd397cc96:
-  tl_dr: 'SUPERSEDED (T588): user now wants commit AND push after each A1-A13 lint step so CI runs in background. Push we-dev after every step. (Was: commit local only, no push.)'
+M-short-4:
+  tier: short
+  title: 'T661: V1 claude_code'
+  contents: |-
+    T661: V1 claude_code DELETED. Sole OAuth provider = ClaudeCodeV2 (FE label 'Claude Code'), 13 beta flags led by oauth-2025-04-20 (haiku strips context-1m), UA 2.1.220, 6 bare-ID models. api_key module kept but FE-hidden. FE = 2 buttons. Detail in body.
+
+    Claude Code V2: OAuth Bearer, 9 beta headers. Models: opus-4-8 ($5/$25 200K), fable-5 ($10/$50 400K cap), sonnet-4-6 ($3/$15 1M). Thinking ada
   importance: high
-  labels:
-  - workflow
-  - temporary
-  - git
-  last_edited_ms: 1784496766882
+  last_edited_ms: 0
+M-short-40:
+  tier: short
+  title: 'DOCUMENTATION PHASE:'
+  importance: medium
+  last_edited_ms: 1787840964647
+M-short-5:
+  tier: short
+  title: 'Datalab OCR API: POST'
+  contents: |-
+    Datalab OCR API: POST /api/v1/convert (multipart, X-Api-Key). Poll GET /convert/{id}. Returns markdown. Old /marker and /ocr endpoints deprecated.
+
+    Endpoint: POST https://www.datalab.to/api/v1/convert (multipart, X-Api-Key). Poll: GET /api/v1/convert/{id}. Params: mode, output_format (markdown/html/json/chunks), max_pages, page_range. Old /marker and /ocr deprecated.
+  importance: high
+  last_edited_ms: 0
+M-short-6:
+  tier: short
+  title: 'Context Pilot env vars:'
+  contents: 'Context Pilot env vars: ANTHROPIC_API_KEY, BRAVE_API_KEY, FIRECRAWL_API_KEY, GITHUB_TOKEN (core). Optional LLM providers and chat bridge tokens. Loaded via dotenvy from .env, fallback to global config.'
+  importance: high
+  last_edited_ms: 0
+M-short-7:
+  tier: short
+  title: T581 footer + editor
+  contents: 'T581 SHIPPED: StatusBar footer behaviour-selector shows+switches active agent (LoadBehaviour command, reused threads/commands sync path — no dup); per-item Delete/Export/Edit + Create/Import via orchestrator library CRUD (GET/PUT/DELETE library/agent/{id}) + AgentEditorDialog. Live-invalidation via OpEntryKind.agent_id.'
+  importance: medium
+  last_edited_ms: 1787840930960
+M-short-8:
+  tier: short
+  title: 'OPERATING MODEL: harbor'
+  contents: |-
+    OPERATING MODEL: harbor auto-loop STOPPED. Launch ONE task at a time from benchmarks/terminal-bench. Full launch syntax in contents.
+
+    Launch: `bash -lc 'CREDS=$(security find-generic-password -s "Claude Code-credentials" -w); export CLAUDE_CREDENTIALS_JSON="$CREDS"; export CP_PROVIDER=claude_code_v2; export PYTHONPATH="$PWD:$PYTHONPATH"; ~/.harbor-venv/bin/harbor run -d terminal-bench@2.0 --ag
+  importance: high
+  last_edited_ms: 0
+M-short-9:
+  tier: short
+  title: T651 fleet-shared behav
+  contents: 'T651 SHIPPED: agents/skills/commands now fleet-shared at ~/.context-pilot/behaviours/{agents,skills,commands}/<id>.md. cp-base home_behaviours_dir(); cp-mod-prompt dir_for->home + migrate_local_to_shared() at boot (byte-compare, incoming gets -<n> on differ, already-shared keeps id); orchestrator create.rs+panels.rs ->home. Migration verified live, local dirs drained. Branch t648.'
+  importance: medium
+  last_edited_ms: 1787841427480
+M-tiny-1:
+  tier: tiny
+  title: 'T568: ''Use'' release'
+  contents: |-
+    T568: 'Use' release selection now survives orchestrator reload. Backend::new reconciles persisted active_tag onto agent_binary at boot. Fix in transport/rest/backend.rs.
+
+    select_release persists act
+  importance: medium
+  last_edited_ms: 0
+M-tiny-10:
+  tier: tiny
+  title: IR Architecture Phases
+  contents: IR Architecture Phases 1-6 COMPLETE. cp-render crate with typed IR primitives. Panel::blocks() trait, build_frame() centralized builder. egui-frontend abandoned.
+  importance: medium
+  last_edited_ms: 0
+M-tiny-11:
+  tier: tiny
+  title: 'T566 restart flow:'
+  contents: 'T566 restart flow: useRestartFlow uses client-only ''waiting'' AgentStatus. Set ONLY on restart success (setQueryData). New agent Lifecycle::Running delta clears it via foldLifecycle. No state machine'
+  importance: medium
+  last_edited_ms: 0
+M-tiny-12:
+  tier: tiny
+  title: Alignment epic
+  contents: Alignment epic (X818/T120) and HUD push-feed (T297) DONE. Context helpers in src/modules/overview/context.rs. OpEntryKind::ContextUsage carries used/threshold/budget + hit/miss.
+  importance: medium
+  last_edited_ms: 0
+M-tiny-13:
+  tier: tiny
+  title: 'User hardware: ThinkPad'
+  contents: 'User hardware: ThinkPad T14s Gen 6, Ryzen AI 7 PRO 350 (Zen 5, 8c/16t), 24GB LPDDR5x 7500MT/s, Radeon 860M iGPU, ~48 GB/s bandwidth.'
+  importance: medium
+  last_edited_ms: 0
+M-tiny-14:
+  tier: tiny
+  title: No autocontinuation
+  contents: NEVER activate autocontinuation (spine_configure continue_until_todos_done). User says it bugs badly. Always sail manually, batch by batch.
+  importance: critical
+  last_edited_ms: 1787840930941
+M-tiny-15:
+  tier: tiny
+  title: Active branch = nornor
+  contents: 'ACTIVE WORKING BRANCH = ''nornor'' (T735 mandate). All changes push to nornor unless user says otherwise. (Exception T650: user chose t648.)'
+  importance: critical
+  last_edited_ms: 1787840930943
+M-tiny-16:
+  tier: tiny
+  title: Freeze RESOLVED at infra
+  contents: Freeze RESOLVED at infra level (v0.2.8 deadman + v0.2.9 stream timeout + v0.2.10 deadman-aware-of-retry). gpt2 dribble = throttle-induced, not fundamental. Normal tasks pass.
+  importance: low
+  last_edited_ms: 0
+M-tiny-17:
+  tier: tiny
+  title: Datalab documentation
+  contents: 'Datalab documentation site: documentation.datalab.to (Mintlify-hosted). API reference at documentation.datalab.to/api-reference/health. Has sections on limits, supported file types, SDK, on-prem, we'
+  importance: low
+  last_edited_ms: 0
+M-tiny-18:
+  tier: tiny
+  title: Never touch gilbert net
+  contents: NEVER touch Tailscale or network config on Mac Mini 'gilbert'. User forbids it. Already configured; deploy without network changes.
+  importance: critical
+  last_edited_ms: 1787840930946
+M-tiny-19:
+  tier: tiny
+  title: English only
+  contents: ALWAYS communicate with user in ENGLISH. Refuse French; if user writes French, politely ask them to switch. (Standing instruction T655.)
+  importance: critical
+  last_edited_ms: 1787840930947
+M-tiny-2:
+  tier: tiny
+  title: Entities module COMPLETE
+  contents: Entities module COMPLETE — 151/151 stress tests passed. 9 bugs found/fixed. Production-quality.
+  importance: medium
+  last_edited_ms: 0
+M-tiny-20:
+  tier: tiny
+  title: Never touch temp files
+  contents: NEVER touch temp_1.md or temp_2.md — user's personal files. Do not read, write, edit, or revert them.
+  importance: critical
+  last_edited_ms: 1787840930949
+M-tiny-21:
+  tier: tiny
+  title: tmp/v2 editor
+  contents: 'tmp/v2 Word-clone editor (side project): Tiptap+Vite+React on :5199. Pretty-printed disk storage, diff3 word-merge, PDF via Paged.js+print.'
+  importance: low
+  last_edited_ms: 1787840930965
+M-tiny-22:
+  tier: tiny
+  title: Rust 1.97.1 pin
+  contents: 'Rust pinned 1.97.1 (T585, was 1.95.0): rust-toolchain.toml channel + ci.yml + release.yml RUST_VERSION. No per-crate MSRV.'
+  importance: medium
+  last_edited_ms: 1787840930968
+M-tiny-23:
+  tier: tiny
+  title: Context Pilot stack
+  contents: 'Context Pilot: Rust TUI AI coding assistant (Ratatui+Crossterm). Workspace = 22+ crates + 1 main binary (tui).'
+  importance: low
+  last_edited_ms: 1787840964664
+M-tiny-3:
+  tier: tiny
+  title: 'Haiku 4.5 max_tokens fix:'
+  contents: 'Haiku 4.5 max_tokens fix: anthropic client uses model-specific limits (64K for Haiku, 200K for others) instead of hardcoded.'
+  importance: medium
+  last_edited_ms: 0
+M-tiny-4:
+  tier: tiny
+  title: 'T646 SHIPPED + FIXED:'
+  contents: 'T646 SHIPPED + FIXED: ⌘/Ctrl+A opens the workspace AgentSwitcher from any view, shows an ''A'' HintBadge on ⌘-hold, and respects empty-vs-filled text fields. Branch t646-agent-selector-shortcut, P'
+  importance: medium
+  last_edited_ms: 0
+M-tiny-5:
+  tier: tiny
+  title: 'CI web-install fix:'
+  contents: |-
+    CI web-install fix: web/pnpm-workspace.yaml needs `packages: [.]` + `allowBuilds: {unrs-resolver: true}`; pin CI+release pnpm to 11.6.0.
+
+    pnpm 11 needs `packages: [.]` in pnpm-workspace.yaml + `allo
+  importance: medium
+  last_edited_ms: 0
+M-tiny-6:
+  tier: tiny
+  title: 'User preference: factor'
+  contents: 'User preference: factor code out into new files rather than trimming comments to stay under line limits.'
+  importance: medium
+  last_edited_ms: 0
+M-tiny-7:
+  tier: tiny
+  title: 'SSE freeze v0.2.4-v0.2.7:'
+  contents: 'SSE freeze v0.2.4-v0.2.7: 4 watchdogs layered (idle-body 120s, send-header 60s, first-content 90s, catch-all TTFB 100s) in streaming.rs + mod.rs. All still in binary.'
+  importance: medium
+  last_edited_ms: 0
+M-tiny-8:
+  tier: tiny
+  title: entity_sql SQL splitter
+  contents: 'entity_sql SQL splitter bugs fixed: UTF-8 truncation, comment/identifier mis-splitting, DML-batch-with-SELECT dispatch. Mini-tokenizer in sql/parse.rs.'
+  importance: medium
+  last_edited_ms: 0
+M-tiny-9:
+  tier: tiny
+  title: T592 tmp/v2 Word-clone
+  contents: 'T592 tmp/v2 Word-clone Tiptap editor: Vite 7 + React 19 + TS strict on :5199, Office ribbon (File/Home/Insert/Layout/View), live A4 pagination via tiptap-pagination-plus, PDF export via Paged.js+pri'
+  importance: medium
+  last_edited_ms: 0
