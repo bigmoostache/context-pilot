@@ -18674,6 +18674,10 @@ d3b2da2605f40d13:
   path: crates/cp-orchestrator/src/services/auth/store.rs
   description: AuthStore — SQLite-backed auth CRUD. Schema init (users/sessions/agent_acl), Argon2id hashing, token/UUID generation. User CRUD, session lifecycle (create/validate→Option<User>/revoke with lazy sweep), ACL operations (grant/revoke/update_role/check/list_agent_users/list_user_agents/is_agent_admin). revoke_all_sessions + auto_grant_creator removed (dead code, re-add when wired). 18 tests in sibling tests.rs.
   last_edited_ms: 1782239654523
+d3b487f34a4ba101:
+  path: web/src/components/Root.tsx
+  description: 'Desktop tree root — Provider-contract boundary + AppShell (view-router fleet/threads/finder/settings/costs, TopBar+StatusBar, live vitals/SSE, disconnect overlay). Mirror twin of mobile Root. T636 nav-history: useNavHistory wires browser Back/Next via History API (NavState {view,agentId,threadId?,settingsTab?}); AppShell OWNS selectedThreadId (single writer of cp-thread-<id>, sync-read seed in openAgent/applyNav) + settingsTab, feeds ThreadsView/SettingsView controlled. CI-fix (PR#182): view-router extracted into ShellViews subcomponent (ShellViewsProps bundles atoms+handlers) to keep AppShell under max-lines-per-function; useNavHistory takes a single `current` tuple arg (max-params 4); conditional history entries use `...(cond && {x})` logical spread; threadKeyFor hoisted to module scope (function-scoping); ShellViewsProps.agents typed Agent[] (not useFleet data union) so FleetDashboard gets non-optional.'
+  last_edited_ms: 1787826344688
 d3c7b08de985c75a:
   path: crates/cp-mod-github/src/tools.rs
   description: GitHub CLI tool. Read-only → dynamic github_result panels. Mutating → async subprocess via spawn_async_tool. flame!("gh_exec"). Token redaction. Cache invalidation of affected panels. GIT_PROMPT_DISABLED.

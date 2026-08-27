@@ -220,9 +220,7 @@ export function FormWidget({
   draftKey: string
   onSubmit: (formId: string, entries: FormAnswerEntry[]) => void
 }) {
-  const [values, setValues] = useState<Record<string, AnswerValue>>(() =>
-    loadDraft(draftKey, spec),
-  )
+  const [values, setValues] = useState<Record<string, AnswerValue>>(() => loadDraft(draftKey, spec))
   const [sent, setSent] = useState(false)
 
   const filled = useMemo(

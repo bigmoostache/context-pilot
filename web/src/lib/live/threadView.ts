@@ -162,7 +162,7 @@ export function useThreadSelection(
       }
     }
     prevThreadIdsRef.current = currentIds
-  }, [threads, currentIds])
+  }, [threads, currentIds, setSelectedId])
 
   // Resolve the selection to a thread that actually exists, falling back to the
   // first non-archived (then any) thread.

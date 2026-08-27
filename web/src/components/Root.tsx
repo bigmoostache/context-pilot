@@ -18,24 +18,17 @@ import { useDevMode } from "@/lib/providers/toggles/devMode"
 import { useFleet, useAgentMeta, useSseConnected, useRestartFlow } from "@/lib/live"
 import { TelemetryProfiler } from "@/lib/support/telemetry"
 import { TelemetryHud } from "@/components/shell/widgets/TelemetryHud"
-import type { ViewMode } from "@/lib/types"
+import type { ViewMode, Agent } from "@/lib/types"
 import "@/App.css"
 
 /**
  * Desktop component-tree root — the mirror twin of `mobile-components/Root`.
  *
- * Extracted verbatim from the former `App.tsx` body; `App.tsx` is now the
- * device switch that lazy-loads this tree or its mobile twin (see `App.tsx`).
- * Mounts the global contexts (theme, auth, account, dev-mode) and the tooltip
- * layer **above** {@link AppShell}. AuthProvider probes the backend's auth
- * status on mount; AuthGuard shows the login page when auth is enabled but no
- * valid session exists, and drives the backend's `next_action` post-login flow
- * — including the day-0 provisioning steps that used to live on the removed
- * maintenance plane (design §13.4).
- *
- * This is a **provider-contract boundary** (design §11.8): any divergent mobile
- * `Root` must mount the same providers, or mobile children that consume these
- * contexts break.
+ * Mounts the global contexts (theme, auth, account, dev-mode) + the tooltip
+ * layer above {@link AppShell}. AuthGuard shows the login page and drives the
+ * backend `next_action` post-login flow (design §13.4). A **provider-contract
+ * boundary** (design §11.8): any divergent mobile `Root` must mount the same
+ * providers, or mobile children consuming these contexts break.
  */
 function Root() {
   return (
@@ -58,14 +51,11 @@ function Root() {
 }
 
 /** The navigation atoms browser Back / Next restore (T636). One degree finer
- *  than the original view+agent: the accessed THREAD (in the threads view) and
- *  the accessed settings CATEGORY (in the settings view) ride along too, so Back
- *  steps through the threads and settings pages you actually visited — not just
- *  the top-level surface. Still coarse below that: the finder tab/split layout
- *  stays remembered per agent in localStorage (restored on the keyed remount),
- *  and rail toggles are never their own entry. `threadId`/`settingsTab` are
- *  optional — only the field relevant to `view` is recorded, and a foreign or
- *  older history entry lacking them decodes fine. */
+ *  than view+agent: the accessed THREAD (threads view) and settings CATEGORY
+ *  (settings view) ride along, so Back steps through the pages actually visited.
+ *  Coarser below that (finder tab/split stays in localStorage; rail toggles are
+ *  never entries). `threadId`/`settingsTab` are optional — only the field
+ *  relevant to `view` is recorded, and an entry lacking them decodes fine. */
 interface NavState {
   view: ViewMode
   agentId: string
@@ -109,40 +99,36 @@ function sameNav(a: NavState, b: NavState): boolean {
   )
 }
 
+/** localStorage key holding an agent's last-selected thread. Module-scoped (no
+ *  closure over shell state) so it seeds the state initializer, the persist
+ *  effect, and the nav-restore fallback from one place. */
+const threadKeyFor = (id: string) => `cp-thread-${id}`
+
 /**
- * Wire the browser's Back / Next buttons to the app's view + agent, using the
- * History API directly (no router — the app was never built on one, and does
- * not need to be for this).
+ * Wire browser Back / Next to the (view, agent, thread, settings-tab) tuple via
+ * the History API directly — the app has no router and needs none here.
  *
- * THREE MECHANISMS, one effect each:
+ * Three effects: (1) PUSH on change — each tuple change pushes a state-only
+ * entry, except a popstate echo (loop guard) or a push matching the top entry;
+ * the first run `replaceState`s so the app starts with no duplicate base entry.
+ * (2) APPLY on popstate — hands the entry's `nav` to `apply`, setting the atoms.
+ * (3) LOOP GUARD — `applyingRef` swallows the one push-effect run that applying
+ * a popstate triggers, so the entry just navigated to isn't re-pushed (same
+ * one-shot-ref trick the SSE reducers use).
  *
- * 1. PUSH on change. Every time the (view, agent) pair changes, a new history
- *    entry is pushed carrying it — UNLESS this render is itself the result of
- *    applying a popstate (see the guard) or the pair already matches the top
- *    entry (a redundant push would make one Back a no-op). The first run
- *    `replaceState`s instead of pushing, so the app does not start with a
- *    duplicate entry the user must Back through to leave.
- *
- * 2. APPLY on popstate. Back / Next fire `popstate` with the entry's `nav`
- *    payload; it is handed to `apply`, which sets the view + agent atoms.
- *
- * 3. THE LOOP GUARD. Applying a popstate sets the atoms, which re-renders and
- *    would re-fire the push effect — pushing the entry we just navigated to and
- *    corrupting the stack. `applyingRef` marks that the next push-effect run is
- *    a popstate echo and must be swallowed, not pushed. Same one-shot-ref trick
- *    the SSE reducers and the doc editor use for remote-applied state.
- *
- * URLs are left untouched (state-only `pushState`): a hard refresh has no path
- * to restore from and simply falls back to the localStorage-persisted view +
- * agent, which is exactly the pre-existing behaviour.
+ * URLs stay untouched: a hard refresh falls back to the localStorage-persisted
+ * view + agent, the pre-existing behaviour.
  */
 function useNavHistory(
-  view: ViewMode,
-  agentId: string,
-  threadId: string | undefined,
-  settingsTab: TabId | undefined,
+  current: {
+    view: ViewMode
+    agentId: string
+    threadId: string | undefined
+    settingsTab: TabId | undefined
+  },
   apply: (s: NavState) => void,
 ) {
+  const { view, agentId, threadId, settingsTab } = current
   const applyingRef = useRef(false)
   const bootRef = useRef(false)
 
@@ -159,8 +145,8 @@ function useNavHistory(
     const nav: NavState = {
       view,
       agentId,
-      ...(view === "threads" && threadId ? { threadId } : {}),
-      ...(view === "settings" ? { settingsTab } : {}),
+      ...(view === "threads" && threadId && { threadId }),
+      ...(view === "settings" && { settingsTab }),
     }
     if (!bootRef.current) {
       // Seed the current location as the base entry rather than pushing a
@@ -187,6 +173,93 @@ function useNavHistory(
   }, [apply])
 }
 
+/** Props for {@link ShellViews} — the shell's view atoms + the handlers each
+ *  surface needs. Extracted verbatim from AppShell's former `renderView` so the
+ *  container stays under the per-function line budget; purely a presentational
+ *  router, all behaviour lives in the handlers passed down. */
+interface ShellViewsProps {
+  effectiveView: ViewMode
+  agents: Agent[]
+  activeAgent: ReturnType<typeof useAgentMeta>["data"] | undefined
+  activeAgentId: string
+  openAgent: (id: string) => void
+  showInFinder: (path: string) => void
+  disconnected: boolean
+  onReconnect: () => void
+  threadsRailOpen: boolean
+  selectedThreadId: string
+  onThreadChange: (id: string) => void
+  newThreadOpen: boolean
+  onNewOpenChange: (v: boolean) => void
+  threadSearchOpen: boolean
+  onSearchOpenChange: (v: boolean) => void
+  settingsRailOpen: boolean
+  settingsTab: TabId
+  onSettingsTab: (t: TabId) => void
+  finderRailOpen: boolean
+  finderRevealPath: string | null
+  onRevealConsumed: () => void
+}
+
+/** Route the active view to its surface. A flat if-chain (not a nested ternary)
+ *  so each branch reads cleanly and the fleet fallthrough is explicit. */
+function ShellViews(p: ShellViewsProps) {
+  if (p.effectiveView === "fleet") {
+    return <FleetDashboard agents={p.agents} onOpenAgent={p.openAgent} />
+  }
+  if (p.effectiveView === "costs") {
+    return (
+      <CostsView
+        agentId={p.activeAgentId}
+        disconnected={p.disconnected}
+        onReconnect={p.onReconnect}
+      />
+    )
+  }
+  if (p.effectiveView === "settings" && p.activeAgent) {
+    return (
+      <SettingsView
+        key={p.activeAgent.id}
+        agent={p.activeAgent}
+        railOpen={p.settingsRailOpen}
+        tab={p.settingsTab}
+        onTab={p.onSettingsTab}
+        disconnected={p.disconnected}
+        onReconnect={p.onReconnect}
+      />
+    )
+  }
+  if (p.effectiveView === "finder" && p.activeAgent) {
+    return (
+      <Finder
+        key={p.activeAgent.id}
+        agent={p.activeAgent}
+        railOpen={p.finderRailOpen}
+        revealPath={p.finderRevealPath}
+        onRevealConsumed={p.onRevealConsumed}
+        disconnected={p.disconnected}
+        onReconnect={p.onReconnect}
+      />
+    )
+  }
+  return (
+    <ThreadsView
+      key={p.activeAgentId}
+      activeAgentId={p.activeAgentId}
+      selectedThreadId={p.selectedThreadId}
+      onThreadChange={p.onThreadChange}
+      onShowInFinder={p.showInFinder}
+      railOpen={p.threadsRailOpen}
+      newOpen={p.newThreadOpen}
+      onNewOpenChange={p.onNewOpenChange}
+      searchOpen={p.threadSearchOpen}
+      onSearchOpenChange={p.onSearchOpenChange}
+      disconnected={p.disconnected}
+      onReconnect={p.onReconnect}
+    />
+  )
+}
+
 function AppShell() {
   const { devMode } = useDevMode()
   const { data: agents = [] } = useFleet()
@@ -208,7 +281,6 @@ function AppShell() {
   // selection stays persisted per agent under the SAME `cp-thread-<id>` key the
   // hook used, so a reload still returns to the last thread; the shell is now
   // simply the single writer of that key (the hook defers to it when controlled).
-  const threadKeyFor = (id: string) => `cp-thread-${id}`
   const [selectedThreadId, setSelectedThreadId] = useState(
     () => localStorage.getItem(threadKeyFor(activeAgentId)) ?? "",
   )
@@ -281,20 +353,15 @@ function AppShell() {
   // per-agent state. Not persisted to localStorage.
   const [threadsRailOpen, setThreadsRailOpen] = useState(true)
 
-  // The settings view's category rail. A SEPARATE flag from the threads rail
-  // above, not a shared one: collapsing the thread list is a statement about
-  // the thread list, and having it silently collapse the settings categories
-  // too would make each panel's state depend on a panel the user cannot see.
-  // Same ownership reasoning — the control that toggles it is the header
-  // rail's Settings tab, a sibling of the view rather than a descendant.
+  // The settings view's category rail — a SEPARATE flag from the threads rail
+  // (collapsing one panel must never silently collapse another the user can't
+  // see). Owned here because its toggle is the header rail's Settings tab, a
+  // sibling of the view, not a descendant.
   const [settingsRailOpen, setSettingsRailOpen] = useState(true)
 
-  // The finder view's explorer rail. Its OWN flag, same reasoning as the two
-  // rails above: the control that toggles it is the header rail's Finder tab
-  // (a sibling of the view), and collapsing one panel must never silently
-  // collapse another the user cannot see. Re-clicking the Finder tab while
-  // finder is already the active view flips this (the activity-bar idiom the
-  // Threads and Settings tabs already use).
+  // The finder view's explorer rail — its OWN flag, same reasoning as above.
+  // Re-clicking the Finder tab while finder is active flips it (the activity-bar
+  // idiom the Threads and Settings tabs already use).
   const [finderRailOpen, setFinderRailOpen] = useState(true)
 
   // The two thread-list ACTIONS, hoisted for the same reason as the rail above:
@@ -326,69 +393,18 @@ function AppShell() {
   const applyNav = useCallback((s: NavState) => {
     setView(s.view)
     setActiveAgentId(s.agentId)
-    setSelectedThreadId(s.threadId ?? localStorage.getItem(`cp-thread-${s.agentId}`) ?? "")
+    setSelectedThreadId(s.threadId ?? localStorage.getItem(threadKeyFor(s.agentId)) ?? "")
     if (s.settingsTab) setSettingsTab(s.settingsTab)
   }, [])
-  useNavHistory(effectiveView, activeAgentId, selectedThreadId || undefined, settingsTab, applyNav)
-
-  // Route the active view to its surface. A flat if-chain (not a nested ternary)
-  // so each branch reads cleanly and the fleet fallthrough is explicit.
-  const renderView = () => {
-    if (effectiveView === "fleet") {
-      return <FleetDashboard agents={agents} onOpenAgent={openAgent} />
-    }
-    if (effectiveView === "costs") {
-      return (
-        <CostsView
-          agentId={activeAgentId}
-          disconnected={showDisconnectOverlay}
-          onReconnect={restartAgent}
-        />
-      )
-    }
-    if (effectiveView === "settings" && activeAgent) {
-      return (
-        <SettingsView
-          key={activeAgent.id}
-          agent={activeAgent}
-          railOpen={settingsRailOpen}
-          tab={settingsTab}
-          onTab={setSettingsTab}
-          disconnected={showDisconnectOverlay}
-          onReconnect={restartAgent}
-        />
-      )
-    }
-    if (effectiveView === "finder" && activeAgent) {
-      return (
-        <Finder
-          key={activeAgent.id}
-          agent={activeAgent}
-          railOpen={finderRailOpen}
-          revealPath={finderRevealPath}
-          onRevealConsumed={() => setFinderRevealPath(null)}
-          disconnected={showDisconnectOverlay}
-          onReconnect={restartAgent}
-        />
-      )
-    }
-    return (
-      <ThreadsView
-        key={activeAgentId}
-        activeAgentId={activeAgentId}
-        selectedThreadId={selectedThreadId}
-        onThreadChange={setSelectedThreadId}
-        onShowInFinder={showInFinder}
-        railOpen={threadsRailOpen}
-        newOpen={newThreadOpen}
-        onNewOpenChange={setNewThreadOpen}
-        searchOpen={threadSearchOpen}
-        onSearchOpenChange={setThreadSearchOpen}
-        disconnected={showDisconnectOverlay}
-        onReconnect={restartAgent}
-      />
-    )
-  }
+  useNavHistory(
+    {
+      view: effectiveView,
+      agentId: activeAgentId,
+      threadId: selectedThreadId || undefined,
+      settingsTab,
+    },
+    applyNav,
+  )
 
   // When the agent is unreachable (SSE down OR registry-stale) and we're
   // viewing an agent surface, blur+grey the main content and intercept all
@@ -431,7 +447,31 @@ function AppShell() {
         {/* The view's own box, unchanged: every view roots itself on
             `flex min-h-0 flex-1`, so it still resolves against a COLUMN. */}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <TelemetryProfiler id={effectiveView}>{renderView()}</TelemetryProfiler>
+          <TelemetryProfiler id={effectiveView}>
+            <ShellViews
+              effectiveView={effectiveView}
+              agents={agents}
+              activeAgent={activeAgent}
+              activeAgentId={activeAgentId}
+              openAgent={openAgent}
+              showInFinder={showInFinder}
+              disconnected={showDisconnectOverlay}
+              onReconnect={restartAgent}
+              threadsRailOpen={threadsRailOpen}
+              selectedThreadId={selectedThreadId}
+              onThreadChange={setSelectedThreadId}
+              newThreadOpen={newThreadOpen}
+              onNewOpenChange={setNewThreadOpen}
+              threadSearchOpen={threadSearchOpen}
+              onSearchOpenChange={setThreadSearchOpen}
+              settingsRailOpen={settingsRailOpen}
+              settingsTab={settingsTab}
+              onSettingsTab={setSettingsTab}
+              finderRailOpen={finderRailOpen}
+              finderRevealPath={finderRevealPath}
+              onRevealConsumed={() => setFinderRevealPath(null)}
+            />
+          </TelemetryProfiler>
         </div>
       </div>
 
