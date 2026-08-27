@@ -52,6 +52,19 @@
   - architecture
   - meilisearch
   last_edited_ms: 1784202976545
+0bc8b494e067496a:
+  tl_dr: 'T645 SHIPPED: agent image editor added to Settings > Model (LlmTab). Now lives on PR #183 (branch t646-agent-selector-shortcut, cherry-picked commit e07fcf8f) — MOVED off its old branch agent-image-in-settings; PR #184 CLOSED + branch deleted (user wants all changes on one PR). Pure render wiring, no backend. Details in body.'
+  contents: 'User (T645) asked to add agent-image modification to the settings tab. The whole avatar upload path already existed (T338: POST /api/agent/{id}/avatar, avatarUrl, useUploadAvatar, and useAgentModalActions.onAvatarChange/onRandomizeAvatar/avatarBust with DiceBear shuffle). The Controller `c` that LlmTab receives already carried these handlers, so this was PURE presentational wiring (M141: no new logic). Added an AvatarField presentational component to web/src/components/agents/AgentModal/manageBody.tsx and render it atop LlmTab (guarded on c.agent): labelled ''Agent image'' section, native <label htmlFor=agent-settings-avatar> file-picker over a visually-hidden input (accept png/jpeg/gif/webp/svg), Dices randomize badge as a SIBLING of the label. Applies immediately (avatar mutation), no Save needed. manageBody 317 lines. AgentModal/ dir stayed at 7 entries (no new file). Full frontend gate green. GOTCHA: prettier failed first because the hand-written JSX/comment wrapping didn''t match prettier; fixed with `npx prettier --write` (that bypasses Edit-tool callbacks, so re-ran the full gate manually).'
+  importance: medium
+  labels:
+  - T645
+  - avatar
+  - agent-image
+  - settings
+  - shipped
+  - web
+  - pr-183
+  last_edited_ms: 1787828109163
 0c509f3ad4df7597:
   tl_dr: 'Reverie supports multiple concurrent sub-agents (one per agent type). HashMap<String, ReverieState> keyed by agent_id. UI shows one card per active reverie. Tool cap: 50.'
   contents: 'HashMap<String, ReverieState> keyed by agent_id. UI shows one card per active reverie. Built-in: cleaner (context optimizer), cartographer (tree describer). Tool cap: 50.'
