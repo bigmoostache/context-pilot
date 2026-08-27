@@ -92,6 +92,16 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     // surfaced in the result so the AI knows the thread is live again (T353).
     let unarchived = push_send_message(state, tid, msg, still_my_turn);
 
+    // Refresh the static Threads panel so the just-sent message appears in the
+    // LLM-facing panel content without needing a follow-up `Read`. Guarded on
+    // the target existing so an invalid id can't clobber the current panel with
+    // a conversation-less list view. This deliberately does NOT break tempo
+    // (`preserves_tempo` stays true below): it updates the panel source + marks
+    // it fresh, but never forces a full context refresh the way `Read` does.
+    if ThreadsState::get(state).threads.iter().any(|t| t.id == tid) {
+        rebuild_threads_panel(state, tid, now);
+    }
+
     // Clear focus + start dangling phase only when handing the thread back.
     if !still_my_turn {
         let fs = FocusState::get_mut(state);
@@ -159,6 +169,23 @@ fn force_refresh_threads_panel(state: &mut State) {
     }
 }
 
+/// Rebuild the static Threads `panel_content` for `focused_tid` and mark the
+/// panel to emit fresh this tick.
+///
+/// `panel_content` is the LLM-facing snapshot; it is (re)generated ONLY here.
+/// Shared by [`execute_read`] (read + focus) and [`execute_send`] (so a message
+/// the agent just posted appears in the panel without a follow-up `Read`).
+///
+/// This updates the panel's SOURCE and force-refreshes it, but does NOT touch
+/// `state.tempo` — a caller that preserves tempo (Send) keeps a full cache
+/// refresh from firing; the new content then emits on the next tick the freeze
+/// pass runs fresh (never lost, since `panel_content` is durable).
+fn rebuild_threads_panel(state: &mut State, focused_tid: &str, now_ms: u64) {
+    let panel_content = build_panel_content(state, focused_tid, now_ms);
+    ThreadsState::get_mut(state).panel_content = panel_content;
+    force_refresh_threads_panel(state);
+}
+
 /// Read messages from a thread. Sets focus and updates the Threads panel.
 ///
 /// Marks all messages in the target thread as acknowledged, builds the
@@ -215,9 +242,7 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
     apply_read_focus(state, tid, thread_status);
 
     // --- Phase 4: Build panel content (thread list + focused conversation) ---
-    let panel_content = build_panel_content(state, tid, now_ms);
-    ThreadsState::get_mut(state).panel_content = panel_content;
-    force_refresh_threads_panel(state);
+    rebuild_threads_panel(state, tid, now_ms);
 
     // --- Phase 5: Build lightweight tool result ---
     let result_body = build_read_result(
