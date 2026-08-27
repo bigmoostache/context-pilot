@@ -45,6 +45,7 @@ export function AgentSwitcher({
   onSwitch,
   onManageAgents,
   rail = false,
+  triggerRef,
 }: {
   agents: Agent[]
   activeId?: string | undefined
@@ -57,12 +58,16 @@ export function AgentSwitcher({
    *  to go — and truncating a name to three letters conveys less than the
    *  avatar already does. The menu itself is unchanged. */
   rail?: boolean
+  /** Ref onto the dropdown trigger button, so an ancestor can open the menu
+   *  programmatically — the ⌘/Ctrl+A workspace shortcut clicks it (T646). */
+  triggerRef?: React.Ref<HTMLButtonElement> | undefined
 }) {
   const active = agents.find((a) => a.id === activeId)
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
+        ref={triggerRef}
         aria-label={active ? `Workspace: ${active.name}` : "Select an agent"}
         className={cn(
           "flex h-8 items-center gap-2 rounded-lg px-1.5 text-left transition-colors outline-none",

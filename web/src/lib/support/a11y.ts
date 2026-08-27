@@ -66,12 +66,16 @@ export function clickable(onActivate: () => void): {
  *    here. Without clearing on blur, the badges stay lit forever after the
  *    first app switch.
  *
- * 3. SOME LETTERS ARE ALREADY TAKEN, and `c` is the dangerous one — it is Copy.
- *    A binding on `c` fires ONLY when a copy would have done nothing anyway
- *    (see {@link copyWouldBeNoop}), so a real copy is never stolen. Note that
- *    the test is on the SELECTION, not on focus: a caret sitting in a text box
- *    with nothing highlighted copies nothing, so the shortcut still works
- *    there. Letters with no such conflict are bound unconditionally.
+ * 3. SOME LETTERS ARE ALREADY TAKEN, and `c` / `a` are the dangerous ones —
+ *    Copy and Select-All. A binding on either fires ONLY when the native action
+ *    would have done nothing anyway (see {@link copyWouldBeNoop} /
+ *    {@link selectAllWouldBeNoop}), so a real copy or select-all is never
+ *    stolen. For `c` the test is on the SELECTION, not on focus: a caret in a
+ *    text box with nothing highlighted copies nothing, so the shortcut still
+ *    works there. For `a` the test IS on focus — a caret in an editable field
+ *    is exactly where select-all is expected, so the letter yields there and is
+ *    free everywhere else. Letters with no such conflict are bound
+ *    unconditionally.
  *
  * @param actions Lowercase letter → what ⌘/Ctrl + that letter should do.
  */
@@ -95,8 +99,11 @@ export function useModifierShortcuts(actions: Record<string, () => void>): boole
       const key = e.key.toLowerCase()
       const run = actionsRef.current[key]
       if (!run) return
-      // See note 3 — the one letter that must yield to the platform.
+      // See note 3 — the two letters that must yield to the platform. `c` is
+      // Copy, `a` is Select-All; each fires only when its native action would
+      // do nothing meaningful, so a real copy / select-all is never stolen.
       if (key === "c" && !copyWouldBeNoop()) return
+      if (key === "a" && !selectAllWouldBeNoop()) return
 
       e.preventDefault()
       run()
@@ -218,4 +225,23 @@ function copyWouldBeNoop(): boolean {
 
   // contentEditable included: its selection IS the document's.
   return (getSelection()?.toString() ?? "") === ""
+}
+
+/**
+ * Whether ⌘/Ctrl+A at this moment would select NOTHING meaningful — the only
+ * case in which the combination is safe to repurpose.
+ *
+ * Select-All is expected in exactly one place: an editable field (input,
+ * textarea, or contenteditable), where it highlights that field's text. Focus
+ * anywhere else and ⌘/Ctrl+A would select the whole page — an action almost no
+ * one intends — so the shortcut is free to claim it. The test is on FOCUS, not
+ * on the current selection: an empty text field still expects select-all to arm
+ * a following copy/replace, so the letter must yield there even with nothing
+ * highlighted (the mirror-image of {@link copyWouldBeNoop}, which tests the
+ * selection precisely because an empty field has nothing to copy).
+ */
+function selectAllWouldBeNoop(): boolean {
+  const el = document.activeElement
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return false
+  return !(el instanceof HTMLElement && el.isContentEditable)
 }

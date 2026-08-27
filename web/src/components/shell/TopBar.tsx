@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import {
   MessagesSquare,
   FolderTree,
@@ -82,15 +82,19 @@ export function TopBar({
   const [profileOpen, setProfileOpen] = useState(false)
   const [usersOpen, setUsersOpen] = useState(false)
 
+  // ⌘/Ctrl+A opens the workspace switcher (T646): the ref lets the shortcut
+  // click the dropdown trigger, so key and click are one action. The `a`
+  // binding yields inside text fields (selectAllWouldBeNoop), so Select-All is
+  // never stolen; bound in the always-mounted bar so it works from every view.
+  const switcherRef = useRef<HTMLButtonElement>(null)
+  useModifierShortcuts({ a: () => switcherRef.current?.click() })
+
   return (
     <>
-      {/* No border, no fill: the rail sits directly on `--background`. It used
-          to carry `.vibrancy` (translucent `--surface` + backdrop blur) and a
-          `border-r`; both gone, so it reads as bare chrome, not a panel —
-          nothing is painted behind it, so the dropped backdrop-filter costs no
-          depth and removes the containing block it created. `p-2` insets all
-          four sides (horizontal-only left the top/bottom controls flush — too
-          tight); `gap-3` is separate: rhythm BETWEEN items, not an edge inset. */}
+      {/* No border, no fill: the rail sits directly on `--background` (the old
+          `.vibrancy` + `border-r` are gone, so nothing is painted behind it and
+          the dropped backdrop-filter costs no depth). `p-2` insets all four
+          sides; `gap-3` is separate rhythm BETWEEN items, not an edge inset. */}
       <header className="flex w-14 shrink-0 flex-col items-center gap-3 p-2">
         <Tip
           title="Workspace"
@@ -99,6 +103,7 @@ export function TopBar({
         >
           <AgentSwitcher
             rail
+            triggerRef={switcherRef}
             agents={agents}
             activeId={inFleet ? undefined : activeAgentId}
             onManageAgents={() => onViewChange("fleet")}
@@ -170,8 +175,6 @@ function TopBarActions({
           <ThemeToggle vertical />
         </span>
       </Tip>
-      {/* The old hairline separator was a `--border` token — gone with the
-          rail's other borders; the `gap-3` stack separates the clusters now. */}
       {isClaudeOAuth && <UsageButton />}
       <Tip title="Account" body="Your profile, app settings, and sign-out." side="right">
         <UserMenu
