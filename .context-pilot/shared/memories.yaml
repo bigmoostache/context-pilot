@@ -554,9 +554,10 @@ M-short-8:
   last_edited_ms: 0
 M-short-9:
   tier: short
-  title: T651 fleet-shared behav
+  title: T654 command edit
+  contents: 'T654: Pencil edit button on /command bubbles opens AgentEditorDialog variant=command mode=edit (prefill from suggestion). Backend PUT library/command/{item}=upsert_library_command (overwrites). useUpsertCommand, both twins, branch t648.'
   importance: medium
-  last_edited_ms: 1787843202356
+  last_edited_ms: 1787845682944
 M-tiny-1:
   tier: tiny
   title: 'T568: ''Use'' release'

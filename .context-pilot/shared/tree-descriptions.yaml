@@ -2490,6 +2490,10 @@
   path: web/src/components/finder/ContextMenu.tsx
   description: 'Finder right-click context menu (macOS-style), TWO variants keyed on pos.node presence. ITEM menu (right-click a file/folder): Open (folder nav / Quick Look), Pin to Sidebar (folders), Rename, Duplicate, Download (real downloadFile), tag swatches (real onTag), Move to Trash. EMPTY-SPACE menu (T279, right-click the content background, pos.node absent): New Folder (real mkdir), Upload… (file picker), Select All, Toggle Quick Look, Refresh — via onNewFolder/onUpload/onSelectAll/onTogglePreview/onRefresh props. EmptyItem row helper. On-screen clamping; closes on outside-click/Esc.'
   last_edited_ms: 1781888527667
+1bcf6f41be8ae1a3:
+  path: web/src/components/threads/fileUpload/index.tsx
+  description: 'Composer file-attachment components + unified ComposerBubbles row (file chips + /command pills + create-command pill). T654: command pills use shared Tip tooltip (no truncated desc); each pill pairs a discrete borderless text-only-hover Pencil edit button (onEditCommand). MessageFileChip/FileUploadChip/MissingChip/FileChipBody subcomponents.'
+  last_edited_ms: 1787845665713
 1bf1109580b4eaec:
   path: crates/cp-mod-queue/src/tools.rs
   description: Queue tool handlers Queue_pause and Queue_undo. format_undo_result helper. Queue_execute handled in pipeline.rs.
@@ -4466,6 +4470,10 @@
   path: ui/src/components/threads/ThreadsView.tsx
   description: 'Threads view assembler, scoped to ACTIVE AGENT''s realm (filters threadDetails by agentId; keyed by agentId in App so local state reseeds per realm; EmptyRealm when none). Holds local thread state so maquette interactions genuinely work: search filters, New Thread prepends a MY_TURN thread, archive/restore toggles. 2-pane (ThreadList | ThreadConversation) + NewThreadDialog. Sidebar is ALWAYS OPEN — the collapse/expand edge rail was removed entirely (T23).'
   last_edited_ms: 1781553182543
+32083d24bc1e386e:
+  path: web/src/components/shell/behaviour/AgentEditorDialog.tsx
+  description: Behaviour-agent + command editor dialog (T581/T654). variant='agent'|'command' × mode create|edit. editorCopy() wording/icon helper; useAgentEditorFields (open-seed + edit-fetch); useAgentEditorSubmit(target,fields,onClose) selects PUT-agent / POST-cmd-create / PUT-cmd-upsert. ⌘/Ctrl+Enter submits.
+  last_edited_ms: 1787845665621
 320a91c0259e5b70:
   path: crates/cp-mod-entities/src/sync.rs
   description: Meilisearch sync for entity data — incremental dirty-tracked, delete-then-add. ensure_index, sync_table, flush_sync, full_reindex. extract_affected_tables for SQL parsing.
@@ -9566,6 +9574,10 @@
   path: crates/cp-orchestrator/tests/end_to_end.rs
   description: Phase 30 end-to-end loopback capstone (3 tests). Backend::new takes 6 args (auth=None, session_ttl). Real agent stack ↔ real backend transport over real sockets. Command journals on agent and re-emerges as SSE delta. Spilled body hydrates over REST. 25 SSE connect/disconnect soak cycles.
   last_edited_ms: 0
+6c800ee7ffb7c8bd:
+  path: web/src/lib/api/index.ts
+  description: REST API client barrel — all via generated SDK. createCommand (POST), updateCommand (PUT library/command/{item} — T654), upsert/deleteLibraryAgent, fetchLibraryAgent, plus fleet/agent/usage/providers/update/threads/search/claude. Re-exports auth+finder+body+envKeys+it.
+  last_edited_ms: 1787845665898
 6c8aecdc4835c224:
   path: src/modules/conversation_history/mod.rs
   description: 'Conversation history module. Core/global. Dynamic panels for frozen history chunks. on_close_context redirects to Close_conversation_history tool. Sub-modules: panel, trap.'
@@ -10906,6 +10918,10 @@
   path: crates/cp-orchestrator/src/transport/rest/mod.rs
   description: 'REST resource handlers. fleet() filtered by auth_user ACL (FR-12). command() dispatches commands. rename_agent (T328), upload/delete avatar (T338). threads() prefers view roster. mint_ticket embeds auth_user.id (Phase 7). claude_usage() proxies Anthropic OAuth /api/oauth/usage (T451). resolve_entry. Backend re-exported from backend.rs. Submodules: create, lifecycle, library, thread_shape, backend, env_keys, releases. Re-exports env_key_reveal, env_key_update, env_keys_list, deploy_fleet, restart_orchestrator, and release handlers.'
   last_edited_ms: 1782843187122
+7b0b5148805be450:
+  path: web/src/lib/live/mutations.ts
+  description: 'Live imperative mutations: finder writes, agent lifecycle, avatar, useCreateCommand (POST), useUpsertCommand (PUT command/{item} — T654 edit), useUpsertLibraryAgent/useDeleteLibraryAgent (T581). One-shot POST/PUT → useMutation, invalidate library query on success.'
+  last_edited_ms: 1787845665791
 7b11aa4dd0f9c8e0:
   path: crates/cp-mod-firecrawl/src/tools.rs
   description: Firecrawl tools (scrape/search/map). A3 else_if fix at :201 (build_search_results_content). Async spawn, dyn panels, PANEL_WARNING.
@@ -18902,6 +18918,10 @@ d4f447c4551668d1:
   path: crates/cp-mod-search/src/lib.rs
   description: 'Search module. 1 tool: search. Global Meilisearch server bootstrap, per-project indexes. sync_logs_to_meilisearch() fire-and-forget (no tags). Context Radar refresh_radar()/push_task_signal() via background thread. Overlay info delegation.'
   last_edited_ms: 0
+d4f63090fb0bb25e:
+  path: crates/cp-orchestrator/src/transport/rest/create.rs
+  description: 'Create/upsert handlers: create_agent (POST fleet/create), create_command (POST library/command, 409 on clobber), upsert_library_command (PUT library/command/{item}, overwrites — T654 edit button), read/upsert/delete_library_agent (T581). compose_md/split_frontmatter shared. slugify pub(super). All behaviour files HOME-derived (T651).'
+  last_edited_ms: 1787845665453
 d50385417599f79a:
   path: crates/cp-orchestrator/src/services/auth/mod.rs
   description: Auth service module hub — declares types, store, backup, helpers submodules. Orchestrator-level user/session/ACL backed by dedicated SQLite (design doc §5).
@@ -22262,6 +22282,10 @@ fc365f66c2ed5f34:
   path: tmp/v2/pnpm-workspace.yaml
   description: 'pnpm 11: build-script permission moved here from package.json''s `pnpm` key. allowBuilds.esbuild:true is REQUIRED — without it esbuild''s postinstall is skipped and vite cannot start.'
   last_edited_ms: 0
+fc37ac29fbaed379:
+  path: crates/cp-orchestrator/tests/openapi/paths.rs
+  description: OpenAPI path definitions — all REST endpoints grouped by tag. Includes PUT library/command/{item} (T654 command upsert) + library/agent/{item} GET/PUT/DELETE.
+  last_edited_ms: 1787845665534
 fc3d6950893ff522:
   path: web/src/lib/providers/DevModeProvider.tsx
   description: 'DevModeProvider component: dev-mode boolean persisted to localStorage ''cp-dev-mode''. web-lint P6: <DevModeContext value=> (React-19 provider idiom).'
