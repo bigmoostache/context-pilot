@@ -12,7 +12,13 @@
 // authoritative source — edits go through the Rust types → openapi.json →
 // codegen pipeline, never by hand.
 
-export type { AccentToken, FinderKind, LibraryItem, ToolCall } from "./api/generated/types.gen"
+export type {
+  AccentToken,
+  FinderKind,
+  LibraryItem,
+  ThreadTask,
+  ToolCall,
+} from "./api/generated/types.gen"
 
 // ── Extended re-exports (generated base + UI-only fields) ────────────
 

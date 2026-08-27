@@ -1,5 +1,7 @@
 import { kindOf } from "@/components/finder/support/kind"
-import type { FinderNode } from "@/lib/types"
+import type { FinderNode, ThreadMsg } from "@/lib/types"
+import { toChatMessage } from "@/lib/support/threadMessages"
+import type { ThreadFile } from "./FileSidebar"
 // `UploadedFile` + `buildUploadMessage` now live in the shared `@/lib` layer so
 // the mobile thread tree can consume the same upload logic without importing
 // back into `@/components/…` (mirror leak-guard, design-mobile.md §3.2). Kept
@@ -105,4 +107,17 @@ export function splitMessageSegments(text: string): MessageSegment[] {
  *  shared Quick Look drawer (kind inferred from the filename, like the Finder). */
 export function uploadToNode(f: UploadedFile): FinderNode {
   return { name: f.name, path: f.path, kind: kindOf(f.name), size: f.size, modified: "" }
+}
+
+/** Collect every file-upload block across all messages for the sidebar rail. */
+export function collectThreadFiles(log: ThreadMsg[]): ThreadFile[] {
+  const result: ThreadFile[] = []
+  for (const msg of log) {
+    const cm = toChatMessage(msg)
+    const segments = splitMessageSegments(cm.text ?? "")
+    for (const seg of segments) {
+      if (seg.type === "file") result.push({ file: seg.file, role: cm.role })
+    }
+  }
+  return result
 }

@@ -1720,6 +1720,12 @@
           "status": {
             "type": "string"
           },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/ThreadTask"
+            },
+            "type": "array"
+          },
           "thread_id": {
             "type": "string"
           },
@@ -2045,6 +2051,12 @@
             ],
             "type": "string"
           },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/ThreadTask"
+            },
+            "type": "array"
+          },
           "unread": {
             "type": "integer"
           }
@@ -2089,6 +2101,37 @@
         "required": [
           "id",
           "author"
+        ],
+        "type": "object"
+      },
+      "ThreadTask": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "parentId": {
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "planned",
+              "in_progress",
+              "done"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "status"
         ],
         "type": "object"
       },

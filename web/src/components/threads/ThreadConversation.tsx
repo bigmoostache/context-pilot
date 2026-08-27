@@ -9,12 +9,13 @@ import { QuickLookSheet } from "@/components/finder/QuickLookSheet"
 import { useLibrary } from "@/lib/live"
 import { sendCommand } from "@/lib/api"
 import { extractDroppedFiles, zipDropped } from "@/lib/utils"
-import { uploadToNode, splitMessageSegments, type UploadedFile } from "./fileUpload/helpers"
+import { uploadToNode, collectThreadFiles, type UploadedFile } from "./fileUpload/helpers"
 import { FormMessageRow } from "./forms/FormMessageRow"
 import { isFormMessage } from "./forms/helpers"
 import { useScrollPin, useThreadForms } from "./forms/useThreadForms"
 import { parseAutoLine, segmentLog, toChatMessage } from "@/lib/support/threadMessages"
-import { FileSidebar, type ThreadFile } from "./fileUpload/FileSidebar"
+import { FileSidebar } from "./fileUpload/FileSidebar"
+import { TodoSidebar } from "./fileUpload/TodoSidebar"
 import type { ThreadDetail, ThreadMsg } from "@/lib/types"
 
 /** True only for an actual OS *file* drag — a text/selection drag must not blur. */
@@ -214,19 +215,6 @@ const MessageRow = memo(
   },
   (a, b) => a.msg === b.msg && a.agentId === b.agentId,
 )
-
-/** Collect every file-upload block across all messages for the sidebar rail. */
-function collectThreadFiles(log: ThreadMsg[]): ThreadFile[] {
-  const result: ThreadFile[] = []
-  for (const msg of log) {
-    const cm = toChatMessage(msg)
-    const segments = splitMessageSegments(cm.text ?? "")
-    for (const seg of segments) {
-      if (seg.type === "file") result.push({ file: seg.file, role: cm.role })
-    }
-  }
-  return result
-}
 
 /**
  * Large restore-from-archive bar shown above the composer while viewing an
@@ -476,8 +464,9 @@ export function ThreadConversation({
         </div>
       </div>
 
-      {/* ── File attachments rail ── */}
+      {/* ── Side rails: file attachments + thread-owned todos (read-only, live via delta) ── */}
       {threadFiles.length > 0 && <FileSidebar files={threadFiles} onOpen={setSheetFile} />}
+      {(thread.tasks?.length ?? 0) > 0 && <TodoSidebar tasks={thread.tasks ?? []} />}
 
       <QuickLookSheet
         node={sheetFile ? uploadToNode(sheetFile) : null}

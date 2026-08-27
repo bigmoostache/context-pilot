@@ -512,8 +512,9 @@ M-short-4:
 M-short-40:
   tier: short
   title: 'DOCUMENTATION PHASE:'
+  contents: 'DOCUMENTATION PHASE (historical marker): documentation-quality pass milestone. See M-mid-4 for the active rule (queue edits during doc work to avoid cache-break cost).'
   importance: medium
-  last_edited_ms: 1787840964647
+  last_edited_ms: 1787855061684
 M-short-5:
   tier: short
   title: 'Datalab OCR API: POST'

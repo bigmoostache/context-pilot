@@ -169,6 +169,9 @@ impl AgentView {
             OpEntryKind::ThreadStatusChanged { ref thread_id, status } => {
                 RosterThread::fold_status(&mut self.roster, thread_id, status);
             }
+            OpEntryKind::TaskListChanged { ref thread_id, ref tasks } => {
+                RosterThread::fold_tasks(&mut self.roster, thread_id, tasks.clone());
+            }
             OpEntryKind::ThreadFocusChanged { ref thread_id } => {
                 self.focused_thread_id.clone_from(thread_id);
             }

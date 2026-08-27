@@ -59,7 +59,7 @@ pub(crate) use releases::{
     select_release, set_arch,
 };
 pub(crate) use threads::conversations::search_conversations;
-use threads::{overlay_roster, reshape_thread};
+use threads::{attach_disk_tasks, overlay_roster, reshape_thread};
 
 /// A transport-agnostic reply: an HTTP status and a JSON body.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -381,6 +381,11 @@ pub fn threads(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
         .unwrap_or(&empty);
 
     let mut details: Vec<serde_json::Value> = raw_threads.iter().map(|t| reshape_thread(t, agent_id)).collect();
+
+    // First-paint tasks from the agent's `config.json` todo module (thread-owned
+    // todos live separately from the thread record). The live roster overlay
+    // below overrides these with the fresher delta-fed task lists where present.
+    attach_disk_tasks(&mut details, config.as_ref());
 
     // Overlay the view's fresher roster onto matching disk threads, then append
     // any view-only threads the disk has not yet flushed.

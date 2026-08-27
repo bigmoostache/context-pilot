@@ -9,4 +9,4 @@
 pub(super) mod conversations;
 pub(super) mod thread_shape;
 
-pub(crate) use thread_shape::{overlay_roster, reshape_thread};
+pub(crate) use thread_shape::{attach_disk_tasks, overlay_roster, reshape_thread};

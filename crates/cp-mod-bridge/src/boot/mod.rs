@@ -65,6 +65,7 @@ use self::lock::{LOCK_RETRY_ATTEMPTS, acquire_lock};
 
 pub mod activate;
 mod lock;
+pub mod seed_state;
 
 /// Name of the oplog directory inside the agent folder.
 const OPLOG_DIR: &str = "oplog";

@@ -115,6 +115,7 @@ impl Durability {
             | OpEntryKind::ThreadResumed { .. }
             | OpEntryKind::ThreadDeleted { .. }
             | OpEntryKind::ThreadStatusChanged { .. }
+            | OpEntryKind::TaskListChanged { .. }
             | OpEntryKind::Lifecycle { .. }
             | OpEntryKind::Checkpoint { .. }
             | OpEntryKind::Unknown => Self::Durable,

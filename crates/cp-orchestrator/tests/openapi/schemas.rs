@@ -98,9 +98,21 @@ pub(super) fn core() -> Value {
                 "archived": { "type": "boolean" },
                 "paused": { "type": "boolean" },
                 "focused": { "type": "boolean" },
-                "log": arr(r("ThreadMsg"))
+                "log": arr(r("ThreadMsg")),
+                "tasks": arr(r("ThreadTask"))
             },
             "required": ["id", "name", "status", "agentId", "log"]
+        },
+        "ThreadTask": {
+            "type": "object",
+            "properties": {
+                "id": { "type": "string" },
+                "parentId": { "type": "string", "nullable": true },
+                "name": { "type": "string" },
+                "description": { "type": "string" },
+                "status": { "type": "string", "enum": ["planned", "in_progress", "done"] }
+            },
+            "required": ["id", "name", "status"]
         },
         "ThreadMsg": {
             "type": "object",
