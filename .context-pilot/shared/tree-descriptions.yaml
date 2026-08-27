@@ -474,6 +474,10 @@
   path: crates/cp-mod-search/src/meili/api.rs
   description: Meilisearch HTTP API client. MeiliClient with index CRUD, document ops, search/multi_search, facet_distribution, stats. SearchParams for query building. pub struct for cross-module use (entities sync).
   last_edited_ms: 0
+04f96a3753027912:
+  path: web/src/mobile-components/threads/CreateCommandDialog.tsx
+  description: Mobile Create Command dialog (T350/T654) — thin wrapper over the shared AgentEditorDialog variant='command' (mobile AgentEditorDialog is itself a stub re-export of desktop), mirroring the desktop twin. Create-only, wired to POST library/command.
+  last_edited_ms: 1787844617602
 04ff5b9f86d83179:
   path: web/src/components/threads/ThreadComposer.tsx
   description: 'Thread input composer. MY_TURN: real textarea with onSend (Enter=submit, Shift+Enter=newline). Non-MY_TURN: working spinner (ACTIVE green vs THEIR_TURN signal).'
@@ -1578,6 +1582,10 @@
   path: web/src/components/finder/FinderPreview.tsx
   description: 'QuickLook preview pane — kind-aware. T272 live .md/code/json/doc fetch via useFsPreview. X906 live markdown via EditableMarkdown (view⇄WYSIWYG-edit, Save→fs/write). T281/T286 live image (<img>)+PDF (<object>) via rawUrl→/fs/raw. T282 live spreadsheet (csv/xlsx/ods) via LiveSheetPreview→useFsSheet→/fs/sheet: sticky-header table (first row=header), zebra rows, row-number gutter, multi-sheet tab switcher, truncated note. Mock path unchanged. agentId prop threads the realm.'
   last_edited_ms: 1781896321244
+115600dcb32b740a:
+  path: web/src/components/threads/fileUpload/index.tsx
+  description: 'Composer file-attachment COMPONENTS + the unified ComposerBubbles row (file chips + /command suggestion pills + create-command pill). T654: command pills dropped their truncated inline description and now use the shared Tip tooltip (title=/command, body=description) same as the app header; create pill also uses Tip. MessageFileChip existence-check via useFs; FileUploadChip present/static/missing; extracted ShowInFinderButton/FileChipBody/MissingChip subcomponents for the cx15 budget.'
+  last_edited_ms: 1787844617670
 115c5ae01f3b8326:
   path: tmp/doc/index.html
   description: 'Dumb assembler page: links the four stylesheets, disables Paged.js auto-run (content arrives async, auto-pagination would chunk an EMPTY document), hosts <main id="document">.'
@@ -13190,6 +13198,10 @@
   path: src/modules/overview/mod.rs
   description: 'Overview module. Core/global. Close_panel pre-flight: warns (not errors) for stale [!] or missing tree descriptions. pub(crate) has_pending_tree_describe() helper. tool_manage, panel_goto_page pre-flights. save/load module+worker data.'
   last_edited_ms: 0
+945a2096038fb3a0:
+  path: web/src/components/shell/behaviour/AgentEditorDialog.tsx
+  description: 'Behaviour-agent editor dialog (T581) — now also serves command authoring via variant=''agent''|''command'' prop (T654). editorCopy() pure helper resolves wording/icon per variant+mode. Borderless form: big name input, file-id/slug preview, description, prompt textarea. agent→PUT library/agent/{id} upsert; command→POST library/command (create-only). Calls both useUpsertLibraryAgent+useCreateCommand, fires the one matching the variant. ⌘/Ctrl+Enter submits.'
+  last_edited_ms: 1787844617453
 9462125d8a1d1d2b:
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus + ThreadAuthor enums #[non_exhaustive] (boss-hunt r9 kills — downstream matches in threads_view + app/run/threads rewritten to matches!(x,Variant), const-fn-safe). ThreadMessage, Thread, ThreadsState, FocusState.'
@@ -14582,6 +14594,10 @@ a3a8daa167736d62:
   path: crates/cp-orchestrator/src/main.rs
   description: Backend entry point (thin). Prints version+protocol+agents dir, exits (no runtime loop yet). use nix/serde/serde_json/cp_oplog/tiny_http as _ acknowledges lib-only deps for per-target unused-crate-dependencies; cfg(test) tempfile likewise.
   last_edited_ms: 1781647650777
+a3b02613dc5df9d7:
+  path: web/src/components/threads/CreateCommandDialog.tsx
+  description: Create Command dialog (T350/T654) — now a THIN WRAPPER over AgentEditorDialog with variant='command', mode create-only. Deliberately reuses the exact same editor component so command + agent authoring surfaces never drift.
+  last_edited_ms: 1787844617536
 a3b86992245bba9c:
   path: web/src/components/finder/Finder.tsx
   description: Per-agent Finder file manager (493 LOC). Owns view state + derived listings + render; delegates fs mutations/nav to useFinderActions, selection/open/tab/menu to useFinderSelection, keyboard to useFinderKeyboard, external drag to useExternalDragUpload, DOWNLOADS to useFinderDownloads (web-lint P2 split), bottom chrome to FinderOverlays. QuickLook = modal shadcn Sheet (grid+list). T334 revealPath navigates to a file's parent + selects it.
@@ -22261,6 +22277,10 @@ fc4504cee061a867:
 fc4be9dd868a81ef:
   path: src/llms/oai_providers/grok.rs
   description: xAI Grok client. OpenAI-compatible API. Shared openai_compat message building. XAI_API_KEY auth.
+  last_edited_ms: 0
+fc542ae5b995a389:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 fc62d75ef1e8e369:
   path: web/src/components/shell/config/ConfigPanel.tsx

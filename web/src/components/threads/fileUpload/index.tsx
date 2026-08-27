@@ -1,6 +1,7 @@
 import { AlertTriangle, FolderOpen, Plus, X } from "lucide-react"
 import { kindOf, extOf } from "@/components/finder/support/kind"
 import { FileIcon } from "@/components/finder/support/macIcons"
+import { Tip } from "@/components/ui/tip"
 import { useFs } from "@/lib/live"
 import type { CommandSuggestion, UploadedFile } from "./helpers"
 
@@ -301,41 +302,37 @@ export function ComposerBubbles({
         </span>
       ))}
 
-      {/* /command suggestion bubbles — opaque pills. */}
+      {/* /command suggestion bubbles — opaque pills, described via a Tip. */}
       {showCommands &&
         suggestions.map((s) => (
-          <button
-            key={s.command}
-            type="button"
-            onClick={() => onPick?.(s)}
-            title={s.description || s.name}
-            className="group inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11.5px] text-foreground/75 transition-colors hover:border-(--signal)/60 hover:text-(--signal)"
-          >
-            <span className="font-mono font-medium text-(--interactive) group-hover:text-(--signal)">
-              {s.command}
-            </span>
-            {s.description && (
-              <span className="max-w-[180px] truncate text-muted-foreground/70">
-                {s.description}
+          <Tip key={s.command} title={s.command} body={s.description || s.name}>
+            <button
+              type="button"
+              onClick={() => onPick?.(s)}
+              className="group inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11.5px] text-foreground/75 transition-colors hover:border-(--signal)/60 hover:text-(--signal)"
+            >
+              <span className="font-mono font-medium text-(--interactive) group-hover:text-(--signal)">
+                {s.command}
               </span>
-            )}
-          </button>
+            </button>
+          </Tip>
         ))}
 
       {/* Create-command pill — opaque, dashed to read as an action. */}
       {showCommands && onCreateCommand && (
-        <button
-          type="button"
-          onClick={onCreateCommand}
-          title="Create a new /command"
-          className="group inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-card px-2.5 py-1 text-[11.5px] text-muted-foreground/80 transition-colors hover:border-(--signal)/60 hover:text-(--signal)"
-        >
-          <Plus
-            className="size-3 text-muted-foreground/70 group-hover:text-(--signal)"
-            strokeWidth={2.5}
-          />
-          <span className="font-medium">create command</span>
-        </button>
+        <Tip title="Create command" body="Author a new /command for this agent's library.">
+          <button
+            type="button"
+            onClick={onCreateCommand}
+            className="group inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-card px-2.5 py-1 text-[11.5px] text-muted-foreground/80 transition-colors hover:border-(--signal)/60 hover:text-(--signal)"
+          >
+            <Plus
+              className="size-3 text-muted-foreground/70 group-hover:text-(--signal)"
+              strokeWidth={2.5}
+            />
+            <span className="font-medium">create command</span>
+          </button>
+        </Tip>
       )}
     </div>
   )
