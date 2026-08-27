@@ -74,7 +74,7 @@ export function FormMessageRow({
   const stripped = stripFormBlocks(text)
   const chatMsg = { ...toChatMessage(msg), text: stripped }
   return (
-    <div className="[contain-intrinsic-size:auto_5rem]">
+    <div>
       {stripped.length > 0 && (
         <Message
           msg={chatMsg}

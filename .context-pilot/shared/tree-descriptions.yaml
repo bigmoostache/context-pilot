@@ -7226,6 +7226,10 @@
   path: src/modules/conversation/mod.rs
   description: 'Conversation display module. Core/global. Context types: ''conversation'' + ''system''. No tools — purely display/rendering. Sub-modules: list, markdown_ir, panel, refresh, render_blocks, render_input_blocks, render_json.'
   last_edited_ms: 0
+512d21eaec74afc7:
+  path: web/src/components/threads/forms/FormMessageRow.tsx
+  description: 'Un-memoized message row for form-bearing messages. form-answer msg renders summary line only; form msg renders stripped prose + one FormWidget per block. T643: contain-intrinsic-size wrapper removed (cv-hint no longer needed).'
+  last_edited_ms: 1787821317228
 5134d14ea8b1ec85:
   path: web/src/components/threads/ThreadComposer.tsx
   description: 'Thread composer (always-active textarea + turn-status banner). T298 paperclip; T304 draftKey; T331 staged pendingFiles; T348/T350 /command bubbles + create pill; T359 Enter/Tab list logic; T371/T429 paused banner. T350 unified ComposerBubbles. T468 paste-to-upload: onPaste reads clipboardData.items+getAsFile() (not .files) for images. onAttach widened to void|Promise<void> (T471). prefill seeds expanded prompt body.'
@@ -16174,6 +16178,10 @@ b689ff54e81da946:
   path: src/infra/tools.rs
   description: Re-exports cp_base::tools types. execute_tool() dispatches via module system. execute_reload_tui() sets reload flag + writes config.json.
   last_edited_ms: 1780651842213
+b694ef0416c38b3b:
+  path: web/src/components/threads/forms/useThreadForms.ts
+  description: 'useThreadForms (answersByForm memo from log scan + onFormSubmit via sendCommand send_message) + useScrollPin. T643: useScrollPin simplified to a SINGLE scrollIntoView (dropped the 6-frame rAF converge loop that existed only to correct content-visibility:auto height estimates — cv gone, one scroll lands true bottom, no fighting user scroll).'
+  last_edited_ms: 1787821317293
 b69c249ca77a78d1:
   path: .git/index
   description: Git index (binary). Not source.
@@ -18994,6 +19002,10 @@ d78780c069fce9c1:
   path: crates/cp-base/src/state/data/model_helpers.rs
   description: 'ModelPricing trait. A6: cleaning_threshold_tokens via scale_to_usize, token_cost via cost_usd. Model selection/pricing/budget for State.'
   last_edited_ms: 1784534077171
+d78bf59ebd86b8ca:
+  path: web/src/components/threads/ThreadConversation.tsx
+  description: 'Center pane: thread conversation + composer. T510 FREEZE FIX = MessageRow React.memo (comparator msg===+agentId===) + AutoRun memo + useMemo(segmentLog). T643: content-visibility:auto + contain-intrinsic-size REMOVED from every row (AutoRun/MessageRow) — the cv layout-skip made a form-interaction height change recompute visibility of tall siblings and JUMP the scroll (''whole app breaks'' on click). Memo alone kept (real perf win). useConversationDrop hook (T367/T471 OS-file drag+zip). FileSidebar rail for thread attachments.'
+  last_edited_ms: 1787821317131
 d794e0ca2d6b10ae:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search. Dynamic entity_result panels.

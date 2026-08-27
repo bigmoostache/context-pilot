@@ -22,7 +22,7 @@ import type { ThreadDetail, ThreadMsg } from "@/lib/types"
 const AutoRun = memo(function AutoRun({ msgs }: { msgs: ThreadMsg[] }) {
   const n = msgs.length
   return (
-    <details className="group/auto mb-2 ml-5 [contain-intrinsic-size:auto_2rem] [content-visibility:auto]">
+    <details className="group/auto mb-2 ml-5">
       <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[12.5px] font-medium text-muted-foreground/75 transition-colors active:bg-muted/40">
         <span className="text-muted-foreground/60 transition-transform group-open/auto:rotate-90">
           ▸
@@ -69,7 +69,7 @@ const MessageRow = memo(
     fresh: boolean
   }) {
     return (
-      <div className="[contain-intrinsic-size:auto_5rem] [content-visibility:auto]">
+      <div className="">
         <Message
           msg={toChatMessage(msg)}
           agentId={agentId}

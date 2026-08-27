@@ -122,7 +122,7 @@ function useConversationDrop(onAttach: ((files: File[]) => void | Promise<void>)
 const AutoRun = memo(function AutoRun({ msgs }: { msgs: ThreadMsg[] }) {
   const n = msgs.length
   return (
-    <details className="group/auto mb-2 ml-7 [contain-intrinsic-size:auto_2rem] [content-visibility:auto]">
+    <details className="group/auto mb-2 ml-7">
       <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[12.5px] font-medium text-muted-foreground/75 transition-colors hover:bg-muted/40 hover:text-muted-foreground">
         <span className="text-muted-foreground/60 transition-transform group-open/auto:rotate-90">
           ▸
@@ -184,11 +184,15 @@ const MessageRow = memo(
   }) {
     return (
       <div
-        // THE freeze fix (layout half): `content-visibility:auto` lets the
-        // browser SKIP layout + paint for any message row scrolled out of view;
-        // the memo boundary above is the COMMIT half (skip re-rendering
-        // unchanged rows). Together they collapse both costs on a huge thread.
-        className="[contain-intrinsic-size:auto_5rem] [content-visibility:auto]"
+        // The freeze fix that MATTERS is the memo boundary above (skip
+        // re-rendering unchanged rows on every SSE delta). The old
+        // `content-visibility:auto` layout-skip was removed (T643): a row's
+        // intrinsic-size estimate diverges wildly from a tall message's real
+        // height, so any nearby reflow — e.g. a form field changing height on
+        // click — made the browser recompute visibility and JUMP the scroll,
+        // which read as "the whole app breaks" on interaction. Plain rows +
+        // memo match the pre-refactor behaviour and stay smooth.
+        className=""
       >
         <Message
           msg={toChatMessage(msg)}
