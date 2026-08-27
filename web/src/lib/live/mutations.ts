@@ -202,6 +202,31 @@ export function useCreateCommand(agentId: string) {
 }
 
 /**
+ * Mutation to create or overwrite an existing `/command` `.md` by its file id
+ * (the command bubble row's per-command Edit button). One-shot
+ * `PUT …/library/command/{itemId}` — the command twin of
+ * {@link useUpsertLibraryAgent}, deliberately overwriting (unlike the
+ * 409-on-clobber {@link useCreateCommand}). Not a delta-covered resource → a
+ * `useMutation`. On success the agent's `useLibrary` query is invalidated so
+ * the edited command surfaces immediately (the running agent also picks the
+ * file up on its own filesystem watch).
+ */
+export function useUpsertCommand(agentId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (cmd: { itemId: string; name: string; description?: string; body: string }) =>
+      api.updateCommand(agentId, cmd.itemId, {
+        name: cmd.name,
+        description: cmd.description ?? "",
+        body: cmd.body,
+      }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: qk.library(agentId) })
+    },
+  })
+}
+
+/**
  * Mutation to create or overwrite a behaviour agent `.md` (T581 footer editor).
  * One-shot `PUT …/library/agent/{itemId}` — a user agent, or a local override
  * of a built-in. Not a delta-covered resource → a `useMutation`. On success the

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { Bot, Loader2, X, CornerDownLeft, TerminalSquare } from "lucide-react"
 import { fetchLibraryAgent } from "@/lib/api"
-import { useUpsertLibraryAgent, useCreateCommand } from "@/lib/live"
+import { useUpsertLibraryAgent, useCreateCommand, useUpsertCommand } from "@/lib/live"
 import { cn } from "@/lib/utils"
 
 /**
@@ -122,6 +122,7 @@ function editorCopy(
   isBuiltin: boolean,
 ): EditorCopy {
   if (variant === "command") {
+    const isEdit = mode.kind === "edit"
     return {
       icon: <TerminalSquare className="size-2.5" />,
       namePlaceholder: "Command name",
@@ -132,8 +133,8 @@ function editorCopy(
       ),
       sectionLabel: "Prompt",
       bodyPlaceholder: "The prompt this command expands to when clicked…",
-      title: "New command",
-      submitLabel: "Create command",
+      title: isEdit ? "Edit command" : "New command",
+      submitLabel: isEdit ? "Save command" : "Create command",
     }
   }
   const isEdit = mode.kind === "edit"
@@ -151,6 +152,71 @@ function editorCopy(
     title: isEdit ? (isBuiltin ? "Override built-in" : "Edit agent") : "New agent",
     submitLabel: isEdit ? "Save agent" : "Create agent",
   }
+}
+
+/** The current field values the submit hook reads to compose the save. */
+interface EditorFieldValues {
+  name: string
+  description: string
+  body: string
+}
+
+/** What the editor is authoring — the agent id, the item variant, and the
+ *  create/edit mode. Bundled so the submit hook stays within the 4-param cap. */
+interface EditorTarget {
+  agentId: string
+  variant: AgentEditorVariant
+  mode: AgentEditorMode
+}
+
+/** The save wiring — the three library mutations (all called for Rules of
+ *  Hooks), the active-mutation selection per variant+mode, the derived
+ *  slug/validity/error/built-in flags, and the submit/close callbacks. Extracted
+ *  from the component so its branches don't inflate the render's line budget.
+ *  `command+edit` → PUT command upsert, `command+create` → POST command create,
+ *  `agent` → PUT agent upsert. */
+function useAgentEditorSubmit(
+  target: EditorTarget,
+  fields: EditorFieldValues,
+  onClose: () => void,
+) {
+  const { agentId, variant, mode } = target
+  const upsert = useUpsertLibraryAgent(agentId)
+  const createCmd = useCreateCommand(agentId)
+  const upsertCmd = useUpsertCommand(agentId)
+  const isCommand = variant === "command"
+  const isEdit = mode.kind === "edit"
+  const mut = isCommand ? (isEdit ? upsertCmd : createCmd) : upsert
+
+  const slug = mode.kind === "edit" ? mode.itemId : slugify(fields.name)
+  const canSave = fields.name.trim().length > 0 && fields.body.trim().length > 0
+  const error = mut.error instanceof Error ? mut.error.message : null
+  const isBuiltin = !isCommand && mode.kind === "edit" && mode.builtin
+
+  const close = () => {
+    upsert.reset()
+    createCmd.reset()
+    upsertCmd.reset()
+    onClose()
+  }
+
+  const submit = (e: React.SyntheticEvent) => {
+    e.preventDefault()
+    if (!canSave || mut.isPending) return
+    const trimmed = {
+      name: fields.name.trim(),
+      description: fields.description.trim(),
+      body: fields.body.trim(),
+    }
+    if (isCommand) {
+      if (isEdit) upsertCmd.mutate({ itemId: slug, ...trimmed }, { onSuccess: () => close() })
+      else createCmd.mutate(trimmed, { onSuccess: () => close() })
+    } else {
+      upsert.mutate({ itemId: slug, ...trimmed }, { onSuccess: () => close() })
+    }
+  }
+
+  return { mut, slug, canSave, error, isBuiltin, submit, close }
 }
 
 /**
@@ -185,34 +251,11 @@ export function AgentEditorDialog({
 }) {
   const { name, setName, description, setDescription, body, setBody, loading } =
     useAgentEditorFields(open, mode, agentId, initial)
-  const upsert = useUpsertLibraryAgent(agentId)
-  const createCmd = useCreateCommand(agentId)
-  const isCommand = variant === "command"
-  // The active mutation for the current variant — both hooks are always called
-  // (Rules of Hooks); only the relevant one is fired on submit.
-  const mut = isCommand ? createCmd : upsert
-
-  const slug = mode.kind === "edit" ? mode.itemId : slugify(name)
-  const canSave = name.trim().length > 0 && body.trim().length > 0
-  const error = mut.error instanceof Error ? mut.error.message : null
-  const isBuiltin = !isCommand && mode.kind === "edit" && mode.builtin
-
-  const close = () => {
-    upsert.reset()
-    createCmd.reset()
-    onClose()
-  }
-
-  const submit = (e: React.SyntheticEvent) => {
-    e.preventDefault()
-    if (!canSave || mut.isPending) return
-    const fields = { name: name.trim(), description: description.trim(), body: body.trim() }
-    if (isCommand) {
-      createCmd.mutate(fields, { onSuccess: () => close() })
-    } else {
-      upsert.mutate({ itemId: slug, ...fields }, { onSuccess: () => close() })
-    }
-  }
+  const { mut, slug, canSave, error, isBuiltin, submit, close } = useAgentEditorSubmit(
+    { agentId, variant, mode },
+    { name, description, body },
+    onClose,
+  )
 
   // ⌘/Ctrl+Enter submits from anywhere in the form (Linear parity).
   const onKeyDown = (e: React.KeyboardEvent) => {

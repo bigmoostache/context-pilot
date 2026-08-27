@@ -305,6 +305,19 @@ pub(super) fn paths() -> Value {
             "properties": { "name": { "type": "string" }, "description": { "type": "string" }, "body": { "type": "string" } },
             "required": ["name", "body"]
         })), r("CreateCommandReceipt"))),
+        "/api/agent/{id}/library/command/{item}": json!({ "put": {
+            "tags": ["agent"], "summary": "Create or overwrite a command",
+            "parameters": [
+                { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+                { "name": "item", "in": "path", "required": true, "schema": { "type": "string" } }
+            ],
+            "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                "type": "object",
+                "properties": { "name": { "type": "string" }, "description": { "type": "string" }, "body": { "type": "string" } },
+                "required": ["name", "body"]
+            }}}},
+            "responses": merge(ok(r("CreateCommandReceipt")), err())
+        }}),
         "/api/agent/{id}/library/agent/{item}": merge(
             merge(
                 json!({ "get": {

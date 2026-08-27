@@ -375,6 +375,7 @@ export function ThreadComposer({
   suggestions = [],
   firstMessage = false,
   onCreateCommand,
+  onEditCommand,
 }: {
   status: ThreadStatus
   /** true when this is the single thread the agent is currently focused on */
@@ -394,6 +395,8 @@ export function ThreadComposer({
   firstMessage?: boolean
   /** Opens the "create command" dialog (T350). Omit to hide the pill. */
   onCreateCommand?: (() => void) | undefined
+  /** Opens the command editor prefilled (T654). Omit to hide the per-pill edit button. */
+  onEditCommand?: ((s: CommandSuggestion) => void) | undefined
   /** localStorage key for persisting the unsent draft + caret per thread (T304). */
   draftKey?: string | undefined
 }) {
@@ -451,6 +454,7 @@ export function ThreadComposer({
           suggestions={commandsActive ? filteredSuggestions : []}
           onPick={composer.prefill}
           onCreateCommand={commandsActive ? onCreateCommand : undefined}
+          onEditCommand={commandsActive ? onEditCommand : undefined}
         />
       )}
       {banner && <ComposerBanner banner={banner} />}

@@ -300,6 +300,9 @@ fn route_rest(
             rest::search_conversations(state, id, body_bytes)
         }
         (Method::Post, ["api", "agent", id, "library", "command"]) => rest::create_command(state, id, body_bytes),
+        (Method::Put, ["api", "agent", id, "library", "command", item]) => {
+            rest::upsert_library_command(state, id, item, body_bytes)
+        }
         (Method::Get, ["api", "agent", id, "library", "agent", item]) => rest::read_library_agent(state, id, item),
         (Method::Put, ["api", "agent", id, "library", "agent", item]) => {
             rest::upsert_library_agent(state, id, item, body_bytes)

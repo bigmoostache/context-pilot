@@ -62,6 +62,7 @@ import {
   postApiAgentByIdAvatar,
   postApiAgentByIdCommand,
   postApiAgentByIdLibraryCommand,
+  putApiAgentByIdLibraryCommandByItem,
   postApiAgentByIdConversationsSearch,
   postApiTicket,
 } from "./generated"
@@ -244,6 +245,20 @@ export function createCommand(
   cmd: { name: string; description?: string; body: string },
 ): Promise<CreateCommandReceipt> {
   return sdk(postApiAgentByIdLibraryCommand({ path: { id: agentId }, body: cmd }))
+}
+
+/** Create or overwrite a `/command` `.md` by its file id (the bubble row's
+ *  per-command Edit button). The command twin of {@link upsertLibraryAgent}:
+ *  `PUT …/library/command/{item}` deliberately overwrites, unlike the 409-on-
+ *  clobber {@link createCommand}. */
+export function updateCommand(
+  agentId: string,
+  itemId: string,
+  cmd: { name: string; description?: string; body: string },
+): Promise<CreateCommandReceipt> {
+  return sdk(
+    putApiAgentByIdLibraryCommandByItem({ path: { id: agentId, item: itemId }, body: cmd }),
+  )
 }
 
 // ── Agent library CRUD (T581 footer editor) ───────────────────────────

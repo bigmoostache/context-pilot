@@ -1,4 +1,4 @@
-import { AlertTriangle, FolderOpen, Plus, X } from "lucide-react"
+import { AlertTriangle, FolderOpen, Pencil, Plus, X } from "lucide-react"
 import { kindOf, extOf } from "@/mobile-components/finder/support/kind"
 import { FileIcon } from "@/mobile-components/finder/support/macIcons"
 import { Tip } from "@/mobile-components/ui/tip"
@@ -277,6 +277,7 @@ export function ComposerBubbles({
   suggestions = [],
   onPick,
   onCreateCommand,
+  onEditCommand,
 }: {
   /** staged-but-unsent uploads, rendered as removable chips */
   files?: UploadedFile[] | undefined
@@ -288,6 +289,8 @@ export function ComposerBubbles({
   onPick?: ((s: CommandSuggestion) => void) | undefined
   /** open the create-command dialog (omit to hide the pill) */
   onCreateCommand?: (() => void) | undefined
+  /** open the editor for an existing command (omit to hide the per-pill edit button) */
+  onEditCommand?: ((s: CommandSuggestion) => void) | undefined
 }) {
   const showCommands = suggestions.length > 0 || !!onCreateCommand
   return (
@@ -306,20 +309,35 @@ export function ComposerBubbles({
         </span>
       ))}
 
-      {/* /command suggestion bubbles — opaque pills, described via a Tip. */}
+      {/* /command suggestion bubbles — opaque pills, described via a Tip.
+          Each pairs with a discrete, same-height Edit button (when editable). */}
       {showCommands &&
         suggestions.map((s) => (
-          <Tip key={s.command} title={s.command} body={s.description || s.name}>
-            <button
-              type="button"
-              onClick={() => onPick?.(s)}
-              className="group inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1.5 text-[12px] text-foreground/75 transition-colors active:border-(--signal)/60 active:text-(--signal)"
-            >
-              <span className="font-mono font-medium text-(--interactive) group-active:text-(--signal)">
-                {s.command}
-              </span>
-            </button>
-          </Tip>
+          <span key={s.command} className="inline-flex items-center gap-1">
+            <Tip title={s.command} body={s.description || s.name}>
+              <button
+                type="button"
+                onClick={() => onPick?.(s)}
+                className="group inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1.5 text-[12px] text-foreground/75 transition-colors active:border-(--signal)/60 active:text-(--signal)"
+              >
+                <span className="font-mono font-medium text-(--interactive) group-active:text-(--signal)">
+                  {s.command}
+                </span>
+              </button>
+            </Tip>
+            {onEditCommand && (
+              <Tip title="Edit command" body={`Edit ${s.command} in the command library.`}>
+                <button
+                  type="button"
+                  onClick={() => onEditCommand(s)}
+                  aria-label={`Edit ${s.command}`}
+                  className="flex items-center justify-center rounded-full p-1.5 text-muted-foreground/50 transition-colors active:text-(--signal)"
+                >
+                  <Pencil className="size-3" />
+                </button>
+              </Tip>
+            )}
+          </span>
         ))}
 
       {/* Create-command pill — opaque, dashed to read as an action. */}
