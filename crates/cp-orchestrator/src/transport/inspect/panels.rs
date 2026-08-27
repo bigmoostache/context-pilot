@@ -90,7 +90,11 @@ pub fn library(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
         }
     };
 
-    let cp_dir = Path::new(&folder).join(".context-pilot");
+    // Behaviour `.md` files are fleet-shared (T651): the scan reads the
+    // HOME-derived shared dir, NOT the per-agent realm. The active-agent id
+    // above stays folder-relative — that's per-agent config.json state, not a
+    // behaviour.
+    let cp_dir = cp_base::config::constants::home_behaviours_dir();
     let mut items: Vec<serde_json::Value> = Vec::new();
 
     for (kind, subdir) in [("agent", "agents"), ("skill", "skills"), ("command", "commands")] {

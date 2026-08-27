@@ -1018,6 +1018,10 @@
   path: src/modules/conversation/list.rs
   description: 'List continuation: detect_list_action() for ''- '', ''1. '', ''a. '' patterns on Enter, alpha increment, ListAction enum'
   last_edited_ms: 0
+0ab0c885cfa0c12f:
+  path: crates/cp-mod-prompt/src/storage.rs
+  description: 'Prompt file storage: YAML-frontmatter .md files for agents/skills/commands, load_all_prompts() merges built-ins, slugify()'
+  last_edited_ms: 0
 0ab1de8cdf889004:
   path: src/modules/conversation/list.rs
   description: 'List continuation: detect_list_action() for ''- '',''1. '',''a. '' on Enter, alpha increment (base.saturating_add via Safe.to_u8, A1), ListAction enum.'
@@ -2594,6 +2598,10 @@
   path: src/ui/help/commands.rs
   description: 'PaletteCommand struct: ID/label/description/keywords. match_score split id_score/label_score/keyword_score (A2). get_available_commands(state).'
   last_edited_ms: 1784495886684
+1d6077c7dfe48ac4:
+  path: crates/cp-mod-prompt/src/seed.rs
+  description: 'Seed data: ensure_default_agent() load/merge/sort, get_active_agent_content() resolve active system prompt'
+  last_edited_ms: 0
 1d68448437509227:
   path: docs/trust-center/security.html
   description: 'Security Architecture page. 10 sections: data flow (4 controls), integrity controls (3 policies: hash chain, lint, structural), access model (3 controls), incident response (3 policies), business continuity (3 controls), supply chain security (4 policies + 6-row table), encryption (4 controls: transit/rest/credential/no-custom-crypto), network architecture (4 policies + 5-row attack vector table), change management (5 controls: VCS/CI/hash-chain/structural/release), vulnerability disclosure program (3 policies: channel/response/scope).'
@@ -8082,6 +8090,10 @@
   path: crates/cp-mod-queue/src/types.rs
   description: QueueState + QueuedToolCall types. Trap fields (trap_active/panel_ids/optional_ids). Methods enqueue/remove_by_index/flush/clear/is_queue_tool.
   last_edited_ms: 1784476429563
+5b6d1564c0bc8394:
+  path: crates/cp-mod-prompt/src/library_panel.rs
+  description: 'LibraryPanel: renders agent/skill/command tables via push_agents_table/push_skills_table/push_commands_table/push_crud_cheatsheet helpers. context() builds combined markdown.'
+  last_edited_ms: 0
 5b91e2fb74aace6c:
   path: crates/cp-orchestrator/src/transport/ticket.rs
   description: 'Phase 19: single-use SSE upgrade tickets (I9b). TicketStore{live:HashMap<token,expiry_ms>,ttl}. mint() (sweep+/dev/urandom 256-bit hex token, DEFAULT_TTL 30s), redeem() true exactly once per unexpired token (remove+expiry check), lazy sweep on mint/redeem bounds map. Defends localhost endpoint vs malicious website (confused-deputy/DNS-rebind) that CORS/Origin can''t stop. 5 tests.'
@@ -8370,6 +8382,10 @@
   path: crates/cp-mod-entities/src/panels/panel.rs
   description: 'Fixed Entities panel: live schema, sample data, empty-state guide. build_context_text (LLM text), populated_blocks via table_blocks helper (A2), empty_state_blocks onboarding. 2s refresh re-introspect.'
   last_edited_ms: 1784487040441
+5f7b565d7feaabac:
+  path: crates/cp-orchestrator/src/transport/inspect/panels.rs
+  description: 'Cockpit inspection-panel endpoints: memory/todos/spine/queue/scratchpad/tree/callbacks/usage/library/panel_list = tier-③ disk reads reshaped to maquette JSON. Tree descriptions truncated to 120-char preview (T492 perf fix, full text via /fs/descriptions). library() returns command body for /cmd suggestion (T350). tools/radar/entities = DERIVED-state endpoints returning normal empty shape by design.'
+  last_edited_ms: 0
 5f8fb51abc4f024e:
   path: src/modules/overview/mod.rs
   description: OverviewModule (id='core', is_global) — owns Statistics + Tools panels, core system tools (Close_panel/system_reload/tool_manage/panel_goto_page/module_toggle), and GLOBAL config persistence. save/load_module_data serialize active_modules, dev_mode, llm_provider + EVERY provider model enum + reverie/cleaning/budget + token/cost counters + disabled_tools. Secondary model persistence removed.
@@ -10766,6 +10782,10 @@
   path: crates/cp-base/src/lib.rs
   description: 'Foundation crate entry. Inline flame graph telemetry module (Guard RAII, folded-stack output, CP_FLAMEGRAPH=1 toggle). 7 modules: cast, config, flame, modules, panels, state, tools, ui. Tests: compile-time YAML validation (18 tool + 6 config YAML files) with #[expect(clippy::panic)].'
   last_edited_ms: 1781391615460
+79d9481e1a5b8297:
+  path: crates/cp-orchestrator/src/transport/rest/create.rs
+  description: 'POST /api/fleet/create + POST /api/agent/{id}/library/command handlers. create_agent: parse {name,folder?,model?}, slugify, mkdir, supervisor.spawn_pty → 202. Auto-grants agent-admin ACL (T447). create_command: write .md file to commands dir. yaml_scalar helper. slugify is pub(super).'
+  last_edited_ms: 0
 79d9aa68220fd380:
   path: src/app/context/freeze_pass.rs
   description: 'Per-panel freeze pass. A9: take_while + find closures over &tuple -> |entry| index; Some((_,gone_type)) destructure -> bind entry, use entry.1. A6: panel cache cost via float_math. apply_full_freeze/run_panel_freeze_pass/freeze_one_panel + telemetry.'
@@ -18142,6 +18162,10 @@ cc38f9829f5f0384:
   path: crates/cp-mod-firecrawl/src/api.rs
   description: Firecrawl v2 HTTP client. FirecrawlClient with 5xx retry (3 attempts, 1s delay). ScrapeParams/SearchParams/MapParams/CrawlParams structs. post_json() + get_json() generic helpers. start_crawl() + poll_crawl() for async crawl jobs. 30s timeout. Bearer auth. Rate limit + forbidden error handling.
   last_edited_ms: 0
+cc58edda12b59bdb:
+  path: crates/cp-base/src/config/constants.rs
+  description: Layout/timing constants. SIDEBAR_HELP_HEIGHT=10 (9 help hints + separator). MAX_SIDEBAR_LABEL_LEN, INPUT_RESERVE, TEMPO_*, token thresholds, typing indicator timing.
+  last_edited_ms: 0
 cc7ec595d8bb9dac:
   path: crates/cp-mod-scratchpad/src/lib.rs
   description: 'Scratchpad module. 3 tools: create_cell/edit_cell/wipe. Fixed SCRATCHPAD panel. Per-worker cells. Visualizer: colored create/update/delete. fixed_order=8.'
@@ -19393,6 +19417,10 @@ dc25adefd5b31fad:
 dc2c1363bb906f50:
   path: crates/cp-orchestrator/src/transport/inspect/vitals.rs
   description: 'On-demand service-connectivity vitals endpoint (GET /api/agent/{id}/vitals — T269). agent_vitals runs REAL probes, never fabricates green: orchestrator self (ok), agent main-loop CONNECTION (heartbeat file fresh + boot_id match), agent loop STATUS (folded view phase·lifecycle, stopped→error), Meilisearch (TCP 127.0.0.1:port from ~/.context-pilot/meilisearch/port), console server (UnixStream connect <folder>/.context-pilot/console/server.sock), and 5 remote hosts (LLM provider mapped from config.json modules.core.llm_provider + Voyage/Datalab/Brave/Firecrawl) via key-independent TCP connect :443. Remotes run concurrently (thread-per-probe → mpsc, collected under COLLECT_DEADLINE 6s; PROBE_TIMEOUT 3s each) so a wedged DNS can''t hang the endpoint. Returns {name,category,status:ok|error|unavailable,latencyMs?,detail}. Unknown agent→404. Frontend prepends the 2 browser-only rows (self + round-trip).'
+  last_edited_ms: 0
+dc31d48c1b5fe64e:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 dc3b579dff546e61:
   path: crates/cp-oplog/src/append.rs

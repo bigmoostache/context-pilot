@@ -3,7 +3,12 @@ tools:
     description: |
       Creates a new behaviour (agent, skill, or command) as a .md file with YAML frontmatter. ID is auto-generated from the name (slugified). Fails if a behaviour with that ID already exists.
 
-      To edit an existing behaviour, use the Edit tool directly on its .md file (shown in the Library panel).
+      Behaviours are FLEET-SHARED: the raw files live under your home directory, shared by every agent on this host —
+        ~/.context-pilot/behaviours/agents/<id>.md
+        ~/.context-pilot/behaviours/skills/<id>.md
+        ~/.context-pilot/behaviours/commands/<id>.md
+
+      To edit an existing behaviour, use the Edit tool directly on its .md file at the path above (also shown in the Library panel).
       To delete a behaviour, delete its .md file. The system detects removals automatically.
     parameters:
       name: "Behaviour name (e.g., 'Code Reviewer')"
@@ -13,12 +18,12 @@ tools:
 
   agent_load:
     description: |
-      Activates an agent as the current system prompt. Pass empty id to revert to default.
+      Activates an agent as the current system prompt. Pass empty id to revert to default. Agents are fleet-shared, loaded from ~/.context-pilot/behaviours/agents/<id>.md (plus compiled-in built-ins).
     parameters:
       id: "Agent ID to activate. Empty to use default."
 
   skill_load:
     description: |
-      Loads a skill as a context panel. The skill's content becomes visible to the AI as a context block. To unload a skill, close its panel with Close_panel.
+      Loads a skill as a context panel. The skill's content becomes visible to the AI as a context block. Skills are fleet-shared, loaded from ~/.context-pilot/behaviours/skills/<id>.md (plus compiled-in built-ins). To unload a skill, close its panel with Close_panel.
     parameters:
       id: "Skill ID to load"

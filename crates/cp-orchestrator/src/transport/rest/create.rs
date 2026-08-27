@@ -217,13 +217,15 @@ pub fn create_command(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> Ht
         return HttpReply::error(400, "command body is required");
     }
 
-    let entry = match resolve_entry(state, id) {
-        Ok(e) => e,
-        Err(reply) => return reply,
-    };
+    // The realm is resolved only to enforce the per-agent ACL (resolve_entry);
+    // behaviour files themselves are fleet-shared, so the path is HOME-derived,
+    // not folder-relative (T651).
+    if let Err(reply) = resolve_entry(state, id) {
+        return reply;
+    }
 
     let slug = slugify(name);
-    let commands_dir = std::path::Path::new(&entry.folder).join(".context-pilot").join("commands");
+    let commands_dir = cp_base::config::constants::home_behaviours_dir().join("commands");
     let file_path = commands_dir.join(format!("{slug}.md"));
 
     if file_path.exists() {
@@ -296,12 +298,10 @@ struct CreateCommandReceipt {
 /// built-in with no local copy — still exportable + editable, editing writes
 /// the first override). `404` only when neither a disk file nor a seed exists.
 pub fn read_library_agent(state: &Mutex<Backend>, id: &str, item_id: &str) -> HttpReply {
-    let entry = match resolve_entry(state, id) {
-        Ok(e) => e,
-        Err(reply) => return reply,
-    };
-    let file_path =
-        std::path::Path::new(&entry.folder).join(".context-pilot").join("agents").join(format!("{item_id}.md"));
+    if let Err(reply) = resolve_entry(state, id) {
+        return reply;
+    }
+    let file_path = cp_base::config::constants::home_behaviours_dir().join("agents").join(format!("{item_id}.md"));
 
     // Disk copy wins (user agent or local override); it also carries the
     // `builtin` flag when its id shadows a compiled-in seed.
@@ -351,11 +351,10 @@ pub fn upsert_library_agent(state: &Mutex<Backend>, id: &str, item_id: &str, bod
         return HttpReply::error(400, "agent body is required");
     }
 
-    let entry = match resolve_entry(state, id) {
-        Ok(e) => e,
-        Err(reply) => return reply,
-    };
-    let agents_dir = std::path::Path::new(&entry.folder).join(".context-pilot").join("agents");
+    if let Err(reply) = resolve_entry(state, id) {
+        return reply;
+    }
+    let agents_dir = cp_base::config::constants::home_behaviours_dir().join("agents");
     let file_path = agents_dir.join(format!("{item_id}.md"));
 
     if let Err(e) = std::fs::create_dir_all(&agents_dir) {
@@ -376,12 +375,10 @@ pub fn upsert_library_agent(state: &Mutex<Backend>, id: &str, item_id: &str, bod
 /// built-in has NO file to delete, so this returns `404` — the frontend hides
 /// Delete on such rows, this is the authoritative backstop.
 pub fn delete_library_agent(state: &Mutex<Backend>, id: &str, item_id: &str) -> HttpReply {
-    let entry = match resolve_entry(state, id) {
-        Ok(e) => e,
-        Err(reply) => return reply,
-    };
-    let file_path =
-        std::path::Path::new(&entry.folder).join(".context-pilot").join("agents").join(format!("{item_id}.md"));
+    if let Err(reply) = resolve_entry(state, id) {
+        return reply;
+    }
+    let file_path = cp_base::config::constants::home_behaviours_dir().join("agents").join(format!("{item_id}.md"));
     if !file_path.exists() {
         return HttpReply::error(404, "no local agent file to delete (pure built-in)");
     }

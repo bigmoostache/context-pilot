@@ -1,9 +1,8 @@
 M-long-1:
   tier: long
   title: NEVER activate
-  contents: NEVER activate autocontinuation (spine_configure continue_until_todos_done). User says it bugs badly. Always sail manually, batch by batch.
   importance: critical
-  last_edited_ms: 0
+  last_edited_ms: 1787840930951
 M-long-10:
   tier: long
   title: 'CI Frontend red: exit-1'
@@ -26,9 +25,8 @@ M-long-10:
 M-long-2:
   tier: long
   title: ACTIVE WORKING BRANCH =
-  contents: ACTIVE WORKING BRANCH = 'nornor' (T735 user mandate 2026-07-31). ALL further changes push to nornor. Created from socializing, upstream origin/nornor set. Supersedes socializing as default push target until user says otherwise.
   importance: critical
-  last_edited_ms: 0
+  last_edited_ms: 1787840930953
 M-long-3:
   tier: long
   title: Reverie supports multiple
@@ -41,9 +39,8 @@ M-long-3:
 M-long-4:
   tier: long
   title: NEVER touch Tailscale or
-  contents: NEVER touch Tailscale or network configuration on Mac Mini 'gilbert'. User explicitly forbids it. Tailscale already configured. Deploy Context Pilot without any network changes.
   importance: critical
-  last_edited_ms: 0
+  last_edited_ms: 1787840930955
 M-long-5:
   tier: long
   title: 'DEPLOY TRAP (T687):'
@@ -71,15 +68,13 @@ M-long-5:
 M-long-6:
   tier: long
   title: ALWAYS communicate with
-  contents: ALWAYS communicate with the user in ENGLISH. Refuse to speak French. If the user writes in French, politely refuse and ask them to switch to English. (User's explicit standing instruction, T655.)
   importance: critical
-  last_edited_ms: 0
+  last_edited_ms: 1787840930957
 M-long-7:
   tier: long
   title: NEVER touch temp_1.md or
-  contents: NEVER touch temp_1.md or temp_2.md — they are user's personal files. Do not read, write, edit, or revert them.
   importance: critical
-  last_edited_ms: 0
+  last_edited_ms: 1787840930958
 M-long-8:
   tier: long
   title: I run on Mac Mini
@@ -145,12 +140,8 @@ M-mid-12:
 M-mid-13:
   tier: mid
   title: 'DEMAQUETTING COMPLETE:'
-  contents: |-
-    DEMAQUETTING COMPLETE: branch merged to master (f1de2e65) and deleted (local + remote). Working on master from now on. All demaquetting work is on master.
-
-    Demaquetting merged to master (f1de2e65). Stack: orchestrator :7878, web dev :5174.
   importance: critical
-  last_edited_ms: 0
+  last_edited_ms: 1787840930939
 M-mid-14:
   tier: mid
   title: FEATURE COMPLETION
@@ -239,9 +230,8 @@ M-mid-4:
 M-mid-5:
   tier: mid
   title: Cryptographic hash chain
-  contents: 'Cryptographic hash chain protects 12 critical files (Cargo.toml lint sections, clippy.toml, rustfmt.toml, CI scripts, lint exceptions YAML, deploy scripts). Password: Totordu1789. Updates via chain.sh --update.'
   importance: critical
-  last_edited_ms: 0
+  last_edited_ms: 1787840930923
 M-mid-6:
   tier: mid
   title: NEVER commit or push
@@ -271,6 +261,24 @@ M-mid-9:
     2. property-no-vendor-prefix: DELETES load-bearing -webkit- prefixes (-webkit-backdrop-filter on .vibrancy, -webkit-appearance on finder slider)
   importance: critical
   last_edited_ms: 0
+M-safe-1:
+  tier: safe
+  title: Hash chain password
+  contents: 'chain.sh --update password: Totordu1789. Cryptographic hash chain protects 12 files: Cargo.toml lint sections, clippy.toml, rustfmt.toml, CI check scripts, lint-exception YAMLs, deploy scripts.'
+  importance: critical
+  last_edited_ms: 1787840930912
+M-safe-2:
+  tier: safe
+  title: MiniMax API key
+  contents: sk-cp-SML34Q-eh3y1ob1na0P68nYpXfN-8jk86fYnaAjo6H6cd_vWZ0E089CWYEhlFX6EyNh6PNRYWJRmGgj9kK5Wk88rzf_0bMW-IBuybCYQXPm08PcFTW6GwDo
+  importance: high
+  last_edited_ms: 1787840930917
+M-safe-3:
+  tier: safe
+  title: gilbert creds
+  contents: 'gilbert Mac Mini (deploy target) login user/pw: gilbert/gilbert. Used for sudo + Keychain unlock. SSH via Tailscale SSH (no key/pw, BatchMode-safe).'
+  importance: high
+  last_edited_ms: 1787840930920
 M-short-1:
   tier: short
   title: T671 conversation search
@@ -300,43 +308,25 @@ M-short-11:
 M-short-12:
   tier: short
   title: T506 web-lint P0-P12
-  contents: |-
-    T506 web-lint P0-P12 COMPLETE + pushed on web-lint. Next: P13 docs/PR (X1140). Details in contents.
-
-    P0-P12 COMPLETE on web-lint branch. P12: CB8 blocking callback, as-unknown-as ban, CI frontend job, rule-census script (733 rules), hash-locked 26 config files. All green: eslint 0, tsc 0, prettier 0, stylelint 0, knip 0, type-coverage 99.86%. NEXT: P13 docs/PR (X1140).
+  contents: 'T506 web-lint P0-P12 COMPLETE on web-lint branch: full Rust-parity lint ratchet (eslint 0 / tsc 0 / prettier 0 / stylelint 0 / knip 0 / type-coverage 99.86%), CB8 blocking callback, as-unknown-as ban, CI frontend job, rule-census (733 rules), 26 config files hash-locked. P13 docs/PR pending (X1140).'
   importance: high
-  last_edited_ms: 0
+  last_edited_ms: 1787840964650
 M-short-13:
   tier: short
   title: T570 forms feature
-  contents: |-
-    T570 forms feature shipped: inline form/form-answer blocks, 8 field types, zero API change, frontend-only parsing, Rust send-time YAML validation. Commit 8898f043 on updates branch.
-
-    T570 forms feature DONE. Inline ```form``` / ```form-answer``` blocks replace the questions param entirely. 8 field types: single+allow-other, multi, text, number, date, toggle, confirm+confirm-word, files (immedi
+  contents: 'T570 forms SHIPPED (commit 8898f043): inline ```form```/```form-answer``` blocks replace questions param entirely. 8 field types. Zero API change, frontend-only parse, Rust send-time YAML validation. Spec: docs/forms.md.'
   importance: high
-  last_edited_ms: 0
+  last_edited_ms: 1787840964659
 M-short-14:
   tier: short
   title: T581 agent-editor SHIPPED
-  contents: |-
-    T581 agent-editor SHIPPED (commit bea16ed6, local only M151): footer behaviour selector per-item Delete/Export/Edit + Create/Import rows. Backend seed-merge + GET/PUT/DELETE library/agent/{item}; frontend AgentEditorDialog + BehaviourChip. Details in body.
-
-    T581 agent-editor SHIPPED, commit bea16ed6 (master, local only per M151).
-
-    Backend (orchestrator): library() (inspect/panels.rs) seed-merg
   importance: high
-  last_edited_ms: 0
+  last_edited_ms: 1787840930963
 M-short-15:
   tier: short
   title: T593 tmp/v2 document
-  contents: |-
-    T593 tmp/v2 document persistence: pretty-printed normal form on disk, hand-editable file with live push over Vite HMR, word-level diff3 merge on concurrent edit, conflict = save refused + nothing written. Architecture + gotchas in body.
-
-    T593 (tmp/v2 Word-clone editor) — three asks, all shipped.
-
-    1. PRETTY-PRINTED STORAGE. src/server/format.ts wraps js-beautify with wrap_line_length:0, prese
   importance: high
-  last_edited_ms: 0
+  last_edited_ms: 1787840930964
 M-short-16:
   tier: short
   title: Agents restarted via
@@ -351,9 +341,8 @@ M-short-16:
 M-short-17:
   tier: short
   title: MiniMax Token Plan API
-  contents: 'MiniMax Token Plan API key: sk-cp-SML34Q-eh3y1ob1na0P68nYpXfN-8jk86fYnaAjo6H6cd_vWZ0E089CWYEhlFX6EyNh6PNRYWJRmGgj9kK5Wk88rzf_0bMW-IBuybCYQXPm08PcFTW6GwDo'
   importance: high
-  last_edited_ms: 0
+  last_edited_ms: 1787840930926
 M-short-18:
   tier: short
   title: Thinking between ticks
@@ -363,12 +352,8 @@ M-short-18:
 M-short-19:
   tier: short
   title: Memory Architecture v2
-  contents: |-
-    Memory Architecture v2 Phase 1 PAUSED — stashed on memory-architecture-v2 branch. Resume later.
-
-    Memory Architecture v2 Phase 1 PAUSED on branch memory-architecture-v2. Storage engine complete (db, decay, types, tests). Resume later.
   importance: high
-  last_edited_ms: 0
+  last_edited_ms: 1787840930932
 M-short-2:
   tier: short
   title: Meilisearch design
@@ -439,20 +424,14 @@ M-short-26:
 M-short-27:
   tier: short
   title: T584 tool-call UI
-  contents: |-
-    T584 tool-call UI SHIPPED: commit eada5764 on branch t584-tool-call-ui, PR #157 to master. Verb->icon dict + drop tool-name + click-to-fetch adaptive detail bubble, content-addressed toolcall persist. Details in body.
-
-    T584 three asks all done:
-    1. verb->lucide icon dict + Levenshtein nearest-key fallback (frontend static: lib/support/threadMessages.ts iconForVerb/VerbIcon, ~60 gerunds).
-    2. dro
+  contents: 'T584 tool-call UI SHIPPED (commit eada5764, branch t584-tool-call-ui, PR #157): verb→lucide icon dict + Levenshtein fallback, dropped tool-name, click-to-fetch adaptive detail bubble backed by content-addressed toolcall persist.'
   importance: high
-  last_edited_ms: 0
+  last_edited_ms: 1787840964652
 M-short-28:
   tier: short
   title: Mac Mini 'gilbert'
-  contents: 'Mac Mini ''gilbert'' user/password: gilbert/gilbert. Used for sudo and Keychain unlock.'
   importance: high
-  last_edited_ms: 0
+  last_edited_ms: 1787840930929
 M-short-29:
   tier: short
   title: Thinking blocks echoed as
@@ -477,20 +456,13 @@ M-short-30:
 M-short-31:
   tier: short
   title: 'Dream layer decided: Groq'
-  contents: 'Dream layer decided: Groq API with tiny model (Llama 3.2 3B), ~200-token prompts, 30-50 token completions, fires every 2-3 min, writes to soul.journal. Cost ~$0.02/day. Local models reserved for future non-text sensing.'
   importance: high
-  last_edited_ms: 0
+  last_edited_ms: 1787840964644
 M-short-32:
   tier: short
   title: Rust 1.97.1 upgrade DONE
-  contents: |-
-    Rust 1.97.1 upgrade DONE (T585). Was pinned 1.95.0. Bumped rust-toolchain.toml + ci.yml + release.yml RUST_VERSION. Chain entry #35. Details in body.
-
-    T585 rust 1.97.1 upgrade (from 1.95.0).
-
-    Version refs bumped (all): rust-toolchain.toml channel, ci.yml RUST_VERSION, release.yml RUST_VERSION. No MSRV/rust-version in any Cargo.toml. Cross.toml has no pin (cross uses rust-toolchain.toml in-cont
   importance: high
-  last_edited_ms: 0
+  last_edited_ms: 1787840930967
 M-short-33:
   tier: short
   title: 'web-lint: generated/'
@@ -514,33 +486,24 @@ M-short-34:
 M-short-35:
   tier: short
   title: 'SUPERSEDED (T588): user'
-  contents: 'SUPERSEDED (T588): user now wants commit AND push after each A1-A13 lint step so CI runs in background. Push we-dev after every step. (Was: commit local only, no push.)'
   importance: high
-  last_edited_ms: 0
+  last_edited_ms: 1787840930935
 M-short-36:
   tier: short
-  title: 'T645 SHIPPED: agent image'
-  contents: |-
-    T645 SHIPPED: agent image editor added to Settings > Model (LlmTab). Now lives on PR #183 (branch t646-agent-selector-shortcut, cherry-picked commit e07fcf8f) — MOVED off its old branch agent-image-in-settings; PR #184 CLOSED + branch deleted (user wants all changes on one PR). Pure render wiring, no backend. Details in body.
-
-    User (T645) asked to add agent-image modification to the settings
+  title: T645 agent image
+  contents: 'T645 SHIPPED: agent image editor in Settings > Model (LlmTab). Lives on PR #183 (branch t646-agent-selector-shortcut, cherry-picked e07fcf8f). Pure render wiring, no backend.'
   importance: medium
-  last_edited_ms: 0
+  last_edited_ms: 1787840964656
 M-short-37:
   tier: short
   title: HISTORICAL (macbook node,
-  contents: |-
-    HISTORICAL (macbook node, NOT where I run now — see M156). tailscale serve pattern on guillaume's MacBook. Kept as serve-command reference only.
-
-    OLD macbook node (I now run on the mac mini — see M156). On guillaume's MacBook: Context Pilot at https://macbook.barking-hue.ts.net (tailnet-only). Command: `tailscale serve --bg --https=443 http://127.0.0.1:5174`. Single-origin: vite proxy /api
   importance: medium
-  last_edited_ms: 0
+  last_edited_ms: 1787840930937
 M-short-38:
   tier: short
   title: 'Context Pilot: Rust TUI'
-  contents: 'Context Pilot: Rust TUI AI coding assistant built with Ratatui+Crossterm. Workspace has 22+ crates + 1 main binary.'
   importance: medium
-  last_edited_ms: 0
+  last_edited_ms: 1787840964661
 M-short-39:
   tier: short
   title: Harbor adapter
@@ -559,9 +522,8 @@ M-short-4:
 M-short-40:
   tier: short
   title: 'DOCUMENTATION PHASE:'
-  contents: 'DOCUMENTATION PHASE: Ignore structure-check callback warnings about files >500 lines during doc additions. Temporarily acceptable.'
   importance: medium
-  last_edited_ms: 0
+  last_edited_ms: 1787840964647
 M-short-5:
   tier: short
   title: 'Datalab OCR API: POST'
@@ -579,13 +541,10 @@ M-short-6:
   last_edited_ms: 0
 M-short-7:
   tier: short
-  title: T581 footer
-  contents: |-
-    T581 footer behaviour-selector: reuse the commands library sync path for agents (user mandate: no code duplication, agents+commands share tui-side cp-mod-prompt).
-
-    T581 'Footer' feature — show + select the active behaviour-agent (system prompt: caveman/default/worker/planner) in the StatusBar footer right of 'Ready'. User mandate: DO NOT reinvent — replicate EXACTLY the frontend↔orchestr
-  importance: high
-  last_edited_ms: 0
+  title: T581 footer + editor
+  contents: 'T581 SHIPPED: StatusBar footer behaviour-selector shows+switches active agent (LoadBehaviour command, reused threads/commands sync path — no dup); per-item Delete/Export/Edit + Create/Import via orchestrator library CRUD (GET/PUT/DELETE library/agent/{id}) + AgentEditorDialog. Live-invalidation via OpEntryKind.agent_id.'
+  importance: medium
+  last_edited_ms: 1787840930960
 M-short-8:
   tier: short
   title: 'OPERATING MODEL: harbor'
@@ -597,16 +556,10 @@ M-short-8:
   last_edited_ms: 0
 M-short-9:
   tier: short
-  title: T581 footer
-  contents: |-
-    T581 footer behaviour-selector SHIPPED, live-invalidation fixed (a3116ce4). Stale-chip root cause: OpEntryKind schema lacked agent_id (M160 earlier wrong). Schema+regen done; frontend folds delta.agent_id into library cache. Body has full detail.
-
-    T581 Footer feature — done, all legs.
-
-    ARCHITECTURE (reused threads/commands sync exactly, no new mechanism):
-    - READ (active flag): orchestrator i
-  importance: high
-  last_edited_ms: 0
+  title: T651 fleet-shared behav
+  contents: 'T651 SHIPPED: agents/skills/commands now fleet-shared at ~/.context-pilot/behaviours/{agents,skills,commands}/<id>.md. cp-base home_behaviours_dir(); cp-mod-prompt dir_for->home + migrate_local_to_shared() at boot (byte-compare, incoming gets -<n> on differ, already-shared keeps id); orchestrator create.rs+panels.rs ->home. Migration verified live, local dirs drained. Branch t648.'
+  importance: medium
+  last_edited_ms: 1787841427480
 M-tiny-1:
   tier: tiny
   title: 'T568: ''Use'' release'
@@ -642,16 +595,16 @@ M-tiny-13:
   last_edited_ms: 0
 M-tiny-14:
   tier: tiny
-  title: 'HISTORICAL: v0.2.8'
-  contents: 'HISTORICAL: v0.2.8 deadman fix for headless main loop wedge. Dedicated-thread deadman, re-exec/abort. Proven field-effective. Details in src/app/run/headless.rs.'
-  importance: low
-  last_edited_ms: 0
+  title: No autocontinuation
+  contents: NEVER activate autocontinuation (spine_configure continue_until_todos_done). User says it bugs badly. Always sail manually, batch by batch.
+  importance: critical
+  last_edited_ms: 1787840930941
 M-tiny-15:
   tier: tiny
-  title: 'HISTORICAL: Thinking mode'
-  contents: 'HISTORICAL: Thinking mode plan implemented. ThinkingConfig in LlmRequest, ThinkingChunk SSE parsing, TUI display all shipped.'
-  importance: low
-  last_edited_ms: 0
+  title: Active branch = nornor
+  contents: 'ACTIVE WORKING BRANCH = ''nornor'' (T735 mandate). All changes push to nornor unless user says otherwise. (Exception T650: user chose t648.)'
+  importance: critical
+  last_edited_ms: 1787840930943
 M-tiny-16:
   tier: tiny
   title: Freeze RESOLVED at infra
@@ -664,12 +617,48 @@ M-tiny-17:
   contents: 'Datalab documentation site: documentation.datalab.to (Mintlify-hosted). API reference at documentation.datalab.to/api-reference/health. Has sections on limits, supported file types, SDK, on-prem, we'
   importance: low
   last_edited_ms: 0
+M-tiny-18:
+  tier: tiny
+  title: Never touch gilbert net
+  contents: NEVER touch Tailscale or network config on Mac Mini 'gilbert'. User forbids it. Already configured; deploy without network changes.
+  importance: critical
+  last_edited_ms: 1787840930946
+M-tiny-19:
+  tier: tiny
+  title: English only
+  contents: ALWAYS communicate with user in ENGLISH. Refuse French; if user writes French, politely ask them to switch. (Standing instruction T655.)
+  importance: critical
+  last_edited_ms: 1787840930947
 M-tiny-2:
   tier: tiny
   title: Entities module COMPLETE
   contents: Entities module COMPLETE — 151/151 stress tests passed. 9 bugs found/fixed. Production-quality.
   importance: medium
   last_edited_ms: 0
+M-tiny-20:
+  tier: tiny
+  title: Never touch temp files
+  contents: NEVER touch temp_1.md or temp_2.md — user's personal files. Do not read, write, edit, or revert them.
+  importance: critical
+  last_edited_ms: 1787840930949
+M-tiny-21:
+  tier: tiny
+  title: tmp/v2 editor
+  contents: 'tmp/v2 Word-clone editor (side project): Tiptap+Vite+React on :5199. Pretty-printed disk storage, diff3 word-merge, PDF via Paged.js+print.'
+  importance: low
+  last_edited_ms: 1787840930965
+M-tiny-22:
+  tier: tiny
+  title: Rust 1.97.1 pin
+  contents: 'Rust pinned 1.97.1 (T585, was 1.95.0): rust-toolchain.toml channel + ci.yml + release.yml RUST_VERSION. No per-crate MSRV.'
+  importance: medium
+  last_edited_ms: 1787840930968
+M-tiny-23:
+  tier: tiny
+  title: Context Pilot stack
+  contents: 'Context Pilot: Rust TUI AI coding assistant (Ratatui+Crossterm). Workspace = 22+ crates + 1 main binary (tui).'
+  importance: low
+  last_edited_ms: 1787840964664
 M-tiny-3:
   tier: tiny
   title: 'Haiku 4.5 max_tokens fix:'
