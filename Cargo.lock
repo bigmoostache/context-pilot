@@ -614,6 +614,7 @@ dependencies = [
  "calamine",
  "cp-base",
  "cp-mod-bridge",
+ "cp-mod-utilities",
  "cp-oplog",
  "cp-vault",
  "cp-wire",

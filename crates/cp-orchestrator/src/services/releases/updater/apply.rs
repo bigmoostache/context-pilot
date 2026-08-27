@@ -82,7 +82,8 @@ pub fn stage_apply(
     let db_backup = if auth_db_path.exists() {
         let backup = db_backup_path(auth_db_path, from.as_deref());
         match auth {
-            Some(auth) => auth.backup_to(&backup).map_err(|e| format!("auth.db backup: {e}"))?,
+            Some(auth) => crate::services::auth::backup::backup_store_to(auth, &backup)
+                .map_err(|e| format!("auth.db backup: {e}"))?,
             None => {
                 let _bytes = std::fs::copy(auth_db_path, &backup).map_err(|e| format!("auth.db backup: {e}"))?;
             }

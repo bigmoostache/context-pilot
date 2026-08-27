@@ -59,7 +59,7 @@ impl BackupScheduler {
         // ── Rolling backup ──────────────────────────────────────────
         if now.saturating_sub(self.last_rolling_ms) >= ROLLING_INTERVAL_MS {
             let dest = self.rolling_path();
-            match auth.backup_to(&dest) {
+            match backup_store_to(auth, &dest) {
                 Ok(()) => {
                     self.last_rolling_ms = now;
                     crate::oerr!("auth backup: rolling snapshot → {}", dest.display());
@@ -80,7 +80,7 @@ impl BackupScheduler {
                 if let Some(parent) = dest.parent() {
                     let _created = std::fs::create_dir_all(parent);
                 }
-                match auth.backup_to(&dest) {
+                match backup_store_to(auth, &dest) {
                     Ok(()) => {
                         crate::oerr!("auth backup: daily snapshot → {}", dest.display());
                     }
@@ -111,82 +111,50 @@ impl BackupScheduler {
 
     /// Produce a `"YYYY-MM-DD-am"` or `"YYYY-MM-DD-pm"` tag from epoch-ms.
     fn daily_tag(epoch_ms: u64) -> String {
-        // Convert to seconds and derive UTC date components.
-        let secs = epoch_ms / 1000;
-        let (year, month, day, hour) = epoch_to_ymd_h(secs);
-        let half = if hour < 12 { "am" } else { "pm" };
-        format!("{year:04}-{month:02}-{day:02}-{half}")
+        // Convert to seconds and derive UTC date components via the shared,
+        // lint-clean civil-date helper (Howard Hinnant) rather than a local copy.
+        let secs = i64::try_from(epoch_ms.wrapping_div(1000)).unwrap_or(0);
+        let Some(dt) = cp_mod_utilities::time::decompose_epoch_secs(secs) else {
+            return "1970-01-01-am".to_owned();
+        };
+        let half = if dt.hour < 12 { "am" } else { "pm" };
+        format!("{:04}-{:02}-{:02}-{half}", dt.year, dt.month, dt.day)
     }
 }
 
-// ─────────────── AuthStore backup method ─────────────────────────────
+// ─────────────── AuthStore backup helper ─────────────────────────────
 
-impl AuthStore {
-    /// Create a consistent backup of the database to `dest` using the `SQLite`
-    /// online backup API.
-    ///
-    /// Safe to call while other threads read the same connection (WAL mode).
-    /// The backup is atomic — `dest` is a complete, self-contained database
-    /// on success.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`AuthError::Database`] if the destination cannot be opened or
-    /// the backup fails.
-    pub(crate) fn backup_to(&self, dest: &Path) -> Result<(), AuthError> {
-        if let Some(parent) = dest.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|_io_err| AuthError::Database(rusqlite::Error::InvalidPath(parent.to_path_buf())))?;
-        }
-        let mut dst = rusqlite::Connection::open(dest)?;
-        let backup = rusqlite::backup::Backup::new(&self.conn, &mut dst)?;
-        // 100 pages per step, no pause — our auth.db is tiny.
-        backup.run_to_completion(100, Duration::from_millis(0), None)?;
-        Ok(())
-    }
-}
-
-// ─────────────── Minimal UTC date extraction ─────────────────────────
-
-/// Convert seconds-since-epoch to `(year, month, day, hour)` in UTC.
+/// Create a consistent backup of `auth`'s database to `dest` using the
+/// `SQLite` online backup API.
 ///
-/// Civil-time algorithm from Howard Hinnant (public domain). No `chrono`
-/// dependency — the auth backup is the only consumer and only needs the
-/// date + hour.
-fn epoch_to_ymd_h(secs: u64) -> (i32, u32, u32, u32) {
-    let hour = ((secs % 86400) / 3600) as u32;
-
-    // Days since 0000-03-01 (era-based algorithm).
-    let z = (secs / 86400) as i64 + 719_468;
-    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
-    let doe = (z - era * 146_097) as u32; // day-of-era  [0, 146096]
-    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
-    let y = i64::from(yoe) + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = if m <= 2 { y + 1 } else { y };
-
-    (i32::try_from(y).unwrap_or(9999), m, d, hour)
+/// A free function rather than an inherent method so the whole backup concern
+/// stays in this module without adding a second `impl AuthStore` block (the
+/// primary one lives in `store.rs`, already at the file-length cap). Reads
+/// `auth.conn` directly — it is `pub(crate)`.
+///
+/// Safe to call while other threads read the same connection (WAL mode). The
+/// backup is atomic — `dest` is a complete, self-contained database on success.
+///
+/// # Errors
+///
+/// Returns [`AuthError::Database`] if the destination cannot be opened or the
+/// backup fails.
+pub(crate) fn backup_store_to(auth: &AuthStore, dest: &Path) -> Result<(), AuthError> {
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|_io_err| AuthError::Database(rusqlite::Error::InvalidPath(parent.to_path_buf())))?;
+    }
+    let mut dest_conn = rusqlite::Connection::open(dest)?;
+    let backup = rusqlite::backup::Backup::new(&auth.conn, &mut dest_conn)?;
+    // 100 pages per step, no pause — our auth.db is tiny.
+    backup.run_to_completion(100, Duration::from_millis(0), None)?;
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::path::Path as StdPath;
-
-    #[test]
-    fn epoch_to_ymd_h_known_dates() {
-        // 2026-06-23 14:30:00 UTC = 1782225000
-        let (y, m, d, h) = epoch_to_ymd_h(1_782_225_000);
-        assert_eq!((y, m, d), (2026, 6, 23));
-        assert_eq!(h, 14);
-
-        // Unix epoch = 1970-01-01 00:00:00
-        let (y, m, d, h) = epoch_to_ymd_h(0);
-        assert_eq!((y, m, d, h), (1970, 1, 1, 0));
-    }
 
     #[test]
     fn daily_tag_am_pm() {
@@ -225,7 +193,8 @@ mod tests {
         // Clean up from any previous run.
         let _removed = std::fs::remove_file(&tmp);
 
-        store.backup_to(&tmp).expect("backup_to");
+        backup_store_to(&store, &tmp).expect("backup_to");
+
 
         // The backup file should exist and be a valid SQLite database.
         assert!(tmp.exists(), "backup file should exist");
