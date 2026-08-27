@@ -3,6 +3,7 @@ import { ScrollArea } from "@/mobile-components/ui/scroll-area"
 import { Message } from "@/mobile-components/conversation/Message"
 import { ThreadComposer, type CommandSuggestion } from "@/mobile-components/threads/ThreadComposer"
 import { CreateCommandDialog } from "@/mobile-components/threads/CreateCommandDialog"
+import { AgentEditorDialog } from "@/mobile-components/shell/behaviour/AgentEditorDialog"
 import { QuickLookSheet } from "@/mobile-components/finder/QuickLookSheet"
 import { useLibrary } from "@/lib/live"
 import { sendCommand } from "@/lib/api"
@@ -143,6 +144,10 @@ export function ThreadConversation({
   // Whether the "create command" dialog (T350) is open — toggled by the pill
   // the composer renders beside the /command suggestion bubbles.
   const [createCmdOpen, setCreateCmdOpen] = useState(false)
+  // The command whose editor is open (null = closed) — mirrors the desktop
+  // twin: the bubble row's per-command Edit button prefills the shared
+  // AgentEditorDialog in command-edit mode (T654).
+  const [editCmd, setEditCmd] = useState<CommandSuggestion | null>(null)
 
   // First-message `/command` suggestions (T348), built from the live prompt
   // library (kind === "command"); each command's slash invocation is `/${id}`.
@@ -287,7 +292,9 @@ export function ThreadConversation({
           suggestions={suggestions}
           firstMessage={thread.log.length === 0}
           onCreateCommand={() => setCreateCmdOpen(true)}
+          onEditCommand={(s) => setEditCmd(s)}
           draftKey={`cp-draft-${agentId}-${thread.id}`}
+          commandKey={`cp-cmd-${agentId}-${thread.id}`}
         />
       </div>
 
@@ -303,6 +310,21 @@ export function ThreadConversation({
         onClose={() => setCreateCmdOpen(false)}
         agentId={agentId}
       />
+
+      {editCmd && (
+        <AgentEditorDialog
+          open
+          onClose={() => setEditCmd(null)}
+          agentId={agentId}
+          variant="command"
+          mode={{ kind: "edit", itemId: editCmd.command.slice(1), builtin: false }}
+          initial={{
+            name: editCmd.name,
+            description: editCmd.description,
+            body: editCmd.body ?? "",
+          }}
+        />
+      )}
     </main>
   )
 }

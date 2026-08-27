@@ -4,6 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Message } from "@/components/conversation/Message"
 import { ThreadComposer, type CommandSuggestion } from "./ThreadComposer"
 import { CreateCommandDialog } from "./CreateCommandDialog"
+import { AgentEditorDialog } from "@/components/shell/behaviour/AgentEditorDialog"
 import { QuickLookSheet } from "@/components/finder/QuickLookSheet"
 import { useLibrary } from "@/lib/live"
 import { sendCommand } from "@/lib/api"
@@ -247,6 +248,34 @@ function UnarchiveBar({ onUnarchive }: { onUnarchive: () => void }) {
 }
 
 /**
+ * The per-command edit dialog (T654) — a thin wrapper over the shared
+ * {@link AgentEditorDialog} in command-edit mode, prefilled from the picked
+ * suggestion (which carries name/description/body, so no extra fetch). Extracted
+ * to module scope so the {@link ThreadConversation} render stays within the P8
+ * max-lines-per-function budget.
+ */
+function CommandEditDialog({
+  sugg,
+  agentId,
+  onClose,
+}: {
+  sugg: CommandSuggestion
+  agentId: string
+  onClose: () => void
+}) {
+  return (
+    <AgentEditorDialog
+      open
+      onClose={onClose}
+      agentId={agentId}
+      variant="command"
+      mode={{ kind: "edit", itemId: sugg.command.slice(1), builtin: false }}
+      initial={{ name: sugg.name, description: sugg.description, body: sugg.body ?? "" }}
+    />
+  )
+}
+
+/**
  * Center pane — the selected thread's full conversation + composer.
  *
  * Intentionally header-less: the thread's identity (name + turn status) already
@@ -295,6 +324,11 @@ export function ThreadConversation({
   // Whether the "create command" dialog (T350) is open — toggled by the pill
   // the composer renders beside the /command suggestion bubbles.
   const [createCmdOpen, setCreateCmdOpen] = useState(false)
+  // The command whose editor is open (null = closed) — the bubble row's
+  // per-command Edit button sets it, prefilling the shared AgentEditorDialog in
+  // command-edit mode (T654). CommandSuggestion carries name/description/body, so
+  // the editor prefills with no extra fetch.
+  const [editCmd, setEditCmd] = useState<CommandSuggestion | null>(null)
 
   // First-message `/command` suggestions (T348). Surfaced ONLY for an empty
   // thread — the agent's command library is a jumping-off point for the very
@@ -435,7 +469,9 @@ export function ThreadConversation({
             suggestions={suggestions}
             firstMessage={thread.log.length === 0}
             onCreateCommand={() => setCreateCmdOpen(true)}
+            onEditCommand={(s) => setEditCmd(s)}
             draftKey={`cp-draft-${agentId}-${thread.id}`}
+            commandKey={`cp-cmd-${agentId}-${thread.id}`}
           />
         </div>
       </div>
@@ -455,6 +491,10 @@ export function ThreadConversation({
         onClose={() => setCreateCmdOpen(false)}
         agentId={agentId}
       />
+
+      {editCmd && (
+        <CommandEditDialog sugg={editCmd} agentId={agentId} onClose={() => setEditCmd(null)} />
+      )}
     </main>
   )
 }

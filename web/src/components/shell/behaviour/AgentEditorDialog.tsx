@@ -1,9 +1,19 @@
 import { useEffect, useState } from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
-import { Bot, Loader2, X, CornerDownLeft } from "lucide-react"
+import { Bot, Loader2, X, CornerDownLeft, TerminalSquare } from "lucide-react"
 import { fetchLibraryAgent } from "@/lib/api"
-import { useUpsertLibraryAgent } from "@/lib/live"
+import { useUpsertLibraryAgent, useCreateCommand, useUpsertCommand } from "@/lib/live"
 import { cn } from "@/lib/utils"
+
+/**
+ * Which library item this dialog authors. `agent` (default) drives the
+ * behaviour-agent upsert (`PUT …/library/agent/{id}`); `command` reuses the
+ * exact same UI but wires to the command create (`POST …/library/command`) and
+ * swaps the agent-specific wording (system prompt → prompt, file id → `/slug`).
+ * The command flow is create-only (no edit/import), so callers pass
+ * `mode={{ kind: "create" }}`.
+ */
+export type AgentEditorVariant = "agent" | "command"
 
 /**
  * Derive a behaviour-agent file id (slug) from its name — mirrors the
@@ -90,6 +100,125 @@ function useAgentEditorFields(
   return { name, setName, description, setDescription, body, setBody, loading }
 }
 
+/** The variant-derived wording + icon for the editor chrome. Extracted as a
+ *  pure helper so the component function stays under its line + complexity
+ *  budgets (the title/submit/id-line branches live here, not in the render). */
+interface EditorCopy {
+  icon: React.ReactNode
+  namePlaceholder: string
+  idLine: React.ReactNode
+  sectionLabel: string
+  bodyPlaceholder: string
+  title: string
+  submitLabel: string
+}
+
+/** Resolve the {@link EditorCopy} for a variant + mode. `command` is always a
+ *  create flow; `agent` distinguishes create / edit / built-in-override. */
+function editorCopy(
+  variant: AgentEditorVariant,
+  mode: AgentEditorMode,
+  slug: string,
+  isBuiltin: boolean,
+): EditorCopy {
+  if (variant === "command") {
+    const isEdit = mode.kind === "edit"
+    return {
+      icon: <TerminalSquare className="size-2.5" />,
+      namePlaceholder: "Command name",
+      idLine: (
+        <>
+          Invoked as <span className="font-mono text-(--interactive)">/{slug}</span>
+        </>
+      ),
+      sectionLabel: "Prompt",
+      bodyPlaceholder: "The prompt this command expands to when clicked…",
+      title: isEdit ? "Edit command" : "New command",
+      submitLabel: isEdit ? "Save command" : "Create command",
+    }
+  }
+  const isEdit = mode.kind === "edit"
+  return {
+    icon: <Bot className="size-2.5" />,
+    namePlaceholder: "Agent name",
+    idLine: (
+      <>
+        File id <span className="font-mono text-(--interactive)">{slug}</span>
+        {isEdit && " · rename only changes the display name"}
+      </>
+    ),
+    sectionLabel: "System prompt",
+    bodyPlaceholder: "The system prompt this behaviour agent loads…",
+    title: isEdit ? (isBuiltin ? "Override built-in" : "Edit agent") : "New agent",
+    submitLabel: isEdit ? "Save agent" : "Create agent",
+  }
+}
+
+/** The current field values the submit hook reads to compose the save. */
+interface EditorFieldValues {
+  name: string
+  description: string
+  body: string
+}
+
+/** What the editor is authoring — the agent id, the item variant, and the
+ *  create/edit mode. Bundled so the submit hook stays within the 4-param cap. */
+interface EditorTarget {
+  agentId: string
+  variant: AgentEditorVariant
+  mode: AgentEditorMode
+}
+
+/** The save wiring — the three library mutations (all called for Rules of
+ *  Hooks), the active-mutation selection per variant+mode, the derived
+ *  slug/validity/error/built-in flags, and the submit/close callbacks. Extracted
+ *  from the component so its branches don't inflate the render's line budget.
+ *  `command+edit` → PUT command upsert, `command+create` → POST command create,
+ *  `agent` → PUT agent upsert. */
+function useAgentEditorSubmit(
+  target: EditorTarget,
+  fields: EditorFieldValues,
+  onClose: () => void,
+) {
+  const { agentId, variant, mode } = target
+  const upsert = useUpsertLibraryAgent(agentId)
+  const createCmd = useCreateCommand(agentId)
+  const upsertCmd = useUpsertCommand(agentId)
+  const isCommand = variant === "command"
+  const isEdit = mode.kind === "edit"
+  const mut = isCommand ? (isEdit ? upsertCmd : createCmd) : upsert
+
+  const slug = mode.kind === "edit" ? mode.itemId : slugify(fields.name)
+  const canSave = fields.name.trim().length > 0 && fields.body.trim().length > 0
+  const error = mut.error instanceof Error ? mut.error.message : null
+  const isBuiltin = !isCommand && mode.kind === "edit" && mode.builtin
+
+  const close = () => {
+    upsert.reset()
+    createCmd.reset()
+    upsertCmd.reset()
+    onClose()
+  }
+
+  const submit = (e: React.SyntheticEvent) => {
+    e.preventDefault()
+    if (!canSave || mut.isPending) return
+    const trimmed = {
+      name: fields.name.trim(),
+      description: fields.description.trim(),
+      body: fields.body.trim(),
+    }
+    if (isCommand) {
+      if (isEdit) upsertCmd.mutate({ itemId: slug, ...trimmed }, { onSuccess: () => close() })
+      else createCmd.mutate(trimmed, { onSuccess: () => close() })
+    } else {
+      upsert.mutate({ itemId: slug, ...trimmed }, { onSuccess: () => close() })
+    }
+  }
+
+  return { mut, slug, canSave, error, isBuiltin, submit, close }
+}
+
 /**
  * Behaviour-agent editor dialog (T581 footer selector). One dialog serves three
  * flows — **Create** (empty), **Edit** (prefilled from the on-disk `.md`, or the
@@ -109,6 +238,7 @@ export function AgentEditorDialog({
   agentId,
   mode,
   initial,
+  variant = "agent",
 }: {
   open: boolean
   onClose: () => void
@@ -116,39 +246,23 @@ export function AgentEditorDialog({
   mode: AgentEditorMode
   /** Prefill (Import path passes the parsed `.md`; Edit fetches on open). */
   initial?: Prefill | undefined
+  /** Which library item to author — `agent` (default) or `command`. */
+  variant?: AgentEditorVariant
 }) {
   const { name, setName, description, setDescription, body, setBody, loading } =
     useAgentEditorFields(open, mode, agentId, initial)
-  const upsert = useUpsertLibraryAgent(agentId)
-
-  const slug = mode.kind === "edit" ? mode.itemId : slugify(name)
-  const canSave = name.trim().length > 0 && body.trim().length > 0
-  const error = upsert.error instanceof Error ? upsert.error.message : null
-  const isBuiltin = mode.kind === "edit" && mode.builtin
-
-  const close = () => {
-    upsert.reset()
-    onClose()
-  }
-
-  const submit = (e: React.SyntheticEvent) => {
-    e.preventDefault()
-    if (!canSave || upsert.isPending) return
-    upsert.mutate(
-      { itemId: slug, name: name.trim(), description: description.trim(), body: body.trim() },
-      { onSuccess: () => close() },
-    )
-  }
+  const { mut, slug, canSave, error, isBuiltin, submit, close } = useAgentEditorSubmit(
+    { agentId, variant, mode },
+    { name, description, body },
+    onClose,
+  )
 
   // ⌘/Ctrl+Enter submits from anywhere in the form (Linear parity).
   const onKeyDown = (e: React.KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") submit(e)
   }
 
-  const title =
-    mode.kind === "create" ? "New agent" : isBuiltin ? "Override built-in" : "Edit agent"
-
-  const submitLabel = mode.kind === "create" ? "Create agent" : "Save agent"
+  const copy = editorCopy(variant, mode, slug, isBuiltin)
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(o) => !o && close()}>
@@ -174,10 +288,10 @@ export function AgentEditorDialog({
             <div className="flex items-center gap-2 px-4 pt-3 pb-1">
               <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
                 <span className="flex size-[15px] items-center justify-center rounded-sm bg-(--signal)/15 text-(--signal)">
-                  <Bot className="size-2.5" />
+                  {copy.icon}
                 </span>
                 <span className="text-muted-foreground/50">›</span>
-                <span className="text-foreground/70">{title}</span>
+                <span className="text-foreground/70">{copy.title}</span>
               </span>
               <button
                 type="button"
@@ -200,12 +314,11 @@ export function AgentEditorDialog({
                   autoFocus
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Agent name"
+                  placeholder={copy.namePlaceholder}
                   className="w-full bg-transparent px-4 pt-1 text-[19px] font-semibold tracking-tight text-foreground outline-none placeholder:text-muted-foreground/40"
                 />
                 <span className="px-4 pt-0.5 text-[11px] text-muted-foreground/70">
-                  File id <span className="font-mono text-(--interactive)">{slug}</span>
-                  {mode.kind === "edit" && " · rename only changes the display name"}
+                  {copy.idLine}
                 </span>
 
                 {/* description — seamless secondary line */}
@@ -219,12 +332,12 @@ export function AgentEditorDialog({
                 {/* system prompt — the primary field, its own scroll region */}
                 <div className="mt-2 flex min-h-0 flex-1 flex-col border-t border-border/60">
                   <span className="px-4 pt-2.5 text-[11px] font-medium tracking-wide text-muted-foreground/70 uppercase">
-                    System prompt
+                    {copy.sectionLabel}
                   </span>
                   <textarea
                     value={body}
                     onChange={(e) => setBody(e.target.value)}
-                    placeholder="The system prompt this behaviour agent loads…"
+                    placeholder={copy.bodyPlaceholder}
                     className="min-h-[340px] w-full flex-1 resize-none overflow-y-auto bg-transparent px-4 pt-1.5 pb-3 font-mono text-[12.5px] leading-relaxed text-foreground/90 outline-none placeholder:text-muted-foreground/40"
                   />
                 </div>
@@ -242,11 +355,11 @@ export function AgentEditorDialog({
               )}
               <button
                 type="submit"
-                disabled={!canSave || upsert.isPending || loading}
+                disabled={!canSave || mut.isPending || loading}
                 className="ml-auto flex items-center gap-1.5 rounded-md bg-(--signal) px-3 py-1.5 text-[12.5px] font-medium text-(--primary-foreground) transition-[filter] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {upsert.isPending && <Loader2 className="size-3.5 animate-spin" />}
-                {submitLabel}
+                {mut.isPending && <Loader2 className="size-3.5 animate-spin" />}
+                {copy.submitLabel}
                 <CornerDownLeft className="size-3.5 opacity-70" />
               </button>
             </div>

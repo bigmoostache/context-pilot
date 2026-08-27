@@ -1677,6 +1677,38 @@ export type PostApiAgentByIdLibraryCommandResponses = {
 
 export type PostApiAgentByIdLibraryCommandResponse = PostApiAgentByIdLibraryCommandResponses[keyof PostApiAgentByIdLibraryCommandResponses];
 
+export type PutApiAgentByIdLibraryCommandByItemData = {
+    body: {
+        body: string;
+        description?: string;
+        name: string;
+    };
+    path: {
+        id: string;
+        item: string;
+    };
+    query?: never;
+    url: '/api/agent/{id}/library/command/{item}';
+};
+
+export type PutApiAgentByIdLibraryCommandByItemErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PutApiAgentByIdLibraryCommandByItemError = PutApiAgentByIdLibraryCommandByItemErrors[keyof PutApiAgentByIdLibraryCommandByItemErrors];
+
+export type PutApiAgentByIdLibraryCommandByItemResponses = {
+    /**
+     * Success
+     */
+    200: CreateCommandReceipt;
+};
+
+export type PutApiAgentByIdLibraryCommandByItemResponse = PutApiAgentByIdLibraryCommandByItemResponses[keyof PutApiAgentByIdLibraryCommandByItemResponses];
+
 export type GetApiAgentByIdMetaData = {
     body?: never;
     path: {

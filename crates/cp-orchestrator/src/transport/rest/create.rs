@@ -252,6 +252,51 @@ pub fn create_command(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> Ht
     HttpReply::json(201, &CreateCommandReceipt { id: slug, status: "created" })
 }
 
+/// `PUT /api/agent/{id}/library/command/{item}` — create or overwrite a
+/// `/command` markdown file (the command bubble row's per-command Edit button).
+///
+/// The command twin of [`upsert_library_agent`]: unlike [`create_command`]
+/// (which 409s on an existing slug to guard accidental clobber), this
+/// DELIBERATELY overwrites — editing an existing command is exactly an
+/// overwrite of `commands/<item>.md`. The file id is the URL's `item` (stable
+/// across edits — only the frontmatter `name` changes, so a rename never
+/// orphans the `.md`).
+///
+/// Body: `{ "name": "...", "description": "...?", "body": "..." }` — `name` and
+/// `body` are required. Returns `200` `{ id, status }`, `400` for a blank
+/// name/body or malformed JSON, `404` for an unknown agent, `502` if the file
+/// cannot be written.
+pub fn upsert_library_command(state: &Mutex<Backend>, id: &str, item_id: &str, body_bytes: &[u8]) -> HttpReply {
+    let Ok(req) = serde_json::from_slice::<CreateCommandReq>(body_bytes) else {
+        return HttpReply::error(400, "malformed upsert-command request");
+    };
+    let name = req.name.trim();
+    if name.is_empty() {
+        return HttpReply::error(400, "command name is required");
+    }
+    let body = req.body.trim();
+    if body.is_empty() {
+        return HttpReply::error(400, "command body is required");
+    }
+
+    // ACL gate only; behaviour files are fleet-shared (HOME-derived), not
+    // folder-relative (T651) — same rule as create_command / upsert_library_agent.
+    if let Err(reply) = resolve_entry(state, id) {
+        return reply;
+    }
+    let commands_dir = cp_base::config::constants::home_behaviours_dir().join("commands");
+    let file_path = commands_dir.join(format!("{item_id}.md"));
+
+    if let Err(e) = std::fs::create_dir_all(&commands_dir) {
+        return HttpReply::error(502, &format!("could not create commands directory: {e}"));
+    }
+    let markdown = compose_md(name, req.description.trim(), body);
+    if let Err(e) = std::fs::write(&file_path, markdown) {
+        return HttpReply::error(502, &format!("could not write command file: {e}"));
+    }
+    HttpReply::json(200, &CreateCommandReceipt { id: item_id.to_owned(), status: "saved" })
+}
+
 /// Encode a single-line string as a double-quoted YAML scalar.
 ///
 /// Backslashes and double quotes are escaped, and any CR/LF is collapsed to a

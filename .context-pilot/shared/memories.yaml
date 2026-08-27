@@ -252,15 +252,13 @@ M-mid-8:
   last_edited_ms: 0
 M-mid-9:
   tier: mid
-  title: stylelint --fix on
+  title: T651 fleet-shared behav
   contents: |-
-    stylelint --fix on Tailwind v4 entry point is DANGEROUS: import-notation + property-no-vendor-prefix both damage it. Both disabled in web/.stylelintrc.json, NEVER re-enable.
+    T651 SHIPPED (commit 48bea9ca, branch t648): agents/skills/commands fleet-shared at ~/.context-pilot/behaviours/{agents,skills,commands}/<id>.md. home_behaviours_dir() in cp-base; cp-mod-prompt dir_for->home + migrate_local_to_shared() at boot; orchestrator create.rs + panels.rs library() ->home.
 
-    Two stylelint rules damage a Tailwind v4 CSS entry point when --fix runs:
-    1. import-notation: rewrites `@import "tailwindcss"` into `@import url("tailwindcss")`. Tailwind's PostCSS plugin only recognizes the BARE-STRING form; url() form yields ZERO utility classes = total styling loss ('2005 look', only inline styles + CSS vars survive).
-    2. property-no-vendor-prefix: DELETES load-bearing -webkit- prefixes (-webkit-backdrop-filter on .vibrancy, -webkit-appearance on finder slider)
-  importance: critical
-  last_edited_ms: 0
+    GOTCHA (fixed 2026-08-27): deployed orch had T651 READ path (panels.rs=home) but STALE WRITE path (create.rs per-realm) — binary predated create.rs home switch. Web-UI agent edits wrote <realm>/.context-pilot/agents/ not home. Fix=rebuild+redeploy orch+restart. Verify: strings<bin>|grep -c behaviours==2, or live PUT probe.
+  importance: high
+  last_edited_ms: 1787843209563
 M-safe-1:
   tier: safe
   title: Hash chain password
@@ -556,10 +554,10 @@ M-short-8:
   last_edited_ms: 0
 M-short-9:
   tier: short
-  title: T651 fleet-shared behav
-  contents: 'T651 SHIPPED: agents/skills/commands now fleet-shared at ~/.context-pilot/behaviours/{agents,skills,commands}/<id>.md. cp-base home_behaviours_dir(); cp-mod-prompt dir_for->home + migrate_local_to_shared() at boot (byte-compare, incoming gets -<n> on differ, already-shared keeps id); orchestrator create.rs+panels.rs ->home. Migration verified live, local dirs drained. Branch t648.'
+  title: T654 command edit
+  contents: 'T654 (PR #186, t654-command-edit): AgentEditorDialog reused for command create+edit + per-command Pencil edit. REWORK (frontend-only, both twins): /command ATTACHES as durable chip (localStorage cp-cmd-$agent-$thread), single max, prepended as prefix on Send then detached; Edit+X only on chip. useComposer: attachCmd/detachCmd/persistCmd. ComposerInputRow+Banner in fileUpload/composerInput.tsx.'
   importance: medium
-  last_edited_ms: 1787841427480
+  last_edited_ms: 1787847146930
 M-tiny-1:
   tier: tiny
   title: 'T568: ''Use'' release'

@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { lineBounds, resolveEnter, resolveTab } from "@/lib/utils"
 import { measure } from "@/lib/support/telemetry"
-import { ArrowUp, Paperclip, Loader2, Clock, Pause } from "lucide-react"
-import { Tip } from "@/components/ui/tip"
 import type { ThreadStatus } from "@/lib/types"
 import { ComposerBubbles } from "./fileUpload"
 import type { UploadedFile, CommandSuggestion } from "./fileUpload/helpers"
+import { ComposerInputRow, ComposerBanner } from "./fileUpload/composerInput"
 import { parseDraft, resolveComposerBanner } from "@/lib/support/threadMessages"
-import type { Banner } from "@/lib/support/threadMessages"
 
 // CommandSuggestion now lives beside the file-chip abstraction in ./fileUpload
 // (both composer pill families share ONE module + ONE rendered row). Re-exported
@@ -24,12 +22,36 @@ interface Composer {
   caret: number
   textareaRef: React.RefObject<HTMLTextAreaElement | null>
   slashPrefix: string | null
+  /** the currently-attached `/command` (prepended to the message on send), or
+   *  null. Durable per-thread (T654). */
+  attachedCmd: CommandSuggestion | null
   canSend: (pendingFiles: number) => boolean
   onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
   onSelect: (e: React.SyntheticEvent<HTMLTextAreaElement>) => void
   handleKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void
   handleSubmit: () => void
-  prefill: (s: CommandSuggestion) => void
+  /** Attach a `/command` as the message prefix (replaces any current one, max
+   *  one) and strip the slash trigger line from the draft. */
+  attachCmd: (s: CommandSuggestion) => void
+  /** Remove the attached `/command`. */
+  detachCmd: () => void
+}
+
+/** Read the persisted attached command for a thread (T654). Tolerant: a missing
+ *  or malformed value yields null. */
+function readAttachedCmd(commandKey: string | undefined): CommandSuggestion | null {
+  if (!commandKey) return null
+  try {
+    const raw = localStorage.getItem(commandKey)
+    if (!raw) return null
+    const parsed: unknown = JSON.parse(raw)
+    if (parsed && typeof parsed === "object" && "command" in parsed) {
+      return parsed as CommandSuggestion
+    }
+  } catch {
+    // corrupt entry — treat as none
+  }
+  return null
 }
 
 /**
@@ -44,6 +66,7 @@ interface Composer {
  */
 function useComposer(
   draftKey: string | undefined,
+  commandKey: string | undefined,
   onSend: ((text: string) => void) | undefined,
 ): Composer {
   // Seed text + caret from the persisted draft ONCE per mount so a remount
@@ -54,7 +77,19 @@ function useComposer(
   // Caret offset, tracked so we can tell which line the user is editing — used
   // to surface the /command bubbles when the current line is exactly `/` (T350).
   const [caret, setCaret] = useState(() => seed.selStart)
+  // The attached `/command` (T654) — seeded once from localStorage so it
+  // survives a refresh, prepended to the message on send, at most one.
+  const [attachedCmd, setAttachedCmd] = useState<CommandSuggestion | null>(() =>
+    readAttachedCmd(commandKey),
+  )
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Persist the attached command per thread; remove the key when detached.
+  const persistCmd = (c: CommandSuggestion | null) => {
+    if (!commandKey) return
+    if (c) localStorage.setItem(commandKey, JSON.stringify(c))
+    else localStorage.removeItem(commandKey)
+  }
 
   // Persist the unsent draft + caret per thread: write JSON on every keystroke
   // and caret move, and remove the key once the draft is empty (sent or
@@ -121,39 +156,52 @@ function useComposer(
   }
 
   /**
-   * Prefill the composer from a suggested `/command` bubble (T348/T350). Seeds
-   * the command's **expanded prompt body** when it carries one (falling back to
-   * the `/command` literal), with a trailing newline and the caret on the fresh
-   * blank line so the user can add context. Two modes: on a lone `/` line,
-   * REPLACE just that line; otherwise seed the whole composer.
+   * Attach a suggested `/command` as the message prefix (T654). Replaces any
+   * currently-attached command (at most one), persists it durably, and strips
+   * the slash trigger line (bare `/` or partial like `/bo`) out of the draft so
+   * the composer is left clean — the command now rides as a chip, not text.
    */
-  const prefill = (s: CommandSuggestion) => {
-    const base = s.body && s.body.trim().length > 0 ? s.body.trimEnd() : s.command
-    const seeded = `${base}\n`
+  const attachCmd = (s: CommandSuggestion) => {
     const { start, end } = lineBounds(text, caret)
-    // Two modes: on a slash-prefixed line (bare `/` or partial like `/bo`),
-    // REPLACE just that line; otherwise seed the whole composer.
     const onSlashLine = text.slice(start, end).startsWith("/")
-    const next = onSlashLine ? text.slice(0, start) + seeded + text.slice(end) : seeded
-    const caretPos = onSlashLine ? start + seeded.length : seeded.length
-    setText(next)
-    setCaret(caretPos)
-    persistDraft(next, caretPos, caretPos)
-    requestAnimationFrame(() => {
-      const el = textareaRef.current
-      if (!el) return
-      el.focus()
-      el.setSelectionRange(caretPos, caretPos)
-      autoResize()
-    })
+    if (onSlashLine) {
+      const next = text.slice(0, start) + text.slice(end)
+      setText(next)
+      setCaret(start)
+      persistDraft(next, start, start)
+      requestAnimationFrame(() => {
+        const el = textareaRef.current
+        if (!el) return
+        el.setSelectionRange(start, start)
+        autoResize()
+      })
+    }
+    setAttachedCmd(s)
+    persistCmd(s)
+  }
+
+  /** Remove the attached `/command` (T654). */
+  const detachCmd = () => {
+    setAttachedCmd(null)
+    persistCmd(null)
   }
 
   const handleSubmit = () => {
-    if (text.trim().length === 0 || !onSend) return
-    onSend(text)
+    if (!onSend) return
+    // Prepend the attached command's prompt (T654): its body rides as a prefix,
+    // separated from the user's message by a blank line. Sending is allowed with
+    // only a command attached (empty text). After send, the command detaches.
+    const base = attachedCmd?.body?.trim() ? attachedCmd.body.trimEnd() : ""
+    const msg = base && text.trim() ? `${base}\n\n${text}` : base || text
+    if (msg.trim().length === 0) return
+    onSend(msg)
     setText("")
     setCaret(0)
     persistDraft("", 0, 0)
+    if (attachedCmd) {
+      setAttachedCmd(null)
+      persistCmd(null)
+    }
     // Collapse back to a single row after sending, then refocus.
     requestAnimationFrame(() => {
       const el = textareaRef.current
@@ -208,159 +256,15 @@ function useComposer(
     caret,
     textareaRef,
     slashPrefix,
+    attachedCmd,
     canSend,
     onChange,
     onSelect,
     handleKeyDown,
     handleSubmit,
-    prefill,
+    attachCmd,
+    detachCmd,
   }
-}
-
-/**
- * The composer's input row: the file-picker + paperclip, the auto-growing
- * textarea, and the send button. Extracted from {@link ThreadComposer} so the
- * outer component stays within the P8 complexity budget; owns its own hidden
- * file-input ref. Receives the textarea's ref/value/handlers from the parent's
- * {@link useComposer} hook and passes `ref={textareaRef}` as a bare identifier
- * (the react-hooks/refs pass allows that but rejects a member-access read).
- */
-function ComposerInputRow({
-  textareaRef,
-  text,
-  sendable,
-  onChange,
-  onSelect,
-  onKeyDown,
-  onSubmit,
-  onAttach,
-}: {
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>
-  text: string
-  sendable: boolean
-  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
-  onSelect: (e: React.SyntheticEvent<HTMLTextAreaElement>) => void
-  onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void
-  onSubmit: () => void
-  onAttach: ((files: File[]) => void | Promise<void>) | undefined
-}) {
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  return (
-    // Linear-style two-row composer (T692, UI only): the textarea spans the full
-    // width on top, and a bottom action row holds the attach control (left) and
-    // the circular submit (pushed right). Behaviour is unchanged — same refs,
-    // handlers, autogrow and props; only the layout was restructured.
-    <div className="card-shadow flex flex-col gap-1.5 rounded-2xl border border-border bg-card px-3 py-2.5 focus-within:border-(--signal)/60">
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        className="hidden"
-        onChange={(e) => {
-          const files = [...(e.target.files ?? [])]
-          if (files.length > 0) void onAttach?.(files)
-          // Reset so picking the same file again re-fires onChange.
-          e.target.value = ""
-        }}
-      />
-      <textarea
-        ref={textareaRef}
-        autoFocus
-        value={text}
-        onChange={onChange}
-        onSelect={onSelect}
-        onKeyDown={onKeyDown}
-        onPaste={(e) => {
-          const items = [...e.clipboardData.items]
-          const images = items
-            .filter((i) => i.kind === "file" && i.type.startsWith("image/"))
-            .map((i) => i.getAsFile())
-            .filter((f): f is File => f !== null)
-          if (images.length > 0 && onAttach) {
-            e.preventDefault()
-            void onAttach(images)
-          }
-        }}
-        placeholder="Reply to this thread…"
-        rows={1}
-        className="max-h-[200px] min-h-[24px] w-full resize-none bg-transparent px-1 pt-1 text-[13.5px] leading-relaxed text-foreground/90 outline-none placeholder:text-muted-foreground/60"
-      />
-      {/* BOTH BUTTONS ARE WRAPPED IN `Tip`, AND THAT CHANGES THE LAYOUT: Tip
-          renders its own trigger <span> around the child, so the SPAN — not the
-          button — is what this flex row lays out. Two consequences are handled
-          on `triggerClassName` rather than on the buttons:
-            * `inline-flex`, or the span is an inline box and the 28px button
-              inside it is mis-sized;
-            * `ml-auto` MOVES onto the send trigger. It used to sit on the send
-              button, which was the flex item; left there it would now be on a
-              child of the flex item and do nothing, and send would slide left
-              until it touched the paperclip.
-          The native `title=` attributes are gone with the same edit — leaving
-          them would show the browser's tooltip on top of ours. */}
-      <div className="flex items-center gap-1">
-        {/* Colour-only hover, no fill. This sits INSIDE the composer pill,
-            which is itself a filled surface — a second filled rectangle on
-            hover reads as a box inside a box. The `disabled:hover:bg-transparent`
-            that used to sit here went with the fill: there is no longer a
-            background to cancel. */}
-        <Tip
-          title="Attach files"
-          body="Upload files into this thread for the agent to read. Pick several at once, or paste an image straight into the box."
-          triggerClassName="inline-flex"
-        >
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={!onAttach}
-            className="flex size-7 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:text-(--interactive) disabled:cursor-default disabled:opacity-40 disabled:hover:text-muted-foreground/60"
-          >
-            <Paperclip className="size-4" />
-          </button>
-        </Tip>
-        {/* The body states the REAL Enter rule, which is not the usual one:
-            `resolveEnter` sends only when the caret is at the end AND the last
-            line is blank, so a first Enter after text opens a new line and the
-            second one sends. Documenting it as plain "Enter to send" would be
-            wrong, and a tooltip that misstates a keybinding trains the wrong
-            reflex. Wording follows the state, since the trigger span still
-            hovers while the button itself is disabled. */}
-        <Tip
-          title="Send"
-          body={
-            sendable
-              ? "Or press Enter on an empty last line — after typing, that means Enter twice. Shift+Enter always inserts a newline."
-              : "Nothing to send yet — type a message first."
-          }
-          triggerClassName="ml-auto inline-flex"
-        >
-          <button
-            onClick={onSubmit}
-            disabled={!sendable}
-            className="flex size-7 items-center justify-center rounded-full bg-(--signal) text-(--primary-foreground) transition-[filter] hover:brightness-105 disabled:opacity-40 disabled:hover:brightness-100"
-          >
-            <ArrowUp className="size-4" strokeWidth={2.5} />
-          </button>
-        </Tip>
-      </div>
-    </div>
-  )
-}
-
-/** The turn-status banner element, or null (see {@link resolveComposerBanner}). */
-function ComposerBanner({ banner }: { banner: Banner }) {
-  return (
-    <div
-      className={`mb-2 flex cursor-default items-center justify-center gap-2 rounded-xl border px-4 py-1.5 text-[13px] font-medium select-none ${banner.paused ? "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400" : "border-border bg-muted/40 text-muted-foreground"}`}
-    >
-      {banner.paused ? (
-        <Pause className="size-4" />
-      ) : banner.working ? (
-        <Loader2 className="size-4 animate-spin" style={{ color: banner.color }} />
-      ) : (
-        <Clock className="size-4" />
-      )}
-      <span>{banner.text}</span>
-    </div>
-  )
 }
 
 /**
@@ -382,6 +286,8 @@ export function ThreadComposer({
   suggestions = [],
   firstMessage = false,
   onCreateCommand,
+  onEditCommand,
+  commandKey,
 }: {
   status: ThreadStatus
   /** true when this is the single thread the agent is currently focused on */
@@ -401,11 +307,16 @@ export function ThreadComposer({
   firstMessage?: boolean
   /** Opens the "create command" dialog (T350). Omit to hide the pill. */
   onCreateCommand?: (() => void) | undefined
+  /** Opens the command editor prefilled (T654). Omit to hide the per-pill edit button. */
+  onEditCommand?: ((s: CommandSuggestion) => void) | undefined
   /** localStorage key for persisting the unsent draft + caret per thread (T304).
    *  Stored as `{text,selStart,selEnd}` JSON; legacy bare-string also read. */
   draftKey?: string | undefined
+  /** localStorage key for the durably-attached `/command` prefix per thread
+   *  (T654). Omit to disable command attachment persistence. */
+  commandKey?: string | undefined
 }) {
-  const composer = useComposer(draftKey, onSend)
+  const composer = useComposer(draftKey, commandKey, onSend)
 
   const userTurn = status === "THEIR_TURN"
   const streaming = status === "ACTIVE"
@@ -434,25 +345,25 @@ export function ThreadComposer({
   // base handler runs (T556).
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Tab autocomplete: if slash bubbles are showing and there are matches,
-    // pick the first one instead of indenting.
+    // attach the first one instead of indenting (T654).
     if (e.key === "Tab" && !e.shiftKey && composer.slashPrefix !== null) {
       const first = filteredSuggestions[0]
       if (first) {
         e.preventDefault()
-        composer.prefill(first)
+        composer.attachCmd(first)
         return
       }
     }
 
     // Space expansion: if the current line is exactly a known command (e.g.
-    // `/boss-hunt`), pressing Space replaces it with the command's body.
+    // `/boss-hunt`), pressing Space attaches it (T654).
     if (e.key === " " && composer.slashPrefix !== null) {
       const match = suggestions.find(
         (s) => s.command.slice(1).toLowerCase() === composer.slashPrefix?.toLowerCase(),
       )
       if (match) {
         e.preventDefault()
-        composer.prefill(match)
+        composer.attachCmd(match)
         return
       }
     }
@@ -468,13 +379,16 @@ export function ThreadComposer({
       {/* Unified bubble row (T350) — file-upload chips + /command suggestions +
           the create-command pill, all in ONE transparent, normal-flow container
           between the conversation and the textarea. */}
-      {(pendingFiles.length > 0 || commandsActive) && (
+      {(pendingFiles.length > 0 || commandsActive || composer.attachedCmd) && (
         <ComposerBubbles
           files={pendingFiles}
           onRemoveFile={onRemoveFile}
           suggestions={commandsActive ? filteredSuggestions : []}
-          onPick={composer.prefill}
+          onPick={composer.attachCmd}
+          attachedCommand={composer.attachedCmd}
+          onDetachCommand={composer.detachCmd}
           onCreateCommand={commandsActive ? onCreateCommand : undefined}
+          onEditCommand={onEditCommand}
         />
       )}
       {banner && <ComposerBanner banner={banner} />}
