@@ -349,10 +349,20 @@ export function ThreadConversation({
   return (
     <main
       className="relative flex min-w-0 flex-1 flex-row bg-background"
-      style={{
-        filter: dragging ? "blur(2px)" : "blur(0px)",
-        transition: "filter 300ms ease",
-      }}
+      // Filter is applied ONLY while dragging. A permanent `blur(0px)` (the old
+      // idle value) is still a non-`none` filter, so it promotes the ENTIRE
+      // conversation to a single GPU compositor layer. On a very tall thread
+      // (scrollHeight can hit ~100k px) that layer exceeds Firefox's max GPU
+      // texture size; a repaint triggered by any interaction (e.g. ticking a
+      // form checkbox) then fails to allocate the texture and Firefox paints
+      // the whole <main> BLANK while the DOM stays intact — recovered only by a
+      // scroll-resetting refresh. Chromium/WebKit tile differently and never
+      // hit it. Using `undefined` when idle drops the layer entirely (T644).
+      style={
+        dragging
+          ? { filter: "blur(2px)", transition: "filter 300ms ease" }
+          : { transition: "filter 300ms ease" }
+      }
       onDragEnter={dropHandlers.onDragEnter}
       onDragOver={dropHandlers.onDragOver}
       onDragLeave={dropHandlers.onDragLeave}

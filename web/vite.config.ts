@@ -34,6 +34,20 @@ export default defineConfig({
       },
     },
   },
+  // `vite preview` serves the built dist/. It does NOT read `server.*`, so the
+  // dev server's port + tailnet allow-list + single-origin `/api` proxy are
+  // mirrored here, letting the production bundle be tested at the same URL
+  // (http://localhost:5174 or the tailnet host) with the backend reachable.
+  preview: {
+    port: 5174,
+    allowedHosts: ["localhost", ".ts.net"],
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:7878",
+        changeOrigin: true,
+      },
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

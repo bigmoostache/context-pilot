@@ -6306,6 +6306,10 @@
   path: web/types.d.ts
   description: Ambient module declarations for build/lint tooling shipping no types (tsconfig.node.json scope). Declares eslint-plugin-jsx-a11y (P6) + eslint-plugin-promise + eslint-plugin-security + eslint-plugin-no-unsanitized (P7) as untyped (any) — eslint.config.ts casts each to its minimal used shape at the use site (the real type contract). no-secrets is NOT here (it ships its own index.d.ts).
   last_edited_ms: 1783438902488
+471a4b2680e6ccb1:
+  path: web/src/mobile-components/threads/ThreadConversation.tsx
+  description: Mobile ThreadConversation twin — single full-width column (no FileSidebar rail), no OS drag-drop. Memoized AutoRun/MessageRow, scroll-pin, forms plumbing shared from desktop. Floating glass composer over fixed ghost-spacer.
+  last_edited_ms: 1787823101894
 4728bac202bdecee:
   path: web/src/components/agents/AgentModal/actions.ts
   description: 'AgentModal mutations hook (P8 split): useAgentModalActions bundles create/rename/restart/retire/avatar mutations + Esc/⌘↵ key handler (bound once via latest-refs). ActionsArgs object bundles 7 params (max-params 4). saveManage sends configure+rename; create maps apiName.'
@@ -9189,6 +9193,10 @@
 6918b64b9ccc1f46:
   path: crates/cp-mod-threads/src/lib.rs
   description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block, count positive. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
+  last_edited_ms: 0
+691ba4b7791bc686:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 691cc457a52d840c:
   path: web/src/components/shell/costs/parse.ts
@@ -12842,6 +12850,10 @@
   path: web/src/components/agents/PromptModal.tsx
   description: 'Create/view/edit library prompt modal (design-only). ImportModal for Claude Code/Codex/Cursor/Windsurf/Aider/Continue. KIND record maps LibraryKind→UI meta. web-lint P5 pending: nested-ternary at PromptModal:193 region.'
   last_edited_ms: 0
+914cb320a390c215:
+  path: web/vite.config.ts
+  description: 'Vite dev config. T310: single-origin tailnet serving — server.allowedHosts:true (accept the macbook.<tailnet>.ts.net Host from `tailscale serve`''s reverse proxy, anti-DNS-rebinding relaxed since the server binds 127.0.0.1 and is exposed only over the private WireGuard tailnet) + server.proxy ''/api''→http://127.0.0.1:7878 (REST + /api/stream SSE) so the frontend uses a RELATIVE base (VITE_API_URL="" in .env.local) and the app works identically at localhost:5174 or https://<host>.ts.net (phone access) with no CORS/mixed-content. @ alias → ./src.'
+  last_edited_ms: 0
 915974f8055cf505:
   path: crates/cp-orchestrator/tests/transport_http.rs
   description: Phase 30 transport surface tests over a real tiny_http server (4 tests). Backend::new takes 6 args (auth=None, session_ttl). ticket_mint_and_command_status_codes asserts tripped breaker blocks cost-incurring send_message (503) but NOT control-plane stop (≠503). REST rev-envelope+404, SSE ticket gate single-use, Last-Event-ID replay.
@@ -12982,6 +12994,10 @@
   path: web/src/lib/api/generated/sdk.gen.ts
   description: Auto-generated typed SDK functions from openapi.json. One function per REST endpoint (getApiFleetMeta, getApiAgentByIdThreads, postApiAuthLogin, etc). Uses @hey-api client runtime, NOT the manual request() wrapper.
   last_edited_ms: 0
+92957c3875787801:
+  path: web/src/mobile-components/threads/forms/useThreadForms.ts
+  description: Mobile useThreadForms twin — keep-stub re-export of desktop @/components/threads/forms/useThreadForms (answersByForm + onFormSubmit + useScrollPin). Logic byte-identical.
+  last_edited_ms: 1787823101759
 92a1efc1cedf5dcc:
   path: crates/cp-mod-search/src/tools.rs
   description: Search tool exec. Split keyword+semantic multi-search via DualSearchSpec/search_index_dual. dedup_by_score, iso_to_ms, parse_file_hit/parse_log_hit, search_entities_block. Async spawn_async_tool. Mandatory semantic_query.
@@ -15078,6 +15094,10 @@ aaae81710683f96a:
   path: web/src/components/threads/QuestionForm.tsx
   description: Embedded question form — single/multi-select options, interactive pick state, onSubmit callback sends formatted answers via sendCommand.
   last_edited_ms: 0
+aac97754bce62395:
+  path: web/src/mobile-components/threads/forms/FormMessageRow.tsx
+  description: Mobile FormMessageRow twin — un-memoized form-bearing row; routes mobile conversation/Message + FormWidget. Parse helpers shared. form-answer renders summary line, form renders stripped prose + one FormWidget per block.
+  last_edited_ms: 1787823101831
 aae8ebc31cc17953:
   path: src/modules/conversation_history/recompute_toggled_tree_folders.rs
   description: Rebuilds tree open_folders set from (1) ancestor folders of open file panels, (2) explicitly opened folders from current + remaining history conversations, (3) root. Called after Close_conversation_history. 5 unit tests.
@@ -21134,6 +21154,10 @@ f25f3b9d89612a17:
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. route_rest dispatches all /api routes incl fs upload/mkdir/rename/move/trash, retire/unretire/restart, fleet create, vitals, metrics. handle_download serves file/zip.
   last_edited_ms: 1781892894857
+f26795307e3afe35:
+  path: web/src/components/threads/ThreadConversation.tsx
+  description: 'Center pane: thread conversation + composer. T510 FREEZE FIX = MessageRow React.memo + AutoRun memo + useMemo(segmentLog). T643: content-visibility removed from rows. T644 FIREFOX BLANK FIX: <main> filter no longer permanently blur(0px) — applied ONLY while dragging. Permanent blur(0px) is non-none, promoting the whole (up to ~100k px tall) conversation to ONE GPU layer; on a big thread that exceeds Firefox''s max GPU texture size, so a repaint from any interaction (ticking a form checkbox) fails texture allocation and FF paints <main> BLANK with DOM intact (recovered only by scroll-resetting refresh). Chromium/WebKit tile differently, never hit it; headless FF software-composites, never repros — which is why every innerHTML-based repro looked clean (paint bug invisible to DOM). useConversationDrop hook (T367/T471). FileSidebar rail.'
+  last_edited_ms: 1787823716565
 f2750957712b6508:
   path: src/ui/help/config_overlay/budget_bars.rs
   description: Budget bars adapter for config overlay. Renders ConfigBudgetBar IR entries as filled/empty block bars with semantic colors. 24-cell bar width.
