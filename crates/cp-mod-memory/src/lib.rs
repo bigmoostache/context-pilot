@@ -1,37 +1,22 @@
-//! Memory module — persistent knowledge items across conversations.
+//! Memory module — a fixed, tiered budget of memory slots across conversations.
 //!
-//! Two tools: `memory_create` and `memory_update` (modify/delete). Memories
-//! survive across sessions and workers. Each has a tl;dr summary (capped at
-//! 80 tokens) shown in the panel, with optional rich body text shown when opened.
+//! One tool: `memory_edit` (batch slot writes addressed by id `M-<tier>-<n>`).
+//! Memories live in a **fixed budget of 220 slots** across five tiers
+//! (`safe`/`tiny`/`short`/`mid`/`long`), each slot's `contents` bounded by its
+//! tier. Editing a slot to empty frees it (renders `**empty**`); there is no
+//! create/update/delete/move — only edit. Memories survive across sessions and
+//! workers (shared `memories.yaml`).
 
-/// Panel rendering and context generation for memory items.
+/// Panel rendering and context generation for memory slots.
 mod panel;
-/// YAML-backed persistent storage for memory items.
+/// YAML-backed persistent storage + one-shot legacy migration.
 mod storage;
-/// Tool execution handlers for `memory_create` and `memory_update`.
+/// Tool execution handler for `memory_edit`.
 mod tools;
-/// Memory state types: `MemoryItem`, `MemoryImportance`, `MemoryState`.
+/// Memory state types: `Tier`, `MemorySlot`, `MemoryState`.
 pub mod types;
 
-use types::MemoryState;
-
-use cp_base::cast::Safe as _;
-
-/// Token budget ADVERTISED to the model for a memory `tl_dr`.
-///
-/// The number quoted in the tool docs and the rejection message. Deliberately
-/// lower than the real limit ([`MEMORY_TLDR_HARD_CAP`]): the model routinely
-/// overshoots a stated cap by a bit, so quoting 80 lands it comfortably under
-/// the true 120 and the create/update succeeds instead of failing on a
-/// marginal overrun.
-pub const MEMORY_TLDR_ADVERTISED_TOKENS: usize = 80;
-
-/// The REAL enforced ceiling for a memory `tl_dr` (create/update reject above).
-///
-/// Never surface this number to the model — it must only ever see
-/// [`MEMORY_TLDR_ADVERTISED_TOKENS`] (80), so its self-trimming aims well below
-/// the true limit and marginal overruns still pass.
-pub const MEMORY_TLDR_HARD_CAP: usize = 120;
+use types::{MemoryState, TITLE_MAX_CHARS, TOTAL_SLOTS};
 
 use serde_json::json;
 
@@ -50,7 +35,7 @@ use cp_base::modules::Module;
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/memory.yaml")));
 
-/// Memory module: persistent knowledge items across conversations.
+/// Memory module: a fixed tiered budget of memory slots.
 #[derive(Debug, Clone, Copy)]
 pub struct MemoryModule;
 
@@ -61,8 +46,7 @@ impl Default for MemoryModule {
 }
 
 impl MemoryModule {
-    /// Construct the module marker (funnels cross-crate construction of this
-    /// `non_exhaustive` unit struct through an associated fn).
+    /// Construct the module marker.
     #[must_use]
     pub const fn new() -> Self {
         Self
@@ -77,7 +61,7 @@ impl Module for MemoryModule {
         "Memory"
     }
     fn description(&self) -> &'static str {
-        "Persistent memory items across conversations"
+        "A fixed tiered budget of memory slots across conversations"
     }
     fn is_global(&self) -> bool {
         true
@@ -93,30 +77,17 @@ impl Module for MemoryModule {
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         let ms = MemoryState::get(state);
-        json!({
-            "memories": ms.memories,
-            "next_memory_id": ms.next_memory_id,
-            "open_memory_ids": ms.open_memory_ids,
-        })
+        json!({ "slots": ms.slots })
     }
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         let ms = MemoryState::get_mut(state);
-        if let Some(arr) = data.get("memories")
+        if let Some(arr) = data.get("slots")
             && let Ok(v) = serde_json::from_value(arr.clone())
         {
-            ms.memories = v;
+            ms.slots = v;
         }
-        if let Some(v) = data.get("next_memory_id").and_then(serde_json::Value::as_u64) {
-            ms.next_memory_id = v.to_usize();
-        }
-        if let Some(arr) = data.get("open_memory_ids")
-            && let Ok(v) = serde_json::from_value(arr.clone())
-        {
-            ms.open_memory_ids = v;
-        }
-        // YAML backing store: migrate existing memories, then populate gaps
-        storage::migrate_to_yaml(&mut ms.memories);
-        storage::populate_from_yaml(ms);
+        // YAML backing store: new slot-keyed entries, or one-shot legacy migration.
+        storage::load_into(ms);
     }
 
     fn fixed_panel_types(&self) -> Vec<Kind> {
@@ -137,44 +108,22 @@ impl Module for MemoryModule {
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
         let t = &*TOOL_TEXTS;
         vec![
-            ToolDefinition::from_yaml("memory_create", t)
-                .short_desc("Store persistent memories")
+            ToolDefinition::from_yaml("memory_edit", t)
+                .short_desc("Edit memory slots")
                 .category("Memory")
                 .reverie_allowed(true)
                 .param_array(
-                    "memories",
+                    "edits",
                     ParamType::Object(vec![
-                        ToolParam::new("content", ParamType::String).desc("Memory content").required(),
+                        ToolParam::new("id", ParamType::String)
+                            .desc("Slot id, M-<tier>-<n> (e.g. M-short-23)")
+                            .required(),
+                        ToolParam::new("title", ParamType::String).desc("Short label, <= 25 chars"),
                         ToolParam::new("contents", ParamType::String)
-                            .desc("Rich body text (visible when memory is opened)"),
+                            .desc("The value - dense and synthetic. Empty frees the slot."),
                         ToolParam::new("importance", ParamType::String)
                             .desc("Importance level")
                             .enum_vals(&["low", "medium", "high", "critical"]),
-                        ToolParam::new("labels", ParamType::Array(Box::new(ParamType::String)))
-                            .desc("Freeform labels for categorization (e.g., ['architecture', 'bug'])"),
-                    ]),
-                    true,
-                )
-                .build(),
-            ToolDefinition::from_yaml("memory_update", t)
-                .short_desc("Modify stored notes")
-                .category("Memory")
-                .reverie_allowed(true)
-                .param_array(
-                    "updates",
-                    ParamType::Object(vec![
-                        ToolParam::new("id", ParamType::String).desc("Memory ID (e.g., M1)").required(),
-                        ToolParam::new("content", ParamType::String).desc("New content"),
-                        ToolParam::new("contents", ParamType::String)
-                            .desc("New rich body text (visible when memory is opened)"),
-                        ToolParam::new("importance", ParamType::String)
-                            .desc("New importance level")
-                            .enum_vals(&["low", "medium", "high", "critical"]),
-                        ToolParam::new("labels", ParamType::Array(Box::new(ParamType::String)))
-                            .desc("New labels (replaces existing)"),
-                        ToolParam::new("open", ParamType::Boolean)
-                            .desc("Set true to show full contents in panel, false to show only tl;dr"),
-                        ToolParam::new("delete", ParamType::Boolean).desc("Set true to delete"),
                     ]),
                     true,
                 )
@@ -183,35 +132,32 @@ impl Module for MemoryModule {
     }
 
     fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
-        match tool.name.as_str() {
-            "memory_update" => {
-                let mut pf = Verdict::new();
-                if let Some(updates) = tool.input.get("updates").and_then(|v| v.as_array()) {
-                    let ms = MemoryState::get(state);
-                    for update in updates {
-                        if let Some(id) = update.get("id").and_then(|v| v.as_str())
-                            && !ms.memories.iter().any(|m| m.id == id)
-                        {
-                            pf.errors.push(format!("Memory '{id}' not found"));
-                        }
-                    }
-                }
-                Some(pf)
-            }
-            _ => None,
+        if tool.name.as_str() != "memory_edit" {
+            return None;
         }
+        let mut pf = Verdict::new();
+        if let Some(edits) = tool.input.get("edits").and_then(|v| v.as_array()) {
+            let ms = MemoryState::get(state);
+            for edit in edits {
+                if let Some(id) = edit.get("id").and_then(|v| v.as_str())
+                    && ms.slot(id).is_none()
+                {
+                    pf.errors.push(format!("Slot '{id}' does not exist"));
+                }
+            }
+        }
+        Some(pf)
     }
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
-            "memory_create" => Some(tools::execute_create(tool, state)),
-            "memory_update" => Some(tools::execute_update(tool, state)),
+            "memory_edit" => Some(tools::execute_edit(tool, state)),
             _ => None,
         }
     }
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
-        vec![("memory_create", visualize_memory_output), ("memory_update", visualize_memory_output)]
+        vec![("memory_edit", visualize_memory_output)]
     }
 
     fn context_type_metadata(&self) -> Vec<cp_base::state::context::TypeMeta> {
@@ -229,14 +175,11 @@ impl Module for MemoryModule {
 
     fn overview_context_section(&self, state: &State) -> Option<String> {
         let ms = MemoryState::get(state);
-        if ms.memories.is_empty() {
-            return None;
-        }
-        Some(format!("Memories: {}\n", ms.memories.len()))
+        Some(format!("Memories: {}/{}\n", ms.occupied_count(), TOTAL_SLOTS))
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
-        vec![("Memory", "Store persistent memories across the conversation")]
+        vec![("Memory", "Edit the fixed tiered budget of memory slots")]
     }
 
     fn dependencies(&self) -> &[&'static str] {
@@ -305,8 +248,8 @@ impl Module for MemoryModule {
     }
 }
 
-/// Visualizer for memory tool results.
-/// Colors importance levels and highlights created/updated memory summaries.
+/// Visualizer for the `memory_edit` tool result.
+/// Colours importance levels and the Set/Freed/Errors summary lines.
 fn visualize_memory_output(content: &str, width: usize) -> Vec<cp_render::Block> {
     use cp_render::{Block, Span};
 
@@ -316,10 +259,9 @@ fn visualize_memory_output(content: &str, width: usize) -> Vec<cp_render::Block>
             if line.is_empty() {
                 return Block::empty();
             }
-            // Memory visualizer uses RGB for the importance gradient
-            let rgb = if line.starts_with("Error:") {
-                (255, 85, 85)
-            } else if line.starts_with("Created") || line.starts_with("Updated") {
+            let rgb = if line.starts_with("Errors") || line.starts_with("Missing") || line.starts_with("WARNING") {
+                (255, 184, 108)
+            } else if line.starts_with("Set") || line.starts_with("Freed") {
                 (80, 250, 123)
             } else if line.contains("critical") {
                 (255, 85, 85)
@@ -327,10 +269,6 @@ fn visualize_memory_output(content: &str, width: usize) -> Vec<cp_render::Block>
                 (255, 184, 108)
             } else if line.contains("medium") {
                 (241, 250, 140)
-            } else if line.contains("low")
-                || (line.starts_with('M') && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()))
-            {
-                (139, 233, 253)
             } else {
                 return Block::text(truncate_mem_line(line, width));
             };
@@ -347,3 +285,6 @@ fn truncate_mem_line(line: &str, width: usize) -> String {
         line.to_owned()
     }
 }
+
+/// Convenience re-export for downstream callers.
+pub const MEMORY_TITLE_MAX_CHARS: usize = TITLE_MAX_CHARS;

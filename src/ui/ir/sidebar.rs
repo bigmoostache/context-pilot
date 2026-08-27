@@ -21,7 +21,7 @@ fn fixed_panel_badge(ctx_type: &str, state: &State) -> Option<String> {
         }
         "library" => cp_mod_prompt::types::PromptState::get(state).loaded_skill_ids.len(),
         "tree" => cp_mod_tree::types::TreeState::get(state).open_folders.len(),
-        "memory" => cp_mod_memory::types::MemoryState::get(state).memories.len(),
+        "memory" => cp_mod_memory::types::MemoryState::get(state).occupied_count(),
         "spine" => cp_mod_spine::types::SpineState::unprocessed_notifications(state).len(),
         "logs" => {
             let ls = cp_mod_logs::types::LogsState::get(state);

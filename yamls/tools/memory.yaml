@@ -1,22 +1,32 @@
 tools:
-  memory_create:
+  memory_edit:
     description: |
-      Creates memory items for important information to remember across the conversation.
-    parameters:
-      memories: "Array of memories to create"
-      content: "Memory content"
-      contents: "Rich body text (visible when memory is opened)"
-      importance: "Importance level"
-      labels: "Freeform labels for categorization (e.g., ['architecture', 'bug'])"
+      Edit your FIXED, BOUNDED budget of memory slots. There is no create,
+      update, delete, or move — only edit. You address a slot directly by its
+      id (M-<tier>-<n>) and write into it; editing a slot to EMPTY contents
+      frees it (it renders **empty** again).
 
-  memory_update:
-    description: |
-      Updates or deletes existing memory items.
+      The budget is SET IN STONE: 220 slots across five tiers. Every token you
+      store must earn its place — write memories as COMPACT, SYNTHETIC and DENSE
+      as you can. A memory is a fact you will thank yourself for later, not a
+      diary entry.
+
+      Tiers (pick the SMALLEST that fits):
+        - M-safe-{1..50}   : ≤ 180 chars. Secrets / key-value repository — env
+                             vars, tokens, passwords, ports, literal values.
+        - M-tiny-{1..100}  : ≤ 50 tokens. One-sentence facts.
+        - M-short-{1..40}  : ≤ 100 tokens. PREFER THIS TIER — most memories fit.
+        - M-mid-{1..20}    : ≤ 170 tokens. Lengthier, only when unavoidable.
+        - M-long-{1..10}   : ≤ 360 tokens. Incompressible material, LAST RESORT.
+
+      Each slot holds: a title (≤ 25 chars, a real label — not a sentence),
+      contents (the tier-bounded value), and importance (orders display within
+      a tier). When the budget nears full the tool result will nudge you to
+      tidy up: free stale slots, factor duplicates, compress several into one
+      M-short.
     parameters:
-      updates: "Array of memory updates"
-      id: "Memory ID (e.g., M1)"
-      content: "New content"
-      contents: "New rich body text (visible when memory is opened)"
-      importance: "New importance level"
-      labels: "New labels (replaces existing)"
-      delete: "Set true to delete"
+      edits: "Array of slot edits to apply, each addressed by slot id"
+      id: "Slot id, M-<tier>-<n> (e.g. M-short-23). The slot must exist."
+      title: "Short label for the slot, ≤ 25 chars"
+      contents: "The value — dense and synthetic, within the tier's bound. Empty frees the slot."
+      importance: "Importance level (orders display within the tier)"

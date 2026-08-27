@@ -1,249 +1,170 @@
-use super::{MEMORY_TLDR_ADVERTISED_TOKENS, MEMORY_TLDR_HARD_CAP};
 use cp_base::state::context::{Kind, estimate_tokens};
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::storage;
-use crate::types::{MemoryImportance, MemoryItem, MemoryState};
+use crate::types::{MemoryImportance, MemoryState, TITLE_MAX_CHARS, TOTAL_SLOTS, Tier};
 use std::fmt::Write as _;
 
-/// Validate that a tl;dr summary does not exceed the token limit.
-///
-/// Enforcement uses the real [`MEMORY_TLDR_HARD_CAP`] (120), but the rejection
-/// message quotes only the advertised [`MEMORY_TLDR_ADVERTISED_TOKENS`] (80).
-/// The gap is intentional: the model trims toward the number it's told, so
-/// telling it 80 keeps its output safely under the true 120 and a marginal
-/// overrun (say ~110) still succeeds instead of erroring. Never leak 120 here.
-fn validate_tldr(text: &str) -> Result<(), String> {
-    let tokens = estimate_tokens(text);
-    if tokens > MEMORY_TLDR_HARD_CAP {
+/// Look up the tier of a slot id (`M-<tier>-<n>`) for bound validation.
+fn tier_of(id: &str) -> Option<Tier> {
+    let rest = id.strip_prefix("M-")?;
+    let (slug, _) = rest.split_once('-')?;
+    Tier::from_str_slug(slug)
+}
+
+/// Validate a proposed `contents` against `tier`'s enforced bound. Returns the
+/// measured size on success, or an error quoting the **advertised** bound.
+fn validate_contents(contents: &str, tier: Tier) -> Result<(), String> {
+    let size = if tier.is_char_bound() { contents.chars().count() } else { estimate_tokens(contents) };
+    if size > tier.enforced_bound() {
         Err(format!(
-            "tl_dr too long: ~{tokens} tokens (max {MEMORY_TLDR_ADVERTISED_TOKENS}). Keep it to a short one-liner; put details in 'contents' instead."
+            "contents too long: ~{size} {unit} (max {adv}). Keep it dense and synthetic; use a larger tier only if truly incompressible.",
+            unit = tier.unit(),
+            adv = tier.advertised_bound(),
         ))
     } else {
         Ok(())
     }
 }
 
-/// Parse + validate + store one memory from its JSON value. Returns a success
-/// summary line, or an error string describing the rejection.
-fn create_one_memory(memory_value: &serde_json::Value, state: &mut State) -> Result<String, String> {
-    let Some(content) = memory_value.get("content").and_then(|v| v.as_str()).map(str::to_owned) else {
-        return Err("Missing 'content' in memory".to_owned());
-    };
-
-    if let Err(e) = validate_tldr(&content) {
-        return Err(format!("Memory '{}...': {}", content.get(..content.floor_char_boundary(30)).unwrap_or(""), e));
-    }
-
-    let importance = memory_value
-        .get("importance")
-        .and_then(|v| v.as_str())
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(MemoryImportance::Medium);
-
-    let labels: Vec<String> = memory_value
-        .get("labels")
-        .and_then(|v| v.as_array())
-        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
-        .unwrap_or_default();
-
-    let contents = memory_value.get("contents").and_then(|v| v.as_str()).unwrap_or("").to_owned();
-
-    let ms = MemoryState::get_mut(state);
-    let id = format!("M{}", ms.next_memory_id);
-    ms.next_memory_id = ms.next_memory_id.saturating_add(1);
-    let yaml_key = storage::generate_yaml_key(&content);
-    ms.memories.push(MemoryItem { id: id.clone(), tl_dr: content.clone(), contents, importance, labels, yaml_key });
-
-    // Sync to YAML backing store
-    if let Some(item) = ms.memories.last() {
-        storage::upsert_yaml_entry(item);
-    }
-
-    let preview = if content.len() > 40 {
-        format!("{}...", content.get(..content.floor_char_boundary(37)).unwrap_or(""))
-    } else {
-        content
-    };
-    Ok(format!("{} [{}]: {}", id, importance.as_str(), preview))
+/// Outcome of applying one edit entry.
+enum EditOutcome {
+    /// Slot written with content — id + title preview.
+    Set(String),
+    /// Slot freed (emptied) — id.
+    Freed(String),
+    /// Rejected — human error line.
+    Error(String),
 }
 
-/// Execute the `memory_create` tool: parse input and store new memory items.
-pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let _fg = cp_base::flame!("memory_create");
-    let Some(memories) = tool.input.get("memories").and_then(|v| v.as_array()) else {
-        return ToolResult::new(tool.id.clone(), "Missing 'memories' array parameter".to_owned(), true);
+/// Apply a single edit entry to `state`, returning its outcome.
+fn apply_one_edit(edit: &serde_json::Value, state: &mut State) -> EditOutcome {
+    let Some(id) = edit.get("id").and_then(|v| v.as_str()) else {
+        return EditOutcome::Error("Missing 'id' in edit".to_owned());
     };
-
-    if memories.is_empty() {
-        return ToolResult::new(tool.id.clone(), "Empty 'memories' array".to_owned(), true);
+    let Some(tier) = tier_of(id) else {
+        return EditOutcome::Error(format!("{id}: not a valid slot id (expected M-<tier>-<n>)"));
+    };
+    // Slot must exist in the fixed budget.
+    if MemoryState::get(state).slot(id).is_none() {
+        return EditOutcome::Error(format!("{id}: no such slot (index out of range for its tier)"));
     }
 
-    let mut created: Vec<String> = Vec::new();
-    let mut errors: Vec<String> = Vec::new();
+    // Read the proposed fields against the CURRENT slot values so a partial
+    // edit (e.g. importance only) preserves the rest.
+    let title_in = edit.get("title").and_then(|v| v.as_str());
+    let contents_in = edit.get("contents").and_then(|v| v.as_str());
+    let importance_in =
+        edit.get("importance").and_then(|v| v.as_str()).and_then(|s| s.parse::<MemoryImportance>().ok());
 
-    for memory_value in memories {
-        match create_one_memory(memory_value, state) {
-            Ok(line) => created.push(line),
-            Err(e) => errors.push(e),
-        }
+    // Validate title / contents BEFORE mutating (all-or-nothing per entry).
+    if let Some(t) = title_in
+        && t.chars().count() > TITLE_MAX_CHARS
+    {
+        return EditOutcome::Error(format!(
+            "{id}: title too long ({} chars, max {TITLE_MAX_CHARS})",
+            t.chars().count()
+        ));
+    }
+    if let Some(c) = contents_in
+        && !c.trim().is_empty()
+        && let Err(e) = validate_contents(c, tier)
+    {
+        return EditOutcome::Error(format!("{id}: {e}"));
     }
 
+    let Some(slot) = MemoryState::get_mut(state).slot_mut(id) else {
+        return EditOutcome::Error(format!("{id}: no such slot"));
+    };
+    if let Some(t) = title_in {
+        t.clone_into(&mut slot.title);
+    }
+    if let Some(c) = contents_in {
+        c.clone_into(&mut slot.contents);
+    }
+    if let Some(imp) = importance_in {
+        slot.importance = imp;
+    }
+    // A slot with neither title nor contents is FREE (the "no delete tool"
+    // path: edit to empty → renders **empty** again).
+    slot.occupied = !(slot.title.trim().is_empty() && slot.contents.trim().is_empty());
+    if !slot.occupied {
+        slot.title.clear();
+        slot.contents.clear();
+        slot.importance = MemoryImportance::Medium;
+    }
+
+    let occupied = slot.occupied;
+    let preview = slot.title.clone();
+    storage::upsert_slot(slot);
+    if occupied { EditOutcome::Set(format!("{id}: {preview}")) } else { EditOutcome::Freed(id.to_owned()) }
+}
+
+/// Append the tidy-up nudge when total occupancy is at/above 90 % (FR6).
+fn tidy_nudge(occupied: usize) -> Option<String> {
+    // ≥ 90 % of TOTAL_SLOTS, computed with integers (occupied*100 ≥ TOTAL*90).
+    if occupied.saturating_mul(100) < TOTAL_SLOTS.saturating_mul(90) {
+        return None;
+    }
+    Some(format!(
+        "\n\nWARNING: Memory is nearly full ({occupied}/{TOTAL_SLOTS}). Tidy up: free stale slots \
+         (edit them empty), factor duplicates, and compress several small entries into one M-short."
+    ))
+}
+
+/// Build the human-readable summary from the three outcome buckets.
+fn build_output(set: &[String], freed: &[String], errors: &[String]) -> String {
     let mut output = String::new();
-
-    if !created.is_empty() {
-        let _r = write!(output, "Created {} memory(s):\n{}", created.len(), created.join("\n"));
-        state.touch_panel(Kind::MEMORY);
+    if !set.is_empty() {
+        let _r = write!(output, "Set {}:\n{}", set.len(), set.join("\n"));
     }
-
+    if !freed.is_empty() {
+        if !output.is_empty() {
+            output.push_str("\n\n");
+        }
+        let _r = write!(output, "Freed: {}", freed.join(", "));
+    }
     if !errors.is_empty() {
         if !output.is_empty() {
             output.push_str("\n\n");
         }
         let _r = write!(output, "Errors ({}):\n{}", errors.len(), errors.join("\n"));
     }
-
-    ToolResult::new(tool.id.clone(), output, created.is_empty())
-}
-
-/// Accumulated per-batch outcomes for a `memory_update` call.
-#[derive(Default)]
-struct UpdateTally {
-    /// Ids modified, each with a comma-joined change list.
-    modified: Vec<String>,
-    /// Ids deleted.
-    deleted: Vec<String>,
-    /// Ids referenced but not present.
-    not_found: Vec<String>,
-    /// Per-update error lines (bad id, validation failure).
-    errors: Vec<String>,
-}
-
-/// Delete the memory with `id`, syncing the YAML store. Records the id in
-/// `tally.deleted` or `tally.not_found`.
-fn delete_memory(id: &str, state: &mut State, tally: &mut UpdateTally) {
-    let ms = MemoryState::get_mut(state);
-    let initial_len = ms.memories.len();
-    let yaml_key = ms.memories.iter().find(|m| m.id == id).map(|m| m.yaml_key.clone());
-    ms.memories.retain(|m| m.id != id);
-    if ms.memories.len() < initial_len {
-        if let Some(key) = yaml_key {
-            storage::remove_yaml_entry(&key);
-        }
-        tally.deleted.push(id.to_owned());
-    } else {
-        tally.not_found.push(id.to_owned());
-    }
-}
-
-/// Apply the provided fields onto memory `m`, returning the list of changed
-/// field names, or an error string on a rejected tl;dr.
-fn apply_memory_fields(update_value: &serde_json::Value, m: &mut MemoryItem) -> Result<Vec<&'static str>, String> {
-    let mut changes = Vec::new();
-
-    if let Some(content) = update_value.get("content").and_then(|v| v.as_str()) {
-        validate_tldr(content).map_err(|e| format!("{}: {e}", m.id))?;
-        content.clone_into(&mut m.tl_dr);
-        changes.push("content");
-    }
-    if let Some(contents) = update_value.get("contents").and_then(|v| v.as_str()) {
-        contents.clone_into(&mut m.contents);
-        changes.push("contents");
-    }
-    if let Some(importance) =
-        update_value.get("importance").and_then(|v| v.as_str()).and_then(|s| s.parse::<MemoryImportance>().ok())
-    {
-        m.importance = importance;
-        changes.push("importance");
-    }
-    if let Some(labels_arr) = update_value.get("labels").and_then(|v| v.as_array()) {
-        m.labels = labels_arr.iter().filter_map(|v| v.as_str().map(String::from)).collect();
-        changes.push("labels");
-    }
-    Ok(changes)
-}
-
-/// Modify (non-delete) the memory named by `id`, syncing YAML on change.
-/// Records outcome onto `tally`.
-fn modify_memory(id: &str, update_value: &serde_json::Value, state: &mut State, tally: &mut UpdateTally) {
-    let ms = MemoryState::get_mut(state);
-    let Some(m) = ms.memories.iter_mut().find(|m| m.id == id) else {
-        tally.not_found.push(id.to_owned());
-        return;
-    };
-    match apply_memory_fields(update_value, m) {
-        Ok(changes) if !changes.is_empty() => {
-            tally.modified.push(format!("{}: {}", id, changes.join(", ")));
-            storage::upsert_yaml_entry(m);
-        }
-        Ok(_) => {}
-        Err(e) => tally.errors.push(e),
-    }
-}
-
-/// Dispatch one update entry to delete or modify. Records a missing-id error.
-fn apply_one_update(update_value: &serde_json::Value, state: &mut State, tally: &mut UpdateTally) {
-    let Some(id) = update_value.get("id").and_then(|v| v.as_str()).map(str::to_owned) else {
-        tally.errors.push("Missing 'id' in update".to_owned());
-        return;
-    };
-    if update_value.get("delete").and_then(serde_json::Value::as_bool).unwrap_or(false) {
-        delete_memory(&id, state, tally);
-    } else {
-        modify_memory(&id, update_value, state, tally);
-    }
-}
-
-/// Render the combined result string from an `UpdateTally`.
-fn build_update_output(tally: &UpdateTally) -> String {
-    let mut output = String::new();
-    let mut push_section = |label: &str, body: String| {
-        if body.is_empty() {
-            return;
-        }
-        if !output.is_empty() {
-            output.push_str("\n\n");
-        }
-        let _r = write!(output, "{label}{body}");
-    };
-
-    if !tally.modified.is_empty() {
-        push_section(&format!("Updated {}:\n", tally.modified.len()), tally.modified.join("\n"));
-    }
-    if !tally.deleted.is_empty() {
-        push_section("Deleted: ", tally.deleted.join(", "));
-    }
-    if !tally.not_found.is_empty() {
-        push_section("Not found: ", tally.not_found.join(", "));
-    }
-    if !tally.errors.is_empty() {
-        push_section("Errors:\n", tally.errors.join("\n"));
-    }
     output
 }
 
-/// Execute the `memory_update` tool: modify, open/close, or delete existing memories.
-pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let _fg = cp_base::flame!("memory_update");
-    let Some(updates) = tool.input.get("updates").and_then(|v| v.as_array()) else {
-        return ToolResult::new(tool.id.clone(), "Missing 'updates' array parameter".to_owned(), true);
+/// Execute the `memory_edit` tool: apply a batch of slot edits addressed by id.
+pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("memory_edit");
+    let Some(edits) = tool.input.get("edits").and_then(|v| v.as_array()) else {
+        return ToolResult::new(tool.id.clone(), "Missing 'edits' array parameter".to_owned(), true);
     };
-
-    if updates.is_empty() {
-        return ToolResult::new(tool.id.clone(), "Empty 'updates' array".to_owned(), true);
+    if edits.is_empty() {
+        return ToolResult::new(tool.id.clone(), "Empty 'edits' array".to_owned(), true);
     }
 
-    let mut tally = UpdateTally::default();
-    for update_value in updates {
-        apply_one_update(update_value, state, &mut tally);
+    let mut set: Vec<String> = Vec::new();
+    let mut freed: Vec<String> = Vec::new();
+    let mut errors: Vec<String> = Vec::new();
+
+    for edit in edits {
+        match apply_one_edit(edit, state) {
+            EditOutcome::Set(line) => set.push(line),
+            EditOutcome::Freed(id) => freed.push(id),
+            EditOutcome::Error(e) => errors.push(e),
+        }
     }
 
-    // Update Memory panel timestamp if anything changed
-    if !tally.modified.is_empty() || !tally.deleted.is_empty() {
+    let changed = !set.is_empty() || !freed.is_empty();
+    if changed {
         state.touch_panel(Kind::MEMORY);
     }
 
-    let no_change = tally.modified.is_empty() && tally.deleted.is_empty();
-    ToolResult::new(tool.id.clone(), build_update_output(&tally), no_change)
+    let mut output = build_output(&set, &freed, &errors);
+    if let Some(nudge) = tidy_nudge(MemoryState::get(state).occupied_count()) {
+        output.push_str(&nudge);
+    }
+
+    ToolResult::new(tool.id.clone(), output, !changed)
 }
