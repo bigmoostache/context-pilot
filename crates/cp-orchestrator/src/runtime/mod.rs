@@ -233,7 +233,7 @@ impl Runtime {
         let backup_scheduler =
             self.config.auth_enabled.then(|| BackupScheduler::new(self.config.auth_db_path.clone()));
 
-        thread::spawn(move || driver::driver_loop(backend, agents_dir, interval, backup_scheduler))
+        thread::spawn(move || driver::driver_loop(&backend, agents_dir, interval, backup_scheduler))
     }
 
     /// Spawn the auto-update scheduler (O4.2): poll the channel on boot and
