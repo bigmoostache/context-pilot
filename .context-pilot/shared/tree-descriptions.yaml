@@ -6734,6 +6734,10 @@
   path: crates/cp-mod-tree/src/types.rs
   description: Tree state types. TreeFileDescription (path, description, file_hash). TreeState (filter, open_folders, descriptions). DEFAULT_TREE_FILTER constant.
   last_edited_ms: 0
+4c66f21540664329:
+  path: web/src/components/agents/AgentModal/manageBody.tsx
+  description: 'AgentModal manage-mode body (T617): ConfigPanel-style rail (Identity/Model/Vitals from tabs.ts) + detail pane. IdentityTab = 10 Agora fields, render-phase pristine-sync (not effect), saves via set_identity bridge command. LlmTab = agent-image editor (AvatarField) + name/realm/ModelPicker. VitalsTab = SessionVitals + AgentAclSection. T645: AvatarField added atop LlmTab — labelled ''Agent image'' section (native <label> file-picker over hidden input + Dices randomize badge sibling), reusing c.avatarBust/onAvatarChange/onRandomizeAvatar from useAgentModalActions (no logic dup, M141); applies immediately, no save.'
+  last_edited_ms: 1787827333532
 4c6e6d76c577d3c9:
   path: web/src/lib/api/index.ts
   description: 'REST API client barrel: fleet/agent/threads/panels/memory/todos/spine/queue/scratchpad/tree/callbacks/tools/radar/entities/metrics/vitals/usage/library + commands (sendCommand) + mintTicket + renameAgent + avatar CRUD + createCommand. Type re-exports from generated/types.gen (AgentMetrics, Vital, CreateAgentReceipt, RestartReceipt, RetireReceipt, UnretireReceipt, CommandReceipt, CreateCommandReceipt, RadarData). Re-exports ./auth + ./finder + ./body + ./env-keys. The @/lib/api single import surface.'
