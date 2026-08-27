@@ -4526,6 +4526,10 @@
   path: tmp/v2/src/export/docxTable.ts
   description: Tables converted to OOXML. Split from docx.ts because column widths, row heights, spans, shading, valign and the border model all have to be restated in units sharing nothing with CSS. Every value comes from an attribute already in the document — nothing measured or invented. TableLayoutType.FIXED with explicit columnWidths, because Word's default autofit recomputes widths from cell content and ignores what was recorded.
   last_edited_ms: 1785772683091
+3341de38c3ebfdce:
+  path: web/ff_repro.mjs
+  description: DELETED throwaway T644 Firefox repro (Playwright). Removed after use.
+  last_edited_ms: 1787824151507
 336414a93c7dcc8f:
   path: src/app/run/threads/mod.rs
   description: 'Thread helpers for main loop: maybe_inject_auto_read (filters paused threads — T371), check_my_turn_threads (filters paused threads — T371), extract_thread_ids, maybe_append_tool_activity. emit_thread_paused re-exported from paused.rs.'
