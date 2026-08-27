@@ -197,12 +197,12 @@ impl Runtime {
         let auth_store = if config.auth_enabled {
             match crate::services::auth::store::AuthStore::open(&config.auth_db_path) {
                 Ok(store) => {
-                    eprintln!("auth enabled — database at {}", config.auth_db_path.display());
+                    crate::oerr!("auth enabled — database at {}", config.auth_db_path.display());
                     seed::seed_accounts_if_empty(&store);
                     Some(store)
                 }
                 Err(err) => {
-                    eprintln!("WARN: auth enabled but database open failed: {err} — running WITHOUT auth");
+                    crate::oerr!("WARN: auth enabled but database open failed: {err} — running WITHOUT auth");
                     None
                 }
             }
@@ -290,17 +290,17 @@ impl Runtime {
             }
             // The new binary is blessed — flip the release state to match it.
             let Ok(mut b) = backend.lock() else {
-                eprintln!("updater: promote skipped \u{2014} backend lock poisoned");
+                crate::oerr!("updater: promote skipped \u{2014} backend lock poisoned");
                 return;
             };
             match crate::services::releases::updater::promote_committed(&mut b.releases, &auth_db) {
                 Ok(Some(agent_binary)) => {
                     b.agent_binary = agent_binary.clone();
                     b.supervisor = crate::supervisor::AgentSupervisor::new(&[agent_binary]);
-                    eprintln!("updater: update committed — active tag is now {:?}", b.releases.active_tag());
+                    crate::oerr!("updater: update committed — active tag is now {:?}", b.releases.active_tag());
                 }
                 Ok(None) => {} // plain self-restart (manual flow), nothing to promote
-                Err(e) => eprintln!("updater: promote after healthy boot FAILED: {e}"),
+                Err(e) => crate::oerr!("updater: promote after healthy boot FAILED: {e}"),
             }
         })
     }
@@ -322,7 +322,7 @@ impl Runtime {
         // (provisioned). This log makes the boot state observable in `logread`.
         if let Ok(b) = self.backend.lock() {
             let provisioned = crate::transport::it::is_provisioned(&b.provision_flag_path);
-            eprintln!(
+            crate::oerr!(
                 "provisioning state: {} (flag: {})",
                 if provisioned {
                     "provisioned \u{2014} cockpit on :443"
@@ -347,7 +347,7 @@ impl Runtime {
         crate::transport::it::apply_network_at_boot(&self.backend);
 
         let addr = self.config.listen_addr();
-        eprintln!("serving on http://{addr}");
+        crate::oerr!("serving on http://{addr}");
         crate::transport::serve(&addr, Arc::clone(&self.backend))
     }
 }

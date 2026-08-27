@@ -78,12 +78,12 @@ pub(crate) fn search_conversations(state: &Mutex<Backend>, id: &str, body_bytes:
         Ok(response) => match response.result {
             Outcome::Hits { hits } => HttpReply::ok(&SearchResponse { hits }),
             Outcome::Error { reason } => {
-                eprintln!("conversation search failed on agent {id}: {reason}");
+                crate::oerr!("conversation search failed on agent {id}: {reason}");
                 HttpReply::error(502, "conversation search unavailable")
             }
         },
         Err(e) => {
-            eprintln!("conversation search transport error for agent {id}: {e:?}");
+            crate::oerr!("conversation search transport error for agent {id}: {e:?}");
             HttpReply::error(502, "agent unreachable")
         }
     }

@@ -62,10 +62,10 @@ impl BackupScheduler {
             match auth.backup_to(&dest) {
                 Ok(()) => {
                     self.last_rolling_ms = now;
-                    eprintln!("auth backup: rolling snapshot → {}", dest.display());
+                    crate::oerr!("auth backup: rolling snapshot → {}", dest.display());
                 }
                 Err(err) => {
-                    eprintln!("WARN: auth rolling backup failed: {err}");
+                    crate::oerr!("WARN: auth rolling backup failed: {err}");
                 }
             }
         }
@@ -82,10 +82,10 @@ impl BackupScheduler {
                 }
                 match auth.backup_to(&dest) {
                     Ok(()) => {
-                        eprintln!("auth backup: daily snapshot → {}", dest.display());
+                        crate::oerr!("auth backup: daily snapshot → {}", dest.display());
                     }
                     Err(err) => {
-                        eprintln!("WARN: auth daily backup failed: {err}");
+                        crate::oerr!("WARN: auth daily backup failed: {err}");
                     }
                 }
             }

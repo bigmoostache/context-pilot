@@ -153,7 +153,7 @@ pub(crate) fn update_apply(state: &Mutex<Backend>) -> HttpReply {
             return HttpReply::error(500, &format!("stage failed: {e}"));
         }
     }
-    eprintln!("updater: apply {current} → {} (admin request) — restarting", manifest.version);
+    crate::oerr!("updater: apply {current} → {} (admin request) — restarting", manifest.version);
     restart_self(&install);
     HttpReply::ok(&serde_json::json!({ "status": "applying", "from": current, "to": manifest.version }))
 }

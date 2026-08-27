@@ -346,7 +346,7 @@ mod tests {
                         return serde_json::from_slice(payload).ok();
                     }
                 }
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => sleep(WRITE_BACKOFF),
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => sleep(WRITE_BACKOFF),
                 Err(_) => return None,
             }
         }

@@ -46,7 +46,7 @@ pub(crate) fn write_uplink_env(tools: &Tools, config: &NetworkConfig) -> Result<
     if let Some(systemctl) = tools.systemctl.as_ref() {
         let args = ["restart".to_owned(), "cp-uplink.service".to_owned()];
         if let Err(failure) = run(systemctl, &args) {
-            eprintln!("network: could not restart cp-uplink (non-fatal): {failure}");
+            crate::oerr!("network: could not restart cp-uplink (non-fatal): {failure}");
         }
     }
     Ok(())

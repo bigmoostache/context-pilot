@@ -123,16 +123,16 @@ impl RetiredStore {
         let mut list: Vec<&RetiredRecord> = self.records.values().collect();
         list.sort_by(|a, b| a.id.cmp(&b.id));
         let Ok(bytes) = serde_json::to_vec_pretty(&list) else {
-            eprintln!("retire: serialize failed");
+            crate::oerr!("retire: serialize failed");
             return;
         };
         let tmp = self.path.with_extension("json.tmp");
         if std::fs::write(&tmp, &bytes).is_err() {
-            eprintln!("retire: write tmp failed: {}", tmp.display());
+            crate::oerr!("retire: write tmp failed: {}", tmp.display());
             return;
         }
         if let Err(e) = std::fs::rename(&tmp, &self.path) {
-            eprintln!("retire: rename failed: {e}");
+            crate::oerr!("retire: rename failed: {e}");
         }
     }
 }

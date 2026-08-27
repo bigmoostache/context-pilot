@@ -21,44 +21,74 @@ use nix as _;
 use serde_json as _;
 use tempfile as _;
 
-#[test]
-fn bridge_module_identity() {
-    let m = BridgeModule;
-    assert_eq!(m.id(), "bridge");
-    assert_eq!(m.name(), "Bridge");
-    assert!(!m.is_core());
-    assert!(m.is_global());
-}
+// The `#[test]` fns live inside this `#[cfg(test)]` module so
+// clippy::tests_outside_test_module (forbid) is satisfied — an integration
+// file's tests are otherwise at the crate root. `#[cfg(test)]` is active for
+// integration-test crates, so the module compiles and its tests run.
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[test]
-fn bridge_module_no_tools() {
-    let m = BridgeModule;
-    assert!(m.tool_definitions().is_empty());
-}
+    #[test]
+    fn bridge_module_identity() {
+        let m = BridgeModule;
+        assert_eq!(m.id(), "bridge");
+        assert_eq!(m.name(), "Bridge");
+        assert!(!m.is_core());
+        assert!(m.is_global());
+    }
 
-#[test]
-fn bridge_state_default_is_none() {
-    let bs = BridgeState::default();
-    assert!(bs.boot.is_none());
-    assert!(bs.tee.is_none());
-    assert!(bs.intake.is_none());
-    assert_eq!(bs.tee_seq, 0);
-    assert_eq!(bs.last_phase, None);
-    assert!((bs.last_cost_usd - 0.0).abs() < f64::EPSILON);
-    assert!(bs.last_context.is_none());
-    assert!(bs.store.is_none());
-    assert!(bs.thread_msg_counts.is_empty());
-    assert!(bs.thread_statuses.is_empty());
-    assert!(bs.last_focus.is_none());
-    assert!(bs.last_behaviour.is_none());
-    assert!(bs.thread_archived_memo.is_empty());
-    assert!(bs.thread_paused_memo.is_empty());
-    assert!(!bs.seeded.messages());
-    assert!(!bs.seeded.statuses());
-    assert!(!bs.seeded.focus());
-    assert!(!bs.seeded.archived());
-    assert!(!bs.seeded.paused());
-    assert!(!bs.seeded.behaviour());
-    assert!(!bs.pending);
-    assert!(bs.pending_model.is_empty());
+    #[test]
+    fn bridge_module_no_tools() {
+        let m = BridgeModule;
+        assert!(m.tool_definitions().is_empty());
+    }
+
+    /// Assert the optional handle slots (`boot`/`tee`/`intake`/`store`) are all
+    /// unset on a cold default.
+    fn assert_handles_empty(bs: &BridgeState) {
+        assert!(bs.boot.is_none());
+        assert!(bs.tee.is_none());
+        assert!(bs.intake.is_none());
+        assert!(bs.store.is_none());
+    }
+
+    /// Assert the telemetry counters are at their zero/none baseline.
+    fn assert_telemetry_zeroed(bs: &BridgeState) {
+        assert_eq!(bs.tee_seq, 0);
+        assert_eq!(bs.last_phase, None);
+        assert!(bs.last_cost_usd.abs() < f64::EPSILON);
+        assert!(bs.last_context.is_none());
+    }
+
+    /// Assert every change-detection memo starts empty/none.
+    fn assert_memos_empty(bs: &BridgeState) {
+        assert!(bs.thread_msg_counts.is_empty());
+        assert!(bs.thread_statuses.is_empty());
+        assert!(bs.last_focus.is_none());
+        assert!(bs.last_behaviour.is_none());
+        assert!(bs.thread_archived_memo.is_empty());
+        assert!(bs.thread_paused_memo.is_empty());
+    }
+
+    /// Assert no seed bit is set on a cold default.
+    fn assert_seed_bits_clear(bs: &BridgeState) {
+        assert!(!bs.seeded.messages());
+        assert!(!bs.seeded.statuses());
+        assert!(!bs.seeded.focus());
+        assert!(!bs.seeded.archived());
+        assert!(!bs.seeded.paused());
+        assert!(!bs.seeded.behaviour());
+    }
+
+    #[test]
+    fn bridge_state_default_is_none() {
+        let bs = BridgeState::default();
+        assert_handles_empty(&bs);
+        assert_telemetry_zeroed(&bs);
+        assert_memos_empty(&bs);
+        assert_seed_bits_clear(&bs);
+        assert!(!bs.pending);
+        assert!(bs.pending_model.is_empty());
+    }
 }

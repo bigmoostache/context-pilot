@@ -138,11 +138,14 @@ mod tests {
     #[test]
     fn delete_removes_override() {
         let vault = Backend::new();
-        let _r = vault.set("anthropic", "sk-temp");
-        let _r = vault.delete("anthropic");
+        let _set = vault.set("anthropic", "sk-temp");
+        let _del = vault.delete("anthropic");
 
-        let guard = vault.overrides.read().unwrap_or_else(std::sync::PoisonError::into_inner);
-        assert!(!guard.contains_key("anthropic"));
+        let contains = {
+            let guard = vault.overrides.read().unwrap_or_else(std::sync::PoisonError::into_inner);
+            guard.contains_key("anthropic")
+        };
+        assert!(!contains);
     }
 
     #[test]

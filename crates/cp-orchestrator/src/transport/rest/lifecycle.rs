@@ -115,7 +115,7 @@ pub fn restart_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
             &RestartReceipt { status: "restarting", folder: folder.to_string_lossy().into_owned(), pid },
         ),
         Err(e) => {
-            eprintln!("restart_agent spawn error: {e}");
+            crate::oerr!("restart_agent spawn error: {e}");
             HttpReply::error(502, &format!("agent respawn failed: {e}"))
         }
     }
@@ -246,7 +246,7 @@ pub fn unretire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
             HttpReply::json(202, &UnretireReceipt { status: "unretiring", id: agent_id, folder: record.folder, pid })
         }
         Err(e) => {
-            eprintln!("unretire_agent spawn error: {e}");
+            crate::oerr!("unretire_agent spawn error: {e}");
             HttpReply::error(502, &format!("agent respawn failed: {e}"))
         }
     }

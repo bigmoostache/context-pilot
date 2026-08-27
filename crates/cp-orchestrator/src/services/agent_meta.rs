@@ -76,16 +76,16 @@ impl NameOverrides {
     /// Atomically write the map to disk (`tmp` → `rename`).
     fn persist(&self) {
         let Ok(bytes) = serde_json::to_vec_pretty(&self.names) else {
-            eprintln!("names: serialize failed");
+            crate::oerr!("names: serialize failed");
             return;
         };
         let tmp = self.path.with_extension("json.tmp");
         if std::fs::write(&tmp, &bytes).is_err() {
-            eprintln!("names: write tmp failed: {}", tmp.display());
+            crate::oerr!("names: write tmp failed: {}", tmp.display());
             return;
         }
         if let Err(e) = std::fs::rename(&tmp, &self.path) {
-            eprintln!("names: rename failed: {e}");
+            crate::oerr!("names: rename failed: {e}");
         }
     }
 }
@@ -174,16 +174,16 @@ impl AvatarStore {
     /// Atomically write the content-type index to disk.
     fn persist_index(&self) {
         let Ok(bytes) = serde_json::to_vec_pretty(&self.types) else {
-            eprintln!("avatars: serialize index failed");
+            crate::oerr!("avatars: serialize index failed");
             return;
         };
         let tmp = self.index_path.with_extension("json.tmp");
         if std::fs::write(&tmp, &bytes).is_err() {
-            eprintln!("avatars: write tmp failed: {}", tmp.display());
+            crate::oerr!("avatars: write tmp failed: {}", tmp.display());
             return;
         }
         if let Err(e) = std::fs::rename(&tmp, &self.index_path) {
-            eprintln!("avatars: rename failed: {e}");
+            crate::oerr!("avatars: rename failed: {e}");
         }
     }
 }

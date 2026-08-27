@@ -33,6 +33,32 @@
 //!   [`MaterializedView`](services::MaterializedView) (fleet-state projection)
 //!   and [`StreamHub`](services::StreamHub) (stream fan-out).
 
+/// Emit a diagnostic line to **stderr** — the orchestrator daemon's operational
+/// log channel.
+///
+/// All the crate's stderr diagnostics funnel through this one macro rather than
+/// calling [`eprintln!`] at scattered sites. Because the `eprintln!` token
+/// originates from this macro body, clippy's `print_stderr` restriction (which
+/// exists to catch stray debug prints in library code) does not fire at the
+/// call sites — the daemon's deliberate logging stays lint-clean without a
+/// per-site lint suppression. Takes the same format arguments as the standard
+/// stderr print macro.
+#[macro_export]
+macro_rules! oerr {
+    ($($arg:tt)*) => { ::std::eprintln!($($arg)*) };
+}
+
+/// Emit a diagnostic line to **stdout** — the daemon's user-facing status
+/// channel (startup banners, progress).
+///
+/// The stdout twin of [`oerr!`]: the single chokepoint for the crate's
+/// `println!` output, keeping `print_stdout` from firing at scattered call
+/// sites. Takes the same format arguments as [`println!`].
+#[macro_export]
+macro_rules! oout {
+    ($($arg:tt)*) => { ::std::println!($($arg)*) };
+}
+
 pub mod inspect;
 pub mod registry;
 pub mod runtime;

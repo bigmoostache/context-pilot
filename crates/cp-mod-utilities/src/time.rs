@@ -466,9 +466,9 @@ mod tests {
 
     #[test]
     fn tz_offset_parsing() {
-        assert_eq!(parse_tz_offset("+0200"), Some(7200));
-        assert_eq!(parse_tz_offset("-0530"), Some(-19800));
-        assert_eq!(parse_tz_offset("+0000"), Some(0));
+        assert_eq!(parse_tz_offset("+0200"), Some(7200i32));
+        assert_eq!(parse_tz_offset("-0530"), Some(-19800i32));
+        assert_eq!(parse_tz_offset("+0000"), Some(0i32));
     }
 
     #[test]

@@ -427,21 +427,13 @@ mod tests {
         let booted = boot(folder.path(), agents.path()).expect("boot");
         drop(booted);
 
-        let lifecycles: Vec<LifecycleState> = read_all_entries(&oplog_dir)
-            .iter()
-            .filter_map(|e| match &e.kind {
-                OpEntryKind::Lifecycle { state } => Some(*state),
-                _ => None,
-            })
-            .collect();
+        let entries = read_all_entries(&oplog_dir);
+        let has_running =
+            entries.iter().any(|e| matches!(e.kind, OpEntryKind::Lifecycle { state: LifecycleState::Running }));
+        let has_stopping =
+            entries.iter().any(|e| matches!(e.kind, OpEntryKind::Lifecycle { state: LifecycleState::Stopping }));
 
-        assert!(
-            lifecycles.contains(&LifecycleState::Running),
-            "Lifecycle::Running must be journaled at boot, got {lifecycles:?}",
-        );
-        assert!(
-            lifecycles.contains(&LifecycleState::Stopping),
-            "Lifecycle::Stopping must be journaled on graceful drop, got {lifecycles:?}",
-        );
+        assert!(has_running, "Lifecycle::Running must be journaled at boot");
+        assert!(has_stopping, "Lifecycle::Stopping must be journaled on graceful drop");
     }
 }

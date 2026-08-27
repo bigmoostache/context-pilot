@@ -18,7 +18,7 @@ pub(super) fn seed_accounts_if_empty(store: &AuthStore) {
         Ok(0) => {}
         Ok(_) => return, // already provisioned — idempotent no-op
         Err(e) => {
-            eprintln!("seed: cannot count users: {e} — skipping");
+            crate::oerr!("seed: cannot count users: {e} — skipping");
             return;
         }
     }
@@ -38,7 +38,7 @@ fn seed_one(store: &AuthStore, role_sql: &str, prefix: &str) {
         return;
     };
     let Some(password) = seed_password(prefix) else {
-        eprintln!("seed: {prefix}_EMAIL set but no password provided — skipping");
+        crate::oerr!("seed: {prefix}_EMAIL set but no password provided — skipping");
         return;
     };
     let name = std::env::var(format!("{prefix}_NAME"))
@@ -49,14 +49,14 @@ fn seed_one(store: &AuthStore, role_sql: &str, prefix: &str) {
     match store.create_user(email.trim(), name.trim(), &password, role) {
         Ok(user) => match store.set_must_change_password(&user.id, true) {
             Ok(_) => {
-                eprintln!(
+                crate::oerr!(
                     "seed: provisioned initial {role_sql} {} (password change required on first login)",
                     user.email
                 );
             }
-            Err(e) => eprintln!("seed: created {} but could not set must-change flag: {e}", user.email),
+            Err(e) => crate::oerr!("seed: created {} but could not set must-change flag: {e}", user.email),
         },
-        Err(e) => eprintln!("seed: failed to create {role_sql} {}: {e}", email.trim()),
+        Err(e) => crate::oerr!("seed: failed to create {role_sql} {}: {e}", email.trim()),
     }
 }
 
@@ -71,7 +71,7 @@ fn seed_password(prefix: &str) -> Option<String> {
                     return Some(pw);
                 }
             }
-            Err(e) => eprintln!("seed: cannot read {prefix}_PASSWORD_FILE: {e}"),
+            Err(e) => crate::oerr!("seed: cannot read {prefix}_PASSWORD_FILE: {e}"),
         }
     }
     std::env::var(format!("{prefix}_PASSWORD")).ok().filter(|s| !s.is_empty())

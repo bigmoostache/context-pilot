@@ -43,140 +43,174 @@ use cp_wire::heartbeat::{DEFAULT_MAX_AGE, HEARTBEAT_LEN, Heartbeat};
 use cp_wire::types::registry::{AgentStatus, Entry};
 use tempfile::TempDir;
 
-// ── helpers ────────────────────────────────────────────────────────────────
+// The `#[test]` fns live inside this `#[cfg(test)]` module so
+// clippy::tests_outside_test_module (forbid) is satisfied — an integration
+// file's tests are otherwise at the crate root. `#[cfg(test)]` is active for
+// integration-test crates (verified), so the module compiles and its tests run,
+// and clippy's allow-expect-in-tests then covers `.expect()` in the shared
+// helpers too.
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-/// Boot an agent in a fresh folder, writing its record into `agents`.
-fn boot_in(folder: &Path, agents: &Path) -> Boot {
-    Boot::start_in(folder, agents, "test-model").expect("boot")
-}
+    // ── helpers ──────────────────────────────────────────────────────────────
 
-/// Read agent `id`'s registry record back as the backend would.
-fn read_entry(agents: &Path, id: &str) -> Entry {
-    let path = agents.join(format!("{id}.json"));
-    let text = fs::read_to_string(&path).expect("read registry record");
-    serde_json::from_str(&text).expect("registry record parses as a wire Entry")
-}
+    /// Boot an agent in a fresh folder, writing its record into `agents`.
+    fn boot_in(folder: &Path, agents: &Path) -> Boot {
+        Boot::start_in(folder, agents, "test-model").expect("boot")
+    }
 
-/// Decode the heartbeat file an agent advertised.
-fn read_beat(heartbeat_path: &str) -> Heartbeat {
-    let bytes = fs::read(heartbeat_path).expect("read heartbeat file");
-    assert_eq!(bytes.len(), HEARTBEAT_LEN, "heartbeat file is exactly one fixed-size record");
-    Heartbeat::decode(&bytes).expect("heartbeat decodes")
-}
+    /// Read agent `id`'s registry record back as the backend would.
+    fn read_entry(agents: &Path, id: &str) -> Entry {
+        let path = agents.join(format!("{id}.json"));
+        let text = fs::read_to_string(&path).expect("read registry record");
+        serde_json::from_str(&text).expect("registry record parses as a wire Entry")
+    }
 
-/// Wall-clock milliseconds since the Unix epoch.
-fn now_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
-}
+    /// Decode the heartbeat file an agent advertised.
+    fn read_beat(heartbeat_path: &str) -> Heartbeat {
+        let bytes = fs::read(heartbeat_path).expect("read heartbeat file");
+        assert_eq!(bytes.len(), HEARTBEAT_LEN, "heartbeat file is exactly one fixed-size record");
+        Heartbeat::decode(&bytes).expect("heartbeat decodes")
+    }
 
-/// [`DEFAULT_MAX_AGE`] expressed in milliseconds for [`Heartbeat::is_fresh`].
-fn default_max_age_ms() -> u64 {
-    u64::try_from(DEFAULT_MAX_AGE.as_millis()).unwrap_or(u64::MAX)
-}
+    /// Wall-clock milliseconds since the Unix epoch.
+    fn now_ms() -> u64 {
+        SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
+    }
 
-// ── discovery contract ──────────────────────────────────────────────────────
+    /// [`DEFAULT_MAX_AGE`] expressed in milliseconds for [`Heartbeat::is_fresh`].
+    fn default_max_age_ms() -> u64 {
+        u64::try_from(DEFAULT_MAX_AGE.as_millis()).unwrap_or(u64::MAX)
+    }
 
-#[test]
-fn a_booted_agent_is_fully_discoverable() {
-    let folder = TempDir::new().expect("folder");
-    let agents = TempDir::new().expect("agents");
-    let booted = boot_in(folder.path(), agents.path());
+    /// Assert the registry record's scalar fields are the expected boot values.
+    fn assert_entry_fields(entry: &Entry, booted_id: &str) {
+        assert_eq!(entry.id, booted_id);
+        assert_eq!(entry.protocol_version, PROTOCOL_VERSION);
+        assert_eq!(entry.status, AgentStatus::Starting);
+        assert_eq!(entry.cap_token.len(), 64, "256-bit cap_token");
+        assert_eq!(entry.boot_id.len(), 32, "128-bit boot_id");
+    }
 
-    // The registry record the backend reads is a valid, complete Entry.
-    let entry = read_entry(agents.path(), booted.id());
-    assert_eq!(entry.id, booted.id());
-    assert_eq!(entry.protocol_version, PROTOCOL_VERSION);
-    assert_eq!(entry.status, AgentStatus::Starting);
-    assert_eq!(entry.cap_token.len(), 64, "256-bit cap_token");
-    assert_eq!(entry.boot_id.len(), 32, "128-bit boot_id");
+    /// Assert every resource path the record advertises exists on disk.
+    fn assert_entry_paths_exist(entry: &Entry) {
+        assert!(Path::new(&entry.oplog_path).exists(), "advertised oplog dir exists");
+        assert!(Path::new(&entry.socket_path).exists(), "advertised socket exists");
+        assert!(Path::new(&entry.heartbeat_path).exists(), "advertised heartbeat file exists");
+    }
 
-    // Every resource path it advertises actually exists.
-    assert!(Path::new(&entry.oplog_path).exists(), "advertised oplog dir exists");
-    assert!(Path::new(&entry.socket_path).exists(), "advertised socket exists");
-    assert!(Path::new(&entry.heartbeat_path).exists(), "advertised heartbeat file exists");
+    /// Assert a booted agent's registry record is complete and every resource
+    /// path it advertises exists on disk. Split into field + path helpers so each
+    /// stays under the cognitive-complexity cap.
+    fn assert_entry_is_complete(entry: &Entry, booted_id: &str) {
+        assert_entry_fields(entry, booted_id);
+        assert_entry_paths_exist(entry);
+    }
 
-    // The heartbeat agrees with the record: a fresh beat from the same boot.
-    let beat = read_beat(&entry.heartbeat_path);
-    assert!(beat.matches_boot(&entry.boot_id), "the beat carries the record's boot_id");
-    assert_eq!(beat.pid, entry.pid, "the beat carries the record's pid");
-    assert!(beat.is_fresh(now_ms(), default_max_age_ms()), "the first beat is fresh on boot");
-}
+    /// Assert the heartbeat file agrees with the registry record: a fresh beat
+    /// from the same boot.
+    fn assert_beat_agrees(beat: &Heartbeat, entry: &Entry) {
+        assert!(beat.matches_boot(&entry.boot_id), "the beat carries the record's boot_id");
+        assert_eq!(beat.pid, entry.pid, "the beat carries the record's pid");
+        assert!(beat.is_fresh(now_ms(), default_max_age_ms()), "the first beat is fresh on boot");
+    }
 
-// ── fleet independence ──────────────────────────────────────────────────────
+    /// Assert two independently-booted agents have distinct secret identities.
+    fn assert_distinct_identity(a: &Boot, b: &Boot) {
+        assert_ne!(a.id(), b.id(), "different folders yield different ids");
+        assert_ne!(a.cap_token(), b.cap_token(), "each agent has its own bearer secret");
+        assert_ne!(a.entry().boot_id, b.entry().boot_id, "each boot is a distinct identity");
+    }
 
-#[test]
-fn two_folders_boot_independently_into_one_fleet() {
-    let folder_a = TempDir::new().expect("folder a");
-    let folder_b = TempDir::new().expect("folder b");
-    let agents = TempDir::new().expect("agents");
+    // ── discovery contract ───────────────────────────────────────────────────
 
-    // Both agents are alive simultaneously — the lock is per-folder.
-    let a = boot_in(folder_a.path(), agents.path());
-    let b = boot_in(folder_b.path(), agents.path());
+    #[test]
+    fn a_booted_agent_is_fully_discoverable() {
+        let folder = TempDir::new().expect("folder");
+        let agents = TempDir::new().expect("agents");
+        let booted = boot_in(folder.path(), agents.path());
 
-    assert_ne!(a.id(), b.id(), "different folders yield different ids");
-    assert_ne!(a.cap_token(), b.cap_token(), "each agent has its own bearer secret");
-    assert_ne!(a.entry().boot_id, b.entry().boot_id, "each boot is a distinct identity");
+        let entry = read_entry(agents.path(), booted.id());
+        assert_entry_is_complete(&entry, booted.id());
 
-    // Both records coexist in the fleet directory and round-trip independently.
-    let entry_a = read_entry(agents.path(), a.id());
-    let entry_b = read_entry(agents.path(), b.id());
-    assert_eq!(entry_a.id, a.id());
-    assert_eq!(entry_b.id, b.id());
+        let beat = read_beat(&entry.heartbeat_path);
+        assert_beat_agrees(&beat, &entry);
+    }
 
-    // Both heartbeats are fresh and bound to their own boot.
-    assert!(read_beat(&entry_a.heartbeat_path).matches_boot(&entry_a.boot_id));
-    assert!(read_beat(&entry_b.heartbeat_path).matches_boot(&entry_b.boot_id));
-}
+    // ── fleet independence ───────────────────────────────────────────────────
 
-// ── restart identity ────────────────────────────────────────────────────────
+    #[test]
+    fn two_folders_boot_independently_into_one_fleet() {
+        let folder_a = TempDir::new().expect("folder a");
+        let folder_b = TempDir::new().expect("folder b");
+        let agents = TempDir::new().expect("agents");
 
-#[test]
-fn rebooting_a_folder_keeps_its_id_but_mints_a_fresh_identity() {
-    let folder = TempDir::new().expect("folder");
-    let agents = TempDir::new().expect("agents");
+        // Both agents are alive simultaneously — the lock is per-folder.
+        let a = boot_in(folder_a.path(), agents.path());
+        let b = boot_in(folder_b.path(), agents.path());
+        assert_distinct_identity(&a, &b);
 
-    let (id, first_boot_id, first_token) = {
-        let first = boot_in(folder.path(), agents.path());
-        (first.id().to_owned(), first.entry().boot_id.clone(), first.cap_token().to_owned())
-    }; // first drops here → lock released, registry + socket removed.
+        // Both records coexist in the fleet directory and round-trip independently.
+        let entry_a = read_entry(agents.path(), a.id());
+        let entry_b = read_entry(agents.path(), b.id());
+        assert_eq!(entry_a.id, a.id());
+        assert_eq!(entry_b.id, b.id());
 
-    // The deterministic id survives a restart…
-    let second = boot_in(folder.path(), agents.path());
-    assert_eq!(second.id(), id, "folder_id is deterministic across restarts");
+        // Both heartbeats are fresh and bound to their own boot.
+        assert!(read_beat(&entry_a.heartbeat_path).matches_boot(&entry_a.boot_id));
+        assert!(read_beat(&entry_b.heartbeat_path).matches_boot(&entry_b.boot_id));
+    }
 
-    // …but the secrets do not: a restart is a new identity to liveness, so a
-    // recycled pid carrying the *old* boot_id cannot masquerade as still-alive.
-    assert_ne!(second.entry().boot_id, first_boot_id, "a restart mints a fresh boot_id");
-    assert_ne!(second.cap_token(), first_token, "a restart mints a fresh cap_token");
+    // ── restart identity ─────────────────────────────────────────────────────
 
-    // Exactly the new record is on disk, and its beat matches the new boot.
-    let entry = read_entry(agents.path(), second.id());
-    assert_eq!(entry.boot_id, second.entry().boot_id);
-    assert!(read_beat(&entry.heartbeat_path).matches_boot(&entry.boot_id));
-}
+    #[test]
+    fn rebooting_a_folder_keeps_its_id_but_mints_a_fresh_identity() {
+        let folder = TempDir::new().expect("folder");
+        let agents = TempDir::new().expect("agents");
 
-// ── beacon-driven liveness verdict ──────────────────────────────────────────
+        let (id, first_boot_id, first_token) = {
+            let first = boot_in(folder.path(), agents.path());
+            (first.id().to_owned(), first.entry().boot_id.clone(), first.cap_token().to_owned())
+        }; // first drops here → lock released, registry + socket removed.
 
-#[test]
-fn a_real_beat_drives_the_freshness_and_boot_match_verdict() {
-    let folder = TempDir::new().expect("folder");
-    let agents = TempDir::new().expect("agents");
-    let booted = boot_in(folder.path(), agents.path());
-    let entry = read_entry(agents.path(), booted.id());
-    let beat = read_beat(&entry.heartbeat_path);
+        // The deterministic id survives a restart…
+        let second = boot_in(folder.path(), agents.path());
+        assert_eq!(second.id(), id, "folder_id is deterministic across restarts");
 
-    // Fresh against the real max-age now.
-    assert!(beat.is_fresh(now_ms(), default_max_age_ms()), "a just-written beat is fresh");
+        // …but the secrets do not: a restart is a new identity to liveness, so a
+        // recycled pid carrying the *old* boot_id cannot masquerade as still-alive.
+        assert_ne!(second.entry().boot_id, first_boot_id, "a restart mints a fresh boot_id");
+        assert_ne!(second.cap_token(), first_token, "a restart mints a fresh cap_token");
 
-    // Stale once the clock has advanced far past a tiny max-age: the verdict is
-    // age-driven, exactly how the backend ages out a silent agent.
-    let distant_future = beat.timestamp_ms.saturating_add(60_000);
-    assert!(!beat.is_fresh(distant_future, 10), "a beat 60s old fails a 10ms max-age");
+        // Exactly the new record is on disk, and its beat matches the new boot.
+        let entry = read_entry(agents.path(), second.id());
+        assert_eq!(entry.boot_id, second.entry().boot_id);
+        assert!(read_beat(&entry.heartbeat_path).matches_boot(&entry.boot_id));
+    }
 
-    // Bound to its own boot only — the pid-reuse defence.
-    assert!(beat.matches_boot(&entry.boot_id), "matches its own boot_id");
-    assert!(!beat.matches_boot("ffffffffffffffffffffffffffffffff"), "rejects a different boot_id");
+    // ── beacon-driven liveness verdict ───────────────────────────────────────
+
+    #[test]
+    fn a_real_beat_drives_the_freshness_and_boot_match_verdict() {
+        let folder = TempDir::new().expect("folder");
+        let agents = TempDir::new().expect("agents");
+        let booted = boot_in(folder.path(), agents.path());
+        let entry = read_entry(agents.path(), booted.id());
+        let beat = read_beat(&entry.heartbeat_path);
+
+        // Fresh against the real max-age now.
+        assert!(beat.is_fresh(now_ms(), default_max_age_ms()), "a just-written beat is fresh");
+
+        // Stale once the clock has advanced far past a tiny max-age: the verdict is
+        // age-driven, exactly how the backend ages out a silent agent.
+        let distant_future = beat.timestamp_ms.saturating_add(60_000);
+        assert!(!beat.is_fresh(distant_future, 10), "a beat 60s old fails a 10ms max-age");
+
+        // Bound to its own boot only — the pid-reuse defence.
+        assert!(beat.matches_boot(&entry.boot_id), "matches its own boot_id");
+        assert!(!beat.matches_boot("ffffffffffffffffffffffffffffffff"), "rejects a different boot_id");
+    }
 }

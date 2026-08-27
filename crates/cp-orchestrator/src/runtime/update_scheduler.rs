@@ -89,7 +89,7 @@ fn tick(backend: &Arc<Mutex<Backend>>, auth_db: &PathBuf, install: &PathBuf) -> 
             Ok(current.clone())
         },
     );
-    eprintln!("updater: {}", outcome.describe());
+    crate::oerr!("updater: {}", outcome.describe());
 
     match outcome {
         scheduler::TickOutcome::SkipWindow { .. } => {

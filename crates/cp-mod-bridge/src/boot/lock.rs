@@ -110,7 +110,7 @@ mod tests {
             let lock = acquire_lock(&holder_path, LOCK_RETRY_ATTEMPTS).expect("holder acquires");
             held_tx.send(()).expect("signal held");
             // Hold until told to release, then drop the lock.
-            let _ = release_rx.recv();
+            let _signal: Result<(), _> = release_rx.recv();
             drop(lock);
         });
 

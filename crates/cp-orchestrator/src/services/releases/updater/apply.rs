@@ -136,7 +136,7 @@ pub fn promote_committed(store: &mut ReleaseStore, _auth_db_path: &Path) -> Resu
     // just leaves the previous SPA in place until the next successful update.
     let web_symlink = std::env::var_os("CP_WEB_ROOT").map(PathBuf::from);
     if let Err(e) = promote_web(store, &pending.to, web_symlink.as_deref()) {
-        eprintln!("updater: web promote failed — front stays on the previous SPA: {e}");
+        crate::oerr!("updater: web promote failed — front stays on the previous SPA: {e}");
     }
 
     if let Some(backup) = &pending.db_backup {
@@ -183,9 +183,9 @@ pub fn boot_reconcile(releases_dir: &Path, auth_db_path: &Path, install: &Path) 
                         let _rm = std::fs::remove_file(PathBuf::from(os));
                     }
                     let _rm = std::fs::remove_file(backup);
-                    eprintln!("updater: rollback — auth.db restored from {}", backup.display());
+                    crate::oerr!("updater: rollback — auth.db restored from {}", backup.display());
                 }
-                Err(e) => eprintln!("updater: rollback db restore FAILED ({e}) — backup kept at {}", backup.display()),
+                Err(e) => crate::oerr!("updater: rollback db restore FAILED ({e}) — backup kept at {}", backup.display()),
             }
         }
     let _rm = std::fs::remove_file(&path);
@@ -194,7 +194,7 @@ pub fn boot_reconcile(releases_dir: &Path, auth_db_path: &Path, install: &Path) 
     st.last_result =
         Some(UpdateResult::RolledBack { to: pending.from.clone(), attempted: pending.to.clone(), at_ms: now_ms() });
     st.save(releases_dir);
-    eprintln!(
+    crate::oerr!(
         "updater: update to {} failed — rolled back to {}",
         pending.to,
         pending.from.as_deref().unwrap_or("(previous)")
@@ -216,7 +216,7 @@ pub fn restart_self(install: &Path) {
         std::thread::sleep(std::time::Duration::from_millis(200));
         let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
         let err = std::process::Command::new(&install).args(&args).exec();
-        eprintln!("updater: exec of {} failed: {err}; exiting for supervisor respawn", install.display());
+        crate::oerr!("updater: exec of {} failed: {err}; exiting for supervisor respawn", install.display());
         std::process::exit(1);
     });
 }

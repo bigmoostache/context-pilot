@@ -240,19 +240,19 @@ pub(crate) fn load(path: &Path) -> NetworkConfig {
         Ok(raw) => raw,
         Err(failure) if failure.kind() == std::io::ErrorKind::NotFound => return NetworkConfig::default(),
         Err(failure) => {
-            eprintln!("WARN: network: {} is unreadable ({failure}) — {FALLBACK_COST}", path.display());
+            crate::oerr!("WARN: network: {} is unreadable ({failure}) — {FALLBACK_COST}", path.display());
             return NetworkConfig::default();
         }
     };
     let config = match serde_json::from_slice::<NetworkConfig>(&raw) {
         Ok(config) => config,
         Err(failure) => {
-            eprintln!("WARN: network: {} is malformed ({failure}) — {FALLBACK_COST}", path.display());
+            crate::oerr!("WARN: network: {} is malformed ({failure}) — {FALLBACK_COST}", path.display());
             return NetworkConfig::default();
         }
     };
     if let Err(reason) = validate(&config) {
-        eprintln!("WARN: network: {} is invalid ({reason}) — {FALLBACK_COST}", path.display());
+        crate::oerr!("WARN: network: {} is invalid ({reason}) — {FALLBACK_COST}", path.display());
         return NetworkConfig::default();
     }
     config

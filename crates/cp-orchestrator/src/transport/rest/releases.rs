@@ -384,7 +384,7 @@ pub(crate) fn restart_orchestrator(state: &Mutex<Backend>) -> HttpReply {
                 match crate::services::releases::stage_orchestrator_update(install, &src) {
                     Ok(()) => updated_tag = Some(tag),
                     Err(e) => {
-                        eprintln!("restart_orchestrator: staging update {tag} failed: {e}; restarting current binary");
+                        crate::oerr!("restart_orchestrator: staging update {tag} failed: {e}; restarting current binary");
                     }
                 }
             }
@@ -401,9 +401,9 @@ pub(crate) fn restart_orchestrator(state: &Mutex<Backend>) -> HttpReply {
             // `exec` only ever returns on failure — on success it never comes
             // back because the process image is replaced.
             let err = std::process::Command::new(&exe).args(&args).exec();
-            eprintln!("restart_orchestrator: exec of {} failed: {err}; exiting for supervisor respawn", exe.display());
+            crate::oerr!("restart_orchestrator: exec of {} failed: {err}; exiting for supervisor respawn", exe.display());
         } else {
-            eprintln!("restart_orchestrator: current_exe() unavailable; exiting for supervisor respawn");
+            crate::oerr!("restart_orchestrator: current_exe() unavailable; exiting for supervisor respawn");
         }
 
         // Fallback: exit non-zero so the supervisor respawns us. A

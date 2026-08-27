@@ -432,3 +432,4 @@ exceptions:
       struct exists to avoid — so #[non_exhaustive] is impossible.
     strategy: >
       Irreducible — the exhaustive literal is the whole point; a ctor re-trips too_many_arguments.
+

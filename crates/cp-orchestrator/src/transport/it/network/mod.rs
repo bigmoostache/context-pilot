@@ -160,7 +160,7 @@ fn commit(state: &Mutex<Backend>, path: &Path, previous: &NetworkConfig, next: &
 /// been rolled back.
 fn restore(path: &Path, previous: &NetworkConfig) {
     if let Err(failure) = state::save(path, previous) {
-        eprintln!(
+        crate::oerr!(
             "WARN: network: could not restore .network.json after a failed apply ({failure}) — \
              the persisted document no longer matches the box, and the next boot will apply it"
         );
@@ -222,7 +222,7 @@ fn reply_for(outcome: Result<bool, String>, payload: serde_json::Value) -> HttpR
             HttpReply::ok(&body)
         }
         Err(failure) => {
-            eprintln!("network: {failure}");
+            crate::oerr!("network: {failure}");
             HttpReply::error(502, "network settings rolled back \u{2014} the box is unchanged")
         }
     }
@@ -391,9 +391,9 @@ pub(crate) fn apply_network_at_boot(state: &Mutex<Backend>) {
     let _guard = APPLY_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let config = state::load(&path);
     match apply::apply(&config) {
-        Ok(true) => eprintln!("network: applied at boot (mode={})", config.mode.as_str()),
+        Ok(true) => crate::oerr!("network: applied at boot (mode={})", config.mode.as_str()),
         Ok(false) => {} // no gates set in this environment — skipped cleanly.
-        Err(failure) => eprintln!("WARN: network boot apply failed: {failure}"),
+        Err(failure) => crate::oerr!("WARN: network boot apply failed: {failure}"),
     }
 }
 

@@ -109,8 +109,13 @@ fn snapshot_without_roster_field_decodes_to_empty() {
     assert!(snapshot.roster.is_empty(), "missing roster field defaults to empty");
 }
 
+/// The first roster entry, or a test failure — avoids `roster[0]` indexing.
+fn first(roster: &[RosterThread]) -> &RosterThread {
+    roster.first().expect("roster has at least one thread")
+}
+
 #[test]
-fn roster_fold_helpers_insert_update_and_accumulate() {
+fn roster_fold_created_is_idempotent_refresh() {
     let mut roster: Vec<RosterThread> = Vec::new();
     RosterThread::fold_created(
         &mut roster,
@@ -123,18 +128,27 @@ fn roster_fold_helpers_insert_update_and_accumulate() {
         ThreadCreation { thread_id: "T1", name: "Plan v2", status: ThreadTurn::MyTurn, timestamp_ms: 100 },
     );
     assert_eq!(roster.len(), 1, "duplicate creation folds idempotently");
-    assert_eq!(roster[0].name, "Plan v2");
-    assert_eq!(roster[0].status, ThreadTurn::MyTurn);
+    assert_eq!(first(&roster).name, "Plan v2");
+    assert_eq!(first(&roster).status, ThreadTurn::MyTurn);
+}
+
+#[test]
+fn roster_fold_message_and_archived_accumulate() {
+    let mut roster: Vec<RosterThread> = Vec::new();
+    RosterThread::fold_created(
+        &mut roster,
+        ThreadCreation { thread_id: "T1", name: "Plan", status: ThreadTurn::TheirTurn, timestamp_ms: 100 },
+    );
 
     RosterThread::fold_message(&mut roster, "T1", 250);
     RosterThread::fold_message(&mut roster, "T1", 400);
-    assert_eq!(roster[0].msg_count, 2);
-    assert_eq!(roster[0].last_activity_ms, 400, "activity tracks the latest message");
+    assert_eq!(first(&roster).msg_count, 2);
+    assert_eq!(first(&roster).last_activity_ms, 400, "activity tracks the latest message");
 
     RosterThread::fold_archived(&mut roster, "T1", true);
-    assert!(roster[0].archived);
+    assert!(first(&roster).archived);
     RosterThread::fold_archived(&mut roster, "T1", false);
-    assert!(!roster[0].archived);
+    assert!(!first(&roster).archived);
 
     // Folds for an unknown thread are no-ops, never a panic.
     RosterThread::fold_message(&mut roster, "T-absent", 999);

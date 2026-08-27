@@ -102,9 +102,9 @@ pub fn boot_check(install: &std::path::Path) {
         let bak = backup_path(install);
         if bak.exists() {
             if let Err(e) = std::fs::rename(&bak, install) {
-                eprintln!("self-update: rollback {} -> {} failed: {e}", bak.display(), install.display());
+                crate::oerr!("self-update: rollback {} -> {} failed: {e}", bak.display(), install.display());
             } else {
-                eprintln!(
+                crate::oerr!(
                     "self-update: staged orchestrator failed to boot {attempts}× — rolled back to previous binary"
                 );
             }
@@ -143,7 +143,7 @@ pub fn boot_commit_when_healthy<F>(
             return true;
         }
         if start.elapsed() >= deadline {
-            eprintln!(
+            crate::oerr!(
                 "self-update: staged update NOT committed — /healthz never returned 200 within {}s; \
                  leaving .pending so the boot-attempt guard can roll back",
                 deadline.as_secs()
@@ -164,5 +164,5 @@ pub fn boot_commit(install: &std::path::Path) {
     }
     let _rm_pending = std::fs::remove_file(&pending);
     let _rm_bak = std::fs::remove_file(backup_path(install));
-    eprintln!("self-update: orchestrator update committed (previous binary backup removed)");
+    crate::oerr!("self-update: orchestrator update committed (previous binary backup removed)");
 }

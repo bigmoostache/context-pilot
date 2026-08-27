@@ -133,9 +133,9 @@ pub(crate) fn apply_caddy_at_boot(state: &Mutex<Backend>) {
         Err(_) => return,
     };
     match super::caddy::write_config(provisioned, identity.as_ref(), &extra) {
-        Ok(true) => eprintln!("caddy: config written at boot (provisioned={provisioned})"),
+        Ok(true) => crate::oerr!("caddy: config written at boot (provisioned={provisioned})"),
         Ok(false) => {} // Caddy not configured in this environment — skipped.
-        Err(e) => eprintln!("WARN: caddy boot config write failed: {e}"),
+        Err(e) => crate::oerr!("WARN: caddy boot config write failed: {e}"),
     }
 }
 
@@ -180,7 +180,7 @@ pub(crate) fn set_identity(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     };
 
     if let Err(e) = save_identity(&path, &identity) {
-        eprintln!("identity: could not persist: {e}");
+        crate::oerr!("identity: could not persist: {e}");
         return HttpReply::error(500, "could not persist identity");
     }
 
@@ -188,7 +188,7 @@ pub(crate) fn set_identity(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     // (design §13.4). Best-effort: a flag-write failure is logged but does not
     // block the identity save; the caller can retry.
     if let Err(e) = super::state::set_provisioned(&flag_path, true) {
-        eprintln!("identity: could not persist provisioned flag: {e}");
+        crate::oerr!("identity: could not persist provisioned flag: {e}");
     }
 
     // Re-render + reload Caddy in provisioned mode so the leaf is re-issued for
@@ -198,7 +198,7 @@ pub(crate) fn set_identity(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     match super::caddy::regenerate(true, Some(&identity), &extra) {
         Ok(reloaded) => HttpReply::ok(&serde_json::json!({ "identity": identity, "reloaded": reloaded })),
         Err(e) => {
-            eprintln!("identity: caddy reload failed: {e}");
+            crate::oerr!("identity: caddy reload failed: {e}");
             HttpReply::error(502, "identity saved but the TLS reload failed")
         }
     }

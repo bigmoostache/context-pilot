@@ -115,7 +115,7 @@ pub fn create_agent(state: &Mutex<Backend>, body_bytes: &[u8], auth_user: Option
             )
         }
         Err(e) => {
-            eprintln!("create_agent spawn error: {e}");
+            crate::oerr!("create_agent spawn error: {e}");
             HttpReply::error(502, &format!("agent spawn failed: {e}"))
         }
     }

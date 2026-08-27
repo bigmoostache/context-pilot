@@ -100,7 +100,7 @@ fn hex_escape(bs: &[u8], i: usize, out: &mut Vec<u8>) -> usize {
         && i.saturating_add(3) < bs.len()
         && let (Some(h), Some(l)) = (hex_digit(hi), hex_digit(lo))
     {
-        out.push((h << 4) | l);
+        out.push((h << 4u8) | l);
         return i.saturating_add(4);
     }
     out.push(b'\\');

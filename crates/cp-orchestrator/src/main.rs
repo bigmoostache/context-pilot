@@ -42,11 +42,11 @@ fn main() {
     for arg in std::env::args().skip(1) {
         match arg.as_str() {
             "--version" | "-V" => {
-                println!("cp-orchestrator v{} (protocol v{})", env!("CARGO_PKG_VERSION"), cp_wire::PROTOCOL_VERSION);
+                cp_orchestrator::oout!("cp-orchestrator v{} (protocol v{})", env!("CARGO_PKG_VERSION"), cp_wire::PROTOCOL_VERSION);
                 return;
             }
             other => {
-                eprintln!("unknown argument: {other}");
+                cp_orchestrator::oerr!("unknown argument: {other}");
                 std::process::exit(2);
             }
         }
@@ -62,7 +62,7 @@ fn main() {
         let _global = dotenvy::from_path_override(&global_env).ok();
     }
 
-    eprintln!("cp-orchestrator v{} (protocol v{})", env!("CARGO_PKG_VERSION"), cp_wire::PROTOCOL_VERSION);
+    cp_orchestrator::oerr!("cp-orchestrator v{} (protocol v{})", env!("CARGO_PKG_VERSION"), cp_wire::PROTOCOL_VERSION);
 
     // Self-update guard. If a staged update replaced the binary on our install
     // path, a `.pending` marker is present. Account for this boot attempt
@@ -77,7 +77,7 @@ fn main() {
     let config = match Config::from_env() {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("configuration error: {e}");
+            cp_orchestrator::oerr!("configuration error: {e}");
             std::process::exit(1);
         }
     };
@@ -92,10 +92,10 @@ fn main() {
         cp_orchestrator::services::releases::updater::boot_reconcile(&releases_dir, &config.auth_db_path, install);
     }
 
-    eprintln!("agents directory: {}", config.agents_dir.display());
-    eprintln!("scan interval: {}ms", config.scan_interval.as_millis());
-    eprintln!("new-agent realm root: {}", config.agents_root.display());
-    eprintln!("agent binary: {}", config.agent_binary.display());
+    cp_orchestrator::oerr!("agents directory: {}", config.agents_dir.display());
+    cp_orchestrator::oerr!("scan interval: {}ms", config.scan_interval.as_millis());
+    cp_orchestrator::oerr!("new-agent realm root: {}", config.agents_root.display());
+    cp_orchestrator::oerr!("agent binary: {}", config.agent_binary.display());
 
     let runtime = Runtime::new(config);
     let _driver = runtime.start_driver();
@@ -116,7 +116,7 @@ fn main() {
     }
 
     if let Err(e) = runtime.serve() {
-        eprintln!("serve failed: {e}");
+        cp_orchestrator::oerr!("serve failed: {e}");
         std::process::exit(1);
     }
 }

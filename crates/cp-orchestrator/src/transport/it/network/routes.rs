@@ -176,7 +176,7 @@ pub(crate) fn apply_mode(tools: &Tools, config: &NetworkConfig) -> Result<(), St
         // modes that want it up, so NM brings it up by itself the moment the
         // device appears — which is why this is a note, not a failure.
         let verb = if wanted_up { "activation" } else { "deactivation" };
-        eprintln!("network: {WWAN_PROFILE} {verb} deferred to NetworkManager ({failure})");
+        crate::oerr!("network: {WWAN_PROFILE} {verb} deferred to NetworkManager ({failure})");
     }
     Ok(())
 }
@@ -197,7 +197,7 @@ pub(crate) fn apply_ap_activation(tools: &Tools, config: &NetworkConfig) -> Resu
     if let Err(failure) = set_active(&tools.nmcli, super::apply::AP_PROFILE, config.ap.enabled) {
         // Same reasoning as the bearer: an rfkilled or absent radio must not
         // roll back a legitimate setting.
-        eprintln!("network: {} (non-fatal): {failure}", super::apply::AP_PROFILE);
+        crate::oerr!("network: {} (non-fatal): {failure}", super::apply::AP_PROFILE);
     }
     let sharing = config.ap.enabled && config.ap.share_internet;
     if !sharing {

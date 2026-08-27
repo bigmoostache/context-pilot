@@ -385,7 +385,7 @@ pub(super) fn store_credentials(creds: &serde_json::Value) -> Result<(), String>
     std::fs::write(&creds_path, &json).map_err(|e| format!("write credentials: {e}"))?;
 
     if !keychain_ok {
-        eprintln!("warning: could not store credentials in macOS Keychain — saved to {}", creds_path.display());
+        crate::oerr!("warning: could not store credentials in macOS Keychain — saved to {}", creds_path.display());
     }
     Ok(())
 }

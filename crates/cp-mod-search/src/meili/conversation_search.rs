@@ -179,10 +179,7 @@ mod tests {
     fn only_hit(json: &serde_json::Value) -> ConvHit {
         let hits = parse_hits(json);
         assert_eq!(hits.len(), 1, "expected exactly one parsed hit");
-        let Some(hit) = hits.into_iter().next() else {
-            unreachable!("len checked above");
-        };
-        hit
+        hits.into_iter().next().expect("len checked above")
     }
 
     #[test]
@@ -241,7 +238,7 @@ mod tests {
         let out = dedupe_by_thread(hits, 10);
         let ids: Vec<&str> = out.iter().map(|h| h.thread_id.as_str()).collect();
         assert_eq!(ids, vec!["T1", "T2", "T3"]);
-        assert_eq!(out[0].text, "best", "kept the first (best-scored) T1 message");
+        assert_eq!(out.first().expect("non-empty").text, "best", "kept the first (best-scored) T1 message");
     }
 
     #[test]

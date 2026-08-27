@@ -268,7 +268,7 @@ pub(super) fn coerce_mode(requested: &NetworkConfig, has_modem: bool) -> Cow<'_,
     if matches!(requested.mode, UplinkMode::Wan) || has_modem {
         return Cow::Borrowed(requested);
     }
-    eprintln!(
+    crate::oerr!(
         "WARN: network: mode `{}` requires a 5G modem and this box has none — applying `wan` instead, \
          routing over {}. The document is unchanged.",
         requested.mode.as_str(),
@@ -312,7 +312,7 @@ fn apply_regdom(tools: &Tools, config: &NetworkConfig) {
     }
     if let Some(regdom) = tools.regdom.as_ref() {
         if let Err(failure) = run(regdom, std::slice::from_ref(&config.ap.country)) {
-            eprintln!("network: cp-regdom {} failed (non-fatal): {failure}", config.ap.country);
+            crate::oerr!("network: cp-regdom {} failed (non-fatal): {failure}", config.ap.country);
         }
         return;
     }
@@ -320,7 +320,7 @@ fn apply_regdom(tools: &Tools, config: &NetworkConfig) {
         return;
     };
     if let Err(failure) = run(iw_bin, &["reg".to_owned(), "set".to_owned(), config.ap.country.clone()]) {
-        eprintln!("network: iw reg set {} failed (non-fatal): {failure}", config.ap.country);
+        crate::oerr!("network: iw reg set {} failed (non-fatal): {failure}", config.ap.country);
     }
 }
 

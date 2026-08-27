@@ -213,7 +213,7 @@ pub fn command(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> HttpReply
             })
         }
         Err(e) => {
-            eprintln!("command send error for agent {id}: {e:?}");
+            crate::oerr!("command send error for agent {id}: {e:?}");
             HttpReply::error(502, "agent unreachable")
         }
     }

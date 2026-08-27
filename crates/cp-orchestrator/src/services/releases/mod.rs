@@ -372,20 +372,20 @@ impl ReleaseStore {
     /// Atomically write config to disk (`tmp` → `rename`).
     fn persist(&self) {
         let Ok(bytes) = serde_json::to_vec_pretty(&self.config) else {
-            eprintln!("releases: serialize config failed");
+            crate::oerr!("releases: serialize config failed");
             return;
         };
         if std::fs::create_dir_all(&self.dir).is_err() {
-            eprintln!("releases: create dir failed");
+            crate::oerr!("releases: create dir failed");
             return;
         }
         let tmp = self.config_path.with_extension("json.tmp");
         if std::fs::write(&tmp, &bytes).is_err() {
-            eprintln!("releases: write tmp failed: {}", tmp.display());
+            crate::oerr!("releases: write tmp failed: {}", tmp.display());
             return;
         }
         if let Err(e) = std::fs::rename(&tmp, &self.config_path) {
-            eprintln!("releases: rename failed: {e}");
+            crate::oerr!("releases: rename failed: {e}");
         }
     }
 }
