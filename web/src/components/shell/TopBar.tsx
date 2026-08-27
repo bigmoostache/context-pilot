@@ -52,9 +52,8 @@ interface TopBarProps {
 }
 
 /** Slim macOS-style side rail — app mark (→ fleet), workspace switcher,
- *  per-agent view tabs (Threads · Finder), theme, usage, account. Vertical:
- *  it hugs the left edge of the window, full height, chrome stacked top to
- *  bottom with the account cluster pinned to the floor. */
+ *  per-agent view tabs (Threads · Finder), theme, usage, account. Vertical: it
+ *  hugs the window's left edge, full height, account cluster pinned to the floor. */
 export function TopBar({
   view,
   onViewChange,
@@ -82,15 +81,17 @@ export function TopBar({
   const [profileOpen, setProfileOpen] = useState(false)
   const [usersOpen, setUsersOpen] = useState(false)
 
+  // ⌘/Ctrl+A opens the workspace switcher (T646) via its CONTROLLED `open`
+  // state (a synthetic click won't open a base-ui menu); `modHeld` reveals the
+  // "A" HintBadge. `a` yields while a field holds text, fires when it's empty.
+  const [switcherOpen, setSwitcherOpen] = useState(false)
+  const switcherModHeld = useModifierShortcuts({ a: () => setSwitcherOpen(true) })
+
   return (
     <>
-      {/* No border, no fill: the rail sits directly on `--background`. It used
-          to carry `.vibrancy` (translucent `--surface` + backdrop blur) and a
-          `border-r`; both gone, so it reads as bare chrome, not a panel —
-          nothing is painted behind it, so the dropped backdrop-filter costs no
-          depth and removes the containing block it created. `p-2` insets all
-          four sides (horizontal-only left the top/bottom controls flush — too
-          tight); `gap-3` is separate: rhythm BETWEEN items, not an edge inset. */}
+      {/* No border, no fill: the rail sits directly on `--background` (the old
+          `.vibrancy` + `border-r` are gone). `p-2` insets all four sides;
+          `gap-3` is separate rhythm BETWEEN items, not an edge inset. */}
       <header className="flex w-14 shrink-0 flex-col items-center gap-3 p-2">
         <Tip
           title="Workspace"
@@ -99,6 +100,10 @@ export function TopBar({
         >
           <AgentSwitcher
             rail
+            open={switcherOpen}
+            onOpenChange={setSwitcherOpen}
+            shortcutHint="A"
+            hintShown={switcherModHeld}
             agents={agents}
             activeId={inFleet ? undefined : activeAgentId}
             onManageAgents={() => onViewChange("fleet")}
@@ -170,8 +175,6 @@ function TopBarActions({
           <ThemeToggle vertical />
         </span>
       </Tip>
-      {/* The old hairline separator was a `--border` token — gone with the
-          rail's other borders; the `gap-3` stack separates the clusters now. */}
       {isClaudeOAuth && <UsageButton />}
       <Tip title="Account" body="Your profile, app settings, and sign-out." side="right">
         <UserMenu
