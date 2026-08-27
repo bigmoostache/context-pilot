@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useState } from "react"
 import {
   MessagesSquare,
   FolderTree,
@@ -52,9 +52,8 @@ interface TopBarProps {
 }
 
 /** Slim macOS-style side rail — app mark (→ fleet), workspace switcher,
- *  per-agent view tabs (Threads · Finder), theme, usage, account. Vertical:
- *  it hugs the left edge of the window, full height, chrome stacked top to
- *  bottom with the account cluster pinned to the floor. */
+ *  per-agent view tabs (Threads · Finder), theme, usage, account. Vertical: it
+ *  hugs the window's left edge, full height, account cluster pinned to the floor. */
 export function TopBar({
   view,
   onViewChange,
@@ -82,19 +81,17 @@ export function TopBar({
   const [profileOpen, setProfileOpen] = useState(false)
   const [usersOpen, setUsersOpen] = useState(false)
 
-  // ⌘/Ctrl+A opens the workspace switcher (T646): the ref lets the shortcut
-  // click the dropdown trigger, so key and click are one action. The `a`
-  // binding yields inside text fields (selectAllWouldBeNoop), so Select-All is
-  // never stolen; bound in the always-mounted bar so it works from every view.
-  const switcherRef = useRef<HTMLButtonElement>(null)
-  useModifierShortcuts({ a: () => switcherRef.current?.click() })
+  // ⌘/Ctrl+A opens the workspace switcher (T646) via its CONTROLLED `open`
+  // state (a synthetic click won't open a base-ui menu); `modHeld` reveals the
+  // "A" HintBadge. `a` yields while a field holds text, fires when it's empty.
+  const [switcherOpen, setSwitcherOpen] = useState(false)
+  const switcherModHeld = useModifierShortcuts({ a: () => setSwitcherOpen(true) })
 
   return (
     <>
       {/* No border, no fill: the rail sits directly on `--background` (the old
-          `.vibrancy` + `border-r` are gone, so nothing is painted behind it and
-          the dropped backdrop-filter costs no depth). `p-2` insets all four
-          sides; `gap-3` is separate rhythm BETWEEN items, not an edge inset. */}
+          `.vibrancy` + `border-r` are gone). `p-2` insets all four sides;
+          `gap-3` is separate rhythm BETWEEN items, not an edge inset. */}
       <header className="flex w-14 shrink-0 flex-col items-center gap-3 p-2">
         <Tip
           title="Workspace"
@@ -103,7 +100,10 @@ export function TopBar({
         >
           <AgentSwitcher
             rail
-            triggerRef={switcherRef}
+            open={switcherOpen}
+            onOpenChange={setSwitcherOpen}
+            shortcutHint="A"
+            hintShown={switcherModHeld}
             agents={agents}
             activeId={inFleet ? undefined : activeAgentId}
             onManageAgents={() => onViewChange("fleet")}

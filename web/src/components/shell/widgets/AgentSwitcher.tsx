@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { accentVar } from "@/lib/support/panelMeta"
 import { avatarUrl } from "@/lib/api"
+import { HintBadge } from "../chrome/HintBadge"
 import type { Agent, AgentStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -45,7 +46,10 @@ export function AgentSwitcher({
   onSwitch,
   onManageAgents,
   rail = false,
-  triggerRef,
+  open,
+  onOpenChange,
+  shortcutHint,
+  hintShown,
 }: {
   agents: Agent[]
   activeId?: string | undefined
@@ -58,19 +62,24 @@ export function AgentSwitcher({
    *  to go — and truncating a name to three letters conveys less than the
    *  avatar already does. The menu itself is unchanged. */
   rail?: boolean
-  /** Ref onto the dropdown trigger button, so an ancestor can open the menu
-   *  programmatically — the ⌘/Ctrl+A workspace shortcut clicks it (T646). */
-  triggerRef?: React.Ref<HTMLButtonElement> | undefined
+  /** Controlled open state — supply BOTH to let an ancestor open/close the menu
+   *  (the ⌘/Ctrl+A workspace shortcut sets `open` true, T646). Omit both to keep
+   *  the menu uncontrolled (its own trigger drives it). */
+  open?: boolean | undefined
+  onOpenChange?: ((v: boolean) => void) | undefined
+  /** The shortcut letter to badge on the trigger while ⌘/Ctrl is held — the
+   *  exact ViewTabs idiom. Pass together with {@link hintShown}. */
+  shortcutHint?: string | undefined
+  hintShown?: boolean | undefined
 }) {
   const active = agents.find((a) => a.id === activeId)
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger
-        ref={triggerRef}
         aria-label={active ? `Workspace: ${active.name}` : "Select an agent"}
         className={cn(
-          "flex h-8 items-center gap-2 rounded-lg px-1.5 text-left transition-colors outline-none",
+          "relative flex h-8 items-center gap-2 rounded-lg px-1.5 text-left transition-colors outline-none",
           // Exact same hover as a threads-sidebar row (T676): soft card lift.
           "hover:card-shadow hover:bg-card",
         )}
@@ -81,6 +90,7 @@ export function AgentSwitcher({
             Threads/Finder/Cockpit view-toggle pill group (also `h-8`).
             In `rail` mode only the glyph survives — see the prop's doc. */}
         <TriggerFace active={active} rail={rail} />
+        {shortcutHint && <HintBadge label={shortcutHint} shown={hintShown ?? false} />}
       </DropdownMenuTrigger>
 
       <DropdownMenuContent

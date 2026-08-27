@@ -72,9 +72,9 @@ export function clickable(onActivate: () => void): {
  *    {@link selectAllWouldBeNoop}), so a real copy or select-all is never
  *    stolen. For `c` the test is on the SELECTION, not on focus: a caret in a
  *    text box with nothing highlighted copies nothing, so the shortcut still
- *    works there. For `a` the test IS on focus — a caret in an editable field
- *    is exactly where select-all is expected, so the letter yields there and is
- *    free everywhere else. Letters with no such conflict are bound
+ *    works there. For `a` the test is on CONTENT: it yields while a field holds
+ *    text (⌘A selects it) but fires in an EMPTY field (nothing to select) and
+ *    everywhere outside a field. Letters with no such conflict are bound
  *    unconditionally.
  *
  * @param actions Lowercase letter → what ⌘/Ctrl + that letter should do.
@@ -228,20 +228,30 @@ function copyWouldBeNoop(): boolean {
 }
 
 /**
- * Whether ⌘/Ctrl+A at this moment would select NOTHING meaningful — the only
- * case in which the combination is safe to repurpose.
+ * Whether ⌘/Ctrl+A at this moment would select NOTHING — the only case in
+ * which the combination is safe to repurpose.
  *
  * Select-All is expected in exactly one place: an editable field (input,
- * textarea, or contenteditable), where it highlights that field's text. Focus
- * anywhere else and ⌘/Ctrl+A would select the whole page — an action almost no
- * one intends — so the shortcut is free to claim it. The test is on FOCUS, not
- * on the current selection: an empty text field still expects select-all to arm
- * a following copy/replace, so the letter must yield there even with nothing
- * highlighted (the mirror-image of {@link copyWouldBeNoop}, which tests the
- * selection precisely because an empty field has nothing to copy).
+ * textarea, or contenteditable) THAT HAS CONTENT, where it highlights that
+ * field's text. So the test is on CONTENT, not merely on focus: a caret parked
+ * in an EMPTY composer has nothing to select — native Select-All is itself a
+ * no-op there — so the letter is free to claim it and open the switcher (T646).
+ * The moment the field holds any text, ⌘/Ctrl+A means "select it" and the
+ * shortcut yields.
+ *
+ * This mirrors {@link copyWouldBeNoop} closely — both fire only when the field
+ * is empty of a target — but they differ on WHAT counts: copy tests the current
+ * SELECTION (a caret amid text with nothing highlighted copies nothing), while
+ * select-all tests whether the field has ANY content at all (text with no
+ * selection is still select-all's target, so it must yield).
  */
 function selectAllWouldBeNoop(): boolean {
   const el = document.activeElement
-  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return false
-  return !(el instanceof HTMLElement && el.isContentEditable)
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+    return el.value === ""
+  }
+  if (el instanceof HTMLElement && el.isContentEditable) {
+    return el.textContent === ""
+  }
+  return true
 }
