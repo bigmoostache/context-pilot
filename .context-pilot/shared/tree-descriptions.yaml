@@ -18662,6 +18662,10 @@ d3b0432ae34befdb:
   path: crates/cp-mod-github/Cargo.toml
   description: 'GitHub module deps: cp-base, cp-render, crossterm, regex, cp-mod-utilities, serde_json.'
   last_edited_ms: 1780565754913
+d3b13cacc6344388:
+  path: web/src/components/threads/forms/FormFields.tsx
+  description: '8 form field input renderers: single+allow-other, multi, text, number, date, toggle, confirm+confirm-word, files (immediate upload). FieldInput dispatcher. T643: effect-free. T644 FIREFOX BLANK FIX: option radio/checkbox inputs no longer `sr-only` (off-screen absolute) — now `absolute size-0 opacity-0` inside a `relative` label so focus lands ON-SCREEN. sr-only inputs, when focused on click, made Firefox scroll-into-view the ~100k-px conversation scroller to the off-screen input, blanking <main>. ''Other…'' never blanked because selecting it autoFocuses its visible textarea (on-screen), which is the clue that pinned focus-location as the cause.'
+  last_edited_ms: 1787824140780
 d3b2da2605f40d13:
   path: crates/cp-orchestrator/src/services/auth/store.rs
   description: AuthStore — SQLite-backed auth CRUD. Schema init (users/sessions/agent_acl), Argon2id hashing, token/UUID generation. User CRUD, session lifecycle (create/validate→Option<User>/revoke with lazy sweep), ACL operations (grant/revoke/update_role/check/list_agent_users/list_user_agents/is_agent_admin). revoke_all_sessions + auto_grant_creator removed (dead code, re-add when wired). 18 tests in sibling tests.rs.
@@ -18822,6 +18826,10 @@ d53ff2aeb1705956:
   path: crates/cp-orchestrator/tests/end_to_end.rs
   description: Phase 30 end-to-end loopback capstone (3 tests). Backend::new takes 6 args (auth=None, session_ttl). Real agent stack ↔ real backend transport over real sockets. Command journals on agent and re-emerges as SSE delta. Spilled body hydrates over REST. 25 SSE connect/disconnect soak cycles.
   last_edited_ms: 0
+d550ba6d1c0f2aff:
+  path: web/src/mobile-components/threads/forms/FormFields.tsx
+  description: 'Mobile FormFields twin — 8 field renderers, 16px SCALAR_INPUT (iOS no-zoom), OptionGroup grouped-inset rows (≥44px tap), mobile ui/calendar+popover. T643: effect-free. T644: option inputs `absolute size-0 opacity-0` in a `relative` label (not sr-only) so focus stays on-screen — mirrors desktop Firefox blank fix. Field logic byte-identical to desktop.'
+  last_edited_ms: 1787824140877
 d550eeb5d1521536:
   path: .context-pilot/shared/memories.yaml
   description: Agent-managed memory store (auto-synced from live state). Merge conflicts here are last_edited_ms churn only — resolve keeping real timestamps, preserve unique entries both sides.

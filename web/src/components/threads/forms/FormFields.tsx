@@ -61,11 +61,25 @@ function OptionRow({
 }) {
   return (
     <label
-      className={`group flex cursor-pointer items-start gap-2.5 rounded-md px-2 py-1.5 text-[13px] transition-colors ${
+      className={`group relative flex cursor-pointer items-start gap-2.5 rounded-md px-2 py-1.5 text-[13px] transition-colors ${
         on ? "bg-(--signal)/6" : "hover:bg-muted/40"
       } ${disabled ? "pointer-events-none opacity-60" : ""}`}
     >
-      <input type={kind} checked={on} disabled={disabled} onChange={onPick} className="sr-only" />
+      {/* Positioned AT the label (parent is `relative`), size-0 + opacity-0 —
+          invisible but IN VIEW. A Tailwind `sr-only` input is
+          `position:absolute` with no local positioned ancestor, so it resolves
+          against a far-up ancestor; clicking the label focuses that off-screen
+          input and Firefox scroll-into-views the ~100k-px conversation scroller
+          to it, painting <main> blank (T644). Keeping focus on-screen fixes it.
+          Selecting an allow-other option instead autoFocuses its visible
+          textarea, which is why "Other…" never blanked. */}
+      <input
+        type={kind}
+        checked={on}
+        disabled={disabled}
+        onChange={onPick}
+        className="absolute top-0 left-0 size-0 opacity-0"
+      />
       <span
         className={`mt-0.5 flex size-4 shrink-0 items-center justify-center border transition-colors ${
           kind === "radio" ? "rounded-full" : "rounded-sm"
@@ -111,7 +125,7 @@ function SingleField({ field, value, onChange, disabled }: FieldProps) {
       ))}
       {field.allowOther === true && (
         <label
-          className={`group flex cursor-pointer items-start gap-2.5 rounded-md px-2 py-1.5 text-[13px] transition-colors ${
+          className={`group relative flex cursor-pointer items-start gap-2.5 rounded-md px-2 py-1.5 text-[13px] transition-colors ${
             isOther ? "bg-(--signal)/6" : "hover:bg-muted/40"
           } ${disabled ? "pointer-events-none opacity-60" : ""}`}
         >
@@ -120,7 +134,7 @@ function SingleField({ field, value, onChange, disabled }: FieldProps) {
             checked={isOther}
             disabled={disabled}
             onChange={() => onChange(" ")}
-            className="sr-only"
+            className="absolute top-0 left-0 size-0 opacity-0"
           />
           <span
             className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border transition-colors ${isOther ? "border-(--signal) bg-(--signal) text-(--primary-foreground)" : "border-border/80 bg-background"}`}

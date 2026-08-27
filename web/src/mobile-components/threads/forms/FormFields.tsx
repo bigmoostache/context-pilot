@@ -76,11 +76,21 @@ function OptionRow({
 }) {
   return (
     <label
-      className={`group flex cursor-pointer items-start gap-3 px-3.5 py-3 text-[14px] transition-colors ${
+      className={`group relative flex cursor-pointer items-start gap-3 px-3.5 py-3 text-[14px] transition-colors ${
         on ? "bg-(--signal)/8" : "active:bg-muted/40"
       } ${disabled ? "pointer-events-none opacity-60" : ""}`}
     >
-      <input type={kind} checked={on} disabled={disabled} onChange={onPick} className="sr-only" />
+      {/* size-0 + opacity-0 at the (relative) label keeps focus ON-SCREEN.
+          A Tailwind `sr-only` input is off-screen absolute, so focusing it on
+          click makes Firefox scroll-into-view the huge conversation scroller,
+          blanking <main> (T644). Mirrors the desktop twin. */}
+      <input
+        type={kind}
+        checked={on}
+        disabled={disabled}
+        onChange={onPick}
+        className="absolute top-0 left-0 size-0 opacity-0"
+      />
       <span
         className={`mt-0.5 flex size-[18px] shrink-0 items-center justify-center border transition-colors ${
           kind === "radio" ? "rounded-full" : "rounded-md"
@@ -123,7 +133,7 @@ function SingleField({ field, value, onChange, disabled }: FieldProps) {
       ))}
       {field.allowOther === true && (
         <label
-          className={`group flex cursor-pointer items-start gap-3 px-3.5 py-3 text-[14px] transition-colors ${
+          className={`group relative flex cursor-pointer items-start gap-3 px-3.5 py-3 text-[14px] transition-colors ${
             isOther ? "bg-(--signal)/8" : "active:bg-muted/40"
           } ${disabled ? "pointer-events-none opacity-60" : ""}`}
         >
@@ -132,7 +142,7 @@ function SingleField({ field, value, onChange, disabled }: FieldProps) {
             checked={isOther}
             disabled={disabled}
             onChange={() => onChange(" ")}
-            className="sr-only"
+            className="absolute top-0 left-0 size-0 opacity-0"
           />
           <span
             className={`mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-full border transition-colors ${isOther ? "border-(--signal) bg-(--signal) text-(--primary-foreground)" : "border-border/80 bg-background"}`}
