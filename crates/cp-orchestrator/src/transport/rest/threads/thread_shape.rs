@@ -27,16 +27,16 @@ pub(crate) fn overlay_roster(details: &mut Vec<serde_json::Value>, roster: &[Ros
         match existing {
             Some(detail) => {
                 if let Some(obj) = detail.as_object_mut() {
-                    let _prev = obj.insert("status".to_owned(), roster_status_value(entry.status));
-                    let _prev = obj.insert("archived".to_owned(), serde_json::Value::Bool(entry.archived));
-                    let _prev = obj.insert("paused".to_owned(), serde_json::Value::Bool(entry.paused));
+                    drop(obj.insert("status".to_owned(), roster_status_value(entry.status)));
+                    drop(obj.insert("archived".to_owned(), serde_json::Value::Bool(entry.archived)));
+                    drop(obj.insert("paused".to_owned(), serde_json::Value::Bool(entry.paused)));
                     // Activity is the later of the two: disk has real message
                     // timestamps; the view bumps on creation/restore.
                     let disk_activity = obj.get("lastActivity").and_then(serde_json::Value::as_u64).unwrap_or(0);
-                    let _prev = obj.insert(
+                    drop(obj.insert(
                         "lastActivity".to_owned(),
                         serde_json::Value::from(disk_activity.max(entry.last_activity_ms)),
-                    );
+                    ));
                 }
             }
             None => details.push(synthesize_from_roster(entry, agent_id)),
@@ -65,7 +65,7 @@ fn synthesize_from_roster(entry: &RosterEntry, agent_id: &str) -> serde_json::Va
 fn roster_status_value(status: ThreadTurn) -> serde_json::Value {
     let s = match status {
         ThreadTurn::MyTurn => "MY_TURN",
-        _ => "THEIR_TURN",
+        ThreadTurn::TheirTurn | ThreadTurn::Unknown => "THEIR_TURN",
     };
     serde_json::Value::String(s.to_owned())
 }
@@ -126,11 +126,10 @@ fn reshape_message(raw: &serde_json::Value, index: usize) -> serde_json::Value {
         "ts": raw.get("timestamp").and_then(serde_json::Value::as_u64).unwrap_or(0),
         "auto": raw.get("auto").and_then(serde_json::Value::as_bool).unwrap_or(false),
     });
-    if let Some(fp) = raw.get("file_path").and_then(serde_json::Value::as_str) {
-        let _prev = msg
-            .as_object_mut()
-            .expect("just built")
-            .insert("fileRef".to_owned(), serde_json::Value::String(fp.to_owned()));
+    if let Some(fp) = raw.get("file_path").and_then(serde_json::Value::as_str)
+        && let Some(obj) = msg.as_object_mut()
+    {
+        drop(obj.insert("fileRef".to_owned(), serde_json::Value::String(fp.to_owned())));
     }
     msg
 }
@@ -139,6 +138,28 @@ fn reshape_message(raw: &serde_json::Value, index: usize) -> serde_json::Value {
 mod tests {
     use super::*;
 
+    /// Read a string field without indexing (`indexing_slicing` is forbid, even
+    /// in tests); `None` when absent or not a string.
+    fn str_at<'val>(v: &'val serde_json::Value, key: &str) -> Option<&'val str> {
+        v.get(key).and_then(serde_json::Value::as_str)
+    }
+
+    /// Read a `u64` field without indexing; `Some(u64)` keeps the compared
+    /// literal typed, so `default_numeric_fallback` never fires.
+    fn u64_at(v: &serde_json::Value, key: &str) -> Option<u64> {
+        v.get(key).and_then(serde_json::Value::as_u64)
+    }
+
+    /// Read a bool field without indexing.
+    fn bool_at(v: &serde_json::Value, key: &str) -> Option<bool> {
+        v.get(key).and_then(serde_json::Value::as_bool)
+    }
+
+    /// Read an array field without indexing.
+    fn arr_at<'val>(v: &'val serde_json::Value, key: &str) -> Option<&'val Vec<serde_json::Value>> {
+        v.get(key).and_then(serde_json::Value::as_array)
+    }
+
     #[test]
     fn overlay_synthesises_view_only_thread() {
         // A thread present in the roster but absent on disk is appended with an
@@ -146,14 +167,13 @@ mod tests {
         let mut details: Vec<serde_json::Value> = Vec::new();
         let roster = [RosterEntry::builder("T9", "fresh", ThreadTurn::TheirTurn).last_activity_ms(4_242).build()];
         overlay_roster(&mut details, &roster, "a1");
-        assert_eq!(details.len(), 1);
-        let d = &details[0];
-        assert_eq!(d["id"], "T9");
-        assert_eq!(d["name"], "fresh");
-        assert_eq!(d["status"], "THEIR_TURN");
-        assert_eq!(d["agentId"], "a1");
-        assert_eq!(d["lastActivity"], 4_242);
-        assert!(d["log"].as_array().expect("log array").is_empty());
+        let d = details.first().expect("one synthesised detail");
+        assert_eq!(str_at(d, "id"), Some("T9"));
+        assert_eq!(str_at(d, "name"), Some("fresh"));
+        assert_eq!(str_at(d, "status"), Some("THEIR_TURN"));
+        assert_eq!(str_at(d, "agentId"), Some("a1"));
+        assert_eq!(u64_at(d, "lastActivity"), Some(4_242));
+        assert_eq!(arr_at(d, "log").map(Vec::len), Some(0), "empty log");
     }
 
     #[test]
@@ -175,12 +195,11 @@ mod tests {
             .msg_count(1)
             .build()];
         overlay_roster(&mut details, &roster, "a1");
-        assert_eq!(details.len(), 1, "no duplicate appended for a matched thread");
-        let d = &details[0];
-        assert_eq!(d["status"], "MY_TURN", "status refreshed from the view");
-        assert_eq!(d["archived"], true, "archived refreshed from the view");
-        assert_eq!(d["lastActivity"], 500, "activity is the later of disk/view");
-        assert_eq!(d["log"].as_array().expect("log").len(), 1, "disk log preserved");
+        let d = details.first().expect("no duplicate appended for a matched thread");
+        assert_eq!(str_at(d, "status"), Some("MY_TURN"), "status refreshed from the view");
+        assert_eq!(bool_at(d, "archived"), Some(true), "archived refreshed from the view");
+        assert_eq!(u64_at(d, "lastActivity"), Some(500), "activity is the later of disk/view");
+        assert_eq!(arr_at(d, "log").map(Vec::len), Some(1), "disk log preserved");
     }
 
     #[test]
@@ -196,14 +215,21 @@ mod tests {
             ],
         });
         let d = reshape_thread(&raw, "a1");
-        assert_eq!(d["id"], "T1");
-        assert_eq!(d["status"], "MY_TURN");
-        assert_eq!(d["messageCount"], 2);
-        assert_eq!(d["unread"], 1, "one unacknowledged message");
-        assert_eq!(d["lastMessage"], "yo");
-        assert_eq!(d["lastActivity"], 20);
-        let log = d["log"].as_array().expect("log");
-        assert_eq!(log[0]["author"], "user");
-        assert_eq!(log[1]["author"], "assistant");
+        assert_eq!(str_at(&d, "id"), Some("T1"));
+        assert_eq!(str_at(&d, "status"), Some("MY_TURN"));
+        assert_eq!(u64_at(&d, "messageCount"), Some(2));
+        assert_eq!(u64_at(&d, "unread"), Some(1), "one unacknowledged message");
+        assert_eq!(str_at(&d, "lastMessage"), Some("yo"));
+        assert_eq!(u64_at(&d, "lastActivity"), Some(20));
+        assert_log_roles(&d);
+    }
+
+    /// The two log entries map `User`/`Assistant` to `user`/`assistant` roles —
+    /// factored out of the test body so the closures don't inflate its
+    /// cognitive complexity past the strict threshold.
+    fn assert_log_roles(d: &serde_json::Value) {
+        let log = arr_at(d, "log").expect("log array");
+        assert_eq!(log.first().and_then(|m| str_at(m, "author")), Some("user"));
+        assert_eq!(log.get(1).and_then(|m| str_at(m, "author")), Some("assistant"));
     }
 }
