@@ -250,6 +250,63 @@ function FileChipBody({
 }
 
 /**
+ * The currently-attached `/command`, shown as a distinct chip in the composer
+ * bubble row (T654). Its prompt is prepended to the message when the user sends,
+ * so the tooltip explains that plainly (non-technical). Carries a discrete edit
+ * button (opens the command editor, only ever shown for the attached command)
+ * and an X to remove the attachment.
+ */
+function AttachedCommandChip({
+  command,
+  onEdit,
+  onDetach,
+}: {
+  command: CommandSuggestion
+  onEdit?: ((s: CommandSuggestion) => void) | undefined
+  onDetach?: (() => void) | undefined
+}) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Tip
+        title={command.command}
+        body="Added to the front of your message when you send. Remove it with ✕."
+      >
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-(--signal)/50 bg-(--signal)/10 px-2.5 py-1 text-[11.5px] text-foreground/80">
+          <span className="font-mono font-medium text-(--signal)">{command.command}</span>
+        </span>
+      </Tip>
+      {onEdit && (
+        <Tip
+          title="Edit command"
+          body="Edit this command. Its prompt is what gets added to the front of your message on send."
+        >
+          <button
+            type="button"
+            onClick={() => onEdit(command)}
+            aria-label={`Edit ${command.command}`}
+            className="flex items-center justify-center rounded-full p-1 text-muted-foreground/50 transition-colors hover:text-(--signal)"
+          >
+            <Pencil className="size-3" />
+          </button>
+        </Tip>
+      )}
+      {onDetach && (
+        <Tip title="Remove command" body="Detach this command — it won't prefix your message.">
+          <button
+            type="button"
+            onClick={onDetach}
+            aria-label={`Remove ${command.command}`}
+            className="flex items-center justify-center rounded-full p-1 text-muted-foreground/50 transition-colors hover:text-destructive"
+          >
+            <X className="size-3" strokeWidth={2.5} />
+          </button>
+        </Tip>
+      )}
+    </span>
+  )
+}
+
+/**
  * The composer's unified bubble row — the SINGLE abstraction shared by the two
  * pill families that sit between the conversation and the textarea: staged
  * file-upload chips and `/command` suggestion bubbles (+ the create-command
@@ -272,6 +329,8 @@ export function ComposerBubbles({
   onRemoveFile,
   suggestions = [],
   onPick,
+  attachedCommand = null,
+  onDetachCommand,
   onCreateCommand,
   onEditCommand,
 }: {
@@ -281,11 +340,15 @@ export function ComposerBubbles({
   onRemoveFile?: ((index: number) => void) | undefined
   /** `/command` suggestions to offer (empty unless in slash / first-message mode) */
   suggestions?: CommandSuggestion[] | undefined
-  /** seed the composer from a picked suggestion */
+  /** attach a picked suggestion as the message prefix (T654) */
   onPick?: ((s: CommandSuggestion) => void) | undefined
+  /** the currently-attached `/command`, shown as a distinct chip (T654) */
+  attachedCommand?: CommandSuggestion | null | undefined
+  /** remove the attached `/command` (the chip's X button) */
+  onDetachCommand?: (() => void) | undefined
   /** open the create-command dialog (omit to hide the pill) */
   onCreateCommand?: (() => void) | undefined
-  /** open the editor for an existing command (omit to hide the per-pill edit button) */
+  /** open the editor for the attached command (the chip's Edit button) */
   onEditCommand?: ((s: CommandSuggestion) => void) | undefined
 }) {
   const showCommands = suggestions.length > 0 || !!onCreateCommand
@@ -305,35 +368,31 @@ export function ComposerBubbles({
         </span>
       ))}
 
-      {/* /command suggestion bubbles — opaque pills, described via a Tip.
-          Each pairs with a discrete, same-height Edit button (when editable). */}
+      {/* The attached /command — a distinct chip with Edit + remove (T654). Its
+          prompt is prepended to the message on send. */}
+      {attachedCommand && (
+        <AttachedCommandChip
+          command={attachedCommand}
+          onEdit={onEditCommand}
+          onDetach={onDetachCommand}
+        />
+      )}
+
+      {/* /command suggestion pills — opaque, described via a Tip. Clicking one
+          ATTACHES it as the message prefix (T654). */}
       {showCommands &&
         suggestions.map((s) => (
-          <span key={s.command} className="inline-flex items-center gap-1">
-            <Tip title={s.command} body={s.description || s.name}>
-              <button
-                type="button"
-                onClick={() => onPick?.(s)}
-                className="group inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11.5px] text-foreground/75 transition-colors hover:border-(--signal)/60 hover:text-(--signal)"
-              >
-                <span className="font-mono font-medium text-(--interactive) group-hover:text-(--signal)">
-                  {s.command}
-                </span>
-              </button>
-            </Tip>
-            {onEditCommand && (
-              <Tip title="Edit command" body={`Edit ${s.command} in the command library.`}>
-                <button
-                  type="button"
-                  onClick={() => onEditCommand(s)}
-                  aria-label={`Edit ${s.command}`}
-                  className="flex items-center justify-center rounded-full p-1 text-muted-foreground/50 transition-colors hover:text-(--signal)"
-                >
-                  <Pencil className="size-3" />
-                </button>
-              </Tip>
-            )}
-          </span>
+          <Tip key={s.command} title={s.command} body={s.description || s.name}>
+            <button
+              type="button"
+              onClick={() => onPick?.(s)}
+              className="group inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11.5px] text-foreground/75 transition-colors hover:border-(--signal)/60 hover:text-(--signal)"
+            >
+              <span className="font-mono font-medium text-(--interactive) group-hover:text-(--signal)">
+                {s.command}
+              </span>
+            </button>
+          </Tip>
         ))}
 
       {/* Create-command pill — opaque, dashed to read as an action. */}

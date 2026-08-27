@@ -294,6 +294,7 @@ export function ThreadConversation({
           onCreateCommand={() => setCreateCmdOpen(true)}
           onEditCommand={(s) => setEditCmd(s)}
           draftKey={`cp-draft-${agentId}-${thread.id}`}
+          commandKey={`cp-cmd-${agentId}-${thread.id}`}
         />
       </div>
 

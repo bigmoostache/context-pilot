@@ -555,9 +555,9 @@ M-short-8:
 M-short-9:
   tier: short
   title: T654 command edit
-  contents: 'T654: Pencil edit button on /command bubbles opens AgentEditorDialog variant=command mode=edit (prefill from suggestion). Backend PUT library/command/{item}=upsert_library_command (overwrites). useUpsertCommand, both twins, branch t648.'
+  contents: 'T654 (PR #186, t654-command-edit): AgentEditorDialog reused for command create+edit + per-command Pencil edit. REWORK (frontend-only, both twins): /command ATTACHES as durable chip (localStorage cp-cmd-$agent-$thread), single max, prepended as prefix on Send then detached; Edit+X only on chip. useComposer: attachCmd/detachCmd/persistCmd. ComposerInputRow+Banner in fileUpload/composerInput.tsx.'
   importance: medium
-  last_edited_ms: 1787845682944
+  last_edited_ms: 1787847146930
 M-tiny-1:
   tier: tiny
   title: 'T568: ''Use'' release'
