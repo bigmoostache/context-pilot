@@ -24,9 +24,10 @@ use cp_wire::types::snapshot::{Heads, RosterThread};
 use cp_wire::types::{LifecycleState, Phase};
 
 /// One thread's roster entry — the lightweight per-thread metadata the
-/// `/threads` endpoint serves directly from the view, with no tier-② disk read
-/// (design doc §16 journals thread create/archive/restore; I5 keeps live reads
-/// off disk).
+/// `/threads` endpoint serves directly from the view.
+///
+/// No tier-② disk read (design doc §16 journals thread create/archive/restore;
+/// I5 keeps live reads off disk).
 ///
 /// This is [`cp_wire::types::snapshot::RosterThread`] — the *same* type the
 /// checkpoint carries — so a roster rebuilt by folding live deltas and one
@@ -58,17 +59,22 @@ pub struct CostSnapshot {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, utoipa::ToSchema)]
 pub struct ContextSnapshot {
     /// Tokens currently occupying the context window.
-    pub used_tokens: u64,
+    #[serde(rename = "used_tokens")]
+    pub used: u64,
     /// Cleaning threshold (reverie trigger point).
-    pub threshold_tokens: u64,
+    #[serde(rename = "threshold_tokens")]
+    pub threshold: u64,
     /// Hard context budget.
-    pub budget_tokens: u64,
-    /// The cache-hit half of `used_tokens` (always-cached prefix + cached
-    /// panels); `hit_tokens + miss_tokens == used_tokens`. Powers the web HUD's
+    #[serde(rename = "budget_tokens")]
+    pub budget: u64,
+    /// The cache-hit half of `used` (always-cached prefix + cached
+    /// panels); `hit + miss == used`. Powers the web HUD's
     /// `Used (hit)` / `Used (miss)` split, identical to the ratatui token bar.
-    pub hit_tokens: u64,
-    /// The cache-miss half of `used_tokens` (uncached panels this turn).
-    pub miss_tokens: u64,
+    #[serde(rename = "hit_tokens")]
+    pub hit: u64,
+    /// The cache-miss half of `used` (uncached panels this turn).
+    #[serde(rename = "miss_tokens")]
+    pub miss: u64,
 }
 
 /// One agent's current projected state.
@@ -130,72 +136,65 @@ impl AgentView {
     /// `Unknown` variants do not affect the projected state.
     pub fn apply(&mut self, entry: &OpEntry) {
         self.rev = self.rev.max(entry.rev);
-        match &entry.kind {
-            OpEntryKind::Checkpoint { snapshot } => {
+        cp_base::deref_match!(&entry.kind, {
+            OpEntryKind::Checkpoint { ref snapshot } => {
                 self.heads = snapshot.heads.clone();
                 self.roster.clone_from(&snapshot.roster);
             }
-            OpEntryKind::MessageCreated { thread_id, head, .. } => {
-                self.heads.set_thread_head(thread_id, *head);
+            OpEntryKind::MessageCreated { ref thread_id, head, .. } => {
+                self.heads.set_thread_head(thread_id, head);
                 RosterThread::fold_message(&mut self.roster, thread_id, entry.timestamp_ms);
             }
-            OpEntryKind::ThreadCreated { thread_id, name, status, timestamp_ms } => {
+            OpEntryKind::ThreadCreated { ref thread_id, ref name, status, timestamp_ms } => {
                 RosterThread::fold_created(
                     &mut self.roster,
-                    cp_wire::types::snapshot::ThreadCreation::new(thread_id, name, *status, *timestamp_ms),
+                    cp_wire::types::snapshot::ThreadCreation::new(thread_id, name, status, timestamp_ms),
                 );
             }
-            OpEntryKind::ThreadArchived { thread_id } => {
+            OpEntryKind::ThreadArchived { ref thread_id } => {
                 RosterThread::fold_archived(&mut self.roster, thread_id, true);
             }
-            OpEntryKind::ThreadRestored { thread_id } => {
+            OpEntryKind::ThreadRestored { ref thread_id } => {
                 RosterThread::fold_archived(&mut self.roster, thread_id, false);
             }
-            OpEntryKind::ThreadPaused { thread_id } => {
+            OpEntryKind::ThreadPaused { ref thread_id } => {
                 RosterThread::fold_paused(&mut self.roster, thread_id, true);
             }
-            OpEntryKind::ThreadResumed { thread_id } => {
+            OpEntryKind::ThreadResumed { ref thread_id } => {
                 RosterThread::fold_paused(&mut self.roster, thread_id, false);
             }
-            OpEntryKind::ThreadDeleted { thread_id } => {
+            OpEntryKind::ThreadDeleted { ref thread_id } => {
                 RosterThread::fold_deleted(&mut self.roster, thread_id);
             }
-            OpEntryKind::ThreadStatusChanged { thread_id, status } => {
-                RosterThread::fold_status(&mut self.roster, thread_id, *status);
+            OpEntryKind::ThreadStatusChanged { ref thread_id, status } => {
+                RosterThread::fold_status(&mut self.roster, thread_id, status);
             }
-            OpEntryKind::ThreadFocusChanged { thread_id } => {
+            OpEntryKind::ThreadFocusChanged { ref thread_id } => {
                 self.focused_thread_id.clone_from(thread_id);
             }
-            OpEntryKind::PhaseTransition { phase } => {
-                self.phase = Some(*phase);
-            }
-            OpEntryKind::Lifecycle { state } => {
-                self.lifecycle = Some(*state);
-            }
+            OpEntryKind::PhaseTransition { phase } => self.phase = Some(phase),
+            OpEntryKind::Lifecycle { state } => self.lifecycle = Some(state),
             OpEntryKind::CostAggregate { input_tokens, output_tokens, cost_usd } => {
-                self.cost =
-                    CostSnapshot { input_tokens: *input_tokens, output_tokens: *output_tokens, cost_usd: *cost_usd };
+                self.cost = CostSnapshot { input_tokens, output_tokens, cost_usd };
             }
             OpEntryKind::ContextUsage { used_tokens, threshold_tokens, budget_tokens, hit_tokens, miss_tokens } => {
                 self.context = ContextSnapshot {
-                    used_tokens: *used_tokens,
-                    threshold_tokens: *threshold_tokens,
-                    budget_tokens: *budget_tokens,
-                    hit_tokens: *hit_tokens,
-                    miss_tokens: *miss_tokens,
+                    used: used_tokens,
+                    threshold: threshold_tokens,
+                    budget: budget_tokens,
+                    hit: hit_tokens,
+                    miss: miss_tokens,
                 };
             }
-            // Durability-only records, message-delete, behaviour-change, and
-            // forward-compat unknowns do not affect the projected state — the
-            // active behaviour is a tier-② `config.json` read the frontend
-            // fetches on invalidation, never folded view state.
+            // Durability-only records, message-delete, behaviour/identity change,
+            // and forward-compat unknowns do not affect the projected state.
             OpEntryKind::CommandEffect { .. }
             | OpEntryKind::SeenMark { .. }
             | OpEntryKind::MessageDeleted { .. }
             | OpEntryKind::BehaviourChanged { .. }
             | OpEntryKind::IdentityChanged
             | OpEntryKind::Unknown => {}
-        }
+        });
     }
 }
 
