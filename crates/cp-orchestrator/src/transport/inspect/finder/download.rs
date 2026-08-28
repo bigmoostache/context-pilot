@@ -30,7 +30,7 @@ const MAX_ZIP_BYTES: u64 = 500 * 1024 * 1024;
 /// Returns an [`HttpReply`] error: `400` for a missing path, `403` for a path
 /// escaping the realm, `404` for a non-file/dir, `413` when the file or zipped
 /// folder exceeds its size cap, and `502` for a read or zip fault.
-pub fn fs_download(state: &Mutex<Backend>, agent_id: &str, query: &str) -> Result<(Vec<u8>, String), HttpReply> {
+pub(crate) fn fs_download(state: &Mutex<Backend>, agent_id: &str, query: &str) -> Result<(Vec<u8>, String), HttpReply> {
     let folder = agent_folder(state, agent_id)?;
     let relative = match extract_param(query, "path") {
         Some(p) if !p.is_empty() => p,
@@ -111,7 +111,7 @@ fn zip_and_download(dir: &Path) -> Result<(Vec<u8>, String), HttpReply> {
 /// Returns an [`HttpReply`] error: `400` for a missing path, `403` for a path
 /// escaping the realm, `404` for a non-file, `413` when the file exceeds the
 /// preview cap, and `502` for a read fault.
-pub fn fs_raw(state: &Mutex<Backend>, agent_id: &str, query: &str) -> Result<(Vec<u8>, String), HttpReply> {
+pub(crate) fn fs_raw(state: &Mutex<Backend>, agent_id: &str, query: &str) -> Result<(Vec<u8>, String), HttpReply> {
     let folder = agent_folder(state, agent_id)?;
     let relative = match extract_param(query, "path") {
         Some(p) if !p.is_empty() => p,

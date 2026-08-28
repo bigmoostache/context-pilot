@@ -24,7 +24,7 @@ use super::{is_bare_name, rel_child};
 /// escape) and must already exist; `name` must be a bare filename (no path
 /// separators, not `.`/`..`) so the write can never land outside the realm.
 /// Returns `{ written, path }` (bytes written + the realm-relative path).
-pub fn fs_upload(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8]) -> HttpReply {
+pub(crate) fn fs_upload(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8]) -> HttpReply {
     let folder = match agent_folder(state, agent_id) {
         Ok(f) => f,
         Err(reply) => return reply,
@@ -79,7 +79,7 @@ pub fn fs_upload(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8
 /// `{ path, name, size }` — the realm-relative path of the **stored** file, its
 /// final (possibly suffixed) name, and the byte count — everything the composer
 /// needs to compose the `file-upload` message block.
-pub fn fs_upload_unique(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8]) -> HttpReply {
+pub(crate) fn fs_upload_unique(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8]) -> HttpReply {
     let folder = match agent_folder(state, agent_id) {
         Ok(f) => f,
         Err(reply) => return reply,

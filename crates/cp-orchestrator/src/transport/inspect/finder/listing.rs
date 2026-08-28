@@ -21,7 +21,7 @@ use super::support::{agent_folder, confined_path, count_visible_children, extrac
 /// flattens it to `{ path: description }`. A missing or unparseable file yields
 /// an empty object (a realm with no descriptions is the normal case, never an
 /// error). The agent id is still resolved so an unknown agent is a `404`.
-pub fn fs_descriptions(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
+pub(crate) fn fs_descriptions(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     let folder = match agent_folder(state, agent_id) {
         Ok(f) => f,
         Err(reply) => return reply,
@@ -64,7 +64,7 @@ const MAX_CONVERSATION_MESSAGES: usize = 200;
 /// path. Returns an array of `FinderNode` objects. The path is confined to
 /// the agent's folder — any attempt to escape (via `..`, symlinks, or
 /// absolute paths) is rejected with a `403`.
-pub fn fs_list(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
+pub(crate) fn fs_list(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
     let folder = match agent_folder(state, agent_id) {
         Ok(f) => f,
         Err(reply) => return reply,
@@ -142,7 +142,7 @@ fn fs_node(name: &str, path: &str, entry_path: &Path, meta: &std::fs::Metadata) 
 /// Returns the first [`MAX_PREVIEW_BYTES`] of a file as a JSON object with
 /// `content` (text) and `truncated` (bool). Binary-looking files are rejected
 /// with a 415.
-pub fn fs_preview(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
+pub(crate) fn fs_preview(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
     let folder = match agent_folder(state, agent_id) {
         Ok(f) => f,
         Err(reply) => return reply,
@@ -191,7 +191,7 @@ pub fn fs_preview(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpRe
 /// Reads YAML message files from the agent's `.context-pilot/messages/`
 /// directory, sorted by filename (which encodes chronological order), capped
 /// at [`MAX_CONVERSATION_MESSAGES`] most recent.
-pub fn conversation(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
+pub(crate) fn conversation(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     let folder = match agent_folder(state, agent_id) {
         Ok(f) => f,
         Err(reply) => return reply,

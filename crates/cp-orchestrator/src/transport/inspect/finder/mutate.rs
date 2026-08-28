@@ -23,7 +23,7 @@ use super::support::{agent_folder, confined_path, extract_param};
 /// overwrite the existing file being edited — never create a stray entry or
 /// clobber a folder. Returns `{ written, path }` (bytes written + the
 /// realm-relative path).
-pub fn fs_write(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8]) -> HttpReply {
+pub(crate) fn fs_write(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8]) -> HttpReply {
     let folder = match agent_folder(state, agent_id) {
         Ok(f) => f,
         Err(reply) => return reply,
@@ -64,7 +64,7 @@ pub fn fs_write(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8]
 /// separators, not `.`/`..`) so the new folder can never land outside the realm.
 /// An already-existing entry with that name is a `409` (never silently reused).
 /// Returns `{ created }` — the realm-relative path of the new folder.
-pub fn fs_mkdir(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
+pub(crate) fn fs_mkdir(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
     let folder = match agent_folder(state, agent_id) {
         Ok(f) => f,
         Err(reply) => return reply,
@@ -114,7 +114,7 @@ pub fn fs_mkdir(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpRepl
 /// A rename to the unchanged name is a no-op success; a name already taken by a
 /// different entry is a `409` (never clobbers). Returns `{ renamed }` — the new
 /// realm-relative path.
-pub fn fs_rename(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
+pub(crate) fn fs_rename(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
     let folder = match agent_folder(state, agent_id) {
         Ok(f) => f,
         Err(reply) => return reply,
@@ -178,7 +178,7 @@ pub fn fs_rename(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpRep
 /// Returns `{ moved, skipped }` (entries actually renamed vs. no-op'd). A single
 /// failing item aborts with the matching error status (best-effort partial moves
 /// already applied are not rolled back — the listing refresh shows the truth).
-pub fn fs_move(state: &Mutex<Backend>, agent_id: &str, body: &[u8]) -> HttpReply {
+pub(crate) fn fs_move(state: &Mutex<Backend>, agent_id: &str, body: &[u8]) -> HttpReply {
     let folder = match agent_folder(state, agent_id) {
         Ok(f) => f,
         Err(reply) => return reply,
@@ -266,7 +266,7 @@ const TRASH_DIR: &str = ".context-pilot/trash";
 /// Returns `{ trashed, skipped }`. A single failing item aborts with the matching
 /// error status (partial moves already applied are not rolled back — the listing
 /// refresh shows the truth).
-pub fn fs_trash(state: &Mutex<Backend>, agent_id: &str, body: &[u8]) -> HttpReply {
+pub(crate) fn fs_trash(state: &Mutex<Backend>, agent_id: &str, body: &[u8]) -> HttpReply {
     let folder = match agent_folder(state, agent_id) {
         Ok(f) => f,
         Err(reply) => return reply,

@@ -41,7 +41,7 @@ const MAX_CSV_BYTES: u64 = 8 * 1024 * 1024;
 /// the agent realm (escape → `403`); a non-file → `404`; an unsupported or
 /// unparseable file → `415`. `truncated` is `true` when any row/column/sheet
 /// cap clipped the data, so the UI can show a "preview clipped" note.
-pub fn fs_sheet(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
+pub(crate) fn fs_sheet(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
     let folder = match agent_folder(state, agent_id) {
         Ok(f) => f,
         Err(reply) => return reply,
