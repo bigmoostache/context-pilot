@@ -77,10 +77,8 @@ impl HttpReply {
     where
         T: Serialize,
     {
-        match serde_json::to_string(value) {
-            Ok(body) => Self { status, body },
-            Err(_) => Self::error(500, "serialization failed"),
-        }
+        serde_json::to_string(value)
+            .map_or_else(|_| Self::error(500, "serialization failed"), |body| Self { status, body })
     }
 
     /// An error reply with a `{"error": reason}` body.
@@ -91,7 +89,7 @@ impl HttpReply {
 
 /// A read response wrapping its payload with the `rev` it reflects.
 #[derive(Debug, Serialize)]
-pub struct Envelope<T: Serialize> {
+pub struct Envelope<T> {
     /// The oplog `rev` this payload reflects — an SSE stream can resume here.
     pub rev: u64,
     /// The resource payload.
@@ -128,13 +126,13 @@ pub fn fleet(state: &Mutex<Backend>, auth_user: Option<&crate::services::auth::t
     // Filter by ACL when auth is enabled (FR-12).
     let visible_ids = crate::transport::auth::filter_fleet(state, &all_ids, auth_user);
 
-    let Ok(backend) = state.lock() else {
+    let Ok(relocked) = state.lock() else {
         return HttpReply::error(500, "backend lock poisoned");
     };
     let mut agents = serde_json::Map::new();
     let mut max_rev = 0u64;
     for id in &visible_ids {
-        if let Some(view) = backend.view.get(id) {
+        if let Some(view) = relocked.view.get(id) {
             max_rev = max_rev.max(view.rev);
             if let Ok(value) = serde_json::to_value(view) {
                 let _prev = agents.insert(id.clone(), value);
@@ -149,10 +147,10 @@ pub fn agent(state: &Mutex<Backend>, id: &str) -> HttpReply {
     let Ok(backend) = state.lock() else {
         return HttpReply::error(500, "backend lock poisoned");
     };
-    match backend.view.get(id) {
-        Some(view) => HttpReply::ok(&Envelope { rev: view.rev, data: view }),
-        None => HttpReply::error(404, "unknown agent"),
-    }
+    backend.view.get(id).map_or_else(
+        || HttpReply::error(404, "unknown agent"),
+        |view| HttpReply::ok(&Envelope { rev: view.rev, data: view }),
+    )
 }
 
 /// `POST /api/ticket` — mint a single-use SSE upgrade ticket.
@@ -277,20 +275,23 @@ pub fn delete_avatar(state: &Mutex<Backend>, id: &str) -> HttpReply {
 /// Returns an [`HttpReply`] error directly so handlers can `?`-style early-out.
 pub(super) fn resolve_entry(state: &Mutex<Backend>, id: &str) -> Result<Entry, HttpReply> {
     let dir = {
-        let backend = state.lock().map_err(|_| HttpReply::error(500, "backend lock poisoned"))?;
+        let backend = state.lock().ok().ok_or_else(|| HttpReply::error(500, "backend lock poisoned"))?;
         backend.agents_dir.clone()
     };
     let path = dir.join(format!("{id}.json"));
-    let raw = std::fs::read(&path).map_err(|e| match e.kind() {
-        std::io::ErrorKind::NotFound => HttpReply::error(404, "unknown agent"),
-        _ => HttpReply::error(502, "registry read failed"),
+    let raw = std::fs::read(&path).map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            HttpReply::error(404, "unknown agent")
+        } else {
+            HttpReply::error(502, "registry read failed")
+        }
     })?;
-    serde_json::from_slice::<Entry>(&raw).map_err(|_| HttpReply::error(502, "registry record corrupt"))
+    serde_json::from_slice::<Entry>(&raw).ok().ok_or_else(|| HttpReply::error(502, "registry record corrupt"))
 }
 
 /// Map an [`Ack`](cp_wire::types::ack::Ack) status to a short string.
 fn ack_status(status: &cp_wire::types::ack::Status) -> String {
-    match status {
+    match *status {
         cp_wire::types::ack::Status::Accepted => "accepted".to_owned(),
         cp_wire::types::ack::Status::Rejected { .. } => "rejected".to_owned(),
         // `Status` is #[non_exhaustive]; a status from a newer protocol folds
@@ -338,7 +339,7 @@ pub fn threads(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
         let cfg = reader.read_config(folder).ok();
 
         // Read focused_thread_id from the first worker's FocusState.
-        let focused = reader.list_workers(folder).unwrap_or_default().into_iter().find_map(|wid| {
+        let disk_focus = reader.list_workers(folder).unwrap_or_default().into_iter().find_map(|wid| {
             let w = reader.read_worker(folder, &wid).ok()?;
             w.get("modules")
                 .and_then(|m| m.get("threads_worker"))
@@ -355,20 +356,20 @@ pub fn threads(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
         // bounded backstop).
         let (roster, view_focus) =
             b.view.get(agent_id).map(|v| (v.roster.clone(), v.focused_thread_id.clone())).unwrap_or_default();
-        let focused = view_focus.or(focused);
+        let focused = view_focus.or(disk_focus);
         (cfg, focused, roster)
     };
 
     // Disk threads (full logs). Absent config is tolerated: the view roster
     // alone can still render newly-created threads.
-    let empty_arr = serde_json::Value::Array(Vec::new());
+    let empty: Vec<serde_json::Value> = Vec::new();
     let raw_threads = config
         .as_ref()
         .and_then(|c| c.get("modules"))
         .and_then(|m| m.get("threads"))
         .and_then(|t| t.get("threads"))
         .and_then(serde_json::Value::as_array)
-        .unwrap_or_else(|| empty_arr.as_array().expect("empty vec is array"));
+        .unwrap_or(&empty);
 
     let mut details: Vec<serde_json::Value> = raw_threads.iter().map(|t| reshape_thread(t, agent_id)).collect();
 
@@ -389,9 +390,9 @@ fn json_string(s: &str) -> String {
 
 /// The JSON body for a hydrated body: bytes serialized as a number array.
 #[derive(Serialize)]
-struct BodyPayload<'a> {
+struct BodyPayload<'bytes> {
     /// Raw body bytes.
-    bytes: &'a [u8],
+    bytes: &'bytes [u8],
 }
 
 #[cfg(test)]
