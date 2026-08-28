@@ -164,6 +164,10 @@ pub(super) fn mode_body() -> Value {
 /// Secrets are write-only: the bearer password, the SIM PIN and the Wi-Fi PSK
 /// are `POSTed` but never returned, so every read schema carries a `*_set`
 /// boolean in their place.
+#[expect(
+    clippy::too_many_lines,
+    reason = "flat OpenAPI schema literal: one linear json! object enumerating the domain schemas; splitting it into sub-builders is churn with no readability gain — the openapi spec-builder twin of the flat State::default initializer"
+)]
 pub(super) fn network() -> Value {
     json!({
         "ItNetworkWwan": {

@@ -16,6 +16,10 @@ fn qp_opt(name: &str) -> Value {
 }
 
 /// All API route definitions.
+#[expect(
+    clippy::too_many_lines,
+    reason = "flat OpenAPI path table: one linear json! object enumerating every REST route; splitting it into sub-builders is churn with no readability gain — the openapi spec-builder twin of the flat State::default initializer"
+)]
 pub(super) fn paths() -> Value {
     json!({
         "/api/health": get("health", "Health check", json!({

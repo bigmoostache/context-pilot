@@ -9,6 +9,10 @@ use serde_json::{Value, json};
 use super::{arr, r};
 
 /// Release management, settings/session, and Claude Code OAuth schemas.
+#[expect(
+    clippy::too_many_lines,
+    reason = "flat OpenAPI schema literal: one linear json! object enumerating the domain schemas; splitting it into sub-builders is churn with no readability gain — the openapi spec-builder twin of the flat State::default initializer"
+)]
 pub(super) fn deploy() -> Value {
     json!({
         // ── Release management (T427) ───────────────────────────────
