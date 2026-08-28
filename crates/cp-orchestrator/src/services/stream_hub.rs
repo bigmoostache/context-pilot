@@ -187,13 +187,10 @@ impl StreamHub {
     /// Clear a subscriber's degraded state after delivering a snapshot resync.
     /// Returns `true` if the subscriber was found.
     pub fn mark_reconciled(&mut self, agent_id: &str, sub_id: u64) -> bool {
-        match self.subscriber_mut(agent_id, sub_id) {
-            Some(sub) => {
-                sub.mark_reconciled();
-                true
-            }
-            None => false,
-        }
+        self.subscriber_mut(agent_id, sub_id).is_some_and(|sub| {
+            sub.mark_reconciled();
+            true
+        })
     }
 
     /// Number of subscribers attached to `agent_id`.
@@ -212,12 +209,11 @@ impl StreamHub {
     /// subscribers.
     #[must_use]
     pub fn agent_stream_health(&self, agent_id: &str) -> (usize, u64, bool) {
-        match self.agents.get(agent_id) {
-            None => (0, 0, false),
-            Some(subs) => subs.iter().fold((0, 0, false), |(n, dropped, degraded), s| {
-                (n + 1, dropped.saturating_add(s.dropped_count()), degraded || s.is_degraded())
-            }),
-        }
+        self.agents.get(agent_id).map_or((0, 0, false), |subs| {
+            subs.iter().fold((0, 0, false), |(n, dropped, degraded), s| {
+                (n.saturating_add(1), dropped.saturating_add(s.dropped_count()), degraded || s.is_degraded())
+            })
+        })
     }
 
     /// Mutable subscriber lookup (private helper).
