@@ -4722,6 +4722,10 @@
   path: web/src/components/threads/ThreadsView.tsx
   description: 'Desktop ThreadsView — master-detail (list rail + conversation). railOpen collapse (T669) now animates (T670): rail stays mounted, slides in/out via transitioned negative left-margin (root overflow-hidden clips it), conversation reclaims width; floating PanelLeft reopen button fades+nudges in when collapsed; motion-reduce snaps. Shared useThreadSelection+useThreadActions from lib/live/threadView. Mobile twin = stack nav.'
   last_edited_ms: 1785154769784
+31baf1d7166fb4d6:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 31dd75744eab57f8:
   path: .git/index
   description: Git index (binary). Not source.
@@ -21570,6 +21574,10 @@ e6d23c43d25765a0:
   path: crates/cp-orchestrator/src/transport/inspect/providers/oauth_creds.rs
   description: 'Claude Code OAuth credential presence check. Routes through cp_vault::oauth::load_claude_oauth_raw (Keychain then file). oauth_creds_usable pure verdict: non-empty accessToken + unexpired expiresAt. 3 tests.'
   last_edited_ms: 1783589205322
+e6d435e6e7096a4e:
+  path: .context-pilot/shared/memories.yaml
+  description: Memory slots store (M-safe/tiny/short/mid/long, 220 fixed). Local-only, synced with commits. Mirrors the Memories panel.
+  last_edited_ms: 0
 e6d78c83d567d2a5:
   path: crates/cp-mod-prompt/src/types.rs
   description: 'PromptItem/PromptState/PromptType. PromptType enum #[expect(exhaustive_enums)] A4.'

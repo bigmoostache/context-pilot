@@ -132,6 +132,45 @@ export function previewOf(t: ThreadDetail): string {
   return last.tool ? `⛭ ${last.tool.name}` : ""
 }
 
+/**
+ * Task-progress summary for a thread's list row (T687) — the second line's
+ * progress bar + label, or `null` when the thread has NO live tasks (the caller
+ * then falls back to the {@link previewOf} message snippet).
+ *
+ * `frac` is the completion of *started* work — `done / (done + in_progress)`,
+ * per the T687 spec — so a thread with only planned tasks reads 0% (guarded
+ * `/0`), and a thread whose active work is all finished reads 100%. `label` is
+ * the current front: the last in-progress task's title, else `"Done"` when every
+ * task is done, else the next planned task's title.
+ */
+export interface ThreadProgress {
+  /** `done / (done + in_progress)`, clamped to `[0, 1]`. */
+  frac: number
+  /** finished-task count (the bar's numerator). */
+  done: number
+  /** `done + in_progress` — the started-work total (the bar's denominator). */
+  total: number
+  /** last in-progress title, else `"Done"`, else the next planned title. */
+  label: string
+}
+
+/** Compute a thread row's {@link ThreadProgress}, or `null` when it has no tasks. */
+export function threadProgress(t: ThreadDetail): ThreadProgress | null {
+  const tasks = t.tasks ?? []
+  if (tasks.length === 0) return null
+  const done = tasks.filter((x) => x.status === "done").length
+  const inProgress = tasks.filter((x) => x.status === "in_progress")
+  const total = done + inProgress.length
+  // Fraction of started-and-finished work that is finished; guard the
+  // only-planned case (total === 0) so the bar reads 0% rather than NaN.
+  const frac = total === 0 ? 0 : done / total
+  const allDone = done === tasks.length
+  const label =
+    inProgress.at(-1)?.name ??
+    (allDone ? "Done" : (tasks.find((x) => x.status === "planned")?.name ?? "Done"))
+  return { frac, done, total, label }
+}
+
 /** A persisted composer draft: the unsent text plus the caret/selection range
  *  to restore (T304). Stored as JSON under the composer's `draftKey`. */
 export interface Draft {
