@@ -182,7 +182,7 @@ mod tests {
         }
         let scan = scan_bytes(&buf);
         assert_eq!(scan.entries.len(), 5);
-        assert_eq!(scan.valid_len, buf.len() as u64);
+        assert_eq!(scan.valid_len, u64::try_from(buf.len()).unwrap_or(u64::MAX));
         assert!(!scan.torn_tail);
     }
 
@@ -196,7 +196,7 @@ mod tests {
 
         let scan = scan_bytes(&buf);
         assert_eq!(scan.entries.len(), 1);
-        assert_eq!(scan.valid_len, clean_len as u64);
+        assert_eq!(scan.valid_len, u64::try_from(clean_len).unwrap_or(u64::MAX));
         assert!(scan.torn_tail);
     }
 
@@ -212,7 +212,7 @@ mod tests {
         }
         let scan = scan_bytes(&buf);
         assert_eq!(scan.entries.len(), 1);
-        assert_eq!(scan.valid_len, clean_len as u64);
+        assert_eq!(scan.valid_len, u64::try_from(clean_len).unwrap_or(u64::MAX));
         assert!(scan.torn_tail);
     }
 

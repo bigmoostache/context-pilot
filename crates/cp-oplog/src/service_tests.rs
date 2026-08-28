@@ -26,7 +26,7 @@ fn effect(token: &str) -> OpEntryKind {
 fn durability_classification_matches_policy() {
     assert_eq!(Durability::of(&OpEntryKind::PhaseTransition { phase: Phase::Streaming }), Durability::BestEffort,);
     assert_eq!(
-        Durability::of(&OpEntryKind::CostAggregate { input_tokens: 1, output_tokens: 2, cost_usd: 0.5 }),
+        Durability::of(&OpEntryKind::CostAggregate { input_tokens: 1, output_tokens: 2, cost_usd: 0.5f64 }),
         Durability::BestEffort,
     );
     assert_eq!(Durability::of(&effect("c1")), Durability::Durable);
@@ -156,17 +156,19 @@ fn v11_emit_burst_never_blocks_the_loop_on_fsync() {
     // We measure the WORST individual emit latency across a large burst and
     // assert it stays far below what even one fsync-per-call would cost.
     use std::time::Instant;
+    const BURST: usize = 5_000;
 
     let dir = tempdir().expect("tempdir");
     let service = Service::spawn(dir.path()).expect("spawn");
 
-    const BURST: usize = 5_000;
     let mut worst = std::time::Duration::ZERO;
     let total = Instant::now();
-    for i in 0..BURST {
+    let mut streaming = true;
+    for _ in 0..BURST {
         // Alternate Streaming/Tooling — the exact "phase transitions during
         // streaming" scenario V11 names.
-        let phase = if i % 2 == 0 { Phase::Streaming } else { Phase::Tooling };
+        let phase = if streaming { Phase::Streaming } else { Phase::Tooling };
+        streaming = !streaming;
         let call = Instant::now();
         let _outcome = service.append_best_effort(OpEntryKind::PhaseTransition { phase });
         worst = worst.max(call.elapsed());
