@@ -31,12 +31,12 @@ fn root_path() -> Option<PathBuf> {
 /// Owns the [`Request`] so it can set a non-JSON content type. Reports `404`
 /// (JSON) when the root isn't configured or hasn't been generated yet.
 pub(crate) fn serve_ca_cert(request: Request) {
-    let pem = root_path().and_then(|p| std::fs::read(p).ok());
-    let Some(pem) = pem else {
+    let pem_bytes = root_path().and_then(|p| std::fs::read(p).ok());
+    let Some(pem) = pem_bytes else {
         crate::transport::respond_json(request, &HttpReply::error(404, "CA root not available yet"));
         return;
     };
-    let mut response = Response::from_data(pem).with_status_code(200);
+    let mut response = Response::from_data(pem).with_status_code(200i32);
     for (name, value) in
         [("Content-Type", "application/x-pem-file"), ("Content-Disposition", "attachment; filename=\"root.crt\"")]
     {
@@ -51,14 +51,14 @@ pub(crate) fn serve_ca_cert(request: Request) {
 /// colon-hex (matching `openssl … -fingerprint -sha256`). `404` when the root
 /// isn't available, `500` when the PEM can't be parsed.
 pub(crate) fn ca_fingerprint() -> HttpReply {
-    let pem = root_path().and_then(|p| std::fs::read_to_string(p).ok());
-    let Some(pem) = pem else {
+    let pem_text = root_path().and_then(|p| std::fs::read_to_string(p).ok());
+    let Some(pem) = pem_text else {
         return HttpReply::error(404, "CA root not available yet");
     };
-    match fingerprint_from_pem(&pem) {
-        Some(fp) => HttpReply::ok(&serde_json::json!({ "fingerprint": fp, "algorithm": "sha256" })),
-        None => HttpReply::error(500, "could not parse CA root certificate"),
-    }
+    fingerprint_from_pem(&pem).map_or_else(
+        || HttpReply::error(500, "could not parse CA root certificate"),
+        |fp| HttpReply::ok(&serde_json::json!({ "fingerprint": fp, "algorithm": "sha256" })),
+    )
 }
 
 /// Compute the SHA-256 fingerprint (colon-hex, uppercase) of the first
@@ -75,7 +75,7 @@ fn fingerprint_from_pem(pem: &str) -> Option<String> {
 fn der_from_pem(pem: &str) -> Option<Vec<u8>> {
     const BEGIN: &str = "-----BEGIN CERTIFICATE-----";
     const END: &str = "-----END CERTIFICATE-----";
-    let start = pem.find(BEGIN)? + BEGIN.len();
+    let start = pem.find(BEGIN)?.checked_add(BEGIN.len())?;
     let rest = pem.get(start..)?;
     let end = rest.find(END)?;
     let body = rest.get(..end)?;
