@@ -1,18 +1,15 @@
 import { useMemo, useState, type KeyboardEvent } from "react"
 import { Circle, CircleDot, CheckCircle2, ChevronRight } from "lucide-react"
-import { Tip } from "@/components/ui/tip"
 import type { ThreadTask } from "@/lib/types"
 
 /**
  * The Tasks-tab body of {@link ThreadAside} (T662) — the thread's todo tree,
- * read-only, with two behaviours beyond the old flat {@link TodoSidebar}:
+ * read-only, with one behaviour beyond the old flat {@link TodoSidebar}:
  *
  *  1. **Auto-collapse of completed branches** — a parent whose entire subtree is
  *     done/cancelled starts collapsed (its children hidden behind a chevron), so
  *     finished work folds away. Clicking the row toggles it. A parent with any
  *     still-open descendant stays expanded.
- *  2. **Hover tooltip** — hovering a task shows its `description` (when present)
- *     via the shadcn Tooltip, instead of the native `title` attribute.
  *
  * The tree is projected by the agent (cancelled excluded upstream) and rides the
  * live `task_list_changed` delta, so this stays purely presentational.
@@ -68,7 +65,7 @@ export function TaskList({ tasks }: { tasks: ThreadTask[] }) {
   )
 }
 
-/** One task row: optional chevron (parents) + status icon + name, tooltip on hover. */
+/** One task row: optional chevron (parents) + status icon + name. */
 function TaskRow({
   task,
   depth,
@@ -137,13 +134,7 @@ function TaskRow({
       <span className="flex h-4 shrink-0 items-center">
         <StatusIcon status={task.status} />
       </span>
-      {task.description ? (
-        <Tip title={task.description} side="left" triggerClassName="min-w-0 text-left">
-          {label}
-        </Tip>
-      ) : (
-        label
-      )}
+      {label}
     </div>
   )
 }
