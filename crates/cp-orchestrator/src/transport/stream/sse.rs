@@ -3,7 +3,7 @@
 //!
 //! SSE rides a single long-lived `GET` over plain chunked HTTP, so it fits
 //! `tiny_http`'s blocking, thread-per-connection model exactly: the response
-//! body is a [`SseBody`] reader whose `read` **blocks** until the next event is
+//! body is a [`Body`] reader whose `read` **blocks** until the next event is
 //! ready, and `tiny_http` pumps it to the socket until the client disconnects.
 //!
 //! # Reconnect-replay by `rev` is native
@@ -17,8 +17,8 @@
 //! hand-rolled replay layer.
 //!
 //! The producer that fills a stream is spawned by the caller; this module
-//! supplies the wire encoding ([`SseMessage::encode`]), the blocking reader
-//! ([`SseBody`]), and the channel that joins them ([`channel`]).
+//! supplies the wire encoding ([`Message::encode`]), the blocking reader
+//! ([`Body`]), and the channel that joins them ([`channel`]).
 
 use std::io::{self, Read, Write as _};
 use std::path::Path;
@@ -29,8 +29,10 @@ use notify::{RecommendedWatcher, RecursiveMode, Watcher as _};
 use tiny_http::Request;
 
 /// Blocks an SSE producer until its agent's oplog changes — the event-driven
-/// replacement for a fixed poll sleep (design doc I12: the inotify watch is the
-/// primary change signal, a timer is only a backstop).
+/// replacement for a fixed poll sleep.
+///
+/// (Design doc I12: the inotify watch is the primary change signal, a timer is
+/// only a backstop.)
 ///
 /// A [`RecommendedWatcher`] (kqueue on macOS, inotify on Linux) watches the
 /// agent's oplog directory; every filesystem event is coalesced into a single
@@ -97,7 +99,7 @@ impl OplogWaiter {
 /// One Server-Sent Event: an optional `rev` id, an event name, and a data
 /// payload (typically a single line of JSON).
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SseMessage {
+pub struct Message {
     /// The `rev` this event reflects, emitted as the SSE `id:` field so a
     /// reconnecting client can resume from it via `Last-Event-ID`.
     pub id: Option<u64>,
@@ -108,7 +110,7 @@ pub struct SseMessage {
     pub data: String,
 }
 
-impl SseMessage {
+impl Message {
     /// Build a `delta` event carrying an oplog entry at `rev`.
     #[must_use]
     pub fn delta(rev: u64, data: String) -> Self {
@@ -178,7 +180,7 @@ pub fn encode_comment(text: &str) -> Vec<u8> {
 /// every [`Sender`] is dropped (the producer finished or the connection was
 /// torn down) `read` returns `Ok(0)` — EOF — and the response ends cleanly.
 #[derive(Debug)]
-pub struct SseBody {
+pub struct Body {
     /// Source of fully-encoded event byte blocks.
     rx: Receiver<Vec<u8>>,
     /// Bytes of the current block not yet copied to a caller.
@@ -187,15 +189,15 @@ pub struct SseBody {
     pos: usize,
 }
 
-impl SseBody {
+impl Body {
     /// Create a body draining `rx`.
     const fn new(rx: Receiver<Vec<u8>>) -> Self {
         Self { rx, leftover: Vec::new(), pos: 0 }
     }
 }
 
-impl Read for SseBody {
-    fn read(&mut self, out: &mut [u8]) -> io::Result<usize> {
+impl Read for Body {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         // Refill from the channel when the current block is exhausted.
         if self.pos >= self.leftover.len() {
             match self.rx.recv() {
@@ -208,8 +210,8 @@ impl Read for SseBody {
             }
         }
         let remaining = self.leftover.get(self.pos..).unwrap_or(&[]);
-        let n = remaining.len().min(out.len());
-        if let (Some(src), Some(dst)) = (remaining.get(..n), out.get_mut(..n)) {
+        let n = remaining.len().min(buf.len());
+        if let (Some(src), Some(dst)) = (remaining.get(..n), buf.get_mut(..n)) {
             dst.copy_from_slice(src);
         }
         self.pos = self.pos.saturating_add(n);
@@ -219,22 +221,22 @@ impl Read for SseBody {
 
 /// A handle for pushing encoded events into a stream.
 ///
-/// Each [`send`](SseSink::send) encodes one [`SseMessage`]; a send error means
-/// the client disconnected (the [`SseBody`] was dropped), which the producer
+/// Each [`send`](Sink::send) encodes one [`Message`]; a send error means
+/// the client disconnected (the [`Body`] was dropped), which the producer
 /// uses as its stop signal.
 #[derive(Clone, Debug)]
-pub struct SseSink {
+pub struct Sink {
     /// Channel to the body reader.
     tx: Sender<Vec<u8>>,
 }
 
-impl SseSink {
+impl Sink {
     /// Encode and enqueue one event. Returns `Err` if the client is gone.
     ///
     /// # Errors
     ///
-    /// Returns the unsent bytes if the receiving [`SseBody`] has been dropped.
-    pub fn send(&self, msg: &SseMessage) -> Result<(), Vec<u8>> {
+    /// Returns the unsent bytes if the receiving [`Body`] has been dropped.
+    pub fn send(&self, msg: &Message) -> Result<(), Vec<u8>> {
         self.tx.send(msg.encode()).map_err(|e| e.0)
     }
 
@@ -242,20 +244,20 @@ impl SseSink {
     ///
     /// # Errors
     ///
-    /// Returns the unsent bytes if the receiving [`SseBody`] has been dropped.
+    /// Returns the unsent bytes if the receiving [`Body`] has been dropped.
     pub fn keep_alive(&self) -> Result<(), Vec<u8>> {
         self.tx.send(encode_comment("keep-alive")).map_err(|e| e.0)
     }
 }
 
-/// Create a connected ([`SseSink`], [`SseBody`]) pair.
+/// Create a connected ([`Sink`], [`Body`]) pair.
 ///
 /// The sink is moved into the producer thread; the body is handed to
 /// `tiny_http` as the response reader.
 #[must_use]
-pub fn channel() -> (SseSink, SseBody) {
+pub fn channel() -> (Sink, Body) {
     let (tx, rx) = mpsc::channel();
-    (SseSink { tx }, SseBody::new(rx))
+    (Sink { tx }, Body::new(rx))
 }
 
 /// Stream an SSE body to the client, flushing **after every event**.
@@ -269,7 +271,7 @@ pub fn channel() -> (SseSink, SseBody) {
 /// produced. The loop ends when the producer finishes (EOF) or the client
 /// disconnects (a write error), at which point dropping `body` signals the
 /// producer thread to stop.
-pub fn stream_to_client(request: Request, mut body: SseBody) {
+pub fn stream_to_client(request: Request, mut body: Body) {
     let mut writer = request.into_writer();
     let preamble = concat!(
         "HTTP/1.1 200 OK\r\n",
@@ -285,17 +287,20 @@ pub fn stream_to_client(request: Request, mut body: SseBody) {
         return;
     }
 
-    let mut buf = [0u8; 4096];
+    // Heap-allocated copy buffer (a 4 KiB stack array trips
+    // clippy::large_stack_arrays, threshold 512B).
+    let mut buf = vec![0u8; 4096];
     loop {
         match body.read(&mut buf) {
-            Ok(0) => break, // producer finished — clean end of stream.
-            Ok(n) => {
+            Ok(n) if n > 0 => {
                 let Some(chunk) = buf.get(..n) else { break };
                 if writer.write_all(chunk).and_then(|()| writer.flush()).is_err() {
                     break; // client disconnected.
                 }
             }
-            Err(_) => break,
+            // Ok(0) = producer finished (clean EOF); Err(_) = read fault —
+            // both end the stream.
+            Ok(_) | Err(_) => break,
         }
     }
 }
@@ -306,21 +311,21 @@ mod tests {
 
     #[test]
     fn encode_includes_id_event_and_data() {
-        let msg = SseMessage::delta(42, "{\"a\":1}".to_owned());
+        let msg = Message::delta(42, "{\"a\":1}".to_owned());
         let wire = String::from_utf8(msg.encode()).expect("utf8");
         assert_eq!(wire, "id: 42\nevent: delta\ndata: {\"a\":1}\n\n");
     }
 
     #[test]
     fn encode_without_id_omits_id_line() {
-        let msg = SseMessage::stream("hi".to_owned());
+        let msg = Message::stream("hi".to_owned());
         let wire = String::from_utf8(msg.encode()).expect("utf8");
         assert_eq!(wire, "event: stream\ndata: hi\n\n");
     }
 
     #[test]
     fn encode_multiline_data_splits_per_line() {
-        let msg = SseMessage { id: None, event: "x".to_owned(), data: "a\nb".to_owned() };
+        let msg = Message { id: None, event: "x".to_owned(), data: "a\nb".to_owned() };
         let wire = String::from_utf8(msg.encode()).expect("utf8");
         assert_eq!(wire, "event: x\ndata: a\ndata: b\n\n");
     }
@@ -334,7 +339,7 @@ mod tests {
     #[test]
     fn body_yields_sent_bytes_then_eof() {
         let (sink, mut body) = channel();
-        sink.send(&SseMessage::delta(1, "x".to_owned())).expect("send");
+        sink.send(&Message::delta(1, "x".to_owned())).expect("send");
         drop(sink); // signal end of stream
 
         let mut all = Vec::new();
@@ -354,7 +359,7 @@ mod tests {
     #[test]
     fn body_handles_partial_reads_across_small_buffers() {
         let (sink, mut body) = channel();
-        sink.send(&SseMessage::stream("abc".to_owned())).expect("send");
+        sink.send(&Message::stream("abc".to_owned())).expect("send");
         drop(sink);
 
         // event = "event: stream\ndata: abc\n\n" — read it 3 bytes at a time.
@@ -375,6 +380,6 @@ mod tests {
     fn send_after_body_dropped_errors() {
         let (sink, body) = channel();
         drop(body);
-        assert!(sink.send(&SseMessage::resync()).is_err(), "client gone \u{21d2} send errors");
+        assert!(sink.send(&Message::resync()).is_err(), "client gone \u{21d2} send errors");
     }
 }

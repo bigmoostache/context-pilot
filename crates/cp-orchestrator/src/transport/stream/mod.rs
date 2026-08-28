@@ -4,7 +4,7 @@
 //! within the workspace's per-file line budget. [`run_stream`] is spawned by
 //! `handle_stream` once per connected subscriber: it tails one agent's oplog
 //! (rev-numbered durable deltas) plus its ephemeral stream-hub frames and
-//! pushes both down the SSE [`sink`](super::sse::SseSink) until the client
+//! pushes both down the SSE [`sink`](super::sse::Sink) until the client
 //! disconnects.
 //!
 //! The cold-connect vs reconnect seeding policy (the T123 fix — a fresh
@@ -61,7 +61,7 @@ const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(10);
 /// Runs until a `send` fails (the client disconnected, dropping the body
 /// reader). Unsubscribes its stream-hub slot on exit.
 pub(crate) fn run_stream(
-    sink: &sse::SseSink,
+    sink: &sse::Sink,
     state: &Arc<Mutex<Backend>>,
     agent_id: &str,
     oplog_dir: &PathBuf,
@@ -114,7 +114,7 @@ pub(crate) fn run_stream(
                     if let (Some(want), Some(first)) = (last_rev, entries.first()) {
                         // The oldest replayable entry skips past the client's
                         // last rev ⇒ a gap the oplog can't cover ⇒ resync.
-                        if first.rev > want.saturating_add(1) && sink.send(&sse::SseMessage::resync()).is_err() {
+                        if first.rev > want.saturating_add(1) && sink.send(&sse::Message::resync()).is_err() {
                             break;
                         }
                     }
@@ -122,13 +122,13 @@ pub(crate) fn run_stream(
                 }
                 for entry in &entries {
                     let data = serde_json::to_string(entry).unwrap_or_default();
-                    if sink.send(&sse::SseMessage::delta(entry.rev, data)).is_err() {
+                    if sink.send(&sse::Message::delta(entry.rev, data)).is_err() {
                         return cleanup(state, agent_id, sub_id);
                     }
                 }
             }
             Err(_) => {
-                if sink.send(&sse::SseMessage::resync()).is_err() {
+                if sink.send(&sse::Message::resync()).is_err() {
                     return cleanup(state, agent_id, sub_id);
                 }
             }
@@ -139,7 +139,7 @@ pub(crate) fn run_stream(
             let frames = drain_frames(state, agent_id, sub);
             for frame in &frames {
                 let data = serde_json::to_string(frame).unwrap_or_default();
-                if sink.send(&sse::SseMessage::stream(data)).is_err() {
+                if sink.send(&sse::Message::stream(data)).is_err() {
                     return cleanup(state, agent_id, sub_id);
                 }
             }
@@ -150,7 +150,7 @@ pub(crate) fn run_stream(
         // event so connected frontends refetch immediately.
         {
             let is_dirty = state.lock().ok().is_some_and(|mut b| b.take_dirty(agent_id));
-            if is_dirty && sink.send(&sse::SseMessage::invalidate()).is_err() {
+            if is_dirty && sink.send(&sse::Message::invalidate()).is_err() {
                 return cleanup(state, agent_id, sub_id);
             }
         }
