@@ -14,7 +14,8 @@ use crate::services::auth::types::{User, UserRole};
 // capability-grep gate clean — the qualified paths are reserved for
 // capabilities/types/tests.rs.
 use crate::services::auth::types::UserRole::{Admin, User as Regular};
-use crate::transport::{Backend, route_rest};
+use crate::transport::Backend;
+use crate::transport::router::route_rest;
 
 /// Build a bare [`User`] with the given role — only `role` matters to the
 /// dispatch guards under test.
@@ -40,7 +41,8 @@ fn state() -> Arc<Mutex<Backend>> {
 
 /// Dispatch one route through [`route_rest`] with the given caller.
 fn dispatch(state: &Arc<Mutex<Backend>>, method: &Method, segments: &[&str], caller: Option<&User>) -> u16 {
-    route_rest(method, segments, state, b"", "", None, caller).status
+    let ctx = crate::transport::RouteCtx { state, body_bytes: b"", query: "", auth_token: None, auth_user: caller };
+    route_rest(method, segments, ctx).status
 }
 
 /// V0.2a — every `/api/releases/*` route sits behind the single
