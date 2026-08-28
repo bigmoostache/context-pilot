@@ -37,7 +37,7 @@ impl ReleaseStore {
         if self.config.channel == channel {
             return Ok(());
         }
-        self.config.channel = channel.to_owned();
+        channel.clone_into(&mut self.config.channel);
         self.config.pending_channel_switch = true;
         self.persist();
         let mut st = UpdateState::load(&self.dir);
