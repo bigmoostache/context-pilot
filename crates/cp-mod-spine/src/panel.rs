@@ -34,7 +34,6 @@ fn push_notif_list(output: &mut String, header: Option<&str>, notifs: &[&crate::
 fn push_config_summary(output: &mut String, state: &State) {
     output.push_str("\n=== Spine Config ===\n");
     let cfg = &SpineState::get(state).config;
-    let _r1 = writeln!(output, "continue_until_todos_done: {}", cfg.continue_until_todos_done);
     let _r2 = writeln!(output, "auto_continuation_count: {}", cfg.auto_continuation_count);
     if let Some(v) = cfg.max_auto_retries {
         let _r3 = writeln!(output, "max_auto_retries: {v}");
@@ -238,13 +237,10 @@ fn push_config_blocks(blocks: &mut Vec<cp_render::Block>, state: &State) {
     use cp_render::{Block, Semantic, Span as S};
     let cfg = &SpineState::get(state).config;
     blocks.push(Block::Line(vec![S::styled("Config".into(), Semantic::Code)]));
-    blocks.push(Block::KeyValue(vec![
-        (
-            vec![S::muted("  continue_until_todos_done".into())],
-            vec![S::new(format!("{}", cfg.continue_until_todos_done))],
-        ),
-        (vec![S::muted("  auto_continuations".into())], vec![S::new(format!("{}", cfg.auto_continuation_count))]),
-    ]));
+    blocks.push(Block::KeyValue(vec![(
+        vec![S::muted("  auto_continuations".into())],
+        vec![S::new(format!("{}", cfg.auto_continuation_count))],
+    )]));
 }
 
 /// Push the active-watchers list (mode icon, recurrence, age) into `blocks`, if any.

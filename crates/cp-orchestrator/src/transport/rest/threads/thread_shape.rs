@@ -9,8 +9,39 @@
 //! both stay small and independently testable.
 
 use cp_wire::types::ThreadTurn;
+use cp_wire::types::snapshot::todo::{WireTask, WireTaskStatus};
 
 use crate::services::materialized_view::RosterEntry;
+
+/// Map a [`WireTaskStatus`] to its maquette wire string (lowercase `snake_case`,
+/// matching the agent's `TodoStatus` serde). `Unknown` degrades to `"planned"`
+/// rather than failing — a newer protocol status renders as a plain item.
+const fn task_status_str(status: WireTaskStatus) -> &'static str {
+    match status {
+        WireTaskStatus::Planned | WireTaskStatus::Unknown => "planned",
+        WireTaskStatus::InProgress => "in_progress",
+        WireTaskStatus::Done => "done",
+    }
+}
+
+/// Reshape one projected [`WireTask`] into the maquette `ThreadTask` JSON shape
+/// (`snake_case` → camelCase `parentId`), the read-only todo item the web aside
+/// renders. Cancelled tasks never reach here (excluded upstream).
+fn reshape_task(task: &WireTask) -> serde_json::Value {
+    serde_json::json!({
+        "id": task.id,
+        "parentId": task.parent_id,
+        "name": task.name,
+        "description": task.description,
+        "status": task_status_str(task.status),
+    })
+}
+
+/// Build the maquette `tasks` array for a roster entry — its projected tasks in
+/// order, each reshaped to the camelCase `ThreadTask` shape.
+fn roster_tasks_value(entry: &RosterEntry) -> serde_json::Value {
+    serde_json::Value::Array(entry.tasks.iter().map(reshape_task).collect())
+}
 
 /// Merge the live view roster into the disk-derived thread list (X848).
 ///
@@ -37,6 +68,10 @@ pub(crate) fn overlay_roster(details: &mut Vec<serde_json::Value>, roster: &[Ros
                         "lastActivity".to_owned(),
                         serde_json::Value::from(disk_activity.max(entry.last_activity_ms)),
                     ));
+                    // The view's projected task list is the fresher authority
+                    // (delta-fed) — it overrides any disk-derived first-paint
+                    // tasks.
+                    drop(obj.insert("tasks".to_owned(), roster_tasks_value(entry)));
                 }
             }
             None => details.push(synthesize_from_roster(entry, agent_id)),
@@ -58,6 +93,59 @@ fn synthesize_from_roster(entry: &RosterEntry, agent_id: &str) -> serde_json::Va
         "archived": entry.archived,
         "paused": entry.paused,
         "log": serde_json::Value::Array(Vec::new()),
+        "tasks": roster_tasks_value(entry),
+    })
+}
+
+/// Attach first-paint tasks to disk-derived thread details from the agent's
+/// `config.json` todo module (`modules.todo.todos`).
+///
+/// Thread-owned todos live **separately** from the thread record in the shared
+/// todo module, so [`reshape_thread`] cannot see them — it defaults `tasks` to
+/// empty. This fills that gap for the cold-start / pre-delta window: it groups
+/// the flat todo list by `thread_id`, excludes cancelled items (the projection
+/// contract), reshapes each to the camelCase `ThreadTask` shape, and writes the
+/// per-thread array onto the matching detail. The live [`overlay_roster`] then
+/// overrides these with the fresher view-fed task lists where the roster has
+/// them.
+///
+/// `config` is the parsed `config.json`; a missing todo module is tolerated
+/// (details keep their empty `tasks`).
+pub(crate) fn attach_disk_tasks(details: &mut [serde_json::Value], config: Option<&serde_json::Value>) {
+    let Some(todos) = config
+        .and_then(|c| c.get("modules"))
+        .and_then(|m| m.get("todo"))
+        .and_then(|t| t.get("todos"))
+        .and_then(serde_json::Value::as_array)
+    else {
+        return;
+    };
+
+    for detail in details.iter_mut() {
+        let Some(tid) = detail.get("id").and_then(serde_json::Value::as_str).map(str::to_owned) else {
+            continue;
+        };
+        let tasks: Vec<serde_json::Value> = todos
+            .iter()
+            .filter(|todo| todo.get("thread_id").and_then(serde_json::Value::as_str) == Some(tid.as_str()))
+            .filter(|todo| todo.get("status").and_then(serde_json::Value::as_str) != Some("cancelled"))
+            .map(disk_task_json)
+            .collect();
+        if let Some(obj) = detail.as_object_mut() {
+            let _prev = obj.insert("tasks".to_owned(), serde_json::Value::Array(tasks));
+        }
+    }
+}
+
+/// Reshape one raw `config.json` todo item into the maquette `ThreadTask` shape
+/// (`parent_id` → `parentId`; status kept as its `snake_case` wire string).
+fn disk_task_json(todo: &serde_json::Value) -> serde_json::Value {
+    serde_json::json!({
+        "id": todo.get("id").and_then(serde_json::Value::as_str).unwrap_or(""),
+        "parentId": todo.get("parent_id").and_then(serde_json::Value::as_str),
+        "name": todo.get("name").and_then(serde_json::Value::as_str).unwrap_or(""),
+        "description": todo.get("description").and_then(serde_json::Value::as_str).unwrap_or(""),
+        "status": todo.get("status").and_then(serde_json::Value::as_str).unwrap_or("planned"),
     })
 }
 
@@ -110,6 +198,7 @@ pub(crate) fn reshape_thread(raw: &serde_json::Value, agent_id: &str) -> serde_j
         "archived": raw.get("archived").and_then(serde_json::Value::as_bool).unwrap_or(false),
         "paused": raw.get("paused").and_then(serde_json::Value::as_bool).unwrap_or(false),
         "log": log,
+        "tasks": serde_json::Value::Array(Vec::new()),
     })
 }
 

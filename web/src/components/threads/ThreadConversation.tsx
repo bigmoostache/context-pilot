@@ -5,108 +5,17 @@ import { Message } from "@/components/conversation/Message"
 import { ThreadComposer, type CommandSuggestion } from "./ThreadComposer"
 import { CreateCommandDialog } from "./CreateCommandDialog"
 import { AgentEditorDialog } from "@/components/shell/behaviour/AgentEditorDialog"
-import { QuickLookSheet } from "@/components/finder/QuickLookSheet"
 import { useLibrary } from "@/lib/live"
 import { sendCommand } from "@/lib/api"
-import { extractDroppedFiles, zipDropped } from "@/lib/utils"
-import { uploadToNode, splitMessageSegments, type UploadedFile } from "./fileUpload/helpers"
+import { collectThreadFiles, useConversationDrop, type UploadedFile } from "./fileUpload/helpers"
 import { FormMessageRow } from "./forms/FormMessageRow"
 import { isFormMessage } from "./forms/helpers"
 import { useScrollPin, useThreadForms } from "./forms/useThreadForms"
 import { parseAutoLine, segmentLog, toChatMessage } from "@/lib/support/threadMessages"
-import { FileSidebar, type ThreadFile } from "./fileUpload/FileSidebar"
+import { ThreadAsideRail } from "./fileUpload/ThreadAsideRail"
+import { useThreadAside } from "./fileUpload/useThreadAside"
+import { useAsideDefault } from "@/lib/providers/toggles/asideDefault"
 import type { ThreadDetail, ThreadMsg } from "@/lib/types"
-
-/** True only for an actual OS *file* drag — a text/selection drag must not blur. */
-function isFileDrag(e: React.DragEvent): boolean {
-  return e.dataTransfer.types.includes("Files")
-}
-
-/** Keep the surface a valid drop target on every dragover (a file drag only)
- *  and show the copy cursor. Stateless — hoisted to module scope. */
-function handleDragOver(e: React.DragEvent) {
-  if (!isFileDrag(e)) return
-  e.preventDefault()
-  e.dataTransfer.dropEffect = "copy"
-}
-
-/** The drag-event handler set spread onto the conversation surface. Each is
- *  `undefined` when uploads are disabled so the surface neither blurs nor drops. */
-interface DropHandlers {
-  onDragEnter: ((e: React.DragEvent) => void) | undefined
-  onDragOver: ((e: React.DragEvent) => void) | undefined
-  onDragLeave: ((e: React.DragEvent) => void) | undefined
-  onDrop: ((e: React.DragEvent) => void) | undefined
-}
-
-/**
- * OS-file drag-and-drop onto the conversation surface (T367/T471). Returns the
- * `dragging` blur flag, the `uploading` overlay flag, and the drag handler set
- * — all inert (`undefined`) when `onAttach` is omitted. Extracted from
- * {@link ThreadConversation} so its body stays within the P8 line budget.
- *
- * dragenter/dragleave fire for every child crossed, so a depth counter tracks
- * "is the cursor still somewhere inside" rather than a flicker-prone boolean.
- */
-function useConversationDrop(onAttach: ((files: File[]) => void | Promise<void>) | undefined): {
-  dragging: boolean
-  uploading: boolean
-  dropHandlers: DropHandlers
-} {
-  const [dragging, setDragging] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const dragDepthRef = useRef(0)
-
-  const onDragEnter = (e: React.DragEvent) => {
-    if (!isFileDrag(e)) return
-    e.preventDefault()
-    dragDepthRef.current += 1
-    setDragging(true)
-  }
-  const onDragLeave = (e: React.DragEvent) => {
-    if (!isFileDrag(e)) return
-    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
-    if (dragDepthRef.current === 0) setDragging(false)
-  }
-  const runDrop = async (e: React.DragEvent) => {
-    if (!isFileDrag(e)) return
-    e.preventDefault()
-    dragDepthRef.current = 0
-    setDragging(false)
-    // Recurse into any dropped FOLDERS (plain `dataTransfer.files` can't — a
-    // folder drop otherwise yields one unreadable pseudo-file that uploaded as a
-    // failed "CORS … status null" request). extractDroppedFiles captures the
-    // Entry objects synchronously before its first await, so the neutered
-    // DataTransfer doesn't matter (T471).
-    const dropped = await extractDroppedFiles(e.dataTransfer)
-    if (dropped.length === 0) return
-    setUploading(true)
-    try {
-      // Zip the whole drop (folder structure preserved) into ONE archive and
-      // upload it in a single request — no per-file burst; awaiting keeps the
-      // loader up until it lands.
-      const archive = await zipDropped(dropped)
-      await onAttach?.([archive])
-    } catch {
-      // Zipping failed (unreadable file / fflate error) — fall back to the raw
-      // files so a drop is never silently lost.
-      await onAttach?.(dropped.map((d) => d.file))
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  const dropHandlers: DropHandlers = onAttach
-    ? {
-        onDragEnter,
-        onDragOver: handleDragOver,
-        onDragLeave,
-        onDrop: (e) => void runDrop(e),
-      }
-    : { onDragEnter: undefined, onDragOver: undefined, onDragLeave: undefined, onDrop: undefined }
-
-  return { dragging, uploading, dropHandlers }
-}
 
 /**
  * A collapsed run of auto tool-activity traces, rendered as an aligned
@@ -215,19 +124,6 @@ const MessageRow = memo(
   (a, b) => a.msg === b.msg && a.agentId === b.agentId,
 )
 
-/** Collect every file-upload block across all messages for the sidebar rail. */
-function collectThreadFiles(log: ThreadMsg[]): ThreadFile[] {
-  const result: ThreadFile[] = []
-  for (const msg of log) {
-    const cm = toChatMessage(msg)
-    const segments = splitMessageSegments(cm.text ?? "")
-    for (const seg of segments) {
-      if (seg.type === "file") result.push({ file: seg.file, role: cm.role })
-    }
-  }
-  return result
-}
-
 /**
  * Large restore-from-archive bar shown above the composer while viewing an
  * archived thread (T709). Signal-accented, full width within the composer
@@ -276,6 +172,24 @@ function CommandEditDialog({
 }
 
 /**
+ * Project the live prompt library into the composer's `/command` suggestions.
+ * A command's slash invocation is `/${id}` (the file-stem slug). Hoisted to
+ * module scope so the {@link ThreadConversation} render stays within budget.
+ */
+function buildSuggestions(
+  library: { kind: string; id: string; name: string; description: string; body?: string }[],
+): CommandSuggestion[] {
+  return library
+    .filter((item) => item.kind === "command")
+    .map((item) => ({
+      command: `/${item.id}`,
+      name: item.name,
+      description: item.description,
+      body: item.body,
+    }))
+}
+
+/**
  * Center pane — the selected thread's full conversation + composer.
  *
  * Intentionally header-less: the thread's identity (name + turn status) already
@@ -292,6 +206,7 @@ export function ThreadConversation({
   onRemoveFile,
   onShowInFinder,
   onUnarchive,
+  leftRailHidden = false,
 }: {
   thread: ThreadDetail
   /** owning agent — needed to open the shared Quick Look drawer for an attachment */
@@ -308,11 +223,16 @@ export function ThreadConversation({
   onShowInFinder?: ((path: string) => void) | undefined
   /** restore this thread from the archive — only rendered when the thread is archived (T709) */
   onUnarchive?: (() => void) | undefined
+  /** Whether the left thread-list rail is hidden (T680). Forwarded to the right
+   *  aside so a file preview widens to half the viewport when the left rail is
+   *  collapsed. Defaults to false (the 40vw behaviour) so nothing breaks if a
+   *  caller omits it. */
+  leftRailHidden?: boolean | undefined
 }) {
-  // The attachment whose Quick Look drawer is open (null = closed). A
-  // `file-upload` chip in any message sets it; the shared QuickLookSheet renders
-  // it with the exact same FinderPreview the Finder uses.
-  const [sheetFile, setSheetFile] = useState<UploadedFile | null>(null)
+  // Unified right-rail aside state (T662) — see useThreadAside. Per-thread
+  // show/hide (T677) is seeded from the global default (Settings › General).
+  const { defaultHidden } = useAsideDefault()
+  const aside = useThreadAside(agentId, thread.id, defaultHidden)
 
   // ── OS-file drag-and-drop onto the whole conversation (T367) ──────────
   // Dragging files from the OS anywhere over the <main> uploads them exactly as
@@ -340,16 +260,7 @@ export function ThreadConversation({
   // composer surfaces them both as first-message bubbles on an empty thread AND
   // mid-draft on any thread when the caret's line is a lone `/` (T350). The
   // `firstMessage` flag below scopes only the empty-composer auto-show.
-  const suggestions = useMemo<CommandSuggestion[]>(() => {
-    return library
-      .filter((item) => item.kind === "command")
-      .map((item) => ({
-        command: `/${item.id}`,
-        name: item.name,
-        description: item.description,
-        body: item.body,
-      }))
-  }, [library])
+  const suggestions = useMemo<CommandSuggestion[]>(() => buildSuggestions(library), [library])
   // Pin the conversation to the latest message: scroll to the bottom whenever
   // a thread is opened (id change) or a new NON-AUTO message lands (user or
   // assistant text — not tool-activity traces). Auto messages update the tool
@@ -382,7 +293,7 @@ export function ThreadConversation({
 
   return (
     <main
-      className="relative flex min-w-0 flex-1 flex-row bg-background"
+      className="relative flex min-w-0 flex-1 flex-row overflow-hidden bg-background"
       // Filter is applied ONLY while dragging. A permanent `blur(0px)` (the old
       // idle value) is still a non-`none` filter, so it promotes the ENTIRE
       // conversation to a single GPU compositor layer. On a very tall thread
@@ -413,7 +324,7 @@ export function ThreadConversation({
       )}
 
       {/* ── Conversation column ── */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="mx-2 flex min-w-0 flex-1 flex-col pb-2">
         <ScrollArea className="min-h-0 flex-1">
           <div className="mx-auto flex max-w-[720px] flex-col px-5 py-4">
             <div className="mb-3 flex items-center gap-2">
@@ -435,7 +346,7 @@ export function ThreadConversation({
                   threadId={thread.id}
                   answersByForm={answersByForm}
                   onFormSubmit={onFormSubmit}
-                  onOpenFile={setSheetFile}
+                  onOpenFile={aside.openFile}
                   onShowInFinder={onShowInFinder}
                   onDelete={handleDelete}
                 />
@@ -444,7 +355,7 @@ export function ThreadConversation({
                   key={seg.msg.id}
                   msg={seg.msg}
                   agentId={agentId}
-                  onOpenFile={setSheetFile}
+                  onOpenFile={aside.openFile}
                   onShowInFinder={onShowInFinder}
                   onDelete={handleDelete}
                 />
@@ -476,14 +387,15 @@ export function ThreadConversation({
         </div>
       </div>
 
-      {/* ── File attachments rail ── */}
-      {threadFiles.length > 0 && <FileSidebar files={threadFiles} onOpen={setSheetFile} />}
-
-      <QuickLookSheet
-        node={sheetFile ? uploadToNode(sheetFile) : null}
+      {/* ── Unified right rail: Files + Tasks tabs, inline preview + show/hide
+          chrome (T662/T677). Extracted to ThreadAsideRail to keep this render
+          body under the 500-line file budget. */}
+      <ThreadAsideRail
         agentId={agentId}
-        open={sheetFile !== null}
-        onClose={() => setSheetFile(null)}
+        files={threadFiles}
+        tasks={thread.tasks ?? []}
+        aside={aside}
+        leftRailHidden={leftRailHidden}
       />
 
       <CreateCommandDialog

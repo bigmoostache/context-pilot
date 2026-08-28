@@ -150,6 +150,7 @@ export function ThreadsView({
           pendingFiles={sel.pendingFiles}
           onRemoveFile={(i) => sel.setPendingFiles((prev) => prev.filter((_, idx) => idx !== i))}
           onShowInFinder={onShowInFinder}
+          leftRailHidden={!railOpen}
           onUnarchive={() => {
             actions.handleArchive(thread.id)
             sel.setShowArchived(false)

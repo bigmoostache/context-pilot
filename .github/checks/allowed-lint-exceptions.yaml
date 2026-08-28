@@ -316,11 +316,20 @@ exceptions:
     strategy: >
       Irreducible — a 10-arg constructor trips too_many_arguments; the exhaustive literal is honest.
 
-  - path: "crates/cp-wire/src/types/oplog.rs"
+  - path: "crates/cp-wire/src/types/oplog/mod.rs"
     match: "OpEntryKind carries an Unknown catch-all for N-1 tolerance"
     reason: >
       OpEntryKind has an Unknown catch-all and is constructed cross-crate (the agent
       emits every kind); non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — the Unknown variant already provides forward-compat.
+
+  - path: "crates/cp-wire/src/types/snapshot/todo.rs"
+    match: "WireTaskStatus carries an Unknown catch-all for N-1 forward-compat"
+    reason: >
+      WireTaskStatus has an Unknown catch-all for N-1 forward-compat and is constructed
+      cross-crate (the agent projects task statuses); non_exhaustive would forbid that
+      construction and add nothing the Unknown variant does not already provide.
     strategy: >
       Irreducible — the Unknown variant already provides forward-compat.
 
@@ -385,6 +394,16 @@ exceptions:
       grouping, so #[non_exhaustive] is impossible.
     strategy: >
       Irreducible — a 6-arg constructor trips too_many_arguments; the exhaustive literal is honest.
+
+  - path: "crates/cp-wire/src/types/snapshot/todo.rs"
+    match: "wire value object: all five fields are public, stable, and built by cross-crate consumers via a struct literal"
+    reason: >
+      WireTask is the five-field read-only task projection, built by struct literal cross-crate
+      (the agent's task projection and the orchestrator's first-paint read). A constructor would
+      take five positional arguments (tripping too_many_arguments) with no natural grouping, so
+      #[non_exhaustive] is impossible.
+    strategy: >
+      Irreducible — a five-arg constructor trips too_many_arguments; the exhaustive literal is honest.
 
   # ── exhaustive_enums: T671 read-path query contracts ─────────────────
   # The read-plane mirror of the command contracts above: query Kind is built

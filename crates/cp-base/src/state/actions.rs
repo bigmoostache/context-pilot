@@ -133,8 +133,6 @@ pub enum Action {
     ConfigNextTheme,
     /// Cycle to previous theme.
     ConfigPrevTheme,
-    /// Toggle spine auto-continuation on/off.
-    ConfigToggleAutoContinue,
     /// Make think reminder threshold less negative (more frequent reminders).
     ConfigThinkThresholdUp,
     /// Make think reminder threshold more negative (less frequent reminders).

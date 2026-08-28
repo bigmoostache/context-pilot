@@ -96,10 +96,6 @@ pub enum ContinuationAction {
 /// Configuration for spine module (per-worker, persisted)
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct SpineConfig {
-    /// Whether to continue until all todos are done
-    #[serde(default)]
-    pub continue_until_todos_done: bool,
-
     // === Guard Rail Limits (all nullable = disabled by default) ===
     /// Max total output tokens before blocking auto-continuation
     #[serde(default)]

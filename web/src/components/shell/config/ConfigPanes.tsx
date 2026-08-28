@@ -12,6 +12,7 @@ import { fetchSettings, updateSettings, fetchEnvKeys } from "@/lib/api"
 import { useAuth } from "@/lib/providers/auth"
 import { useDevMode } from "@/lib/providers/toggles/devMode"
 import { useShowOverlay } from "@/lib/providers/toggles/showOverlay"
+import { useAsideDefault } from "@/lib/providers/toggles/asideDefault"
 import { cn } from "@/lib/utils"
 
 // ── per-category bodies ───────────────────────────────────────────
@@ -110,8 +111,8 @@ function ServiceRow({ label, available }: { label: string; available: boolean })
   return (
     <div
       className={cn(
-        "flex items-center gap-3 rounded-xl border px-3.5 py-3 transition-colors",
-        available ? "border-border bg-card" : "border-border/50 bg-muted/20 opacity-55",
+        "flex items-center gap-3 rounded-lg px-3.5 py-3 transition-colors",
+        available ? "card-shadow bg-card" : "bg-muted/20 opacity-55",
       )}
     >
       <span
@@ -149,6 +150,7 @@ function GeneralPane() {
       <ToggleRow name="Think reminders" detail="Periodic nudge to reason before acting" on />
       <DevModeToggle />
       <ShowOverlayToggle />
+      <AsideDefaultToggle />
       <AccessControlToggle />
     </Stack>
   )
@@ -231,7 +233,7 @@ function AllowedModelsSection() {
     <FieldGroup label="Allowed models" hint="Which models your users may pick">
       <label
         htmlFor="allow-all-models"
-        className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-3.5 py-2.5"
+        className="card-shadow flex items-center gap-2.5 rounded-lg bg-card px-3.5 py-2.5"
       >
         <input
           id="allow-all-models"
@@ -328,6 +330,26 @@ function ShowOverlayToggle() {
   )
 }
 
+/**
+ * The **thread details rail** default (T677): whether the Files/Tasks aside
+ * beside a conversation is shown by default. A pure client-side view preference
+ * ({@link useAsideDefault}, `localStorage`-backed). Each thread still remembers
+ * its own show/hide choice; this only sets the fallback for a thread you haven't
+ * toggled yet. Surfaced as "shown by default" so ON = show (the requested
+ * default), OFF = hidden.
+ */
+function AsideDefaultToggle() {
+  const { defaultHidden, setDefaultHidden } = useAsideDefault()
+  return (
+    <ToggleRow
+      name="Thread details rail"
+      detail="Show the Files & Tasks rail beside conversations by default"
+      value={!defaultHidden}
+      onChange={(next) => setDefaultHidden(!next)}
+    />
+  )
+}
+
 // ── building blocks ───────────────────────────────────────────────
 function Stack({ children }: { children: React.ReactNode }) {
   return <div className="flex flex-col gap-2.5">{children}</div>
@@ -381,7 +403,7 @@ function ToggleRow({
   return (
     <button
       onClick={handleToggle}
-      className="card-shadow flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-3 text-left"
+      className="card-shadow flex items-center gap-2.5 rounded-lg bg-card px-3.5 py-3 text-left"
     >
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-[13px] font-medium text-foreground/90">{name}</span>

@@ -157,7 +157,7 @@ export function MarkdownEditor({
     >
       <Toolbar editor={editor} extra={toolbarExtra} />
       {inTable && <TableContextBar editor={editor} />}
-      <div className="relative min-h-0 flex-1 overflow-y-auto">
+      <div className="scrollbar-hidden relative min-h-0 flex-1 overflow-y-auto">
         <EditorContent editor={editor} className="min-h-full" />
       </div>
     </div>

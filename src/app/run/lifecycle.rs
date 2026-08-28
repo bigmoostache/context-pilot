@@ -355,9 +355,6 @@ impl App {
     /// Evaluates guard rails and auto-continuation logic.
     /// If a continuation fires, starts streaming.
     fn check_spine(&mut self, tx: &Sender<StreamEvent>) {
-        // Check if incomplete todos should trigger auto-continuation
-        self.check_todo_continuation();
-
         // Idle is the implicit no-op tail — a non_exhaustive enum forbids a
         // cross-crate exhaustive match, so the two actionable variants are
         // handled via if-let and Idle simply falls through.
@@ -399,42 +396,6 @@ impl App {
         } else {
             // SpineDecision::Idle — no auto-continuation, nothing to do.
         }
-    }
-
-    /// Check if todos need auto-continuation. Creates a single deduplicated
-    /// notification — the spine's normal flow handles the rest.
-    fn check_todo_continuation(&mut self) {
-        if !SpineState::get(&self.state).config.continue_until_todos_done {
-            return;
-        }
-        if self.state.flags.stream.phase.is_streaming() {
-            return;
-        }
-        // Deduplicate: don't create if one already exists unprocessed
-        let already = SpineState::get(&self.state)
-            .notifications
-            .iter()
-            .any(|n| !n.is_processed() && n.source == "todo_continuation");
-        if already {
-            return;
-        }
-        let ts = cp_mod_todo::types::TodoState::get(&self.state);
-        if !ts.has_incomplete_todos() {
-            return;
-        }
-        // Report only the COUNT plus the FIRST incomplete item — never the full
-        // list. On a large roadmap (hundreds of todos) dumping every remaining
-        // entry floods the model with redundant tokens on every auto-continuation
-        // tick; the count conveys the scale and the first item points at what to
-        // pick up next, which is all the continuation nudge needs (T361).
-        let summary = ts.incomplete_todos_summary();
-        let first = summary.first().map_or("", String::as_str);
-        let _r = SpineState::create_notification(
-            &mut self.state,
-            NotificationType::Custom,
-            "todo_continuation".to_owned(),
-            format!("Non-completed todo items ({}). First: {first}", summary.len()),
-        );
     }
 
     /// Tick the dirty flag at 10fps **only while something on-screen is actually

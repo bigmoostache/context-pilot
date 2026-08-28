@@ -91,6 +91,7 @@ fn snapshot_round_trip_with_roster() {
         paused: false,
         last_activity_ms: 1_700,
         msg_count: 3,
+        tasks: Vec::new(),
     });
     let json = serde_json::to_string(&snapshot).expect("serialize");
     let back: Snapshot = serde_json::from_str(&json).expect("deserialize");

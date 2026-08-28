@@ -28,7 +28,9 @@ impl TodoPanel {
             }
             line.push('\n');
 
-            for child in todos.iter().filter(|t| t.parent_id.as_ref() == Some(&todo.id)) {
+            for child in
+                todos.iter().filter(|t| t.parent_id.as_ref() == Some(&todo.id) && t.status != TodoStatus::Cancelled)
+            {
                 line.push_str(&format_todo(child, todos, indent.saturating_add(1)));
             }
 
@@ -36,12 +38,19 @@ impl TodoPanel {
         }
 
         let ts = TodoState::get(state);
-        if ts.todos.is_empty() {
-            return "No todos".to_owned();
+        let Some(focus) = ts.focus_filter.as_deref() else {
+            return "No focused thread".to_owned();
+        };
+
+        // Items of the focused thread, excluding soft-deleted (cancelled) ones.
+        let visible: Vec<&TodoItem> =
+            ts.todos.iter().filter(|t| t.thread_id == focus && t.status != TodoStatus::Cancelled).collect();
+        if visible.is_empty() {
+            return "No tasks".to_owned();
         }
 
         let mut output = String::new();
-        for todo in ts.todos.iter().filter(|t| t.parent_id.is_none()) {
+        for todo in visible.iter().filter(|t| t.parent_id.is_none()) {
             output.push_str(&format_todo(todo, &ts.todos, 0));
         }
 
@@ -61,7 +70,8 @@ impl Panel for TodoPanel {
             indent: usize,
             lines: &mut Vec<TodoLine>,
         ) {
-            for todo in todos.iter().filter(|t| t.parent_id.as_ref() == parent_id) {
+            for todo in todos.iter().filter(|t| t.parent_id.as_ref() == parent_id && t.status != TodoStatus::Cancelled)
+            {
                 lines.push((indent, todo.id.clone(), todo.name.clone(), todo.status, todo.description.clone()));
                 collect_todo_lines(todos, Some(&todo.id), indent.saturating_add(1), lines);
             }
@@ -70,20 +80,27 @@ impl Panel for TodoPanel {
         use cp_render::{Block, Semantic, Span as S};
         let ts = TodoState::get(state);
 
-        if ts.todos.is_empty() {
-            return vec![Block::Line(vec![S::muted("  No todos".into()).italic()])];
+        let Some(focus) = ts.focus_filter.as_deref() else {
+            return vec![Block::Line(vec![S::muted("  No focused thread".into()).italic()])];
+        };
+
+        // Restrict to the focused thread's items before flattening the tree.
+        let scoped: Vec<TodoItem> = ts.todos.iter().filter(|t| t.thread_id == focus).cloned().collect();
+        if scoped.iter().all(|t| t.status == TodoStatus::Cancelled) {
+            return vec![Block::Line(vec![S::muted("  No tasks".into()).italic()])];
         }
 
         let mut todo_lines: Vec<TodoLine> = Vec::new();
-        collect_todo_lines(&ts.todos, None, 0, &mut todo_lines);
+        collect_todo_lines(&scoped, None, 0, &mut todo_lines);
 
         let mut blocks = Vec::new();
         for (indent, id, name, status, description) in todo_lines {
             let prefix = "  ".repeat(indent);
             let (status_char, status_sem) = match status {
-                TodoStatus::Pending => (' ', Semantic::Muted),
+                TodoStatus::Planned => (' ', Semantic::Muted),
                 TodoStatus::InProgress => ('~', Semantic::Warning),
                 TodoStatus::Done => ('x', Semantic::Success),
+                TodoStatus::Cancelled => ('/', Semantic::Muted),
             };
             let name_sem = if status == TodoStatus::Done { Semantic::Muted } else { Semantic::Default };
 
@@ -124,7 +141,7 @@ impl Panel for TodoPanel {
     }
 
     fn max_freezes(&self) -> u8 {
-        0
+        5
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {

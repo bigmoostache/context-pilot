@@ -1,5 +1,9 @@
+import { useRef, useState } from "react"
 import { kindOf } from "@/components/finder/support/kind"
-import type { FinderNode } from "@/lib/types"
+import type { FinderNode, ThreadMsg } from "@/lib/types"
+import { toChatMessage } from "@/lib/support/threadMessages"
+import { extractDroppedFiles, zipDropped } from "@/lib/utils"
+import type { ThreadFile } from "./FileSidebar"
 // `UploadedFile` + `buildUploadMessage` now live in the shared `@/lib` layer so
 // the mobile thread tree can consume the same upload logic without importing
 // back into `@/components/…` (mirror leak-guard, design-mobile.md §3.2). Kept
@@ -105,4 +109,114 @@ export function splitMessageSegments(text: string): MessageSegment[] {
  *  shared Quick Look drawer (kind inferred from the filename, like the Finder). */
 export function uploadToNode(f: UploadedFile): FinderNode {
   return { name: f.name, path: f.path, kind: kindOf(f.name), size: f.size, modified: "" }
+}
+
+/** Collect every file-upload block across all messages for the sidebar rail. */
+export function collectThreadFiles(log: ThreadMsg[]): ThreadFile[] {
+  const result: ThreadFile[] = []
+  for (const msg of log) {
+    const cm = toChatMessage(msg)
+    const segments = splitMessageSegments(cm.text ?? "")
+    for (const seg of segments) {
+      if (seg.type === "file") result.push({ file: seg.file, role: cm.role })
+    }
+  }
+  return result
+}
+
+// ── OS-file drag-and-drop (T367/T471) ────────────────────────────────────────
+
+/** True only for an actual OS *file* drag — a text/selection drag must not blur. */
+function isFileDrag(e: React.DragEvent): boolean {
+  return e.dataTransfer.types.includes("Files")
+}
+
+/** Keep the surface a valid drop target on every dragover (a file drag only)
+ *  and show the copy cursor. Stateless — hoisted to module scope. */
+function handleDragOver(e: React.DragEvent) {
+  if (!isFileDrag(e)) return
+  e.preventDefault()
+  e.dataTransfer.dropEffect = "copy"
+}
+
+/** The drag-event handler set spread onto the conversation surface. Each is
+ *  `undefined` when uploads are disabled so the surface neither blurs nor drops. */
+export interface DropHandlers {
+  onDragEnter: ((e: React.DragEvent) => void) | undefined
+  onDragOver: ((e: React.DragEvent) => void) | undefined
+  onDragLeave: ((e: React.DragEvent) => void) | undefined
+  onDrop: ((e: React.DragEvent) => void) | undefined
+}
+
+/**
+ * OS-file drag-and-drop onto the conversation surface (T367/T471). Returns the
+ * `dragging` blur flag, the `uploading` overlay flag, and the drag handler set
+ * — all inert (`undefined`) when `onAttach` is omitted. Lives here in the
+ * fileUpload helpers (rather than a standalone module) so the `fileUpload/`
+ * folder stays within its 8-entry cap while `ThreadConversation` keeps this
+ * ~90-line block out of its own 500-line budget.
+ *
+ * dragenter/dragleave fire for every child crossed, so a depth counter tracks
+ * "is the cursor still somewhere inside" rather than a flicker-prone boolean.
+ */
+export function useConversationDrop(
+  onAttach: ((files: File[]) => void | Promise<void>) | undefined,
+): {
+  dragging: boolean
+  uploading: boolean
+  dropHandlers: DropHandlers
+} {
+  const [dragging, setDragging] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const dragDepthRef = useRef(0)
+
+  const onDragEnter = (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return
+    e.preventDefault()
+    dragDepthRef.current += 1
+    setDragging(true)
+  }
+  const onDragLeave = (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
+    if (dragDepthRef.current === 0) setDragging(false)
+  }
+  const runDrop = async (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return
+    e.preventDefault()
+    dragDepthRef.current = 0
+    setDragging(false)
+    // Recurse into any dropped FOLDERS (plain `dataTransfer.files` can't — a
+    // folder drop otherwise yields one unreadable pseudo-file that uploaded as a
+    // failed "CORS … status null" request). extractDroppedFiles captures the
+    // Entry objects synchronously before its first await, so the neutered
+    // DataTransfer doesn't matter (T471).
+    const dropped = await extractDroppedFiles(e.dataTransfer)
+    if (dropped.length === 0) return
+    setUploading(true)
+    try {
+      // Zip the whole drop (folder structure preserved) into ONE archive and
+      // upload it in a single request — no per-file burst; awaiting keeps the
+      // loader up until it lands.
+      const archive = await zipDropped(dropped)
+      await onAttach?.([archive])
+    } catch {
+      // Zipping failed (unreadable file / fflate error) — fall back to the raw
+      // files so a drop is never silently lost.
+      await onAttach?.(dropped.map((d) => d.file))
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const dropHandlers: DropHandlers = onAttach
+    ? {
+        onDragEnter,
+        onDragOver: handleDragOver,
+        onDragLeave,
+        onDrop: (e) => void runDrop(e),
+      }
+    : { onDragEnter: undefined, onDragOver: undefined, onDragLeave: undefined, onDrop: undefined }
+
+  return { dragging, uploading, dropHandlers }
 }

@@ -4,10 +4,9 @@ import { Message } from "@/mobile-components/conversation/Message"
 import { ThreadComposer, type CommandSuggestion } from "@/mobile-components/threads/ThreadComposer"
 import { CreateCommandDialog } from "@/mobile-components/threads/CreateCommandDialog"
 import { AgentEditorDialog } from "@/mobile-components/shell/behaviour/AgentEditorDialog"
-import { QuickLookSheet } from "@/mobile-components/finder/QuickLookSheet"
 import { useLibrary } from "@/lib/live"
 import { sendCommand } from "@/lib/api"
-import { uploadToNode, type UploadedFile } from "@/mobile-components/threads/fileUpload/helpers"
+import type { UploadedFile } from "@/mobile-components/threads/fileUpload/helpers"
 import { FormMessageRow } from "@/mobile-components/threads/forms/FormMessageRow"
 import { isFormMessage } from "@/mobile-components/threads/forms/helpers"
 import { useScrollPin, useThreadForms } from "@/mobile-components/threads/forms/useThreadForms"
@@ -136,10 +135,14 @@ export function ThreadConversation({
   /** navigate the Finder to a file's parent directory and select it (T334) */
   onShowInFinder?: ((path: string) => void) | undefined
 }) {
-  // The attachment whose Quick Look drawer is open (null = closed). A
-  // `file-upload` chip in any message sets it; the shared QuickLookSheet renders
-  // it with the exact same FinderPreview the Finder uses.
-  const [sheetFile, setSheetFile] = useState<UploadedFile | null>(null)
+  // T662 (mobile): the file-preview drawer was retired to match desktop. A
+  // single full-width phone column can't host desktop's inline side-rail
+  // preview, so tapping a file chip now opens it in the Finder (its natural
+  // home) instead of a thread-local Quick Look sheet.
+  const openInFinder = useCallback(
+    (file: UploadedFile) => onShowInFinder?.(file.path),
+    [onShowInFinder],
+  )
 
   // Whether the "create command" dialog (T350) is open — toggled by the pill
   // the composer renders beside the /command suggestion bubbles.
@@ -249,7 +252,7 @@ export function ThreadConversation({
                 threadId={thread.id}
                 answersByForm={answersByForm}
                 onFormSubmit={onFormSubmit}
-                onOpenFile={setSheetFile}
+                onOpenFile={openInFinder}
                 onShowInFinder={onShowInFinder}
                 onDelete={handleDelete}
               />
@@ -258,7 +261,7 @@ export function ThreadConversation({
                 key={seg.msg.id}
                 msg={seg.msg}
                 agentId={agentId}
-                onOpenFile={setSheetFile}
+                onOpenFile={openInFinder}
                 onShowInFinder={onShowInFinder}
                 onDelete={handleDelete}
                 fresh={seg.msg.id === freshId}
@@ -297,13 +300,6 @@ export function ThreadConversation({
           commandKey={`cp-cmd-${agentId}-${thread.id}`}
         />
       </div>
-
-      <QuickLookSheet
-        node={sheetFile ? uploadToNode(sheetFile) : null}
-        agentId={agentId}
-        open={sheetFile !== null}
-        onClose={() => setSheetFile(null)}
-      />
 
       <CreateCommandDialog
         open={createCmdOpen}

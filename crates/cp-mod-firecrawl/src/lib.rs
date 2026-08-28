@@ -88,6 +88,7 @@ impl Module for FirecrawlModule {
         let t = &*TOOL_TEXTS;
         vec![
             ToolDefinition::from_yaml("firecrawl_scrape", t)
+                .declares_task()
                 .short_desc("Scrape a URL for full content")
                 .category("Web Scrape")
                 .param("url", ParamType::String, true)
@@ -102,6 +103,7 @@ impl Module for FirecrawlModule {
                 )
                 .build(),
             ToolDefinition::from_yaml("firecrawl_search", t)
+                .declares_task()
                 .short_desc("Search and scrape in one call")
                 .category("Web Scrape")
                 .param("query", ParamType::String, true)
@@ -112,6 +114,7 @@ impl Module for FirecrawlModule {
                 .param("location", ParamType::String, false)
                 .build(),
             ToolDefinition::from_yaml("firecrawl_map", t)
+                .declares_task()
                 .short_desc("Discover all URLs on a domain")
                 .category("Web Scrape")
                 .param("url", ParamType::String, true)
@@ -128,6 +131,7 @@ impl Module for FirecrawlModule {
                 )
                 .build(),
             ToolDefinition::from_yaml("firecrawl_crawl", t)
+                .declares_task()
                 .short_desc("Recursively crawl a site")
                 .category("Web Scrape")
                 .param("url", ParamType::String, true)

@@ -17,6 +17,7 @@
 // P8 budgets and each concern is independently readable.
 
 import type { Agent, ThreadDetail } from "../types"
+import { foldTaskList } from "./taskReducer"
 
 // ── Oplog delta shape (the push-plane payload) ───────────────────────
 //
@@ -292,6 +293,9 @@ export function applyThreadDelta(
     }
     case "thread_status_changed": {
       return foldThreadFlag(prev, k.thread_id, { status: turnToStatus(k.status) })
+    }
+    case "task_list_changed": {
+      return foldTaskList(prev, k)
     }
     case "thread_focus_changed": {
       return foldThreadFocus(prev, k)

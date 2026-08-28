@@ -11,6 +11,7 @@ import { AccountProvider } from "@/lib/providers/AccountProvider"
 import { AuthProvider } from "@/lib/providers/AuthProvider"
 import { DevModeProvider } from "@/lib/providers/toggles/DevModeProvider"
 import { ShowOverlayProvider } from "@/lib/providers/toggles/ShowOverlayProvider"
+import { AsideDefaultProvider } from "@/lib/providers/toggles/AsideDefaultProvider"
 import { useFleet } from "@/lib/live"
 import { TopButtonsProvider } from "@/lib/providers/topButtons/provider"
 import { useTopButtons } from "@/lib/providers/topButtons"
@@ -66,13 +67,15 @@ function Root() {
         <AccountProvider>
           <DevModeProvider>
             <ShowOverlayProvider>
-              <TooltipProvider delay={350} closeDelay={80}>
-                <AuthGuard>
-                  <TopButtonsProvider>
-                    <MobileShell />
-                  </TopButtonsProvider>
-                </AuthGuard>
-              </TooltipProvider>
+              <AsideDefaultProvider>
+                <TooltipProvider delay={350} closeDelay={80}>
+                  <AuthGuard>
+                    <TopButtonsProvider>
+                      <MobileShell />
+                    </TopButtonsProvider>
+                  </AuthGuard>
+                </TooltipProvider>
+              </AsideDefaultProvider>
             </ShowOverlayProvider>
           </DevModeProvider>
         </AccountProvider>

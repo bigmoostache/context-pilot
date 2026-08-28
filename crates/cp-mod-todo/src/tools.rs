@@ -1,114 +1,91 @@
-use cp_base::state::context::Kind;
+//! Pure task operations for the thread-owned todo model.
+//!
+//! Every entry point takes an explicit `thread_id` and is **free of any
+//! `cp-mod-threads` dependency** (the focused thread is resolved by the main
+//! crate and passed down — see the design doc §8 dependency-injection rule).
+//! These functions never touch panels: the panel-refresh asymmetry (structural
+//! `Think.todo` deprecates the panel, `todo_mark` does not) is the caller's
+//! responsibility.
+
+use serde::Deserialize;
+
 use cp_base::state::runtime::State;
-use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::types::{TodoItem, TodoState, TodoStatus};
-use std::fmt::Write as _;
 
-/// Normalize a `parent_id` JSON value: treat `null`, `"none"`, `"null"`, `""`
-/// as `None`. Returns the trimmed owned id otherwise.
-fn normalize_parent_id(value: &serde_json::Value) -> Option<String> {
-    value
-        .get("parent_id")
-        .and_then(|v| {
-            if v.is_null() {
-                return None;
-            }
-            v.as_str()
-        })
-        .filter(|s| {
-            let lower = s.to_lowercase();
-            !s.is_empty() && lower != "none" && lower != "null"
-        })
-        .map(str::to_owned)
+// =============================================================================
+// Input / output types
+// =============================================================================
+
+/// One node of the recursive upsert forest accepted by `Think.todo`.
+///
+/// `id` absent → **create**; present → **update** (partial patch). `children`
+/// are descendants of this node. `status` is a raw string so tool ergonomics
+/// aliases (`~`, `x`, `/`) parse alongside the canonical wire values.
+#[derive(Debug, Default, Deserialize)]
+pub struct TodoNode {
+    /// Existing id → update; absent → create.
+    #[serde(default)]
+    pub id: Option<String>,
+    /// Title. Required on create, optional on update.
+    #[serde(default)]
+    pub name: Option<String>,
+    /// Detailed description.
+    #[serde(default)]
+    pub description: Option<String>,
+    /// Status (canonical wire value or ergonomics alias).
+    #[serde(default)]
+    pub status: Option<String>,
+    /// Reparent an existing item under an already-existing id (rare).
+    #[serde(default)]
+    pub parent_id: Option<String>,
+    /// Nodes living under this node.
+    #[serde(default)]
+    pub children: Vec<Self>,
 }
 
-/// Create a single todo from one JSON entry. Returns the `"id: name"` label on
-/// success, or an error message (missing name, unknown parent) on failure.
-fn create_one_todo(todo_value: &serde_json::Value, state: &mut State) -> Result<String, String> {
-    let Some(name) = todo_value.get("name").and_then(|v| v.as_str()).map(str::to_owned) else {
-        return Err("Missing 'name' in todo".to_owned());
-    };
-    let description = todo_value.get("description").and_then(|v| v.as_str()).unwrap_or("").to_owned();
-    let parent_id = normalize_parent_id(todo_value);
-
-    // Validate parent exists if specified.
-    let ts = TodoState::get(state);
-    if let Some(pid) = parent_id.as_ref()
-        && !ts.todos.iter().any(|t| t.id == *pid)
-    {
-        let available: Vec<&str> = ts.todos.iter().map(|t| t.id.as_str()).collect();
-        let available_str = if available.is_empty() {
-            "no todos exist yet".to_owned()
-        } else {
-            format!("available: {}", available.join(", "))
-        };
-        return Err(format!("Parent '{pid}' not found for '{name}' ({available_str})"));
-    }
-
-    let status =
-        todo_value.get("status").and_then(|v| v.as_str()).and_then(|s| s.parse().ok()).unwrap_or(TodoStatus::Pending);
-
-    let ts_mut = TodoState::get_mut(state);
-    let id = format!("X{}", ts_mut.next_todo_id);
-    ts_mut.next_todo_id = ts_mut.next_todo_id.saturating_add(1);
-    ts_mut.todos.push(TodoItem { id: id.clone(), parent_id, name: name.clone(), description, status });
-    Ok(format!("{id}: {name}"))
+/// Result of an `upsert_task_forest` call.
+#[derive(Debug, Default)]
+pub struct UpsertOutcome {
+    /// Ids of newly created items.
+    pub created: Vec<String>,
+    /// Ids of updated items.
+    pub updated: Vec<String>,
+    /// Per-node error messages (a failed node skips its subtree).
+    pub errors: Vec<String>,
 }
 
-/// Execute `todo_create` tool — add one or more todo items with optional nesting.
-pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let _fg = cp_base::flame!("todo_create");
-    let Some(todos) = tool.input.get("todos").and_then(|v| v.as_array()) else {
-        return ToolResult::new(tool.id.clone(), "Missing 'todos' array parameter".to_owned(), true);
-    };
-
-    if todos.is_empty() {
-        return ToolResult::new(tool.id.clone(), "Empty 'todos' array".to_owned(), true);
+impl UpsertOutcome {
+    /// Whether anything was actually created or updated.
+    #[must_use]
+    pub const fn changed(&self) -> bool {
+        !self.created.is_empty() || !self.updated.is_empty()
     }
-
-    let mut created: Vec<String> = Vec::new();
-    let mut errors: Vec<String> = Vec::new();
-
-    for todo_value in todos {
-        match create_one_todo(todo_value, state) {
-            Ok(label) => created.push(label),
-            Err(e) => errors.push(e),
-        }
-    }
-
-    let mut output = String::new();
-
-    if !created.is_empty() {
-        let _r = write!(output, "Created {} todo(s):\n{}", created.len(), created.join("\n"));
-        // Update Todo panel timestamp
-        state.touch_panel(Kind::TODO);
-    }
-
-    if !errors.is_empty() {
-        if !output.is_empty() {
-            output.push_str("\n\n");
-        }
-        let _r = write!(output, "Errors ({}):\n{}", errors.len(), errors.join("\n"));
-    }
-
-    ToolResult::new(tool.id.clone(), output, created.is_empty())
 }
 
-/// Collect the ids of every todo being deleted in this batch (via `delete:true`
-/// or `status:"deleted"`), used to validate no child is orphaned.
-fn collect_delete_ids(updates: &[serde_json::Value]) -> std::collections::HashSet<String> {
-    updates
-        .iter()
-        .filter(|u| {
-            u.get("delete").and_then(serde_json::Value::as_bool).unwrap_or(false)
-                || u.get("status").and_then(|v| v.as_str()) == Some("deleted")
-        })
-        .filter_map(|u| u.get("id").and_then(|v| v.as_str()).map(str::to_owned))
-        .collect()
+/// Result of a `mark_tasks` call.
+#[derive(Debug, Default)]
+pub struct MarkOutcome {
+    /// Ids whose status was changed.
+    pub marked: Vec<String>,
+    /// Per-mark error messages.
+    pub errors: Vec<String>,
 }
 
-/// Recursively collect all descendant ids of `id`.
+impl MarkOutcome {
+    /// Whether any status was changed.
+    #[must_use]
+    pub const fn changed(&self) -> bool {
+        !self.marked.is_empty()
+    }
+}
+
+// =============================================================================
+// Shared pure invariants (thread-scoped)
+// =============================================================================
+
+/// Recursively collect all descendant ids of `id` (within the same thread —
+/// nesting is thread-local, so a plain `parent_id` walk stays scoped).
 fn collect_descendants(id: &str, todos: &[TodoItem]) -> Vec<String> {
     let mut desc = Vec::new();
     for t in todos {
@@ -120,102 +97,16 @@ fn collect_descendants(id: &str, todos: &[TodoItem]) -> Vec<String> {
     desc
 }
 
-/// Whether an update entry requests deletion (`delete:true` or `status:"deleted"`).
-fn is_delete_request(update_value: &serde_json::Value) -> bool {
-    update_value.get("delete").and_then(serde_json::Value::as_bool).unwrap_or(false)
-        || update_value.get("status").and_then(|v| v.as_str()) == Some("deleted")
-}
-
-/// Outcome of processing one deletion request.
-enum DeleteOutcome {
-    /// Todo removed — carries its id.
-    Deleted(String),
-    /// Todo id not present — carries its id.
-    NotFound(String),
-    /// Deletion rejected (would orphan children) — carries the error message.
-    Rejected(String),
-}
-
-/// Handle one deletion request, rejecting it when a child would be orphaned
-/// (i.e. a descendant not also being deleted in this batch).
-fn delete_one(id: &str, delete_ids: &std::collections::HashSet<String>, state: &mut State) -> DeleteOutcome {
-    let ts_check = TodoState::get(state);
-    let descendants = collect_descendants(id, &ts_check.todos);
-    let orphans: Vec<&String> = descendants.iter().filter(|d| !delete_ids.contains(d.as_str())).collect();
-    if !orphans.is_empty() {
-        return DeleteOutcome::Rejected(format!(
-            "{}: cannot delete — children {} would be orphaned. Delete them too, or delete all at once.",
-            id,
-            orphans.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")
-        ));
-    }
-
-    let ts_del = TodoState::get_mut(state);
-    let initial_len = ts_del.todos.len();
-    ts_del.todos.retain(|t| t.id != id);
-    if ts_del.todos.len() < initial_len {
-        DeleteOutcome::Deleted(id.to_owned())
-    } else {
-        DeleteOutcome::NotFound(id.to_owned())
-    }
-}
-
-/// A requested change to a todo's `parent_id`, pre-validated.
-enum ParentUpdate {
-    /// No `parent_id` field present — leave the parent unchanged.
-    Unchanged,
-    /// Detach: make the todo top-level (`parent_id = None`).
-    Detach,
-    /// Reparent under the carried (validated, existing) parent id.
-    Reparent(String),
-}
-
-/// Resolve a `parent_id` change into a [`ParentUpdate`], or `Err(msg)` on a
-/// validation failure (self-parent or unknown parent).
-fn resolve_parent_update(update_value: &serde_json::Value, id: &str, state: &State) -> Result<ParentUpdate, String> {
-    if update_value.get("parent_id").is_none() {
-        return Ok(ParentUpdate::Unchanged);
-    }
-    let raw = update_value.get("parent_id");
-    if raw.is_some_and(serde_json::Value::is_null) {
-        return Ok(ParentUpdate::Detach);
-    }
-    let Some(pid) = raw.and_then(|v| v.as_str()) else {
-        return Ok(ParentUpdate::Unchanged);
-    };
-    let lower = pid.to_lowercase();
-    if pid.is_empty() || lower == "none" || lower == "null" {
-        return Ok(ParentUpdate::Detach);
-    }
-    if pid == id {
-        return Err(format!("{id}: cannot be its own parent"));
-    }
-    let ts = TodoState::get(state);
-    if !ts.todos.iter().any(|other| other.id == pid) {
-        let available: Vec<&str> = ts.todos.iter().filter(|t| t.id != id).map(|t| t.id.as_str()).collect();
-        let available_str = if available.is_empty() {
-            "no other todos exist".to_owned()
-        } else {
-            format!("available: {}", available.join(", "))
-        };
-        return Err(format!("{id}: parent '{pid}' not found ({available_str})"));
-    }
-    Ok(ParentUpdate::Reparent(pid.to_owned()))
-}
-
-/// Reject marking a todo `done` while any of its children are not done.
-fn check_done_allowed(update_value: &serde_json::Value, id: &str, state: &State) -> Result<(), String> {
-    let Some(s) = update_value.get("status").and_then(|v| v.as_str()) else {
-        return Ok(());
-    };
-    if s.parse::<TodoStatus>().ok() != Some(TodoStatus::Done) {
-        return Ok(());
-    }
+/// Reject marking `id` `Done` while any of its **non-cancelled** children are
+/// not done. Cancelled children are ignored (soft-deleted).
+fn check_done_allowed(state: &State, id: &str) -> Result<(), String> {
     let ts = TodoState::get(state);
     let undone: Vec<String> = ts
         .todos
         .iter()
-        .filter(|c| c.parent_id.as_deref() == Some(id) && c.status != TodoStatus::Done)
+        .filter(|c| {
+            c.parent_id.as_deref() == Some(id) && c.status != TodoStatus::Done && c.status != TodoStatus::Cancelled
+        })
         .map(|c| format!("{} ({})", c.id, c.name))
         .collect();
     if undone.is_empty() {
@@ -225,233 +116,300 @@ fn check_done_allowed(update_value: &serde_json::Value, id: &str, state: &State)
     }
 }
 
-/// Apply the field changes from one update entry onto a todo. `parent` is the
-/// pre-validated parent change from [`resolve_parent_update`]. Returns the list
-/// of changed field labels.
-fn apply_field_updates(t: &mut TodoItem, update_value: &serde_json::Value, parent: &ParentUpdate) -> Vec<&'static str> {
-    let mut changes = Vec::new();
-    if let Some(name) = update_value.get("name").and_then(|v| v.as_str()) {
-        name.clone_into(&mut t.name);
-        changes.push("name");
-    }
-    if let Some(desc) = update_value.get("description").and_then(|v| v.as_str()) {
-        desc.clone_into(&mut t.description);
-        changes.push("description");
-    }
-    cp_base::deref_match!(parent, {
-        ParentUpdate::Unchanged => {}
-        ParentUpdate::Detach => {
-            t.parent_id = None;
-            changes.push("parent");
-        }
-        ParentUpdate::Reparent(ref pid) => {
-            t.parent_id = Some(pid.clone());
-            changes.push("parent");
-        }
-    });
-    if let Some(status) = update_value.get("status").and_then(|v| v.as_str()).and_then(|s| s.parse::<TodoStatus>().ok())
-    {
-        t.status = status;
-        changes.push("status");
-    }
-    changes
-}
-
-/// Walk up the parent chain of every `in_progress`-set todo, promoting pending
-/// ancestors to `in_progress`. Returns the ids that were promoted.
-fn propagate_in_progress(updates: &[serde_json::Value], state: &mut State) -> Vec<String> {
-    let mut propagated: Vec<String> = Vec::new();
-    for update_value in updates {
-        let prop_status = update_value.get("status").and_then(|v| v.as_str());
-        if (prop_status == Some("in_progress") || prop_status == Some("~"))
-            && let Some(id) = update_value.get("id").and_then(|v| v.as_str())
-        {
-            let ts = TodoState::get_mut(state);
-            let mut current_id = ts.todos.iter().find(|t| t.id == id).and_then(|t| t.parent_id.clone());
-            while let Some(pid) = current_id.as_ref() {
-                let Some(parent) = ts.todos.iter_mut().find(|t| t.id == *pid) else {
-                    break;
-                };
-                if parent.status == TodoStatus::Pending {
-                    parent.status = TodoStatus::InProgress;
-                    propagated.push(parent.id.clone());
-                }
-                current_id.clone_from(&parent.parent_id);
-            }
-        }
-    }
-    propagated
-}
-
-/// Tallies accumulated while applying a batch of todo updates.
-#[derive(Default)]
-struct UpdateTally {
-    /// `"id: changed-fields"` lines for successfully modified todos.
-    modified: Vec<String>,
-    /// Ids of deleted todos.
-    deleted: Vec<String>,
-    /// Ids of propagated (auto-`in_progress`) ancestors.
-    propagated: Vec<String>,
-    /// Ids referenced by an update but not found.
-    not_found: Vec<String>,
-    /// Validation / parse error messages.
-    errors: Vec<String>,
-}
-
-/// Format the accumulated update tally into the tool's output string.
-fn build_update_output(tally: &UpdateTally) -> String {
-    let mut output = String::new();
-    let mut push_section = |body: String| {
-        if !output.is_empty() {
-            output.push_str("\n\n");
-        }
-        output.push_str(&body);
-    };
-    if !tally.modified.is_empty() {
-        push_section(format!("Updated {}:\n{}", tally.modified.len(), tally.modified.join("\n")));
-    }
-    if !tally.propagated.is_empty() {
-        push_section(format!("Auto-propagated in_progress to parents: {}", tally.propagated.join(", ")));
-    }
-    if !tally.deleted.is_empty() {
-        push_section(format!("Deleted: {}", tally.deleted.join(", ")));
-    }
-    if !tally.not_found.is_empty() {
-        push_section(format!("Not found: {}", tally.not_found.join(", ")));
-    }
-    if !tally.errors.is_empty() {
-        push_section(format!("Errors:\n{}", tally.errors.join("\n")));
-    }
-    output
-}
-
-/// Apply one update entry, routing to delete / field-update and recording the
-/// result into `tally`. Assumes propagation runs separately afterwards.
-fn apply_one_update(
-    update_value: &serde_json::Value,
-    delete_ids: &std::collections::HashSet<String>,
-    tally: &mut UpdateTally,
-    state: &mut State,
-) {
-    let Some(id) = update_value.get("id").and_then(|v| v.as_str()) else {
-        tally.errors.push("Missing 'id' in update".to_owned());
-        return;
-    };
-
-    if is_delete_request(update_value) {
-        match delete_one(id, delete_ids, state) {
-            DeleteOutcome::Deleted(x) => tally.deleted.push(x),
-            DeleteOutcome::NotFound(x) => tally.not_found.push(x),
-            DeleteOutcome::Rejected(e) => tally.errors.push(e),
-        }
-        return;
-    }
-
-    let normalized_parent = match resolve_parent_update(update_value, id, state) {
-        Ok(v) => v,
-        Err(e) => {
-            tally.errors.push(e);
-            return;
-        }
-    };
-    if let Err(e) = check_done_allowed(update_value, id, state) {
-        tally.errors.push(e);
-        return;
-    }
-
+/// Bubble `Planned` ancestors of `id` up to `InProgress`. Returns nothing —
+/// mutates in place. Used after a child is set `InProgress`.
+fn propagate_in_progress(state: &mut State, id: &str) {
     let ts = TodoState::get_mut(state);
-    match ts.todos.iter_mut().find(|t| t.id == id) {
-        Some(t) => {
-            let changes = apply_field_updates(t, update_value, &normalized_parent);
-            if !changes.is_empty() {
-                tally.modified.push(format!("{}: {}", id, changes.join(", ")));
-            }
+    let mut current = ts.todos.iter().find(|t| t.id == id).and_then(|t| t.parent_id.clone());
+    while let Some(pid) = current.as_ref() {
+        let Some(parent) = ts.todos.iter_mut().find(|t| t.id == *pid) else {
+            break;
+        };
+        if parent.status == TodoStatus::Planned {
+            parent.status = TodoStatus::InProgress;
         }
-        None => tally.not_found.push(id.to_owned()),
+        current.clone_from(&parent.parent_id);
     }
 }
 
-/// Execute `todo_update` tool — modify status, name, description, or delete todos.
-pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let _fg = cp_base::flame!("todo_update");
-    let Some(updates) = tool.input.get("updates").and_then(|v| v.as_array()) else {
-        return ToolResult::new(tool.id.clone(), "Missing 'updates' array parameter".to_owned(), true);
-    };
-
-    if updates.is_empty() {
-        return ToolResult::new(tool.id.clone(), "Empty 'updates' array".to_owned(), true);
+/// Validate that `parent` is a legal parent for `id` within `thread_id`:
+/// exists, same thread, not self, and not a descendant of `id` (no cycle).
+fn validate_parent(state: &State, thread_id: &str, id: &str, parent: &str) -> Result<(), String> {
+    if parent == id {
+        return Err(format!("{id}: cannot be its own parent"));
     }
-
-    let owned_updates = updates.clone();
-    let delete_ids = collect_delete_ids(&owned_updates);
-    let mut tally = UpdateTally::default();
-
-    for update_value in &owned_updates {
-        apply_one_update(update_value, &delete_ids, &mut tally, state);
+    let ts = TodoState::get(state);
+    let exists = ts.todos.iter().any(|t| t.id == parent && t.thread_id == thread_id);
+    if !exists {
+        return Err(format!("{id}: parent '{parent}' not found in this thread"));
     }
-
-    tally.propagated = propagate_in_progress(&owned_updates, state);
-
-    if !tally.modified.is_empty() || !tally.deleted.is_empty() || !tally.propagated.is_empty() {
-        state.touch_panel(Kind::TODO);
+    if collect_descendants(id, &ts.todos).iter().any(|d| d == parent) {
+        return Err(format!("{id}: '{parent}' is a descendant — would create a cycle"));
     }
-
-    let is_error = tally.modified.is_empty() && tally.deleted.is_empty() && tally.propagated.is_empty();
-    ToolResult::new(tool.id.clone(), build_update_output(&tally), is_error)
+    Ok(())
 }
 
-/// Execute `todo_move` tool — reorder a todo by placing it after another.
-pub(crate) fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let _fg = cp_base::flame!("todo_move");
-    let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) else {
-        return ToolResult::new(tool.id.clone(), "Missing 'id' parameter".to_owned(), true);
-    };
+/// Parse a status string (canonical wire value or ergonomics alias).
+fn parse_status(raw: &str) -> Result<TodoStatus, String> {
+    raw.parse().map_err(|()| format!("unknown status '{raw}'"))
+}
 
-    // Normalize after_id: treat null, "none", "null", "" as None (move to top)
-    let after_id = tool
-        .input
-        .get("after_id")
-        .and_then(|v| {
-            if v.is_null() {
+// =============================================================================
+// upsert_task_forest
+// =============================================================================
+
+/// Threaded accumulators for one `upsert_task_forest` traversal — bundled so
+/// the recursive helpers stay within the argument budget. `state` is passed
+/// separately (a disjoint `&mut` borrow).
+struct UpsertCtx<'ctx> {
+    /// The focused thread every node belongs to.
+    thread_id: &'ctx str,
+    /// Created/updated ids + per-node errors.
+    outcome: &'ctx mut UpsertOutcome,
+    /// Ids set `InProgress` this call (ancestors bubbled afterwards).
+    newly_in_progress: &'ctx mut Vec<String>,
+}
+
+/// Apply a recursive upsert forest to the focused thread's tasks.
+///
+/// Pre-order DFS (outer→inner): a node is created/updated and its id resolved
+/// **before** its children are processed, so a new parent already exists by the
+/// time its children attach. Best-effort per node — a failed node skips its
+/// subtree.
+pub fn upsert_task_forest(state: &mut State, thread_id: &str, nodes: &[TodoNode]) -> UpsertOutcome {
+    let mut outcome = UpsertOutcome::default();
+    let mut newly_in_progress: Vec<String> = Vec::new();
+    {
+        let mut ctx = UpsertCtx { thread_id, outcome: &mut outcome, newly_in_progress: &mut newly_in_progress };
+        for node in nodes {
+            apply_node(state, &mut ctx, node, None);
+        }
+    }
+    for id in &newly_in_progress {
+        propagate_in_progress(state, id);
+    }
+    outcome
+}
+
+/// Apply one node (create or update), then recurse into its children with this
+/// node's resolved id as their parent. Records results into `ctx.outcome`.
+fn apply_node(state: &mut State, ctx: &mut UpsertCtx<'_>, node: &TodoNode, enclosing_parent: Option<&str>) {
+    let resolved = match node.id.as_deref() {
+        None => create_node(state, ctx, node, enclosing_parent),
+        Some(_) => update_node(state, ctx, node, enclosing_parent),
+    };
+    // Only recurse when this node resolved to a real id (create/update ok).
+    if let Some(parent_id) = resolved {
+        for child in &node.children {
+            apply_node(state, ctx, child, Some(&parent_id));
+        }
+    }
+}
+
+/// Create a new item. Returns its id on success (so children can attach).
+fn create_node(
+    state: &mut State,
+    ctx: &mut UpsertCtx<'_>,
+    node: &TodoNode,
+    enclosing_parent: Option<&str>,
+) -> Option<String> {
+    let Some(name) = node.name.as_deref().filter(|n| !n.trim().is_empty()) else {
+        ctx.outcome.errors.push("create: missing 'name'".to_owned());
+        return None;
+    };
+    // Parent precedence: explicit parent_id, else the enclosing node.
+    let parent_id = node.parent_id.as_deref().or(enclosing_parent);
+    if let Some(pid) = parent_id
+        && let Err(e) = validate_parent_for_create(state, ctx.thread_id, pid)
+    {
+        ctx.outcome.errors.push(format!("create '{name}': {e}"));
+        return None;
+    }
+    let status = match node.status.as_deref() {
+        None => TodoStatus::Planned,
+        Some(raw) => match parse_status(raw) {
+            Ok(s) => s,
+            Err(e) => {
+                ctx.outcome.errors.push(format!("create '{name}': {e}"));
                 return None;
             }
-            v.as_str()
-        })
-        .filter(|s| {
-            let lower = s.to_lowercase();
-            !s.is_empty() && lower != "none" && lower != "null"
-        });
-
-    // Find the todo to move
-    let ts = TodoState::get(state);
-    let Some(move_idx) = ts.todos.iter().position(|t| t.id == id) else {
-        return ToolResult::new(tool.id.clone(), format!("Todo '{id}' not found"), true);
+        },
     };
 
-    // Validate after_id exists if specified
-    if let Some(aid) = after_id {
-        if aid == id {
-            return ToolResult::new(tool.id.clone(), format!("Cannot move '{id}' after itself"), true);
-        }
-        if !ts.todos.iter().any(|t| t.id == aid) {
-            return ToolResult::new(tool.id.clone(), format!("Target '{aid}' not found"), true);
-        }
+    let ts = TodoState::get_mut(state);
+    let id = format!("X{}", ts.next_todo_id);
+    ts.next_todo_id = ts.next_todo_id.saturating_add(1);
+    ts.todos.push(TodoItem {
+        id: id.clone(),
+        thread_id: ctx.thread_id.to_owned(),
+        parent_id: parent_id.map(str::to_owned),
+        name: name.to_owned(),
+        description: node.description.clone().unwrap_or_default(),
+        status,
+    });
+    if status == TodoStatus::InProgress {
+        ctx.newly_in_progress.push(id.clone());
+    }
+    ctx.outcome.created.push(id.clone());
+    Some(id)
+}
+
+/// Validate a parent id for a *create* (exists + same thread; no cycle check
+/// needed since the new item has no descendants yet).
+fn validate_parent_for_create(state: &State, thread_id: &str, parent: &str) -> Result<(), String> {
+    let ts = TodoState::get(state);
+    if ts.todos.iter().any(|t| t.id == parent && t.thread_id == thread_id) {
+        Ok(())
+    } else {
+        Err(format!("parent '{parent}' not found in this thread"))
+    }
+}
+
+/// Update an existing item (partial patch). Returns its id on success.
+///
+/// The caller (`apply_node`) only dispatches here for a node carrying an `id`,
+/// so `node.id` is always `Some`.
+fn update_node(
+    state: &mut State,
+    ctx: &mut UpsertCtx<'_>,
+    node: &TodoNode,
+    enclosing_parent: Option<&str>,
+) -> Option<String> {
+    let id = node.id.as_deref()?;
+    let thread_id = ctx.thread_id;
+
+    // Item must exist AND belong to the focused thread.
+    if !TodoState::get(state).todos.iter().any(|t| t.id == id && t.thread_id == thread_id) {
+        ctx.outcome.errors.push(format!("update '{id}': not found in this thread"));
+        return None;
     }
 
-    // Remove the todo from its current position
-    let ts_mut = TodoState::get_mut(state);
-    let item = ts_mut.todos.remove(move_idx);
+    // Resolve reparent target + new status up front so a bad value aborts
+    // before any mutation.
+    let reparent_to = node.parent_id.as_deref().or(enclosing_parent);
+    if let Some(pid) = reparent_to
+        && let Err(e) = validate_parent(state, thread_id, id, pid)
+    {
+        ctx.outcome.errors.push(format!("update '{id}': {e}"));
+        return None;
+    }
+    let new_status = match resolve_status(node) {
+        Ok(s) => s,
+        Err(e) => {
+            ctx.outcome.errors.push(format!("update '{id}': {e}"));
+            return None;
+        }
+    };
+    if new_status == Some(TodoStatus::Done)
+        && let Err(e) = check_done_allowed(state, id)
+    {
+        ctx.outcome.errors.push(format!("update '{id}': {e}"));
+        return None;
+    }
 
-    // Insert at new position
-    let insert_idx = after_id.map_or(0, |aid| {
-        // Find the after_id position (may have shifted after remove)
-        ts_mut.todos.iter().position(|t| t.id == aid).map_or(0, |idx| idx.saturating_add(1))
-    });
+    write_update_fields(state, id, &UpdatePatch { node, reparent_to, new_status });
+    if new_status == Some(TodoStatus::InProgress) {
+        ctx.newly_in_progress.push(id.to_owned());
+    }
+    ctx.outcome.updated.push(id.to_owned());
+    Some(id.to_owned())
+}
 
-    ts_mut.todos.insert(insert_idx, item);
-    state.touch_panel(Kind::TODO);
+/// Parse an optional status string into `Option<TodoStatus>` (None = untouched).
+fn resolve_status(node: &TodoNode) -> Result<Option<TodoStatus>, String> {
+    node.status.as_deref().map_or(Ok(None), |raw| parse_status(raw).map(Some))
+}
 
-    let position_desc = after_id.map_or_else(|| "top".to_owned(), |aid| format!("after {aid}"));
+/// A validated field patch for `write_update_fields` — bundled to keep the
+/// helper within the argument budget.
+struct UpdatePatch<'patch> {
+    /// The source node carrying name/description edits.
+    node: &'patch TodoNode,
+    /// New parent id, if reparenting.
+    reparent_to: Option<&'patch str>,
+    /// New status, if changing.
+    new_status: Option<TodoStatus>,
+}
 
-    ToolResult::new(tool.id.clone(), format!("Moved {id} to {position_desc}"), false)
+/// Apply the validated field patch to an existing item (name/description/parent/
+/// status). Assumes all validation already passed.
+fn write_update_fields(state: &mut State, id: &str, patch: &UpdatePatch<'_>) {
+    let UpdatePatch { node, reparent_to, new_status } = *patch;
+    let ts = TodoState::get_mut(state);
+    let Some(item) = ts.todos.iter_mut().find(|t| t.id == id) else {
+        return;
+    };
+    if let Some(name) = node.name.as_deref() {
+        name.clone_into(&mut item.name);
+    }
+    if let Some(desc) = node.description.as_deref() {
+        desc.clone_into(&mut item.description);
+    }
+    if let Some(pid) = reparent_to {
+        item.parent_id = Some(pid.to_owned());
+    }
+    if let Some(status) = new_status {
+        item.status = status;
+    }
+}
+
+// =============================================================================
+// mark_tasks
+// =============================================================================
+
+/// Flip the status of a batch of items, all belonging to `thread_id`.
+///
+/// Enforces `check_done_allowed` and bubbles `Planned` ancestors on
+/// `InProgress`. `Cancelled` is the soft-delete. Best-effort per mark.
+pub fn mark_tasks(state: &mut State, thread_id: &str, marks: &[(String, TodoStatus)]) -> MarkOutcome {
+    let mut outcome = MarkOutcome::default();
+    let mut newly_in_progress: Vec<String> = Vec::new();
+    for mark in marks {
+        let id = &mark.0;
+        let status = mark.1;
+        let exists = TodoState::get(state).todos.iter().any(|t| t.id == *id && t.thread_id == thread_id);
+        if !exists {
+            outcome.errors.push(format!("'{id}': not found in this thread"));
+            continue;
+        }
+        if status == TodoStatus::Done
+            && let Err(e) = check_done_allowed(state, id)
+        {
+            outcome.errors.push(e);
+            continue;
+        }
+        if let Some(item) = TodoState::get_mut(state).todos.iter_mut().find(|t| t.id == *id) {
+            item.status = status;
+            if status == TodoStatus::InProgress {
+                newly_in_progress.push(id.clone());
+            }
+            outcome.marked.push(id.clone());
+        }
+    }
+    for id in &newly_in_progress {
+        propagate_in_progress(state, id);
+    }
+    outcome
+}
+
+// =============================================================================
+// purge_threadless / set_focus_filter
+// =============================================================================
+
+/// Drop every item lacking a `thread_id` (the legacy, pre-rework backlog).
+/// Called once on load — a permanent, forever purge (FR4).
+pub fn purge_threadless(state: &mut State) {
+    TodoState::get_mut(state).todos.retain(|t| !t.thread_id.is_empty());
+}
+
+/// Set the injected focused-thread filter used by the panel. Returns whether it
+/// changed (which drives the caller's forced panel refresh).
+pub fn set_focus_filter(state: &mut State, thread_id: Option<String>) -> bool {
+    let ts = TodoState::get_mut(state);
+    if ts.focus_filter == thread_id {
+        false
+    } else {
+        ts.focus_filter = thread_id;
+        true
+    }
 }

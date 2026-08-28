@@ -71,3 +71,17 @@ tools:
     parameters:
       thought_body: "The full reasoning. Be thorough — this is your scratch space to think clearly. Markdown is supported. Stays in active context until the turn is detached into history."
       task_context: "Short (1-2 sentences) description of what you're currently working on. Feeds the Context Radar panel — automatically recalls related past decisions and context from logs. Describe *what* you're working on, not *how*. Example: 'Investigating port reconnection failure on TUI reload'"
+
+  Todo:
+    description: |
+      Create, update, and organize the CURRENTLY FOCUSED thread's task tree via a single recursive upsert. Tasks are thread-owned, so this is rejected when no thread is focused — Read a thread first.
+
+      The `todo` parameter is an ordered forest of nodes. Each node: {id?, name?, description?, status?, parent_id?, children?}. A node WITHOUT an `id` is CREATED (name required); a node WITH an `id` is UPDATED (partial patch — only provided fields change; omission never deletes, so a lone {id, status} is a cheap status flip). `children` are nested descendants — a whole hierarchy is scaffolded in one call with no need to know ids upfront. Processing is outer-to-inner (parent before children), so you can create a parent and nest items under it in the same call. `status` in planned|in_progress|done|cancelled (cancelled is the soft-delete). To reparent an existing item under a newly-created parent, nest it in that parent's `children`; to reparent under an already-existing item, set `parent_id`.
+    parameters:
+      todo: "Ordered forest of task nodes to upsert. Each node: {id?, name?, description?, status?, parent_id?, children?}."
+      id: "Existing id → update; absent → create."
+      name: "Title (required on create)."
+      description: "Detailed description."
+      status: "planned | in_progress | done | cancelled."
+      parent_id: "Reparent to an already-existing id (rare)."
+      children: "Nested descendant nodes of the same shape."

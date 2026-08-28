@@ -107,6 +107,7 @@ impl Module for ScratchpadModule {
         let t = &*TOOL_TEXTS;
         vec![
             ToolDefinition::from_yaml("scratchpad_create_cell", t)
+                .declares_task()
                 .short_desc("Add scratchpad cell")
                 .category("Scratchpad")
                 .reverie_allowed(true)
@@ -114,6 +115,7 @@ impl Module for ScratchpadModule {
                 .param("cell_contents", ParamType::String, true)
                 .build(),
             ToolDefinition::from_yaml("scratchpad_edit_cell", t)
+                .declares_task()
                 .short_desc("Modify scratchpad cell")
                 .category("Scratchpad")
                 .reverie_allowed(true)
@@ -122,6 +124,7 @@ impl Module for ScratchpadModule {
                 .param("cell_contents", ParamType::String, false)
                 .build(),
             ToolDefinition::from_yaml("scratchpad_wipe", t)
+                .declares_task()
                 .short_desc("Delete scratchpad cells")
                 .category("Scratchpad")
                 .reverie_allowed(true)

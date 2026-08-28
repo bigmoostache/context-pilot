@@ -321,6 +321,20 @@ html.mobile.standalone .mobile-shell {
   color: var(--muted-foreground);
 }
 
+/* Hidden-but-scrollable — an épuré scroll surface with NO visible scrollbar,
+   yet still fully scrollable (wheel / trackpad / drag). Used by the thread
+   aside's inline file viewer so the preview reads as a clean, chromeless
+   page. Covers all three engines: Firefox (scrollbar-width), old Edge
+   (-ms-overflow-style), and WebKit/Chromium (::-webkit-scrollbar). */
+.scrollbar-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
 /* soft macOS card elevation */
 .card-shadow {
   box-shadow: var(--shadow-card);

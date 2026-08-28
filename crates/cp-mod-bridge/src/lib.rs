@@ -27,6 +27,7 @@ use cp_wire::types::stream::Kind as StreamKind;
 
 use crate::body::Store;
 use crate::boot::Boot;
+use crate::boot::seed_state::MemoSeeds;
 use crate::command::Intake;
 use crate::tee::Tee;
 
@@ -73,97 +74,6 @@ pub fn try_recover(state: &mut State) {
 /// still re-emits the split (named alias to keep the field off the
 /// `clippy::type_complexity` lint).
 pub type ContextMemo = (u64, u64, u64, u64, u64);
-
-/// Seed flags for observe-on-change memos.
-///
-/// Each flag is `false` until the corresponding chokepoint runs its first
-/// pass (seed without emit), then `true` for the remainder of the session.
-/// Stored as a compact bitfield to stay under the `struct_excessive_bools`
-/// lint (5 independent seed flags).
-#[derive(Debug, Default, Clone, Copy)]
-pub struct MemoSeeds(u8);
-
-impl MemoSeeds {
-    /// Bit position: messages memo.
-    const MESSAGES: u8 = 1 << 0;
-    /// Bit position: statuses memo.
-    const STATUSES: u8 = 1 << 1;
-    /// Bit position: focus memo.
-    const FOCUS: u8 = 1 << 2;
-    /// Bit position: archived memo.
-    const ARCHIVED: u8 = 1 << 3;
-    /// Bit position: paused memo.
-    const PAUSED: u8 = 1 << 4;
-    /// Bit position: behaviour (active-agent) memo.
-    const BEHAVIOUR: u8 = 1 << 5;
-    /// Bit position: identity (self-identity) memo.
-    const IDENTITY: u8 = 1 << 6;
-
-    /// Messages memo seeded (`emit_messages`).
-    #[must_use]
-    pub const fn messages(self) -> bool {
-        self.0 & Self::MESSAGES != 0
-    }
-    /// Thread-status memo seeded (`emit_thread_status`).
-    #[must_use]
-    pub const fn statuses(self) -> bool {
-        self.0 & Self::STATUSES != 0
-    }
-    /// Focus memo seeded (`emit_thread_focus`).
-    #[must_use]
-    pub const fn focus(self) -> bool {
-        self.0 & Self::FOCUS != 0
-    }
-    /// Archived memo seeded (`emit_thread_archived`).
-    #[must_use]
-    pub const fn archived(self) -> bool {
-        self.0 & Self::ARCHIVED != 0
-    }
-    /// Paused memo seeded (`emit_thread_paused`).
-    #[must_use]
-    pub const fn paused(self) -> bool {
-        self.0 & Self::PAUSED != 0
-    }
-    /// Behaviour (active-agent) memo seeded (`emit_behaviour`).
-    #[must_use]
-    pub const fn behaviour(self) -> bool {
-        self.0 & Self::BEHAVIOUR != 0
-    }
-    /// Identity (self-identity) memo seeded (`emit_identity`).
-    #[must_use]
-    pub const fn identity(self) -> bool {
-        self.0 & Self::IDENTITY != 0
-    }
-
-    /// Mark messages as seeded.
-    pub const fn seed_messages(&mut self) {
-        self.0 |= Self::MESSAGES;
-    }
-    /// Mark statuses as seeded.
-    pub const fn seed_statuses(&mut self) {
-        self.0 |= Self::STATUSES;
-    }
-    /// Mark focus as seeded.
-    pub const fn seed_focus(&mut self) {
-        self.0 |= Self::FOCUS;
-    }
-    /// Mark archived as seeded.
-    pub const fn seed_archived(&mut self) {
-        self.0 |= Self::ARCHIVED;
-    }
-    /// Mark paused as seeded.
-    pub const fn seed_paused(&mut self) {
-        self.0 |= Self::PAUSED;
-    }
-    /// Mark behaviour (active-agent) as seeded.
-    pub const fn seed_behaviour(&mut self) {
-        self.0 |= Self::BEHAVIOUR;
-    }
-    /// Mark identity (self-identity) as seeded.
-    pub const fn seed_identity(&mut self) {
-        self.0 |= Self::IDENTITY;
-    }
-}
 
 /// Runtime state for the bridge (stored in [`State`]'s `TypeMap`).
 ///
@@ -279,6 +189,22 @@ pub struct BridgeState {
     /// memo every tick and emits `ThreadPaused`/`ThreadResumed` only on an
     /// actual change — mirrors the archived chokepoint (T371).
     pub thread_paused_memo: std::collections::HashMap<String, bool>,
+
+    /// Per-thread projected task list as last emitted/seeded, keyed by thread
+    /// id. The task chokepoint ([`emit_task_lists`]) projects each thread's
+    /// cancelled-excluded todo items into `WireTask`s, diffs the result against
+    /// this memo every tick, and emits a
+    /// [`TaskListChanged`](cp_wire::types::oplog::OpEntryKind::TaskListChanged)
+    /// (whole-list snapshot) only when the list actually changes — the same
+    /// observe-on-change discipline as the status/archived/paused roster
+    /// chokepoints. Seeded from the oplog roster on the first post-boot tick so
+    /// a change that landed on disk while the bridge was down but was never
+    /// journaled is emitted on the very first pass (self-healing disk↔oplog
+    /// divergence).
+    ///
+    /// [`emit_task_lists`]: (the agent-binary chokepoint in
+    /// `src/app/run/threads/messages.rs`)
+    pub thread_tasks: std::collections::HashMap<String, Vec<cp_wire::types::snapshot::todo::WireTask>>,
 
     /// Flags tracking which observe-on-change memos have been seeded from the
     /// oplog roster on the first tick after boot. See [`MemoSeeds`].

@@ -102,11 +102,18 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
         rebuild_threads_panel(state, tid, now);
     }
 
-    // Clear focus + start dangling phase only when handing the thread back.
+    // Handing the thread back (still_my_turn=false) flips it to THEIR_TURN
+    // (done in push_send_message) but KEEPS focus on it — the agent stays on the
+    // thread it just replied to instead of being cast adrift into the dangling
+    // phase (T683). Focus is only ever moved by an explicit `Read` of another
+    // thread. We pin focus to the sent thread and hold the focused-state
+    // invariant `apply_read_focus` uses (dangling_remaining = 0, no escalation),
+    // and still reset the MY_TURN notification debounce so a later user reply on
+    // this now-THEIR_TURN thread re-notifies.
     if !still_my_turn {
         let fs = FocusState::get_mut(state);
-        fs.focused_thread_id = None;
-        fs.dangling_remaining = 5i32;
+        fs.focused_thread_id = Some(tid.to_owned());
+        fs.dangling_remaining = 0i32;
         fs.escalation_level = 0;
         // Reset debounce so next MY_TURN transition fires a new notification.
         fs.notified_my_turn_id = None;
@@ -326,8 +333,12 @@ fn build_read_result(state: &State, r: &ReadResult<'_>) -> String {
 /// Write the YAML thread-overview list (active threads only) into `output`.
 fn write_thread_list(output: &mut String, ts: &ThreadsState, focused_tid: &str) {
     // Archived threads are invisible to the LLM (T9): only active threads
-    // appear in the context the model reads.
-    for t in ts.threads.iter().filter(|t| !t.archived) {
+    // appear in the context the model reads. Paused threads are hidden from the
+    // panel list too (T663) — a paused thread is deliberately parked, so it
+    // should not clutter the roster — EXCEPT the focused one, which stays visible
+    // because the conversation section below renders it and hiding what you're
+    // actively working would be jarring.
+    for t in ts.threads.iter().filter(|t| !t.archived && (!t.paused || t.id == focused_tid)) {
         let unack = t.messages.iter().filter(|m| !m.acknowledged).count();
         _ = writeln!(output, "  - id: {}", t.id);
         _ = writeln!(output, "    name: \"{}\"", yaml_escape(&t.name));

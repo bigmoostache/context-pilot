@@ -296,7 +296,7 @@ function EditableMarkdown({
         initialMarkdown={content}
         onChange={onChange}
         toolbarExtra={extra}
-        className="min-h-0 flex-1 rounded-none border-0"
+        className="min-h-0 flex-1 rounded-none border-0 bg-surface-2"
       />
     </Suspense>
   )

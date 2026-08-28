@@ -597,6 +597,7 @@ export type OpEntryKind = {
     phase?: string;
     state?: string;
     status?: string;
+    tasks?: Array<ThreadTask>;
     thread_id?: string;
     threshold_tokens?: number;
     timestamp_ms?: number;
@@ -692,6 +693,7 @@ export type ThreadDetail = {
     name: string;
     paused?: boolean;
     status: 'MY_TURN' | 'THEIR_TURN' | 'ACTIVE';
+    tasks?: Array<ThreadTask>;
     unread?: number;
 };
 
@@ -703,6 +705,14 @@ export type ThreadMsg = {
     text?: string;
     tool?: ToolCall;
     ts?: number;
+};
+
+export type ThreadTask = {
+    description?: string;
+    id: string;
+    name: string;
+    parentId?: string | null;
+    status: 'planned' | 'in_progress' | 'done';
 };
 
 export type ThreadsResponse = {

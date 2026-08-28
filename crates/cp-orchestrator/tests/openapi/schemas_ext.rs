@@ -413,7 +413,10 @@ pub(super) fn transport() -> Value {
                 "message_ts": { "type": "integer" },
                 // behaviour_changed delta payload: the newly-active behaviour-agent
                 // id (absent on a revert-to-default), carried by a `kind:"behaviour_changed"` entry.
-                "agent_id": { "type": "string" }
+                "agent_id": { "type": "string" },
+                // task_list_changed delta payload: the thread's complete current
+                // (cancelled-excluded) task list, carried by a `kind:"task_list_changed"` entry.
+                "tasks": arr(r("ThreadTask"))
             },
             "required": ["kind"]
         },

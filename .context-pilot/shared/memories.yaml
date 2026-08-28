@@ -511,9 +511,10 @@ M-short-4:
   last_edited_ms: 0
 M-short-40:
   tier: short
-  title: 'DOCUMENTATION PHASE:'
+  title: todo-v2 FE wiring shipped
+  contents: 'todo-v2 FE wiring SHIPPED commit 6aa70ae1 (todo-v2; backend=3ce87b37). Read-only todos aside beside Attachments, delta-live. Chain: WireTask+TaskListChanged->oplog fold->emit_task_lists->MaterializedView reshape/attach_disk_tasks->openapi/TS->reducers foldTaskList->TodoSidebar(desktop-only). build/fmt/openapi/TS-lint green. NOT pushed. clippy --all-targets red=pre-existing orch debt.'
   importance: medium
-  last_edited_ms: 1787840964647
+  last_edited_ms: 1787859203626
 M-short-5:
   tier: short
   title: 'Datalab OCR API: POST'
@@ -649,6 +650,18 @@ M-tiny-23:
   contents: 'Context Pilot: Rust TUI AI coding assistant (Ratatui+Crossterm). Workspace = 22+ crates + 1 main binary (tui).'
   importance: low
   last_edited_ms: 1787840964664
+M-tiny-24:
+  tier: tiny
+  title: Queue is mandatory
+  contents: 'Edits ALWAYS queue; cannot bypass. Inherent to context-pilot, forces batching = big token savings. Don''t fight it: batch edits, Queue_execute once.'
+  importance: high
+  last_edited_ms: 1787910296001
+M-tiny-25:
+  tier: tiny
+  title: 'todo-v2 PR #188 open'
+  contents: 'todo-v2 rebased onto post-#187 master, PR #188 OPEN (base master). 6 commits on 50fae45c. Clippy-clean under --workspace gate, chain #94. Frontend back on vite dev/HMR :5174. CB1 already active.'
+  importance: high
+  last_edited_ms: 1787910650137
 M-tiny-3:
   tier: tiny
   title: 'Haiku 4.5 max_tokens fix:'

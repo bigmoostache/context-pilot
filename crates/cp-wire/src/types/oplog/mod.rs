@@ -8,6 +8,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::snapshot::Snapshot;
+use super::snapshot::todo::WireTask;
 use super::{ContentHash, LifecycleState, Phase, ThreadTurn};
 
 /// A single oplog record.
@@ -184,6 +185,25 @@ pub enum OpEntryKind {
         status: ThreadTurn,
     },
 
+    /// A thread's projected task list changed — the read-only todo items the
+    /// web thread view renders. Carries the thread's **complete** current
+    /// (cancelled-excluded) task list as a whole-list snapshot, so an observer
+    /// folds it by replacing [`RosterThread::tasks`](super::snapshot::RosterThread::tasks)
+    /// wholesale (see [`RosterThread::fold_tasks`](super::snapshot::RosterThread::fold_tasks)).
+    ///
+    /// Durable roster state (carried in the [`Checkpoint`](Self::Checkpoint)
+    /// snapshot via the roster), emitted whenever the agent observes a thread's
+    /// tasks change. The tasks themselves are also re-derivable from the
+    /// agent's tier-② persistence, so a dropped delta self-heals on the next
+    /// change.
+    #[serde(rename = "task_list_changed")]
+    TaskListChanged {
+        /// The thread whose task list changed.
+        thread_id: String,
+        /// The thread's complete current task list (cancelled excluded).
+        tasks: Vec<WireTask>,
+    },
+
     /// The agent's *focused* thread changed — which thread it is actively
     /// working right now (the UI highlights it). This is ephemeral, disposable
     /// UI state in the same class as [`PhaseTransition`](Self::PhaseTransition):
@@ -308,175 +328,5 @@ pub enum OpEntryKind {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn opentry_round_trip() {
-        let entry = OpEntry {
-            schema_version: 1,
-            rev: 17,
-            timestamp_ms: 1_718_000_000_000,
-            kind: OpEntryKind::PhaseTransition { phase: Phase::Streaming },
-        };
-        let json = serde_json::to_string(&entry).expect("serialize");
-        let back: OpEntry = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(entry, back);
-    }
-
-    #[test]
-    fn message_created_round_trip() {
-        let hash = ContentHash::new([0xde; 32]);
-        let entry = OpEntry {
-            schema_version: 1,
-            rev: 42,
-            timestamp_ms: 1_718_000_001_000,
-            kind: OpEntryKind::MessageCreated {
-                thread_id: "T5".into(),
-                message_id: "msg-abc".into(),
-                head: hash,
-                inline_body: None,
-            },
-        };
-        let json = serde_json::to_string(&entry).expect("serialize");
-        let back: OpEntry = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(entry, back);
-    }
-
-    #[test]
-    fn message_created_inline_body_round_trips_and_omits_when_none() {
-        let hash = ContentHash::new([0x07; 32]);
-        // Inlined body survives the round-trip verbatim.
-        let inlined = OpEntry {
-            schema_version: 1,
-            rev: 7,
-            timestamp_ms: 0,
-            kind: OpEntryKind::MessageCreated {
-                thread_id: "T1".into(),
-                message_id: "T1-m0".into(),
-                head: hash,
-                inline_body: Some(r#"{"author":"user","text":"hi"}"#.into()),
-            },
-        };
-        let inlined_json = serde_json::to_string(&inlined).expect("serialize");
-        assert!(inlined_json.contains("inline_body"), "inline body present on the wire: {inlined_json}");
-        assert_eq!(serde_json::from_str::<OpEntry>(&inlined_json).expect("deserialize"), inlined);
-
-        // A spilled (None) body is omitted from the wire entirely.
-        let spilled = OpEntry {
-            schema_version: 1,
-            rev: 8,
-            timestamp_ms: 0,
-            kind: OpEntryKind::MessageCreated {
-                thread_id: "T1".into(),
-                message_id: "T1-m1".into(),
-                head: hash,
-                inline_body: None,
-            },
-        };
-        let json = serde_json::to_string(&spilled).expect("serialize");
-        assert!(!json.contains("inline_body"), "spilled body omits the field: {json}");
-        assert_eq!(serde_json::from_str::<OpEntry>(&json).expect("deserialize"), spilled);
-    }
-
-    #[test]
-    fn unknown_opentry_kind_tolerant() {
-        let json = r#"{
-            "schema_version": 1,
-            "rev": 99,
-            "timestamp_ms": 0,
-            "kind": {"kind": "future_event", "payload": [1,2,3]}
-        }"#;
-        let entry: OpEntry = serde_json::from_str(json).expect("tolerant decode");
-        assert_eq!(entry.kind, OpEntryKind::Unknown);
-    }
-
-    #[test]
-    fn thread_roster_kinds_round_trip() {
-        let kinds = [
-            OpEntryKind::ThreadCreated {
-                thread_id: "T7".into(),
-                name: "Refactor the cache engine".into(),
-                status: ThreadTurn::MyTurn,
-                timestamp_ms: 1_718_000_002_000,
-            },
-            OpEntryKind::ThreadArchived { thread_id: "T7".into() },
-            OpEntryKind::ThreadRestored { thread_id: "T7".into() },
-            OpEntryKind::ThreadStatusChanged { thread_id: "T7".into(), status: ThreadTurn::TheirTurn },
-        ];
-        for kind in kinds {
-            let entry = OpEntry { schema_version: 1, rev: 1, timestamp_ms: 0, kind: kind.clone() };
-            let json = serde_json::to_string(&entry).expect("serialize");
-            let back: OpEntry = serde_json::from_str(&json).expect("deserialize");
-            assert_eq!(entry, back);
-        }
-    }
-
-    #[test]
-    fn context_usage_round_trip_and_stable_tag() {
-        let entry = OpEntry {
-            schema_version: 1,
-            rev: 11,
-            timestamp_ms: 0,
-            kind: OpEntryKind::ContextUsage {
-                used_tokens: 167_766,
-                threshold_tokens: 190_000,
-                budget_tokens: 200_000,
-                hit_tokens: 120_000,
-                miss_tokens: 47_766,
-            },
-        };
-        let json = serde_json::to_string(&entry).expect("serialize");
-        assert!(json.contains("\"kind\":\"context_usage\""), "stable tag: {json}");
-        let back: OpEntry = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(entry, back);
-    }
-
-    #[test]
-    fn thread_created_wire_tag_is_stable() {
-        // The internally-tagged discriminant is part of the wire contract.
-        let entry = OpEntry {
-            schema_version: 1,
-            rev: 3,
-            timestamp_ms: 0,
-            kind: OpEntryKind::ThreadArchived { thread_id: "T1".into() },
-        };
-        let json = serde_json::to_string(&entry).expect("serialize");
-        assert!(json.contains("\"kind\":\"thread_archived\""), "stable tag: {json}");
-    }
-
-    #[test]
-    fn behaviour_changed_round_trip_and_stable_tag() {
-        // Carries the new active agent id and round-trips; the id is omitted on
-        // a revert-to-default (None).
-        let with_id = OpEntry {
-            schema_version: 1,
-            rev: 5,
-            timestamp_ms: 0,
-            kind: OpEntryKind::BehaviourChanged { agent_id: Some("caveman".into()) },
-        };
-        let with_id_json = serde_json::to_string(&with_id).expect("serialize");
-        assert!(with_id_json.contains("\"kind\":\"behaviour_changed\""), "stable tag: {with_id_json}");
-        assert!(with_id_json.contains("caveman"), "carries the active id: {with_id_json}");
-        assert_eq!(serde_json::from_str::<OpEntry>(&with_id_json).expect("deserialize"), with_id);
-
-        let reverted = OpEntry {
-            schema_version: 1,
-            rev: 6,
-            timestamp_ms: 0,
-            kind: OpEntryKind::BehaviourChanged { agent_id: None },
-        };
-        let json = serde_json::to_string(&reverted).expect("serialize");
-        assert!(!json.contains("agent_id"), "None id omitted: {json}");
-        assert_eq!(serde_json::from_str::<OpEntry>(&json).expect("deserialize"), reverted);
-    }
-
-    #[test]
-    fn identity_changed_round_trip_and_stable_tag() {
-        let entry = OpEntry { schema_version: 1, rev: 9, timestamp_ms: 0, kind: OpEntryKind::IdentityChanged };
-        let json = serde_json::to_string(&entry).expect("serialize");
-        assert!(json.contains("\"kind\":\"identity_changed\""), "stable tag: {json}");
-        let back: OpEntry = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(entry, back);
-    }
-}
+#[path = "tests.rs"]
+mod tests;

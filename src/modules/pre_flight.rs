@@ -32,6 +32,11 @@ pub(crate) fn pre_flight_tool(tool: &ToolUse, state: &State, active_modules: &Ha
     // Phase 1: Global schema validation against ToolDefinition
     if let Some(def) = state.tools.iter().find(|t| t.id == tool.name) {
         validate_schema(&tool.input, &def.params, &mut result);
+        // Phase 1.5: Task declaration — opted-in tools carry a schema-compulsory
+        // `task_id` that is validated non-blockingly here (warn, never error).
+        if def.declares_task {
+            validate_task_declaration(tool, state, &mut result);
+        }
     }
     // If tool not found in definitions, skip schema check — dispatch will catch it
 
@@ -95,6 +100,66 @@ fn check_duplicate_close(tool: &ToolUse, state: &State) -> Option<String> {
         .iter()
         .find(|id| queued_ids.contains(id))
         .map(|id| format!("Panel '{id}' is already queued for closing by another Close_conversation_history call"))
+}
+
+/// Validate the `task_id` declaration on an opted-in tool call (non-blocking).
+///
+/// `task_id` is compulsory in the tool's advertised schema (injected like
+/// `intent`/`verb`), but enforcement here is **soft**: it only produces
+/// [`warnings`](Verdict::warnings), never [`errors`](Verdict::errors), and only
+/// when a thread is focused (per the design, `task_id` is "compulsory whenever a
+/// thread is focused"). With no focused thread the declaration is irrelevant, so
+/// this returns silently.
+///
+/// When a thread IS focused, it warns on three conditions:
+/// - `task_id` missing/empty — the AI forgot to declare the task;
+/// - `task_id` matches no todo in ANY thread — a stale/typo'd id;
+/// - `task_id` matches a todo owned by a DIFFERENT thread — a cross-thread
+///   reference (the precise "wrong thread" warning the all-todos scope enables).
+fn validate_task_declaration(tool: &ToolUse, state: &State, result: &mut Verdict) {
+    let Some(focused) = cp_mod_threads::types::FocusState::get(state).focused_thread_id.clone() else {
+        return; // No focused thread → task_id not enforced.
+    };
+
+    let declared =
+        tool.input.get("task_id").and_then(serde_json::Value::as_str).map(str::trim).filter(|s| !s.is_empty());
+
+    let Some(task_id) = declared else {
+        result.warnings.push(
+            "Missing 'task_id'. Declare which task (from your Todo list) this call advances \u{2014} \
+             it feeds the user's progress UI and keeps your roadmap accurate."
+                .to_owned(),
+        );
+        return;
+    };
+
+    // Look up across ALL todos so an "exists but wrong thread" case yields the
+    // precise cross-thread warning rather than a generic "unknown".
+    let todos = &cp_mod_todo::types::TodoState::get(state).todos;
+    match todos.iter().find(|t| t.id == task_id) {
+        None => result.warnings.push(format!(
+            "Task '{task_id}' does not exist in your Todo list. Declare a real task id, or create it first."
+        )),
+        Some(item) if item.thread_id != focused => result.warnings.push(format!(
+            "Task '{task_id}' belongs to thread {}, not the focused thread {focused}. \
+             Declare a task from the focused thread.",
+            item.thread_id
+        )),
+        // A finished/cancelled task is a wrong thing to declare work against —
+        // warn and do nothing (the pipeline's auto-promote also leaves it be).
+        Some(item)
+            if matches!(
+                item.status,
+                cp_mod_todo::types::TodoStatus::Done | cp_mod_todo::types::TodoStatus::Cancelled
+            ) =>
+        {
+            result.warnings.push(format!(
+                "You're working on a finished/cancelled task ('{task_id}'). \
+                 Demote it to in_progress or planned if it actually isn't done."
+            ));
+        }
+        Some(_) => {}
+    }
 }
 
 /// Validate tool input JSON against the parameter schema.

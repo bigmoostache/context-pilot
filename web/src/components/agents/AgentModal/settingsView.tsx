@@ -248,7 +248,7 @@ function SettingsPane({ c, tab, agentId }: { c: Controller; tab: TabId; agentId:
  */
 function SaveBar({ c }: { c: Controller }) {
   return (
-    <div className="flex items-center gap-3 border-t border-border/70 px-6 py-3">
+    <div className="flex items-center gap-3 px-6 py-3">
       {c.error && <span className="text-[11px] text-(--danger)">{c.error}</span>}
       <button
         type="button"
@@ -267,7 +267,7 @@ function SaveBar({ c }: { c: Controller }) {
  *  dialog footer. Retire is destructive and keeps its danger colouring. */
 function LifecycleBar({ c }: { c: Controller }) {
   return (
-    <div className="flex items-center gap-2 border-t border-border/70 px-6 py-3">
+    <div className="flex items-center gap-2 px-6 py-3">
       <button
         type="button"
         onClick={c.retire}

@@ -312,8 +312,6 @@ const fn handle_config_event(key: &KeyEvent, state: &State) -> Action {
         // Theme selection - t/T to cycle through themes
         KeyCode::Char('t') => Action::ConfigNextTheme,
         KeyCode::Char('T') => Action::ConfigPrevTheme,
-        // Toggle auto-continuation
-        KeyCode::Char('s') => Action::ConfigToggleAutoContinue,
         // Toggle reverie (context optimizer)
         KeyCode::Char('r') => Action::ConfigToggleReverie,
         // Think reminder threshold adjustment

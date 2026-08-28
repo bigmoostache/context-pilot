@@ -136,7 +136,7 @@ function TabStrip({
   canSplit: boolean
 }) {
   return (
-    <div className="flex h-9 shrink-0 items-stretch border-b border-(--border-strong)/70 bg-surface">
+    <div className="flex h-9 shrink-0 items-stretch bg-surface">
       <SortableContext
         items={group.tabs.map((t) => tabDragId(group.id, t.path))}
         strategy={horizontalListSortingStrategy}
@@ -163,7 +163,7 @@ function TabStrip({
             groups.setActiveGroup(group.id)
             groups.splitActive()
           }}
-          className="flex w-8 shrink-0 items-center justify-center border-l border-(--border-strong)/70 text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground"
+          className="flex w-8 shrink-0 items-center justify-center text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground"
         >
           <SplitSquareHorizontal className="size-3.5" />
         </button>
@@ -227,7 +227,7 @@ function Tab({
         onClose()
       }}
       className={cn(
-        "group flex max-w-[220px] min-w-[120px] shrink-0 cursor-default items-center gap-1.5 border-r border-(--border-strong)/70 px-3 text-[12.5px] transition-colors outline-none",
+        "group flex max-w-[220px] min-w-[120px] shrink-0 cursor-default items-center gap-1.5 px-3 text-[12.5px] transition-colors outline-none",
         isDragging && "z-10 opacity-60",
         active
           ? "bg-background text-foreground"

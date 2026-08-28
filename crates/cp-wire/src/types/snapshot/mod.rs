@@ -8,22 +8,23 @@
 //! * [`SeenSet`] — the dedup-tokens of command effects that are durable but not
 //!   yet acknowledged-and-evicted, which makes command application
 //!   **exactly-once** across a replay (design doc I4); and
-//! * a [`RosterThread`] list — the bounded thread roster (one entry per live
-//!   thread) so the backend can render the thread list after oplog
-//!   **compaction** without folding the roster deltas from offset 0 (design
-//!   doc I5 / §16).
+//! * a [`RosterThread`] list — the bounded thread roster so the backend can
+//!   render the thread list after oplog **compaction** without folding roster
+//!   deltas from offset 0 (design doc I5 / §16).
 //!
 //! A [`Snapshot`] bundles all three. It is what a `Checkpoint` oplog record
 //! carries as the first record of every rolled segment, so recovery reads only
 //! the newest segment instead of folding the whole log (design doc I5 / GAP 1).
-//! Both [`Heads`] and [`SeenSet`] must be in the checkpoint: if only [`Heads`]
-//! were snapshotted, rebuilding the [`SeenSet`] would have to fold from offset
-//! 0 — re-introducing the unbounded replay the checkpoint exists to prevent;
-//! the [`RosterThread`] list extends that same guarantee to the thread list.
+//! All three must ride the checkpoint: snapshotting only [`Heads`] would force
+//! rebuilding the [`SeenSet`] and roster by folding from offset 0 — the
+//! unbounded replay the checkpoint exists to prevent.
 
 use serde::{Deserialize, Serialize};
 
 use super::{ContentHash, ThreadTurn};
+
+pub mod todo;
+use todo::WireTask;
 
 /// Wire-schema revision stamped onto freshly-constructed snapshot structures.
 const SNAPSHOT_SCHEMA_VERSION: u32 = 1;
@@ -103,6 +104,18 @@ pub struct RosterThread {
 
     /// Number of messages folded into this thread so far.
     pub msg_count: u32,
+
+    /// The thread's projected tasks (read-only todo items), a flat list with
+    /// nesting expressed via [`WireTask::parent_id`]. Cancelled tasks are
+    /// excluded upstream. Replaced wholesale by each
+    /// [`TaskListChanged`](super::oplog::OpEntryKind::TaskListChanged) delta
+    /// (whole-list snapshot semantics).
+    ///
+    /// `#[serde(default)]`: a checkpoint or roster from an older agent (before
+    /// tasks were projected) decodes to an empty list, and an older backend
+    /// ignores the field — N-1 compatible in both directions.
+    #[serde(default)]
+    pub tasks: Vec<WireTask>,
 }
 
 /// The facts a `ThreadCreated` oplog delta carries — the borrowed payload of
@@ -167,6 +180,8 @@ pub struct RosterThreadBuilder {
     last_activity_ms: u64,
     /// Number of messages folded into this thread so far.
     msg_count: u32,
+    /// The thread's projected tasks (read-only todo items).
+    tasks: Vec<WireTask>,
 }
 
 impl RosterThreadBuilder {
@@ -198,6 +213,13 @@ impl RosterThreadBuilder {
         self
     }
 
+    /// Set the thread's projected tasks. Default empty.
+    #[must_use]
+    pub fn tasks(mut self, tasks: Vec<WireTask>) -> Self {
+        self.tasks = tasks;
+        self
+    }
+
     /// Finalise into a [`RosterThread`]. Total (no fallible field), so it never
     /// panics.
     #[must_use]
@@ -210,6 +232,7 @@ impl RosterThreadBuilder {
             paused: self.paused,
             last_activity_ms: self.last_activity_ms,
             msg_count: self.msg_count,
+            tasks: self.tasks,
         }
     }
 }
@@ -236,6 +259,7 @@ impl RosterThread {
             paused: false,
             last_activity_ms: 0,
             msg_count: 0,
+            tasks: Vec::new(),
         }
     }
 
@@ -256,6 +280,7 @@ impl RosterThread {
                 paused: false,
                 last_activity_ms: created.timestamp_ms,
                 msg_count: 0,
+                tasks: Vec::new(),
             });
         }
     }
@@ -293,6 +318,17 @@ impl RosterThread {
         if let Some(existing) = roster.iter_mut().find(|e| e.thread_id == thread_id) {
             existing.msg_count = existing.msg_count.saturating_add(1);
             existing.last_activity_ms = timestamp_ms;
+        }
+    }
+
+    /// Replace `thread_id`'s task list wholesale — whole-list snapshot
+    /// semantics (each
+    /// [`TaskListChanged`](super::oplog::OpEntryKind::TaskListChanged) carries
+    /// the thread's complete cancelled-excluded list, so folding is an
+    /// assignment). A no-op if the thread is not in the roster.
+    pub fn fold_tasks(roster: &mut [Self], thread_id: &str, tasks: Vec<WireTask>) {
+        if let Some(existing) = roster.iter_mut().find(|e| e.thread_id == thread_id) {
+            existing.tasks = tasks;
         }
     }
 }

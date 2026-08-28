@@ -220,6 +220,11 @@ pub struct ToolDefinition {
     pub reverie_allowed: bool,
     /// Category for grouping (e.g., `"File"`, `"Git"`, `"System"`).
     pub category: String,
+    /// Whether this tool opts into task declaration: when `true`, a compulsory
+    /// `task_id` parameter is injected into the LLM-facing schema (like
+    /// `intent`/`verb`) and validated non-blockingly (warn on missing / unknown
+    /// / cross-thread when a thread is focused). Default `false` (opt-out).
+    pub declares_task: bool,
 }
 
 // =============================================================================
@@ -248,6 +253,7 @@ impl ToolDefinition {
             category: String::new(),
             enabled: true,
             reverie_allowed: false,
+            declares_task: false,
         }
     }
 
@@ -304,6 +310,8 @@ pub struct ToolDefBuilder<'yaml> {
     enabled: bool,
     /// Reverie access flag.
     reverie_allowed: bool,
+    /// Task-declaration opt-in (injects a compulsory `task_id` param).
+    declares_task: bool,
 }
 
 impl ToolDefBuilder<'_> {
@@ -325,6 +333,15 @@ impl ToolDefBuilder<'_> {
     #[must_use]
     pub const fn reverie_allowed(mut self, allowed: bool) -> Self {
         self.reverie_allowed = allowed;
+        self
+    }
+
+    /// Opt this tool into task declaration — a compulsory `task_id` parameter is
+    /// injected into the LLM-facing schema and validated non-blockingly (warn on
+    /// missing / unknown / cross-thread when a thread is focused).
+    #[must_use]
+    pub const fn declares_task(mut self) -> Self {
+        self.declares_task = true;
         self
     }
 
@@ -423,6 +440,7 @@ impl ToolDefBuilder<'_> {
             enabled: self.enabled,
             reverie_allowed: self.reverie_allowed,
             category: self.category,
+            declares_task: self.declares_task,
         }
     }
 }

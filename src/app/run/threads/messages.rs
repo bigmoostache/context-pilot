@@ -7,13 +7,17 @@
 //! the content-addressed body store first (the I13 body-before-reference
 //! barrier).
 
+use std::collections::HashMap;
+
 use cp_base::state::runtime::State;
 use cp_mod_bridge::BridgeState;
 use cp_mod_bridge::body::Stored;
 use cp_mod_threads::types::{ThreadAuthor, ThreadMessage, ThreadsState};
+use cp_mod_todo::types::{TodoState, TodoStatus};
 use cp_wire::types::oplog::OpEntryKind;
+use cp_wire::types::snapshot::todo::{WireTask, WireTaskStatus};
 
-use super::bridge::bridge_active;
+use super::bridge::{bridge_active, emit_roster_delta};
 use crate::app::App;
 
 /// Emit a [`MessageCreated`](OpEntryKind::MessageCreated) for every thread
@@ -146,4 +150,126 @@ fn emit_one_message(state: &State, thread_id: &str, message_id: &str, body: &str
         head,
         inline_body,
     });
+}
+
+// ── Task-list emission (thread-owned todos → frontend, M141) ─────────────
+
+/// Map a [`TodoStatus`] to its wire projection, or `None` for the soft-deleted
+/// [`Cancelled`](TodoStatus::Cancelled) state — cancelled tasks are excluded
+/// from the projection entirely (the backend is the source of truth, the
+/// frontend renders verbatim).
+const fn wire_task_status(status: TodoStatus) -> Option<WireTaskStatus> {
+    match status {
+        TodoStatus::Planned => Some(WireTaskStatus::Planned),
+        TodoStatus::InProgress => Some(WireTaskStatus::InProgress),
+        TodoStatus::Done => Some(WireTaskStatus::Done),
+        TodoStatus::Cancelled => None,
+    }
+}
+
+/// Project a thread's todo items into the read-only [`WireTask`] list the web
+/// aside renders: the thread's own items in insertion order, cancelled
+/// excluded, nesting expressed via [`WireTask::parent_id`].
+fn project_thread_tasks(todos: &TodoState, thread_id: &str) -> Vec<WireTask> {
+    todos
+        .todos
+        .iter()
+        .filter(|t| t.thread_id == thread_id)
+        .filter_map(|t| {
+            wire_task_status(t.status).map(|status| WireTask {
+                id: t.id.clone(),
+                parent_id: t.parent_id.clone(),
+                name: t.name.clone(),
+                description: t.description.clone(),
+                status,
+            })
+        })
+        .collect()
+}
+
+/// Replay the agent's oplog to recover the **last per-thread task list the log
+/// recorded** — i.e. exactly what the backend's view has folded.
+///
+/// The correct seed for the task chokepoint on the first pass after a (re)boot:
+/// comparing the live projection against this (not against the live list
+/// itself) means any task change that landed on disk while the bridge was down
+/// but was never journaled is emitted on the very first pass — self-healing
+/// disk↔oplog divergence. Returns an empty map when the bridge is OFF or the
+/// replay fails.
+fn oplog_roster_tasks(state: &State) -> HashMap<String, Vec<WireTask>> {
+    let Some(bs) = state.get_ext::<BridgeState>() else {
+        return HashMap::new();
+    };
+    let Some(boot) = bs.boot.as_ref() else {
+        return HashMap::new();
+    };
+    match cp_oplog::replay::replay(&boot.entry().oplog_path) {
+        Ok(recovered) => recovered.roster.into_iter().map(|t| (t.thread_id, t.tasks)).collect(),
+        Err(e) => {
+            log::warn!("bridge: oplog replay for task seed failed: {e:?}");
+            HashMap::new()
+        }
+    }
+}
+
+/// First pass after (re)boot: seed the task memo from the oplog roster (what the
+/// backend view has folded), then let the diff catch any change the oplog
+/// missed. No-op once already seeded.
+fn seed_tasks_memo_if_needed(app: &mut App) {
+    let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.tasks());
+    if seeded {
+        return;
+    }
+    let oplog_tasks = oplog_roster_tasks(&app.state);
+    let bs = app.state.ext_mut::<BridgeState>();
+    bs.thread_tasks.extend(oplog_tasks);
+    bs.seeded.seed_tasks();
+}
+
+/// Diff each thread's live task projection against the memo; collect
+/// (`thread_id`, tasks) for every thread whose list changed. A thread absent
+/// from the memo is treated as having an empty list, so a thread that never had
+/// tasks (and still has none) yields no spurious emission.
+fn collect_task_changes(app: &App) -> Vec<(String, Vec<WireTask>)> {
+    let ts = ThreadsState::get(&app.state);
+    let todos = TodoState::get(&app.state);
+    let memo = &app.state.ext::<BridgeState>().thread_tasks;
+    let empty: Vec<WireTask> = Vec::new();
+    ts.threads
+        .iter()
+        .filter_map(|t| {
+            let live = project_thread_tasks(todos, &t.id);
+            (memo.get(&t.id).unwrap_or(&empty) != &live).then(|| (t.id.clone(), live))
+        })
+        .collect()
+}
+
+/// Emit a [`TaskListChanged`](OpEntryKind::TaskListChanged) the instant any
+/// thread's projected task list changes, so the backend view (and the web todo
+/// aside) reflect a `Think.todo` / `todo_mark` in milliseconds.
+///
+/// A main-loop **observe-on-change chokepoint** mirroring
+/// [`emit_thread_archived`](super::archived::emit_thread_archived): it seeds the
+/// per-thread task memo from the oplog roster on the first pass (what the view
+/// has folded), then falls through to the diff so any change the oplog missed
+/// while the bridge was down is emitted immediately. Each delta carries the
+/// thread's **complete** cancelled-excluded list (whole-list snapshot), and
+/// rides the **durable** path ([`emit_roster_delta`]) — task state is
+/// user-visible roster state that must never be silently lost.
+///
+/// No-op when the bridge is OFF.
+pub(in crate::app::run) fn emit_task_lists(app: &mut App) {
+    if !bridge_active(&app.state) {
+        return;
+    }
+
+    seed_tasks_memo_if_needed(app);
+
+    for (thread_id, tasks) in collect_task_changes(app) {
+        emit_roster_delta(
+            &app.state,
+            OpEntryKind::TaskListChanged { thread_id: thread_id.clone(), tasks: tasks.clone() },
+        );
+        let _prev = app.state.ext_mut::<BridgeState>().thread_tasks.insert(thread_id, tasks);
+    }
 }

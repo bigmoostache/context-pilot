@@ -1,13 +1,16 @@
-//! Todo module — hierarchical task tracking with status management.
+//! Todo module — hierarchical, thread-owned task tracking with status management.
 //!
-//! Three tools: `todo_create` (with optional nesting), `todo_update` (status,
-//! name, description, delete), `todo_move` (reorder). Todos are stored per-worker
-//! and drive the spine's `continue_until_todos_done` auto-continuation mode.
+//! State (`TodoState`) owns all task items; each item carries a compulsory
+//! `thread_id` (thread-owned tasks rework). Structural edits and status marking
+//! are hosted in the main crate (`Think.todo` + `todo_mark`) which resolves the
+//! focused thread and calls the pure ops in [`tools`]; this module exposes the
+//! pure task operations + the focus-scoped Todo panel and owns **no tools** of
+//! its own. `TodoState` is shared (`is_global == true`).
 
 /// Panel implementation for the todo list view.
 mod panel;
-/// Tool implementations for creating, updating, and moving todos.
-mod tools;
+/// Pure, thread-scoped task operations (`upsert_task_forest`, `mark_tasks`, …).
+pub mod tools;
 /// Todo state types: `TodoItem`, `TodoStatus`, `TodoState`.
 pub mod types;
 
@@ -19,17 +22,13 @@ use cp_base::modules::ToolVisualizer;
 use cp_base::panels::Panel;
 use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
+use cp_base::tools::ToolDefinition;
 use cp_base::tools::pre_flight::Verdict;
-use cp_base::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::TodoPanel;
 use cp_base::cast::Safe as _;
 use cp_base::modules::Module;
-
-/// Lazily parsed tool definitions loaded from the YAML spec.
-static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
-    std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/todo.yaml")));
 
 /// Todo module: hierarchical task tracking with status and nesting.
 #[derive(Debug, Clone, Copy)]
@@ -86,6 +85,8 @@ impl Module for TodoModule {
         if let Some(v) = data.get("next_todo_id").and_then(serde_json::Value::as_u64) {
             ts.next_todo_id = v.to_usize();
         }
+        // FR4: forever-purge legacy items lacking a thread_id (old schema).
+        tools::purge_threadless(state);
     }
 
     fn fixed_panel_types(&self) -> Vec<Kind> {
@@ -104,77 +105,21 @@ impl Module for TodoModule {
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
-        let t = &*TOOL_TEXTS;
-        vec![
-            ToolDefinition::from_yaml("todo_create", t)
-                .short_desc("Add task items")
-                .category("Todo")
-                .reverie_allowed(true)
-                .param_array(
-                    "todos",
-                    ParamType::Object(vec![
-                        ToolParam::new("name", ParamType::String).desc("Todo title").required(),
-                        ToolParam::new("description", ParamType::String).desc("Detailed description"),
-                        ToolParam::new("parent_id", ParamType::String).desc("Parent todo ID for nesting"),
-                    ]),
-                    true,
-                )
-                .build(),
-            ToolDefinition::from_yaml("todo_update", t)
-                .short_desc("Modify task items")
-                .category("Todo")
-                .reverie_allowed(true)
-                .param_array(
-                    "updates",
-                    ParamType::Object(vec![
-                        ToolParam::new("id", ParamType::String).desc("Todo ID (e.g., X1)").required(),
-                        ToolParam::new("status", ParamType::String).desc("New status").enum_vals(&[
-                            "pending",
-                            "in_progress",
-                            "done",
-                            "deleted",
-                        ]),
-                        ToolParam::new("name", ParamType::String).desc("New name"),
-                        ToolParam::new("description", ParamType::String).desc("New description"),
-                        ToolParam::new("parent_id", ParamType::String).desc("New parent ID, or null to make top-level"),
-                        ToolParam::new("delete", ParamType::Boolean).desc("Set true to delete this todo"),
-                    ]),
-                    true,
-                )
-                .build(),
-            ToolDefinition::from_yaml("todo_move", t)
-                .short_desc("Reorder a task")
-                .category("Todo")
-                .param("id", ParamType::String, true)
-                .param("after_id", ParamType::String, false)
-                .build(),
-        ]
+        // No tools of its own: `Think.todo` + `todo_mark` are hosted in the main
+        // crate (they need the focused thread from `cp-mod-threads::FocusState`).
+        vec![]
     }
 
-    fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
-        match tool.name.as_str() {
-            "todo_create" => Some(preflight_create(tool, state)),
-            "todo_update" => Some(preflight_update(tool, state)),
-            "todo_move" => Some(preflight_move(tool, state)),
-            _ => None,
-        }
+    fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<Verdict> {
+        None
     }
 
-    fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
-        match tool.name.as_str() {
-            "todo_create" => Some(tools::execute_create(tool, state)),
-            "todo_update" => Some(tools::execute_update(tool, state)),
-            "todo_move" => Some(tools::execute_move(tool, state)),
-            _ => None,
-        }
+    fn execute_tool(&self, _tool: &ToolUse, _state: &mut State) -> Option<ToolResult> {
+        None
     }
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
-        vec![
-            ("todo_create", visualize_todo_output),
-            ("todo_update", visualize_todo_output),
-            ("todo_move", visualize_todo_output),
-        ]
+        vec![]
     }
 
     fn context_type_metadata(&self) -> Vec<cp_base::state::context::TypeMeta> {
@@ -192,11 +137,14 @@ impl Module for TodoModule {
 
     fn overview_context_section(&self, state: &State) -> Option<String> {
         let ts = TodoState::get(state);
-        if ts.todos.is_empty() {
+        // Global rollup across all threads; cancelled items are excluded from
+        // both the numerator and denominator (they are soft-deleted).
+        let counted: Vec<&types::TodoItem> = ts.todos.iter().filter(|t| t.status != TodoStatus::Cancelled).collect();
+        if counted.is_empty() {
             return None;
         }
-        let done = ts.todos.iter().filter(|t| t.status == TodoStatus::Done).count();
-        Some(format!("Todos: {}/{} done\n", done, ts.todos.len()))
+        let done = counted.iter().filter(|t| t.status == TodoStatus::Done).count();
+        Some(format!("Tasks: {}/{} done\n", done, counted.len()))
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
@@ -212,7 +160,7 @@ impl Module for TodoModule {
     }
 
     fn is_global(&self) -> bool {
-        false
+        true
     }
 
     fn save_worker_data(&self, _state: &State) -> serde_json::Value {
@@ -271,113 +219,4 @@ impl Module for TodoModule {
     fn watcher_immediate_refresh(&self) -> bool {
         true
     }
-}
-
-/// Pre-flight for `todo_create`: warn when a referenced `parent_id` is unknown.
-fn preflight_create(tool: &ToolUse, state: &State) -> Verdict {
-    let mut pf = Verdict::new();
-    if let Some(todos) = tool.input.get("todos").and_then(|v| v.as_array()) {
-        let ts = TodoState::get(state);
-        for todo in todos {
-            if let Some(parent_id) = todo.get("parent_id").and_then(|v| v.as_str())
-                && !ts.todos.iter().any(|t| t.id == parent_id)
-            {
-                pf.errors.push(format!("Parent todo '{parent_id}' not found"));
-            }
-        }
-    }
-    pf
-}
-
-/// Pre-flight for `todo_update`: error when a targeted `id` does not exist.
-fn preflight_update(tool: &ToolUse, state: &State) -> Verdict {
-    let mut pf = Verdict::new();
-    if let Some(updates) = tool.input.get("updates").and_then(|v| v.as_array()) {
-        let ts = TodoState::get(state);
-        for update in updates {
-            if let Some(id) = update.get("id").and_then(|v| v.as_str())
-                && !ts.todos.iter().any(|t| t.id == id)
-            {
-                pf.errors.push(format!("Todo '{id}' not found"));
-            }
-        }
-    }
-    pf
-}
-
-/// Pre-flight for `todo_move`: error on unknown `id`, warn on unknown `after_id`.
-fn preflight_move(tool: &ToolUse, state: &State) -> Verdict {
-    let mut pf = Verdict::new();
-    let ts = TodoState::get(state);
-    if let Some(id) = tool.input.get("id").and_then(|v| v.as_str())
-        && !ts.todos.iter().any(|t| t.id == id)
-    {
-        pf.errors.push(format!("Todo '{id}' not found"));
-    }
-    if let Some(after_id) = tool.input.get("after_id").and_then(|v| v.as_str())
-        && !ts.todos.iter().any(|t| t.id == after_id)
-    {
-        pf.warnings.push(format!("after_id '{after_id}' not found — will move to top"));
-    }
-    pf
-}
-
-/// Primary keyword classes (error / done / in-progress / pending). Returns
-/// `None` when the line matches none, deferring to [`tail_semantic`].
-fn keyword_semantic(line: &str) -> Option<cp_render::Semantic> {
-    use cp_render::Semantic;
-    if line.starts_with("Error:") {
-        Some(Semantic::Error)
-    } else if line.contains("done") || line.contains("Done") || line.starts_with("Created") {
-        Some(Semantic::Success)
-    } else if line.contains("in_progress") || line.contains("in-progress") {
-        Some(Semantic::Warning)
-    } else if line.contains("pending") || line.contains("Moved") {
-        Some(Semantic::Info)
-    } else {
-        None
-    }
-}
-
-/// Secondary classes (deleted / updated / id / arrow), falling back to `Default`.
-fn tail_semantic(line: &str) -> cp_render::Semantic {
-    use cp_render::Semantic;
-    if line.contains("deleted") || line.contains("Deleted") {
-        Semantic::Error
-    } else if line.contains("Updated") {
-        Semantic::Success
-    } else if line.starts_with('X') && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
-        Semantic::Info
-    } else if line.contains('\u{2192}') {
-        Semantic::Muted
-    } else {
-        Semantic::Default
-    }
-}
-
-/// Classify one todo tool-output line into a display semantic.
-fn todo_line_semantic(line: &str) -> cp_render::Semantic {
-    keyword_semantic(line).unwrap_or_else(|| tail_semantic(line))
-}
-
-/// Visualizer for todo tool results.
-/// Shows todo status with colored indicators and highlights created/updated item names.
-fn visualize_todo_output(content: &str, width: usize) -> Vec<cp_render::Block> {
-    use cp_render::{Block, Span};
-
-    content
-        .lines()
-        .map(|line| {
-            if line.is_empty() {
-                return Block::empty();
-            }
-            let semantic = todo_line_semantic(line);
-            let display = if line.len() > width {
-                format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
-            } else {
-                line.to_owned()
-            };
-            Block::Line(vec![Span::styled(display, semantic)])
-        })
-        .collect()
 }

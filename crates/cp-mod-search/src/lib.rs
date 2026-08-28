@@ -180,6 +180,7 @@ impl Module for SearchModule {
         let t = &*TOOL_TEXTS;
         vec![
             ToolDefinition::from_yaml("search", t)
+                .declares_task()
                 .short_desc("Search across project files and logs using full-text search")
                 .category("Search")
                 .param("query", ParamType::String, true)

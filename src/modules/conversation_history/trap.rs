@@ -91,7 +91,11 @@ pub(crate) fn trap_blocks_tool(tool_name: &str, state: &State) -> Option<String>
     if !qs.trap_active {
         return None;
     }
-    if tool_name == "Close_conversation_history" || tool_name == "Think" {
+    // `Todo` joins `Close_conversation_history`/`Think` as trap-exempt (T664):
+    // planning must stay available while the trap is active, and — like `Think`
+    // — a `Todo` upsert only touches task state (tempo-preserving), never the
+    // history panels the trap exists to prune.
+    if tool_name == "Close_conversation_history" || tool_name == "Think" || tool_name == "Todo" {
         return None;
     }
     Some(format_blocked_message(state))

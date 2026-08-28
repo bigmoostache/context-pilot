@@ -85,6 +85,7 @@ impl Module for GithubModule {
         let t = &*TOOL_TEXTS;
         vec![
             ToolDefinition::from_yaml("gh_execute", t)
+                .declares_task()
                 .short_desc("Run gh commands")
                 .category("Git")
                 .param("command", ParamType::String, true)
