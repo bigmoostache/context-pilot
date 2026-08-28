@@ -1,5 +1,5 @@
 import { useMemo } from "react"
-import { Paperclip, ListChecks, ChevronRight, ChevronLeft, Download } from "lucide-react"
+import { Paperclip, ListChecks, ChevronLeft, Download } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { FileIcon } from "@/components/finder/support/macIcons"
@@ -220,20 +220,19 @@ function FileList({
           key={f.file.path}
           type="button"
           onClick={() => onSelect(f.file)}
-          className="group flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left"
+          className="group flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted/40"
         >
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted/50">
-            <FileIcon kind={kindOf(f.file.name)} size={20} />
+          <span className="shrink-0">
+            <FileIcon kind={kindOf(f.file.name)} size={28} />
           </span>
           <span className="flex min-w-0 flex-1 flex-col leading-tight">
-            <span className="truncate text-[13.5px] font-medium text-foreground/85 group-hover:text-foreground">
+            <span className="truncate text-[13.5px] text-foreground/85 group-hover:text-foreground">
               {f.file.name}
             </span>
-            <span className="text-[9.5px] text-muted-foreground/50">
+            <span className="text-[11px] text-muted-foreground/55">
               {f.role === "user" ? "You" : "Assistant"}
             </span>
           </span>
-          <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/30 group-hover:text-muted-foreground/60" />
         </button>
       ))}
     </div>
