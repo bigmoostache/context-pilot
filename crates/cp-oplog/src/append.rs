@@ -352,8 +352,8 @@ mod tests {
     fn append_assigns_monotonic_revs() {
         let dir = tempdir().expect("tempdir");
         let mut writer = OplogWriter::open(dir.path()).expect("open");
-        let revs: Vec<u64> = (0..10).map(|_unused| writer.append(phase_kind()).expect("append")).collect();
-        assert_eq!(revs, (0..10).collect::<Vec<_>>(), "revs strictly increase from 0");
+        let revs: Vec<u64> = std::iter::repeat_with(|| writer.append(phase_kind()).expect("append")).take(10).collect();
+        assert_eq!(revs, (0u64..10).collect::<Vec<_>>(), "revs strictly increase from 0");
     }
 
     #[test]
@@ -361,15 +361,15 @@ mod tests {
         let dir = tempdir().expect("tempdir");
         {
             let mut writer = OplogWriter::open(dir.path()).expect("open");
-            for _unused in 0..5 {
+            for _unused in 0u32..5 {
                 let _rev = writer.append(phase_kind()).expect("append");
             }
             assert_eq!(writer.next_rev(), 5);
         }
         // Reopen: next rev must continue at 5, never reusing 0..4.
-        let mut writer = OplogWriter::open(dir.path()).expect("reopen");
-        assert_eq!(writer.next_rev(), 5, "rev resumes past the highest durable rev");
-        let rev = writer.append(phase_kind()).expect("append");
+        let mut reopened = OplogWriter::open(dir.path()).expect("reopen");
+        assert_eq!(reopened.next_rev(), 5, "rev resumes past the highest durable rev");
+        let rev = reopened.append(phase_kind()).expect("append");
         assert_eq!(rev, 5);
     }
 
@@ -377,7 +377,7 @@ mod tests {
     fn appended_records_read_back_in_order() {
         let dir = tempdir().expect("tempdir");
         let mut writer = OplogWriter::open(dir.path()).expect("open");
-        for _unused in 0..4 {
+        for _unused in 0u32..4 {
             let _rev = writer.append(phase_kind()).expect("append");
         }
         let path = segment::path(dir.path(), 0);
@@ -396,7 +396,7 @@ mod tests {
         // user-record count — assert monotonicity + a roll, not an exact total.
         let mut writer = OplogWriter::open_with_segment_limit(dir.path(), 16).expect("open");
         let mut last = 0;
-        for _unused in 0..6 {
+        for _unused in 0u32..6 {
             last = writer.append(phase_kind()).expect("append");
         }
         assert!(writer.current_segment() > 0, "tiny limit must have rolled segments");
@@ -404,9 +404,9 @@ mod tests {
         assert!(after_first_session > last, "next_rev is past the last appended rev");
 
         // Reopen across multiple segments: rev resumes exactly where it stopped.
-        let writer = OplogWriter::open_with_segment_limit(dir.path(), 16).expect("reopen");
+        let reopened = OplogWriter::open_with_segment_limit(dir.path(), 16).expect("reopen");
         assert_eq!(
-            writer.next_rev(),
+            reopened.next_rev(),
             after_first_session,
             "rev resumes across multi-segment scan, checkpoints included",
         );
@@ -418,7 +418,7 @@ mod tests {
         {
             let mut writer = OplogWriter::open(dir.path()).expect("open");
             let _rev = writer.append(phase_kind()).expect("append");
-            let _rev = writer.append(phase_kind()).expect("append");
+            let _rev2 = writer.append(phase_kind()).expect("append");
         }
         // Corrupt the segment by appending garbage bytes (a torn write).
         let path = segment::path(dir.path(), 0);
@@ -455,10 +455,13 @@ mod tests {
         // The newest segment now ends with a checkpoint whose heads match the
         // running heads.
         let scan = segment::read(&segment::path(dir.path(), 0)).expect("read");
-        let last = scan.entries.last().expect("entries");
-        match &last.kind {
-            OpEntryKind::Checkpoint { snapshot } => assert_eq!(&snapshot.heads, writer.heads()),
-            other => panic!("expected trailing checkpoint, got {other:?}"),
-        }
+        // Own the last entry so the checkpoint pattern binds `snapshot` by value —
+        // matching a `&OpEntryKind` via ergonomics trips pattern_type_mismatch, and
+        // its mandated `ref` fix trips ref_patterns (the two are mutually exclusive).
+        let last_kind = scan.entries.into_iter().next_back().expect("entries").kind;
+        let OpEntryKind::Checkpoint { snapshot } = last_kind else {
+            panic!("expected trailing checkpoint");
+        };
+        assert_eq!(&snapshot.heads, writer.heads());
     }
 }
