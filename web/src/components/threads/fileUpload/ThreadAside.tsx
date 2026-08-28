@@ -96,7 +96,7 @@ export function ThreadAside({
 
             {/* Tasks tab */}
             {hasTasks && (
-              <TabsContent value="tasks" className="min-h-0 flex-1 overflow-y-auto p-1.5">
+              <TabsContent value="tasks" className="min-h-0 flex-1 overflow-y-auto">
                 <TaskList tasks={tasks} />
               </TabsContent>
             )}
