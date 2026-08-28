@@ -63,7 +63,7 @@ mod tests {
     #[test]
     fn oauth_unusable_when_token_empty_or_fields_missing() {
         assert!(!oauth_creds_usable(&creds("", 2_000), 1_000));
-        assert!(!oauth_creds_usable(&serde_json::json!({ "unexpected": 1 }), 1_000));
+        assert!(!oauth_creds_usable(&serde_json::json!({ "unexpected": 1i32 }), 1_000));
         assert!(!oauth_creds_usable(&serde_json::Value::Null, 1_000));
     }
 }

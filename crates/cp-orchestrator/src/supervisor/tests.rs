@@ -127,7 +127,7 @@ fn adopt_and_detect_vanish() {
     let events = sup.check_liveness();
     assert_eq!(events.len(), 1);
     assert!(
-        matches!(&events[0], Event::Vanished { agent_id } if agent_id == "a2"),
+        matches!(events.first(), Some(Event::Vanished { agent_id }) if agent_id == "a2"),
         "expected Vanished, got {events:?}"
     );
     assert!(sup.is_empty(), "dead agent should be removed");
@@ -175,7 +175,7 @@ fn check_liveness_reaps_exited_child() {
     let events = sup.check_liveness();
     assert_eq!(events.len(), 1);
     assert!(
-        matches!(&events[0], Event::Exited { agent_id, .. } if agent_id == "a4"),
+        matches!(events.first(), Some(Event::Exited { agent_id, .. }) if agent_id == "a4"),
         "expected Exited, got {events:?}"
     );
     assert!(sup.is_empty());

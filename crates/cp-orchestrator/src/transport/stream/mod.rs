@@ -277,7 +277,7 @@ mod tests {
         // The cold subscriber must see rev 0 on the live tail.
         let got = tailer.poll().expect("poll");
         assert_eq!(got.len(), 1, "first append delivered");
-        assert_eq!(got[0].rev, 0, "rev 0 is not dropped");
+        assert_eq!(got.first().expect("one entry").rev, 0, "rev 0 is not dropped");
     }
 
     /// The contrast case the T123 head-seed exists for: a subscriber cold-
@@ -303,6 +303,6 @@ mod tests {
         let _rev1 = writer.append(OpEntryKind::PhaseTransition { phase: Phase::Idle }).expect("append rev 1");
         let got = tailer.poll().expect("poll");
         assert_eq!(got.len(), 1, "future append delivered");
-        assert_eq!(got[0].rev, 1, "only the post-seed rev arrives");
+        assert_eq!(got.first().expect("one entry").rev, 1, "only the post-seed rev arrives");
     }
 }
