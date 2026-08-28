@@ -478,6 +478,12 @@ M-short-34:
     T518. Switched check-rust-tests.sh to `cargo test --workspace`. Fixed 3 pre-existing breakages: cp-wire snapshot missing `paused` field, 8 test binaries with drifted use-extern silencer blocks, command() REST handler lost cost-breaker gate. Chain #30.
   importance: high
   last_edited_ms: 0
+M-short-35:
+  tier: short
+  title: T677 show/hide aside
+  contents: 'T677 SHIPPED (todo-v2 f9669f3b): per-thread show/hide of Files/Tasks right rail. ThreadAside icon-only hide btn; useThreadAside persists hidden (cp-aside-hidden-<a>-<t>), openFile re-shows. New ThreadAsideRail (mobile-twinned) slides via neg margin-right + floating reopen btn. Global default = AsideDefaultProvider (cp-aside-default-hidden, default show) + Settings>General toggle.'
+  importance: high
+  last_edited_ms: 1787930213740
 M-short-36:
   tier: short
   title: T645 agent image
@@ -511,10 +517,10 @@ M-short-4:
   last_edited_ms: 0
 M-short-40:
   tier: short
-  title: todo-v2 FE wiring shipped
-  contents: 'todo-v2 FE wiring SHIPPED commit 6aa70ae1 (todo-v2; backend=3ce87b37). Read-only todos aside beside Attachments, delta-live. Chain: WireTask+TaskListChanged->oplog fold->emit_task_lists->MaterializedView reshape/attach_disk_tasks->openapi/TS->reducers foldTaskList->TodoSidebar(desktop-only). build/fmt/openapi/TS-lint green. NOT pushed. clippy --all-targets red=pre-existing orch debt.'
+  title: T679 Settings/Finder
+  contents: 'T679 SHIPPED (todo-v2). d511e410: ConfigPanel rail floats bg-surface-2 card-shadow my-2 w-(--sidebar-w) over bg-background, no border dividers, hover=card-shadow bg-card; ConfigPanes rows rounded-lg shadow-card; settingsView bars no border-t. fc4486b6: TabHost dropped 3 border-strong dividers. Rails unified T669.'
   importance: medium
-  last_edited_ms: 1787859203626
+  last_edited_ms: 1787931384247
 M-short-5:
   tier: short
   title: 'Datalab OCR API: POST'
