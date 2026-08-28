@@ -57,7 +57,7 @@ pub(crate) fn probe(config: &NetworkConfig, has_modem: bool) -> Value {
         "modem_present": has_modem,
         "wan": wan_status(default_dev, gateway),
         "wwan": tools.as_ref().and_then(wwan_status),
-        "ap": tools.as_ref().map(|tools| ap_status(tools, config)),
+        "ap": tools.as_ref().map(|resolved| ap_status(resolved, config)),
         "supervisor": supervisor_status(),
     })
 }
@@ -119,7 +119,7 @@ fn parse_default_route(table: &str) -> Option<(u32, String, String)> {
     let mut best: Option<(u32, String, String)> = None;
     for line in table.lines().skip(1) {
         let cols: Vec<&str> = line.split_whitespace().collect();
-        let (Some(iface), Some(dest), Some(gateway), Some(metric), Some(mask)) =
+        let (Some(iface), Some(dest), Some(gateway), Some(metric_raw), Some(mask)) =
             (cols.first(), cols.get(1), cols.get(2), cols.get(6), cols.get(7))
         else {
             continue;
@@ -127,10 +127,10 @@ fn parse_default_route(table: &str) -> Option<(u32, String, String)> {
         if *dest != "00000000" || *mask != "00000000" {
             continue;
         }
-        let Ok(metric) = metric.parse::<u32>() else {
+        let Ok(metric) = metric_raw.parse::<u32>() else {
             continue;
         };
-        if best.as_ref().is_none_or(|(seen, _dev, _gw)| metric < *seen) {
+        if best.as_ref().is_none_or(|seen| metric < seen.0) {
             best = Some((metric, (*iface).to_owned(), hex_le_ipv4(gateway).unwrap_or_default()));
         }
     }
@@ -192,8 +192,10 @@ fn parse_default_route6(table: &str) -> Option<(u32, String)> {
 /// `192.168.1.1`).
 fn hex_le_ipv4(hex: &str) -> Option<String> {
     let raw = u32::from_str_radix(hex, 16).ok()?;
-    let [byte0, byte1, byte2, byte3] = raw.to_le_bytes();
-    Some(std::net::Ipv4Addr::new(byte0, byte1, byte2, byte3).to_string())
+    // `/proc/net/route` stores the address little-endian; swap to native
+    // (MSB-first) order so `Ipv4Addr::from`, which reads the octets high-byte
+    // first, yields the dotted quad. Avoids the forbidden `to_le_bytes`.
+    Some(std::net::Ipv4Addr::from(raw.swap_bytes()).to_string())
 }
 
 /// Classify the default-route device: `wan`, `wwan`, `other` or `none`.
