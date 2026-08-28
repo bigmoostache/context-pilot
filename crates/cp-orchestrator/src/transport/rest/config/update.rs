@@ -236,6 +236,13 @@ mod tests {
         (Mutex::new(b), dir)
     }
 
+    /// Assert `reply`'s JSON body contains `needle`. A plain call, so folding the
+    /// `body.contains` checks through it keeps the roundtrip tests under the
+    /// cognitive-complexity cap.
+    fn assert_body_has(reply: &HttpReply, needle: &str) {
+        assert!(reply.body.contains(needle), "expected {needle} in {}", reply.body);
+    }
+
     /// V5.1b — `status` reports the defaults; `mode` flips the posture and
     /// moves the window (server-persisted, reflected in the next status).
     #[test]
@@ -244,13 +251,13 @@ mod tests {
 
         let status = update_status(&state);
         assert_eq!(status.status, 200);
-        assert!(status.body.contains("\"mode\":\"auto\""), "default mode: {}", status.body);
-        assert!(status.body.contains("\"start\":\"03:00\""), "default window: {}", status.body);
+        assert_body_has(&status, "\"mode\":\"auto\"");
+        assert_body_has(&status, "\"start\":\"03:00\"");
 
         let set = update_set_mode(&state, br#"{"mode":"manual","window":{"start":"22:00","end":"23:30"}}"#);
         assert_eq!(set.status, 200, "{}", set.body);
-        assert!(set.body.contains("\"mode\":\"manual\""));
-        assert!(set.body.contains("\"start\":\"22:00\""));
+        assert_body_has(&set, "\"mode\":\"manual\"");
+        assert_body_has(&set, "\"start\":\"22:00\"");
 
         // Persisted server-side: a reloaded store sees the same values.
         let reloaded = ReleaseStore::load(dir.join("releases"));
@@ -266,11 +273,11 @@ mod tests {
     fn update_routes_channel_switch() {
         let (state, dir) = backend("channel");
 
-        assert!(update_status(&state).body.contains("\"channel\":\"stable\""), "default channel");
+        assert_body_has(&update_status(&state), "\"channel\":\"stable\""); // default channel
 
         let set = update_set_mode(&state, br#"{"channel":"nightly"}"#);
         assert_eq!(set.status, 200, "{}", set.body);
-        assert!(set.body.contains("\"channel\":\"nightly\""), "channel switched: {}", set.body);
+        assert_body_has(&set, "\"channel\":\"nightly\"");
 
         // Persisted server-side.
         let reloaded = ReleaseStore::load(dir.join("releases"));
@@ -279,7 +286,7 @@ mod tests {
 
         // An unknown channel is refused and changes nothing.
         assert_eq!(update_set_mode(&state, br#"{"channel":"beta"}"#).status, 400, "unknown channel refused");
-        assert!(update_status(&state).body.contains("\"channel\":\"nightly\""));
+        assert_body_has(&update_status(&state), "\"channel\":\"nightly\"");
 
         drop(std::fs::remove_dir_all(&dir));
     }
