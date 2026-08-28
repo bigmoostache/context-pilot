@@ -91,24 +91,23 @@ fn percent_decode(input: &str) -> String {
         if b == b'%' {
             let h1 = src.next();
             let h2 = src.next();
-            if let (Some(h1), Some(h2)) = (h1, h2) {
-                // SAFETY: h1 and h2 are ASCII hex digits (or not); from_str_radix
-                // validates, so the unwrap_or fallback is unreachable for valid
-                // percent-encoded input.
-                let pair = [h1, h2];
+            if let (Some(d1), Some(d2)) = (h1, h2) {
+                // d1 and d2 are the two chars after `%`; from_str_radix
+                // validates they are hex, so the else branch handles non-hex.
+                let pair = [d1, d2];
                 if let Ok(decoded) = u8::from_str_radix(std::str::from_utf8(&pair).unwrap_or(""), 16) {
                     bytes.push(decoded);
                 } else {
                     // Not valid hex — pass through literally.
                     bytes.push(b'%');
-                    bytes.push(h1);
-                    bytes.push(h2);
+                    bytes.push(d1);
+                    bytes.push(d2);
                 }
             } else {
                 // Trailing `%` at end of string — pass through literally.
                 bytes.push(b'%');
-                if let Some(h1) = h1 {
-                    bytes.push(h1);
+                if let Some(d1) = h1 {
+                    bytes.push(d1);
                 }
             }
         } else if b == b'+' {
