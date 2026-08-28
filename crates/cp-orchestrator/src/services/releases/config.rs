@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 /// How the box treats a published update (update-policy §5.5/§5.9).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum UpdateMode {
+pub(crate) enum UpdateMode {
     /// Apply automatically inside the maintenance window (the default).
     #[default]
     Auto,
@@ -27,7 +27,7 @@ pub enum UpdateMode {
 impl UpdateMode {
     /// Stable lowercase name (mirrors the serde encoding).
     #[must_use]
-    pub const fn as_str(self) -> &'static str {
+    pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::Auto => "auto",
             Self::Manual => "manual",
@@ -39,7 +39,7 @@ impl UpdateMode {
 /// A daily box-local time window, `"HH:MM"` bounds, end exclusive. A window
 /// with `start > end` wraps past midnight (e.g. `23:00`–`01:00`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct MaintenanceWindow {
+pub(crate) struct MaintenanceWindow {
     /// Inclusive opening bound, `"HH:MM"` box-local.
     pub start: String,
     /// Exclusive closing bound, `"HH:MM"` box-local.
@@ -56,7 +56,7 @@ impl MaintenanceWindow {
     /// Whether `now_minutes` (minutes since box-local midnight) falls inside
     /// the window. Malformed bounds fail closed (never in the window).
     #[must_use]
-    pub fn contains(&self, now_minutes: u16) -> bool {
+    pub(crate) fn contains(&self, now_minutes: u16) -> bool {
         let (Some(start), Some(end)) = (parse_hhmm(&self.start), parse_hhmm(&self.end)) else {
             return false;
         };
@@ -65,13 +65,13 @@ impl MaintenanceWindow {
 
     /// Both bounds parse as `HH:MM`.
     #[must_use]
-    pub fn is_valid(&self) -> bool {
+    pub(crate) fn is_valid(&self) -> bool {
         parse_hhmm(&self.start).is_some() && parse_hhmm(&self.end).is_some()
     }
 
     /// Minutes from `now_minutes` until the window next opens (0 inside it).
     #[must_use]
-    pub fn minutes_until_open(&self, now_minutes: u16) -> u16 {
+    pub(crate) fn minutes_until_open(&self, now_minutes: u16) -> u16 {
         if self.contains(now_minutes) {
             return 0;
         }

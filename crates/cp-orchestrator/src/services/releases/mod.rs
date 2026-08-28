@@ -35,7 +35,7 @@ const USER_AGENT: &str = "context-pilot-orchestrator";
 /// [`config`].
 mod config;
 use config::ReleaseConfig;
-pub use config::{MaintenanceWindow, UpdateMode};
+pub(crate) use config::{MaintenanceWindow, UpdateMode};
 
 /// OTA channel selection (`stable`/`nightly`) + the crossgrade flag — see
 /// [`channel`].
@@ -195,12 +195,12 @@ impl ReleaseStore {
 
     /// The box's auto-update posture (`auto` / `manual` / `paused`).
     #[must_use]
-    pub const fn update_mode(&self) -> UpdateMode {
+    pub(crate) const fn update_mode(&self) -> UpdateMode {
         self.config.update_mode
     }
 
     /// Set the auto-update posture and persist.
-    pub fn set_update_mode(&mut self, mode: UpdateMode) {
+    pub(crate) fn set_update_mode(&mut self, mode: UpdateMode) {
         self.config.update_mode = mode;
         self.persist();
     }
@@ -216,7 +216,7 @@ impl ReleaseStore {
 
     /// The box-local maintenance window auto-applies are confined to.
     #[must_use]
-    pub const fn window(&self) -> &MaintenanceWindow {
+    pub(crate) const fn window(&self) -> &MaintenanceWindow {
         &self.config.window
     }
 
@@ -225,7 +225,7 @@ impl ReleaseStore {
     /// # Errors
     ///
     /// Returns an error if either bound is not a valid `HH:MM`.
-    pub fn set_window(&mut self, window: MaintenanceWindow) -> Result<(), String> {
+    pub(crate) fn set_window(&mut self, window: MaintenanceWindow) -> Result<(), String> {
         if !window.is_valid() {
             return Err(format!("invalid window bounds: {} – {}", window.start, window.end));
         }
@@ -469,22 +469,27 @@ pub fn semver_sort_key(tag: &str) -> (u32, u32, u32) {
 
 /// Orchestrator self-update — stage a downloaded `cp-orchestrator` over the
 /// running install path with atomic-rename + `.bak` rollback (see module docs).
-mod self_update;
-pub use self_update::{boot_check, boot_commit, boot_commit_when_healthy, stage_orchestrator_update};
+///
+/// `pub mod` (not a `pub use` item re-export, which `clippy::pub_use` forbids)
+/// so the binary's boot path reaches [`self_update::boot_check`] at
+/// `services::releases::self_update::boot_check`; the crate-internal short
+/// paths (`releases::boot_commit`, …) ride the `pub(crate) use` below.
+pub mod self_update;
+pub(crate) use self_update::{boot_commit_when_healthy, stage_orchestrator_update};
 
 /// Signed update-manifest schema (update-policy §5.3).
 mod manifest;
-pub use manifest::{Manifest, ManifestArtifact};
+pub(crate) use manifest::Manifest;
 
 /// Manifest-signing trust anchor (update-policy §5.4).
 mod signing;
-pub use signing::UPDATE_PUBKEY;
+pub(crate) use signing::UPDATE_PUBKEY;
 
 /// The on-box updater: fetch → verify → download → apply (update-policy §5.5).
 pub mod updater;
 
 #[cfg(test)]
-pub(crate) use self_update::{backup_path, pending_path};
+pub(crate) use self_update::{backup_path, boot_commit, pending_path};
 
 #[cfg(test)]
 mod tests;

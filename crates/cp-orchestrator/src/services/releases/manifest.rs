@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 /// One channel's signed desired-state: "channel X is on version Y".
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Manifest {
+pub(crate) struct Manifest {
     /// Manifest format version — bump on breaking shape changes.
     pub schema: u32,
     /// Channel name this manifest governs (e.g. `"stable"`).
@@ -40,7 +40,7 @@ pub struct Manifest {
 
 /// One architecture's pinned release artifact.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ManifestArtifact {
+pub(crate) struct ManifestArtifact {
     /// Download URL of the release tarball.
     pub url: String,
     /// Hex SHA-256 of the tarball — verified on the box before extraction.

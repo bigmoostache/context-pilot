@@ -76,7 +76,7 @@ fn main() {
     // self-heals. The matching commit is health-gated below (needs the port).
     let install = std::env::current_exe().ok();
     if let Some(install) = install.as_deref() {
-        cp_orchestrator::services::releases::boot_check(install);
+        cp_orchestrator::services::releases::self_update::boot_check(install);
     }
 
     let config = match Config::from_env() {
