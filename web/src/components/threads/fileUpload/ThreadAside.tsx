@@ -12,11 +12,12 @@ import { TaskList } from "./ThreadAsideTasks"
 import type { ThreadTask } from "@/lib/types"
 
 /**
- * Rail width strategy (dynamic): in LIST mode the rail sizes to its content
- * (`w-fit`) — as wide as its longest task/file line — floored at a sensible
- * minimum and capped at 2/5 of the viewport (`max-w-[40vw]`), beyond which the
- * content wraps. In PREVIEW mode (a file open) the rail takes the full 40vw cap
- * so the embedded {@link FinderPreview} has room.
+ * Rail width strategy (dynamic): in LIST mode the rail is EXACTLY the width of
+ * the thread sidebar (`w-(--sidebar-w)`, the shared `--sidebar-w` token every
+ * top-level sidebar reads) so the two rails frame the conversation symmetrically
+ * (T676). In PREVIEW mode (a file open) it widens to the full 40vw cap so the
+ * embedded {@link FinderPreview} has room; the `transition-[width,max-width]`
+ * animates between the two.
  */
 const RAIL_MAX = "max-w-[40vw]"
 
@@ -73,7 +74,7 @@ export function ThreadAside({
     <div
       className={
         "card-shadow my-2 mr-2 flex shrink-0 flex-col overflow-hidden border-l border-border/70 bg-surface-2 transition-[width,max-width] duration-300 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none " +
-        (previewing ? `w-[40vw] ${RAIL_MAX}` : `w-fit min-w-60 ${RAIL_MAX}`)
+        (previewing ? `w-[40vw] ${RAIL_MAX}` : "w-(--sidebar-w)")
       }
     >
       <TooltipProvider>
