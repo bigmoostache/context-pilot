@@ -90,12 +90,12 @@ pub(super) fn probe_keyed_services() -> Vec<serde_json::Value> {
         let tx_thread = tx.clone();
         let _handle = thread::spawn(move || {
             let v = key.map_or_else(
-                || vital(kp.label, kp.category, "unavailable", None, "no API key configured"),
+                || vital((kp.label, kp.category), "unavailable", None, "no API key configured"),
                 |k| {
                     let started = Instant::now();
                     let r = (kp.probe)(&k);
                     let latency = u64::try_from(started.elapsed().as_millis()).ok();
-                    vital(kp.label, kp.category, r.status, latency, &r.detail)
+                    vital((kp.label, kp.category), r.status, latency, &r.detail)
                 },
             );
             let _sent = tx_thread.send((idx, v));
@@ -124,7 +124,7 @@ pub(super) fn probe_keyed_services() -> Vec<serde_json::Value> {
 
     slots
         .into_iter()
-        .map(|slot| slot.unwrap_or_else(|| vital("Service", "service", "unavailable", None, "probe timed out")))
+        .map(|slot| slot.unwrap_or_else(|| vital(("Service", "service"), "unavailable", None, "probe timed out")))
         .collect()
 }
 

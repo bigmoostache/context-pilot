@@ -119,7 +119,7 @@ pub(super) fn route_rest(method: &Method, segments: &[&str], ctx: RouteCtx<'_>) 
         (&Method::Get, &["api", "agent", id]) => rest::agent(state, id),
         (&Method::Get, &["api", "agent", id, "meta"]) => inspect::meta::agent(state, id),
         (&Method::Get, &["api", "agent", id, "metrics"]) => inspect::metrics::agent(state, id),
-        (&Method::Get, &["api", "agent", id, "vitals"]) => inspect::vitals::agent_vitals(state, id),
+        (&Method::Get, &["api", "agent", id, "vitals"]) => inspect::vitals::agent(state, id),
         (&Method::Get, &["api", "agent", id, "body", hash]) => rest::body(state, id, hash),
         (&Method::Get, &["api", "agent", id, "threads"]) => rest::threads(state, id),
         (&Method::Get, &["api", "agent", id, "usage"]) => inspect::panels::usage(state, id, query),

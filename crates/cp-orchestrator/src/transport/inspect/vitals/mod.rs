@@ -62,7 +62,7 @@ const COLLECT_DEADLINE: Duration = Duration::from_secs(6);
 ///
 /// Returns a JSON array of vital objects (`{name, category, status, latencyMs?,
 /// detail?}`). Unknown agent → `404`.
-pub fn agent_vitals(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
+pub fn agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     let entry = match crate::transport::rest::resolve_entry(state, agent_id) {
         Ok(e) => e,
         Err(reply) => return reply,
@@ -71,7 +71,7 @@ pub fn agent_vitals(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     let mut vitals: Vec<serde_json::Value> = Vec::new();
 
     // 1. Orchestrator — we are responding, so it is trivially up.
-    vitals.push(vital("Orchestrator", "orchestrator", "ok", Some(0), "serving"));
+    vitals.push(vital(("Orchestrator", "orchestrator"), "ok", Some(0), "serving"));
 
     // 2-3. Agent-side reads (heartbeat + folded status), under one short lock.
     let provider = read_provider(state, &entry);
@@ -123,21 +123,21 @@ fn read_provider(state: &Mutex<Backend>, entry: &Entry) -> String {
 /// whose `boot_id` matches the registry record means the process is alive.
 fn agent_connection_vital(entry: &Entry) -> serde_json::Value {
     let Ok(bytes) = std::fs::read(&entry.heartbeat_path) else {
-        return vital("Agent main loop", "agent", "unavailable", None, "no heartbeat file");
+        return vital(("Agent main loop", "agent"), "unavailable", None, "no heartbeat file");
     };
     let Ok(hb) = Heartbeat::decode(&bytes) else {
-        return vital("Agent main loop", "agent", "error", None, "corrupt heartbeat");
+        return vital(("Agent main loop", "agent"), "error", None, "corrupt heartbeat");
     };
     let now_ms = now_ms();
     let max_age_ms = u64::try_from(DEFAULT_MAX_AGE.as_millis()).unwrap_or(5_000);
     let age_ms = now_ms.saturating_sub(hb.timestamp_ms);
     if !hb.matches_boot(&entry.boot_id) {
-        return vital("Agent main loop", "agent", "error", None, "boot_id mismatch (pid reused)");
+        return vital(("Agent main loop", "agent"), "error", None, "boot_id mismatch (pid reused)");
     }
     if hb.is_fresh(now_ms, max_age_ms) {
-        vital("Agent main loop", "agent", "ok", None, &format!("heartbeat {age_ms}ms old"))
+        vital(("Agent main loop", "agent"), "ok", None, &format!("heartbeat {age_ms}ms old"))
     } else {
-        vital("Agent main loop", "agent", "error", None, &format!("stale heartbeat ({age_ms}ms old)"))
+        vital(("Agent main loop", "agent"), "error", None, &format!("stale heartbeat ({age_ms}ms old)"))
     }
 }
 
@@ -148,17 +148,14 @@ fn agent_connection_vital(entry: &Entry) -> serde_json::Value {
 fn agent_status_vital(state: &Mutex<Backend>, agent_id: &str) -> serde_json::Value {
     let snapshot = state.lock().ok().and_then(|b| b.view.get(agent_id).map(|v| (v.phase, v.lifecycle)));
     let Some((phase, lifecycle)) = snapshot else {
-        return vital("Agent loop status", "agent", "unavailable", None, "no view yet");
+        return vital(("Agent loop status", "agent"), "unavailable", None, "no view yet");
     };
     let phase_str = phase.map_or("idle", phase_label);
     let life_str = lifecycle.map(lifecycle_label);
     let stopped = matches!(life_str, Some("stopping" | "stopped"));
-    let detail = match life_str {
-        Some(l) => format!("{phase_str} · {l}"),
-        None => phase_str.to_owned(),
-    };
+    let detail = life_str.map_or_else(|| phase_str.to_owned(), |l| format!("{phase_str} · {l}"));
     let status = if stopped { "error" } else { "ok" };
-    vital("Agent loop status", "agent", status, None, &detail)
+    vital(("Agent loop status", "agent"), status, None, &detail)
 }
 
 // ── Local infra checks ──────────────────────────────────────────────────
@@ -167,12 +164,12 @@ fn agent_status_vital(state: &Mutex<Backend>, agent_id: &str) -> serde_json::Val
 /// `~/.context-pilot/meilisearch/port`. No port file → it was never started.
 fn meilisearch_vital() -> serde_json::Value {
     let Some(port) = meili_port() else {
-        return vital("Meilisearch", "infra", "unavailable", None, "no port file (not started)");
+        return vital(("Meilisearch", "infra"), "unavailable", None, "no port file (not started)");
     };
     let started = Instant::now();
     match TcpStream::connect_timeout(&(std::net::Ipv4Addr::LOCALHOST, port).into(), PROBE_TIMEOUT) {
-        Ok(_) => vital("Meilisearch", "infra", "ok", Some(elapsed_ms(started)), &format!("127.0.0.1:{port}")),
-        Err(e) => vital("Meilisearch", "infra", "error", None, &format!("connect failed: {e}")),
+        Ok(_) => vital(("Meilisearch", "infra"), "ok", Some(elapsed_ms(started)), &format!("127.0.0.1:{port}")),
+        Err(e) => vital(("Meilisearch", "infra"), "error", None, &format!("connect failed: {e}")),
     }
 }
 
@@ -187,12 +184,12 @@ fn meili_port() -> Option<u16> {
 fn console_vital(folder: &str) -> serde_json::Value {
     let sock = Path::new(folder).join(".context-pilot/console/server.sock");
     if !sock.exists() {
-        return vital("Console server", "infra", "unavailable", None, "no socket (not started)");
+        return vital(("Console server", "infra"), "unavailable", None, "no socket (not started)");
     }
     let started = Instant::now();
     match std::os::unix::net::UnixStream::connect(&sock) {
-        Ok(_) => vital("Console server", "infra", "ok", Some(elapsed_ms(started)), "socket connected"),
-        Err(e) => vital("Console server", "infra", "error", None, &format!("connect failed: {e}")),
+        Ok(_) => vital(("Console server", "infra"), "ok", Some(elapsed_ms(started)), "socket connected"),
+        Err(e) => vital(("Console server", "infra"), "error", None, &format!("connect failed: {e}")),
     }
 }
 
@@ -208,16 +205,16 @@ fn probe_remotes(remotes: Vec<(String, String, String)>) -> Vec<serde_json::Valu
     let total = remotes.len();
     let (tx, rx) = mpsc::channel::<(usize, serde_json::Value)>();
     for (idx, (label, category, host)) in remotes.into_iter().enumerate() {
-        let tx = tx.clone();
+        let tx_probe = tx.clone();
         let _handle = thread::spawn(move || {
             let v = tcp_check(&label, &category, &host, 443);
-            let _sent = tx.send((idx, v));
+            let _sent = tx_probe.send((idx, v));
         });
     }
     drop(tx); // so the channel closes once every probe thread has reported
 
-    let mut slots: Vec<Option<serde_json::Value>> = (0..total).map(|_| None).collect();
-    let deadline = Instant::now() + COLLECT_DEADLINE;
+    let mut slots: Vec<Option<serde_json::Value>> = vec![None; total];
+    let deadline = Instant::now().checked_add(COLLECT_DEADLINE).unwrap_or_else(Instant::now);
     let mut received = 0;
     while received < total {
         let remaining = deadline.saturating_duration_since(Instant::now());
@@ -228,7 +225,7 @@ fn probe_remotes(remotes: Vec<(String, String, String)>) -> Vec<serde_json::Valu
             Ok((idx, v)) => {
                 if let Some(slot) = slots.get_mut(idx) {
                     *slot = Some(v);
-                    received += 1;
+                    received = received.saturating_add(1);
                 }
             }
             Err(_) => break, // deadline elapsed or all senders dropped
@@ -237,7 +234,7 @@ fn probe_remotes(remotes: Vec<(String, String, String)>) -> Vec<serde_json::Valu
 
     slots
         .into_iter()
-        .map(|s| s.unwrap_or_else(|| vital("Service", "service", "unavailable", None, "probe timed out")))
+        .map(|s| s.unwrap_or_else(|| vital(("Service", "service"), "unavailable", None, "probe timed out")))
         .collect()
 }
 
@@ -247,14 +244,14 @@ fn tcp_check(label: &str, category: &str, host: &str, port: u16) -> serde_json::
     let started = Instant::now();
     let addrs = match (host, port).to_socket_addrs() {
         Ok(it) => it,
-        Err(e) => return vital(label, category, "error", None, &format!("dns failed: {e}")),
+        Err(e) => return vital((label, category), "error", None, &format!("dns failed: {e}")),
     };
     let Some(addr) = addrs.into_iter().next() else {
-        return vital(label, category, "error", None, "dns resolved to no address");
+        return vital((label, category), "error", None, "dns resolved to no address");
     };
     match TcpStream::connect_timeout(&addr, PROBE_TIMEOUT) {
-        Ok(_) => vital(label, category, "ok", Some(elapsed_ms(started)), &format!("{host}:{port} reachable")),
-        Err(e) => vital(label, category, "error", None, &format!("{host}:{port} {e}")),
+        Ok(_) => vital((label, category), "ok", Some(elapsed_ms(started)), &format!("{host}:{port} reachable")),
+        Err(e) => vital((label, category), "error", None, &format!("{host}:{port} {e}")),
     }
 }
 
@@ -299,7 +296,8 @@ const fn lifecycle_label(state: cp_wire::types::LifecycleState) -> &'static str 
 }
 
 /// Build one vital JSON object.
-fn vital(name: &str, category: &str, status: &str, latency_ms: Option<u64>, detail: &str) -> serde_json::Value {
+fn vital(id: (&str, &str), status: &str, latency_ms: Option<u64>, detail: &str) -> serde_json::Value {
+    let (name, category) = id;
     serde_json::json!({
         "name": name,
         "category": category,
