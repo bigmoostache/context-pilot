@@ -533,9 +533,9 @@ M-short-6:
 M-short-7:
   tier: short
   title: T692 auto-read fix
-  contents: 'T692 SHIPPED (todo-v3-yaml-diffs): fallback my_turn_thread notif now created-then-mark_notification_processed = PASSIVE (spine can''t interrupt focused work). Debounce on notified_my_turn_id. Removed my_turn_debounced. check_my_turn_threads @ src/app/run/threads/mod.rs.'
-  importance: medium
-  last_edited_ms: 1787950558556
+  contents: 'T692 (todo-v3-yaml-diffs, check_my_turn_threads @ src/app/run/threads/mod.rs): Send(still_my_turn=false) pins focus (T683) so focus ~never None -> old `focus.is_none()` auto-read gate was DEAD. FIX: auto-read fires when FREE = unfocused OR focused thread not itself MY_TURN. Passive notif only when focused on a DIFFERENT MY_TURN thread.'
+  importance: high
+  last_edited_ms: 1787951012233
 M-short-8:
   tier: short
   title: 'OPERATING MODEL: harbor'

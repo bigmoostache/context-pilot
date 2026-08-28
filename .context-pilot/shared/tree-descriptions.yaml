@@ -10058,6 +10058,10 @@
   path: crates/cp-oplog/src/replay.rs
   description: 'Oplog replay (GAP1/I5): Recovered{rev_head,heads,seen,roster}. fold_entry: Checkpoint=authoritative clone_from heads+seen+roster, MessageCreated=set_thread_head + RosterThread::fold_message, ThreadCreated/Archived/Restored/Paused/Resumed/Deleted/StatusChanged=RosterThread fold helpers (roster rebuilt from deltas), CommandEffect|SeenMark=seen.mark, others no-op. Fast-path reads only newest checkpoint-bearing segment; roster survives compaction because the checkpoint Snapshot carries it. Tests incl replay_rebuilds_roster_from_thread_deltas + roster_survives_compaction_via_checkpoint.'
   last_edited_ms: 1782315774643
+6a94c8889e894823:
+  path: .context-pilot/shared/memories.yaml
+  description: Memory slots store (M-safe/tiny/short/mid/long, 220 fixed). Local-only, synced with commits. Mirrors the Memories panel.
+  last_edited_ms: 0
 6a9c916ddfbc2004:
   path: web/src/mobile-components/agents/ModelPicker.tsx
   description: Mobile ModelPicker twin — scrollable provider rail (no-scrollbar overflow-x-auto), py-3 touch model cards, hover->active. Two-level registry shape + empty-guard identical, pure @/lib. Shared by mobile AgentModal + config GeneralPane.
@@ -10917,6 +10921,10 @@
 7401467bc3e9f87d:
   path: crates/cp-mod-memory/src/lib.rs
   description: 'Memory module. 2 tools: memory_create/update. Fixed MEMORY panel. Global, not core. 80-token tl_dr cap. Module data: memories + next_id + open_ids. Importance-gradient visualizer (critical→low).'
+  last_edited_ms: 0
+740b5b1f92561359:
+  path: src/app/run/threads/mod.rs
+  description: 'Thread helpers for main loop: maybe_inject_auto_read (filters paused threads — T371), check_my_turn_threads (filters paused threads — T371), extract_thread_ids, maybe_append_tool_activity. emit_thread_paused re-exported from paused.rs.'
   last_edited_ms: 0
 74150afab89d24d0:
   path: src/app/reverie/mod.rs
@@ -19538,6 +19546,10 @@ ce4ce60e0bd4a007:
   path: crates/cp-mod-todo/src/lib.rs
   description: 'Todo module. 3 tools: create/update/move. Fixed TODO panel (fixed_order=0, top priority). Nested object params with parent_id nesting. overview shows X/Y done. Drives spine auto-continuation.'
   last_edited_ms: 0
+ce9cc9cb5ee45f3a:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 ce9ea2332a8e0cdf:
   path: yamls/tools/spine.yaml
   description: 'Spine tool YAML. 3 tools: notification_mark_processed, spine_configure (guard rails: max_output_tokens, max_duration_secs, max_messages, max_auto_retries), coucou (timer/datetime scheduling). max_cost removed.'
@@ -22553,6 +22565,10 @@ f0d7354031e7883e:
 f0ddd4bf8efd19d3:
   path: web/src/components/shell/widgets/AgentSwitcher.tsx
   description: TopBar workspace switcher dropdown (one agent=one folder); switch/create/fleet. AgentDot shows avatar image (T338) when hasAvatar is true, fallback to accent-tinted FolderGit2 icon.
+  last_edited_ms: 0
+f0df67ec8b75a761:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 f0e1cef017b6f0f7:
   path: web/src/components/threads/ThreadsView.tsx

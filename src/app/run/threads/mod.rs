@@ -173,11 +173,14 @@ pub(super) fn inject_tool_call(app: &mut App, tool: ToolUse) {
 
 /// Handle an idle thread that has `MY_TURN` status (T692).
 ///
-/// The response is **momentum-first**: when the agent is idle **and unfocused**,
-/// this directly auto-injects the `Read` on the thread — the natural next tool
-/// call — and creates **no** spine notification (the tool call itself is the
-/// response). The notification is a **fallback**, created only when auto-read
-/// can't fire — i.e. the agent is already focused on a *different* thread.
+/// The response is **momentum-first**: when the agent is **free** — unfocused,
+/// or focused on a thread that is itself parked (`THEIR_TURN`, e.g. one just
+/// handed back via `Send(still_my_turn=false)`, which pins focus on it per T683)
+/// — this directly auto-injects the `Read` on a waiting `MY_TURN` thread (the
+/// natural next tool call) and creates **no** spine notification. The
+/// notification is a **passive** fallback, created only when the agent is
+/// genuinely mid-work — i.e. focused on a *different* thread that is itself
+/// `MY_TURN`.
 ///
 /// Previously the auto-Read only happened as a side-effect of the
 /// notification→auto-continuation chain in [`check_spine`](crate::app::run) via
@@ -192,12 +195,28 @@ pub(super) fn check_my_turn_threads(app: &mut App) {
     }
 
     let threads = ThreadsState::get(&app.state);
-    // Archived threads are invisible to the LLM (T9) — they never nudge.
-    // Paused threads suppress MY_TURN notifications (T371).
-    let my_turn = threads.threads.iter().find(|t| !t.archived && !t.paused && t.status == ThreadStatus::MyTurn);
+    let focus = FocusState::get(&app.state).focused_thread_id.clone();
 
-    let Some(thread) = my_turn else {
-        // No MY_TURN threads — clear debounce.
+    // Am I actively working a demanding thread right now? "Demanding" = the
+    // thread I'm focused on is ITSELF MY_TURN (it still needs my response). Being
+    // focused on a THEIR_TURN thread (one I just handed back via
+    // `Send(still_my_turn=false)`, which pins focus on it per T683) is NOT active
+    // work — I'm parked waiting on the user, so I'm free to pick up another
+    // waiting thread. This is the crux of the fix: post-T683 focus is (almost)
+    // never `None`, so gating auto-read on `focus.is_none()` made it dead code.
+    // Archived/paused threads are LLM-invisible (T9/T371) and never count.
+    let focused_is_my_turn = focus.as_deref().is_some_and(|f| {
+        threads.threads.iter().any(|t| t.id == f && !t.archived && !t.paused && t.status == ThreadStatus::MyTurn)
+    });
+
+    // The waiting thread: the first eligible MY_TURN thread that is NOT the one
+    // I'm already focused on (so I never "auto-read" my own active thread).
+    let waiting = threads.threads.iter().find(|t| {
+        !t.archived && !t.paused && t.status == ThreadStatus::MyTurn && Some(t.id.as_str()) != focus.as_deref()
+    });
+
+    let Some(thread) = waiting else {
+        // No OTHER MY_TURN thread — clear debounce.
         FocusState::get_mut(&mut app.state).notified_my_turn_id = None;
         return;
     };
@@ -205,25 +224,20 @@ pub(super) fn check_my_turn_threads(app: &mut App) {
     let tid = thread.id.clone();
     let tname = thread.name.clone();
 
-    let focus = FocusState::get(&app.state).focused_thread_id.clone();
-    // Already working this very thread — nothing to trigger.
-    if focus.as_deref() == Some(tid.as_str()) {
-        return;
-    }
-
-    // Idle + unfocused → auto-Read directly (no notification). The debounce is
-    // deliberately NOT applied here: the auto-read path is guarded against
-    // re-entry by the `is_streaming` check at the top (it begins streaming) and
-    // the `focus == tid` check above (once the Read focuses the thread), so a
-    // stale/persisted `notified_my_turn_id` (e.g. carried across a reload)
-    // must never suppress it.
-    if focus.is_none() {
+    // Free (unfocused OR focused thread is parked/THEIR_TURN) → auto-Read the
+    // waiting thread directly, no notification. The debounce is deliberately NOT
+    // read as a guard here: the auto-read path is guarded against re-entry by the
+    // `is_streaming` check at the top (it begins streaming) and by the injected
+    // Read focusing the thread, so a stale/persisted `notified_my_turn_id`
+    // (e.g. carried across a reload) must never suppress it.
+    if !focused_is_my_turn {
         FocusState::get_mut(&mut app.state).notified_my_turn_id = Some(tid.clone());
         inject_direct_auto_read(app, &tid, &tname);
         return;
     }
 
-    // Focused on a DIFFERENT thread → we can't hijack focus, so leave a PASSIVE
+    // Focused on a DIFFERENT thread that is ITSELF MY_TURN (genuinely mid-work)
+    // → we can't hijack focus, so leave a PASSIVE
     // nudge instead of an active trigger. The `my_turn_thread` notification is
     // created **already-processed** so the spine never auto-continues on it —
     // an active one would interrupt the focused work with a "go read T…" nudge,
