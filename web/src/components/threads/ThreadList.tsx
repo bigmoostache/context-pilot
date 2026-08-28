@@ -112,7 +112,7 @@ export function ThreadList({
     // and the `card-shadow` (not a border — transparent since T605) separates
     // it from the conversation on the right. One happy consequence: ThreadsView's
     // collapse offset is now just `--sidebar-w`, with no margins to add on.
-    <aside className="card-shadow my-2 flex w-(--sidebar-w) shrink-0 flex-col overflow-hidden rounded-none border border-border bg-surface-2">
+    <aside className="card-shadow mt-2 flex w-(--sidebar-w) shrink-0 flex-col overflow-hidden rounded-none border border-border bg-surface-2">
       {/* fixed-width inner shell pinned to the rail width */}
       <div
         className="flex h-full flex-col"

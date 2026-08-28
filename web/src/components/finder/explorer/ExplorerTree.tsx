@@ -51,7 +51,7 @@ export function ExplorerTree({
     // same `card-shadow my-2` panel with NO horizontal margin, same
     // `bg-surface-2`. Uniformity was the ask — a second rail vocabulary would
     // make the app feel like two apps.
-    <aside className="card-shadow my-2 flex w-(--sidebar-w) shrink-0 flex-col overflow-hidden rounded-none border border-border bg-surface-2">
+    <aside className="card-shadow mt-2 flex w-(--sidebar-w) shrink-0 flex-col overflow-hidden rounded-none border border-border bg-surface-2">
       <div
         className="flex h-full flex-col"
         style={{ width: "var(--sidebar-w)", minWidth: "var(--sidebar-w)" }}
