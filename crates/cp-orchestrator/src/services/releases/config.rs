@@ -78,22 +78,29 @@ impl MaintenanceWindow {
         let Some(start) = parse_hhmm(&self.start) else {
             return u16::MAX; // fail closed: effectively "not tonight"
         };
-        if start > now_minutes { start - now_minutes } else { 24 * 60 - now_minutes + start }
+        if start > now_minutes {
+            start.saturating_sub(now_minutes)
+        } else {
+            MINUTES_PER_DAY.saturating_sub(now_minutes).saturating_add(start)
+        }
     }
 }
 
+/// Minutes in a full day — the wrap-around modulus for maintenance windows.
+const MINUTES_PER_DAY: u16 = 24 * 60;
+
 /// Parse `"HH:MM"` into minutes since midnight.
-pub(crate) fn parse_hhmm(s: &str) -> Option<u16> {
-    let (h, m) = s.split_once(':')?;
-    if h.len() != 2 || m.len() != 2 {
+pub(crate) fn parse_hhmm(raw: &str) -> Option<u16> {
+    let (hh, mm) = raw.split_once(':')?;
+    if hh.len() != 2 || mm.len() != 2 {
         return None;
     }
-    let hours: u16 = h.parse().ok()?;
-    let minutes: u16 = m.parse().ok()?;
+    let hours: u16 = hh.parse().ok()?;
+    let minutes: u16 = mm.parse().ok()?;
     if hours > 23 || minutes > 59 {
         return None;
     }
-    Some(hours * 60 + minutes)
+    Some(hours.saturating_mul(60).saturating_add(minutes))
 }
 
 /// Serde default: the `stable` channel.

@@ -83,35 +83,73 @@ mod tests {
     /// direction), and a manifest missing a required field is rejected.
     #[test]
     fn manifest_schema() {
-        // Parse the realistic fixture.
+        // Parse the realistic fixture and check its fields + round-trip.
         let manifest: Manifest = serde_json::from_str(FIXTURE).expect("CI-shaped manifest must parse");
-        assert_eq!(manifest.schema, 1);
-        assert_eq!(manifest.channel, "stable");
-        assert_eq!(manifest.version, "v0.4.0");
-        assert_eq!(manifest.artifacts.len(), 2);
-        let arm = &manifest.artifacts["linux-aarch64"];
-        assert_eq!(arm.size, 12_345_678);
-        assert_eq!(arm.sha256.len(), 64, "hex sha256");
+        assert_fields_and_roundtrip(&manifest);
+
+        // Every required field — top-level and per-artifact — is mandatory.
+        let full: serde_json::Value = serde_json::from_str(FIXTURE).expect("fixture is valid JSON");
+        assert_required_fields_rejected(&full);
+    }
+
+    /// Drop each required key in turn (top-level, then per-artifact) and assert
+    /// the pruned value no longer deserialises. Both loops live here so the test
+    /// body itself carries no branching and stays under the cognitive-complexity
+    /// cap.
+    fn assert_required_fields_rejected(full: &serde_json::Value) {
+        for key in ["schema", "channel", "version", "released_at", "expires_at", "min_from", "notes_url", "artifacts"] {
+            assert_missing_top_level_key_rejected(full, key);
+        }
+        for key in ["url", "sha256", "size"] {
+            assert_missing_artifact_key_rejected(full, key);
+        }
+    }
+
+    /// Assert the parsed manifest's fields and that it re-serialises to the exact
+    /// same JSON value — hoisted out of the test to keep it under the
+    /// cognitive-complexity cap.
+    fn assert_fields_and_roundtrip(manifest: &Manifest) {
+        let arm = manifest.artifacts.get("linux-aarch64").expect("aarch64 artifact present");
+        // One grouped tuple comparison rather than six separate assert_eq!
+        // expansions, keeping this helper under the cognitive-complexity cap.
+        assert_eq!(
+            (
+                manifest.schema,
+                manifest.channel.as_str(),
+                manifest.version.as_str(),
+                manifest.artifacts.len(),
+                arm.size,
+                arm.sha256.len()
+            ),
+            (1, "stable", "v0.4.0", 2, 12_345_678, 64),
+            "parsed manifest fields (incl. the aarch64 artifact size + hex sha256 length)"
+        );
 
         // Round-trip: re-serialising loses nothing (value-level equality).
         let original: serde_json::Value = serde_json::from_str(FIXTURE).expect("fixture is valid JSON");
-        let round_tripped = serde_json::to_value(&manifest).expect("manifest serialises");
+        let round_tripped = serde_json::to_value(manifest).expect("manifest serialises");
         assert_eq!(round_tripped, original, "round-trip must not lose or alter any field");
+    }
 
-        // Every required field is mandatory: dropping any one key must fail.
-        let full: serde_json::Value = serde_json::from_str(FIXTURE).expect("fixture is valid JSON");
-        for key in ["schema", "channel", "version", "released_at", "expires_at", "min_from", "notes_url", "artifacts"] {
-            let mut pruned = full.clone();
-            let _removed = pruned.as_object_mut().expect("object").remove(key);
-            let outcome = serde_json::from_value::<Manifest>(pruned);
-            assert!(outcome.is_err(), "a manifest missing `{key}` must be rejected");
-        }
-        // Same for the per-artifact fields.
-        for key in ["url", "sha256", "size"] {
-            let mut pruned = full.clone();
-            let _removed = pruned["artifacts"]["linux-aarch64"].as_object_mut().expect("artifact").remove(key);
-            let outcome = serde_json::from_value::<Manifest>(pruned);
-            assert!(outcome.is_err(), "an artifact missing `{key}` must be rejected");
-        }
+    /// Prune one top-level `key` from a valid manifest value and assert the
+    /// result no longer deserialises — hoisted out of the test to keep it under
+    /// the cognitive-complexity cap.
+    fn assert_missing_top_level_key_rejected(full: &serde_json::Value, key: &str) {
+        let mut pruned = full.clone();
+        let _removed = pruned.as_object_mut().expect("object").remove(key);
+        assert!(serde_json::from_value::<Manifest>(pruned).is_err(), "a manifest missing `{key}` must be rejected");
+    }
+
+    /// Prune one per-artifact `key` from a valid manifest value and assert the
+    /// result no longer deserialises.
+    fn assert_missing_artifact_key_rejected(full: &serde_json::Value, key: &str) {
+        let mut pruned = full.clone();
+        let _removed = pruned
+            .get_mut("artifacts")
+            .and_then(|artifacts| artifacts.get_mut("linux-aarch64"))
+            .and_then(serde_json::Value::as_object_mut)
+            .expect("artifact object")
+            .remove(key);
+        assert!(serde_json::from_value::<Manifest>(pruned).is_err(), "an artifact missing `{key}` must be rejected");
     }
 }
