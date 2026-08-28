@@ -82,15 +82,23 @@ function TaskRow({
   collapsed: boolean
   onToggle: () => void
 }) {
+  // The label is a TIGHT-leading text line (`leading-none`) centered in a 16px
+  // (`min-h-4`) flex box — the SAME height the status/chevron icons are centered
+  // in. Centering a tight line box (whose box centre ≈ glyph optical centre)
+  // against the icon well makes the check and the text share a true optical
+  // centreline; a `text-…/4` line box would centre its 16px *box* but leave the
+  // glyphs sitting optically low (the check then reads as "too high").
   const label = (
-    <span
-      className={
-        task.status === "done"
-          ? "text-[11.5px]/4 text-muted-foreground/50 line-through"
-          : "text-[11.5px]/4 text-foreground/85 group-hover:text-foreground"
-      }
-    >
-      {task.name}
+    <span className="flex min-h-4 min-w-0 items-center">
+      <span
+        className={
+          task.status === "done"
+            ? "text-[11.5px]/none text-muted-foreground/50 line-through"
+            : "text-[11.5px]/none text-foreground/85 group-hover:text-foreground"
+        }
+      >
+        {task.name}
+      </span>
     </span>
   )
 
