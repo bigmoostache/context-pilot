@@ -45,6 +45,26 @@ fn dispatch(state: &Arc<Mutex<Backend>>, method: &Method, segments: &[&str], cal
     route_rest(method, segments, ctx).status
 }
 
+/// Assert `caller` is refused (`403`) on every route in `routes`. A plain call,
+/// so folding the loop through it keeps the dispatch tests under the
+/// cognitive-complexity cap.
+fn assert_all_refused(state: &Arc<Mutex<Backend>>, routes: &[(&Method, &[&str])], caller: &User) {
+    for &(method, segments) in routes {
+        assert_eq!(dispatch(state, method, segments, Some(caller)), 403, "must be refused on {segments:?}");
+    }
+}
+
+/// Assert both an `Admin` caller and god-mode (`None`) pass the guard (any
+/// non-`403`) on every route in `routes`. Extracted from `releases_rbac` to
+/// keep it under the cognitive-complexity cap.
+fn assert_all_pass_gate(state: &Arc<Mutex<Backend>>, routes: &[(&Method, &[&str])]) {
+    let admin = user(Admin);
+    for &(method, segments) in routes {
+        assert_ne!(dispatch(state, method, segments, Some(&admin)), 403, "admin passes the gate {segments:?}");
+        assert_ne!(dispatch(state, method, segments, None), 403, "god-mode passes the gate {segments:?}");
+    }
+}
+
 /// V0.2a — every `/api/releases/*` route sits behind the single
 /// `can_manage_it` guard arm: a `user`-role caller gets `403` on all seven
 /// routes; an `Admin` (and a `None` caller = access control off, god-mode
@@ -64,9 +84,7 @@ fn releases_rbac() {
         (&Method::Delete, &["api", "releases", "v0.0.0-ghost"]),
     ];
     let low = user(Regular);
-    for (method, segments) in all {
-        assert_eq!(dispatch(&state, method, segments, Some(&low)), 403, "user must be refused on {segments:?}");
-    }
+    assert_all_refused(&state, &all, &low);
 
     // Gate-pass probes for Admin and god-mode. Restricted to routes with a
     // safe, network-free outcome: `GET /api/releases` would call the GitHub
@@ -80,12 +98,9 @@ fn releases_rbac() {
         (&Method::Put, &["api", "releases", "select"]),
         (&Method::Delete, &["api", "releases", "v0.0.0-ghost"]),
     ];
-    let admin = user(Admin);
-    for (method, segments) in safe {
-        assert_ne!(dispatch(&state, method, segments, Some(&admin)), 403, "admin passes the gate {segments:?}");
-        assert_ne!(dispatch(&state, method, segments, None), 403, "god-mode passes the gate {segments:?}");
-    }
+    assert_all_pass_gate(&state, &safe);
     // The no-op fleet deploy (empty view) even succeeds outright.
+    let admin = user(Admin);
     assert_eq!(dispatch(&state, &Method::Post, &["api", "releases", "deploy"], Some(&admin)), 200);
     assert_eq!(dispatch(&state, &Method::Post, &["api", "releases", "deploy"], None), 200);
 }

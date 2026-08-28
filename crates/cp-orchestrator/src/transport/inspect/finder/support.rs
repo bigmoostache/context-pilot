@@ -142,13 +142,18 @@ mod tests {
 
     #[test]
     fn infer_kind_classifies_extensions() {
-        assert_eq!(infer_kind("main.rs"), "code");
-        assert_eq!(infer_kind("README.md"), "markdown");
-        assert_eq!(infer_kind("data.json"), "json");
-        assert_eq!(infer_kind("photo.png"), "image");
-        assert_eq!(infer_kind("config.yaml"), "doc");
-        assert_eq!(infer_kind("archive.zip"), "archive");
-        assert_eq!(infer_kind("mystery"), "binary");
+        // A plain call, so each classification case costs nothing against the
+        // cognitive-complexity cap (the seven inline assert_eq!s tripped it).
+        fn assert_kind(name: &str, want: &str) {
+            assert_eq!(infer_kind(name), want);
+        }
+        assert_kind("main.rs", "code");
+        assert_kind("README.md", "markdown");
+        assert_kind("data.json", "json");
+        assert_kind("photo.png", "image");
+        assert_kind("config.yaml", "doc");
+        assert_kind("archive.zip", "archive");
+        assert_kind("mystery", "binary");
     }
 
     #[test]
