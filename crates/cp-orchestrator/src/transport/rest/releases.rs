@@ -301,33 +301,9 @@ pub(crate) fn deploy_fleet(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     let agents_dir_str = agents_dir.to_string_lossy().into_owned();
 
     for id in &agent_ids {
-        let Ok(entry) = super::resolve_entry(state, id) else {
-            errors.push(format!("{id}: not found in registry"));
-            continue;
-        };
-        let folder = PathBuf::from(&entry.folder);
-        let key = folder.to_string_lossy().into_owned();
-
-        // Kill old process (lock-free — may block up to the stop grace).
-        supervisor::kill_pid(entry.pid);
-
-        // Drop stale supervised record.
-        if let Ok(mut b) = state.lock()
-            && b.supervisor.is_supervised(&key)
-        {
-            let _stopped = b.supervisor.stop(&key);
-        }
-
-        // Respawn on the same folder with the (potentially new) binary.
-        let env: [(&str, &str); 2] = [("CP_BRIDGE", "1"), ("CP_AGENTS_DIR", &agents_dir_str)];
-        match state.lock() {
-            Ok(mut b) => {
-                match b.supervisor.spawn_pty(key, supervisor::PtyPlan { binary: &binary, folder: &folder, env: &env }) {
-                    Ok(pid) => restarted.push(serde_json::json!({ "id": id, "pid": pid })),
-                    Err(e) => errors.push(format!("{id}: spawn failed: {e}")),
-                }
-            }
-            Err(_) => errors.push(format!("{id}: backend lock poisoned")),
+        match restart_one(state, id, &agents_dir_str, &binary) {
+            Ok(receipt) => restarted.push(receipt),
+            Err(msg) => errors.push(msg),
         }
     }
 
@@ -337,6 +313,45 @@ pub(crate) fn deploy_fleet(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
         "restarted": restarted,
         "errors": errors,
     }))
+}
+
+/// Restart one agent for [`deploy_fleet`]: kill its old process, drop any stale
+/// supervised record, and respawn it on the same folder with `binary`.
+///
+/// Split out of the fleet loop to keep `deploy_fleet` under the line cap. Errors
+/// are returned as pre-formatted, `id`-prefixed strings the caller collects into
+/// the deploy summary (an unreachable agent must not abort the whole fleet
+/// deploy), and success yields the `{ id, pid }` receipt object.
+fn restart_one(
+    state: &Mutex<Backend>,
+    id: &str,
+    agents_dir_str: &str,
+    binary: &std::path::Path,
+) -> Result<serde_json::Value, String> {
+    let entry = super::resolve_entry(state, id)
+        .map_err(|reply| format!("{id}: registry lookup failed (HTTP {})", reply.status))?;
+    let folder = PathBuf::from(&entry.folder);
+    let key = folder.to_string_lossy().into_owned();
+
+    // Kill old process (lock-free — may block up to the stop grace).
+    supervisor::kill_pid(entry.pid);
+
+    // Drop stale supervised record.
+    if let Ok(mut b) = state.lock()
+        && b.supervisor.is_supervised(&key)
+    {
+        let _stopped = b.supervisor.stop(&key);
+    }
+
+    // Respawn on the same folder with the (potentially new) binary.
+    let env: [(&str, &str); 2] = [("CP_BRIDGE", "1"), ("CP_AGENTS_DIR", agents_dir_str)];
+    state.lock().map_or_else(
+        |_| Err(format!("{id}: backend lock poisoned")),
+        |mut b| match b.supervisor.spawn_pty(key, supervisor::PtyPlan { binary, folder: &folder, env: &env }) {
+            Ok(pid) => Ok(serde_json::json!({ "id": id, "pid": pid })),
+            Err(e) => Err(format!("{id}: spawn failed: {e}")),
+        },
+    )
 }
 
 /// `POST /api/releases/restart-orchestrator` — **update &** restart the
