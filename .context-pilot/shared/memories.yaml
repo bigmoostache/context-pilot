@@ -253,9 +253,9 @@ M-mid-8:
 M-mid-9:
   tier: mid
   title: orch-clippy campaign
-  contents: 'orch-clippy COMPLETE (branch orchestrator-clippy, PR #187, chain #92 pwd Totordu1789). Whole workspace clippy-clean under --workspace --all-targets=0. Gate widened: check-rust-lints.sh now clippy+check --workspace (commit fe67653f) — closes blind spot where standalone crates (cp-orchestrator/cp-oplog/cp-console-server) outside tui''s graph were never linted. Chain resealed. CB1 api-contract RESTORED to **/*.rs. Recipe: tests/*.rs mod-wrapper; foundational % -> counters/flip-bool; as -> try_from; cognitive -> plain-call assert helpers. LEFT: finalize PR #187.'
+  contents: 'orch-clippy DONE + ALL CI GREEN (branch orchestrator-clippy, PR #187 MERGEABLE, chain #93 pwd Totordu1789). Whole workspace clippy-clean --workspace --all-targets=0. Gate widened: check-rust-lints.sh now clippy+check --workspace (fe67653f). CB1 api-contract RESTORED **/*.rs. TRAP+FIXED: callbacks.yaml is PROTECTED — CB1 restore rewrote it after #92 reseal, broke chain, Structure CI red; resealed #93 (9ad4d1b5). LESSON: reseal chain LAST, after ALL Callback_upsert/protected edits. READY TO MERGE.'
   importance: medium
-  last_edited_ms: 1787907580995
+  last_edited_ms: 1787908085935
 M-safe-1:
   tier: safe
   title: Hash chain password
