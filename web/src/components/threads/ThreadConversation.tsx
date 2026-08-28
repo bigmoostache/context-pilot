@@ -5,17 +5,16 @@ import { Message } from "@/components/conversation/Message"
 import { ThreadComposer, type CommandSuggestion } from "./ThreadComposer"
 import { CreateCommandDialog } from "./CreateCommandDialog"
 import { AgentEditorDialog } from "@/components/shell/behaviour/AgentEditorDialog"
-import { QuickLookSheet } from "@/components/finder/QuickLookSheet"
 import { useLibrary } from "@/lib/live"
 import { sendCommand } from "@/lib/api"
 import { extractDroppedFiles, zipDropped } from "@/lib/utils"
-import { uploadToNode, collectThreadFiles, type UploadedFile } from "./fileUpload/helpers"
+import { collectThreadFiles, type UploadedFile } from "./fileUpload/helpers"
 import { FormMessageRow } from "./forms/FormMessageRow"
 import { isFormMessage } from "./forms/helpers"
 import { useScrollPin, useThreadForms } from "./forms/useThreadForms"
 import { parseAutoLine, segmentLog, toChatMessage } from "@/lib/support/threadMessages"
-import { FileSidebar } from "./fileUpload/FileSidebar"
-import { TodoSidebar } from "./fileUpload/TodoSidebar"
+import { ThreadAside } from "./fileUpload/ThreadAside"
+import { useThreadAside } from "./fileUpload/useThreadAside"
 import type { ThreadDetail, ThreadMsg } from "@/lib/types"
 
 /** True only for an actual OS *file* drag — a text/selection drag must not blur. */
@@ -264,6 +263,24 @@ function CommandEditDialog({
 }
 
 /**
+ * Project the live prompt library into the composer's `/command` suggestions.
+ * A command's slash invocation is `/${id}` (the file-stem slug). Hoisted to
+ * module scope so the {@link ThreadConversation} render stays within budget.
+ */
+function buildSuggestions(
+  library: { kind: string; id: string; name: string; description: string; body?: string }[],
+): CommandSuggestion[] {
+  return library
+    .filter((item) => item.kind === "command")
+    .map((item) => ({
+      command: `/${item.id}`,
+      name: item.name,
+      description: item.description,
+      body: item.body,
+    }))
+}
+
+/**
  * Center pane — the selected thread's full conversation + composer.
  *
  * Intentionally header-less: the thread's identity (name + turn status) already
@@ -297,10 +314,8 @@ export function ThreadConversation({
   /** restore this thread from the archive — only rendered when the thread is archived (T709) */
   onUnarchive?: (() => void) | undefined
 }) {
-  // The attachment whose Quick Look drawer is open (null = closed). A
-  // `file-upload` chip in any message sets it; the shared QuickLookSheet renders
-  // it with the exact same FinderPreview the Finder uses.
-  const [sheetFile, setSheetFile] = useState<UploadedFile | null>(null)
+  // Unified right-rail aside state (T662) — see useThreadAside.
+  const aside = useThreadAside()
 
   // ── OS-file drag-and-drop onto the whole conversation (T367) ──────────
   // Dragging files from the OS anywhere over the <main> uploads them exactly as
@@ -328,16 +343,7 @@ export function ThreadConversation({
   // composer surfaces them both as first-message bubbles on an empty thread AND
   // mid-draft on any thread when the caret's line is a lone `/` (T350). The
   // `firstMessage` flag below scopes only the empty-composer auto-show.
-  const suggestions = useMemo<CommandSuggestion[]>(() => {
-    return library
-      .filter((item) => item.kind === "command")
-      .map((item) => ({
-        command: `/${item.id}`,
-        name: item.name,
-        description: item.description,
-        body: item.body,
-      }))
-  }, [library])
+  const suggestions = useMemo<CommandSuggestion[]>(() => buildSuggestions(library), [library])
   // Pin the conversation to the latest message: scroll to the bottom whenever
   // a thread is opened (id change) or a new NON-AUTO message lands (user or
   // assistant text — not tool-activity traces). Auto messages update the tool
@@ -423,7 +429,7 @@ export function ThreadConversation({
                   threadId={thread.id}
                   answersByForm={answersByForm}
                   onFormSubmit={onFormSubmit}
-                  onOpenFile={setSheetFile}
+                  onOpenFile={aside.openFile}
                   onShowInFinder={onShowInFinder}
                   onDelete={handleDelete}
                 />
@@ -432,7 +438,7 @@ export function ThreadConversation({
                   key={seg.msg.id}
                   msg={seg.msg}
                   agentId={agentId}
-                  onOpenFile={setSheetFile}
+                  onOpenFile={aside.openFile}
                   onShowInFinder={onShowInFinder}
                   onDelete={handleDelete}
                 />
@@ -464,15 +470,15 @@ export function ThreadConversation({
         </div>
       </div>
 
-      {/* ── Side rails: file attachments + thread-owned todos (read-only, live via delta) ── */}
-      {threadFiles.length > 0 && <FileSidebar files={threadFiles} onOpen={setSheetFile} />}
-      {(thread.tasks?.length ?? 0) > 0 && <TodoSidebar tasks={thread.tasks ?? []} />}
-
-      <QuickLookSheet
-        node={sheetFile ? uploadToNode(sheetFile) : null}
+      {/* ── Unified right rail: Files + Tasks tabs, inline file preview (T662) ── */}
+      <ThreadAside
+        files={threadFiles}
+        tasks={thread.tasks ?? []}
         agentId={agentId}
-        open={sheetFile !== null}
-        onClose={() => setSheetFile(null)}
+        tab={aside.tab}
+        onTabChange={aside.setTab}
+        selectedFile={aside.file}
+        onSelectFile={aside.setFile}
       />
 
       <CreateCommandDialog
