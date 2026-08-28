@@ -4,7 +4,7 @@
 //! The view holds, per agent, the bounded state a UI needs *now*: the content
 //! [`Heads`], the latest [`Phase`] and [`LifecycleState`], and the most recent
 //! cost aggregate. It is folded from the [`OpEntry`] stream the
-//! [`Tailer`](crate::channel::Tailer) delivers.
+//! [`Tailer`](crate::tailer::Tailer) delivers.
 //!
 //! # Restart latency scales with agent *count*, not disk (I5)
 //!
@@ -202,7 +202,7 @@ impl AgentView {
 /// The fleet-wide materialized view: one [`AgentView`] per known agent.
 ///
 /// Driven by the orchestrator loop, which polls each agent's
-/// [`Tailer`](crate::channel::Tailer) and feeds the resulting entries through
+/// [`Tailer`](crate::tailer::Tailer) and feeds the resulting entries through
 /// [`apply`](MaterializedView::apply).
 #[derive(Debug, Default)]
 pub struct MaterializedView {
@@ -223,7 +223,7 @@ impl MaterializedView {
     }
 
     /// Fold a batch of entries (as returned by one
-    /// [`Tailer::poll`](crate::channel::Tailer::poll)) into `agent_id`'s view.
+    /// [`Tailer::poll`](crate::tailer::Tailer::poll)) into `agent_id`'s view.
     pub fn apply_batch(&mut self, agent_id: &str, entries: &[OpEntry]) {
         if entries.is_empty() {
             return;

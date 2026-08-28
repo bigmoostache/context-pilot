@@ -16,10 +16,10 @@ use cp_wire::types::LifecycleState;
 use cp_wire::types::oplog::OpEntryKind;
 use cp_wire::types::registry::Entry;
 
-use crate::channel::Tailer;
 use crate::registry::tee_reader::TeeReader;
 use crate::registry::{Event, FleetScanner};
 use crate::services::auth::backup::BackupScheduler;
+use crate::tailer::Tailer;
 use crate::transport::Backend;
 
 /// Fast inner cadence for folding each agent's oplog tail into the view.

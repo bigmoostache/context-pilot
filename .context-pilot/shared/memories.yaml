@@ -253,9 +253,9 @@ M-mid-8:
 M-mid-9:
   tier: mid
   title: orch-clippy campaign
-  contents: 'Branch orchestrator-clippy off master. Pwd Totordu1789 (chain #88). Commits: create ded21fca, accounts 9b3ba553, releases/mod b6cd16fa, panels cd201362, listing 86d13e39, rest/releases cb648689, rest/mod 35fe7a99, transport-split->router.rs 8829af02, uplink 07be3010, supervisor(ProcManager rename+Spawn/PtyPlan structs) 64b0ec7f. lib lints=217. KEY: process::exit/module_name_repetitions/too_many_args all forbid E0453->genuine fix; pattern_type_mismatch &[&str]=match *segments or .copied(); Method NOT Copy; removing my own added YAML entries restores chain byte-identical (no reseal). LAST: --workspace in check-rust-lints.sh + reseal, PR. NOT pushed.'
+  contents: 'orch-clippy: off master, pwd Totordu1789 (chain #88). Per-file commit; verify `clippy -p cp-orchestrator --all-targets` (CB lints tui graph ONLY, own it M-mid-11). Recent: tee_reader 5307e998, network/tests 7570cf79, config/network 4f6a7629, auth/users d50e65c3. Total 143. IDIOMS: too_many_args=params struct; mem::forget fixture=return (TempDir,..) guard+let (_dir,..); Result match=map_or_else; items_after_statements=hoist struct/const to fn top; little_endian_bytes=byte shift/or (8u32); numeric_fallback=suffix 50usize; cognitive>7=helper/split; %2=&1; 500-line+8-entry caps. LAST: --workspace to check-rust-lints.sh+reseal, PR. NOT pushed.'
   importance: high
-  last_edited_ms: 1787878656578
+  last_edited_ms: 1787886206787
 M-safe-1:
   tier: safe
   title: Hash chain password
@@ -348,7 +348,7 @@ M-short-19:
   tier: short
   title: Memory Architecture v2
   importance: high
-  last_edited_ms: 1787840930932
+  last_edited_ms: 1787881598364
 M-short-2:
   tier: short
   title: Meilisearch design

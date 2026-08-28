@@ -50,8 +50,8 @@ use std::path::Path;
 
 use cp_oplog::service::Service as OplogService;
 
-use cp_orchestrator::channel::Tailer;
 use cp_orchestrator::services::{MaterializedView, StreamHub};
+use cp_orchestrator::tailer::Tailer;
 
 use cp_wire::types::oplog::OpEntryKind;
 use cp_wire::types::stream::{Frame, Kind as StreamKind};

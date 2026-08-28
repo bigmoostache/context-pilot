@@ -10,9 +10,9 @@
 //! by an external cadence.
 //!
 //! Split out of `channel.rs` (which retains the read/write
-//! [`AgentChannel`](crate::registry::channel::AgentChannel)) to keep each file
+//! [`AgentHandle`](crate::registry::channel::AgentHandle)) to keep each file
 //! within the workspace's per-file line budget; the `Tailer` remains reachable
-//! at the stable `channel::Tailer` path via a re-export there.
+//! at `tailer::Tailer` (the crate root re-exports the `tailer` module).
 
 use std::fs;
 use std::io;

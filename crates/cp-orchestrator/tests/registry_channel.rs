@@ -16,10 +16,10 @@
 //!   `Stale`, and a still-stale agent stays quiet.
 //! * **The body store → oplog → tailer → hydrate chain reconnects.** A spilled
 //!   body the agent wrote is picked up by the backend's [`Tailer`] as a
-//!   `MessageCreated` head and resolved by [`AgentChannel::hydrate`], integrity
+//!   `MessageCreated` head and resolved by [`AgentHandle::hydrate`], integrity
 //!   verified; an inlined body is *not* hydratable (it rides its entry).
 //! * **A command round-trips backend → real intake and stays exactly-once.**
-//!   [`AgentChannel::send`] reaches a real [`cp_mod_bridge::command::Intake`],
+//!   [`AgentHandle::send`] reaches a real [`cp_mod_bridge::command::Intake`],
 //!   is journalled-then-acked, and a redelivery is deduped — one durable
 //!   effect, ever.
 
@@ -59,9 +59,10 @@ use cp_mod_bridge::command::Intake;
 use cp_oplog::replay::replay;
 use cp_oplog::service::Service as OplogService;
 
-use cp_orchestrator::channel::{AgentChannel, Tailer};
+use cp_orchestrator::channel::AgentHandle;
 use cp_orchestrator::liveness::Liveness;
 use cp_orchestrator::registry::{Event, FleetScanner};
+use cp_orchestrator::tailer::Tailer;
 
 use cp_wire::heartbeat::Heartbeat;
 use cp_wire::types::ack::Status;
@@ -242,7 +243,7 @@ fn the_tailer_picks_up_a_spilled_body_the_channel_then_hydrates() {
 
     // The channel hydrates the spilled body (integrity verified), but an
     // inlined body has no file to hydrate — it rode its oplog entry.
-    let ch = AgentChannel::from_entry(&entry("a", &dir.path().join("hb"), &oplog_dir, &dir.path().join("a.sock")));
+    let ch = AgentHandle::from_entry(&entry("a", &dir.path().join("hb"), &oplog_dir, &dir.path().join("a.sock")));
     assert_eq!(
         ch.hydrate(head).expect("hydrate"),
         Some(b"a large body that spills to its own durable file".to_vec()),
@@ -279,11 +280,11 @@ fn a_command_round_trips_to_a_real_intake_and_stays_exactly_once() {
 
     // The backend side: build a channel from a record advertising this socket.
     let record = Entry { cap_token: token, ..entry("a", &dir.path().join("hb"), &oplog_dir, &sock) };
-    let ch = AgentChannel::from_entry(&record);
+    let ch = AgentHandle::from_entry(&record);
 
     // First send is accepted; the same command redelivered is still acked
     // accepted (idempotent) but journals no second effect.
-    let first = ch.send_with_retry(send_command("dt-1"), 10).expect("first send");
+    let first = ch.send_with_retry(&send_command("dt-1"), 10).expect("first send");
     assert_eq!(first.status, Status::Accepted, "the command is accepted");
     let second = ch.send(send_command("dt-1")).expect("second send");
     assert_eq!(second.status, Status::Accepted, "a duplicate is still acknowledged");

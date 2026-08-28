@@ -23,8 +23,8 @@
 //!   on-disk persistence files (tier-② state: config, workers, shared,
 //!   messages, panels).
 //!
-//! * [`channel`] — the per-agent [`AgentChannel`](channel::AgentChannel): oplog
-//!   tail ([`Tailer`](channel::Tailer)), rev-pinned body hydrate, and command
+//! * [`channel`] — the per-agent [`AgentHandle`](channel::AgentHandle): oplog
+//!   tail ([`Tailer`](tailer::Tailer)), rev-pinned body hydrate, and command
 //!   send.
 //! * [`supervisor`] — the
 //!   [`ProcManager`](supervisor::ProcManager): spawn / stop / restart /
@@ -69,6 +69,11 @@ pub mod transport;
 // Re-export channel at the crate root so external consumers (tests, runtime)
 // that imported `cp_orchestrator::channel` continue to compile unchanged.
 pub use registry::channel;
+
+// Re-export the tailer module at the crate root so the incremental oplog
+// consumer is reachable at `cp_orchestrator::tailer::Tailer` — a module
+// re-export (not an item re-export), so it does not trip `clippy::pub_use`.
+pub use registry::tailer;
 
 // Re-export liveness at the crate root so external consumers (tests) that
 // imported `cp_orchestrator::liveness` continue to compile unchanged.

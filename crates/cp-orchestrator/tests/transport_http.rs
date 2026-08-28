@@ -50,7 +50,7 @@ use std::time::Duration;
 
 use cp_oplog::append::OplogWriter;
 
-use cp_orchestrator::channel::Tailer;
+use cp_orchestrator::tailer::Tailer;
 use cp_orchestrator::transport::{Backend, serve_bound};
 
 use cp_wire::types::ContentHash;

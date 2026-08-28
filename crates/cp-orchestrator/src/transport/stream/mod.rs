@@ -32,7 +32,7 @@ use cp_wire::types::oplog::OpEntry;
 use cp_wire::types::stream::Frame;
 
 use super::Backend;
-use crate::channel::Tailer;
+use crate::tailer::Tailer;
 
 /// Tight tail re-poll cadence for the SSE producer.
 ///

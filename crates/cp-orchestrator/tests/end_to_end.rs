@@ -7,7 +7,7 @@
 //!
 //! ```text
 //!   HTTP client ──REST POST /command──▶ backend transport
-//!                                          │ AgentChannel::send (UDS)
+//!                                          │ AgentHandle::send (UDS)
 //!                                          ▼
 //!                                       agent: Intake.handle_connection
 //!                                          │ journal-then-ack (fsync)

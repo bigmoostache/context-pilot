@@ -7840,3 +7840,21 @@ index c8d5683f..03dfa0e3 100644
 +
 +
 # --- End entry #88 ---
+89:f77bd80b5af3250aa397989b32ac62f7454b77672c5393680a6caccadfe39e42:6d04e1078b5fc35a2c1135beba296546fdd6d7999931da5902c18b3ffd0eb96f:be98d3a1911cd6922e7f4150b7c06f8b349ad34134b3c340609bf8feaf8d765b
+# --- Diff for entry #89 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 03dfa0e3..e9784415 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -175,6 +175,10 @@ exceptions:
+ 
+ 
+ 
++
++
++
++
+   # ── app/run/*: multiple_inherent_impl for App ────────────────────────
+ 
+   - path: "src/app/run/lifecycle.rs"
+# --- End entry #89 ---
