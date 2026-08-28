@@ -39,15 +39,14 @@ export function ConfigPanel({ variant = "dialog" }: { variant?: "dialog" | "inli
   const inline = variant === "inline"
 
   return (
-    <div className="flex min-h-0 flex-1">
-      {/* category rail */}
-      <aside
-        className={cn(
-          "flex w-[230px] shrink-0 flex-col border-r border-border/70",
-          inline ? "bg-surface" : "bg-muted/30",
-        )}
-      >
-        <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2.5 py-3.5">
+    // Threads design language (T679): the settings surface floats a
+    // `bg-surface-2` category rail (card-shadow + my-2 breathing room, no
+    // border divider) over a `bg-background` detail pane — the exact model the
+    // thread list + conversation use — instead of the old docked bordered panes.
+    <div className="flex min-h-0 flex-1 bg-background">
+      {/* floating category rail — a deliberate twin of the thread list rail */}
+      <aside className="card-shadow my-2 ml-2 flex w-(--sidebar-w) shrink-0 flex-col overflow-hidden rounded-none border border-border bg-surface-2">
+        <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-2">
           {visibleCategories.map((c) => {
             const on = c.id === cat
             return (
@@ -55,10 +54,10 @@ export function ConfigPanel({ variant = "dialog" }: { variant?: "dialog" | "inli
                 key={c.id}
                 onClick={() => setCat(c.id)}
                 className={cn(
-                  "group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12.5px] transition-colors",
+                  "group flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] transition-colors",
                   on
                     ? "card-shadow bg-card font-medium text-foreground"
-                    : "text-foreground/75 hover:bg-muted/60",
+                    : "hover:card-shadow text-foreground/75 hover:bg-card",
                 )}
               >
                 <span
@@ -87,7 +86,7 @@ export function ConfigPanel({ variant = "dialog" }: { variant?: "dialog" | "inli
             already names the page, so repeating it as a heading is noise.
             Dialog variant keeps just a slim bar holding the close control. */}
         {!inline && (
-          <header className="flex h-[46px] shrink-0 items-center justify-end border-b border-border/70 px-3">
+          <header className="flex h-[46px] shrink-0 items-center justify-end px-3">
             <DialogClose
               className="flex size-7 items-center justify-center rounded-md text-muted-foreground/55 transition-colors hover:bg-muted/70 hover:text-foreground"
               aria-label="Close"
@@ -107,7 +106,7 @@ export function ConfigPanel({ variant = "dialog" }: { variant?: "dialog" | "inli
           </div>
         )}
 
-        <footer className="flex h-[58px] shrink-0 items-center border-t border-border/70 bg-muted/25 px-6">
+        <footer className="flex h-[58px] shrink-0 items-center px-6">
           <span className="text-[11.5px] text-muted-foreground/70">Changes apply on save.</span>
           {inline ? (
             <button className="ml-auto flex items-center gap-2 rounded-lg bg-(--interactive) px-4 py-2 text-[13px] font-medium text-(--primary-foreground) transition-all hover:brightness-105 active:scale-[0.98]">

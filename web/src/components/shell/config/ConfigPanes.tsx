@@ -111,8 +111,8 @@ function ServiceRow({ label, available }: { label: string; available: boolean })
   return (
     <div
       className={cn(
-        "flex items-center gap-3 rounded-xl border px-3.5 py-3 transition-colors",
-        available ? "border-border bg-card" : "border-border/50 bg-muted/20 opacity-55",
+        "flex items-center gap-3 rounded-lg px-3.5 py-3 transition-colors",
+        available ? "card-shadow bg-card" : "bg-muted/20 opacity-55",
       )}
     >
       <span
@@ -233,7 +233,7 @@ function AllowedModelsSection() {
     <FieldGroup label="Allowed models" hint="Which models your users may pick">
       <label
         htmlFor="allow-all-models"
-        className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-3.5 py-2.5"
+        className="card-shadow flex items-center gap-2.5 rounded-lg bg-card px-3.5 py-2.5"
       >
         <input
           id="allow-all-models"
@@ -403,7 +403,7 @@ function ToggleRow({
   return (
     <button
       onClick={handleToggle}
-      className="card-shadow flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-3 text-left"
+      className="card-shadow flex items-center gap-2.5 rounded-lg bg-card px-3.5 py-3 text-left"
     >
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-[13px] font-medium text-foreground/90">{name}</span>
