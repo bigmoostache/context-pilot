@@ -280,23 +280,23 @@ fn now_ms() -> u64 {
 
 /// The receipt returned when an agent has been retired.
 #[derive(Serialize)]
-struct RetireReceipt<'a> {
+struct RetireReceipt<'id> {
     /// Always `"retired"`.
     status: &'static str,
     /// The agent id retired.
-    id: &'a str,
+    id: &'id str,
     /// The realm folder, kept intact.
     folder: String,
 }
 
 /// The receipt returned when an agent unretire (respawn) has been launched.
 #[derive(Serialize)]
-struct UnretireReceipt<'a> {
+struct UnretireReceipt<'id> {
     /// Always `"unretiring"` — the agent re-appears in the active fleet once it
     /// boots.
     status: &'static str,
     /// The agent id being brought back.
-    id: &'a str,
+    id: &'id str,
     /// The realm folder it was respawned in.
     folder: String,
     /// The freshly spawned process pid.
