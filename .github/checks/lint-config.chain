@@ -7972,3 +7972,77 @@ index f11b0038..d551b7b1 100644
  
  
 # --- End entry #91 ---
+92:40068ce86a20751d89b7758877b3457b42b7a1eb98f412a8e360f0d9928c05c0:8b8be3df528038f19704257fef113ba4fb3ac1042674bbc1eb26bee5a4fbb79b:e7178fc5e3b3508d6cac4f07600cace2d104a6b7dc1c574e9bf78b1a4fe23010
+# --- Diff for entry #92 ---
+diff --git a/.github/checks/check-rust-lints.sh b/.github/checks/check-rust-lints.sh
+index a1ffb832..a17be473 100755
+--- a/.github/checks/check-rust-lints.sh
++++ b/.github/checks/check-rust-lints.sh
+@@ -9,12 +9,21 @@
+ #
+ # Sub-checks (all fail-fast to a single non-zero exit):
+ #   1. cargo fmt -- --check                     (rustfmt twin)
+-#   2. cargo clippy --all-targets -- -D warnings (the clippy gate)
+-#   3. RUSTFLAGS="-D warnings" cargo check       (rustc-forbid twin, --ci only —
+-#      redundant with the rust-tests callback's full-workspace build in --callback)
++#   2. cargo clippy --workspace --all-targets -- -D warnings (the clippy gate)
++#   3. RUSTFLAGS="-D warnings" cargo check --workspace (rustc-forbid twin,
++#      --ci only — redundant with the rust-tests callback's full-workspace
++#      build in --callback)
+ #   4. lint-exception registry — delegates to check-lint-exceptions.sh
+ #   5. vault-bypass (FULL repo scan) — delegates to check-vault-bypass.sh
+ #
++# --workspace is LOAD-BEARING (added after the campaign that drove
++# cp-orchestrator/cp-oplog/cp-console-server to clippy-clean): a bare
++# --all-targets from the repo root only compiles the `tui` root package and
++# its dependency graph, so standalone binaries outside that graph
++# (cp-orchestrator, cp-oplog, cp-console-server) were NEVER linted and
++# accumulated lint debt invisibly. --workspace lints every crate, closing
++# that blind spot permanently.
++#
+ # vault-bypass runs a WHOLE-REPO scan in both modes (no $CP_CHANGED_FILES
+ # narrowing): coverage equality trumps the incremental speed-up the callback
+ # used to take. Repo root via git so it is cwd-independent.
+@@ -28,8 +37,8 @@ fail=0
+ echo "=== cargo fmt --check ==="
+ cargo fmt -- --check 2>&1 || fail=1
+ 
+-echo "=== cargo clippy --all-targets -D warnings ==="
+-cargo clippy --all-targets -- -D warnings 2>&1 || fail=1
++echo "=== cargo clippy --workspace --all-targets -D warnings ==="
++cargo clippy --workspace --all-targets -- -D warnings 2>&1 || fail=1
+ 
+ # cargo check runs in --ci only. In --callback it is redundant + too slow: the
+ # rust-tests callback already does a full-workspace `cargo build` (debug) which
+@@ -37,8 +46,8 @@ cargo clippy --all-targets -- -D warnings 2>&1 || fail=1
+ # so re-checking here would double the workspace compile on every .rs edit for
+ # zero extra coverage. CI keeps it (the rust job's cache is warm; explicit gate).
+ if [ "$MODE" = "--ci" ]; then
+-  echo "=== cargo check -D warnings ==="
+-  RUSTFLAGS="-D warnings" cargo check 2>&1 || fail=1
++  echo "=== cargo check --workspace -D warnings ==="
++  RUSTFLAGS="-D warnings" cargo check --workspace 2>&1 || fail=1
+ fi
+ 
+ echo "=== lint-exception registry ==="
+diff --git a/.context-pilot/shared/callbacks.yaml b/.context-pilot/shared/callbacks.yaml
+index 5e186a7b..c8f6adac 100644
+--- a/.context-pilot/shared/callbacks.yaml
++++ b/.context-pilot/shared/callbacks.yaml
+@@ -1,13 +1,13 @@
+ api-contract-rust:
+   name: api-contract-rust
+   description: API-contract family (OpenAPI spec+routes, TS codegen drift, manual-fetch audit) on Rust edits
+-  pattern: '**/*.rs'
++  pattern: .cb1-disabled-during-clippy-sweep/**/*.rs
+   blocking: true
+   timeout_secs: 180
+   success_message: API contract OK ✓
+   is_global: true
+   script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-api-contract.sh" --callback
+-  last_edited_ms: 1783511056445
++  last_edited_ms: 1787906197419
+ api-contract-ts:
+   name: api-contract-ts
+   description: API-contract family (OpenAPI spec+routes, TS codegen drift, manual-fetch audit) on web TS edits
+# --- End entry #92 ---

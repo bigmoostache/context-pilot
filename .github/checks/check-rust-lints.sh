@@ -9,11 +9,20 @@
 #
 # Sub-checks (all fail-fast to a single non-zero exit):
 #   1. cargo fmt -- --check                     (rustfmt twin)
-#   2. cargo clippy --all-targets -- -D warnings (the clippy gate)
-#   3. RUSTFLAGS="-D warnings" cargo check       (rustc-forbid twin, --ci only —
-#      redundant with the rust-tests callback's full-workspace build in --callback)
+#   2. cargo clippy --workspace --all-targets -- -D warnings (the clippy gate)
+#   3. RUSTFLAGS="-D warnings" cargo check --workspace (rustc-forbid twin,
+#      --ci only — redundant with the rust-tests callback's full-workspace
+#      build in --callback)
 #   4. lint-exception registry — delegates to check-lint-exceptions.sh
 #   5. vault-bypass (FULL repo scan) — delegates to check-vault-bypass.sh
+#
+# --workspace is LOAD-BEARING (added after the campaign that drove
+# cp-orchestrator/cp-oplog/cp-console-server to clippy-clean): a bare
+# --all-targets from the repo root only compiles the `tui` root package and
+# its dependency graph, so standalone binaries outside that graph
+# (cp-orchestrator, cp-oplog, cp-console-server) were NEVER linted and
+# accumulated lint debt invisibly. --workspace lints every crate, closing
+# that blind spot permanently.
 #
 # vault-bypass runs a WHOLE-REPO scan in both modes (no $CP_CHANGED_FILES
 # narrowing): coverage equality trumps the incremental speed-up the callback
@@ -28,8 +37,8 @@ fail=0
 echo "=== cargo fmt --check ==="
 cargo fmt -- --check 2>&1 || fail=1
 
-echo "=== cargo clippy --all-targets -D warnings ==="
-cargo clippy --all-targets -- -D warnings 2>&1 || fail=1
+echo "=== cargo clippy --workspace --all-targets -D warnings ==="
+cargo clippy --workspace --all-targets -- -D warnings 2>&1 || fail=1
 
 # cargo check runs in --ci only. In --callback it is redundant + too slow: the
 # rust-tests callback already does a full-workspace `cargo build` (debug) which
@@ -37,8 +46,8 @@ cargo clippy --all-targets -- -D warnings 2>&1 || fail=1
 # so re-checking here would double the workspace compile on every .rs edit for
 # zero extra coverage. CI keeps it (the rust job's cache is warm; explicit gate).
 if [ "$MODE" = "--ci" ]; then
-  echo "=== cargo check -D warnings ==="
-  RUSTFLAGS="-D warnings" cargo check 2>&1 || fail=1
+  echo "=== cargo check --workspace -D warnings ==="
+  RUSTFLAGS="-D warnings" cargo check --workspace 2>&1 || fail=1
 fi
 
 echo "=== lint-exception registry ==="
