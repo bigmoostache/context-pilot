@@ -810,6 +810,10 @@
   path: crates/cp-oplog/src/append.rs
   description: OplogWriter single-writer WAL, uses OpEntry::new/Snapshot::new ctors (A5).
   last_edited_ms: 0
+07f43c938c103b0e:
+  path: src/app/run/tools/pipeline.rs
+  description: Main tool execution pipeline. collect_tool_results(ToolBatch) + finalize_tool_cycle(ToolCycle) split from handle_tool_execution (A2). execute_one_tool/execute_queue_control/enqueue_tool. Pre-flight → queue intercept (auto-flush on trap defusal) → execute → callbacks(sibling) → tempo. Radar signals, Meili log sync.
+  last_edited_ms: 0
 07f9691e993528e6:
   path: crates/cp-orchestrator/src/main.rs
   description: 'Backend entry point. Reads Config from env, prints version/protocol/agents-dir/budget/scan-interval + X896 new-agent realm root + agent binary, creates Runtime, starts driver thread, serves HTTP (blocking). `use <crate> as _` block acknowledges lib-only deps in the bin target (per-target unused-crate-dependencies forbid): incl portable_pty, calamine, csv (T282 sheet parsing — used only by the lib finder/sheet.rs, not main).'
@@ -14278,6 +14282,10 @@
   path: src/app/run/threads/commands.rs
   description: Bridge command APPLICATION (K7 mutation half), split from bridge.rs for the 500-line limit. apply_command dispatches SendMessage(inject user msg + MyTurn flip + on_user_message)/CreateThread(+emit_roster_delta ThreadCreated + prime status memo)/ArchiveThread(soft-delete + focus cleanup + emit ThreadArchived)/RestoreThread(emit ThreadRestored)/Stop|Interrupt(mirror Esc StopStreaming)/Configure(serde-deserialize provider+model, set on state). Imports emit_roster_delta + wire_turn (pub(super)) from bridge.
   last_edited_ms: 0
+971350aa45b0bd08:
+  path: src/modules/questions/think.rs
+  description: ThinkState (count/threshold/next_notification_at), execute() increments counter + encouraging status
+  last_edited_ms: 0
 973e1cc049b7e0ab:
   path: crates/cp-mod-threads/src/tools.rs
   description: 'Thread tool handlers. execute_send: post message, set THEIR_TURN, clear focus, start dangling(5). execute_read: last k messages formatted, MY_TURN sets focus, THEIR_TURN peeks. format_age helper.'
@@ -17890,6 +17898,10 @@ bd5339d9623987fd:
   path: crates/cp-orchestrator/src/transport/finder.rs
   description: 'Finder endpoints: confined dir listing (GET /fs?path=) now annotates folder nodes with count (count_visible_children helper, non-hidden direct children, best-effort), file preview (256KB cap, binary reject), conversation, download. Path confinement via canonicalize+starts_with.'
   last_edited_ms: 1781795177888
+bd5a6d48ed86e8b5:
+  path: src/app/run/tools/checks.rs
+  description: 'Post-tool non-blocking polls: panel readiness (5s timeout), deferred sleep timer. Each resumes streaming pipeline when condition met. Imports has_dirty_panels from streaming.rs.'
+  last_edited_ms: 0
 bd662097808facee:
   path: src/infra/constants.rs
   description: API/layout/loop/persistence constants + theme color accessors (from YAML themes) + card design tokens (card_text, card_agent_bg, card_reverie_bg, card_queue_bg, card_think_bg) + icons + prompts.
@@ -18774,6 +18786,10 @@ c65ec79f95e72c8f:
   path: ui/src/components/shell/ConfigModal.tsx
   description: 'Settings dialog — thin portaled Base UI Dialog wrapper around ConfigPanel variant=''dialog''. Used by TopBar gear (in-agent). LARGE: h-[88vh] max-h-[860px] w-[1100px] max-w-[calc(100vw-3rem)] (T20). Portal escapes the .vibrancy backdrop-filter containing block (half-off-screen fix). Controlled open/onClose.'
   last_edited_ms: 1781545579121
+c662f9dfd2b51940:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 c6693ad9a7e8d8a2:
   path: crates/cp-mod-files/src/tools/diff.rs
   description: 'Diff algorithm: LCS-based unified diff, generate_unified_diff(), compute_diff(), O(m*n) DP'
@@ -22898,6 +22914,10 @@ f5360cf0c0e71a32:
   path: tmp/v2/src/ribbon/controls.tsx
   description: 'Office ribbon primitives: RibbonGroup (labelled cluster), RibbonRow, RibbonButton (active-state toggle), RibbonBigButton (stacked icon+label), RibbonSelect, RibbonDivider. All buttons preventDefault on mousedown so clicking chrome never collapses the editor selection.'
   last_edited_ms: 0
+f5476467019d513d:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 f54924eedb3c09b1:
   path: ui/src/components/panels/cockpit/TodoPanel.tsx
   description: 'Cockpit Todo List maquette: depth-indented hierarchical tasks, status glyph (pending/in-progress/done), header progress bar. Reads mock todoItems.'
@@ -23774,6 +23794,10 @@ fd2cc3a6e7f7a05b:
   path: ui/src/components/threads/ThreadsView.tsx
   description: Threads view assembler, scoped to ACTIVE AGENT's realm (filters threadDetails by agentId, EmptyRealm when none). 2-pane (collapsible ThreadList | ThreadConversation). Owns collapsed state; floating PanelLeft Button re-opens the rail when collapsed. No onOpenCockpit (details popup removed).
   last_edited_ms: 1781533385882
+fd386cabc715176c:
+  path: crates/cp-mod-todo/src/lib.rs
+  description: Todo module. 3 tools create/update/move. Fixed TODO panel (fixed_order=0). pre_flight split preflight_create/update/move. todo_line_semantic split keyword_semantic/tail_semantic (A2). Drives spine auto-continuation.
+  last_edited_ms: 0
 fd3e6c8949725418:
   path: deploy/photonicat/bootstrap.sh
   description: 'Single-file day-0 provisioning script for Photonicat (WiFi → Tailscale install + persistent procd service → tailscale up --ssh). Interactive: prompts WiFi SSID/pass (UCI wwan+sta config, retry loop with connectivity check), installs tailscale via opkg, writes /etc/init.d/tailscale, enrolls with authkey/hostname/tag. uci deletes guarded with || true; radio device resolved before use.'

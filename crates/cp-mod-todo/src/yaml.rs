@@ -156,14 +156,28 @@ fn scalar(s: &str) -> String {
 ///
 /// # Errors
 /// Returns `Err` with a human-readable message when a `prev` is not found /
-/// ambiguous, or the resulting buffer is not valid YAML. State is left
-/// untouched on any error.
+/// ambiguous, the resulting buffer is not valid YAML, or the edited tree fails
+/// validation (an unresolved `id:`, a create missing its `title:`, or an
+/// unparseable `status:`). State is left untouched on any error.
 pub fn apply_diffs(state: &mut State, thread_id: &str, diffs: &[(String, String)]) -> Result<String, String> {
     let mut buffer = render(state, thread_id);
     for (idx, diff) in diffs.iter().enumerate() {
         apply_one_diff(&mut buffer, diff.0.as_str(), diff.1.as_str(), idx)?;
     }
-    let nodes: Vec<YamlNode> = serde_yaml::from_str(&buffer).map_err(|e| format!("resulting YAML is invalid: {e}"))?;
+    // A wholly empty (or whitespace-only) buffer means "clear the list" — every
+    // item was deleted. `serde_yaml` rejects an empty document for a `Vec`, so
+    // treat it as the empty tree rather than surfacing a spurious parse error
+    // (otherwise the list could never be emptied by deleting all its lines).
+    let nodes: Vec<YamlNode> = if buffer.trim().is_empty() {
+        Vec::new()
+    } else {
+        serde_yaml::from_str(&buffer).map_err(|e| format!("resulting YAML is invalid: {e}"))?
+    };
+    // Validate the parsed tree BEFORE mutating anything, so a bad edit (an
+    // unresolved `id:`, a create missing its `title:`, an unparseable `status:`)
+    // is a hard error that leaves the tasks untouched — never a silent
+    // mis-apply that cancels real children or drops an invalid status.
+    validate_nodes(state, thread_id, &nodes)?;
     reconcile(state, thread_id, &nodes);
     Ok(render(state, thread_id))
 }
@@ -188,6 +202,60 @@ fn apply_one_diff(buffer: &mut String, prev: &str, new: &str, idx: usize) -> Res
             "diff #{}: 'prev' matches {n} places — make it unique (include the item's `id:` line)",
             idx.saturating_add(1)
         )),
+    }
+}
+
+// =============================================================================
+// validation — reject bad edits BEFORE mutating (atomic apply)
+// =============================================================================
+
+/// Validate the parsed `nodes` tree against `thread_id`'s current tasks,
+/// returning `Err` listing every problem (so the model can fix them all at
+/// once) or `Ok(())` when the edit is safe to apply.
+///
+/// Three classes of problem are rejected — each of which would otherwise cause
+/// a silent, surprising mutation:
+///   * an `id:` that does not resolve to an existing item of this thread (ids
+///     are backend-assigned; a stale/typo'd id must never be treated as a
+///     create, and — the dangerous case — must never let its real children be
+///     silently soft-cancelled);
+///   * a create (no `id:`) missing a non-empty `title:`;
+///   * a `status:` string that is not one of the accepted values.
+fn validate_nodes(state: &State, thread_id: &str, nodes: &[YamlNode]) -> Result<(), String> {
+    let mut errors: Vec<String> = Vec::new();
+    validate_group(state, thread_id, nodes, &mut errors);
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(format!("{} problem(s) in the edited task YAML:\n  - {}", errors.len(), errors.join("\n  - ")))
+    }
+}
+
+/// Recursively validate one sibling group, pushing any problems onto `errors`.
+fn validate_group(state: &State, thread_id: &str, nodes: &[YamlNode], errors: &mut Vec<String>) {
+    for node in nodes {
+        match node.id.as_deref() {
+            Some(id) => {
+                let exists = TodoState::get(state).todos.iter().any(|t| t.id == id && t.thread_id == thread_id);
+                if !exists {
+                    errors.push(format!(
+                        "item id `{id}` does not exist on this thread — ids are backend-assigned; omit the `id:` line to create a new item"
+                    ));
+                }
+            }
+            None => {
+                if node.title.as_deref().map(str::trim).is_none_or(str::is_empty) {
+                    errors.push("a new item (no `id:`) is missing a non-empty `title:`".to_owned());
+                }
+            }
+        }
+        if let Some(raw) = node.status.as_deref()
+            && !raw.trim().is_empty()
+            && parse_status(raw).is_none()
+        {
+            errors.push(format!("invalid status `{}` — use one of: planned, in_progress, done, cancelled", raw.trim()));
+        }
+        validate_group(state, thread_id, &node.children, errors);
     }
 }
 

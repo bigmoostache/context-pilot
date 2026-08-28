@@ -99,10 +99,13 @@ fn apply_todo_diffs(diffs_val: &serde_json::Value, state: &mut State) -> Result<
         return Err("no focused thread (tasks must live in a thread; Read a thread first).".to_owned());
     };
     let diffs = parse_diffs(diffs_val)?;
-    let rendered = cp_mod_todo::yaml::apply_diffs(state, &tid, &diffs)?;
+    // Apply the edit (mutates the tasks); the returned canonical YAML is not
+    // shown in the result anymore — the Todo panel already renders it, so the
+    // tool result instead carries the synthetic task tree (T686).
+    let _yaml = cp_mod_todo::yaml::apply_diffs(state, &tid, &diffs)?;
     // Deprecate the Todo panel but preserve tempo (FR8) — no forced refresh.
     state.touch_panel(crate::state::Kind::TODO);
-    Ok(rendered)
+    Ok(cp_mod_todo::tree::result_annex(state, &tid))
 }
 
 /// One parsed `{prev, new}` search/replace edit for the `Todo` tool.
@@ -142,11 +145,11 @@ pub(super) fn execute_todo(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     match apply_todo_diffs(diffs_val, state) {
-        Ok(yaml) => {
-            let body = if yaml.trim().is_empty() {
+        Ok(annex) => {
+            let body = if annex.trim().is_empty() {
                 "Todo applied \u{2014} the task list is now empty.".to_owned()
             } else {
-                format!("Todo applied. Current task list:\n\n{}", yaml.trim_end())
+                format!("Todo applied. Current tasks:\n\n{}", annex.trim_end())
             };
             let mut result = ToolResult::new(tool.id.clone(), body, false);
             result.preserves_tempo = true; // FR8 — structural edits preserve tempo

@@ -511,10 +511,10 @@ M-short-4:
   last_edited_ms: 0
 M-short-40:
   tier: short
-  title: todo-v2 FE wiring shipped
-  contents: 'todo-v2 FE wiring SHIPPED commit 6aa70ae1 (todo-v2; backend=3ce87b37). Read-only todos aside beside Attachments, delta-live. Chain: WireTask+TaskListChanged->oplog fold->emit_task_lists->MaterializedView reshape/attach_disk_tasks->openapi/TS->reducers foldTaskList->TodoSidebar(desktop-only). build/fmt/openapi/TS-lint green. NOT pushed. clippy --all-targets red=pre-existing orch debt.'
-  importance: medium
-  last_edited_ms: 1787859203626
+  title: T686 tree tool-result
+  contents: 'T686 SHIPPED (todo-v3-yaml-diffs): Todo tool result = nested ASCII tree (├──, [ ]/[~]/[x]+id+title, no desc) of focused thread tasks, REPLACES YAML echo (panel keeps YAML). Opted-in tools APPEND tree when task_id flips Planned→InProgress. >1 in_progress LEAF → warning. New cp-mod-todo/src/tree.rs; checks.rs promote_declared_tasks; think.rs tree::result_annex.'
+  importance: high
+  last_edited_ms: 1787938231516
 M-short-5:
   tier: short
   title: 'Datalab OCR API: POST'
