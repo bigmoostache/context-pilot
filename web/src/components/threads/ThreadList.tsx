@@ -473,7 +473,7 @@ function RowMeta({
 }
 
 /**
- * The row's second-line task-progress widget (T687): a slim rounded track whose
+ * The row's second-line task-progress widget (T687): a slim track whose
  * fill = `done / (done + in_progress)`, then the current-front label. Fill is
  * `--ok` at 100% (calm-green, finished) and `--signal` in flight (draws the eye).
  */
@@ -482,9 +482,9 @@ function RowProgress({ p }: { p: import("@/lib/support/threadMessages").ThreadPr
   const complete = pct >= 100
   return (
     <span className="flex min-w-0 flex-1 items-center gap-1.5" title={`${p.done}/${p.total} done`}>
-      <span className="relative h-1 w-10 shrink-0 overflow-hidden rounded-full bg-muted">
+      <span className="relative h-1 w-10 shrink-0 overflow-hidden bg-muted">
         <span
-          className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-300 ease-out"
+          className="absolute inset-y-0 left-0 transition-[width] duration-300 ease-out"
           style={{ width: `${pct}%`, background: complete ? "var(--ok)" : "var(--signal)" }}
         />
       </span>
