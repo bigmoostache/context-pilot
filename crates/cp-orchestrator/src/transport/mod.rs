@@ -159,13 +159,7 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
     // `None` means it handled and consumed the request; `Some(request)` gives it
     // back for the rest of the pipeline.
     if method == Method::Get {
-        let get_ctx = RouteCtx {
-            state,
-            body_bytes: &[],
-            query: &query,
-            auth_token: auth_token.as_deref(),
-            auth_user: auth_user.as_ref(),
-        };
+        let get_ctx = RouteCtx::new(state, &query, auth_token.as_deref(), auth_user.as_ref());
         match router::try_raw_route(request, &segments, get_ctx) {
             Some(returned) => request = returned,
             None => return,
@@ -183,13 +177,7 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
     let reply = router::route_rest(
         &method,
         &segments,
-        RouteCtx {
-            state,
-            body_bytes: body_bytes.as_slice(),
-            query: &query,
-            auth_token: auth_token.as_deref(),
-            auth_user: auth_user.as_ref(),
-        },
+        RouteCtx::new(state, &query, auth_token.as_deref(), auth_user.as_ref()).with_body(body_bytes.as_slice()),
     );
     respond_json(request, &reply);
 }
@@ -243,6 +231,32 @@ struct RouteCtx<'ctx> {
     auth_token: Option<&'ctx str>,
     /// The authenticated user, when auth is enabled.
     auth_user: Option<&'ctx crate::services::auth::types::User>,
+}
+
+impl<'ctx> RouteCtx<'ctx> {
+    /// Bundle the shared per-request inputs (body defaults empty). A thin
+    /// constructor so [`handle`] builds the context in one short call at each of
+    /// its two routing sites (the GET raw-route pass and the JSON `route_rest`
+    /// pass) rather than repeating the field-by-field literal — keeping `handle`
+    /// under the line-count cap. The POST/PUT/PATCH pass attaches its body with
+    /// [`with_body`](Self::with_body); the four-field form stays within the
+    /// argument-count cap.
+    const fn new(
+        state: &'ctx Arc<Mutex<Backend>>,
+        query: &'ctx str,
+        auth_token: Option<&'ctx str>,
+        auth_user: Option<&'ctx crate::services::auth::types::User>,
+    ) -> Self {
+        Self { state, body_bytes: &[], query, auth_token, auth_user }
+    }
+
+    /// Return a copy of this context carrying `body_bytes` (the read request
+    /// body). Used by the `route_rest` pass; the GET raw-route pass keeps the
+    /// empty-body default.
+    const fn with_body(mut self, body_bytes: &'ctx [u8]) -> Self {
+        self.body_bytes = body_bytes;
+        self
+    }
 }
 
 /// CORS response headers permitting the Vite dev server (or any origin) to
