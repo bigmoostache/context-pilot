@@ -9,7 +9,7 @@
 //! logging the decision; the health-gated committer of the next boot finishes
 //! the job.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -31,18 +31,26 @@ const BOOT_POLL_DELAY: Duration = Duration::from_secs(30);
 /// Spawn the scheduler loop. One thread for the process lifetime.
 pub(crate) fn spawn(backend: Arc<Mutex<Backend>>, auth_db: PathBuf, install: PathBuf) -> thread::JoinHandle<()> {
     thread::spawn(move || {
-        thread::sleep(BOOT_POLL_DELAY);
-        loop {
-            let sleep = tick(&backend, &auth_db, &install);
-            thread::sleep(sleep);
-        }
+        run_loop(&backend, &auth_db, &install);
     })
+}
+
+/// The scheduler's endless poll loop: settle after boot, then tick-and-sleep
+/// forever. Split into a `-> !` helper so the divergence is explicit
+/// (`infinite_loop`) while the spawned closure still yields `()` for the
+/// `JoinHandle<()>` return.
+fn run_loop(backend: &Arc<Mutex<Backend>>, auth_db: &Path, install: &Path) -> ! {
+    thread::sleep(BOOT_POLL_DELAY);
+    loop {
+        let sleep = tick(backend, auth_db, install);
+        thread::sleep(sleep);
+    }
 }
 
 /// One poll tick: snapshot config, run the decision, log it, and say how long
 /// to sleep before the next tick (until the window opens when an update is
 /// waiting on it, else the configured poll interval).
-fn tick(backend: &Arc<Mutex<Backend>>, auth_db: &PathBuf, install: &PathBuf) -> Duration {
+fn tick(backend: &Arc<Mutex<Backend>>, auth_db: &Path, install: &Path) -> Duration {
     // Snapshot everything the tick needs under one short lock.
     let Ok(b) = backend.lock() else {
         return Duration::from_mins(1);
@@ -65,9 +73,9 @@ fn tick(backend: &Arc<Mutex<Backend>>, auth_db: &PathBuf, install: &PathBuf) -> 
             // A verified answer on the new channel retires the crossgrade window
             // (mirrors the REST check handler).
             if result.is_ok()
-                && let Ok(mut b) = backend.lock()
+                && let Ok(mut bk) = backend.lock()
             {
-                b.releases.clear_pending_switch();
+                bk.releases.clear_pending_switch();
             }
             result.map(|eval| match eval {
                 UpdateEvaluation::Available(manifest) => Some(*manifest),
@@ -79,11 +87,11 @@ fn tick(backend: &Arc<Mutex<Backend>>, auth_db: &PathBuf, install: &PathBuf) -> 
             let snapshot = ReleaseStore::load(releases_dir.clone());
             download_artifact(&snapshot, manifest, &arch)?;
             // Stage (DB backup + binary swap) under the lock — local + fast.
-            let Ok(b) = backend.lock() else {
+            let Ok(bk) = backend.lock() else {
                 return Err("backend lock poisoned".to_owned());
             };
-            stage_apply(&b.releases, &AuthDb { store: b.auth.as_ref(), path: auth_db }, install, &manifest.version)?;
-            drop(b);
+            stage_apply(&bk.releases, &AuthDb { store: bk.auth.as_ref(), path: auth_db }, install, &manifest.version)?;
+            drop(bk);
             restart_self(install);
             Ok(current.clone())
         },
@@ -97,6 +105,11 @@ fn tick(backend: &Arc<Mutex<Backend>>, auth_db: &PathBuf, install: &PathBuf) -> 
             let minutes = window.minutes_until_open(scheduler::local_now_minutes()).max(1);
             Duration::from_secs(u64::from(minutes) * 60)
         }
-        _ => Duration::from_secs(u64::from(interval_hours) * 3600),
+        scheduler::TickOutcome::CheckFailed(_)
+        | scheduler::TickOutcome::UpToDate
+        | scheduler::TickOutcome::SkipMode(_)
+        | scheduler::TickOutcome::SkipInFlight
+        | scheduler::TickOutcome::Applied { .. }
+        | scheduler::TickOutcome::ApplyFailed(_) => Duration::from_secs(u64::from(interval_hours) * 3600),
     }
 }
