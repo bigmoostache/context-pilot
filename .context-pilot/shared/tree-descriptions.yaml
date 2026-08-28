@@ -566,6 +566,10 @@
   path: crates/cp-mod-search/src/lib.rs
   description: 'Search module. 1 tool: search. Global Meilisearch server bootstrap, per-project indexes. sync_logs_to_meilisearch() fire-and-forget (no tags). Context Radar refresh_radar()/push_task_signal() via background thread. Overlay info delegation.'
   last_edited_ms: 0
+0553ce5864f6f528:
+  path: src/app/run/threads/mod.rs
+  description: 'Thread helpers for main loop: maybe_inject_auto_read (filters paused threads — T371), check_my_turn_threads (filters paused threads — T371), extract_thread_ids, maybe_append_tool_activity. emit_thread_paused re-exported from paused.rs.'
+  last_edited_ms: 0
 0554dfaaec7c46af:
   path: crates/cp-mod-typst/src/lib.rs
   description: 'Typst module. 1 tool: typst_execute. Embedded compiler (no external binary). Depends on core+callback. catch-all watchlist callback recompiles affected docs. Seeds shared templates. @preview/ package support.'
@@ -1266,6 +1270,10 @@
   path: web/src/mobile-components/auth/AgentAclSection.tsx
   description: Mobile per-agent ACL twin (embedded in mobile AgentModal). Hover-revealed actions -> always-visible, py-2.5 touch rows, 16px grant-form selects, single-column. Same list/grant/revoke/toggle-role hooks.
   last_edited_ms: 1784669172642
+0d0cbbb8e02fd4b7:
+  path: src/app/run/threads/mod.rs
+  description: 'Thread helpers for main loop: maybe_inject_auto_read (filters paused threads — T371), check_my_turn_threads (filters paused threads — T371), extract_thread_ids, maybe_append_tool_activity. emit_thread_paused re-exported from paused.rs.'
+  last_edited_ms: 0
 0d254e205ae95b23:
   path: .context-pilot/scripts/rust-check.sh
   description: 'CB4 callback script. Runs 3 checks on every .rs edit: (1) cargo fmt --check, (2) cargo check -D warnings, (3) cargo clippy --all-targets -D warnings. Matches CI ci.yml steps. Fmt check added T462 (was missing since June 5 consolidation).'
@@ -9414,6 +9422,10 @@
   path: crates/cp-mod-git/src/tools.rs
   description: 'Git tool. Unified inline-vs-panel: short/fast results (≤150 lines, ≤8KB, ≤10s) returned inline with tempo; long/slow results create static git_result panels. spawn_async_tool for all commands. GIT_ASKPASS temp script for HTTPS auth. Cache invalidation via regex patterns.'
   last_edited_ms: 1782988305038
+63c14b6985ac37ea:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 63ca4aef271bb870:
   path: crates/cp-base/src/ui/mod.rs
   description: 'Shared UI helpers for panel rendering. Align enum + TextCell + render_table_text() (plain-text for LLM context). Tree output parsing helpers (find_size_pattern, find_children_pattern). Sub-modules: render_cache. No question_form module.'
@@ -10030,6 +10042,10 @@
   path: crates/cp-mod-brave/Cargo.toml
   description: 'Brave module deps: cp-base, cp-vault, cp-render, crossterm, serde, serde_json, serde_yaml, reqwest.'
   last_edited_ms: 1783253850437
+6a794f7127c7cae3:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 6a80600c66d89e02:
   path: crates/cp-oplog/src/append.rs
   description: 'OplogWriter: single-writer append-only fsync''d log + running Heads fold. open() seeds heads via replay. append(kind)->rev probes frame size, rolls at 64MiB. roll() stamps leading Checkpoint(heads) as new segment''s first record (GAP1). write_record = sole rev-assignment point (frame+write_all+sync_data+fold_entry, announce-after-durable K9). checkpoint() public. seg-0 has no leading cp. OplogError{Io,Frame}. 7 tests.'
@@ -19774,6 +19790,10 @@ d1554728527af01d:
   path: web/src/mobile-components/threads/ThreadsView.tsx
   description: Mobile ThreadsView twin — conversation-primary + left drawer (T609). Drawer toggled by fixed top-left CornerButton, anime.js spring settle. onNewThread creates directly + closes drawer (T633, NewThreadDialog removed). onGoToAgents passed to ThreadList. Logic from shared @/lib/live/threadView.
   last_edited_ms: 0
+d156751909c88000:
+  path: .context-pilot/shared/memories.yaml
+  description: Memory slots store (M-safe/tiny/short/mid/long, 220 fixed). Local-only, synced with commits. Mirrors the Memories panel.
+  last_edited_ms: 0
 d165a994ae75f945:
   path: crates/cp-mod-utilities/src/hash.rs
   description: FNV-1a 128-bit content hashing. compute(bytes) and compute_str(str) return 32-char hex. Replaces sha2 crate.
@@ -21566,6 +21586,10 @@ e6180126816cb598:
   path: src/app/context/freeze.rs
   description: 'Freeze policy: per-panel and ordering freeze decisions (queue, tempo, breath budget). T493 fix: tempo gated on frozen_context_snapshot.is_some() so telemetry only reports tempo=ON when the full-freeze path can actually protect the prompt.'
   last_edited_ms: 1783183419721
+e6200a2c288aeda9:
+  path: src/app/run/threads/mod.rs
+  description: 'Thread helpers for main loop: maybe_inject_auto_read (filters paused threads — T371), check_my_turn_threads (filters paused threads — T371), extract_thread_ids, maybe_append_tool_activity. emit_thread_paused re-exported from paused.rs.'
+  last_edited_ms: 0
 e62d724617c344d9:
   path: crates/cp-orchestrator/src/main.rs
   description: 'Backend entry point. Reads Config from env, prints version/protocol/agents-dir/budget/scan-interval + X896 new-agent realm root + agent binary, creates Runtime, starts driver thread, serves HTTP (blocking). `use <crate> as _` block acknowledges lib-only deps in the bin target (per-target unused-crate-dependencies forbid): incl argon2, rusqlite, portable_pty, calamine, csv, reqwest, openssl.'
@@ -24041,6 +24065,10 @@ ff972378b9c9624f:
 ff9c054b62de336d:
   path: Cargo.lock
   description: Workspace lockfile
+  last_edited_ms: 0
+ffa7beb598c87ada:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 ffb581ce118ca8a0:
   path: src/modules/overview/tools/panel_goto_page.rs

@@ -532,10 +532,10 @@ M-short-6:
   last_edited_ms: 0
 M-short-7:
   tier: short
-  title: T581 footer + editor
-  contents: 'T581 SHIPPED: StatusBar footer behaviour-selector shows+switches active agent (LoadBehaviour command, reused threads/commands sync path — no dup); per-item Delete/Export/Edit + Create/Import via orchestrator library CRUD (GET/PUT/DELETE library/agent/{id}) + AgentEditorDialog. Live-invalidation via OpEntryKind.agent_id.'
+  title: T692 auto-read fix
+  contents: 'T692 SHIPPED (todo-v3-yaml-diffs): fallback my_turn_thread notif now created-then-mark_notification_processed = PASSIVE (spine can''t interrupt focused work). Debounce on notified_my_turn_id. Removed my_turn_debounced. check_my_turn_threads @ src/app/run/threads/mod.rs.'
   importance: medium
-  last_edited_ms: 1787840930960
+  last_edited_ms: 1787950558556
 M-short-8:
   tier: short
   title: 'OPERATING MODEL: harbor'
