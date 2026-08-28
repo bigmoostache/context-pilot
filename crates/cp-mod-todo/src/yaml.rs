@@ -22,8 +22,6 @@
 use std::collections::HashSet;
 use std::fmt::Write as _;
 
-use serde::Deserialize;
-
 use cp_base::state::runtime::State;
 
 use crate::types::{TodoItem, TodoState, TodoStatus};
@@ -32,30 +30,26 @@ use crate::types::{TodoItem, TodoState, TodoStatus};
 // Parsed YAML node
 // =============================================================================
 
-/// One node of the edited virtual YAML, parsed by `serde_yaml`.
+/// One node of the edited virtual YAML, populated by [`node_from_value`].
 ///
 /// Every field is optional so a malformed-but-parseable node still loads: a
 /// missing `title` on a *create* is the one hard error (caught in `reconcile`);
-/// a missing `id` simply means "create". `serde_yaml` handles block scalars,
-/// quoting and nesting per the YAML spec, so indentation determines nesting
-/// deterministically (not heuristically) — the canonical re-render is the safety
-/// net that surfaces any mis-nest to the model on the next turn.
-#[derive(Debug, Default, Deserialize)]
+/// a missing `id` simply means "create". In the id-as-key shape the item's first
+/// line is `- {id}: {status}` — the id is the mapping KEY and its value is the
+/// status — so `title`/`description`/`children` are its sibling keys. The
+/// canonical re-render is the safety net that surfaces any mis-nest to the model
+/// on the next turn.
+#[derive(Debug, Default)]
 struct YamlNode {
     /// Item id (`X{n}`); absent means "create a new item".
-    #[serde(default)]
     id: Option<String>,
     /// Task title (required when creating).
-    #[serde(default)]
     title: Option<String>,
     /// Status wire string (`planned`/`in_progress`/`done`/`cancelled`).
-    #[serde(default)]
     status: Option<String>,
     /// Longer description (block scalar in the canonical render).
-    #[serde(default)]
     description: Option<String>,
     /// Nested child nodes (the `children:` sub-list).
-    #[serde(default)]
     children: Vec<Self>,
 }
 
@@ -97,9 +91,10 @@ fn render_group(items: &[&TodoItem], parent: Option<&str>, depth: usize, out: &m
 /// then recurse into its children one level deeper.
 fn render_item(items: &[&TodoItem], item: &TodoItem, depth: usize, out: &mut String) {
     let indent = "  ".repeat(depth);
-    // `- ` opens the list entry; subsequent keys align under the first key.
-    _ = writeln!(out, "{indent}- id: {}", item.id);
-    _ = writeln!(out, "{indent}  status: {}", status_wire(item.status));
+    // `- {id}: {status}` opens the list entry — the id is the mapping KEY, so a
+    // status flip is a tiny inline edit (`X106: in progress` → `X106: done`)
+    // that needs no surrounding-line match. Sibling keys align under it.
+    _ = writeln!(out, "{indent}- {}: {}", item.id, status_wire(item.status));
     _ = writeln!(out, "{indent}  title: {}", scalar(&item.name));
     if !item.description.is_empty() {
         _ = writeln!(out, "{indent}  description: |");
@@ -168,11 +163,7 @@ pub fn apply_diffs(state: &mut State, thread_id: &str, diffs: &[(String, String)
     // item was deleted. `serde_yaml` rejects an empty document for a `Vec`, so
     // treat it as the empty tree rather than surfacing a spurious parse error
     // (otherwise the list could never be emptied by deleting all its lines).
-    let nodes: Vec<YamlNode> = if buffer.trim().is_empty() {
-        Vec::new()
-    } else {
-        serde_yaml::from_str(&buffer).map_err(|e| format!("resulting YAML is invalid: {e}"))?
-    };
+    let nodes: Vec<YamlNode> = if buffer.trim().is_empty() { Vec::new() } else { parse_nodes(&buffer)? };
     // Validate the parsed tree BEFORE mutating anything, so a bad edit (an
     // unresolved `id:`, a create missing its `title:`, an unparseable `status:`)
     // is a hard error that leaves the tasks untouched — never a silent
@@ -203,6 +194,67 @@ fn apply_one_diff(buffer: &mut String, prev: &str, new: &str, idx: usize) -> Res
             idx.saturating_add(1)
         )),
     }
+}
+
+// =============================================================================
+// parse — the id-as-key shape → YamlNode tree
+// =============================================================================
+
+/// Parse the edited buffer into the internal node tree.
+///
+/// The shape is a sequence of item mappings whose first line is `- {id}: {status}`
+/// — the id is the mapping KEY, its value the status — plus optional `title`,
+/// `description`, and a nested `children:` sequence. An item with **no** id key
+/// is a create (status from an optional `status:` key, else default). We parse
+/// into a generic [`serde_yaml::Value`] and hand-walk it, so the dynamic id key
+/// is read positionally rather than via a fixed struct field.
+fn parse_nodes(buffer: &str) -> Result<Vec<YamlNode>, String> {
+    let value: serde_yaml::Value =
+        serde_yaml::from_str(buffer).map_err(|e| format!("resulting YAML is invalid: {e}"))?;
+    nodes_from_value(&value)
+}
+
+/// A YAML value that should be a sequence-of-item-mappings → nodes (null = empty).
+fn nodes_from_value(value: &serde_yaml::Value) -> Result<Vec<YamlNode>, String> {
+    if value.is_null() {
+        return Ok(Vec::new());
+    }
+    let seq = value.as_sequence().ok_or_else(|| "expected a YAML list of task items".to_owned())?;
+    seq.iter().map(node_from_value).collect()
+}
+
+/// Parse one item value (must be a mapping) into a [`YamlNode`].
+///
+/// Reserved keys (`title`/`description`/`status`/`children`) map to their field;
+/// any *other* string key is the item **id** and its value is the status. A
+/// second such key is a hard error (ambiguous id).
+fn node_from_value(value: &serde_yaml::Value) -> Result<YamlNode, String> {
+    let map = value.as_mapping().ok_or_else(|| "each task item must be a mapping".to_owned())?;
+    let mut node = YamlNode::default();
+    for (raw_key, val) in map {
+        let key = raw_key.as_str().ok_or_else(|| "task item keys must be strings".to_owned())?;
+        match key {
+            "title" => node.title = val.as_str().map(str::to_owned),
+            "description" => node.description = val.as_str().map(str::to_owned),
+            "status" => node.status = val.as_str().map(str::to_owned),
+            "children" => node.children = nodes_from_value(val)?,
+            id => set_id_status(&mut node, id, val)?,
+        }
+    }
+    Ok(node)
+}
+
+/// Record the item's id (the mapping key) and its status (the key's value).
+/// The id-key value wins over any explicit `status:` key when non-empty.
+fn set_id_status(node: &mut YamlNode, id: &str, val: &serde_yaml::Value) -> Result<(), String> {
+    if let Some(existing) = node.id.as_deref() {
+        return Err(format!("task item has more than one id key (`{existing}` and `{id}`)"));
+    }
+    node.id = Some(id.to_owned());
+    if let Some(status) = val.as_str().map(str::trim).filter(|s| !s.is_empty()) {
+        node.status = Some(status.to_owned());
+    }
+    Ok(())
 }
 
 // =============================================================================

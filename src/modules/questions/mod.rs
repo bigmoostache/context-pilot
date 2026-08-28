@@ -22,7 +22,7 @@ pub(crate) struct QuestionsModule;
 fn todo_diff_object() -> ParamType {
     ParamType::Object(vec![
         ToolParam::new("prev", ParamType::String).desc(
-            "Exact text to find in the current task YAML (must match exactly once; empty appends 'new' at the end)",
+            "Exact text to find in the current task YAML (must match exactly once; empty appends 'new' at the end). Prefer a tiny id-anchored anchor like 'X41: in_progress'.",
         ),
         ToolParam::new("new", ParamType::String).desc("Replacement text"),
     ])
