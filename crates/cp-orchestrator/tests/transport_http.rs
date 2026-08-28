@@ -133,7 +133,7 @@ fn harness(agent_id: &str, n_msgs: u8) -> Harness {
     write_entry(agents.path(), &entry);
 
     let mut backend = Backend::new(
-        cp_orchestrator::transport::rest::backend::BackendPaths {
+        cp_orchestrator::transport::rest::backend::Paths {
             agents_dir: agents.path().to_path_buf(),
             agents_root: std::path::PathBuf::from("/tmp/cp-test-realms"),
             agent_binary: std::path::PathBuf::from("/tmp/cp-test-bin"),

@@ -48,7 +48,7 @@ use std::thread;
 
 use tiny_http::{Header, Method, Request, Response, Server};
 
-pub(crate) use rest::backend::{Backend, BackendPaths};
+pub(crate) use rest::backend::{Backend, Paths};
 
 /// Maximum request body size accepted on a POST route (32 MiB) — bounds memory
 /// against a client that sends an endless stream, while comfortably fitting any

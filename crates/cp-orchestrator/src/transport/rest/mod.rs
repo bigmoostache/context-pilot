@@ -24,7 +24,7 @@ use serde::Serialize;
 
 use crate::channel::AgentHandle;
 
-// `pub mod` (not private `mod`) so `Backend`/`BackendPaths` are reachable at
+// `pub mod` (not private `mod`) so `Backend`/`Paths` are reachable at
 // a fully-public path (`transport::rest::backend::Backend`) for external test
 // consumers, without a `pub use` item re-export (which `clippy::pub_use`
 // forbids). The crate-internal short path `crate::transport::Backend` rides the

@@ -100,8 +100,12 @@ pub struct Backend {
 
 /// The three filesystem locations [`Backend::new`] needs, bundled so its
 /// signature stays within the argument budget.
+///
+/// Named `Paths` (not `BackendPaths`) so it does not repeat its module name
+/// `backend` — `clippy::module_name_repetitions` (forbid) rejects the
+/// module-name-prefixed spelling; it is re-exported as `transport::Paths`.
 #[derive(Debug)]
-pub struct BackendPaths {
+pub struct Paths {
     /// Directory of agent registry records (`<id>.json`).
     pub agents_dir: PathBuf,
     /// Root directory new agents' realm folders are created under.
@@ -118,8 +122,8 @@ impl Backend {
     /// seeds the supervisor's allow-list (R2-15), so it is the only binary that
     /// can ever be launched.
     #[must_use]
-    pub fn new(paths: BackendPaths, auth: Option<AuthStore>, session_ttl: Duration) -> Self {
-        let BackendPaths { agents_dir, agents_root, agent_binary } = paths;
+    pub fn new(paths: Paths, auth: Option<AuthStore>, session_ttl: Duration) -> Self {
+        let Paths { agents_dir, agents_root, agent_binary } = paths;
         // Durable provisioned-flag location: env override, else a dot-file in
         // the agents dir (on the box that dir lives under /opt/context-pilot on
         // the persistent rootfs, so the flag survives reboots; the registry scan

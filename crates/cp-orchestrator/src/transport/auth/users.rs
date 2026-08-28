@@ -233,7 +233,7 @@ mod tests {
             .create_user(NewUser { email: "manager@box", name: "Manager", password: &test_pw(), role: Manager })
             .expect("manager");
         let backend = Backend::new(
-            crate::transport::BackendPaths {
+            crate::transport::Paths {
                 agents_dir: dir.path().to_path_buf(),
                 agents_root: PathBuf::from("/tmp/cp-users-test-realms"),
                 agent_binary: PathBuf::from("/tmp/cp-users-test-bin"),

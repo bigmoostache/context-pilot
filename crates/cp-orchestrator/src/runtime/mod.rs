@@ -211,7 +211,7 @@ impl Runtime {
         };
 
         let backend = Arc::new(Mutex::new(Backend::new(
-            crate::transport::BackendPaths {
+            crate::transport::Paths {
                 agents_dir: config.agents_dir.clone(),
                 agents_root: config.agents_root.clone(),
                 agent_binary: config.agent_binary.clone(),

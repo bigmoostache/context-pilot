@@ -239,7 +239,7 @@ mod tests {
     fn backend_with_subscriber(agent_id: &str) -> (Arc<Mutex<Backend>>, u64) {
         let dir = tempdir().expect("dir");
         let backend = Arc::new(Mutex::new(Backend::new(
-            crate::transport::BackendPaths {
+            crate::transport::Paths {
                 agents_dir: dir.path().to_path_buf(),
                 agents_root: PathBuf::from("/tmp/cp-test-realms"),
                 agent_binary: PathBuf::from("/tmp/cp-test-bin"),
