@@ -305,8 +305,20 @@ mod tests {
     use crate::transport::it::network::state::{ApConfig, Band, ProbeConfig, WwanConfig};
 
     /// Read the value that follows `key` in an argv.
-    fn value_of<'a>(argv: &'a [String], key: &str) -> Option<&'a str> {
+    fn value_of<'argv>(argv: &'argv [String], key: &str) -> Option<&'argv str> {
         argv.iter().position(|arg| arg == key).and_then(|at| argv.get(at.saturating_add(1))).map(String::as_str)
+    }
+
+    /// Assert `key` is present in `argv` with value `want`. A plain call (not a
+    /// branch), so hoisting the argv assertions through it keeps the argv tests
+    /// under the cognitive-complexity cap.
+    fn expect_kv(argv: &[String], key: &str, want: &str) {
+        assert_eq!(value_of(argv, key), Some(want), "{key}");
+    }
+
+    /// Assert `key` does not appear in `argv`. Companion to [`expect_kv`].
+    fn expect_absent(argv: &[String], key: &str) {
+        assert_eq!(value_of(argv, key), None, "{key} must be absent");
     }
 
     fn config(mode: UplinkMode) -> NetworkConfig {
@@ -339,18 +351,18 @@ mod tests {
     #[test]
     fn wwan_argv_matches_the_mode() {
         let standby = wwan_args(&config(UplinkMode::WanThen5g));
-        assert_eq!(value_of(&standby, "gsm.apn"), Some("orange.fr"));
-        assert_eq!(value_of(&standby, "gsm.home-only"), Some("yes"), "roaming false \u{21d2} home-only yes");
-        assert_eq!(value_of(&standby, "connection.autoconnect"), Some("yes"), "hot standby autoconnects");
+        expect_kv(&standby, "gsm.apn", "orange.fr");
+        expect_kv(&standby, "gsm.home-only", "yes"); // roaming false ⇒ home-only yes
+        expect_kv(&standby, "connection.autoconnect", "yes"); // hot standby autoconnects
 
         let strict = wwan_args(&config(UplinkMode::FiveG));
-        assert_eq!(value_of(&strict, "ipv4.route-metric"), Some("50"), "the chosen uplink, below end0's 100");
-        assert_eq!(value_of(&strict, "ipv6.route-metric"), Some("50"), "both families move together");
-        assert_eq!(value_of(&strict, "connection.autoconnect"), Some("yes"));
+        expect_kv(&strict, "ipv4.route-metric", "50"); // the chosen uplink, below end0's 100
+        expect_kv(&strict, "ipv6.route-metric", "50"); // both families move together
+        expect_kv(&strict, "connection.autoconnect", "yes");
 
         let ethernet = wwan_args(&config(UplinkMode::Wan));
-        assert_eq!(value_of(&ethernet, "ipv4.route-metric"), Some("700"), "parked above end0's 100");
-        assert_eq!(value_of(&ethernet, "connection.autoconnect"), Some("no"), "wan never brings the modem up");
+        expect_kv(&ethernet, "ipv4.route-metric", "700"); // parked above end0's 100
+        expect_kv(&ethernet, "connection.autoconnect", "no"); // wan never brings the modem up
     }
 
     /// In `wan_5g` the METRIC IS THE FAILOVER MECHANISM and belongs to
@@ -360,8 +372,8 @@ mod tests {
     #[test]
     fn the_supervisor_owns_the_metric_in_wan_5g() {
         let failover = wwan_args(&config(UplinkMode::WanThen5g));
-        assert_eq!(value_of(&failover, "ipv4.route-metric"), None, "an unrelated apply must not touch it");
-        assert_eq!(value_of(&failover, "ipv6.route-metric"), None, "\u{2026}in either family");
+        expect_absent(&failover, "ipv4.route-metric"); // an unrelated apply must not touch it
+        expect_absent(&failover, "ipv6.route-metric"); // …in either family
         assert!(
             failover.iter().all(|arg| !arg.contains("route-metric")),
             "no route-metric property survives in wan_5g: {failover:?}"
@@ -371,9 +383,9 @@ mod tests {
         // once at creation. Without this the bearer would be created at NM's
         // default and could outrank end0 before the supervisor ever ran.
         let created = wwan_create_args(&config(UplinkMode::WanThen5g));
-        assert_eq!(value_of(&created, "ipv4.route-metric"), Some("700"), "the starting point is still ours");
-        assert_eq!(value_of(&created, "ipv6.route-metric"), Some("700"));
-        assert_eq!(value_of(&wwan_create_args(&config(UplinkMode::FiveG)), "ipv4.route-metric"), Some("50"));
+        expect_kv(&created, "ipv4.route-metric", "700"); // the starting point is still ours
+        expect_kv(&created, "ipv6.route-metric", "700");
+        expect_kv(&wwan_create_args(&config(UplinkMode::FiveG)), "ipv4.route-metric", "50");
     }
 
     #[test]
@@ -388,11 +400,11 @@ mod tests {
     #[test]
     fn ap_argv_switches_method_on_sharing() {
         let shared = ap_args(&config(UplinkMode::Wan));
-        assert_eq!(value_of(&shared, "ipv4.method"), Some("shared"), "NM runs dnsmasq + NAT");
-        assert_eq!(value_of(&shared, "ipv4.addresses"), Some("10.42.0.1/24"));
-        assert_eq!(value_of(&shared, "802-11-wireless.mode"), Some("ap"));
-        assert_eq!(value_of(&shared, "802-11-wireless.band"), Some("a"));
-        assert_eq!(value_of(&shared, "802-11-wireless.channel"), Some("36"));
+        expect_kv(&shared, "ipv4.method", "shared"); // NM runs dnsmasq + NAT
+        expect_kv(&shared, "ipv4.addresses", "10.42.0.1/24");
+        expect_kv(&shared, "802-11-wireless.mode", "ap");
+        expect_kv(&shared, "802-11-wireless.band", "a");
+        expect_kv(&shared, "802-11-wireless.channel", "36");
 
         // MEASURED: `manual` would leave the AP with no DHCP server, so a client
         // could not get onto the cul-de-sac network at all, and the cockpit —
@@ -402,8 +414,8 @@ mod tests {
         let mut cul_de_sac = config(UplinkMode::Wan);
         cul_de_sac.ap.share_internet = false;
         let solo = ap_args(&cul_de_sac);
-        assert_eq!(value_of(&solo, "ipv4.method"), Some("shared"), "dnsmasq must keep serving DHCP");
-        assert_eq!(value_of(&solo, "ipv4.addresses"), Some("10.42.0.1/24"), "\u{2026}on the same address");
+        expect_kv(&solo, "ipv4.method", "shared"); // dnsmasq must keep serving DHCP
+        expect_kv(&solo, "ipv4.addresses", "10.42.0.1/24"); // …on the same address
     }
 
     /// MEASURED on hardware: `802-11-wireless.channel 0` is rejected outright.
