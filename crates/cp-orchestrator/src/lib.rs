@@ -27,7 +27,7 @@
 //!   tail ([`Tailer`](channel::Tailer)), rev-pinned body hydrate, and command
 //!   send.
 //! * [`supervisor`] — the
-//!   [`AgentSupervisor`](supervisor::AgentSupervisor): spawn / stop / restart /
+//!   [`ProcManager`](supervisor::ProcManager): spawn / stop / restart /
 //!   adopt of agent processes.
 //! * [`services`] — the runtime services layer:
 //!   [`MaterializedView`](services::MaterializedView) (fleet-state projection)

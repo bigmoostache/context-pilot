@@ -7106,6 +7106,10 @@
   path: crates/cp-base/src/tools/mod.rs
   description: 'Tool system. ToolUse/ToolResult (display, tldr, preserves_tempo). ToolDefinition + ToolDefBuilder (schema in Rust, descriptions from YAML). ParamType recursive JSON Schema. build_api() generates LLM tool array. Sub-modules: pre_flight, async_exec.'
   last_edited_ms: 0
+4f02cb9d9594897b:
+  path: crates/cp-orchestrator/src/transport/it/network/uplink.rs
+  description: Interface with cp-uplink-watch failover supervisor. write_uplink_env/render_uplink_env (writeln! to /etc/default/cp-uplink, restart on change), validate_probe/validate_probe_timing (bounds), supervisor_status/parse_uplink_state/UplinkState (read /run/cp-uplink/state). clippy-clean.
+  last_edited_ms: 1787877882017
 4f084614e1699d9e:
   path: web/src/main.tsx
   description: React entry point. Imports setupClient.ts (hey-api config side-effect), createRoot → StrictMode → QueryClientProvider (TanStack shared queryClient) wrapping <App/>. Activates TanStack Query cache + SSE push-plane.
@@ -9186,6 +9190,10 @@
   path: web/src/lib/live/mutations.ts
   description: 'Live imperative mutations (split from live/index for <500): finder writes (useUploadFiles/useWriteFile/useCreateFolder/useMoveItems/useRenameItem/useTrashItems) + agent lifecycle (useCreateAgent/useRestartAgent/useRenameAgent(T328)/useRetiredFleet/useRetireAgent/useUnretireAgent) + avatar (useUploadAvatar/useDeleteAvatar, T338). One-shot POSTs → useMutation, invalidate the affected query family on success.'
   last_edited_ms: 1782141874912
+6705f2192bde1311:
+  path: crates/cp-orchestrator/tests/openapi/exhaustive.rs
+  description: Route exhaustiveness test — bidirectional set equality between router match arms and openapi.json paths. Scrapes BOTH router.rs (route_rest &-prefixed arms + try_raw_route slice arms) and mod.rs (handle() if-let specials) as text.
+  last_edited_ms: 1787877882129
 6717c9caacdb30d4:
   path: web/e2e/threads.spec.ts
   description: Phase 1 e2e threads CRUD (3 tests) over the live push plane. create→row appears live + roster confirms; archive→leaves live list, lands in Archived; restore→returns. Each test builds its own precondition via API command(); UI drives only the action under test; roster() cross-checks backend ground truth. afterAll archives all e2e- threads.

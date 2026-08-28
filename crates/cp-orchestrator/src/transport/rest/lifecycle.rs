@@ -106,7 +106,7 @@ pub fn restart_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
         let Ok(mut backend) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
         };
-        backend.supervisor.spawn_pty(key, &binary, &folder, &env)
+        backend.supervisor.spawn_pty(key, supervisor::PtyPlan { binary: &binary, folder: &folder, env: &env })
     };
 
     match spawn_result {
@@ -237,7 +237,7 @@ pub fn unretire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
         let Ok(mut b) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
         };
-        b.supervisor.spawn_pty(key, &binary, &folder, &env)
+        b.supervisor.spawn_pty(key, supervisor::PtyPlan { binary: &binary, folder: &folder, env: &env })
     };
 
     match spawn_result {

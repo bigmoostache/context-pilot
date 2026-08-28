@@ -231,7 +231,7 @@ pub(crate) fn select_release(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
 
     // Update the agent binary and supervisor allow-list.
     b.agent_binary.clone_from(&binary_path);
-    b.supervisor = supervisor::AgentSupervisor::new(std::slice::from_ref(&binary_path));
+    b.supervisor = supervisor::ProcManager::new(std::slice::from_ref(&binary_path));
 
     HttpReply::ok(&serde_json::json!({
         "status": "selected",
@@ -277,7 +277,7 @@ pub(crate) fn deploy_fleet(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
             Err(e) => return HttpReply::error(400, &e),
         };
         b.agent_binary.clone_from(&binary_path);
-        b.supervisor = supervisor::AgentSupervisor::new(&[binary_path]);
+        b.supervisor = supervisor::ProcManager::new(&[binary_path]);
         tag.clone()
     } else {
         let Ok(b) = state.lock() else {
@@ -321,10 +321,12 @@ pub(crate) fn deploy_fleet(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
         // Respawn on the same folder with the (potentially new) binary.
         let env: [(&str, &str); 2] = [("CP_BRIDGE", "1"), ("CP_AGENTS_DIR", &agents_dir_str)];
         match state.lock() {
-            Ok(mut b) => match b.supervisor.spawn_pty(key, &binary, &folder, &env) {
-                Ok(pid) => restarted.push(serde_json::json!({ "id": id, "pid": pid })),
-                Err(e) => errors.push(format!("{id}: spawn failed: {e}")),
-            },
+            Ok(mut b) => {
+                match b.supervisor.spawn_pty(key, supervisor::PtyPlan { binary: &binary, folder: &folder, env: &env }) {
+                    Ok(pid) => restarted.push(serde_json::json!({ "id": id, "pid": pid })),
+                    Err(e) => errors.push(format!("{id}: spawn failed: {e}")),
+                }
+            }
             Err(_) => errors.push(format!("{id}: backend lock poisoned")),
         }
     }

@@ -1,4 +1,4 @@
-//! Phase 28 — the backend [`AgentSupervisor`] driven against **real OS
+//! Phase 28 — the backend [`ProcManager`] driven against **real OS
 //! processes**, through its public API only.
 //!
 //! The in-crate unit tests (`supervisor/tests.rs`) prove each method against a
@@ -53,7 +53,7 @@ use nix::errno::Errno;
 use nix::sys::signal::kill;
 use nix::unistd::Pid;
 
-use cp_orchestrator::supervisor::{AgentSupervisor, Event};
+use cp_orchestrator::supervisor::{Event, ProcManager};
 use cp_wire::types::registry::{AgentStatus, Entry};
 
 use tempfile::tempdir;
@@ -74,7 +74,7 @@ fn pid_present(pid: u32) -> bool {
 }
 
 /// A registry [`Entry`] naming an already-running `pid` in `folder`, the shape
-/// [`AgentSupervisor::adopt`] consumes.
+/// [`ProcManager::adopt`] consumes.
 fn adopt_entry(id: &str, pid: u32, folder: &Path) -> Entry {
     Entry {
         schema_version: 1,
@@ -99,7 +99,7 @@ fn adopt_entry(id: &str, pid: u32, folder: &Path) -> Entry {
 #[test]
 fn a_stubborn_agent_that_ignores_sigterm_is_killed_by_escalation() {
     let folder = tempdir().expect("folder");
-    let mut sup = AgentSupervisor::new(&[PathBuf::from("/bin/sh")]);
+    let mut sup = ProcManager::new(&[PathBuf::from("/bin/sh")]);
 
     // A shell that traps (ignores) SIGTERM and then sleeps: stop() must fall
     // through the grace window and escalate to the uncatchable SIGKILL.
@@ -122,7 +122,7 @@ fn a_stubborn_agent_that_ignores_sigterm_is_killed_by_escalation() {
 #[test]
 fn the_supervisor_tracks_and_tears_down_a_multi_agent_fleet() {
     let folder = tempdir().expect("folder");
-    let mut sup = AgentSupervisor::new(&[PathBuf::from("/bin/sleep")]);
+    let mut sup = ProcManager::new(&[PathBuf::from("/bin/sleep")]);
 
     let mut pids = Vec::new();
     for n in 0..3 {
@@ -150,7 +150,7 @@ fn the_supervisor_tracks_and_tears_down_a_multi_agent_fleet() {
 #[test]
 fn an_adopted_foreign_process_is_signalled_on_stop() {
     let folder = tempdir().expect("folder");
-    let mut sup = AgentSupervisor::new(&[]);
+    let mut sup = ProcManager::new(&[]);
 
     // A process the supervisor did NOT spawn — the test owns the handle.
     let mut foreign = Command::new("/bin/sleep")
@@ -186,7 +186,7 @@ fn an_adopted_foreign_process_is_signalled_on_stop() {
 #[test]
 fn check_liveness_routes_a_spawned_exit_and_an_adopted_vanish_in_one_pass() {
     let folder = tempdir().expect("folder");
-    let mut sup = AgentSupervisor::new(&[PathBuf::from("/bin/sleep")]);
+    let mut sup = ProcManager::new(&[PathBuf::from("/bin/sleep")]);
 
     // A spawned agent that exits on its own almost immediately.
     let _spawned =

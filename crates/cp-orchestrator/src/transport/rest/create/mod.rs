@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{Backend, HttpReply};
 use crate::services::auth::types::{AgentRole, User};
+use crate::supervisor;
 
 /// FNV-1a 64-bit offset basis (same constants as the agent-side identity
 /// module in `cp-mod-bridge` — duplicated here to avoid a cross-crate dep
@@ -39,7 +40,7 @@ fn folder_id(path: &str) -> String {
 /// `--model` flag — a new agent boots with its folder's default model).
 ///
 /// The flow: resolve + `mkdir -p` the realm folder, then ask the
-/// [`AgentSupervisor`](crate::supervisor::AgentSupervisor) to spawn the `cp`
+/// [`ProcManager`](crate::supervisor::ProcManager) to spawn the `cp`
 /// binary attached to a pty, with `CP_BRIDGE=1` and the backend's shared
 /// `CP_AGENTS_DIR` so the agent self-registers where the backend scans. The
 /// agent appears in the fleet within a scan tick once it has booted; the
@@ -96,7 +97,7 @@ pub(crate) fn create_agent(state: &Mutex<Backend>, body_bytes: &[u8], auth_user:
         let Ok(mut backend) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
         };
-        backend.supervisor.spawn_pty(key, &binary, &folder, &env)
+        backend.supervisor.spawn_pty(key, supervisor::PtyPlan { binary: &binary, folder: &folder, env: &env })
     };
 
     match spawn_result {

@@ -10,7 +10,7 @@ use std::time::Duration;
 use crate::inspect::StateReader;
 use crate::services::auth::store::AuthStore;
 use crate::services::{AvatarStore, MaterializedView, NameOverrides, ReleaseStore, RetiredStore, StreamHub};
-use crate::supervisor::AgentSupervisor;
+use crate::supervisor::ProcManager;
 
 use super::super::stream::ticket::TicketStore;
 
@@ -43,7 +43,7 @@ pub struct Backend {
     pub liveness: HashMap<String, crate::liveness::Liveness>,
     /// Process-lifecycle manager — spawns dashboard-created agents (PTY) under
     /// a binary allow-list (R2-15).
-    pub supervisor: AgentSupervisor,
+    pub supervisor: ProcManager,
     /// Root directory new agents' realm folders are created under.
     pub agents_root: PathBuf,
     /// The `cp` TUI binary the supervisor spawns (also the sole allow-list
@@ -140,7 +140,7 @@ impl Backend {
             agents_dir,
             dirty_agents: HashSet::new(),
             liveness: HashMap::new(),
-            supervisor: AgentSupervisor::new(std::slice::from_ref(&agent_binary)),
+            supervisor: ProcManager::new(std::slice::from_ref(&agent_binary)),
             agents_root,
             agent_binary,
             auth,
@@ -204,7 +204,7 @@ impl Backend {
             agents_dir,
             dirty_agents: HashSet::new(),
             liveness: HashMap::new(),
-            supervisor: AgentSupervisor::new(&[]),
+            supervisor: ProcManager::new(&[]),
             agents_root: PathBuf::from("/tmp/cp-test-realms"),
             agent_binary: PathBuf::from("/tmp/cp-test-bin"),
             auth: None,
