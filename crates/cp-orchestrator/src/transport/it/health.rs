@@ -54,9 +54,11 @@ mod tests {
         let db_path = dir.path().join("auth.db");
         let store = AuthStore::open(&db_path).expect("open auth store");
         let backend = Backend::new(
-            dir.path().to_path_buf(),
-            PathBuf::from("/tmp/cp-health-test-realms"),
-            PathBuf::from("/tmp/cp-health-test-bin"),
+            crate::transport::BackendPaths {
+                agents_dir: dir.path().to_path_buf(),
+                agents_root: PathBuf::from("/tmp/cp-health-test-realms"),
+                agent_binary: PathBuf::from("/tmp/cp-health-test-bin"),
+            },
             Some(store),
             Duration::from_hours(1),
         );

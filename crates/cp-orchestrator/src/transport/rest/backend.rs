@@ -23,6 +23,13 @@ const DEFAULT_SUB_CAPACITY: usize = 256;
 /// Wrapped in an [`Arc<Mutex<Backend>>`](std::sync::Mutex) for the
 /// thread-per-connection server. Handlers hold the lock only briefly and never
 /// across blocking agent I/O.
+///
+/// The struct is `pub(crate)` — its fields are therefore `pub` (uniformly, to
+/// satisfy `partial_pub_fields`, and unscoped, to satisfy
+/// `field_scoped_visibility_modifiers`) yet capped at crate visibility by the
+/// struct itself, so no field is actually reachable outside the crate. This
+/// also lets `pkce_session` hold the `pub(crate)` `PkceSession` type without
+/// tripping `private_interfaces`.
 #[derive(Debug)]
 pub struct Backend {
     /// Per-agent projected fleet state.
@@ -76,15 +83,27 @@ pub struct Backend {
     /// partition. Kept distinct from the `onboarding_completed` UI setting.
     pub provision_flag_path: PathBuf,
     /// In-flight PKCE session for the Claude Code OAuth login flow (T451).
-    /// At most one login can be in progress at a time. Private — the OAuth
-    /// handlers reach it through [`Backend::set_pkce_session`] /
-    /// [`Backend::take_pkce_session`] so its non-`pub` type never leaks into a
-    /// `pub` field.
-    pkce_session: Option<super::claude_oauth::PkceSession>,
+    /// At most one login can be in progress at a time. Reached through
+    /// [`Backend::set_pkce_session`] / [`Backend::take_pkce_session`] rather
+    /// than written directly, keeping the `PkceSession` type-detail localized
+    /// to the OAuth handlers.
+    pub pkce_session: Option<super::claude_oauth::PkceSession>,
     /// Path of the auth `SQLite` database — the update-apply flow backs it up
     /// around the binary swap (update-policy §5.5 step 2 / §5.8). Derived from
     /// the same env default as `runtime::Config` (`AuthStore::default_db_path`).
     pub auth_db_path: PathBuf,
+}
+
+/// The three filesystem locations [`Backend::new`] needs, bundled so its
+/// signature stays within the argument budget.
+#[derive(Debug)]
+pub struct BackendPaths {
+    /// Directory of agent registry records (`<id>.json`).
+    pub agents_dir: PathBuf,
+    /// Root directory new agents' realm folders are created under.
+    pub agents_root: PathBuf,
+    /// The `cp` TUI binary the supervisor spawns (sole allow-list entry).
+    pub agent_binary: PathBuf,
 }
 
 impl Backend {
@@ -95,13 +114,8 @@ impl Backend {
     /// seeds the supervisor's allow-list (R2-15), so it is the only binary that
     /// can ever be launched.
     #[must_use]
-    pub fn new(
-        agents_dir: PathBuf,
-        agents_root: PathBuf,
-        agent_binary: PathBuf,
-        auth: Option<AuthStore>,
-        session_ttl: Duration,
-    ) -> Self {
+    pub fn new(paths: BackendPaths, auth: Option<AuthStore>, session_ttl: Duration) -> Self {
+        let BackendPaths { agents_dir, agents_root, agent_binary } = paths;
         // Durable provisioned-flag location: env override, else a dot-file in
         // the agents dir (on the box that dir lives under /opt/context-pilot on
         // the persistent rootfs, so the flag survives reboots; the registry scan
@@ -119,7 +133,7 @@ impl Backend {
         // release as "Active" — an incoherence where the badge lies. So the
         // persisted `active_tag` WINS over the env seed, with a fallback to the
         // seed when its binary was deleted out from under us.
-        let agent_binary = releases
+        let resolved_binary = releases
             .active_tag()
             .map(|tag| releases.binary_path(tag))
             .filter(|bin| bin.exists())
@@ -140,9 +154,9 @@ impl Backend {
             agents_dir,
             dirty_agents: HashSet::new(),
             liveness: HashMap::new(),
-            supervisor: ProcManager::new(std::slice::from_ref(&agent_binary)),
+            supervisor: ProcManager::new(std::slice::from_ref(&resolved_binary)),
             agents_root,
-            agent_binary,
+            agent_binary: resolved_binary,
             auth,
             access_control: super::config::settings::access_control_enabled(),
             session_ttl,
@@ -186,7 +200,7 @@ impl Backend {
     }
 
     /// Take (consume) the in-flight PKCE login session (`/claude-login/complete`).
-    pub(crate) fn take_pkce_session(&mut self) -> Option<super::claude_oauth::PkceSession> {
+    pub(crate) const fn take_pkce_session(&mut self) -> Option<super::claude_oauth::PkceSession> {
         self.pkce_session.take()
     }
 

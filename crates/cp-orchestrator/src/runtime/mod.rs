@@ -211,9 +211,11 @@ impl Runtime {
         };
 
         let backend = Arc::new(Mutex::new(Backend::new(
-            config.agents_dir.clone(),
-            config.agents_root.clone(),
-            config.agent_binary.clone(),
+            crate::transport::BackendPaths {
+                agents_dir: config.agents_dir.clone(),
+                agents_root: config.agents_root.clone(),
+                agent_binary: config.agent_binary.clone(),
+            },
             auth_store,
             config.session_ttl,
         )));

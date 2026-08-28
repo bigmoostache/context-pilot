@@ -409,9 +409,11 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let store = AuthStore::open(&dir.path().join("auth.db")).expect("open auth store");
         let mut b = Backend::new(
-            dir.path().to_path_buf(),
-            PathBuf::from("/tmp/cp-auth-test-realms"),
-            PathBuf::from("/tmp/cp-auth-test-bin"),
+            crate::transport::BackendPaths {
+                agents_dir: dir.path().to_path_buf(),
+                agents_root: PathBuf::from("/tmp/cp-auth-test-realms"),
+                agent_binary: PathBuf::from("/tmp/cp-auth-test-bin"),
+            },
             Some(store),
             Duration::from_hours(1),
         );

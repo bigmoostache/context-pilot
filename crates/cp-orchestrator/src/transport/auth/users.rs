@@ -224,9 +224,11 @@ mod tests {
         let admin = store.create_user("admin@box", "Admin", &test_pw(), Admin).expect("admin");
         let manager = store.create_user("manager@box", "Manager", &test_pw(), Manager).expect("manager");
         let backend = Backend::new(
-            dir.path().to_path_buf(),
-            PathBuf::from("/tmp/cp-users-test-realms"),
-            PathBuf::from("/tmp/cp-users-test-bin"),
+            crate::transport::BackendPaths {
+                agents_dir: dir.path().to_path_buf(),
+                agents_root: PathBuf::from("/tmp/cp-users-test-realms"),
+                agent_binary: PathBuf::from("/tmp/cp-users-test-bin"),
+            },
             Some(store),
             Duration::from_hours(1),
         );

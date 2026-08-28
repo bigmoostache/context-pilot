@@ -31,10 +31,14 @@ mod create;
 mod lifecycle;
 mod releases;
 mod threads;
-pub use backend::Backend;
+pub use backend::{Backend, BackendPaths};
 pub(crate) use claude_oauth::accounts::{delete_account, list_accounts, store_account, switch_account};
 pub(crate) use claude_oauth::sweep::spawn as spawn_oauth_refresh;
 pub(crate) use claude_oauth::{claude_usage, login_complete, login_start, refresh_login, token_status};
+// Re-exported so the `pub` `Backend::pkce_session` field's type is nameable
+// through a public path (satisfies `unnameable_types`); the module itself stays
+// private.
+pub use claude_oauth::PkceSession;
 pub(crate) use config::env_keys::{env_key_reveal, env_key_update, env_keys_list, vault_snapshot};
 pub(crate) use config::it::{it_ca_fingerprint, it_get_identity, it_provisioned, it_set_identity};
 pub(crate) use config::network::{it_get_network, it_set_network_ap, it_set_network_mode, it_set_network_wwan};

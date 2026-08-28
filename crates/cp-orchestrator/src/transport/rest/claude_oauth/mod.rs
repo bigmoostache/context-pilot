@@ -45,7 +45,7 @@ const PKCE_TTL_SECS: u64 = 300;
 
 /// In-flight PKCE session — lives between `/start` and `/complete`.
 #[derive(Debug)]
-pub(crate) struct PkceSession {
+pub struct PkceSession {
     /// The PKCE code verifier; also echoed as the `state` parameter.
     code_verifier: String,
     /// The `state` parameter (equal to the verifier per the Claude contract).

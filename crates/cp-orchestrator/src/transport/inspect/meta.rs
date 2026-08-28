@@ -73,7 +73,10 @@ pub fn fleet(state: &Mutex<Backend>, auth_user: Option<&crate::services::auth::t
 /// than the live registry (a retired agent has no running process to inspect).
 /// Each carries `status: "retired"` and a `retiredAt` epoch-ms so the frontend
 /// can render and sort the section without a second lookup.
-pub fn fleet_retired(state: &Mutex<Backend>, auth_user: Option<&crate::services::auth::types::User>) -> HttpReply {
+pub(crate) fn fleet_retired(
+    state: &Mutex<Backend>,
+    auth_user: Option<&crate::services::auth::types::User>,
+) -> HttpReply {
     let records = {
         let Ok(b) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
@@ -256,7 +259,7 @@ fn inspect_threads(state: &Mutex<Backend>, folder: &str) -> (usize, bool, u64, S
 /// inferring the provider from the model name. The id uses the wire serde form
 /// (lowercase: `anthropic`, `claudecode`, `claudecodeapikey`, `claudecodev2`,
 /// `grok`, `groq`, `deepseek`, `minimax`).
-pub(crate) fn read_provider(state: &Mutex<Backend>, folder: &str) -> String {
+pub fn read_provider(state: &Mutex<Backend>, folder: &str) -> String {
     let folder_path = std::path::Path::new(folder);
     let config = {
         let Ok(mut b) = state.lock() else {
