@@ -60,11 +60,20 @@ export function ThreadAsideRail({
   const hasAside = files.length > 0 || tasks.length > 0
   if (!hasAside) return null
 
+  // The hide slide pulls the rail fully off the RIGHT edge via a negative
+  // margin-right equal to its ACTUAL current width plus the `mr-2` gutter. That
+  // width is dynamic (T680): when a file preview is open the rail widens to
+  // 40vw (or 50vw with the left rail hidden), so a fixed `--sidebar-w` offset
+  // would only slide it partway and leave the wide preview poking in from the
+  // right (T689b). Mirror ThreadAside's own width rule so the two always agree.
+  const previewing = aside.tab === "files" && aside.file !== null
+  const asideWidth = previewing ? (leftRailHidden ? "50vw" : "40vw") : "var(--sidebar-w)"
+
   return (
     <>
       <div
         className="flex shrink-0 transition-[margin-right] duration-300 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none"
-        style={{ marginRight: aside.hidden ? "calc(-1 * (var(--sidebar-w) + 0.5rem))" : 0 }}
+        style={{ marginRight: aside.hidden ? `calc(-1 * (${asideWidth} + 0.5rem))` : 0 }}
       >
         <ThreadAside
           files={files}
