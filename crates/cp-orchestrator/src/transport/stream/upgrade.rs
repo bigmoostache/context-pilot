@@ -38,8 +38,8 @@ pub(in crate::transport) fn handle_stream(request: Request, state: &Arc<Mutex<Ba
     };
 
     // Single-use ticket redemption (Phase 7: now returns user identity).
-    let ticket = state.lock().ok().and_then(|mut b| b.tickets.redeem(token));
-    let Some(ticket) = ticket else {
+    let redeemed = state.lock().ok().and_then(|mut b| b.tickets.redeem(token));
+    let Some(ticket) = redeemed else {
         respond_json(request, &rest::HttpReply { status: 401, body: "{\"error\":\"invalid ticket\"}".to_owned() });
         return;
     };
@@ -49,23 +49,20 @@ pub(in crate::transport) fn handle_stream(request: Request, state: &Arc<Mutex<Ba
     // to the requested agent before committing to a stream. System admins
     // bypass (FR-09). When auth is disabled (user_id is None) the check is
     // skipped entirely (NFR-09).
-    if let Some(ref user_id) = ticket.user_id {
+    if let Some(user_id) = ticket.user_id.as_ref() {
         let authorized = state.lock().ok().is_some_and(|b| {
-            match b.auth.as_ref() {
-                Some(auth) => match auth.get_user_by_id(user_id) {
-                    Ok(Some(user)) => {
-                        // Implicit access to all agents (manager+) bypasses the
-                        // per-agent ACL (design §13.3); everyone else needs a row.
-                        if user.can_manage_all_agents() {
-                            true
-                        } else {
-                            auth.check_access(agent_id, user_id).is_ok_and(|role| role.is_some())
-                        }
+            b.auth.as_ref().is_none_or(|auth| match auth.get_user_by_id(user_id) {
+                Ok(Some(user)) => {
+                    // Implicit access to all agents (manager+) bypasses the
+                    // per-agent ACL (design §13.3); everyone else needs a row.
+                    if user.can_manage_all_agents() {
+                        true
+                    } else {
+                        auth.check_access(agent_id, user_id).is_ok_and(|role| role.is_some())
                     }
-                    _ => false,
-                },
-                None => true, // auth not enabled — pass through
-            }
+                }
+                _ => false,
+            })
         });
         if !authorized {
             respond_json(
