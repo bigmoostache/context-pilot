@@ -3,6 +3,8 @@ import { ThreadAside } from "./ThreadAside"
 import type { useThreadAside } from "./useThreadAside"
 import type { ThreadFile } from "./FileSidebar"
 import type { ThreadTask } from "@/lib/types"
+import { HintBadge } from "@/components/shell/chrome/HintBadge"
+import { useModifierShortcuts } from "@/lib/support/a11y"
 
 /**
  * The thread conversation's right rail (T662 aside) plus its show/hide chrome
@@ -41,6 +43,22 @@ export function ThreadAsideRail({
    *  so a file preview widens to half the viewport when it is (T680). */
   leftRailHidden: boolean
 }) {
+  // ⌘/Ctrl+H toggles the whole details rail — the exact header pattern
+  // (useModifierShortcuts + a HintBadge that reveals the "H" while the modifier
+  // is held). Hidden → show; shown → clear any preview and hide (mirrors the
+  // tab bar's own hide button). Bound BEFORE the early return so the hook is
+  // never conditional (rules-of-hooks); it's inert with no aside on screen.
+  const modHeld = useModifierShortcuts({
+    h: () => {
+      if (aside.hidden) {
+        aside.setHidden(false)
+      } else {
+        aside.setFile(null)
+        aside.setHidden(true)
+      }
+    },
+  })
+
   const hasAside = files.length > 0 || tasks.length > 0
   if (!hasAside) return null
 
@@ -59,6 +77,7 @@ export function ThreadAsideRail({
           selectedFile={aside.file}
           onSelectFile={aside.setFile}
           leftRailHidden={leftRailHidden}
+          hintShown={modHeld}
           onHide={() => {
             aside.setFile(null)
             aside.setHidden(true)
@@ -75,6 +94,7 @@ export function ThreadAsideRail({
           className="absolute top-3 right-3 z-10 flex size-7 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:text-foreground"
         >
           <PanelRightOpen className="size-4" />
+          <HintBadge label="H" shown={modHeld} />
         </button>
       )}
     </>

@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { FileIcon } from "@/components/finder/support/macIcons"
 import { kindOf } from "@/components/finder/support/kind"
 import { FinderPreview } from "@/components/finder/preview/FinderPreview"
+import { HintBadge } from "@/components/shell/chrome/HintBadge"
 import { downloadFile } from "@/lib/api"
 import { uploadToNode, type UploadedFile } from "./helpers"
 import type { ThreadFile } from "./FileSidebar"
@@ -45,6 +46,7 @@ export function ThreadAside({
   selectedFile,
   onSelectFile,
   leftRailHidden,
+  hintShown = false,
   onHide,
 }: {
   files: ThreadFile[]
@@ -58,6 +60,9 @@ export function ThreadAside({
    *  previewing, the aside widens to half the viewport (50vw) instead of 40vw,
    *  claiming the space the collapsed left rail freed up (T680). */
   leftRailHidden: boolean
+  /** Whether ⌘/Ctrl is currently held (T688) — reveals the "H" hint badge on the
+   *  tab bar's hide button, mirroring the header rail's shortcut affordance. */
+  hintShown?: boolean
   /** Hide the whole rail for this thread (T677) — the tab bar's right-aligned
    *  hide button. Re-showing is driven by the parent's floating reopen button. */
   onHide: () => void
@@ -110,6 +115,7 @@ export function ThreadAside({
             file={selectedFile}
             onBack={() => onSelectFile(null)}
             onHide={onHide}
+            hintShown={hintShown}
           />
 
           {/* Tasks tab */}
@@ -157,6 +163,7 @@ function AsideTabBar({
   file,
   onBack,
   onHide,
+  hintShown,
 }: {
   hasTasks: boolean
   hasFiles: boolean
@@ -165,6 +172,7 @@ function AsideTabBar({
   file: UploadedFile | null
   onBack: () => void
   onHide: () => void
+  hintShown: boolean
 }) {
   return (
     <div className="flex items-center gap-1.5 border-b border-border/60">
@@ -216,9 +224,10 @@ function AsideTabBar({
           onClick={onHide}
           aria-label="Hide details rail"
           title="Hide"
-          className="inline-flex items-center px-1 text-foreground/60 transition-colors hover:text-foreground"
+          className="relative inline-flex items-center px-1 text-foreground/60 transition-colors hover:text-foreground"
         >
           <PanelRightClose className="size-3.5" />
+          <HintBadge label="H" shown={hintShown} />
         </button>
       </div>
     </div>
