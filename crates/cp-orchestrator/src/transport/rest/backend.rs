@@ -16,7 +16,7 @@ use crate::services::retire::RetiredStore;
 use crate::services::stream_hub::StreamHub;
 use crate::supervisor::ProcManager;
 
-use super::super::stream::ticket::TicketStore;
+use super::super::stream::ticket;
 
 /// Default per-agent SSE subscriber buffer capacity.
 const DEFAULT_SUB_CAPACITY: usize = 256;
@@ -41,7 +41,7 @@ pub struct Backend {
     /// Per-agent ephemeral stream fan-out.
     pub hub: StreamHub,
     /// Single-use SSE upgrade tickets.
-    pub tickets: TicketStore,
+    pub tickets: ticket::Store,
     /// Read-only, mtime-cached reader of agent persistence files.
     pub inspect: StateReader,
     /// Directory of agent registry records (`<id>.json`).
@@ -146,7 +146,7 @@ impl Backend {
         Self {
             view: MaterializedView::new(),
             hub: StreamHub::new(DEFAULT_SUB_CAPACITY),
-            tickets: TicketStore::new(),
+            tickets: ticket::Store::new(),
             inspect: StateReader::new(),
             retired: RetiredStore::load(&agents_dir),
             names: NameOverrides::load(&agents_dir),
@@ -214,7 +214,7 @@ impl Backend {
         Self {
             view,
             hub: StreamHub::new(DEFAULT_SUB_CAPACITY),
-            tickets: TicketStore::new(),
+            tickets: ticket::Store::new(),
             inspect: StateReader::new(),
             retired: RetiredStore::default(),
             names: NameOverrides::default(),

@@ -26,7 +26,7 @@ const TOKEN_BYTES: usize = 32;
 
 /// Data stored alongside a minted ticket.
 #[derive(Debug, Clone)]
-struct TicketEntry {
+struct Entry {
     /// Expiry timestamp (ms since the Unix epoch).
     expiry_ms: u64,
     /// The authenticated user who minted this ticket, if any. `None` when auth
@@ -37,21 +37,21 @@ struct TicketEntry {
 
 /// The payload returned on a successful single-use redemption.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RedeemedTicket {
+pub struct Redeemed {
     /// The user who minted the ticket (`None` when auth is disabled).
     pub user_id: Option<String>,
 }
 
 /// A mint-once, redeem-once SSE upgrade ticket store.
 #[derive(Debug)]
-pub struct TicketStore {
+pub struct Store {
     /// token → entry (expiry + optional user identity).
-    live: HashMap<String, TicketEntry>,
+    live: HashMap<String, Entry>,
     /// Ticket lifetime.
     ttl: Duration,
 }
 
-impl TicketStore {
+impl Store {
     /// Create a store with the default TTL.
     #[must_use]
     pub fn new() -> Self {
@@ -76,19 +76,19 @@ impl TicketStore {
         self.sweep(now);
         let token = random_token();
         let expiry_ms = now.saturating_add(saturating_millis(self.ttl));
-        let entry = TicketEntry { expiry_ms, user_id: user_id.map(str::to_owned) };
+        let entry = Entry { expiry_ms, user_id: user_id.map(str::to_owned) };
         let _previous = self.live.insert(token.clone(), entry);
         token
     }
 
-    /// Redeem a ticket. Returns `Some(RedeemedTicket)` exactly once per
+    /// Redeem a ticket. Returns `Some(Redeemed)` exactly once per
     /// minted, unexpired token — carrying the user identity embedded at mint
     /// time. Every subsequent or unknown redemption returns `None`.
-    pub fn redeem(&mut self, token: &str) -> Option<RedeemedTicket> {
+    pub fn redeem(&mut self, token: &str) -> Option<Redeemed> {
         let now = now_ms();
         self.sweep(now);
         match self.live.remove(token) {
-            Some(entry) if entry.expiry_ms >= now => Some(RedeemedTicket { user_id: entry.user_id }),
+            Some(entry) if entry.expiry_ms >= now => Some(Redeemed { user_id: entry.user_id }),
             _ => None,
         }
     }
@@ -111,7 +111,7 @@ impl TicketStore {
     }
 }
 
-impl Default for TicketStore {
+impl Default for Store {
     fn default() -> Self {
         Self::new()
     }
@@ -138,7 +138,7 @@ fn random_token() -> String {
         // Fallback: spread a nanosecond clock across the buffer.
         let seed = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0u128, |d| d.as_nanos());
         for (i, slot) in bytes.iter_mut().enumerate() {
-            let shift = u32::try_from((i % 16).saturating_mul(8)).unwrap_or(0);
+            let shift = u32::try_from((i & 15).saturating_mul(8)).unwrap_or(0);
             *slot = u8::try_from(seed.wrapping_shr(shift) & 0xff).unwrap_or(0);
         }
     }
@@ -162,7 +162,7 @@ mod tests {
 
     #[test]
     fn mint_then_redeem_succeeds_once() {
-        let mut store = TicketStore::new();
+        let mut store = Store::new();
         let token = store.mint(None);
         assert_eq!(store.len(), 1);
         assert!(store.redeem(&token).is_some(), "first redemption succeeds");
@@ -172,13 +172,13 @@ mod tests {
 
     #[test]
     fn unknown_token_is_rejected() {
-        let mut store = TicketStore::new();
+        let mut store = Store::new();
         assert!(store.redeem("never-minted").is_none());
     }
 
     #[test]
     fn expired_ticket_is_rejected() {
-        let mut store = TicketStore::with_ttl(Duration::from_millis(10));
+        let mut store = Store::with_ttl(Duration::from_millis(10));
         let token = store.mint(None);
         sleep(Duration::from_millis(30));
         assert!(store.redeem(&token).is_none(), "expired ticket must not redeem");
@@ -187,7 +187,7 @@ mod tests {
 
     #[test]
     fn tokens_are_unique_and_long() {
-        let mut store = TicketStore::new();
+        let mut store = Store::new();
         let a = store.mint(None);
         let b = store.mint(None);
         assert_ne!(a, b, "each mint yields a distinct token");
@@ -196,7 +196,7 @@ mod tests {
 
     #[test]
     fn mint_sweeps_expired() {
-        let mut store = TicketStore::with_ttl(Duration::from_millis(10));
+        let mut store = Store::with_ttl(Duration::from_millis(10));
         let _stale = store.mint(None);
         sleep(Duration::from_millis(30));
         let _fresh = store.mint(None); // mint sweeps the stale one first
@@ -205,7 +205,7 @@ mod tests {
 
     #[test]
     fn ticket_carries_user_id() {
-        let mut store = TicketStore::new();
+        let mut store = Store::new();
         let token = store.mint(Some("user-42"));
         let ticket = store.redeem(&token).expect("valid ticket");
         assert_eq!(ticket.user_id.as_deref(), Some("user-42"));
@@ -213,7 +213,7 @@ mod tests {
 
     #[test]
     fn ticket_without_user_redeems_as_none() {
-        let mut store = TicketStore::new();
+        let mut store = Store::new();
         let token = store.mint(None);
         let ticket = store.redeem(&token).expect("valid ticket");
         assert!(ticket.user_id.is_none());
