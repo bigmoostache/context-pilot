@@ -92,10 +92,11 @@ mod tests {
         }
     }
 
-    /// A `Mutex<Backend>` with auth enabled over a leaked temp dir (so the
-    /// `SQLite` file + identity/flag paths outlive the test body), mirroring the
-    /// fixture in `transport/maint/mod.rs`.
-    fn backend() -> Mutex<Backend> {
+    /// A `Mutex<Backend>` with auth enabled over a temp dir, returned alongside
+    /// its [`TempDir`](tempfile::TempDir) guard so the caller keeps the `SQLite`
+    /// file + identity/flag paths alive for the test body (mirrors the fixture in
+    /// `transport/maint/mod.rs`).
+    fn backend() -> (Mutex<Backend>, tempfile::TempDir) {
         let dir = tempfile::tempdir().expect("tempdir");
         let store = AuthStore::open(&dir.path().join("auth.db")).expect("open auth store");
         let backend = Backend::new(
@@ -107,8 +108,34 @@ mod tests {
             Some(store),
             Duration::from_hours(1),
         );
-        std::mem::forget(dir);
-        Mutex::new(backend)
+        (Mutex::new(backend), dir)
+    }
+
+    /// Assert every JSON `/api/it/*` handler refuses a below-bar `role` with a
+    /// `403`. Extracted from [`it_gated`] to keep it under the
+    /// cognitive-complexity cap.
+    fn assert_it_denied(state: &Mutex<Backend>, role: UserRole) {
+        let u = user(role);
+        assert_eq!(it_ca_fingerprint(Some(&u)).status, 403, "ca/fingerprint denied for {role:?}");
+        assert_eq!(it_get_identity(state, Some(&u)).status, 403, "identity GET denied for {role:?}");
+        assert_eq!(
+            it_set_identity(state, br#"{"name":"box","ip":"192.168.1.1"}"#, Some(&u)).status,
+            403,
+            "identity POST denied for {role:?}"
+        );
+        assert_eq!(it_provisioned(state, Some(&u)).status, 403, "provisioned denied for {role:?}");
+    }
+
+    /// Assert an at-or-above-bar `role` reaches each handler's delegate (not a
+    /// `403`). Extracted from [`it_gated`] to keep it under the
+    /// cognitive-complexity cap.
+    fn assert_it_reached(state: &Mutex<Backend>, role: UserRole) {
+        let u = user(role);
+        // `ca/fingerprint` 404s in the test env (no CP_CA_ROOT) — the point is the
+        // gate lets the caller reach the delegate, i.e. not a 403.
+        assert_ne!(it_ca_fingerprint(Some(&u)).status, 403, "ca/fingerprint reached for {role:?}");
+        assert_eq!(it_get_identity(state, Some(&u)).status, 200, "identity GET ok for {role:?}");
+        assert_eq!(it_provisioned(state, Some(&u)).status, 200, "provisioned ok for {role:?}");
     }
 
     /// V4.1a — every JSON `/api/it/*` handler is gated on `can_manage_it`:
@@ -117,25 +144,12 @@ mod tests {
     /// above passes into the delegate).
     #[test]
     fn it_gated() {
-        let state = backend();
+        let (state, _dir) = backend();
         for role in [Manager, Regular] {
-            let u = user(role);
-            assert_eq!(it_ca_fingerprint(Some(&u)).status, 403, "ca/fingerprint denied for {role:?}");
-            assert_eq!(it_get_identity(&state, Some(&u)).status, 403, "identity GET denied for {role:?}");
-            assert_eq!(
-                it_set_identity(&state, br#"{"name":"box","ip":"192.168.1.1"}"#, Some(&u)).status,
-                403,
-                "identity POST denied for {role:?}"
-            );
-            assert_eq!(it_provisioned(&state, Some(&u)).status, 403, "provisioned denied for {role:?}");
+            assert_it_denied(&state, role);
         }
         for role in [Admin, Superadmin] {
-            let u = user(role);
-            // `ca/fingerprint` 404s in the test env (no CP_CA_ROOT) — the point
-            // is the gate lets the caller reach the delegate, i.e. not a 403.
-            assert_ne!(it_ca_fingerprint(Some(&u)).status, 403, "ca/fingerprint reached for {role:?}");
-            assert_eq!(it_get_identity(&state, Some(&u)).status, 200, "identity GET ok for {role:?}");
-            assert_eq!(it_provisioned(&state, Some(&u)).status, 200, "provisioned ok for {role:?}");
+            assert_it_reached(&state, role);
         }
     }
 
@@ -144,7 +158,7 @@ mod tests {
     /// (god-mode) so this exercises the identity logic, not the gate.
     #[test]
     fn it_identity_roundtrip() {
-        let state = backend();
+        let (state, _dir) = backend();
         // No identity initially.
         assert!(it_get_identity(&state, None).body.contains("\"identity\":null"), "no identity initially");
 
