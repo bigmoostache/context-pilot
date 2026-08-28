@@ -24,15 +24,20 @@ const MAX_ZIP_BYTES: u64 = 500 * 1024 * 1024;
 /// system `zip` command (available on macOS and most Linux distros).
 ///
 /// Returns `Ok((bytes, filename))` on success, `Err(HttpReply)` on error.
-pub fn fs_download(state: &Mutex<Backend>, agent_id: &str, query: &str) -> Result<(Vec<u8>, String), HttpReply> {
+///
+/// # Errors
+///
+/// Returns an [`HttpReply`] error: `400` for a missing path, `403` for a path
+/// escaping the realm, `404` for a non-file/dir, `413` when the file or zipped
+/// folder exceeds its size cap, and `502` for a read or zip fault.
+pub(crate) fn fs_download(state: &Mutex<Backend>, agent_id: &str, query: &str) -> Result<(Vec<u8>, String), HttpReply> {
     let folder = agent_folder(state, agent_id)?;
     let relative = match extract_param(query, "path") {
         Some(p) if !p.is_empty() => p,
         _ => return Err(HttpReply::error(400, "missing path parameter")),
     };
-    let target = match confined_path(&folder, &relative) {
-        Some(p) => p,
-        None => return Err(HttpReply::error(403, "path outside agent realm")),
+    let Some(target) = confined_path(&folder, &relative) else {
+        return Err(HttpReply::error(403, "path outside agent realm"));
     };
 
     if target.is_dir() {
@@ -43,12 +48,12 @@ pub fn fs_download(state: &Mutex<Backend>, agent_id: &str, query: &str) -> Resul
         return Err(HttpReply::error(404, "not a file or directory"));
     }
 
-    let meta = std::fs::metadata(&target).map_err(|_| HttpReply::error(404, "file not found"))?;
+    let meta = std::fs::metadata(&target).map_err(|e| HttpReply::error(404, &format!("file not found: {e}")))?;
     if meta.len() > MAX_DOWNLOAD_BYTES {
         return Err(HttpReply::error(413, "file too large for download"));
     }
 
-    let bytes = std::fs::read(&target).map_err(|_| HttpReply::error(502, "read failed"))?;
+    let bytes = std::fs::read(&target).map_err(|e| HttpReply::error(502, &format!("read failed: {e}")))?;
     let filename = target.file_name().and_then(|n| n.to_str()).unwrap_or("download").to_owned();
 
     Ok((bytes, filename))
@@ -59,33 +64,33 @@ fn zip_and_download(dir: &Path) -> Result<(Vec<u8>, String), HttpReply> {
     let dirname = dir.file_name().and_then(|n| n.to_str()).unwrap_or("folder");
 
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis());
-    let tmp = format!("/tmp/cp-dl-{}-{now}.zip", std::process::id());
+    let tmp_path = format!("/tmp/cp-dl-{}-{now}.zip", std::process::id());
 
     let output = std::process::Command::new("zip")
-        .args(["-r", "-q", &tmp, "."])
+        .args(["-r", "-q", &tmp_path, "."])
         .current_dir(dir)
         .output()
-        .map_err(|_| HttpReply::error(502, "zip command not available"))?;
+        .map_err(|e| HttpReply::error(502, &format!("zip command not available: {e}")))?;
 
     if !output.status.success() {
-        drop(std::fs::remove_file(&tmp));
+        drop(std::fs::remove_file(&tmp_path));
         return Err(HttpReply::error(502, "zip failed"));
     }
 
-    let meta = std::fs::metadata(&tmp).map_err(|_| {
-        drop(std::fs::remove_file(&tmp));
-        HttpReply::error(502, "zip read failed")
+    let meta = std::fs::metadata(&tmp_path).map_err(|e| {
+        drop(std::fs::remove_file(&tmp_path));
+        HttpReply::error(502, &format!("zip read failed: {e}"))
     })?;
     if meta.len() > MAX_ZIP_BYTES {
-        drop(std::fs::remove_file(&tmp));
+        drop(std::fs::remove_file(&tmp_path));
         return Err(HttpReply::error(413, "zipped folder too large"));
     }
 
-    let bytes = std::fs::read(&tmp).map_err(|_| {
-        drop(std::fs::remove_file(&tmp));
-        HttpReply::error(502, "zip read failed")
+    let bytes = std::fs::read(&tmp_path).map_err(|e| {
+        drop(std::fs::remove_file(&tmp_path));
+        HttpReply::error(502, &format!("zip read failed: {e}"))
     })?;
-    drop(std::fs::remove_file(&tmp));
+    drop(std::fs::remove_file(&tmp_path));
 
     let zip_name = format!("{dirname}.zip");
     Ok((bytes, zip_name))
@@ -100,26 +105,31 @@ fn zip_and_download(dir: &Path) -> Result<(Vec<u8>, String), HttpReply> {
 /// this URL. Confined to the agent realm and capped at [`MAX_DOWNLOAD_BYTES`].
 ///
 /// Returns `Ok((bytes, content_type))` on success, `Err(HttpReply)` on error.
-pub fn fs_raw(state: &Mutex<Backend>, agent_id: &str, query: &str) -> Result<(Vec<u8>, String), HttpReply> {
+///
+/// # Errors
+///
+/// Returns an [`HttpReply`] error: `400` for a missing path, `403` for a path
+/// escaping the realm, `404` for a non-file, `413` when the file exceeds the
+/// preview cap, and `502` for a read fault.
+pub(crate) fn fs_raw(state: &Mutex<Backend>, agent_id: &str, query: &str) -> Result<(Vec<u8>, String), HttpReply> {
     let folder = agent_folder(state, agent_id)?;
     let relative = match extract_param(query, "path") {
         Some(p) if !p.is_empty() => p,
         _ => return Err(HttpReply::error(400, "missing path parameter")),
     };
-    let target = match confined_path(&folder, &relative) {
-        Some(p) => p,
-        None => return Err(HttpReply::error(403, "path outside agent realm")),
+    let Some(target) = confined_path(&folder, &relative) else {
+        return Err(HttpReply::error(403, "path outside agent realm"));
     };
     if !target.is_file() {
         return Err(HttpReply::error(404, "not a file"));
     }
 
-    let meta = std::fs::metadata(&target).map_err(|_| HttpReply::error(404, "file not found"))?;
+    let meta = std::fs::metadata(&target).map_err(|e| HttpReply::error(404, &format!("file not found: {e}")))?;
     if meta.len() > MAX_DOWNLOAD_BYTES {
         return Err(HttpReply::error(413, "file too large to preview"));
     }
 
-    let bytes = std::fs::read(&target).map_err(|_| HttpReply::error(502, "read failed"))?;
+    let bytes = std::fs::read(&target).map_err(|e| HttpReply::error(502, &format!("read failed: {e}")))?;
     let ctype = target.file_name().and_then(|n| n.to_str()).map_or("application/octet-stream", content_type_for);
 
     Ok((bytes, ctype.to_owned()))

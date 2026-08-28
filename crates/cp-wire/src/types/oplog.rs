@@ -358,9 +358,9 @@ mod tests {
                 inline_body: Some(r#"{"author":"user","text":"hi"}"#.into()),
             },
         };
-        let json = serde_json::to_string(&inlined).expect("serialize");
-        assert!(json.contains("inline_body"), "inline body present on the wire: {json}");
-        assert_eq!(serde_json::from_str::<OpEntry>(&json).expect("deserialize"), inlined);
+        let inlined_json = serde_json::to_string(&inlined).expect("serialize");
+        assert!(inlined_json.contains("inline_body"), "inline body present on the wire: {inlined_json}");
+        assert_eq!(serde_json::from_str::<OpEntry>(&inlined_json).expect("deserialize"), inlined);
 
         // A spilled (None) body is omitted from the wire entirely.
         let spilled = OpEntry {
@@ -455,10 +455,10 @@ mod tests {
             timestamp_ms: 0,
             kind: OpEntryKind::BehaviourChanged { agent_id: Some("caveman".into()) },
         };
-        let json = serde_json::to_string(&with_id).expect("serialize");
-        assert!(json.contains("\"kind\":\"behaviour_changed\""), "stable tag: {json}");
-        assert!(json.contains("caveman"), "carries the active id: {json}");
-        assert_eq!(serde_json::from_str::<OpEntry>(&json).expect("deserialize"), with_id);
+        let with_id_json = serde_json::to_string(&with_id).expect("serialize");
+        assert!(with_id_json.contains("\"kind\":\"behaviour_changed\""), "stable tag: {with_id_json}");
+        assert!(with_id_json.contains("caveman"), "carries the active id: {with_id_json}");
+        assert_eq!(serde_json::from_str::<OpEntry>(&with_id_json).expect("deserialize"), with_id);
 
         let reverted = OpEntry {
             schema_version: 1,

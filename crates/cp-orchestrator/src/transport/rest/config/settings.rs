@@ -20,8 +20,11 @@ use crate::services::auth::types::User;
 const LLM_PROVIDERS: &[&str] = &["anthropic", "deepseek", "xai", "groq"];
 
 /// Setting keys stored in the central config.
+/// Default LLM provider a newly-created agent inherits.
 const DEFAULT_PROVIDER: &str = "default_provider";
+/// Default model (within [`DEFAULT_PROVIDER`]) a newly-created agent inherits.
 const DEFAULT_MODEL: &str = "default_model";
+/// First-run onboarding-complete flag key.
 const ONBOARDING_DONE: &str = "onboarding_completed";
 /// Access-control master flag (design §13.10) — server-authoritative central
 /// setting (NOT localStorage). Four-role RBAC is enforced **by default**; only an
@@ -77,7 +80,7 @@ fn may_set_access_control(want: bool, caller: Option<&User>) -> bool {
 /// `can_manage_users` (manager+). When access control is disabled (single-user
 /// appliance) everyone is.
 fn can_manage_config(state: &Mutex<Backend>, auth_user: Option<&User>) -> bool {
-    let access_control = state.lock().map(|b| b.access_control).unwrap_or(false);
+    let access_control = state.lock().is_ok_and(|b| b.access_control);
     if !access_control {
         return true;
     }
@@ -87,9 +90,8 @@ fn can_manage_config(state: &Mutex<Backend>, auth_user: Option<&User>) -> bool {
 /// `GET /api/settings` — central defaults, onboarding state, and which
 /// providers have a key configured (never the key values). Drives both the
 /// onboarding gate and the profile/config panes.
-pub fn get_settings(state: &Mutex<Backend>, auth_user: Option<&User>) -> HttpReply {
-    let (auth_enabled, access_control) =
-        state.lock().map(|b| (b.auth.is_some(), b.access_control)).unwrap_or((false, false));
+pub(crate) fn get_settings(state: &Mutex<Backend>, auth_user: Option<&User>) -> HttpReply {
+    let (auth_enabled, access_control) = state.lock().map_or((false, false), |b| (b.auth.is_some(), b.access_control));
     let providers: Vec<serde_json::Value> =
         // Resolve via the vault (not `global::has_api_key`) so a key added at
         // runtime through the settings page shows as configured without an
@@ -117,7 +119,7 @@ pub fn get_settings(state: &Mutex<Backend>, auth_user: Option<&User>) -> HttpRep
 
 /// `POST /api/settings` — admin: update new-agent defaults and/or the
 /// onboarding flag. Body fields are all optional; absent fields are untouched.
-pub fn update_settings(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&User>) -> HttpReply {
+pub(crate) fn update_settings(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&User>) -> HttpReply {
     #[derive(serde::Deserialize)]
     struct Req {
         default_provider: Option<String>,
@@ -132,22 +134,8 @@ pub fn update_settings(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&U
         return HttpReply::error(400, "malformed settings body");
     };
 
-    // ── Access-control flag: independent asymmetric gate (FR-v3-10/11) ──
-    // Handled before the product-config gate so a `user`/`manager` can *enable*
-    // RBAC without holding the config capability.
-    if let Some(want) = req.access_control {
-        if !may_set_access_control(want, auth_user) {
-            return HttpReply::error(403, "superadmin required to disable access control");
-        }
-        // Store `"false"` (not empty) to disable: the default is ON, so only an
-        // explicit `"false"` marker turns RBAC off (access_control_from_raw).
-        if let Err(e) = global::set_setting(ACCESS_CONTROL, if want { "true" } else { "false" }) {
-            return HttpReply::error(500, &e);
-        }
-        // Update the in-memory cache the enforcement pipeline reads per request.
-        if let Ok(mut b) = state.lock() {
-            b.access_control = want;
-        }
+    if let Some(reply) = apply_access_control(state, req.access_control, auth_user) {
+        return reply;
     }
 
     // ── Product/org config fields — gated on can_manage_config (§13.5) ──
@@ -158,28 +146,67 @@ pub fn update_settings(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&U
     if touches_config && !can_manage_config(state, auth_user) {
         return HttpReply::error(403, "management access required");
     }
+    if let Some(reply) =
+        apply_product_config(req.default_provider.as_deref(), req.default_model.as_deref(), req.onboarding_completed)
+    {
+        return reply;
+    }
     if let Some(models) = req.allowed_models {
         let json = serde_json::to_string(&models).unwrap_or_else(|_| "[]".to_owned());
         if let Err(e) = global::set_setting(ALLOWED_MODELS, &json) {
             return HttpReply::error(500, &e);
         }
     }
-    if let Some(p) = req.default_provider.as_deref()
+    get_settings(state, auth_user)
+}
+
+/// Apply the access-control master-flag toggle (design §13.10). Returns
+/// `Some(reply)` on a gate refusal or a persistence failure (the caller returns
+/// it verbatim); `None` when there was nothing to do or the write succeeded.
+fn apply_access_control(
+    state: &Mutex<Backend>,
+    requested: Option<bool>,
+    auth_user: Option<&User>,
+) -> Option<HttpReply> {
+    let want = requested?;
+    if !may_set_access_control(want, auth_user) {
+        return Some(HttpReply::error(403, "superadmin required to disable access control"));
+    }
+    // Store `"false"` (not empty) to disable: the default is ON, so only an
+    // explicit `"false"` marker turns RBAC off (access_control_from_raw).
+    if let Err(e) = global::set_setting(ACCESS_CONTROL, if want { "true" } else { "false" }) {
+        return Some(HttpReply::error(500, &e));
+    }
+    // Update the in-memory cache the enforcement pipeline reads per request.
+    if let Ok(mut b) = state.lock() {
+        b.access_control = want;
+    }
+    None
+}
+
+/// Persist the new-agent defaults + onboarding flag. Returns `Some(reply)` on
+/// the first persistence failure; `None` when every present field was written.
+fn apply_product_config(
+    default_provider: Option<&str>,
+    default_model: Option<&str>,
+    onboarding_completed: Option<bool>,
+) -> Option<HttpReply> {
+    if let Some(p) = default_provider
         && let Err(e) = global::set_setting(DEFAULT_PROVIDER, p)
     {
-        return HttpReply::error(500, &e);
+        return Some(HttpReply::error(500, &e));
     }
-    if let Some(m) = req.default_model.as_deref()
+    if let Some(m) = default_model
         && let Err(e) = global::set_setting(DEFAULT_MODEL, m)
     {
-        return HttpReply::error(500, &e);
+        return Some(HttpReply::error(500, &e));
     }
-    if let Some(done) = req.onboarding_completed
+    if let Some(done) = onboarding_completed
         && let Err(e) = global::set_setting(ONBOARDING_DONE, if done { "true" } else { "" })
     {
-        return HttpReply::error(500, &e);
+        return Some(HttpReply::error(500, &e));
     }
-    get_settings(state, auth_user)
+    None
 }
 
 #[cfg(test)]
@@ -209,25 +236,36 @@ mod tests {
     /// explicit `"true"`); only an explicit `"false"` turns it off.
     #[test]
     fn flag_default_on() {
-        assert!(access_control_from_raw(None), "unset ⇒ on (default)");
-        assert!(access_control_from_raw(Some("")), "empty ⇒ on");
-        assert!(access_control_from_raw(Some("true")), "explicit true ⇒ on");
-        assert!(!access_control_from_raw(Some("false")), "explicit false ⇒ off");
+        assert!(access_control_from_raw(None), "unset \u{21d2} on (default)");
+        assert!(access_control_from_raw(Some("")), "empty \u{21d2} on");
+        assert!(access_control_from_raw(Some("true")), "explicit true \u{21d2} on");
+        assert!(!access_control_from_raw(Some("false")), "explicit false \u{21d2} off");
     }
 
-    /// V0.4c — enabling is allowed for anyone; disabling requires superadmin.
-    #[test]
-    fn disable_requires_superadmin() {
-        // Enable (want = true): allowed for every role and even no caller.
+    /// Assert that *enabling* access control (`want = true`) is allowed for
+    /// every role and even with no caller (god-mode). Hoisted out of the test
+    /// so its body stays under the cognitive-complexity cap.
+    fn assert_enable_allowed_for_all() {
         for role in [Superadmin, Admin, Manager, Regular] {
             assert!(may_set_access_control(true, Some(&user(role))), "enable by {role:?}");
         }
         assert!(may_set_access_control(true, None), "enable with no caller (god-mode)");
-        // Disable (want = false): only superadmin.
+    }
+
+    /// Assert that *disabling* access control (`want = false`) is allowed only
+    /// for a superadmin. Hoisted out of the test for the same reason.
+    fn assert_disable_superadmin_only() {
         assert!(may_set_access_control(false, Some(&user(Superadmin))), "superadmin disables");
         assert!(!may_set_access_control(false, Some(&user(Admin))), "admin cannot disable");
         assert!(!may_set_access_control(false, Some(&user(Manager))), "manager cannot disable");
         assert!(!may_set_access_control(false, Some(&user(Regular))), "user cannot disable");
         assert!(!may_set_access_control(false, None), "no caller cannot disable");
+    }
+
+    /// V0.4c — enabling is allowed for anyone; disabling requires superadmin.
+    #[test]
+    fn disable_requires_superadmin() {
+        assert_enable_allowed_for_all();
+        assert_disable_superadmin_only();
     }
 }

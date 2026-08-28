@@ -62,7 +62,7 @@ pub(crate) struct Session {
 }
 
 /// Lifecycle status of a managed session.
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub(crate) enum SessionStatus {
     /// The child process is still running.
     Running,
@@ -81,17 +81,17 @@ impl Session {
 
     /// Return a human-readable status string for use in responses.
     fn status_str(&self) -> String {
-        match &self.status {
-            SessionStatus::Running => "running".to_string(),
+        match self.status {
+            SessionStatus::Running => "running".to_owned(),
             SessionStatus::Exited(code) => format!("exited({code})"),
         }
     }
 
     /// Return the exit code if the session has terminated, otherwise `None`.
     const fn exit_code(&self) -> Option<i32> {
-        match &self.status {
+        match self.status {
             SessionStatus::Running => None,
-            SessionStatus::Exited(c) => Some(*c),
+            SessionStatus::Exited(c) => Some(c),
         }
     }
 
@@ -132,7 +132,7 @@ struct CreateParams<'req> {
 
 /// Spawn a new child process and register it under `key`, redirecting output to `log_path`.
 fn handle_create(sessions: &Sessions, params: &CreateParams<'_>) -> Response {
-    let CreateParams { key, command, cwd, log_path } = params;
+    let &CreateParams { key, command, cwd, log_path } = params;
     let log = PathBuf::from(log_path);
 
     // Create/truncate log file
@@ -168,9 +168,9 @@ fn handle_create(sessions: &Sessions, params: &CreateParams<'_>) -> Response {
     // Spawn a thread to wait for the child so we get proper exit status
     {
         let task_sessions = Arc::clone(sessions);
-        let task_key = key.to_string();
+        let task_key = key.to_owned();
         drop(std::thread::spawn(move || {
-            let code = child.wait().map_or(-1, |status| status.code().unwrap_or(-1));
+            let code = child.wait().map_or(-1i32, |status| status.code().unwrap_or(-1i32));
             if let Ok(mut map) = task_sessions.lock()
                 && let Some(session) = map.get_mut(&task_key)
             {
@@ -180,7 +180,7 @@ fn handle_create(sessions: &Sessions, params: &CreateParams<'_>) -> Response {
     }
 
     let session = Session { pid, stdin, status: SessionStatus::Running };
-    drop(sessions.lock().unwrap_or_else(PoisonError::into_inner).insert(key.to_string(), session));
+    drop(sessions.lock().unwrap_or_else(PoisonError::into_inner).insert(key.to_owned(), session));
 
     Response::ok_pid(pid)
 }
@@ -197,7 +197,7 @@ fn handle_send(sessions: &Sessions, key: &str, input: &str) -> Response {
         }
         Some(session) => match session.stdin.take() {
             Some(s) => s,
-            None => return Response::err("No stdin available".to_string()),
+            None => return Response::err("No stdin available".to_owned()),
         },
     };
 
@@ -465,7 +465,7 @@ fn main() {
                     ConnectionHandler { stream, sessions: conn_sessions }.run();
                 }));
             }
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                 // No pending connection — sleep briefly and retry
                 std::thread::sleep(std::time::Duration::from_millis(50));
             }

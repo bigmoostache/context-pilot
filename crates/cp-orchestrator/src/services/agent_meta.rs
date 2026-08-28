@@ -76,16 +76,16 @@ impl NameOverrides {
     /// Atomically write the map to disk (`tmp` → `rename`).
     fn persist(&self) {
         let Ok(bytes) = serde_json::to_vec_pretty(&self.names) else {
-            eprintln!("names: serialize failed");
+            crate::oerr!("names: serialize failed");
             return;
         };
-        let tmp = self.path.with_extension("json.tmp");
-        if std::fs::write(&tmp, &bytes).is_err() {
-            eprintln!("names: write tmp failed: {}", tmp.display());
+        let tmp_path = self.path.with_extension("json.tmp");
+        if std::fs::write(&tmp_path, &bytes).is_err() {
+            crate::oerr!("names: write tmp failed: {}", tmp_path.display());
             return;
         }
-        if let Err(e) = std::fs::rename(&tmp, &self.path) {
-            eprintln!("names: rename failed: {e}");
+        if let Err(e) = std::fs::rename(&tmp_path, &self.path) {
+            crate::oerr!("names: rename failed: {e}");
         }
     }
 }
@@ -142,6 +142,10 @@ impl AvatarStore {
 
     /// Store (or replace) an avatar. `bytes` are the raw image; the content
     /// type is sniffed from magic bytes. Returns an error string on failure.
+    ///
+    /// # Errors
+    /// Returns an error string if `bytes` exceeds [`MAX_AVATAR_BYTES`], its
+    /// format is unrecognised, or the directory/file write fails.
     pub fn set(&mut self, agent_id: &str, bytes: &[u8]) -> Result<(), String> {
         if bytes.len() > MAX_AVATAR_BYTES {
             return Err(format!("avatar too large ({} bytes, max {})", bytes.len(), MAX_AVATAR_BYTES));
@@ -153,9 +157,9 @@ impl AvatarStore {
         }
         // Write the image atomically (tmp → rename).
         let file_path = self.dir.join(agent_id);
-        let tmp = file_path.with_extension("tmp");
-        std::fs::write(&tmp, bytes).map_err(|e| format!("write tmp: {e}"))?;
-        std::fs::rename(&tmp, &file_path).map_err(|e| format!("rename: {e}"))?;
+        let tmp_path = file_path.with_extension("tmp");
+        std::fs::write(&tmp_path, bytes).map_err(|e| format!("write tmp: {e}"))?;
+        std::fs::rename(&tmp_path, &file_path).map_err(|e| format!("rename: {e}"))?;
         let _prev = self.types.insert(agent_id.to_owned(), ctype.to_owned());
         self.persist_index();
         Ok(())
@@ -174,23 +178,23 @@ impl AvatarStore {
     /// Atomically write the content-type index to disk.
     fn persist_index(&self) {
         let Ok(bytes) = serde_json::to_vec_pretty(&self.types) else {
-            eprintln!("avatars: serialize index failed");
+            crate::oerr!("avatars: serialize index failed");
             return;
         };
-        let tmp = self.index_path.with_extension("json.tmp");
-        if std::fs::write(&tmp, &bytes).is_err() {
-            eprintln!("avatars: write tmp failed: {}", tmp.display());
+        let tmp_path = self.index_path.with_extension("json.tmp");
+        if std::fs::write(&tmp_path, &bytes).is_err() {
+            crate::oerr!("avatars: write tmp failed: {}", tmp_path.display());
             return;
         }
-        if let Err(e) = std::fs::rename(&tmp, &self.index_path) {
-            eprintln!("avatars: rename failed: {e}");
+        if let Err(e) = std::fs::rename(&tmp_path, &self.index_path) {
+            crate::oerr!("avatars: rename failed: {e}");
         }
     }
 }
 
 /// Sniff the MIME content type from the first bytes of an image.
 ///
-/// Recognises PNG, JPEG, GIF, WebP, BMP, ICO, and SVG (text-based, detected
+/// Recognises PNG, JPEG, GIF, `WebP`, BMP, ICO, and SVG (text-based, detected
 /// by a leading `<svg` or `<?xml` + `<svg`).
 fn sniff_image_type(bytes: &[u8]) -> Option<&'static str> {
     if bytes.len() < 4 {
@@ -209,7 +213,7 @@ fn sniff_image_type(bytes: &[u8]) -> Option<&'static str> {
         return Some("image/gif");
     }
     // WebP: RIFF....WEBP
-    if bytes.len() >= 12 && bytes.starts_with(b"RIFF") && &bytes[8..12] == b"WEBP" {
+    if bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP".as_slice()) {
         return Some("image/webp");
     }
     // BMP: BM
@@ -221,7 +225,7 @@ fn sniff_image_type(bytes: &[u8]) -> Option<&'static str> {
         return Some("image/x-icon");
     }
     // SVG (text-based) — look for <svg in the first 256 bytes.
-    let head = &bytes[..bytes.len().min(256)];
+    let head = bytes.get(..bytes.len().min(256)).unwrap_or(bytes);
     if let Ok(text) = std::str::from_utf8(head) {
         let lower = text.to_lowercase();
         if lower.contains("<svg") {
@@ -234,6 +238,16 @@ fn sniff_image_type(bytes: &[u8]) -> Option<&'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Assert `id` has a stored PNG avatar whose bytes equal `expected`. A plain
+    /// call (not a branch), so folding the has/get/ctype/bytes checks through it
+    /// keeps `avatar_roundtrip_set_get_remove` under the cognitive-complexity cap.
+    fn assert_png_stored(store: &AvatarStore, id: &str, expected: &[u8]) {
+        assert!(store.has(id));
+        let (bytes, ctype) = store.get(id).expect("get should succeed");
+        assert_eq!(ctype, "image/png");
+        assert_eq!(bytes, expected);
+    }
 
     #[test]
     fn name_set_get_roundtrip() {
@@ -251,7 +265,7 @@ mod tests {
         assert_eq!(reloaded.get("a"), Some("My Agent"));
 
         // Empty name clears the override.
-        let _prev = store.set("a", "  ");
+        let _cleared = store.set("a", "  ");
         assert!(store.get("a").is_none());
         assert!(NameOverrides::load(&dir).get("a").is_none());
 
@@ -278,15 +292,11 @@ mod tests {
             0x44, 0xAE, 0x42, 0x60, 0x82,
         ];
         store.set("a1", png).expect("set should succeed");
-        assert!(store.has("a1"));
-
-        let (bytes, ctype) = store.get("a1").expect("get should succeed");
-        assert_eq!(ctype, "image/png");
-        assert_eq!(bytes, png);
+        assert_png_stored(&store, "a1", png);
 
         // Reload from disk proves persistence.
         let reloaded = AvatarStore::load(&dir);
-        assert!(reloaded.has("a1"));
+        assert_png_stored(&reloaded, "a1", png);
 
         // Remove.
         assert!(store.remove("a1"));

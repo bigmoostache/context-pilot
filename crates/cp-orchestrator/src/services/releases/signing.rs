@@ -11,7 +11,7 @@
 /// Generated 2026-07-10 on the signing host — key id `5C445DA7034A99A4`.
 /// This is the base64 body of `minisign.pub` (second line of the file); the
 /// `minisign-verify` crate parses it with `PublicKey::from_base64`.
-pub const UPDATE_PUBKEY: &str = "RWSkmUoDp11EXC/O98y3UWueIh+QohxCLKj5oMmqxRO6EdwegqfjWdnM";
+pub(crate) const UPDATE_PUBKEY: &str = "RWSkmUoDp11EXC/O98y3UWueIh+QohxCLKj5oMmqxRO6EdwegqfjWdnM";
 
 #[cfg(test)]
 mod tests {

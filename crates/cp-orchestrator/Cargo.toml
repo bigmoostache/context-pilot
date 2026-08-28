@@ -20,6 +20,10 @@ dotenvy = "0.15"
 # new-agent defaults here (admin onboarding); agents read them via the same
 # module, so both sides agree on one source of truth.
 cp-base.workspace = true
+# Shared, lint-clean date/time helpers (zero-dep leaf crate). Used by the auth
+# backup scheduler for UTC epoch → (year, month, day, hour) — the canonical
+# Howard-Hinnant civil-date implementation, rather than a second hand-rolled copy.
+cp-mod-utilities.workspace = true
 utoipa = "5"
 nix = { version = "0.30", features = ["signal"] }
 serde = { version = "1", features = ["derive"] }

@@ -30,18 +30,22 @@ pub(crate) fn pending_path(install: &std::path::Path) -> PathBuf {
     with_suffix(install, "pending")
 }
 
-/// Append a `.suffix` to a path's file name (not `with_extension`, which would
-/// clobber an existing extension — the binary has none, but be explicit).
+/// Append a `.suffix` to a path's file name.
+///
+/// Not `with_extension`, which would clobber an existing extension — the binary
+/// has none, but be explicit.
 fn with_suffix(path: &std::path::Path, suffix: &str) -> PathBuf {
-    let mut name = path.file_name().map(|n| n.to_os_string()).unwrap_or_default();
+    let mut name = path.file_name().map(std::ffi::OsStr::to_os_string).unwrap_or_default();
     name.push(".");
     name.push(suffix);
     path.with_file_name(name)
 }
 
 /// Stage `src` (a downloaded `cp-orchestrator`) over the running `install`
-/// binary via atomic rename, backing the current binary up to `<name>.bak` and
-/// writing a fresh `<name>.pending` boot-attempt marker.
+/// binary via atomic rename.
+///
+/// Backs the current binary up to `<name>.bak` and writes a fresh
+/// `<name>.pending` boot-attempt marker.
 ///
 /// The running process is untouched (it keeps its open inode); the swap only
 /// takes effect when the process re-execs the install path.
@@ -59,12 +63,12 @@ pub fn stage_orchestrator_update(install: &std::path::Path, src: &std::path::Pat
 
     // 1. Back up the current binary (copy, so `install` is never absent).
     let bak = backup_path(install);
-    let _bytes =
+    let _bak_bytes =
         std::fs::copy(install, &bak).map_err(|e| format!("backup {} -> {}: {e}", install.display(), bak.display()))?;
 
     // 2. Write the new bytes to a sibling temp and make it executable.
     let staged = with_suffix(install, "new");
-    let _bytes =
+    let _staged_bytes =
         std::fs::copy(src, &staged).map_err(|e| format!("stage {} -> {}: {e}", src.display(), staged.display()))?;
     #[cfg(unix)]
     {
@@ -95,16 +99,16 @@ pub fn boot_check(install: &std::path::Path) {
     let Ok(raw) = std::fs::read_to_string(&pending) else {
         return; // No staged update in flight.
     };
-    let attempts: u32 = raw.trim().parse::<u32>().unwrap_or(0).saturating_add(1);
+    let attempts = raw.trim().parse::<u32>().unwrap_or(0).saturating_add(1);
 
     if attempts >= MAX_BOOT_ATTEMPTS {
         // The staged update is crash-looping — roll back to the backup.
         let bak = backup_path(install);
         if bak.exists() {
             if let Err(e) = std::fs::rename(&bak, install) {
-                eprintln!("self-update: rollback {} -> {} failed: {e}", bak.display(), install.display());
+                crate::oerr!("self-update: rollback {} -> {} failed: {e}", bak.display(), install.display());
             } else {
-                eprintln!(
+                crate::oerr!(
                     "self-update: staged orchestrator failed to boot {attempts}× — rolled back to previous binary"
                 );
             }
@@ -116,10 +120,11 @@ pub fn boot_check(install: &std::path::Path) {
     }
 }
 
-/// Health-gated commit (update-policy §5.5 step 5): poll `healthy` and commit
-/// the staged update **only** once it reports `true` — `/healthz` answered
-/// `200`, i.e. socket bound + auth DB answering + registry readable. "Stayed
-/// up N seconds" is not enough to bless a new binary.
+/// Health-gated commit (update-policy §5.5 step 5).
+///
+/// Poll `healthy` and commit the staged update **only** once it reports `true`
+/// — `/healthz` answered `200`, i.e. socket bound + auth DB answering + registry
+/// readable. "Stayed up N seconds" is not enough to bless a new binary.
 ///
 /// If the deadline passes without a healthy probe, **no commit happens**: the
 /// `.pending` marker and `.bak` backup are left in place, so the next
@@ -127,12 +132,15 @@ pub fn boot_check(install: &std::path::Path) {
 /// tolerance is exhausted. Returns `true` iff the update was committed.
 ///
 /// No-op (`false`) when nothing is staged — a normal boot never polls.
-pub fn boot_commit_when_healthy<F: FnMut() -> bool>(
+pub fn boot_commit_when_healthy<F>(
     install: &std::path::Path,
     mut healthy: F,
     deadline: std::time::Duration,
     interval: std::time::Duration,
-) -> bool {
+) -> bool
+where
+    F: FnMut() -> bool,
+{
     if !pending_path(install).exists() {
         return false; // Nothing staged; normal boot.
     }
@@ -143,7 +151,7 @@ pub fn boot_commit_when_healthy<F: FnMut() -> bool>(
             return true;
         }
         if start.elapsed() >= deadline {
-            eprintln!(
+            crate::oerr!(
                 "self-update: staged update NOT committed — /healthz never returned 200 within {}s; \
                  leaving .pending so the boot-attempt guard can roll back",
                 deadline.as_secs()
@@ -155,8 +163,10 @@ pub fn boot_commit_when_healthy<F: FnMut() -> bool>(
 }
 
 /// Commit a staged update after a healthy boot: clear the `.pending` marker and
-/// delete the `.bak` backup. Call once the process is known to be running
-/// normally (e.g. after it has stayed up past a short grace period).
+/// delete the `.bak` backup.
+///
+/// Call once the process is known to be running normally (e.g. after it has
+/// stayed up past a short grace period).
 pub fn boot_commit(install: &std::path::Path) {
     let pending = pending_path(install);
     if !pending.exists() {
@@ -164,5 +174,5 @@ pub fn boot_commit(install: &std::path::Path) {
     }
     let _rm_pending = std::fs::remove_file(&pending);
     let _rm_bak = std::fs::remove_file(backup_path(install));
-    eprintln!("self-update: orchestrator update committed (previous binary backup removed)");
+    crate::oerr!("self-update: orchestrator update committed (previous binary backup removed)");
 }

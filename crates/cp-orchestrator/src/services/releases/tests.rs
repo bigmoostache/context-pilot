@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn semver_sort_key_ordering() {
     let mut tags = ["v0.2.9", "v0.2.10", "v0.1.0", "v0.2.2", "v0.2.1"];
-    tags.sort_by(|a, b| semver_sort_key(b).cmp(&semver_sort_key(a)));
+    tags.sort_by_key(|tag| std::cmp::Reverse(semver_sort_key(tag)));
     assert_eq!(tags, ["v0.2.10", "v0.2.9", "v0.2.2", "v0.2.1", "v0.1.0"]);
 }
 
@@ -65,7 +65,7 @@ fn update_config_legacy_migrates_with_defaults() {
     assert_eq!(store.update_mode(), UpdateMode::Auto, "default mode is auto");
     assert_eq!(store.channel(), "stable");
     assert_eq!(store.poll_interval_hours(), 6);
-    assert_eq!(store.window(), &MaintenanceWindow::default(), "default window 03:00–05:00");
+    assert_eq!(store.window(), &MaintenanceWindow::default(), "default window 03:00\u{2013}05:00");
 
     drop(std::fs::remove_dir_all(&dir));
 }
@@ -92,6 +92,49 @@ fn update_config_roundtrip() {
     drop(std::fs::remove_dir_all(&dir));
 }
 
+/// Seed a stale "available" hint into the on-disk update state, so a channel
+/// switch has something to clear. Hoisted out of the test to keep it under the
+/// cognitive-complexity cap.
+#[cfg(test)]
+fn seed_stale_available(releases: &std::path::Path) {
+    let mut st = updater::state::UpdateState::load(releases);
+    st.available = Some("v9.9.9".to_owned());
+    st.save(releases);
+}
+
+/// Assert a freshly reloaded store reports `(channel, pending)` — the
+/// persistence half of the round-trip, hoisted out of the test body.
+#[cfg(test)]
+fn assert_persisted(releases: &std::path::Path, channel: &str, pending: bool) {
+    let reloaded = ReleaseStore::load(releases.to_path_buf());
+    assert_eq!(reloaded.channel(), channel, "persisted channel");
+    assert_eq!(reloaded.pending_channel_switch(), pending, "persisted pending flag");
+}
+
+/// Switch `store` to `nightly`, asserting the bogus-channel refusal, the armed
+/// crossgrade flag, the cleared stale hint, and the persisted round-trip.
+/// Hoisted out of the test body to keep it under the cognitive-complexity cap.
+#[cfg(test)]
+fn switch_and_verify(store: &mut ReleaseStore, releases: &std::path::Path) {
+    assert!(store.set_channel("bogus").is_err(), "unknown channel refused");
+    store.set_channel("nightly").expect("nightly accepted");
+    assert_eq!(store.channel(), "nightly");
+    assert!(store.pending_channel_switch(), "switch arms the crossgrade flag");
+    assert!(updater::state::UpdateState::load(releases).available.is_none(), "stale available cleared");
+    assert_persisted(releases, "nightly", true);
+}
+
+/// Clear the armed flag on `store`, asserting it drops, that a no-op re-set of
+/// the current channel does not re-arm, and that the cleared state persists.
+#[cfg(test)]
+fn clear_and_verify(store: &mut ReleaseStore, releases: &std::path::Path) {
+    store.clear_pending_switch();
+    assert!(!store.pending_channel_switch());
+    store.set_channel("nightly").expect("same channel is a no-op");
+    assert!(!store.pending_channel_switch(), "re-setting the current channel does not re-arm");
+    assert_persisted(releases, "nightly", false);
+}
+
 /// A channel switch validates its input, arms the crossgrade flag, clears the
 /// stale "available" hint, and round-trips through persist + reload; clearing
 /// the flag persists too.
@@ -106,27 +149,10 @@ fn store_set_channel_roundtrip() {
     assert!(!store.pending_channel_switch());
 
     // A stale availability hint from the old channel must be dropped on switch.
-    let mut st = updater::UpdateState::load(&releases);
-    st.available = Some("v9.9.9".to_owned());
-    st.save(&releases);
+    seed_stale_available(&releases);
 
-    assert!(store.set_channel("bogus").is_err(), "unknown channel refused");
-    store.set_channel("nightly").expect("nightly accepted");
-    assert_eq!(store.channel(), "nightly");
-    assert!(store.pending_channel_switch(), "switch arms the crossgrade flag");
-    assert!(updater::UpdateState::load(&releases).available.is_none(), "stale available cleared");
-
-    // Persisted: a reload sees the switch and the armed flag.
-    let reloaded = ReleaseStore::load(releases.clone());
-    assert_eq!(reloaded.channel(), "nightly");
-    assert!(reloaded.pending_channel_switch());
-
-    // Clearing the flag persists; a no-op re-set of the same channel is inert.
-    store.clear_pending_switch();
-    assert!(!store.pending_channel_switch());
-    store.set_channel("nightly").expect("same channel is a no-op");
-    assert!(!store.pending_channel_switch(), "re-setting the current channel does not re-arm");
-    assert!(!ReleaseStore::load(releases).pending_channel_switch(), "clear persisted");
+    switch_and_verify(&mut store, &releases);
+    clear_and_verify(&mut store, &releases);
 
     drop(std::fs::remove_dir_all(&dir));
 }
@@ -137,7 +163,7 @@ fn store_select_rejects_missing() {
     drop(std::fs::create_dir_all(&dir));
 
     let mut store = ReleaseStore::load(dir.clone());
-    assert!(store.select("v0.0.1-ghost").is_err());
+    let _err: String = store.select("v0.0.1-ghost").unwrap_err();
 
     drop(std::fs::remove_dir_all(&dir));
 }
@@ -177,9 +203,11 @@ fn local_releases_scan() {
     let locals = store.local_releases();
     assert_eq!(locals.len(), 2);
     // Sorted descending by tag.
-    assert_eq!(locals[0].tag, "v0.2.0-bbb");
-    assert_eq!(locals[1].tag, "v0.1.0-aaa");
-    assert!(locals[0].binary_size > 0);
+    let newest = locals.first().expect("first release");
+    let oldest = locals.get(1).expect("second release");
+    assert_eq!(newest.tag, "v0.2.0-bbb");
+    assert_eq!(oldest.tag, "v0.1.0-aaa");
+    assert!(newest.binary_size > 0);
 
     drop(std::fs::remove_dir_all(&dir));
 }

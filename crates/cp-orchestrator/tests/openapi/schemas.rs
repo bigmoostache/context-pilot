@@ -1,10 +1,14 @@
-//! Core OpenAPI schemas — domain types that the spec references.
+//! Core `OpenAPI` schemas — domain types that the spec references.
 
 use serde_json::{Value, json};
 
 use super::{arr, r};
 
 /// Agent/thread/panel/tool schemas — the domain model.
+#[expect(
+    clippy::too_many_lines,
+    reason = "flat OpenAPI schema literal: one linear json! object enumerating the domain schemas; splitting it into sub-builders is churn with no readability gain — the openapi spec-builder twin of the flat State::default initializer"
+)]
 pub(super) fn core() -> Value {
     json!({
         // ── Shared enums ────────────────────────────────────────

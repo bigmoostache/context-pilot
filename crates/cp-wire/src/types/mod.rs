@@ -215,7 +215,7 @@ mod tests {
 
     #[test]
     fn content_hash_round_trip() {
-        let bytes: [u8; 32] = core::array::from_fn(|i| i as u8);
+        let bytes: [u8; 32] = core::array::from_fn(|i| u8::try_from(i).unwrap_or(0));
         let hash = ContentHash::new(bytes);
         let json = serde_json::to_string(&hash).expect("serialize");
         let back: ContentHash = serde_json::from_str(&json).expect("deserialize");
@@ -263,7 +263,7 @@ mod tests {
     #[test]
     fn content_hash_rejects_short_hex() {
         let result = serde_json::from_str::<ContentHash>("\"abcd\"");
-        assert!(result.is_err());
+        let _err = result.unwrap_err();
     }
 
     #[test]

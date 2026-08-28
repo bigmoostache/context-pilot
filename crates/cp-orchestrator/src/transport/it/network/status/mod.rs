@@ -57,7 +57,7 @@ pub(crate) fn probe(config: &NetworkConfig, has_modem: bool) -> Value {
         "modem_present": has_modem,
         "wan": wan_status(default_dev, gateway),
         "wwan": tools.as_ref().and_then(wwan_status),
-        "ap": tools.as_ref().map(|tools| ap_status(tools, config)),
+        "ap": tools.as_ref().map(|resolved| ap_status(resolved, config)),
         "supervisor": supervisor_status(),
     })
 }
@@ -119,7 +119,7 @@ fn parse_default_route(table: &str) -> Option<(u32, String, String)> {
     let mut best: Option<(u32, String, String)> = None;
     for line in table.lines().skip(1) {
         let cols: Vec<&str> = line.split_whitespace().collect();
-        let (Some(iface), Some(dest), Some(gateway), Some(metric), Some(mask)) =
+        let (Some(iface), Some(dest), Some(gateway), Some(metric_raw), Some(mask)) =
             (cols.first(), cols.get(1), cols.get(2), cols.get(6), cols.get(7))
         else {
             continue;
@@ -127,10 +127,10 @@ fn parse_default_route(table: &str) -> Option<(u32, String, String)> {
         if *dest != "00000000" || *mask != "00000000" {
             continue;
         }
-        let Ok(metric) = metric.parse::<u32>() else {
+        let Ok(metric) = metric_raw.parse::<u32>() else {
             continue;
         };
-        if best.as_ref().is_none_or(|(seen, _dev, _gw)| metric < *seen) {
+        if best.as_ref().is_none_or(|seen| metric < seen.0) {
             best = Some((metric, (*iface).to_owned(), hex_le_ipv4(gateway).unwrap_or_default()));
         }
     }
@@ -192,8 +192,10 @@ fn parse_default_route6(table: &str) -> Option<(u32, String)> {
 /// `192.168.1.1`).
 fn hex_le_ipv4(hex: &str) -> Option<String> {
     let raw = u32::from_str_radix(hex, 16).ok()?;
-    let [byte0, byte1, byte2, byte3] = raw.to_le_bytes();
-    Some(std::net::Ipv4Addr::new(byte0, byte1, byte2, byte3).to_string())
+    // `/proc/net/route` stores the address little-endian; swap to native
+    // (MSB-first) order so `Ipv4Addr::from`, which reads the octets high-byte
+    // first, yields the dotted quad. Avoids the forbidden `to_le_bytes`.
+    Some(std::net::Ipv4Addr::from(raw.swap_bytes()).to_string())
 }
 
 /// Classify the default-route device: `wan`, `wwan`, `other` or `none`.
@@ -257,7 +259,7 @@ fn wan_status(default_dev: Option<&str>, gateway: Option<&str>) -> Value {
 /// The first global IPv4 on `iface`, via `ip -4 -o addr show dev <iface>`.
 ///
 /// `CP_IP_BIN`-gated like every other tool. `end0` is networkd's, not
-/// NetworkManager's, so `nmcli` cannot answer this one.
+/// `NetworkManager`'s, so `nmcli` cannot answer this one.
 fn interface_ipv4(iface: &str) -> Value {
     let Some(ip_bin) = std::env::var_os("CP_IP_BIN") else {
         return Value::Null;
@@ -310,7 +312,7 @@ fn wwan_status(tools: &Tools) -> Option<Value> {
 /// something an apply turns on behind the admin's back.
 ///
 /// `modem` is the D-Bus path [`wwan_status`] already discovered from `mmcli -L`,
-/// not the index `0` this used to hardcode. ModemManager increments the
+/// not the index `0` this used to hardcode. `ModemManager` increments the
 /// index across re-enumerations, so after a modem reset every other bearer field
 /// was correct and the signal alone silently read `null`.
 fn signal_dbm(mmcli: &OsStr, modem: &str) -> Value {
@@ -346,10 +348,10 @@ fn plausible_dbm(raw: &str) -> Option<i64> {
     // need a lossy cast back that the lint config rightly forbids.
     let whole = raw.split_once('.').map_or(raw, |(before, _after)| before);
     let value = whole.trim().parse::<i64>().ok()?;
-    if (-160..=0).contains(&value) { Some(value) } else { None }
+    (-160..=0).contains(&value).then_some(value)
 }
 
-/// The first IPv4 address NetworkManager assigned to `profile`, without its
+/// The first IPv4 address `NetworkManager` assigned to `profile`, without its
 /// prefix length. Null when the profile is not active.
 fn nmcli_first_address(nmcli: &OsStr, profile: &str) -> Value {
     let args =
@@ -466,10 +468,8 @@ fn parse_global_country(output: &str) -> Option<String> {
             in_global = true;
             continue;
         }
-        if in_global {
-            if let Some(rest) = line.strip_prefix("country ") {
-                return rest.split(':').next().map(str::to_owned);
-            }
+        if in_global && let Some(rest) = line.strip_prefix("country ") {
+            return rest.split(':').next().map(str::to_owned);
         }
     }
     None

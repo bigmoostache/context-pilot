@@ -213,48 +213,48 @@ mod tests {
     #[test]
     fn multibyte_non_final_rows_not_truncated() {
         let sql = "INSERT INTO t(a,b) VALUES\n\
-                   ('s1','Réserve légale'),\n\
-                   ('s2','Disponibilités'),\n\
-                   ('s3','Créances diverses'),\n\
+                   ('s1','R\u{e9}serve l\u{e9}gale'),\n\
+                   ('s2','Disponibilit\u{e9}s'),\n\
+                   ('s3','Cr\u{e9}ances diverses'),\n\
                    ('s4','AT');";
         let stmts = split_statements(sql);
         assert_eq!(stmts.len(), 1, "expected one statement, got {stmts:?}");
         let stmt = stmts.first().copied().unwrap_or_default();
         // The full statement must survive — including the final row + closing paren.
         assert!(stmt.ends_with("('s4','AT')"), "statement truncated: {stmt}");
-        assert!(stmt.contains("Réserve légale"));
-        assert!(stmt.contains("Créances diverses"));
+        assert!(stmt.contains("R\u{e9}serve l\u{e9}gale"));
+        assert!(stmt.contains("Cr\u{e9}ances diverses"));
     }
 
     /// Multiple statements separated by `;`, each carrying multi-byte content,
     /// must split at the correct byte boundaries.
     #[test]
     fn multibyte_multiple_statements() {
-        let sql = "INSERT INTO t VALUES ('é');\nINSERT INTO t VALUES ('à');";
+        let sql = "INSERT INTO t VALUES ('\u{e9}');\nINSERT INTO t VALUES ('\u{e0}');";
         let stmts = split_statements(sql);
         assert_eq!(stmts.len(), 2, "got {stmts:?}");
-        assert!(stmts.first().copied().unwrap_or_default().contains("'é'"));
-        assert!(stmts.get(1).copied().unwrap_or_default().contains("'à'"));
+        assert!(stmts.first().copied().unwrap_or_default().contains("'\u{e9}'"));
+        assert!(stmts.get(1).copied().unwrap_or_default().contains("'\u{e0}'"));
     }
 
     /// Escaped quotes (`''`) inside a multi-byte string literal must not end
     /// the string early or desynchronize byte offsets.
     #[test]
     fn escaped_quotes_with_multibyte() {
-        let sql = "INSERT INTO t VALUES ('Cré''ance'),('x');";
+        let sql = "INSERT INTO t VALUES ('Cr\u{e9}''ance'),('x');";
         let stmts = split_statements(sql);
         assert_eq!(stmts.len(), 1, "got {stmts:?}");
-        assert!(stmts.first().copied().unwrap_or_default().contains("Cré''ance"));
+        assert!(stmts.first().copied().unwrap_or_default().contains("Cr\u{e9}''ance"));
     }
 
     /// A `;` inside a string literal (with multi-byte chars present) must NOT
     /// split the statement.
     #[test]
     fn semicolon_inside_multibyte_string() {
-        let sql = "INSERT INTO t VALUES ('café; thé');";
+        let sql = "INSERT INTO t VALUES ('caf\u{e9}; th\u{e9}');";
         let stmts = split_statements(sql);
         assert_eq!(stmts.len(), 1, "got {stmts:?}");
-        assert!(stmts.first().copied().unwrap_or_default().contains("café; thé"));
+        assert!(stmts.first().copied().unwrap_or_default().contains("caf\u{e9}; th\u{e9}"));
     }
 
     /// Pure-ASCII multi-statement splitting still works (no regression).
@@ -359,11 +359,11 @@ mod tests {
     /// and in-data semicolons — exactly one statement should result.
     #[test]
     fn combined_adversarial_single_statement() {
-        let sql = "INSERT INTO \"tbl;x\" (a,b) /* c; */ VALUES ('Réserve; légale','x') -- trailing; note";
+        let sql = "INSERT INTO \"tbl;x\" (a,b) /* c; */ VALUES ('R\u{e9}serve; l\u{e9}gale','x') -- trailing; note";
         let stmts = split_statements(sql);
         assert_eq!(stmts.len(), 1, "got {stmts:?}");
         let stmt = stmts.first().copied().unwrap_or_default();
-        assert!(stmt.contains("Réserve; légale"));
+        assert!(stmt.contains("R\u{e9}serve; l\u{e9}gale"));
         assert!(stmt.contains("\"tbl;x\""));
     }
 }

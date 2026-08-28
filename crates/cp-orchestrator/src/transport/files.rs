@@ -47,7 +47,7 @@ pub(super) fn serve_static(request: Request, path: &str) {
 
     match std::fs::read(&file) {
         Ok(bytes) => {
-            let mut response = Response::from_data(bytes).with_status_code(200);
+            let mut response = Response::from_data(bytes).with_status_code(200u16);
             if let Ok(h) = Header::from_bytes(&b"Content-Type"[..], content_type(&file).as_bytes()) {
                 response = response.with_header(h);
             }
@@ -90,7 +90,7 @@ fn content_type(path: &Path) -> &'static str {
 pub(super) fn handle_download(request: Request, state: &Arc<Mutex<Backend>>, id: &str, query: &str) {
     match inspect::finder::fs_download(state, id, query) {
         Ok((bytes, filename)) => {
-            let mut response = Response::from_data(bytes).with_status_code(200);
+            let mut response = Response::from_data(bytes).with_status_code(200u16);
             if let Ok(h) = Header::from_bytes(
                 &b"Content-Disposition"[..],
                 format!("attachment; filename=\"{filename}\"").as_bytes(),
@@ -115,7 +115,7 @@ pub(super) fn handle_download(request: Request, state: &Arc<Mutex<Backend>>, id:
 pub(super) fn handle_raw(request: Request, state: &Arc<Mutex<Backend>>, id: &str, query: &str) {
     match inspect::finder::fs_raw(state, id, query) {
         Ok((bytes, ctype)) => {
-            let mut response = Response::from_data(bytes).with_status_code(200);
+            let mut response = Response::from_data(bytes).with_status_code(200u16);
             if let Ok(h) = Header::from_bytes(&b"Content-Type"[..], ctype.as_bytes()) {
                 response = response.with_header(h);
             }
@@ -136,7 +136,7 @@ pub(super) fn handle_avatar(request: Request, state: &Arc<Mutex<Backend>>, id: &
     let avatar = state.lock().ok().and_then(|b| b.avatars.get(id));
     match avatar {
         Some((bytes, ctype)) => {
-            let mut response = Response::from_data(bytes).with_status_code(200);
+            let mut response = Response::from_data(bytes).with_status_code(200u16);
             if let Ok(h) = Header::from_bytes(&b"Content-Type"[..], ctype.as_bytes()) {
                 response = response.with_header(h);
             }

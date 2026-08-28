@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use super::super::HttpReply;
 
+/// Filename (under `~/.context-pilot/`) of the stored-accounts vault.
 const ACCOUNTS_FILE: &str = "claude-accounts.json";
 
 /// Refresh a token once it drops within this window of expiry (1 hour). Shared
@@ -26,15 +27,18 @@ struct AccountsFile {
     accounts: BTreeMap<String, serde_json::Value>,
 }
 
+/// Absolute path to `~/.context-pilot/claude-accounts.json`.
 fn accounts_path() -> std::path::PathBuf {
     let home = std::env::var("HOME").unwrap_or_default();
     std::path::Path::new(&home).join(".context-pilot").join(ACCOUNTS_FILE)
 }
 
+/// Load the accounts vault, returning an empty store on any read/parse error.
 fn read_accounts() -> AccountsFile {
     std::fs::read_to_string(accounts_path()).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
 }
 
+/// Serialize the accounts vault to disk (pretty JSON), creating the parent dir.
 fn write_accounts(store: &AccountsFile) -> Result<(), String> {
     let json = serde_json::to_string_pretty(store).map_err(|e| e.to_string())?;
     let path = accounts_path();
@@ -46,26 +50,35 @@ fn write_accounts(store: &AccountsFile) -> Result<(), String> {
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
+/// Current wall-clock time in epoch milliseconds (shared time source).
 fn now_ms() -> i64 {
-    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
+    cp_mod_utilities::time::now_epoch_ms()
 }
 
 // ── Response types ───────────────────────────────────────────────────
 
+/// One row of `GET /api/claude-accounts` — a stored (inactive) account.
 #[derive(Serialize)]
 struct AccountSummary {
+    /// The account's email (the vault key).
     email: String,
+    /// Token expiry (epoch ms), when present.
     expires_at: Option<i64>,
+    /// Whether the stored token is non-empty and unexpired.
     valid: bool,
 }
 
+/// JSON body of `GET /api/claude-accounts`.
 #[derive(Serialize)]
 struct AccountsListResponse {
+    /// The stored accounts, one summary each.
     accounts: Vec<AccountSummary>,
 }
 
+/// JSON body of `POST /api/claude-accounts/switch`.
 #[derive(Deserialize)]
 struct SwitchRequest {
+    /// Email of the stored account to activate.
     email: String,
 }
 
@@ -79,7 +92,7 @@ pub(crate) fn list_accounts() -> HttpReply {
         .accounts
         .iter()
         .map(|(email, creds)| {
-            let expires_at = creds.get("expiresAt").and_then(|v| v.as_i64());
+            let expires_at = creds.get("expiresAt").and_then(serde_json::Value::as_i64);
             let token = creds.get("accessToken").and_then(|v| v.as_str()).unwrap_or("");
             let valid = expires_at.is_some_and(|e| e > now) && !token.is_empty();
             AccountSummary { email: email.clone(), expires_at, valid }
@@ -128,16 +141,16 @@ pub(crate) fn switch_account(body_bytes: &[u8]) -> HttpReply {
 
     // If the access token is expired or within an hour of expiry, refresh it
     // before activating so the switched-to account is comfortably usable.
-    let target_creds = maybe_refresh(target_creds, REFRESH_THRESHOLD_MS);
+    let refreshed_creds = maybe_refresh(target_creds, REFRESH_THRESHOLD_MS);
 
     // Save current active into the store (best-effort: if no active token
     // exists we still proceed with the switch).
     if let Some(current) = super::read_credentials_json() {
         let current_token = current.get("accessToken").and_then(|v| v.as_str()).unwrap_or("");
-        if !current_token.is_empty() {
-            if let Some(current_email) = super::fetch_account_email(current_token) {
-                let _prev = store.accounts.insert(current_email, current);
-            }
+        if !current_token.is_empty()
+            && let Some(current_email) = super::fetch_account_email(current_token)
+        {
+            let _prev = store.accounts.insert(current_email, current);
         }
     }
 
@@ -147,7 +160,7 @@ pub(crate) fn switch_account(body_bytes: &[u8]) -> HttpReply {
     }
 
     // Activate the target credentials.
-    let wrapped = serde_json::json!({ "claudeAiOauth": target_creds });
+    let wrapped = serde_json::json!({ "claudeAiOauth": refreshed_creds });
     if let Err(e) = super::store_credentials(&wrapped) {
         return HttpReply::error(500, &format!("failed to activate credentials: {e}"));
     }
@@ -173,7 +186,7 @@ pub(crate) fn delete_account(email: &str) -> HttpReply {
 /// carries a non-empty refresh token to renew with. `threshold_ms == 0` is the
 /// classic "expired only" test; a positive value (e.g. 1h) refreshes early.
 pub(super) fn is_stale(creds: &serde_json::Value, threshold_ms: i64) -> bool {
-    let expires_at = creds.get("expiresAt").and_then(|v| v.as_i64()).unwrap_or(0);
+    let expires_at = creds.get("expiresAt").and_then(serde_json::Value::as_i64).unwrap_or(0);
     let has_refresh = creds.get("refreshToken").and_then(|v| v.as_str()).is_some_and(|s| !s.is_empty());
     has_refresh && expires_at.saturating_sub(now_ms()) < threshold_ms
 }
@@ -209,12 +222,15 @@ pub(super) fn try_refresh(base: &serde_json::Value, refresh_token: &str) -> Opti
         return None;
     }
     let new_refresh = val.get("refresh_token").and_then(|v| v.as_str()).unwrap_or(refresh_token);
-    let expires_in = val.get("expires_in").and_then(|v| v.as_i64()).unwrap_or(0);
+    let expires_in = val.get("expires_in").and_then(serde_json::Value::as_i64).unwrap_or(0);
+    let expires_at = now_ms().saturating_add(expires_in.saturating_mul(1000));
 
     let mut creds = base.clone();
-    creds["accessToken"] = serde_json::Value::String(access_token.to_owned());
-    creds["refreshToken"] = serde_json::Value::String(new_refresh.to_owned());
-    creds["expiresAt"] = serde_json::json!(now_ms() + expires_in * 1000);
+    if let Some(obj) = creds.as_object_mut() {
+        let _old_access = obj.insert("accessToken".to_owned(), serde_json::Value::String(access_token.to_owned()));
+        let _old_refresh = obj.insert("refreshToken".to_owned(), serde_json::Value::String(new_refresh.to_owned()));
+        let _old_expiry = obj.insert("expiresAt".to_owned(), serde_json::json!(expires_at));
+    }
     Some(creds)
 }
 

@@ -426,7 +426,7 @@ mod tests {
 
         // A command-only connection never consults the responder.
         let never = |_q: &cp_wire::types::payload::query::Query| -> cp_wire::types::payload::query::Outcome {
-            unreachable!("no query frame on this connection");
+            panic!("no query frame on this connection");
         };
         let applied = intake.handle_connection(&oplog, &mut server, &never).expect("handle");
         assert_eq!(applied.len(), 1, "one fresh command was accepted off the connection");

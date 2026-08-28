@@ -301,7 +301,7 @@ mod tests {
     #[test]
     fn payload_too_large() {
         let mut frame = encode_raw(b"x").expect("encode");
-        let huge: u32 = MAX_PAYLOAD_SIZE.wrapping_add(1);
+        let huge = MAX_PAYLOAD_SIZE.wrapping_add(1);
         if let Some(slot) = frame.get_mut(..4) {
             slot.copy_from_slice(&u32_to_le(huge));
         }

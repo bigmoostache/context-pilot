@@ -18,7 +18,7 @@ use super::accounts::{self, REFRESH_THRESHOLD_MS};
 
 /// How often the sweep runs. A token entering its final hour is therefore
 /// renewed within at most one interval — well before it can expire.
-const SWEEP_INTERVAL: Duration = Duration::from_secs(600);
+const SWEEP_INTERVAL: Duration = Duration::from_mins(10);
 
 /// Settle delay before the first sweep — lets the transport bind and the boot
 /// sequence land so a refresh never races startup.
@@ -28,11 +28,19 @@ const BOOT_DELAY: Duration = Duration::from_secs(10);
 pub(crate) fn spawn() -> thread::JoinHandle<()> {
     thread::spawn(|| {
         thread::sleep(BOOT_DELAY);
-        loop {
-            sweep_once();
-            thread::sleep(SWEEP_INTERVAL);
-        }
+        sweeper_loop()
     })
+}
+
+/// The sweeper's perpetual cadence — refresh, sleep, repeat for the process
+/// lifetime. Divergent (`-> !`): the daemon thread never returns, so the
+/// `loop` is legitimately unbounded (`clippy::infinite_loop` is satisfied by the
+/// never-return type rather than a dead `break`).
+fn sweeper_loop() -> ! {
+    loop {
+        sweep_once();
+        thread::sleep(SWEEP_INTERVAL);
+    }
 }
 
 /// One pass: refresh the active-slot token if stale, then every stored account.

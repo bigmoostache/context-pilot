@@ -47,15 +47,15 @@ pub(super) enum Proc {
 /// A single supervised agent process.
 pub(super) struct Supervised {
     /// The OS-process handle (spawned-std / spawned-pty / adopted).
-    pub(super) proc: Proc,
+    pub proc: Proc,
     /// OS pid of the agent process.
-    pub(super) pid: u32,
+    pub pid: u32,
     /// Canonical binary path (for restart).
-    pub(super) binary: PathBuf,
+    pub binary: PathBuf,
     /// Working directory = agent's realm folder.
-    pub(super) folder: PathBuf,
+    pub folder: PathBuf,
     /// Extra CLI arguments passed at spawn (for restart).
-    pub(super) args: Vec<String>,
+    pub args: Vec<String>,
 }
 
 // Manual Debug — `Box<dyn Child>` / `Box<dyn MasterPty>` are not `Debug`.
@@ -102,8 +102,8 @@ pub(super) fn spawn_pty_proc(binary: &Path, folder: &Path, env: &[(&str, &str)])
     for (k, v) in std::env::vars() {
         cmd.env(k, v);
     }
-    for (k, v) in env {
-        cmd.env(*k, *v);
+    for (k, v) in env.iter().copied() {
+        cmd.env(k, v);
     }
 
     let child = pair.slave.spawn_command(cmd).map_err(|e| Error::Pty { detail: e.to_string() })?;
@@ -118,7 +118,9 @@ pub(super) fn spawn_pty_proc(binary: &Path, folder: &Path, env: &[(&str, &str)])
     // agent exits (read returns 0 / errors).
     let mut reader = pair.master.try_clone_reader().map_err(|e| Error::Pty { detail: e.to_string() })?;
     let _drain = thread::spawn(move || {
-        let mut buf = [0u8; 4096];
+        // Heap-allocated drain buffer (a 4 KiB stack array trips
+        // clippy::large_stack_arrays, threshold 512B). Contents are discarded.
+        let mut buf = vec![0u8; 4096];
         while let Ok(n) = reader.read(&mut buf) {
             if n == 0 {
                 break;

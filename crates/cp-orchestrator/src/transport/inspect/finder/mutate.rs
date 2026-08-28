@@ -23,7 +23,7 @@ use super::support::{agent_folder, confined_path, extract_param};
 /// overwrite the existing file being edited — never create a stray entry or
 /// clobber a folder. Returns `{ written, path }` (bytes written + the
 /// realm-relative path).
-pub fn fs_write(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8]) -> HttpReply {
+pub(crate) fn fs_write(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8]) -> HttpReply {
     let folder = match agent_folder(state, agent_id) {
         Ok(f) => f,
         Err(reply) => return reply,
@@ -33,9 +33,8 @@ pub fn fs_write(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8]
         _ => return HttpReply::error(400, "missing path parameter"),
     };
 
-    let target = match confined_path(&folder, &relative) {
-        Some(p) => p,
-        None => return HttpReply::error(403, "path outside agent realm"),
+    let Some(target) = confined_path(&folder, &relative) else {
+        return HttpReply::error(403, "path outside agent realm");
     };
     if target.is_dir() {
         return HttpReply::error(400, "cannot write over a directory");
@@ -65,7 +64,7 @@ pub fn fs_write(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8]
 /// separators, not `.`/`..`) so the new folder can never land outside the realm.
 /// An already-existing entry with that name is a `409` (never silently reused).
 /// Returns `{ created }` — the realm-relative path of the new folder.
-pub fn fs_mkdir(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
+pub(crate) fn fs_mkdir(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
     let folder = match agent_folder(state, agent_id) {
         Ok(f) => f,
         Err(reply) => return reply,
@@ -82,9 +81,8 @@ pub fn fs_mkdir(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpRepl
         return HttpReply::error(400, "invalid folder name");
     }
 
-    let dir = match confined_path(&folder, &relative_dir) {
-        Some(p) => p,
-        None => return HttpReply::error(403, "path outside agent realm"),
+    let Some(dir) = confined_path(&folder, &relative_dir) else {
+        return HttpReply::error(403, "path outside agent realm");
     };
     if !dir.is_dir() {
         return HttpReply::error(404, "parent directory not found");
@@ -94,7 +92,10 @@ pub fn fs_mkdir(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpRepl
     if dest.exists() {
         return HttpReply::error(409, "an entry with that name already exists");
     }
-    if std::fs::create_dir(&dest).is_err() {
+    // Parent is verified to exist above and `name` is a bare component, so
+    // `create_dir_all` creates exactly the one new folder (no intermediates) —
+    // equivalent to `create_dir` here, and avoids clippy::create_dir.
+    if std::fs::create_dir_all(&dest).is_err() {
         return HttpReply::error(502, "create failed");
     }
 
@@ -113,7 +114,7 @@ pub fn fs_mkdir(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpRepl
 /// A rename to the unchanged name is a no-op success; a name already taken by a
 /// different entry is a `409` (never clobbers). Returns `{ renamed }` — the new
 /// realm-relative path.
-pub fn fs_rename(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
+pub(crate) fn fs_rename(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
     let folder = match agent_folder(state, agent_id) {
         Ok(f) => f,
         Err(reply) => return reply,
@@ -133,9 +134,8 @@ pub fn fs_rename(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpRep
         return HttpReply::error(400, "invalid name");
     }
 
-    let src = match confined_path(&folder, &relative) {
-        Some(p) => p,
-        None => return HttpReply::error(403, "path outside agent realm"),
+    let Some(src) = confined_path(&folder, &relative) else {
+        return HttpReply::error(403, "path outside agent realm");
     };
     if !src.exists() {
         return HttpReply::error(404, "entry not found");
@@ -178,15 +178,14 @@ pub fn fs_rename(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpRep
 /// Returns `{ moved, skipped }` (entries actually renamed vs. no-op'd). A single
 /// failing item aborts with the matching error status (best-effort partial moves
 /// already applied are not rolled back — the listing refresh shows the truth).
-pub fn fs_move(state: &Mutex<Backend>, agent_id: &str, body: &[u8]) -> HttpReply {
+pub(crate) fn fs_move(state: &Mutex<Backend>, agent_id: &str, body: &[u8]) -> HttpReply {
     let folder = match agent_folder(state, agent_id) {
         Ok(f) => f,
         Err(reply) => return reply,
     };
 
-    let parsed: serde_json::Value = match serde_json::from_slice(body) {
-        Ok(v) => v,
-        Err(_) => return HttpReply::error(400, "malformed move request"),
+    let Ok(parsed): Result<serde_json::Value, _> = serde_json::from_slice(body) else {
+        return HttpReply::error(400, "malformed move request");
     };
     let items: Vec<String> = parsed
         .get("items")
@@ -198,20 +197,18 @@ pub fn fs_move(state: &Mutex<Backend>, agent_id: &str, body: &[u8]) -> HttpReply
     }
     let dest_rel = parsed.get("dest").and_then(serde_json::Value::as_str).unwrap_or("");
 
-    let dest_dir = match confined_path(&folder, dest_rel) {
-        Some(p) => p,
-        None => return HttpReply::error(403, "destination outside agent realm"),
+    let Some(dest_dir) = confined_path(&folder, dest_rel) else {
+        return HttpReply::error(403, "destination outside agent realm");
     };
     if !dest_dir.is_dir() {
         return HttpReply::error(404, "destination directory not found");
     }
 
-    let mut moved = 0_usize;
-    let mut skipped = 0_usize;
+    let mut moved = 0usize;
+    let mut skipped = 0usize;
     for item in &items {
-        let src = match confined_path(&folder, item) {
-            Some(p) => p,
-            None => return HttpReply::error(403, "source outside agent realm"),
+        let Some(src) = confined_path(&folder, item) else {
+            return HttpReply::error(403, "source outside agent realm");
         };
         let Some(base) = src.file_name() else {
             return HttpReply::error(400, "invalid source path");
@@ -220,7 +217,7 @@ pub fn fs_move(state: &Mutex<Backend>, agent_id: &str, body: &[u8]) -> HttpReply
 
         // Already in the destination directory → nothing to do.
         if dest_path == src {
-            skipped += 1;
+            skipped = skipped.saturating_add(1);
             continue;
         }
         // Refuse to move a directory inside itself or one of its descendants.
@@ -234,7 +231,7 @@ pub fn fs_move(state: &Mutex<Backend>, agent_id: &str, body: &[u8]) -> HttpReply
         if std::fs::rename(&src, &dest_path).is_err() {
             return HttpReply::error(502, "move failed");
         }
-        moved += 1;
+        moved = moved.saturating_add(1);
     }
 
     HttpReply::ok(&serde_json::json!({ "moved": moved, "skipped": skipped }))
@@ -269,15 +266,14 @@ const TRASH_DIR: &str = ".context-pilot/trash";
 /// Returns `{ trashed, skipped }`. A single failing item aborts with the matching
 /// error status (partial moves already applied are not rolled back — the listing
 /// refresh shows the truth).
-pub fn fs_trash(state: &Mutex<Backend>, agent_id: &str, body: &[u8]) -> HttpReply {
+pub(crate) fn fs_trash(state: &Mutex<Backend>, agent_id: &str, body: &[u8]) -> HttpReply {
     let folder = match agent_folder(state, agent_id) {
         Ok(f) => f,
         Err(reply) => return reply,
     };
 
-    let parsed: serde_json::Value = match serde_json::from_slice(body) {
-        Ok(v) => v,
-        Err(_) => return HttpReply::error(400, "malformed trash request"),
+    let Ok(parsed): Result<serde_json::Value, _> = serde_json::from_slice(body) else {
+        return HttpReply::error(400, "malformed trash request");
     };
     let items: Vec<String> = parsed
         .get("items")
@@ -297,16 +293,15 @@ pub fn fs_trash(state: &Mutex<Backend>, agent_id: &str, body: &[u8]) -> HttpRepl
         return HttpReply::error(502, "could not create trash directory");
     }
 
-    let mut trashed = 0_usize;
-    let mut skipped = 0_usize;
+    let mut trashed = 0usize;
+    let mut skipped = 0usize;
     for item in &items {
-        let src = match confined_path(&folder, item) {
-            Some(p) => p,
-            None => return HttpReply::error(403, "source outside agent realm"),
+        let Some(src) = confined_path(&folder, item) else {
+            return HttpReply::error(403, "source outside agent realm");
         };
         // Never trash the trash itself, nor anything already inside it.
         if src == trash || src.starts_with(&trash) {
-            skipped += 1;
+            skipped = skipped.saturating_add(1);
             continue;
         }
         let Some(base) = src.file_name() else {
@@ -323,7 +318,7 @@ pub fn fs_trash(state: &Mutex<Backend>, agent_id: &str, body: &[u8]) -> HttpRepl
         if std::fs::rename(&src, &dest).is_err() {
             return HttpReply::error(502, "trash failed");
         }
-        trashed += 1;
+        trashed = trashed.saturating_add(1);
     }
 
     HttpReply::ok(&serde_json::json!({ "trashed": trashed, "skipped": skipped }))

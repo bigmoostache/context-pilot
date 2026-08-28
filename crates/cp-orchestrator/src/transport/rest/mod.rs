@@ -22,16 +22,24 @@ use cp_wire::types::command::Command;
 use cp_wire::types::registry::Entry;
 use serde::Serialize;
 
-use crate::channel::AgentChannel;
+use crate::channel::AgentHandle;
 
-mod backend;
-mod claude_oauth;
+// `pub mod` (not private `mod`) so `Backend`/`Paths` are reachable at
+// a fully-public path (`transport::rest::backend::Backend`) for external test
+// consumers, without a `pub use` item re-export (which `clippy::pub_use`
+// forbids). The crate-internal short path `crate::transport::Backend` rides the
+// `pub(crate) use` below.
+pub mod backend;
+// `pub` (not private `mod`) so the `pub` `Backend::pkce_session` field's type
+// `PkceSession` is nameable through a public path (`rest::claude_oauth::PkceSession`),
+// satisfying `unnameable_types` without a forbidden `pub use` item re-export.
+pub mod claude_oauth;
 mod config;
 mod create;
 mod lifecycle;
 mod releases;
 mod threads;
-pub use backend::Backend;
+pub(crate) use backend::Backend;
 pub(crate) use claude_oauth::accounts::{delete_account, list_accounts, store_account, switch_account};
 pub(crate) use claude_oauth::sweep::spawn as spawn_oauth_refresh;
 pub(crate) use claude_oauth::{claude_usage, login_complete, login_start, refresh_login, token_status};
@@ -39,13 +47,13 @@ pub(crate) use config::env_keys::{env_key_reveal, env_key_update, env_keys_list,
 pub(crate) use config::it::{it_ca_fingerprint, it_get_identity, it_provisioned, it_set_identity};
 pub(crate) use config::network::{it_get_network, it_set_network_ap, it_set_network_mode, it_set_network_wwan};
 pub(crate) use config::settings::{allowed_models, onboarding_completed};
-pub use config::settings::{get_settings, update_settings};
+pub(crate) use config::settings::{get_settings, update_settings};
 pub(crate) use config::update::{APPLY_IN_FLIGHT, update_apply, update_check, update_set_mode, update_status};
-pub use create::{
+pub(crate) use create::{
     create_agent, create_command, delete_library_agent, read_library_agent, upsert_library_agent,
     upsert_library_command,
 };
-pub use lifecycle::{restart_agent, retire_agent, unretire_agent};
+pub(crate) use lifecycle::{restart_agent, retire_agent, unretire_agent};
 pub(crate) use releases::{
     delete_release, deploy_fleet, download_release, list_releases, releases_break_glass, restart_orchestrator,
     select_release, set_arch,
@@ -64,17 +72,21 @@ pub struct HttpReply {
 
 impl HttpReply {
     /// A `200 OK` carrying `value` serialized as JSON.
-    pub(crate) fn ok<T: Serialize>(value: &T) -> Self {
+    pub(crate) fn ok<T>(value: &T) -> Self
+    where
+        T: Serialize,
+    {
         Self::json(200, value)
     }
 
     /// A reply with `status` carrying `value` serialized as JSON. Serialization
     /// is infallible for our own types; a failure degrades to a `500`.
-    fn json<T: Serialize>(status: u16, value: &T) -> Self {
-        match serde_json::to_string(value) {
-            Ok(body) => Self { status, body },
-            Err(_) => Self::error(500, "serialization failed"),
-        }
+    fn json<T>(status: u16, value: &T) -> Self
+    where
+        T: Serialize,
+    {
+        serde_json::to_string(value)
+            .map_or_else(|_| Self::error(500, "serialization failed"), |body| Self { status, body })
     }
 
     /// An error reply with a `{"error": reason}` body.
@@ -85,7 +97,7 @@ impl HttpReply {
 
 /// A read response wrapping its payload with the `rev` it reflects.
 #[derive(Debug, Serialize)]
-pub struct Envelope<T: Serialize> {
+pub struct Envelope<T> {
     /// The oplog `rev` this payload reflects — an SSE stream can resume here.
     pub rev: u64,
     /// The resource payload.
@@ -122,13 +134,13 @@ pub fn fleet(state: &Mutex<Backend>, auth_user: Option<&crate::services::auth::t
     // Filter by ACL when auth is enabled (FR-12).
     let visible_ids = crate::transport::auth::filter_fleet(state, &all_ids, auth_user);
 
-    let Ok(backend) = state.lock() else {
+    let Ok(relocked) = state.lock() else {
         return HttpReply::error(500, "backend lock poisoned");
     };
     let mut agents = serde_json::Map::new();
     let mut max_rev = 0u64;
     for id in &visible_ids {
-        if let Some(view) = backend.view.get(id) {
+        if let Some(view) = relocked.view.get(id) {
             max_rev = max_rev.max(view.rev);
             if let Ok(value) = serde_json::to_value(view) {
                 let _prev = agents.insert(id.clone(), value);
@@ -143,10 +155,10 @@ pub fn agent(state: &Mutex<Backend>, id: &str) -> HttpReply {
     let Ok(backend) = state.lock() else {
         return HttpReply::error(500, "backend lock poisoned");
     };
-    match backend.view.get(id) {
-        Some(view) => HttpReply::ok(&Envelope { rev: view.rev, data: view }),
-        None => HttpReply::error(404, "unknown agent"),
-    }
+    backend.view.get(id).map_or_else(
+        || HttpReply::error(404, "unknown agent"),
+        |view| HttpReply::ok(&Envelope { rev: view.rev, data: view }),
+    )
 }
 
 /// `POST /api/ticket` — mint a single-use SSE upgrade ticket.
@@ -175,7 +187,7 @@ pub fn body(state: &Mutex<Backend>, id: &str, hash_hex: &str) -> HttpReply {
         Err(reply) => return reply,
     };
     // Hydrate is blocking agent I/O — performed with no lock held.
-    match AgentChannel::from_entry(&entry).hydrate(hash) {
+    match AgentHandle::from_entry(&entry).hydrate(hash) {
         Ok(Some(bytes)) => {
             HttpReply { status: 200, body: serde_json::to_string(&BodyPayload { bytes: &bytes }).unwrap_or_default() }
         }
@@ -198,7 +210,7 @@ pub fn command(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> HttpReply
         Err(reply) => return reply,
     };
     let dedup_token = command.dedup_token.clone();
-    match AgentChannel::from_entry(&entry).send(command) {
+    match AgentHandle::from_entry(&entry).send(command) {
         Ok(ack) => {
             // Mark state dirty so SSE producers emit an `invalidate` event,
             // prompting connected frontends to refetch tier-② data.
@@ -213,7 +225,7 @@ pub fn command(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> HttpReply
             })
         }
         Err(e) => {
-            eprintln!("command send error for agent {id}: {e:?}");
+            crate::oerr!("command send error for agent {id}: {e:?}");
             HttpReply::error(502, "agent unreachable")
         }
     }
@@ -271,20 +283,23 @@ pub fn delete_avatar(state: &Mutex<Backend>, id: &str) -> HttpReply {
 /// Returns an [`HttpReply`] error directly so handlers can `?`-style early-out.
 pub(super) fn resolve_entry(state: &Mutex<Backend>, id: &str) -> Result<Entry, HttpReply> {
     let dir = {
-        let backend = state.lock().map_err(|_| HttpReply::error(500, "backend lock poisoned"))?;
+        let backend = state.lock().ok().ok_or_else(|| HttpReply::error(500, "backend lock poisoned"))?;
         backend.agents_dir.clone()
     };
     let path = dir.join(format!("{id}.json"));
-    let raw = std::fs::read(&path).map_err(|e| match e.kind() {
-        std::io::ErrorKind::NotFound => HttpReply::error(404, "unknown agent"),
-        _ => HttpReply::error(502, "registry read failed"),
+    let raw = std::fs::read(&path).map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            HttpReply::error(404, "unknown agent")
+        } else {
+            HttpReply::error(502, "registry read failed")
+        }
     })?;
-    serde_json::from_slice::<Entry>(&raw).map_err(|_| HttpReply::error(502, "registry record corrupt"))
+    serde_json::from_slice::<Entry>(&raw).ok().ok_or_else(|| HttpReply::error(502, "registry record corrupt"))
 }
 
 /// Map an [`Ack`](cp_wire::types::ack::Ack) status to a short string.
 fn ack_status(status: &cp_wire::types::ack::Status) -> String {
-    match status {
+    match *status {
         cp_wire::types::ack::Status::Accepted => "accepted".to_owned(),
         cp_wire::types::ack::Status::Rejected { .. } => "rejected".to_owned(),
         // `Status` is #[non_exhaustive]; a status from a newer protocol folds
@@ -297,7 +312,7 @@ fn ack_status(status: &cp_wire::types::ack::Status) -> String {
 ///
 /// The thread **roster** (which threads exist, their turn status, archived
 /// flag, and last activity) comes from the in-memory
-/// [`MaterializedView`](crate::services::MaterializedView) — folded live from
+/// [`MaterializedView`](crate::services::materialized_view::MaterializedView) — folded live from
 /// the agent's oplog, so a just-created/archived/restored thread is reflected
 /// in milliseconds, never waiting on the debounced tier-② disk write (design
 /// doc I5: live reads ride the view, not disk).
@@ -332,15 +347,15 @@ pub fn threads(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
         let cfg = reader.read_config(folder).ok();
 
         // Read focused_thread_id from the first worker's FocusState.
-        let focused = reader.list_workers(folder).unwrap_or_default().into_iter().find_map(|wid| {
-            reader.read_worker(folder, &wid).ok().and_then(|w| {
+        let disk_focus =
+            crate::inspect::StateReader::list_workers(folder).unwrap_or_default().into_iter().find_map(|wid| {
+                let w = reader.read_worker(folder, &wid).ok()?;
                 w.get("modules")
                     .and_then(|m| m.get("threads_worker"))
                     .and_then(|tw| tw.get("focused_thread_id"))
                     .and_then(serde_json::Value::as_str)
                     .map(String::from)
-            })
-        });
+            });
         // The `reader` borrow ends with `cfg`/`focused` (both owned); now read
         // the live roster + focused thread from the view under the same lock.
         // The view's focus (push-fed via `ThreadFocusChanged`) is the fresher
@@ -350,20 +365,20 @@ pub fn threads(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
         // bounded backstop).
         let (roster, view_focus) =
             b.view.get(agent_id).map(|v| (v.roster.clone(), v.focused_thread_id.clone())).unwrap_or_default();
-        let focused = view_focus.or(focused);
+        let focused = view_focus.or(disk_focus);
         (cfg, focused, roster)
     };
 
     // Disk threads (full logs). Absent config is tolerated: the view roster
     // alone can still render newly-created threads.
-    let empty_arr = serde_json::Value::Array(Vec::new());
+    let empty: Vec<serde_json::Value> = Vec::new();
     let raw_threads = config
         .as_ref()
         .and_then(|c| c.get("modules"))
         .and_then(|m| m.get("threads"))
         .and_then(|t| t.get("threads"))
         .and_then(serde_json::Value::as_array)
-        .unwrap_or_else(|| empty_arr.as_array().expect("empty vec is array"));
+        .unwrap_or(&empty);
 
     let mut details: Vec<serde_json::Value> = raw_threads.iter().map(|t| reshape_thread(t, agent_id)).collect();
 
@@ -384,15 +399,15 @@ fn json_string(s: &str) -> String {
 
 /// The JSON body for a hydrated body: bytes serialized as a number array.
 #[derive(Serialize)]
-struct BodyPayload<'a> {
+struct BodyPayload<'bytes> {
     /// Raw body bytes.
-    bytes: &'a [u8],
+    bytes: &'bytes [u8],
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::MaterializedView;
+    use crate::services::materialized_view::MaterializedView;
     use cp_wire::types::Phase;
     use cp_wire::types::oplog::{OpEntry, OpEntryKind};
     use std::path::PathBuf;

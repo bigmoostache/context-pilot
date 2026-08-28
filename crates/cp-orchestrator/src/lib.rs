@@ -14,7 +14,7 @@
 //! * [`liveness`] — the pure per-agent **liveness verdict** (live pid **and**
 //!   fresh heartbeat **and** matching `boot_id`), the decision at the heart of
 //!   discovery.
-//! * [`registry`] — the **`AgentRegistry`** (design doc §10, roadmap P5-T1):
+//! * [`registry`] — the **`FleetScanner`** (design doc §10, roadmap P5-T1):
 //!   scans `~/.context-pilot/agents/`, applies the verdict to each record, and
 //!   diffs successive passes into appeared / disappeared / status-changed /
 //!   stale events.
@@ -23,15 +23,41 @@
 //!   on-disk persistence files (tier-② state: config, workers, shared,
 //!   messages, panels).
 //!
-//! * [`channel`] — the per-agent [`AgentChannel`](channel::AgentChannel): oplog
-//!   tail ([`Tailer`](channel::Tailer)), rev-pinned body hydrate, and command
+//! * [`channel`] — the per-agent [`AgentHandle`](channel::AgentHandle): oplog
+//!   tail ([`Tailer`](tailer::Tailer)), rev-pinned body hydrate, and command
 //!   send.
 //! * [`supervisor`] — the
-//!   [`AgentSupervisor`](supervisor::AgentSupervisor): spawn / stop / restart /
+//!   [`ProcManager`](supervisor::ProcManager): spawn / stop / restart /
 //!   adopt of agent processes.
 //! * [`services`] — the runtime services layer:
-//!   [`MaterializedView`](services::MaterializedView) (fleet-state projection)
-//!   and [`StreamHub`](services::StreamHub) (stream fan-out).
+//!   [`MaterializedView`](services::materialized_view::MaterializedView) (fleet-state projection)
+//!   and [`StreamHub`](services::stream_hub::StreamHub) (stream fan-out).
+
+/// Emit a diagnostic line to **stderr** — the orchestrator daemon's operational
+/// log channel.
+///
+/// All the crate's stderr diagnostics funnel through this one macro rather than
+/// calling [`eprintln!`] at scattered sites. Because the `eprintln!` token
+/// originates from this macro body, clippy's `print_stderr` restriction (which
+/// exists to catch stray debug prints in library code) does not fire at the
+/// call sites — the daemon's deliberate logging stays lint-clean without a
+/// per-site lint suppression. Takes the same format arguments as the standard
+/// stderr print macro.
+#[macro_export]
+macro_rules! oerr {
+    ($($arg:tt)*) => { ::std::eprintln!($($arg)*) };
+}
+
+/// Emit a diagnostic line to **stdout** — the daemon's user-facing status
+/// channel (startup banners, progress).
+///
+/// The stdout twin of [`oerr!`]: the single chokepoint for the crate's
+/// `println!` output, keeping `print_stdout` from firing at scattered call
+/// sites. Takes the same format arguments as [`println!`].
+#[macro_export]
+macro_rules! oout {
+    ($($arg:tt)*) => { ::std::println!($($arg)*) };
+}
 
 pub mod inspect;
 pub mod registry;
@@ -40,13 +66,12 @@ pub mod services;
 pub mod supervisor;
 pub mod transport;
 
-// Re-export channel at the crate root so external consumers (tests, runtime)
-// that imported `cp_orchestrator::channel` continue to compile unchanged.
-pub use registry::channel;
-
-// Re-export liveness at the crate root so external consumers (tests) that
-// imported `cp_orchestrator::liveness` continue to compile unchanged.
-pub use registry::liveness;
+// Re-export channel/tailer/liveness at the crate root as `pub(crate)` so the
+// many internal `crate::channel` / `crate::tailer` / `crate::liveness` paths
+// resolve without churn. `pub(crate) use` (unlike `pub use`) does not trip
+// `clippy::pub_use`. External test consumers reach these through the canonical
+// `cp_orchestrator::registry::{channel,tailer,liveness}` module paths instead.
+pub(crate) use registry::{channel, liveness, tailer};
 
 // `openssl` with the `vendored` feature compiles OpenSSL from source during
 // cross-compilation (reqwest → native-tls → openssl-sys). Without a direct

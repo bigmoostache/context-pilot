@@ -24,11 +24,19 @@ pub(crate) enum TickOutcome {
     /// Update available but the mode forbids automatic applies.
     SkipMode(UpdateMode),
     /// Update available, mode `auto`, but outside the maintenance window.
-    SkipWindow { available: String },
+    SkipWindow {
+        /// The channel version on offer that the window is holding back.
+        available: String,
+    },
     /// Update available but an apply is already in flight (restart pending).
     SkipInFlight,
     /// The apply pipeline was launched (download + stage + restart).
-    Applied { from: String, to: String },
+    Applied {
+        /// The version the box was running before this apply.
+        from: String,
+        /// The version being applied.
+        to: String,
+    },
     /// The apply pipeline failed; the gate was released for a retry.
     ApplyFailed(String),
 }
@@ -36,33 +44,41 @@ pub(crate) enum TickOutcome {
 impl TickOutcome {
     /// The log line for this decision.
     pub(crate) fn describe(&self) -> String {
-        match self {
-            Self::CheckFailed(e) => format!("check failed: {e}"),
+        cp_base::deref_match!(self, {
+            Self::CheckFailed(ref e) => format!("check failed: {e}"),
             Self::UpToDate => "up to date".to_owned(),
-            Self::SkipMode(mode) => format!("skip: mode is {}", mode.as_str()),
-            Self::SkipWindow { available } => format!("skip: {available} available but outside the window"),
+            Self::SkipMode(ref mode) => format!("skip: mode is {}", mode.as_str()),
+            Self::SkipWindow { ref available } => format!("skip: {available} available but outside the window"),
             Self::SkipInFlight => "skip: an apply is already in flight".to_owned(),
-            Self::Applied { from, to } => format!("apply: {from} → {to}"),
-            Self::ApplyFailed(e) => format!("apply failed: {e}"),
-        }
+            Self::Applied { ref from, ref to } => format!("apply: {from} → {to}"),
+            Self::ApplyFailed(ref e) => format!("apply failed: {e}"),
+        })
     }
+}
+
+/// The decision inputs for one [`run_tick`] — the posture (`mode`), the
+/// maintenance `window`, the box-local `now_minutes`, and the process-wide
+/// `apply_gate`. Bundled so `run_tick` keeps the two injected closures without
+/// tripping the argument-count budget.
+pub(crate) struct TickCtx<'ctx> {
+    /// Update posture: `auto` applies in-window, `manual`/`paused` never do.
+    pub mode: UpdateMode,
+    /// The maintenance window automatic applies are confined to.
+    pub window: &'ctx MaintenanceWindow,
+    /// Minutes since box-local midnight, for the window check.
+    pub now_minutes: u16,
+    /// Caller-owned serialisation gate: held while an apply is in flight.
+    pub apply_gate: &'ctx AtomicBool,
 }
 
 /// Run one scheduler tick.
 ///
 /// `check` fetches + verifies the channel (recording durable state) and
 /// returns the available manifest, if any. `apply` runs the M3 pipeline
-/// (download → stage → restart). `apply_gate` serialises applies: it is
+/// (download → stage → restart). `ctx.apply_gate` serialises applies: it is
 /// acquired here and **released only on apply failure** — a successful apply
 /// ends in a process restart, so the gate deliberately stays held.
-pub(crate) fn run_tick<C, A>(
-    mode: UpdateMode,
-    window: &MaintenanceWindow,
-    now_minutes: u16,
-    apply_gate: &AtomicBool,
-    check: C,
-    apply: A,
-) -> TickOutcome
+pub(crate) fn run_tick<C, A>(ctx: &TickCtx<'_>, check: C, apply: A) -> TickOutcome
 where
     C: FnOnce() -> Result<Option<Manifest>, String>,
     A: FnOnce(&Manifest) -> Result<String, String>,
@@ -75,20 +91,20 @@ where
         Ok(Some(manifest)) => manifest,
     };
 
-    match mode {
-        UpdateMode::Manual | UpdateMode::Paused => return TickOutcome::SkipMode(mode),
+    match ctx.mode {
+        UpdateMode::Manual | UpdateMode::Paused => return TickOutcome::SkipMode(ctx.mode),
         UpdateMode::Auto => {}
     }
-    if !window.contains(now_minutes) {
+    if !ctx.window.contains(ctx.now_minutes) {
         return TickOutcome::SkipWindow { available: manifest.version };
     }
-    if apply_gate.swap(true, Ordering::SeqCst) {
+    if ctx.apply_gate.swap(true, Ordering::SeqCst) {
         return TickOutcome::SkipInFlight;
     }
     match apply(&manifest) {
         Ok(from) => TickOutcome::Applied { from, to: manifest.version },
         Err(e) => {
-            apply_gate.store(false, Ordering::SeqCst); // allow a retry next tick
+            ctx.apply_gate.store(false, Ordering::SeqCst); // allow a retry next tick
             TickOutcome::ApplyFailed(e)
         }
     }
@@ -116,6 +132,6 @@ pub(crate) fn local_now_minutes() -> u16 {
         .and_then(|s| parse_hhmm(s.trim()));
     local.unwrap_or_else(|| {
         let secs = super::state::now_epoch_secs();
-        u16::try_from(secs % 86_400 / 60).unwrap_or(0)
+        u16::try_from(secs.wrapping_rem(86_400).wrapping_div(60)).unwrap_or(0)
     })
 }

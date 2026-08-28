@@ -1,6 +1,6 @@
 //! Agent lifecycle **supervisor** — spawn, stop, restart, adopt.
 //!
-//! The [`AgentSupervisor`] is the backend's process manager.  It owns the
+//! The [`ProcManager`] is the backend's process manager.  It owns the
 //! mapping from `agent_id` → running process and enforces the **allow-list
 //! gate** (R2-15): only binaries whose `realpath` appears on the list may be
 //! spawned.  Path canonicalisation (`std::fs::canonicalize`) defeats symlink
@@ -14,7 +14,7 @@
 //! # Adopt
 //!
 //! On backend restart, the registry may contain agents that are still live
-//! (valid pid, fresh heartbeat).  [`adopt`](AgentSupervisor::adopt) records
+//! (valid pid, fresh heartbeat).  [`adopt`](ProcManager::adopt) records
 //! them in the supervisor without re-spawning — the backend re-acquires
 //! control of their lifecycle (D7).
 
@@ -88,20 +88,20 @@ pub enum Error {
 
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Self::NotAllowed { binary } => {
+        cp_base::deref_match!(self, {
+            Self::NotAllowed { ref binary } => {
                 write!(f, "binary not on allow-list: {}", binary.display())
             }
-            Self::NotFound { agent_id } => {
+            Self::NotFound { ref agent_id } => {
                 write!(f, "agent not found: {agent_id}")
             }
-            Self::AlreadySupervised { agent_id } => {
+            Self::AlreadySupervised { ref agent_id } => {
                 write!(f, "agent already supervised: {agent_id}")
             }
-            Self::Io { context, source } => write!(f, "{context}: {source}"),
+            Self::Io { context, ref source } => write!(f, "{context}: {source}"),
             Self::Signal { source } => write!(f, "signal error: {source}"),
-            Self::Pty { detail } => write!(f, "pty error: {detail}"),
-        }
+            Self::Pty { ref detail } => write!(f, "pty error: {detail}"),
+        })
     }
 }
 
@@ -110,7 +110,7 @@ pub type Result<T> = core::result::Result<T, Error>;
 
 // ── Supervisor events ───────────────────────────────────────────────────
 
-/// Events emitted by [`AgentSupervisor::check_liveness`].
+/// Events emitted by [`ProcManager::check_liveness`].
 #[derive(Debug)]
 pub enum Event {
     /// A spawned agent exited on its own (reaped via `try_wait`).
@@ -127,38 +127,75 @@ pub enum Event {
     },
 }
 
-// ── AgentSupervisor ─────────────────────────────────────────────────────
+// ── Launch plans ────────────────────────────────────────────────────────
+
+/// Launch target for [`ProcManager::spawn`].
+///
+/// Bundles the binary, working directory, and process args so the call stays
+/// within the argument-count cap (the three inputs have no other natural
+/// grouping and always travel together). All fields are borrows, so the plan
+/// is `Copy` and passes by value without a move.
+#[derive(Debug, Clone, Copy)]
+pub struct SpawnPlan<'plan> {
+    /// Binary to execute (allow-list validated).
+    pub binary: &'plan Path,
+    /// Working directory for the child process.
+    pub folder: &'plan Path,
+    /// Extra command-line arguments passed to the binary.
+    pub args: &'plan [&'plan str],
+}
+
+/// Launch target for [`ProcManager::spawn_pty`].
+///
+/// Bundles the binary, working directory, and environment overrides so the
+/// call stays within the argument-count cap. All fields are borrows, so the
+/// plan is `Copy` and passes by value without a move.
+#[derive(Debug, Clone, Copy)]
+pub struct PtyPlan<'plan> {
+    /// Binary to execute (allow-list validated).
+    pub binary: &'plan Path,
+    /// Working directory for the child process.
+    pub folder: &'plan Path,
+    /// Environment overrides layered on top of the inherited environment.
+    pub env: &'plan [(&'plan str, &'plan str)],
+}
+
+// ── ProcManager ─────────────────────────────────────────────────────
 
 /// Process-level lifecycle manager for a fleet of agents.
 #[derive(Debug)]
-pub struct AgentSupervisor {
+pub struct ProcManager {
     /// Canonicalised binary paths that may be spawned.
     allow_list: Vec<PathBuf>,
     /// Active agents keyed by `agent_id`.
     known: HashMap<String, Supervised>,
 }
 
-impl AgentSupervisor {
+impl ProcManager {
     /// Create a supervisor with the given allow-list.
     ///
     /// Each path is canonicalised eagerly; entries that fail to resolve are
     /// silently skipped (the binary may not exist yet on disk).
+    #[must_use]
     pub fn new(allow_list: &[PathBuf]) -> Self {
         let resolved = allow_list.iter().filter_map(|p| std::fs::canonicalize(p).ok()).collect();
         Self { allow_list: resolved, known: HashMap::new() }
     }
 
     /// Number of supervised agents.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.known.len()
     }
 
     /// Whether the supervisor tracks zero agents.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.known.is_empty()
     }
 
     /// Whether an agent with this key is currently supervised.
+    #[must_use]
     pub fn is_supervised(&self, agent_id: &str) -> bool {
         self.known.contains_key(agent_id)
     }
@@ -184,17 +221,23 @@ impl AgentSupervisor {
     /// survives backend termination.  stdin/stdout/stderr are closed.
     ///
     /// Returns the agent's OS pid.
-    pub fn spawn(&mut self, agent_id: String, binary: &Path, folder: &Path, extra_args: &[&str]) -> Result<u32> {
+    ///
+    /// # Errors
+    ///
+    /// [`Error::AlreadySupervised`] for a duplicate id, [`Error::NotAllowed`]
+    /// for an off-allow-list binary, and [`Error::Io`] for a folder or binary
+    /// path that cannot be canonicalised or a spawn that fails.
+    pub fn spawn(&mut self, agent_id: String, plan: SpawnPlan<'_>) -> Result<u32> {
         if self.known.contains_key(&agent_id) {
             return Err(Error::AlreadySupervised { agent_id });
         }
-        let canonical = self.validate_binary(binary)?;
+        let canonical = self.validate_binary(plan.binary)?;
         let folder_canonical =
-            std::fs::canonicalize(folder).map_err(|e| Error::Io { context: "canonicalize folder", source: e })?;
+            std::fs::canonicalize(plan.folder).map_err(|e| Error::Io { context: "canonicalize folder", source: e })?;
 
         let child = Command::new(&canonical)
             .current_dir(&folder_canonical)
-            .args(extra_args)
+            .args(plan.args)
             .process_group(0)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
@@ -210,7 +253,7 @@ impl AgentSupervisor {
                 pid,
                 binary: canonical,
                 folder: folder_canonical,
-                args: extra_args.iter().map(|s| (*s).to_owned()).collect(),
+                args: plan.args.iter().map(|s| (*s).to_owned()).collect(),
             },
         );
         Ok(pid)
@@ -243,15 +286,15 @@ impl AgentSupervisor {
     /// [`Error::NotAllowed`] for an off-allow-list binary, [`Error::Io`] for a
     /// folder that cannot be canonicalised, [`Error::AlreadySupervised`] for a
     /// duplicate id, and [`Error::Pty`] for any pty-layer failure.
-    pub fn spawn_pty(&mut self, agent_id: String, binary: &Path, folder: &Path, env: &[(&str, &str)]) -> Result<u32> {
+    pub fn spawn_pty(&mut self, agent_id: String, plan: PtyPlan<'_>) -> Result<u32> {
         if self.known.contains_key(&agent_id) {
             return Err(Error::AlreadySupervised { agent_id });
         }
-        let canonical = self.validate_binary(binary)?;
+        let canonical = self.validate_binary(plan.binary)?;
         let folder_canonical =
-            std::fs::canonicalize(folder).map_err(|e| Error::Io { context: "canonicalize folder", source: e })?;
+            std::fs::canonicalize(plan.folder).map_err(|e| Error::Io { context: "canonicalize folder", source: e })?;
 
-        let (proc, pid) = spawn_pty_proc(&canonical, &folder_canonical, env)?;
+        let (proc, pid) = spawn_pty_proc(&canonical, &folder_canonical, plan.env)?;
 
         let _previous = self
             .known
@@ -265,16 +308,20 @@ impl AgentSupervisor {
     ///
     /// Sends SIGTERM, polls for exit up to [`STOP_GRACE`], then escalates
     /// to SIGKILL.  For spawned agents the child is reaped via `wait()`.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NotFound`] if no supervised agent has this id.
     pub fn stop(&mut self, agent_id: &str) -> Result<()> {
         let mut supervised =
             self.known.remove(agent_id).ok_or_else(|| Error::NotFound { agent_id: agent_id.to_owned() })?;
         let raw_pid = Pid::from_raw(i32::try_from(supervised.pid).unwrap_or(i32::MAX));
 
         // Phase 1: SIGTERM
-        let _sent = send_signal(raw_pid, Signal::SIGTERM);
+        let _term_sent = send_signal(raw_pid, Signal::SIGTERM);
 
         // Phase 2: poll until dead or grace expires
-        let deadline = Instant::now() + STOP_GRACE;
+        let deadline = Instant::now().checked_add(STOP_GRACE).unwrap_or_else(Instant::now);
         let died = loop {
             if !pid_alive(raw_pid) {
                 break true;
@@ -287,7 +334,7 @@ impl AgentSupervisor {
 
         // Phase 3: SIGKILL if still alive
         if !died {
-            let _sent = send_signal(raw_pid, Signal::SIGKILL);
+            let _kill_sent = send_signal(raw_pid, Signal::SIGKILL);
         }
 
         // Reap zombie if we spawned it (std or pty); adopted agents have no
@@ -309,6 +356,11 @@ impl AgentSupervisor {
     /// Restart a supervised agent: stop, then re-spawn with the same config.
     ///
     /// Returns the new pid.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NotFound`] if no supervised agent has this id, plus any error
+    /// from the underlying [`stop`](Self::stop) / [`spawn`](Self::spawn).
     pub fn restart(&mut self, agent_id: &str) -> Result<u32> {
         let info = self.known.get(agent_id).ok_or_else(|| Error::NotFound { agent_id: agent_id.to_owned() })?;
         let binary = info.binary.clone();
@@ -318,7 +370,7 @@ impl AgentSupervisor {
         self.stop(agent_id)?;
 
         let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
-        self.spawn(agent_id.to_owned(), &binary, &folder, &arg_refs)
+        self.spawn(agent_id.to_owned(), SpawnPlan { binary: &binary, folder: &folder, args: &arg_refs })
     }
 
     // ── Adopt ───────────────────────────────────────────────────────
@@ -327,6 +379,10 @@ impl AgentSupervisor {
     ///
     /// No process is spawned — the supervisor merely records the mapping so
     /// that subsequent `stop`/`restart` calls work.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::AlreadySupervised`] if an agent with this id is already tracked.
     pub fn adopt(&mut self, agent_id: String, entry: &Entry, binary: PathBuf) -> Result<()> {
         if self.known.contains_key(&agent_id) {
             return Err(Error::AlreadySupervised { agent_id });
@@ -354,7 +410,13 @@ impl AgentSupervisor {
         let mut events = Vec::new();
         let mut dead_ids = Vec::new();
 
-        for (id, sup) in &mut self.known {
+        // Collect ids first: iterating the HashMap directly trips
+        // clippy::iter_over_hash_type (non-deterministic order). Order is
+        // irrelevant to a liveness sweep, but the collected Vec satisfies the
+        // lint and lets us take a fresh `get_mut` per id.
+        let ids: Vec<String> = self.known.keys().cloned().collect();
+        for id in &ids {
+            let Some(sup) = self.known.get_mut(id) else { continue };
             let raw_pid = Pid::from_raw(i32::try_from(sup.pid).unwrap_or(i32::MAX));
 
             match sup.proc {
@@ -416,21 +478,21 @@ pub(crate) fn pid_alive(pid: Pid) -> bool {
 
 /// Best-effort terminate an **arbitrary** pid (SIGTERM → grace → SIGKILL).
 ///
-/// Unlike [`AgentSupervisor::stop`], this targets a process the supervisor
+/// Unlike [`ProcManager::stop`], this targets a process the supervisor
 /// never spawned — an externally-launched agent (e.g. a `cp` TUI started by
 /// hand) that must be restarted to pick up a new binary. There is no child
 /// handle to reap, so it only signals. ESRCH (already dead) is treated as
 /// success. Blocks up to [`STOP_GRACE`]; call it with no lock held.
 pub fn kill_pid(pid: u32) {
     let raw = Pid::from_raw(i32::try_from(pid).unwrap_or(i32::MAX));
-    let _sent = send_signal(raw, Signal::SIGTERM);
+    let _term_sent = send_signal(raw, Signal::SIGTERM);
 
-    let deadline = Instant::now() + STOP_GRACE;
+    let deadline = Instant::now().checked_add(STOP_GRACE).unwrap_or_else(Instant::now);
     while pid_alive(raw) && Instant::now() < deadline {
         thread::sleep(POLL_INTERVAL);
     }
 
     if pid_alive(raw) {
-        let _sent = send_signal(raw, Signal::SIGKILL);
+        let _kill_sent = send_signal(raw, Signal::SIGKILL);
     }
 }

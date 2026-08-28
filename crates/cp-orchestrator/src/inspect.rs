@@ -119,11 +119,17 @@ impl StateReader {
 
     /// List the worker ids for an agent (filenames in `states/` sans `.json`).
     ///
+    /// Worker enumeration is deliberately **uncached** (it reads the `states/`
+    /// directory fresh each call), so unlike [`read_config`](Self::read_config)
+    /// and [`read_worker`](Self::read_worker) it needs no `&self` — it is an
+    /// associated function on [`StateReader`], reached as
+    /// `StateReader::list_workers(folder)`.
+    ///
     /// # Errors
     ///
     /// Returns [`io::Error`] if the `states/` directory cannot be listed.
     /// A missing directory yields an empty list.
-    pub fn list_workers(&self, folder: &Path) -> io::Result<Vec<String>> {
+    pub fn list_workers(folder: &Path) -> io::Result<Vec<String>> {
         let dir = folder.join(CP_DIR).join(STATES_DIR);
         list_json_stems(&dir)
     }
@@ -137,10 +143,10 @@ fn read_cached_json(path: &Path, slot: &mut Option<CachedJson>) -> io::Result<Va
     let current_mtime = file_mtime(path)?;
 
     // Cache hit: mtime unchanged → return the existing parse.
-    if let Some(cached) = slot.as_ref() {
-        if cached.mtime == current_mtime {
-            return Ok(cached.data.clone());
-        }
+    if let Some(cached) = slot.as_ref()
+        && cached.mtime == current_mtime
+    {
+        return Ok(cached.data.clone());
     }
 
     // Cache miss: read + parse.
@@ -151,7 +157,7 @@ fn read_cached_json(path: &Path, slot: &mut Option<CachedJson>) -> io::Result<Va
         }
         Err(_) if slot.is_some() => {
             // Torn read while the agent is mid-write → return last good value.
-            Ok(slot.as_ref().map(|c| c.data.clone()).unwrap_or(Value::Null))
+            Ok(slot.as_ref().map_or(Value::Null, |c| c.data.clone()))
         }
         Err(e) => Err(e),
     }
@@ -203,10 +209,10 @@ fn list_json_stems(dir: &Path) -> io::Result<Vec<String>> {
 
     let mut stems = Vec::new();
     for entry in read_dir {
-        let entry = entry?;
-        let name = entry.file_name();
-        let Some(name) = name.to_str() else { continue };
-        if let Some(stem) = name.strip_suffix(".json") {
+        let dir_entry = entry?;
+        let name = dir_entry.file_name();
+        let Some(name_str) = name.to_str() else { continue };
+        if let Some(stem) = name_str.strip_suffix(".json") {
             stems.push(stem.to_owned());
         }
     }
@@ -251,14 +257,14 @@ mod tests {
     fn read_config_re_parses_on_mtime_change() {
         let dir = tempdir().expect("dir");
         let folder = dir.path();
-        let v1 = serde_json::json!({"version": 1});
+        let v1 = serde_json::json!({"version": 1u32});
         write_config(folder, &v1);
 
         let mut reader = StateReader::new();
         let _first = reader.read_config(folder).expect("read");
 
         // Mutate the file (mtime changes).
-        let v2 = serde_json::json!({"version": 2});
+        let v2 = serde_json::json!({"version": 2u32});
         // Ensure mtime actually differs (some filesystems have 1s granularity).
         std::thread::sleep(std::time::Duration::from_millis(50));
         write_config(folder, &v2);
@@ -297,7 +303,7 @@ mod tests {
         write_worker(folder, "def456", &w2);
 
         let mut reader = StateReader::new();
-        let workers = reader.list_workers(folder).expect("list");
+        let workers = StateReader::list_workers(folder).expect("list");
         assert_eq!(workers, vec!["abc123", "def456"]);
 
         let read = reader.read_worker(folder, "abc123").expect("read");
@@ -307,8 +313,7 @@ mod tests {
     #[test]
     fn list_workers_on_missing_dir_returns_empty() {
         let dir = tempdir().expect("dir");
-        let reader = StateReader::new();
-        let workers = reader.list_workers(dir.path()).expect("list");
+        let workers = StateReader::list_workers(dir.path()).expect("list");
         assert!(workers.is_empty());
     }
 }

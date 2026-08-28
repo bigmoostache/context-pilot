@@ -32,7 +32,7 @@ pub(super) fn confined_path(root: &str, relative: &str) -> Option<PathBuf> {
 
     let candidate = root_path.join(relative);
     let canonical = candidate.canonicalize().ok()?;
-    if canonical.starts_with(&root_canonical) { Some(canonical) } else { None }
+    canonical.starts_with(&root_canonical).then_some(canonical)
 }
 
 /// Count the non-hidden direct children of a directory.
@@ -75,12 +75,7 @@ pub(super) fn infer_kind(name: &str) -> &'static str {
 pub(super) fn extract_param(query: &str, key: &str) -> Option<String> {
     query.split('&').filter(|s| !s.is_empty()).find_map(|pair| {
         let (k, v) = pair.split_once('=')?;
-        if k == key {
-            // Percent-decode the value (basic: %20 → space, %2F → /).
-            Some(percent_decode(v))
-        } else {
-            None
-        }
+        (k == key).then(|| percent_decode(v))
     })
 }
 
@@ -96,24 +91,23 @@ fn percent_decode(input: &str) -> String {
         if b == b'%' {
             let h1 = src.next();
             let h2 = src.next();
-            if let (Some(h1), Some(h2)) = (h1, h2) {
-                // SAFETY: h1 and h2 are ASCII hex digits (or not); from_str_radix
-                // validates, so the unwrap_or fallback is unreachable for valid
-                // percent-encoded input.
-                let pair = [h1, h2];
+            if let (Some(d1), Some(d2)) = (h1, h2) {
+                // d1 and d2 are the two chars after `%`; from_str_radix
+                // validates they are hex, so the else branch handles non-hex.
+                let pair = [d1, d2];
                 if let Ok(decoded) = u8::from_str_radix(std::str::from_utf8(&pair).unwrap_or(""), 16) {
                     bytes.push(decoded);
                 } else {
                     // Not valid hex — pass through literally.
                     bytes.push(b'%');
-                    bytes.push(h1);
-                    bytes.push(h2);
+                    bytes.push(d1);
+                    bytes.push(d2);
                 }
             } else {
                 // Trailing `%` at end of string — pass through literally.
                 bytes.push(b'%');
-                if let Some(h1) = h1 {
-                    bytes.push(h1);
+                if let Some(d1) = h1 {
+                    bytes.push(d1);
                 }
             }
         } else if b == b'+' {
@@ -148,13 +142,18 @@ mod tests {
 
     #[test]
     fn infer_kind_classifies_extensions() {
-        assert_eq!(infer_kind("main.rs"), "code");
-        assert_eq!(infer_kind("README.md"), "markdown");
-        assert_eq!(infer_kind("data.json"), "json");
-        assert_eq!(infer_kind("photo.png"), "image");
-        assert_eq!(infer_kind("config.yaml"), "doc");
-        assert_eq!(infer_kind("archive.zip"), "archive");
-        assert_eq!(infer_kind("mystery"), "binary");
+        // A plain call, so each classification case costs nothing against the
+        // cognitive-complexity cap (the seven inline assert_eq!s tripped it).
+        fn assert_kind(name: &str, want: &str) {
+            assert_eq!(infer_kind(name), want);
+        }
+        assert_kind("main.rs", "code");
+        assert_kind("README.md", "markdown");
+        assert_kind("data.json", "json");
+        assert_kind("photo.png", "image");
+        assert_kind("config.yaml", "doc");
+        assert_kind("archive.zip", "archive");
+        assert_kind("mystery", "binary");
     }
 
     #[test]
@@ -167,15 +166,15 @@ mod tests {
     #[test]
     fn percent_decode_handles_multibyte_utf8() {
         // é = U+00E9 = UTF-8 bytes C3 A9
-        assert_eq!(percent_decode("t%C3%A9st"), "tést");
+        assert_eq!(percent_decode("t%C3%A9st"), "t\u{e9}st");
         // ñ = U+00F1 = UTF-8 bytes C3 B1
-        assert_eq!(percent_decode("espa%C3%B1ol"), "español");
+        assert_eq!(percent_decode("espa%C3%B1ol"), "espa\u{f1}ol");
         // 日 = U+65E5 = UTF-8 bytes E6 97 A5
-        assert_eq!(percent_decode("%E6%97%A5%E6%9C%AC"), "日本");
+        assert_eq!(percent_decode("%E6%97%A5%E6%9C%AC"), "\u{65e5}\u{672c}");
         // Mixed: spaces + accents
-        assert_eq!(percent_decode("caf%C3%A9%20latt%C3%A9"), "café latté");
+        assert_eq!(percent_decode("caf%C3%A9%20latt%C3%A9"), "caf\u{e9} latt\u{e9}");
         // emoji: 🎉 = U+1F389 = UTF-8 bytes F0 9F 8E 89
-        assert_eq!(percent_decode("%F0%9F%8E%89"), "🎉");
+        assert_eq!(percent_decode("%F0%9F%8E%89"), "\u{1f389}");
     }
 
     #[test]
@@ -184,6 +183,6 @@ mod tests {
         assert_eq!(extract_param("path=src%2Flib&format=json", "format"), Some("json".to_owned()));
         assert_eq!(extract_param("path=src", "missing"), None);
         // Multi-byte UTF-8: é in a filename
-        assert_eq!(extract_param("name=t%C3%A9st.xlsx", "name"), Some("tést.xlsx".to_owned()));
+        assert_eq!(extract_param("name=t%C3%A9st.xlsx", "name"), Some("t\u{e9}st.xlsx".to_owned()));
     }
 }

@@ -8,13 +8,14 @@ use std::sync::{Arc, Mutex};
 
 use tiny_http::Method;
 
-use crate::services::MaterializedView;
 use crate::services::auth::types::{User, UserRole};
+use crate::services::materialized_view::MaterializedView;
 // Bare variant imports (not the `UserRole::Admin` qualified spelling) keep the
 // capability-grep gate clean — the qualified paths are reserved for
 // capabilities/types/tests.rs.
 use crate::services::auth::types::UserRole::{Admin, User as Regular};
-use crate::transport::{Backend, route_rest};
+use crate::transport::Backend;
+use crate::transport::router::route_rest;
 
 /// Build a bare [`User`] with the given role — only `role` matters to the
 /// dispatch guards under test.
@@ -40,7 +41,28 @@ fn state() -> Arc<Mutex<Backend>> {
 
 /// Dispatch one route through [`route_rest`] with the given caller.
 fn dispatch(state: &Arc<Mutex<Backend>>, method: &Method, segments: &[&str], caller: Option<&User>) -> u16 {
-    route_rest(method, segments, state, b"", "", None, caller).status
+    let ctx = crate::transport::RouteCtx { state, body_bytes: b"", query: "", auth_token: None, auth_user: caller };
+    route_rest(method, segments, ctx).status
+}
+
+/// Assert `caller` is refused (`403`) on every route in `routes`. A plain call,
+/// so folding the loop through it keeps the dispatch tests under the
+/// cognitive-complexity cap.
+fn assert_all_refused(state: &Arc<Mutex<Backend>>, routes: &[(&Method, &[&str])], caller: &User) {
+    for &(method, segments) in routes {
+        assert_eq!(dispatch(state, method, segments, Some(caller)), 403, "must be refused on {segments:?}");
+    }
+}
+
+/// Assert both an `Admin` caller and god-mode (`None`) pass the guard (any
+/// non-`403`) on every route in `routes`. Extracted from `releases_rbac` to
+/// keep it under the cognitive-complexity cap.
+fn assert_all_pass_gate(state: &Arc<Mutex<Backend>>, routes: &[(&Method, &[&str])]) {
+    let admin = user(Admin);
+    for &(method, segments) in routes {
+        assert_ne!(dispatch(state, method, segments, Some(&admin)), 403, "admin passes the gate {segments:?}");
+        assert_ne!(dispatch(state, method, segments, None), 403, "god-mode passes the gate {segments:?}");
+    }
 }
 
 /// V0.2a — every `/api/releases/*` route sits behind the single
@@ -62,9 +84,7 @@ fn releases_rbac() {
         (&Method::Delete, &["api", "releases", "v0.0.0-ghost"]),
     ];
     let low = user(Regular);
-    for (method, segments) in all {
-        assert_eq!(dispatch(&state, method, segments, Some(&low)), 403, "user must be refused on {segments:?}");
-    }
+    assert_all_refused(&state, &all, &low);
 
     // Gate-pass probes for Admin and god-mode. Restricted to routes with a
     // safe, network-free outcome: `GET /api/releases` would call the GitHub
@@ -78,12 +98,9 @@ fn releases_rbac() {
         (&Method::Put, &["api", "releases", "select"]),
         (&Method::Delete, &["api", "releases", "v0.0.0-ghost"]),
     ];
-    let admin = user(Admin);
-    for (method, segments) in safe {
-        assert_ne!(dispatch(&state, method, segments, Some(&admin)), 403, "admin passes the gate {segments:?}");
-        assert_ne!(dispatch(&state, method, segments, None), 403, "god-mode passes the gate {segments:?}");
-    }
+    assert_all_pass_gate(&state, &safe);
     // The no-op fleet deploy (empty view) even succeeds outright.
+    let admin = user(Admin);
     assert_eq!(dispatch(&state, &Method::Post, &["api", "releases", "deploy"], Some(&admin)), 200);
     assert_eq!(dispatch(&state, &Method::Post, &["api", "releases", "deploy"], None), 200);
 }

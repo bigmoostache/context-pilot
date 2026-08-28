@@ -4,7 +4,7 @@
 //! within the workspace's per-file line budget. [`run_stream`] is spawned by
 //! `handle_stream` once per connected subscriber: it tails one agent's oplog
 //! (rev-numbered durable deltas) plus its ephemeral stream-hub frames and
-//! pushes both down the SSE [`sink`](super::sse::SseSink) until the client
+//! pushes both down the SSE [`sink`](super::sse::Sink) until the client
 //! disconnects.
 //!
 //! The cold-connect vs reconnect seeding policy (the T123 fix — a fresh
@@ -18,21 +18,26 @@ pub mod ticket;
 // The `GET /api/stream` landing pad (ticket redemption + ACL + producer
 // hand-off), split out of the transport router for its line budget.
 pub mod upgrade;
+// URL query-string parser — used by the `/api/stream` upgrade handler to read
+// the `agent` / `ticket` / `last_rev` params. Lives here (its sole consumer is
+// `upgrade`) to keep the `transport/` folder within the 8-entry cap.
+mod query;
 
-use std::path::PathBuf;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+use cp_wire::types::oplog::OpEntry;
 use cp_wire::types::stream::Frame;
 
 use super::Backend;
-use crate::channel::Tailer;
+use crate::tailer::Tailer;
 
 /// Tight tail re-poll cadence for the SSE producer.
 ///
 /// The [`OplogWaiter`](sse::OplogWaiter) wakes the producer the instant the
-/// agent appends — single-digit ms on Linux (inotify) — but macOS FSEvents
+/// agent appends — single-digit ms on Linux (inotify) — but macOS `FSEvents`
 /// coalesces filesystem notifications with a ~300 ms latency window, which
 /// would otherwise floor visible latency at hundreds of ms. Capping the wait at
 /// this tight value makes the producer re-poll its tailer every few ms
@@ -56,49 +61,19 @@ const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(10);
 ///
 /// Runs until a `send` fails (the client disconnected, dropping the body
 /// reader). Unsubscribes its stream-hub slot on exit.
-pub(crate) fn run_stream(
-    sink: &sse::SseSink,
-    state: &Arc<Mutex<Backend>>,
-    agent_id: &str,
-    oplog_dir: &PathBuf,
-    last_rev: Option<u64>,
-) {
-    let mut tailer = Tailer::new(oplog_dir.clone());
-    // Seed the tailer so the subscriber receives only the deltas it needs:
-    //   * RECONNECT (`Last-Event-ID` present) → seed at the client's last-seen
-    //     rev, so the producer replays exactly the gap (`rev > last_seen`) the
-    //     client missed while disconnected (design doc §9 replay-by-rev).
-    //   * COLD CONNECT (no `Last-Event-ID`) → seed at the CURRENT oplog head, so
-    //     the subscriber rides the LIVE tail and receives only deltas appended
-    //     from now on. The client just loaded full current state over REST, so
-    //     replaying the entire oplog history would be both redundant and — for a
-    //     long-lived agent with thousands of entries — catastrophically slow:
-    //     the browser would chew through the whole backlog (seconds) before the
-    //     user's just-sent message delta, sitting at the live head, ever paints
-    //     (T123). Seeding at the head keeps a fresh connection's first live
-    //     delta sub-ms instead of gated behind a full-history drain.
-    match last_rev {
-        Some(rev) => tailer.seed(rev),
-        // COLD CONNECT: seed at the CURRENT head so the subscriber rides the
-        // live tail (skips the history it just loaded over REST — T123). But an
-        // EMPTY oplog has NO head: `oplog_head_rev` returns `None`, and seeding
-        // a bogus `0` would tell the tailer "deliver only rev > 0" — silently
-        // DROPPING the agent's very first append at rev 0, which then surfaces
-        // only on the slow backstop poll (T271 off-by-one). So when the log is
-        // empty we leave the tailer UNSEEDED (`last_rev = None`), which delivers
-        // from rev 0 onward — there is no backlog to replay on an empty log, so
-        // this is both correct and cheap.
-        None => {
-            if let Some(head) = oplog_head_rev(oplog_dir) {
-                tailer.seed(head);
-            }
-        }
-    }
+///
+/// The four connection references are bundled into [`StreamCtx`] so the
+/// producer stays within the argument budget; `last_rev` is the one per-run
+/// scalar (the client's `Last-Event-ID`, `None` on a cold connect).
+pub(crate) fn run_stream(ctx: &StreamCtx<'_>, last_rev: Option<u64>) {
+    let mut tailer = Tailer::new(ctx.oplog_dir.to_path_buf());
+    seed_tailer(&mut tailer, ctx.oplog_dir, last_rev);
+
     // Event-driven wakeup on oplog appends (design doc I12). If the watch can't
     // be established, `waiter` is None and the loop degrades to a pure backstop
     // poll at TAIL_REPOLL — correct, just less snappy.
-    let waiter = sse::OplogWaiter::new(oplog_dir).ok();
-    let sub_id = state.lock().ok().map(|mut b| b.hub.subscribe(agent_id));
+    let waiter = sse::OplogWaiter::new(ctx.oplog_dir).ok();
+    let sub_id = ctx.state.lock().ok().map(|mut b| b.hub.subscribe(ctx.agent_id));
     let mut gap_checked = last_rev.is_none();
     let mut last_keepalive = std::time::Instant::now();
 
@@ -106,71 +81,141 @@ pub(crate) fn run_stream(
         // Oplog deltas (durable, rev-numbered).
         match tailer.poll() {
             Ok(entries) => {
-                if !gap_checked {
-                    if let (Some(want), Some(first)) = (last_rev, entries.first()) {
-                        // The oldest replayable entry skips past the client's
-                        // last rev ⇒ a gap the oplog can't cover ⇒ resync.
-                        if first.rev > want.saturating_add(1) && sink.send(&sse::SseMessage::resync()).is_err() {
-                            break;
-                        }
-                    }
-                    gap_checked = true;
-                }
-                for entry in &entries {
-                    let data = serde_json::to_string(entry).unwrap_or_default();
-                    if sink.send(&sse::SseMessage::delta(entry.rev, data)).is_err() {
-                        return cleanup(state, agent_id, sub_id);
-                    }
+                if !send_deltas(ctx, &entries, last_rev, &mut gap_checked) {
+                    break;
                 }
             }
+            // A tailer read error means the client fell off the replayable
+            // window — ask it to resync from a fresh REST load.
             Err(_) => {
-                if sink.send(&sse::SseMessage::resync()).is_err() {
-                    return cleanup(state, agent_id, sub_id);
+                if ctx.sink.send(&sse::Message::resync()).is_err() {
+                    break;
                 }
             }
         }
 
         // Ephemeral stream frames (best-effort hints).
-        if let Some(sub) = sub_id {
-            let frames = drain_frames(state, agent_id, sub);
-            for frame in &frames {
-                let data = serde_json::to_string(frame).unwrap_or_default();
-                if sink.send(&sse::SseMessage::stream(data)).is_err() {
-                    return cleanup(state, agent_id, sub_id);
-                }
-            }
+        if sub_id.is_some_and(|sub| !send_frames(ctx, sub)) {
+            break;
         }
 
         // Tier-② state change — the driver loop or a command handler flagged
         // this agent's inspection-plane data as stale. Push an `invalidate`
         // event so connected frontends refetch immediately.
-        {
-            let is_dirty = state.lock().ok().map_or(false, |mut b| b.take_dirty(agent_id));
-            if is_dirty && sink.send(&sse::SseMessage::invalidate()).is_err() {
-                return cleanup(state, agent_id, sub_id);
-            }
+        let is_dirty = ctx.state.lock().ok().is_some_and(|mut b| b.take_dirty(ctx.agent_id));
+        if is_dirty && ctx.sink.send(&sse::Message::invalidate()).is_err() {
+            break;
         }
 
-        // Keep-alive doubles as a disconnect probe, but only on a slow cadence
-        // so the tight tail re-poll below does not flood the client with
-        // comments. A busy stream is already disconnect-probed by its failing
-        // delta/frame writes above.
-        if last_keepalive.elapsed() >= KEEPALIVE_INTERVAL {
-            if sink.keep_alive().is_err() {
-                return cleanup(state, agent_id, sub_id);
-            }
-            last_keepalive = std::time::Instant::now();
+        // Keep-alive doubles as a disconnect probe on a slow cadence (see
+        // [`keepalive`]) so the tight tail re-poll does not flood the client.
+        if !keepalive(ctx, &mut last_keepalive) {
+            break;
         }
-        // Park until the agent appends to its oplog (woken in sub-ms on Linux
-        // inotify) or the tight backstop elapses — so a delta surfaces within
-        // ~TAIL_REPOLL even on macOS, where FSEvents notification latency is
-        // far higher than the target.
-        match &waiter {
-            Some(w) => w.wait(TAIL_REPOLL),
-            None => thread::sleep(TAIL_REPOLL),
+        park(waiter.as_ref());
+    }
+    cleanup(ctx.state, ctx.agent_id, sub_id);
+}
+
+/// Borrowed connection context for one SSE producer run — the four references
+/// [`run_stream`] needs, bundled so its signature stays within the argument
+/// budget.
+pub(crate) struct StreamCtx<'ctx> {
+    /// The SSE sink the producer writes events into.
+    pub sink: &'ctx sse::Sink,
+    /// Shared backend state (stream hub + dirty flags).
+    pub state: &'ctx Arc<Mutex<Backend>>,
+    /// The agent whose oplog + stream frames this producer tails.
+    pub agent_id: &'ctx str,
+    /// That agent's oplog directory.
+    pub oplog_dir: &'ctx Path,
+}
+
+/// Seed the tailer so the subscriber receives only the deltas it needs.
+///
+/// RECONNECT (`last_rev` present) → seed at the client's last-seen rev, so the
+/// producer replays exactly the gap (`rev > last_seen`) the client missed while
+/// disconnected (design doc §9 replay-by-rev).
+///
+/// COLD CONNECT (`None`) → seed at the CURRENT oplog head, so the subscriber
+/// rides the LIVE tail and skips the history it just loaded over REST (T123).
+/// But an EMPTY oplog has NO head: `oplog_head_rev` returns `None`, and seeding
+/// a bogus `0` would silently DROP the agent's first append at rev 0 (T271
+/// off-by-one). So an empty log is left UNSEEDED — delivering from rev 0 onward,
+/// which is both correct and cheap (there is no backlog to replay).
+fn seed_tailer(tailer: &mut Tailer, oplog_dir: &Path, last_rev: Option<u64>) {
+    match last_rev {
+        Some(rev) => tailer.seed(rev),
+        None => {
+            if let Some(head) = oplog_head_rev(oplog_dir) {
+                tailer.seed(head);
+            }
         }
     }
-    cleanup(state, agent_id, sub_id);
+}
+
+/// Forward one poll's durable deltas; returns `false` on client disconnect.
+///
+/// On the FIRST poll of a reconnect (`!gap_checked`), emits a `resync` when the
+/// oldest replayable entry skips past the client's last rev — a gap the oplog
+/// can no longer cover.
+fn send_deltas(ctx: &StreamCtx<'_>, entries: &[OpEntry], last_rev: Option<u64>, gap_checked: &mut bool) -> bool {
+    if !*gap_checked {
+        // The oldest replayable entry skips past the client's last rev ⇒ a gap
+        // the oplog can no longer cover ⇒ ask the client to resync.
+        let gap = matches!(
+            (last_rev, entries.first()),
+            (Some(want), Some(first)) if first.rev > want.saturating_add(1)
+        );
+        if gap && ctx.sink.send(&sse::Message::resync()).is_err() {
+            return false;
+        }
+        *gap_checked = true;
+    }
+    for entry in entries {
+        let data = serde_json::to_string(entry).unwrap_or_default();
+        if ctx.sink.send(&sse::Message::delta(entry.rev, data)).is_err() {
+            return false;
+        }
+    }
+    true
+}
+
+/// Drain and forward an agent's ephemeral stream frames; `false` on disconnect.
+fn send_frames(ctx: &StreamCtx<'_>, sub: u64) -> bool {
+    let frames = drain_frames(ctx.state, ctx.agent_id, sub);
+    for frame in &frames {
+        let data = serde_json::to_string(frame).unwrap_or_default();
+        if ctx.sink.send(&sse::Message::stream(data)).is_err() {
+            return false;
+        }
+    }
+    true
+}
+
+/// Park until the agent appends to its oplog (woken in sub-ms on Linux inotify)
+/// or the tight backstop elapses — so a delta surfaces within ~`TAIL_REPOLL`
+/// even on macOS, where `FSEvents` notification latency is far higher.
+fn park(waiter: Option<&sse::OplogWaiter>) {
+    match waiter {
+        Some(w) => w.wait(TAIL_REPOLL),
+        None => thread::sleep(TAIL_REPOLL),
+    }
+}
+
+/// Emit a keep-alive comment on a slow cadence (it doubles as the idle
+/// disconnect probe); returns `false` if the write fails (client disconnected).
+///
+/// Kept off the tight tail re-poll so it does not flood the client — a busy
+/// stream is already disconnect-probed by its failing delta/frame writes.
+fn keepalive(ctx: &StreamCtx<'_>, last: &mut std::time::Instant) -> bool {
+    if last.elapsed() >= KEEPALIVE_INTERVAL {
+        if ctx.sink.keep_alive().is_err() {
+            return false;
+        }
+        *last = std::time::Instant::now();
+    }
+    true
 }
 
 /// Drain an agent's stream-hub subscriber buffer under a brief lock.
@@ -197,8 +242,9 @@ fn cleanup(state: &Arc<Mutex<Backend>>, agent_id: &str, sub_id: Option<u64>) {
 /// newest checkpoint-bearing segment to recover the head rev, so this is a cheap
 /// read even for a long-lived log — it does NOT parse the whole history (which
 /// is exactly the cost we are avoiding by not replaying it to the subscriber).
-fn oplog_head_rev(oplog_dir: &std::path::Path) -> Option<u64> {
-    cp_oplog::replay::replay(oplog_dir).ok().and_then(|r| r.rev_head)
+fn oplog_head_rev(oplog_dir: &Path) -> Option<u64> {
+    let r = cp_oplog::replay::replay(oplog_dir).ok()?;
+    r.rev_head
 }
 
 #[cfg(test)]
@@ -231,7 +277,7 @@ mod tests {
         // The cold subscriber must see rev 0 on the live tail.
         let got = tailer.poll().expect("poll");
         assert_eq!(got.len(), 1, "first append delivered");
-        assert_eq!(got[0].rev, 0, "rev 0 is not dropped");
+        assert_eq!(got.first().expect("one entry").rev, 0, "rev 0 is not dropped");
     }
 
     /// The contrast case the T123 head-seed exists for: a subscriber cold-
@@ -249,7 +295,7 @@ mod tests {
 
         // Cold connect now seeds at the head (Some), skipping the backlog.
         let head = oplog_head_rev(&oplog).expect("non-empty log has a head");
-        let mut tailer = Tailer::new(oplog.clone());
+        let mut tailer = Tailer::new(oplog);
         tailer.seed(head);
         assert!(tailer.poll().expect("poll").is_empty(), "backlog is not replayed");
 
@@ -257,6 +303,6 @@ mod tests {
         let _rev1 = writer.append(OpEntryKind::PhaseTransition { phase: Phase::Idle }).expect("append rev 1");
         let got = tailer.poll().expect("poll");
         assert_eq!(got.len(), 1, "future append delivered");
-        assert_eq!(got[0].rev, 1, "only the post-seed rev arrives");
+        assert_eq!(got.first().expect("one entry").rev, 1, "only the post-seed rev arrives");
     }
 }

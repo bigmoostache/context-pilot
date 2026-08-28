@@ -7,9 +7,9 @@
 //! behaviour. This module exposes that slice from state the backend already
 //! collects:
 //!
-//! * **stream** — [`StreamHub`](crate::services::StreamHub) aggregate health:
+//! * **stream** — [`StreamHub`](crate::services::stream_hub::StreamHub) aggregate health:
 //!   live subscriber count, total dropped frames, any-degraded.
-//! * **rev** — the [`MaterializedView`](crate::services::MaterializedView)'s
+//! * **rev** — the [`MaterializedView`](crate::services::materialized_view::MaterializedView)'s
 //!   folded `rev` against the agent oplog's head `rev` (read fresh), and their
 //!   lag; under the live tail the lag is ~0, so a persistent non-zero lag is
 //!   the signal the projection is falling behind.
@@ -34,7 +34,7 @@ use crate::transport::Backend;
 use crate::transport::rest::HttpReply;
 
 /// `GET /api/agent/{id}/metrics` — the §19 observability snapshot for one agent.
-pub fn agent_metrics(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
+pub fn agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     let entry = match crate::transport::rest::resolve_entry(state, agent_id) {
         Ok(e) => e,
         Err(reply) => return reply,
@@ -45,25 +45,27 @@ pub fn agent_metrics(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
 /// `GET /api/metrics` — the §19 snapshot for every agent in the registry.
 ///
 /// When auth is enabled the list is filtered to the caller's ACL-granted agents
-/// (FR-12), mirroring [`fleet_meta`](super::meta::fleet_meta): a regular user
+/// (FR-12), mirroring [`fleet`](super::meta::fleet): a regular user
 /// must not be able to enumerate every agent's id, cost, and budget via the
 /// Usage page. System admins see all; auth-disabled passes everything.
-pub fn fleet_metrics(state: &Mutex<Backend>, auth_user: Option<&crate::services::auth::types::User>) -> HttpReply {
+pub fn fleet(state: &Mutex<Backend>, auth_user: Option<&crate::services::auth::types::User>) -> HttpReply {
     let dir = {
         let Ok(b) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
         };
         b.agents_dir.clone()
     };
-    let entries = match list_entries(&dir) {
-        Ok(e) => e,
-        Err(_) => return HttpReply::ok(&serde_json::json!([])),
+    let Ok(entries) = list_entries(&dir) else {
+        return HttpReply::ok(&serde_json::json!([]));
     };
     let ids: Vec<String> = entries.iter().map(|e| e.id.clone()).collect();
     let visible = crate::transport::auth::filter_fleet(state, &ids, auth_user);
-    let visible: std::collections::HashSet<&str> = visible.iter().map(String::as_str).collect();
-    let metrics: Vec<serde_json::Value> =
-        entries.iter().filter(|e| visible.contains(e.id.as_str())).map(|e| build_metrics(state, &e.id, e)).collect();
+    let visible_set: std::collections::HashSet<&str> = visible.iter().map(String::as_str).collect();
+    let metrics: Vec<serde_json::Value> = entries
+        .iter()
+        .filter(|e| visible_set.contains(e.id.as_str()))
+        .map(|e| build_metrics(state, &e.id, e))
+        .collect();
     HttpReply::ok(&metrics)
 }
 
@@ -120,18 +122,24 @@ fn build_metrics(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> serde
 /// Replay uses the bounded checkpoint fast-path, so this is a cheap read even
 /// for a long-lived log.
 fn oplog_head_rev(oplog_path: &str) -> Option<u64> {
-    cp_oplog::replay::replay(Path::new(oplog_path)).ok().and_then(|r| r.rev_head)
+    let r = cp_oplog::replay::replay(Path::new(oplog_path)).ok()?;
+    r.rev_head
 }
 
 /// List all registry entries in a directory (same scan as the meta endpoint).
 fn list_entries(dir: &Path) -> std::io::Result<Vec<Entry>> {
     let mut entries = Vec::new();
-    for item in std::fs::read_dir(dir)? {
-        let item = item?;
+    for raw in std::fs::read_dir(dir)? {
+        let item = raw?;
         let path = item.path();
-        let name = item.file_name();
-        let Some(name) = name.to_str() else { continue };
-        if !name.ends_with(".json") || name.ends_with(".tmp") {
+        let file_name = item.file_name();
+        let Some(name) = file_name.to_str() else { continue };
+        let is_json = Path::new(name).extension().is_some_and(|e| e.eq_ignore_ascii_case("json"));
+        // A torn atomic write leaves a `<id>.json.tmp`; its extension is `tmp`,
+        // not `json`, so the `is_json` check above already excludes it — no
+        // separate `.tmp` guard needed (and a `.ends_with(".tmp")` would trip
+        // clippy::case_sensitive_file_extension_comparisons).
+        if !is_json {
             continue;
         }
         if let Ok(bytes) = std::fs::read(&path)

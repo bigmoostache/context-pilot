@@ -150,13 +150,21 @@ fn apn_and_pin_charsets_are_enforced() {
     config.wwan.apn = "orange fr; rm -rf /".to_owned();
     assert!(state::validate_wwan(&config.wwan).is_err(), "an APN with spaces/semicolons is rejected");
     config.wwan.apn = "internet.sfr".to_owned();
-    assert!(state::validate_wwan(&config.wwan).is_ok());
+    state::validate_wwan(&config.wwan).unwrap();
     config.wwan.pin = Some("12".to_owned());
     assert!(state::validate_wwan(&config.wwan).is_err(), "a 2-digit PIN is rejected");
     config.wwan.pin = Some("abcd".to_owned());
     assert!(state::validate_wwan(&config.wwan).is_err(), "a non-numeric PIN would burn an unlock retry");
     config.wwan.pin = Some("00000000".to_owned());
     assert!(state::validate_wwan(&config.wwan).is_ok(), "8 digits is the top of the range");
+}
+
+/// Fail if any secret leaks into a serialised read-path projection (hoisted out
+/// of the test loop to keep the test under the cognitive-complexity cap).
+fn assert_hides_secrets(body: &str) {
+    assert!(!body.contains("correct-horse-battery"), "the Wi-Fi PSK leaked: {body}");
+    assert!(!body.contains("s3cr3t-bearer-password"), "the bearer password leaked: {body}");
+    assert!(!body.contains("4271"), "the SIM PIN leaked: {body}");
 }
 
 /// The load-bearing secret test. Every read-path projection is serialised
@@ -173,9 +181,7 @@ fn no_read_path_output_contains_a_secret() {
         serde_json::to_string(&config.redacted_wwan()).expect("serialize wwan"),
     ];
     for body in &projections {
-        assert!(!body.contains("correct-horse-battery"), "the Wi-Fi PSK leaked: {body}");
-        assert!(!body.contains("s3cr3t-bearer-password"), "the bearer password leaked: {body}");
-        assert!(!body.contains("4271"), "the SIM PIN leaked: {body}");
+        assert_hides_secrets(body);
     }
     // …and the booleans that replace them are present and true.
     let full = &projections[0];
@@ -195,8 +201,8 @@ fn probe_tuning_is_bounded() {
     assert_eq!(state::load(&path), NetworkConfig::default(), "no probe target is not a usable supervisor config");
 
     config.probe.targets = vec!["not-an-ip".to_owned()];
-    let raw = serde_json::to_vec(&config).expect("serialize");
-    std::fs::write(&path, &raw).expect("write");
+    let retuned_raw = serde_json::to_vec(&config).expect("serialize");
+    std::fs::write(&path, &retuned_raw).expect("write");
     assert_eq!(state::load(&path), NetworkConfig::default(), "probe targets must be addresses");
 }
 
@@ -220,12 +226,12 @@ fn status_degrades_to_null_for_every_gated_field() {
     // an admin watches during a failover and a box missing every optional tool
     // still deserves an honest answer there.
     let status = status::probe(&NetworkConfig::default(), true);
-    assert!(status.get("wwan").is_some_and(serde_json::Value::is_null), "no CP_MMCLI_BIN ⇒ null bearer");
-    assert!(status.get("ap").is_some_and(serde_json::Value::is_null), "no CP_NMCLI_BIN ⇒ null AP");
-    assert!(status.get("active_uplink").is_some_and(|v| v.is_string()), "the active uplink needs no tool");
+    assert!(status.get("wwan").is_some_and(serde_json::Value::is_null), "no CP_MMCLI_BIN \u{21d2} null bearer");
+    assert!(status.get("ap").is_some_and(serde_json::Value::is_null), "no CP_NMCLI_BIN \u{21d2} null AP");
+    assert!(status.get("active_uplink").is_some_and(serde_json::Value::is_string), "the active uplink needs no tool");
     let wan = status.get("wan").expect("wan is always present");
     assert!(wan.get("has_default_route").is_some_and(serde_json::Value::is_boolean), "read from /proc/net/*route");
-    assert!(wan.get("ip").is_some_and(serde_json::Value::is_null), "no CP_IP_BIN ⇒ null address");
+    assert!(wan.get("ip").is_some_and(serde_json::Value::is_null), "no CP_IP_BIN \u{21d2} null address");
 }
 
 // ── The per-step applied marks ──────────────────────────────────────────────
@@ -240,45 +246,56 @@ fn a_mode_change_does_not_touch_the_access_points_hash() {
     strict.mode = UplinkMode::FiveG;
     let (before, after) = (StepHashes::of(&ethernet), StepHashes::of(&strict));
 
-    assert_eq!(before.access_point, after.access_point, "the AP is untouched by a mode change — no client bounces");
-    assert_eq!(before.ap_activation, after.ap_activation, "…and neither is its activation");
+    assert_eq!(
+        before.access_point, after.access_point,
+        "the AP is untouched by a mode change \u{2014} no client bounces"
+    );
+    assert_eq!(before.ap_activation, after.ap_activation, "\u{2026}and neither is its activation");
     assert_ne!(before.mode, after.mode, "the mode step must re-run");
-    assert_ne!(before.wwan, after.wwan, "…and so must the bearer: the mode drives its metric and autoconnect");
+    assert_ne!(before.wwan, after.wwan, "\u{2026}and so must the bearer: the mode drives its metric and autoconnect");
     assert_ne!(before.uplink_env, after.uplink_env, "the supervisor is told the new mode");
 }
 
-/// Each step's hash covers exactly its own inputs, in both directions.
+/// The AP steps key on their own inputs: an SSID change rewrites the profile
+/// and bounces nothing else, a secret change still reconciles it.
 #[test]
-fn each_step_keys_on_its_own_inputs() {
+fn each_ap_step_keys_on_its_own_inputs() {
     let base = populated();
-
+    let base_h = StepHashes::of(&base);
     // An SSID change is the AP's business and nothing else's.
     let mut renamed = populated();
     renamed.ap.ssid = "ContextPilot-beef".to_owned();
     let after = StepHashes::of(&renamed);
-    assert_ne!(StepHashes::of(&base).access_point, after.access_point, "the profile must be rewritten");
-    assert_eq!(StepHashes::of(&base).ap_activation, after.ap_activation, "but the AP is not bounced");
-    assert_eq!(StepHashes::of(&base).wwan, after.wwan, "and the bearer is not touched at all — the other half");
-    assert_eq!(StepHashes::of(&base).mode, after.mode);
+    assert_ne!(base_h.access_point, after.access_point, "the profile must be rewritten");
+    assert_eq!(
+        (&base_h.ap_activation, &base_h.wwan, &base_h.mode),
+        (&after.ap_activation, &after.wwan, &after.mode),
+        "the AP is not bounced, the bearer is untouched (the other half), and the mode is unchanged"
+    );
+    // A secret change with every other field identical still reconciles.
+    let mut rekeyed = populated();
+    rekeyed.ap.passphrase = Some("a-completely-different-psk".to_owned());
+    assert_ne!(base_h.access_point, StepHashes::of(&rekeyed).access_point);
+}
 
+/// The supervisor and mode steps key on their own inputs: probe tuning re-renders
+/// only the env file, a standby switch re-runs only the mode step.
+#[test]
+fn each_supervisor_and_mode_step_keys_on_its_own_inputs() {
+    let base = populated();
+    let base_h = StepHashes::of(&base);
     // Probe tuning is the supervisor's business and nothing else's.
     let mut retuned = populated();
     retuned.probe.cooldown_s = 15;
     let tuned = StepHashes::of(&retuned);
-    assert_ne!(StepHashes::of(&base).uplink_env, tuned.uplink_env, "the env file is re-rendered");
-    assert_eq!(StepHashes::of(&base).access_point, tuned.access_point, "…and nothing on the radio moves");
-    assert_eq!(StepHashes::of(&base).mode, tuned.mode);
-
+    assert_ne!(base_h.uplink_env, tuned.uplink_env, "the env file is re-rendered");
+    let (radio_before, radio_after) = ((&base_h.access_point, &base_h.mode), (&tuned.access_point, &tuned.mode));
+    assert_eq!(radio_before, radio_after, "\u{2026}and nothing on the radio nor the mode moves");
     // A standby switch is what `apply_mode` acts on, so it must re-run: `hot`
     // keeps the bearer up, `cold` takes it down.
     let mut cold = populated();
     cold.wwan.standby = Standby::Cold;
-    assert_ne!(StepHashes::of(&base).mode, StepHashes::of(&cold).mode, "hot → cold must bring the bearer down");
-
-    // A secret change with every other field identical still reconciles.
-    let mut rekeyed = populated();
-    rekeyed.ap.passphrase = Some("a-completely-different-psk".to_owned());
-    assert_ne!(StepHashes::of(&base).access_point, StepHashes::of(&rekeyed).access_point);
+    assert_ne!(base_h.mode, StepHashes::of(&cold).mode, "hot \u{2192} cold must bring the bearer down");
 }
 
 /// The load-bearing one. This is `commit`'s rollback, played out against
@@ -314,21 +331,21 @@ fn a_partial_apply_leaves_the_rollback_with_work_to_do() {
     assert_eq!(ran, [STEP_WWAN, STEP_AP, STEP_MODE], "a fresh boot reconciles everything for real");
 
     // Now `apply(next)`: the bearer and the AP succeed, the mode step fails.
-    let mut marks = Marks::load(&marker);
+    let mut marks_next = Marks::load(&marker);
     let after = StepHashes::of(&next);
-    step(&mut marks, STEP_WWAN, after.wwan, || Ok(())).expect("bearer ok");
-    step(&mut marks, STEP_AP, after.access_point, || Ok(())).expect("ap ok");
-    let failed = step(&mut marks, STEP_MODE, after.mode, || Err("networkctl reconfigure failed".to_owned()));
+    step(&mut marks_next, STEP_WWAN, after.wwan, || Ok(())).expect("bearer ok");
+    step(&mut marks_next, STEP_AP, after.access_point, || Ok(())).expect("ap ok");
+    let failed = step(&mut marks_next, STEP_MODE, after.mode, || Err("networkctl reconfigure failed".to_owned()));
     assert!(failed.is_err(), "the mode step failed partway through the apply");
 
     // The rollback. Every step that RAN with `next` must run again with
     // `previous`; the one that never ran is correctly skipped.
-    let mut marks = Marks::load(&marker);
+    let mut marks_rollback = Marks::load(&marker);
     let mut rolled_back = Vec::new();
     for (name, hash) in
         [(STEP_WWAN, before.wwan.clone()), (STEP_AP, before.access_point.clone()), (STEP_MODE, before.mode)]
     {
-        step(&mut marks, name, hash, || {
+        step(&mut marks_rollback, name, hash, || {
             rolled_back.push(name);
             Ok(())
         })
@@ -366,7 +383,7 @@ fn a_mark_is_recorded_the_instant_its_step_succeeds() {
         Ok(())
     })
     .expect("second ap");
-    assert!(!ran, "an unchanged step is skipped — that is what stops the Wi-Fi bouncing");
+    assert!(!ran, "an unchanged step is skipped \u{2014} that is what stops the Wi-Fi bouncing");
 
     // …and a step that has never run is not skipped by another step's mark.
     assert!(!reloaded.unchanged(STEP_AP_ACTIVATION, &hashes.ap_activation));
@@ -462,8 +479,8 @@ fn a_document_missing_the_new_probe_fields_is_refused() {
         "wwan": { "apn": "orange.fr", "username": null, "password": null, "pin": null,
                   "roaming": false, "standby": "hot" },
         "ap": { "enabled": false, "ssid": "ContextPilot", "passphrase": null, "band": "a",
-                "channel": 0, "country": "FR", "hidden": false, "share_internet": true },
-        "probe": { "targets": ["1.1.1.1"], "fail_threshold": 3, "ok_threshold": 2, "interval_s": 10 },
+                "channel": 0u32, "country": "FR", "hidden": false, "share_internet": true },
+        "probe": { "targets": ["1.1.1.1"], "fail_threshold": 3u32, "ok_threshold": 2u32, "interval_s": 10u32 },
     });
     std::fs::write(&path, serde_json::to_vec(&old).expect("serialize")).expect("write");
     assert_eq!(state::load(&path), NetworkConfig::default(), "a stale template shape is fail-closed, and logged");

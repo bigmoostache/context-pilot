@@ -1,6 +1,8 @@
 //! **Finder** endpoints — the per-agent file manager confined to an agent's
-//! working directory (realm). All paths are jailed to the realm: any attempt to
-//! escape via `..`, a symlink, or an absolute path is rejected.
+//! working directory (realm).
+//!
+//! All paths are jailed to the realm: any attempt to escape via `..`, a
+//! symlink, or an absolute path is rejected.
 //!
 //! Split across cohesive sub-modules (kept under the 500-line file budget, and
 //! room for the preview-format endpoints that keep landing here):
@@ -25,10 +27,10 @@ mod sheet;
 pub(super) mod support;
 mod upload;
 
-pub use download::{fs_download, fs_raw};
-pub use listing::{conversation, fs_descriptions, fs_list, fs_preview};
-pub use mutate::{fs_mkdir, fs_move, fs_rename, fs_trash, fs_write};
+pub(crate) use download::{fs_download, fs_raw};
+pub(crate) use listing::{conversation, fs_descriptions, fs_list, fs_preview};
+pub(crate) use mutate::{fs_mkdir, fs_move, fs_rename, fs_trash, fs_write};
 // Private re-export so sibling `upload` can reach these via `super::`.
 use mutate::{is_bare_name, rel_child};
-pub use sheet::fs_sheet;
-pub use upload::{fs_upload, fs_upload_unique};
+pub(crate) use sheet::fs_sheet;
+pub(crate) use upload::{fs_upload, fs_upload_unique};

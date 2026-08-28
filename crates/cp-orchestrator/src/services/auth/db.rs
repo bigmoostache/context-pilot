@@ -8,25 +8,29 @@ use std::path::Path;
 use std::time::Duration;
 
 use argon2::Argon2;
-use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
+use argon2::password_hash::{PasswordHash, PasswordHasher as _, PasswordVerifier as _, SaltString};
 use rusqlite::Connection;
 
 use super::helpers::{fill_random, format_uuid, now_ms, random_hex};
-use super::types::{AuthError, User, UserRole, row_to_user};
+use super::types::{AuthError, NewUser, User, row_to_user};
 
 // ───────────────────────────── auth store ─────────────────────────────
 
-/// Orchestrator-level authentication store backed by a dedicated SQLite
+/// Orchestrator-level authentication store backed by a dedicated `SQLite`
 /// database (`~/.context-pilot/orchestrator/auth.db`).
 ///
 /// Owns the database [`Connection`] directly — callers that need shared access
 /// wrap it in an `Arc<Mutex<AuthStore>>`.
 #[derive(Debug)]
 pub struct AuthStore {
-    /// The SQLite connection — WAL mode, foreign keys enforced.
-    pub(crate) conn: Connection,
+    /// The `SQLite` connection — WAL mode, foreign keys enforced.
+    pub conn: Connection,
 }
 
+#[expect(
+    clippy::multiple_inherent_impl,
+    reason = "AuthStore's inherent methods are split across db.rs, helpers.rs, and acl.rs to respect the 500-line file cap; folding them into one impl block would push a file over the limit"
+)]
 impl AuthStore {
     /// Open (or create) the auth database at `path` and initialise the schema.
     ///
@@ -39,7 +43,7 @@ impl AuthStore {
     pub(crate) fn open(path: &Path) -> Result<Self, AuthError> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)
-                .map_err(|_io_err| AuthError::Database(rusqlite::Error::InvalidPath(parent.to_path_buf().into())))?;
+                .map_err(|_io_err| AuthError::Database(rusqlite::Error::InvalidPath(parent.to_path_buf())))?;
         }
         let conn = Connection::open(path)?;
         let store = Self { conn };
@@ -102,18 +106,18 @@ impl AuthStore {
 
     /// Widen the legacy two-role `users.role` CHECK to the v3 four-role domain
     /// (`superadmin`/`admin`/`manager`/`user`) on an existing database (design
-    /// §13.6). SQLite cannot alter a CHECK in place, so a legacy table is rebuilt
+    /// §13.6). `SQLite` cannot alter a CHECK in place, so a legacy table is rebuilt
     /// via the standard 12-step rename-copy-drop, mapping legacy `admin` →
     /// `superadmin` (the god account held the provider-key capability, now
     /// superadmin-only). Idempotent: a no-op once the CHECK already lists
     /// `superadmin` (fresh DBs are created with the widened CHECK directly).
     fn migrate_role_check(&self) -> Result<(), AuthError> {
         use rusqlite::OptionalExtension as _;
-        let ddl: Option<String> = self
+        let queried_ddl: Option<String> = self
             .conn
             .query_row("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'", [], |row| row.get(0))
             .optional()?;
-        let Some(ddl) = ddl else { return Ok(()) };
+        let Some(ddl) = queried_ddl else { return Ok(()) };
         // Already widened (fresh DB or previously migrated) → nothing to do.
         if ddl.contains("superadmin") {
             return Ok(());
@@ -214,15 +218,10 @@ impl AuthStore {
     /// # Errors
     ///
     /// Returns [`AuthError::Database`] on duplicate email (UNIQUE
-    /// constraint) or any SQLite failure, [`AuthError::Hash`] if password
+    /// constraint) or any `SQLite` failure, [`AuthError::Hash`] if password
     /// hashing fails.
-    pub(crate) fn create_user(
-        &self,
-        email: &str,
-        name: &str,
-        password: &str,
-        role: UserRole,
-    ) -> Result<User, AuthError> {
+    pub(crate) fn create_user(&self, new: NewUser<'_>) -> Result<User, AuthError> {
+        let NewUser { email, name, password, role } = new;
         let id = Self::generate_uuid();
         let hash = Self::hash_password(password)?;
         let now = now_ms();
@@ -249,7 +248,7 @@ impl AuthStore {
     ///
     /// # Errors
     ///
-    /// Returns [`AuthError::Database`] on SQLite failure.
+    /// Returns [`AuthError::Database`] on `SQLite` failure.
     pub(crate) fn set_must_change_password(&self, user_id: &str, value: bool) -> Result<bool, AuthError> {
         let now = now_ms();
         let updated = self.conn.execute(
@@ -263,7 +262,7 @@ impl AuthStore {
     ///
     /// # Errors
     ///
-    /// Returns [`AuthError::Database`] on SQLite failure.
+    /// Returns [`AuthError::Database`] on `SQLite` failure.
     pub(crate) fn get_user_by_id(&self, id: &str) -> Result<Option<User>, AuthError> {
         let mut stmt = self.conn.prepare(
             "SELECT id, email, name, password_hash, role, created_at, updated_at, must_change_password \
@@ -280,7 +279,7 @@ impl AuthStore {
     ///
     /// # Errors
     ///
-    /// Returns [`AuthError::Database`] on SQLite failure.
+    /// Returns [`AuthError::Database`] on `SQLite` failure.
     pub(crate) fn get_user_by_email(&self, email: &str) -> Result<Option<User>, AuthError> {
         let mut stmt = self.conn.prepare(
             "SELECT id, email, name, password_hash, role, created_at, updated_at, must_change_password \
@@ -297,7 +296,7 @@ impl AuthStore {
     ///
     /// # Errors
     ///
-    /// Returns [`AuthError::Database`] on SQLite failure.
+    /// Returns [`AuthError::Database`] on `SQLite` failure.
     pub(crate) fn list_users(&self) -> Result<Vec<User>, AuthError> {
         let mut stmt = self.conn.prepare(
             "SELECT id, email, name, password_hash, role, created_at, updated_at, must_change_password \
@@ -316,7 +315,7 @@ impl AuthStore {
     ///
     /// # Errors
     ///
-    /// Returns [`AuthError::Database`] on SQLite failure.
+    /// Returns [`AuthError::Database`] on `SQLite` failure.
     pub(crate) fn delete_user(&self, id: &str) -> Result<bool, AuthError> {
         let deleted = self.conn.execute("DELETE FROM users WHERE id = ?1", rusqlite::params![id])?;
         Ok(deleted > 0)
@@ -327,7 +326,7 @@ impl AuthStore {
     ///
     /// # Errors
     ///
-    /// Returns [`AuthError::Database`] on SQLite failure.
+    /// Returns [`AuthError::Database`] on `SQLite` failure.
     pub(crate) fn count_users(&self) -> Result<u64, AuthError> {
         let count: i64 = self.conn.query_row("SELECT COUNT(*) FROM users", [], |row| row.get(0))?;
         Ok(u64::try_from(count).unwrap_or(0))
@@ -341,7 +340,7 @@ impl AuthStore {
     ///
     /// # Errors
     ///
-    /// Returns [`AuthError::Database`] on SQLite failure (e.g. foreign-key
+    /// Returns [`AuthError::Database`] on `SQLite` failure (e.g. foreign-key
     /// violation if `user_id` does not exist).
     pub(crate) fn create_session(
         &self,
@@ -367,7 +366,7 @@ impl AuthStore {
     ///
     /// # Errors
     ///
-    /// Returns [`AuthError::Database`] on SQLite failure.
+    /// Returns [`AuthError::Database`] on `SQLite` failure.
     pub(crate) fn list_sessions(
         &self,
         user_id: &str,
@@ -405,7 +404,7 @@ impl AuthStore {
     ///
     /// # Errors
     ///
-    /// Returns [`AuthError::Database`] on SQLite failure.
+    /// Returns [`AuthError::Database`] on `SQLite` failure.
     pub(crate) fn revoke_session_by_id(&self, user_id: &str, id: &str) -> Result<Option<String>, AuthError> {
         let token: Option<String> = self
             .conn
@@ -426,7 +425,7 @@ impl AuthStore {
     /// # Errors
     ///
     /// Returns [`AuthError::Hash`] if hashing fails, [`AuthError::Database`] on
-    /// SQLite failure.
+    /// `SQLite` failure.
     pub(crate) fn update_password(&self, user_id: &str, new_password: &str) -> Result<bool, AuthError> {
         let hash = Self::hash_password(new_password)?;
         let now = now_ms();
@@ -444,7 +443,7 @@ impl AuthStore {
     ///
     /// # Errors
     ///
-    /// Returns [`AuthError::Database`] on SQLite failure (incl. duplicate
+    /// Returns [`AuthError::Database`] on `SQLite` failure (incl. duplicate
     /// email).
     pub(crate) fn update_profile(&self, user_id: &str, name: &str, email: &str) -> Result<bool, AuthError> {
         let now = now_ms();
@@ -462,7 +461,7 @@ impl AuthStore {
     ///
     /// # Errors
     ///
-    /// Returns [`AuthError::Database`] on SQLite failure.
+    /// Returns [`AuthError::Database`] on `SQLite` failure.
     pub(crate) fn validate_session(&self, token: &str) -> Result<Option<User>, AuthError> {
         let now = now_ms();
         // Lazy sweep — delete all expired sessions.
@@ -488,7 +487,7 @@ impl AuthStore {
     ///
     /// # Errors
     ///
-    /// Returns [`AuthError::Database`] on SQLite failure.
+    /// Returns [`AuthError::Database`] on `SQLite` failure.
     pub(crate) fn revoke_session(&self, token: &str) -> Result<bool, AuthError> {
         let deleted = self.conn.execute("DELETE FROM sessions WHERE token = ?1", rusqlite::params![token])?;
         Ok(deleted > 0)

@@ -328,7 +328,7 @@ mod tests {
         // Exactly one body file on disk.
         let count = fs::read_dir(dir.path().join(BODIES_DIR))
             .expect("ls")
-            .filter(|e| e.as_ref().map(|e| e.file_name().to_string_lossy().len() == 64).unwrap_or(false))
+            .filter(|e| e.as_ref().is_ok_and(|entry| entry.file_name().to_string_lossy().len() == 64))
             .count();
         assert_eq!(count, 1, "idempotent spill keeps a single file");
     }

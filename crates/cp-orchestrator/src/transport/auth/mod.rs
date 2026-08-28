@@ -24,7 +24,8 @@ use std::sync::Mutex;
 
 use super::Backend;
 use super::rest::HttpReply;
-use crate::services::auth::store::AuthStore;
+use crate::services::auth::db::AuthStore;
+use crate::services::auth::types::NewUser;
 use crate::services::auth::types::{User, UserRole};
 
 /// Minimum password length (FR-21).
@@ -54,8 +55,7 @@ pub(crate) fn authenticate(
     // sites already short-circuit to full access on `auth_user == None`. Also a
     // no-op when there is no auth store to enforce against (NFR-09). Both are read
     // from the cached [`Backend::access_control`] flag — no per-request disk I/O.
-    let (access_control, auth_enabled) =
-        state.lock().map(|b| (b.access_control, b.auth.is_some())).unwrap_or((false, false));
+    let (access_control, auth_enabled) = state.lock().map_or((false, false), |b| (b.access_control, b.auth.is_some()));
     if !access_control || !auth_enabled {
         return Ok(None);
     }
@@ -70,10 +70,19 @@ pub(crate) fn authenticate(
         return Err(HttpReply::error(401, "missing authorization"));
     };
 
-    let b = state.lock().map_err(|_| HttpReply::error(500, "backend lock poisoned"))?;
-    let auth = b.auth.as_ref().ok_or_else(|| HttpReply::error(501, "auth not enabled"))?;
+    // One statement so the `MutexGuard` is a temporary dropped at the `;`, not
+    // a named binding held across the match (significant_drop_tightening). The
+    // session lookup returns an owned outcome, so nothing borrows the guard past
+    // the statement.
+    let outcome = state
+        .lock()
+        .map_err(|_poison| HttpReply::error(500, "backend lock poisoned"))?
+        .auth
+        .as_ref()
+        .ok_or_else(|| HttpReply::error(501, "auth not enabled"))?
+        .validate_session(token);
 
-    match auth.validate_session(token) {
+    match outcome {
         Ok(Some(user)) => Ok(Some(user)),
         Ok(None) => Err(HttpReply::error(401, "invalid or expired session")),
         Err(_) => Err(HttpReply::error(500, "session validation error")),
@@ -84,21 +93,7 @@ pub(crate) fn authenticate(
 fn is_public_route(segments: &[&str]) -> bool {
     matches!(
         segments,
-        ["api", "health"]
-            | ["api", "auth", "login"]
-            | ["api", "auth", "register"]
-            | ["api", "auth", "status"]
-            // SSE uses ticket-based auth, not Bearer (Phase 7 enriches tickets
-            // with user_id; until then the ticket mechanism is the sole gate).
-            | ["api", "stream"]
-            // Agent avatars are loaded by a plain `<img src>` element, which
-            // cannot attach an `Authorization: Bearer` header — so the route
-            // must be public or every avatar 401s once auth is on (T345).
-            // Profile pictures are non-sensitive (shown in the switcher to any
-            // authenticated viewer), so public access is safe. Marking it
-            // public here also skips the per-agent ACL check in `handle`
-            // (which only runs when `auth_user` is `Some`).
-            | ["api", "agent", _, "avatar"]
+        ["api", "health" | "stream"] | ["api", "auth", "login" | "register" | "status"] | ["api", "agent", _, "avatar"]
     )
 }
 
@@ -107,14 +102,11 @@ fn is_public_route(segments: &[&str]) -> bool {
 /// decide whether to show a login vs bootstrap-register page before any
 /// Bearer token is available).
 pub(crate) fn auth_status(state: &Mutex<Backend>) -> HttpReply {
-    let (enabled, bootstrapped) = state
-        .lock()
-        .map(|b| {
-            let enabled = b.auth.is_some();
-            let bootstrapped = b.auth.as_ref().and_then(|a| a.count_users().ok()).map_or(false, |n| n > 0);
-            (enabled, bootstrapped)
-        })
-        .unwrap_or((false, false));
+    let (enabled, bootstrapped) = state.lock().map_or((false, false), |b| {
+        let enabled = b.auth.is_some();
+        let bootstrapped = b.auth.as_ref().and_then(|a| a.count_users().ok()).is_some_and(|n| n > 0);
+        (enabled, bootstrapped)
+    });
     HttpReply::ok(&serde_json::json!({
         "enabled": enabled,
         "bootstrapped": bootstrapped,
@@ -159,9 +151,8 @@ pub(crate) fn login(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     }
 
     let ttl = b.session_ttl;
-    let token = match auth.create_session(&user.id, None, ttl) {
-        Ok(t) => t,
-        Err(_) => return HttpReply::error(500, "session creation failed"),
+    let Ok(token) = auth.create_session(&user.id, None, ttl) else {
+        return HttpReply::error(500, "session creation failed");
     };
 
     HttpReply::ok(&serde_json::json!({
@@ -200,9 +191,8 @@ pub(crate) fn register(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&U
         return HttpReply::error(501, "auth not enabled");
     };
 
-    let user_count = match auth.count_users() {
-        Ok(n) => n,
-        Err(_) => return HttpReply::error(500, "database error"),
+    let Ok(user_count) = auth.count_users() else {
+        return HttpReply::error(500, "database error");
     };
 
     // Bootstrap: the first-ever account is the vendor `superadmin` (FR-03 →
@@ -218,7 +208,7 @@ pub(crate) fn register(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&U
         }
     };
 
-    let user = match auth.create_user(&req.email, &req.name, &req.password, role) {
+    let user = match auth.create_user(NewUser { email: &req.email, name: &req.name, password: &req.password, role }) {
         Ok(u) => u,
         Err(e) => {
             let msg = e.to_string();
@@ -264,8 +254,7 @@ pub(crate) fn me(state: &Mutex<Backend>, auth_user: Option<&User>) -> HttpReply 
     let Some(user) = auth_user else {
         return HttpReply::error(501, "auth not enabled");
     };
-    let provisioned =
-        state.lock().map(|b| crate::transport::it::is_provisioned(&b.provision_flag_path)).unwrap_or(false);
+    let provisioned = state.lock().is_ok_and(|b| crate::transport::it::is_provisioned(&b.provision_flag_path));
     let mut value = serde_json::to_value(user).unwrap_or_default();
     if let Some(obj) = value.as_object_mut() {
         drop(obj.insert("next_action".to_owned(), next_action(user, provisioned).into()));
@@ -295,14 +284,14 @@ fn next_action(user: &User, provisioned: bool) -> &'static str {
 /// profile). Body: `{ "current": "...", "new": "..." }`. Verifies the current
 /// password before applying the new one (min length enforced).
 pub(crate) fn change_password(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&User>) -> HttpReply {
-    let Some(caller) = auth_user else {
-        return HttpReply::error(501, "auth not enabled");
-    };
     #[derive(serde::Deserialize)]
     struct Req {
         current: String,
         new: String,
     }
+    let Some(caller) = auth_user else {
+        return HttpReply::error(501, "auth not enabled");
+    };
     let Ok(req) = serde_json::from_slice::<Req>(body) else {
         return HttpReply::error(400, "expected {\"current\":\"...\",\"new\":\"...\"}");
     };
@@ -330,14 +319,14 @@ pub(crate) fn change_password(state: &Mutex<Backend>, body: &[u8], auth_user: Op
 /// `PATCH /api/auth/me` — update the current user's display name and email.
 /// Body: `{ "name": "...", "email": "..." }`. Returns the refreshed profile.
 pub(crate) fn update_me(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&User>) -> HttpReply {
-    let Some(caller) = auth_user else {
-        return HttpReply::error(501, "auth not enabled");
-    };
     #[derive(serde::Deserialize)]
     struct Req {
         name: String,
         email: String,
     }
+    let Some(caller) = auth_user else {
+        return HttpReply::error(501, "auth not enabled");
+    };
     let Ok(req) = serde_json::from_slice::<Req>(body) else {
         return HttpReply::error(400, "expected {\"name\":\"...\",\"email\":\"...\"}");
     };
@@ -378,10 +367,10 @@ pub(crate) fn list_sessions(state: &Mutex<Backend>, auth_token: Option<&str>, au
     let Some(auth) = b.auth.as_ref() else {
         return HttpReply::error(501, "auth not enabled");
     };
-    match auth.list_sessions(&caller.id, auth_token) {
-        Ok(sessions) => HttpReply::ok(&serde_json::json!({ "sessions": sessions })),
-        Err(_) => HttpReply::error(500, "database error"),
-    }
+    auth.list_sessions(&caller.id, auth_token).map_or_else(
+        |_| HttpReply::error(500, "database error"),
+        |sessions| HttpReply::ok(&serde_json::json!({ "sessions": sessions })),
+    )
 }
 
 /// `DELETE /api/auth/sessions/{id}` — revoke one of the current user's own
@@ -415,21 +404,22 @@ mod tests {
     use super::*;
 
     /// Build a `Mutex<Backend>` with an auth store present, and the access-control
-    /// flag forced to `access_control`. The tempdir is leaked so the SQLite file
-    /// outlives the test body.
-    fn backend(access_control: bool) -> Mutex<Backend> {
+    /// flag forced to `access_control`. Returns the `TempDir` guard alongside so
+    /// the `SQLite` file outlives the test body (bound as `_dir` at call sites).
+    fn backend(access_control: bool) -> (Mutex<Backend>, tempfile::TempDir) {
         let dir = tempfile::tempdir().expect("tempdir");
         let store = AuthStore::open(&dir.path().join("auth.db")).expect("open auth store");
         let mut b = Backend::new(
-            dir.path().to_path_buf(),
-            PathBuf::from("/tmp/cp-auth-test-realms"),
-            PathBuf::from("/tmp/cp-auth-test-bin"),
+            crate::transport::Paths {
+                agents_dir: dir.path().to_path_buf(),
+                agents_root: PathBuf::from("/tmp/cp-auth-test-realms"),
+                agent_binary: PathBuf::from("/tmp/cp-auth-test-bin"),
+            },
             Some(store),
-            Duration::from_secs(3600),
+            Duration::from_hours(1),
         );
         b.access_control = access_control;
-        std::mem::forget(dir);
-        Mutex::new(b)
+        (Mutex::new(b), dir)
     }
 
     /// V0.4b — with the flag OFF, a request with no token on an agent-scoped
@@ -437,18 +427,18 @@ mod tests {
     /// store is present. Mirrors the current auth-disabled behaviour.
     #[test]
     fn flag_off_is_god_mode() {
-        let state = backend(false);
+        let (state, _dir) = backend(false);
         let outcome = authenticate(&state, &["api", "agent", "some-agent"], None);
-        assert!(matches!(outcome, Ok(None)), "flag off ⇒ no authenticated user (god mode)");
+        assert!(matches!(outcome, Ok(None)), "flag off \u{21d2} no authenticated user (god mode)");
     }
 
     /// With the flag ON, the same tokenless request to a protected route is
     /// rejected (401), while a public route still passes through.
     #[test]
     fn flag_on_enforces() {
-        let state = backend(true);
+        let (state, _dir) = backend(true);
         let protected = authenticate(&state, &["api", "agent", "some-agent"], None);
-        assert!(matches!(protected, Err(reply) if reply.status == 401), "flag on + no token ⇒ 401");
+        assert!(matches!(protected, Err(reply) if reply.status == 401), "flag on + no token \u{21d2} 401");
         let public = authenticate(&state, &["api", "health"], None);
         assert!(matches!(public, Ok(None)), "public route bypasses the gate");
     }
@@ -476,7 +466,7 @@ mod tests {
     /// regular user skips the IT step → `ready`. Hermetic (only the durable flag).
     #[test]
     fn me_next_action_day0_walk_and_capability_scope() {
-        let state = backend(false); // me() ignores access_control; needs the flag path
+        let (state, _dir) = backend(false); // me() ignores access_control; needs the flag path
         let flag_path = state.lock().expect("lock").provision_flag_path.clone();
         let na = |u: &User| me(&state, Some(u)).body;
         let set = |v| crate::transport::it::state::set_provisioned(&flag_path, v).expect("flag");
@@ -493,6 +483,6 @@ mod tests {
         assert!(!done.contains("\"next_action\":\"set_identity\""), "provisioned clears day-0: {done}");
         // A regular user skips the IT step; no user-mgmt cap → onboarding short-circuits → ready.
         set(false);
-        assert!(na(&user(Regular, false)).contains("\"next_action\":\"ready\""), "non-IT user ⇒ ready");
+        assert!(na(&user(Regular, false)).contains("\"next_action\":\"ready\""), "non-IT user \u{21d2} ready");
     }
 }

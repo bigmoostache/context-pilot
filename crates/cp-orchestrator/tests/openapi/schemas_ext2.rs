@@ -1,4 +1,4 @@
-//! Deploy-plane OpenAPI schemas — release management, app settings/profile,
+//! Deploy-plane `OpenAPI` schemas — release management, app settings/profile,
 //! and Claude Code OAuth usage + login.
 //!
 //! Split out of [`schemas_ext`](super::schemas_ext) to keep each file within
@@ -9,6 +9,10 @@ use serde_json::{Value, json};
 use super::{arr, r};
 
 /// Release management, settings/session, and Claude Code OAuth schemas.
+#[expect(
+    clippy::too_many_lines,
+    reason = "flat OpenAPI schema literal: one linear json! object enumerating the domain schemas; splitting it into sub-builders is churn with no readability gain — the openapi spec-builder twin of the flat State::default initializer"
+)]
 pub(super) fn deploy() -> Value {
     json!({
         // ── Release management (T427) ───────────────────────────────

@@ -20,14 +20,14 @@ use crate::transport::rest::{Backend, HttpReply};
 /// `GET /healthz` — `200` when every readiness check passes, else `503`.
 ///
 /// Checks (socket-bound is inherent — this handler ran):
-/// * `auth_db` — when auth is enabled, the SQLite store answers a query
+/// * `auth_db` — when auth is enabled, the `SQLite` store answers a query
 ///   (an unconfigured store passes: no database is required to be open);
 /// * `registry` — the agents directory is readable.
 pub(crate) fn healthz(state: &Mutex<Backend>) -> HttpReply {
     let Ok(b) = state.lock() else {
         return HttpReply { status: 503, body: "{\"status\":\"unavailable\"}".to_owned() };
     };
-    let auth_db = b.auth.as_ref().map_or(true, |auth| auth.count_users().is_ok());
+    let auth_db = b.auth.as_ref().is_none_or(|auth| auth.count_users().is_ok());
     let registry = std::fs::read_dir(&b.agents_dir).is_ok();
     drop(b);
 
@@ -42,33 +42,35 @@ pub(crate) fn healthz(state: &Mutex<Backend>) -> HttpReply {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::MaterializedView;
-    use crate::services::auth::store::AuthStore;
+    use crate::services::auth::db::AuthStore;
+    use crate::services::materialized_view::MaterializedView;
     use std::path::PathBuf;
     use std::time::Duration;
 
     /// A backend over a real tempdir (readable registry) with auth enabled on
-    /// a real SQLite file. The tempdir is leaked so paths outlive the test.
-    fn backend_with_auth() -> (Mutex<Backend>, PathBuf) {
+    /// a real `SQLite` file. The caller binds the returned `TempDir` for the
+    /// test's lifetime so the paths stay valid — it is deleted on drop, no leak.
+    fn backend_with_auth() -> (tempfile::TempDir, Mutex<Backend>, PathBuf) {
         let dir = tempfile::tempdir().expect("tempdir");
         let db_path = dir.path().join("auth.db");
         let store = AuthStore::open(&db_path).expect("open auth store");
         let backend = Backend::new(
-            dir.path().to_path_buf(),
-            PathBuf::from("/tmp/cp-health-test-realms"),
-            PathBuf::from("/tmp/cp-health-test-bin"),
+            crate::transport::Paths {
+                agents_dir: dir.path().to_path_buf(),
+                agents_root: PathBuf::from("/tmp/cp-health-test-realms"),
+                agent_binary: PathBuf::from("/tmp/cp-health-test-bin"),
+            },
             Some(store),
-            Duration::from_secs(3600),
+            Duration::from_hours(1),
         );
-        std::mem::forget(dir);
-        (Mutex::new(backend), db_path)
+        (dir, Mutex::new(backend), db_path)
     }
 
     /// V2.1a (handler half) — a bound, DB-open, registry-readable backend is
     /// `200 ok`; with auth disabled entirely it is healthy too.
     #[test]
     fn healthy_backend_is_200() {
-        let (state, _db) = backend_with_auth();
+        let (_dir, state, _db) = backend_with_auth();
         let reply = healthz(&state);
         assert_eq!(reply.status, 200, "healthy backend: {}", reply.body);
         assert!(reply.body.contains("\"status\":\"ok\""));
@@ -82,7 +84,7 @@ mod tests {
     /// tables dropped underneath the open store) → `503`, `auth_db: false`.
     #[test]
     fn broken_auth_db_is_503() {
-        let (state, db_path) = backend_with_auth();
+        let (_dir, state, db_path) = backend_with_auth();
         // Sever the schema through a second connection to the same file — the
         // store's own handle stays open, but its queries now fail.
         let conn = rusqlite::Connection::open(&db_path).expect("second connection");
@@ -107,7 +109,7 @@ mod tests {
     /// absolute path, no secret ever leaves this unauthenticated endpoint.
     #[test]
     fn body_carries_no_sensitive_data() {
-        let (state, db_path) = backend_with_auth();
+        let (_dir, state, db_path) = backend_with_auth();
         for reply in [healthz(&state), {
             let conn = rusqlite::Connection::open(&db_path).expect("second connection");
             conn.execute_batch("DROP TABLE users;").expect("drop users table");
@@ -116,8 +118,8 @@ mod tests {
             let parsed: serde_json::Value = serde_json::from_str(&reply.body).expect("healthz body is JSON");
             let obj = parsed.as_object().expect("object body");
             assert_eq!(obj.keys().collect::<Vec<_>>(), ["checks", "status"], "only status + checks keys");
-            assert!(parsed["status"].is_string());
-            let checks = parsed["checks"].as_object().expect("checks object");
+            assert!(parsed.get("status").is_some_and(serde_json::Value::is_string));
+            let checks = parsed.get("checks").and_then(serde_json::Value::as_object).expect("checks object");
             assert!(checks.values().all(serde_json::Value::is_boolean), "checks are booleans only");
             assert!(!reply.body.contains('/'), "no path fragment in the body: {}", reply.body);
         }

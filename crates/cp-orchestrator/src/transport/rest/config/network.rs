@@ -81,7 +81,7 @@ mod tests {
     // Bare variant imports (the `Admin` variant, not its fully-qualified path)
     // keep the capability-grep gate (V1.1a) clean.
     use super::*;
-    use crate::services::auth::store::AuthStore;
+    use crate::services::auth::db::AuthStore;
     use crate::services::auth::types::UserRole;
     use crate::services::auth::types::UserRole::{Admin, Manager, Superadmin, User as Regular};
     use std::path::PathBuf;
@@ -101,40 +101,46 @@ mod tests {
         }
     }
 
-    /// A `Mutex<Backend>` over a leaked temp dir, mirroring the fixture in
-    /// `config/it.rs` so `.network.json` lands somewhere writable and private.
-    fn backend() -> Mutex<Backend> {
+    /// A `Mutex<Backend>` plus its owning temp dir, so `.network.json` lands
+    /// somewhere writable and private. The caller binds the `TempDir` for the
+    /// duration of the test — it is deleted on drop, no leak.
+    fn backend() -> (tempfile::TempDir, Mutex<Backend>) {
         let dir = tempfile::tempdir().expect("tempdir");
         let store = AuthStore::open(&dir.path().join("auth.db")).expect("open auth store");
         let backend = Backend::new(
-            dir.path().to_path_buf(),
-            PathBuf::from("/tmp/cp-net-test-realms"),
-            PathBuf::from("/tmp/cp-net-test-bin"),
+            crate::transport::Paths {
+                agents_dir: dir.path().to_path_buf(),
+                agents_root: PathBuf::from("/tmp/cp-net-test-realms"),
+                agent_binary: PathBuf::from("/tmp/cp-net-test-bin"),
+            },
             Some(store),
-            Duration::from_secs(3600),
+            Duration::from_hours(1),
         );
-        std::mem::forget(dir);
-        Mutex::new(backend)
+        (dir, Mutex::new(backend))
+    }
+
+    /// Assert the three site-level routes (`GET`, mode, AP) all answer
+    /// `expected` for `caller`. Hoisted out of the loop so `network_gated` stays
+    /// under the cognitive-complexity cap.
+    fn assert_site_routes(state: &Mutex<Backend>, role: UserRole, expected: u16) {
+        let caller = user(role);
+        let mode = br#"{"mode":"wan"}"#;
+        let access_point = br#"{"enabled":false,"ssid":"x","band":"a","channel":0,"country":"FR","hidden":false,"share_internet":true}"#;
+        assert_eq!(it_get_network(state, Some(&caller)).status, expected, "GET for {role:?}");
+        assert_eq!(it_set_network_mode(state, mode, Some(&caller)).status, expected, "mode for {role:?}");
+        assert_eq!(it_set_network_ap(state, access_point, Some(&caller)).status, expected, "ap for {role:?}");
     }
 
     /// The site-level routes are gated on `can_manage_it`: `manager`/`user` →
     /// 403; `admin`/`superadmin` → the delegate's own status.
     #[test]
     fn network_gated() {
-        let state = backend();
-        let mode = br#"{"mode":"wan"}"#;
-        let access_point = br#"{"enabled":false,"ssid":"x","band":"a","channel":0,"country":"FR","hidden":false,"share_internet":true}"#;
+        let (_dir, state) = backend();
         for role in [Manager, Regular] {
-            let caller = user(role);
-            assert_eq!(it_get_network(&state, Some(&caller)).status, 403, "GET denied for {role:?}");
-            assert_eq!(it_set_network_mode(&state, mode, Some(&caller)).status, 403, "mode denied for {role:?}");
-            assert_eq!(it_set_network_ap(&state, access_point, Some(&caller)).status, 403, "ap denied for {role:?}");
+            assert_site_routes(&state, role, 403);
         }
         for role in [Admin, Superadmin] {
-            let caller = user(role);
-            assert_eq!(it_get_network(&state, Some(&caller)).status, 200, "GET ok for {role:?}");
-            assert_eq!(it_set_network_mode(&state, mode, Some(&caller)).status, 200, "mode ok for {role:?}");
-            assert_eq!(it_set_network_ap(&state, access_point, Some(&caller)).status, 200, "ap ok for {role:?}");
+            assert_site_routes(&state, role, 200);
         }
     }
 
@@ -144,7 +150,7 @@ mod tests {
     /// the APN are ours, and changing them breaks their connectivity on our bill.
     #[test]
     fn the_bearer_is_superadmin_only() {
-        let state = backend();
+        let (_dir, state) = backend();
         let wwan = br#"{"apn":"orange.fr","roaming":false,"standby":"hot"}"#;
         for role in [Regular, Manager, Admin] {
             let caller = user(role);
@@ -159,7 +165,7 @@ mod tests {
     /// is what they need when the box loses its uplink and calls us.
     #[test]
     fn an_admin_sees_bearer_status_but_not_bearer_config() {
-        let state = backend();
+        let (_dir, state) = backend();
         let vendor = user(Superadmin);
         assert_eq!(
             it_set_network_wwan(
@@ -175,7 +181,7 @@ mod tests {
         assert_eq!(admin.status, 200, "an admin still reads the pane");
         assert!(!admin.body.contains("vendor.apn.example"), "the vendor's APN leaked to an admin: {}", admin.body);
         assert!(admin.body.contains("\"wwan\":null"), "the bearer CONFIG is elided: {}", admin.body);
-        assert!(admin.body.contains("\"status\""), "…but the status half is still there");
+        assert!(admin.body.contains("\"status\""), "\u{2026}but the status half is still there");
 
         let superadmin = it_get_network(&state, Some(&vendor));
         assert!(superadmin.body.contains("vendor.apn.example"), "the vendor sees their own APN");
@@ -190,7 +196,7 @@ mod tests {
     /// so this drives the no-modem variant without touching the environment.
     #[test]
     fn a_box_with_no_modem_refuses_the_5g_modes_and_hides_the_bearer() {
-        let state = backend();
+        let (_dir, state) = backend();
         let no_modem = false;
 
         assert_eq!(network::set_mode(&state, br#"{"mode":"wan"}"#, no_modem).status, 200, "ethernet always works");
@@ -214,7 +220,7 @@ mod tests {
     /// gate.
     #[test]
     fn mode_round_trips() {
-        let state = backend();
+        let (_dir, state) = backend();
         assert!(it_get_network(&state, None).body.contains("\"mode\":\"wan\""), "a fresh box defaults to wan");
         assert_eq!(it_set_network_mode(&state, br#"{"mode":"5g"}"#, None).status, 200);
         let got = it_get_network(&state, None);
@@ -224,17 +230,21 @@ mod tests {
     /// The two `400`s the design calls out by name.
     #[test]
     fn invalid_bodies_are_400() {
-        let state = backend();
-        assert_eq!(it_set_network_mode(&state, br#"{"mode":"satellite"}"#, None).status, 400, "unknown mode → 400");
+        let (_dir, state) = backend();
+        assert_eq!(
+            it_set_network_mode(&state, br#"{"mode":"satellite"}"#, None).status,
+            400,
+            "unknown mode \u{2192} 400"
+        );
         let no_country = br#"{"enabled":true,"ssid":"cp","passphrase":"abcdefghij","band":"a","channel":0,"country":"","hidden":false,"share_internet":true}"#;
-        assert_eq!(it_set_network_ap(&state, no_country, None).status, 400, "enabling with no country → 400");
+        assert_eq!(it_set_network_ap(&state, no_country, None).status, 400, "enabling with no country \u{2192} 400");
     }
 
     /// Secret elision at the transport boundary: a PSK that was just written is not
     /// echoed by the response, nor by any later read.
     #[test]
     fn secrets_never_come_back_out() {
-        let state = backend();
+        let (_dir, state) = backend();
         let body = br#"{"enabled":true,"ssid":"cp","passphrase":"correct-horse-battery","band":"a","channel":36,"country":"FR","hidden":false,"share_internet":true}"#;
         let set = it_set_network_ap(&state, body, None);
         assert_eq!(set.status, 200, "valid AP accepted: {}", set.body);
@@ -254,17 +264,18 @@ mod tests {
     /// see the first writer's result.
     #[test]
     fn concurrent_writes_to_different_halves_both_survive() {
-        let state = std::sync::Arc::new(backend());
+        let (_dir, backend) = backend();
+        let state = std::sync::Arc::new(backend);
         let ap = br#"{"enabled":false,"ssid":"concurrent","band":"a","channel":36,"country":"FR","hidden":false,"share_internet":true}"#;
         let wwan = br#"{"apn":"concurrent.apn","roaming":true,"standby":"cold"}"#;
-        let threads: Vec<_> = (0..8)
+        let threads: Vec<_> = (0..8usize)
             .map(|worker| {
-                let state = std::sync::Arc::clone(&state);
+                let worker_state = std::sync::Arc::clone(&state);
                 std::thread::spawn(move || {
-                    if worker % 2 == 0 {
-                        assert_eq!(it_set_network_ap(&state, ap, None).status, 200);
+                    if worker & 1 == 0 {
+                        assert_eq!(it_set_network_ap(&worker_state, ap, None).status, 200);
                     } else {
-                        assert_eq!(it_set_network_wwan(&state, wwan, None).status, 200);
+                        assert_eq!(it_set_network_wwan(&worker_state, wwan, None).status, 200);
                     }
                 })
             })
@@ -275,13 +286,13 @@ mod tests {
         let got = it_get_network(&state, None);
         assert!(got.body.contains("\"ssid\":\"concurrent\""), "the AP write survived: {}", got.body);
         assert!(got.body.contains("\"apn\":\"concurrent.apn\""), "the bearer write survived too: {}", got.body);
-        assert!(got.body.contains("\"standby\":\"cold\""), "…including its other fields");
+        assert!(got.body.contains("\"standby\":\"cold\""), "\u{2026}including its other fields");
     }
 
     /// An omitted passphrase keeps the stored one; an explicit `null` clears it.
     #[test]
     fn an_omitted_secret_is_kept_and_an_explicit_null_clears_it() {
-        let state = backend();
+        let (_dir, state) = backend();
         let with_psk = br#"{"enabled":true,"ssid":"cp","passphrase":"correct-horse-battery","band":"a","channel":36,"country":"FR","hidden":false,"share_internet":true}"#;
         assert_eq!(it_set_network_ap(&state, with_psk, None).status, 200);
 

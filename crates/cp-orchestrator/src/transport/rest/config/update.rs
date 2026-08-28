@@ -21,10 +21,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use serde::Deserialize;
 
 use super::super::{Backend, HttpReply};
-use crate::services::ReleaseStore;
-use crate::services::releases::updater::{
-    UpdateEvaluation, UpdateState, check_channel, download_artifact, restart_self, scheduler, stage_apply,
-};
+use crate::services::releases::ReleaseStore;
+use crate::services::releases::updater::apply::{AuthDb, restart_self, stage_apply};
+use crate::services::releases::updater::download::download_artifact;
+use crate::services::releases::updater::state::UpdateState;
+use crate::services::releases::updater::verify::UpdateEvaluation;
+use crate::services::releases::updater::{check_channel, scheduler};
 use crate::services::releases::{MaintenanceWindow, UpdateMode};
 
 /// Process-wide apply serialisation (T4.2.3): the REST `apply` route and the
@@ -121,7 +123,7 @@ pub(crate) fn update_apply(state: &Mutex<Backend>) -> HttpReply {
             }
             return HttpReply::ok(&serde_json::json!({ "status": "up_to_date", "current": current }));
         }
-        Ok(UpdateEvaluation::Available(manifest)) => manifest,
+        Ok(UpdateEvaluation::Available(manifest)) => *manifest,
     };
     // The switch resolved to a concrete target; retire the crossgrade window
     // now so a mid-apply failure doesn't re-trigger head-tracking next poll.
@@ -147,13 +149,18 @@ pub(crate) fn update_apply(state: &Mutex<Backend>) -> HttpReply {
             APPLY_IN_FLIGHT.store(false, Ordering::SeqCst);
             return HttpReply::error(500, "backend lock poisoned");
         };
-        if let Err(e) = stage_apply(&b.releases, b.auth.as_ref(), &b.auth_db_path, &install, &manifest.version) {
+        if let Err(e) = stage_apply(
+            &b.releases,
+            &AuthDb { store: b.auth.as_ref(), path: &b.auth_db_path },
+            &install,
+            &manifest.version,
+        ) {
             drop(b);
             APPLY_IN_FLIGHT.store(false, Ordering::SeqCst);
             return HttpReply::error(500, &format!("stage failed: {e}"));
         }
     }
-    eprintln!("updater: apply {current} → {} (admin request) — restarting", manifest.version);
+    crate::oerr!("updater: apply {current} → {} (admin request) — restarting", manifest.version);
     restart_self(&install);
     HttpReply::ok(&serde_json::json!({ "status": "applying", "from": current, "to": manifest.version }))
 }
@@ -172,8 +179,8 @@ pub(crate) fn update_set_mode(state: &Mutex<Backend>, body: &[u8]) -> HttpReply 
         Nightly,
     }
     impl Channel {
-        fn as_str(&self) -> &'static str {
-            match self {
+        const fn as_str(&self) -> &'static str {
+            match *self {
                 Self::Stable => "stable",
                 Self::Nightly => "nightly",
             }
@@ -197,15 +204,15 @@ pub(crate) fn update_set_mode(state: &Mutex<Backend>, body: &[u8]) -> HttpReply 
     let Ok(mut b) = state.lock() else {
         return HttpReply::error(500, "backend lock poisoned");
     };
-    if let Some(window) = req.window {
-        if let Err(e) = b.releases.set_window(window) {
-            return HttpReply::error(400, &e);
-        }
+    if let Some(window) = req.window
+        && let Err(e) = b.releases.set_window(window)
+    {
+        return HttpReply::error(400, &e);
     }
-    if let Some(channel) = req.channel {
-        if let Err(e) = b.releases.set_channel(channel.as_str()) {
-            return HttpReply::error(400, &e);
-        }
+    if let Some(channel) = req.channel
+        && let Err(e) = b.releases.set_channel(channel.as_str())
+    {
+        return HttpReply::error(400, &e);
     }
     if let Some(mode) = req.mode {
         b.releases.set_update_mode(mode);
@@ -216,7 +223,7 @@ pub(crate) fn update_set_mode(state: &Mutex<Backend>, body: &[u8]) -> HttpReply 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::MaterializedView;
+    use crate::services::materialized_view::MaterializedView;
     use std::path::PathBuf;
 
     /// A hermetic backend whose release store lives in a fresh temp dir.
@@ -229,6 +236,13 @@ mod tests {
         (Mutex::new(b), dir)
     }
 
+    /// Assert `reply`'s JSON body contains `needle`. A plain call, so folding the
+    /// `body.contains` checks through it keeps the roundtrip tests under the
+    /// cognitive-complexity cap.
+    fn assert_body_has(reply: &HttpReply, needle: &str) {
+        assert!(reply.body.contains(needle), "expected {needle} in {}", reply.body);
+    }
+
     /// V5.1b — `status` reports the defaults; `mode` flips the posture and
     /// moves the window (server-persisted, reflected in the next status).
     #[test]
@@ -237,13 +251,13 @@ mod tests {
 
         let status = update_status(&state);
         assert_eq!(status.status, 200);
-        assert!(status.body.contains("\"mode\":\"auto\""), "default mode: {}", status.body);
-        assert!(status.body.contains("\"start\":\"03:00\""), "default window: {}", status.body);
+        assert_body_has(&status, "\"mode\":\"auto\"");
+        assert_body_has(&status, "\"start\":\"03:00\"");
 
         let set = update_set_mode(&state, br#"{"mode":"manual","window":{"start":"22:00","end":"23:30"}}"#);
         assert_eq!(set.status, 200, "{}", set.body);
-        assert!(set.body.contains("\"mode\":\"manual\""));
-        assert!(set.body.contains("\"start\":\"22:00\""));
+        assert_body_has(&set, "\"mode\":\"manual\"");
+        assert_body_has(&set, "\"start\":\"22:00\"");
 
         // Persisted server-side: a reloaded store sees the same values.
         let reloaded = ReleaseStore::load(dir.join("releases"));
@@ -259,11 +273,11 @@ mod tests {
     fn update_routes_channel_switch() {
         let (state, dir) = backend("channel");
 
-        assert!(update_status(&state).body.contains("\"channel\":\"stable\""), "default channel");
+        assert_body_has(&update_status(&state), "\"channel\":\"stable\""); // default channel
 
         let set = update_set_mode(&state, br#"{"channel":"nightly"}"#);
         assert_eq!(set.status, 200, "{}", set.body);
-        assert!(set.body.contains("\"channel\":\"nightly\""), "channel switched: {}", set.body);
+        assert_body_has(&set, "\"channel\":\"nightly\"");
 
         // Persisted server-side.
         let reloaded = ReleaseStore::load(dir.join("releases"));
@@ -272,7 +286,7 @@ mod tests {
 
         // An unknown channel is refused and changes nothing.
         assert_eq!(update_set_mode(&state, br#"{"channel":"beta"}"#).status, 400, "unknown channel refused");
-        assert!(update_status(&state).body.contains("\"channel\":\"nightly\""));
+        assert_body_has(&update_status(&state), "\"channel\":\"nightly\"");
 
         drop(std::fs::remove_dir_all(&dir));
     }

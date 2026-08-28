@@ -9,14 +9,14 @@ fn tmp() -> tempfile::TempDir {
 
 #[test]
 fn reject_binary_not_on_allow_list() {
-    let sup = AgentSupervisor::new(&[PathBuf::from("/bin/echo")]);
+    let sup = ProcManager::new(&[PathBuf::from("/bin/echo")]);
     let result = sup.validate_binary(Path::new("/bin/cat"));
     assert!(matches!(result, Err(Error::NotAllowed { .. })), "expected NotAllowed, got {result:?}");
 }
 
 #[test]
 fn accept_binary_on_allow_list() {
-    let sup = AgentSupervisor::new(&[PathBuf::from("/bin/echo")]);
+    let sup = ProcManager::new(&[PathBuf::from("/bin/echo")]);
     let result = sup.validate_binary(Path::new("/bin/echo"));
     assert!(result.is_ok(), "expected Ok, got {result:?}");
 }
@@ -30,14 +30,14 @@ fn symlink_resolved_against_allow_list() {
     std::os::unix::fs::symlink(&target, &link).unwrap_or_else(|e| panic!("symlink: {e}"));
 
     // Allow-list has the real binary; symlink should resolve to it.
-    let sup = AgentSupervisor::new(&[target]);
+    let sup = ProcManager::new(&[target]);
     let result = sup.validate_binary(&link);
     assert!(result.is_ok(), "symlink should resolve to allowed binary");
 }
 
 #[test]
 fn dotdot_resolved_against_allow_list() {
-    let sup = AgentSupervisor::new(&[PathBuf::from("/bin/echo")]);
+    let sup = ProcManager::new(&[PathBuf::from("/bin/echo")]);
     let result = sup.validate_binary(Path::new("/bin/../bin/echo"));
     assert!(result.is_ok(), ".. should resolve to allowed path");
 }
@@ -47,10 +47,10 @@ fn dotdot_resolved_against_allow_list() {
 #[test]
 fn spawn_and_stop() {
     let folder = tmp();
-    let mut sup = AgentSupervisor::new(&[PathBuf::from("/bin/sleep")]);
+    let mut sup = ProcManager::new(&[PathBuf::from("/bin/sleep")]);
 
     let pid = sup
-        .spawn("a1".into(), Path::new("/bin/sleep"), folder.path(), &["60"])
+        .spawn("a1".into(), SpawnPlan { binary: Path::new("/bin/sleep"), folder: folder.path(), args: &["60"] })
         .unwrap_or_else(|e| panic!("spawn: {e}"));
     assert_eq!(sup.len(), 1);
 
@@ -67,12 +67,14 @@ fn spawn_and_stop() {
 #[test]
 fn spawn_rejects_duplicate_id() {
     let folder = tmp();
-    let mut sup = AgentSupervisor::new(&[PathBuf::from("/bin/sleep")]);
+    let mut sup = ProcManager::new(&[PathBuf::from("/bin/sleep")]);
 
-    let _pid =
-        sup.spawn("a1".into(), Path::new("/bin/sleep"), folder.path(), &["60"]).unwrap_or_else(|e| panic!("{e}"));
+    let _pid = sup
+        .spawn("a1".into(), SpawnPlan { binary: Path::new("/bin/sleep"), folder: folder.path(), args: &["60"] })
+        .unwrap_or_else(|e| panic!("{e}"));
 
-    let dup = sup.spawn("a1".into(), Path::new("/bin/sleep"), folder.path(), &["60"]);
+    let dup =
+        sup.spawn("a1".into(), SpawnPlan { binary: Path::new("/bin/sleep"), folder: folder.path(), args: &["60"] });
     assert!(matches!(dup, Err(Error::AlreadySupervised { .. })), "duplicate spawn should fail");
 
     let _stopped = sup.stop("a1");
@@ -83,7 +85,7 @@ fn spawn_rejects_duplicate_id() {
 #[test]
 fn adopt_and_detect_vanish() {
     let folder = tmp();
-    let mut sup = AgentSupervisor::new(&[]);
+    let mut sup = ProcManager::new(&[]);
 
     // Spawn a short-lived process externally, then adopt it.
     let mut child = Command::new("/bin/sleep")
@@ -125,7 +127,7 @@ fn adopt_and_detect_vanish() {
     let events = sup.check_liveness();
     assert_eq!(events.len(), 1);
     assert!(
-        matches!(&events[0], Event::Vanished { agent_id } if agent_id == "a2"),
+        matches!(events.first(), Some(Event::Vanished { agent_id }) if agent_id == "a2"),
         "expected Vanished, got {events:?}"
     );
     assert!(sup.is_empty(), "dead agent should be removed");
@@ -136,10 +138,10 @@ fn adopt_and_detect_vanish() {
 #[test]
 fn restart_stops_and_respawns() {
     let folder = tmp();
-    let mut sup = AgentSupervisor::new(&[PathBuf::from("/bin/sleep")]);
+    let mut sup = ProcManager::new(&[PathBuf::from("/bin/sleep")]);
 
     let pid1 = sup
-        .spawn("a3".into(), Path::new("/bin/sleep"), folder.path(), &["60"])
+        .spawn("a3".into(), SpawnPlan { binary: Path::new("/bin/sleep"), folder: folder.path(), args: &["60"] })
         .unwrap_or_else(|e| panic!("spawn: {e}"));
 
     let pid2 = sup.restart("a3").unwrap_or_else(|e| panic!("restart: {e}"));
@@ -162,17 +164,18 @@ fn restart_stops_and_respawns() {
 #[test]
 fn check_liveness_reaps_exited_child() {
     let folder = tmp();
-    let mut sup = AgentSupervisor::new(&[PathBuf::from("/bin/sleep")]);
+    let mut sup = ProcManager::new(&[PathBuf::from("/bin/sleep")]);
 
-    let _pid =
-        sup.spawn("a4".into(), Path::new("/bin/sleep"), folder.path(), &["0"]).unwrap_or_else(|e| panic!("spawn: {e}"));
+    let _pid = sup
+        .spawn("a4".into(), SpawnPlan { binary: Path::new("/bin/sleep"), folder: folder.path(), args: &["0"] })
+        .unwrap_or_else(|e| panic!("spawn: {e}"));
 
     thread::sleep(Duration::from_millis(200));
 
     let events = sup.check_liveness();
     assert_eq!(events.len(), 1);
     assert!(
-        matches!(&events[0], Event::Exited { agent_id, .. } if agent_id == "a4"),
+        matches!(events.first(), Some(Event::Exited { agent_id, .. }) if agent_id == "a4"),
         "expected Exited, got {events:?}"
     );
     assert!(sup.is_empty());
@@ -180,7 +183,7 @@ fn check_liveness_reaps_exited_child() {
 
 #[test]
 fn stop_not_found() {
-    let mut sup = AgentSupervisor::new(&[]);
+    let mut sup = ProcManager::new(&[]);
     let result = sup.stop("nonexistent");
     assert!(matches!(result, Err(Error::NotFound { .. })), "expected NotFound");
 }

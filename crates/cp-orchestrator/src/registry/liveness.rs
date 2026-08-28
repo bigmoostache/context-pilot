@@ -108,7 +108,7 @@ mod tests {
     const BOOT_A: &str = "0123456789abcdef0123456789abcdef";
     const BOOT_B: &str = "ffffffffffffffffffffffffffffffff";
 
-    /// A pid that cannot name a live process (above any platform's pid_max).
+    /// A pid that cannot name a live process (above any platform's `pid_max`).
     const DEAD_PID: u32 = 4_000_000_000;
 
     fn entry(pid: u32, boot_id: &str) -> Entry {

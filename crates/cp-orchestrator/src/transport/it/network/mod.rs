@@ -40,22 +40,55 @@ use super::Backend;
 use super::HttpReply;
 use state::{ApConfig, Band, NetworkConfig, Standby, UplinkMode, WwanConfig};
 
-/// serde helper distinguishing an **absent** field from an explicit `null`.
+/// A write-only field edit: **absent keeps** the stored value, **`null` clears**
+/// it, **a value replaces** it — the serde-idiomatic `Option<Option<T>>` given
+/// one named type so the intent reads plainly at the call site (`.resolve`).
 ///
 /// Secrets are write-only: a read never returns them, so the cockpit cannot send
 /// back what it never received. Without this distinction every AP save from a UI
-/// that simply omits the untouched passphrase field would wipe the PSK. With it,
-/// absent means "keep", `null` means "clear", a string means "replace".
+/// that simply omits the untouched passphrase field would wipe the PSK.
+enum FieldEdit<T> {
+    /// The field was absent — keep whatever is stored.
+    Keep,
+    /// An explicit `null` — clear the stored value.
+    Clear,
+    /// A concrete value — replace the stored value.
+    Set(T),
+}
+
+impl<T> Default for FieldEdit<T> {
+    /// A missing field defaults to [`Keep`](FieldEdit::Keep) — the whole point
+    /// of the absent-vs-`null` distinction (paired with `#[serde(default)]`).
+    fn default() -> Self {
+        Self::Keep
+    }
+}
+
+impl<T> FieldEdit<T> {
+    /// Apply the edit against the currently-stored `current`: keep it, clear it,
+    /// or replace it.
+    fn resolve(self, current: Option<T>) -> Option<T> {
+        match self {
+            Self::Keep => current,
+            Self::Clear => None,
+            Self::Set(value) => Some(value),
+        }
+    }
+}
+
+/// Deserialize a **present** field into a [`FieldEdit`]: `null` → `Clear`, a
+/// value → `Set`. An absent field never reaches here — `#[serde(default)]`
+/// yields `Keep` — so this only distinguishes an explicit `null` from a value.
 ///
 /// # Errors
 ///
 /// Propagates the deserializer's own error for a malformed value.
-fn double_option<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+fn field_edit<'de, D, T>(deserializer: D) -> Result<FieldEdit<T>, D::Error>
 where
     D: Deserializer<'de>,
     T: Deserialize<'de>,
 {
-    Deserialize::deserialize(deserializer).map(Some)
+    Ok(Option::<T>::deserialize(deserializer)?.map_or(FieldEdit::Clear, FieldEdit::Set))
 }
 
 /// Resolve `.network.json`'s path from the backend, or the reply to send when
@@ -103,7 +136,7 @@ where
     let _guard = APPLY_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let previous = state::load(&path);
     let (next, payload) = match build(&previous) {
-        Ok(built) => built,
+        Ok(derived) => derived,
         Err(reply) => return reply,
     };
     reply_for(commit(state, &path, &previous, &next), payload)
@@ -160,7 +193,7 @@ fn commit(state: &Mutex<Backend>, path: &Path, previous: &NetworkConfig, next: &
 /// been rolled back.
 fn restore(path: &Path, previous: &NetworkConfig) {
     if let Err(failure) = state::save(path, previous) {
-        eprintln!(
+        crate::oerr!(
             "WARN: network: could not restore .network.json after a failed apply ({failure}) — \
              the persisted document no longer matches the box, and the next boot will apply it"
         );
@@ -222,8 +255,8 @@ fn reply_for(outcome: Result<bool, String>, payload: serde_json::Value) -> HttpR
             HttpReply::ok(&body)
         }
         Err(failure) => {
-            eprintln!("network: {failure}");
-            HttpReply::error(502, "network settings rolled back — the box is unchanged")
+            crate::oerr!("network: {failure}");
+            HttpReply::error(502, "network settings rolled back \u{2014} the box is unchanged")
         }
     }
 }
@@ -291,9 +324,9 @@ pub(crate) fn set_ap(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
         /// Broadcast network name.
         ssid: String,
         /// WPA2 PSK — absent keeps, `null` clears, a string replaces.
-        #[serde(default, deserialize_with = "double_option")]
-        passphrase: Option<Option<String>>,
-        /// 2.4 (`bg`) or 5 GHz (`a`).
+        #[serde(default, deserialize_with = "field_edit")]
+        passphrase: FieldEdit<String>,
+        /// 2.4 (`bg`) or 5 `GHz` (`a`).
         band: Band,
         /// Channel number, `0` for automatic.
         channel: u16,
@@ -311,7 +344,7 @@ pub(crate) fn set_ap(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
         let access_point = ApConfig {
             enabled: req.enabled,
             ssid: req.ssid.trim().to_owned(),
-            passphrase: req.passphrase.unwrap_or_else(|| previous.ap.passphrase.clone()),
+            passphrase: req.passphrase.resolve(previous.ap.passphrase.clone()),
             band: req.band,
             channel: req.channel,
             country: req.country.trim().to_uppercase(),
@@ -342,14 +375,14 @@ pub(crate) fn set_wwan(state: &Mutex<Backend>, body: &[u8], has_modem: bool) -> 
         /// Carrier APN.
         apn: String,
         /// PAP/CHAP username — absent keeps, `null` clears.
-        #[serde(default, deserialize_with = "double_option")]
-        username: Option<Option<String>>,
+        #[serde(default, deserialize_with = "field_edit")]
+        username: FieldEdit<String>,
         /// PAP/CHAP password — absent keeps, `null` clears.
-        #[serde(default, deserialize_with = "double_option")]
-        password: Option<Option<String>>,
+        #[serde(default, deserialize_with = "field_edit")]
+        password: FieldEdit<String>,
         /// SIM PIN — absent keeps, `null` clears.
-        #[serde(default, deserialize_with = "double_option")]
-        pin: Option<Option<String>>,
+        #[serde(default, deserialize_with = "field_edit")]
+        pin: FieldEdit<String>,
         /// Allow attaching to a roaming network.
         roaming: bool,
         /// Standby policy while ethernet is the active uplink.
@@ -364,9 +397,9 @@ pub(crate) fn set_wwan(state: &Mutex<Backend>, body: &[u8], has_modem: bool) -> 
     mutate(state, |previous| {
         let wwan = WwanConfig {
             apn: req.apn.trim().to_owned(),
-            username: req.username.unwrap_or_else(|| previous.wwan.username.clone()),
-            password: req.password.unwrap_or_else(|| previous.wwan.password.clone()),
-            pin: req.pin.unwrap_or_else(|| previous.wwan.pin.clone()),
+            username: req.username.resolve(previous.wwan.username.clone()),
+            password: req.password.resolve(previous.wwan.password.clone()),
+            pin: req.pin.resolve(previous.wwan.pin.clone()),
             roaming: req.roaming,
             standby: req.standby,
         };
@@ -391,9 +424,9 @@ pub(crate) fn apply_network_at_boot(state: &Mutex<Backend>) {
     let _guard = APPLY_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let config = state::load(&path);
     match apply::apply(&config) {
-        Ok(true) => eprintln!("network: applied at boot (mode={})", config.mode.as_str()),
+        Ok(true) => crate::oerr!("network: applied at boot (mode={})", config.mode.as_str()),
         Ok(false) => {} // no gates set in this environment — skipped cleanly.
-        Err(failure) => eprintln!("WARN: network boot apply failed: {failure}"),
+        Err(failure) => crate::oerr!("WARN: network boot apply failed: {failure}"),
     }
 }
 

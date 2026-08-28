@@ -37,28 +37,34 @@ pub fn usage(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
         return HttpReply::error(500, "backend lock poisoned");
     };
 
-    let worker_id = extract_worker_param(query);
-    let wid = match worker_id {
-        Some(id) => id,
-        None => {
-            let workers = match backend.inspect_mut().list_workers(folder_path) {
-                Ok(w) => w,
-                Err(_) => return HttpReply::error(404, "cannot list workers"),
-            };
-            match workers.first() {
-                Some(w) => w.clone(),
-                None => return HttpReply::error(404, "no workers found"),
-            }
-        }
+    let wid = match resolve_worker_id(folder_path, query) {
+        Ok(id) => id,
+        Err(reply) => return reply,
     };
 
-    match backend.inspect_mut().read_worker(folder_path, &wid) {
-        Ok(ws) => {
+    backend.inspect_mut().read_worker(folder_path, &wid).map_or_else(
+        |_| HttpReply::error(404, "worker state unavailable"),
+        |ws| {
             let cost = ws.get("cost").cloned().unwrap_or(serde_json::Value::Null);
             HttpReply::ok(&cost)
-        }
-        Err(_) => HttpReply::error(404, "worker state unavailable"),
+        },
+    )
+}
+
+/// Resolve the worker id for [`usage`]: the explicit `?worker=` query param if
+/// present, otherwise the first worker listed on disk. Returns an error
+/// [`HttpReply`] when no worker can be determined.
+fn resolve_worker_id(folder_path: &Path, query: &str) -> Result<String, HttpReply> {
+    if let Some(id) = extract_worker_param(query) {
+        return Ok(id);
     }
+    let Ok(workers) = crate::inspect::StateReader::list_workers(folder_path) else {
+        return Err(HttpReply::error(404, "cannot list workers"));
+    };
+    let Some(first) = workers.first() else {
+        return Err(HttpReply::error(404, "no workers found"));
+    };
+    Ok(first.clone())
 }
 
 /// `GET /api/agent/{id}/library` — prompt library items.
@@ -98,63 +104,67 @@ pub fn library(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     let mut items: Vec<serde_json::Value> = Vec::new();
 
     for (kind, subdir) in [("agent", "agents"), ("skill", "skills"), ("command", "commands")] {
-        // Seed built-in ids for this kind — an on-disk `.md` whose id matches one
-        // is an OVERRIDE of a compiled-in seed (flag it `builtin: true`), and any
-        // seed with NO disk file is appended below so the dropdown lists it too.
-        // Mirrors the tui-side `cp_mod_prompt::storage::load_prompts_for` merge:
-        // one seed source (`yamls/library.yaml` via `cp_base`), disk wins on id.
-        let seeds = seed_entries(kind);
+        collect_kind_items(kind, &cp_dir.join(subdir), active_agent_id.as_deref(), &mut items);
+    }
 
-        let mut disk_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
-        let dir = cp_dir.join(subdir);
-        if let Ok(entries) = std::fs::read_dir(&dir) {
-            for entry in entries {
-                let Ok(entry) = entry else { continue };
-                let path = entry.path();
-                if path.extension().and_then(std::ffi::OsStr::to_str) != Some("md") {
-                    continue;
-                }
-                let Ok(content) = std::fs::read_to_string(&path) else { continue };
-                let (name, description) = parse_frontmatter(&content);
-                let id = path.file_stem().and_then(std::ffi::OsStr::to_str).unwrap_or("").to_owned();
-                if id.is_empty() {
-                    continue;
-                }
-                let is_builtin = seeds.iter().any(|s| s.id == id);
-                let _new = disk_ids.insert(id.clone());
-                items.push(library_item(
-                    kind,
-                    &id,
-                    &name,
-                    &description,
-                    &content,
-                    active_agent_id.as_deref(),
-                    is_builtin,
-                ));
-            }
-        }
+    HttpReply::ok(&items)
+}
 
-        // Append seed built-ins that have no on-disk override, so the dropdown
-        // lists every agent even before the user has created a local copy.
-        for seed in seeds {
-            if disk_ids.contains(&seed.id) {
+/// Scan one library `kind`'s shared `.md` directory and append its items to
+/// `items`: disk files first (each an override candidate for a compiled-in
+/// seed), then any seed with no on-disk file so the dropdown lists it too.
+///
+/// Mirrors the tui-side `cp_mod_prompt::storage::load_prompts_for` merge — one
+/// seed source (`yamls/library.yaml` via `cp_base`), disk wins on id.
+fn collect_kind_items(kind: &str, dir: &Path, active_agent_id: Option<&str>, items: &mut Vec<serde_json::Value>) {
+    let seeds = seed_entries(kind);
+
+    let mut disk_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for raw in entries {
+            let Ok(entry) = raw else { continue };
+            let path = entry.path();
+            if path.extension().and_then(std::ffi::OsStr::to_str) != Some("md") {
                 continue;
             }
-            let active = (kind == "agent" && active_agent_id.as_deref() == Some(seed.id.as_str())).then_some(true);
-            let body = (kind == "command").then(|| seed.content.clone());
-            items.push(serde_json::json!({
-                "id": seed.id,
-                "name": seed.name,
-                "kind": kind,
-                "description": seed.description,
-                "body": body,
-                "active": active,
-                "builtin": true,
+            let Ok(content) = std::fs::read_to_string(&path) else { continue };
+            let (name, description) = parse_frontmatter(&content);
+            let id = path.file_stem().and_then(std::ffi::OsStr::to_str).unwrap_or("").to_owned();
+            if id.is_empty() {
+                continue;
+            }
+            let is_builtin = seeds.iter().any(|s| s.id == id);
+            let _new = disk_ids.insert(id.clone());
+            items.push(library_item(&LibraryItemParts {
+                kind,
+                id: &id,
+                name: &name,
+                description: &description,
+                content: &content,
+                active_agent_id,
+                is_builtin,
             }));
         }
     }
 
-    HttpReply::ok(&items)
+    // Append seed built-ins that have no on-disk override, so the dropdown
+    // lists every agent even before the user has created a local copy.
+    for seed in seeds {
+        if disk_ids.contains(&seed.id) {
+            continue;
+        }
+        let active = (kind == "agent" && active_agent_id == Some(seed.id.as_str())).then_some(true);
+        let body = (kind == "command").then(|| seed.content.clone());
+        items.push(serde_json::json!({
+            "id": seed.id,
+            "name": seed.name,
+            "kind": kind,
+            "description": seed.description,
+            "body": body,
+            "active": active,
+            "builtin": true,
+        }));
+    }
 }
 
 /// `GET /api/agent/{id}/identity` — the agent's durable self-identity.
@@ -222,6 +232,26 @@ fn seed_entries(kind: &str) -> &'static [cp_base::config::SeedEntry] {
     }
 }
 
+/// Borrowed inputs for [`library_item`] — bundled so the builder stays under
+/// the argument-count cap. Built by struct literal at the single call site in
+/// [`collect_kind_items`].
+struct LibraryItemParts<'parts> {
+    /// Library kind (`"agent"` / `"skill"` / `"command"`).
+    kind: &'parts str,
+    /// The item's id (file stem).
+    id: &'parts str,
+    /// Display name from frontmatter.
+    name: &'parts str,
+    /// Description from frontmatter.
+    description: &'parts str,
+    /// Raw `.md` file contents (command body is parsed from this).
+    content: &'parts str,
+    /// The currently loaded behaviour agent id, if any.
+    active_agent_id: Option<&'parts str>,
+    /// Whether this id also exists as a compiled-in seed.
+    is_builtin: bool,
+}
+
 /// Build one `LibraryItem` JSON object from an on-disk `.md`.
 ///
 /// `body` is surfaced only for commands (the `/cmd` composer seed — T350);
@@ -229,25 +259,17 @@ fn seed_entries(kind: &str) -> &'static [cp_base::config::SeedEntry] {
 /// Edit fetch them on demand). `active` marks the loaded behaviour agent;
 /// `builtin` flags an id that also exists as a compiled-in seed (i.e. this disk
 /// file is a local OVERRIDE of a built-in).
-fn library_item(
-    kind: &str,
-    id: &str,
-    name: &str,
-    description: &str,
-    content: &str,
-    active_agent_id: Option<&str>,
-    is_builtin: bool,
-) -> serde_json::Value {
-    let body = (kind == "command").then(|| parse_command_body(content));
-    let active = (kind == "agent" && active_agent_id == Some(id)).then_some(true);
+fn library_item(parts: &LibraryItemParts<'_>) -> serde_json::Value {
+    let body = (parts.kind == "command").then(|| parse_command_body(parts.content));
+    let active = (parts.kind == "agent" && parts.active_agent_id == Some(parts.id)).then_some(true);
     serde_json::json!({
-        "id": id,
-        "name": name,
-        "kind": kind,
-        "description": description,
+        "id": parts.id,
+        "name": parts.name,
+        "kind": parts.kind,
+        "description": parts.description,
         "body": body,
         "active": active,
-        "builtin": is_builtin.then_some(true),
+        "builtin": parts.is_builtin.then_some(true),
     })
 }
 
@@ -265,20 +287,16 @@ fn library_item(
 /// * otherwise → the trimmed text after the closing fence line.
 fn parse_command_body(content: &str) -> String {
     let trimmed = content.trim_start();
-    if !trimmed.starts_with("---") {
+    let Some(after_first) = trimmed.strip_prefix("---") else {
         return trimmed.trim().to_owned();
-    }
-    let after_first = trimmed[3..].trim_start_matches(['\r', '\n']);
-    let Some(end) = after_first.find("\n---") else {
+    };
+    let after_fm = after_first.trim_start_matches(['\r', '\n']);
+    // `rest` begins immediately after the closing `\n---`; the remainder of the
+    // fence line runs up to the next newline, so the body is everything past it.
+    let Some((_front, rest)) = after_fm.split_once("\n---") else {
         return String::new();
     };
-    // `after_first[end..]` begins with "\n---"; skip the newline so we sit on
-    // the closing fence line, then take everything after that line ends.
-    let after_fence = &after_first[end + 1..];
-    match after_fence.find('\n') {
-        Some(nl) => after_fence[nl + 1..].trim().to_owned(),
-        None => String::new(),
-    }
+    rest.split_once('\n').map_or_else(String::new, |(_fence_tail, body)| body.trim().to_owned())
 }
 
 /// Extract `name` and `description` from YAML frontmatter in a markdown file.
@@ -287,22 +305,23 @@ fn parse_command_body(content: &str) -> String {
 /// if the file has no valid frontmatter.
 fn parse_frontmatter(content: &str) -> (String, String) {
     let trimmed = content.trim_start();
-    if !trimmed.starts_with("---") {
-        return (String::new(), String::new());
-    }
-    let after_first = &trimmed[3..].trim_start_matches(['\r', '\n']);
-    let Some(end) = after_first.find("\n---") else {
+    let Some(after_first) = trimmed.strip_prefix("---") else {
         return (String::new(), String::new());
     };
-    let front = &after_first[..end];
+    let after_fm = after_first.trim_start_matches(['\r', '\n']);
+    let Some((front, _rest)) = after_fm.split_once("\n---") else {
+        return (String::new(), String::new());
+    };
 
     let mut name = String::new();
     let mut description = String::new();
     for line in front.lines() {
         if let Some(rest) = line.strip_prefix("name:") {
-            name = rest.trim().trim_matches('"').trim_matches('\'').to_owned();
-        } else if let Some(rest) = line.strip_prefix("description:") {
-            description = rest.trim().trim_matches('"').trim_matches('\'').to_owned();
+            rest.trim().trim_matches('"').trim_matches('\'').clone_into(&mut name);
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix("description:") {
+            rest.trim().trim_matches('"').trim_matches('\'').clone_into(&mut description);
         }
     }
     (name, description)

@@ -20,7 +20,7 @@ use std::sync::Mutex;
 use cp_wire::types::payload::query::{ConvHit, Kind, Outcome, Query};
 use serde::{Deserialize, Serialize};
 
-use crate::channel::AgentChannel;
+use crate::channel::AgentHandle;
 use crate::transport::rest::{Backend, HttpReply, resolve_entry};
 
 /// Default hit count when the caller does not specify one.
@@ -74,16 +74,16 @@ pub(crate) fn search_conversations(state: &Mutex<Backend>, id: &str, body_bytes:
 
     // Blocking agent I/O — performed with no backend lock held (same discipline
     // as the command and body-hydrate handlers).
-    match AgentChannel::from_entry(&entry).query(query) {
+    match AgentHandle::from_entry(&entry).query(query) {
         Ok(response) => match response.result {
             Outcome::Hits { hits } => HttpReply::ok(&SearchResponse { hits }),
             Outcome::Error { reason } => {
-                eprintln!("conversation search failed on agent {id}: {reason}");
+                crate::oerr!("conversation search failed on agent {id}: {reason}");
                 HttpReply::error(502, "conversation search unavailable")
             }
         },
         Err(e) => {
-            eprintln!("conversation search transport error for agent {id}: {e:?}");
+            crate::oerr!("conversation search transport error for agent {id}: {e:?}");
             HttpReply::error(502, "agent unreachable")
         }
     }

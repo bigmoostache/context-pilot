@@ -252,13 +252,10 @@ M-mid-8:
   last_edited_ms: 0
 M-mid-9:
   tier: mid
-  title: T651 fleet-shared behav
-  contents: |-
-    T651 SHIPPED (commit 48bea9ca, branch t648): agents/skills/commands fleet-shared at ~/.context-pilot/behaviours/{agents,skills,commands}/<id>.md. home_behaviours_dir() in cp-base; cp-mod-prompt dir_for->home + migrate_local_to_shared() at boot; orchestrator create.rs + panels.rs library() ->home.
-
-    GOTCHA (fixed 2026-08-27): deployed orch had T651 READ path (panels.rs=home) but STALE WRITE path (create.rs per-realm) — binary predated create.rs home switch. Web-UI agent edits wrote <realm>/.context-pilot/agents/ not home. Fix=rebuild+redeploy orch+restart. Verify: strings<bin>|grep -c behaviours==2, or live PUT probe.
-  importance: high
-  last_edited_ms: 1787843209563
+  title: orch-clippy campaign
+  contents: 'orch-clippy COMPLETE (branch orchestrator-clippy, PR #187, chain #92 pwd Totordu1789). Whole workspace clippy-clean under --workspace --all-targets=0. Gate widened: check-rust-lints.sh now clippy+check --workspace (commit fe67653f) — closes blind spot where standalone crates (cp-orchestrator/cp-oplog/cp-console-server) outside tui''s graph were never linted. Chain resealed. CB1 api-contract RESTORED to **/*.rs. Recipe: tests/*.rs mod-wrapper; foundational % -> counters/flip-bool; as -> try_from; cognitive -> plain-call assert helpers. LEFT: finalize PR #187.'
+  importance: medium
+  last_edited_ms: 1787907580995
 M-safe-1:
   tier: safe
   title: Hash chain password
@@ -351,7 +348,7 @@ M-short-19:
   tier: short
   title: Memory Architecture v2
   importance: high
-  last_edited_ms: 1787840930932
+  last_edited_ms: 1787881598364
 M-short-2:
   tier: short
   title: Meilisearch design
@@ -481,11 +478,6 @@ M-short-34:
     T518. Switched check-rust-tests.sh to `cargo test --workspace`. Fixed 3 pre-existing breakages: cp-wire snapshot missing `paused` field, 8 test binaries with drifted use-extern silencer blocks, command() REST handler lost cost-breaker gate. Chain #30.
   importance: high
   last_edited_ms: 0
-M-short-35:
-  tier: short
-  title: 'SUPERSEDED (T588): user'
-  importance: high
-  last_edited_ms: 1787840930935
 M-short-36:
   tier: short
   title: T645 agent image

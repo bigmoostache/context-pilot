@@ -1,15 +1,15 @@
 //! Per-agent **channel** — the backend's read/write handle to one agent.
 //!
-//! An [`AgentChannel`] is constructed from a registry [`Entry`] and exposes
+//! An [`AgentHandle`] is constructed from a registry [`Entry`] and exposes
 //! the backend's two runtime operations against that agent:
 //!
-//! * [`hydrate`](AgentChannel::hydrate) — on-demand, content-addressed body
+//! * [`hydrate`](AgentHandle::hydrate) — on-demand, content-addressed body
 //!   fetch from the agent's body store (`oplog/bodies/{hash}`). The oplog tail
 //!   delivers heads (content hashes); hydrate resolves them to bytes, verifying
 //!   integrity.
-//! * [`send`](AgentChannel::send) — deliver a [`Command`] to the agent over its
+//! * [`send`](AgentHandle::send) — deliver a [`Command`] to the agent over its
 //!   UDS stream socket, returning the durable [`Ack`] (journal-then-ack, I11).
-//! * [`query`](AgentChannel::query) — ask the agent a **read-only** question
+//! * [`query`](AgentHandle::query) — ask the agent a **read-only** question
 //!   over that same socket (T671), returning a
 //!   [`Response`](cp_wire::types::payload::query::Response). Nothing is
 //!   journaled and no `rev` is assigned; the reply carries data, not a durable
@@ -17,7 +17,7 @@
 //!
 //! The incremental oplog consumer that feeds the materialized view lives in the
 //! sibling [`tailer`](crate::registry::tailer) module; [`Tailer`] is re-exported
-//! here so it remains reachable at the stable `channel::Tailer` path.
+//! here so it lives in its own file; the crate root re-exports the `tailer` module so it is reachable at `tailer::Tailer`.
 
 use std::io::{self, Read as _, Write as _};
 use std::os::unix::net::UnixStream;
@@ -31,11 +31,6 @@ use cp_wire::types::ack::Ack;
 use cp_wire::types::command::{Command, Frame as CommandFrame};
 use cp_wire::types::payload::query::{Frame as QueryFrame, Query, Response};
 use cp_wire::types::registry::Entry;
-
-/// Re-export so the tailer stays reachable at the historical `channel::Tailer`
-/// path despite living in its own file (call sites and rustdoc links are
-/// unchanged by the split).
-pub use crate::registry::tailer::Tailer;
 
 /// Subdirectory of the oplog directory holding spilled body files.
 const BODIES_DIR: &str = "bodies";
@@ -54,10 +49,10 @@ const ACK_READ_TIMEOUT: Duration = Duration::from_secs(5);
 const READ_CHUNK: usize = 4096;
 
 /// Delay between connection retries when the agent's socket is not yet
-/// ready (used only by [`send_with_retry`](AgentChannel::send_with_retry)).
+/// ready (used only by [`send_with_retry`](AgentHandle::send_with_retry)).
 const RETRY_DELAY: Duration = Duration::from_millis(100);
 
-// ── AgentChannel ───────────────────────────────────────────────────────
+// ── AgentHandle ───────────────────────────────────────────────────────
 
 /// The backend's read/write handle to one agent (hydrate bodies + send
 /// commands).
@@ -65,7 +60,7 @@ const RETRY_DELAY: Duration = Duration::from_millis(100);
 /// Constructed from a registry [`Entry`]; holds the paths and credential
 /// needed to reach the agent's body store and command socket.
 #[derive(Debug)]
-pub struct AgentChannel {
+pub struct AgentHandle {
     /// Path to the agent's UDS stream socket.
     socket_path: PathBuf,
 
@@ -76,7 +71,7 @@ pub struct AgentChannel {
     bodies_dir: PathBuf,
 }
 
-impl AgentChannel {
+impl AgentHandle {
     /// Build a channel from a registry record.
     #[must_use]
     pub fn from_entry(entry: &Entry) -> Self {
@@ -150,7 +145,7 @@ impl AgentChannel {
     /// # Errors
     ///
     /// Returns the last [`io::Error`] if all attempts fail.
-    pub fn send_with_retry(&self, command: Command, retries: u32) -> io::Result<Ack> {
+    pub fn send_with_retry(&self, command: &Command, retries: u32) -> io::Result<Ack> {
         let mut last_err = None;
         for attempt in 0..=retries {
             match self.send(command.clone()) {
@@ -214,15 +209,18 @@ fn read_ack(stream: &mut UnixStream) -> io::Result<Ack> {
 /// [`MAX_ACK_BUFFER`].
 ///
 /// Shared by the command path ([`read_ack`]) and the query path
-/// ([`AgentChannel::query`]) — both speak the same envelope, differing only in
+/// ([`AgentHandle::query`]) — both speak the same envelope, differing only in
 /// the payload type. `what` names the expected payload in error messages so a
 /// decode failure says which half of the protocol broke.
-fn read_framed<T: serde::de::DeserializeOwned>(stream: &mut UnixStream, what: &str) -> io::Result<T> {
+fn read_framed<T>(stream: &mut UnixStream, what: &str) -> io::Result<T>
+where
+    T: serde::de::DeserializeOwned,
+{
     let mut buf: Vec<u8> = Vec::new();
-    let mut chunk = [0u8; READ_CHUNK];
+    let mut chunk = vec![0u8; READ_CHUNK];
 
     loop {
-        let read = stream.read(&mut chunk)?;
+        let read = stream.read(chunk.as_mut_slice())?;
         if read == 0 && buf.is_empty() {
             return Err(io::Error::new(io::ErrorKind::UnexpectedEof, format!("agent closed before {what}")));
         }
@@ -252,8 +250,8 @@ mod tests {
 
     // ── hydrate tests ──────────────────────────────────────────────────
 
-    fn make_channel(bodies_dir: &Path) -> AgentChannel {
-        AgentChannel {
+    fn make_channel(bodies_dir: &Path) -> AgentHandle {
+        AgentHandle {
             socket_path: PathBuf::from("/tmp/unused.sock"),
             cap_token: "tok".to_owned(),
             bodies_dir: bodies_dir.to_path_buf(),
@@ -305,22 +303,14 @@ mod tests {
         Command::new(format!("cmd-{dedup}"), 1, dedup.to_owned(), cp_wire::types::command::Kind::Stop)
     }
 
-    /// A minimal echo-ack server: reads one framed CommandFrame, writes back
+    /// A minimal echo-ack server: reads one framed `CommandFrame`, writes back
     /// a canned Accepted Ack with rev=42, then closes.
-    fn echo_ack_server(listener: UnixListener) {
+    fn echo_ack_server(listener: &UnixListener) {
         let (mut conn, _addr) = listener.accept().expect("accept");
-        let mut buf: Vec<u8> = Vec::new();
-        let mut chunk = [0u8; READ_CHUNK];
-        loop {
-            let n = conn.read(&mut chunk).expect("read");
-            if let Some(got) = chunk.get(..n) {
-                buf.extend_from_slice(got);
-            }
-            if n == 0 {
-                break;
-            }
-        }
-        // We don't need to parse the command — just ack it.
+        let mut chunk = vec![0u8; READ_CHUNK];
+        // Drain the request to EOF without collecting — we don't parse the
+        // command, we just ack it.
+        while conn.read(chunk.as_mut_slice()).expect("read") != 0 {}
         let ack = Ack::new("cmd-echo".to_owned(), Status::Accepted, Some(42));
         let payload = serde_json::to_vec(&ack).expect("ser");
         let frame = framing::encode_raw(&payload).expect("frame");
@@ -333,9 +323,9 @@ mod tests {
         let sock = dir.path().join("test.sock");
         let listener = UnixListener::bind(&sock).expect("bind");
 
-        let server = thread::spawn(move || echo_ack_server(listener));
+        let server = thread::spawn(move || echo_ack_server(&listener));
 
-        let ch = AgentChannel { socket_path: sock, cap_token: "tok".to_owned(), bodies_dir: PathBuf::new() };
+        let ch = AgentHandle { socket_path: sock, cap_token: "tok".to_owned(), bodies_dir: PathBuf::new() };
         let ack = ch.send(test_command("echo")).expect("send");
         assert_eq!(ack.status, Status::Accepted);
         assert_eq!(ack.rev, Some(42));
@@ -345,7 +335,7 @@ mod tests {
 
     #[test]
     fn send_returns_error_on_connection_refused() {
-        let ch = AgentChannel {
+        let ch = AgentHandle {
             socket_path: PathBuf::from("/tmp/nonexistent_socket_for_test.sock"),
             cap_token: "tok".to_owned(),
             bodies_dir: PathBuf::new(),
@@ -359,10 +349,10 @@ mod tests {
     /// A minimal query server: drains one framed query frame, then writes back
     /// a canned single-hit Response. Mirrors [`echo_ack_server`] on the read
     /// plane.
-    fn echo_hits_server(listener: UnixListener) {
+    fn echo_hits_server(listener: &UnixListener) {
         let (mut conn, _addr) = listener.accept().expect("accept");
-        let mut chunk = [0u8; READ_CHUNK];
-        while conn.read(&mut chunk).expect("read") != 0 {}
+        let mut chunk = vec![0u8; READ_CHUNK];
+        while conn.read(chunk.as_mut_slice()).expect("read") != 0 {}
 
         let response = Response::new(
             "q-1".to_owned(),
@@ -396,9 +386,9 @@ mod tests {
         let sock = dir.path().join("query.sock");
         let listener = UnixListener::bind(&sock).expect("bind");
 
-        let server = thread::spawn(move || echo_hits_server(listener));
+        let server = thread::spawn(move || echo_hits_server(&listener));
 
-        let ch = AgentChannel { socket_path: sock, cap_token: "tok".to_owned(), bodies_dir: PathBuf::new() };
+        let ch = AgentHandle { socket_path: sock, cap_token: "tok".to_owned(), bodies_dir: PathBuf::new() };
         let response = ch.query(test_query()).expect("query");
         assert_eq!(response.query_id, "q-1", "the reply echoes the query id");
         match response.result {
@@ -411,7 +401,7 @@ mod tests {
 
     #[test]
     fn query_returns_error_on_connection_refused() {
-        let ch = AgentChannel {
+        let ch = AgentHandle {
             socket_path: PathBuf::from("/tmp/nonexistent_query_socket_for_test.sock"),
             cap_token: "tok".to_owned(),
             bodies_dir: PathBuf::new(),

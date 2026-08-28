@@ -56,7 +56,7 @@ const DEFAULT_PORT: u16 = 7878;
 const DEFAULT_BIND: &str = "127.0.0.1";
 
 /// Default registry + oplog poll interval.
-const DEFAULT_SCAN_INTERVAL: Duration = Duration::from_millis(2000);
+const DEFAULT_SCAN_INTERVAL: Duration = Duration::from_secs(2);
 
 /// Parsed runtime configuration, sourced from environment variables.
 #[derive(Debug)]
@@ -85,9 +85,9 @@ pub struct Config {
     /// Session lifetime (`CP_SESSION_TTL_SECS`, default 30 days). Absolute
     /// expiry — a session cannot be refreshed past its original TTL (Q6).
     pub session_ttl: Duration,
-    /// Path to the auth SQLite database (`CP_AUTH_DB`, default
+    /// Path to the auth `SQLite` database (`CP_AUTH_DB`, default
     /// `~/.context-pilot/orchestrator/auth.db`). Orchestrator-level storage,
-    /// not inside agents_dir (D7/Q9).
+    /// not inside `agents_dir` (D7/Q9).
     pub auth_db_path: PathBuf,
 }
 
@@ -124,29 +124,29 @@ impl Config {
         // Where new agents' realm folders are created. Default `~/code`, or the
         // current directory if `$HOME` is unset (never fail — creation simply
         // lands somewhere sensible).
-        let agents_root = match std::env::var_os("CP_AGENTS_ROOT") {
-            Some(dir) => PathBuf::from(dir),
-            None => std::env::var_os("HOME").map_or_else(|| PathBuf::from("."), |h| PathBuf::from(h).join("code")),
-        };
+        let agents_root = std::env::var_os("CP_AGENTS_ROOT").map_or_else(
+            || std::env::var_os("HOME").map_or_else(|| PathBuf::from("."), |h| PathBuf::from(h).join("code")),
+            PathBuf::from,
+        );
 
         // The `cp` TUI binary the supervisor spawns. Default to the release
         // build under the current working directory; override with an absolute
         // path in deployment.
-        let agent_binary = match std::env::var_os("CP_AGENT_BINARY") {
-            Some(p) => PathBuf::from(p),
-            None => std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join("target/release/tui"),
-        };
+        let agent_binary = std::env::var_os("CP_AGENT_BINARY").map_or_else(
+            || std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join("target/release/tui"),
+            PathBuf::from,
+        );
 
         // Auth configuration (§8 of design doc).
         let auth_enabled =
-            std::env::var("CP_AUTH_ENABLED").ok().map(|s| s.eq_ignore_ascii_case("true") || s == "1").unwrap_or(false);
+            std::env::var("CP_AUTH_ENABLED").ok().is_some_and(|s| s.eq_ignore_ascii_case("true") || s == "1");
 
         let session_ttl = std::env::var("CP_SESSION_TTL_SECS")
             .ok()
             .and_then(|s| s.parse::<u64>().ok())
-            .map_or(Duration::from_secs(2_592_000), Duration::from_secs); // 30 days
+            .map_or(Duration::from_hours(720), Duration::from_secs); // 30 days
 
-        let auth_db_path = crate::services::auth::store::AuthStore::default_db_path();
+        let auth_db_path = crate::services::auth::db::AuthStore::default_db_path();
 
         Ok(Self {
             port,
@@ -195,14 +195,14 @@ impl Runtime {
         // log the error and proceed without auth — the middleware will
         // refuse all requests (fail-closed, NFR-06).
         let auth_store = if config.auth_enabled {
-            match crate::services::auth::store::AuthStore::open(&config.auth_db_path) {
+            match crate::services::auth::db::AuthStore::open(&config.auth_db_path) {
                 Ok(store) => {
-                    eprintln!("auth enabled — database at {}", config.auth_db_path.display());
+                    crate::oerr!("auth enabled — database at {}", config.auth_db_path.display());
                     seed::seed_accounts_if_empty(&store);
                     Some(store)
                 }
                 Err(err) => {
-                    eprintln!("WARN: auth enabled but database open failed: {err} — running WITHOUT auth");
+                    crate::oerr!("WARN: auth enabled but database open failed: {err} — running WITHOUT auth");
                     None
                 }
             }
@@ -211,9 +211,11 @@ impl Runtime {
         };
 
         let backend = Arc::new(Mutex::new(Backend::new(
-            config.agents_dir.clone(),
-            config.agents_root.clone(),
-            config.agent_binary.clone(),
+            crate::transport::Paths {
+                agents_dir: config.agents_dir.clone(),
+                agents_root: config.agents_root.clone(),
+                agent_binary: config.agent_binary.clone(),
+            },
             auth_store,
             config.session_ttl,
         )));
@@ -225,14 +227,14 @@ impl Runtime {
     ///
     /// Returns the [`JoinHandle`](thread::JoinHandle) (the thread runs until
     /// the process exits).
+    #[must_use]
     pub fn start_driver(&self) -> thread::JoinHandle<()> {
         let backend = Arc::clone(&self.backend);
         let agents_dir = self.config.agents_dir.clone();
         let interval = self.config.scan_interval;
-        let backup_scheduler =
-            if self.config.auth_enabled { Some(BackupScheduler::new(self.config.auth_db_path.clone())) } else { None };
+        let backup_scheduler = self.config.auth_enabled.then(|| BackupScheduler::new(self.config.auth_db_path.clone()));
 
-        thread::spawn(move || driver::driver_loop(backend, agents_dir, interval, backup_scheduler))
+        thread::spawn(move || driver::driver_loop(&backend, agents_dir, interval, backup_scheduler))
     }
 
     /// Spawn the auto-update scheduler (O4.2): poll the channel on boot and
@@ -240,6 +242,7 @@ impl Runtime {
     /// maintenance window, drive the download → stage → restart pipeline.
     /// `manual`/`paused` only refresh the visible state. See
     /// [`update_scheduler`].
+    #[must_use]
     pub fn start_update_scheduler(&self, install: PathBuf) -> thread::JoinHandle<()> {
         update_scheduler::spawn(Arc::clone(&self.backend), self.config.auth_db_path.clone(), install)
     }
@@ -249,7 +252,8 @@ impl Runtime {
     /// within an hour of expiry. Needs no backend state (OAuth lives on disk /
     /// Keychain), so it takes nothing and holds no locks. See
     /// [`crate::transport::rest::spawn_oauth_refresh`].
-    pub fn start_oauth_sweeper(&self) -> thread::JoinHandle<()> {
+    #[must_use]
+    pub fn start_oauth_sweeper() -> thread::JoinHandle<()> {
         crate::transport::rest::spawn_oauth_refresh()
     }
 
@@ -265,6 +269,7 @@ impl Runtime {
     /// `boot_check` counts the failure and can roll back.
     ///
     /// No-op thread on a normal (nothing-staged) boot.
+    #[must_use]
     pub fn start_update_committer(&self, install: PathBuf) -> thread::JoinHandle<()> {
         let backend = Arc::clone(&self.backend);
         let url = format!("http://127.0.0.1:{}/healthz", self.config.port);
@@ -274,11 +279,11 @@ impl Runtime {
                 .timeout(Duration::from_secs(2))
                 .build()
                 .unwrap_or_else(|_| reqwest::blocking::Client::new());
-            let healthy = || client.get(&url).send().map(|r| r.status().as_u16() == 200).unwrap_or(false);
+            let healthy = || client.get(&url).send().is_ok_and(|r| r.status().as_u16() == 200);
             let committed = crate::services::releases::boot_commit_when_healthy(
                 &install,
                 healthy,
-                Duration::from_secs(60),
+                Duration::from_mins(1),
                 Duration::from_secs(2),
             );
             if !committed {
@@ -286,17 +291,17 @@ impl Runtime {
             }
             // The new binary is blessed — flip the release state to match it.
             let Ok(mut b) = backend.lock() else {
-                eprintln!("updater: promote skipped — backend lock poisoned");
+                crate::oerr!("updater: promote skipped \u{2014} backend lock poisoned");
                 return;
             };
-            match crate::services::releases::updater::promote_committed(&mut b.releases, &auth_db) {
+            match crate::services::releases::updater::apply::promote_committed(&mut b.releases, &auth_db) {
                 Ok(Some(agent_binary)) => {
-                    b.agent_binary = agent_binary.clone();
-                    b.supervisor = crate::supervisor::AgentSupervisor::new(&[agent_binary]);
-                    eprintln!("updater: update committed — active tag is now {:?}", b.releases.active_tag());
+                    b.agent_binary.clone_from(&agent_binary);
+                    b.supervisor = crate::supervisor::ProcManager::new(&[agent_binary]);
+                    crate::oerr!("updater: update committed — active tag is now {:?}", b.releases.active_tag());
                 }
                 Ok(None) => {} // plain self-restart (manual flow), nothing to promote
-                Err(e) => eprintln!("updater: promote after healthy boot FAILED: {e}"),
+                Err(e) => crate::oerr!("updater: promote after healthy boot FAILED: {e}"),
             }
         })
     }
@@ -318,12 +323,12 @@ impl Runtime {
         // (provisioned). This log makes the boot state observable in `logread`.
         if let Ok(b) = self.backend.lock() {
             let provisioned = crate::transport::it::is_provisioned(&b.provision_flag_path);
-            eprintln!(
+            crate::oerr!(
                 "provisioning state: {} (flag: {})",
                 if provisioned {
-                    "provisioned — cockpit on :443"
+                    "provisioned \u{2014} cockpit on :443"
                 } else {
-                    "UNPROVISIONED — cockpit on :80 (day-0)"
+                    "UNPROVISIONED \u{2014} cockpit on :80 (day-0)"
                 },
                 b.provision_flag_path.display()
             );
@@ -343,8 +348,8 @@ impl Runtime {
         crate::transport::it::apply_network_at_boot(&self.backend);
 
         let addr = self.config.listen_addr();
-        eprintln!("serving on http://{addr}");
-        crate::transport::serve(&addr, Arc::clone(&self.backend))
+        crate::oerr!("serving on http://{addr}");
+        crate::transport::serve(&addr, &self.backend)
     }
 }
 

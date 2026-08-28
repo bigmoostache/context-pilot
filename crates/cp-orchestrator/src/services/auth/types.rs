@@ -5,7 +5,7 @@
 /// Errors returned by auth operations.
 #[derive(Debug)]
 pub(crate) enum AuthError {
-    /// SQLite failure.
+    /// `SQLite` failure.
     Database(rusqlite::Error),
     /// Argon2 hashing / verification failure.
     Hash(String),
@@ -13,10 +13,10 @@ pub(crate) enum AuthError {
 
 impl std::fmt::Display for AuthError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Database(err) => write!(f, "auth database error: {err}"),
-            Self::Hash(msg) => write!(f, "password hash error: {msg}"),
-        }
+        cp_base::deref_match!(self, {
+            Self::Database(ref err) => write!(f, "auth database error: {err}"),
+            Self::Hash(ref msg) => write!(f, "password hash error: {msg}"),
+        })
     }
 }
 
@@ -36,7 +36,7 @@ impl From<rusqlite::Error> for AuthError {
 /// single source of truth the whole matrix derives from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum UserRole {
+pub enum UserRole {
     /// Vendor god-mode (rank 4): everything, including provider secrets;
     /// invisible to the client (FR-v3-05).
     Superadmin,
@@ -61,7 +61,7 @@ impl UserRole {
 
     /// Parse from the stored SQL text.  Falls back to [`User`](Self::User) on
     /// unknown values (forward-compat, design §13.6).
-    pub(crate) fn from_sql(value: &str) -> Self {
+    pub(crate) const fn from_sql(value: &str) -> Self {
         if value.eq_ignore_ascii_case("superadmin") {
             Self::Superadmin
         } else if value.eq_ignore_ascii_case("admin") {
@@ -120,7 +120,7 @@ impl AgentRole {
 
     /// Parse from the stored SQL text.  Falls back to
     /// [`AgentUser`](Self::AgentUser) on unknown values.
-    pub(crate) fn from_sql(value: &str) -> Self {
+    pub(crate) const fn from_sql(value: &str) -> Self {
         if value.eq_ignore_ascii_case("agent-admin") { Self::AgentAdmin } else { Self::AgentUser }
     }
 }
@@ -129,24 +129,56 @@ impl AgentRole {
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct User {
     /// UUID v4 (hex-formatted, 36 chars with dashes).
-    pub(crate) id: String,
+    pub id: String,
     /// Unique, case-insensitive email address.
-    pub(crate) email: String,
+    pub email: String,
     /// Display name.
-    pub(crate) name: String,
+    pub name: String,
     /// Argon2id PHC string — **never** serialised to the frontend.
     #[serde(skip)]
-    pub(crate) password_hash: String,
+    pub password_hash: String,
     /// System-level role.
-    pub(crate) role: UserRole,
+    pub role: UserRole,
     /// When `true`, the user must change their password before using the app —
     /// set on seeded/admin-provisioned accounts whose initial password is known
     /// to the provisioner. Cleared on the next successful password change.
-    pub(crate) must_change_password: bool,
+    pub must_change_password: bool,
     /// Creation timestamp (ms since Unix epoch).
-    pub(crate) created_at: u64,
+    pub created_at: u64,
     /// Last-update timestamp (ms since Unix epoch).
-    pub(crate) updated_at: u64,
+    pub updated_at: u64,
+}
+
+/// Borrowed parameters for [`AuthStore::create_user`], bundled so the call
+/// stays within the argument budget (the four fields always travel together).
+///
+/// [`AuthStore::create_user`]: super::db::AuthStore::create_user
+#[derive(Clone, Copy)]
+pub(crate) struct NewUser<'req> {
+    /// Login email — unique, case-insensitive.
+    pub email: &'req str,
+    /// Display name.
+    pub name: &'req str,
+    /// Plaintext password, hashed with Argon2id before storage.
+    pub password: &'req str,
+    /// Role to assign the new account.
+    pub role: UserRole,
+}
+
+/// Borrowed parameters for [`AuthStore::grant_access`], bundled so the call
+/// stays within the argument budget (the four fields always travel together).
+///
+/// [`AuthStore::grant_access`]: super::db::AuthStore::grant_access
+#[derive(Clone, Copy)]
+pub(crate) struct AccessGrant<'req> {
+    /// The agent being granted access to.
+    pub agent_id: &'req str,
+    /// The user receiving access.
+    pub user_id: &'req str,
+    /// The per-agent role to grant.
+    pub role: AgentRole,
+    /// Who granted the access (`None` for a system/bootstrap grant).
+    pub granted_by: Option<&'req str>,
 }
 
 /// An access-control list entry — one user's permission on one agent,
@@ -154,19 +186,19 @@ pub struct User {
 #[derive(Clone, Debug, serde::Serialize)]
 pub(crate) struct AclEntry {
     /// The agent this entry grants access to.
-    pub(crate) agent_id: String,
+    pub agent_id: String,
     /// The authorized user's UUID.
-    pub(crate) user_id: String,
+    pub user_id: String,
     /// Per-agent role (FR-14a).
-    pub(crate) role: AgentRole,
+    pub role: AgentRole,
     /// When access was granted (ms since Unix epoch).
-    pub(crate) granted_at: u64,
+    pub granted_at: u64,
     /// UUID of the user who granted access (nullable).
-    pub(crate) granted_by: Option<String>,
+    pub granted_by: Option<String>,
     /// Authorized user's email (joined from `users`).
-    pub(crate) user_email: String,
+    pub user_email: String,
     /// Authorized user's display name (joined from `users`).
-    pub(crate) user_name: String,
+    pub user_name: String,
 }
 
 /// One device session for the "active sessions" profile list — never exposes
@@ -174,20 +206,20 @@ pub(crate) struct AclEntry {
 #[derive(Clone, Debug, serde::Serialize)]
 pub(crate) struct SessionInfo {
     /// Opaque per-session id (safe to send to the client; not the token).
-    pub(crate) id: String,
+    pub id: String,
     /// Creation timestamp (ms since Unix epoch).
-    pub(crate) created_at: u64,
+    pub created_at: u64,
     /// Absolute expiry (ms since Unix epoch).
-    pub(crate) expires_at: u64,
+    pub expires_at: u64,
     /// User-agent string captured at login, if any.
-    pub(crate) user_agent: Option<String>,
+    pub user_agent: Option<String>,
     /// Whether this is the session making the request (the current device).
-    pub(crate) current: bool,
+    pub current: bool,
 }
 
 /// Map a `rusqlite::Row` from the canonical `SELECT` column order into a
-/// [`User`].  Column indices: 0=id, 1=email, 2=name, 3=password_hash,
-/// 4=role, 5=created_at, 6=updated_at, 7=must_change_password.
+/// [`User`].  Column indices: 0=id, 1=email, 2=name, `3=password_hash`,
+/// 4=role, `5=created_at`, `6=updated_at`, `7=must_change_password`.
 pub(crate) fn row_to_user(row: &rusqlite::Row<'_>) -> Result<User, rusqlite::Error> {
     let role_str: String = row.get(4)?;
     Ok(User {

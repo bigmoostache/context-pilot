@@ -87,7 +87,7 @@ mod tests {
         let resp = answer(&query_frame(TOKEN), TOKEN, &one_hit);
         assert_eq!(resp.query_id, "q-1", "the response echoes the query id");
         let Outcome::Hits { hits } = resp.result else {
-            unreachable!("responder returned hits");
+            panic!("responder returned hits");
         };
         assert_eq!(hits.len(), 1);
     }
@@ -95,11 +95,11 @@ mod tests {
     #[test]
     fn bad_bearer_is_rejected_without_calling_the_responder() {
         let never = |_q: &Query| -> Outcome {
-            unreachable!("responder must not run for a bad bearer");
+            panic!("responder must not run for a bad bearer");
         };
         let resp = answer(&query_frame("wrong"), TOKEN, &never);
         let Outcome::Error { reason } = resp.result else {
-            unreachable!("bad bearer must yield an error outcome");
+            panic!("bad bearer must yield an error outcome");
         };
         assert_eq!(reason, "bad bearer token");
     }
@@ -107,7 +107,7 @@ mod tests {
     #[test]
     fn empty_bearer_is_rejected() {
         let never = |_q: &Query| -> Outcome {
-            unreachable!("responder must not run for an empty bearer");
+            panic!("responder must not run for an empty bearer");
         };
         assert!(matches!(answer(&query_frame(""), TOKEN, &never).result, Outcome::Error { .. }));
     }

@@ -24,7 +24,7 @@ use super::{is_bare_name, rel_child};
 /// escape) and must already exist; `name` must be a bare filename (no path
 /// separators, not `.`/`..`) so the write can never land outside the realm.
 /// Returns `{ written, path }` (bytes written + the realm-relative path).
-pub fn fs_upload(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8]) -> HttpReply {
+pub(crate) fn fs_upload(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8]) -> HttpReply {
     let folder = match agent_folder(state, agent_id) {
         Ok(f) => f,
         Err(reply) => return reply,
@@ -41,9 +41,8 @@ pub fn fs_upload(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8
         return HttpReply::error(400, "invalid file name");
     }
 
-    let dir = match confined_path(&folder, &relative_dir) {
-        Some(p) => p,
-        None => return HttpReply::error(403, "path outside agent realm"),
+    let Some(dir) = confined_path(&folder, &relative_dir) else {
+        return HttpReply::error(403, "path outside agent realm");
     };
     if !dir.is_dir() {
         return HttpReply::error(404, "destination directory not found");
@@ -80,7 +79,7 @@ pub fn fs_upload(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8
 /// `{ path, name, size }` — the realm-relative path of the **stored** file, its
 /// final (possibly suffixed) name, and the byte count — everything the composer
 /// needs to compose the `file-upload` message block.
-pub fn fs_upload_unique(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8]) -> HttpReply {
+pub(crate) fn fs_upload_unique(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8]) -> HttpReply {
     let folder = match agent_folder(state, agent_id) {
         Ok(f) => f,
         Err(reply) => return reply,
@@ -104,15 +103,14 @@ pub fn fs_upload_unique(state: &Mutex<Backend>, agent_id: &str, query: &str, bod
     let Some(root) = confined_path(&folder, "") else {
         return HttpReply::error(403, "realm root unresolved");
     };
-    let dir = root.join(&relative_dir);
-    if std::fs::create_dir_all(&dir).is_err() {
+    let raw_dir = root.join(&relative_dir);
+    if std::fs::create_dir_all(&raw_dir).is_err() {
         return HttpReply::error(502, "could not create destination directory");
     }
     // Re-confine now that the directory exists — defends against a symlinked
     // component pointing outside the realm.
-    let dir = match confined_path(&folder, &relative_dir) {
-        Some(p) => p,
-        None => return HttpReply::error(403, "path outside agent realm"),
+    let Some(dir) = confined_path(&folder, &relative_dir) else {
+        return HttpReply::error(403, "path outside agent realm");
     };
 
     let final_name = unique_name(&dir, &name);
@@ -144,7 +142,7 @@ fn unique_name(dir: &std::path::Path, name: &str) -> String {
         Some((s, e)) if !s.is_empty() => (s, format!(".{e}")),
         _ => (name, String::new()),
     };
-    for n in 1..10_000 {
+    for n in 1u32..10_000u32 {
         let candidate = format!("{stem} ({n}){ext}");
         if !dir.join(&candidate).exists() {
             return candidate;

@@ -31,10 +31,17 @@ disallowed-names = ["foo", "bar", "baz", "tmp", "thing"]
 
 avoid-breaking-exported-api = false
 warn-on-all-wildcard-imports = true
-allow-unwrap-in-tests = false
-allow-expect-in-tests = false
-allow-panic-in-tests = false
-allow-dbg-in-tests = false
+# Tests SHOULD panic on failure — that is precisely how a test signals a
+# failed assertion. unwrap/expect/panic are idiomatic in test bodies; the
+# restriction lints for them are meant for production code only. These were
+# left `false` but never actually enforced (sibling crates' test targets were
+# outside the root clippy gate's dependency graph, so `--all-targets` never
+# linted them). Flipping to the standard clippy idiom as part of the
+# workspace clippy-clean pass; production code keeps the restriction.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-dbg-in-tests = true
 
 # ── Identifier Quality ───────────────────────────────────────────────────────
 

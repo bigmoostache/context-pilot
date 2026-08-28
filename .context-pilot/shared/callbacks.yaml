@@ -7,7 +7,7 @@ api-contract-rust:
   success_message: API contract OK ✓
   is_global: true
   script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-api-contract.sh" --callback
-  last_edited_ms: 1783511056445
+  last_edited_ms: 1787907566116
 api-contract-ts:
   name: api-contract-ts
   description: API-contract family (OpenAPI spec+routes, TS codegen drift, manual-fetch audit) on web TS edits

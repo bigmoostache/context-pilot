@@ -28,7 +28,7 @@ use serde::{Deserialize, Serialize};
 
 use super::super::{ReleaseStore, self_update, stage_orchestrator_update};
 use super::state::{UpdateResult, UpdateState, now_ms};
-use crate::services::auth::store::AuthStore;
+use crate::services::auth::db::AuthStore;
 
 /// In-flight update record under the releases directory.
 const PENDING_UPDATE_FILE: &str = "pending-update.json";
@@ -49,6 +49,18 @@ fn pending_update_path(releases_dir: &Path) -> PathBuf {
     releases_dir.join(PENDING_UPDATE_FILE)
 }
 
+/// The auth database inputs [`stage_apply`] needs to back up before staging:
+/// the optional live store (for a consistent `SQLite` online-backup) and the
+/// on-disk path (the store-less fallback + backup sibling location). Bundled
+/// so `stage_apply` stays within the argument-count budget.
+pub(crate) struct AuthDb<'db> {
+    /// The live auth store, when auth is enabled — enables a consistent
+    /// online-backup snapshot instead of a bare file copy.
+    pub store: Option<&'db AuthStore>,
+    /// The `auth.db` path on disk (the backup source + backup sibling dir).
+    pub path: &'db Path,
+}
+
 /// Stage an update to `to_tag` (already downloaded + sha-verified): back up
 /// the database, record the in-flight update, and swap the orchestrator
 /// binary on the install path. The caller triggers the restart.
@@ -58,13 +70,7 @@ fn pending_update_path(releases_dir: &Path) -> PathBuf {
 /// Returns an error (with the in-flight record cleaned up) if the release
 /// does not ship both binaries, the backup fails, or staging fails. The
 /// install path is left as it was on any error.
-pub fn stage_apply(
-    store: &ReleaseStore,
-    auth: Option<&AuthStore>,
-    auth_db_path: &Path,
-    install: &Path,
-    to_tag: &str,
-) -> Result<(), String> {
+pub(crate) fn stage_apply(store: &ReleaseStore, db: &AuthDb<'_>, install: &Path, to_tag: &str) -> Result<(), String> {
     // Both binaries must ship in the release — they move together (§5.1).
     let new_orchestrator = store.orchestrator_binary_path(to_tag);
     if !new_orchestrator.exists() {
@@ -79,12 +85,13 @@ pub fn stage_apply(
     // 1. Back up auth.db BEFORE anything moves (§5.5 step 2, §5.8). The
     //    SQLite online-backup API gives a consistent snapshot while the store
     //    is live; a bare file copy covers the store-less (auth off) case.
-    let db_backup = if auth_db_path.exists() {
-        let backup = db_backup_path(auth_db_path, from.as_deref());
-        match auth {
-            Some(auth) => auth.backup_to(&backup).map_err(|e| format!("auth.db backup: {e}"))?,
+    let db_backup = if db.path.exists() {
+        let backup = db_backup_path(db.path, from.as_deref());
+        match db.store {
+            Some(auth_store) => crate::services::auth::backup::backup_store_to(auth_store, &backup)
+                .map_err(|e| format!("auth.db backup: {e}"))?,
             None => {
-                let _bytes = std::fs::copy(auth_db_path, &backup).map_err(|e| format!("auth.db backup: {e}"))?;
+                let _bytes = std::fs::copy(db.path, &backup).map_err(|e| format!("auth.db backup: {e}"))?;
             }
         }
         Some(backup)
@@ -119,7 +126,7 @@ pub fn stage_apply(
 ///
 /// Returns an error if the in-flight record is unreadable or the release
 /// vanished from disk; the record is preserved for inspection.
-pub fn promote_committed(store: &mut ReleaseStore, _auth_db_path: &Path) -> Result<Option<PathBuf>, String> {
+pub(crate) fn promote_committed(store: &mut ReleaseStore, _auth_db_path: &Path) -> Result<Option<PathBuf>, String> {
     let path = pending_update_path(store.dir());
     let Ok(bytes) = std::fs::read(&path) else {
         return Ok(None); // nothing in flight — a normal boot
@@ -136,10 +143,10 @@ pub fn promote_committed(store: &mut ReleaseStore, _auth_db_path: &Path) -> Resu
     // just leaves the previous SPA in place until the next successful update.
     let web_symlink = std::env::var_os("CP_WEB_ROOT").map(PathBuf::from);
     if let Err(e) = promote_web(store, &pending.to, web_symlink.as_deref()) {
-        eprintln!("updater: web promote failed — front stays on the previous SPA: {e}");
+        crate::oerr!("updater: web promote failed — front stays on the previous SPA: {e}");
     }
 
-    if let Some(backup) = &pending.db_backup {
+    if let Some(backup) = pending.db_backup.as_ref() {
         let _rm = std::fs::remove_file(backup);
     }
     let _rm = std::fs::remove_file(&path);
@@ -172,21 +179,21 @@ pub fn boot_reconcile(releases_dir: &Path, auth_db_path: &Path, install: &Path) 
     };
 
     // The staged binary was rolled back — restore the matching database.
-    if let Some(backup) = &pending.db_backup {
-        if backup.exists() {
-            match std::fs::copy(backup, auth_db_path) {
-                Ok(_bytes) => {
-                    // Stale WAL/SHM would shadow the restored file's content.
-                    for suffix in ["-wal", "-shm"] {
-                        let mut os = auth_db_path.as_os_str().to_owned();
-                        os.push(suffix);
-                        let _rm = std::fs::remove_file(PathBuf::from(os));
-                    }
-                    let _rm = std::fs::remove_file(backup);
-                    eprintln!("updater: rollback — auth.db restored from {}", backup.display());
+    if let Some(backup) = pending.db_backup.as_ref()
+        && backup.exists()
+    {
+        match std::fs::copy(backup, auth_db_path) {
+            Ok(_bytes) => {
+                // Stale WAL/SHM would shadow the restored file's content.
+                for suffix in ["-wal", "-shm"] {
+                    let mut os = auth_db_path.as_os_str().to_owned();
+                    os.push(suffix);
+                    let _rm = std::fs::remove_file(PathBuf::from(os));
                 }
-                Err(e) => eprintln!("updater: rollback db restore FAILED ({e}) — backup kept at {}", backup.display()),
+                let _rm = std::fs::remove_file(backup);
+                crate::oerr!("updater: rollback — auth.db restored from {}", backup.display());
             }
+            Err(e) => crate::oerr!("updater: rollback db restore FAILED ({e}) — backup kept at {}", backup.display()),
         }
     }
     let _rm = std::fs::remove_file(&path);
@@ -195,7 +202,7 @@ pub fn boot_reconcile(releases_dir: &Path, auth_db_path: &Path, install: &Path) 
     st.last_result =
         Some(UpdateResult::RolledBack { to: pending.from.clone(), attempted: pending.to.clone(), at_ms: now_ms() });
     st.save(releases_dir);
-    eprintln!(
+    crate::oerr!(
         "updater: update to {} failed — rolled back to {}",
         pending.to,
         pending.from.as_deref().unwrap_or("(previous)")
@@ -210,15 +217,23 @@ pub fn boot_reconcile(releases_dir: &Path, auth_db_path: &Path, install: &Path) 
 /// If `exec` fails we exit non-zero so the supervisor respawns us: a
 /// self-inflicted `SIGTERM` counts as a *clean* stop under systemd's
 /// `Restart=on-failure` and would leave the service down.
-pub fn restart_self(install: &Path) {
+pub(crate) fn restart_self(install: &Path) {
     use std::os::unix::process::CommandExt as _;
-    let install = install.to_path_buf();
+    let install_path = install.to_path_buf();
     let _restart = std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(200));
         let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
-        let err = std::process::Command::new(&install).args(&args).exec();
-        eprintln!("updater: exec of {} failed: {err}; exiting for supervisor respawn", install.display());
-        std::process::exit(1);
+        let err = std::process::Command::new(&install_path).args(&args).exec();
+        crate::oerr!("updater: exec of {} failed: {err}; aborting for supervisor respawn", install_path.display());
+        // exec() only returns on failure — the process image was NOT replaced,
+        // so this thread is left in a live-but-broken orchestrator. A non-zero
+        // termination is the only signal that provokes the supervisor (systemd
+        // Restart=on-failure) to respawn this PID; returning would just end the
+        // thread and strand the broken process. `std::process::exit` is a
+        // disallowed method (and clippy::exit is forbid, so neither can be
+        // lint-suppressed), so we abort — SIGABRT is an uncatchable non-zero
+        // exit the supervisor reads as a failure.
+        std::process::abort();
     });
 }
 
@@ -256,7 +271,7 @@ pub(crate) fn promote_web(store: &ReleaseStore, tag: &str, web_symlink: Option<&
 
 /// True when `dir` has no entries (or cannot be read).
 fn dir_is_empty(dir: &Path) -> bool {
-    std::fs::read_dir(dir).map(|mut e| e.next().is_none()).unwrap_or(true)
+    std::fs::read_dir(dir).map_or(true, |mut e| e.next().is_none())
 }
 
 /// A hidden sibling of `path`: `.<name>.<suffix>` in the same directory, so a
@@ -293,35 +308,35 @@ fn swap_web_symlink(link: &Path, target: &Path) -> Result<(), String> {
     std::fs::create_dir_all(parent).map_err(|e| format!("mkdir {}: {e}", parent.display()))?;
 
     // 1. Stage the replacement symlink at a sibling temp.
-    let tmp = dot_sibling(link, "tmp");
-    let _rm = std::fs::remove_file(&tmp);
-    symlink(target, &tmp).map_err(|e| format!("symlink {} -> {}: {e}", tmp.display(), target.display()))?;
+    let staged = dot_sibling(link, "tmp");
+    let _rm_staged = std::fs::remove_file(&staged);
+    symlink(target, &staged).map_err(|e| format!("symlink {} -> {}: {e}", staged.display(), target.display()))?;
 
     // 2. Legacy layout: `link` is a real directory. Move it aside so the rename
     //    can land — the old SPA stays intact under `aside` until we're done.
-    let is_real_dir = link.symlink_metadata().map(|m| m.file_type().is_dir()).unwrap_or(false);
+    let is_real_dir = link.symlink_metadata().is_ok_and(|m| m.file_type().is_dir());
     let aside = is_real_dir.then(|| dot_sibling(link, "legacy"));
-    if let Some(aside) = &aside {
-        let _rm = std::fs::remove_dir_all(aside);
-        if let Err(e) = std::fs::rename(link, aside) {
-            let _cleanup = std::fs::remove_file(&tmp);
+    if let Some(aside_dir) = aside.as_ref() {
+        let _rm_aside = std::fs::remove_dir_all(aside_dir);
+        if let Err(e) = std::fs::rename(link, aside_dir) {
+            let _cleanup = std::fs::remove_file(&staged);
             return Err(format!("move aside legacy web dir {}: {e}", link.display()));
         }
     }
 
     // 3. Swap the symlink in. On failure, undo: drop the temp, put the legacy
     //    dir back where it was.
-    if let Err(e) = std::fs::rename(&tmp, link) {
-        let _cleanup = std::fs::remove_file(&tmp);
-        if let Some(aside) = &aside {
-            let _restore = std::fs::rename(aside, link);
+    if let Err(e) = std::fs::rename(&staged, link) {
+        let _cleanup = std::fs::remove_file(&staged);
+        if let Some(aside_dir) = aside.as_ref() {
+            let _restore = std::fs::rename(aside_dir, link);
         }
         return Err(format!("promote web symlink {} -> {}: {e}", link.display(), target.display()));
     }
 
     // 4. Symlink is live — the old SPA is now safe to drop.
-    if let Some(aside) = &aside {
-        let _rm = std::fs::remove_dir_all(aside);
+    if let Some(aside_dir) = aside.as_ref() {
+        let _rm_old = std::fs::remove_dir_all(aside_dir);
     }
     Ok(())
 }
@@ -341,7 +356,8 @@ fn db_backup_path(auth_db_path: &Path, from: Option<&str>) -> PathBuf {
 // The `promote_web` no-op guards + happy symlink repoint live in
 // `updater/tests.rs`; the two `swap_web_symlink` layout transitions are unit
 // tested here, next to the private helper.
-#[cfg(all(test, unix))]
+#[cfg(test)]
+#[cfg(unix)]
 mod web_tests {
     use std::os::unix::fs::symlink;
 

@@ -144,15 +144,22 @@ fn implausible_signal_readings_are_rejected() {
 
 #[test]
 fn status_is_well_formed_without_gates() {
+    // Plain-call helpers keep the loop + null checks off the cognitive cap.
+    fn assert_present(status: &Value, field: &str) {
+        assert!(status.get(field).is_some(), "{field} is present");
+    }
+    fn assert_null(status: &Value, field: &str, why: &str) {
+        assert!(status.get(field).is_some_and(Value::is_null), "{field}: {why}");
+    }
     // The off-box half: a dev machine answers 200 with a well-formed
     // object whose optional halves are null, not an error.
     let status = probe(&NetworkConfig::default(), true);
     for field in ["active_uplink", "wan", "wwan", "ap", "supervisor"] {
-        assert!(status.get(field).is_some(), "{field} is present");
+        assert_present(&status, field);
     }
-    assert!(status.get("wwan").is_some_and(Value::is_null), "no mmcli gate ⇒ null bearer");
-    assert!(status.get("ap").is_some_and(Value::is_null), "no nmcli gate ⇒ null AP");
-    assert!(status.get("supervisor").is_some_and(Value::is_null), "no state file ⇒ null supervisor");
+    assert_null(&status, "wwan", "no mmcli gate \u{21d2} null bearer");
+    assert_null(&status, "ap", "no nmcli gate \u{21d2} null AP");
+    assert_null(&status, "supervisor", "no state file \u{21d2} null supervisor");
     // The hardware fact is the one the caller threaded in, not a
     // second sysfs read that could disagree with the handler's own gate.
     assert_eq!(status.get("modem_present"), Some(&json!(true)));
@@ -165,14 +172,18 @@ fn status_is_well_formed_without_gates() {
 /// the one screen an admin watches during a failover.
 #[test]
 fn an_unrecognised_default_route_device_is_other_not_wwan() {
-    assert_eq!(active_uplink(Some("end0")), json!("wan"), "the configured WAN port");
-    assert_eq!(active_uplink(Some("eth0")), json!("wan"));
-    assert_eq!(active_uplink(Some("enp1s0")), json!("wan"));
-    assert_eq!(active_uplink(Some("wwu1u1i4")), json!("wwan"), "the QMI net port");
-    for stranger in ["tun0", "wg0", "docker0", "wlp1s0", "br-lan"] {
-        assert_eq!(active_uplink(Some(stranger)), json!("other"), "{stranger} is not the 5G bearer");
+    // A plain call keeps the nine cases off the cognitive cap.
+    fn assert_uplink(dev: Option<&str>, want: &str) {
+        assert_eq!(active_uplink(dev), json!(want), "{dev:?} \u{2192} {want}");
     }
-    assert_eq!(active_uplink(None), json!("none"));
+    assert_uplink(Some("end0"), "wan"); // the configured WAN port
+    assert_uplink(Some("eth0"), "wan");
+    assert_uplink(Some("enp1s0"), "wan");
+    assert_uplink(Some("wwu1u1i4"), "wwan"); // the QMI net port
+    for stranger in ["tun0", "wg0", "docker0", "wlp1s0", "br-lan"] {
+        assert_uplink(Some(stranger), "other");
+    }
+    assert_uplink(None, "none");
 }
 
 /// `ssid` and `channel` come off the radio, from one `iw dev … info`.

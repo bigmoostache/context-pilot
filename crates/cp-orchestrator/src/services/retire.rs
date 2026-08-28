@@ -95,7 +95,7 @@ impl RetiredStore {
     pub fn list(&self) -> Vec<RetiredRecord> {
         let mut v: Vec<RetiredRecord> = self.records.values().cloned().collect();
         // Most-recently-retired first.
-        v.sort_by(|a, b| b.retired_at_ms.cmp(&a.retired_at_ms));
+        v.sort_by_key(|r| std::cmp::Reverse(r.retired_at_ms));
         v
     }
 
@@ -123,16 +123,16 @@ impl RetiredStore {
         let mut list: Vec<&RetiredRecord> = self.records.values().collect();
         list.sort_by(|a, b| a.id.cmp(&b.id));
         let Ok(bytes) = serde_json::to_vec_pretty(&list) else {
-            eprintln!("retire: serialize failed");
+            crate::oerr!("retire: serialize failed");
             return;
         };
-        let tmp = self.path.with_extension("json.tmp");
-        if std::fs::write(&tmp, &bytes).is_err() {
-            eprintln!("retire: write tmp failed: {}", tmp.display());
+        let tmp_path = self.path.with_extension("json.tmp");
+        if std::fs::write(&tmp_path, &bytes).is_err() {
+            crate::oerr!("retire: write tmp failed: {}", tmp_path.display());
             return;
         }
-        if let Err(e) = std::fs::rename(&tmp, &self.path) {
-            eprintln!("retire: rename failed: {e}");
+        if let Err(e) = std::fs::rename(&tmp_path, &self.path) {
+            crate::oerr!("retire: rename failed: {e}");
         }
     }
 }
@@ -152,6 +152,25 @@ mod tests {
         }
     }
 
+    /// Reload the store from `dir` and assert `id` survived to disk as the sole
+    /// record. A plain call, so folding these two checks through it keeps
+    /// `retire_unretire_roundtrips_through_disk` under the cognitive cap.
+    fn assert_persisted_retired(dir: &Path, id: &str) {
+        let reloaded = RetiredStore::load(dir);
+        assert!(reloaded.is_retired(id));
+        assert_eq!(reloaded.list().len(), 1);
+    }
+
+    /// Reload the store from `dir`, unretire `id`, and assert the flag cleared
+    /// both in memory and on the next reload. Extracted from
+    /// `retire_unretire_roundtrips_through_disk` to keep it under the cognitive cap.
+    fn assert_unretire_clears(dir: &Path, id: &str) {
+        let mut store = RetiredStore::load(dir);
+        assert!(store.unretire(id).is_some());
+        assert!(!store.is_retired(id));
+        assert!(RetiredStore::load(dir).list().is_empty());
+    }
+
     #[test]
     fn retire_unretire_roundtrips_through_disk() {
         let dir = std::env::temp_dir().join(format!("cp-retire-test-{}", std::process::id()));
@@ -165,16 +184,10 @@ mod tests {
         assert!(!store.is_folder_retired("/tmp/b"));
 
         // Reload from disk proves persistence.
-        let reloaded = RetiredStore::load(&dir);
-        assert!(reloaded.is_retired("a"));
-        assert_eq!(reloaded.list().len(), 1);
+        assert_persisted_retired(&dir, "a");
 
-        // Unretire clears it.
-        let mut store2 = RetiredStore::load(&dir);
-        let removed = store2.unretire("a");
-        assert!(removed.is_some());
-        assert!(!store2.is_retired("a"));
-        assert!(RetiredStore::load(&dir).list().is_empty());
+        // Unretire clears it, in memory and on the next reload.
+        assert_unretire_clears(&dir, "a");
 
         drop(std::fs::remove_dir_all(&dir));
     }

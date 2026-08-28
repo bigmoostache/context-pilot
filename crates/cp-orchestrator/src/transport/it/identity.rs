@@ -19,9 +19,9 @@ use super::state::write_atomic;
 pub(crate) struct Identity {
     /// DNS name the operator gives the box (e.g. `pilot.acme.corp`). May be
     /// empty if the operator only pins an IP.
-    pub(crate) name: String,
+    pub name: String,
     /// The box's LAN IP (e.g. `192.168.1.116`).
-    pub(crate) ip: String,
+    pub ip: String,
 }
 
 /// On-disk location of the identity record, beside the provisioned flag in the
@@ -133,9 +133,9 @@ pub(crate) fn apply_caddy_at_boot(state: &Mutex<Backend>) {
         Err(_) => return,
     };
     match super::caddy::write_config(provisioned, identity.as_ref(), &extra) {
-        Ok(true) => eprintln!("caddy: config written at boot (provisioned={provisioned})"),
+        Ok(true) => crate::oerr!("caddy: config written at boot (provisioned={provisioned})"),
         Ok(false) => {} // Caddy not configured in this environment — skipped.
-        Err(e) => eprintln!("WARN: caddy boot config write failed: {e}"),
+        Err(e) => crate::oerr!("WARN: caddy boot config write failed: {e}"),
     }
 }
 
@@ -180,7 +180,7 @@ pub(crate) fn set_identity(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     };
 
     if let Err(e) = save_identity(&path, &identity) {
-        eprintln!("identity: could not persist: {e}");
+        crate::oerr!("identity: could not persist: {e}");
         return HttpReply::error(500, "could not persist identity");
     }
 
@@ -188,7 +188,7 @@ pub(crate) fn set_identity(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     // (design §13.4). Best-effort: a flag-write failure is logged but does not
     // block the identity save; the caller can retry.
     if let Err(e) = super::state::set_provisioned(&flag_path, true) {
-        eprintln!("identity: could not persist provisioned flag: {e}");
+        crate::oerr!("identity: could not persist provisioned flag: {e}");
     }
 
     // Re-render + reload Caddy in provisioned mode so the leaf is re-issued for
@@ -198,7 +198,7 @@ pub(crate) fn set_identity(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     match super::caddy::regenerate(true, Some(&identity), &extra) {
         Ok(reloaded) => HttpReply::ok(&serde_json::json!({ "identity": identity, "reloaded": reloaded })),
         Err(e) => {
-            eprintln!("identity: caddy reload failed: {e}");
+            crate::oerr!("identity: caddy reload failed: {e}");
             HttpReply::error(502, "identity saved but the TLS reload failed")
         }
     }
@@ -210,28 +210,43 @@ mod tests {
 
     #[test]
     fn name_validation_accepts_hostnames_rejects_junk() {
-        assert!(validate_name("pilot.acme.corp"));
-        assert!(validate_name("box1"));
-        assert!(validate_name("a-b.example"));
+        // Plain calls, so each case costs nothing against the cognitive-complexity
+        // cap (the ten inline assert!s tripped it).
+        fn ok(name: &str) {
+            assert!(validate_name(name), "should accept {name}");
+        }
+        fn bad(name: &str, why: &str) {
+            assert!(!validate_name(name), "should reject {name}: {why}");
+        }
+        ok("pilot.acme.corp");
+        ok("box1");
+        ok("a-b.example");
         // Rejections.
-        assert!(!validate_name(""));
-        assert!(!validate_name("-bad.example"), "label starts with hyphen");
-        assert!(!validate_name("bad-.example"), "label ends with hyphen");
-        assert!(!validate_name("a..b"), "empty label");
-        assert!(!validate_name("192.168.1.1"), "a bare IP is not a name");
-        assert!(!validate_name("under_score.example"), "underscore not allowed");
-        assert!(!validate_name(&"x".repeat(254)), "too long");
+        bad("", "empty");
+        bad("-bad.example", "label starts with hyphen");
+        bad("bad-.example", "label ends with hyphen");
+        bad("a..b", "empty label");
+        bad("192.168.1.1", "a bare IP is not a name");
+        bad("under_score.example", "underscore not allowed");
+        bad(&"x".repeat(254), "too long");
     }
 
     #[test]
     fn ip_validation_accepts_v4_and_v6() {
-        assert!(validate_ip("192.168.1.116"));
-        assert!(validate_ip("10.0.0.1"));
-        assert!(validate_ip("::1"));
-        assert!(validate_ip("fd00::1"));
-        assert!(!validate_ip("not.an.ip"));
-        assert!(!validate_ip("999.1.1.1"));
-        assert!(!validate_ip(""));
+        // Plain calls keep the seven inline assert!s off the cognitive-complexity cap.
+        fn ok(ip: &str) {
+            assert!(validate_ip(ip), "should accept {ip}");
+        }
+        fn bad(ip: &str) {
+            assert!(!validate_ip(ip), "should reject {ip}");
+        }
+        ok("192.168.1.116");
+        ok("10.0.0.1");
+        ok("::1");
+        ok("fd00::1");
+        bad("not.an.ip");
+        bad("999.1.1.1");
+        bad("");
     }
 
     #[test]

@@ -2,7 +2,7 @@
 //! management, session handling, and per-agent access control (design doc
 //! `docs/design-auth.md`).
 //!
-//! The auth subsystem is backed by a dedicated SQLite database stored at
+//! The auth subsystem is backed by a dedicated `SQLite` database stored at
 //! `~/.context-pilot/orchestrator/auth.db` (configurable via `CP_AUTH_DB`),
 //! separate from agent data. Three tables: `users`, `sessions`, `agent_acl`.
 //!
@@ -10,12 +10,12 @@
 //!
 //! * [`types`] — Domain types: [`AuthError`], [`UserRole`], [`AgentRole`],
 //!   [`User`], [`Session`].
-//! * [`store`] — [`AuthStore`] struct: schema init, password hashing,
+//! * [`db`] — [`AuthStore`] struct: schema init, password hashing,
 //!   token generation, and all CRUD operations.
 
 pub(crate) mod acl;
 pub(crate) mod backup;
 mod capabilities;
+pub mod db;
 mod helpers;
-pub mod store;
 pub mod types;

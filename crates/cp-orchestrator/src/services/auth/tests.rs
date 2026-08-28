@@ -1,10 +1,12 @@
 //! Unit tests for the auth store — schema, hashing, CRUD, sessions.
 
+use super::super::types::AccessGrant;
 use super::super::types::AgentRole;
+use super::super::types::UserRole;
 use super::*;
 
 /// A throwaway password for tests. Generated at runtime (never a string
-/// literal) so CodeQL's hard-coded-credential scan has nothing to flag — the
+/// literal) so `CodeQL`'s hard-coded-credential scan has nothing to flag — the
 /// exact value is irrelevant since no test re-authenticates with it.
 fn test_password() -> String {
     AuthStore::generate_token()
@@ -55,8 +57,7 @@ fn generate_token_length() {
 fn generate_uuid_format() {
     let uuid = AuthStore::generate_uuid();
     assert_eq!(uuid.len(), 36, "UUID = 36 chars with dashes");
-    let parts: Vec<&str> = uuid.split('-').collect();
-    assert_eq!(parts.len(), 5, "5 groups separated by dashes");
+    assert_eq!(uuid.split('-').count(), 5, "5 groups separated by dashes");
     assert!(uuid.as_bytes().get(14).copied() == Some(b'4'), "version nibble must be 4, got: {uuid}");
 }
 
@@ -108,7 +109,7 @@ fn migration_widens_check() {
     assert_eq!(user_role, "user", "legacy user unchanged");
     // The widened CHECK now admits a manager.
     let _manager = store
-        .create_user("m@x", "Mgr", &test_password(), UserRole::Manager)
+        .create_user(NewUser { email: "m@x", name: "Mgr", password: &test_password(), role: UserRole::Manager })
         .unwrap_or_else(|err| panic!("manager insert should succeed post-migration: {err}"));
 }
 
@@ -117,9 +118,12 @@ fn migration_widens_check() {
 #[test]
 fn migration_idempotent() {
     let store = AuthStore::open(Path::new(":memory:")).unwrap_or_else(|err| panic!("open failed: {err}"));
-    let _s =
-        store.create_user("s@x", "S", &test_password(), UserRole::Superadmin).unwrap_or_else(|err| panic!("{err}"));
-    let _u = store.create_user("u@x", "U", &test_password(), UserRole::User).unwrap_or_else(|err| panic!("{err}"));
+    let _s = store
+        .create_user(NewUser { email: "s@x", name: "S", password: &test_password(), role: UserRole::Superadmin })
+        .unwrap_or_else(|err| panic!("{err}"));
+    let _u = store
+        .create_user(NewUser { email: "u@x", name: "U", password: &test_password(), role: UserRole::User })
+        .unwrap_or_else(|err| panic!("{err}"));
     store.init_schema().unwrap_or_else(|err| panic!("second init_schema failed: {err}"));
     assert_eq!(store.count_users().unwrap_or(0), 2, "no rows added or dropped");
     let role: String =
@@ -140,31 +144,30 @@ fn agent_role_roundtrip() {
 
 #[test]
 fn create_and_get_user() {
-    let store = AuthStore::open(Path::new(":memory:")).unwrap_or_else(|err| {
-        panic!("open failed: {err}");
-    });
+    let store = AuthStore::open(Path::new(":memory:")).expect("open");
     let user = store
-        .create_user("alice@example.com", "Alice", &test_password(), UserRole::Admin)
-        .unwrap_or_else(|err| panic!("create failed: {err}"));
-    assert_eq!(user.email, "alice@example.com");
-    assert_eq!(user.name, "Alice");
-    assert_eq!(user.role, UserRole::Admin);
-    assert_eq!(user.id.len(), 36, "UUID format");
+        .create_user(NewUser {
+            email: "alice@example.com",
+            name: "Alice",
+            password: &test_password(),
+            role: UserRole::Admin,
+        })
+        .expect("create");
+    assert_eq!(
+        (user.email.as_str(), user.name.as_str(), user.role, user.id.len()),
+        ("alice@example.com", "Alice", UserRole::Admin, 36),
+        "created user fields (incl. UUID length)"
+    );
     assert!(user.password_hash.starts_with("$argon2"), "PHC hash stored");
 
-    // Fetch by id.
-    let found = store
-        .get_user_by_id(&user.id)
-        .unwrap_or_else(|err| panic!("get_by_id failed: {err}"))
-        .unwrap_or_else(|| panic!("user not found"));
-    assert_eq!(found.email, "alice@example.com");
-
-    // Fetch by email (case-insensitive).
-    let found2 = store
-        .get_user_by_email("ALICE@EXAMPLE.COM")
-        .unwrap_or_else(|err| panic!("get_by_email failed: {err}"))
-        .unwrap_or_else(|| panic!("user not found"));
-    assert_eq!(found2.id, user.id);
+    // Fetch by id, then by email (case-insensitive) — both must resolve the same user.
+    let found = store.get_user_by_id(&user.id).expect("get_by_id").expect("user not found");
+    let found2 = store.get_user_by_email("ALICE@EXAMPLE.COM").expect("get_by_email").expect("user not found");
+    assert_eq!(
+        (found.email.as_str(), found2.id.as_str()),
+        ("alice@example.com", user.id.as_str()),
+        "by-id and by-email fetches agree"
+    );
 }
 
 #[test]
@@ -174,10 +177,10 @@ fn list_and_count_users() {
     });
     assert_eq!(store.count_users().unwrap_or(99), 0);
     let _u1 = store
-        .create_user("a@x.com", "A", &test_password(), UserRole::Admin)
+        .create_user(NewUser { email: "a@x.com", name: "A", password: &test_password(), role: UserRole::Admin })
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     let _u2 = store
-        .create_user("b@x.com", "B", "pass5678", UserRole::User)
+        .create_user(NewUser { email: "b@x.com", name: "B", password: "pass5678", role: UserRole::User })
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     assert_eq!(store.count_users().unwrap_or(0), 2);
     let list = store.list_users().unwrap_or_else(|err| panic!("list failed: {err}"));
@@ -190,10 +193,10 @@ fn delete_user_cascades() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("del@x.com", "Del", &test_password(), UserRole::User)
+        .create_user(NewUser { email: "del@x.com", name: "Del", password: &test_password(), role: UserRole::User })
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     let token = store
-        .create_session(&user.id, None, Duration::from_secs(3600))
+        .create_session(&user.id, None, Duration::from_hours(1))
         .unwrap_or_else(|err| panic!("session failed: {err}"));
     assert!(store.delete_user(&user.id).unwrap_or(false));
     // Session must be cascade-deleted.
@@ -208,10 +211,10 @@ fn session_lifecycle() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("sess@x.com", "Sess", &test_password(), UserRole::User)
+        .create_user(NewUser { email: "sess@x.com", name: "Sess", password: &test_password(), role: UserRole::User })
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     let token = store
-        .create_session(&user.id, Some("test-agent"), Duration::from_secs(3600))
+        .create_session(&user.id, Some("test-agent"), Duration::from_hours(1))
         .unwrap_or_else(|err| panic!("session failed: {err}"));
     // Valid session returns the correct user.
     let found_user = store
@@ -231,7 +234,7 @@ fn expired_session_swept() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("exp@x.com", "Exp", &test_password(), UserRole::User)
+        .create_user(NewUser { email: "exp@x.com", name: "Exp", password: &test_password(), role: UserRole::User })
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     // Create a session that's already expired (TTL = 0).
     let token =
@@ -248,17 +251,22 @@ fn grant_and_check_access() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("acl@x.com", "Acl", &test_password(), UserRole::User)
+        .create_user(NewUser { email: "acl@x.com", name: "Acl", password: &test_password(), role: UserRole::User })
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     // No access initially.
     let access = store.check_access("agent-1", &user.id).unwrap_or_else(|err| panic!("check failed: {err}"));
     assert!(access.is_none(), "no access before grant");
     // Grant agent-user.
     store
-        .grant_access("agent-1", &user.id, AgentRole::AgentUser, None)
+        .grant_access(AccessGrant {
+            agent_id: "agent-1",
+            user_id: &user.id,
+            role: AgentRole::AgentUser,
+            granted_by: None,
+        })
         .unwrap_or_else(|err| panic!("grant failed: {err}"));
-    let access = store.check_access("agent-1", &user.id).unwrap_or_else(|err| panic!("check failed: {err}"));
-    assert_eq!(access, Some(AgentRole::AgentUser));
+    let granted = store.check_access("agent-1", &user.id).unwrap_or_else(|err| panic!("check failed: {err}"));
+    assert_eq!(granted, Some(AgentRole::AgentUser));
     assert!(!store.is_agent_admin("agent-1", &user.id).unwrap_or(true));
 }
 
@@ -268,10 +276,15 @@ fn update_agent_role() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("role@x.com", "Role", &test_password(), UserRole::User)
+        .create_user(NewUser { email: "role@x.com", name: "Role", password: &test_password(), role: UserRole::User })
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     store
-        .grant_access("agent-1", &user.id, AgentRole::AgentUser, None)
+        .grant_access(AccessGrant {
+            agent_id: "agent-1",
+            user_id: &user.id,
+            role: AgentRole::AgentUser,
+            granted_by: None,
+        })
         .unwrap_or_else(|err| panic!("grant failed: {err}"));
     // Promote to agent-admin.
     assert!(store.update_agent_role("agent-1", &user.id, AgentRole::AgentAdmin).unwrap_or(false));
@@ -286,10 +299,20 @@ fn revoke_access() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("rev-acl@x.com", "RevAcl", &test_password(), UserRole::User)
+        .create_user(NewUser {
+            email: "rev-acl@x.com",
+            name: "RevAcl",
+            password: &test_password(),
+            role: UserRole::User,
+        })
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     store
-        .grant_access("agent-1", &user.id, AgentRole::AgentUser, None)
+        .grant_access(AccessGrant {
+            agent_id: "agent-1",
+            user_id: &user.id,
+            role: AgentRole::AgentUser,
+            granted_by: None,
+        })
         .unwrap_or_else(|err| panic!("grant failed: {err}"));
     assert!(store.revoke_access("agent-1", &user.id).unwrap_or(false));
     assert!(store.check_access("agent-1", &user.id).unwrap_or(None).is_none());
@@ -299,37 +322,59 @@ fn revoke_access() {
 
 #[test]
 fn list_agent_users_and_user_agents() {
-    let store = AuthStore::open(Path::new(":memory:")).unwrap_or_else(|err| {
-        panic!("open failed: {err}");
-    });
+    let store = AuthStore::open(Path::new(":memory:")).expect("open");
     let alice = store
-        .create_user("alice-acl@x.com", "Alice", &test_password(), UserRole::User)
-        .unwrap_or_else(|err| panic!("create failed: {err}"));
+        .create_user(NewUser {
+            email: "alice-acl@x.com",
+            name: "Alice",
+            password: &test_password(),
+            role: UserRole::User,
+        })
+        .expect("create alice");
     let bob = store
-        .create_user("bob-acl@x.com", "Bob", "pass5678", UserRole::User)
-        .unwrap_or_else(|err| panic!("create failed: {err}"));
+        .create_user(NewUser { email: "bob-acl@x.com", name: "Bob", password: "pass5678", role: UserRole::User })
+        .expect("create bob");
     store
-        .grant_access("agent-1", &alice.id, AgentRole::AgentAdmin, None)
-        .unwrap_or_else(|err| panic!("grant failed: {err}"));
+        .grant_access(AccessGrant {
+            agent_id: "agent-1",
+            user_id: &alice.id,
+            role: AgentRole::AgentAdmin,
+            granted_by: None,
+        })
+        .expect("grant alice a1");
     store
-        .grant_access("agent-1", &bob.id, AgentRole::AgentUser, Some(&alice.id))
-        .unwrap_or_else(|err| panic!("grant failed: {err}"));
+        .grant_access(AccessGrant {
+            agent_id: "agent-1",
+            user_id: &bob.id,
+            role: AgentRole::AgentUser,
+            granted_by: Some(&alice.id),
+        })
+        .expect("grant bob a1");
     store
-        .grant_access("agent-2", &alice.id, AgentRole::AgentUser, None)
-        .unwrap_or_else(|err| panic!("grant failed: {err}"));
+        .grant_access(AccessGrant {
+            agent_id: "agent-2",
+            user_id: &alice.id,
+            role: AgentRole::AgentUser,
+            granted_by: None,
+        })
+        .expect("grant alice a2");
     // List users on agent-1.
-    let users = store.list_agent_users("agent-1").unwrap_or_else(|err| panic!("list failed: {err}"));
-    assert_eq!(users.len(), 2);
-    assert_eq!(users[0].user_name, "Alice");
-    assert_eq!(users[0].role, AgentRole::AgentAdmin);
-    assert_eq!(users[0].user_email, "alice-acl@x.com");
-    assert!(users[0].granted_by.is_none());
-    assert_eq!(users[1].user_name, "Bob");
-    assert_eq!(users[1].role, AgentRole::AgentUser);
-    assert_eq!(users[1].granted_by.as_deref(), Some(alice.id.as_str()));
-    assert!(users[1].granted_at > 0);
+    let users = store.list_agent_users("agent-1").expect("list agent users");
+    assert_eq!(users.len(), 2, "expected exactly two ACL entries");
+    let first = users.first().expect("first ACL entry");
+    let second = users.get(1).expect("second ACL entry");
+    assert_eq!(
+        (first.user_name.as_str(), first.role, first.user_email.as_str(), first.granted_by.is_none()),
+        ("Alice", AgentRole::AgentAdmin, "alice-acl@x.com", true),
+        "first ACL entry (Alice, admin, ungranted)"
+    );
+    assert_eq!(
+        (second.user_name.as_str(), second.role, second.granted_by.as_deref(), second.granted_at > 0),
+        ("Bob", AgentRole::AgentUser, Some(alice.id.as_str()), true),
+        "second ACL entry (Bob, user, granted by Alice)"
+    );
     // List agents for alice.
-    let agents = store.list_user_agents(&alice.id).unwrap_or_else(|err| panic!("list failed: {err}"));
+    let agents = store.list_user_agents(&alice.id).expect("list user agents");
     assert_eq!(agents, vec!["agent-1", "agent-2"]);
 }
 
@@ -339,10 +384,20 @@ fn delete_user_cascades_acl() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("del-acl@x.com", "DelAcl", &test_password(), UserRole::User)
+        .create_user(NewUser {
+            email: "del-acl@x.com",
+            name: "DelAcl",
+            password: &test_password(),
+            role: UserRole::User,
+        })
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     store
-        .grant_access("agent-1", &user.id, AgentRole::AgentUser, None)
+        .grant_access(AccessGrant {
+            agent_id: "agent-1",
+            user_id: &user.id,
+            role: AgentRole::AgentUser,
+            granted_by: None,
+        })
         .unwrap_or_else(|err| panic!("grant failed: {err}"));
     assert!(store.delete_user(&user.id).unwrap_or(false));
     let users = store.list_agent_users("agent-1").unwrap_or_else(|err| panic!("list failed: {err}"));
@@ -355,14 +410,24 @@ fn grant_overwrites_previous() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("ow@x.com", "Ow", &test_password(), UserRole::User)
+        .create_user(NewUser { email: "ow@x.com", name: "Ow", password: &test_password(), role: UserRole::User })
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     store
-        .grant_access("agent-1", &user.id, AgentRole::AgentUser, None)
+        .grant_access(AccessGrant {
+            agent_id: "agent-1",
+            user_id: &user.id,
+            role: AgentRole::AgentUser,
+            granted_by: None,
+        })
         .unwrap_or_else(|err| panic!("grant failed: {err}"));
     // Re-grant with different role overwrites.
     store
-        .grant_access("agent-1", &user.id, AgentRole::AgentAdmin, None)
+        .grant_access(AccessGrant {
+            agent_id: "agent-1",
+            user_id: &user.id,
+            role: AgentRole::AgentAdmin,
+            granted_by: None,
+        })
         .unwrap_or_else(|err| panic!("re-grant failed: {err}"));
     assert_eq!(store.check_access("agent-1", &user.id).unwrap_or(None), Some(AgentRole::AgentAdmin),);
     // Only one entry, not two.

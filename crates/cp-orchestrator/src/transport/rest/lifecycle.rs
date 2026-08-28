@@ -30,7 +30,7 @@
 //! * the agent's **Rust process is killed** (lock-free), and so is its
 //!   **console-server daemon** (which survives TUI restarts by design);
 //! * the retired state is recorded in the orchestrator-owned
-//!   [`RetiredStore`](crate::services::RetiredStore) — **not** the agent's
+//!   [`RetiredStore`](crate::services::retire::RetiredStore) — **not** the agent's
 //!   registry record — so the Retired card can be rendered with no live
 //!   process, and a same-path create can be blocked.
 //!
@@ -42,7 +42,7 @@ use std::sync::Mutex;
 use serde::Serialize;
 
 use super::{Backend, HttpReply};
-use crate::services::RetiredRecord;
+use crate::services::retire::RetiredRecord;
 use crate::supervisor;
 
 // ── Restart ─────────────────────────────────────────────────────────────
@@ -60,7 +60,7 @@ use crate::supervisor;
 ///
 /// Returns `202 {status:"restarting", folder, pid}` on success, `404` for an
 /// unknown agent, `502` for a respawn failure.
-pub fn restart_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
+pub(crate) fn restart_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     let entry = match super::resolve_entry(state, agent_id) {
         Ok(e) => e,
         Err(reply) => return reply,
@@ -106,7 +106,7 @@ pub fn restart_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
         let Ok(mut backend) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
         };
-        backend.supervisor.spawn_pty(key, &binary, &folder, &env)
+        backend.supervisor.spawn_pty(key, supervisor::PtyPlan { binary: &binary, folder: &folder, env: &env })
     };
 
     match spawn_result {
@@ -115,7 +115,7 @@ pub fn restart_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
             &RestartReceipt { status: "restarting", folder: folder.to_string_lossy().into_owned(), pid },
         ),
         Err(e) => {
-            eprintln!("restart_agent spawn error: {e}");
+            crate::oerr!("restart_agent spawn error: {e}");
             HttpReply::error(502, &format!("agent respawn failed: {e}"))
         }
     }
@@ -150,7 +150,7 @@ struct RestartReceipt {
 ///
 /// Returns `200 {status:"retired", id, folder}` on success, `404` for an
 /// unknown agent.
-pub fn retire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
+pub(crate) fn retire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     let entry = match super::resolve_entry(state, agent_id) {
         Ok(e) => e,
         Err(reply) => return reply,
@@ -188,10 +188,8 @@ pub fn retire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     kill_console_server(&folder);
 
     // Drop any stale supervised record so a later unretire respawn key is free.
-    if was_supervised {
-        if let Ok(mut b) = state.lock() {
-            let _stopped = b.supervisor.stop(&key);
-        }
+    if was_supervised && let Ok(mut b) = state.lock() {
+        let _stopped = b.supervisor.stop(&key);
     }
 
     // Record retired (persisted).
@@ -210,7 +208,7 @@ pub fn retire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
 ///
 /// Returns `202 {status:"unretiring", id, folder, pid}` on success, `404` if
 /// the agent is not retired, `502` for a respawn failure.
-pub fn unretire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
+pub(crate) fn unretire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     // Clear the flag, recovering the snapshot (404 if it was never retired).
     let record = {
         let Ok(mut b) = state.lock() else {
@@ -239,7 +237,7 @@ pub fn unretire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
         let Ok(mut b) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
         };
-        b.supervisor.spawn_pty(key, &binary, &folder, &env)
+        b.supervisor.spawn_pty(key, supervisor::PtyPlan { binary: &binary, folder: &folder, env: &env })
     };
 
     match spawn_result {
@@ -247,7 +245,7 @@ pub fn unretire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
             HttpReply::json(202, &UnretireReceipt { status: "unretiring", id: agent_id, folder: record.folder, pid })
         }
         Err(e) => {
-            eprintln!("unretire_agent spawn error: {e}");
+            crate::oerr!("unretire_agent spawn error: {e}");
             HttpReply::error(502, &format!("agent respawn failed: {e}"))
         }
     }
@@ -277,29 +275,28 @@ fn kill_console_server(folder: &str) {
 fn now_ms() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
-        .unwrap_or(0)
+        .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
 }
 
 /// The receipt returned when an agent has been retired.
 #[derive(Serialize)]
-struct RetireReceipt<'a> {
+struct RetireReceipt<'id> {
     /// Always `"retired"`.
     status: &'static str,
     /// The agent id retired.
-    id: &'a str,
+    id: &'id str,
     /// The realm folder, kept intact.
     folder: String,
 }
 
 /// The receipt returned when an agent unretire (respawn) has been launched.
 #[derive(Serialize)]
-struct UnretireReceipt<'a> {
+struct UnretireReceipt<'id> {
     /// Always `"unretiring"` — the agent re-appears in the active fleet once it
     /// boots.
     status: &'static str,
     /// The agent id being brought back.
-    id: &'a str,
+    id: &'id str,
     /// The realm folder it was respawned in.
     folder: String,
     /// The freshly spawned process pid.

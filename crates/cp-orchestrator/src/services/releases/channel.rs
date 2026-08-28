@@ -6,7 +6,7 @@
 //! plain monotonic comparison would refuse the move as a rollback.
 
 use super::ReleaseStore;
-use super::updater::UpdateState;
+use super::updater::state::UpdateState;
 
 impl ReleaseStore {
     /// The channel this box follows (`stable` or `nightly`).
@@ -18,7 +18,7 @@ impl ReleaseStore {
     /// Whether an admin channel switch is awaiting its first check — the next
     /// evaluation adopts the new channel's head regardless of version ordering.
     #[must_use]
-    pub fn pending_channel_switch(&self) -> bool {
+    pub const fn pending_channel_switch(&self) -> bool {
         self.config.pending_channel_switch
     }
 
@@ -37,7 +37,7 @@ impl ReleaseStore {
         if self.config.channel == channel {
             return Ok(());
         }
-        self.config.channel = channel.to_owned();
+        channel.clone_into(&mut self.config.channel);
         self.config.pending_channel_switch = true;
         self.persist();
         let mut st = UpdateState::load(&self.dir);

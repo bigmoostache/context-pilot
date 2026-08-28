@@ -35,7 +35,7 @@ const USER_AGENT: &str = "context-pilot-orchestrator";
 /// [`config`].
 mod config;
 use config::ReleaseConfig;
-pub use config::{MaintenanceWindow, UpdateMode};
+pub(crate) use config::{MaintenanceWindow, UpdateMode};
 
 /// OTA channel selection (`stable`/`nightly`) + the crossgrade flag — see
 /// [`channel`].
@@ -83,6 +83,10 @@ pub struct ReleaseStore {
     config_path: PathBuf,
 }
 
+#[expect(
+    clippy::multiple_inherent_impl,
+    reason = "ReleaseStore inherent methods are split across mod.rs and the sibling channel.rs to respect the 500-line file cap; merging channel's OTA-channel methods back here would push mod.rs over the limit"
+)]
 impl ReleaseStore {
     /// Load (or create) the release store from the given directory.
     ///
@@ -99,6 +103,7 @@ impl ReleaseStore {
     }
 
     /// The default releases directory (`~/.context-pilot/releases/`).
+    #[must_use]
     pub fn default_dir() -> Option<PathBuf> {
         std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".context-pilot/releases"))
     }
@@ -113,13 +118,13 @@ impl ReleaseStore {
 
     /// Whether the architecture was auto-detected.
     #[must_use]
-    pub fn is_arch_auto(&self) -> bool {
+    pub const fn is_arch_auto(&self) -> bool {
         self.config.arch_auto
     }
 
     /// Manually override the architecture and persist.
     pub fn set_arch(&mut self, arch: &str) {
-        self.config.arch = arch.to_owned();
+        arch.clone_into(&mut self.config.arch);
         self.config.arch_auto = false;
         self.persist();
     }
@@ -141,7 +146,7 @@ impl ReleaseStore {
         };
         let mut releases = Vec::new();
         for entry in entries.flatten() {
-            if !entry.file_type().map_or(false, |ft| ft.is_dir()) {
+            if !entry.file_type().is_ok_and(|ft| ft.is_dir()) {
                 continue;
             }
             let tag = entry.file_name().to_string_lossy().into_owned();
@@ -150,10 +155,10 @@ impl ReleaseStore {
                 continue;
             }
             let binary = entry.path().join("cpilot");
-            let binary_size = std::fs::metadata(&binary).map(|m| m.len()).unwrap_or(0);
+            let binary_size = std::fs::metadata(&binary).map_or(0, |m| m.len());
             releases.push(LocalRelease { tag, binary_size });
         }
-        releases.sort_by(|a, b| semver_sort_key(&b.tag).cmp(&semver_sort_key(&a.tag)));
+        releases.sort_by_key(|r| std::cmp::Reverse(semver_sort_key(&r.tag)));
         releases
     }
 
@@ -190,12 +195,12 @@ impl ReleaseStore {
 
     /// The box's auto-update posture (`auto` / `manual` / `paused`).
     #[must_use]
-    pub fn update_mode(&self) -> UpdateMode {
+    pub(crate) const fn update_mode(&self) -> UpdateMode {
         self.config.update_mode
     }
 
     /// Set the auto-update posture and persist.
-    pub fn set_update_mode(&mut self, mode: UpdateMode) {
+    pub(crate) fn set_update_mode(&mut self, mode: UpdateMode) {
         self.config.update_mode = mode;
         self.persist();
     }
@@ -205,13 +210,13 @@ impl ReleaseStore {
 
     /// Hours between channel polls.
     #[must_use]
-    pub fn poll_interval_hours(&self) -> u32 {
+    pub const fn poll_interval_hours(&self) -> u32 {
         self.config.poll_interval_hours
     }
 
     /// The box-local maintenance window auto-applies are confined to.
     #[must_use]
-    pub fn window(&self) -> &MaintenanceWindow {
+    pub(crate) const fn window(&self) -> &MaintenanceWindow {
         &self.config.window
     }
 
@@ -220,7 +225,7 @@ impl ReleaseStore {
     /// # Errors
     ///
     /// Returns an error if either bound is not a valid `HH:MM`.
-    pub fn set_window(&mut self, window: MaintenanceWindow) -> Result<(), String> {
+    pub(crate) fn set_window(&mut self, window: MaintenanceWindow) -> Result<(), String> {
         if !window.is_valid() {
             return Err(format!("invalid window bounds: {} – {}", window.start, window.end));
         }
@@ -250,7 +255,7 @@ impl ReleaseStore {
     ///
     /// Returns an error if the tag is the currently active release, or if
     /// the directory cannot be removed.
-    pub fn delete(&mut self, tag: &str) -> Result<(), String> {
+    pub fn delete(&self, tag: &str) -> Result<(), String> {
         if self.config.active_tag.as_deref() == Some(tag) {
             return Err("cannot delete the currently active release".to_owned());
         }
@@ -345,14 +350,14 @@ impl ReleaseStore {
 
         if !tar_status.success() {
             // Clean up the partial extraction.
-            let _rm = std::fs::remove_dir_all(&dest);
+            let _rm_partial = std::fs::remove_dir_all(&dest);
             return Err("tar extraction failed".to_owned());
         }
 
         // Set executable permission on the binary (Unix).
         #[cfg(unix)]
         {
-            use std::os::unix::fs::PermissionsExt;
+            use std::os::unix::fs::PermissionsExt as _;
             let binary = dest.join("cpilot");
             if binary.exists() {
                 let _r = std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o755));
@@ -371,38 +376,47 @@ impl ReleaseStore {
     /// Atomically write config to disk (`tmp` → `rename`).
     fn persist(&self) {
         let Ok(bytes) = serde_json::to_vec_pretty(&self.config) else {
-            eprintln!("releases: serialize config failed");
+            crate::oerr!("releases: serialize config failed");
             return;
         };
         if std::fs::create_dir_all(&self.dir).is_err() {
-            eprintln!("releases: create dir failed");
+            crate::oerr!("releases: create dir failed");
             return;
         }
-        let tmp = self.config_path.with_extension("json.tmp");
-        if std::fs::write(&tmp, &bytes).is_err() {
-            eprintln!("releases: write tmp failed: {}", tmp.display());
+        let tmp_path = self.config_path.with_extension("json.tmp");
+        if std::fs::write(&tmp_path, &bytes).is_err() {
+            crate::oerr!("releases: write tmp failed: {}", tmp_path.display());
             return;
         }
-        if let Err(e) = std::fs::rename(&tmp, &self.config_path) {
-            eprintln!("releases: rename failed: {e}");
+        if let Err(e) = std::fs::rename(&tmp_path, &self.config_path) {
+            crate::oerr!("releases: rename failed: {e}");
         }
     }
 }
 
 // ── GitHub API types (deserialization only) ──────────────────────────────
 
+/// A GitHub release entry (subset of the API response we consume).
 #[derive(Debug, Deserialize)]
 struct GitHubRelease {
+    /// The release git tag (e.g. `"v0.3.0-abc1234"`).
     tag_name: String,
+    /// Human-readable release name, if set.
     name: Option<String>,
+    /// ISO-8601 publication timestamp, if present.
     published_at: Option<String>,
+    /// Downloadable assets attached to the release.
     assets: Vec<GitHubAsset>,
 }
 
+/// A single downloadable asset on a [`GitHubRelease`].
 #[derive(Debug, Deserialize)]
 struct GitHubAsset {
+    /// Asset filename (used to match the arch + `.tar.gz` suffix).
     name: String,
+    /// Direct browser download URL.
     browser_download_url: String,
+    /// Asset size in bytes.
     size: u64,
 }
 
@@ -439,6 +453,7 @@ pub const KNOWN_ARCHS: &[&str] =
 ///
 /// Non-numeric or missing components default to 0. This gives correct
 /// *descending* order when used with `.reverse()` or `Reverse(...)`.
+#[must_use]
 pub fn semver_sort_key(tag: &str) -> (u32, u32, u32) {
     let stripped = tag.strip_prefix('v').unwrap_or(tag);
     let mut parts = stripped.splitn(3, '.');
@@ -447,29 +462,34 @@ pub fn semver_sort_key(tag: &str) -> (u32, u32, u32) {
     // Patch may trail non-numeric chars (e.g. "10-rc1") — parse prefix digits.
     let patch = parts
         .next()
-        .and_then(|s| s.chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse().ok())
+        .and_then(|s| s.chars().take_while(char::is_ascii_digit).collect::<String>().parse().ok())
         .unwrap_or(0);
     (major, minor, patch)
 }
 
 /// Orchestrator self-update — stage a downloaded `cp-orchestrator` over the
 /// running install path with atomic-rename + `.bak` rollback (see module docs).
-mod self_update;
-pub use self_update::{boot_check, boot_commit, boot_commit_when_healthy, stage_orchestrator_update};
+///
+/// `pub mod` (not a `pub use` item re-export, which `clippy::pub_use` forbids)
+/// so the binary's boot path reaches [`self_update::boot_check`] at
+/// `services::releases::self_update::boot_check`; the crate-internal short
+/// paths (`releases::boot_commit`, …) ride the `pub(crate) use` below.
+pub mod self_update;
+pub(crate) use self_update::{boot_commit_when_healthy, stage_orchestrator_update};
 
 /// Signed update-manifest schema (update-policy §5.3).
 mod manifest;
-pub use manifest::{Manifest, ManifestArtifact};
+pub(crate) use manifest::Manifest;
 
 /// Manifest-signing trust anchor (update-policy §5.4).
 mod signing;
-pub use signing::UPDATE_PUBKEY;
+pub(crate) use signing::UPDATE_PUBKEY;
 
 /// The on-box updater: fetch → verify → download → apply (update-policy §5.5).
 pub mod updater;
 
 #[cfg(test)]
-pub(crate) use self_update::{backup_path, pending_path};
+pub(crate) use self_update::{backup_path, boot_check, boot_commit, pending_path};
 
 #[cfg(test)]
 mod tests;

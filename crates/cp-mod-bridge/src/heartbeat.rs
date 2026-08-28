@@ -224,7 +224,10 @@ mod tests {
         let beacon = Beacon::start(&path, 9, BOOT.to_owned(), Duration::from_millis(15)).expect("start");
         sleep(Duration::from_millis(70));
         // In-place overwrite must never grow the file.
-        assert_eq!(std::fs::metadata(&path).expect("meta").len(), HEARTBEAT_LEN as u64);
+        assert_eq!(
+            std::fs::metadata(&path).expect("meta").len(),
+            u64::try_from(HEARTBEAT_LEN).expect("heartbeat len fits u64")
+        );
         beacon.stop();
     }
 }

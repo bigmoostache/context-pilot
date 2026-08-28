@@ -15,7 +15,7 @@ pub(super) fn agent_folder(state: &Mutex<Backend>, agent_id: &str) -> Result<Str
 pub(super) fn extract_worker_param(query: &str) -> Option<String> {
     query.split('&').filter(|s| !s.is_empty()).find_map(|pair| {
         let (k, v) = pair.split_once('=')?;
-        if k == "worker" { Some(v.to_owned()) } else { None }
+        (k == "worker").then(|| v.to_owned())
     })
 }
 

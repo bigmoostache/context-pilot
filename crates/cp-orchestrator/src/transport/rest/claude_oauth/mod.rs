@@ -6,28 +6,36 @@
 //! browser, then pastes the resulting code back into the frontend dialog.
 
 pub(crate) mod accounts;
+mod helpers;
 pub(crate) mod sweep;
+
+use helpers::{extract_code, fetch_account_email, read_random, urlencoded};
 
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use sha2::{Digest as _, Sha256};
 
 use super::{Backend, HttpReply};
 
 // ── Constants ────────────────────────────────────────────────────────
 
+/// Anthropic's public OAuth client id for the Claude Code integration.
 pub(super) const CLIENT_ID: &str = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
+/// OAuth authorize endpoint the user opens in their browser.
 const AUTHORIZE_URL: &str = "https://claude.ai/oauth/authorize";
+/// OAuth token endpoint — code/refresh exchange target.
 pub(super) const TOKEN_URL: &str = "https://claude.ai/v1/oauth/token";
+/// Registered redirect URI for the authorization-code callback.
 const REDIRECT_URI: &str = "https://console.anthropic.com/oauth/code/callback";
 /// User-Agent required by Anthropic's OAuth token endpoint. The canonical
 /// Claude Code OAuth contract expects a Claude Code identity here; a default
 /// `reqwest/x.y` UA is rejected/misrouted by the edge, breaking both the
-/// authorization_code exchange and refresh.
+/// `authorization_code` exchange and refresh.
 pub(super) const TOKEN_USER_AGENT: &str = "claude-cli/2.1.196 (external, cli)";
+/// Space-separated OAuth scopes requested for a Claude Code session.
 const SCOPES: &str =
     "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload";
 /// PKCE sessions expire after 5 minutes.
@@ -37,9 +45,12 @@ const PKCE_TTL_SECS: u64 = 300;
 
 /// In-flight PKCE session — lives between `/start` and `/complete`.
 #[derive(Debug)]
-pub(crate) struct PkceSession {
+pub struct PkceSession {
+    /// The PKCE code verifier; also echoed as the `state` parameter.
     code_verifier: String,
+    /// The `state` parameter (equal to the verifier per the Claude contract).
     state: String,
+    /// When the session was created, for the [`PKCE_TTL_SECS`] expiry check.
     created_at: Instant,
 }
 
@@ -76,33 +87,31 @@ pub(crate) fn claude_usage() -> HttpReply {
 
 /// `GET /api/claude-login/status` — check whether a valid OAuth token exists.
 pub(crate) fn token_status() -> HttpReply {
-    let creds = read_credentials_json();
-    match creds {
-        Some(oauth) => {
-            let expires_at = oauth.get("expiresAt").and_then(|v| v.as_i64()).unwrap_or(0);
-            let now_ms = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_millis() as i64)
-                .unwrap_or(0);
+    read_credentials_json().map_or_else(
+        || {
+            HttpReply::ok(&TokenStatusResponse {
+                valid: false,
+                expires_at: None,
+                subscription_type: None,
+                rate_limit_tier: None,
+                account_email: None,
+            })
+        },
+        |oauth| {
+            let expires_at = oauth.get("expiresAt").and_then(serde_json::Value::as_i64).unwrap_or(0);
+            let now_ms = cp_mod_utilities::time::now_epoch_ms();
             let token = oauth.get("accessToken").and_then(|v| v.as_str()).unwrap_or("");
             let valid = expires_at > now_ms && !token.is_empty();
             let account_email = if valid { fetch_account_email(token) } else { None };
             HttpReply::ok(&TokenStatusResponse {
                 valid,
-                expires_at: if expires_at > 0 { Some(expires_at) } else { None },
+                expires_at: (expires_at > 0).then_some(expires_at),
                 subscription_type: oauth.get("subscriptionType").and_then(|v| v.as_str()).map(str::to_owned),
                 rate_limit_tier: oauth.get("rateLimitTier").and_then(|v| v.as_str()).map(str::to_owned),
                 account_email,
             })
-        }
-        None => HttpReply::ok(&TokenStatusResponse {
-            valid: false,
-            expires_at: None,
-            subscription_type: None,
-            rate_limit_tier: None,
-            account_email: None,
-        }),
-    }
+        },
+    )
 }
 
 // ── Login start ──────────────────────────────────────────────────────
@@ -136,24 +145,18 @@ pub(crate) fn login_start(state: &Mutex<Backend>) -> HttpReply {
 
     // Store PKCE session for the /complete step.
     if let Ok(mut b) = state.lock() {
-        b.pkce_session =
-            Some(PkceSession { code_verifier: code_verifier.clone(), state: state_param, created_at: Instant::now() });
+        b.set_pkce_session(PkceSession { code_verifier, state: state_param, created_at: Instant::now() });
     }
 
     // Check whether there's already a valid token (multi-account scenario).
     // When `already_valid` is true, the auto-poller MUST stay disabled — the
     // user intends to switch accounts and needs to paste the new code.
-    let already_valid = read_credentials_json()
-        .map(|c| {
-            let expires_at = c.get("expiresAt").and_then(|v| v.as_i64()).unwrap_or(0);
-            let now_ms = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_millis() as i64)
-                .unwrap_or(0);
-            let token = c.get("accessToken").and_then(|v| v.as_str()).unwrap_or("");
-            expires_at > now_ms && !token.is_empty()
-        })
-        .unwrap_or(false);
+    let already_valid = read_credentials_json().is_some_and(|c| {
+        let expires_at = c.get("expiresAt").and_then(serde_json::Value::as_i64).unwrap_or(0);
+        let now_ms = cp_mod_utilities::time::now_epoch_ms();
+        let token = c.get("accessToken").and_then(|v| v.as_str()).unwrap_or("");
+        expires_at > now_ms && !token.is_empty()
+    });
 
     HttpReply::ok(&LoginStartResponse { url, already_valid: Some(already_valid) })
 }
@@ -169,20 +172,20 @@ pub(crate) fn login_complete(state: &Mutex<Backend>, body_bytes: &[u8]) -> HttpR
     let Ok(req) = serde_json::from_slice::<LoginCompleteRequest>(body_bytes) else {
         return HttpReply::error(400, "expected {\"code\":\"...\"}");
     };
-    let code = req.code.trim();
+    let trimmed = req.code.trim();
     // Accept either a raw code or the full callback URL containing `?code=…`.
-    let code = extract_code(code);
+    let code = extract_code(trimmed);
     if code.is_empty() {
         return HttpReply::error(400, "code is required");
     }
 
     // Retrieve and consume the PKCE session.
-    let session = state.lock().ok().and_then(|mut b| b.pkce_session.take());
-    let Some(session) = session else {
-        return HttpReply::error(400, "no pending login — call /start first");
+    let pending = state.lock().ok().and_then(|mut b| b.take_pkce_session());
+    let Some(session) = pending else {
+        return HttpReply::error(400, "no pending login \u{2014} call /start first");
     };
     if session.created_at.elapsed().as_secs() > PKCE_TTL_SECS {
-        return HttpReply::error(400, "login session expired — please start again");
+        return HttpReply::error(400, "login session expired \u{2014} please start again");
     }
 
     match exchange_and_store(code, &session.code_verifier, &session.state) {
@@ -203,7 +206,7 @@ pub(crate) fn refresh_login() -> HttpReply {
     let creds = read_credentials_json();
     let refresh_token = creds.as_ref().and_then(|c| c.get("refreshToken")).and_then(|v| v.as_str()).unwrap_or("");
     if refresh_token.is_empty() {
-        return HttpReply::error(400, "no refresh token stored — please log in first");
+        return HttpReply::error(400, "no refresh token stored \u{2014} please log in first");
     }
 
     let body = serde_json::json!({
@@ -249,12 +252,9 @@ pub(crate) fn refresh_login() -> HttpReply {
 
             let access_token = val.get("access_token").and_then(|v| v.as_str()).unwrap_or("");
             let new_refresh = val.get("refresh_token").and_then(|v| v.as_str()).unwrap_or(refresh_token);
-            let expires_in = val.get("expires_in").and_then(|v| v.as_i64()).unwrap_or(0);
-            let now_ms = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_millis() as i64)
-                .unwrap_or(0);
-            let expires_at = now_ms + expires_in * 1000;
+            let expires_in = val.get("expires_in").and_then(serde_json::Value::as_i64).unwrap_or(0);
+            let now_ms = cp_mod_utilities::time::now_epoch_ms();
+            let expires_at = now_ms.saturating_add(expires_in.saturating_mul(1000));
 
             let new_creds = serde_json::json!({
                 "claudeAiOauth": {
@@ -301,8 +301,10 @@ fn exchange_and_store(code: &str, code_verifier: &str, state: &str) -> Result<i6
 
     let status = resp.status();
     let text = resp.text().map_err(|e| format!("reading token response: {e}"))?;
-    let val: serde_json::Value = serde_json::from_str(&text)
-        .map_err(|e| format!("invalid token JSON: {e} — body: {}", &text[..text.len().min(500)]))?;
+    let val: serde_json::Value = serde_json::from_str(&text).map_err(|e| {
+        let preview: String = text.chars().take(500).collect();
+        format!("invalid token JSON: {e} — body: {preview}")
+    })?;
     if !status.is_success() {
         let msg = val
             .get("error")
@@ -314,10 +316,9 @@ fn exchange_and_store(code: &str, code_verifier: &str, state: &str) -> Result<i6
 
     let access_token = val.get("access_token").and_then(|v| v.as_str()).unwrap_or("");
     let refresh_token = val.get("refresh_token").and_then(|v| v.as_str()).unwrap_or("");
-    let expires_in = val.get("expires_in").and_then(|v| v.as_i64()).unwrap_or(0);
-    let now_ms =
-        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
-    let expires_at = now_ms + expires_in * 1000;
+    let expires_in = val.get("expires_in").and_then(serde_json::Value::as_i64).unwrap_or(0);
+    let now_ms = cp_mod_utilities::time::now_epoch_ms();
+    let expires_at = now_ms.saturating_add(expires_in.saturating_mul(1000));
 
     let creds = serde_json::json!({
         "claudeAiOauth": {
@@ -379,114 +380,65 @@ pub(super) fn store_credentials(creds: &serde_json::Value) -> Result<(), String>
             &json,
         ])
         .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false);
+        .is_ok_and(|o| o.status.success());
 
     // Always write the credentials file as fallback.
-    let home = std::env::var("HOME").map_err(|_| "HOME not set")?;
+    let home = std::env::var("HOME").ok().ok_or("HOME not set")?;
     let claude_dir = std::path::Path::new(&home).join(".claude");
     let _mkdir = std::fs::create_dir_all(&claude_dir);
     let creds_path = claude_dir.join(".credentials.json");
     std::fs::write(&creds_path, &json).map_err(|e| format!("write credentials: {e}"))?;
 
     if !keychain_ok {
-        eprintln!("warning: could not store credentials in macOS Keychain — saved to {}", creds_path.display());
+        crate::oerr!("warning: could not store credentials in macOS Keychain — saved to {}", creds_path.display());
     }
     Ok(())
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────
-
-/// Extract the authorization code from user input.
-///
-/// Accepts:
-/// - Raw code string
-/// - `code#state` format (Anthropic's callback page output)
-/// - Full callback URL (`http://…/callback?code=XXXX&state=YYYY`)
-fn extract_code(input: &str) -> &str {
-    // If it looks like a URL with `code=`, pull out the code value.
-    if let Some(qs) = input.split('?').nth(1) {
-        for pair in qs.split('&') {
-            if let Some(val) = pair.strip_prefix("code=") {
-                return val;
-            }
-        }
-    }
-    // Anthropic's callback page returns `code#state` — strip the state part.
-    if let Some(hash_pos) = input.find('#') {
-        return &input[..hash_pos];
-    }
-    input
-}
-
-/// Minimal percent-encoding for URL query parameters.
-fn urlencoded(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for b in s.bytes() {
-        match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(b as char),
-            _ => {
-                out.push('%');
-                out.push(char::from(b"0123456789ABCDEF"[(b >> 4) as usize]));
-                out.push(char::from(b"0123456789ABCDEF"[(b & 0x0F) as usize]));
-            }
-        }
-    }
-    out
-}
-
-/// Read random bytes from `/dev/urandom`.
-fn read_random(buf: &mut [u8]) -> Result<(), std::io::Error> {
-    use std::io::Read;
-    std::fs::File::open("/dev/urandom")?.read_exact(buf)
-}
-
-/// Fetch the account email from Anthropic's OAuth profile endpoint.
-pub(super) fn fetch_account_email(token: &str) -> Option<String> {
-    let client = reqwest::blocking::Client::new();
-    let resp = client
-        .get("https://api.anthropic.com/api/oauth/profile")
-        .header("Authorization", format!("Bearer {token}"))
-        .header("User-Agent", "claude-code/2.1.196")
-        .header("anthropic-beta", "oauth-2025-04-20")
-        .timeout(Duration::from_secs(5))
-        .send()
-        .ok()?;
-    let val: serde_json::Value = resp.json().ok()?;
-    val.get("account")?.get("email")?.as_str().map(str::to_owned)
-}
-
 // ── Response types ───────────────────────────────────────────────────
 
+/// JSON body of `GET /api/claude-login/status`.
 #[derive(Serialize)]
 struct TokenStatusResponse {
+    /// Whether a non-empty, unexpired token is on disk.
     valid: bool,
+    /// Token expiry (epoch ms), omitted when unknown.
     #[serde(skip_serializing_if = "Option::is_none")]
     expires_at: Option<i64>,
+    /// Anthropic subscription tier, when the credentials carry it.
     #[serde(skip_serializing_if = "Option::is_none")]
     subscription_type: Option<String>,
+    /// Rate-limit tier, when the credentials carry it.
     #[serde(skip_serializing_if = "Option::is_none")]
     rate_limit_tier: Option<String>,
+    /// The logged-in account email, resolved from the profile endpoint.
     #[serde(skip_serializing_if = "Option::is_none")]
     account_email: Option<String>,
 }
 
+/// JSON body of `POST /api/claude-login/start`.
 #[derive(Serialize)]
 struct LoginStartResponse {
+    /// The authorize URL the user opens in their browser.
     url: String,
     /// `true` when there is already a still-valid token on disk — the
     /// auto-polling must stay OFF so the user can paste the new code.
     already_valid: Option<bool>,
 }
 
+/// JSON body accepted by `POST /api/claude-login/complete`.
 #[derive(Deserialize)]
 struct LoginCompleteRequest {
+    /// The pasted authorization code (raw, `code#state`, or a callback URL).
     code: String,
 }
 
+/// JSON body returned by `/complete` and `/refresh` on success.
 #[derive(Serialize)]
 struct LoginCompleteResponse {
+    /// Result marker (`"ok"` on success).
     status: String,
+    /// Token expiry (epoch ms) of the freshly stored credentials.
     #[serde(skip_serializing_if = "Option::is_none")]
     expires_at: Option<i64>,
 }

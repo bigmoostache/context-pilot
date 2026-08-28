@@ -6,7 +6,7 @@ use std::sync::Mutex;
 
 use super::super::Backend;
 use super::super::rest::HttpReply;
-use crate::services::auth::types::User;
+use crate::services::auth::types::{AccessGrant, User};
 
 // ───────────────── per-agent authorization (Phase 6) ─────────────────
 
@@ -14,8 +14,8 @@ use crate::services::auth::types::User;
 ///
 /// Matches `["api", "agent", id, ..]` — every route that targets a
 /// specific agent.
-pub(crate) fn extract_agent_id<'a>(segments: &[&'a str]) -> Option<&'a str> {
-    match segments {
+pub(crate) fn extract_agent_id<'seg>(segments: &[&'seg str]) -> Option<&'seg str> {
+    match *segments {
         ["api", "agent", id, ..] => Some(id),
         _ => None,
     }
@@ -33,7 +33,7 @@ pub(crate) fn authorize_agent(state: &Mutex<Backend>, agent_id: &str, user: &Use
     }
     let Ok(b) = state.lock() else { return false };
     let Some(auth) = b.auth.as_ref() else { return true };
-    auth.check_access(agent_id, &user.id).map(|role| role.is_some()).unwrap_or(false)
+    auth.check_access(agent_id, &user.id).is_ok_and(|role| role.is_some())
 }
 
 /// Check whether the caller can manage ACL on an agent (system admin OR
@@ -64,31 +64,29 @@ pub(crate) fn acl_list(state: &Mutex<Backend>, agent_id: &str, auth_user: Option
     let Some(auth) = b.auth.as_ref() else {
         return HttpReply::error(501, "auth not enabled");
     };
-    match auth.list_agent_users(agent_id) {
-        Ok(entries) => HttpReply::ok(&entries),
-        Err(_) => HttpReply::error(500, "database error"),
-    }
+    auth.list_agent_users(agent_id)
+        .map_or_else(|_| HttpReply::error(500, "database error"), |entries| HttpReply::ok(&entries))
 }
 
 /// `POST /api/agent/{id}/acl` — grant a user access (with role).
 ///
 /// Body: `{ "user_id": "...", "role": "agent-user" }`
 pub(crate) fn acl_grant(state: &Mutex<Backend>, agent_id: &str, body: &[u8], auth_user: Option<&User>) -> HttpReply {
-    let Some(caller) = auth_user else {
-        return HttpReply::error(501, "auth not enabled");
-    };
-    if !can_manage_acl(state, agent_id, caller) {
-        return HttpReply::error(403, "admin or agent-admin required");
-    }
-
     #[derive(serde::Deserialize)]
     struct Req {
         user_id: String,
         #[serde(default = "default_agent_role")]
         role: crate::services::auth::types::AgentRole,
     }
-    fn default_agent_role() -> crate::services::auth::types::AgentRole {
+    const fn default_agent_role() -> crate::services::auth::types::AgentRole {
         crate::services::auth::types::AgentRole::AgentUser
+    }
+
+    let Some(caller) = auth_user else {
+        return HttpReply::error(501, "auth not enabled");
+    };
+    if !can_manage_acl(state, agent_id, caller) {
+        return HttpReply::error(403, "admin or agent-admin required");
     }
 
     let Ok(req) = serde_json::from_slice::<Req>(body) else {
@@ -101,7 +99,12 @@ pub(crate) fn acl_grant(state: &Mutex<Backend>, agent_id: &str, body: &[u8], aut
     let Some(auth) = b.auth.as_ref() else {
         return HttpReply::error(501, "auth not enabled");
     };
-    match auth.grant_access(agent_id, &req.user_id, req.role, Some(&caller.id)) {
+    match auth.grant_access(AccessGrant {
+        agent_id,
+        user_id: &req.user_id,
+        role: req.role,
+        granted_by: Some(&caller.id),
+    }) {
         Ok(()) => HttpReply::ok(&serde_json::json!({ "ok": true })),
         Err(_) => HttpReply::error(500, "grant failed"),
     }
@@ -112,11 +115,16 @@ pub(crate) fn acl_grant(state: &Mutex<Backend>, agent_id: &str, body: &[u8], aut
 /// Body: `{ "role": "agent-admin" }`
 pub(crate) fn acl_update_role(
     state: &Mutex<Backend>,
-    agent_id: &str,
-    target_user_id: &str,
+    ids: (&str, &str),
     body: &[u8],
     auth_user: Option<&User>,
 ) -> HttpReply {
+    #[derive(serde::Deserialize)]
+    struct Req {
+        role: crate::services::auth::types::AgentRole,
+    }
+
+    let (agent_id, target_user_id) = ids;
     let Some(caller) = auth_user else {
         return HttpReply::error(501, "auth not enabled");
     };
@@ -124,10 +132,6 @@ pub(crate) fn acl_update_role(
         return HttpReply::error(403, "admin or agent-admin required");
     }
 
-    #[derive(serde::Deserialize)]
-    struct Req {
-        role: crate::services::auth::types::AgentRole,
-    }
     let Ok(req) = serde_json::from_slice::<Req>(body) else {
         return HttpReply::error(400, "expected {\"role\":\"agent-admin\"}");
     };

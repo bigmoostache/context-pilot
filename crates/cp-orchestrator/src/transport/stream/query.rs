@@ -23,7 +23,7 @@ impl QueryParams {
 
     /// Look up the first value for `key`.
     pub(super) fn get(&self, key: &str) -> Option<&str> {
-        self.pairs.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
+        self.pairs.iter().find(|pair| pair.0 == key).map(|pair| pair.1.as_str())
     }
 }
 

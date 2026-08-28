@@ -10,6 +10,7 @@ use std::sync::Mutex;
 
 use cp_wire::types::registry::Entry;
 
+use crate::services::materialized_view::ContextSnapshot;
 use crate::transport::Backend;
 use crate::transport::rest::HttpReply;
 
@@ -18,7 +19,7 @@ use crate::transport::rest::HttpReply;
 /// Combines registry record (name, folder, model), oplog-projected state
 /// (phase, cost), thread inspection (count, any-MY_TURN → "needs-you"), and
 /// `git` branch. Returns a JSON object matching the maquette `Agent` shape.
-pub fn agent_meta(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
+pub fn agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     let entry = match crate::transport::rest::resolve_entry(state, agent_id) {
         Ok(e) => e,
         Err(reply) => return reply,
@@ -39,16 +40,15 @@ pub fn agent_meta(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
 /// [`fleet`](crate::transport::rest::fleet) and the endpoint the web dashboard
 /// actually reads, so it must apply the same ACL filter or a regular user would
 /// see every agent's card (T346).
-pub fn fleet_meta(state: &Mutex<Backend>, auth_user: Option<&crate::services::auth::types::User>) -> HttpReply {
+pub fn fleet(state: &Mutex<Backend>, auth_user: Option<&crate::services::auth::types::User>) -> HttpReply {
     let dir = {
         let Ok(b) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
         };
         b.agents_dir.clone()
     };
-    let entries = match list_entries(&dir) {
-        Ok(e) => e,
-        Err(_) => return HttpReply::ok(&serde_json::json!([])),
+    let Ok(entries) = list_entries(&dir) else {
+        return HttpReply::ok(&serde_json::json!([]));
     };
     // Retired agents live in the orchestrator-owned store, not the registry —
     // exclude them from the ACTIVE fleet so they render only in the dashboard's
@@ -58,8 +58,8 @@ pub fn fleet_meta(state: &Mutex<Backend>, auth_user: Option<&crate::services::au
 
     // ACL filter (FR-12) — drop agents the caller has no access to.
     let active_ids: Vec<String> = active.iter().map(|e| e.id.clone()).collect();
-    let visible = crate::transport::auth::filter_fleet(state, &active_ids, auth_user);
-    let visible: std::collections::HashSet<&str> = visible.iter().map(String::as_str).collect();
+    let visible_ids = crate::transport::auth::filter_fleet(state, &active_ids, auth_user);
+    let visible: std::collections::HashSet<&str> = visible_ids.iter().map(String::as_str).collect();
 
     let agents: Vec<serde_json::Value> =
         active.iter().filter(|e| visible.contains(e.id.as_str())).map(|e| build_agent_meta(state, &e.id, e)).collect();
@@ -69,11 +69,14 @@ pub fn fleet_meta(state: &Mutex<Backend>, auth_user: Option<&crate::services::au
 /// `GET /api/fleet/retired` — the dashboard's Retired (archived) section.
 ///
 /// Returns one maquette-`Agent`-shaped object per retired agent, built from the
-/// orchestrator's [`RetiredStore`](crate::services::RetiredStore) snapshot rather
+/// orchestrator's [`RetiredStore`](crate::services::retire::RetiredStore) snapshot rather
 /// than the live registry (a retired agent has no running process to inspect).
 /// Each carries `status: "retired"` and a `retiredAt` epoch-ms so the frontend
 /// can render and sort the section without a second lookup.
-pub fn fleet_retired(state: &Mutex<Backend>, auth_user: Option<&crate::services::auth::types::User>) -> HttpReply {
+pub(crate) fn fleet_retired(
+    state: &Mutex<Backend>,
+    auth_user: Option<&crate::services::auth::types::User>,
+) -> HttpReply {
     let records = {
         let Ok(b) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
@@ -84,8 +87,8 @@ pub fn fleet_retired(state: &Mutex<Backend>, auth_user: Option<&crate::services:
     // granted access to (the ACL entry survives retirement). System admins see
     // all; auth-disabled passes everything through.
     let ids: Vec<String> = records.iter().map(|r| r.id.clone()).collect();
-    let visible = crate::transport::auth::filter_fleet(state, &ids, auth_user);
-    let visible: std::collections::HashSet<&str> = visible.iter().map(String::as_str).collect();
+    let visible_ids = crate::transport::auth::filter_fleet(state, &ids, auth_user);
+    let visible: std::collections::HashSet<&str> = visible_ids.iter().map(String::as_str).collect();
     let agents: Vec<serde_json::Value> = records
         .iter()
         .filter(|r| visible.contains(r.id.as_str()))
@@ -102,9 +105,9 @@ pub fn fleet_retired(state: &Mutex<Backend>, auth_user: Option<&crate::services:
                 "model": r.model,
                 "provider": r.provider,
                 "status": "retired",
-                "costUsd": 0.0,
+                "costUsd": 0.0f64,
                 "task": "",
-                "threads": 0,
+                "threads": 0u64,
                 "lastActivity": r.retired_at_ms,
                 "retiredAt": r.retired_at_ms,
                 "accent": "interactive",
@@ -128,13 +131,16 @@ fn build_agent_meta(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> se
     // deltas folded into the view), so serving them here keeps a COLD load /
     // backstop poll consistent with the live SSE deltas the frontend folds —
     // the same value arrives over both planes (T297 live HUD reactivity).
-    let (phase, lifecycle, cost_usd, input_tokens, output_tokens, context, is_stale) =
-        state.lock().map_or((None, None, 0.0, 0, 0, Default::default(), false), |b| {
-            let stale = b.liveness.get(agent_id).is_some_and(|l| !l.is_live());
-            b.view.get(agent_id).map_or((None, None, 0.0, 0, 0, Default::default(), stale), |v| {
-                (v.phase, v.lifecycle, v.cost.cost_usd, v.cost.input_tokens, v.cost.output_tokens, v.context, stale)
-            })
-        });
+    let (phase, lifecycle, cost_usd, input_tokens, output_tokens, context, is_stale) = state.lock().map_or_else(
+        |_| (None, None, 0.0f64, 0u64, 0u64, ContextSnapshot::default(), false),
+        |b| {
+            let dead = b.liveness.get(agent_id).is_some_and(|l| !l.is_live());
+            b.view.get(agent_id).map_or_else(
+                || (None, None, 0.0f64, 0u64, 0u64, ContextSnapshot::default(), dead),
+                |v| (v.phase, v.lifecycle, v.cost.cost_usd, v.cost.input_tokens, v.cost.output_tokens, v.context, dead),
+            )
+        },
+    );
 
     // Thread count + any-MY_TURN + last activity from config.json.
     let (threads_count, has_my_turn, last_activity_ms, task) = inspect_threads(state, folder);
@@ -182,15 +188,15 @@ fn build_agent_meta(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> se
         // the same figure the live delta carries). The web HUD shows THIS so its
         // meter is byte-identical to the agent's ratatui sidebar, not a frontend
         // re-sum that drifts (T297). Zero until the agent emits its first sample.
-        "contextUsed": context.used_tokens,
-        "contextThreshold": context.threshold_tokens,
-        "contextBudget": context.budget_tokens,
+        "contextUsed": context.used,
+        "contextThreshold": context.threshold,
+        "contextBudget": context.budget,
         // The cache hit/miss split of contextUsed (hit + miss == used), folded
         // from the same ContextUsage delta. The web HUD shows `Used (hit)` /
         // `Used (miss)` from these, byte-identical to the ratatui sidebar's
         // green/amber token-bar segments (T297). Zero before the first sample.
-        "contextHit": context.hit_tokens,
-        "contextMiss": context.miss_tokens,
+        "contextHit": context.hit,
+        "contextMiss": context.miss,
         "task": task,
         "threads": threads_count,
         "lastActivity": last_activity_ms,
@@ -203,13 +209,13 @@ fn build_agent_meta(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> se
 /// last activity, and current task (focused thread name).
 fn inspect_threads(state: &Mutex<Backend>, folder: &str) -> (usize, bool, u64, String) {
     let folder_path = std::path::Path::new(folder);
-    let config = {
+    let cfg = {
         let Ok(mut b) = state.lock() else {
             return (0, false, 0, String::new());
         };
         b.inspect_mut().read_config(folder_path).ok()
     };
-    let Some(config) = config else {
+    let Some(config) = cfg else {
         return (0, false, 0, String::new());
     };
     let empty_arr = Vec::new();
@@ -253,7 +259,7 @@ fn inspect_threads(state: &Mutex<Backend>, folder: &str) -> (usize, bool, u64, S
 /// inferring the provider from the model name. The id uses the wire serde form
 /// (lowercase: `anthropic`, `claudecode`, `claudecodeapikey`, `claudecodev2`,
 /// `grok`, `groq`, `deepseek`, `minimax`).
-pub(crate) fn read_provider(state: &Mutex<Backend>, folder: &str) -> String {
+pub fn read_provider(state: &Mutex<Backend>, folder: &str) -> String {
     let folder_path = std::path::Path::new(folder);
     let config = {
         let Ok(mut b) = state.lock() else {
@@ -327,17 +333,17 @@ fn git_branch(folder: &str) -> String {
 /// a graceful-shutdown lifecycle (`Stopping`/`Stopped`, I8) can never be
 /// "working": the authoritative oplog signal wins over a stale phase that a
 /// torn shutdown might have left behind. Otherwise the live `phase` decides
-/// "working", falling back to "needs-you" (any MY_TURN thread) or "idle".
+/// "working", falling back to "needs-you" (any `MY_TURN` thread) or "idle".
 fn derive_status(
     phase: Option<cp_wire::types::Phase>,
     lifecycle: Option<cp_wire::types::LifecycleState>,
     has_my_turn: bool,
     is_stale: bool,
 ) -> String {
+    use cp_wire::types::LifecycleState;
     if is_stale {
         return "disconnected".to_owned();
     }
-    use cp_wire::types::LifecycleState;
     if matches!(lifecycle, Some(LifecycleState::Stopping | LifecycleState::Stopped)) {
         return if has_my_turn { "needs-you".to_owned() } else { "idle".to_owned() };
     }
@@ -352,7 +358,7 @@ fn derive_status(
 /// (`idle`/`streaming`/`tooling`) — the exact serde form the frontend's
 /// `applyAgentDelta` phase fold uses, so the cold-load `/meta` value and the
 /// live SSE `PhaseTransition` delta resolve to the same string (T297).
-fn phase_label(phase: cp_wire::types::Phase) -> &'static str {
+const fn phase_label(phase: cp_wire::types::Phase) -> &'static str {
     use cp_wire::types::Phase;
     match phase {
         Phase::Idle => "idle",
@@ -377,12 +383,14 @@ fn derive_accent(status: &str) -> &'static str {
 /// List all registry entries in a directory.
 fn list_entries(dir: &std::path::Path) -> std::io::Result<Vec<Entry>> {
     let mut entries = Vec::new();
-    for item in std::fs::read_dir(dir)? {
-        let item = item?;
+    for item_res in std::fs::read_dir(dir)? {
+        let item = item_res?;
         let path = item.path();
-        let name = item.file_name();
-        let Some(name) = name.to_str() else { continue };
-        if !name.ends_with(".json") || name.ends_with(".tmp") {
+        let raw_name = item.file_name();
+        let Some(name) = raw_name.to_str() else { continue };
+        // Keep only `*.json` records (case-insensitive), skipping `*.tmp`
+        // torn-write siblings whose extension is `tmp`, not `json`.
+        if std::path::Path::new(name).extension().is_none_or(|ext| !ext.eq_ignore_ascii_case("json")) {
             continue;
         }
         if let Ok(bytes) = std::fs::read(&path)
