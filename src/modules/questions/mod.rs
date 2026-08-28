@@ -16,39 +16,16 @@ static CORE_TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 /// Module that provides the Think reasoning tool.
 pub(crate) struct QuestionsModule;
 
-/// Scalar fields shared by every `Todo` node (no `children`).
-///
-/// `children` is added on top of these to build one nesting level of the schema
-/// (see [`todo_node_object`]). The Rust-side `TodoNode` deserializes arbitrary
-/// depth regardless of how many levels the advertised JSON schema declares — the
-/// schema depth only documents nesting for the model.
-fn todo_node_scalar_fields() -> Vec<ToolParam> {
-    vec![
-        ToolParam::new("id", ParamType::String).desc("Existing id \u{2192} update; absent \u{2192} create"),
-        ToolParam::new("name", ParamType::String).desc("Title (required on create)"),
-        ToolParam::new("description", ParamType::String).desc("Detailed description"),
-        ToolParam::new("status", ParamType::String).desc("planned | in_progress | done | cancelled").enum_vals(&[
-            "planned",
-            "in_progress",
-            "done",
-            "cancelled",
-        ]),
-        ToolParam::new("parent_id", ParamType::String).desc("Reparent to an already-existing id (rare)"),
-    ]
-}
-
-/// The `Todo` node object type: scalar fields + a `children` array of
-/// (one level of) the same shape. Deeper nesting is parsed recursively at
-/// runtime even though the schema only advertises a couple of levels.
-fn todo_node_object() -> ParamType {
-    // Inner level: scalar fields + a `children` array of plain scalar nodes.
-    let mut inner_fields = todo_node_scalar_fields();
-    inner_fields
-        .push(ToolParam::new("children", ParamType::Array(Box::new(ParamType::Object(todo_node_scalar_fields())))));
-    // Outer level: scalar fields + `children` of the inner (2-deep) shape.
-    let mut outer_fields = todo_node_scalar_fields();
-    outer_fields.push(ToolParam::new("children", ParamType::Array(Box::new(ParamType::Object(inner_fields)))));
-    ParamType::Object(outer_fields)
+/// The `Todo` tool's `diffs` item type: a `{prev, new}` search/replace edit
+/// applied to the virtual task YAML (the same paradigm as the `Edit` tool's
+/// `old_string`/`new_string`).
+fn todo_diff_object() -> ParamType {
+    ParamType::Object(vec![
+        ToolParam::new("prev", ParamType::String).desc(
+            "Exact text to find in the current task YAML (must match exactly once; empty appends 'new' at the end)",
+        ),
+        ToolParam::new("new", ParamType::String).desc("Replacement text"),
+    ])
 }
 
 impl Module for QuestionsModule {
@@ -85,9 +62,9 @@ impl Module for QuestionsModule {
                 .param("task_context", ParamType::String, false)
                 .build(),
             ToolDefinition::from_yaml("Todo", core_t)
-                .short_desc("Create, update, and organize tasks")
+                .short_desc("Edit the task list via YAML diffs")
                 .category("Todo")
-                .param_array("todo", todo_node_object(), true)
+                .param_array("diffs", todo_diff_object(), true)
                 .build(),
         ]
     }

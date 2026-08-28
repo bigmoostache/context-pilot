@@ -85,73 +85,77 @@ pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     result
 }
 
-/// Apply the `Todo` recursive upsert to the focused thread's tasks.
+/// Apply the `Todo` YAML diffs to the focused thread's tasks.
 ///
 /// Resolves the focused thread from `FocusState`; rejects when none is focused
-/// (all task-tracking must live in a thread — design §5/§9-#7). On any change,
-/// the Todo panel is **deprecated but tempo preserved** (FR8): `touch_panel`
-/// marks it stale so the fresh tree emits at tempo exhaustion (bounded by the
-/// panel's `max_freeze = 5`), never forced immediately. Returns a one-line
-/// summary folded into the `Todo` tool result.
-fn apply_todo_upsert(todo_val: &serde_json::Value, state: &mut State) -> String {
+/// (all task-tracking must live in a thread — design §5/§9-#7). Parses the
+/// `diffs` array (list of `{prev, new}`), applies them to the thread's virtual
+/// task YAML, reconciles by id, and returns either the fresh canonical YAML (on
+/// success) or an error string. On any change the Todo panel is **deprecated but
+/// tempo preserved** (FR8): `touch_panel` marks it stale so the fresh tree emits
+/// at tempo exhaustion, never forced immediately.
+fn apply_todo_diffs(diffs_val: &serde_json::Value, state: &mut State) -> Result<String, String> {
     let Some(tid) = cp_mod_threads::types::FocusState::get(state).focused_thread_id.clone() else {
-        return "todo: rejected \u{2014} no focused thread (tasks must live in a thread; Read a thread first)."
-            .to_owned();
+        return Err("no focused thread (tasks must live in a thread; Read a thread first).".to_owned());
     };
-    let nodes: Vec<cp_mod_todo::tools::TodoNode> = match serde_json::from_value(todo_val.clone()) {
-        Ok(n) => n,
-        Err(e) => return format!("todo: parse error \u{2014} {e}"),
-    };
-    let outcome = cp_mod_todo::tools::upsert_task_forest(state, &tid, &nodes);
-    if outcome.changed() {
-        // Deprecate the Todo panel but preserve tempo (FR8) — no forced refresh.
-        state.touch_panel(crate::state::Kind::TODO);
-    }
-    let mut parts = Vec::new();
-    if !outcome.created.is_empty() {
-        parts.push(format!("created {}", outcome.created.join(", ")));
-    }
-    if !outcome.updated.is_empty() {
-        parts.push(format!("updated {}", outcome.updated.join(", ")));
-    }
-    if !outcome.errors.is_empty() {
-        parts.push(format!("errors: {}", outcome.errors.join("; ")));
-    }
-    if parts.is_empty() { "todo: no changes.".to_owned() } else { format!("todo: {}", parts.join(" \u{b7} ")) }
+    let diffs = parse_diffs(diffs_val)?;
+    let rendered = cp_mod_todo::yaml::apply_diffs(state, &tid, &diffs)?;
+    // Deprecate the Todo panel but preserve tempo (FR8) — no forced refresh.
+    state.touch_panel(crate::state::Kind::TODO);
+    Ok(rendered)
 }
 
-/// Execute the `Todo` tool — recursive upsert of the focused thread's task tree.
-///
-/// This is the single task-editing entry point (it replaced both the former
-/// `Think.todo` param and the `todo_mark` tool): a node without an `id` is
-/// **created**, a node with an `id` is a partial **update** (status flips,
-/// renames, reparenting via `parent_id`), and `children` scaffold a whole
-/// hierarchy in one call. Rejects when no thread is focused — tasks are
-/// thread-owned (design §5/§9-#7).
-///
-/// Tempo-preserving (FR8): a structural edit deprecates the Todo panel but never
-/// breaks tempo, so the fresh tree surfaces at tempo exhaustion (bounded by the
-/// panel's `max_freeze = 5`). The upsert itself is applied immediately.
-pub(super) fn execute_todo(tool: &ToolUse, state: &mut State) -> ToolResult {
-    // Focus guard up front so the error flag is precise (a missing focus is a
-    // real error, not a partial-success summary).
-    if cp_mod_threads::types::FocusState::get(state).focused_thread_id.is_none() {
-        return ToolResult::new(
-            tool.id.clone(),
-            "Todo: no focused thread \u{2014} tasks must live in a thread; Read a thread first.".to_owned(),
-            true,
-        );
-    }
+/// One parsed `{prev, new}` search/replace edit for the `Todo` tool.
+type TodoDiff = (String, String);
 
-    let Some(todo_val) = tool.input.get("todo") else {
-        return ToolResult::new(tool.id.clone(), "Todo: missing 'todo' array.".to_owned(), true);
+/// Parse the `diffs` JSON array into `(prev, new)` string pairs. A missing
+/// `prev`/`new` defaults to the empty string (empty `prev` = append).
+fn parse_diffs(diffs_val: &serde_json::Value) -> Result<Vec<TodoDiff>, String> {
+    let arr = diffs_val.as_array().ok_or_else(|| "'diffs' must be an array".to_owned())?;
+    let mut out = Vec::with_capacity(arr.len());
+    for (idx, entry) in arr.iter().enumerate() {
+        let obj = entry.as_object().ok_or_else(|| format!("diff #{}: must be an object", idx.saturating_add(1)))?;
+        let prev = obj.get("prev").and_then(serde_json::Value::as_str).unwrap_or("").to_owned();
+        let new = obj.get("new").and_then(serde_json::Value::as_str).unwrap_or("").to_owned();
+        out.push((prev, new));
+    }
+    Ok(out)
+}
+
+/// Execute the `Todo` tool — apply `{prev, new}` YAML diffs to the focused
+/// thread's task tree.
+///
+/// This is the single task-editing entry point. The model edits a **virtual,
+/// canonical YAML** projection of the tasks (the same text the Todo panel
+/// shows): each diff is a search/replace, `prev` matching exactly once. Adding a
+/// child = insert a `children:` sub-item; deleting = remove the lines
+/// (soft-cancel); reordering = move lines; renaming/status = edit the field.
+/// Rejects when no thread is focused — tasks are thread-owned (design §5/§9-#7).
+///
+/// On success the tool result echoes the **fresh canonical YAML** so the model
+/// (and user) always see the interpreted tree — the safety net that makes
+/// lenient indentation safe. Tempo-preserving (FR8): a structural edit
+/// deprecates the Todo panel but never breaks tempo.
+pub(super) fn execute_todo(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let Some(diffs_val) = tool.input.get("diffs") else {
+        return ToolResult::new(tool.id.clone(), "Todo: missing 'diffs' array.".to_owned(), true);
     };
 
-    let line = apply_todo_upsert(todo_val, state);
-    // A parse failure of the forest is a hard error; per-node validation issues
-    // are reported inside the summary text (best-effort, like the old path).
-    let is_error = line.starts_with("todo: parse error");
-    let mut result = ToolResult::new(tool.id.clone(), line, is_error);
-    result.preserves_tempo = true; // FR8 — structural edits preserve tempo
-    result
+    match apply_todo_diffs(diffs_val, state) {
+        Ok(yaml) => {
+            let body = if yaml.trim().is_empty() {
+                "Todo applied \u{2014} the task list is now empty.".to_owned()
+            } else {
+                format!("Todo applied. Current task list:\n\n{}", yaml.trim_end())
+            };
+            let mut result = ToolResult::new(tool.id.clone(), body, false);
+            result.preserves_tempo = true; // FR8 — structural edits preserve tempo
+            result
+        }
+        Err(e) => {
+            let mut result = ToolResult::new(tool.id.clone(), format!("Todo: {e}"), true);
+            result.preserves_tempo = true;
+            result
+        }
+    }
 }

@@ -592,10 +592,10 @@ M-tiny-14:
   last_edited_ms: 1787840930941
 M-tiny-15:
   tier: tiny
-  title: Active branch = nornor
-  contents: 'ACTIVE WORKING BRANCH = ''nornor'' (T735 mandate). All changes push to nornor unless user says otherwise. (Exception T650: user chose t648.)'
+  title: Active branch
+  contents: 'ACTIVE WORKING BRANCH = ''todo-v3-yaml-diffs'' (off fresh master, T682 Todo YAML-diff redesign). Previous todo-v2 PR #188 MERGED to master. Push here + open new PR unless told otherwise.'
   importance: critical
-  last_edited_ms: 1787840930943
+  last_edited_ms: 1787935261012
 M-tiny-16:
   tier: tiny
   title: Freeze RESOLVED at infra

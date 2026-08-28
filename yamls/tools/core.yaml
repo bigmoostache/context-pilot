@@ -74,14 +74,30 @@ tools:
 
   Todo:
     description: |
-      Create, update, and organize the CURRENTLY FOCUSED thread's task tree via a single recursive upsert. Tasks are thread-owned, so this is rejected when no thread is focused — Read a thread first.
+      Edit the CURRENTLY FOCUSED thread's task list. Tasks are thread-owned, so this is rejected when no thread is focused — Read a thread first.
 
-      The `todo` parameter is an ordered forest of nodes. Each node: {id?, name?, description?, status?, parent_id?, children?}. A node WITHOUT an `id` is CREATED (name required); a node WITH an `id` is UPDATED (partial patch — only provided fields change; omission never deletes, so a lone {id, status} is a cheap status flip). `children` are nested descendants — a whole hierarchy is scaffolded in one call with no need to know ids upfront. Processing is outer-to-inner (parent before children), so you can create a parent and nest items under it in the same call. `status` in planned|in_progress|done|cancelled (cancelled is the soft-delete). To reparent an existing item under a newly-created parent, nest it in that parent's `children`; to reparent under an already-existing item, set `parent_id`.
+      The task list is a virtual YAML document (the exact text shown in the Todo panel). You edit it with `diffs`: an ordered list of `{prev, new}` search/replace edits — the SAME paradigm as the Edit tool's `old_string`/`new_string`. Each `prev` must match the current YAML EXACTLY ONCE (include the item's `id:` line to disambiguate); an empty `prev` appends `new` at the end. Diffs apply in order (a later diff sees earlier results). After applying, the tool echoes the fresh canonical YAML — always check it to confirm the interpreted tree.
+
+      The YAML shape (nesting = the `children:` sub-list, ids shown, no parent/order fields):
+
+        - id: X41
+          status: in_progress
+          title: Ship feature X
+          description: |
+            Longer detail, if any.
+          children:
+            - id: X42
+              status: planned
+              title: Write code
+
+      Rules:
+      - CREATE an item by writing a new block and OMITTING its `id:` line — the backend assigns the next id and echoes it back. Provide `title` (required); `status` defaults to planned.
+      - UPDATE an item by editing its `title`/`status`/`description` lines in place (keep its `id:`).
+      - REPARENT / NEST by moving an item's block under another item's `children:` list.
+      - REORDER siblings by moving their blocks — sibling order is positional (top to bottom).
+      - DELETE an item by removing its block: it is SOFT-CANCELLED (recoverable, sorted last in its group), never hard-deleted.
+      - `status` is one of: planned, in_progress, done, cancelled.
     parameters:
-      todo: "Ordered forest of task nodes to upsert. Each node: {id?, name?, description?, status?, parent_id?, children?}."
-      id: "Existing id → update; absent → create."
-      name: "Title (required on create)."
-      description: "Detailed description."
-      status: "planned | in_progress | done | cancelled."
-      parent_id: "Reparent to an already-existing id (rare)."
-      children: "Nested descendant nodes of the same shape."
+      diffs: "Ordered list of {prev, new} search/replace edits applied to the task YAML."
+      prev: "Exact text to find in the current task YAML (matches exactly once; empty appends 'new' at the end)."
+      new: "Replacement text."
