@@ -253,9 +253,9 @@ M-mid-8:
 M-mid-9:
   tier: mid
   title: orch-clippy campaign
-  contents: 'orch-clippy (branch orchestrator-clippy, chain Totordu1789 #90, per-file commit, NOT pushed). LIB+bin=0. all-targets=113. Recipe: wrap tests/*.rs body in `#[cfg(test)] mod tests { use super::*; }` kills expect/unwrap/panic+tests_outside_test_module (NOT cfg-out). Residual forbid in place: indexing->.get().expect; numeric->0u64; string_slice->.get(..n); mem::forget->TempDir guard; arithmetic->saturating; too_many_args->params struct; cognitive->extract helpers. DONE: services_integration 8a8b6be4, common+transport_http+end_to_end d1506146. NEXT: openapi/exhaustive 26, registry_channel 18, fleet_soak 16, openapi/main 7. LAST X23: --workspace+reseal+PR.'
+  contents: 'orch-clippy (branch orchestrator-clippy, PR #187 WIP, chain #91 pwd Totordu1789, per-file commit, PUSHED thru fleet_soak/exhaustive). cp-orchestrator FULLY CLEAN: lib+bin=0 AND all-targets=0 (final 4 cognitive fixed 230bf55d: status/tests assert_present/null+assert_uplink, update assert_body_has, identity ok/bad, routes assert_sync/body). LESSONS: cognitive in tests->extract plain-call assert helper (fn call=0 cost); float default->1.0f64 NO underscore; mem::forget->TempDir guard. NEXT: cp-oplog test tier (~81 lints, same mod-wrapper+in-place recipe), then other crates. LAST X23: add --workspace to check-rust-lints.sh + reseal + verify + finalize PR.'
   importance: high
-  last_edited_ms: 1787901132718
+  last_edited_ms: 1787905192189
 M-safe-1:
   tier: safe
   title: Hash chain password

@@ -662,6 +662,10 @@
   path: web/src/components/finder/views/ColumnsView.tsx
   description: Miller-columns view (ColumnsView + MillerColumn + PaneRow). Per-ancestor useFs fetch, traversed-path highlight (onTrail via relOf-normalized nextPath), folder-row + column-body drop targets (relOf realm-relative dest — T293), select-none for native drag-start (T287).
   last_edited_ms: 0
+06dd6b7f27b96cf6:
+  path: crates/cp-orchestrator/src/transport/it/network/status/tests.rs
+  description: 'Live uplink status parser tests: metric-lowest default-route winner (v4+v6), hex v6 metric, RTF_REJECT lo trap, IPv6-only bearer regression, standby-bearer-doesn''t-steal, regulatory domain, dBm plausibility, iw ssid/channel. orch-clippy: CLEAN (230bf55d) — assert_present/assert_null + assert_uplink helpers for cognitive.'
+  last_edited_ms: 1787905172222
 06e558f30139f9e5:
   path: .github/workflows/ci.yml
   description: 'Unified CI workflow (replaces rust.yml + code_length.yml). 3 jobs: rust (fmt + clippy --all-targets + build --release + test), structure (file-lengths, folder-sizes, lint-exceptions, lint-config hash chain, web-structure), contract (OpenAPI+TS drift check). Triggers: push/PR to master.'
@@ -2526,6 +2530,10 @@
   path: web/src/components/finder/ContextMenu.tsx
   description: 'Finder right-click context menu (macOS-style), TWO variants keyed on pos.node presence. ITEM menu (right-click a file/folder): Open (folder nav / Quick Look), Pin to Sidebar (folders), Rename, Duplicate, Download (real downloadFile), tag swatches (real onTag), Move to Trash. EMPTY-SPACE menu (T279, right-click the content background, pos.node absent): New Folder (real mkdir), Upload… (file picker), Select All, Toggle Quick Look, Refresh — via onNewFolder/onUpload/onSelectAll/onTogglePreview/onRefresh props. EmptyItem row helper. On-screen clamping; closes on outside-click/Esc.'
   last_edited_ms: 1781888527667
+1bcdf80ace88fe0c:
+  path: crates/cp-orchestrator/src/transport/it/network/routes.rs
+  description: 'Mode->routing table + sysctl/drop-in side effects. sync_dropin (strict-5g gateway suppression, all 3 stanzas), reconfigure_wan, set_active (nmcli --wait bounded), apply_mode/apply_ap_activation, drop_nat_table, set_ip_forward. orch-clippy: CLEAN (21fcd9b3) — assert_sync/assert_body helpers for dropin idempotent test cognitive.'
+  last_edited_ms: 1787905172381
 1bcf6f41be8ae1a3:
   path: web/src/components/threads/fileUpload/index.tsx
   description: 'Composer file-attachment components + unified ComposerBubbles row (file chips + /command pills + create-command pill). T654: command pills use shared Tip tooltip (no truncated desc); each pill pairs a discrete borderless text-only-hover Pencil edit button (onEditCommand). MessageFileChip/FileUploadChip/MissingChip/FileChipBody subcomponents.'
@@ -4430,6 +4438,10 @@
   path: src/llms/claude_code/message_format.rs
   description: 'inject_system_reminder(): CC validation marker injection, string→array normalization, tool_result-aware fallback'
   last_edited_ms: 0
+30b3e5be7918dbc3:
+  path: crates/cp-orchestrator/src/transport/inspect/providers/oauth_creds.rs
+  description: 'Claude Code OAuth credential presence check. Routes through cp_vault::oauth::load_claude_oauth_raw (Keychain then file). oauth_creds_usable pure verdict: non-empty accessToken + unexpired expiresAt. 3 tests. orch-clippy: CLEAN (c9c2263f) — json! literal 1 -> 1i32 (unseparated suffix).'
+  last_edited_ms: 1787904524981
 30ccc9d6b72a4b76:
   path: crates/cp-mod-firecrawl/src/tools.rs
   description: Firecrawl tool dispatch with flame!("firecrawl_scrape"), flame!("firecrawl_search"), flame!("firecrawl_map"). All async via spawn_async_tool. DynPanel creation.
@@ -8926,6 +8938,10 @@
   path: src/ui/help/input.rs
   description: Autocomplete popup overlay adapter. render_autocomplete_popup + autocomplete_entry_line helper (A2). Renders Autocomplete IR to ratatui, no State access.
   last_edited_ms: 1784495886760
+62714f724ad89b83:
+  path: crates/cp-orchestrator/src/transport/auth/mod.rs
+  description: 'Auth REST handlers + middleware. authenticate() Bearer gate (chained lock stmt, |_poison|), login/register (let-else), me/next_action day-0 flow, change_password/update_me (Req structs hoisted), list_sessions (map_or_else), revoke_session. is_public_route. orch-clippy: CLEAN (18d40d70) — backend() test helper returns (Mutex<Backend>,TempDir) guard instead of mem::forget.'
+  last_edited_ms: 1787904297275
 627ad0b53f94107a:
   path: crates/cp-oplog/src/append.rs
   description: 'OplogWriter: single-writer append-only log + running ReplayState fold (heads+seen). open() seeds via replay. append(kind)=append_buffered+sync (announce-after-durable K9). append_buffered(kind)=frame+write_all+fold, NO sync (group-commit primitive). sync()=single fdatasync (the amortised group-commit point, I2). roll() fdatasyncs old segment BEFORE switching (batch spanning a roll loses nothing), stamps leading Checkpoint(Snapshot) on new seg (GAP1). write_record=sole rev point (no sync). checkpoint()/heads()/seen()/snapshot() public. 7 tests.'
@@ -13954,6 +13970,10 @@
   path: crates/cp-mod-prompt/src/seed.rs
   description: 'Seed data: ensure_default_agent() load/merge/sort, get_active_agent_content() resolve active system prompt'
   last_edited_ms: 0
+9885c2b665282034:
+  path: crates/cp-orchestrator/src/transport/stream/mod.rs
+  description: 'SSE producer loop (run_stream). Tails one agent''s oplog (rev deltas) + stream-hub frames, pushes as SSE until disconnect. Cold-connect seeds at head (T123), reconnect replays from last_rev. StreamCtx bundles 4 conn refs; seed_tailer/send_deltas/send_frames/park/keepalive helpers. TAIL_REPOLL 5ms, KEEPALIVE 10s. orch-clippy: CLEAN (c9c2263f) — got[0].rev -> got.first().expect().rev in tests.'
+  last_edited_ms: 1787904524909
 98a12f702470f7df:
   path: src/ui/mod.rs
   description: Top-level render() with flame!("render"). IR frame build → sidebar + content panel + status bar + overlays (perf from IR, autocomplete from IR, config from IR, search index from IR). Autocomplete offset-aware for Threads mode (THREAD_LIST_WIDTH). All overlays consume IR data.
@@ -13974,6 +13994,10 @@
   path: src/llms/claude_code_api_key/mod.rs
   description: Claude Code API Key implementation. API key from vault ("anthropic") with Bearer auth + Claude Code headers. Replicates Claude Code request signature for Claude 4.5 model access.
   last_edited_ms: 0
+98dd5de0458887c3:
+  path: crates/cp-orchestrator/src/services/agent_meta.rs
+  description: 'Per-agent cosmetic metadata services. NameOverrides (T328): custom display names via agent-names.json. AvatarStore (T338): profile pictures via agent-avatars/{id}, magic-byte content-type sniffing, MAX_AVATAR_BYTES 2MiB. Both atomic tmp->rename. orch-clippy: CLEAN (566452d1) — _prev shadow->_cleared, assert_png_stored helper for avatar cognitive.'
+  last_edited_ms: 1787903938464
 9905336f09d4b722:
   path: mobile/lib/main.dart
   description: Flutter agent fleet listing app. Connects to cp-orchestrator /api/fleet, shows AgentCard with lifecycle/phase/cost/threads. Dark Material 3. Dio HTTP client. Pull-to-refresh + configurable backend URL.
@@ -16078,6 +16102,10 @@ b0a660da308fbec4:
   path: web/src/components/finder/preview/sheetState.ts
   description: 'Univer sheet helpers (~280 lines). SheetPayload interface (name, rows, optional formulas from backend). toWorkbookData(): converts calamine rows+formulas to IWorkbookData with cell.f formula strings. generateXlsxBlob(): reads Univer snapshot, maps styles (bold/italic/underline/strike/colors/bg/alignment/borders) + formulas to ExcelJS. exportToXlsx(): browser download. saveToRealm(): generates XLSX blob + uploads to agent realm. toBorderStyle(): maps 13 Univer BorderStyleTypes to ExcelJS.'
   last_edited_ms: 0
+b0a86a7717b30ac2:
+  path: crates/cp-orchestrator/src/supervisor/tests.rs
+  description: 'Phase 17 supervisor unit tests (9): allow-list accept/reject + symlink/.. canonicalization, spawn_and_stop, dup-id reject, restart yields new pid + kills old, check_liveness reaps exited spawned child (Exited), adopt_and_detect_vanish (reaps external zombie first), stop_not_found. orch-clippy: CLEAN (c9c2263f) — matches!(&events[0]) -> matches!(events.first(), Some(..)).'
+  last_edited_ms: 1787904524820
 b0a9bbbf7a9c45e4:
   path: web/src/components/ui/scroll-area.tsx
   description: shadcn ScrollArea wrapper over Base UI scroll-area primitive (Root/Viewport/Scrollbar/Thumb/Corner). Vertical+horizontal orientations, focus-visible ring. Shared UI primitive.
@@ -17098,6 +17126,10 @@ bb8a674ef6c1a158:
   path: web/vite.config.ts
   description: 'Vite config: react + tailwind v4 plugins, @ alias to src. Dev server on port 5174.'
   last_edited_ms: 1781687537974
+bb90422c37906583:
+  path: crates/cp-orchestrator/src/services/retire.rs
+  description: 'Orchestrator-owned RetiredStore (T271): stop-and-keep agents, persisted to retired.json (atomic). Separate from registry Entry (agent removes own <id>.json on shutdown). orch-clippy: CLEAN (81f54baa) — assert_persisted_retired/assert_unretire_clears helpers for roundtrip test cognitive.'
+  last_edited_ms: 1787904682352
 bb9359cb1d40f20a:
   path: crates/cp-base/src/config/llm_types.rs
   description: 'StreamEvent + LlmProvider enums #[expect(exhaustive_enums)] A4. A6: cache hit/miss price via float_math::mul_f32. ModelInfo trait.'
@@ -17302,6 +17334,10 @@ bdb821c68ede0ffb:
   path: web/src/components/agents/AgentModal.tsx
   description: 'Agent create/manage dialog. MODELS + MODEL_META (rich picker). slugify(name) derives realm folder. AgentModalMode: create or manage{agent}. onFlash optional (fleet supplies, TopBar omits). submit() decorative (no API call).'
   last_edited_ms: 1781775130157
+bdcd5582b1beaeec:
+  path: crates/cp-orchestrator/src/transport/rest/config/update.rs
+  description: 'Update REST handlers (O5.1): GET status, POST check/apply, PUT mode/channel. APPLY_IN_FLIGHT gate shared w/ scheduler. status_json, Channel enum (400 on unknown). orch-clippy: CLEAN (230bf55d) — assert_body_has helper for roundtrip test cognitive.'
+  last_edited_ms: 1787905172449
 bdd2710cf9c6a242:
   path: tmp/v2/scripts/seed-doc.py
   description: Seeds data/demo-doc/content.html from tmp/doc/content/contents.html by applying the editor's schema transforms ONCE (unwrap article/section, flatten figure to img + italic caption, rebase images). A script and not a hand-written file because a hand-transcribed seed drifts silently — that is how a stray 'Medievall' got in. Refuses to overwrite without --force; --check compares.
@@ -19454,6 +19490,10 @@ d593b04b5065ab1f:
   path: web/src/components/threads/ThreadList.tsx
   description: Thread sidebar list. Grouped by turn-status (Agent's turn / User turn) + Archived view. Search now lives in ThreadSearchPalette (T669) opened from ListHeader's Search button; ListHeader also has a PanelLeftClose sidebar-collapse button. Row-hover title marquee via useTitleMarquee (WAA). Subcomponents RowActions/RowMeta/ListHeader/EmptyState keep budgets. Exactly 500 lines (cap).
   last_edited_ms: 0
+d5974b253f9d28ba:
+  path: crates/cp-orchestrator/src/services/auth/backup.rs
+  description: 'Auth.db backup (NFR-19/20): BackupScheduler rolling 5min + daily AM/PM snapshots. backup_store_to free fn via SQLite online backup API. daily_tag reuses cp_mod_utilities::time::decompose_epoch_secs (civil-date). orch-clippy: CLEAN (18d40d70) — daily_tag_am_pm shadowed tag->morning/afternoon.'
+  last_edited_ms: 1787904297205
 d59b21cd4e123e84:
   path: crates/cp-oplog/src/segment.rs
   description: Segment files seg-{n}.log zero-padded sortable. Scan{entries,valid_len,torn_tail}. path/parse_index/indices/read/scan_bytes torn-tail-aware frame walk. offset u64::try_from (A1). scan_bytes pub so backend Tailer decodes only appended tail.
@@ -20190,6 +20230,10 @@ dfc405b73cc11aae:
   path: crates/cp-orchestrator/src/transport/rest/backend.rs
   description: Backend shared state struct + impl. Extracted from transport/mod.rs. Holds view/breaker/hub/tickets/inspect/agents_dir/dirty/supervisor/retired/names/avatars/auth/session_ttl/env_overrides(T404)/releases(T427). Accessor methods + for_test.
   last_edited_ms: 1782486062961
+dfc7a21cc9bba7f5:
+  path: crates/cp-orchestrator/src/services/materialized_view/tests.rs
+  description: 'Unit tests for materialized view fold: message head tracking, checkpoint authoritative reset (heads + roster), roster lifecycle (create/archive/restore/delete/pause), phase/lifecycle/cost latest-wins, batch folding, durability-only entries inert, remove drops agent. orch-clippy: CLEAN (dc49f099) — assert_carried_wholesale/assert_fresh_created helpers for cognitive, cost_usd float literals suffixed 1.0f64 (NO underscore — separated_literal_suffix forbids 1.0_f64).'
+  last_edited_ms: 1787903385265
 dfc935ed27e21ea0:
   path: web/src/components/agents/FleetShell.tsx
   description: Fleet shell — sidebar-less Agents⇄Prompts toggle. Accepts agents prop, forwards to FleetDashboard. Passes agents[0]?.id to PromptsPage for live library. FLEET_MAX_W shared width constant.
@@ -21154,6 +21198,10 @@ eb1cd7b27df46579:
   path: crates/cp-wire/src/types/snapshot.rs
   description: 'Snapshot/Heads/SeenSet/RosterThread/ThreadHead/PanelHead/SeenEntry/ThreadCreation all #[non_exhaustive] A5 + Snapshot::new/ThreadCreation::new constructors. Under 500 lines.'
   last_edited_ms: 0
+eb20bf90ac2cf754:
+  path: crates/cp-orchestrator/src/transport/it/identity.rs
+  description: 'Box identity (DNS name + IP) + POST /api/it/identity. validate_name/validate_ip, load/save atomic, apply_caddy_at_boot (write-only, no reload), set_identity (persist+provision+caddy regenerate). orch-clippy: CLEAN (21fcd9b3) — ok/bad local helpers for name/ip validation test cognitive.'
+  last_edited_ms: 1787905172312
 eb36c105ec470259:
   path: src/ui/threads_view/messages.rs
   description: Thread message area right pane. Message display (reuses conversation IR renderer), input area. auto:true traces render as dim '⚙ {line}'. u16->usize/usize->u16 via Safe cast (A1). calculate_input_height 50% cap.
@@ -21506,6 +21554,10 @@ ee906324b02eb279:
   path: src/app/actions/input.rs
   description: 'InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation. Thread input routing: handle_thread_input_submit resolves selected_thread_idx through ThreadsState::visible_indices(viewing_archived) — the selection is a VISIBLE-slice position (T9 archive refactor), so the virtual ''+ New Thread'' row is detected as selected_idx >= visible.len() (active view only) and message-send maps the visible position back to a real storage index. handle_thread_create stores the new thread''s VISIBLE index. Thread struct includes paused:false default. MAX_THREAD_NAME_LEN=200. Paste sentinel expansion. /command replacement.'
   last_edited_ms: 0
+ee90ff0c7c8f556d:
+  path: crates/cp-orchestrator/src/transport/it/network/profiles.rs
+  description: 'NetworkManager cp-wwan (5G bearer) + cp-ap (access point) profile rendering from NetworkConfig. wwan_args/ap_args/wwan_create_args argv builders, metric ownership boundary (applier vs cp-uplink-watch in wan_5g), security_args (RSN/CCMP WPA2/3, omitted without PSK). orch-clippy: CLEAN (e1de58f4) — value_of lifetime ''argv, expect_kv/expect_absent argv test helpers for cognitive.'
+  last_edited_ms: 1787903798085
 ee933fd41c3db6dd:
   path: src/app/context/freeze.rs
   description: 'Freeze policy: per-panel + ordering freeze (queue, tempo, breath budget). FreezeConditions/FreezeDecision. compute_force_break_at (item_is_culprit helper), free_region_anchor (BP-anchored free region T509). Tempo gated on frozen_context_snapshot.is_some().'
@@ -22734,6 +22786,10 @@ fb939ca37deea5a1:
   path: crates/cp-base/src/tools/async_exec.rs
   description: 'spawn_async_tool: runs blocking tool I/O on worker thread, returns BLOCKING_TOOL_SENTINEL, delivers via ChannelWatcher. ToolOutput struct (content/is_error/create_panel/preserves_tempo). Error via ASYNC_ERROR_PREFIX.'
   last_edited_ms: 0
+fb9439a5af6fa09d:
+  path: crates/cp-orchestrator/src/transport/rest/config/it.rs
+  description: 'IT-infrastructure REST handlers: ca/fingerprint, identity get/set, provisioned flag. Gated on can_manage_it (admin+). Thin wrappers over it::ca/identity/state modules. Tests: V4.1a gate enforcement, V4.1b identity roundtrip. orch-clippy: CLEAN (d9b2800b) — TempDir-guard return replaces mem::forget, assert_it_denied/assert_it_reached helpers for cognitive.'
+  last_edited_ms: 1787903563370
 fb9806fe97cfa33e:
   path: crates/cp-orchestrator/Cargo.toml
   description: 'Backend deps: cp-wire (with openapi feature) + cp-oplog + utoipa 5 + nix 0.30 (signal) + serde + serde_json + serde_yaml + tiny_http (0.12) + notify (oplog inotify) + portable-pty 0.9 (X896 safe pty) + calamine 0.26 & csv 1 (T282 Finder spreadsheet→table preview) + argon2 0.5 (Argon2id hashing) + rusqlite (auth SQLite) + reqwest (GitHub Releases API for release manager). dev: cp-mod-bridge + tempfile. lib+bin. Workspace lints.'
@@ -22866,6 +22922,10 @@ fcb55afe46ec47b5:
   path: crates/cp-mod-threads/src/tools.rs
   description: Thread tool handlers. execute_send split push_send_message + clamp_bytes/preview_ellipsis helpers (A2). execute_read split collect_thread_summaries/apply_read_focus/force_refresh_threads_panel + build_read_result(ReadResult struct). build_panel_content split write_thread_list/write_message. YAML output, MAX caps. T353 auto-unarchive.
   last_edited_ms: 1784482418571
+fcba15cb708168d1:
+  path: crates/cp-orchestrator/src/registry/mod.rs
+  description: 'FleetScanner (renamed AgentRegistry, module_name_repetitions): poll-based scan-and-diff of agents dir. Event::Appeared(Box<Entry>) (large_enum_variant boxed). Disappeared/StatusChanged/Stale. reap_tmp crash-orphan collector. diff collects keys->Vec (iter_over_hash_type). 8 tests. orch-clippy: CLEAN (81f54baa) — assert_appeared_live helper hoists matches! guard for cognitive.'
+  last_edited_ms: 1787904682253
 fcc26df09619a38a:
   path: ui/src/lib/inline.tsx
   description: Minimal inline renderer for **bold**, `code`, line breaks — typesets assistant/user prose without a markdown dep.
