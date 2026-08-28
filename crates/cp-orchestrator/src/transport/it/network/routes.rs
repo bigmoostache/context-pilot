@@ -271,25 +271,33 @@ mod tests {
 
     #[test]
     fn dropin_is_written_and_removed_idempotently() {
+        // Plain-call helpers keep the ~13 inline asserts off the cognitive cap.
+        fn assert_sync(root: &Path, wanted: bool, changed: bool, why: &str) {
+            assert_eq!(sync_dropin(root, wanted), Ok(changed), "{why}");
+        }
+        // All three stanzas, or strict 5g leaks. The IPv6AcceptRA one was found
+        // by measurement — the RA default route is independent of DHCPv4.
+        fn assert_body(root: &Path) {
+            let file = dropin_dir(root).join(DROPIN_FILE);
+            let body = std::fs::read_to_string(&file).expect("read drop-in");
+            assert!(body.contains("[DHCPv4]\nUseGateway=false"), "DHCPv4 gateway suppressed");
+            assert!(body.contains("[DHCPv6]\nUseGateway=false"), "DHCPv6 gateway suppressed");
+            assert!(body.contains("[IPv6AcceptRA]\nUseGateway=false"), "the RA default route is suppressed too");
+            assert!(!body.contains("Address="), "the drop-in never touches an address");
+        }
+
         let dir = tempfile::tempdir().expect("tempdir");
         let root = dir.path();
         // Absent → absent is a no-op, so the caller never reconfigures for nothing.
-        assert_eq!(sync_dropin(root, false), Ok(false), "removing an absent drop-in changes nothing");
-        assert_eq!(sync_dropin(root, true), Ok(true), "the first write changes state");
-        let file = dropin_dir(root).join(DROPIN_FILE);
-        let body = std::fs::read_to_string(&file).expect("read drop-in");
-        // All three stanzas, or strict 5g leaks. The IPv6AcceptRA one was found
-        // by measurement — the RA default route is independent of DHCPv4.
-        assert!(body.contains("[DHCPv4]\nUseGateway=false"), "DHCPv4 gateway suppressed");
-        assert!(body.contains("[DHCPv6]\nUseGateway=false"), "DHCPv6 gateway suppressed");
-        assert!(body.contains("[IPv6AcceptRA]\nUseGateway=false"), "the RA default route is suppressed too");
-        assert!(!body.contains("Address="), "the drop-in never touches an address");
+        assert_sync(root, false, false, "removing an absent drop-in changes nothing");
+        assert_sync(root, true, true, "the first write changes state");
+        assert_body(root);
 
-        assert_eq!(sync_dropin(root, true), Ok(false), "a second write changes nothing");
-        assert_eq!(sync_dropin(root, true), Ok(false), "\u{2026}and stays idempotent");
-        assert_eq!(sync_dropin(root, false), Ok(true), "removal changes state");
-        assert!(!file.exists(), "the drop-in is gone");
-        assert_eq!(sync_dropin(root, false), Ok(false), "removing it twice changes nothing");
+        assert_sync(root, true, false, "a second write changes nothing");
+        assert_sync(root, true, false, "\u{2026}and stays idempotent");
+        assert_sync(root, false, true, "removal changes state");
+        assert!(!dropin_dir(root).join(DROPIN_FILE).exists(), "the drop-in is gone");
+        assert_sync(root, false, false, "removing it twice changes nothing");
     }
 
     #[test]

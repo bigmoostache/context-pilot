@@ -210,28 +210,43 @@ mod tests {
 
     #[test]
     fn name_validation_accepts_hostnames_rejects_junk() {
-        assert!(validate_name("pilot.acme.corp"));
-        assert!(validate_name("box1"));
-        assert!(validate_name("a-b.example"));
+        // Plain calls, so each case costs nothing against the cognitive-complexity
+        // cap (the ten inline assert!s tripped it).
+        fn ok(name: &str) {
+            assert!(validate_name(name), "should accept {name}");
+        }
+        fn bad(name: &str, why: &str) {
+            assert!(!validate_name(name), "should reject {name}: {why}");
+        }
+        ok("pilot.acme.corp");
+        ok("box1");
+        ok("a-b.example");
         // Rejections.
-        assert!(!validate_name(""));
-        assert!(!validate_name("-bad.example"), "label starts with hyphen");
-        assert!(!validate_name("bad-.example"), "label ends with hyphen");
-        assert!(!validate_name("a..b"), "empty label");
-        assert!(!validate_name("192.168.1.1"), "a bare IP is not a name");
-        assert!(!validate_name("under_score.example"), "underscore not allowed");
-        assert!(!validate_name(&"x".repeat(254)), "too long");
+        bad("", "empty");
+        bad("-bad.example", "label starts with hyphen");
+        bad("bad-.example", "label ends with hyphen");
+        bad("a..b", "empty label");
+        bad("192.168.1.1", "a bare IP is not a name");
+        bad("under_score.example", "underscore not allowed");
+        bad(&"x".repeat(254), "too long");
     }
 
     #[test]
     fn ip_validation_accepts_v4_and_v6() {
-        assert!(validate_ip("192.168.1.116"));
-        assert!(validate_ip("10.0.0.1"));
-        assert!(validate_ip("::1"));
-        assert!(validate_ip("fd00::1"));
-        assert!(!validate_ip("not.an.ip"));
-        assert!(!validate_ip("999.1.1.1"));
-        assert!(!validate_ip(""));
+        // Plain calls keep the seven inline assert!s off the cognitive-complexity cap.
+        fn ok(ip: &str) {
+            assert!(validate_ip(ip), "should accept {ip}");
+        }
+        fn bad(ip: &str) {
+            assert!(!validate_ip(ip), "should reject {ip}");
+        }
+        ok("192.168.1.116");
+        ok("10.0.0.1");
+        ok("::1");
+        ok("fd00::1");
+        bad("not.an.ip");
+        bad("999.1.1.1");
+        bad("");
     }
 
     #[test]
