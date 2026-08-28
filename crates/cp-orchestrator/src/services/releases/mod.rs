@@ -489,7 +489,7 @@ pub(crate) use signing::UPDATE_PUBKEY;
 pub mod updater;
 
 #[cfg(test)]
-pub(crate) use self_update::{backup_path, boot_commit, pending_path};
+pub(crate) use self_update::{backup_path, boot_check, boot_commit, pending_path};
 
 #[cfg(test)]
 mod tests;

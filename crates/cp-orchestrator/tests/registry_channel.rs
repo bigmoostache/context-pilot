@@ -59,10 +59,10 @@ use cp_mod_bridge::command::Intake;
 use cp_oplog::replay::replay;
 use cp_oplog::service::Service as OplogService;
 
-use cp_orchestrator::channel::AgentHandle;
-use cp_orchestrator::liveness::Liveness;
+use cp_orchestrator::registry::channel::AgentHandle;
+use cp_orchestrator::registry::liveness::Liveness;
+use cp_orchestrator::registry::tailer::Tailer;
 use cp_orchestrator::registry::{Event, FleetScanner};
-use cp_orchestrator::tailer::Tailer;
 
 use cp_wire::heartbeat::Heartbeat;
 use cp_wire::types::ack::Status;
