@@ -94,17 +94,7 @@ pub(crate) fn list_releases(state: &Mutex<Backend>) -> HttpReply {
 
     // Flatten into a sorted array (newest first by publish date, then semver).
     let mut release_list: Vec<serde_json::Value> = releases.into_values().collect();
-    release_list.sort_by(|a, b| {
-        let pa = a.get("publishedAt").and_then(|v| v.as_str()).unwrap_or("");
-        let pb = b.get("publishedAt").and_then(|v| v.as_str()).unwrap_or("");
-        // Primary: published date descending (ISO 8601 sorts lexicographically).
-        // Fallback: semver descending for releases without a publish date.
-        pb.cmp(pa).then_with(|| {
-            let ta = a.get("tag").and_then(|v| v.as_str()).unwrap_or("");
-            let tb = b.get("tag").and_then(|v| v.as_str()).unwrap_or("");
-            semver_sort_key(tb).cmp(&semver_sort_key(ta))
-        })
-    });
+    release_list.sort_by(compare_releases);
 
     HttpReply::ok(&serde_json::json!({
         "arch": arch,
@@ -114,6 +104,19 @@ pub(crate) fn list_releases(state: &Mutex<Backend>) -> HttpReply {
         "knownArchs": KNOWN_ARCHS,
         "releases": release_list,
     }))
+}
+
+/// Order two merged release entries newest-first: primary key is the ISO-8601
+/// `publishedAt` descending (ISO timestamps sort lexicographically), falling
+/// back to semver descending for local-only releases that carry no publish date.
+fn compare_releases(a: &serde_json::Value, b: &serde_json::Value) -> std::cmp::Ordering {
+    let pa = a.get("publishedAt").and_then(|v| v.as_str()).unwrap_or("");
+    let pb = b.get("publishedAt").and_then(|v| v.as_str()).unwrap_or("");
+    pb.cmp(pa).then_with(|| {
+        let ta = a.get("tag").and_then(|v| v.as_str()).unwrap_or("");
+        let tb = b.get("tag").and_then(|v| v.as_str()).unwrap_or("");
+        semver_sort_key(tb).cmp(&semver_sort_key(ta))
+    })
 }
 
 /// `PUT /api/releases/arch` — set architecture manually or reset to auto-detect.
@@ -135,8 +138,8 @@ pub(crate) fn set_arch(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
 
     if req.auto == Some(true) {
         b.releases.auto_detect_arch();
-    } else if let Some(arch) = &req.arch {
-        if !KNOWN_ARCHS.contains(&arch.as_str()) {
+    } else if let Some(arch) = req.arch.as_deref() {
+        if !KNOWN_ARCHS.contains(&arch) {
             return HttpReply::error(400, &format!("unknown arch: {arch}"));
         }
         b.releases.set_arch(arch);
@@ -227,7 +230,7 @@ pub(crate) fn select_release(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     };
 
     // Update the agent binary and supervisor allow-list.
-    b.agent_binary = binary_path.clone();
+    b.agent_binary.clone_from(&binary_path);
     b.supervisor = supervisor::AgentSupervisor::new(std::slice::from_ref(&binary_path));
 
     HttpReply::ok(&serde_json::json!({
@@ -265,7 +268,7 @@ pub(crate) fn deploy_fleet(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     let req = serde_json::from_slice::<Req>(body).unwrap_or(Req { tag: None });
 
     // 1. Select the release if a tag was provided.
-    let active_tag = if let Some(ref tag) = req.tag {
+    let active_tag = if let Some(tag) = req.tag.as_ref() {
         let Ok(mut b) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
         };
@@ -273,7 +276,7 @@ pub(crate) fn deploy_fleet(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
             Ok(p) => p,
             Err(e) => return HttpReply::error(400, &e),
         };
-        b.agent_binary = binary_path.clone();
+        b.agent_binary.clone_from(&binary_path);
         b.supervisor = supervisor::AgentSupervisor::new(&[binary_path]);
         tag.clone()
     } else {
@@ -298,9 +301,7 @@ pub(crate) fn deploy_fleet(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     let agents_dir_str = agents_dir.to_string_lossy().into_owned();
 
     for id in &agent_ids {
-        let entry = if let Ok(e) = super::resolve_entry(state, id) {
-            e
-        } else {
+        let Ok(entry) = super::resolve_entry(state, id) else {
             errors.push(format!("{id}: not found in registry"));
             continue;
         };
@@ -375,17 +376,14 @@ pub(crate) fn restart_orchestrator(state: &Mutex<Backend>) -> HttpReply {
     // If a release is selected and ships a cp-orchestrator, stage it over the
     // install path so the re-exec below adopts the new binary.
     let mut updated_tag: Option<String> = None;
-    if let Some(install) = install.as_deref() {
-        let src = {
-            match state.lock() {
-                Ok(b) => b.releases.active_tag().map(|tag| (tag.to_owned(), b.releases.orchestrator_binary_path(tag))),
-                Err(_) => None,
-            }
-        };
-        if let Some((tag, src)) = src
-            && src.exists()
+    if let Some(install_path) = install.as_deref() {
+        let src = state.lock().ok().and_then(|b| {
+            b.releases.active_tag().map(|tag| (tag.to_owned(), b.releases.orchestrator_binary_path(tag)))
+        });
+        if let Some((tag, src_path)) = src
+            && src_path.exists()
         {
-            match crate::services::releases::stage_orchestrator_update(install, &src) {
+            match crate::services::releases::stage_orchestrator_update(install_path, &src_path) {
                 Ok(()) => updated_tag = Some(tag),
                 Err(e) => {
                     crate::oerr!("restart_orchestrator: staging update {tag} failed: {e}; restarting current binary");
@@ -413,10 +411,16 @@ pub(crate) fn restart_orchestrator(state: &Mutex<Backend>) -> HttpReply {
             crate::oerr!("restart_orchestrator: current_exe() unavailable; exiting for supervisor respawn");
         }
 
-        // Fallback: exit non-zero so the supervisor respawns us. A
-        // self-inflicted SIGTERM counts as a *clean* stop under systemd's
-        // `Restart=on-failure` and would leave the service down.
-        std::process::exit(1);
+        // Fallback: crash the process (non-zero) so a supervised host respawns
+        // us. A plain `return` from this spawned thread would leave the parent
+        // process alive with its listener socket already gone, and the workspace
+        // forbids the usual non-zero terminator, so `abort()` (SIGABRT, exit 134)
+        // is the honest primitive here: a genuine failure under systemd
+        // `Restart=on-failure` / procd, so it triggers a respawn — unlike a clean
+        // SIGTERM, which reads as an intentional stop and would leave the service
+        // down. This path only runs when the in-place `execv` above fails, which
+        // should effectively never happen.
+        std::process::abort();
     });
 
     HttpReply::ok(&serde_json::json!({
