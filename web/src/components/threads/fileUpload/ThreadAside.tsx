@@ -220,13 +220,13 @@ function FileList({
           key={f.file.path}
           type="button"
           onClick={() => onSelect(f.file)}
-          className="group flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted/40"
+          className="group flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left"
         >
           <span className="shrink-0">
             <FileIcon kind={kindOf(f.file.name)} size={28} />
           </span>
           <span className="flex min-w-0 flex-1 flex-col leading-tight">
-            <span className="truncate text-[13.5px] text-foreground/85 group-hover:text-foreground">
+            <span className="truncate text-[13.5px] text-foreground/85 transition-colors group-hover:text-foreground">
               {f.file.name}
             </span>
             <span className="text-[11px] text-muted-foreground/55">
