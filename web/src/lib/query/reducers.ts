@@ -17,6 +17,7 @@
 // P8 budgets and each concern is independently readable.
 
 import type { Agent, ThreadDetail } from "../types"
+import { foldTaskList } from "./taskReducer"
 
 // ── Oplog delta shape (the push-plane payload) ───────────────────────
 //
@@ -116,18 +117,6 @@ function foldThreadFlag(
 ): ThreadDetail[] | null {
   if (prev.every((t) => t.id !== threadId)) return null
   return prev.map((t) => (t.id === threadId ? { ...t, ...patch } : t))
-}
-
-/**
- * task_list_changed — replace the target thread's `tasks` wholesale (the delta
- * carries the thread's COMPLETE cancelled-excluded list, whole-list snapshot
- * semantics). Returns `null` when the thread is unknown (→ hydrate), the SAME
- * roster when the delta lacks a task payload (defensive no-op).
- */
-function foldTaskList(prev: ThreadDetail[], k: Kind): ThreadDetail[] | null {
-  if (prev.every((t) => t.id !== k.thread_id)) return null // unknown thread → hydrate
-  const tasks = k.tasks ?? []
-  return prev.map((t) => (t.id === k.thread_id ? { ...t, tasks } : t))
 }
 
 /** thread_deleted — drop the thread (idempotent: absent → unchanged). */
