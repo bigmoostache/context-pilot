@@ -239,6 +239,16 @@ fn sniff_image_type(bytes: &[u8]) -> Option<&'static str> {
 mod tests {
     use super::*;
 
+    /// Assert `id` has a stored PNG avatar whose bytes equal `expected`. A plain
+    /// call (not a branch), so folding the has/get/ctype/bytes checks through it
+    /// keeps `avatar_roundtrip_set_get_remove` under the cognitive-complexity cap.
+    fn assert_png_stored(store: &AvatarStore, id: &str, expected: &[u8]) {
+        assert!(store.has(id));
+        let (bytes, ctype) = store.get(id).expect("get should succeed");
+        assert_eq!(ctype, "image/png");
+        assert_eq!(bytes, expected);
+    }
+
     #[test]
     fn name_set_get_roundtrip() {
         let dir = std::env::temp_dir().join(format!("cp-names-test-{}", std::process::id()));
@@ -255,7 +265,7 @@ mod tests {
         assert_eq!(reloaded.get("a"), Some("My Agent"));
 
         // Empty name clears the override.
-        let _prev = store.set("a", "  ");
+        let _cleared = store.set("a", "  ");
         assert!(store.get("a").is_none());
         assert!(NameOverrides::load(&dir).get("a").is_none());
 
@@ -282,15 +292,11 @@ mod tests {
             0x44, 0xAE, 0x42, 0x60, 0x82,
         ];
         store.set("a1", png).expect("set should succeed");
-        assert!(store.has("a1"));
-
-        let (bytes, ctype) = store.get("a1").expect("get should succeed");
-        assert_eq!(ctype, "image/png");
-        assert_eq!(bytes, png);
+        assert_png_stored(&store, "a1", png);
 
         // Reload from disk proves persistence.
         let reloaded = AvatarStore::load(&dir);
-        assert!(reloaded.has("a1"));
+        assert_png_stored(&reloaded, "a1", png);
 
         // Remove.
         assert!(store.remove("a1"));
