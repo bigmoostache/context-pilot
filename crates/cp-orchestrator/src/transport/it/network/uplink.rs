@@ -280,6 +280,18 @@ impl UplinkState {
 mod tests {
     use super::*;
 
+    /// A field mutator for a [`ProbeConfig`], factored into a `type` so the
+    /// out-of-range table below stays under the type-complexity cap.
+    type ProbeMut = fn(&mut ProbeConfig);
+
+    /// Assert a parsed-state field equals `want` (or is absent when `None`),
+    /// hoisted out of the projection tests so each stays under the
+    /// cognitive-complexity cap (the repeated `assert_eq!` expansions are what
+    /// pushed them over).
+    fn assert_field(state: &Value, key: &str, want: Option<&Value>) {
+        assert_eq!(state.get(key), want, "field {key}");
+    }
+
     /// A realistic `/run/cp-uplink/state`, mid-failover, byte-for-byte in
     /// the shape `write_state` emits.
     #[test]
@@ -296,17 +308,17 @@ last_transition=1753800000
 last_reason=end0 unreachable for 3 consecutive probes
 ";
         let state = parse_uplink_state(file);
-        assert_eq!(state.get("supervising"), Some(&json!(true)));
-        assert_eq!(state.get("promoted"), Some(&json!(true)));
-        assert_eq!(state.get("achieved"), Some(&json!(true)));
-        assert_eq!(state.get("active_uplink"), Some(&json!("wwan")));
-        assert_eq!(state.get("fail_streak"), Some(&json!(0)));
-        assert_eq!(state.get("ok_streak"), Some(&json!(1)));
-        assert_eq!(state.get("last_transition"), Some(&json!(1_753_800_000u64)));
+        assert_field(&state, "supervising", Some(&json!(true)));
+        assert_field(&state, "promoted", Some(&json!(true)));
+        assert_field(&state, "achieved", Some(&json!(true)));
+        assert_field(&state, "active_uplink", Some(&json!("wwan")));
+        assert_field(&state, "fail_streak", Some(&json!(0u32)));
+        assert_field(&state, "ok_streak", Some(&json!(1u32)));
+        assert_field(&state, "last_transition", Some(&json!(1_753_800_000u64)));
         // The reason is a sentence: everything after the FIRST `=` is its value.
-        assert_eq!(state.get("last_reason"), Some(&json!("end0 unreachable for 3 consecutive probes")));
+        assert_field(&state, "last_reason", Some(&json!("end0 unreachable for 3 consecutive probes")));
         // `mode` is not part of this projection: ignored, not fatal.
-        assert_eq!(state.get("mode"), None);
+        assert_field(&state, "mode", None);
     }
 
     /// The same tolerance the `nmcli -t` parsers apply: missing keys default,
@@ -318,16 +330,16 @@ last_reason=end0 unreachable for 3 consecutive probes
         let startup =
             "supervising=no\npromoted=no\nfail_streak=0\nok_streak=0\nlast_transition=0\nlast_reason=startup\n";
         let state = parse_uplink_state(startup);
-        assert_eq!(state.get("last_transition"), Some(&Value::Null), "0 means never, not 1970");
-        assert_eq!(state.get("active_uplink"), Some(&json!("none")), "an absent key takes its default");
-        assert_eq!(state.get("achieved"), Some(&json!(true)), "a script predating the key is not 'failing'");
+        assert_field(&state, "last_transition", Some(&Value::Null));
+        assert_field(&state, "active_uplink", Some(&json!("none")));
+        assert_field(&state, "achieved", Some(&json!(true)));
 
         // The key the shell side is adding for "decided but not achieved",
         // read as written.
-        assert_eq!(parse_uplink_state("promoted=yes\nachieved=no\n").get("achieved"), Some(&json!(false)));
+        assert_field(&parse_uplink_state("promoted=yes\nachieved=no\n"), "achieved", Some(&json!(false)));
 
         // A word this build does not know must not widen the response's enum.
-        assert_eq!(parse_uplink_state("active_uplink=carrier-pigeon").get("active_uplink"), Some(&json!("other")));
+        assert_field(&parse_uplink_state("active_uplink=carrier-pigeon"), "active_uplink", Some(&json!("other")));
 
         assert_eq!(parse_uplink_state(""), Value::Null, "no content \u{21d2} nothing to report");
         assert_eq!(parse_uplink_state("# just a comment\n"), Value::Null, "\u{2026}and neither is a comment");
@@ -339,7 +351,7 @@ last_reason=end0 unreachable for 3 consecutive probes
     fn the_supervisor_knobs_are_bounded_by_what_it_can_honour() {
         assert!(validate_probe(&ProbeConfig::default()).is_ok(), "the shipped defaults are legal");
 
-        let out_of_range: [(&str, fn(&mut ProbeConfig)); 6] = [
+        let out_of_range: [(&str, ProbeMut); 6] = [
             ("a zero probe timeout", |probe| probe.probe_timeout_s = 0),
             ("a probe timeout above 60 s", |probe| probe.probe_timeout_s = 61),
             ("a zero cooldown", |probe| probe.cooldown_s = 0),
@@ -356,9 +368,7 @@ last_reason=end0 unreachable for 3 consecutive probes
         // A cooldown BELOW the interval is legal: it simply never binds, which
         // is a coherent way to spell "no hysteresis beyond the streak
         // thresholds". Refusing it would make the two fields fight for nothing.
-        let mut never_binds = ProbeConfig::default();
-        never_binds.interval_s = 120;
-        never_binds.cooldown_s = 30;
+        let never_binds = ProbeConfig { interval_s: 120, cooldown_s: 30, ..ProbeConfig::default() };
         assert!(validate_probe(&never_binds).is_ok(), "a never-binding cooldown is a choice, not an error");
     }
 
