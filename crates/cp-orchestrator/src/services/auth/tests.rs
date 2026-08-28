@@ -1,6 +1,7 @@
 //! Unit tests for the auth store — schema, hashing, CRUD, sessions.
 
 use super::super::types::AgentRole;
+use super::super::types::UserRole;
 use super::*;
 
 /// A throwaway password for tests. Generated at runtime (never a string
@@ -107,7 +108,7 @@ fn migration_widens_check() {
     assert_eq!(user_role, "user", "legacy user unchanged");
     // The widened CHECK now admits a manager.
     let _manager = store
-        .create_user("m@x", "Mgr", &test_password(), UserRole::Manager)
+        .create_user(NewUser { email: "m@x", name: "Mgr", password: &test_password(), role: UserRole::Manager })
         .unwrap_or_else(|err| panic!("manager insert should succeed post-migration: {err}"));
 }
 
@@ -116,9 +117,12 @@ fn migration_widens_check() {
 #[test]
 fn migration_idempotent() {
     let store = AuthStore::open(Path::new(":memory:")).unwrap_or_else(|err| panic!("open failed: {err}"));
-    let _s =
-        store.create_user("s@x", "S", &test_password(), UserRole::Superadmin).unwrap_or_else(|err| panic!("{err}"));
-    let _u = store.create_user("u@x", "U", &test_password(), UserRole::User).unwrap_or_else(|err| panic!("{err}"));
+    let _s = store
+        .create_user(NewUser { email: "s@x", name: "S", password: &test_password(), role: UserRole::Superadmin })
+        .unwrap_or_else(|err| panic!("{err}"));
+    let _u = store
+        .create_user(NewUser { email: "u@x", name: "U", password: &test_password(), role: UserRole::User })
+        .unwrap_or_else(|err| panic!("{err}"));
     store.init_schema().unwrap_or_else(|err| panic!("second init_schema failed: {err}"));
     assert_eq!(store.count_users().unwrap_or(0), 2, "no rows added or dropped");
     let role: String =
@@ -140,7 +144,14 @@ fn agent_role_roundtrip() {
 #[test]
 fn create_and_get_user() {
     let store = AuthStore::open(Path::new(":memory:")).expect("open");
-    let user = store.create_user("alice@example.com", "Alice", &test_password(), UserRole::Admin).expect("create");
+    let user = store
+        .create_user(NewUser {
+            email: "alice@example.com",
+            name: "Alice",
+            password: &test_password(),
+            role: UserRole::Admin,
+        })
+        .expect("create");
     assert_eq!(
         (user.email.as_str(), user.name.as_str(), user.role, user.id.len()),
         ("alice@example.com", "Alice", UserRole::Admin, 36),
@@ -165,10 +176,10 @@ fn list_and_count_users() {
     });
     assert_eq!(store.count_users().unwrap_or(99), 0);
     let _u1 = store
-        .create_user("a@x.com", "A", &test_password(), UserRole::Admin)
+        .create_user(NewUser { email: "a@x.com", name: "A", password: &test_password(), role: UserRole::Admin })
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     let _u2 = store
-        .create_user("b@x.com", "B", "pass5678", UserRole::User)
+        .create_user(NewUser { email: "b@x.com", name: "B", password: "pass5678", role: UserRole::User })
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     assert_eq!(store.count_users().unwrap_or(0), 2);
     let list = store.list_users().unwrap_or_else(|err| panic!("list failed: {err}"));
@@ -181,7 +192,7 @@ fn delete_user_cascades() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("del@x.com", "Del", &test_password(), UserRole::User)
+        .create_user(NewUser { email: "del@x.com", name: "Del", password: &test_password(), role: UserRole::User })
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     let token = store
         .create_session(&user.id, None, Duration::from_hours(1))
@@ -199,7 +210,7 @@ fn session_lifecycle() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("sess@x.com", "Sess", &test_password(), UserRole::User)
+        .create_user(NewUser { email: "sess@x.com", name: "Sess", password: &test_password(), role: UserRole::User })
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     let token = store
         .create_session(&user.id, Some("test-agent"), Duration::from_hours(1))
@@ -222,7 +233,7 @@ fn expired_session_swept() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("exp@x.com", "Exp", &test_password(), UserRole::User)
+        .create_user(NewUser { email: "exp@x.com", name: "Exp", password: &test_password(), role: UserRole::User })
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     // Create a session that's already expired (TTL = 0).
     let token =
@@ -239,7 +250,7 @@ fn grant_and_check_access() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("acl@x.com", "Acl", &test_password(), UserRole::User)
+        .create_user(NewUser { email: "acl@x.com", name: "Acl", password: &test_password(), role: UserRole::User })
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     // No access initially.
     let access = store.check_access("agent-1", &user.id).unwrap_or_else(|err| panic!("check failed: {err}"));
@@ -259,7 +270,7 @@ fn update_agent_role() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("role@x.com", "Role", &test_password(), UserRole::User)
+        .create_user(NewUser { email: "role@x.com", name: "Role", password: &test_password(), role: UserRole::User })
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     store
         .grant_access("agent-1", &user.id, AgentRole::AgentUser, None)
@@ -277,7 +288,12 @@ fn revoke_access() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("rev-acl@x.com", "RevAcl", &test_password(), UserRole::User)
+        .create_user(NewUser {
+            email: "rev-acl@x.com",
+            name: "RevAcl",
+            password: &test_password(),
+            role: UserRole::User,
+        })
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     store
         .grant_access("agent-1", &user.id, AgentRole::AgentUser, None)
@@ -291,8 +307,17 @@ fn revoke_access() {
 #[test]
 fn list_agent_users_and_user_agents() {
     let store = AuthStore::open(Path::new(":memory:")).expect("open");
-    let alice = store.create_user("alice-acl@x.com", "Alice", &test_password(), UserRole::User).expect("create alice");
-    let bob = store.create_user("bob-acl@x.com", "Bob", "pass5678", UserRole::User).expect("create bob");
+    let alice = store
+        .create_user(NewUser {
+            email: "alice-acl@x.com",
+            name: "Alice",
+            password: &test_password(),
+            role: UserRole::User,
+        })
+        .expect("create alice");
+    let bob = store
+        .create_user(NewUser { email: "bob-acl@x.com", name: "Bob", password: "pass5678", role: UserRole::User })
+        .expect("create bob");
     store.grant_access("agent-1", &alice.id, AgentRole::AgentAdmin, None).expect("grant alice a1");
     store.grant_access("agent-1", &bob.id, AgentRole::AgentUser, Some(&alice.id)).expect("grant bob a1");
     store.grant_access("agent-2", &alice.id, AgentRole::AgentUser, None).expect("grant alice a2");
@@ -322,7 +347,12 @@ fn delete_user_cascades_acl() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("del-acl@x.com", "DelAcl", &test_password(), UserRole::User)
+        .create_user(NewUser {
+            email: "del-acl@x.com",
+            name: "DelAcl",
+            password: &test_password(),
+            role: UserRole::User,
+        })
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     store
         .grant_access("agent-1", &user.id, AgentRole::AgentUser, None)
@@ -338,7 +368,7 @@ fn grant_overwrites_previous() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("ow@x.com", "Ow", &test_password(), UserRole::User)
+        .create_user(NewUser { email: "ow@x.com", name: "Ow", password: &test_password(), role: UserRole::User })
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     store
         .grant_access("agent-1", &user.id, AgentRole::AgentUser, None)

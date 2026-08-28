@@ -15,7 +15,7 @@
 use std::sync::Mutex;
 
 use super::{Backend, HttpReply, MIN_PASSWORD_LEN};
-use crate::services::auth::types::{User, UserRole};
+use crate::services::auth::types::{NewUser, User, UserRole};
 
 /// `GET /api/auth/users` — list all users the caller may see (FR-04). Superadmin
 /// rows are filtered out for non-superadmin callers (FR-v3-05).
@@ -82,7 +82,7 @@ pub(crate) fn create_user(state: &Mutex<Backend>, body: &[u8], auth_user: Option
     let Some(auth) = b.auth.as_ref() else {
         return HttpReply::error(501, "auth not enabled");
     };
-    match auth.create_user(&req.email, &req.name, &req.password, req.role) {
+    match auth.create_user(NewUser { email: &req.email, name: &req.name, password: &req.password, role: req.role }) {
         Ok(user) => HttpReply::ok(&serde_json::json!({ "user": user })),
         Err(e) => {
             let msg = e.to_string();
@@ -203,7 +203,7 @@ mod tests {
 
     use super::{Backend, create_user, list_users};
     use crate::services::auth::store::AuthStore;
-    use crate::services::auth::types::User;
+    use crate::services::auth::types::{NewUser, User};
     // Bare variant imports (never the fully-qualified `UserRole::` form) so the
     // V1.1a acceptance grep keeps matching only capabilities.rs / types.rs /
     // *tests.rs.
@@ -223,9 +223,15 @@ mod tests {
     fn seeded_backend() -> (tempfile::TempDir, Mutex<Backend>, User, User, User) {
         let dir = tempfile::tempdir().expect("tempdir");
         let store = AuthStore::open(&dir.path().join("auth.db")).expect("open auth store");
-        let root = store.create_user("root@box", "Root", &test_pw(), Superadmin).expect("superadmin");
-        let admin = store.create_user("admin@box", "Admin", &test_pw(), Admin).expect("admin");
-        let manager = store.create_user("manager@box", "Manager", &test_pw(), Manager).expect("manager");
+        let root = store
+            .create_user(NewUser { email: "root@box", name: "Root", password: &test_pw(), role: Superadmin })
+            .expect("superadmin");
+        let admin = store
+            .create_user(NewUser { email: "admin@box", name: "Admin", password: &test_pw(), role: Admin })
+            .expect("admin");
+        let manager = store
+            .create_user(NewUser { email: "manager@box", name: "Manager", password: &test_pw(), role: Manager })
+            .expect("manager");
         let backend = Backend::new(
             crate::transport::BackendPaths {
                 agents_dir: dir.path().to_path_buf(),

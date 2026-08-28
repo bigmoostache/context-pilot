@@ -12,7 +12,7 @@ use argon2::password_hash::{PasswordHash, PasswordHasher as _, PasswordVerifier 
 use rusqlite::Connection;
 
 use super::helpers::{fill_random, format_uuid, now_ms, random_hex};
-use super::types::{AuthError, User, UserRole, row_to_user};
+use super::types::{AuthError, NewUser, User, row_to_user};
 
 // ───────────────────────────── auth store ─────────────────────────────
 
@@ -109,11 +109,11 @@ impl AuthStore {
     /// `superadmin` (fresh DBs are created with the widened CHECK directly).
     fn migrate_role_check(&self) -> Result<(), AuthError> {
         use rusqlite::OptionalExtension as _;
-        let ddl: Option<String> = self
+        let queried_ddl: Option<String> = self
             .conn
             .query_row("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'", [], |row| row.get(0))
             .optional()?;
-        let Some(ddl) = ddl else { return Ok(()) };
+        let Some(ddl) = queried_ddl else { return Ok(()) };
         // Already widened (fresh DB or previously migrated) → nothing to do.
         if ddl.contains("superadmin") {
             return Ok(());
@@ -216,13 +216,8 @@ impl AuthStore {
     /// Returns [`AuthError::Database`] on duplicate email (UNIQUE
     /// constraint) or any `SQLite` failure, [`AuthError::Hash`] if password
     /// hashing fails.
-    pub(crate) fn create_user(
-        &self,
-        email: &str,
-        name: &str,
-        password: &str,
-        role: UserRole,
-    ) -> Result<User, AuthError> {
+    pub(crate) fn create_user(&self, new: NewUser<'_>) -> Result<User, AuthError> {
+        let NewUser { email, name, password, role } = new;
         let id = Self::generate_uuid();
         let hash = Self::hash_password(password)?;
         let now = now_ms();

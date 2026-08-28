@@ -186,7 +186,12 @@ mod tests {
         let store = AuthStore::open(StdPath::new(":memory:")).expect("open in-memory");
         // Seed a user so the backup is non-trivial.
         let _user = store
-            .create_user("backup@test.com", "Bak", "password1234", super::super::types::UserRole::User)
+            .create_user(super::super::types::NewUser {
+                email: "backup@test.com",
+                name: "Bak",
+                password: "password1234",
+                role: super::super::types::UserRole::User,
+            })
             .expect("create user");
 
         let tmp = std::env::temp_dir().join("cp-auth-backup-test.db");
@@ -212,7 +217,12 @@ mod tests {
 
         let store = AuthStore::open(&db_path).expect("open");
         let _user = store
-            .create_user("sched@test.com", "Sched", "password1234", super::super::types::UserRole::User)
+            .create_user(super::super::types::NewUser {
+                email: "sched@test.com",
+                name: "Sched",
+                password: "password1234",
+                role: super::super::types::UserRole::User,
+            })
             .expect("create");
 
         let mut sched = BackupScheduler::new(db_path);

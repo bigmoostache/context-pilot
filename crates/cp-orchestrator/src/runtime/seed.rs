@@ -5,6 +5,7 @@
 //! [`Runtime::new`](super::Runtime::new) when auth is enabled.
 
 use crate::services::auth::store::AuthStore;
+use crate::services::auth::types::NewUser;
 use crate::services::auth::types::UserRole;
 
 /// Boot-time account seeding (provisioning, design §13.4). When auth is enabled
@@ -46,7 +47,7 @@ fn seed_one(store: &AuthStore, role_sql: &str, prefix: &str) {
         .filter(|s| !s.trim().is_empty())
         .unwrap_or_else(|| role_sql.to_owned());
     let role = UserRole::from_sql(role_sql);
-    match store.create_user(email.trim(), name.trim(), &password, role) {
+    match store.create_user(NewUser { email: email.trim(), name: name.trim(), password: &password, role }) {
         Ok(user) => match store.set_must_change_password(&user.id, true) {
             Ok(_) => {
                 crate::oerr!(

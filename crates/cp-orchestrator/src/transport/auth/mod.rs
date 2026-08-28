@@ -25,6 +25,7 @@ use std::sync::Mutex;
 use super::Backend;
 use super::rest::HttpReply;
 use crate::services::auth::store::AuthStore;
+use crate::services::auth::types::NewUser;
 use crate::services::auth::types::{User, UserRole};
 
 /// Minimum password length (FR-21).
@@ -207,7 +208,7 @@ pub(crate) fn register(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&U
         }
     };
 
-    let user = match auth.create_user(&req.email, &req.name, &req.password, role) {
+    let user = match auth.create_user(NewUser { email: &req.email, name: &req.name, password: &req.password, role }) {
         Ok(u) => u,
         Err(e) => {
             let msg = e.to_string();

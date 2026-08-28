@@ -149,6 +149,21 @@ pub struct User {
     pub updated_at: u64,
 }
 
+/// Borrowed parameters for [`AuthStore::create_user`], bundled so the call
+/// stays within the argument budget (the four fields always travel together).
+///
+/// [`AuthStore::create_user`]: super::store::AuthStore::create_user
+pub(crate) struct NewUser<'a> {
+    /// Login email — unique, case-insensitive.
+    pub email: &'a str,
+    /// Display name.
+    pub name: &'a str,
+    /// Plaintext password, hashed with Argon2id before storage.
+    pub password: &'a str,
+    /// Role to assign the new account.
+    pub role: UserRole,
+}
+
 /// An access-control list entry — one user's permission on one agent,
 /// joined with their profile info for display.
 #[derive(Clone, Debug, serde::Serialize)]
