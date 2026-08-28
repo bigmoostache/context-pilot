@@ -148,16 +148,16 @@ function AsideTabBar({
 }) {
   return (
     <div className="flex items-center gap-1.5 border-b border-border/60">
-      <TabsList variant="line" className="h-7 gap-0.5">
+      <TabsList variant="line" className="h-8 gap-0.5">
         {hasTasks && (
-          <TabsTrigger value="tasks" className="px-2 text-[11px]">
-            <ListChecks className="size-3" />
+          <TabsTrigger value="tasks" className="px-2 text-[13.5px]">
+            <ListChecks className="size-3.5" />
             Tasks
           </TabsTrigger>
         )}
         {hasFiles && (
-          <TabsTrigger value="files" className="px-2 text-[11px]">
-            <Paperclip className="size-3" />
+          <TabsTrigger value="files" className="px-2 text-[13.5px]">
+            <Paperclip className="size-3.5" />
             Files
           </TabsTrigger>
         )}
@@ -168,18 +168,18 @@ function AsideTabBar({
             <button
               type="button"
               onClick={() => void downloadFile(agentId, file.path)}
-              className="inline-flex items-center gap-1.5 px-2 text-[11px] font-medium text-foreground/60 transition-colors hover:text-foreground"
+              className="inline-flex items-center gap-1.5 px-2 text-[13.5px] font-medium text-foreground/60 transition-colors hover:text-foreground"
             >
-              <Download className="size-3" />
+              <Download className="size-3.5" />
               Download
             </button>
           )}
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center gap-1.5 px-2 text-[11px] font-medium text-foreground/60 transition-colors hover:text-foreground"
+            className="inline-flex items-center gap-1.5 px-2 text-[13.5px] font-medium text-foreground/60 transition-colors hover:text-foreground"
           >
-            <ChevronLeft className="size-3" />
+            <ChevronLeft className="size-3.5" />
             Back
           </button>
         </div>
