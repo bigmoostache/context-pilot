@@ -8046,3 +8046,19 @@ index 5e186a7b..c8f6adac 100644
    name: api-contract-ts
    description: API-contract family (OpenAPI spec+routes, TS codegen drift, manual-fetch audit) on web TS edits
 # --- End entry #92 ---
+93:e7178fc5e3b3508d6cac4f07600cace2d104a6b7dc1c574e9bf78b1a4fe23010:35e3e772a0f6f7788d1f38eb97e06e840c53ced94a86ed8790127f1869071491:6f1ae818e6248010aa45fb7a820b21f6df7b93b9dd12631f9591206f799f829d
+# --- Diff for entry #93 ---
+diff --git a/.context-pilot/shared/callbacks.yaml b/.context-pilot/shared/callbacks.yaml
+index 5e186a7b..87a6b469 100644
+--- a/.context-pilot/shared/callbacks.yaml
++++ b/.context-pilot/shared/callbacks.yaml
+@@ -7,7 +7,7 @@ api-contract-rust:
+   success_message: API contract OK ✓
+   is_global: true
+   script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-api-contract.sh" --callback
+-  last_edited_ms: 1783511056445
++  last_edited_ms: 1787907566116
+ api-contract-ts:
+   name: api-contract-ts
+   description: API-contract family (OpenAPI spec+routes, TS codegen drift, manual-fetch audit) on web TS edits
+# --- End entry #93 ---
