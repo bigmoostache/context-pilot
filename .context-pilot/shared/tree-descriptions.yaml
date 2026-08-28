@@ -3350,6 +3350,10 @@
   path: tmp/Attali/iran/vite.config.js
   description: 'Vite dev-server config for the Iran report — SUPERSEDED by bs-config.js (browser-sync), kept for reference. Vite used purely as a static server (no bundling), with allowedHosts + a wss HMR client pinned to guillaume.barking-hue.ts.net:7443 to work behind the tailscale HTTPS proxy. Abandoned: vite''s dep re-optimize triggers a post-paint reload and it treats stylesheets as HMR modules, swapping the <link> after Paged.js has rewritten the DOM — CSS visibly loads then vanishes.'
   last_edited_ms: 1785136968557
+23e59e3ea2966ee5:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 23fd2fd437b74750:
   path: docs/prompt-building.md
   description: How context/prompts are assembled for LLM calls
@@ -9674,6 +9678,10 @@
   path: web/e2e/threads.spec.ts
   description: Phase 1 e2e threads CRUD (3 tests) over the live push plane. create→row appears live + roster confirms; archive→leaves live list, lands in Archived; restore→returns. Each test builds its own precondition via API command(); UI drives only the action under test; roster() cross-checks backend ground truth. afterAll archives all e2e- threads.
   last_edited_ms: 1781814025138
+6720bc0b1269ba4a:
+  path: crates/cp-mod-memory/src/panel.rs
+  description: Memory panel. Per-tier 'M-short (40/40):' summary header + occupied slots only (title+importance+contents, M-safe shown full) + '… N empty slots free' line (saturating_sub). Ordered by importance then slot idx. format_for_context mirrors for LLM. needs_cache=false.
+  last_edited_ms: 0
 672a62d585033f7d:
   path: crates/cp-mod-threads/src/tools.rs
   description: 'Thread tool handlers. execute_send: post message, set THEIR_TURN, clear focus, start dangling(5). execute_read: last k messages formatted, MY_TURN sets focus, THEIR_TURN peeks. format_age helper.'
@@ -9858,6 +9866,10 @@
   path: crates/cp-orchestrator/src/transport/inspect/finder/download.rs
   description: 'Finder file/folder download + inline raw-serve. fs_download: files raw (100MiB, attachment), folders zipped /tmp via `zip -r -q` (500MiB) then cleaned. fs_raw: inline bytes (Content-Type via content_type_for images+PDF) for <img>/<object> previews. orch-clippy: clean (c0c1c62c).'
   last_edited_ms: 1787881815985
+68f8168714cf7b17:
+  path: web/src/components/threads/ThreadList.tsx
+  description: Thread sidebar list. Grouped by turn-status (Agent's turn / User turn) + Archived view. Search now lives in ThreadSearchPalette (T669) opened from ListHeader's Search button; ListHeader also has a PanelLeftClose sidebar-collapse button. Row-hover title marquee via useTitleMarquee (WAA). Subcomponents RowActions/RowMeta/ListHeader/EmptyState keep budgets. Exactly 500 lines (cap).
+  last_edited_ms: 0
 6901f0ab9bfa4b82:
   path: src/app/actions/streaming.rs
   description: 'Streaming action handlers: AppendChars (typewriter), StreamDone (token accounting, cache correction), StreamError (logging, truncation). Per-stream/total/tick token accumulation in apply_token_usage().'
@@ -22314,6 +22326,10 @@ ee80bf72f8f835dd:
   path: crates/cp-base/src/tools/async_exec.rs
   description: 'spawn_async_tool: runs blocking tool I/O on worker thread, returns BLOCKING_TOOL_SENTINEL via ChannelWatcher. ToolOutput #[non_exhaustive] A5 + ok/error/new/with_panel ctors. WatcherResult::new+tool_use_id setter.'
   last_edited_ms: 1784541002394
+ee88c1deba2d016c:
+  path: web/src/lib/support/threadMessages.ts
+  description: Pure thread-support transforms (P8 extraction from ThreadConversation + ThreadList + ThreadComposer). relAge/EPOCH_2020/formatTs, toChatMessage, parseAutoLine, Segment+segmentLog, flattenMarkdown(internal)+previewOf, and Draft type + parseDraft (composer draft localStorage (de)serialization, tolerant of legacy bare-string format, caret clamped). lib/support at 8-entry cap.
+  last_edited_ms: 0
 ee8d4cb29bfb6892:
   path: crates/cp-orchestrator/src/services/names.rs
   description: 'Orchestrator-owned agent display-name overrides (T328). NameOverrides: HashMap<agent_id, display_name> persisted to <agents_dir>/agent-names.json (atomic tmp→rename). load/get/set (empty name clears override). Independent of agent process — orchestrator-only. Unit-tested roundtrip + clear.'

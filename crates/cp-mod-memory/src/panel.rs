@@ -10,12 +10,38 @@ use crate::types::{MemorySlot, MemoryState, Tier};
 use cp_base::panels::scroll_key_action;
 use std::fmt::Write as _;
 
-/// Occupied slots of `tier`, sorted by importance (critical first) then slot
-/// index (stable insertion order within an importance band).
+/// The 1-based slot index parsed from an id (`M-{tier}-{n}` → `n`); `0` if the
+/// trailing segment isn't a number (never expected — ids are backend-built).
+fn slot_index(id: &str) -> usize {
+    id.rsplit('-').next().and_then(|n| n.parse().ok()).unwrap_or(0)
+}
+
+/// Occupied slots of `tier`, sorted by slot **id index** ascending (T690) — a
+/// pure positional order (`M-tiny-1`, `M-tiny-2`, …). Importance is still
+/// surfaced per-row (tag + colour), just no longer the sort key.
 fn occupied_of(state: &MemoryState, tier: Tier) -> Vec<&MemorySlot> {
     let mut v: Vec<&MemorySlot> = state.slots.iter().filter(|s| s.occupied && s.tier == tier).collect();
-    v.sort_by_key(|s| s.importance.rank());
+    v.sort_by_key(|s| slot_index(&s.id));
     v
+}
+
+/// The 1-based indices of `tier`'s FREE (unoccupied) slots, ascending — listed
+/// explicitly under each tier so the exact reusable ids are always in view (T690).
+fn free_indices_of(state: &MemoryState, tier: Tier) -> Vec<usize> {
+    let mut v: Vec<usize> =
+        state.slots.iter().filter(|s| !s.occupied && s.tier == tier).map(|s| slot_index(&s.id)).collect();
+    v.sort_unstable();
+    v
+}
+
+/// Render a tier's free slots as `"{n} free: {csv}"`, or `None` when the tier is
+/// full — the shared copy for both the panel and the LLM context projection.
+fn free_line(indices: &[usize]) -> Option<String> {
+    if indices.is_empty() {
+        return None;
+    }
+    let csv = indices.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ");
+    Some(format!("{} free: {csv}", indices.len()))
 }
 
 /// Panel that renders the fixed memory budget and provides LLM context.
@@ -24,9 +50,9 @@ pub(crate) struct MemoryPanel;
 impl MemoryPanel {
     /// Format the fixed slot budget for LLM context, grouped by tier.
     ///
-    /// Each tier shows a `used/total` header, its occupied slots (importance
-    /// first), and a single line for the free slots — so the ceiling is always
-    /// in view without paying one row per empty slot.
+    /// Each tier shows a `used/total` header, its occupied slots (id order), and
+    /// a single line listing the free slot indices — so both the ceiling and the
+    /// exact reusable ids are always in view without one row per empty slot.
     fn format_for_context(state: &State) -> String {
         let ms = MemoryState::get(state);
         let mut out = String::new();
@@ -43,9 +69,8 @@ impl MemoryPanel {
                     }
                 }
             }
-            let free = total.saturating_sub(occ.len());
-            if free > 0 {
-                let _f = writeln!(out, "  … {free} empty slots free");
+            if let Some(line) = free_line(&free_indices_of(ms, tier)) {
+                let _f = writeln!(out, "  … {line}");
             }
         }
 
@@ -87,9 +112,8 @@ impl Panel for MemoryPanel {
                     blocks.push(Block::Line(vec![S::new("      ".into()), S::styled(line.to_owned(), Semantic::Code)]));
                 }
             }
-            let free = total.saturating_sub(occ.len());
-            if free > 0 {
-                blocks.push(Block::Line(vec![S::muted(format!("   … {free} empty slots free")).italic()]));
+            if let Some(line) = free_line(&free_indices_of(ms, tier)) {
+                blocks.push(Block::Line(vec![S::muted(format!("   … {line}")).italic()]));
             }
         }
 
