@@ -253,9 +253,9 @@ M-mid-8:
 M-mid-9:
   tier: mid
   title: orch-clippy campaign
-  contents: 'Branch orchestrator-clippy off master (T649: workspace clippy=0). Pwd Totordu1789. cp-orch lib=257. Committed: create/(ded21fca), accounts(9b3ba553), releases/mod(b6cd16fa), panels(cd201362), listing(86d13e39), rest/releases(cb648689), rest/mod(35fe7a99). KEY: process::exit=E0453 NOT expectable->abort(); lint-exceptions greps comments for ''disallowed_methods''/''#[expect''. pub_use=deferred crate-wide pass. Densest left: transport/mod 15, uplink 14, supervisor/mod 13, finder/download 12, sheet 11, mutate 11. LAST: --workspace to check-rust-lints.sh + reseal chain #87, PR. NOT pushed.'
+  contents: 'Branch orchestrator-clippy off master (T649: workspace clippy=0). Pwd Totordu1789 (chain #88). Committed: create/(ded21fca), accounts(9b3ba553), releases/mod(b6cd16fa), panels(cd201362), listing(86d13e39), rest/releases(cb648689), rest/mod(35fe7a99), transport/mod SPLIT->router.rs(8829af02). KEY: process::exit=E0453 NOT expectable->abort(); pattern_type_mismatch on &[&str]=match *segments; tiny_http Method NOT Copy; lint-exceptions greps comments for ''disallowed_methods''/''#[expect''. exhaustive.rs scrapes router.rs+mod.rs. pub_use=deferred crate-wide pass. LAST: --workspace to check-rust-lints.sh + reseal chain, PR. NOT pushed.'
   importance: high
-  last_edited_ms: 1787875927182
+  last_edited_ms: 1787877686563
 M-safe-1:
   tier: safe
   title: Hash chain password
