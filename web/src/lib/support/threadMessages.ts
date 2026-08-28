@@ -134,21 +134,24 @@ export function previewOf(t: ThreadDetail): string {
 
 /**
  * Task-progress summary for a thread's list row (T687) — the second line's
- * progress bar + label, or `null` when the thread has NO live tasks (the caller
- * then falls back to the {@link previewOf} message snippet).
+ * segmented progress bar + label, or `null` when the thread has NO tasks (the
+ * caller then falls back to the {@link previewOf} message snippet).
  *
- * `frac` is the completion of *started* work — `done / (done + in_progress)`,
- * per the T687 spec — so a thread with only planned tasks reads 0% (guarded
- * `/0`), and a thread whose active work is all finished reads 100%. `label` is
- * the current front: the last in-progress task's title, else `"Done"` when every
- * task is done, else the next planned task's title.
+ * Carries the three status COUNTS so the bar can draw three segments — green
+ * `done`, orange `inProgress`, gray `planned` — over `total` (all tasks). A
+ * thread with only planned tasks reads an empty (all-gray) bar; one whose work
+ * is all finished reads full green. `label` is the current front: the last
+ * in-progress task's title, else `"Done"` when every task is done, else the
+ * next planned task's title.
  */
 export interface ThreadProgress {
-  /** `done / (done + in_progress)`, clamped to `[0, 1]`. */
-  frac: number
-  /** finished-task count (the bar's numerator). */
+  /** finished-task count (the green segment). */
   done: number
-  /** `done + in_progress` — the started-work total (the bar's denominator). */
+  /** in-progress-task count (the orange segment). */
+  inProgress: number
+  /** planned-task count (the gray remainder). */
+  planned: number
+  /** all tasks — `done + inProgress + planned` (the bar's denominator). */
   total: number
   /** last in-progress title, else `"Done"`, else the next planned title. */
   label: string
@@ -158,17 +161,16 @@ export interface ThreadProgress {
 export function threadProgress(t: ThreadDetail): ThreadProgress | null {
   const tasks = t.tasks ?? []
   if (tasks.length === 0) return null
+  const inProgressTasks = tasks.filter((x) => x.status === "in_progress")
   const done = tasks.filter((x) => x.status === "done").length
-  const inProgress = tasks.filter((x) => x.status === "in_progress")
-  const total = done + inProgress.length
-  // Fraction of started-and-finished work that is finished; guard the
-  // only-planned case (total === 0) so the bar reads 0% rather than NaN.
-  const frac = total === 0 ? 0 : done / total
-  const allDone = done === tasks.length
+  const planned = tasks.filter((x) => x.status === "planned").length
+  const inProgress = inProgressTasks.length
+  const total = tasks.length
+  const allDone = done === total
   const label =
-    inProgress.at(-1)?.name ??
+    inProgressTasks.at(-1)?.name ??
     (allDone ? "Done" : (tasks.find((x) => x.status === "planned")?.name ?? "Done"))
-  return { frac, done, total, label }
+  return { done, inProgress, planned, total, label }
 }
 
 /** A persisted composer draft: the unsent text plus the caret/selection range

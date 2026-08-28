@@ -297,7 +297,7 @@ function ThreadRow({
       {/* `gap-0.5` binds title + preview into ONE unit; rows are kept apart by
           padding + `mb-0.5`, sharpening the hierarchy. */}
       <div {...clickable(() => onSelect(t.id))} className="flex flex-col gap-0.5 text-left">
-        {/* line 1 — dot + name + time + hover actions */}
+        {/* line 1 — dot + status badges + name + time + hover actions */}
         <div className="flex items-center gap-2">
           <span
             className={cn(
@@ -308,6 +308,8 @@ function ThreadRow({
               background: archived ? "var(--muted-foreground)" : isPaused ? "var(--warn)" : dot,
             }}
           />
+          {isFocused && <StatusBadge tone="ok" label="focused" />}
+          {isPaused && <StatusBadge tone="warn" label="paused" />}
           <MarqueeTitle name={t.name} trackRef={marquee.trackRef} />
           <span className="relative ml-auto shrink-0">
             <span className="text-[10.5px] text-muted-foreground/50 tabular-nums transition-opacity group-hover:opacity-0">
@@ -323,13 +325,8 @@ function ThreadRow({
             />
           </span>
         </div>
-        {/* line 2 — badges + preview + unread */}
-        <RowMeta
-          t={t}
-          archived={Boolean(archived)}
-          isFocused={Boolean(isFocused)}
-          isPaused={Boolean(isPaused)}
-        />
+        {/* line 2 — progress bar (or preview) + unread */}
+        <RowMeta t={t} archived={Boolean(archived)} />
       </div>
     </div>
   )
@@ -415,54 +412,40 @@ function RowAction({
   )
 }
 
-/** A row's second line: focused / paused status badges, then either the T687
- *  task-progress widget or the flattened preview snippet, and the unread pill. */
-function RowMeta({
-  t,
-  archived,
-  isFocused,
-  isPaused,
-}: {
-  t: ThreadDetail
-  archived: boolean
-  isFocused: boolean
-  isPaused: boolean
-}) {
+/** A first-line status pill (focused / paused), tone-keyed to the app palette.
+ *  No `rounded-*` — the codebase is square throughout. */
+function StatusBadge({ tone, label }: { tone: "ok" | "warn"; label: string }) {
+  return (
+    <span
+      className="shrink-0 px-1.5 py-px text-[9.5px] font-semibold tracking-wide uppercase"
+      style={{
+        background: `color-mix(in oklab, var(--${tone}) 18%, transparent)`,
+        color: `var(--${tone})`,
+      }}
+    >
+      {label}
+    </span>
+  )
+}
+
+/** A row's second line: either the T687 task-progress widget (`x/y` + segmented
+ *  bar + label) or the flattened message preview when the thread has no tasks,
+ *  and the unread pill. Focused/paused badges now live on the FIRST line. When
+ *  every task is done the whole line renders muted so a finished thread reads
+ *  calm and doesn't pull focus. */
+function RowMeta({ t, archived }: { t: ThreadDetail; archived: boolean }) {
   const progress = threadProgress(t)
+  const allDone = progress !== null && progress.done === progress.total
   return (
     <div className="flex items-center gap-1.5 pl-4">
-      {isFocused && (
-        <span
-          className="shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-semibold tracking-wide uppercase"
-          style={{
-            background: "color-mix(in oklab, var(--ok) 18%, transparent)",
-            color: "var(--ok)",
-          }}
-        >
-          focused
-        </span>
-      )}
-      {isPaused && (
-        <span
-          className="shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-semibold tracking-wide uppercase"
-          style={{
-            background: "color-mix(in oklab, var(--warn) 18%, transparent)",
-            color: "var(--warn)",
-          }}
-        >
-          paused
-        </span>
-      )}
-      {/* Second-line body: the T687 task-progress bar, or the last-message
-          preview when the thread carries no tasks. */}
       {progress ? (
-        <RowProgress p={progress} />
+        <RowProgress p={progress} muted={allDone} />
       ) : (
         <span className="truncate text-[11.5px] text-muted-foreground/70">{previewOf(t)}</span>
       )}
       {!archived && (t.unread ?? 0) > 0 && (
         <span
-          className="ml-auto shrink-0 rounded-full px-1.5 text-[10px] font-semibold text-(--primary-foreground) tabular-nums"
+          className="ml-auto shrink-0 px-1.5 text-[10px] font-semibold text-(--primary-foreground) tabular-nums"
           style={{ background: "var(--signal)" }}
         >
           {t.unread}
@@ -473,28 +456,40 @@ function RowMeta({
 }
 
 /**
- * The row's second-line task-progress widget (T687): a slim track whose
- * fill = `done / (done + in_progress)`, then the current-front label. Fill is
- * `--ok` at 100% (calm-green, finished) and `--signal` in flight (draws the eye).
+ * The row's second-line task-progress widget (T687): an `x/y` (done/total)
+ * count, then a slim three-segment track — green `done`, orange `inProgress`,
+ * gray `planned` (the track showing through) — then the current-front label.
+ * When `muted` (the whole thread is done) every part renders in the muted grey
+ * so a finished thread doesn't pull focus.
  */
-function RowProgress({ p }: { p: import("@/lib/support/threadMessages").ThreadProgress }) {
-  const pct = Math.round(p.frac * 100)
-  const complete = pct >= 100
+function RowProgress({
+  p,
+  muted,
+}: {
+  p: import("@/lib/support/threadMessages").ThreadProgress
+  muted: boolean
+}) {
+  const donePct = p.total ? (p.done / p.total) * 100 : 0
+  const inProgPct = p.total ? (p.inProgress / p.total) * 100 : 0
+  const countCls = muted ? "text-muted-foreground/60" : "text-muted-foreground/70"
   return (
     <span className="flex min-w-0 flex-1 items-center gap-1.5" title={`${p.done}/${p.total} done`}>
+      <span className={"shrink-0 text-[11px] tabular-nums " + countCls}>
+        {p.done}/{p.total}
+      </span>
       <span className="relative h-1 w-10 shrink-0 overflow-hidden bg-muted">
+        {/* done — green, filled from the left */}
         <span
           className="absolute inset-y-0 left-0 transition-[width] duration-300 ease-out"
-          style={{ width: `${pct}%`, background: complete ? "var(--ok)" : "var(--signal)" }}
+          style={{ width: `${donePct}%`, background: muted ? "var(--muted-foreground)" : "var(--ok)" }}
+        />
+        {/* in-progress — orange, starting where done ends (gray track = planned) */}
+        <span
+          className="absolute inset-y-0 transition-all duration-300 ease-out"
+          style={{ left: `${donePct}%`, width: `${inProgPct}%`, background: "var(--warn)" }}
         />
       </span>
-      <span
-        className={
-          "truncate text-[11.5px] " + (complete ? "text-(--ok)" : "text-muted-foreground/70")
-        }
-      >
-        {p.label}
-      </span>
+      <span className={"truncate text-[11.5px] " + countCls}>{p.label}</span>
     </span>
   )
 }
