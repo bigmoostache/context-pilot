@@ -10,7 +10,7 @@ pub(super) fn fill_random(buf: &mut [u8]) {
     if std::fs::File::open("/dev/urandom").and_then(|mut file| std::io::Read::read_exact(&mut file, buf)).is_err() {
         let seed = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0u128, |dur| dur.as_nanos());
         for (idx, slot) in buf.iter_mut().enumerate() {
-            let shift = u32::try_from((idx % 16).saturating_mul(8)).unwrap_or(0);
+            let shift = u32::try_from((idx & 15).saturating_mul(8)).unwrap_or(0);
             *slot = u8::try_from(seed.wrapping_shr(shift) & 0xff).unwrap_or(0);
         }
     }
@@ -60,12 +60,14 @@ impl super::store::AuthStore {
     /// derived; `runtime::Config` and the transport both read it here).
     #[must_use]
     pub fn default_db_path() -> std::path::PathBuf {
-        match std::env::var_os("CP_AUTH_DB") {
-            Some(p) => std::path::PathBuf::from(p),
-            None => std::env::var_os("HOME").map_or_else(
-                || std::path::PathBuf::from("auth.db"),
-                |h| std::path::PathBuf::from(h).join(".context-pilot/orchestrator/auth.db"),
-            ),
-        }
+        std::env::var_os("CP_AUTH_DB").map_or_else(
+            || {
+                std::env::var_os("HOME").map_or_else(
+                    || std::path::PathBuf::from("auth.db"),
+                    |h| std::path::PathBuf::from(h).join(".context-pilot/orchestrator/auth.db"),
+                )
+            },
+            std::path::PathBuf::from,
+        )
     }
 }
