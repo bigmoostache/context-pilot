@@ -50,9 +50,8 @@ pub fn fs_sheet(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpRepl
         Some(p) if !p.is_empty() => p,
         _ => return HttpReply::error(400, "missing path parameter"),
     };
-    let target = match confined_path(&folder, &relative) {
-        Some(p) => p,
-        None => return HttpReply::error(403, "path outside agent realm"),
+    let Some(target) = confined_path(&folder, &relative) else {
+        return HttpReply::error(403, "path outside agent realm");
     };
     if !target.is_file() {
         return HttpReply::error(404, "file not found");
@@ -78,7 +77,9 @@ pub fn fs_sheet(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpRepl
 
 /// A parsed spreadsheet: named sheets of stringified cell grids + a clip flag.
 struct Workbook {
+    /// One entry per worksheet, each `{ name, rows, formulas? }`.
     sheets: Vec<serde_json::Value>,
+    /// `true` when any row/column/sheet cap clipped the data.
     truncated: bool,
 }
 
@@ -90,19 +91,19 @@ struct Workbook {
 /// still yields its best-effort rows.
 fn parse_delimited(path: &std::path::Path, delimiter: u8) -> Option<Workbook> {
     let bytes = read_capped(path, MAX_CSV_BYTES)?;
-    let over_cap = bytes.len() as u64 >= MAX_CSV_BYTES;
+    let over_cap = u64::try_from(bytes.len()).unwrap_or(u64::MAX) >= MAX_CSV_BYTES;
 
     let mut reader =
         csv::ReaderBuilder::new().delimiter(delimiter).has_headers(false).flexible(true).from_reader(bytes.as_slice());
 
     let mut rows: Vec<serde_json::Value> = Vec::new();
     let mut truncated = over_cap;
-    for record in reader.records() {
+    for result in reader.records() {
         if rows.len() >= MAX_ROWS {
             truncated = true;
             break;
         }
-        let Ok(record) = record else { continue };
+        let Ok(record) = result else { continue };
         let mut cells: Vec<String> = Vec::new();
         for (i, field) in record.iter().enumerate() {
             if i >= MAX_COLS {
@@ -138,43 +139,8 @@ fn parse_workbook(path: &std::path::Path) -> Option<Workbook> {
         // degrades to no-formula mode for ODS / older XLS.
         let formula_range = workbook.worksheet_formula(&name).ok();
 
-        let mut rows: Vec<serde_json::Value> = Vec::new();
-        let mut formulas: Vec<serde_json::Value> = Vec::new();
-        let mut has_any_formula = false;
-
-        for (ri, row) in range.rows().enumerate() {
-            if rows.len() >= MAX_ROWS {
-                truncated = true;
-                break;
-            }
-            let mut cells: Vec<String> = Vec::new();
-            let mut formula_row: Vec<serde_json::Value> = Vec::new();
-
-            for (ci, cell) in row.iter().enumerate() {
-                if ci >= MAX_COLS {
-                    truncated = true;
-                    break;
-                }
-                cells.push(cell_to_string(cell));
-
-                // Extract formula string for this cell position if available.
-                let formula = formula_range.as_ref().and_then(|fr| fr.get((ri, ci))).filter(|f| !f.is_empty());
-                if let Some(f) = formula {
-                    formula_row.push(serde_json::json!(f));
-                    has_any_formula = true;
-                } else {
-                    formula_row.push(serde_json::Value::Null);
-                }
-            }
-            rows.push(serde_json::json!(cells));
-            formulas.push(serde_json::json!(formula_row));
-        }
-        let mut sheet = serde_json::json!({ "name": name, "rows": rows });
-        // Only include the formulas array when the sheet actually has formulas,
-        // keeping the response lean for plain data sheets.
-        if has_any_formula {
-            sheet["formulas"] = serde_json::json!(formulas);
-        }
+        let (sheet, clipped) = build_sheet(&name, &range, formula_range.as_ref());
+        truncated |= clipped;
         sheets.push(sheet);
     }
 
@@ -184,25 +150,91 @@ fn parse_workbook(path: &std::path::Path) -> Option<Workbook> {
     Some(Workbook { sheets, truncated })
 }
 
+/// Build one sheet's JSON (`{ name, rows, formulas? }`) from a calamine range,
+/// bounded by [`MAX_ROWS`] × [`MAX_COLS`]. The returned bool is `true` when the
+/// row or column cap clipped the sheet. Extracted from [`parse_workbook`] so the
+/// outer per-workbook loop stays under the cognitive-complexity cap.
+fn build_sheet(
+    name: &str,
+    range: &calamine::Range<Data>,
+    formula_range: Option<&calamine::Range<String>>,
+) -> (serde_json::Value, bool) {
+    let mut rows: Vec<serde_json::Value> = Vec::new();
+    let mut formulas: Vec<serde_json::Value> = Vec::new();
+    let mut has_any_formula = false;
+    let mut clipped = false;
+
+    for (ri, row) in range.rows().enumerate() {
+        if rows.len() >= MAX_ROWS {
+            clipped = true;
+            break;
+        }
+        let (cells, formula_row, row_had_formula, row_clipped) = build_row(ri, row, formula_range);
+        has_any_formula |= row_had_formula;
+        clipped |= row_clipped;
+        rows.push(serde_json::json!(cells));
+        formulas.push(serde_json::json!(formula_row));
+    }
+
+    let mut sheet = serde_json::json!({ "name": name, "rows": rows });
+    // Only include the formulas array when the sheet actually has formulas,
+    // keeping the response lean for plain data sheets. Insert via the object
+    // map (not `sheet["formulas"] = …`, which indexes and can panic).
+    if has_any_formula && let Some(obj) = sheet.as_object_mut() {
+        let _prev = obj.insert("formulas".to_owned(), serde_json::json!(formulas));
+    }
+    (sheet, clipped)
+}
+
+/// Stringify one row's cells (bounded by [`MAX_COLS`]) and gather any formula
+/// strings at each column. Returns `(cells, formula_row, row_had_formula,
+/// clipped)` — `clipped` is `true` when the column cap truncated the row.
+fn build_row(
+    ri: usize,
+    row: &[Data],
+    formula_range: Option<&calamine::Range<String>>,
+) -> (Vec<String>, Vec<serde_json::Value>, bool, bool) {
+    let mut cells: Vec<String> = Vec::new();
+    let mut formula_row: Vec<serde_json::Value> = Vec::new();
+    let mut has_any_formula = false;
+    let mut clipped = false;
+
+    for (ci, cell) in row.iter().enumerate() {
+        if ci >= MAX_COLS {
+            clipped = true;
+            break;
+        }
+        cells.push(cell_to_string(cell));
+
+        // Extract the formula string for this cell position, if any.
+        let formula = formula_range.and_then(|fr| fr.get((ri, ci))).filter(|f| !f.is_empty());
+        if let Some(f) = formula {
+            formula_row.push(serde_json::json!(f));
+            has_any_formula = true;
+        } else {
+            formula_row.push(serde_json::Value::Null);
+        }
+    }
+    (cells, formula_row, has_any_formula, clipped)
+}
+
 /// Stringify one workbook cell for display. Empty/error cells render as an
 /// empty string; everything else uses its natural textual form (numbers without
 /// a trailing `.0` where integral, via `Data`'s own `Display`).
 fn cell_to_string(cell: &Data) -> String {
-    match cell {
+    cp_base::deref_match!(cell, {
         Data::Empty => String::new(),
-        Data::String(s) => s.clone(),
-        Data::Float(f) => {
-            // Render an integral float without the ".0" tail (e.g. 42 not 42.0),
-            // matching how a spreadsheet shows a whole number.
-            if f.fract() == 0.0 && f.abs() < 1e15 { format!("{}", *f as i64) } else { format!("{f}") }
-        }
+        Data::String(ref s) | Data::DateTimeIso(ref s) | Data::DurationIso(ref s) => s.clone(),
+        // `f64`'s `Display` already omits a trailing `.0` for integral values
+        // (e.g. `42.0` renders as `42`), matching how a spreadsheet shows a
+        // whole number — so no explicit integral special-case (or `as i64`
+        // truncating cast) is needed.
+        Data::Float(f) => format!("{f}"),
         Data::Int(i) => format!("{i}"),
         Data::Bool(b) => format!("{b}"),
         Data::DateTime(d) => format!("{d}"),
-        Data::DateTimeIso(s) => s.clone(),
-        Data::DurationIso(s) => s.clone(),
-        Data::Error(e) => format!("#{e:?}"),
-    }
+        Data::Error(ref e) => format!("#{e:?}"),
+    })
 }
 
 /// Read a file into memory, capped at `max` bytes (the read simply stops at the

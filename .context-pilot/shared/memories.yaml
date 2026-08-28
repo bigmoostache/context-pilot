@@ -253,9 +253,9 @@ M-mid-8:
 M-mid-9:
   tier: mid
   title: orch-clippy campaign
-  contents: 'Branch orchestrator-clippy off master (T649: workspace clippy=0). Pwd Totordu1789 (chain #88). Committed: create/(ded21fca), accounts(9b3ba553), releases/mod(b6cd16fa), panels(cd201362), listing(86d13e39), rest/releases(cb648689), rest/mod(35fe7a99), transport/mod SPLIT->router.rs(8829af02). KEY: process::exit=E0453 NOT expectable->abort(); pattern_type_mismatch on &[&str]=match *segments; tiny_http Method NOT Copy; lint-exceptions greps comments for ''disallowed_methods''/''#[expect''. exhaustive.rs scrapes router.rs+mod.rs. pub_use=deferred crate-wide pass. LAST: --workspace to check-rust-lints.sh + reseal chain, PR. NOT pushed.'
+  contents: 'Branch orchestrator-clippy off master. Pwd Totordu1789 (chain #88). Commits: create ded21fca, accounts 9b3ba553, releases/mod b6cd16fa, panels cd201362, listing 86d13e39, rest/releases cb648689, rest/mod 35fe7a99, transport-split->router.rs 8829af02, uplink 07be3010, supervisor(ProcManager rename+Spawn/PtyPlan structs) 64b0ec7f. lib lints=217. KEY: process::exit/module_name_repetitions/too_many_args all forbid E0453->genuine fix; pattern_type_mismatch &[&str]=match *segments or .copied(); Method NOT Copy; removing my own added YAML entries restores chain byte-identical (no reseal). LAST: --workspace in check-rust-lints.sh + reseal, PR. NOT pushed.'
   importance: high
-  last_edited_ms: 1787877686563
+  last_edited_ms: 1787878656578
 M-safe-1:
   tier: safe
   title: Hash chain password
