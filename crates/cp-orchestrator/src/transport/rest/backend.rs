@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use crate::inspect::StateReader;
 use crate::services::agent_meta::{AvatarStore, NameOverrides};
-use crate::services::auth::store::AuthStore;
+use crate::services::auth::db::AuthStore;
 use crate::services::materialized_view::MaterializedView;
 use crate::services::releases::ReleaseStore;
 use crate::services::retire::RetiredStore;

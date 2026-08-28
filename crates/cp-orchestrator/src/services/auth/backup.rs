@@ -20,7 +20,7 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use super::store::AuthStore;
+use super::db::AuthStore;
 use super::types::AuthError;
 
 /// Interval between rolling backups (overwrite the single rolling file).
@@ -129,7 +129,7 @@ impl BackupScheduler {
 ///
 /// A free function rather than an inherent method so the whole backup concern
 /// stays in this module without adding a second `impl AuthStore` block (the
-/// primary one lives in `store.rs`, already at the file-length cap). Reads
+/// primary one lives in `db.rs`, already at the file-length cap). Reads
 /// `auth.conn` directly — it is `pub(crate)`.
 ///
 /// Safe to call while other threads read the same connection (WAL mode). The

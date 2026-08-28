@@ -1,9 +1,9 @@
 //! Per-agent access-control operations on [`AuthStore`].
 //!
-//! Extracted from `store.rs` to keep both files within the line budget.
+//! Extracted from `db.rs` to keep both files within the line budget.
 
+use super::db::AuthStore;
 use super::helpers::now_ms;
-use super::store::AuthStore;
 use super::types::{AccessGrant, AclEntry, AgentRole, AuthError};
 
 impl AuthStore {

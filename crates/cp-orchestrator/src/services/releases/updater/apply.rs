@@ -28,7 +28,7 @@ use serde::{Deserialize, Serialize};
 
 use super::super::{ReleaseStore, self_update, stage_orchestrator_update};
 use super::state::{UpdateResult, UpdateState, now_ms};
-use crate::services::auth::store::AuthStore;
+use crate::services::auth::db::AuthStore;
 
 /// In-flight update record under the releases directory.
 const PENDING_UPDATE_FILE: &str = "pending-update.json";

@@ -54,7 +54,7 @@ pub(super) fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |dur| u64::try_from(dur.as_millis()).unwrap_or(u64::MAX))
 }
 
-impl super::store::AuthStore {
+impl super::db::AuthStore {
     /// The auth database path — `CP_AUTH_DB`, else
     /// `~/.context-pilot/orchestrator/auth.db` (the one place this default is
     /// derived; `runtime::Config` and the transport both read it here).

@@ -180,7 +180,7 @@ enum TargetCheck {
 /// non-superadmin cannot probe for superadmin accounts.
 ///
 /// [`NotFound`]: TargetCheck::NotFound
-fn target_manageable_by(auth: &crate::services::auth::store::AuthStore, caller: &User, target_id: &str) -> TargetCheck {
+fn target_manageable_by(auth: &crate::services::auth::db::AuthStore, caller: &User, target_id: &str) -> TargetCheck {
     let target = match auth.get_user_by_id(target_id) {
         Ok(Some(u)) => u,
         Ok(None) => return TargetCheck::NotFound,
@@ -202,7 +202,7 @@ mod tests {
     use std::time::Duration;
 
     use super::{Backend, create_user, list_users};
-    use crate::services::auth::store::AuthStore;
+    use crate::services::auth::db::AuthStore;
     use crate::services::auth::types::{NewUser, User};
     // Bare variant imports (never the fully-qualified `UserRole::` form) so the
     // V1.1a acceptance grep keeps matching only capabilities.rs / types.rs /

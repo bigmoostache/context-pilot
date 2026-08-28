@@ -81,7 +81,7 @@ mod tests {
     // Bare variant imports (the `Admin` variant, not its fully-qualified path)
     // keep the capability-grep gate (V1.1a) clean.
     use super::*;
-    use crate::services::auth::store::AuthStore;
+    use crate::services::auth::db::AuthStore;
     use crate::services::auth::types::UserRole;
     use crate::services::auth::types::UserRole::{Admin, Manager, Superadmin, User as Regular};
     use std::path::PathBuf;

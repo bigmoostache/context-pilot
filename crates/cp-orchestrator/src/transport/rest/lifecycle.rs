@@ -60,7 +60,7 @@ use crate::supervisor;
 ///
 /// Returns `202 {status:"restarting", folder, pid}` on success, `404` for an
 /// unknown agent, `502` for a respawn failure.
-pub fn restart_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
+pub(crate) fn restart_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     let entry = match super::resolve_entry(state, agent_id) {
         Ok(e) => e,
         Err(reply) => return reply,
@@ -150,7 +150,7 @@ struct RestartReceipt {
 ///
 /// Returns `200 {status:"retired", id, folder}` on success, `404` for an
 /// unknown agent.
-pub fn retire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
+pub(crate) fn retire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     let entry = match super::resolve_entry(state, agent_id) {
         Ok(e) => e,
         Err(reply) => return reply,
@@ -208,7 +208,7 @@ pub fn retire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
 ///
 /// Returns `202 {status:"unretiring", id, folder, pid}` on success, `404` if
 /// the agent is not retired, `502` for a respawn failure.
-pub fn unretire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
+pub(crate) fn unretire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     // Clear the flag, recovering the snapshot (404 if it was never retired).
     let record = {
         let Ok(mut b) = state.lock() else {

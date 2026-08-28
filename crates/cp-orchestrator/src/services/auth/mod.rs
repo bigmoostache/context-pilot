@@ -10,12 +10,12 @@
 //!
 //! * [`types`] — Domain types: [`AuthError`], [`UserRole`], [`AgentRole`],
 //!   [`User`], [`Session`].
-//! * [`store`] — [`AuthStore`] struct: schema init, password hashing,
+//! * [`db`] — [`AuthStore`] struct: schema init, password hashing,
 //!   token generation, and all CRUD operations.
 
 pub(crate) mod acl;
 pub(crate) mod backup;
 mod capabilities;
+pub mod db;
 mod helpers;
-pub mod store;
 pub mod types;

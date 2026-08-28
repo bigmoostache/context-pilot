@@ -146,7 +146,7 @@ impl Config {
             .and_then(|s| s.parse::<u64>().ok())
             .map_or(Duration::from_hours(720), Duration::from_secs); // 30 days
 
-        let auth_db_path = crate::services::auth::store::AuthStore::default_db_path();
+        let auth_db_path = crate::services::auth::db::AuthStore::default_db_path();
 
         Ok(Self {
             port,
@@ -195,7 +195,7 @@ impl Runtime {
         // log the error and proceed without auth — the middleware will
         // refuse all requests (fail-closed, NFR-06).
         let auth_store = if config.auth_enabled {
-            match crate::services::auth::store::AuthStore::open(&config.auth_db_path) {
+            match crate::services::auth::db::AuthStore::open(&config.auth_db_path) {
                 Ok(store) => {
                     crate::oerr!("auth enabled — database at {}", config.auth_db_path.display());
                     seed::seed_accounts_if_empty(&store);

@@ -152,7 +152,7 @@ pub struct User {
 /// Borrowed parameters for [`AuthStore::create_user`], bundled so the call
 /// stays within the argument budget (the four fields always travel together).
 ///
-/// [`AuthStore::create_user`]: super::store::AuthStore::create_user
+/// [`AuthStore::create_user`]: super::db::AuthStore::create_user
 #[derive(Clone, Copy)]
 pub(crate) struct NewUser<'req> {
     /// Login email — unique, case-insensitive.
@@ -168,7 +168,7 @@ pub(crate) struct NewUser<'req> {
 /// Borrowed parameters for [`AuthStore::grant_access`], bundled so the call
 /// stays within the argument budget (the four fields always travel together).
 ///
-/// [`AuthStore::grant_access`]: super::store::AuthStore::grant_access
+/// [`AuthStore::grant_access`]: super::db::AuthStore::grant_access
 #[derive(Clone, Copy)]
 pub(crate) struct AccessGrant<'req> {
     /// The agent being granted access to.

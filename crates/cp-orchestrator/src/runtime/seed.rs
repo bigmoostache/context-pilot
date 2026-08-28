@@ -4,7 +4,7 @@
 //! workspace's per-file line budget. The seed runs once at boot from
 //! [`Runtime::new`](super::Runtime::new) when auth is enabled.
 
-use crate::services::auth::store::AuthStore;
+use crate::services::auth::db::AuthStore;
 use crate::services::auth::types::NewUser;
 use crate::services::auth::types::UserRole;
 

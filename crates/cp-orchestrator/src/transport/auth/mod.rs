@@ -24,7 +24,7 @@ use std::sync::Mutex;
 
 use super::Backend;
 use super::rest::HttpReply;
-use crate::services::auth::store::AuthStore;
+use crate::services::auth::db::AuthStore;
 use crate::services::auth::types::NewUser;
 use crate::services::auth::types::{User, UserRole};
 

@@ -71,7 +71,7 @@ mod tests {
     // keep the capability-grep gate (V1.1a) clean — that qualified spelling is
     // reserved for capabilities/types/tests.rs.
     use super::*;
-    use crate::services::auth::store::AuthStore;
+    use crate::services::auth::db::AuthStore;
     use crate::services::auth::types::UserRole;
     use crate::services::auth::types::UserRole::{Admin, Manager, Superadmin, User as Regular};
     use std::path::PathBuf;
