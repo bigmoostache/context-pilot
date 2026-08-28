@@ -27,6 +27,10 @@ pub struct AuthStore {
     pub conn: Connection,
 }
 
+#[expect(
+    clippy::multiple_inherent_impl,
+    reason = "AuthStore's inherent methods are split across db.rs, helpers.rs, and acl.rs to respect the 500-line file cap; folding them into one impl block would push a file over the limit"
+)]
 impl AuthStore {
     /// Open (or create) the auth database at `path` and initialise the schema.
     ///

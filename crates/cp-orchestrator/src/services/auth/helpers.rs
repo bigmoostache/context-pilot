@@ -54,6 +54,10 @@ pub(super) fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |dur| u64::try_from(dur.as_millis()).unwrap_or(u64::MAX))
 }
 
+#[expect(
+    clippy::multiple_inherent_impl,
+    reason = "AuthStore's inherent methods are split across db.rs, helpers.rs, and acl.rs to respect the 500-line file cap; folding them into one impl block would push a file over the limit"
+)]
 impl super::db::AuthStore {
     /// The auth database path — `CP_AUTH_DB`, else
     /// `~/.context-pilot/orchestrator/auth.db` (the one place this default is

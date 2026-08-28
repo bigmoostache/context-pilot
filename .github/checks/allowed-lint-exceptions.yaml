@@ -453,6 +453,34 @@ exceptions:
       Irreducible under the 500-line file cap — the two impl blocks are the honest
       shape once the type's methods exceed one file's budget.
 
+  # ── multiple_inherent_impl: AuthStore split across db/helpers/acl ────
+
+  - path: "crates/cp-orchestrator/src/services/auth/db.rs"
+    match: "AuthStore's inherent methods are split across db.rs, helpers.rs, and acl.rs to respect the 500-line file cap; folding them into one impl block would push a file over the limit"
+    reason: >
+      AuthStore's inherent methods are split across db.rs (the primary impl: open,
+      schema, password hashing, user/session CRUD), helpers.rs (the default_db_path
+      helper), and acl.rs (the per-agent ACL operations). db.rs already sits near
+      the 500-line file cap; folding the sibling blocks back in would push it over
+      the limit. clippy::multiple_inherent_impl fires on the db.rs and helpers.rs
+      blocks (acl.rs is the canonical first), so each carries the #[expect].
+    strategy: >
+      Irreducible under the 500-line file cap — the three impl blocks are the honest
+      shape once the type's methods exceed one file's budget.
+
+  - path: "crates/cp-orchestrator/src/services/auth/helpers.rs"
+    match: "AuthStore's inherent methods are split across db.rs, helpers.rs, and acl.rs to respect the 500-line file cap; folding them into one impl block would push a file over the limit"
+    reason: >
+      AuthStore's inherent methods are split across db.rs (the primary impl: open,
+      schema, password hashing, user/session CRUD), helpers.rs (the default_db_path
+      helper), and acl.rs (the per-agent ACL operations). db.rs already sits near
+      the 500-line file cap; folding the sibling blocks back in would push it over
+      the limit. clippy::multiple_inherent_impl fires on the db.rs and helpers.rs
+      blocks (acl.rs is the canonical first), so each carries the #[expect].
+    strategy: >
+      Irreducible under the 500-line file cap — the three impl blocks are the honest
+      shape once the type's methods exceed one file's budget.
+
   # ── flat path-segment router: too_many_lines + pattern_type_mismatch ──
 
   - path: "crates/cp-orchestrator/src/transport/router.rs"
