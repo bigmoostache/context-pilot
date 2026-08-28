@@ -21,6 +21,30 @@ fn message(thread: &str, byte: u8) -> OpEntryKind {
     }
 }
 
+/// Assert the wholesale-restored roster entry carries the checkpoint's fields.
+/// Extracted so `checkpoint_restores_roster_wholesale` stays under the
+/// cognitive-complexity cap.
+fn assert_carried_wholesale(e: &RosterEntry) {
+    assert_eq!(e.thread_id, "T7");
+    assert_eq!(e.name, "carried");
+    assert_eq!(e.status, ThreadTurn::MyTurn);
+    assert!(e.archived);
+    assert_eq!(e.last_activity_ms, 9_000);
+    assert_eq!(e.msg_count, 4);
+}
+
+/// Assert a freshly-created roster entry's initial fields. Extracted so
+/// `roster_create_archive_restore_cycle` stays under the cognitive-complexity
+/// cap.
+fn assert_fresh_created(e: &RosterEntry) {
+    assert_eq!(e.thread_id, "T1");
+    assert_eq!(e.name, "Refactor cache");
+    assert_eq!(e.status, ThreadTurn::TheirTurn);
+    assert!(!e.archived);
+    assert_eq!(e.last_activity_ms, 1_000);
+    assert_eq!(e.msg_count, 0);
+}
+
 #[test]
 fn message_created_sets_thread_head() {
     let mut view = MaterializedView::new();
@@ -83,11 +107,7 @@ fn checkpoint_restores_roster_wholesale() {
     let agent = view.get("a1").expect("agent present");
     assert_eq!(agent.roster.len(), 1, "checkpoint replaces the roster wholesale");
     let e = agent.roster.first().expect("entry");
-    assert_eq!(e.thread_id, "T7");
-    assert_eq!(e.name, "carried");
-    assert_eq!(e.status, ThreadTurn::MyTurn);
-    assert!(e.archived);
-    assert_eq!(e.msg_count, 4);
+    assert_carried_wholesale(e);
     assert!(agent.roster.iter().all(|r| r.thread_id != "T-stale"), "the pre-checkpoint roster entry is dropped");
 }
 
@@ -139,8 +159,8 @@ fn phase_and_lifecycle_are_latest_wins() {
 #[test]
 fn cost_aggregate_is_latest_not_summed() {
     let mut view = MaterializedView::new();
-    view.apply("a1", &entry(0, OpEntryKind::CostAggregate { input_tokens: 100, output_tokens: 10, cost_usd: 1.0 }));
-    view.apply("a1", &entry(1, OpEntryKind::CostAggregate { input_tokens: 250, output_tokens: 30, cost_usd: 2.5 }));
+    view.apply("a1", &entry(0, OpEntryKind::CostAggregate { input_tokens: 100, output_tokens: 10, cost_usd: 1.0f64 }));
+    view.apply("a1", &entry(1, OpEntryKind::CostAggregate { input_tokens: 250, output_tokens: 30, cost_usd: 2.5f64 }));
 
     let agent = view.get("a1").expect("agent present");
     // Cumulative-since-boot ⇒ latest wins, never 350/40/3.5.
@@ -201,12 +221,7 @@ fn roster_create_archive_restore_cycle() {
     );
     let agent = view.get("a1").expect("agent present");
     let e = agent.roster.first().expect("roster entry");
-    assert_eq!(e.thread_id, "T1");
-    assert_eq!(e.name, "Refactor cache");
-    assert_eq!(e.status, ThreadTurn::TheirTurn);
-    assert!(!e.archived);
-    assert_eq!(e.last_activity_ms, 1_000);
-    assert_eq!(e.msg_count, 0);
+    assert_fresh_created(e);
 
     view.apply("a1", &entry(1, OpEntryKind::ThreadArchived { thread_id: "T1".into() }));
     assert!(view.get("a1").expect("a").roster.first().expect("e").archived);
