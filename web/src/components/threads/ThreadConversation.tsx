@@ -13,8 +13,9 @@ import { FormMessageRow } from "./forms/FormMessageRow"
 import { isFormMessage } from "./forms/helpers"
 import { useScrollPin, useThreadForms } from "./forms/useThreadForms"
 import { parseAutoLine, segmentLog, toChatMessage } from "@/lib/support/threadMessages"
-import { ThreadAside } from "./fileUpload/ThreadAside"
+import { ThreadAsideRail } from "./fileUpload/ThreadAsideRail"
 import { useThreadAside } from "./fileUpload/useThreadAside"
+import { useAsideDefault } from "@/lib/providers/toggles/asideDefault"
 import type { ThreadDetail, ThreadMsg } from "@/lib/types"
 
 /** True only for an actual OS *file* drag — a text/selection drag must not blur. */
@@ -314,8 +315,10 @@ export function ThreadConversation({
   /** restore this thread from the archive — only rendered when the thread is archived (T709) */
   onUnarchive?: (() => void) | undefined
 }) {
-  // Unified right-rail aside state (T662) — see useThreadAside.
-  const aside = useThreadAside()
+  // Unified right-rail aside state (T662) — see useThreadAside. Per-thread
+  // show/hide (T677) is seeded from the global default (Settings › General).
+  const { defaultHidden } = useAsideDefault()
+  const aside = useThreadAside(agentId, thread.id, defaultHidden)
 
   // ── OS-file drag-and-drop onto the whole conversation (T367) ──────────
   // Dragging files from the OS anywhere over the <main> uploads them exactly as
@@ -376,7 +379,7 @@ export function ThreadConversation({
 
   return (
     <main
-      className="relative flex min-w-0 flex-1 flex-row bg-background"
+      className="relative flex min-w-0 flex-1 flex-row overflow-hidden bg-background"
       // Filter is applied ONLY while dragging. A permanent `blur(0px)` (the old
       // idle value) is still a non-`none` filter, so it promotes the ENTIRE
       // conversation to a single GPU compositor layer. On a very tall thread
@@ -470,16 +473,10 @@ export function ThreadConversation({
         </div>
       </div>
 
-      {/* ── Unified right rail: Files + Tasks tabs, inline file preview (T662) ── */}
-      <ThreadAside
-        files={threadFiles}
-        tasks={thread.tasks ?? []}
-        agentId={agentId}
-        tab={aside.tab}
-        onTabChange={aside.setTab}
-        selectedFile={aside.file}
-        onSelectFile={aside.setFile}
-      />
+      {/* ── Unified right rail: Files + Tasks tabs, inline preview + show/hide
+          chrome (T662/T677). Extracted to ThreadAsideRail to keep this render
+          body under the 500-line file budget. */}
+      <ThreadAsideRail agentId={agentId} files={threadFiles} tasks={thread.tasks ?? []} aside={aside} />
 
       <CreateCommandDialog
         open={createCmdOpen}

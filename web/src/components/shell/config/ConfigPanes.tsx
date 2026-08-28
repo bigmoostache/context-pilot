@@ -12,6 +12,7 @@ import { fetchSettings, updateSettings, fetchEnvKeys } from "@/lib/api"
 import { useAuth } from "@/lib/providers/auth"
 import { useDevMode } from "@/lib/providers/toggles/devMode"
 import { useShowOverlay } from "@/lib/providers/toggles/showOverlay"
+import { useAsideDefault } from "@/lib/providers/toggles/asideDefault"
 import { cn } from "@/lib/utils"
 
 // ── per-category bodies ───────────────────────────────────────────
@@ -149,6 +150,7 @@ function GeneralPane() {
       <ToggleRow name="Think reminders" detail="Periodic nudge to reason before acting" on />
       <DevModeToggle />
       <ShowOverlayToggle />
+      <AsideDefaultToggle />
       <AccessControlToggle />
     </Stack>
   )
@@ -324,6 +326,26 @@ function ShowOverlayToggle() {
       detail="Corner performance HUD — Web Vitals, long frames, worst React commits"
       value={showOverlay}
       onChange={setShowOverlay}
+    />
+  )
+}
+
+/**
+ * The **thread details rail** default (T677): whether the Files/Tasks aside
+ * beside a conversation is shown by default. A pure client-side view preference
+ * ({@link useAsideDefault}, `localStorage`-backed). Each thread still remembers
+ * its own show/hide choice; this only sets the fallback for a thread you haven't
+ * toggled yet. Surfaced as "shown by default" so ON = show (the requested
+ * default), OFF = hidden.
+ */
+function AsideDefaultToggle() {
+  const { defaultHidden, setDefaultHidden } = useAsideDefault()
+  return (
+    <ToggleRow
+      name="Thread details rail"
+      detail="Show the Files & Tasks rail beside conversations by default"
+      value={!defaultHidden}
+      onChange={(next) => setDefaultHidden(!next)}
     />
   )
 }

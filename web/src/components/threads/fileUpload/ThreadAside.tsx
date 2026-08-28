@@ -1,5 +1,5 @@
 import { useMemo } from "react"
-import { Paperclip, ListChecks, ChevronLeft, Download } from "lucide-react"
+import { Paperclip, ListChecks, ChevronLeft, Download, PanelRightClose } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { FileIcon } from "@/components/finder/support/macIcons"
@@ -43,6 +43,7 @@ export function ThreadAside({
   onTabChange,
   selectedFile,
   onSelectFile,
+  onHide,
 }: {
   files: ThreadFile[]
   tasks: ThreadTask[]
@@ -51,6 +52,9 @@ export function ThreadAside({
   onTabChange: (tab: "files" | "tasks") => void
   selectedFile: UploadedFile | null
   onSelectFile: (file: UploadedFile | null) => void
+  /** Hide the whole rail for this thread (T677) — the tab bar's right-aligned
+   *  hide button. Re-showing is driven by the parent's floating reopen button. */
+  onHide: () => void
 }) {
   // Per-section presence gates (T666): a tab is shown only when its section has
   // content, and the whole rail disappears when BOTH are empty (the conversation
@@ -95,6 +99,7 @@ export function ThreadAside({
             agentId={agentId}
             file={selectedFile}
             onBack={() => onSelectFile(null)}
+            onHide={onHide}
           />
 
           {/* Tasks tab */}
@@ -124,12 +129,14 @@ export function ThreadAside({
   )
 }
 
-/** The single header row: the left-aligned Tasks/Files tab selector, plus —
- *  while a file preview is open — a right-aligned Download + Back(return to
- *  files) control group, styled to match the tab triggers (icon+text, same
- *  colour, hover changes text colour only, no background). Extracted so its
- *  per-tab presence branches live outside {@link ThreadAside} (keeping that
- *  function under the cyclomatic-complexity budget). The controls replace
+/** The single header row: the left-aligned Tasks/Files tab selector, then a
+ *  right-aligned control cluster. That cluster always ends with an icon-only
+ *  Hide button (T677 — collapses the rail; the parent renders the floating
+ *  reopen affordance), and while a file preview is open it is PREFIXED with the
+ *  Download + Back(return to files) controls, styled to match the tab triggers
+ *  (icon+text, colour-only hover, no background). Extracted so its per-tab
+ *  presence branches live outside {@link ThreadAside} (keeping that function
+ *  under the cyclomatic-complexity budget). The preview controls replace
  *  {@link FinderPreview}'s own Quick Look header, which is suppressed by
  *  rendering the preview with variant="full". */
 function AsideTabBar({
@@ -139,6 +146,7 @@ function AsideTabBar({
   agentId,
   file,
   onBack,
+  onHide,
 }: {
   hasTasks: boolean
   hasFiles: boolean
@@ -146,6 +154,7 @@ function AsideTabBar({
   agentId: string
   file: UploadedFile | null
   onBack: () => void
+  onHide: () => void
 }) {
   return (
     <div className="flex items-center gap-1.5 border-b border-border/60">
@@ -163,18 +172,21 @@ function AsideTabBar({
           </TabsTrigger>
         )}
       </TabsList>
-      {previewing && (
-        <div className="ml-auto flex items-center gap-0.5 pr-1.5">
-          {file && (
-            <button
-              type="button"
-              onClick={() => void downloadFile(agentId, file.path)}
-              className="inline-flex items-center gap-1.5 px-2 text-[13.5px] font-medium text-foreground/60 transition-colors hover:text-foreground"
-            >
-              <Download className="size-3.5" />
-              Download
-            </button>
-          )}
+      {/* Right cluster: the preview opt-in controls (Download + Back), then the
+          always-present hide button pinned to the far right — so hiding stays
+          to the right of the file controls exactly as asked (T677). */}
+      <div className="ml-auto flex items-center gap-0.5 pr-1.5">
+        {previewing && file && (
+          <button
+            type="button"
+            onClick={() => void downloadFile(agentId, file.path)}
+            className="inline-flex items-center gap-1.5 px-2 text-[13.5px] font-medium text-foreground/60 transition-colors hover:text-foreground"
+          >
+            <Download className="size-3.5" />
+            Download
+          </button>
+        )}
+        {previewing && (
           <button
             type="button"
             onClick={onBack}
@@ -183,8 +195,17 @@ function AsideTabBar({
             <ChevronLeft className="size-3.5" />
             Back
           </button>
-        </div>
-      )}
+        )}
+        <button
+          type="button"
+          onClick={onHide}
+          aria-label="Hide details rail"
+          title="Hide"
+          className="inline-flex items-center px-1 text-foreground/60 transition-colors hover:text-foreground"
+        >
+          <PanelRightClose className="size-3.5" />
+        </button>
+      </div>
     </div>
   )
 }
