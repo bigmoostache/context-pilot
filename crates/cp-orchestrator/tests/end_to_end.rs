@@ -68,7 +68,8 @@ use cp_oplog::append::OplogWriter;
 use cp_oplog::replay::replay;
 use cp_oplog::service::Service as OplogService;
 
-use cp_orchestrator::transport::{Backend, serve_bound};
+use cp_orchestrator::transport::rest::backend::Backend;
+use cp_orchestrator::transport::serve_bound;
 
 use cp_wire::types::ContentHash;
 use cp_wire::types::oplog::OpEntryKind;
@@ -110,7 +111,7 @@ fn write_entry(agents_dir: &Path, entry: &Entry) {
 /// address. The acceptor thread runs until the process exits.
 fn serve_backend(agents_dir: &Path) -> (String, Arc<Mutex<Backend>>) {
     let state = Arc::new(Mutex::new(Backend::new(
-        cp_orchestrator::transport::BackendPaths {
+        cp_orchestrator::transport::rest::backend::BackendPaths {
             agents_dir: agents_dir.to_path_buf(),
             agents_root: std::path::PathBuf::from("/tmp/cp-test-realms"),
             agent_binary: std::path::PathBuf::from("/tmp/cp-test-bin"),

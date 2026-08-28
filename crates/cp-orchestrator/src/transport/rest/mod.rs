@@ -24,32 +24,36 @@ use serde::Serialize;
 
 use crate::channel::AgentHandle;
 
-mod backend;
-mod claude_oauth;
+// `pub mod` (not private `mod`) so `Backend`/`BackendPaths` are reachable at
+// a fully-public path (`transport::rest::backend::Backend`) for external test
+// consumers, without a `pub use` item re-export (which `clippy::pub_use`
+// forbids). The crate-internal short path `crate::transport::Backend` rides the
+// `pub(crate) use` below.
+pub mod backend;
+// `pub` (not private `mod`) so the `pub` `Backend::pkce_session` field's type
+// `PkceSession` is nameable through a public path (`rest::claude_oauth::PkceSession`),
+// satisfying `unnameable_types` without a forbidden `pub use` item re-export.
+pub mod claude_oauth;
 mod config;
 mod create;
 mod lifecycle;
 mod releases;
 mod threads;
-pub use backend::{Backend, BackendPaths};
+pub(crate) use backend::Backend;
 pub(crate) use claude_oauth::accounts::{delete_account, list_accounts, store_account, switch_account};
 pub(crate) use claude_oauth::sweep::spawn as spawn_oauth_refresh;
 pub(crate) use claude_oauth::{claude_usage, login_complete, login_start, refresh_login, token_status};
-// Re-exported so the `pub` `Backend::pkce_session` field's type is nameable
-// through a public path (satisfies `unnameable_types`); the module itself stays
-// private.
-pub use claude_oauth::PkceSession;
 pub(crate) use config::env_keys::{env_key_reveal, env_key_update, env_keys_list, vault_snapshot};
 pub(crate) use config::it::{it_ca_fingerprint, it_get_identity, it_provisioned, it_set_identity};
 pub(crate) use config::network::{it_get_network, it_set_network_ap, it_set_network_mode, it_set_network_wwan};
 pub(crate) use config::settings::{allowed_models, onboarding_completed};
-pub use config::settings::{get_settings, update_settings};
+pub(crate) use config::settings::{get_settings, update_settings};
 pub(crate) use config::update::{APPLY_IN_FLIGHT, update_apply, update_check, update_set_mode, update_status};
 pub(crate) use create::{
     create_agent, create_command, delete_library_agent, read_library_agent, upsert_library_agent,
     upsert_library_command,
 };
-pub use lifecycle::{restart_agent, retire_agent, unretire_agent};
+pub(crate) use lifecycle::{restart_agent, retire_agent, unretire_agent};
 pub(crate) use releases::{
     delete_release, deploy_fleet, download_release, list_releases, releases_break_glass, restart_orchestrator,
     select_release, set_arch,

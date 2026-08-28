@@ -51,7 +51,8 @@ use std::time::Duration;
 use cp_oplog::append::OplogWriter;
 
 use cp_orchestrator::registry::tailer::Tailer;
-use cp_orchestrator::transport::{Backend, serve_bound};
+use cp_orchestrator::transport::rest::backend::Backend;
+use cp_orchestrator::transport::serve_bound;
 
 use cp_wire::types::ContentHash;
 use cp_wire::types::oplog::{OpEntry, OpEntryKind};
@@ -132,7 +133,7 @@ fn harness(agent_id: &str, n_msgs: u8) -> Harness {
     write_entry(agents.path(), &entry);
 
     let mut backend = Backend::new(
-        cp_orchestrator::transport::BackendPaths {
+        cp_orchestrator::transport::rest::backend::BackendPaths {
             agents_dir: agents.path().to_path_buf(),
             agents_root: std::path::PathBuf::from("/tmp/cp-test-realms"),
             agent_binary: std::path::PathBuf::from("/tmp/cp-test-bin"),
