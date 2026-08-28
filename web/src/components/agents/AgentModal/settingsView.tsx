@@ -160,7 +160,7 @@ function CategoryRail({ tab, onSelect }: { tab: TabId; onSelect: (t: TabId) => v
   const navHintOf = (id: string): "up" | "down" | undefined =>
     id === prevId ? "up" : id === nextId ? "down" : undefined
   return (
-    <aside className="card-shadow mt-2 flex w-(--sidebar-w) shrink-0 flex-col overflow-hidden rounded-none border border-border bg-surface-2">
+    <aside className="card-shadow my-2 flex w-(--sidebar-w) shrink-0 flex-col overflow-hidden rounded-none border border-border bg-surface-2">
       <div
         className="flex h-full flex-col"
         style={{ width: "var(--sidebar-w)", minWidth: "var(--sidebar-w)" }}

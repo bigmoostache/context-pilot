@@ -72,7 +72,7 @@ export function ThreadAside({
   return (
     <div
       className={
-        "card-shadow mt-2 mr-2 flex shrink-0 flex-col overflow-hidden border-l border-border/70 transition-[width,max-width] duration-300 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none " +
+        "card-shadow my-2 mr-2 flex shrink-0 flex-col overflow-hidden border-l border-border/70 transition-[width,max-width] duration-300 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none " +
         (previewing ? `w-[40vw] ${RAIL_MAX}` : `w-fit min-w-60 ${RAIL_MAX}`)
       }
     >
