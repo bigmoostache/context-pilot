@@ -45,17 +45,15 @@ export function ThreadAsideRail({
 }) {
   // ⌘/Ctrl+H toggles the whole details rail — the exact header pattern
   // (useModifierShortcuts + a HintBadge that reveals the "H" while the modifier
-  // is held). Hidden → show; shown → clear any preview and hide (mirrors the
-  // tab bar's own hide button). Bound BEFORE the early return so the hook is
-  // never conditional (rules-of-hooks); it's inert with no aside on screen.
+  // is held). The previewed file is preserved across hide/show (T689). Bound
+  // BEFORE the early return so the hook is never conditional (rules-of-hooks);
+  // it's inert with no aside on screen.
   const modHeld = useModifierShortcuts({
     h: () => {
-      if (aside.hidden) {
-        aside.setHidden(false)
-      } else {
-        aside.setFile(null)
-        aside.setHidden(true)
-      }
+      // Toggle visibility only — the previewed file is PRESERVED across a
+      // hide/show cycle (T689), so re-showing returns to the open preview
+      // rather than resetting to the file list.
+      aside.setHidden(!aside.hidden)
     },
   })
 
@@ -78,10 +76,7 @@ export function ThreadAsideRail({
           onSelectFile={aside.setFile}
           leftRailHidden={leftRailHidden}
           hintShown={modHeld}
-          onHide={() => {
-            aside.setFile(null)
-            aside.setHidden(true)
-          }}
+          onHide={() => aside.setHidden(true)}
         />
       </div>
 
