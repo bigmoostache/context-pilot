@@ -79,12 +79,12 @@ impl NameOverrides {
             crate::oerr!("names: serialize failed");
             return;
         };
-        let tmp = self.path.with_extension("json.tmp");
-        if std::fs::write(&tmp, &bytes).is_err() {
-            crate::oerr!("names: write tmp failed: {}", tmp.display());
+        let tmp_path = self.path.with_extension("json.tmp");
+        if std::fs::write(&tmp_path, &bytes).is_err() {
+            crate::oerr!("names: write tmp failed: {}", tmp_path.display());
             return;
         }
-        if let Err(e) = std::fs::rename(&tmp, &self.path) {
+        if let Err(e) = std::fs::rename(&tmp_path, &self.path) {
             crate::oerr!("names: rename failed: {e}");
         }
     }
@@ -142,6 +142,10 @@ impl AvatarStore {
 
     /// Store (or replace) an avatar. `bytes` are the raw image; the content
     /// type is sniffed from magic bytes. Returns an error string on failure.
+    ///
+    /// # Errors
+    /// Returns an error string if `bytes` exceeds [`MAX_AVATAR_BYTES`], its
+    /// format is unrecognised, or the directory/file write fails.
     pub fn set(&mut self, agent_id: &str, bytes: &[u8]) -> Result<(), String> {
         if bytes.len() > MAX_AVATAR_BYTES {
             return Err(format!("avatar too large ({} bytes, max {})", bytes.len(), MAX_AVATAR_BYTES));
@@ -153,9 +157,9 @@ impl AvatarStore {
         }
         // Write the image atomically (tmp → rename).
         let file_path = self.dir.join(agent_id);
-        let tmp = file_path.with_extension("tmp");
-        std::fs::write(&tmp, bytes).map_err(|e| format!("write tmp: {e}"))?;
-        std::fs::rename(&tmp, &file_path).map_err(|e| format!("rename: {e}"))?;
+        let tmp_path = file_path.with_extension("tmp");
+        std::fs::write(&tmp_path, bytes).map_err(|e| format!("write tmp: {e}"))?;
+        std::fs::rename(&tmp_path, &file_path).map_err(|e| format!("rename: {e}"))?;
         let _prev = self.types.insert(agent_id.to_owned(), ctype.to_owned());
         self.persist_index();
         Ok(())
@@ -177,12 +181,12 @@ impl AvatarStore {
             crate::oerr!("avatars: serialize index failed");
             return;
         };
-        let tmp = self.index_path.with_extension("json.tmp");
-        if std::fs::write(&tmp, &bytes).is_err() {
-            crate::oerr!("avatars: write tmp failed: {}", tmp.display());
+        let tmp_path = self.index_path.with_extension("json.tmp");
+        if std::fs::write(&tmp_path, &bytes).is_err() {
+            crate::oerr!("avatars: write tmp failed: {}", tmp_path.display());
             return;
         }
-        if let Err(e) = std::fs::rename(&tmp, &self.index_path) {
+        if let Err(e) = std::fs::rename(&tmp_path, &self.index_path) {
             crate::oerr!("avatars: rename failed: {e}");
         }
     }
@@ -209,7 +213,7 @@ fn sniff_image_type(bytes: &[u8]) -> Option<&'static str> {
         return Some("image/gif");
     }
     // WebP: RIFF....WEBP
-    if bytes.len() >= 12 && bytes.starts_with(b"RIFF") && &bytes[8..12] == b"WEBP" {
+    if bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP".as_slice()) {
         return Some("image/webp");
     }
     // BMP: BM
@@ -221,7 +225,7 @@ fn sniff_image_type(bytes: &[u8]) -> Option<&'static str> {
         return Some("image/x-icon");
     }
     // SVG (text-based) — look for <svg in the first 256 bytes.
-    let head = &bytes[..bytes.len().min(256)];
+    let head = bytes.get(..bytes.len().min(256)).unwrap_or(bytes);
     if let Ok(text) = std::str::from_utf8(head) {
         let lower = text.to_lowercase();
         if lower.contains("<svg") {
