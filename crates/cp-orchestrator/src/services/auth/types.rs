@@ -13,10 +13,10 @@ pub(crate) enum AuthError {
 
 impl std::fmt::Display for AuthError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Database(err) => write!(f, "auth database error: {err}"),
-            Self::Hash(msg) => write!(f, "password hash error: {msg}"),
-        }
+        cp_base::deref_match!(self, {
+            Self::Database(ref err) => write!(f, "auth database error: {err}"),
+            Self::Hash(ref msg) => write!(f, "password hash error: {msg}"),
+        })
     }
 }
 
@@ -153,13 +153,14 @@ pub struct User {
 /// stays within the argument budget (the four fields always travel together).
 ///
 /// [`AuthStore::create_user`]: super::store::AuthStore::create_user
-pub(crate) struct NewUser<'a> {
+#[derive(Clone, Copy)]
+pub(crate) struct NewUser<'req> {
     /// Login email — unique, case-insensitive.
-    pub email: &'a str,
+    pub email: &'req str,
     /// Display name.
-    pub name: &'a str,
+    pub name: &'req str,
     /// Plaintext password, hashed with Argon2id before storage.
-    pub password: &'a str,
+    pub password: &'req str,
     /// Role to assign the new account.
     pub role: UserRole,
 }
