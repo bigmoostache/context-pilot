@@ -62,199 +62,223 @@ use tiny_http::Server;
 
 use tempfile::{TempDir, tempdir};
 
-/// Build a registry [`Entry`] with the full schema, pointing at `oplog_dir`.
-fn make_entry(id: &str, oplog_dir: &Path) -> Entry {
-    Entry {
-        schema_version: 1,
-        id: id.to_owned(),
-        folder: "/tmp/agent".to_owned(),
-        pid: std::process::id(),
-        boot_id: "boot-xyz".to_owned(),
-        model: "test-model".to_owned(),
-        protocol_version: 1,
-        binary_version: "0.0.0".to_owned(),
-        socket_path: oplog_dir.join("stream.sock").to_string_lossy().into_owned(),
-        oplog_path: oplog_dir.to_string_lossy().into_owned(),
-        heartbeat_path: oplog_dir.join("hb").to_string_lossy().into_owned(),
-        cap_token: "cap-token".to_owned(),
-        started_at_ms: 0,
-        status: AgentStatus::Running,
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Build a registry [`Entry`] with the full schema, pointing at `oplog_dir`.
+    fn make_entry(id: &str, oplog_dir: &Path) -> Entry {
+        Entry {
+            schema_version: 1,
+            id: id.to_owned(),
+            folder: "/tmp/agent".to_owned(),
+            pid: std::process::id(),
+            boot_id: "boot-xyz".to_owned(),
+            model: "test-model".to_owned(),
+            protocol_version: 1,
+            binary_version: "0.0.0".to_owned(),
+            socket_path: oplog_dir.join("stream.sock").to_string_lossy().into_owned(),
+            oplog_path: oplog_dir.to_string_lossy().into_owned(),
+            heartbeat_path: oplog_dir.join("hb").to_string_lossy().into_owned(),
+            cap_token: "cap-token".to_owned(),
+            started_at_ms: 0,
+            status: AgentStatus::Running,
+        }
     }
-}
 
-/// Write an agent's registry record to `<agents_dir>/<id>.json`.
-fn write_entry(agents_dir: &Path, entry: &Entry) {
-    let json = serde_json::to_string(entry).expect("serialize entry");
-    std::fs::write(agents_dir.join(format!("{}.json", entry.id)), json).expect("write entry");
-}
-
-/// A `MessageCreated` head keyed by `byte`.
-fn message(byte: u8) -> OpEntryKind {
-    OpEntryKind::MessageCreated {
-        thread_id: "T1".to_owned(),
-        message_id: format!("m{byte}"),
-        head: ContentHash::new([byte; 32]),
-        inline_body: None,
+    /// Write an agent's registry record to `<agents_dir>/<id>.json`.
+    fn write_entry(agents_dir: &Path, entry: &Entry) {
+        let json = serde_json::to_string(entry).expect("serialize entry");
+        std::fs::write(agents_dir.join(format!("{}.json", entry.id)), json).expect("write entry");
     }
-}
 
-/// Replay an oplog directory into a flat entry list (for seeding the view).
-fn replay_entries(oplog_dir: &Path) -> Vec<OpEntry> {
-    Tailer::new(oplog_dir.to_path_buf()).poll().expect("poll")
-}
-
-/// A running backend on an ephemeral port. Keeps the temp dirs alive for the
-/// duration of the test.
-struct Harness {
-    /// `host:port` the server is bound to.
-    addr: String,
-    /// Shared backend state.
-    _state: Arc<Mutex<Backend>>,
-    /// Agents directory (held so it outlives the server).
-    _agents: TempDir,
-    /// Oplog directory (held so it outlives the server).
-    _oplog: TempDir,
-}
-
-/// Boot a backend serving one discoverable agent whose oplog holds `n_msgs`
-/// message entries, on a freshly-claimed ephemeral port.
-fn harness(agent_id: &str, n_msgs: u8) -> Harness {
-    let agents = tempdir().expect("agents dir");
-    let oplog = tempdir().expect("oplog dir");
-
-    // Seed the agent's oplog with real entries for the stream to deliver.
-    let mut writer = OplogWriter::open(oplog.path()).expect("open oplog");
-    for byte in 0..n_msgs {
-        let _rev = writer.append(message(byte)).expect("append");
+    /// A `MessageCreated` head keyed by `byte`.
+    fn message(byte: u8) -> OpEntryKind {
+        OpEntryKind::MessageCreated {
+            thread_id: "T1".to_owned(),
+            message_id: format!("m{byte}"),
+            head: ContentHash::new([byte; 32]),
+            inline_body: None,
+        }
     }
-    writer.sync().expect("sync");
 
-    let entry = make_entry(agent_id, oplog.path());
-    write_entry(agents.path(), &entry);
+    /// Replay an oplog directory into a flat entry list (for seeding the view).
+    fn replay_entries(oplog_dir: &Path) -> Vec<OpEntry> {
+        Tailer::new(oplog_dir.to_path_buf()).poll().expect("poll")
+    }
 
-    let mut backend = Backend::new(
-        cp_orchestrator::transport::rest::backend::Paths {
-            agents_dir: agents.path().to_path_buf(),
-            agents_root: std::path::PathBuf::from("/tmp/cp-test-realms"),
-            agent_binary: std::path::PathBuf::from("/tmp/cp-test-bin"),
-        },
-        None,
-        Duration::from_hours(1),
-    );
-    backend.view_mut().apply_batch(agent_id, &replay_entries(oplog.path()));
-    let state = Arc::new(Mutex::new(backend));
+    /// A running backend on an ephemeral port. Keeps the temp dirs alive for the
+    /// duration of the test.
+    struct Harness {
+        /// `host:port` the server is bound to.
+        addr: String,
+        /// Shared backend state.
+        _state: Arc<Mutex<Backend>>,
+        /// Agents directory (held so it outlives the server).
+        _agents: TempDir,
+        /// Oplog directory (held so it outlives the server).
+        _oplog: TempDir,
+    }
 
-    let server = Server::http("127.0.0.1:0").expect("bind ephemeral");
-    let addr = server.server_addr().to_string();
-    let serve_state = Arc::clone(&state);
-    let _acceptor = thread::spawn(move || serve_bound(&server, &serve_state));
+    /// Boot a backend serving one discoverable agent whose oplog holds `n_msgs`
+    /// message entries, on a freshly-claimed ephemeral port.
+    fn harness(agent_id: &str, n_msgs: u8) -> Harness {
+        let agents = tempdir().expect("agents dir");
+        let oplog = tempdir().expect("oplog dir");
 
-    Harness { addr, _state: state, _agents: agents, _oplog: oplog }
-}
+        // Seed the agent's oplog with real entries for the stream to deliver.
+        let mut writer = OplogWriter::open(oplog.path()).expect("open oplog");
+        for byte in 0..n_msgs {
+            let _rev = writer.append(message(byte)).expect("append");
+        }
+        writer.sync().expect("sync");
 
-/// Mint a ticket over the real server and return its token.
-fn ticket_token(h: &Harness) -> String {
-    let body = common::post_json(&h.addr, "/api/ticket", b"").body;
-    body.split_once("\"ticket\":\"")
-        .and_then(|(_, rest)| rest.split_once('"'))
-        .map(|(token, _)| token.to_owned())
-        .expect("ticket token in body")
-}
+        let entry = make_entry(agent_id, oplog.path());
+        write_entry(agents.path(), &entry);
 
-// ── 1. REST envelopes over the wire ─────────────────────────────────────────
+        let mut backend = Backend::new(
+            cp_orchestrator::transport::rest::backend::Paths {
+                agents_dir: agents.path().to_path_buf(),
+                agents_root: std::path::PathBuf::from("/tmp/cp-test-realms"),
+                agent_binary: std::path::PathBuf::from("/tmp/cp-test-bin"),
+            },
+            None,
+            Duration::from_hours(1),
+        );
+        backend.view_mut().apply_batch(agent_id, &replay_entries(oplog.path()));
+        let state = Arc::new(Mutex::new(backend));
 
-#[test]
-fn rest_fleet_and_agent_carry_rev_envelopes() {
-    let h = harness("agent-a", 3);
+        let server = Server::http("127.0.0.1:0").expect("bind ephemeral");
+        let addr = server.server_addr().to_string();
+        let serve_state = Arc::clone(&state);
+        let _acceptor = thread::spawn(move || serve_bound(&server, &serve_state));
 
-    let fleet = common::get(&h.addr, "/api/fleet", &[]);
-    assert_eq!(fleet.status, 200, "fleet served");
-    assert!(fleet.body.contains("\"rev\""), "fleet wraps a rev envelope");
-    assert!(fleet.body.contains("agent-a"), "the agent appears in the fleet");
+        Harness { addr, _state: state, _agents: agents, _oplog: oplog }
+    }
 
-    let agent = common::get(&h.addr, "/api/agent/agent-a", &[]);
-    assert_eq!(agent.status, 200);
-    assert!(agent.body.contains("\"rev\""), "agent view wraps a rev");
+    /// Mint a ticket over the real server and return its token.
+    fn ticket_token(h: &Harness) -> String {
+        let body = common::post_json(&h.addr, "/api/ticket", b"").body;
+        body.split_once("\"ticket\":\"")
+            .and_then(|(_, rest)| rest.split_once('"'))
+            .map(|(token, _)| token.to_owned())
+            .expect("ticket token in body")
+    }
 
-    let missing = common::get(&h.addr, "/api/agent/ghost", &[]);
-    assert_eq!(missing.status, 404, "unknown agent is a real 404");
-}
+    // ── 1. REST envelopes over the wire ─────────────────────────────────────────
 
-// ── 1b. the /healthz readiness probe on the wire ─────────────────────────────
+    #[test]
+    fn rest_fleet_and_agent_carry_rev_envelopes() {
+        let h = harness("agent-a", 3);
 
-/// V2.1a — a bound server with a readable registry (and no auth DB required)
-/// answers `200` on `/healthz` from loopback, with a booleans-only body.
-#[test]
-fn healthz_answers_200_on_the_wire() {
-    let h = harness("agent-hz", 1);
+        let fleet = common::get(&h.addr, "/api/fleet", &[]);
+        assert_eq!(fleet.status, 200, "fleet served");
+        assert!(fleet.body.contains("\"rev\""), "fleet wraps a rev envelope");
+        assert!(fleet.body.contains("agent-a"), "the agent appears in the fleet");
 
-    let reply = common::get(&h.addr, "/healthz", &[]);
-    assert_eq!(reply.status, 200, "healthy box: {}", reply.body);
-    assert!(reply.body.contains("\"status\":\"ok\""), "status ok: {}", reply.body);
-    assert!(!reply.body.contains('/'), "no path or secret in the body: {}", reply.body);
-}
+        let agent = common::get(&h.addr, "/api/agent/agent-a", &[]);
+        assert_eq!(agent.status, 200);
+        assert!(agent.body.contains("\"rev\""), "agent view wraps a rev");
 
-// ── 2. actions: ticket mint, command 400 ─────────────────────────────────────
+        let missing = common::get(&h.addr, "/api/agent/ghost", &[]);
+        assert_eq!(missing.status, 404, "unknown agent is a real 404");
+    }
 
-#[test]
-fn ticket_mint_and_command_status_codes() {
-    let h = harness("agent-b", 1);
+    // ── 1b. the /healthz readiness probe on the wire ─────────────────────────────
 
-    let ticket = common::post_json(&h.addr, "/api/ticket", b"");
-    assert_eq!(ticket.status, 200);
-    assert!(ticket.body.contains("\"ticket\""), "a ticket token is minted");
+    /// V2.1a — a bound server with a readable registry (and no auth DB required)
+    /// answers `200` on `/healthz` from loopback, with a booleans-only body.
+    #[test]
+    fn healthz_answers_200_on_the_wire() {
+        let h = harness("agent-hz", 1);
 
-    let bad = common::post_json(&h.addr, "/api/agent/agent-b/command", b"{not json");
-    assert_eq!(bad.status, 400, "a malformed command is a real 400");
-}
+        let reply = common::get(&h.addr, "/healthz", &[]);
+        assert_eq!(reply.status, 200, "healthy box: {}", reply.body);
+        assert!(reply.body.contains("\"status\":\"ok\""), "status ok: {}", reply.body);
+        assert!(!reply.body.contains('/'), "no path or secret in the body: {}", reply.body);
+    }
 
-// ── 3. the SSE ticket gate is required and single-use ───────────────────────
+    // ── 2. actions: ticket mint, command 400 ─────────────────────────────────────
 
-#[test]
-fn sse_requires_a_valid_single_use_ticket() {
-    let h = harness("agent-c", 4);
+    #[test]
+    fn ticket_mint_and_command_status_codes() {
+        let h = harness("agent-b", 1);
 
-    // No ticket → 401 (the negative case resolves fast).
-    let (no_ticket, _none) =
-        common::sse_collect(&h.addr, "/api/stream?agent=agent-c", &[], 1, Duration::from_millis(600));
-    assert_eq!(no_ticket, 401, "the stream demands a ticket");
+        let ticket = common::post_json(&h.addr, "/api/ticket", b"");
+        assert_eq!(ticket.status, 200);
+        assert!(ticket.body.contains("\"ticket\""), "a ticket token is minted");
 
-    // A bogus ticket → 401.
-    let (bogus, _e) =
-        common::sse_collect(&h.addr, "/api/stream?agent=agent-c&ticket=deadbeef", &[], 1, Duration::from_millis(600));
-    assert_eq!(bogus, 401, "an unminted ticket is rejected");
+        let bad = common::post_json(&h.addr, "/api/agent/agent-b/command", b"{not json");
+        assert_eq!(bad.status, 400, "a malformed command is a real 400");
+    }
 
-    // Mint a real ticket, open the stream resuming from rev 0 → 200 + the
-    // replayed tail (a cold connect head-seeds per T123, so historical deltas
-    // come from the reconnect-replay path).
-    let token = ticket_token(&h);
-    let path = format!("/api/stream?agent=agent-c&ticket={token}");
-    let (ok, events) = common::sse_collect(&h.addr, &path, &[("Last-Event-ID", "0")], 1, Duration::from_secs(3));
-    assert_eq!(ok, 200, "a valid ticket opens the stream");
-    assert!(events.iter().any(|e| e.event == "delta"), "the oplog tail streams as deltas");
+    // ── 3. the SSE ticket gate is required and single-use ───────────────────────
 
-    // The same ticket cannot open a second stream (single-use).
-    let (reused, _e2) = common::sse_collect(&h.addr, &path, &[], 1, Duration::from_millis(800));
-    assert_eq!(reused, 401, "a redeemed ticket is single-use");
-}
+    #[test]
+    fn sse_requires_a_valid_single_use_ticket() {
+        let h = harness("agent-c", 4);
 
-// ── 4. reconnect-replay by rev (Last-Event-ID) ──────────────────────────────
+        // No ticket → 401 (the negative case resolves fast).
+        let (no_ticket, _none) = common::sse_collect(
+            &h.addr,
+            "/api/stream?agent=agent-c",
+            &[],
+            common::SseWait { want: 1, deadline: Duration::from_millis(600) },
+        );
+        assert_eq!(no_ticket, 401, "the stream demands a ticket");
 
-#[test]
-fn sse_resumes_from_last_event_id() {
-    let h = harness("agent-d", 6);
-    let token = ticket_token(&h);
-    let path = format!("/api/stream?agent=agent-d&ticket={token}");
+        // A bogus ticket → 401.
+        let (bogus, _e) = common::sse_collect(
+            &h.addr,
+            "/api/stream?agent=agent-c&ticket=deadbeef",
+            &[],
+            common::SseWait { want: 1, deadline: Duration::from_millis(600) },
+        );
+        assert_eq!(bogus, 401, "an unminted ticket is rejected");
 
-    // Resume from rev 2 → only deltas with a higher rev are delivered.
-    let (status, events) = common::sse_collect(&h.addr, &path, &[("Last-Event-ID", "2")], 1, Duration::from_secs(3));
-    assert_eq!(status, 200);
-    let deltas: Vec<u64> = events.iter().filter(|e| e.event == "delta").filter_map(|e| e.id).collect();
-    assert!(!deltas.is_empty(), "replay delivers the tail past rev 2");
-    assert!(deltas.iter().all(|&rev| rev > 2), "no delta at or below the resumed rev");
-    // Each delta carries the JSON-encoded oplog entry as its data payload.
-    assert!(
-        events.iter().filter(|e| e.event == "delta").all(|e| e.data.contains("\"rev\"")),
-        "a delta's data payload is the serialized oplog entry",
-    );
+        // Mint a real ticket, open the stream resuming from rev 0 → 200 + the
+        // replayed tail (a cold connect head-seeds per T123, so historical deltas
+        // come from the reconnect-replay path).
+        let token = ticket_token(&h);
+        let path = format!("/api/stream?agent=agent-c&ticket={token}");
+        let (ok, events) = common::sse_collect(
+            &h.addr,
+            &path,
+            &[("Last-Event-ID", "0")],
+            common::SseWait { want: 1, deadline: Duration::from_secs(3) },
+        );
+        assert_eq!(ok, 200, "a valid ticket opens the stream");
+        assert!(events.iter().any(|e| e.event == "delta"), "the oplog tail streams as deltas");
+
+        // The same ticket cannot open a second stream (single-use).
+        let (reused, _e2) =
+            common::sse_collect(&h.addr, &path, &[], common::SseWait { want: 1, deadline: Duration::from_millis(800) });
+        assert_eq!(reused, 401, "a redeemed ticket is single-use");
+    }
+
+    // ── 4. reconnect-replay by rev (Last-Event-ID) ──────────────────────────────
+
+    #[test]
+    fn sse_resumes_from_last_event_id() {
+        let h = harness("agent-d", 6);
+        let token = ticket_token(&h);
+        let path = format!("/api/stream?agent=agent-d&ticket={token}");
+
+        // Resume from rev 2 → only deltas with a higher rev are delivered.
+        let (status, events) = common::sse_collect(
+            &h.addr,
+            &path,
+            &[("Last-Event-ID", "2")],
+            common::SseWait { want: 1, deadline: Duration::from_secs(3) },
+        );
+        assert_eq!(status, 200);
+        let deltas: Vec<u64> = events.iter().filter(|e| e.event == "delta").filter_map(|e| e.id).collect();
+        assert!(!deltas.is_empty(), "replay delivers the tail past rev 2");
+        assert!(deltas.iter().all(|&rev| rev > 2), "no delta at or below the resumed rev");
+        // Each delta carries the JSON-encoded oplog entry as its data payload.
+        assert!(
+            events.iter().filter(|e| e.event == "delta").all(|e| e.data.contains("\"rev\"")),
+            "a delta's data payload is the serialized oplog entry",
+        );
+    }
 }
