@@ -66,7 +66,7 @@ export function ThreadAside({
 
   return (
     <div
-      className="shrink-0 overflow-hidden border-l border-border/70 transition-[width] duration-300 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none"
+      className="mx-2 mt-2 shrink-0 overflow-hidden border-l border-border/70 transition-[width] duration-300 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none"
       style={{ width }}
     >
       <div className="flex h-full flex-col" style={{ width }}>
@@ -77,7 +77,7 @@ export function ThreadAside({
             className="flex min-h-0 flex-1 flex-col gap-0"
           >
             {/* Header: left-aligned tab bar. */}
-            <div className="flex items-center gap-1.5 border-b border-border/60 px-2 py-1.5">
+            <div className="flex items-center gap-1.5 border-b border-border/60">
               <TabsList variant="line" className="h-7 gap-0.5">
                 {hasTasks && (
                   <TabsTrigger value="tasks" className="px-2 text-[11px]">
