@@ -343,14 +343,15 @@ pub fn threads(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
         let cfg = reader.read_config(folder).ok();
 
         // Read focused_thread_id from the first worker's FocusState.
-        let disk_focus = reader.list_workers(folder).unwrap_or_default().into_iter().find_map(|wid| {
-            let w = reader.read_worker(folder, &wid).ok()?;
-            w.get("modules")
-                .and_then(|m| m.get("threads_worker"))
-                .and_then(|tw| tw.get("focused_thread_id"))
-                .and_then(serde_json::Value::as_str)
-                .map(String::from)
-        });
+        let disk_focus =
+            crate::inspect::StateReader::list_workers(folder).unwrap_or_default().into_iter().find_map(|wid| {
+                let w = reader.read_worker(folder, &wid).ok()?;
+                w.get("modules")
+                    .and_then(|m| m.get("threads_worker"))
+                    .and_then(|tw| tw.get("focused_thread_id"))
+                    .and_then(serde_json::Value::as_str)
+                    .map(String::from)
+            });
         // The `reader` borrow ends with `cfg`/`focused` (both owned); now read
         // the live roster + focused thread from the view under the same lock.
         // The view's focus (push-fed via `ThreadFocusChanged`) is the fresher

@@ -37,7 +37,7 @@ pub fn usage(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
         return HttpReply::error(500, "backend lock poisoned");
     };
 
-    let wid = match resolve_worker_id(&mut backend, folder_path, query) {
+    let wid = match resolve_worker_id(folder_path, query) {
         Ok(id) => id,
         Err(reply) => return reply,
     };
@@ -54,11 +54,11 @@ pub fn usage(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
 /// Resolve the worker id for [`usage`]: the explicit `?worker=` query param if
 /// present, otherwise the first worker listed on disk. Returns an error
 /// [`HttpReply`] when no worker can be determined.
-fn resolve_worker_id(backend: &mut Backend, folder_path: &Path, query: &str) -> Result<String, HttpReply> {
+fn resolve_worker_id(folder_path: &Path, query: &str) -> Result<String, HttpReply> {
     if let Some(id) = extract_worker_param(query) {
         return Ok(id);
     }
-    let Ok(workers) = backend.inspect_mut().list_workers(folder_path) else {
+    let Ok(workers) = crate::inspect::StateReader::list_workers(folder_path) else {
         return Err(HttpReply::error(404, "cannot list workers"));
     };
     let Some(first) = workers.first() else {
