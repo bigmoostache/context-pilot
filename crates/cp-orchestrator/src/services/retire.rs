@@ -95,7 +95,7 @@ impl RetiredStore {
     pub fn list(&self) -> Vec<RetiredRecord> {
         let mut v: Vec<RetiredRecord> = self.records.values().cloned().collect();
         // Most-recently-retired first.
-        v.sort_by(|a, b| b.retired_at_ms.cmp(&a.retired_at_ms));
+        v.sort_by_key(|r| std::cmp::Reverse(r.retired_at_ms));
         v
     }
 
@@ -126,12 +126,12 @@ impl RetiredStore {
             crate::oerr!("retire: serialize failed");
             return;
         };
-        let tmp = self.path.with_extension("json.tmp");
-        if std::fs::write(&tmp, &bytes).is_err() {
-            crate::oerr!("retire: write tmp failed: {}", tmp.display());
+        let tmp_path = self.path.with_extension("json.tmp");
+        if std::fs::write(&tmp_path, &bytes).is_err() {
+            crate::oerr!("retire: write tmp failed: {}", tmp_path.display());
             return;
         }
-        if let Err(e) = std::fs::rename(&tmp, &self.path) {
+        if let Err(e) = std::fs::rename(&tmp_path, &self.path) {
             crate::oerr!("retire: rename failed: {e}");
         }
     }
