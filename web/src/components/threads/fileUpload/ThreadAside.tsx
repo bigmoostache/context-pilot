@@ -72,53 +72,53 @@ export function ThreadAside({
   return (
     <div
       className={
-        "card-shadow my-2 mr-2 flex shrink-0 flex-col overflow-hidden border-l border-border/70 transition-[width,max-width] duration-300 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none " +
+        "card-shadow my-2 mr-2 flex shrink-0 flex-col overflow-hidden border-l border-border/70 bg-surface-2 transition-[width,max-width] duration-300 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none " +
         (previewing ? `w-[40vw] ${RAIL_MAX}` : `w-fit min-w-60 ${RAIL_MAX}`)
       }
     >
       <TooltipProvider>
-          <Tabs
-            value={activeTab}
-            onValueChange={(v) => onTabChange(v as "files" | "tasks")}
-            className="flex min-h-0 flex-1 flex-col gap-0"
-          >
-            {/* Header: the single always-visible Tasks/Files tab bar. While a
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => onTabChange(v as "files" | "tasks")}
+          className="flex min-h-0 flex-1 flex-col gap-0"
+        >
+          {/* Header: the single always-visible Tasks/Files tab bar. While a
                 file preview is open it is ENRICHED with right-aligned Download +
                 Back(return-to-files) controls — so the aside keeps exactly ONE
                 header and the preview's own Quick Look bar is suppressed (its
                 FinderPreview renders with variant="full"). */}
-            <AsideTabBar
-              hasTasks={hasTasks}
-              hasFiles={hasFiles}
-              previewing={previewing}
-              agentId={agentId}
-              file={selectedFile}
-              onBack={() => onSelectFile(null)}
-            />
+          <AsideTabBar
+            hasTasks={hasTasks}
+            hasFiles={hasFiles}
+            previewing={previewing}
+            agentId={agentId}
+            file={selectedFile}
+            onBack={() => onSelectFile(null)}
+          />
 
-            {/* Tasks tab */}
-            {hasTasks && (
-              <TabsContent value="tasks" className="min-h-0 flex-1 overflow-y-auto">
-                <TaskList tasks={tasks} />
-              </TabsContent>
-            )}
+          {/* Tasks tab */}
+          {hasTasks && (
+            <TabsContent value="tasks" className="min-h-0 flex-1 overflow-y-auto">
+              <TaskList tasks={tasks} />
+            </TabsContent>
+          )}
 
-            {/* Files tab — list, or inline preview when a file is selected */}
-            {hasFiles && (
-              <TabsContent value="files" className="flex min-h-0 flex-1 flex-col">
-                {selectedFile ? (
-                  <InlineFilePreview
-                    file={selectedFile}
-                    agentId={agentId}
-                    onBack={() => onSelectFile(null)}
-                  />
-                ) : (
-                  <FileList files={files} onSelect={onSelectFile} />
-                )}
-              </TabsContent>
-            )}
-          </Tabs>
-        </TooltipProvider>
+          {/* Files tab — list, or inline preview when a file is selected */}
+          {hasFiles && (
+            <TabsContent value="files" className="flex min-h-0 flex-1 flex-col">
+              {selectedFile ? (
+                <InlineFilePreview
+                  file={selectedFile}
+                  agentId={agentId}
+                  onBack={() => onSelectFile(null)}
+                />
+              ) : (
+                <FileList files={files} onSelect={onSelectFile} />
+              )}
+            </TabsContent>
+          )}
+        </Tabs>
+      </TooltipProvider>
     </div>
   )
 }

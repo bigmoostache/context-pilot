@@ -40,9 +40,7 @@ export function TaskList({ tasks }: { tasks: ThreadTask[] }) {
     const children = model.childrenOf.get(parentKey) ?? []
     for (const t of children) {
       const hasChildren = model.childrenOf.has(t.id)
-      const collapsed = hasChildren
-        ? (overrides[t.id] ?? model.defaultCollapsed.has(t.id))
-        : false
+      const collapsed = hasChildren ? (overrides[t.id] ?? model.defaultCollapsed.has(t.id)) : false
       rows.push({ task: t, depth, hasChildren, collapsed })
       if (hasChildren && !collapsed) walk(t.id, depth + 1)
     }

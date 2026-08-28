@@ -56,6 +56,6 @@ function normalizeTask(t: RawTask): ThreadTask {
  */
 export function foldTaskList(prev: ThreadDetail[], k: Kind): ThreadDetail[] | null {
   if (prev.every((t) => t.id !== k.thread_id)) return null // unknown thread → hydrate
-  const tasks = ((k.tasks ?? []) as RawTask[]).map(normalizeTask)
+  const tasks = ((k.tasks ?? []) as RawTask[]).map((t) => normalizeTask(t))
   return prev.map((t) => (t.id === k.thread_id ? { ...t, tasks } : t))
 }
