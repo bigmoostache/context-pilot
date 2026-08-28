@@ -5,6 +5,8 @@
 //! spawns a background driver thread that scans the registry and tails every
 //! agent's oplog, then blocks on the HTTP transport serving REST + SSE.
 
+use std::process::ExitCode;
+
 use cp_orchestrator::runtime::{Config, Runtime};
 
 // Acknowledge crate-level dependencies used only by the library half or by
@@ -35,12 +37,14 @@ use tempfile as _;
 use tiny_http as _;
 use utoipa as _;
 
-fn main() {
+fn main() -> ExitCode {
     // Arguments must be handled before ANYTHING boots: a silently-ignored
     // `--version` used to start the full server, bind the port, and shadow
     // the real service (M6 e2e, 2026-07-16). Unknown arguments are a hard
-    // error for the same reason.
-    for arg in std::env::args().skip(1) {
+    // error for the same reason. Only the first argument is meaningful — both
+    // branches terminate the process — so it is inspected directly rather than
+    // in a loop that could never iterate twice.
+    if let Some(arg) = std::env::args().nth(1) {
         match arg.as_str() {
             "--version" | "-V" => {
                 cp_orchestrator::oout!(
@@ -48,11 +52,11 @@ fn main() {
                     env!("CARGO_PKG_VERSION"),
                     cp_wire::PROTOCOL_VERSION
                 );
-                return;
+                return ExitCode::SUCCESS;
             }
             other => {
                 cp_orchestrator::oerr!("unknown argument: {other}");
-                std::process::exit(2);
+                return ExitCode::from(2);
             }
         }
     }
@@ -74,8 +78,8 @@ fn main() {
     // *before* we bind anything: if the staged binary has crash-looped past the
     // tolerance, `boot_check` rolls back to the `.bak` binary so the service
     // self-heals. The matching commit is health-gated below (needs the port).
-    let install = std::env::current_exe().ok();
-    if let Some(install) = install.as_deref() {
+    let install_path = std::env::current_exe().ok();
+    if let Some(install) = install_path.as_deref() {
         cp_orchestrator::services::releases::self_update::boot_check(install);
     }
 
@@ -83,7 +87,7 @@ fn main() {
         Ok(c) => c,
         Err(e) => {
             cp_orchestrator::oerr!("configuration error: {e}");
-            std::process::exit(1);
+            return ExitCode::FAILURE;
         }
     };
 
@@ -91,7 +95,7 @@ fn main() {
     // auth store opens: if a staged update crash-looped and `boot_check`
     // restored the old binary, this restores the matching `auth.db` backup (a
     // forward migration may have run, §5.8) and records `rolled_back`.
-    if let Some(install) = install.as_deref() {
+    if let Some(install) = install_path.as_deref() {
         let releases_dir = cp_orchestrator::services::releases::ReleaseStore::default_dir()
             .unwrap_or_else(|| config.agents_dir.join("releases"));
         cp_orchestrator::services::releases::updater::apply::boot_reconcile(
@@ -118,7 +122,7 @@ fn main() {
     // deadline, commits the binary swap and promotes the release state
     // (`active_tag`, agent binary). If the probe never turns healthy, the
     // rollback markers stay and the next boot's `boot_check` self-heals.
-    if let Some(install) = install {
+    if let Some(install) = install_path {
         let _committer = runtime.start_update_committer(install.clone());
         // Auto-update scheduler (O4.2): boot poll + nightly-window applies.
         let _scheduler = runtime.start_update_scheduler(install);
@@ -126,6 +130,7 @@ fn main() {
 
     if let Err(e) = runtime.serve() {
         cp_orchestrator::oerr!("serve failed: {e}");
-        std::process::exit(1);
+        return ExitCode::FAILURE;
     }
+    ExitCode::SUCCESS
 }
