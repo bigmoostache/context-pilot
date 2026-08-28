@@ -6,7 +6,7 @@
 //! connects to the agent's `tee.sock`, reads length-prefixed
 //! [`StreamFrame`]s (the same `len + CRC` framing the oplog uses, written by the
 //! agent's `Tee` publisher), and republishes each one into the shared
-//! [`StreamHub`](crate::services::StreamHub) so every connected SSE subscriber
+//! [`StreamHub`](crate::services::stream_hub::StreamHub) so every connected SSE subscriber
 //! fans it out to the browser.
 //!
 //! # One reader per agent, not per subscriber
@@ -73,7 +73,7 @@ pub struct TeeReader {
 
 impl TeeReader {
     /// Spawn a reader for the agent at `folder`, republishing its stream frames
-    /// into `backend`'s [`StreamHub`](crate::services::StreamHub) under
+    /// into `backend`'s [`StreamHub`](crate::services::stream_hub::StreamHub) under
     /// `agent_id`.
     ///
     /// The reader connects to `<folder>/tee.sock`, retrying while the socket is

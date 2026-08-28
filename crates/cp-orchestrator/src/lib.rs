@@ -30,8 +30,8 @@
 //!   [`ProcManager`](supervisor::ProcManager): spawn / stop / restart /
 //!   adopt of agent processes.
 //! * [`services`] — the runtime services layer:
-//!   [`MaterializedView`](services::MaterializedView) (fleet-state projection)
-//!   and [`StreamHub`](services::StreamHub) (stream fan-out).
+//!   [`MaterializedView`](services::materialized_view::MaterializedView) (fleet-state projection)
+//!   and [`StreamHub`](services::stream_hub::StreamHub) (stream fan-out).
 
 /// Emit a diagnostic line to **stderr** — the orchestrator daemon's operational
 /// log channel.

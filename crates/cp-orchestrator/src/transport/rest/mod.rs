@@ -308,7 +308,7 @@ fn ack_status(status: &cp_wire::types::ack::Status) -> String {
 ///
 /// The thread **roster** (which threads exist, their turn status, archived
 /// flag, and last activity) comes from the in-memory
-/// [`MaterializedView`](crate::services::MaterializedView) — folded live from
+/// [`MaterializedView`](crate::services::materialized_view::MaterializedView) — folded live from
 /// the agent's oplog, so a just-created/archived/restored thread is reflected
 /// in milliseconds, never waiting on the debounced tier-② disk write (design
 /// doc I5: live reads ride the view, not disk).
@@ -403,7 +403,7 @@ struct BodyPayload<'bytes> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::MaterializedView;
+    use crate::services::materialized_view::MaterializedView;
     use cp_wire::types::Phase;
     use cp_wire::types::oplog::{OpEntry, OpEntryKind};
     use std::path::PathBuf;

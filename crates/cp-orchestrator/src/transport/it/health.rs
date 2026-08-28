@@ -42,8 +42,8 @@ pub(crate) fn healthz(state: &Mutex<Backend>) -> HttpReply {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::MaterializedView;
     use crate::services::auth::store::AuthStore;
+    use crate::services::materialized_view::MaterializedView;
     use std::path::PathBuf;
     use std::time::Duration;
 

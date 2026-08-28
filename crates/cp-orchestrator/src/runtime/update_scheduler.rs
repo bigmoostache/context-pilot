@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use crate::services::ReleaseStore;
+use crate::services::releases::ReleaseStore;
 use crate::services::releases::updater::apply::{AuthDb, restart_self, stage_apply};
 use crate::services::releases::updater::download::download_artifact;
 use crate::services::releases::updater::verify::UpdateEvaluation;

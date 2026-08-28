@@ -30,7 +30,7 @@
 //! * the agent's **Rust process is killed** (lock-free), and so is its
 //!   **console-server daemon** (which survives TUI restarts by design);
 //! * the retired state is recorded in the orchestrator-owned
-//!   [`RetiredStore`](crate::services::RetiredStore) — **not** the agent's
+//!   [`RetiredStore`](crate::services::retire::RetiredStore) — **not** the agent's
 //!   registry record — so the Retired card can be rendered with no live
 //!   process, and a same-path create can be blocked.
 //!
@@ -42,7 +42,7 @@ use std::sync::Mutex;
 use serde::Serialize;
 
 use super::{Backend, HttpReply};
-use crate::services::RetiredRecord;
+use crate::services::retire::RetiredRecord;
 use crate::supervisor;
 
 // ── Restart ─────────────────────────────────────────────────────────────

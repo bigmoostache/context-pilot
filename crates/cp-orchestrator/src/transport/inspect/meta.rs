@@ -69,7 +69,7 @@ pub fn fleet(state: &Mutex<Backend>, auth_user: Option<&crate::services::auth::t
 /// `GET /api/fleet/retired` — the dashboard's Retired (archived) section.
 ///
 /// Returns one maquette-`Agent`-shaped object per retired agent, built from the
-/// orchestrator's [`RetiredStore`](crate::services::RetiredStore) snapshot rather
+/// orchestrator's [`RetiredStore`](crate::services::retire::RetiredStore) snapshot rather
 /// than the live registry (a retired agent has no running process to inspect).
 /// Each carries `status: "retired"` and a `retiredAt` epoch-ms so the frontend
 /// can render and sort the section without a second lookup.

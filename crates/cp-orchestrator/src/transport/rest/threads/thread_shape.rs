@@ -3,7 +3,7 @@
 //!
 //! The `/threads` handler ([`threads`](super::threads)) combines two
 //! sources: the agent's on-disk `config.json` (full message logs) and the
-//! in-memory [`MaterializedView`](crate::services::MaterializedView) roster
+//! in-memory [`MaterializedView`](crate::services::materialized_view::MaterializedView) roster
 //! (the live, up-to-the-millisecond thread list). The functions here perform
 //! the reshaping and the merge, kept separate from the request-handling code so
 //! both stay small and independently testable.

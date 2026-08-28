@@ -7,9 +7,9 @@
 //! behaviour. This module exposes that slice from state the backend already
 //! collects:
 //!
-//! * **stream** — [`StreamHub`](crate::services::StreamHub) aggregate health:
+//! * **stream** — [`StreamHub`](crate::services::stream_hub::StreamHub) aggregate health:
 //!   live subscriber count, total dropped frames, any-degraded.
-//! * **rev** — the [`MaterializedView`](crate::services::MaterializedView)'s
+//! * **rev** — the [`MaterializedView`](crate::services::materialized_view::MaterializedView)'s
 //!   folded `rev` against the agent oplog's head `rev` (read fresh), and their
 //!   lag; under the live tail the lag is ~0, so a persistent non-zero lag is
 //!   the signal the projection is falling behind.

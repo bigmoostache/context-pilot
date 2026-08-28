@@ -62,7 +62,8 @@ use std::thread;
 
 use cp_oplog::service::Service as OplogService;
 
-use cp_orchestrator::services::{MaterializedView, StreamHub};
+use cp_orchestrator::services::materialized_view::MaterializedView;
+use cp_orchestrator::services::stream_hub::StreamHub;
 use cp_orchestrator::tailer::Tailer;
 
 use cp_wire::types::oplog::OpEntryKind;

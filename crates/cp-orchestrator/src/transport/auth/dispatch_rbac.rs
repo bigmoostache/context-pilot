@@ -8,8 +8,8 @@ use std::sync::{Arc, Mutex};
 
 use tiny_http::Method;
 
-use crate::services::MaterializedView;
 use crate::services::auth::types::{User, UserRole};
+use crate::services::materialized_view::MaterializedView;
 // Bare variant imports (not the `UserRole::Admin` qualified spelling) keep the
 // capability-grep gate clean — the qualified paths are reserved for
 // capabilities/types/tests.rs.

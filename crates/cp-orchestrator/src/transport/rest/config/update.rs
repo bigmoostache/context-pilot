@@ -21,7 +21,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use serde::Deserialize;
 
 use super::super::{Backend, HttpReply};
-use crate::services::ReleaseStore;
+use crate::services::releases::ReleaseStore;
 use crate::services::releases::updater::apply::{AuthDb, restart_self, stage_apply};
 use crate::services::releases::updater::download::download_artifact;
 use crate::services::releases::updater::state::UpdateState;
@@ -223,7 +223,7 @@ pub(crate) fn update_set_mode(state: &Mutex<Backend>, body: &[u8]) -> HttpReply 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::MaterializedView;
+    use crate::services::materialized_view::MaterializedView;
     use std::path::PathBuf;
 
     /// A hermetic backend whose release store lives in a fresh temp dir.
