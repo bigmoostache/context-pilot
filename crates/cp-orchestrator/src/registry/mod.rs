@@ -348,6 +348,15 @@ mod tests {
         fs::write(path, hb.encode().expect("encode")).expect("write heartbeat");
     }
 
+    /// Assert `events` is a single `Appeared` for `id` and that `id` reads back
+    /// live. A plain call, so hoisting the `matches!` guard out of the test body
+    /// keeps `scan_emits_appeared_then_disappeared` under the cognitive cap.
+    fn assert_appeared_live(reg: &FleetScanner, events: &[Event], id: &str) {
+        assert_eq!(events.len(), 1);
+        assert!(matches!(events.first(), Some(Event::Appeared(e)) if e.id == id));
+        assert_eq!(reg.liveness(id), Some(Liveness::Live), "fresh self-pid agent is live");
+    }
+
     #[test]
     fn scan_emits_appeared_then_disappeared() {
         let dir = tempdir().expect("dir");
@@ -358,9 +367,7 @@ mod tests {
 
         let mut reg = FleetScanner::new(dir.path().to_path_buf());
         let first = reg.scan().expect("scan");
-        assert_eq!(first.len(), 1);
-        assert!(matches!(first.first(), Some(Event::Appeared(e)) if e.id == "a"));
-        assert_eq!(reg.liveness("a"), Some(Liveness::Live), "fresh self-pid agent is live");
+        assert_appeared_live(&reg, &first, "a");
 
         // A second scan with no changes is quiet.
         assert!(reg.scan().expect("scan").is_empty(), "idempotent scan emits nothing");
