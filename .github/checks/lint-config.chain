@@ -8062,3 +8062,52 @@ index 5e186a7b..87a6b469 100644
    name: api-contract-ts
    description: API-contract family (OpenAPI spec+routes, TS codegen drift, manual-fetch audit) on web TS edits
 # --- End entry #93 ---
+94:6f1ae818e6248010aa45fb7a820b21f6df7b93b9dd12631f9591206f799f829d:439fa49d0e867a10b72fde3617b878ab2a18cb3118e0be19940ede3187c308fc:897cf24a54c59b5a79b7e6c74c61357e5b211abda342d47acf2d0e03b37d4cbd
+# --- Diff for entry #94 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index d551b7b1..70e88880 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -316,7 +316,7 @@ exceptions:
+     strategy: >
+       Irreducible — a 10-arg constructor trips too_many_arguments; the exhaustive literal is honest.
+ 
+-  - path: "crates/cp-wire/src/types/oplog.rs"
++  - path: "crates/cp-wire/src/types/oplog/mod.rs"
+     match: "OpEntryKind carries an Unknown catch-all for N-1 tolerance"
+     reason: >
+       OpEntryKind has an Unknown catch-all and is constructed cross-crate (the agent
+@@ -324,6 +324,15 @@ exceptions:
+     strategy: >
+       Irreducible — the Unknown variant already provides forward-compat.
+ 
++  - path: "crates/cp-wire/src/types/snapshot/todo.rs"
++    match: "WireTaskStatus carries an Unknown catch-all for N-1 forward-compat"
++    reason: >
++      WireTaskStatus has an Unknown catch-all for N-1 forward-compat and is constructed
++      cross-crate (the agent projects task statuses); non_exhaustive would forbid that
++      construction and add nothing the Unknown variant does not already provide.
++    strategy: >
++      Irreducible — the Unknown variant already provides forward-compat.
++
+   - path: "crates/cp-wire/src/types/stream.rs"
+     match: "the stream-frame Kind carries an Unknown catch-all"
+     reason: >
+@@ -386,6 +395,16 @@ exceptions:
+     strategy: >
+       Irreducible — a 6-arg constructor trips too_many_arguments; the exhaustive literal is honest.
+ 
++  - path: "crates/cp-wire/src/types/snapshot/todo.rs"
++    match: "wire value object: all five fields are public, stable, and built by cross-crate consumers via a struct literal"
++    reason: >
++      WireTask is the five-field read-only task projection, built by struct literal cross-crate
++      (the agent's task projection and the orchestrator's first-paint read). A constructor would
++      take five positional arguments (tripping too_many_arguments) with no natural grouping, so
++      #[non_exhaustive] is impossible.
++    strategy: >
++      Irreducible — a five-arg constructor trips too_many_arguments; the exhaustive literal is honest.
++
+   # ── exhaustive_enums: T671 read-path query contracts ─────────────────
+   # The read-plane mirror of the command contracts above: query Kind is built
+   # by the orchestrator and matched exhaustively by the agent (Unknown catch-all
+# --- End entry #94 ---

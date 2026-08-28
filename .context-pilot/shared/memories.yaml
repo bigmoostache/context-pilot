@@ -650,6 +650,12 @@ M-tiny-23:
   contents: 'Context Pilot: Rust TUI AI coding assistant (Ratatui+Crossterm). Workspace = 22+ crates + 1 main binary (tui).'
   importance: low
   last_edited_ms: 1787840964664
+M-tiny-24:
+  tier: tiny
+  title: Queue is mandatory
+  contents: 'Edits ALWAYS queue; cannot bypass. Inherent to context-pilot, forces batching = big token savings. Don''t fight it: batch edits, Queue_execute once.'
+  importance: high
+  last_edited_ms: 1787910296001
 M-tiny-3:
   tier: tiny
   title: 'Haiku 4.5 max_tokens fix:'
