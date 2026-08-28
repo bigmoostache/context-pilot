@@ -45,7 +45,23 @@ export function ThreadAside({
   selectedFile: UploadedFile | null
   onSelectFile: (file: UploadedFile | null) => void
 }) {
-  const previewing = tab === "files" && selectedFile !== null
+  // Per-section presence gates (T666): a tab is shown only when its section has
+  // content, and the whole rail disappears when BOTH are empty (the conversation
+  // then takes the full width).
+  const hasFiles = files.length > 0
+  const hasTasks = tasks.length > 0
+  if (!hasFiles && !hasTasks) return null
+
+  // Clamp the active tab to a VISIBLE one: keep the requested tab when its
+  // section still has content, else fall back to whichever tab remains. Prevents
+  // landing on a now-hidden tab after switching to a thread that lacks it.
+  const activeTab: "files" | "tasks" =
+    (tab === "files" && hasFiles) || (tab === "tasks" && hasTasks)
+      ? tab
+      : hasTasks
+        ? "tasks"
+        : "files"
+  const previewing = activeTab === "files" && selectedFile !== null
   const width = previewing ? PREVIEW_WIDTH : LIST_WIDTH
 
   return (
@@ -56,7 +72,7 @@ export function ThreadAside({
       <div className="flex h-full flex-col" style={{ width }}>
         <TooltipProvider>
           <Tabs
-            value={tab}
+            value={activeTab}
             onValueChange={(v) => onTabChange(v as "files" | "tasks")}
             className="flex min-h-0 flex-1 flex-col gap-0"
           >
@@ -64,34 +80,42 @@ export function ThreadAside({
                 240 → 680 for a file preview. */}
             <div className="flex items-center gap-1.5 border-b border-border/60 px-2 py-1.5">
               <TabsList variant="line" className="ml-auto h-7 gap-0.5">
-                <TabsTrigger value="tasks" className="px-2 text-[11px]">
-                  <ListChecks className="size-3" />
-                  Tasks
-                </TabsTrigger>
-                <TabsTrigger value="files" className="px-2 text-[11px]">
-                  <Paperclip className="size-3" />
-                  Files
-                </TabsTrigger>
+                {hasTasks && (
+                  <TabsTrigger value="tasks" className="px-2 text-[11px]">
+                    <ListChecks className="size-3" />
+                    Tasks
+                  </TabsTrigger>
+                )}
+                {hasFiles && (
+                  <TabsTrigger value="files" className="px-2 text-[11px]">
+                    <Paperclip className="size-3" />
+                    Files
+                  </TabsTrigger>
+                )}
               </TabsList>
             </div>
 
             {/* Tasks tab */}
-            <TabsContent value="tasks" className="min-h-0 flex-1 overflow-y-auto p-1.5">
-              <TaskList tasks={tasks} />
-            </TabsContent>
+            {hasTasks && (
+              <TabsContent value="tasks" className="min-h-0 flex-1 overflow-y-auto p-1.5">
+                <TaskList tasks={tasks} />
+              </TabsContent>
+            )}
 
             {/* Files tab — list, or inline preview when a file is selected */}
-            <TabsContent value="files" className="flex min-h-0 flex-1 flex-col">
-              {selectedFile ? (
-                <InlineFilePreview
-                  file={selectedFile}
-                  agentId={agentId}
-                  onBack={() => onSelectFile(null)}
-                />
-              ) : (
-                <FileList files={files} onSelect={onSelectFile} />
-              )}
-            </TabsContent>
+            {hasFiles && (
+              <TabsContent value="files" className="flex min-h-0 flex-1 flex-col">
+                {selectedFile ? (
+                  <InlineFilePreview
+                    file={selectedFile}
+                    agentId={agentId}
+                    onBack={() => onSelectFile(null)}
+                  />
+                ) : (
+                  <FileList files={files} onSelect={onSelectFile} />
+                )}
+              </TabsContent>
+            )}
           </Tabs>
         </TooltipProvider>
       </div>
