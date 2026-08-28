@@ -69,10 +69,19 @@ pub(crate) fn authenticate(
         return Err(HttpReply::error(401, "missing authorization"));
     };
 
-    let b = state.lock().map_err(|_| HttpReply::error(500, "backend lock poisoned"))?;
-    let auth = b.auth.as_ref().ok_or_else(|| HttpReply::error(501, "auth not enabled"))?;
+    // One statement so the `MutexGuard` is a temporary dropped at the `;`, not
+    // a named binding held across the match (significant_drop_tightening). The
+    // session lookup returns an owned outcome, so nothing borrows the guard past
+    // the statement.
+    let outcome = state
+        .lock()
+        .map_err(|_poison| HttpReply::error(500, "backend lock poisoned"))?
+        .auth
+        .as_ref()
+        .ok_or_else(|| HttpReply::error(501, "auth not enabled"))?
+        .validate_session(token);
 
-    match auth.validate_session(token) {
+    match outcome {
         Ok(Some(user)) => Ok(Some(user)),
         Ok(None) => Err(HttpReply::error(401, "invalid or expired session")),
         Err(_) => Err(HttpReply::error(500, "session validation error")),
@@ -141,9 +150,8 @@ pub(crate) fn login(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     }
 
     let ttl = b.session_ttl;
-    let token = match auth.create_session(&user.id, None, ttl) {
-        Ok(t) => t,
-        Err(_) => return HttpReply::error(500, "session creation failed"),
+    let Ok(token) = auth.create_session(&user.id, None, ttl) else {
+        return HttpReply::error(500, "session creation failed");
     };
 
     HttpReply::ok(&serde_json::json!({
@@ -182,9 +190,8 @@ pub(crate) fn register(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&U
         return HttpReply::error(501, "auth not enabled");
     };
 
-    let user_count = match auth.count_users() {
-        Ok(n) => n,
-        Err(_) => return HttpReply::error(500, "database error"),
+    let Ok(user_count) = auth.count_users() else {
+        return HttpReply::error(500, "database error");
     };
 
     // Bootstrap: the first-ever account is the vendor `superadmin` (FR-03 →
@@ -276,14 +283,14 @@ fn next_action(user: &User, provisioned: bool) -> &'static str {
 /// profile). Body: `{ "current": "...", "new": "..." }`. Verifies the current
 /// password before applying the new one (min length enforced).
 pub(crate) fn change_password(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&User>) -> HttpReply {
-    let Some(caller) = auth_user else {
-        return HttpReply::error(501, "auth not enabled");
-    };
     #[derive(serde::Deserialize)]
     struct Req {
         current: String,
         new: String,
     }
+    let Some(caller) = auth_user else {
+        return HttpReply::error(501, "auth not enabled");
+    };
     let Ok(req) = serde_json::from_slice::<Req>(body) else {
         return HttpReply::error(400, "expected {\"current\":\"...\",\"new\":\"...\"}");
     };
@@ -311,14 +318,14 @@ pub(crate) fn change_password(state: &Mutex<Backend>, body: &[u8], auth_user: Op
 /// `PATCH /api/auth/me` — update the current user's display name and email.
 /// Body: `{ "name": "...", "email": "..." }`. Returns the refreshed profile.
 pub(crate) fn update_me(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&User>) -> HttpReply {
-    let Some(caller) = auth_user else {
-        return HttpReply::error(501, "auth not enabled");
-    };
     #[derive(serde::Deserialize)]
     struct Req {
         name: String,
         email: String,
     }
+    let Some(caller) = auth_user else {
+        return HttpReply::error(501, "auth not enabled");
+    };
     let Ok(req) = serde_json::from_slice::<Req>(body) else {
         return HttpReply::error(400, "expected {\"name\":\"...\",\"email\":\"...\"}");
     };
@@ -359,10 +366,10 @@ pub(crate) fn list_sessions(state: &Mutex<Backend>, auth_token: Option<&str>, au
     let Some(auth) = b.auth.as_ref() else {
         return HttpReply::error(501, "auth not enabled");
     };
-    match auth.list_sessions(&caller.id, auth_token) {
-        Ok(sessions) => HttpReply::ok(&serde_json::json!({ "sessions": sessions })),
-        Err(_) => HttpReply::error(500, "database error"),
-    }
+    auth.list_sessions(&caller.id, auth_token).map_or_else(
+        |_| HttpReply::error(500, "database error"),
+        |sessions| HttpReply::ok(&serde_json::json!({ "sessions": sessions })),
+    )
 }
 
 /// `DELETE /api/auth/sessions/{id}` — revoke one of the current user's own
