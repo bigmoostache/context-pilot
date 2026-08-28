@@ -254,7 +254,13 @@ function InlineFilePreview({
   onBack: () => void
 }) {
   return (
-    <div className="min-h-0 flex-1 overflow-hidden">
+    // MUST be a flex COLUMN: the embedded FinderPreview (variant="full") sizes
+    // itself with `flex-1`/`min-h-0`, which only resolves to a bounded height
+    // inside a flex-column parent. A plain block here let the preview grow to
+    // content height, so its inner `overflow-y-auto` scroll containers never
+    // overflowed and the excess was silently clipped by `overflow-hidden` —
+    // the "can't scroll the md file viewer" bug (T673).
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <FinderPreview node={uploadToNode(file)} agentId={agentId} variant="full" onClose={onBack} />
     </div>
   )
