@@ -63,7 +63,9 @@ export function TaskList({ tasks }: { tasks: ThreadTask[] }) {
   )
 }
 
-/** One task row: optional chevron (parents) + status icon + name. */
+/** One task row: status icon + name, then a TRAILING collapse chevron for
+ *  parents (leaf rows render nothing after the name — no leading spacer needed,
+ *  the label's `flex-1` pushes the chevron to the row's right edge). */
 function TaskRow({
   task,
   depth,
@@ -84,7 +86,7 @@ function TaskRow({
   // centreline; a `text-…/4` line box would centre its 16px *box* but leave the
   // glyphs sitting optically low (the check then reads as "too high").
   const label = (
-    <span className="flex min-h-4 min-w-0 items-center">
+    <span className="flex min-h-4 min-w-0 flex-1 items-center">
       <span
         className={
           task.status === "done"
@@ -117,7 +119,11 @@ function TaskRow({
           }
         : {})}
     >
-      {hasChildren ? (
+      <span className="flex h-4 shrink-0 items-center">
+        <StatusIcon status={task.status} />
+      </span>
+      {label}
+      {hasChildren && (
         <span className="flex h-4 shrink-0 items-center">
           <ChevronRight
             className={
@@ -126,13 +132,7 @@ function TaskRow({
             }
           />
         </span>
-      ) : (
-        <span className="h-4 w-3 shrink-0" />
       )}
-      <span className="flex h-4 shrink-0 items-center">
-        <StatusIcon status={task.status} />
-      </span>
-      {label}
     </div>
   )
 }
