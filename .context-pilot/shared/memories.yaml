@@ -75,28 +75,6 @@ M-long-7:
   title: NEVER touch temp_1.md or
   importance: critical
   last_edited_ms: 1787840930958
-M-long-8:
-  tier: long
-  title: I run on Mac Mini
-  contents: |-
-    I run on Mac Mini (Guillaume-2.local, user guillaumedraznieks, realm ~/code/cpilot), NOT the MacBook. Local shell/git run here. Git identity CORRECTED T584: now Sui-ne-laxim <250819889+Sui-ne-laxim@users.noreply.github.com> (was wrong plang). Full details in body.
-
-    HUGE context change (2026-07-17): agent runtime host moved from guillaume's MacBook to the Mac Mini.
-
-    GIT IDENTITY (corrected T584 2026-07-19): global ~/.gitconfig was set to a DIFFERENT person — PLang <323260+plang@users.noreply.github.com> (github user 'plang'). Now corrected to the user's real account: user.name=Sui-ne-laxim, user.email=250819889+Sui-ne-laxim@users.noreply.github.com (github id 250819889). All prior mis-attributed commits on PR#152 were re-authored + force-pushed.
-
-    MACHINE I RUN ON NOW:
-    - host: Guillaume-2.local (tailscale HostName 'Guillaume')
-    - user guillaumedraznieks, home /Users/guillaumedraznieks, realm ~/code/cpilot
-    - Macmini9,1 = Mac Mini (M1, 2020), Apple M1 8-core arm64, 16GB RAM, macOS 26.3, ~258Gi free
-
-    TAILSCALE (this node):
-    - MagicDNS guillaume.barking-hue.ts.net, IP 100.71.221.58 / fd7a:115c:a1e0::2636:dd3b
-    - tailnet barking-hue.ts.net, account g.draznieks@
-    - serve https://guillaume.barking-hue.ts.net -> proxies / to VITE DEV (http://localhost:5174) as of T579. Let's Encrypt (YE1), exp Oct 15 2026
-    - /us
-  importance: critical
-  last_edited_ms: 0
 M-long-9:
   tier: long
   title: MULTI-WORKER (subworkers
