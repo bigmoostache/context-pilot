@@ -77,6 +77,18 @@ pub struct ContextSnapshot {
     pub miss: u64,
 }
 
+impl ContextSnapshot {
+    /// Assemble a snapshot from the `(used, threshold, budget, hit, miss)`
+    /// figures carried by a [`ContextUsage`](OpEntryKind::ContextUsage) entry.
+    /// Takes the five as a tuple so the constructor stays within the
+    /// four-argument cap.
+    #[must_use]
+    const fn from_usage(figures: (u64, u64, u64, u64, u64)) -> Self {
+        let (used, threshold, budget, hit, miss) = figures;
+        Self { used, threshold, budget, hit, miss }
+    }
+}
+
 /// One agent's current projected state.
 ///
 /// Folded from the agent's [`OpEntry`] stream; every field reflects the most
@@ -181,13 +193,8 @@ impl AgentView {
                 self.cost = CostSnapshot { input_tokens, output_tokens, cost_usd };
             }
             OpEntryKind::ContextUsage { used_tokens, threshold_tokens, budget_tokens, hit_tokens, miss_tokens } => {
-                self.context = ContextSnapshot {
-                    used: used_tokens,
-                    threshold: threshold_tokens,
-                    budget: budget_tokens,
-                    hit: hit_tokens,
-                    miss: miss_tokens,
-                };
+                self.context =
+                    ContextSnapshot::from_usage((used_tokens, threshold_tokens, budget_tokens, hit_tokens, miss_tokens));
             }
             // Durability-only records, message-delete, behaviour/identity change,
             // and forward-compat unknowns do not affect the projected state.

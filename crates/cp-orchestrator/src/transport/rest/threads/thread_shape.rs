@@ -13,10 +13,10 @@ use cp_wire::types::snapshot::todo::{WireTask, WireTaskStatus};
 
 use crate::services::materialized_view::RosterEntry;
 
-/// Map a [`WireTaskStatus`] to its maquette wire string (lowercase snake_case,
+/// Map a [`WireTaskStatus`] to its maquette wire string (lowercase `snake_case`,
 /// matching the agent's `TodoStatus` serde). `Unknown` degrades to `"planned"`
 /// rather than failing — a newer protocol status renders as a plain item.
-fn task_status_str(status: WireTaskStatus) -> &'static str {
+const fn task_status_str(status: WireTaskStatus) -> &'static str {
     match status {
         WireTaskStatus::Planned | WireTaskStatus::Unknown => "planned",
         WireTaskStatus::InProgress => "in_progress",
@@ -25,7 +25,7 @@ fn task_status_str(status: WireTaskStatus) -> &'static str {
 }
 
 /// Reshape one projected [`WireTask`] into the maquette `ThreadTask` JSON shape
-/// (snake_case → camelCase `parentId`), the read-only todo item the web aside
+/// (`snake_case` → camelCase `parentId`), the read-only todo item the web aside
 /// renders. Cancelled tasks never reach here (excluded upstream).
 fn reshape_task(task: &WireTask) -> serde_json::Value {
     serde_json::json!({
@@ -138,7 +138,7 @@ pub(crate) fn attach_disk_tasks(details: &mut [serde_json::Value], config: Optio
 }
 
 /// Reshape one raw `config.json` todo item into the maquette `ThreadTask` shape
-/// (`parent_id` → `parentId`; status kept as its snake_case wire string).
+/// (`parent_id` → `parentId`; status kept as its `snake_case` wire string).
 fn disk_task_json(todo: &serde_json::Value) -> serde_json::Value {
     serde_json::json!({
         "id": todo.get("id").and_then(serde_json::Value::as_str).unwrap_or(""),

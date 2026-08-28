@@ -52,9 +52,9 @@ fn message_created_inline_body_round_trips_and_omits_when_none() {
             inline_body: Some(r#"{"author":"user","text":"hi"}"#.into()),
         },
     };
-    let json = serde_json::to_string(&inlined).expect("serialize");
-    assert!(json.contains("inline_body"), "inline body present on the wire: {json}");
-    assert_eq!(serde_json::from_str::<OpEntry>(&json).expect("deserialize"), inlined);
+    let inlined_json = serde_json::to_string(&inlined).expect("serialize");
+    assert!(inlined_json.contains("inline_body"), "inline body present on the wire: {inlined_json}");
+    assert_eq!(serde_json::from_str::<OpEntry>(&inlined_json).expect("deserialize"), inlined);
 
     // A spilled (None) body is omitted from the wire entirely.
     let spilled = OpEntry {
@@ -68,9 +68,9 @@ fn message_created_inline_body_round_trips_and_omits_when_none() {
             inline_body: None,
         },
     };
-    let json = serde_json::to_string(&spilled).expect("serialize");
-    assert!(!json.contains("inline_body"), "spilled body omits the field: {json}");
-    assert_eq!(serde_json::from_str::<OpEntry>(&json).expect("deserialize"), spilled);
+    let spilled_json = serde_json::to_string(&spilled).expect("serialize");
+    assert!(!spilled_json.contains("inline_body"), "spilled body omits the field: {spilled_json}");
+    assert_eq!(serde_json::from_str::<OpEntry>(&spilled_json).expect("deserialize"), spilled);
 }
 
 #[test]
@@ -149,16 +149,16 @@ fn behaviour_changed_round_trip_and_stable_tag() {
         timestamp_ms: 0,
         kind: OpEntryKind::BehaviourChanged { agent_id: Some("caveman".into()) },
     };
-    let json = serde_json::to_string(&with_id).expect("serialize");
-    assert!(json.contains("\"kind\":\"behaviour_changed\""), "stable tag: {json}");
-    assert!(json.contains("caveman"), "carries the active id: {json}");
-    assert_eq!(serde_json::from_str::<OpEntry>(&json).expect("deserialize"), with_id);
+    let with_id_json = serde_json::to_string(&with_id).expect("serialize");
+    assert!(with_id_json.contains("\"kind\":\"behaviour_changed\""), "stable tag: {with_id_json}");
+    assert!(with_id_json.contains("caveman"), "carries the active id: {with_id_json}");
+    assert_eq!(serde_json::from_str::<OpEntry>(&with_id_json).expect("deserialize"), with_id);
 
     let reverted =
         OpEntry { schema_version: 1, rev: 6, timestamp_ms: 0, kind: OpEntryKind::BehaviourChanged { agent_id: None } };
-    let json = serde_json::to_string(&reverted).expect("serialize");
-    assert!(!json.contains("agent_id"), "None id omitted: {json}");
-    assert_eq!(serde_json::from_str::<OpEntry>(&json).expect("deserialize"), reverted);
+    let reverted_json = serde_json::to_string(&reverted).expect("serialize");
+    assert!(!reverted_json.contains("agent_id"), "None id omitted: {reverted_json}");
+    assert_eq!(serde_json::from_str::<OpEntry>(&reverted_json).expect("deserialize"), reverted);
 }
 
 #[test]
