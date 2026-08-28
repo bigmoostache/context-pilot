@@ -10,9 +10,14 @@ import type { ThreadFile } from "./FileSidebar"
 import { TaskList } from "./ThreadAsideTasks"
 import type { ThreadTask } from "@/lib/types"
 
-/** Rail width (px) while browsing the list; widens when a file preview is open. */
-const LIST_WIDTH = 440
-const PREVIEW_WIDTH = 680
+/**
+ * Rail width strategy (dynamic): in LIST mode the rail sizes to its content
+ * (`w-fit`) — as wide as its longest task/file line — floored at a sensible
+ * minimum and capped at 2/5 of the viewport (`max-w-[40vw]`), beyond which the
+ * content wraps. In PREVIEW mode (a file open) the rail takes the full 40vw cap
+ * so the embedded {@link FinderPreview} has room.
+ */
+const RAIL_MAX = "max-w-[40vw]"
 
 /**
  * The unified right-rail aside for a thread conversation (T662) — a single
@@ -20,7 +25,7 @@ const PREVIEW_WIDTH = 680
  * separate {@link FileSidebar} + {@link TodoSidebar} rails.
  *
  * In the Files tab, clicking a file swaps the list for an inline
- * {@link FinderPreview} and widens the rail to {@link PREVIEW_WIDTH} — so the
+ * {@link FinderPreview} and widens the rail to the {@link RAIL_MAX} cap — so the
  * drawer that previously popped over the whole conversation is gone (the Finder
  * still uses that drawer; threads no longer do).
  *
@@ -62,15 +67,15 @@ export function ThreadAside({
         ? "tasks"
         : "files"
   const previewing = activeTab === "files" && selectedFile !== null
-  const width = previewing ? PREVIEW_WIDTH : LIST_WIDTH
 
   return (
     <div
-      className="mx-2 mt-2 shrink-0 overflow-hidden border-l border-border/70 transition-[width] duration-300 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none"
-      style={{ width }}
+      className={
+        "mx-2 mt-2 flex shrink-0 flex-col overflow-hidden border-l border-border/70 transition-[width,max-width] duration-300 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none " +
+        (previewing ? `w-[40vw] ${RAIL_MAX}` : `w-fit min-w-60 ${RAIL_MAX}`)
+      }
     >
-      <div className="flex h-full flex-col" style={{ width }}>
-        <TooltipProvider>
+      <TooltipProvider>
           <Tabs
             value={activeTab}
             onValueChange={(v) => onTabChange(v as "files" | "tasks")}
@@ -117,7 +122,6 @@ export function ThreadAside({
             )}
           </Tabs>
         </TooltipProvider>
-      </div>
     </div>
   )
 }
