@@ -36,7 +36,7 @@ export function ComposerInputRow({
     // width on top, and a bottom action row holds the attach control (left) and
     // the circular submit (pushed right). Behaviour is unchanged — same refs,
     // handlers, autogrow and props; only the layout was restructured.
-    <div className="card-shadow flex flex-col gap-1.5 rounded-2xl border border-border bg-card px-3 py-2.5 focus-within:border-(--signal)/60">
+    <div className="card-shadow flex flex-col gap-1.5 rounded-2xl border border-border bg-surface-2 px-3 py-2.5 focus-within:border-(--signal)/60">
       <input
         ref={fileInputRef}
         type="file"
