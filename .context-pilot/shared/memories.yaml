@@ -511,10 +511,10 @@ M-short-4:
   last_edited_ms: 0
 M-short-40:
   tier: short
-  title: T686 tree tool-result
-  contents: 'T686 SHIPPED (todo-v3-yaml-diffs): Todo tool result = nested ASCII tree (├──, [ ]/[~]/[x]+id+title, no desc) of focused thread tasks, REPLACES YAML echo (panel keeps YAML). Opted-in tools APPEND tree when task_id flips Planned→InProgress. >1 in_progress LEAF → warning. New cp-mod-todo/src/tree.rs; checks.rs promote_declared_tasks; think.rs tree::result_annex.'
+  title: T686b id-as-key Todo
+  contents: 'T686b SHIPPED (todo-v3-yaml-diffs): Todo canonical YAML 1st line = ''- {id}: {status}'' (id=mapping KEY, val=status); title/desc/children siblings. Flip = tiny inline diff {prev:''X41: in_progress'',new:''X41: done''}. yaml.rs manual serde_yaml::Value parser (dropped serde derive). Create=omit id line, 1st key title:. core.yaml desc: id-anchored inline edits + stale-panel warn. Builds on T686 tree.'
   importance: high
-  last_edited_ms: 1787938231516
+  last_edited_ms: 1787949116200
 M-short-5:
   tier: short
   title: 'Datalab OCR API: POST'
