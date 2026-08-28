@@ -89,7 +89,10 @@ pub(in crate::transport) fn handle_stream(request: Request, state: &Arc<Mutex<Ba
     let producer_state = Arc::clone(state);
     let agent = agent_id.to_owned();
     let oplog_dir = PathBuf::from(&entry.oplog_path);
-    let _producer = thread::spawn(move || run_stream(&sink, &producer_state, &agent, &oplog_dir, last_rev));
+    let _producer = thread::spawn(move || {
+        let ctx = super::StreamCtx { sink: &sink, state: &producer_state, agent_id: &agent, oplog_dir: &oplog_dir };
+        run_stream(&ctx, last_rev);
+    });
 
     sse::stream_to_client(request, body);
 }
