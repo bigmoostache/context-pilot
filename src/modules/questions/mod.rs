@@ -16,7 +16,7 @@ static CORE_TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 /// Module that provides the Think reasoning tool.
 pub(crate) struct QuestionsModule;
 
-/// Scalar fields shared by every `Think.todo` node (no `children`).
+/// Scalar fields shared by every `Todo` node (no `children`).
 ///
 /// `children` is added on top of these to build one nesting level of the schema
 /// (see [`todo_node_object`]). The Rust-side `TodoNode` deserializes arbitrary
@@ -37,7 +37,7 @@ fn todo_node_scalar_fields() -> Vec<ToolParam> {
     ]
 }
 
-/// The `Think.todo` node object type: scalar fields + a `children` array of
+/// The `Todo` node object type: scalar fields + a `children` array of
 /// (one level of) the same shape. Deeper nesting is parsed recursively at
 /// runtime even though the schema only advertises a couple of levels.
 fn todo_node_object() -> ParamType {
@@ -83,22 +83,11 @@ impl Module for QuestionsModule {
                 .category("Context")
                 .param("thought_body", ParamType::String, true)
                 .param("task_context", ParamType::String, false)
-                .param_array("todo", todo_node_object(), false)
                 .build(),
-            ToolDefinition::from_yaml("todo_mark", core_t)
-                .short_desc("Mark task statuses")
+            ToolDefinition::from_yaml("Todo", core_t)
+                .short_desc("Create, update, and organize tasks")
                 .category("Todo")
-                .param_array(
-                    "marks",
-                    ParamType::Object(vec![
-                        ToolParam::new("id", ParamType::String).desc("Task id (e.g. X1)").required(),
-                        ToolParam::new("status", ParamType::String)
-                            .desc("planned | in_progress | done | cancelled")
-                            .enum_vals(&["planned", "in_progress", "done", "cancelled"])
-                            .required(),
-                    ]),
-                    true,
-                )
+                .param_array("todo", todo_node_object(), true)
                 .build(),
         ]
     }
@@ -106,7 +95,7 @@ impl Module for QuestionsModule {
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
             "Think" => Some(think::execute(tool, state)),
-            "todo_mark" => Some(think::execute_todo_mark(tool, state)),
+            "Todo" => Some(think::execute_todo(tool, state)),
             _ => None,
         }
     }
