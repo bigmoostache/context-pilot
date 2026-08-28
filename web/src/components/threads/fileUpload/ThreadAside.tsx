@@ -1,5 +1,5 @@
 import { useMemo } from "react"
-import { Paperclip, ListChecks, ChevronLeft, ChevronRight } from "lucide-react"
+import { Paperclip, ListChecks, ChevronRight } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { FileIcon } from "@/components/finder/support/macIcons"
@@ -81,23 +81,10 @@ export function ThreadAside({
             onValueChange={(v) => onTabChange(v as "files" | "tasks")}
             className="flex min-h-0 flex-1 flex-col gap-0"
           >
-            {/* Header: left-aligned tab bar. */}
-            <div className="flex items-center gap-1.5 border-b border-border/60">
-              <TabsList variant="line" className="h-7 gap-0.5">
-                {hasTasks && (
-                  <TabsTrigger value="tasks" className="px-2 text-[11px]">
-                    <ListChecks className="size-3" />
-                    Tasks
-                  </TabsTrigger>
-                )}
-                {hasFiles && (
-                  <TabsTrigger value="files" className="px-2 text-[11px]">
-                    <Paperclip className="size-3" />
-                    Files
-                  </TabsTrigger>
-                )}
-              </TabsList>
-            </div>
+            {/* Header: left-aligned tab bar. Hidden while previewing a file so
+                the aside shows exactly ONE header — the preview's own Quick Look
+                bar (its Close returns to the Files list, where the tabs return). */}
+            {!previewing && <AsideTabBar hasTasks={hasTasks} hasFiles={hasFiles} />}
 
             {/* Tasks tab */}
             {hasTasks && (
@@ -122,6 +109,30 @@ export function ThreadAside({
             )}
           </Tabs>
         </TooltipProvider>
+    </div>
+  )
+}
+
+/** The single header row: the left-aligned Tasks/Files tab selector. Extracted
+ *  so its per-tab presence branches live outside {@link ThreadAside} (keeping
+ *  that function under the cyclomatic-complexity budget). */
+function AsideTabBar({ hasTasks, hasFiles }: { hasTasks: boolean; hasFiles: boolean }) {
+  return (
+    <div className="flex items-center gap-1.5 border-b border-border/60">
+      <TabsList variant="line" className="h-7 gap-0.5">
+        {hasTasks && (
+          <TabsTrigger value="tasks" className="px-2 text-[11px]">
+            <ListChecks className="size-3" />
+            Tasks
+          </TabsTrigger>
+        )}
+        {hasFiles && (
+          <TabsTrigger value="files" className="px-2 text-[11px]">
+            <Paperclip className="size-3" />
+            Files
+          </TabsTrigger>
+        )}
+      </TabsList>
     </div>
   )
 }
@@ -178,8 +189,10 @@ function FileList({
   )
 }
 
-/** Inline file preview in the Files tab — a slim back bar over the shared
- *  {@link FinderPreview} pane (the same renderer the Finder uses). */
+/** Inline file preview in the Files tab — the shared {@link FinderPreview} pane
+ *  (the same renderer the Finder uses). Its OWN Quick Look header is the aside's
+ *  single header bar while previewing; its Close (X) calls `onBack` to return to
+ *  the file list (where the Tasks/Files tab bar reappears). No extra back bar. */
 function InlineFilePreview({
   file,
   agentId,
@@ -190,18 +203,8 @@ function InlineFilePreview({
   onBack: () => void
 }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <button
-        type="button"
-        onClick={onBack}
-        className="flex shrink-0 items-center gap-1 border-b border-border/60 px-2 py-1.5 text-[11px] font-medium text-muted-foreground/70 transition-colors hover:text-foreground"
-      >
-        <ChevronLeft className="size-3.5" />
-        Back to files
-      </button>
-      <div className="min-h-0 flex-1 overflow-hidden">
-        <FinderPreview node={uploadToNode(file)} agentId={agentId} variant="pane" onClose={onBack} />
-      </div>
+    <div className="min-h-0 flex-1 overflow-hidden">
+      <FinderPreview node={uploadToNode(file)} agentId={agentId} variant="pane" onClose={onBack} />
     </div>
   )
 }
