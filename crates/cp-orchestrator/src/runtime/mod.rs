@@ -124,18 +124,18 @@ impl Config {
         // Where new agents' realm folders are created. Default `~/code`, or the
         // current directory if `$HOME` is unset (never fail — creation simply
         // lands somewhere sensible).
-        let agents_root = match std::env::var_os("CP_AGENTS_ROOT") {
-            Some(dir) => PathBuf::from(dir),
-            None => std::env::var_os("HOME").map_or_else(|| PathBuf::from("."), |h| PathBuf::from(h).join("code")),
-        };
+        let agents_root = std::env::var_os("CP_AGENTS_ROOT").map_or_else(
+            || std::env::var_os("HOME").map_or_else(|| PathBuf::from("."), |h| PathBuf::from(h).join("code")),
+            PathBuf::from,
+        );
 
         // The `cp` TUI binary the supervisor spawns. Default to the release
         // build under the current working directory; override with an absolute
         // path in deployment.
-        let agent_binary = match std::env::var_os("CP_AGENT_BINARY") {
-            Some(p) => PathBuf::from(p),
-            None => std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join("target/release/tui"),
-        };
+        let agent_binary = std::env::var_os("CP_AGENT_BINARY").map_or_else(
+            || std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join("target/release/tui"),
+            PathBuf::from,
+        );
 
         // Auth configuration (§8 of design doc).
         let auth_enabled =
@@ -253,7 +253,7 @@ impl Runtime {
     /// Keychain), so it takes nothing and holds no locks. See
     /// [`crate::transport::rest::spawn_oauth_refresh`].
     #[must_use]
-    pub fn start_oauth_sweeper(&self) -> thread::JoinHandle<()> {
+    pub fn start_oauth_sweeper() -> thread::JoinHandle<()> {
         crate::transport::rest::spawn_oauth_refresh()
     }
 
@@ -296,7 +296,7 @@ impl Runtime {
             };
             match crate::services::releases::updater::apply::promote_committed(&mut b.releases, &auth_db) {
                 Ok(Some(agent_binary)) => {
-                    b.agent_binary = agent_binary.clone();
+                    b.agent_binary.clone_from(&agent_binary);
                     b.supervisor = crate::supervisor::ProcManager::new(&[agent_binary]);
                     crate::oerr!("updater: update committed — active tag is now {:?}", b.releases.active_tag());
                 }
