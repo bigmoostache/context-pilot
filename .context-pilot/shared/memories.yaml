@@ -253,9 +253,9 @@ M-mid-8:
 M-mid-9:
   tier: mid
   title: orch-clippy campaign
-  contents: 'orch-clippy: off master, pwd Totordu1789 (chain #88). Per-file commit; verify `clippy -p cp-orchestrator --all-targets` (CB lints tui graph ONLY, own it M-mid-11). Recent: tee_reader 5307e998, network/tests 7570cf79, config/network 4f6a7629, auth/users d50e65c3. Total 143. IDIOMS: too_many_args=params struct; mem::forget fixture=return (TempDir,..) guard+let (_dir,..); Result match=map_or_else; items_after_statements=hoist struct/const to fn top; little_endian_bytes=byte shift/or (8u32); numeric_fallback=suffix 50usize; cognitive>7=helper/split; %2=&1; 500-line+8-entry caps. LAST: --workspace to check-rust-lints.sh+reseal, PR. NOT pushed.'
+  contents: 'orch-clippy (branch orchestrator-clippy, chain Totordu1789 #90, per-file commit, NOT pushed). LIB+bin=0. all-targets=113. Recipe: wrap tests/*.rs body in `#[cfg(test)] mod tests { use super::*; }` kills expect/unwrap/panic+tests_outside_test_module (NOT cfg-out). Residual forbid in place: indexing->.get().expect; numeric->0u64; string_slice->.get(..n); mem::forget->TempDir guard; arithmetic->saturating; too_many_args->params struct; cognitive->extract helpers. DONE: services_integration 8a8b6be4, common+transport_http+end_to_end d1506146. NEXT: openapi/exhaustive 26, registry_channel 18, fleet_soak 16, openapi/main 7. LAST X23: --workspace+reseal+PR.'
   importance: high
-  last_edited_ms: 1787886206787
+  last_edited_ms: 1787901132718
 M-safe-1:
   tier: safe
   title: Hash chain password
@@ -482,7 +482,7 @@ M-short-35:
   tier: short
   title: 'SUPERSEDED (T588): user'
   importance: high
-  last_edited_ms: 1787862337022
+  last_edited_ms: 1787899146132
 M-short-36:
   tier: short
   title: T645 agent image
