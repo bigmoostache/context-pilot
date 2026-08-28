@@ -102,11 +102,18 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
         rebuild_threads_panel(state, tid, now);
     }
 
-    // Clear focus + start dangling phase only when handing the thread back.
+    // Handing the thread back (still_my_turn=false) flips it to THEIR_TURN
+    // (done in push_send_message) but KEEPS focus on it — the agent stays on the
+    // thread it just replied to instead of being cast adrift into the dangling
+    // phase (T683). Focus is only ever moved by an explicit `Read` of another
+    // thread. We pin focus to the sent thread and hold the focused-state
+    // invariant `apply_read_focus` uses (dangling_remaining = 0, no escalation),
+    // and still reset the MY_TURN notification debounce so a later user reply on
+    // this now-THEIR_TURN thread re-notifies.
     if !still_my_turn {
         let fs = FocusState::get_mut(state);
-        fs.focused_thread_id = None;
-        fs.dangling_remaining = 5i32;
+        fs.focused_thread_id = Some(tid.to_owned());
+        fs.dangling_remaining = 0i32;
         fs.escalation_level = 0;
         // Reset debounce so next MY_TURN transition fires a new notification.
         fs.notified_my_turn_id = None;
