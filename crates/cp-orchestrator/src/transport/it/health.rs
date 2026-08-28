@@ -48,8 +48,9 @@ mod tests {
     use std::time::Duration;
 
     /// A backend over a real tempdir (readable registry) with auth enabled on
-    /// a real `SQLite` file. The tempdir is leaked so paths outlive the test.
-    fn backend_with_auth() -> (Mutex<Backend>, PathBuf) {
+    /// a real `SQLite` file. The caller binds the returned `TempDir` for the
+    /// test's lifetime so the paths stay valid — it is deleted on drop, no leak.
+    fn backend_with_auth() -> (tempfile::TempDir, Mutex<Backend>, PathBuf) {
         let dir = tempfile::tempdir().expect("tempdir");
         let db_path = dir.path().join("auth.db");
         let store = AuthStore::open(&db_path).expect("open auth store");
@@ -62,15 +63,14 @@ mod tests {
             Some(store),
             Duration::from_hours(1),
         );
-        std::mem::forget(dir);
-        (Mutex::new(backend), db_path)
+        (dir, Mutex::new(backend), db_path)
     }
 
     /// V2.1a (handler half) — a bound, DB-open, registry-readable backend is
     /// `200 ok`; with auth disabled entirely it is healthy too.
     #[test]
     fn healthy_backend_is_200() {
-        let (state, _db) = backend_with_auth();
+        let (_dir, state, _db) = backend_with_auth();
         let reply = healthz(&state);
         assert_eq!(reply.status, 200, "healthy backend: {}", reply.body);
         assert!(reply.body.contains("\"status\":\"ok\""));
@@ -84,7 +84,7 @@ mod tests {
     /// tables dropped underneath the open store) → `503`, `auth_db: false`.
     #[test]
     fn broken_auth_db_is_503() {
-        let (state, db_path) = backend_with_auth();
+        let (_dir, state, db_path) = backend_with_auth();
         // Sever the schema through a second connection to the same file — the
         // store's own handle stays open, but its queries now fail.
         let conn = rusqlite::Connection::open(&db_path).expect("second connection");
@@ -109,7 +109,7 @@ mod tests {
     /// absolute path, no secret ever leaves this unauthenticated endpoint.
     #[test]
     fn body_carries_no_sensitive_data() {
-        let (state, db_path) = backend_with_auth();
+        let (_dir, state, db_path) = backend_with_auth();
         for reply in [healthz(&state), {
             let conn = rusqlite::Connection::open(&db_path).expect("second connection");
             conn.execute_batch("DROP TABLE users;").expect("drop users table");
@@ -118,8 +118,8 @@ mod tests {
             let parsed: serde_json::Value = serde_json::from_str(&reply.body).expect("healthz body is JSON");
             let obj = parsed.as_object().expect("object body");
             assert_eq!(obj.keys().collect::<Vec<_>>(), ["checks", "status"], "only status + checks keys");
-            assert!(parsed["status"].is_string());
-            let checks = parsed["checks"].as_object().expect("checks object");
+            assert!(parsed.get("status").is_some_and(serde_json::Value::is_string));
+            let checks = parsed.get("checks").and_then(serde_json::Value::as_object).expect("checks object");
             assert!(checks.values().all(serde_json::Value::is_boolean), "checks are booleans only");
             assert!(!reply.body.contains('/'), "no path fragment in the body: {}", reply.body);
         }
