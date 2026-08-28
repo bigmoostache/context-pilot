@@ -1,5 +1,5 @@
 import { useMemo } from "react"
-import { Paperclip, ListChecks, ChevronRight, Download, X } from "lucide-react"
+import { Paperclip, ListChecks, ChevronRight, ChevronLeft, Download } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { FileIcon } from "@/components/finder/support/macIcons"
@@ -84,7 +84,7 @@ export function ThreadAside({
           >
             {/* Header: the single always-visible Tasks/Files tab bar. While a
                 file preview is open it is ENRICHED with right-aligned Download +
-                Close(return-to-files) controls — so the aside keeps exactly ONE
+                Back(return-to-files) controls — so the aside keeps exactly ONE
                 header and the preview's own Quick Look bar is suppressed (its
                 FinderPreview renders with variant="full"). */}
             <AsideTabBar
@@ -124,11 +124,13 @@ export function ThreadAside({
 }
 
 /** The single header row: the left-aligned Tasks/Files tab selector, plus —
- *  while a file preview is open — a right-aligned Download + Close(return to
- *  files) control group. Extracted so its per-tab presence branches live outside
- *  {@link ThreadAside} (keeping that function under the cyclomatic-complexity
- *  budget). The controls replace {@link FinderPreview}'s own Quick Look header,
- *  which is suppressed by rendering the preview with variant="full". */
+ *  while a file preview is open — a right-aligned Download + Back(return to
+ *  files) control group, styled to match the tab triggers (icon+text, same
+ *  colour, hover changes text colour only, no background). Extracted so its
+ *  per-tab presence branches live outside {@link ThreadAside} (keeping that
+ *  function under the cyclomatic-complexity budget). The controls replace
+ *  {@link FinderPreview}'s own Quick Look header, which is suppressed by
+ *  rendering the preview with variant="full". */
 function AsideTabBar({
   hasTasks,
   hasFiles,
@@ -161,24 +163,24 @@ function AsideTabBar({
         )}
       </TabsList>
       {previewing && (
-        <div className="ml-auto flex items-center gap-1 pr-1.5">
+        <div className="ml-auto flex items-center gap-0.5 pr-1.5">
           {file && (
             <button
               type="button"
-              title="Download"
               onClick={() => void downloadFile(agentId, file.path)}
-              className="flex size-7 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted/70 hover:text-foreground"
+              className="inline-flex items-center gap-1.5 px-2 text-[11px] font-medium text-foreground/60 transition-colors hover:text-foreground"
             >
-              <Download className="size-3.5" />
+              <Download className="size-3" />
+              Download
             </button>
           )}
           <button
             type="button"
-            title="Back to files"
             onClick={onBack}
-            className="flex size-7 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted/70 hover:text-foreground"
+            className="inline-flex items-center gap-1.5 px-2 text-[11px] font-medium text-foreground/60 transition-colors hover:text-foreground"
           >
-            <X className="size-3.5" />
+            <ChevronLeft className="size-3" />
+            Back
           </button>
         </div>
       )}
