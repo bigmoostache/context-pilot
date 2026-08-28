@@ -90,8 +90,8 @@ function TaskRow({
       <span
         className={
           task.status === "done"
-            ? "text-[11.5px]/none text-muted-foreground/50 line-through"
-            : "text-[11.5px]/none text-foreground/85 group-hover:text-foreground"
+            ? "text-[13.5px]/none text-muted-foreground/50 line-through"
+            : "text-[13.5px]/none text-foreground/85 group-hover:text-foreground"
         }
       >
         {task.name}

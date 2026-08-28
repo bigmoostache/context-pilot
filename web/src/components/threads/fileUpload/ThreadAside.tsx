@@ -226,7 +226,7 @@ function FileList({
             <FileIcon kind={kindOf(f.file.name)} size={20} />
           </span>
           <span className="flex min-w-0 flex-1 flex-col leading-tight">
-            <span className="truncate text-[11.5px] font-medium text-foreground/85 group-hover:text-foreground">
+            <span className="truncate text-[13.5px] font-medium text-foreground/85 group-hover:text-foreground">
               {f.file.name}
             </span>
             <span className="text-[9.5px] text-muted-foreground/50">
