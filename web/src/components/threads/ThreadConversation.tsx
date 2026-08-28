@@ -7,8 +7,7 @@ import { CreateCommandDialog } from "./CreateCommandDialog"
 import { AgentEditorDialog } from "@/components/shell/behaviour/AgentEditorDialog"
 import { useLibrary } from "@/lib/live"
 import { sendCommand } from "@/lib/api"
-import { extractDroppedFiles, zipDropped } from "@/lib/utils"
-import { collectThreadFiles, type UploadedFile } from "./fileUpload/helpers"
+import { collectThreadFiles, useConversationDrop, type UploadedFile } from "./fileUpload/helpers"
 import { FormMessageRow } from "./forms/FormMessageRow"
 import { isFormMessage } from "./forms/helpers"
 import { useScrollPin, useThreadForms } from "./forms/useThreadForms"
@@ -17,97 +16,6 @@ import { ThreadAsideRail } from "./fileUpload/ThreadAsideRail"
 import { useThreadAside } from "./fileUpload/useThreadAside"
 import { useAsideDefault } from "@/lib/providers/toggles/asideDefault"
 import type { ThreadDetail, ThreadMsg } from "@/lib/types"
-
-/** True only for an actual OS *file* drag — a text/selection drag must not blur. */
-function isFileDrag(e: React.DragEvent): boolean {
-  return e.dataTransfer.types.includes("Files")
-}
-
-/** Keep the surface a valid drop target on every dragover (a file drag only)
- *  and show the copy cursor. Stateless — hoisted to module scope. */
-function handleDragOver(e: React.DragEvent) {
-  if (!isFileDrag(e)) return
-  e.preventDefault()
-  e.dataTransfer.dropEffect = "copy"
-}
-
-/** The drag-event handler set spread onto the conversation surface. Each is
- *  `undefined` when uploads are disabled so the surface neither blurs nor drops. */
-interface DropHandlers {
-  onDragEnter: ((e: React.DragEvent) => void) | undefined
-  onDragOver: ((e: React.DragEvent) => void) | undefined
-  onDragLeave: ((e: React.DragEvent) => void) | undefined
-  onDrop: ((e: React.DragEvent) => void) | undefined
-}
-
-/**
- * OS-file drag-and-drop onto the conversation surface (T367/T471). Returns the
- * `dragging` blur flag, the `uploading` overlay flag, and the drag handler set
- * — all inert (`undefined`) when `onAttach` is omitted. Extracted from
- * {@link ThreadConversation} so its body stays within the P8 line budget.
- *
- * dragenter/dragleave fire for every child crossed, so a depth counter tracks
- * "is the cursor still somewhere inside" rather than a flicker-prone boolean.
- */
-function useConversationDrop(onAttach: ((files: File[]) => void | Promise<void>) | undefined): {
-  dragging: boolean
-  uploading: boolean
-  dropHandlers: DropHandlers
-} {
-  const [dragging, setDragging] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const dragDepthRef = useRef(0)
-
-  const onDragEnter = (e: React.DragEvent) => {
-    if (!isFileDrag(e)) return
-    e.preventDefault()
-    dragDepthRef.current += 1
-    setDragging(true)
-  }
-  const onDragLeave = (e: React.DragEvent) => {
-    if (!isFileDrag(e)) return
-    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
-    if (dragDepthRef.current === 0) setDragging(false)
-  }
-  const runDrop = async (e: React.DragEvent) => {
-    if (!isFileDrag(e)) return
-    e.preventDefault()
-    dragDepthRef.current = 0
-    setDragging(false)
-    // Recurse into any dropped FOLDERS (plain `dataTransfer.files` can't — a
-    // folder drop otherwise yields one unreadable pseudo-file that uploaded as a
-    // failed "CORS … status null" request). extractDroppedFiles captures the
-    // Entry objects synchronously before its first await, so the neutered
-    // DataTransfer doesn't matter (T471).
-    const dropped = await extractDroppedFiles(e.dataTransfer)
-    if (dropped.length === 0) return
-    setUploading(true)
-    try {
-      // Zip the whole drop (folder structure preserved) into ONE archive and
-      // upload it in a single request — no per-file burst; awaiting keeps the
-      // loader up until it lands.
-      const archive = await zipDropped(dropped)
-      await onAttach?.([archive])
-    } catch {
-      // Zipping failed (unreadable file / fflate error) — fall back to the raw
-      // files so a drop is never silently lost.
-      await onAttach?.(dropped.map((d) => d.file))
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  const dropHandlers: DropHandlers = onAttach
-    ? {
-        onDragEnter,
-        onDragOver: handleDragOver,
-        onDragLeave,
-        onDrop: (e) => void runDrop(e),
-      }
-    : { onDragEnter: undefined, onDragOver: undefined, onDragLeave: undefined, onDrop: undefined }
-
-  return { dragging, uploading, dropHandlers }
-}
 
 /**
  * A collapsed run of auto tool-activity traces, rendered as an aligned
