@@ -180,7 +180,7 @@ pub(crate) fn update_set_mode(state: &Mutex<Backend>, body: &[u8]) -> HttpReply 
     }
     impl Channel {
         const fn as_str(&self) -> &'static str {
-            match self {
+            match *self {
                 Self::Stable => "stable",
                 Self::Nightly => "nightly",
             }

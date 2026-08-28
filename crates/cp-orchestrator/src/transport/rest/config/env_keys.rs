@@ -98,9 +98,8 @@ pub(crate) fn env_key_update(name: &str, auth_user: Option<&User>, body: &str) -
         Ok(v) => v,
         Err(_) => return HttpReply::error(400, "invalid JSON"),
     };
-    let value = match parsed.get("value").and_then(serde_json::Value::as_str) {
-        Some(v) => v,
-        None => return HttpReply::error(400, "missing string field 'value'"),
+    let Some(value) = parsed.get("value").and_then(serde_json::Value::as_str) else {
+        return HttpReply::error(400, "missing string field 'value'");
     };
 
     if let Err(e) = cp_vault::vault().set(name, value) {
