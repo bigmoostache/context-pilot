@@ -72,196 +72,241 @@ use cp_wire::types::{ContentHash, Phase, ThreadTurn};
 
 use tempfile::tempdir;
 
-/// Agents in the soak. Large enough to exercise real cross-agent concurrency
-/// and isolation, small enough to stay a fast, deterministic CI test (the
-/// literal 10k-agent OS soak is external — see the module docs).
-const AGENTS: usize = 16;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-/// Mixed records each agent journals, per the workload below.
-const RECORDS_PER_AGENT: u8 = 40;
+    /// Agents in the soak. Large enough to exercise real cross-agent concurrency
+    /// and isolation, small enough to stay a fast, deterministic CI test (the
+    /// literal 10k-agent OS soak is external — see the module docs).
+    const AGENTS: usize = 16;
 
-// ── record builders ─────────────────────────────────────────────────────────
+    /// Mixed records each agent journals, per the workload below.
+    const RECORDS_PER_AGENT: u8 = 40;
 
-/// A durable `MessageCreated` head for `thread`, keyed by `byte`.
-fn message(thread: &str, byte: u8) -> OpEntryKind {
-    OpEntryKind::MessageCreated {
-        thread_id: thread.to_owned(),
-        message_id: format!("m{byte}"),
-        head: ContentHash::new([byte; 32]),
-        inline_body: None,
-    }
-}
+    // ── record builders ─────────────────────────────────────────────────────────
 
-/// A durable `ThreadCreated` roster delta.
-fn thread_created(thread: &str) -> OpEntryKind {
-    OpEntryKind::ThreadCreated {
-        thread_id: thread.to_owned(),
-        name: format!("thread {thread}"),
-        status: ThreadTurn::TheirTurn,
-        timestamp_ms: 0,
-    }
-}
-
-/// A droppable best-effort cost aggregate of `cost_usd`.
-const fn cost(cost_usd: f64) -> OpEntryKind {
-    OpEntryKind::CostAggregate { input_tokens: 0, output_tokens: 0, cost_usd }
-}
-
-/// A droppable best-effort phase transition.
-const fn phase() -> OpEntryKind {
-    OpEntryKind::PhaseTransition { phase: Phase::Streaming }
-}
-
-/// A stream token frame for `agent` at `seq`.
-fn token(agent: &str, seq: u64) -> Frame {
-    Frame {
-        schema_version: 1,
-        agent_id: agent.to_owned(),
-        worker_id: "w0".to_owned(),
-        thread_id: "T1".to_owned(),
-        message_id: "m1".to_owned(),
-        seq,
-        kind: StreamKind::Token { text: format!("t{seq}") },
-    }
-}
-
-/// Read every entry an agent's oplog holds, in `rev` order, via the backend's
-/// real [`Tailer`] (one full catch-up poll).
-fn tail_all(oplog_dir: &Path) -> Vec<cp_wire::types::oplog::OpEntry> {
-    Tailer::new(oplog_dir.to_path_buf()).poll().expect("tail poll")
-}
-
-/// One agent's contended workload: open its oplog, interleave durable roster /
-/// message records with droppable best-effort phase / cost records, then shut
-/// down (draining + syncing the final batch).
-fn run_agent_workload(dir: &Path, _agent_idx: usize) {
-    let oplog = OplogService::spawn(dir).expect("spawn agent oplog");
-
-    let _thread_rev = oplog.append_durable(thread_created("T1")).expect("thread durable");
-    for byte in 0..RECORDS_PER_AGENT {
-        // A best-effort phase + cost between every durable head — these may be
-        // shed under pressure, and that shedding must NOT tear the rev stream.
-        let _phase = oplog.append_best_effort(phase());
-        let _cost = oplog.append_best_effort(cost(f64::from(byte) + 1.0));
-        let _msg_rev = oplog.append_durable(message("T1", byte)).expect("message durable");
-    }
-    oplog.shutdown().expect("agent shutdown");
-}
-
-/// Assert an agent's replayed oplog is a **gap-free** `rev` stream: the first
-/// `rev` is 0, every successor increments by exactly one, and the last equals
-/// the recovered head. A shed best-effort record never consumes a `rev`, so a
-/// surviving log is always contiguous (design doc K5 / V10).
-fn assert_gap_free(entries: &[cp_wire::types::oplog::OpEntry], agent_id: &str) {
-    assert!(!entries.is_empty(), "{agent_id}: replayed a non-empty oplog");
-    assert_eq!(entries[0].rev, 0, "{agent_id}: rev stream starts at 0");
-    for pair in entries.windows(2) {
-        assert_eq!(
-            pair[1].rev,
-            pair[0].rev + 1,
-            "{agent_id}: gap or reorder in the rev stream ({} -> {})",
-            pair[0].rev,
-            pair[1].rev,
-        );
-    }
-}
-
-// ── V10 + V8(scaled): concurrent fleet, gap-free + isolated ─────────────────
-
-#[test]
-fn n_agents_under_concurrent_load_stay_gap_free_and_isolated() {
-    // One tempdir per agent; keep the guards alive for the whole test so the
-    // oplog directories survive until every replay + projection is done.
-    let dirs: Vec<tempfile::TempDir> = (0..AGENTS).map(|_| tempdir().expect("dir")).collect();
-
-    // Drive all N agents' workloads concurrently — real contention across N
-    // commit threads, each on its own oplog. Scoped threads borrow `dirs`.
-    thread::scope(|scope| {
-        let handles: Vec<_> = dirs
-            .iter()
-            .enumerate()
-            .map(|(idx, dir)| {
-                let path = dir.path().to_path_buf();
-                scope.spawn(move || run_agent_workload(&path, idx))
-            })
-            .collect();
-        for h in handles {
-            h.join().expect("agent thread");
+    /// A durable `MessageCreated` head for `thread`, keyed by `byte`.
+    fn message(thread: &str, byte: u8) -> OpEntryKind {
+        OpEntryKind::MessageCreated {
+            thread_id: thread.to_owned(),
+            message_id: format!("m{byte}"),
+            head: ContentHash::new([byte; 32]),
+            inline_body: None,
         }
-    });
-
-    // Every agent's oplog is independently gap-free after the concurrent storm.
-    let mut view = MaterializedView::new();
-    for (idx, dir) in dirs.iter().enumerate() {
-        let agent_id = format!("agent-{idx}");
-        let entries = tail_all(dir.path());
-        assert_gap_free(&entries, &agent_id);
-        view.apply_batch(&agent_id, &entries);
     }
 
-    // The shared view holds N isolated projections — no cross-contamination.
-    assert_eq!(view.len(), AGENTS, "one projection per agent");
-    for idx in 0..AGENTS {
+    /// A durable `ThreadCreated` roster delta.
+    fn thread_created(thread: &str) -> OpEntryKind {
+        OpEntryKind::ThreadCreated {
+            thread_id: thread.to_owned(),
+            name: format!("thread {thread}"),
+            status: ThreadTurn::TheirTurn,
+            timestamp_ms: 0,
+        }
+    }
+
+    /// A droppable best-effort cost aggregate of `cost_usd`.
+    const fn cost(cost_usd: f64) -> OpEntryKind {
+        OpEntryKind::CostAggregate { input_tokens: 0, output_tokens: 0, cost_usd }
+    }
+
+    /// A droppable best-effort phase transition.
+    const fn phase() -> OpEntryKind {
+        OpEntryKind::PhaseTransition { phase: Phase::Streaming }
+    }
+
+    /// A stream token frame for `agent` at `seq`.
+    fn token(agent: &str, seq: u64) -> Frame {
+        Frame {
+            schema_version: 1,
+            agent_id: agent.to_owned(),
+            worker_id: "w0".to_owned(),
+            thread_id: "T1".to_owned(),
+            message_id: "m1".to_owned(),
+            seq,
+            kind: StreamKind::Token { text: format!("t{seq}") },
+        }
+    }
+
+    /// Read every entry an agent's oplog holds, in `rev` order, via the backend's
+    /// real [`Tailer`] (one full catch-up poll).
+    fn tail_all(oplog_dir: &Path) -> Vec<cp_wire::types::oplog::OpEntry> {
+        Tailer::new(oplog_dir.to_path_buf()).poll().expect("tail poll")
+    }
+
+    /// One agent's contended workload: open its oplog, interleave durable roster /
+    /// message records with droppable best-effort phase / cost records, then shut
+    /// down (draining + syncing the final batch).
+    fn run_agent_workload(dir: &Path, _agent_idx: usize) {
+        let oplog = OplogService::spawn(dir).expect("spawn agent oplog");
+
+        let _thread_rev = oplog.append_durable(thread_created("T1")).expect("thread durable");
+        for byte in 0..RECORDS_PER_AGENT {
+            // A best-effort phase + cost between every durable head — these may be
+            // shed under pressure, and that shedding must NOT tear the rev stream.
+            let _phase = oplog.append_best_effort(phase());
+            let _cost = oplog.append_best_effort(cost(f64::from(byte)));
+            let _msg_rev = oplog.append_durable(message("T1", byte)).expect("message durable");
+        }
+        oplog.shutdown().expect("agent shutdown");
+    }
+
+    /// Assert an agent's replayed oplog is a **gap-free** `rev` stream: the first
+    /// `rev` is 0, every successor increments by exactly one, and the last equals
+    /// the recovered head. A shed best-effort record never consumes a `rev`, so a
+    /// surviving log is always contiguous (design doc K5 / V10).
+    fn assert_gap_free(entries: &[cp_wire::types::oplog::OpEntry], agent_id: &str) {
+        assert!(!entries.is_empty(), "{agent_id}: replayed a non-empty oplog");
+        assert_eq!(entries.first().expect("non-empty").rev, 0, "{agent_id}: rev stream starts at 0");
+        for pair in entries.windows(2) {
+            let a = pair.first().expect("window of 2");
+            let b = pair.get(1).expect("window of 2");
+            assert_eq!(
+                b.rev,
+                a.rev.saturating_add(1),
+                "{agent_id}: gap or reorder in the rev stream ({} -> {})",
+                a.rev,
+                b.rev,
+            );
+        }
+    }
+
+    /// Drive all `N` agents' workloads concurrently — real contention across `N`
+    /// commit threads, each on its own oplog. Scoped threads borrow `dirs`.
+    /// Extracted from the test to keep it under the cognitive-complexity cap.
+    fn drive_all_workloads(dirs: &[tempfile::TempDir]) {
+        thread::scope(|scope| {
+            let handles: Vec<_> = dirs
+                .iter()
+                .enumerate()
+                .map(|(idx, dir)| {
+                    let path = dir.path().to_path_buf();
+                    scope.spawn(move || run_agent_workload(&path, idx))
+                })
+                .collect();
+            for h in handles {
+                h.join().expect("agent thread");
+            }
+        });
+    }
+
+    /// Assert the shared view's projection for `agent-{idx}` carries this agent's
+    /// own last message + thread and no neighbour's — the V8 isolation invariant.
+    /// Extracted from the test to keep it under the cognitive-complexity cap.
+    fn assert_isolated_projection(view: &MaterializedView, idx: usize) {
         let agent_id = format!("agent-{idx}");
         let agent = view.get(&agent_id).unwrap_or_else(|| panic!("{agent_id} projected"));
         let head =
             agent.heads.threads.iter().find(|h| h.thread_id == "T1").unwrap_or_else(|| panic!("{agent_id} T1 head"));
         assert_eq!(
             head.last_message_hash,
-            ContentHash::new([RECORDS_PER_AGENT - 1; 32]),
+            ContentHash::new([RECORDS_PER_AGENT.saturating_sub(1); 32]),
             "{agent_id}: head is this agent's own last message, not a neighbour's",
         );
         assert!(agent.roster.iter().any(|t| t.thread_id == "T1"), "{agent_id}: roster carries its own thread");
     }
-}
 
-// ── V5: drop + reorder chaos, recovered from the authoritative snapshot ──────
+    // ── V10 + V8(scaled): concurrent fleet, gap-free + isolated ─────────────────
 
-#[test]
-fn a_flooded_reordered_subscriber_coalesces_then_reconciles_from_the_view() {
-    let dir = tempdir().expect("dir");
+    #[test]
+    fn n_agents_under_concurrent_load_stay_gap_free_and_isolated() {
+        // One tempdir per agent; keep the guards alive for the whole test so the
+        // oplog directories survive until every replay + projection is done.
+        let dirs: Vec<tempfile::TempDir> = std::iter::repeat_with(|| tempdir().expect("dir")).take(AGENTS).collect();
 
-    // The authoritative recovery source: a real oplog folded into the view's
-    // heads. This is what a reconcile delivers to a degraded subscriber.
-    {
-        let oplog = OplogService::spawn(dir.path()).expect("spawn");
-        let _head_rev = oplog.append_durable(message("T1", 0x42)).expect("durable head");
-        oplog.shutdown().expect("shutdown");
+        drive_all_workloads(&dirs);
+
+        // Every agent's oplog is independently gap-free after the concurrent storm.
+        let mut view = MaterializedView::new();
+        for (idx, dir) in dirs.iter().enumerate() {
+            let agent_id = format!("agent-{idx}");
+            let entries = tail_all(dir.path());
+            assert_gap_free(&entries, &agent_id);
+            view.apply_batch(&agent_id, &entries);
+        }
+
+        // The shared view holds N isolated projections — no cross-contamination.
+        assert_eq!(view.len(), AGENTS, "one projection per agent");
+        for idx in 0..AGENTS {
+            assert_isolated_projection(&view, idx);
+        }
     }
-    let mut view = MaterializedView::new();
-    view.apply_batch("chaos", &tail_all(dir.path()));
-    let authoritative_head =
-        view.get("chaos").expect("agent").heads.threads.first().expect("T1 head").last_message_hash;
-    assert_eq!(authoritative_head, ContentHash::new([0x42; 32]));
 
-    // A small-capacity subscriber is flooded with MORE frames than it can hold,
-    // delivered OUT OF ORDER (seq 5,3,8,1,9,2 …). The hub keeps the newest
-    // window by eviction and latches degraded — a lossy stream by design.
-    let mut hub = StreamHub::new(3);
-    let sub = hub.subscribe("chaos");
-    for seq in [5u64, 3, 8, 1, 9, 2, 7, 4, 6, 0] {
-        let _clean = hub.publish("chaos", &token("chaos", seq));
+    // ── V5: drop + reorder chaos, recovered from the authoritative snapshot ──────
+
+    /// Seed a real oplog with one durable head, fold it into a fresh view, and
+    /// return the authoritative last-message hash a reconcile would deliver.
+    /// Extracted from the V5 test to keep it under the cognitive-complexity cap.
+    fn seed_authoritative_head(dir: &Path) -> ContentHash {
+        {
+            let oplog = OplogService::spawn(dir).expect("spawn");
+            let _head_rev = oplog.append_durable(message("T1", 0x42)).expect("durable head");
+            oplog.shutdown().expect("shutdown");
+        }
+        let mut view = MaterializedView::new();
+        view.apply_batch("chaos", &tail_all(dir));
+        view.get("chaos").expect("agent").heads.threads.first().expect("T1 head").last_message_hash
     }
-    let degraded = hub.subscriber("chaos", sub).expect("sub");
-    assert!(degraded.is_degraded(), "a past-capacity flood latches degraded");
-    assert!(degraded.dropped_count() > 0, "frames were shed under the flood");
 
-    // The buffer holds at most `capacity` frames — never grows unbounded under
-    // a flood, however reordered (design doc I7 producer-never-blocks fan-out).
-    let buffered = hub.drain("chaos", sub).expect("drain");
-    assert!(buffered.len() <= 3, "the bounded buffer never exceeds its capacity");
+    /// Flood the `chaos` subscriber with more out-of-order frames than the hub's
+    /// capacity. Extracted from the V5 test to keep it under the
+    /// cognitive-complexity cap.
+    fn flood_out_of_order(hub: &mut StreamHub) {
+        for seq in [5u64, 3, 8, 1, 9, 2, 7, 4, 6, 0] {
+            let _clean = hub.publish("chaos", &token("chaos", seq));
+        }
+    }
 
-    // Recovery: the caller delivers the authoritative oplog-folded snapshot
-    // (above) and clears the degraded latch — the R2-17 reconcile completing.
-    // Post-reconcile, the durable head is the recovery truth, not any dropped
-    // stream frame.
-    assert!(hub.mark_reconciled("chaos", sub), "subscriber reconciled");
-    let healed = hub.subscriber("chaos", sub).expect("sub");
-    assert!(!healed.is_degraded(), "reconcile clears the degraded latch");
-    assert_eq!(healed.dropped_count(), 0, "reconcile resets the dropped counter");
-    assert_eq!(
-        authoritative_head,
-        ContentHash::new([0x42; 32]),
-        "the oplog head is the recovery source of truth after stream loss",
-    );
+    /// Assert the flooded subscriber latched `degraded`, shed frames, and kept
+    /// its buffer bounded by capacity. Extracted from the V5 test to keep it
+    /// under the cognitive-complexity cap.
+    fn assert_degraded_and_bounded(hub: &mut StreamHub, sub: u64) {
+        let degraded = hub.subscriber("chaos", sub).expect("sub");
+        assert!(degraded.is_degraded(), "a past-capacity flood latches degraded");
+        assert!(degraded.dropped_count() > 0, "frames were shed under the flood");
+        // The buffer holds at most `capacity` frames — never grows unbounded under
+        // a flood, however reordered (design doc I7 producer-never-blocks fan-out).
+        let buffered = hub.drain("chaos", sub).expect("drain");
+        assert!(buffered.len() <= 3, "the bounded buffer never exceeds its capacity");
+    }
+
+    /// Assert a reconcile clears the degraded latch and resets the dropped
+    /// counter. Extracted from the V5 test to keep it under the
+    /// cognitive-complexity cap.
+    fn assert_reconcile_heals(hub: &mut StreamHub, sub: u64) {
+        assert!(hub.mark_reconciled("chaos", sub), "subscriber reconciled");
+        let healed = hub.subscriber("chaos", sub).expect("sub");
+        assert!(!healed.is_degraded(), "reconcile clears the degraded latch");
+        assert_eq!(healed.dropped_count(), 0, "reconcile resets the dropped counter");
+    }
+
+    #[test]
+    fn a_flooded_reordered_subscriber_coalesces_then_reconciles_from_the_view() {
+        let dir = tempdir().expect("dir");
+
+        // The authoritative recovery source: a real oplog folded into the view's
+        // heads. This is what a reconcile delivers to a degraded subscriber.
+        let authoritative_head = seed_authoritative_head(dir.path());
+        assert_eq!(authoritative_head, ContentHash::new([0x42; 32]));
+
+        // A small-capacity subscriber is flooded with MORE frames than it can hold,
+        // delivered OUT OF ORDER (seq 5,3,8,1,9,2 …). The hub keeps the newest
+        // window by eviction and latches degraded — a lossy stream by design.
+        let mut hub = StreamHub::new(3);
+        let sub = hub.subscribe("chaos");
+        flood_out_of_order(&mut hub);
+        assert_degraded_and_bounded(&mut hub, sub);
+
+        // Recovery: the caller delivers the authoritative oplog-folded snapshot
+        // (above) and clears the degraded latch — the R2-17 reconcile completing.
+        // Post-reconcile, the durable head is the recovery truth, not any dropped
+        // stream frame.
+        assert_reconcile_heals(&mut hub, sub);
+        assert_eq!(
+            authoritative_head,
+            ContentHash::new([0x42; 32]),
+            "the oplog head is the recovery source of truth after stream loss",
+        );
+    }
 }
