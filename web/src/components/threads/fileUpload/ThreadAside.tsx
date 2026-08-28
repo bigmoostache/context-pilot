@@ -1,10 +1,11 @@
 import { useMemo } from "react"
-import { Paperclip, ListChecks, ChevronRight } from "lucide-react"
+import { Paperclip, ListChecks, ChevronRight, Download, X } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { FileIcon } from "@/components/finder/support/macIcons"
 import { kindOf } from "@/components/finder/support/kind"
 import { FinderPreview } from "@/components/finder/preview/FinderPreview"
+import { downloadFile } from "@/lib/api"
 import { uploadToNode, type UploadedFile } from "./helpers"
 import type { ThreadFile } from "./FileSidebar"
 import { TaskList } from "./ThreadAsideTasks"
@@ -81,10 +82,19 @@ export function ThreadAside({
             onValueChange={(v) => onTabChange(v as "files" | "tasks")}
             className="flex min-h-0 flex-1 flex-col gap-0"
           >
-            {/* Header: left-aligned tab bar. Hidden while previewing a file so
-                the aside shows exactly ONE header — the preview's own Quick Look
-                bar (its Close returns to the Files list, where the tabs return). */}
-            {!previewing && <AsideTabBar hasTasks={hasTasks} hasFiles={hasFiles} />}
+            {/* Header: the single always-visible Tasks/Files tab bar. While a
+                file preview is open it is ENRICHED with right-aligned Download +
+                Close(return-to-files) controls — so the aside keeps exactly ONE
+                header and the preview's own Quick Look bar is suppressed (its
+                FinderPreview renders with variant="full"). */}
+            <AsideTabBar
+              hasTasks={hasTasks}
+              hasFiles={hasFiles}
+              previewing={previewing}
+              agentId={agentId}
+              file={selectedFile}
+              onBack={() => onSelectFile(null)}
+            />
 
             {/* Tasks tab */}
             {hasTasks && (
@@ -113,10 +123,27 @@ export function ThreadAside({
   )
 }
 
-/** The single header row: the left-aligned Tasks/Files tab selector. Extracted
- *  so its per-tab presence branches live outside {@link ThreadAside} (keeping
- *  that function under the cyclomatic-complexity budget). */
-function AsideTabBar({ hasTasks, hasFiles }: { hasTasks: boolean; hasFiles: boolean }) {
+/** The single header row: the left-aligned Tasks/Files tab selector, plus —
+ *  while a file preview is open — a right-aligned Download + Close(return to
+ *  files) control group. Extracted so its per-tab presence branches live outside
+ *  {@link ThreadAside} (keeping that function under the cyclomatic-complexity
+ *  budget). The controls replace {@link FinderPreview}'s own Quick Look header,
+ *  which is suppressed by rendering the preview with variant="full". */
+function AsideTabBar({
+  hasTasks,
+  hasFiles,
+  previewing,
+  agentId,
+  file,
+  onBack,
+}: {
+  hasTasks: boolean
+  hasFiles: boolean
+  previewing: boolean
+  agentId: string
+  file: UploadedFile | null
+  onBack: () => void
+}) {
   return (
     <div className="flex items-center gap-1.5 border-b border-border/60">
       <TabsList variant="line" className="h-7 gap-0.5">
@@ -133,6 +160,28 @@ function AsideTabBar({ hasTasks, hasFiles }: { hasTasks: boolean; hasFiles: bool
           </TabsTrigger>
         )}
       </TabsList>
+      {previewing && (
+        <div className="ml-auto flex items-center gap-1 pr-1.5">
+          {file && (
+            <button
+              type="button"
+              title="Download"
+              onClick={() => void downloadFile(agentId, file.path)}
+              className="flex size-7 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted/70 hover:text-foreground"
+            >
+              <Download className="size-3.5" />
+            </button>
+          )}
+          <button
+            type="button"
+            title="Back to files"
+            onClick={onBack}
+            className="flex size-7 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted/70 hover:text-foreground"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -190,9 +239,10 @@ function FileList({
 }
 
 /** Inline file preview in the Files tab — the shared {@link FinderPreview} pane
- *  (the same renderer the Finder uses). Its OWN Quick Look header is the aside's
- *  single header bar while previewing; its Close (X) calls `onBack` to return to
- *  the file list (where the Tasks/Files tab bar reappears). No extra back bar. */
+ *  rendered with variant="full" so it draws NO Quick Look header of its own. The
+ *  aside's single header is the enriched {@link AsideTabBar} (which carries the
+ *  Download + Close controls while previewing); Close there returns to the file
+ *  list. `onClose` is wired to `onBack` as a harmless fallback. */
 function InlineFilePreview({
   file,
   agentId,
@@ -204,7 +254,7 @@ function InlineFilePreview({
 }) {
   return (
     <div className="min-h-0 flex-1 overflow-hidden">
-      <FinderPreview node={uploadToNode(file)} agentId={agentId} variant="pane" onClose={onBack} />
+      <FinderPreview node={uploadToNode(file)} agentId={agentId} variant="full" onClose={onBack} />
     </div>
   )
 }
