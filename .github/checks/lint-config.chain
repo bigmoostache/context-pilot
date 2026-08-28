@@ -7900,3 +7900,75 @@ index e9784415..f11b0038 100644
  
    - path: "crates/cp-orchestrator/src/transport/router.rs"
 # --- End entry #90 ---
+91:7ab308af904f231516f810a5cc79eb86019eac27c7172ca90d25c9b8324b0a3e:eeaf0cc58974b886c40d48468b1c7864d71bb135a1b9989bb023eb03899eebd5:40068ce86a20751d89b7758877b3457b42b7a1eb98f412a8e360f0d9928c05c0
+# --- Diff for entry #91 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index f11b0038..d551b7b1 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -499,6 +499,64 @@ exceptions:
+       without a forbidden wildcard catch-all, and pattern_type_mismatch on &[&str]
+       slice patterns has no owned-scrutinee escape (Method is not Copy).
+ 
++  # ── too_many_lines: flat OpenAPI spec-builder literals (test binary) ──
++  # The tests/openapi/ binary builds openapi.json from flat json! literals — one
++  # linear object per schema group / the path table. Each builder is a single
++  # exhaustive data literal; splitting it into sub-builders trades a linear,
++  # greppable spec for cross-cutting churn with no readability gain. This is the
++  # openapi twin of the accepted flat State::default initializer + route_rest
++  # table above. Registered per file (the checker keys on path).
++
++  - path: "crates/cp-orchestrator/tests/openapi/schemas.rs"
++    match: "flat OpenAPI schema literal: one linear json! object enumerating the domain schemas; splitting it into sub-builders is churn with no readability gain — the openapi spec-builder twin of the flat State::default initializer"
++    reason: >
++      core() is a single flat json! literal enumerating the domain schemas
++      (Agent, ThreadDetail, ToolCall, …). Splitting a linear schema literal into
++      sub-builders is churn with no readability gain.
++    strategy: >
++      Irreducible — a flat exhaustive spec literal is the honest shape; the twin
++      of the accepted State::default flat-initializer expect.
++
++  - path: "crates/cp-orchestrator/tests/openapi/schemas_ext.rs"
++    match: "flat OpenAPI schema literal: one linear json! object enumerating the domain schemas; splitting it into sub-builders is churn with no readability gain — the openapi spec-builder twin of the flat State::default initializer"
++    reason: >
++      transport() is a single flat json! literal enumerating the receipt/auth/
++      env-key/filesystem/conversation schemas. Splitting a linear schema literal
++      into sub-builders is churn with no readability gain.
++    strategy: >
++      Irreducible — a flat exhaustive spec literal is the honest shape; the twin
++      of the accepted State::default flat-initializer expect.
++
++  - path: "crates/cp-orchestrator/tests/openapi/schemas_ext2.rs"
++    match: "flat OpenAPI schema literal: one linear json! object enumerating the domain schemas; splitting it into sub-builders is churn with no readability gain — the openapi spec-builder twin of the flat State::default initializer"
++    reason: >
++      deploy() is a single flat json! literal enumerating the release-management/
++      settings/session/Claude-OAuth schemas. Splitting a linear schema literal
++      into sub-builders is churn with no readability gain.
++    strategy: >
++      Irreducible — a flat exhaustive spec literal is the honest shape; the twin
++      of the accepted State::default flat-initializer expect.
++
++  - path: "crates/cp-orchestrator/tests/openapi/schemas_net.rs"
++    match: "flat OpenAPI schema literal: one linear json! object enumerating the domain schemas; splitting it into sub-builders is churn with no readability gain — the openapi spec-builder twin of the flat State::default initializer"
++    reason: >
++      network() is a single flat json! literal enumerating the uplink/AP/probe/
++      status/supervisor schemas. Splitting a linear schema literal into
++      sub-builders is churn with no readability gain.
++    strategy: >
++      Irreducible — a flat exhaustive spec literal is the honest shape; the twin
++      of the accepted State::default flat-initializer expect.
++
++  - path: "crates/cp-orchestrator/tests/openapi/paths.rs"
++    match: "flat OpenAPI path table: one linear json! object enumerating every REST route; splitting it into sub-builders is churn with no readability gain — the openapi spec-builder twin of the flat State::default initializer"
++    reason: >
++      paths() is a single flat json! literal enumerating every REST route
++      (path → operation). Splitting a linear route table into sub-builders is
++      churn with no readability gain.
++    strategy: >
++      Irreducible — a flat exhaustive path table is the honest shape; the twin
++      of the accepted State::default flat-initializer + route_rest expects.
++
+ 
+ 
+ 
+# --- End entry #91 ---
