@@ -656,6 +656,12 @@ M-tiny-24:
   contents: 'Edits ALWAYS queue; cannot bypass. Inherent to context-pilot, forces batching = big token savings. Don''t fight it: batch edits, Queue_execute once.'
   importance: high
   last_edited_ms: 1787910296001
+M-tiny-25:
+  tier: tiny
+  title: 'todo-v2 PR #188 open'
+  contents: 'todo-v2 rebased onto post-#187 master, PR #188 OPEN (base master). 6 commits on 50fae45c. Clippy-clean under --workspace gate, chain #94. Frontend back on vite dev/HMR :5174. CB1 already active.'
+  importance: high
+  last_edited_ms: 1787910650137
 M-tiny-3:
   tier: tiny
   title: 'Haiku 4.5 max_tokens fix:'

@@ -109,8 +109,15 @@ fn execute_one_tool(
         qs.active = true;
     }
 
-    let should_queue =
-        QueueState::get(&app.state).active && !QueueState::is_queue_tool(&tool.name) && tool.name != "Think";
+    // `Todo` (like `Think`) is queue-insensitive (T664): it executes directly
+    // even while the queue is active, so planning stays live. Safe against the
+    // queue's panel-freeze because `execute_todo` preserves tempo — it deprecates
+    // the Todo panel but never force-refreshes, so the freeze still replays the
+    // frozen snapshot and no panel is modified mid-freeze.
+    let should_queue = QueueState::get(&app.state).active
+        && !QueueState::is_queue_tool(&tool.name)
+        && tool.name != "Think"
+        && tool.name != "Todo";
     if should_queue {
         return enqueue_tool(app, tool, &pf, flushed_tools);
     }
@@ -357,6 +364,10 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
     // Todo panel on focus change), then evaluate the fire-once hygiene nudge.
     super::checks::sync_todo_focus(app);
     super::checks::maybe_hygiene_nudge(app);
+    // Promote any planned task declared via `task_id` on an opted-in tool to
+    // in_progress (done/cancelled left be — pre-flight warned; the live delta
+    // rides the emit_task_lists chokepoint).
+    super::checks::promote_declared_tasks(app, &tools);
 
     // Check if any tool triggered a console blocking wait
     let has_console_wait = tool_results.iter().any(|r| r.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL));

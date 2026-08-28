@@ -222,15 +222,15 @@ Result: **no new module edge in either direction.** The dependency graph is stri
 
 All six earlier open questions are now decided by the owner:
 
-1. `is_global` **of** `TodoState` **→ global.** `TodoState` becomes **shared** (`is_global() == true`), matching `cp-mod-threads` (FR14 / §3). A shared thread's tasks are shared.
-2. **Deletion path → cascade + cancel (FR13).** Hard removal only on **thread deletion** (cascade); per-item removal is **marking the item** `cancelled` (soft-delete). No separate delete op / flag.
-3. `todo_mark` **batching & scope → batch, focused-thread only (FR7 / §6).** Many `{id, status}` marks per call; every id must belong to the focused thread.
-4. **Nudge repetition → fire-once per thread (FR11 / §7).** Not "debounce" in any timer sense — it simply fires **at most once per focused thread** until the condition clears (todo created / WIP picked) or focus changes. Plain wording specified in §7.
-5. **Focus-change refresh → breaks tempo (forced, immediate) (§4 / §4.1).** And, critically: **no todo data of any kind lives in the threads panel** — todo edits must never touch/deprecate the threads panel (else its cache breaks on every edit, prohibitively expensive). No `N/M` per-row counter.
-6. **Backwards-compat → forever purge of legacy items (FR4).** Normal persistence is kept — thread-owned todos survive across runs. The *only* removal is a **permanent purge of legacy items with no** `thread_id` (the old-schema backlog), dropped from memory **and disk** on load. This is **not** a per-boot wipe of the store.
-7. **Agent-level / un-threaded tasks → none.** All task-tracking **must happen inside a thread**. There is no unfocused/agent-level task list: when no thread is focused, `Think.todo` is rejected (§5). The discipline is "plan inside a thread."
-8. **Cross-thread task move → disallowed.** A task is **born and dies in one thread** — reparent is same-thread only (§5), and there is no move-to-thread operation.
-9. **Archive vs. hard-delete → archive keeps tasks (FR13).** Archiving a thread (soft-delete) leaves its tasks intact; they return when the thread is resurrected. Only a **hard-delete** of the thread cascades a removal of its tasks.
+ 1. `is_global` **of** `TodoState` **→ global.** `TodoState` becomes **shared** (`is_global() == true`), matching `cp-mod-threads` (FR14 / §3). A shared thread's tasks are shared.
+ 2. **Deletion path → cascade + cancel (FR13).** Hard removal only on **thread deletion** (cascade); per-item removal is **marking the item** `cancelled` (soft-delete). No separate delete op / flag.
+ 3. `todo_mark` **batching & scope → batch, focused-thread only (FR7 / §6).** Many `{id, status}` marks per call; every id must belong to the focused thread.
+ 4. **Nudge repetition → fire-once per thread (FR11 / §7).** Not "debounce" in any timer sense — it simply fires **at most once per focused thread** until the condition clears (todo created / WIP picked) or focus changes. Plain wording specified in §7.
+ 5. **Focus-change refresh → breaks tempo (forced, immediate) (§4 / §4.1).** And, critically: **no todo data of any kind lives in the threads panel** — todo edits must never touch/deprecate the threads panel (else its cache breaks on every edit, prohibitively expensive). No `N/M` per-row counter.
+ 6. **Backwards-compat → forever purge of legacy items (FR4).** Normal persistence is kept — thread-owned todos survive across runs. The *only* removal is a **permanent purge of legacy items with no** `thread_id` (the old-schema backlog), dropped from memory **and disk** on load. This is **not** a per-boot wipe of the store.
+ 7. **Agent-level / un-threaded tasks → none.** All task-tracking **must happen inside a thread**. There is no unfocused/agent-level task list: when no thread is focused, `Think.todo` is rejected (§5). The discipline is "plan inside a thread."
+ 8. **Cross-thread task move → disallowed.** A task is **born and dies in one thread** — reparent is same-thread only (§5), and there is no move-to-thread operation.
+ 9. **Archive vs. hard-delete → archive keeps tasks (FR13).** Archiving a thread (soft-delete) leaves its tasks intact; they return when the thread is resurrected. Only a **hard-delete** of the thread cascades a removal of its tasks.
 10. **Todo auto-continuation → removed entirely (§11).** Rather than rescope `continue_until_todos_done` to threads, the whole todo-driven spine auto-continuation is **deleted from the codebase** (a clean wipe, no migration). It may be redesigned from scratch later if wanted.
 
 ## 10. Surface touched (informational, for later planning)
@@ -248,15 +248,15 @@ The earlier plan was to *rework* the todo-fired spine coupling to be thread-scop
 
 The todo↔spine coupling lives in three sites; **sites 1 and 2 are deleted outright**, site 3 (a plain display line, not auto-continuation) is kept as a rollup:
 
-1. **`continue_until_todos_done` config flag** — delete everywhere:
+1. `continue_until_todos_done` **config flag** — delete everywhere:
    - the field on `SpineConfig` (`cp-mod-spine/src/types.rs`);
    - the `spine_configure` tool param + handler (`cp-mod-spine/src/lib.rs`, `tools.rs`);
    - the toggle **keybind action** (`src/app/actions/mod.rs`);
    - the config-overlay + spine-panel **display** of the flag (`src/ui/help/config_overlay/builder.rs`, `cp-mod-spine/src/panel.rs`).
-2. **`check_todo_continuation`** (`src/app/run/lifecycle.rs`) — delete the function **and its call site** in `check_spine`. This removes the `todo_continuation` spine notification path entirely.
-3. **`overview_context_section`** (`cp-mod-todo/src/lib.rs`) — **kept** (it is a display line, not auto-continuation). Reframed as a cheap global rollup: `Tasks: N/M done` — a plain count, no per-thread breakdown, no coupling to any panel.
+2. `check_todo_continuation` (`src/app/run/lifecycle.rs`) — delete the function **and its call site** in `check_spine`. This removes the `todo_continuation` spine notification path entirely.
+3. `overview_context_section` (`cp-mod-todo/src/lib.rs`) — **kept** (it is a display line, not auto-continuation). Reframed as a cheap global rollup: `Tasks: N/M done` — a plain count, no per-thread breakdown, no coupling to any panel.
 
-Because sites 1–2 are their only callers, **`has_incomplete_todos()` and `incomplete_todos_summary()`** (`cp-mod-todo/src/types.rs`) become dead and are **deleted too**.
+Because sites 1–2 are their only callers, `has_incomplete_todos()` **and** `incomplete_todos_summary()` (`cp-mod-todo/src/types.rs`) become dead and are **deleted too**.
 
 ### 11.2 Consequences
 

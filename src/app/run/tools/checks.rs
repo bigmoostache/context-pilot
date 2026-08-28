@@ -125,3 +125,54 @@ pub(crate) fn maybe_hygiene_nudge(app: &mut App) {
     let _found = cp_mod_spine::types::SpineState::mark_notification_processed(&mut app.state, &id);
     cp_mod_todo::types::TodoState::get_mut(&mut app.state).nudged_thread = Some(tid);
 }
+
+/// Auto-promote a declared task to `in_progress` after an opted-in tool runs.
+///
+/// When an executed tool that opted into task declaration (`declares_task`)
+/// carries a valid `task_id` belonging to the focused thread and that task is
+/// still `planned`, flip it to `in_progress` — so declaring work on a task marks
+/// it started, live. Finished/cancelled tasks are left untouched (pre-flight
+/// already warned); an already-`in_progress` task is a silent no-op.
+///
+/// The flip mutates `TodoState` only; the `emit_task_lists` main-loop chokepoint
+/// observes the change and emits the `TaskListChanged` delta, so the web aside
+/// re-renders in real time. Like `todo_mark` (FR7) it does NOT deprecate the
+/// Todo panel — a status flip is deliberately cheap.
+pub(crate) fn promote_declared_tasks(app: &mut App, tools: &[cp_base::tools::ToolUse]) {
+    let Some(focused) = cp_mod_threads::types::FocusState::get(&app.state).focused_thread_id.clone() else {
+        return; // No focused thread → task_id not enforced, nothing to promote.
+    };
+
+    // Collect the distinct, valid, focused-thread task ids declared by opted-in
+    // tools in this batch (borrow of app.state dropped before the mutation).
+    let mut to_promote: Vec<String> = Vec::new();
+    for tool in tools {
+        let opted_in = app.state.tools.iter().any(|d| d.id == tool.name && d.declares_task);
+        if !opted_in {
+            continue;
+        }
+        let Some(task_id) =
+            tool.input.get("task_id").and_then(serde_json::Value::as_str).map(str::trim).filter(|s| !s.is_empty())
+        else {
+            continue;
+        };
+        if !to_promote.iter().any(|id| id == task_id) {
+            to_promote.push(task_id.to_owned());
+        }
+    }
+    if to_promote.is_empty() {
+        return;
+    }
+
+    // Flip only planned tasks owned by the focused thread; leave done/cancelled/
+    // already-in_progress untouched.
+    let ts = cp_mod_todo::types::TodoState::get_mut(&mut app.state);
+    for item in &mut ts.todos {
+        if item.thread_id == focused
+            && item.status == cp_mod_todo::types::TodoStatus::Planned
+            && to_promote.iter().any(|id| id == &item.id)
+        {
+            item.status = cp_mod_todo::types::TodoStatus::InProgress;
+        }
+    }
+}

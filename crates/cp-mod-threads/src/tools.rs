@@ -326,8 +326,12 @@ fn build_read_result(state: &State, r: &ReadResult<'_>) -> String {
 /// Write the YAML thread-overview list (active threads only) into `output`.
 fn write_thread_list(output: &mut String, ts: &ThreadsState, focused_tid: &str) {
     // Archived threads are invisible to the LLM (T9): only active threads
-    // appear in the context the model reads.
-    for t in ts.threads.iter().filter(|t| !t.archived) {
+    // appear in the context the model reads. Paused threads are hidden from the
+    // panel list too (T663) — a paused thread is deliberately parked, so it
+    // should not clutter the roster — EXCEPT the focused one, which stays visible
+    // because the conversation section below renders it and hiding what you're
+    // actively working would be jarring.
+    for t in ts.threads.iter().filter(|t| !t.archived && (!t.paused || t.id == focused_tid)) {
         let unack = t.messages.iter().filter(|m| !m.acknowledged).count();
         _ = writeln!(output, "  - id: {}", t.id);
         _ = writeln!(output, "    name: \"{}\"", yaml_escape(&t.name));

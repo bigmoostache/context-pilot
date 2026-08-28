@@ -145,6 +145,19 @@ fn validate_task_declaration(tool: &ToolUse, state: &State, result: &mut Verdict
              Declare a task from the focused thread.",
             item.thread_id
         )),
+        // A finished/cancelled task is a wrong thing to declare work against —
+        // warn and do nothing (the pipeline's auto-promote also leaves it be).
+        Some(item)
+            if matches!(
+                item.status,
+                cp_mod_todo::types::TodoStatus::Done | cp_mod_todo::types::TodoStatus::Cancelled
+            ) =>
+        {
+            result.warnings.push(format!(
+                "You're working on a finished/cancelled task ('{task_id}'). \
+                 Demote it to in_progress or planned if it actually isn't done."
+            ));
+        }
         Some(_) => {}
     }
 }
