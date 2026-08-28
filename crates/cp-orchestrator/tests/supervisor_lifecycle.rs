@@ -53,7 +53,7 @@ use nix::errno::Errno;
 use nix::sys::signal::kill;
 use nix::unistd::Pid;
 
-use cp_orchestrator::supervisor::{Event, ProcManager};
+use cp_orchestrator::supervisor::{Event, ProcManager, SpawnPlan};
 use cp_wire::types::registry::{AgentStatus, Entry};
 
 use tempfile::tempdir;
@@ -104,7 +104,14 @@ fn a_stubborn_agent_that_ignores_sigterm_is_killed_by_escalation() {
     // A shell that traps (ignores) SIGTERM and then sleeps: stop() must fall
     // through the grace window and escalate to the uncatchable SIGKILL.
     let pid = sup
-        .spawn("stubborn".to_owned(), Path::new("/bin/sh"), folder.path(), &["-c", "trap '' TERM; exec sleep 60"])
+        .spawn(
+            "stubborn".to_owned(),
+            SpawnPlan {
+                binary: Path::new("/bin/sh"),
+                folder: folder.path(),
+                args: &["-c", "trap '' TERM; exec sleep 60"],
+            },
+        )
         .expect("spawn stubborn agent");
     assert!(pid_present(pid), "the agent is running");
 
@@ -127,7 +134,10 @@ fn the_supervisor_tracks_and_tears_down_a_multi_agent_fleet() {
     let mut pids = Vec::new();
     for n in 0..3 {
         let pid = sup
-            .spawn(format!("agent-{n}"), Path::new("/bin/sleep"), folder.path(), &["60"])
+            .spawn(
+                format!("agent-{n}"),
+                SpawnPlan { binary: Path::new("/bin/sleep"), folder: folder.path(), args: &["60"] },
+            )
             .unwrap_or_else(|e| panic!("spawn agent-{n}: {e}"));
         pids.push(pid);
     }
@@ -189,8 +199,9 @@ fn check_liveness_routes_a_spawned_exit_and_an_adopted_vanish_in_one_pass() {
     let mut sup = ProcManager::new(&[PathBuf::from("/bin/sleep")]);
 
     // A spawned agent that exits on its own almost immediately.
-    let _spawned =
-        sup.spawn("exits".to_owned(), Path::new("/bin/sleep"), folder.path(), &["0"]).expect("spawn exiting agent");
+    let _spawned = sup
+        .spawn("exits".to_owned(), SpawnPlan { binary: Path::new("/bin/sleep"), folder: folder.path(), args: &["0"] })
+        .expect("spawn exiting agent");
 
     // A foreign process we adopt, then let fully die + be reaped, so its pid is
     // genuinely gone before the liveness probe (an unreaped zombie would still

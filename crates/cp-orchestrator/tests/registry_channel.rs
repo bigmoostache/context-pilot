@@ -8,7 +8,7 @@
 //! commands that agent exactly as it will in production.
 //!
 //! * **A real booted agent is discovered live, then survives graceful shutdown.**
-//!   [`AgentRegistry`] reports `Appeared`+`Live` for a freshly booted agent;
+//!   [`FleetScanner`] reports `Appeared`+`Live` for a freshly booted agent;
 //!   after its `Boot` drops the registry record is intentionally kept (the
 //!   agent shows as "Disconnected" in the fleet rather than vanishing).
 //! * **`Stale` fires only on a `Live → non-live` transition.** First-sight
@@ -61,7 +61,7 @@ use cp_oplog::service::Service as OplogService;
 
 use cp_orchestrator::channel::{AgentChannel, Tailer};
 use cp_orchestrator::liveness::Liveness;
-use cp_orchestrator::registry::{AgentRegistry, Event};
+use cp_orchestrator::registry::{Event, FleetScanner};
 
 use cp_wire::heartbeat::Heartbeat;
 use cp_wire::types::ack::Status;
@@ -142,7 +142,7 @@ fn a_real_agent_is_discovered_live_then_survives_graceful_shutdown() {
         let boot = Boot::start_in(folder.path(), agents.path(), "test-model").expect("boot");
         let id = boot.id().to_owned();
 
-        let mut reg = AgentRegistry::new(agents.path().to_path_buf());
+        let mut reg = FleetScanner::new(agents.path().to_path_buf());
         let first = reg.scan().expect("scan");
         assert!(
             matches!(first.first(), Some(Event::Appeared(e)) if e.id == id),
@@ -177,7 +177,7 @@ fn stale_fires_once_on_transition_and_first_sight_staleness_rides_appeared() {
     write_heartbeat(&hb_a, &heartbeat(now_ms()));
     write_record(agents.path(), &entry("a", &hb_a, &oplog, &sock));
 
-    let mut reg = AgentRegistry::new(agents.path().to_path_buf());
+    let mut reg = FleetScanner::new(agents.path().to_path_buf());
     let first = reg.scan().expect("scan");
     assert!(matches!(first.as_slice(), [Event::Appeared(e)] if e.id == "a"));
     assert_eq!(reg.liveness("a"), Some(Liveness::Live));
@@ -195,7 +195,7 @@ fn stale_fires_once_on_transition_and_first_sight_staleness_rides_appeared() {
     write_heartbeat(&hb_b, &heartbeat(0));
     write_record(agents.path(), &entry("b", &hb_b, &oplog, &sock));
     let third = reg.scan().expect("scan");
-    assert_eq!(third, vec![Event::Appeared(entry("b", &hb_b, &oplog, &sock))]);
+    assert_eq!(third, vec![Event::Appeared(Box::new(entry("b", &hb_b, &oplog, &sock)))]);
     assert_eq!(reg.liveness("b"), Some(Liveness::StaleHeartbeat), "B is stale but only Appeared");
 }
 
