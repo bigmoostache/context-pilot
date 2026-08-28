@@ -14,7 +14,7 @@
 //! * [`liveness`] — the pure per-agent **liveness verdict** (live pid **and**
 //!   fresh heartbeat **and** matching `boot_id`), the decision at the heart of
 //!   discovery.
-//! * [`registry`] — the **`AgentRegistry`** (design doc §10, roadmap P5-T1):
+//! * [`registry`] — the **`FleetScanner`** (design doc §10, roadmap P5-T1):
 //!   scans `~/.context-pilot/agents/`, applies the verdict to each record, and
 //!   diffs successive passes into appeared / disappeared / status-changed /
 //!   stale events.

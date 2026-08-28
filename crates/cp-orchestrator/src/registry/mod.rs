@@ -1,16 +1,16 @@
-//! [`AgentRegistry`] — fleet discovery via directory scan-and-diff
+//! [`FleetScanner`] — fleet discovery via directory scan-and-diff
 //! (design doc §10, roadmap P5-T1).
 //!
 //! An agent advertises itself by atomically writing
 //! `~/.context-pilot/agents/<id>.json` at boot (`cp-mod-bridge`'s registry
 //! writer) and rewriting `<folder>/heartbeat` at a fixed cadence
-//! (`cp_wire::heartbeat`). [`AgentRegistry`] reads that directory, derives a
+//! (`cp_wire::heartbeat`). [`FleetScanner`] reads that directory, derives a
 //! [`Liveness`] verdict per record (see [`liveness`]), and diffs each
 //! pass against the last to emit fleet-change [`Event`]s.
 //!
 //! # Scan-and-diff, not a kernel watch
 //!
-//! Discovery is **poll-based** ([`AgentRegistry::scan`]): each pass reads the
+//! Discovery is **poll-based** ([`FleetScanner::scan`]): each pass reads the
 //! directory, parses every record, computes each verdict, and diffs the result
 //! against the previous pass. Agents appear and disappear rarely (boot /
 //! shutdown), so a directory poll at a modest cadence meets the "within one
@@ -18,11 +18,11 @@
 //! tail (a high-frequency stream, design doc I12) genuinely needs. Keeping the
 //! core a pure scan+diff also makes it testable against real files and pids with
 //! no timing flakiness — the live driver is a thin loop that calls
-//! [`scan`](AgentRegistry::scan) and [`reap_tmp`](AgentRegistry::reap_tmp) each
+//! [`scan`](FleetScanner::scan) and [`reap_tmp`](FleetScanner::reap_tmp) each
 //! tick.
 //!
 //! A registry write is `tmp → fsync → rename`, so a crashed writer can leave a
-//! `*.tmp` orphan. [`reap_tmp`](AgentRegistry::reap_tmp) deletes those once they
+//! `*.tmp` orphan. [`reap_tmp`](FleetScanner::reap_tmp) deletes those once they
 //! are older than a grace window, exactly as the body store reaps crash-orphan
 //! bodies (design doc GAP 3) — the grace must exceed the longest write window so
 //! an in-flight `*.tmp` about to be renamed is never deleted out from under it.
@@ -57,13 +57,14 @@ const TMP_SUFFIX: &str = ".tmp";
 /// so only genuine crash-orphans are ever collected.
 pub const DEFAULT_TMP_GRACE: Duration = Duration::from_mins(1);
 
-/// A change in the fleet observed between two [`scan`](AgentRegistry::scan)es.
+/// A change in the fleet observed between two [`scan`](FleetScanner::scan)es.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Event {
     /// A record with a previously-unseen id was discovered. Carries the full
-    /// record; the agent's liveness is queryable via
-    /// [`AgentRegistry::liveness`].
-    Appeared(Entry),
+    /// record (boxed — it is far larger than the other variants' payloads, so
+    /// boxing keeps `Event` small); the agent's liveness is queryable via
+    /// [`FleetScanner::liveness`].
+    Appeared(Box<Entry>),
 
     /// A previously-known record is no longer present (graceful shutdown
     /// removed it, or it was reaped).
@@ -90,11 +91,11 @@ struct Snapshot {
 
 /// Watches an agents directory and reports fleet membership and liveness.
 ///
-/// Construct with [`new`](AgentRegistry::new), then call
-/// [`scan`](AgentRegistry::scan) on a cadence to drive [`Event`]s and
-/// [`reap_tmp`](AgentRegistry::reap_tmp) to clear crash-orphan writes.
+/// Construct with [`new`](FleetScanner::new), then call
+/// [`scan`](FleetScanner::scan) on a cadence to drive [`Event`]s and
+/// [`reap_tmp`](FleetScanner::reap_tmp) to clear crash-orphan writes.
 #[derive(Debug)]
-pub struct AgentRegistry {
+pub struct FleetScanner {
     /// Directory holding `<id>.json` records (and transient `*.tmp` writes).
     dir: PathBuf,
 
@@ -105,7 +106,7 @@ pub struct AgentRegistry {
     known: HashMap<String, Snapshot>,
 }
 
-impl AgentRegistry {
+impl FleetScanner {
     /// Watch `dir` with the default heartbeat freshness window
     /// ([`DEFAULT_MAX_AGE`]).
     #[must_use]
@@ -171,16 +172,21 @@ impl AgentRegistry {
     fn diff(&self, fresh: &HashMap<String, Snapshot>) -> Vec<Event> {
         let mut events = Vec::new();
 
-        // Disappearances: known ids absent from the fresh scan.
-        for id in self.known.keys() {
+        // Disappearances: known ids absent from the fresh scan. Collect the keys
+        // into a Vec first — iterating the HashMap directly trips
+        // clippy::iter_over_hash_type (non-deterministic order); order is
+        // irrelevant to a diff, but the collected Vec satisfies the lint.
+        let known_ids: Vec<&String> = self.known.keys().collect();
+        for id in known_ids {
             if !fresh.contains_key(id) {
                 events.push(Event::Disappeared(id.clone()));
             }
         }
 
-        for (id, snap) in fresh {
+        let fresh_pairs: Vec<(&String, &Snapshot)> = fresh.iter().collect();
+        for (id, snap) in fresh_pairs {
             match self.known.get(id) {
-                None => events.push(Event::Appeared(snap.entry.clone())),
+                None => events.push(Event::Appeared(Box::new(snap.entry.clone()))),
                 Some(prev) => {
                     if prev.entry.status != snap.entry.status {
                         events.push(Event::StatusChanged(id.clone(), snap.entry.status));
@@ -215,8 +221,8 @@ impl AgentRegistry {
         };
 
         let mut removed: u64 = 0;
-        for entry in read_dir {
-            let entry = entry?;
+        for raw in read_dir {
+            let entry = raw?;
             let path = entry.path();
             if !path.to_string_lossy().ends_with(TMP_SUFFIX) {
                 continue;
@@ -251,11 +257,11 @@ fn read_records(dir: &Path) -> io::Result<Vec<Entry>> {
     };
 
     let mut records = Vec::new();
-    for entry in read_dir {
-        let entry = entry?;
+    for raw in read_dir {
+        let entry = raw?;
         let path = entry.path();
-        let name = entry.file_name();
-        let Some(name) = name.to_str() else { continue };
+        let file_name = entry.file_name();
+        let Some(name) = file_name.to_str() else { continue };
         if !name.ends_with(RECORD_SUFFIX) || name.ends_with(TMP_SUFFIX) {
             continue;
         }
@@ -350,7 +356,7 @@ mod tests {
         write_heartbeat(&hb_path, &heartbeat(me, now_ms()));
         write_record(dir.path(), &entry("a", me, &hb_path, AgentStatus::Running));
 
-        let mut reg = AgentRegistry::new(dir.path().to_path_buf());
+        let mut reg = FleetScanner::new(dir.path().to_path_buf());
         let first = reg.scan().expect("scan");
         assert_eq!(first.len(), 1);
         assert!(matches!(first.first(), Some(Event::Appeared(e)) if e.id == "a"));
@@ -374,7 +380,7 @@ mod tests {
         write_heartbeat(&hb_path, &heartbeat(me, now_ms()));
         write_record(dir.path(), &entry("a", me, &hb_path, AgentStatus::Starting));
 
-        let mut reg = AgentRegistry::new(dir.path().to_path_buf());
+        let mut reg = FleetScanner::new(dir.path().to_path_buf());
         let _appeared = reg.scan().expect("scan");
 
         write_record(dir.path(), &entry("a", me, &hb_path, AgentStatus::Running));
@@ -391,7 +397,7 @@ mod tests {
         write_heartbeat(&hb_path, &heartbeat(me, now_ms()));
         write_record(dir.path(), &entry("a", me, &hb_path, AgentStatus::Running));
 
-        let mut reg = AgentRegistry::new(dir.path().to_path_buf());
+        let mut reg = FleetScanner::new(dir.path().to_path_buf());
         let _appeared = reg.scan().expect("scan");
         assert_eq!(reg.liveness("a"), Some(Liveness::Live));
 
@@ -411,7 +417,7 @@ mod tests {
         write_heartbeat(&hb_path, &heartbeat(DEAD_PID, now_ms()));
         write_record(dir.path(), &entry("a", DEAD_PID, &hb_path, AgentStatus::Running));
 
-        let mut reg = AgentRegistry::new(dir.path().to_path_buf());
+        let mut reg = FleetScanner::new(dir.path().to_path_buf());
         let events = reg.scan().expect("scan");
         assert!(matches!(events.first(), Some(Event::Appeared(_))));
         assert_eq!(reg.liveness("a"), Some(Liveness::StalePid), "dead pid \u{2192} stale, not live");
@@ -423,7 +429,7 @@ mod tests {
         fs::write(dir.path().join("garbage.json"), b"not json").expect("write");
         fs::write(dir.path().join("a.json.tmp"), b"{}").expect("write tmp");
 
-        let mut reg = AgentRegistry::new(dir.path().to_path_buf());
+        let mut reg = FleetScanner::new(dir.path().to_path_buf());
         assert!(reg.scan().expect("scan").is_empty(), "garbage + tmp yield no agents");
     }
 
@@ -433,7 +439,7 @@ mod tests {
         let tmp = dir.path().join("x.json.tmp");
         fs::write(&tmp, b"partial").expect("write tmp");
 
-        let reg = AgentRegistry::new(dir.path().to_path_buf());
+        let reg = FleetScanner::new(dir.path().to_path_buf());
         // A long grace protects the just-written tmp (an in-flight write).
         assert_eq!(reg.reap_tmp(DEFAULT_TMP_GRACE).expect("reap"), 0);
         assert!(tmp.exists(), "young tmp survives");
@@ -446,7 +452,7 @@ mod tests {
     #[test]
     fn empty_or_missing_dir_scans_clean() {
         let dir = tempdir().expect("dir");
-        let mut reg = AgentRegistry::new(dir.path().join("does-not-exist"));
+        let mut reg = FleetScanner::new(dir.path().join("does-not-exist"));
         assert!(reg.scan().expect("scan").is_empty());
         assert_eq!(reg.reap_tmp(DEFAULT_TMP_GRACE).expect("reap"), 0);
     }

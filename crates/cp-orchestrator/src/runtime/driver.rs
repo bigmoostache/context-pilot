@@ -18,7 +18,7 @@ use cp_wire::types::registry::Entry;
 
 use crate::channel::Tailer;
 use crate::registry::tee_reader::TeeReader;
-use crate::registry::{AgentRegistry, Event};
+use crate::registry::{Event, FleetScanner};
 use crate::services::auth::backup::BackupScheduler;
 use crate::transport::Backend;
 
@@ -64,7 +64,7 @@ pub(super) fn driver_loop(
     interval: Duration,
     mut backup_scheduler: Option<BackupScheduler>,
 ) -> ! {
-    let mut registry = AgentRegistry::new(agents_dir);
+    let mut registry = FleetScanner::new(agents_dir);
     let mut ds = DriverState::default();
 
     loop {
@@ -123,7 +123,7 @@ pub(super) fn driver_loop(
 fn process_registry_events(events: Vec<Event>, backend: &Arc<Mutex<Backend>>, ds: &mut DriverState) {
     for event in events {
         match event {
-            Event::Appeared(entry) => handle_appeared(&entry, backend, ds),
+            Event::Appeared(entry) => handle_appeared(entry.as_ref(), backend, ds),
             Event::Disappeared(id) => {
                 drop(ds.tailers.remove(&id));
                 if let Some(reader) = ds.tee_readers.remove(&id) {
@@ -175,7 +175,7 @@ fn handle_appeared(entry: &Entry, backend: &Arc<Mutex<Backend>>, ds: &mut Driver
 /// recovers (heartbeat resumes, PID alive) would stay "disconnected" in the
 /// backend forever. Recovered agents are marked dirty so the SSE invalidate
 /// fires promptly.
-fn sync_liveness(backend: &Arc<Mutex<Backend>>, registry: &AgentRegistry, agent_folders: &BTreeMap<String, PathBuf>) {
+fn sync_liveness(backend: &Arc<Mutex<Backend>>, registry: &FleetScanner, agent_folders: &BTreeMap<String, PathBuf>) {
     let Ok(mut b) = backend.lock() else {
         return;
     };

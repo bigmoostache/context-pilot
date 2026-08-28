@@ -6,7 +6,7 @@
 //! skipped, so the consumer sees a complete, ordered event stream. The tailer
 //! is a **pure poll primitive** — no kernel watch, no thread. The live driver
 //! (inotify + backstop timer) belongs to the runtime loop, exactly as
-//! [`AgentRegistry`](crate::registry::AgentRegistry) is a pure scan+diff driven
+//! [`FleetScanner`](crate::registry::FleetScanner) is a pure scan+diff driven
 //! by an external cadence.
 //!
 //! Split out of `channel.rs` (which retains the read/write
