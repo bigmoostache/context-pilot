@@ -159,12 +159,12 @@ mod tests {
     #[test]
     fn daily_tag_am_pm() {
         // 2026-06-23 03:00:00 UTC → AM
-        let tag = BackupScheduler::daily_tag(1_782_210_000_000);
-        assert!(tag.ends_with("-am"), "tag={tag}");
+        let morning = BackupScheduler::daily_tag(1_782_210_000_000);
+        assert!(morning.ends_with("-am"), "tag={morning}");
 
         // 2026-06-23 15:00:00 UTC → PM
-        let tag = BackupScheduler::daily_tag(1_782_253_200_000);
-        assert!(tag.ends_with("-pm"), "tag={tag}");
+        let afternoon = BackupScheduler::daily_tag(1_782_253_200_000);
+        assert!(afternoon.ends_with("-pm"), "tag={afternoon}");
     }
 
     #[test]

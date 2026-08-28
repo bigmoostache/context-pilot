@@ -404,9 +404,9 @@ mod tests {
     use super::*;
 
     /// Build a `Mutex<Backend>` with an auth store present, and the access-control
-    /// flag forced to `access_control`. The tempdir is leaked so the `SQLite` file
-    /// outlives the test body.
-    fn backend(access_control: bool) -> Mutex<Backend> {
+    /// flag forced to `access_control`. Returns the `TempDir` guard alongside so
+    /// the `SQLite` file outlives the test body (bound as `_dir` at call sites).
+    fn backend(access_control: bool) -> (Mutex<Backend>, tempfile::TempDir) {
         let dir = tempfile::tempdir().expect("tempdir");
         let store = AuthStore::open(&dir.path().join("auth.db")).expect("open auth store");
         let mut b = Backend::new(
@@ -419,8 +419,7 @@ mod tests {
             Duration::from_hours(1),
         );
         b.access_control = access_control;
-        std::mem::forget(dir);
-        Mutex::new(b)
+        (Mutex::new(b), dir)
     }
 
     /// V0.4b — with the flag OFF, a request with no token on an agent-scoped
@@ -428,7 +427,7 @@ mod tests {
     /// store is present. Mirrors the current auth-disabled behaviour.
     #[test]
     fn flag_off_is_god_mode() {
-        let state = backend(false);
+        let (state, _dir) = backend(false);
         let outcome = authenticate(&state, &["api", "agent", "some-agent"], None);
         assert!(matches!(outcome, Ok(None)), "flag off \u{21d2} no authenticated user (god mode)");
     }
@@ -437,7 +436,7 @@ mod tests {
     /// rejected (401), while a public route still passes through.
     #[test]
     fn flag_on_enforces() {
-        let state = backend(true);
+        let (state, _dir) = backend(true);
         let protected = authenticate(&state, &["api", "agent", "some-agent"], None);
         assert!(matches!(protected, Err(reply) if reply.status == 401), "flag on + no token \u{21d2} 401");
         let public = authenticate(&state, &["api", "health"], None);
@@ -467,7 +466,7 @@ mod tests {
     /// regular user skips the IT step → `ready`. Hermetic (only the durable flag).
     #[test]
     fn me_next_action_day0_walk_and_capability_scope() {
-        let state = backend(false); // me() ignores access_control; needs the flag path
+        let (state, _dir) = backend(false); // me() ignores access_control; needs the flag path
         let flag_path = state.lock().expect("lock").provision_flag_path.clone();
         let na = |u: &User| me(&state, Some(u)).body;
         let set = |v| crate::transport::it::state::set_provisioned(&flag_path, v).expect("flag");
