@@ -137,6 +137,30 @@ fn set_active(nmcli: &OsStr, profile: &str, active: bool) -> Result<(), String> 
 /// address on the ethernet ports the cockpit stays reachable on the LAN address
 /// and the fleet ULA, so the choice is always reversible.
 ///
+/// Sync the systemd-networkd drop-in for the WAN uplink and reconfigure it when
+/// the drop-in actually changed. Split out of [`apply_mode`] to keep that
+/// function under the cognitive-complexity cap — this carries the nested
+/// drop-in-write-then-reconfigure conditional on its own.
+///
+/// `strict` (5G mode) suppresses `end0`'s default route so the modem bearer
+/// wins; `sync_dropin` returns `true` when it rewrote the file, and only then
+/// do we ask `networkctl` to reload.
+///
+/// # Errors
+///
+/// Returns a message when the drop-in cannot be written or `networkctl` fails.
+fn sync_networkd(tools: &Tools, config: &NetworkConfig) -> Result<(), String> {
+    if let Some(dir) = tools.networkd_dir.as_ref() {
+        let strict = matches!(config.mode, UplinkMode::FiveG);
+        if sync_dropin(dir, strict)?
+            && let Some(networkctl) = tools.networkctl.as_ref()
+        {
+            reconfigure_wan(networkctl)?;
+        }
+    }
+    Ok(())
+}
+
 /// **"No modem ⇒ no 5G mode" is not enforced here** — `config.mode` has already
 /// been coerced to `wan` by `apply::effective_config` if this box has no modem.
 /// It used to be enforced by the `modem_present()` early-return below, which sits
@@ -151,14 +175,7 @@ fn set_active(nmcli: &OsStr, profile: &str, active: bool) -> Result<(), String> 
 /// Returns a message when the drop-in cannot be written or `networkctl` fails —
 /// the parts that are genuinely under our control.
 pub(crate) fn apply_mode(tools: &Tools, config: &NetworkConfig) -> Result<(), String> {
-    if let Some(dir) = tools.networkd_dir.as_ref() {
-        let strict = matches!(config.mode, UplinkMode::FiveG);
-        if sync_dropin(dir, strict)?
-            && let Some(networkctl) = tools.networkctl.as_ref()
-        {
-            reconfigure_wan(networkctl)?;
-        }
-    }
+    sync_networkd(tools, config)?;
     let wanted_up = match config.mode {
         UplinkMode::Wan => false,
         UplinkMode::FiveG => true,
