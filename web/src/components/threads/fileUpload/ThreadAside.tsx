@@ -76,10 +76,9 @@ export function ThreadAside({
             onValueChange={(v) => onTabChange(v as "files" | "tasks")}
             className="flex min-h-0 flex-1 flex-col gap-0"
           >
-            {/* Header: tab bar, right-aligned so it stays put as the rail widens
-                240 → 680 for a file preview. */}
+            {/* Header: left-aligned tab bar. */}
             <div className="flex items-center gap-1.5 border-b border-border/60 px-2 py-1.5">
-              <TabsList variant="line" className="ml-auto h-7 gap-0.5">
+              <TabsList variant="line" className="h-7 gap-0.5">
                 {hasTasks && (
                   <TabsTrigger value="tasks" className="px-2 text-[11px]">
                     <ListChecks className="size-3" />
