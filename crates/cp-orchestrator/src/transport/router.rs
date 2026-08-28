@@ -83,7 +83,7 @@ pub(super) fn route_rest(method: &Method, segments: &[&str], ctx: RouteCtx<'_>) 
         (&Method::Get, &["api", "agent", id, "acl"]) => auth::acl_list(state, id, auth_user),
         (&Method::Post, &["api", "agent", id, "acl"]) => auth::acl_grant(state, id, body_bytes, auth_user),
         (&Method::Patch, &["api", "agent", id, "acl", user_id]) => {
-            auth::acl_update_role(state, id, user_id, body_bytes, auth_user)
+            auth::acl_update_role(state, (id, user_id), body_bytes, auth_user)
         }
         (&Method::Delete, &["api", "agent", id, "acl", user_id]) => auth::acl_revoke(state, id, user_id, auth_user),
 
