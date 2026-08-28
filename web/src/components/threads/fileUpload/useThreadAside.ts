@@ -41,9 +41,7 @@ function readHidden(agentId: string, threadId: string, defaultHidden: boolean): 
 export function useThreadAside(agentId: string, threadId: string, defaultHidden: boolean) {
   const [tab, setTab] = useState<ThreadAsideTab>("tasks")
   const [file, setFile] = useState<UploadedFile | null>(null)
-  const [hidden, setHidden] = useState<boolean>(() =>
-    readHidden(agentId, threadId, defaultHidden),
-  )
+  const [hidden, setHidden] = useState<boolean>(() => readHidden(agentId, threadId, defaultHidden))
 
   // Re-seed the per-thread hidden choice when the agent/thread key changes
   // (the component instance is reused across thread switches). Guarded by the

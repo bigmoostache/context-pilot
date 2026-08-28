@@ -482,7 +482,13 @@ export function ThreadConversation({
       {/* ── Unified right rail: Files + Tasks tabs, inline preview + show/hide
           chrome (T662/T677). Extracted to ThreadAsideRail to keep this render
           body under the 500-line file budget. */}
-      <ThreadAsideRail agentId={agentId} files={threadFiles} tasks={thread.tasks ?? []} aside={aside} leftRailHidden={leftRailHidden} />
+      <ThreadAsideRail
+        agentId={agentId}
+        files={threadFiles}
+        tasks={thread.tasks ?? []}
+        aside={aside}
+        leftRailHidden={leftRailHidden}
+      />
 
       <CreateCommandDialog
         open={createCmdOpen}
