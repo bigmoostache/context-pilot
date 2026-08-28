@@ -30,22 +30,55 @@ type Route = (String, String);
 const EXCLUDED: &[(&str, &str)] = &[("GET", "/api/stream")];
 
 /// Extract all routes from the router source code.
+///
+/// The routing code is split across two files (the transport `handle` shell was
+/// pushed over the 500-line budget): `router.rs` holds the `route_rest()` match
+/// arms and the raw-bytes `try_raw_route()` dispatcher, while `mod.rs` still
+/// holds the `handle()` special-case routes. Both are parsed as text.
 fn extract_router_routes() -> BTreeSet<Route> {
-    let src_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/transport/mod.rs");
-    let src = std::fs::read_to_string(&src_path).expect("read transport/mod.rs");
-
+    let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/transport");
     let mut routes = BTreeSet::new();
+    for file in ["router.rs", "mod.rs"] {
+        let src = std::fs::read_to_string(base.join(file)).expect("read transport source");
+        extract_routes_from_source(&src, &mut routes);
+    }
 
+    // Remove intentionally excluded routes.
+    for &(m, p) in EXCLUDED {
+        let _removed = routes.remove(&(m.to_owned(), p.to_owned()));
+    }
+
+    routes
+}
+
+/// Parse one transport source file for route patterns, inserting each into
+/// `routes`. Recognises three arm shapes:
+///
+/// * `route_rest()` tuple arms — `(&Method::Get, &["api", …]) =>` (the `&`
+///   reference patterns clippy::pattern_type_mismatch mandates over `&[&str]`);
+/// * `try_raw_route()` slice arms — `["api", …] =>` matched on `*segments`,
+///   all GET (the raw-bytes dispatcher only runs for GET);
+/// * `handle()` special routes — `if … segments … == ["api", …]`, also GET.
+fn extract_routes_from_source(src: &str, routes: &mut BTreeSet<Route>) {
     for line in src.lines() {
         let t = line.trim();
 
-        // ── Match arms in route_rest(): (Method::Get, ["api", ...]) ──
-        if let Some(rest) = t.strip_prefix("(Method::")
+        // ── route_rest() tuple arms: (&Method::Get, &["api", ...]) ──
+        if let Some(rest) = t.strip_prefix("(&Method::").or_else(|| t.strip_prefix("(Method::"))
             && let Some((method_raw, after)) = rest.split_once(',')
             && let Some(segs) = extract_bracket_segments(after)
         {
             let path = segments_to_path(&segs);
             let _new = routes.insert((method_raw.trim().to_uppercase(), path));
+        }
+
+        // ── try_raw_route() slice arms: ["api", ...] => (all GET) ──
+        if t.starts_with("[\"api\"")
+            && t.contains("=>")
+            && let Some(segs) = extract_bracket_segments(t)
+        {
+            let path = segments_to_path(&segs);
+            let _new = routes.insert(("GET".to_owned(), path));
         }
 
         // ── Special routes in handle(): if let ["api", ...] = segments ──
@@ -57,13 +90,6 @@ fn extract_router_routes() -> BTreeSet<Route> {
             let _new = routes.insert(("GET".to_owned(), path));
         }
     }
-
-    // Remove intentionally excluded routes.
-    for &(m, p) in EXCLUDED {
-        let _removed = routes.remove(&(m.to_owned(), p.to_owned()));
-    }
-
-    routes
 }
 
 /// Extract all `(method, path)` pairs from the committed `openapi.json`.

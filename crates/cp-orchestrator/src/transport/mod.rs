@@ -32,12 +32,15 @@ mod auth;
 mod files;
 pub mod inspect;
 pub mod it;
-mod query;
 pub mod rest;
 // `pub` so the `sse` and `ticket` submodules it now contains stay as reachable
 // as they were at the transport root (else their `pub` items trip
 // `unreachable_pub`).
 pub mod stream;
+
+/// The non-streaming REST route table + raw-bytes GET dispatcher, split out to
+/// keep this file within the 500-line budget.
+mod router;
 
 use std::io::Read as _;
 use std::sync::{Arc, Mutex};
@@ -68,9 +71,9 @@ const MAX_BODY: u64 = 32 * 1024 * 1024;
 /// # Errors
 ///
 /// Returns an error string if the address cannot be bound.
-pub fn serve(addr: &str, state: Arc<Mutex<Backend>>) -> Result<(), String> {
+pub fn serve(addr: &str, state: &Arc<Mutex<Backend>>) -> Result<(), String> {
     let server = Server::http(addr).map_err(|e| e.to_string())?;
-    serve_bound(server, state);
+    serve_bound(&server, state);
     Ok(())
 }
 
@@ -82,10 +85,10 @@ pub fn serve(addr: &str, state: Arc<Mutex<Backend>>) -> Result<(), String> {
 /// [`Server::server_addr`] before handing the server here. There is a single
 /// transport face now (design §13.4 removed the separate maintenance plane), so
 /// this dispatches every request through the one product [`handle`] pipeline.
-pub fn serve_bound(server: Server, state: Arc<Mutex<Backend>>) {
+pub fn serve_bound(server: &Server, state: &Arc<Mutex<Backend>>) {
     for request in server.incoming_requests() {
-        let state = Arc::clone(&state);
-        let _handle = thread::spawn(move || handle(request, &state));
+        let handler_state = Arc::clone(state);
+        let _handle = thread::spawn(move || handle(request, &handler_state));
     }
 }
 
@@ -97,11 +100,7 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
 
     // CORS preflight — return 204 with permissive headers.
     if method == Method::Options {
-        let mut response = Response::from_string("").with_status_code(204);
-        for header in cors_headers() {
-            response = response.with_header(header);
-        }
-        let _sent = request.respond(response);
+        respond_preflight(request);
         return;
     }
 
@@ -111,12 +110,7 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
     // and the systemd-era rollback machinery), which must reach it before any
     // session can exist. Non-loopback callers get a flat 403.
     if method == Method::Get && segments.as_slice() == ["healthz"] {
-        let reply = if request.remote_addr().is_some_and(|a| a.ip().is_loopback()) {
-            it::health::healthz(state)
-        } else {
-            rest::HttpReply::error(403, "loopback only")
-        };
-        respond_json(request, &reply);
+        respond_healthz(request, state);
         return;
     }
 
@@ -131,9 +125,7 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
     }
 
     // Extract the Bearer token for auth-aware handlers.
-    let auth_token = request.headers().iter().find_map(|h| {
-        if h.field.equiv("Authorization") { h.value.as_str().strip_prefix("Bearer ").map(str::to_owned) } else { None }
-    });
+    let auth_token = bearer_token(&request);
 
     // Centralised auth gate (Phase 5, NFR-16). Validates the session for
     // protected routes when auth is enabled; no-op when disabled (NFR-09).
@@ -149,7 +141,7 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
     // targets a specific agent, verify the caller has access. System admins
     // bypass (FR-09); regular users need an ACL entry (FR-10).
     if let Some(agent_id) = auth::extract_agent_id(&segments)
-        && let Some(ref user) = auth_user
+        && let Some(user) = auth_user.as_ref()
         && !auth::authorize_agent(state, agent_id, user)
     {
         respond_json(request, &rest::HttpReply::error(403, "no access to this agent"));
@@ -162,31 +154,21 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
         return;
     }
 
-    // File download — returns raw bytes, not JSON.
+    // File download — returns raw bytes, not JSON. Delegated to [`try_raw_route`]
+    // (a GET-only dispatcher that owns the `Request` for its non-JSON body):
+    // `None` means it handled and consumed the request; `Some(request)` gives it
+    // back for the rest of the pipeline.
     if method == Method::Get {
-        if let ["api", "agent", id, "avatar"] = segments.as_slice() {
-            files::handle_avatar(request, state, id);
-            return;
-        }
-        if let ["api", "agent", id, "fs", "download"] = segments.as_slice() {
-            files::handle_download(request, state, id, &query);
-            return;
-        }
-        if let ["api", "agent", id, "fs", "raw"] = segments.as_slice() {
-            files::handle_raw(request, state, id, &query);
-            return;
-        }
-        // IT: private-CA root download (design §13.5, re-homed from the maint plane).
-        // Owns the `Request` for its non-JSON content type, so it can't route
-        // through `route_rest`. Gate on `can_manage_it` here (a `None` caller is
-        // god-mode, FR-v3-08); then reuse the maintenance handler verbatim.
-        if let ["api", "it", "ca.crt"] = segments.as_slice() {
-            if auth_user.as_ref().is_some_and(|u| !u.can_manage_it()) {
-                respond_json(request, &rest::HttpReply::error(403, "IT management access required"));
-            } else {
-                it::ca::serve_ca_cert(request);
-            }
-            return;
+        let get_ctx = RouteCtx {
+            state,
+            body_bytes: &[],
+            query: &query,
+            auth_token: auth_token.as_deref(),
+            auth_user: auth_user.as_ref(),
+        };
+        match router::try_raw_route(request, &segments, get_ctx) {
+            Some(returned) => request = returned,
+            None => return,
         }
     }
 
@@ -198,8 +180,17 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
         Vec::new()
     };
 
-    let reply =
-        route_rest(&method, &segments, state, body_bytes.as_slice(), &query, auth_token.as_deref(), auth_user.as_ref());
+    let reply = router::route_rest(
+        &method,
+        &segments,
+        RouteCtx {
+            state,
+            body_bytes: body_bytes.as_slice(),
+            query: &query,
+            auth_token: auth_token.as_deref(),
+            auth_user: auth_user.as_ref(),
+        },
+    );
     respond_json(request, &reply);
 }
 
@@ -210,167 +201,48 @@ fn read_body(request: &mut Request) -> Vec<u8> {
     buf
 }
 
-/// Dispatch a non-streaming REST route to its handler.
-fn route_rest(
-    method: &Method,
-    segments: &[&str],
-    state: &Arc<Mutex<Backend>>,
-    body_bytes: &[u8],
-    query: &str,
-    auth_token: Option<&str>,
-    auth_user: Option<&crate::services::auth::types::User>,
-) -> rest::HttpReply {
-    match (method, segments) {
-        (Method::Get, ["api", "health"]) => rest::HttpReply { status: 200, body: "{\"status\":\"ok\"}".to_owned() },
-        (Method::Get, ["api", "providers"]) => inspect::providers::providers(query),
+/// Extract the `Authorization: Bearer <token>` value, if present.
+fn bearer_token(request: &Request) -> Option<String> {
+    request.headers().iter().find_map(|h| {
+        if h.field.equiv("Authorization") { h.value.as_str().strip_prefix("Bearer ").map(str::to_owned) } else { None }
+    })
+}
 
-        // ── Auth routes (§6 of design doc) ──────────────────────────
-        (Method::Get, ["api", "auth", "status"]) => auth::auth_status(state),
-        (Method::Post, ["api", "auth", "login"]) => auth::login(state, body_bytes),
-        (Method::Post, ["api", "auth", "register"]) => auth::register(state, body_bytes, auth_user),
-        (Method::Post, ["api", "auth", "logout"]) => auth::logout(state, auth_token),
-        (Method::Get, ["api", "auth", "me"]) => auth::me(state, auth_user),
-        (Method::Patch, ["api", "auth", "me"]) => auth::update_me(state, body_bytes, auth_user),
-        (Method::Post, ["api", "auth", "password"]) => auth::change_password(state, body_bytes, auth_user),
-        (Method::Get, ["api", "auth", "sessions"]) => auth::list_sessions(state, auth_token, auth_user),
-        (Method::Delete, ["api", "auth", "sessions", sid]) => auth::revoke_session(state, sid, auth_user),
-        (Method::Get, ["api", "settings"]) => rest::get_settings(state, auth_user),
-        (Method::Post, ["api", "settings"]) => rest::update_settings(state, body_bytes, auth_user),
-        (Method::Get, ["api", "auth", "users"]) => auth::list_users(state, auth_user),
-        (Method::Post, ["api", "auth", "users"]) => auth::create_user(state, body_bytes, auth_user),
-        (Method::Delete, ["api", "auth", "users", user_id]) => auth::delete_user(state, user_id, auth_user),
-        (Method::Post, ["api", "auth", "users", user_id, "logout"]) => {
-            auth::force_logout_user(state, user_id, auth_user)
-        }
-
-        // ── ACL routes (Phase 6, §6 of design doc) ─────────────────
-        (Method::Get, ["api", "agent", id, "acl"]) => auth::acl_list(state, id, auth_user),
-        (Method::Post, ["api", "agent", id, "acl"]) => auth::acl_grant(state, id, body_bytes, auth_user),
-        (Method::Patch, ["api", "agent", id, "acl", user_id]) => {
-            auth::acl_update_role(state, id, user_id, body_bytes, auth_user)
-        }
-        (Method::Delete, ["api", "agent", id, "acl", user_id]) => auth::acl_revoke(state, id, user_id, auth_user),
-
-        // ── Fleet + agent routes ────────────────────────────────────
-        (Method::Get, ["api", "fleet"]) => rest::fleet(state, auth_user),
-        (Method::Get, ["api", "fleet", "meta"]) => inspect::meta::fleet(state, auth_user),
-        (Method::Get, ["api", "fleet", "retired"]) => inspect::meta::fleet_retired(state, auth_user),
-        (Method::Get, ["api", "metrics"]) => inspect::metrics::fleet_metrics(state, auth_user),
-
-        // ── Env-key inspection (T399) + editing (T404) ────────────
-        (Method::Get, ["api", "env-keys"]) => rest::env_keys_list(),
-        (Method::Get, ["api", "env-keys", name]) => rest::env_key_reveal(name, auth_user),
-        (Method::Put, ["api", "env-keys", name]) => {
-            let body = String::from_utf8_lossy(body_bytes);
-            rest::env_key_update(name, auth_user, &body)
-        }
-
-        // ── Vault snapshot (BridgeVault cache warm-up) ──────────────
-        (Method::Get, ["api", "vault", "snapshot"]) => rest::vault_snapshot(auth_user),
-
-        // ── IT infra (design §13.5, re-homed from the maint plane; can_manage_it) ──
-        (Method::Get, ["api", "it", "ca", "fingerprint"]) => rest::it_ca_fingerprint(auth_user),
-        (Method::Get, ["api", "it", "identity"]) => rest::it_get_identity(state, auth_user),
-        (Method::Post, ["api", "it", "identity"]) => rest::it_set_identity(state, body_bytes, auth_user),
-        (Method::Get, ["api", "it", "provisioned"]) => rest::it_provisioned(state, auth_user),
-
-        // ── Internet uplink + Wi-Fi AP (can_manage_it) ──────────────────────────
-        (Method::Get, ["api", "it", "network"]) => rest::it_get_network(state, auth_user),
-        (Method::Post, ["api", "it", "network", "mode"]) => rest::it_set_network_mode(state, body_bytes, auth_user),
-        (Method::Post, ["api", "it", "network", "ap"]) => rest::it_set_network_ap(state, body_bytes, auth_user),
-        (Method::Post, ["api", "it", "network", "wwan"]) => rest::it_set_network_wwan(state, body_bytes, auth_user),
-
-        (Method::Get, ["api", "agent", id]) => rest::agent(state, id),
-        (Method::Get, ["api", "agent", id, "meta"]) => inspect::meta::agent(state, id),
-        (Method::Get, ["api", "agent", id, "metrics"]) => inspect::metrics::agent_metrics(state, id),
-        (Method::Get, ["api", "agent", id, "vitals"]) => inspect::vitals::agent_vitals(state, id),
-        (Method::Get, ["api", "agent", id, "body", hash]) => rest::body(state, id, hash),
-        (Method::Get, ["api", "agent", id, "threads"]) => rest::threads(state, id),
-        (Method::Get, ["api", "agent", id, "usage"]) => inspect::panels::usage(state, id, query),
-        (Method::Get, ["api", "agent", id, "library"]) => inspect::panels::library(state, id),
-        (Method::Get, ["api", "agent", id, "identity"]) => inspect::panels::identity(state, id),
-        (Method::Get, ["api", "agent", id, "fs"]) => inspect::finder::fs_list(state, id, query),
-        (Method::Get, ["api", "agent", id, "fs", "preview"]) => inspect::finder::fs_preview(state, id, query),
-        (Method::Get, ["api", "agent", id, "fs", "sheet"]) => inspect::finder::fs_sheet(state, id, query),
-        (Method::Get, ["api", "agent", id, "fs", "descriptions"]) => inspect::finder::fs_descriptions(state, id),
-        (Method::Get, ["api", "agent", id, "conversation"]) => inspect::finder::conversation(state, id),
-        (Method::Post, ["api", "agent", id, "command"]) => rest::command(state, id, body_bytes),
-        (Method::Post, ["api", "agent", id, "conversations", "search"]) => {
-            rest::search_conversations(state, id, body_bytes)
-        }
-        (Method::Post, ["api", "agent", id, "library", "command"]) => rest::create_command(state, id, body_bytes),
-        (Method::Put, ["api", "agent", id, "library", "command", item]) => {
-            rest::upsert_library_command(state, id, item, body_bytes)
-        }
-        (Method::Get, ["api", "agent", id, "library", "agent", item]) => rest::read_library_agent(state, id, item),
-        (Method::Put, ["api", "agent", id, "library", "agent", item]) => {
-            rest::upsert_library_agent(state, id, item, body_bytes)
-        }
-        (Method::Delete, ["api", "agent", id, "library", "agent", item]) => rest::delete_library_agent(state, id, item),
-        (Method::Post, ["api", "agent", id, "fs", "upload"]) => {
-            inspect::finder::fs_upload(state, id, query, body_bytes)
-        }
-        (Method::Post, ["api", "agent", id, "fs", "upload-unique"]) => {
-            inspect::finder::fs_upload_unique(state, id, query, body_bytes)
-        }
-        (Method::Post, ["api", "agent", id, "fs", "write"]) => inspect::finder::fs_write(state, id, query, body_bytes),
-        (Method::Post, ["api", "agent", id, "fs", "mkdir"]) => inspect::finder::fs_mkdir(state, id, query),
-        (Method::Post, ["api", "agent", id, "fs", "rename"]) => inspect::finder::fs_rename(state, id, query),
-        (Method::Post, ["api", "agent", id, "fs", "move"]) => inspect::finder::fs_move(state, id, body_bytes),
-        (Method::Post, ["api", "agent", id, "fs", "trash"]) => inspect::finder::fs_trash(state, id, body_bytes),
-        (Method::Post, ["api", "agent", id, "restart"]) => rest::restart_agent(state, id),
-        (Method::Post, ["api", "agent", id, "retire"]) => rest::retire_agent(state, id),
-        (Method::Post, ["api", "agent", id, "unretire"]) => rest::unretire_agent(state, id),
-        (Method::Post, ["api", "agent", id, "rename"]) => rest::rename_agent(state, id, body_bytes),
-        (Method::Post, ["api", "agent", id, "avatar"]) => rest::upload_avatar(state, id, body_bytes),
-        (Method::Delete, ["api", "agent", id, "avatar"]) => rest::delete_avatar(state, id),
-        (Method::Post, ["api", "fleet", "create"]) => rest::create_agent(state, body_bytes, auth_user),
-        (Method::Post, ["api", "ticket"]) => rest::mint_ticket(state, auth_user),
-
-        // ── Release + update management — IT surface (can_manage_it) ──
-        // One guard for every `/api/releases/*` and `/api/update/*` arm below
-        // (update-policy §1 problem 2): a real caller without `can_manage_it`
-        // (Admin+) is refused; `None` = access control off → god-mode (§13.10).
-        (_, ["api", "releases" | "update", ..]) if auth_user.is_some_and(|u| !u.can_manage_it()) => {
-            rest::HttpReply::error(403, "IT management access required")
-        }
-        // ── Auto-update (O5.1, update-policy §5.9) ──────────────────
-        (Method::Get, ["api", "update", "status"]) => rest::update_status(state),
-        (Method::Post, ["api", "update", "check"]) => rest::update_check(state),
-        (Method::Post, ["api", "update", "apply"]) => rest::update_apply(state),
-        (Method::Put, ["api", "update", "mode"]) => rest::update_set_mode(state, body_bytes),
-        // Retired manual version-choice routes (T5.1.5): the Update pane owns
-        // the flow now; these stay only as a break-glass hatch.
-        (Method::Post, ["api", "releases", "download"])
-        | (Method::Put, ["api", "releases", "select"])
-        | (Method::Delete, ["api", "releases", _])
-            if !rest::releases_break_glass() =>
-        {
-            rest::HttpReply::error(410, "retired \u{2014} auto-update owns versions (set CP_RELEASES_BREAK_GLASS=1)")
-        }
-        (Method::Get, ["api", "releases"]) => rest::list_releases(state),
-        (Method::Put, ["api", "releases", "arch"]) => rest::set_arch(state, body_bytes),
-        (Method::Post, ["api", "releases", "download"]) => rest::download_release(state, body_bytes),
-        (Method::Put, ["api", "releases", "select"]) => rest::select_release(state, body_bytes),
-        (Method::Post, ["api", "releases", "deploy"]) => rest::deploy_fleet(state, body_bytes),
-        (Method::Post, ["api", "releases", "restart-orchestrator"]) => rest::restart_orchestrator(state),
-        (Method::Delete, ["api", "releases", tag]) => rest::delete_release(state, tag),
-
-        // ── Claude Code usage + login (OAuth) ───────────────────────
-        (Method::Get, ["api", "claude-usage"]) => rest::claude_usage(),
-        (Method::Get, ["api", "claude-login", "status"]) => rest::token_status(),
-        (Method::Post, ["api", "claude-login", "start"]) => rest::login_start(state),
-        (Method::Post, ["api", "claude-login", "complete"]) => rest::login_complete(state, body_bytes),
-        (Method::Post, ["api", "claude-login", "refresh"]) => rest::refresh_login(),
-
-        // ── Claude multi-account token vault ────────────────────────
-        (Method::Get, ["api", "claude-accounts"]) => rest::list_accounts(),
-        (Method::Post, ["api", "claude-accounts", "store"]) => rest::store_account(),
-        (Method::Post, ["api", "claude-accounts", "switch"]) => rest::switch_account(body_bytes),
-        (Method::Delete, ["api", "claude-accounts", email]) => rest::delete_account(email),
-
-        _ => rest::HttpReply { status: 404, body: "{\"error\":\"not found\"}".to_owned() },
+/// Answer a CORS preflight with `204 No Content` and the permissive CORS headers.
+fn respond_preflight(request: Request) {
+    let mut response = Response::from_string("").with_status_code(204i32);
+    for header in cors_headers() {
+        response = response.with_header(header);
     }
+    let _sent = request.respond(response);
+}
+
+/// Answer the loopback-only readiness probe (`GET /healthz`): the box's own
+/// health check, served before the auth gate. Non-loopback callers get `403`.
+fn respond_healthz(request: Request, state: &Arc<Mutex<Backend>>) {
+    let reply = if request.remote_addr().is_some_and(|a| a.ip().is_loopback()) {
+        it::health::healthz(state)
+    } else {
+        rest::HttpReply::error(403, "loopback only")
+    };
+    respond_json(request, &reply);
+}
+
+/// Borrowed per-request routing context — the shared inputs every REST handler
+/// draws on, bundled so [`route_rest`] stays under the argument-count cap. The
+/// match arms destructure it once at the top and reference the locals verbatim.
+#[derive(Clone, Copy)]
+struct RouteCtx<'ctx> {
+    /// The shared backend state.
+    state: &'ctx Arc<Mutex<Backend>>,
+    /// The request body (empty for non-POST/PUT/PATCH routes).
+    body_bytes: &'ctx [u8],
+    /// The raw query string.
+    query: &'ctx str,
+    /// The caller's Bearer token, if present.
+    auth_token: Option<&'ctx str>,
+    /// The authenticated user, when auth is enabled.
+    auth_user: Option<&'ctx crate::services::auth::types::User>,
 }
 
 /// CORS response headers permitting the Vite dev server (or any origin) to

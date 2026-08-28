@@ -21,8 +21,8 @@ use tiny_http::Request;
 
 use cp_wire::types::registry::Entry;
 
-use super::super::query::QueryParams;
 use super::super::{Backend, respond_json, rest};
+use super::query::QueryParams;
 use super::{run_stream, sse};
 
 /// Redeem the ticket and stream an agent's deltas as SSE until disconnect.

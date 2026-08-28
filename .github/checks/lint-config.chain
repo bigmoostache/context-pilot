@@ -7790,3 +7790,53 @@ index 463f7cbd..8f328e96 100644
  # ── Identifier Quality ───────────────────────────────────────────────────────
  
 # --- End entry #87 ---
+88:e66cb1538d8f159e2b32f49c6b00eb56b72c008964e6e61ec23f969d8b51c0ef:6dab85d92ab46c29f628f1215a585c1811cbd6ca3360e5094a57dd239bcbe2e4:f77bd80b5af3250aa397989b32ac62f7454b77672c5393680a6caccadfe39e42
+# --- Diff for entry #88 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index c8d5683f..03dfa0e3 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -432,3 +432,42 @@ exceptions:
+       struct exists to avoid — so #[non_exhaustive] is impossible.
+     strategy: >
+       Irreducible — the exhaustive literal is the whole point; a ctor re-trips too_many_arguments.
++
++  # ── multiple_inherent_impl: ReleaseStore split for the 500-line cap ──
++
++  - path: "crates/cp-orchestrator/src/services/releases/mod.rs"
++    match: "ReleaseStore inherent methods are split across mod.rs and the sibling channel.rs to respect the 500-line file cap"
++    reason: >
++      ReleaseStore's inherent methods are split across mod.rs (the primary impl:
++      arch, local releases, GitHub API, download, select/delete, persistence) and
++      the sibling channel.rs (the OTA-channel methods: channel, set_channel,
++      pending_channel_switch, clear_pending_switch). mod.rs already sits at 477
++      lines; folding channel.rs's ~45 lines back in would push it over the 500-line
++      file cap. clippy::multiple_inherent_impl (forbid) fires on the second block,
++      so the primary impl carries the #[expect].
++    strategy: >
++      Irreducible under the 500-line file cap — the two impl blocks are the honest
++      shape once the type's methods exceed one file's budget.
++
++  # ── flat path-segment router: too_many_lines + pattern_type_mismatch ──
++
++  - path: "crates/cp-orchestrator/src/transport/router.rs"
++    match: "flat path-segment router: a closed match over ~60 borrowed `(&Method, &[&str])` route shapes"
++    reason: >
++      route_rest is a flat path-segment router — a closed match over ~60 borrowed
++      (&Method, &[&str]) route shapes, each arm a one-line delegation. It cannot be
++      split under the 60-line cap without a wildcard catch-all per sub-dispatcher
++      (forbidden wildcard_enum_match_arm), and the slice patterns over &[&str] bind
++      elements as &&str (pattern_type_mismatch) which is irreducible: tiny_http's
++      Method is not Copy, so neither the Method nor the segment slice can be
++      dereferenced to an owned scrutinee. The flat variant→handler table is the
++      transport twin of src/app/actions/mod.rs::apply_action.
++    strategy: >
++      Irreducible — a closed borrowed-slice router cannot be split under the line cap
++      without a forbidden wildcard catch-all, and pattern_type_mismatch on &[&str]
++      slice patterns has no owned-scrutinee escape (Method is not Copy).
++
++
++
++
++
+# --- End entry #88 ---

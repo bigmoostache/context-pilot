@@ -252,13 +252,10 @@ M-mid-8:
   last_edited_ms: 0
 M-mid-9:
   tier: mid
-  title: T651 fleet-shared behav
-  contents: |-
-    T651 SHIPPED (commit 48bea9ca, branch t648): agents/skills/commands fleet-shared at ~/.context-pilot/behaviours/{agents,skills,commands}/<id>.md. home_behaviours_dir() in cp-base; cp-mod-prompt dir_for->home + migrate_local_to_shared() at boot; orchestrator create.rs + panels.rs library() ->home.
-
-    GOTCHA (fixed 2026-08-27): deployed orch had T651 READ path (panels.rs=home) but STALE WRITE path (create.rs per-realm) — binary predated create.rs home switch. Web-UI agent edits wrote <realm>/.context-pilot/agents/ not home. Fix=rebuild+redeploy orch+restart. Verify: strings<bin>|grep -c behaviours==2, or live PUT probe.
+  title: orch-clippy campaign
+  contents: 'Branch orchestrator-clippy off master (T649: workspace clippy=0). Pwd Totordu1789. cp-orch lib=257. Committed: create/(ded21fca), accounts(9b3ba553), releases/mod(b6cd16fa), panels(cd201362), listing(86d13e39), rest/releases(cb648689), rest/mod(35fe7a99). KEY: process::exit=E0453 NOT expectable->abort(); lint-exceptions greps comments for ''disallowed_methods''/''#[expect''. pub_use=deferred crate-wide pass. Densest left: transport/mod 15, uplink 14, supervisor/mod 13, finder/download 12, sheet 11, mutate 11. LAST: --workspace to check-rust-lints.sh + reseal chain #87, PR. NOT pushed.'
   importance: high
-  last_edited_ms: 1787843209563
+  last_edited_ms: 1787875927182
 M-safe-1:
   tier: safe
   title: Hash chain password
@@ -485,7 +482,7 @@ M-short-35:
   tier: short
   title: 'SUPERSEDED (T588): user'
   importance: high
-  last_edited_ms: 1787840930935
+  last_edited_ms: 1787862337022
 M-short-36:
   tier: short
   title: T645 agent image

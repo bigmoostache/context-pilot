@@ -347,7 +347,7 @@ impl Runtime {
 
         let addr = self.config.listen_addr();
         crate::oerr!("serving on http://{addr}");
-        crate::transport::serve(&addr, Arc::clone(&self.backend))
+        crate::transport::serve(&addr, &self.backend)
     }
 }
 

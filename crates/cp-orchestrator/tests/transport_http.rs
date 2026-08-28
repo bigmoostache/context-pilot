@@ -144,7 +144,7 @@ fn harness(agent_id: &str, n_msgs: u8) -> Harness {
     let server = Server::http("127.0.0.1:0").expect("bind ephemeral");
     let addr = server.server_addr().to_string();
     let serve_state = Arc::clone(&state);
-    let _acceptor = thread::spawn(move || serve_bound(server, serve_state));
+    let _acceptor = thread::spawn(move || serve_bound(&server, &serve_state));
 
     Harness { addr, _state: state, _agents: agents, _oplog: oplog }
 }

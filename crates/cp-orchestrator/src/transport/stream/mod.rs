@@ -18,6 +18,10 @@ pub mod ticket;
 // The `GET /api/stream` landing pad (ticket redemption + ACL + producer
 // hand-off), split out of the transport router for its line budget.
 pub mod upgrade;
+// URL query-string parser — used by the `/api/stream` upgrade handler to read
+// the `agent` / `ticket` / `last_rev` params. Lives here (its sole consumer is
+// `upgrade`) to keep the `transport/` folder within the 8-entry cap.
+mod query;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
