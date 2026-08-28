@@ -84,6 +84,7 @@ impl Module for BraveModule {
         let t = &*TOOL_TEXTS;
         vec![
             ToolDefinition::from_yaml("brave_search", t)
+                .declares_task()
                 .short_desc("Search the web via Brave")
                 .category("Web Search")
                 .param("query", ParamType::String, true)
@@ -95,6 +96,7 @@ impl Module for BraveModule {
                 .param("goggles_id", ParamType::String, false)
                 .build(),
             ToolDefinition::from_yaml("brave_llm_context", t)
+                .declares_task()
                 .short_desc("Get LLM-optimized web content from Brave")
                 .category("Web Search")
                 .param("query", ParamType::String, true)

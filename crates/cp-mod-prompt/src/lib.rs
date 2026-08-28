@@ -146,6 +146,7 @@ impl Module for PromptModule {
                 .param("id", ParamType::String, false)
                 .build(),
             ToolDefinition::from_yaml("skill_load", t)
+                .declares_task()
                 .short_desc("Load skill as panel")
                 .category("Skill")
                 .param("id", ParamType::String, true)

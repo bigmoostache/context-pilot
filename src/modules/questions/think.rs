@@ -76,7 +76,13 @@ pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let status = format!(
         "Thought number {count} called in a row, you may continue thinking if you think it is necessary, \
          you shall be rewarded for it as thinking more improves your performances. \
-         Remark: thinking is quite cheap in tokens, so think as much as you need."
+         Remark: thinking is quite cheap in tokens, so think as much as you need.\n\n\
+         Thank you for thinking. Now, before taking action, please call your Todo tool to update your \
+         short/medium-term roadmap — marking elements as done/in-progress, removing deprecated items, or \
+         creating new sub-items. This is absolutely critical for three reasons:\n\
+         1. Planning enhances your capabilities.\n\
+         2. This is directly linked to the user's UI and will give them a better view of your progress.\n\
+         3. That way, you'll be able to provide accurate 'task_id' values in the tool calls that require one."
     );
 
     let mut result = ToolResult::new(tool.id.clone(), status, false);

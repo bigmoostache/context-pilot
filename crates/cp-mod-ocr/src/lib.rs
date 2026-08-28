@@ -72,6 +72,7 @@ impl Module for OcrModule {
         let t = &*TOOL_TEXTS;
         vec![
             ToolDefinition::from_yaml("ocr", t)
+                .declares_task()
                 .short_desc("Convert document to text via OCR")
                 .category("OCR")
                 .param("path", ParamType::String, true)

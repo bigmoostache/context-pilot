@@ -164,6 +164,7 @@ impl Module for TreeModule {
                 .param_enum("action", &["open", "close", "toggle"], false)
                 .build(),
             ToolDefinition::from_yaml("tree_describe", t)
+                .declares_task()
                 .short_desc("Add file/folder descriptions")
                 .category("Tree")
                 .reverie_allowed(true)

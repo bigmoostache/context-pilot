@@ -233,6 +233,7 @@ impl Module for ConsoleModule {
         let t = &*TOOL_TEXTS;
         vec![
             ToolDefinition::from_yaml("console_create", t)
+                .declares_task()
                 .short_desc("Spawn a new process")
                 .category("Console")
                 .param("command", ParamType::String, true)
@@ -240,12 +241,14 @@ impl Module for ConsoleModule {
                 .param("description", ParamType::String, false)
                 .build(),
             ToolDefinition::from_yaml("console_send_keys", t)
+                .declares_task()
                 .short_desc("Send input to process")
                 .category("Console")
                 .param("id", ParamType::String, true)
                 .param("input", ParamType::String, true)
                 .build(),
             ToolDefinition::from_yaml("console_wait", t)
+                .declares_task()
                 .short_desc("Wait for process event")
                 .category("Console")
                 .param("id", ParamType::String, true)
@@ -254,6 +257,7 @@ impl Module for ConsoleModule {
                 .param_with_default("max_wait", ParamType::Integer, "60")
                 .build(),
             ToolDefinition::from_yaml("console_watch", t)
+                .declares_task()
                 .short_desc("Async watch for process event")
                 .category("Console")
                 .param("id", ParamType::String, true)
@@ -261,6 +265,7 @@ impl Module for ConsoleModule {
                 .param("pattern", ParamType::String, false)
                 .build(),
             ToolDefinition::from_yaml("console_easy_bash", t)
+                .declares_task()
                 .short_desc("Run a command and return output")
                 .category("Console")
                 .param("command", ParamType::String, true)

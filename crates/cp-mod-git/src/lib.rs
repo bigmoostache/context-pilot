@@ -237,6 +237,7 @@ impl Module for GitModule {
         let t = &*TOOL_TEXTS;
         vec![
             ToolDefinition::from_yaml("git_execute", t)
+                .declares_task()
                 .short_desc("Run git commands")
                 .category("Git")
                 .param("command", ParamType::String, true)

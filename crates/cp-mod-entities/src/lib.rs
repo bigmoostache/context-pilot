@@ -154,6 +154,7 @@ impl Module for EntitiesModule {
         let t = &*TOOL_TEXTS;
         vec![
             ToolDefinition::from_yaml("entity_sql", t)
+                .declares_task()
                 .short_desc("Execute SQL on entity database")
                 .category("Entity")
                 .param("sql", ParamType::String, false)

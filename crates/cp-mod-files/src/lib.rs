@@ -235,12 +235,14 @@ impl Module for FilesModule {
         let t = &*TOOL_TEXTS;
         vec![
             ToolDefinition::from_yaml("Open", t)
+                .declares_task()
                 .short_desc("Read file into context")
                 .category("File")
                 .reverie_allowed(true)
                 .param_array("path", ParamType::String, true)
                 .build(),
             ToolDefinition::from_yaml("Edit", t)
+                .declares_task()
                 .short_desc("Modify file content")
                 .category("File")
                 .param("file_path", ParamType::String, true)
@@ -248,6 +250,7 @@ impl Module for FilesModule {
                 .param("new_string", ParamType::String, true)
                 .build(),
             ToolDefinition::from_yaml("Write", t)
+                .declares_task()
                 .short_desc("Create or overwrite file")
                 .category("File")
                 .param("file_path", ParamType::String, true)
