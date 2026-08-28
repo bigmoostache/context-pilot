@@ -118,10 +118,7 @@ fn site_line(subjects: &[String], scheme: &str, port: Option<u16>) -> String {
         .iter()
         .map(|s| {
             let host = bracketed(s);
-            match port {
-                Some(p) => format!("{scheme}://{host}:{p}"),
-                None => format!("{scheme}://{host}"),
-            }
+            port.map_or_else(|| format!("{scheme}://{host}"), |p| format!("{scheme}://{host}:{p}"))
         })
         .collect::<Vec<_>>()
         .join(", ")
@@ -184,16 +181,16 @@ pub(crate) fn subjects_for(identity: Option<&Identity>, extra: &[String]) -> Vec
 /// the arguments and testable without depending on whatever addresses the machine
 /// running the tests happens to carry.
 fn subjects_with(identity: Option<&Identity>, detected_ip: Option<&str>, ulas: &[String]) -> Vec<String> {
-    let mut v = match identity {
-        Some(id) => {
+    let mut v = identity.map_or_else(
+        || detected_ip.map(ToOwned::to_owned).into_iter().collect::<Vec<_>>(),
+        |id| {
             let mut v = vec![id.ip.clone()];
             if !id.name.trim().is_empty() {
                 v.push(id.name.clone());
             }
             v
-        }
-        None => detected_ip.map(ToOwned::to_owned).into_iter().collect::<Vec<_>>(),
-    };
+        },
+    );
     if v.is_empty() {
         return v;
     }
