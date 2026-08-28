@@ -53,11 +53,6 @@ const READ_TIMEOUT: Duration = Duration::from_millis(200);
 /// Size of each socket read into the accumulation buffer.
 const READ_CHUNK: usize = 4096;
 
-/// Hard ceiling on the accumulation buffer. A buffer that grows past one
-/// maximum frame without yielding a decodable record is treated as desynced and
-/// reset — defends against a corrupt `len` header wedging the reader.
-const MAX_BUFFER: usize = MAX_PAYLOAD_SIZE as usize;
-
 /// Tee socket file name inside an agent's folder (mirrors `cp-mod-bridge`'s
 /// `TEE_SOCKET`). Defined here rather than imported to keep the backend's
 /// dependency on the agent crate test-only.
@@ -132,24 +127,25 @@ fn read_loop(agent_id: &str, tee_path: &PathBuf, backend: &Arc<Mutex<Backend>>, 
 /// connection ends (EOF / hard error) or `stop` is set.
 fn pump_connection(agent_id: &str, mut stream: UnixStream, backend: &Arc<Mutex<Backend>>, stop: &AtomicBool) {
     let mut buf: Vec<u8> = Vec::with_capacity(READ_CHUNK);
-    let mut chunk = [0u8; READ_CHUNK];
+    let mut chunk = vec![0u8; READ_CHUNK];
 
     while !stop.load(Ordering::Relaxed) {
-        match stream.read(&mut chunk) {
+        match stream.read(chunk.as_mut_slice()) {
             Ok(0) => return, // EOF — the agent closed the stream (e.g. restart).
-            Ok(n) => {
-                if let Some(got) = chunk.get(..n) {
+            Ok(read_n) => {
+                if let Some(got) = chunk.get(..read_n) {
                     buf.extend_from_slice(got);
                 }
                 drain_frames(agent_id, &mut buf, backend);
-                if buf.len() > MAX_BUFFER {
-                    // Desynced past a full frame without decoding — reset.
+                // Desynced past a full frame without decoding — reset. A buffer
+                // that no longer fits a `u32` is unconditionally over the cap.
+                if u32::try_from(buf.len()).map_or(true, |len| len > MAX_PAYLOAD_SIZE) {
                     buf.clear();
                 }
             }
             // A timeout is the expected idle path: it just lets us re-check
             // the stop flag. WouldBlock is the same on non-timeout platforms.
-            Err(ref e) if e.kind() == ErrorKind::TimedOut || e.kind() == ErrorKind::WouldBlock => {}
+            Err(err) if err.kind() == ErrorKind::TimedOut || err.kind() == ErrorKind::WouldBlock => {}
             Err(_hard) => return, // broken pipe / reset — reconnect.
         }
     }
@@ -199,8 +195,11 @@ fn drain_frames(agent_id: &str, buf: &mut Vec<u8>, backend: &Arc<Mutex<Backend>>
 /// when the header is not yet fully buffered or the declared length exceeds the
 /// safety cap (so the caller falls back to a full-buffer resync).
 fn corrupt_frame_span(buf: &[u8]) -> Option<usize> {
-    let len_bytes: [u8; 4] = buf.get(0..4)?.try_into().ok()?;
-    let len = u32::from_le_bytes(len_bytes);
+    let [byte0, byte1, byte2, byte3] = buf.get(0..4)?.try_into().ok()?;
+    // Reassemble the little-endian length header by hand: `from_le_bytes` is
+    // barred by `clippy::little_endian_bytes` (forbid), and the byte-wise
+    // shift/or form makes the endianness explicit at the one place it matters.
+    let len = u32::from(byte0) | (u32::from(byte1) << 8u32) | (u32::from(byte2) << 16u32) | (u32::from(byte3) << 24u32);
     if len > MAX_PAYLOAD_SIZE {
         return None;
     }
@@ -273,8 +272,9 @@ mod tests {
 
         // Poll the subscriber buffer until the three frames arrive.
         let mut got = Vec::new();
-        for _ in 0..50 {
-            if let Some(frames) = backend.lock().expect("lock").hub_mut().drain("agentX", sub) {
+        for _ in 0..50usize {
+            let drained = backend.lock().expect("lock").hub_mut().drain("agentX", sub);
+            if let Some(frames) = drained {
                 got.extend(frames);
             }
             if got.len() >= 3 {
@@ -306,7 +306,7 @@ mod tests {
         conn.flush().expect("flush");
 
         let mut delivered = false;
-        for _ in 0..50 {
+        for _ in 0..50usize {
             if let Some(frames) = backend.lock().expect("lock").hub_mut().drain("late", sub)
                 && !frames.is_empty()
             {
@@ -342,8 +342,9 @@ mod tests {
         conn.flush().expect("flush");
 
         let mut got = Vec::new();
-        for _ in 0..50 {
-            if let Some(frames) = backend.lock().expect("lock").hub_mut().drain("noisy", sub) {
+        for _ in 0..50usize {
+            let drained = backend.lock().expect("lock").hub_mut().drain("noisy", sub);
+            if let Some(frames) = drained {
                 got.extend(frames);
             }
             if !got.is_empty() {
