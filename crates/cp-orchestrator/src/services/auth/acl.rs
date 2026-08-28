@@ -4,7 +4,7 @@
 
 use super::helpers::now_ms;
 use super::store::AuthStore;
-use super::types::{AclEntry, AgentRole, AuthError};
+use super::types::{AccessGrant, AclEntry, AgentRole, AuthError};
 
 impl AuthStore {
     /// Grant a user access to an agent with a specific per-agent role.
@@ -16,13 +16,8 @@ impl AuthStore {
     ///
     /// Returns [`AuthError::Database`] on foreign-key violation (unknown
     /// `user_id`) or other `SQLite` failure.
-    pub(crate) fn grant_access(
-        &self,
-        agent_id: &str,
-        user_id: &str,
-        role: AgentRole,
-        granted_by: Option<&str>,
-    ) -> Result<(), AuthError> {
+    pub(crate) fn grant_access(&self, grant: AccessGrant<'_>) -> Result<(), AuthError> {
+        let AccessGrant { agent_id, user_id, role, granted_by } = grant;
         let now = now_ms();
         let _rows = self.conn.execute(
             "INSERT OR REPLACE INTO agent_acl (agent_id, user_id, role, granted_at, granted_by) \

@@ -10,7 +10,7 @@ use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 
 use super::{Backend, HttpReply};
-use crate::services::auth::types::{AgentRole, User};
+use crate::services::auth::types::{AccessGrant, AgentRole, User};
 use crate::supervisor;
 
 /// FNV-1a 64-bit offset basis (same constants as the agent-side identity
@@ -110,7 +110,12 @@ pub(crate) fn create_agent(state: &Mutex<Backend>, body_bytes: &[u8], auth_user:
             {
                 let canonical = folder.canonicalize().unwrap_or_else(|_| folder.clone());
                 let agent_id = folder_id(&canonical.to_string_lossy());
-                let _grant = auth.grant_access(&agent_id, &user.id, AgentRole::AgentAdmin, None);
+                let _grant = auth.grant_access(AccessGrant {
+                    agent_id: &agent_id,
+                    user_id: &user.id,
+                    role: AgentRole::AgentAdmin,
+                    granted_by: None,
+                });
             }
 
             HttpReply::json(

@@ -165,6 +165,22 @@ pub(crate) struct NewUser<'req> {
     pub role: UserRole,
 }
 
+/// Borrowed parameters for [`AuthStore::grant_access`], bundled so the call
+/// stays within the argument budget (the four fields always travel together).
+///
+/// [`AuthStore::grant_access`]: super::store::AuthStore::grant_access
+#[derive(Clone, Copy)]
+pub(crate) struct AccessGrant<'req> {
+    /// The agent being granted access to.
+    pub agent_id: &'req str,
+    /// The user receiving access.
+    pub user_id: &'req str,
+    /// The per-agent role to grant.
+    pub role: AgentRole,
+    /// Who granted the access (`None` for a system/bootstrap grant).
+    pub granted_by: Option<&'req str>,
+}
+
 /// An access-control list entry — one user's permission on one agent,
 /// joined with their profile info for display.
 #[derive(Clone, Debug, serde::Serialize)]

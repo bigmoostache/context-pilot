@@ -6,7 +6,7 @@ use std::sync::Mutex;
 
 use super::super::Backend;
 use super::super::rest::HttpReply;
-use crate::services::auth::types::User;
+use crate::services::auth::types::{AccessGrant, User};
 
 // ───────────────── per-agent authorization (Phase 6) ─────────────────
 
@@ -99,7 +99,12 @@ pub(crate) fn acl_grant(state: &Mutex<Backend>, agent_id: &str, body: &[u8], aut
     let Some(auth) = b.auth.as_ref() else {
         return HttpReply::error(501, "auth not enabled");
     };
-    match auth.grant_access(agent_id, &req.user_id, req.role, Some(&caller.id)) {
+    match auth.grant_access(AccessGrant {
+        agent_id,
+        user_id: &req.user_id,
+        role: req.role,
+        granted_by: Some(&caller.id),
+    }) {
         Ok(()) => HttpReply::ok(&serde_json::json!({ "ok": true })),
         Err(_) => HttpReply::error(500, "grant failed"),
     }
