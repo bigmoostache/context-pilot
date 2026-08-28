@@ -1,6 +1,6 @@
 //! Read views for the Finder: directory listing, file preview, conversation.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use crate::transport::Backend;
@@ -38,9 +38,9 @@ pub fn fs_descriptions(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     let mut map = serde_json::Map::new();
     if let Some(entries) = doc.as_mapping() {
         for value in entries.values() {
-            let path = value.get("path").and_then(serde_yaml::Value::as_str);
+            let rel = value.get("path").and_then(serde_yaml::Value::as_str);
             let desc = value.get("description").and_then(serde_yaml::Value::as_str);
-            if let (Some(p), Some(d)) = (path, desc)
+            if let (Some(p), Some(d)) = (rel, desc)
                 && !p.is_empty()
                 && !d.is_empty()
             {
@@ -70,19 +70,17 @@ pub fn fs_list(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply
         Err(reply) => return reply,
     };
     let relative = extract_param(query, "path").unwrap_or_default();
-    let target = match confined_path(&folder, &relative) {
-        Some(p) => p,
-        None => return HttpReply::error(403, "path outside agent realm"),
+    let Some(target) = confined_path(&folder, &relative) else {
+        return HttpReply::error(403, "path outside agent realm");
     };
 
-    let entries = match std::fs::read_dir(&target) {
-        Ok(rd) => rd,
-        Err(_) => return HttpReply::error(404, "directory not found"),
+    let Ok(entries) = std::fs::read_dir(&target) else {
+        return HttpReply::error(404, "directory not found");
     };
 
     let mut nodes: Vec<serde_json::Value> = Vec::new();
-    for entry in entries {
-        let Ok(entry) = entry else { continue };
+    for raw in entries {
+        let Ok(entry) = raw else { continue };
         let Ok(meta) = entry.metadata() else { continue };
         let name = entry.file_name();
         let Some(name_str) = name.to_str() else { continue };
@@ -94,34 +92,7 @@ pub fn fs_list(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply
 
         let entry_path = if relative.is_empty() { name_str.to_owned() } else { format!("{relative}/{name_str}") };
 
-        let kind = if meta.is_dir() { "folder" } else { infer_kind(name_str) };
-
-        let modified_ms = meta
-            .modified()
-            .ok()
-            .and_then(|t| t.duration_since(std::time::SystemTime::UNIX_EPOCH).ok())
-            .map_or(0, |d| d.as_millis() as u64);
-
-        let mut node = serde_json::json!({
-            "name": name_str,
-            "path": entry_path,
-            "kind": kind,
-            "modified": modified_ms,
-        });
-
-        if meta.is_file() {
-            let _prev =
-                node.as_object_mut().expect("just built").insert("size".to_owned(), serde_json::json!(meta.len()));
-        } else if meta.is_dir() {
-            // Direct (non-hidden) child count, so every view can render
-            // "N items" on a folder without a second round-trip. Mirrors the
-            // hidden-file skip below, so the count matches what a listing of
-            // this folder would actually show.
-            let count = count_visible_children(&entry.path());
-            let _prev = node.as_object_mut().expect("just built").insert("count".to_owned(), serde_json::json!(count));
-        }
-
-        nodes.push(node);
+        nodes.push(fs_node(name_str, &entry_path, &entry.path(), &meta));
     }
 
     // Sort: folders first, then alphabetically by name.
@@ -138,7 +109,35 @@ pub fn fs_list(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply
     HttpReply::ok(&nodes)
 }
 
-/// `GET /api/agent/{id}/fs/preview?path=` — file content preview.
+/// Build one Finder `FinderNode` JSON object for a directory entry.
+///
+/// Owns the `serde_json::Map` directly (never `as_object_mut().expect(...)`),
+/// so there is no panic path. File entries carry a `size`; directory entries
+/// carry a `count` of their non-hidden direct children (so a view can render
+/// "N items" without a second round-trip). The two branches are mutually
+/// exclusive, so they are two independent `if`s rather than an `else if` chain
+/// (which would demand an unused final `else`).
+fn fs_node(name: &str, path: &str, entry_path: &Path, meta: &std::fs::Metadata) -> serde_json::Value {
+    let modified_ms = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::SystemTime::UNIX_EPOCH).ok())
+        .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX));
+    let kind = if meta.is_dir() { "folder" } else { infer_kind(name) };
+
+    let mut map = serde_json::Map::new();
+    drop(map.insert("name".to_owned(), serde_json::json!(name)));
+    drop(map.insert("path".to_owned(), serde_json::json!(path)));
+    drop(map.insert("kind".to_owned(), serde_json::json!(kind)));
+    drop(map.insert("modified".to_owned(), serde_json::json!(modified_ms)));
+    if meta.is_file() {
+        drop(map.insert("size".to_owned(), serde_json::json!(meta.len())));
+    }
+    if meta.is_dir() {
+        drop(map.insert("count".to_owned(), serde_json::json!(count_visible_children(entry_path))));
+    }
+    serde_json::Value::Object(map)
+}
 ///
 /// Returns the first [`MAX_PREVIEW_BYTES`] of a file as a JSON object with
 /// `content` (text) and `truncated` (bool). Binary-looking files are rejected
@@ -152,25 +151,22 @@ pub fn fs_preview(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpRe
         Some(p) if !p.is_empty() => p,
         _ => return HttpReply::error(400, "missing path parameter"),
     };
-    let target = match confined_path(&folder, &relative) {
-        Some(p) => p,
-        None => return HttpReply::error(403, "path outside agent realm"),
+    let Some(target) = confined_path(&folder, &relative) else {
+        return HttpReply::error(403, "path outside agent realm");
     };
     if !target.is_file() {
         return HttpReply::error(404, "file not found");
     }
 
-    let meta = match std::fs::metadata(&target) {
-        Ok(m) => m,
-        Err(_) => return HttpReply::error(404, "file not found"),
+    let Ok(meta) = std::fs::metadata(&target) else {
+        return HttpReply::error(404, "file not found");
     };
     let file_size = meta.len();
     let truncated = file_size > MAX_PREVIEW_BYTES;
-    let read_size = file_size.min(MAX_PREVIEW_BYTES) as usize;
+    let read_size = usize::try_from(file_size.min(MAX_PREVIEW_BYTES)).unwrap_or(usize::MAX);
 
-    let bytes = match std::fs::read(&target) {
-        Ok(b) => b,
-        Err(_) => return HttpReply::error(502, "read failed"),
+    let Ok(bytes) = std::fs::read(&target) else {
+        return HttpReply::error(502, "read failed");
     };
     let slice = bytes.get(..read_size).unwrap_or(&bytes);
 
@@ -202,9 +198,8 @@ pub fn conversation(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     };
     let messages_dir = PathBuf::from(&folder).join(".context-pilot").join("messages");
 
-    let entries = match std::fs::read_dir(&messages_dir) {
-        Ok(rd) => rd,
-        Err(_) => return HttpReply::ok(&serde_json::json!([])),
+    let Ok(entries) = std::fs::read_dir(&messages_dir) else {
+        return HttpReply::ok(&serde_json::json!([]));
     };
 
     let mut files: Vec<PathBuf> = entries
