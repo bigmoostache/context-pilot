@@ -31,11 +31,15 @@ export function ThreadAsideRail({
   files,
   tasks,
   aside,
+  leftRailHidden,
 }: {
   agentId: string
   files: ThreadFile[]
   tasks: ThreadTask[]
   aside: ReturnType<typeof useThreadAside>
+  /** Whether the left thread-list rail is hidden — forwarded to {@link ThreadAside}
+   *  so a file preview widens to half the viewport when it is (T680). */
+  leftRailHidden: boolean
 }) {
   const hasAside = files.length > 0 || tasks.length > 0
   if (!hasAside) return null
@@ -54,6 +58,7 @@ export function ThreadAsideRail({
           onTabChange={aside.setTab}
           selectedFile={aside.file}
           onSelectFile={aside.setFile}
+          leftRailHidden={leftRailHidden}
           onHide={() => {
             aside.setFile(null)
             aside.setHidden(true)

@@ -15,11 +15,12 @@ import type { ThreadTask } from "@/lib/types"
  * Rail width strategy (dynamic): in LIST mode the rail is EXACTLY the width of
  * the thread sidebar (`w-(--sidebar-w)`, the shared `--sidebar-w` token every
  * top-level sidebar reads) so the two rails frame the conversation symmetrically
- * (T676). In PREVIEW mode (a file open) it widens to the full 40vw cap so the
- * embedded {@link FinderPreview} has room; the `transition-[width,max-width]`
- * animates between the two.
+ * (T676). In PREVIEW mode (a file open) it widens so the embedded
+ * {@link FinderPreview} has room — normally to 40vw, but to **half the viewport
+ * (50vw)** when the left thread-list rail is hidden (T680), since the reclaimed
+ * left space lets the preview breathe. The `transition-[width,max-width]`
+ * animates between all three.
  */
-const RAIL_MAX = "max-w-[40vw]"
 
 /**
  * The unified right-rail aside for a thread conversation (T662) — a single
@@ -43,6 +44,7 @@ export function ThreadAside({
   onTabChange,
   selectedFile,
   onSelectFile,
+  leftRailHidden,
   onHide,
 }: {
   files: ThreadFile[]
@@ -52,6 +54,10 @@ export function ThreadAside({
   onTabChange: (tab: "files" | "tasks") => void
   selectedFile: UploadedFile | null
   onSelectFile: (file: UploadedFile | null) => void
+  /** Whether the left thread-list rail is hidden. When it is AND a file is
+   *  previewing, the aside widens to half the viewport (50vw) instead of 40vw,
+   *  claiming the space the collapsed left rail freed up (T680). */
+  leftRailHidden: boolean
   /** Hide the whole rail for this thread (T677) — the tab bar's right-aligned
    *  hide button. Re-showing is driven by the parent's floating reopen button. */
   onHide: () => void
@@ -78,7 +84,11 @@ export function ThreadAside({
     <div
       className={
         "card-shadow my-2 mr-2 flex shrink-0 flex-col overflow-hidden border-l border-border/70 bg-surface-2 transition-[width,max-width] duration-300 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none " +
-        (previewing ? `w-[40vw] ${RAIL_MAX}` : "w-(--sidebar-w)")
+        (previewing
+          ? leftRailHidden
+            ? "w-[50vw] max-w-[50vw]"
+            : "w-[40vw] max-w-[40vw]"
+          : "w-(--sidebar-w)")
       }
     >
       <TooltipProvider>

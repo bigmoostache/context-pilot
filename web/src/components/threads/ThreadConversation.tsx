@@ -298,6 +298,7 @@ export function ThreadConversation({
   onRemoveFile,
   onShowInFinder,
   onUnarchive,
+  leftRailHidden = false,
 }: {
   thread: ThreadDetail
   /** owning agent — needed to open the shared Quick Look drawer for an attachment */
@@ -314,6 +315,11 @@ export function ThreadConversation({
   onShowInFinder?: ((path: string) => void) | undefined
   /** restore this thread from the archive — only rendered when the thread is archived (T709) */
   onUnarchive?: (() => void) | undefined
+  /** Whether the left thread-list rail is hidden (T680). Forwarded to the right
+   *  aside so a file preview widens to half the viewport when the left rail is
+   *  collapsed. Defaults to false (the 40vw behaviour) so nothing breaks if a
+   *  caller omits it. */
+  leftRailHidden?: boolean | undefined
 }) {
   // Unified right-rail aside state (T662) — see useThreadAside. Per-thread
   // show/hide (T677) is seeded from the global default (Settings › General).
@@ -476,7 +482,7 @@ export function ThreadConversation({
       {/* ── Unified right rail: Files + Tasks tabs, inline preview + show/hide
           chrome (T662/T677). Extracted to ThreadAsideRail to keep this render
           body under the 500-line file budget. */}
-      <ThreadAsideRail agentId={agentId} files={threadFiles} tasks={thread.tasks ?? []} aside={aside} />
+      <ThreadAsideRail agentId={agentId} files={threadFiles} tasks={thread.tasks ?? []} aside={aside} leftRailHidden={leftRailHidden} />
 
       <CreateCommandDialog
         open={createCmdOpen}
