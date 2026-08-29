@@ -117,11 +117,8 @@ impl LlmClient for GrokClient {
 
         super::openai_streaming::dump_request(&request.worker_id, "grok", &api_request);
 
-        let ep = super::openai_streaming::OaiEndpoint {
-            client: &client,
-            url: &target.url,
-            key: target.key.expose_secret(),
-        };
+        let ep =
+            super::openai_streaming::OaiEndpoint { client: &client, url: &target.url, key: target.key.expose_secret() };
         let acc = super::openai_streaming::run_oai_stream(&ep, &api_request, &tx)?;
         super::openai_streaming::send_stream_done(&tx, acc);
         Ok(())
@@ -134,11 +131,8 @@ impl LlmClient for GrokClient {
             return super::super::ApiCheckResult::failure(Some("XAI_API_KEY not set".to_owned()));
         };
         let client = Client::new();
-        let ep = super::openai_streaming::OaiEndpoint {
-            client: &client,
-            url: &target.url,
-            key: target.key.expose_secret(),
-        };
+        let ep =
+            super::openai_streaming::OaiEndpoint { client: &client, url: &target.url, key: target.key.expose_secret() };
         super::openai_streaming::oai_check_api(&ep, model, "max_tokens")
     }
 }

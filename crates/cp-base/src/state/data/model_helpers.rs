@@ -5,7 +5,7 @@
 //! `clippy::multiple_inherent_impl`.
 
 use super::super::runtime::State;
-use crate::config::llm_types::{LlmProvider, ModelInfo as _};
+use crate::config::llm::types::{LlmProvider, ModelInfo as _};
 
 /// Model-selection, pricing, and context-budget helpers for [`State`].
 pub trait ModelPricing {

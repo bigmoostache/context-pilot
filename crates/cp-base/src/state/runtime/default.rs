@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use super::super::data::config::ViewMode;
 use super::super::flags::{ConfigOverlay, StatusBools, UiState};
 use super::State;
-use crate::config::llm_types::LlmProvider;
+use crate::config::llm::types::LlmProvider;
 
 impl Default for State {
     // State is the flat aggregate root of the whole application — ~80 leaf
@@ -52,12 +52,12 @@ impl Default for State {
             config_selected_bar: 0,
             active_theme: crate::config::DEFAULT_THEME.to_owned(),
             llm_provider: LlmProvider::default(),
-            anthropic_model: crate::config::models::AnthropicModel::default(),
-            grok_model: crate::config::models::GrokModel::default(),
-            groq_model: crate::config::models::GroqModel::default(),
-            deepseek_model: crate::config::models::DeepSeekModel::default(),
-            minimax_model: crate::config::models::MiniMaxModel::default(),
-            claude_code_v2_model: crate::config::models::ClaudeCodeV2Model::default(),
+            anthropic_model: crate::config::llm::models::AnthropicModel::default(),
+            grok_model: crate::config::llm::models::GrokModel::default(),
+            groq_model: crate::config::llm::models::GroqModel::default(),
+            deepseek_model: crate::config::llm::models::DeepSeekModel::default(),
+            minimax_model: crate::config::llm::models::MiniMaxModel::default(),
+            claude_code_v2_model: crate::config::llm::models::ClaudeCodeV2Model::default(),
             view_mode: ViewMode::Normal,
             reveries: HashMap::new(),
             cache_hit_tokens: 0,

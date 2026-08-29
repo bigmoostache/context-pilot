@@ -23,7 +23,7 @@
 //! The two Claude Code providers ignore all of this on purpose; the reason is
 //! documented where they build their requests.
 
-use cp_base::config::llm_gateway;
+use cp_base::config::llm::gateway as llm_gateway;
 use cp_mod_utilities::secret::Redacted;
 
 /// Unified chat-completions path, appended to the base URL for every
@@ -53,7 +53,7 @@ pub(crate) struct OaiTarget {
 
 /// The configured gateway base URL, or `None` when unset or empty.
 ///
-/// Delegates to [`cp_base::config::llm_gateway`], which the orchestrator also
+/// Delegates to [`cp_base::config::llm::gateway`], which the orchestrator also
 /// reads to decide which providers the cockpit may offer. One definition, so the
 /// picker and the request path cannot disagree.
 fn base_url() -> Option<String> {
@@ -131,5 +131,5 @@ pub(crate) fn is_active() -> bool {
 }
 
 #[cfg(test)]
-#[path = "gateway_tests.rs"]
+#[path = "tests.rs"]
 mod tests;

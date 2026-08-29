@@ -7,8 +7,10 @@
 //! `SendMessage`/`CreateThread`/`ArchiveThread`/`RestoreThread`/`Stop` — entered
 //! exactly as local user input would be (the K7 path).
 
-use cp_base::config::llm_types::LlmProvider;
-use cp_base::config::models::{AnthropicModel, ClaudeCodeV2Model, DeepSeekModel, GrokModel, GroqModel, MiniMaxModel};
+use cp_base::config::llm::models::{
+    AnthropicModel, ClaudeCodeV2Model, DeepSeekModel, GrokModel, GroqModel, MiniMaxModel,
+};
+use cp_base::config::llm::types::LlmProvider;
 use cp_base::state::runtime::State;
 use cp_mod_bridge::BridgeState;
 use cp_mod_spine::types::SpineState;

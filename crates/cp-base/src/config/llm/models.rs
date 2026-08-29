@@ -1,9 +1,9 @@
-//! Per-provider model enums with [`ModelInfo`](super::llm_types::ModelInfo) impls.
+//! Per-provider model enums with [`ModelInfo`](super::types::ModelInfo) impls.
 //!
 //! Each enum represents the available models for one LLM provider,
 //! carrying API name, display name, context window, and pricing info.
 
-use super::llm_types::ModelInfo;
+use super::types::ModelInfo;
 
 /// Anthropic model variants with per-model pricing and context limits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]

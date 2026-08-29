@@ -108,19 +108,19 @@ pub enum Action {
 
     // === Config overlay — primary model ===
     /// Select primary LLM provider.
-    ConfigSelectProvider(crate::config::llm_types::LlmProvider),
+    ConfigSelectProvider(crate::config::llm::types::LlmProvider),
     /// Select primary Anthropic model.
-    ConfigSelectAnthropicModel(crate::config::models::AnthropicModel),
+    ConfigSelectAnthropicModel(crate::config::llm::models::AnthropicModel),
     /// Select primary Grok model.
-    ConfigSelectGrokModel(crate::config::models::GrokModel),
+    ConfigSelectGrokModel(crate::config::llm::models::GrokModel),
     /// Select primary Groq model.
-    ConfigSelectGroqModel(crate::config::models::GroqModel),
+    ConfigSelectGroqModel(crate::config::llm::models::GroqModel),
     /// Select primary `DeepSeek` model.
-    ConfigSelectDeepSeekModel(crate::config::models::DeepSeekModel),
+    ConfigSelectDeepSeekModel(crate::config::llm::models::DeepSeekModel),
     /// Select primary `MiniMax` model.
-    ConfigSelectMiniMaxModel(crate::config::models::MiniMaxModel),
+    ConfigSelectMiniMaxModel(crate::config::llm::models::MiniMaxModel),
     /// Select primary Claude Code V2 model.
-    ConfigSelectClaudeCodeV2Model(crate::config::models::ClaudeCodeV2Model),
+    ConfigSelectClaudeCodeV2Model(crate::config::llm::models::ClaudeCodeV2Model),
     /// Move config bar selection forward (→).
     ConfigSelectNextBar,
     /// Move config bar selection backward (←).

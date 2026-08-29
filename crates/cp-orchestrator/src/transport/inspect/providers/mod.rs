@@ -383,10 +383,7 @@ pub(crate) fn providers(query: &str) -> HttpReply {
     // An empty allowlist (the delivery default) means "everything allowed".
     let restrict = apply_allowlist && !allow_set.is_empty();
 
-    // What the gateway declares it can route, fetched once for the whole reply
-    // (cached across replies). `None` = no gateway, or it could not be asked; the
-    // catalogue then passes through unfiltered.
-    let declared = gateway_models::declared();
+    let gateway = gateway_models::Filter::new();
 
     let mut out: Vec<serde_json::Value> = Vec::new();
     for p in all_providers() {
@@ -396,10 +393,6 @@ pub(crate) fn providers(query: &str) -> HttpReply {
         if !provider_usable(p.id) {
             continue;
         }
-        // Under a gateway, this provider's models are only offerable if the proxy
-        // declares them — see `gateway_offers`.
-        let gated = cp_base::config::llm_gateway::is_active()
-            && cp_base::config::llm_gateway::declared_in_model_list(p.id);
         // Annotate each model with its canonical "<provider>:<model>" key,
         // applying the org allowlist when this is the picker variant.
         let models: Vec<serde_json::Value> = p
@@ -410,7 +403,7 @@ pub(crate) fn providers(query: &str) -> HttpReply {
                 if restrict && !allow_set.contains(key.as_str()) {
                     return None;
                 }
-                if !gateway_offers(gated, declared.as_ref(), m.api_name) {
+                if !gateway.offers(p.id, m.api_name) {
                     return None;
                 }
                 let mut mv = serde_json::to_value(m).unwrap_or_default();
@@ -437,17 +430,6 @@ pub(crate) fn providers(query: &str) -> HttpReply {
     }
 }
 
-/// May `api_name` be offered, given what the gateway declares?
-///
-/// `gated` is false for a provider the gateway does not carry, or when there is
-/// no gateway — the catalogue then decides alone. When `declared` is `None` the
-/// answer is yes as well: not knowing what the proxy routes is a reason to keep
-/// the catalogue, not to empty the picker (a proxy that is briefly unreachable
-/// would otherwise look like a product that lost its models).
-fn gateway_offers(gated: bool, declared: Option<&std::collections::HashSet<String>>, api_name: &str) -> bool {
-    !gated || declared.is_none_or(|set| set.contains(api_name))
-}
-
 /// Is `key` present as a query parameter (with or without a value)?
 fn has_param(query: &str, key: &str) -> bool {
     query.split('&').filter(|s| !s.is_empty()).any(|pair| pair.split_once('=').map_or(pair, |(k, _)| k) == key)
@@ -464,14 +446,9 @@ fn has_param(query: &str, key: &str) -> bool {
 /// re-read of `~/.context-pilot/.env`), whereas `global::has_api_key` only sees
 /// process env vars loaded by dotenvy at boot. Reading the vault here keeps the
 /// picker in sync with the key manager without requiring an orchestrator
-/// restart.
-/// Under a gateway (`CP_LLM_GATEWAY`) the providers it carries are usable with no
-/// local key at all: the credential that reaches the provider is the one held by
-/// the proxy, and this process is not supposed to have a copy. Without this the
-/// cockpit offers nothing on a gateway deployment — an empty model picker with no
-/// error anywhere, which is not a diagnosable failure.
+/// restart. A gateway short-circuits all of it — see [`gateway_models::provides`].
 fn provider_usable(id: &str) -> bool {
-    if cp_base::config::llm_gateway::is_active() && cp_base::config::llm_gateway::routes_provider(id) {
+    if gateway_models::provides(id) {
         return true;
     }
     match id {

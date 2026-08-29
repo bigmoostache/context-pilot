@@ -410,12 +410,8 @@ pub fn invariant_panic(msg: &str) -> ! {
 pub mod constants;
 /// Global API key storage at `~/.config/context-pilot/config.json`.
 pub mod global;
-/// Optional LLM gateway (`CP_LLM_GATEWAY`) and the providers it carries.
-pub mod llm_gateway;
-/// LLM provider/model type definitions and capabilities.
-pub mod llm_types;
-/// Per-provider model enums (Anthropic, Grok, Groq, DeepSeek, MiniMax, Claude Code V2).
-pub mod models;
+/// LLM vocabulary, model catalogues, and optional gateway routing.
+pub mod llm;
 /// Unified YAML synchronizer for cross-branch persistent state.
 pub mod yaml_sync;
 

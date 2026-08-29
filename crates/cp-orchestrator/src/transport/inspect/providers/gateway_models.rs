@@ -47,8 +47,8 @@ static CACHE: LazyLock<Mutex<Option<Snapshot>>> = LazyLock::new(|| Mutex::new(No
 /// could not be reached. Callers keep their full catalogue in that case: a
 /// transient proxy failure must not empty the cockpit's model picker, which would
 /// read as the product losing its models.
-pub(crate) fn declared() -> Option<HashSet<String>> {
-    let base = cp_base::config::llm_gateway::base_url()?;
+fn declared() -> Option<HashSet<String>> {
+    let base = cp_base::config::llm::gateway::base_url()?;
     let mut cache = CACHE.lock().ok()?;
     if let Some(snapshot) = cache.as_ref() {
         let ttl = if snapshot.models.is_some() { TTL_OK } else { TTL_ERR };
@@ -65,7 +65,7 @@ pub(crate) fn declared() -> Option<HashSet<String>> {
 /// error, non-2xx status or unparseable body — every one of which means the same
 /// thing here: we do not know, so we must not filter.
 fn fetch(base: &str) -> Option<HashSet<String>> {
-    let key = std::env::var(cp_base::config::llm_gateway::GATEWAY_KEY_ENV).unwrap_or_default();
+    let key = std::env::var(cp_base::config::llm::gateway::GATEWAY_KEY_ENV).unwrap_or_default();
     let response = reqwest::blocking::Client::builder()
         .timeout(TIMEOUT)
         .build()
@@ -78,14 +78,52 @@ fn fetch(base: &str) -> Option<HashSet<String>> {
         return None;
     }
     let body: serde_json::Value = response.json().ok()?;
-    let ids: HashSet<String> = body
-        .get("data")?
-        .as_array()?
-        .iter()
-        .filter_map(|entry| entry.get("id")?.as_str().map(str::to_owned))
-        .collect();
+    let ids: HashSet<String> =
+        body.get("data")?.as_array()?.iter().filter_map(|entry| entry.get("id")?.as_str().map(str::to_owned)).collect();
     // An empty list is a valid answer ("this proxy declares nothing"), but it is
     // indistinguishable from a shape we failed to understand — and the cost of
     // being wrong is an empty picker, so treat it as "unknown".
     if ids.is_empty() { None } else { Some(ids) }
+}
+
+// ── The picker's view ───────────────────────────────────────────────────
+
+/// What the gateway will route, snapshotted once for one `GET /api/providers`
+/// reply. Taken once rather than per model: the answer cannot change mid-reply,
+/// and a per-model lookup would make an unreachable proxy cost one timeout per
+/// catalogue entry.
+pub(crate) struct Filter {
+    /// The declared model ids, or `None` when the gateway could not be asked.
+    declared: Option<HashSet<String>>,
+}
+
+impl Filter {
+    /// Take the snapshot (served from the cache when it is warm).
+    pub(crate) fn new() -> Self {
+        Self { declared: declared() }
+    }
+
+    /// May `provider_id`'s `api_name` be offered to the cockpit?
+    ///
+    /// Yes for a provider the gateway does not carry, or when there is no
+    /// gateway — the catalogue then decides alone. Yes as well when the proxy
+    /// could not be asked: not knowing what it routes is a reason to keep the
+    /// catalogue, not to empty the picker (a proxy that is briefly unreachable
+    /// would otherwise look like a product that lost its models).
+    pub(crate) fn offers(&self, provider_id: &str, api_name: &str) -> bool {
+        let gated = cp_base::config::llm::gateway::is_active()
+            && cp_base::config::llm::gateway::declared_in_model_list(provider_id);
+        !gated || self.declared.as_ref().is_none_or(|set| set.contains(api_name))
+    }
+}
+
+/// Does the gateway hold `provider_id`'s credential on this process's behalf?
+///
+/// Under a gateway the providers it carries are usable with **no local key at
+/// all**: the credential that reaches the provider lives in the proxy, and this
+/// process is not supposed to have a copy. Without this the cockpit offers
+/// nothing on a gateway deployment — an empty model picker with no error
+/// anywhere, which is not a diagnosable failure.
+pub(crate) fn provides(provider_id: &str) -> bool {
+    cp_base::config::llm::gateway::is_active() && cp_base::config::llm::gateway::routes_provider(provider_id)
 }
