@@ -7974,6 +7974,10 @@
   path: .github/ISSUE_TEMPLATE/config.yml
   description: Issue template chooser config
   last_edited_ms: 0
+5399a79a46b485a0:
+  path: crates/cp-orchestrator/src/transport/it/mod.rs
+  description: 'IT infra module root (certs/network/provisioning). v3 teardown: separate maintenance plane removed, fns re-homed onto product REST (:443) under can_manage_it. Declares ca/caddy/crypto/health/identity/network/state submodules; re-exports apply_caddy_at_boot/apply_network_at_boot/is_provisioned. No own router.'
+  last_edited_ms: 1787951720192
 53a0e3e98ba96139:
   path: tmp/v2/src/table/tableFit.ts
   description: Keeps a table exactly as wide as the text column. prosemirror's updateColumnWidth writes only the dragged column and leaves the others, so the table grew to 887px inside a 602px column and the excess hung off the sheet. appendTransaction rescales PROPORTIONALLY (the drag expressed a ratio), fires once on release, addToHistory:false. fitWidths settles CELL_MIN_WIDTH-floor overshoot by repeated sweeps, not a fixed cap.
