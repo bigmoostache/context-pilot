@@ -3159,7 +3159,9 @@ export type PostApiItSmsResponse = PostApiItSmsResponses[keyof PostApiItSmsRespo
 
 export type DeleteApiItSmsByIdData = {
     body?: never;
-    path?: never;
+    path: {
+        id: number;
+    };
     query?: never;
     url: '/api/it/sms/{id}';
 };
@@ -3184,7 +3186,9 @@ export type DeleteApiItSmsByIdResponse = DeleteApiItSmsByIdResponses[keyof Delet
 
 export type PostApiItSmsByIdReadData = {
     body?: never;
-    path?: never;
+    path: {
+        id: number;
+    };
     query?: never;
     url: '/api/it/sms/{id}/read';
 };

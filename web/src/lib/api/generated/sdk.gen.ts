@@ -632,12 +632,12 @@ export const postApiItSms = <ThrowOnError extends boolean = false>(options: Opti
 /**
  * Drop one message from the archive (our copy; the modem's is long gone)
  */
-export const deleteApiItSmsById = <ThrowOnError extends boolean = false>(options?: Options<DeleteApiItSmsByIdData, ThrowOnError>): RequestResult<DeleteApiItSmsByIdResponses, DeleteApiItSmsByIdErrors, ThrowOnError> => (options?.client ?? client).delete<DeleteApiItSmsByIdResponses, DeleteApiItSmsByIdErrors, ThrowOnError>({ url: '/api/it/sms/{id}', ...options });
+export const deleteApiItSmsById = <ThrowOnError extends boolean = false>(options: Options<DeleteApiItSmsByIdData, ThrowOnError>): RequestResult<DeleteApiItSmsByIdResponses, DeleteApiItSmsByIdErrors, ThrowOnError> => (options.client ?? client).delete<DeleteApiItSmsByIdResponses, DeleteApiItSmsByIdErrors, ThrowOnError>({ url: '/api/it/sms/{id}', ...options });
 
 /**
  * Mark one message read
  */
-export const postApiItSmsByIdRead = <ThrowOnError extends boolean = false>(options?: Options<PostApiItSmsByIdReadData, ThrowOnError>): RequestResult<PostApiItSmsByIdReadResponses, PostApiItSmsByIdReadErrors, ThrowOnError> => (options?.client ?? client).post<PostApiItSmsByIdReadResponses, PostApiItSmsByIdReadErrors, ThrowOnError>({ url: '/api/it/sms/{id}/read', ...options });
+export const postApiItSmsByIdRead = <ThrowOnError extends boolean = false>(options: Options<PostApiItSmsByIdReadData, ThrowOnError>): RequestResult<PostApiItSmsByIdReadResponses, PostApiItSmsByIdReadErrors, ThrowOnError> => (options.client ?? client).post<PostApiItSmsByIdReadResponses, PostApiItSmsByIdReadErrors, ThrowOnError>({ url: '/api/it/sms/{id}/read', ...options });
 
 /**
  * Fleet-wide metrics

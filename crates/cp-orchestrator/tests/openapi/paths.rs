@@ -16,6 +16,11 @@ fn qp_opt(name: &str) -> Value {
     json!({ "name": name, "in": "query", "schema": { "type": "string" } })
 }
 
+/// The `{id}` path parameter shared by the two by-id SMS operations.
+fn id_param() -> Value {
+    json!({ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } })
+}
+
 /// All API route definitions.
 #[expect(
     clippy::too_many_lines,
@@ -128,8 +133,22 @@ pub(super) fn paths() -> Value {
             post("it", "Send one SMS (rate-limited per operator and per box; the sender is recorded)",
                 Some(send_body()), r("ItSmsSendResult"))
         ),
-        "/api/it/sms/{id}/read": post("it", "Mark one message read", None, r("OkResponse")),
-        "/api/it/sms/{id}": del("it", "Drop one message from the archive (our copy; the modem's is long gone)"),
+        // The `{id}` parameter is declared EXPLICITLY on both operations. It is
+        // not decoration: the generated client builds its URL from this
+        // declaration, so a templated path with no parameter yields an SDK that
+        // requests the literal `/api/it/sms/%7Bid%7D` and every call 400s.
+        "/api/it/sms/{id}/read": json!({ "post": {
+            "tags": ["it"],
+            "summary": "Mark one message read",
+            "parameters": [id_param()],
+            "responses": merge(ok(r("OkResponse")), err())
+        }}),
+        "/api/it/sms/{id}": json!({ "delete": {
+            "tags": ["it"],
+            "summary": "Drop one message from the archive (our copy; the modem's is long gone)",
+            "parameters": [id_param()],
+            "responses": merge(ok(r("OkResponse")), err())
+        }}),
         // ── Ticket ──────────────────────────────────────────────────
         "/api/ticket": post("ticket", "Mint SSE upgrade ticket", None, r("TicketResponse")),
         // ── Auth ────────────────────────────────────────────────────

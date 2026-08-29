@@ -27,6 +27,7 @@
 pub(crate) mod db;
 mod modem;
 pub(crate) mod poll;
+mod records;
 #[cfg(test)]
 mod tests;
 
@@ -294,11 +295,20 @@ fn validate(req: &SendReq) -> Result<(), &'static str> {
 /// Why this send is refused, or `None` when it is within both ceilings.
 fn over_rate_limit(store: &SmsStore, sender: Option<&str>) -> Option<String> {
     let now = db::now_s();
-    let hourly = store.sent_since(now.saturating_sub(HOUR_S), sender).unwrap_or(0);
+    // FAIL CLOSED. A read error here used to count as zero, which turned a
+    // momentarily locked database into unlimited sending on someone else's
+    // bill. A ceiling that opens when it cannot see is not a ceiling.
+    let hourly = match store.sent_since(now.saturating_sub(HOUR_S), sender) {
+        Ok(count) => count,
+        Err(failure) => return Some(format!("cannot verify the send ceiling ({failure})")),
+    };
     if hourly >= RATE_PER_USER_HOURLY {
         return Some(format!("rate limit: {RATE_PER_USER_HOURLY} messages per hour"));
     }
-    let daily = store.sent_since(now.saturating_sub(DAY_S), None).unwrap_or(0);
+    let daily = match store.sent_since(now.saturating_sub(DAY_S), None) {
+        Ok(count) => count,
+        Err(failure) => return Some(format!("cannot verify the send ceiling ({failure})")),
+    };
     if daily >= RATE_GLOBAL_DAILY {
         return Some(format!("rate limit: {RATE_GLOBAL_DAILY} messages per day for this box"));
     }

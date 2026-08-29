@@ -31,8 +31,8 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use super::db::{SmsStore, sms_path};
-use super::modem::Modem;
+use super::db::{Inbound, SmsStore, sms_path};
+use super::modem::{MessageSource, Modem};
 use super::{Backend, RETENTION_ROWS, enabled, retention_days};
 
 /// Settle delay before the first sweep — lets the transport bind and
@@ -71,7 +71,11 @@ fn run_loop(backend: &Arc<Mutex<Backend>>) -> ! {
 /// modem that is busy, a database that is momentarily locked, and a
 /// `ModemManager` restart.
 fn tick(backend: &Arc<Mutex<Backend>>) {
-    if !enabled() || !super::super::apply::modem_present() {
+    // `modem::available()` is part of the gate, not just an optimisation:
+    // `modem_present()` answers TRUE wherever the applier is inert (a laptop, CI,
+    // any box with no NetworkManager), so without this a dev machine would
+    // create and chmod an sms.db every 30 s for a modem that does not exist.
+    if !enabled() || !super::modem::available() || !super::super::apply::modem_present() {
         return;
     }
     let Some(dir) = backend.lock().ok().map(|guard| guard.agents_dir.clone()) else {
@@ -91,7 +95,7 @@ fn tick(backend: &Arc<Mutex<Backend>>) {
 }
 
 /// Move everything the network delivered into the archive, then free its slot.
-fn ingest(store: &SmsStore, radio: &Modem) {
+pub(super) fn ingest(store: &SmsStore, radio: &dyn MessageSource) {
     let waiting = match radio.list_incoming() {
         Ok(waiting) => waiting,
         Err(failure) => {
@@ -100,11 +104,13 @@ fn ingest(store: &SmsStore, radio: &Modem) {
         }
     };
     for message in waiting {
-        match store.insert_incoming(&message.peer, &message.body, message.sent_at) {
+        let inbound =
+            Inbound { handle: &message.handle, peer: &message.peer, body: &message.body, sent_at: message.sent_at };
+        match store.insert_incoming(&inbound) {
             // Archived now, or archived by an earlier sweep whose delete did not
             // take — either way the modem's copy is redundant and its slot is
             // wanted back.
-            Ok(_new) => drop_from_modem(radio, &message.handle),
+            Ok(id) => reclaim(store, radio, &message.handle, id),
             Err(failure) => {
                 // Deliberately NOT deleted: the archive does not have it, so the
                 // modem is the only copy left. Better a full storage than a lost
@@ -115,13 +121,20 @@ fn ingest(store: &SmsStore, radio: &Modem) {
     }
 }
 
-/// Delete one message from the modem, logging a failure without acting on it.
+/// Delete the modem's copy and, only if that succeeded, release the row.
 ///
-/// Non-fatal by construction: the archive already has the message, and the
-/// digest makes the next sweep's re-read a no-op.
-fn drop_from_modem(radio: &Modem, handle: &str) {
+/// The order is the whole point. `forget_modem_copy` is what lets a LATER
+/// identical message be archived as its own message; calling it before the
+/// modem's copy is actually gone would make the next sweep re-archive this one
+/// as a duplicate. So a failed delete leaves the row pending, which is exactly
+/// the state that makes the retry idempotent.
+fn reclaim(store: &SmsStore, radio: &dyn MessageSource, handle: &str, id: i64) {
     if let Err(failure) = radio.delete(handle) {
         crate::oerr!("sms: archived {handle} but could not delete it from the modem ({failure}) — will retry");
+        return;
+    }
+    if let Err(failure) = store.forget_modem_copy(id) {
+        crate::oerr!("sms: deleted {handle} from the modem but could not release row {id} ({failure})");
     }
 }
 

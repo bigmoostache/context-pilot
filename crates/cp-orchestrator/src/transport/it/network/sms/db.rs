@@ -10,7 +10,7 @@
 //! (`pcat-manager-web/app/pc_sms_client.py`: *"delete the message from
 //! modem/SIM storage to prevent overflow"*).
 //!
-//! # Why [`Message::digest`] exists
+//! # Why the digest is unique only *while the modem still holds a copy*
 //!
 //! That contract has a failure mode: the copy succeeds and the delete does not
 //! (modem busy, `ModemManager` restarting, box powered off in between). The next
@@ -18,10 +18,26 @@
 //! index would not help — `ModemManager` reassigns indices freely across
 //! re-enumerations, the same reason [`signal_dbm`] stopped hardcoding modem `0`.
 //!
-//! So identity is a **content digest**, and insertion is `INSERT OR IGNORE`.
-//! A failed delete is then merely untidy: the next poll re-reads the message,
-//! the insert is a no-op, and the delete is retried. Without it, every failed
-//! delete would duplicate a message on every poll, forever.
+//! So identity is a **content digest** and insertion is `INSERT OR IGNORE`. But
+//! a plain `UNIQUE(digest)` is wrong, and wrong in the worst direction: a
+//! carrier short-code that sends the *same* alert text twice — with no network
+//! timestamp, which is a real and tested case — would hash identically, the
+//! second insert would be a silent no-op, and the poller would delete it from
+//! the modem anyway. The operator would never see it and nothing would log it.
+//! Message LOSS, in the feature whose whole premise is not losing messages.
+//!
+//! The fix is that uniqueness is **partial**:
+//!
+//! ```sql
+//! CREATE UNIQUE INDEX sms_pending ON sms(digest) WHERE modem_handle IS NOT NULL;
+//! ```
+//!
+//! A row is *pending* while `modem_handle` is set, i.e. while the modem's copy
+//! has not been confirmed gone. Re-reading a pending message collides and is
+//! correctly recognised as the same one; once
+//! [`forget_modem_copy`](SmsStore::forget_modem_copy) clears the handle, an
+//! identical message is free to be archived again, because by then it IS a
+//! different message.
 //!
 //! The file is `0600` and holds personal data — see [`prune`](SmsStore::prune)
 //! for what bounds its lifetime.
@@ -29,109 +45,11 @@
 //! [`signal_dbm`]: super::super::status
 
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use rusqlite::Connection;
 use sha2::{Digest as _, Sha256};
 
-/// Which way a message travelled.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Direction {
-    /// Delivered to this box by the network (`pdu-type: deliver`).
-    Received,
-    /// Submitted by an operator through the cockpit (`pdu-type: submit`).
-    Sent,
-}
-
-impl Direction {
-    /// The column value. Stored as an integer because it is a closed two-valued
-    /// fact, and because the read paths filter on it.
-    const fn as_i64(self) -> i64 {
-        match self {
-            Self::Received => 0,
-            Self::Sent => 1,
-        }
-    }
-
-    /// The inverse of [`Self::as_i64`]; anything unexpected reads as
-    /// `Received`, which is the direction that cannot be confused with an
-    /// action this box took.
-    const fn from_i64(raw: i64) -> Self {
-        if raw == 1 { Self::Sent } else { Self::Received }
-    }
-}
-
-/// Where a message is in its life.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Delivery {
-    /// Ingested from the modem. Terminal for an inbound message.
-    Received,
-    /// Handed to the modem, no confirmation yet.
-    Sending,
-    /// The modem accepted it for delivery.
-    Sent,
-    /// The modem refused it, or the send never completed.
-    Failed,
-}
-
-impl Delivery {
-    /// The column value — a string, so the table stays readable to a human
-    /// holding `sqlite3` during an incident.
-    const fn as_str(self) -> &'static str {
-        match self {
-            Self::Received => "received",
-            Self::Sending => "sending",
-            Self::Sent => "sent",
-            Self::Failed => "failed",
-        }
-    }
-
-    /// The inverse of [`Self::as_str`]. An unknown spelling reads as
-    /// [`Failed`](Self::Failed): a row we cannot interpret must not be
-    /// presented as delivered.
-    fn from_str(raw: &str) -> Self {
-        match raw {
-            "received" => Self::Received,
-            "sending" => Self::Sending,
-            "sent" => Self::Sent,
-            _unknown => Self::Failed,
-        }
-    }
-}
-
-/// One archived message, as the read paths hand it out.
-#[derive(Clone, Debug)]
-pub(crate) struct Message {
-    /// Row id — the handle the cockpit uses to mark read or delete.
-    pub id: i64,
-    /// Which way it travelled.
-    pub direction: Direction,
-    /// The other end, in E.164 where the network gave us one. Senders may also
-    /// be alphanumeric short names, which no dialling plan validates.
-    pub peer: String,
-    /// The text, already decoded to UTF-8 by `ModemManager`.
-    pub body: String,
-    /// The network's own timestamp, epoch seconds — `None` when the modem
-    /// reported none (`mmcli` spells that `"--"`).
-    pub sent_at: Option<i64>,
-    /// When this box first saw it. Never null, so the list has a stable order
-    /// even for messages the network did not timestamp.
-    pub ingested_at: i64,
-    /// Where it is in its life.
-    pub delivery: Delivery,
-    /// When an operator marked it read, or `None` while unread.
-    pub read_at: Option<i64>,
-    /// The user id that sent it — the audit trail for outbound messages, which
-    /// cost money on the vendor's data plan. `None` for inbound.
-    pub sent_by: Option<String>,
-    /// Why a send failed, verbatim from the modem.
-    pub error: Option<String>,
-}
-
-/// Epoch seconds, saturating rather than panicking on a pre-1970 clock.
-pub(crate) fn now_s() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |dur| i64::try_from(dur.as_secs()).unwrap_or(i64::MAX))
-}
+pub(crate) use super::records::{Delivery, Direction, Inbound, Message, now_s};
 
 /// The content digest that makes ingestion idempotent — see the module doc.
 ///
@@ -176,9 +94,16 @@ impl SmsStore {
             std::fs::create_dir_all(parent).map_err(|e| format!("create {}: {e}", parent.display()))?;
         }
         let conn = Connection::open(path).map_err(|e| format!("open {}: {e}", path.display()))?;
+        // Tighten BEFORE the schema batch, not after. `PRAGMA journal_mode =
+        // WAL` mints the `-wal` and `-shm` sidecars, and SQLite copies the MAIN
+        // database's mode onto them at creation time. Chmodding afterwards
+        // therefore left the sidecars at whatever the umask gave — and an
+        // inbound message body transits the WAL before it ever reaches the
+        // table. The unit runs with `UMask=0022`, so "afterwards" meant a
+        // world-readable file carrying SMS text.
+        restrict(path)?;
         let store = Self { conn };
         store.init_schema()?;
-        restrict(path)?;
         Ok(store)
     }
 
@@ -190,44 +115,55 @@ impl SmsStore {
                  PRAGMA busy_timeout = 5000;
 
                  CREATE TABLE IF NOT EXISTS sms (
-                     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                     digest      TEXT    NOT NULL UNIQUE,
-                     direction   INTEGER NOT NULL,
-                     peer        TEXT    NOT NULL,
-                     body        TEXT    NOT NULL,
-                     sent_at     INTEGER,
-                     ingested_at INTEGER NOT NULL,
-                     delivery    TEXT    NOT NULL,
-                     read_at     INTEGER,
-                     sent_by     TEXT,
-                     error       TEXT
+                     id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                     digest       TEXT    NOT NULL,
+                     modem_handle TEXT,
+                     direction    INTEGER NOT NULL,
+                     peer         TEXT    NOT NULL,
+                     body         TEXT    NOT NULL,
+                     sent_at      INTEGER,
+                     ingested_at  INTEGER NOT NULL,
+                     delivery     TEXT    NOT NULL,
+                     read_at      INTEGER,
+                     deleted_at   INTEGER,
+                     sent_by      TEXT,
+                     error        TEXT
                  );
 
-                 CREATE INDEX IF NOT EXISTS sms_by_time ON sms(ingested_at DESC, id DESC);
+                 -- The uniqueness that makes ingestion idempotent is PARTIAL: it
+                 -- binds only while the modem still holds a copy. See the module
+                 -- doc for why a plain UNIQUE(digest) silently ate messages.
+                 CREATE UNIQUE INDEX IF NOT EXISTS sms_pending ON sms(digest) WHERE modem_handle IS NOT NULL;
+                 CREATE INDEX IF NOT EXISTS sms_by_id ON sms(id DESC);
                  CREATE INDEX IF NOT EXISTS sms_unread ON sms(read_at) WHERE read_at IS NULL;",
             )
             .map_err(|e| format!("sms schema: {e}"))
     }
 
-    /// Archive one inbound message. `Ok(true)` when it was new.
+    /// Archive one inbound message and return the row that now owns the modem's
+    /// copy. Idempotent: re-offering the same message returns the same row.
     ///
-    /// `INSERT OR IGNORE` on the digest is the whole idempotence story: the
-    /// caller may re-offer the same message any number of times — after a
-    /// failed modem delete, it will.
+    /// `handle` is the modem's D-Bus path. Storing it is what makes the row
+    /// *pending* — the state the partial unique index keys on. The caller clears
+    /// it with [`Self::forget_modem_copy`] once the modem's copy is actually
+    /// gone, and only then can an identical message be archived again as the
+    /// separate message it is.
     ///
     /// # Errors
     ///
-    /// Returns the `SQLite` message when the insert cannot run at all.
-    pub(crate) fn insert_incoming(&self, peer: &str, body: &str, sent_at: Option<i64>) -> Result<bool, String> {
+    /// Returns the `SQLite` message when the statements cannot run.
+    pub(crate) fn insert_incoming(&self, message: &Inbound<'_>) -> Result<i64, String> {
+        let Inbound { handle, peer, body, sent_at } = *message;
         let digest = digest_of(Direction::Received, peer, body, sent_at);
-        let changed = self
+        let _inserted = self
             .conn
             .execute(
                 "INSERT OR IGNORE INTO sms
-                   (digest, direction, peer, body, sent_at, ingested_at, delivery)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                   (digest, modem_handle, direction, peer, body, sent_at, ingested_at, delivery)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
                 rusqlite::params![
                     digest,
+                    handle,
                     Direction::Received.as_i64(),
                     peer,
                     body,
@@ -237,7 +173,40 @@ impl SmsStore {
                 ],
             )
             .map_err(|e| format!("sms insert: {e}"))?;
-        Ok(changed > 0)
+        // Refresh the handle on the pending row: ModemManager renumbers its
+        // object paths across restarts, so the copy we could not delete last
+        // sweep may be answering to a different path this one.
+        let _refreshed = self
+            .conn
+            .execute(
+                "UPDATE sms SET modem_handle = ?1 WHERE digest = ?2 AND modem_handle IS NOT NULL",
+                rusqlite::params![handle, digest],
+            )
+            .map_err(|e| format!("sms refresh handle: {e}"))?;
+        self.conn
+            .query_row(
+                "SELECT id FROM sms WHERE digest = ?1 AND modem_handle IS NOT NULL",
+                rusqlite::params![digest],
+                |row| row.get(0),
+            )
+            .map_err(|e| format!("sms locate pending row: {e}"))
+    }
+
+    /// Record that the modem no longer holds a copy of this row.
+    ///
+    /// This is what releases the digest: until it is called the row is pending
+    /// and a re-read is recognised as the same message; afterwards an identical
+    /// message is a NEW message, because that is what it is.
+    ///
+    /// # Errors
+    ///
+    /// Returns the `SQLite` message when the update fails.
+    pub(crate) fn forget_modem_copy(&self, id: i64) -> Result<(), String> {
+        let _rows = self
+            .conn
+            .execute("UPDATE sms SET modem_handle = NULL WHERE id = ?1", rusqlite::params![id])
+            .map_err(|e| format!("sms clear handle: {e}"))?;
+        Ok(())
     }
 
     /// Record an outbound message before it is handed to the modem, in
@@ -296,9 +265,14 @@ impl SmsStore {
     /// One page of the archive, newest first. `before` is the id the previous
     /// page ended on, or `None` for the first page.
     ///
-    /// Ordered by `ingested_at` then `id`, never by `sent_at`: the network's
-    /// timestamp is optional and, on a message that arrived while the modem's
-    /// clock was unset, wrong. Ingestion order is the one this box can vouch for.
+    /// Ordered by `id`, never by `sent_at` or `ingested_at`.
+    ///
+    /// `sent_at` is the network's, and optional. `ingested_at` is ours but NOT
+    /// monotonic: an appliance with no RTC boots at some arbitrary epoch and
+    /// jumps forward when NTP lands, so an earlier row can carry a later
+    /// timestamp. Since the page cursor is `id`, ordering by anything else lets
+    /// a page repeat or skip rows. `id` is insertion order and agrees with the
+    /// cursor by construction.
     ///
     /// # Errors
     ///
@@ -306,8 +280,8 @@ impl SmsStore {
     pub(crate) fn list(&self, before: Option<i64>, limit: i64) -> Result<Vec<Message>, String> {
         let sql = format!(
             "SELECT {SELECT_COLUMNS} FROM sms
-             WHERE (?1 IS NULL OR id < ?1)
-             ORDER BY ingested_at DESC, id DESC
+             WHERE (?1 IS NULL OR id < ?1) AND deleted_at IS NULL
+             ORDER BY id DESC
              LIMIT ?2"
         );
         let mut stmt = self.conn.prepare(&sql).map_err(|e| format!("sms list: {e}"))?;
@@ -324,7 +298,7 @@ impl SmsStore {
     pub(crate) fn unread_count(&self) -> Result<i64, String> {
         self.conn
             .query_row(
-                "SELECT COUNT(*) FROM sms WHERE read_at IS NULL AND direction = ?1",
+                "SELECT COUNT(*) FROM sms WHERE read_at IS NULL AND deleted_at IS NULL AND direction = ?1",
                 rusqlite::params![Direction::Received.as_i64()],
                 |row| row.get(0),
             )
@@ -342,7 +316,10 @@ impl SmsStore {
     pub(crate) fn mark_read(&self, id: i64) -> Result<bool, String> {
         let changed = self
             .conn
-            .execute("UPDATE sms SET read_at = ?1 WHERE id = ?2 AND read_at IS NULL", rusqlite::params![now_s(), id])
+            .execute(
+                "UPDATE sms SET read_at = ?1 WHERE id = ?2 AND read_at IS NULL AND deleted_at IS NULL",
+                rusqlite::params![now_s(), id],
+            )
             .map_err(|e| format!("sms mark read: {e}"))?;
         if changed > 0 {
             return Ok(true);
@@ -366,20 +343,36 @@ impl SmsStore {
             .map_err(|e| format!("sms exists: {e}"))
     }
 
-    /// Delete one message from the archive. `Ok(false)` when no such row.
+    /// Hide one message from the archive. `Ok(false)` when no such row.
     ///
-    /// This deletes only our copy — the modem's has already been removed by the
-    /// ingester, which is what keeps its storage from filling.
+    /// A **soft** delete, and the reason is not tidiness. The send ceiling is
+    /// counted from this table by [`sent_since`](Self::sent_since), and the same
+    /// `can_manage_it` caller who may send may also call this route: a hard
+    /// delete would let an operator send ten, delete the ten rows, and send ten
+    /// more, forever — erasing the vendor-cost ceiling AND the `sent_by` audit
+    /// trail that stands in place of a stricter capability. Hidden rows still
+    /// count, and only [`prune`](Self::prune) ever removes bytes.
+    ///
+    /// It deletes only our copy either way — the modem's is long gone, removed
+    /// by the ingester, which is what keeps its storage from filling.
     ///
     /// # Errors
     ///
-    /// Returns the `SQLite` message when the delete fails.
+    /// Returns the `SQLite` message when the update fails.
     pub(crate) fn delete(&self, id: i64) -> Result<bool, String> {
         let changed = self
             .conn
-            .execute("DELETE FROM sms WHERE id = ?1", rusqlite::params![id])
+            .execute(
+                "UPDATE sms SET deleted_at = ?1 WHERE id = ?2 AND deleted_at IS NULL",
+                rusqlite::params![now_s(), id],
+            )
             .map_err(|e| format!("sms delete: {e}"))?;
-        Ok(changed > 0)
+        if changed > 0 {
+            return Ok(true);
+        }
+        // Already hidden is still "this message exists" — same distinction
+        // `mark_read` draws, so a repeat is not reported as a 404.
+        self.exists(id)
     }
 
     /// How many messages `sender` has sent since `since` — the rate limiter's
@@ -426,7 +419,7 @@ impl SmsStore {
             .conn
             .execute(
                 "DELETE FROM sms WHERE id NOT IN (
-                     SELECT id FROM sms ORDER BY ingested_at DESC, id DESC LIMIT ?1
+                     SELECT id FROM sms ORDER BY id DESC LIMIT ?1
                  )",
                 rusqlite::params![max_rows],
             )

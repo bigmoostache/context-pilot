@@ -24,12 +24,75 @@
 //! makes "no `ModemManager` here" and "not configured for messaging" the same
 //! honest state (the lesson `nmcli_bin` already learned).
 
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::path::Path;
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
 
-use super::super::apply::run;
+/// How long one `mmcli` call may take before we stop waiting and kill it.
+///
+/// The shared `run` helper in the applier has NO deadline, and here that is not
+/// survivable: the ingester is a single thread, so one wedged `mmcli` — a
+/// `ModemManager` stuck on D-Bus, a modem mid-reset, both documented on this
+/// hardware — would hang it forever. No timeout, no restart, and nothing in the
+/// journal, because the log line comes after the call. The modem storage would
+/// then fill and drop inbound messages in silence: exactly the failure this
+/// whole module exists to prevent, arrived by a different road.
+const CALL_TIMEOUT: Duration = Duration::from_secs(20);
+
+/// How often the deadline is re-checked while a call is in flight.
+const POLL_STEP: Duration = Duration::from_millis(50);
+
+/// Run `bin` with `args`, killing it if it outlives [`CALL_TIMEOUT`].
+///
+/// Local rather than the applier's shared `run` solely for that deadline;
+/// everything else matches it, argv only and no shell.
+///
+/// One bounded assumption: the child must not fill the ~64 KiB pipe buffer
+/// before exiting, or it blocks and we treat it as a timeout. Every `mmcli`
+/// call here answers in well under that — a list of D-Bus paths, or one
+/// message.
+///
+/// # Errors
+///
+/// Returns the spawn error, `mmcli`'s stderr, or a timeout message.
+fn run_bounded(bin: &OsStr, args: &[String]) -> Result<String, String> {
+    let name = bin.to_string_lossy().into_owned();
+    let mut child = Command::new(bin)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("spawn {name}: {e}"))?;
+    let deadline = Instant::now().checked_add(CALL_TIMEOUT);
+    while !exited(&mut child, &name)? {
+        if deadline.is_some_and(|limit| Instant::now() >= limit) {
+            drop(child.kill());
+            drop(child.wait());
+            return Err(format!("{name} timed out after {}s", CALL_TIMEOUT.as_secs()));
+        }
+        std::thread::sleep(POLL_STEP);
+    }
+    let output = child.wait_with_output().map_err(|e| format!("collect {name}: {e}"))?;
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).trim().to_owned())
+    }
+}
+
+/// Whether the child has exited, split out to keep [`run_bounded`] within the
+/// cognitive-complexity cap.
+///
+/// # Errors
+///
+/// Returns the wait error.
+fn exited(child: &mut std::process::Child, name: &str) -> Result<bool, String> {
+    child.try_wait().map(|status| status.is_some()).map_err(|e| format!("wait {name}: {e}"))
+}
 
 /// `mmcli`'s path, **only if that path exists** — see the module doc.
 fn mmcli_bin() -> Option<OsString> {
@@ -66,6 +129,39 @@ pub(crate) struct Incoming {
     pub sent_at: Option<i64>,
 }
 
+/// What the ingester needs from the modem, and nothing more.
+///
+/// A trait for one reason: it lets the archive-then-delete contract — the
+/// invariant this whole feature rests on — be tested against a fake that can be
+/// told to fail its deletes, with no modem, no `ModemManager` and no
+/// process-global environment variable. [`Modem`] is its only production
+/// implementation.
+pub(super) trait MessageSource {
+    /// Every message the network delivered and the modem still holds.
+    ///
+    /// # Errors
+    ///
+    /// Returns the reason the list could not be obtained.
+    fn list_incoming(&self) -> Result<Vec<Incoming>, String>;
+
+    /// Remove one message from the modem's storage, freeing its slot.
+    ///
+    /// # Errors
+    ///
+    /// Returns the reason the deletion failed.
+    fn delete(&self, handle: &str) -> Result<(), String>;
+}
+
+impl MessageSource for Modem {
+    fn list_incoming(&self) -> Result<Vec<Incoming>, String> {
+        self.fetch_incoming()
+    }
+
+    fn delete(&self, handle: &str) -> Result<(), String> {
+        self.remove(handle)
+    }
+}
+
 /// A detected modem: the tool and the D-Bus path to drive it with.
 pub(crate) struct Modem {
     /// `mmcli`'s absolute path.
@@ -84,7 +180,7 @@ impl Modem {
     /// `signal_dbm` was fixed to do this.
     pub(crate) fn detect() -> Option<Self> {
         let bin = mmcli_bin()?;
-        let listed = run(&bin, &["-J".to_owned(), "-L".to_owned()]).ok()?;
+        let listed = run_bounded(&bin, &["-J".to_owned(), "-L".to_owned()]).ok()?;
         let parsed: Value = serde_json::from_str(&listed).ok()?;
         let path = parsed.get("modem-list")?.as_array()?.first()?.as_str()?.to_owned();
         Some(Self { bin, path })
@@ -105,9 +201,11 @@ impl Modem {
     /// # Errors
     ///
     /// Returns `mmcli`'s stderr when the list itself cannot be obtained.
-    pub(crate) fn list_incoming(&self) -> Result<Vec<Incoming>, String> {
-        let listed =
-            run(&self.bin, &["-J".to_owned(), "-m".to_owned(), self.path.clone(), "--messaging-list-sms".to_owned()])?;
+    fn fetch_incoming(&self) -> Result<Vec<Incoming>, String> {
+        let listed = run_bounded(
+            &self.bin,
+            &["-J".to_owned(), "-m".to_owned(), self.path.clone(), "--messaging-list-sms".to_owned()],
+        )?;
         let parsed: Value = serde_json::from_str(&listed).map_err(|e| format!("mmcli sms list: {e}"))?;
         let handles = parsed
             .get("modem.messaging.sms")
@@ -118,7 +216,7 @@ impl Modem {
 
     /// Read one message, or `None` when it is unreadable or not a delivery.
     fn read(&self, handle: &str) -> Option<Incoming> {
-        let shown = run(&self.bin, &["-J".to_owned(), "-s".to_owned(), handle.to_owned()]).ok()?;
+        let shown = run_bounded(&self.bin, &["-J".to_owned(), "-s".to_owned(), handle.to_owned()]).ok()?;
         let parsed: Value = serde_json::from_str(&shown).ok()?;
         parse_incoming(handle, &parsed)
     }
@@ -128,9 +226,9 @@ impl Modem {
     /// # Errors
     ///
     /// Returns `mmcli`'s stderr.
-    pub(crate) fn delete(&self, handle: &str) -> Result<(), String> {
+    fn remove(&self, handle: &str) -> Result<(), String> {
         let args = ["-m".to_owned(), self.path.clone(), format!("--messaging-delete-sms={handle}")];
-        run(&self.bin, &args).map(|_out| ())
+        run_bounded(&self.bin, &args).map(|_out| ())
     }
 
     /// Create and send one message.
@@ -149,7 +247,7 @@ impl Modem {
     /// draft occupying a storage slot.
     pub(crate) fn send(&self, to: &str, body: &str) -> Result<(), String> {
         let scratch = BodyFile::write(body)?;
-        let created = run(
+        let created = run_bounded(
             &self.bin,
             &[
                 "-m".to_owned(),
@@ -163,15 +261,19 @@ impl Modem {
             .find(|token| token.starts_with("/org/freedesktop/ModemManager1/SMS/"))
             .ok_or_else(|| format!("mmcli did not name the created message: {created}"))?
             .to_owned();
-        match run(&self.bin, &["-s".to_owned(), handle.clone(), "--send".to_owned()]) {
-            Ok(_out) => Ok(()),
-            Err(failure) => {
-                // Best-effort: the send already failed, and a failure to clean
-                // up must not replace the reason with a less useful one.
-                drop(self.delete(&handle));
-                Err(failure)
-            }
+        let outcome = run_bounded(&self.bin, &["-s".to_owned(), handle.clone(), "--send".to_owned()]);
+        // Reclaim the slot on BOTH paths. On failure that is obvious. On
+        // success it is the part that was missing and that matters more: the
+        // sent message stays in the modem's storage forever otherwise, and the
+        // ingester reads every stored object on every sweep. Fifty sends — the
+        // daily ceiling — would leave fifty permanent entries, costing fifty
+        // extra subprocesses per sweep and fifty of the few dozen slots whose
+        // exhaustion silently drops INBOUND messages. The feature would fill
+        // the storage it exists to keep empty.
+        if let Err(failure) = self.remove(&handle) {
+            crate::oerr!("sms: sent {handle} but could not reclaim its slot ({failure})");
         }
+        outcome.map(|_out| ())
     }
 }
 
@@ -250,8 +352,6 @@ fn private(options: &mut std::fs::OpenOptions) {
 /// No-op on non-Unix (local dev on a platform without POSIX modes).
 #[cfg(not(unix))]
 fn private(_options: &mut std::fs::OpenOptions) {}
-
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// RFC 3339 (what `ModemManager` emits, offset included) to epoch **seconds**.
 ///

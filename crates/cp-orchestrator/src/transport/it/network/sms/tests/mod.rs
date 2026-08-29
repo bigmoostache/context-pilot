@@ -5,12 +5,17 @@
 //! MBIM composition) — the shape is measured, not guessed — and every archive
 //! test runs against its own temp-dir database, so they hold no global state and
 //! can run in parallel.
+//!
+//! Split in two for the 500-line file cap: this file covers the parser, the
+//! archive and the gate; [`ingest`] covers the sweep loop.
+
+mod ingest;
 
 use std::path::Path;
 
 use serde_json::{Value, json};
 
-use super::db::{Delivery, Direction, Message, SmsStore};
+use super::db::{Delivery, Direction, Inbound, Message, SmsStore};
 use super::modem::parse_incoming;
 
 // ── Fixtures, captured from the box ─────────────────────────────────────────
@@ -137,8 +142,23 @@ fn malformed_document_is_none() {
 #[test]
 fn re_ingesting_the_same_message_is_a_no_op() {
     let (_dir, store) = store();
-    assert!(store.insert_incoming("+33612345678", "Bonjour", Some(1_787_080_353)).expect("first"), "new");
-    assert!(!store.insert_incoming("+33612345678", "Bonjour", Some(1_787_080_353)).expect("second"), "duplicate");
+    let first = store
+        .insert_incoming(&Inbound {
+            handle: "/h1",
+            peer: "+33612345678",
+            body: "Bonjour",
+            sent_at: Some(1_787_080_353),
+        })
+        .expect("first");
+    let again = store
+        .insert_incoming(&Inbound {
+            handle: "/h1",
+            peer: "+33612345678",
+            body: "Bonjour",
+            sent_at: Some(1_787_080_353),
+        })
+        .expect("second");
+    assert_eq!(first, again, "the same message maps to the same row");
     assert_eq!(store.list(None, 10).expect("list").len(), 1, "exactly one row");
 }
 
@@ -147,8 +167,12 @@ fn re_ingesting_the_same_message_is_a_no_op() {
 #[test]
 fn different_bodies_are_different_messages() {
     let (_dir, store) = store();
-    let _first = store.insert_incoming("+33612345678", "Un", Some(100)).expect("first");
-    let _second = store.insert_incoming("+33612345678", "Deux", Some(100)).expect("second");
+    let _first_row = store
+        .insert_incoming(&Inbound { handle: "/h1", peer: "+33612345678", body: "Un", sent_at: Some(100) })
+        .expect("first");
+    let _second_row = store
+        .insert_incoming(&Inbound { handle: "/h2", peer: "+33612345678", body: "Deux", sent_at: Some(100) })
+        .expect("second");
     assert_eq!(store.list(None, 10).expect("list").len(), 2);
 }
 
@@ -157,8 +181,12 @@ fn different_bodies_are_different_messages() {
 #[test]
 fn peer_boundary_cannot_be_shifted() {
     let (_dir, store) = store();
-    let _first = store.insert_incoming("+3361", "234Bonjour", Some(100)).expect("first");
-    let _second = store.insert_incoming("+3361234", "Bonjour", Some(100)).expect("second");
+    let _first_row = store
+        .insert_incoming(&Inbound { handle: "/h1", peer: "+3361", body: "234Bonjour", sent_at: Some(100) })
+        .expect("first");
+    let _second_row = store
+        .insert_incoming(&Inbound { handle: "/h2", peer: "+3361234", body: "Bonjour", sent_at: Some(100) })
+        .expect("second");
     assert_eq!(store.list(None, 10).expect("list").len(), 2, "concatenation must not collide");
 }
 
@@ -169,7 +197,14 @@ fn peer_boundary_cannot_be_shifted() {
 fn lists_newest_first_and_paginates() {
     let (_dir, store) = store();
     for index in 0..5i64 {
-        let _new = store.insert_incoming("+33612345678", &format!("message {index}"), Some(index)).expect("insert");
+        let _row = store
+            .insert_incoming(&Inbound {
+                handle: &format!("/h{index}"),
+                peer: "+33612345678",
+                body: &format!("message {index}"),
+                sent_at: Some(index),
+            })
+            .expect("insert");
     }
     let first_page = store.list(None, 2).expect("page one");
     assert_eq!(first_page.len(), 2);
@@ -183,7 +218,9 @@ fn lists_newest_first_and_paginates() {
 #[test]
 fn unread_count_tracks_marking() {
     let (_dir, store) = store();
-    let _new = store.insert_incoming("+33612345678", "Bonjour", Some(1)).expect("insert");
+    let _row = store
+        .insert_incoming(&Inbound { handle: "/h1", peer: "+33612345678", body: "Bonjour", sent_at: Some(1) })
+        .expect("insert");
     assert_eq!(store.unread_count().expect("count"), 1);
     let id = only(&store.list(None, 1).expect("list")).id;
     assert!(store.mark_read(id).expect("mark"), "marking an existing message succeeds");
@@ -195,7 +232,9 @@ fn unread_count_tracks_marking() {
 #[test]
 fn re_marking_read_still_reports_found() {
     let (_dir, store) = store();
-    let _new = store.insert_incoming("+33612345678", "Bonjour", Some(1)).expect("insert");
+    let _row = store
+        .insert_incoming(&Inbound { handle: "/h1", peer: "+33612345678", body: "Bonjour", sent_at: Some(1) })
+        .expect("insert");
     let id = only(&store.list(None, 1).expect("list")).id;
     assert!(store.mark_read(id).expect("first"), "first mark");
     assert!(store.mark_read(id).expect("second"), "already read is still found");
@@ -213,7 +252,9 @@ fn missing_id_is_reported() {
 #[test]
 fn delete_removes_the_row() {
     let (_dir, store) = store();
-    let _new = store.insert_incoming("+33612345678", "Bonjour", Some(1)).expect("insert");
+    let _row = store
+        .insert_incoming(&Inbound { handle: "/h1", peer: "+33612345678", body: "Bonjour", sent_at: Some(1) })
+        .expect("insert");
     let id = only(&store.list(None, 1).expect("list")).id;
     assert!(store.delete(id).expect("delete"), "deleted");
     assert!(store.list(None, 10).expect("list").is_empty());
@@ -276,7 +317,14 @@ fn sent_since_counts_per_sender_and_window() {
 fn retention_bounds_by_volume() {
     let (_dir, store) = store();
     for index in 0..10i64 {
-        let _new = store.insert_incoming("+33612345678", &format!("message {index}"), Some(index)).expect("insert");
+        let _row = store
+            .insert_incoming(&Inbound {
+                handle: &format!("/h{index}"),
+                peer: "+33612345678",
+                body: &format!("message {index}"),
+                sent_at: Some(index),
+            })
+            .expect("insert");
     }
     assert_eq!(store.prune(super::db::now_s(), 365, 4).expect("prune"), 6, "six removed");
     let kept = store.list(None, 100).expect("list");
@@ -293,7 +341,9 @@ fn retention_bounds_by_volume() {
 fn retention_bounds_by_age() {
     const DAY_S: i64 = 86_400;
     let (_dir, store) = store();
-    let _new = store.insert_incoming("+33612345678", "Vieux", Some(1)).expect("insert");
+    let _row = store
+        .insert_incoming(&Inbound { handle: "/h1", peer: "+33612345678", body: "Vieux", sent_at: Some(1) })
+        .expect("insert");
     let now = super::db::now_s();
     assert_eq!(store.prune(now, 30, 5_000).expect("prune"), 0, "inside the window, kept");
     let in_two_months = now.saturating_add(DAY_S.saturating_mul(60));
