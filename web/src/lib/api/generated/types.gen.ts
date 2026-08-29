@@ -429,6 +429,10 @@ export type ItNetworkStatus = {
     ap: ItNetworkApStatus | null;
     modem_present: boolean;
     /**
+     * Null on a box with no 5G module or no `mmcli` — the SMS panel is then absent, not disabled.
+     */
+    sms: ItSmsStatus | null;
+    /**
      * Null when the failover supervisor is not running or its state file is absent.
      */
     supervisor: ItNetworkSupervisor | null;
@@ -522,6 +526,69 @@ export type ItNetworkWwanStatus = {
 export type ItSetIdentityResponse = {
     identity: Identity;
     reloaded: boolean;
+};
+
+export type ItSmsList = {
+    messages: Array<ItSmsMessage>;
+};
+
+/**
+ * One archived message. Inbound messages are ingested from the modem by a background sweep and then deleted from it; outbound ones are written here BEFORE the modem is asked to send, so a send that dies mid-flight still leaves a record of what was attempted and by whom.
+ */
+export type ItSmsMessage = {
+    /**
+     * UTF-8, decoded and de-segmented by ModemManager.
+     */
+    body: string;
+    /**
+     * `received` is terminal for inbound. Outbound walks `sending` → `sent` | `failed`.
+     */
+    delivery: 'received' | 'sending' | 'sent' | 'failed';
+    /**
+     * `received` is `pdu-type: deliver` from the network; `sent` is one this box submitted.
+     */
+    direction: 'received' | 'sent';
+    /**
+     * The modem's own words when a send failed.
+     */
+    error: string | null;
+    id: number;
+    /**
+     * When this box first saw it. Never null; the sort key.
+     */
+    ingested_at: number;
+    /**
+     * The other end. NOT always a dialling number: carriers send alerts from alphanumeric short names (`Bouygues`), so this is never validated as E.164 on the way in — only on the way out, where we are the sender.
+     */
+    peer: string;
+    read: boolean;
+    /**
+     * The NETWORK's timestamp, epoch seconds. Null when the modem reported none (`mmcli` spells that `--`) or reported something unparseable. A wrong time is worse than none, so listings order by `ingested_at`, which this box can vouch for.
+     */
+    sent_at: number | null;
+    /**
+     * The user id that ordered an outbound message — the audit trail, since sending spends the vendor's data plan. Null for inbound.
+     */
+    sent_by: string | null;
+};
+
+export type ItSmsSendResult = {
+    delivery: 'sent';
+    /**
+     * The archived row, written before the modem was touched.
+     */
+    id: number;
+};
+
+/**
+ * Whether this box can do SMS at all, plus the unread badge. NULL — not an object with `available: false` — for either of two reasons: the box is not a 5G variant (`status.modem_present` false), or no `mmcli` is configured. The cockpit renders the SMS panel only when this is an object, so a box with no modem does not show a disabled panel, it shows none. Deliberately carries NO storage counts: `mmcli --messaging-status` reports which storages the modem supports (`mt` on the RM520N-GL) and not how full they are, so a used/total pair would have to be invented.
+ */
+export type ItSmsStatus = {
+    available: boolean;
+    /**
+     * Inbound messages nobody has opened yet. Counts the ARCHIVE, not the modem — the ingester empties the modem on every sweep, which is what keeps its handful of storage slots from filling and silently dropping the next message.
+     */
+    unread: number;
 };
 
 export type LibraryAgentRaw = {
@@ -3027,6 +3094,118 @@ export type GetApiItProvisionedResponses = {
 };
 
 export type GetApiItProvisionedResponse = GetApiItProvisionedResponses[keyof GetApiItProvisionedResponses];
+
+export type GetApiItSmsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        before?: string;
+        limit?: string;
+    };
+    url: '/api/it/sms';
+};
+
+export type GetApiItSmsErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiItSmsError = GetApiItSmsErrors[keyof GetApiItSmsErrors];
+
+export type GetApiItSmsResponses = {
+    /**
+     * Success
+     */
+    200: ItSmsList;
+};
+
+export type GetApiItSmsResponse = GetApiItSmsResponses[keyof GetApiItSmsResponses];
+
+export type PostApiItSmsData = {
+    body: {
+        /**
+         * 1 to 670 characters. The ceiling is ten UCS-2 segments (67 characters each once the concatenation header is subtracted), which is where carriers stop being reliable about reassembly. The text is handed to `mmcli` through a FILE, never interpolated into an option string, so apostrophes, commas and newlines survive.
+         */
+        body: string;
+        /**
+         * Destination in E.164: 6–15 digits, optionally prefixed with `+`. Rejected with a 400 otherwise — unlike an inbound `peer`, which may be an alphanumeric short name.
+         */
+        to: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/it/sms';
+};
+
+export type PostApiItSmsErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiItSmsError = PostApiItSmsErrors[keyof PostApiItSmsErrors];
+
+export type PostApiItSmsResponses = {
+    /**
+     * Success
+     */
+    200: ItSmsSendResult;
+};
+
+export type PostApiItSmsResponse = PostApiItSmsResponses[keyof PostApiItSmsResponses];
+
+export type DeleteApiItSmsByIdData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/it/sms/{id}';
+};
+
+export type DeleteApiItSmsByIdErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type DeleteApiItSmsByIdError = DeleteApiItSmsByIdErrors[keyof DeleteApiItSmsByIdErrors];
+
+export type DeleteApiItSmsByIdResponses = {
+    /**
+     * Success
+     */
+    200: OkResponse;
+};
+
+export type DeleteApiItSmsByIdResponse = DeleteApiItSmsByIdResponses[keyof DeleteApiItSmsByIdResponses];
+
+export type PostApiItSmsByIdReadData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/it/sms/{id}/read';
+};
+
+export type PostApiItSmsByIdReadErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiItSmsByIdReadError = PostApiItSmsByIdReadErrors[keyof PostApiItSmsByIdReadErrors];
+
+export type PostApiItSmsByIdReadResponses = {
+    /**
+     * Success
+     */
+    200: OkResponse;
+};
+
+export type PostApiItSmsByIdReadResponse = PostApiItSmsByIdReadResponses[keyof PostApiItSmsByIdReadResponses];
 
 export type GetApiMetricsData = {
     body?: never;
