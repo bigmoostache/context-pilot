@@ -7,4 +7,5 @@ pub(crate) mod env_keys;
 pub(crate) mod it;
 pub(crate) mod network;
 pub(crate) mod settings;
+pub(crate) mod sms;
 pub(crate) mod update;

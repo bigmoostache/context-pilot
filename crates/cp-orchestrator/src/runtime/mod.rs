@@ -257,6 +257,20 @@ impl Runtime {
         crate::transport::rest::spawn_oauth_refresh()
     }
 
+    /// Spawn the SMS ingester: sweep the modem's message storage into the local
+    /// archive, then free the slot.
+    ///
+    /// It runs on every box, not only 5G ones — the tick's first act is the
+    /// same sysfs modem probe the cockpit gates on, so on a box with no module
+    /// the thread costs one directory read every 30 s and nothing else. That is
+    /// cheaper than threading the hardware answer through boot, and it stays
+    /// correct if a module is ever fitted without a reflash. See
+    /// [`sms::poll`](crate::transport::it::network::sms::poll).
+    #[must_use]
+    pub fn start_sms_poller(&self) -> thread::JoinHandle<()> {
+        crate::transport::it::network::sms::poll::spawn(Arc::clone(&self.backend))
+    }
+
     /// Spawn the self-update committer thread (update-policy §5.5 steps 4-5).
     ///
     /// It polls our own `/healthz` and, once a staged update's boot proves

@@ -1285,6 +1285,15 @@
           "modem_present": {
             "type": "boolean"
           },
+          "sms": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ItSmsStatus"
+              }
+            ],
+            "description": "Null on a box with no 5G module or no `mmcli` — the SMS panel is then absent, not disabled.",
+            "nullable": true
+          },
           "supervisor": {
             "allOf": [
               {
@@ -1312,7 +1321,8 @@
           "wan",
           "wwan",
           "ap",
-          "supervisor"
+          "supervisor",
+          "sms"
         ],
         "type": "object"
       },
@@ -1501,6 +1511,125 @@
         "required": [
           "identity",
           "reloaded"
+        ],
+        "type": "object"
+      },
+      "ItSmsList": {
+        "properties": {
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ItSmsMessage"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "messages"
+        ],
+        "type": "object"
+      },
+      "ItSmsMessage": {
+        "description": "One archived message. Inbound messages are ingested from the modem by a background sweep and then deleted from it; outbound ones are written here BEFORE the modem is asked to send, so a send that dies mid-flight still leaves a record of what was attempted and by whom.",
+        "properties": {
+          "body": {
+            "description": "UTF-8, decoded and de-segmented by ModemManager.",
+            "type": "string"
+          },
+          "delivery": {
+            "description": "`received` is terminal for inbound. Outbound walks `sending` → `sent` | `failed`.",
+            "enum": [
+              "received",
+              "sending",
+              "sent",
+              "failed"
+            ],
+            "type": "string"
+          },
+          "direction": {
+            "description": "`received` is `pdu-type: deliver` from the network; `sent` is one this box submitted.",
+            "enum": [
+              "received",
+              "sent"
+            ],
+            "type": "string"
+          },
+          "error": {
+            "description": "The modem's own words when a send failed.",
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "ingested_at": {
+            "description": "When this box first saw it. Never null; the sort key.",
+            "type": "integer"
+          },
+          "peer": {
+            "description": "The other end. NOT always a dialling number: carriers send alerts from alphanumeric short names (`Bouygues`), so this is never validated as E.164 on the way in — only on the way out, where we are the sender.",
+            "type": "string"
+          },
+          "read": {
+            "type": "boolean"
+          },
+          "sent_at": {
+            "description": "The NETWORK's timestamp, epoch seconds. Null when the modem reported none (`mmcli` spells that `--`) or reported something unparseable. A wrong time is worse than none, so listings order by `ingested_at`, which this box can vouch for.",
+            "nullable": true,
+            "type": "integer"
+          },
+          "sent_by": {
+            "description": "The user id that ordered an outbound message — the audit trail, since sending spends the vendor's data plan. Null for inbound.",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "direction",
+          "peer",
+          "body",
+          "sent_at",
+          "ingested_at",
+          "delivery",
+          "read",
+          "sent_by",
+          "error"
+        ],
+        "type": "object"
+      },
+      "ItSmsSendResult": {
+        "properties": {
+          "delivery": {
+            "enum": [
+              "sent"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "description": "The archived row, written before the modem was touched.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "delivery"
+        ],
+        "type": "object"
+      },
+      "ItSmsStatus": {
+        "description": "Whether this box can do SMS at all, plus the unread badge. NULL — not an object with `available: false` — for either of two reasons: the box is not a 5G variant (`status.modem_present` false), or no `mmcli` is configured. The cockpit renders the SMS panel only when this is an object, so a box with no modem does not show a disabled panel, it shows none. Deliberately carries NO storage counts: `mmcli --messaging-status` reports which storages the modem supports (`mt` on the RM520N-GL) and not how full they are, so a used/total pair would have to be invented.",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "unread": {
+            "description": "Inbound messages nobody has opened yet. Counts the ARCHIVE, not the modem — the ingester empties the modem on every sweep, which is what keeps its handful of storage slots from filling and silently dropping the next message.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "available",
+          "unread"
         ],
         "type": "object"
       },
@@ -6089,6 +6218,164 @@
           }
         },
         "summary": "Whether the box has been provisioned",
+        "tags": [
+          "it"
+        ]
+      }
+    },
+    "/api/it/sms": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "before",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItSmsList"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "One page of the SMS archive, newest first",
+        "tags": [
+          "it"
+        ]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "body": {
+                    "description": "1 to 670 characters. The ceiling is ten UCS-2 segments (67 characters each once the concatenation header is subtracted), which is where carriers stop being reliable about reassembly. The text is handed to `mmcli` through a FILE, never interpolated into an option string, so apostrophes, commas and newlines survive.",
+                    "type": "string"
+                  },
+                  "to": {
+                    "description": "Destination in E.164: 6–15 digits, optionally prefixed with `+`. Rejected with a 400 otherwise — unlike an inbound `peer`, which may be an alphanumeric short name.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "to",
+                  "body"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItSmsSendResult"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Send one SMS (rate-limited per operator and per box; the sender is recorded)",
+        "tags": [
+          "it"
+        ]
+      }
+    },
+    "/api/it/sms/{id}": {
+      "delete": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Drop one message from the archive (our copy; the modem's is long gone)",
+        "tags": [
+          "it"
+        ]
+      }
+    },
+    "/api/it/sms/{id}/read": {
+      "post": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Mark one message read",
         "tags": [
           "it"
         ]

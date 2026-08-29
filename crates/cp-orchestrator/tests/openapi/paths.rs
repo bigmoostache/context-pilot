@@ -3,6 +3,7 @@
 use serde_json::{Value, json};
 
 use super::schemas_net::{ap_body, mode_body, wwan_body};
+use super::schemas_sms::send_body;
 use super::{arr, del, err, get, merge, ok, post, r, with_agent};
 
 /// Required query parameter shorthand.
@@ -116,6 +117,19 @@ pub(super) fn paths() -> Value {
         // the vendor's, so the APN is not a per-site setting.
         "/api/it/network/wwan": post("it", "Set the 5G bearer configuration (superadmin \u{2014} vendor-managed)",
             Some(wwan_body()), r("ItNetworkWwanResult")),
+        // ── SMS (can_manage_it; only ever answers on a 5G variant) ──
+        "/api/it/sms": merge(
+            json!({ "get": {
+                "tags": ["it"],
+                "summary": "One page of the SMS archive, newest first",
+                "parameters": [qp_opt("before"), qp_opt("limit")],
+                "responses": merge(ok(r("ItSmsList")), err())
+            }}),
+            post("it", "Send one SMS (rate-limited per operator and per box; the sender is recorded)",
+                Some(send_body()), r("ItSmsSendResult"))
+        ),
+        "/api/it/sms/{id}/read": post("it", "Mark one message read", None, r("OkResponse")),
+        "/api/it/sms/{id}": del("it", "Drop one message from the archive (our copy; the modem's is long gone)"),
         // ── Ticket ──────────────────────────────────────────────────
         "/api/ticket": post("ticket", "Mint SSE upgrade ticket", None, r("TicketResponse")),
         // ── Auth ────────────────────────────────────────────────────

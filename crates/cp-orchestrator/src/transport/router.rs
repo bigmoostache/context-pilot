@@ -116,6 +116,12 @@ pub(super) fn route_rest(method: &Method, segments: &[&str], ctx: RouteCtx<'_>) 
         (&Method::Post, &["api", "it", "network", "ap"]) => rest::it_set_network_ap(state, body_bytes, auth_user),
         (&Method::Post, &["api", "it", "network", "wwan"]) => rest::it_set_network_wwan(state, body_bytes, auth_user),
 
+        // ── SMS on the box's own SIM (can_manage_it; 5G variants only) ──────────
+        (&Method::Get, &["api", "it", "sms"]) => rest::it_list_sms(state, query, auth_user),
+        (&Method::Post, &["api", "it", "sms"]) => rest::it_send_sms(state, body_bytes, auth_user),
+        (&Method::Post, &["api", "it", "sms", id, "read"]) => rest::it_read_sms(state, id, auth_user),
+        (&Method::Delete, &["api", "it", "sms", id]) => rest::it_delete_sms(state, id, auth_user),
+
         (&Method::Get, &["api", "agent", id]) => rest::agent(state, id),
         (&Method::Get, &["api", "agent", id, "meta"]) => inspect::meta::agent(state, id),
         (&Method::Get, &["api", "agent", id, "metrics"]) => inspect::metrics::agent(state, id),

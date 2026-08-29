@@ -48,6 +48,7 @@ pub(crate) use config::it::{it_ca_fingerprint, it_get_identity, it_provisioned, 
 pub(crate) use config::network::{it_get_network, it_set_network_ap, it_set_network_mode, it_set_network_wwan};
 pub(crate) use config::settings::{allowed_models, onboarding_completed};
 pub(crate) use config::settings::{get_settings, update_settings};
+pub(crate) use config::sms::{it_delete_sms, it_list_sms, it_read_sms, it_send_sms};
 pub(crate) use config::update::{APPLY_IN_FLIGHT, update_apply, update_check, update_set_mode, update_status};
 pub(crate) use create::{
     create_agent, create_command, delete_library_agent, read_library_agent, upsert_library_agent,

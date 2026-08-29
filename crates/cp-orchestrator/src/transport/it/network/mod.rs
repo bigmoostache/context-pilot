@@ -26,6 +26,7 @@
 
 pub(crate) mod apply;
 mod profiles;
+pub(crate) mod sms;
 pub(crate) mod state;
 mod status;
 mod uplink;
@@ -277,11 +278,20 @@ pub(crate) fn get_network(state: &Mutex<Backend>, bearer_visible: bool, has_mode
         Err(reply) => return reply,
     };
     let config = state::load(&path);
+    let mut status = status::probe(&config, has_modem);
+    // Folded into the same response rather than given a route of its own: the
+    // cockpit already polls this one every five seconds, and answering "can this
+    // box do SMS" from the SAME hardware probe that gated the 5G modes is what
+    // stops the two halves of the panel from disagreeing.
+    if let Some(fields) = status.as_object_mut() {
+        let dir = path.parent().unwrap_or(&path).to_path_buf();
+        let _previous = fields.insert("sms".to_owned(), sms::status_json(&dir, has_modem));
+    }
     // Two independent reasons to hide the bearer configuration: the caller is
     // not the vendor, or this box is not a 5G variant at all.
     HttpReply::ok(&serde_json::json!({
         "config": config.redacted(bearer_visible && has_modem),
-        "status": status::probe(&config, has_modem),
+        "status": status,
     }))
 }
 

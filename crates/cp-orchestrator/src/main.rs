@@ -117,6 +117,11 @@ fn main() -> ExitCode {
     // token never expires from under the fleet regardless of any open UI.
     let _oauth_sweeper = Runtime::start_oauth_sweeper();
 
+    // Sweep the modem's SMS storage into the local archive. It has to run
+    // whether or not anyone has the cockpit open: the modem holds a few dozen
+    // slots and drops the next message in SILENCE once they are full.
+    let _sms_poller = runtime.start_sms_poller();
+
     // Health-gated commit of a staged update (update-policy §5.5): a committer
     // thread polls our own `/healthz` and, only after a real `200` within the
     // deadline, commits the binary swap and promotes the release state

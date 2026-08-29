@@ -354,9 +354,19 @@ pub(super) fn network() -> Value {
                     "allOf": [r("ItNetworkSupervisor")],
                     "nullable": true,
                     "description": "Null when the failover supervisor is not running or its state file is absent."
+                },
+                // Folded in here rather than given a route of its own: the
+                // cockpit already polls this response every five seconds, and
+                // answering "can this box do SMS" from the SAME `modem_present`
+                // probe that gated the 5G modes is what stops the two halves of
+                // the panel from ever disagreeing.
+                "sms": {
+                    "allOf": [r("ItSmsStatus")],
+                    "nullable": true,
+                    "description": "Null on a box with no 5G module or no `mmcli` \u{2014} the SMS panel is then absent, not disabled."
                 }
             },
-            "required": ["active_uplink", "modem_present", "wan", "wwan", "ap", "supervisor"]
+            "required": ["active_uplink", "modem_present", "wan", "wwan", "ap", "supervisor", "sms"]
         },
         "ItNetworkResponse": {
             "type": "object",
