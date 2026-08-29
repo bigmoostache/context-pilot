@@ -11,7 +11,7 @@ use cp_base::config::llm_types::LlmProvider;
 use cp_base::config::models::{AnthropicModel, ClaudeCodeV2Model, DeepSeekModel, GrokModel, GroqModel, MiniMaxModel};
 use cp_base::state::runtime::State;
 use cp_mod_bridge::BridgeState;
-use cp_mod_spine::types::{NotificationType, SpineState};
+use cp_mod_spine::types::SpineState;
 use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadMessage, ThreadStatus, ThreadsState};
 use cp_wire::types::command::{Command, Kind as CommandKind};
 use cp_wire::types::oplog::OpEntryKind;
@@ -83,26 +83,20 @@ fn apply_send_message(state: &mut State, thread_id: &str, content: &str) {
 
     thread.messages.push(ThreadMessage::user(content.to_owned()));
     thread.status = ThreadStatus::MyTurn;
-    let thread_name = thread.name.clone();
 
     // No instant spine notification for unfocused threads — the idle
     // MY_TURN detection (`check_my_turn_threads`) handles it when the
     // agent finishes, avoiding mid-task distraction.
     //
-    // Exception: if the message lands on the CURRENTLY FOCUSED thread,
-    // fire immediately — the user is actively talking to the agent in the
-    // thread it's working on and expects a quick acknowledgement.
+    // Focused-thread case (T697): the user just messaged the thread the agent is
+    // parked on. Rather than firing a redundant `focused_thread_input`
+    // notification (a "go Read + ack" nudge), **re-arm** the idle auto-read by
+    // clearing the MY_TURN debounce. `check_my_turn_threads` then reads the
+    // focused thread directly the moment the agent is idle (immediately if not
+    // streaming, or as soon as the current stream ends), turning every new
+    // message on the focused thread into exactly one direct auto-read.
     if FocusState::get(state).focused_thread_id.as_deref() == Some(thread_id) {
-        let notif = format!(
-            "The user has just sent a NEW message to your currently focused thread \
-             \"{thread_name}\" ({thread_id}):\n\n\
-             {content}\n\n\
-             Please acknowledge QUICKLY:\n\
-             1. Read(thread_id=\"{thread_id}\") to refresh the conversation\n\
-             2. Send a short acknowledgement (still_my_turn=true)",
-        );
-        let _r =
-            SpineState::create_notification(state, NotificationType::Custom, "focused_thread_input".to_owned(), notif);
+        FocusState::get_mut(state).notified_my_turn_id = None;
     }
 
     for module in crate::modules::all_modules() {
