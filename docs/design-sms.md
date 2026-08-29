@@ -2,6 +2,12 @@
 
 > Branche `feat/sms`, partant de `master` (537a0e3d). Indépendante de
 > `dockerisation`.
+>
+> **État : livré.** L'étape 0 a tranché pour le chemin A, mesuré sur la box
+> (Armbian, `mmcli 1.24.0`, RM520N-GL en MBIM) : `--messaging-status` répond
+> `supported storages: mt` et un aller-retour create → list → read → delete rend
+> accents, emoji et retour ligne intacts. Les écarts entre ce plan et le code
+> livré sont notés en ligne ci-dessous ; **le code fait foi**.
 
 Feature : lire, envoyer et archiver les SMS de la SIM depuis le cockpit.
 **Disponible uniquement sur les Photonicat équipés du module 5G.**
@@ -164,11 +170,19 @@ CREATE TABLE IF NOT EXISTS sms(
 CREATE INDEX IF NOT EXISTS sms_by_time ON sms(ingested_at DESC);
 ```
 
-**`digest UNIQUE` est le cœur du lot**, et c'est repris du vendeur
+**Le digest est le cœur du lot**, et c'est repris du vendeur
 (`pc_sms_client.py`, `hash_digest VARCHAR(256) UNIQUE`). Sans lui, un
 `--messaging-delete` raté après une insertion réussie **duplique le message à
 chaque tour de poll**. `digest = sha256(peer ‖ sent_at ‖ body ‖ direction)` :
 volontairement indépendant de l'index modem, qui est réattribué.
+
+**Correction apportée à l'implémentation** : un `UNIQUE(digest)` simple, comme
+chez le vendeur, échoue dans l'autre sens et plus gravement. Un numéro court
+d'opérateur qui envoie deux fois la même alerte, sans horodatage réseau — cas
+réel — hache pareil : la seconde copie est avalée en silence *et* supprimée du
+modem. L'unicité est donc **partielle**, `WHERE modem_handle IS NOT NULL` : elle
+ne lie que tant que le modem détient encore une copie. Une fois celle-ci
+effacée, un message identique est un nouveau message.
 
 Rétention : purge par âge (`CP_SMS_RETENTION_DAYS`, défaut 90) **et** par volume
 (plafond dur, défaut 5000) à chaque tick. Les SMS sont des données personnelles
@@ -276,8 +290,12 @@ Sémantique RBAC inchangée : `auth_user == None` ⇒ god-mode, passe.
 Statut greffé sur `GET /api/it/network` plutôt qu'une route de plus :
 
 ```json
-"status": { "sms": { "available": true, "unread": 3, "storage_used": 4, "storage_total": 23 } }
+"status": { "sms": { "available": true, "unread": 3 } }
 ```
+
+**Sans compteurs d'occupation** : `mmcli --messaging-status` dit *quels*
+stockages le modem accepte (`mt` ici), pas combien il en reste — mesuré. Un
+couple `used`/`total` aurait dû être inventé, ce qui est pire qu'absent.
 
 `null` quand pas de modem ou pas d'outil — même règle que `wwan`. Une seule
 sonde par requête, une seule réponse : le cockpit ne peut pas afficher deux
@@ -286,8 +304,15 @@ vérités contradictoires.
 **Garde-fous d'envoi** (l'envoi coûte de l'argent sur *votre* forfait — la
 frontière que `can_manage_secrets` protège déjà sur l'APN) :
 
-- validation E.164 stricte sur `to` ; corps ≤ 1530 caractères (10 segments) ;
-- rate-limit par utilisateur et global (défaut 10/h, 50/j) — refus `429` ;
+- validation E.164 stricte sur `to` ; corps ≤ **670 caractères** — dix segments
+  UCS-2 à 67 caractères une fois l'en-tête de concaténation retiré, et non 1530
+  comme écrit ici initialement (le brouillon comptait en GSM-7, ce que le corps
+  n'est pas dès le premier accent) ; compté en **points de code** des deux côtés,
+  un `.length` JavaScript compte en unités UTF-16 et se désaccorderait du
+  `chars().count()` de Rust au premier emoji ;
+- rate-limit par utilisateur et global (défaut 10/h, 50/j) — refus `429`, et
+  qui **échoue fermé** : une erreur de lecture refuse l'envoi plutôt que de
+  compter zéro, sinon le plafond s'ouvre au moment où il devrait tenir ;
 - `sent_by` en base = trace d'audit non optionnelle.
 
 **Contrat.** Toute route doit être ajoutée à `tests/openapi/paths.rs` (+ schémas
@@ -336,9 +361,12 @@ matérielle que `modem.yml`** (`/sys/class/usbmisc/cdc-wdm*`, `/sys/class/net/ww
   --reload-rules && udevadm trigger`, sur le patron déjà présent dans
   `modem.yml`.
 
-`CP_SMS_ENABLED=0` doit désarmer la feature entièrement (poller non démarré,
-routes en `503`) : un interrupteur pour une box où le client ne veut pas de SMS
-stockés.
+`CP_SMS_ENABLED=0` désarme la feature : le thread est bien démarré — il coûte
+un test par tick et reste ainsi commutable à chaud — mais chaque tick sort
+immédiatement, aucun store n'est ouvert, et les routes d'écriture répondent
+`503`. **Ce n'est pas une purge** : un archive déjà sur disque reste. Un
+interrupteur pour une box où le client ne veut pas de SMS stockés, pas pour en
+effacer.
 
 ---
 
