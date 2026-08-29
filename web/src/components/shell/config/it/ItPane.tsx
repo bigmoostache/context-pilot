@@ -236,6 +236,11 @@ function TrustSection() {
  * autofill (B10). The read half of the contract was already honoured — only
  * `••••••••` placeholders derived from the `*_set` booleans ever come back from
  * the server — so this is the client half alone.
+ *
+ * `disabled` is optional and off by default, so every existing call site keeps
+ * an always-live field. `ItSmsPane` is the one caller that passes it: a field
+ * left editable during a send was enough to re-arm the Send button and put a
+ * SECOND real SMS on the vendor's metered plan (review C1).
  */
 export function TextField({
   label,
@@ -246,6 +251,7 @@ export function TextField({
   type = "text",
   autoComplete,
   inputMode,
+  disabled,
 }: {
   label: string
   hint?: string
@@ -255,6 +261,7 @@ export function TextField({
   type?: "text" | "password"
   autoComplete?: string
   inputMode?: "numeric" | "text"
+  disabled?: boolean
 }) {
   return (
     <label className="flex flex-col gap-1">
@@ -269,9 +276,11 @@ export function TextField({
         placeholder={placeholder}
         autoComplete={autoComplete}
         inputMode={inputMode}
+        disabled={disabled}
         className={cn(
           "w-full rounded-md border border-border bg-muted/50 px-2.5 py-1.5 font-mono text-[12px] text-foreground",
           "placeholder:text-muted-foreground/50 focus:ring-1 focus:ring-(--interactive) focus:outline-none",
+          "disabled:opacity-50",
         )}
       />
     </label>

@@ -102,6 +102,21 @@ export interface SmsDraft {
 export const EMPTY_SMS_DRAFT: SmsDraft = { to: "", body: "" }
 
 /**
+ * True while the operator has typed nothing at all.
+ *
+ * {@link sendProblem} answers a pristine draft with its FIRST rule — "number
+ * must be digits" — which is a correct reason not to send and a nonsense thing
+ * to show someone who has just opened the panel and touched nothing (review
+ * C4). The panel therefore keeps the Send button disabled on a pristine draft
+ * (it genuinely cannot be sent) but withholds the *message* until there is
+ * something to be wrong about. Emptying both fields again makes the form
+ * pristine once more, which is the same claim: nothing here is a mistake yet.
+ */
+export function smsDraftPristine(draft: SmsDraft): boolean {
+  return draft.to === "" && draft.body === ""
+}
+
+/**
  * The `POST /api/it/sms` body for a draft.
  *
  * The number is trimmed, the text is not: leading and trailing whitespace in a

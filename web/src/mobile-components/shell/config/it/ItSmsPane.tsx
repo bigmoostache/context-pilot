@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useId, useState } from "react"
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Loader2, Mail, Trash2 } from "lucide-react"
 import type { ItSmsMessage, ItSmsStatus } from "@/lib/api/generated/types.gen"
@@ -23,6 +23,7 @@ import {
   sendProblem,
   smsBody,
   smsBodyLength,
+  smsDraftPristine,
   smsView,
   unreadLabel,
 } from "@/lib/api/it/sms"
@@ -65,13 +66,17 @@ export function ItSmsPane() {
 
   // Nothing at all until the box has SAID it can do SMS. Rendering a frame
   // while the first read is in flight would put an SMS panel in the DOM of a
-  // modem-less box for as long as the request takes, which is exactly what
-  // `e2e/sms.spec.ts` asserts never happens.
+  // modem-less box for as long as the request takes — `e2e/sms.spec.ts` holds
+  // that read open for a second and asserts the panel is absent THROUGHOUT the
+  // window, not merely once it resolves. Nothing runs that suite on a push: it
+  // drives the live stack, and the TS-TESTS CI family is a documented no-op
+  // (`.github/checks/check-ts-tests.sh`). The promise is kept by the line
+  // below; the spec is how a human re-proves it.
   const sms = data?.status.sms ?? null
   if (sms?.available !== true) return null
 
   return (
-    <section className="flex flex-col gap-2">
+    <section data-testid="it-sms" className="flex flex-col gap-2">
       <SectionLabel label="SMS" hint="Messages on this box's SIM" />
       <SmsCard status={sms} />
     </section>
@@ -117,7 +122,14 @@ function Inbox() {
     refetchInterval: SMS_POLL_MS,
   })
 
-  if (list.isError) {
+  // A hard error ONLY when there is nothing else to show — the shape
+  // `ItNetworkPane` already settled on for its own R6. Without the
+  // `data === undefined` half, a single failed 15 s tick (`SQLITE_BUSY` while
+  // the ingester sweeps the same file is real and recurring) unmounted every
+  // row, the "Load older" button and each row's local expanded state, and the
+  // archive came back collapsed a tick later. With messages in hand a failed
+  // poll is a banner over them instead.
+  if (list.isError && list.data === undefined) {
     return (
       <p className="text-[11px] text-(--danger)">
         {apiErrorMessage(list.error, "Could not read this box's messages.")}
@@ -133,12 +145,19 @@ function Inbox() {
   }
 
   const messages = flattenSmsPages(list.data.pages)
-  if (messages.length === 0) {
-    return <p className="text-[11px] text-muted-foreground">No messages on this SIM yet.</p>
-  }
+  // Failing while a previous read still stands: say so quietly, keep the rows.
+  const stale = list.isError ? apiErrorMessage(list.error, "unreachable") : null
 
   return (
     <div className="flex flex-col gap-1.5">
+      {stale !== null && (
+        <p className="rounded-md border border-(--danger)/40 bg-(--danger)/10 px-2.5 py-1.5 text-[11px] text-(--danger)">
+          Showing the last reading — the box stopped answering ({stale}).
+        </p>
+      )}
+      {messages.length === 0 && (
+        <p className="text-[11px] text-muted-foreground">No messages on this SIM yet.</p>
+      )}
       {messages.map((message) => (
         <MessageRow key={message.id} message={message} />
       ))}
@@ -192,7 +211,14 @@ function MessageRow({ message }: { message: ItSmsMessage }) {
   const drop = useMutation({ mutationFn: () => deleteItSms(message.id), onSuccess: invalidate })
 
   const toggle = () => {
-    if (!open && view.unread) read.mutate()
+    // One POST per row, ever. `view.unread` stays true until BOTH invalidations
+    // round-trip, so collapsing and re-opening inside that window used to fire a
+    // second `POST /api/it/sms/{id}/read` — which the server answers 404: its
+    // `UPDATE … WHERE read_at IS NULL` then matches no row and `with_id` maps
+    // `Ok(false)` to a 404. The mutation's own state is that window's memory. A
+    // FAILED mark stays retryable on the next open: only success and in-flight
+    // hold the call back.
+    if (!open && view.unread && !read.isPending && !read.isSuccess) read.mutate()
     setOpen((previous) => !previous)
   }
 
@@ -214,7 +240,16 @@ function MessageRow({ message }: { message: ItSmsMessage }) {
             {view.inbound ? "From" : "To"}
           </span>
           <span className="font-mono text-[12px] text-foreground/90">{view.peer}</span>
-          {view.unread && <span className="size-1.5 rounded-full bg-(--interactive)" />}
+          {view.unread && (
+            <>
+              {/* The dot carries no text, and the only other cue is a font
+                  weight — so the badge could announce "3 unread" while a screen
+                  reader could not tell WHICH three (review C5a). `sr-only` is
+                  this codebase's convention for the words behind a graphic. */}
+              <span className="size-1.5 rounded-full bg-(--interactive)" aria-hidden="true" />
+              <span className="sr-only">Unread</span>
+            </>
+          )}
           <span className="ml-auto text-[11px] text-muted-foreground/70" title={view.exact}>
             {view.when}
           </span>
@@ -257,6 +292,14 @@ function MessageRow({ message }: { message: ItSmsMessage }) {
           {apiErrorMessage(drop.error, "Could not remove this message")}
         </span>
       )}
+      {/* A mark-read that fails (403 once the session has expired, 500 on a
+          locked DB) used to say nothing at all, leaving the badge counting a
+          message the operator has plainly read and no clue why (review C6). */}
+      {read.isError && (
+        <span className="text-[11px] text-(--danger)">
+          {apiErrorMessage(read.error, "Could not mark this message read")}
+        </span>
+      )}
     </div>
   )
 }
@@ -277,6 +320,9 @@ function MessageRow({ message }: { message: ItSmsMessage }) {
 function ComposeForm() {
   const qc = useQueryClient()
   const [draft, setDraft] = useState<SmsDraft>(EMPTY_SMS_DRAFT)
+  // The textarea's own id, so a label can name it without swallowing the live
+  // counter that sits beside it (C5b, below).
+  const bodyId = useId()
 
   const send = useMutation({
     mutationFn: () => sendItSms(smsBody(draft)),
@@ -290,15 +336,29 @@ function ComposeForm() {
   })
 
   /** Edit one field, clearing the send banner on the first keystroke so a stale
-   *  "Sent" never sits under a form that no longer matches it. */
+   *  "Sent" never sits under a form that no longer matches it — but NEVER while
+   *  a send is in flight. `reset()` detaches the mutation's observer, so
+   *  `isPending` snapped to false, the Send button re-enabled, and a second
+   *  click put a SECOND real SMS on the vendor's metered plan and burnt a second
+   *  slot of the 10/hour ceiling — while the first send's `onSuccess` still ran
+   *  on the detached mutation, so even a single-click operator was never told it
+   *  had landed (review C1). One keystroke in the recipient field was the whole
+   *  trigger; that field is now disabled during a send too, so this guard is the
+   *  belt to that brace rather than the only defence. */
   const edit =
     <K extends keyof SmsDraft>(field: K) =>
     (value: SmsDraft[K]) => {
-      send.reset()
+      if (!send.isPending) send.reset()
       setDraft((previous) => ({ ...previous, [field]: value }))
     }
 
   const problem = sendProblem(draft)
+  // A pristine form is not a mistake. `sendProblem` answers an empty draft with
+  // its first rule, so every operator who merely OPENED the panel was told
+  // "number must be digits" before touching anything (review C4). The button
+  // stays disabled either way — an empty draft genuinely cannot be sent — only
+  // the words wait for something to be wrong about.
+  const pristine = smsDraftPristine(draft)
   const used = smsBodyLength(draft.body)
 
   return (
@@ -306,6 +366,7 @@ function ComposeForm() {
       className="flex flex-col gap-2.5 border-t border-border pt-3"
       onSubmit={(event) => {
         event.preventDefault()
+        // `isPending` is now trustworthy here: nothing resets a live send.
         if (problem === null && !send.isPending) send.mutate()
       }}
     >
@@ -316,10 +377,16 @@ function ComposeForm() {
         onChange={edit("to")}
         placeholder="+33612345678"
         inputMode="numeric"
+        disabled={send.isPending}
       />
-      <label className="flex flex-col gap-1">
+      {/* Deliberately NOT a wrapping <label>: the counter inside one becomes
+          part of the textarea's accessible name ("Message 12 / 670") and is
+          re-announced on every keystroke (review C5b). `htmlFor` names the field
+          with the word "Message" alone and leaves the counter beside it,
+          unmoved on screen. */}
+      <div className="flex flex-col gap-1">
         <span className="flex items-baseline gap-2 text-[12px] font-medium text-foreground/90">
-          Message
+          <label htmlFor={bodyId}>Message</label>
           <span
             className={cn(
               "text-[11px] font-normal text-muted-foreground/60",
@@ -330,6 +397,7 @@ function ComposeForm() {
           </span>
         </span>
         <textarea
+          id={bodyId}
           value={draft.body}
           onChange={(event) => edit("body")(event.target.value)}
           disabled={send.isPending}
@@ -337,7 +405,7 @@ function ComposeForm() {
           placeholder="Type your message"
           className="w-full resize-y rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-[12px] text-foreground placeholder:text-muted-foreground/50 focus:ring-1 focus:ring-(--interactive) focus:outline-none disabled:opacity-50"
         />
-      </label>
+      </div>
 
       <div className="flex items-center gap-2">
         <button
@@ -348,7 +416,9 @@ function ComposeForm() {
           {send.isPending && <Loader2 className="size-3.5 animate-spin" />}
           Send
         </button>
-        {problem !== null && <span className="text-[11px] text-muted-foreground">{problem}</span>}
+        {problem !== null && !pristine && (
+          <span className="text-[11px] text-muted-foreground">{problem}</span>
+        )}
         {send.isSuccess && <span className="text-[11px] text-(--ok)">Sent</span>}
         {send.isError && (
           <span className="text-[11px] text-(--danger)">
