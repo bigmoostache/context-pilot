@@ -217,8 +217,12 @@ const FIVE_GHZ_CHANNELS = new Set([
  *  other side of the wire. `String.length` counts UTF-16 code units, so it and
  *  the server would disagree on any astral character — rare in a passphrase or
  *  an APN, and precisely the kind of disagreement that produces an unexplained
- *  rejection. `/./gsu` is one match per code point, `s` so a newline counts. */
-function codePointCount(text: string): number {
+ *  rejection. `/./gsu` is one match per code point, `s` so a newline counts.
+ *
+ *  Exported for `./sms.ts`, which counts a message body against the same Rust
+ *  rule and where the astral character is an emoji rather than a rarity. One
+ *  copy, because two would drift and the drift would be invisible. */
+export function codePointCount(text: string): number {
   return text.match(/./gsu)?.length ?? 0
 }
 

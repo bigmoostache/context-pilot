@@ -27,8 +27,11 @@ import type {
  * barrel module itself, and this file lives in a directory the barrel
  * re-exports, so importing it would close a cycle. Takes unix **seconds** —
  * what the supervisor writes — rather than `formatAge`'s epoch milliseconds.
+ *
+ * Exported for `./sms.ts`, whose archive rows carry the same unix-seconds
+ * timestamps and must read the same way; a second copy would drift.
  */
-function agoLabel(unixSeconds: number): string {
+export function agoLabel(unixSeconds: number): string {
   const minutes = Math.floor((Date.now() / 1000 - unixSeconds) / 60)
   if (minutes < 1) return "just now"
   if (minutes < 60) return `${minutes}m ago`

@@ -6,6 +6,7 @@ import { UsagePage } from "@/mobile-components/agents/UsagePage"
 import { UpdatePane } from "./UpdatePane"
 import { SecretsPane } from "./SecretsPane"
 import { ItNetworkPane } from "./it/ItNetworkPane"
+import { ItSmsPane } from "./it/ItSmsPane"
 import { ItPane } from "./it/ItPane"
 import { useProviders } from "@/lib/support/models"
 import { fetchSettings, updateSettings, fetchEnvKeys } from "@/lib/api"
@@ -42,14 +43,21 @@ export function CategoryBody({ cat }: { cat: CatId }) {
       return <SecretsPane />
     }
     case "it": {
-      // Two panes, one category. ItPane owns identity + TLS trust and
-      // ItNetworkPane owns the uplink + Wi-Fi; mounting them as siblings HERE
-      // rather than nesting one inside the other is what keeps them free of a
-      // module cycle, so ItNetworkPane can share ItPane's field primitives.
+      // Three panes, one category. ItPane owns identity + TLS trust,
+      // ItNetworkPane owns the uplink + Wi-Fi and ItSmsPane owns the SIM's
+      // messages; mounting them as siblings HERE rather than nesting them is
+      // what keeps them free of a module cycle, so both of the others can share
+      // ItPane's field primitives.
+      //
+      // ItSmsPane is mounted unconditionally and gates ITSELF on `status.sms`,
+      // which it reads from the same polled `GET /api/it/network` the uplink
+      // pane already runs. A box with no 5G module or no `mmcli` renders no SMS
+      // panel at all — absent, not disabled.
       return (
         <div className="flex flex-col gap-6">
           <ItPane />
           <ItNetworkPane />
+          <ItSmsPane />
         </div>
       )
     }

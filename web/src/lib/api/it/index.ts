@@ -14,9 +14,13 @@ import type {
   ItNetworkApResult,
   ItNetworkModeResult,
   ItNetworkWwanResult,
+  ItSmsList,
+  ItSmsSendResult,
+  OkResponse,
   PostApiItNetworkApData,
   PostApiItNetworkModeData,
   PostApiItNetworkWwanData,
+  PostApiItSmsData,
 } from "../generated/types.gen"
 import {
   getApiItCaFingerprint,
@@ -27,6 +31,10 @@ import {
   postApiItNetworkAp,
   postApiItNetworkMode,
   postApiItNetworkWwan,
+  getApiItSms,
+  postApiItSms,
+  postApiItSmsByIdRead,
+  deleteApiItSmsById,
 } from "../generated"
 import { sdk, getToken, BASE } from "../client"
 
@@ -38,6 +46,7 @@ import { sdk, getToken, BASE } from "../client"
 type ItNetworkModeBody = PostApiItNetworkModeData["body"]
 type ItNetworkApBody = PostApiItNetworkApData["body"]
 type ItNetworkWwanBody = PostApiItNetworkWwanData["body"]
+type ItSmsSendBody = PostApiItSmsData["body"]
 
 // ── Endpoints (SDK) ──────────────────────────────────────────────────
 
@@ -103,6 +112,52 @@ export function setItNetworkAp(body: ItNetworkApBody): Promise<ItNetworkApResult
  *  semantics as the AP passphrase. */
 export function setItNetworkWwan(body: ItNetworkWwanBody): Promise<ItNetworkWwanResult> {
   return sdk(postApiItNetworkWwan({ body }))
+}
+
+// ── SMS on the box's own SIM ─────────────────────────────────────────
+//
+// Only ever reachable on a 5G variant: `GET /api/it/network` reports
+// `status.sms: null` on a box with no modem or no `mmcli`, and the panel is
+// then absent rather than disabled. These four wrappers do not re-probe that —
+// one probe per request, one answer, so the cockpit cannot show two
+// contradictory truths.
+
+/** One page of the archive, newest first. `before` is the previous page's last
+ *  id (the route filters `id < before`); null asks for the first page. The
+ *  server clamps `limit` to 200, so an over-large ask is answered, not
+ *  refused. */
+export function fetchItSms(before: number | null, limit: number): Promise<ItSmsList> {
+  return sdk(
+    getApiItSms({
+      query: { ...(before !== null && { before: String(before) }), limit: String(limit) },
+    }),
+  )
+}
+
+/** Send one message. Sending spends the vendor's data plan, so this is the one
+ *  IT route with a rate limit of its own: a `429` carries the ceiling that was
+ *  hit and a `502` carries the modem's own refusal. Both are worth printing
+ *  verbatim — `apiErrorMessage` already unwraps the `{ error }` envelope they
+ *  arrive in. The archive row is written BEFORE the modem is touched, so
+ *  even a send that dies mid-flight leaves a record of what was attempted and
+ *  by whom. */
+export function sendItSms(body: ItSmsSendBody): Promise<ItSmsSendResult> {
+  return sdk(postApiItSms({ body }))
+}
+
+/** Mark one inbound message read — what moves the `status.sms.unread` badge.
+ *  `404` when the id is not in the archive (retention swept it, or another
+ *  session deleted it). */
+export function markItSmsRead(id: number): Promise<OkResponse> {
+  return sdk(postApiItSmsByIdRead({ path: { id } }))
+}
+
+/** Remove one message from the listing. A SOFT delete: the row stops being
+ *  listed but is retained server-side, because the send-rate audit is counted
+ *  over it and an operator must not be able to clear their own trail by
+ *  tidying. So the cockpit says "removed from the list", never "erased". */
+export function deleteItSms(id: number): Promise<OkResponse> {
+  return sdk(deleteApiItSmsById({ path: { id } }))
 }
 
 // ── CA-root download (irreducible binary blob) ───────────────────────
