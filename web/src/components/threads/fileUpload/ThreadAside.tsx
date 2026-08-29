@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { FileIcon } from "@/components/finder/support/macIcons"
 import { kindOf } from "@/components/finder/support/kind"
 import { FinderPreview } from "@/components/finder/preview/FinderPreview"
+import { HintBadge } from "@/components/shell/chrome/HintBadge"
 import { downloadFile } from "@/lib/api"
 import { uploadToNode, type UploadedFile } from "./helpers"
 import type { ThreadFile } from "./FileSidebar"
@@ -45,6 +46,7 @@ export function ThreadAside({
   selectedFile,
   onSelectFile,
   leftRailHidden,
+  hintShown = false,
   onHide,
 }: {
   files: ThreadFile[]
@@ -58,6 +60,9 @@ export function ThreadAside({
    *  previewing, the aside widens to half the viewport (50vw) instead of 40vw,
    *  claiming the space the collapsed left rail freed up (T680). */
   leftRailHidden: boolean
+  /** Whether ⌘/Ctrl is currently held (T688) — reveals the "H" hint badge on the
+   *  tab bar's hide button, mirroring the header rail's shortcut affordance. */
+  hintShown?: boolean
   /** Hide the whole rail for this thread (T677) — the tab bar's right-aligned
    *  hide button. Re-showing is driven by the parent's floating reopen button. */
   onHide: () => void
@@ -110,6 +115,7 @@ export function ThreadAside({
             file={selectedFile}
             onBack={() => onSelectFile(null)}
             onHide={onHide}
+            hintShown={hintShown}
           />
 
           {/* Tasks tab */}
@@ -157,6 +163,7 @@ function AsideTabBar({
   file,
   onBack,
   onHide,
+  hintShown,
 }: {
   hasTasks: boolean
   hasFiles: boolean
@@ -165,18 +172,24 @@ function AsideTabBar({
   file: UploadedFile | null
   onBack: () => void
   onHide: () => void
+  hintShown: boolean
 }) {
   return (
     <div className="flex items-center gap-1.5 border-b border-border/60">
-      <TabsList variant="line" className="h-8 gap-0.5">
+      {/* p-0 kills the TabsList primitive's base p-[3px]; border-0 kills each
+          trigger's 1px transparent border. Both are removed so the FIRST tab's
+          icon starts at exactly the trigger's px-2 (8px) inset — the SAME 8px a
+          depth-0 task row's status icon sits at — so the tab strip and the task
+          list share one icon column (T685 alignment). */}
+      <TabsList variant="line" className="h-8 gap-0.5 p-0">
         {hasTasks && (
-          <TabsTrigger value="tasks" className="px-2 text-[13.5px]">
+          <TabsTrigger value="tasks" className="border-0 px-2 text-[13.5px]">
             <ListChecks className="size-3.5" />
             Tasks
           </TabsTrigger>
         )}
         {hasFiles && (
-          <TabsTrigger value="files" className="px-2 text-[13.5px]">
+          <TabsTrigger value="files" className="border-0 px-2 text-[13.5px]">
             <Paperclip className="size-3.5" />
             Files
           </TabsTrigger>
@@ -211,9 +224,10 @@ function AsideTabBar({
           onClick={onHide}
           aria-label="Hide details rail"
           title="Hide"
-          className="inline-flex items-center px-1 text-foreground/60 transition-colors hover:text-foreground"
+          className="relative inline-flex items-center px-1 text-foreground/60 transition-colors hover:text-foreground"
         >
           <PanelRightClose className="size-3.5" />
+          <HintBadge label="H" shown={hintShown} />
         </button>
       </div>
     </div>

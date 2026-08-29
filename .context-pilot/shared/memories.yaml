@@ -75,28 +75,6 @@ M-long-7:
   title: NEVER touch temp_1.md or
   importance: critical
   last_edited_ms: 1787840930958
-M-long-8:
-  tier: long
-  title: I run on Mac Mini
-  contents: |-
-    I run on Mac Mini (Guillaume-2.local, user guillaumedraznieks, realm ~/code/cpilot), NOT the MacBook. Local shell/git run here. Git identity CORRECTED T584: now Sui-ne-laxim <250819889+Sui-ne-laxim@users.noreply.github.com> (was wrong plang). Full details in body.
-
-    HUGE context change (2026-07-17): agent runtime host moved from guillaume's MacBook to the Mac Mini.
-
-    GIT IDENTITY (corrected T584 2026-07-19): global ~/.gitconfig was set to a DIFFERENT person — PLang <323260+plang@users.noreply.github.com> (github user 'plang'). Now corrected to the user's real account: user.name=Sui-ne-laxim, user.email=250819889+Sui-ne-laxim@users.noreply.github.com (github id 250819889). All prior mis-attributed commits on PR#152 were re-authored + force-pushed.
-
-    MACHINE I RUN ON NOW:
-    - host: Guillaume-2.local (tailscale HostName 'Guillaume')
-    - user guillaumedraznieks, home /Users/guillaumedraznieks, realm ~/code/cpilot
-    - Macmini9,1 = Mac Mini (M1, 2020), Apple M1 8-core arm64, 16GB RAM, macOS 26.3, ~258Gi free
-
-    TAILSCALE (this node):
-    - MagicDNS guillaume.barking-hue.ts.net, IP 100.71.221.58 / fd7a:115c:a1e0::2636:dd3b
-    - tailnet barking-hue.ts.net, account g.draznieks@
-    - serve https://guillaume.barking-hue.ts.net -> proxies / to VITE DEV (http://localhost:5174) as of T579. Let's Encrypt (YE1), exp Oct 15 2026
-    - /us
-  importance: critical
-  last_edited_ms: 0
 M-long-9:
   tier: long
   title: MULTI-WORKER (subworkers
@@ -511,10 +489,10 @@ M-short-4:
   last_edited_ms: 0
 M-short-40:
   tier: short
-  title: todo-v2 FE wiring shipped
-  contents: 'todo-v2 FE wiring SHIPPED commit 6aa70ae1 (todo-v2; backend=3ce87b37). Read-only todos aside beside Attachments, delta-live. Chain: WireTask+TaskListChanged->oplog fold->emit_task_lists->MaterializedView reshape/attach_disk_tasks->openapi/TS->reducers foldTaskList->TodoSidebar(desktop-only). build/fmt/openapi/TS-lint green. NOT pushed. clippy --all-targets red=pre-existing orch debt.'
-  importance: medium
-  last_edited_ms: 1787859203626
+  title: T686b id-as-key Todo
+  contents: 'T686b SHIPPED (todo-v3-yaml-diffs): Todo canonical YAML 1st line = ''- {id}: {status}'' (id=mapping KEY, val=status); title/desc/children siblings. Flip = tiny inline diff {prev:''X41: in_progress'',new:''X41: done''}. yaml.rs manual serde_yaml::Value parser (dropped serde derive). Create=omit id line, 1st key title:. core.yaml desc: id-anchored inline edits + stale-panel warn. Builds on T686 tree.'
+  importance: high
+  last_edited_ms: 1787949116200
 M-short-5:
   tier: short
   title: 'Datalab OCR API: POST'
@@ -532,10 +510,10 @@ M-short-6:
   last_edited_ms: 0
 M-short-7:
   tier: short
-  title: T581 footer + editor
-  contents: 'T581 SHIPPED: StatusBar footer behaviour-selector shows+switches active agent (LoadBehaviour command, reused threads/commands sync path — no dup); per-item Delete/Export/Edit + Create/Import via orchestrator library CRUD (GET/PUT/DELETE library/agent/{id}) + AgentEditorDialog. Live-invalidation via OpEntryKind.agent_id.'
-  importance: medium
-  last_edited_ms: 1787840930960
+  title: T692 auto-read fix
+  contents: 'T692 (todo-v3-yaml-diffs, check_my_turn_threads @ src/app/run/threads/mod.rs): Send(still_my_turn=false) pins focus (T683) so focus ~never None -> old `focus.is_none()` auto-read gate was DEAD. FIX: auto-read fires when FREE = unfocused OR focused thread not itself MY_TURN. Passive notif only when focused on a DIFFERENT MY_TURN thread.'
+  importance: high
+  last_edited_ms: 1787951012233
 M-short-8:
   tier: short
   title: 'OPERATING MODEL: harbor'
@@ -592,10 +570,10 @@ M-tiny-14:
   last_edited_ms: 1787840930941
 M-tiny-15:
   tier: tiny
-  title: Active branch = nornor
-  contents: 'ACTIVE WORKING BRANCH = ''nornor'' (T735 mandate). All changes push to nornor unless user says otherwise. (Exception T650: user chose t648.)'
+  title: Active branch
+  contents: 'ACTIVE WORKING BRANCH = ''todo-v3-yaml-diffs'' (off fresh master, T682 Todo YAML-diff redesign). Previous todo-v2 PR #188 MERGED to master. Push here + open new PR unless told otherwise.'
   importance: critical
-  last_edited_ms: 1787840930943
+  last_edited_ms: 1787935261012
 M-tiny-16:
   tier: tiny
   title: Freeze RESOLVED at infra

@@ -1,5 +1,5 @@
 import { useMemo, useState, type KeyboardEvent } from "react"
-import { Circle, CircleDot, CheckCircle2, ChevronRight } from "lucide-react"
+import { Square, SquareDot, SquareCheckBig, ChevronRight } from "lucide-react"
 import type { ThreadTask } from "@/lib/types"
 
 /**
@@ -140,12 +140,12 @@ function TaskRow({
 /** The lucide status glyph for a task, colour-keyed to the app palette. */
 function StatusIcon({ status }: { status: ThreadTask["status"] }) {
   if (status === "done") {
-    return <CheckCircle2 className="size-3 shrink-0 text-(--ok)" />
+    return <SquareCheckBig className="size-3 shrink-0 text-(--ok)" />
   }
   if (status === "in_progress") {
-    return <CircleDot className="size-3 shrink-0 text-(--signal)" />
+    return <SquareDot className="size-3 shrink-0 text-(--signal)" />
   }
-  return <Circle className="size-3 shrink-0 text-muted-foreground/45" />
+  return <Square className="size-3 shrink-0 text-muted-foreground/45" />
 }
 
 const ROOT_KEY = "\u{0}root"

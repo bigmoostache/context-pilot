@@ -366,8 +366,9 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
     super::checks::maybe_hygiene_nudge(app);
     // Promote any planned task declared via `task_id` on an opted-in tool to
     // in_progress (done/cancelled left be — pre-flight warned; the live delta
-    // rides the emit_task_lists chokepoint).
-    super::checks::promote_declared_tasks(app, &tools);
+    // rides the emit_task_lists chokepoint). On a real flip, the thread's task
+    // tree is appended to that tool's result (T686).
+    super::checks::promote_declared_tasks(app, &tools, &mut tool_results);
 
     // Check if any tool triggered a console blocking wait
     let has_console_wait = tool_results.iter().any(|r| r.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL));

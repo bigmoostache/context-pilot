@@ -132,6 +132,47 @@ export function previewOf(t: ThreadDetail): string {
   return last.tool ? `⛭ ${last.tool.name}` : ""
 }
 
+/**
+ * Task-progress summary for a thread's list row (T687) — the second line's
+ * segmented progress bar + label, or `null` when the thread has NO tasks (the
+ * caller then falls back to the {@link previewOf} message snippet).
+ *
+ * Carries the three status COUNTS so the bar can draw three segments — green
+ * `done`, orange `inProgress`, gray `planned` — over `total` (all tasks). A
+ * thread with only planned tasks reads an empty (all-gray) bar; one whose work
+ * is all finished reads full green. `label` is the current front: the last
+ * in-progress task's title, else `"Done"` when every task is done, else the
+ * next planned task's title.
+ */
+export interface ThreadProgress {
+  /** finished-task count (the green segment). */
+  done: number
+  /** in-progress-task count (the orange segment). */
+  inProgress: number
+  /** planned-task count (the gray remainder). */
+  planned: number
+  /** all tasks — `done + inProgress + planned` (the bar's denominator). */
+  total: number
+  /** last in-progress title, else `"Done"`, else the next planned title. */
+  label: string
+}
+
+/** Compute a thread row's {@link ThreadProgress}, or `null` when it has no tasks. */
+export function threadProgress(t: ThreadDetail): ThreadProgress | null {
+  const tasks = t.tasks ?? []
+  if (tasks.length === 0) return null
+  const inProgressTasks = tasks.filter((x) => x.status === "in_progress")
+  const done = tasks.filter((x) => x.status === "done").length
+  const planned = tasks.filter((x) => x.status === "planned").length
+  const inProgress = inProgressTasks.length
+  const total = tasks.length
+  const allDone = done === total
+  const label =
+    inProgressTasks.at(-1)?.name ??
+    (allDone ? "Done" : (tasks.find((x) => x.status === "planned")?.name ?? "Done"))
+  return { done, inProgress, planned, total, label }
+}
+
 /** A persisted composer draft: the unsent text plus the caret/selection range
  *  to restore (T304). Stored as JSON under the composer's `draftKey`. */
 export interface Draft {

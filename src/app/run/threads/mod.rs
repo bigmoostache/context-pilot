@@ -171,23 +171,52 @@ pub(super) fn inject_tool_call(app: &mut App, tool: ToolUse) {
     app.pending_done = Some(synthetic_done);
 }
 
-/// Notify when idle and a thread has `MY_TURN` status.
+/// Handle an idle thread that has `MY_TURN` status (T692).
 ///
-/// Debounced via `FocusState::notified_my_turn_id` — fires once per
-/// thread transition to `MY_TURN`, cleared when the AI sends a reply
-/// (which sets `THEIR_TURN`).
+/// The response is **momentum-first**: when the agent is **free** — unfocused,
+/// or focused on a thread that is itself parked (`THEIR_TURN`, e.g. one just
+/// handed back via `Send(still_my_turn=false)`, which pins focus on it per T683)
+/// — this directly auto-injects the `Read` on a waiting `MY_TURN` thread (the
+/// natural next tool call) and creates **no** spine notification. The
+/// notification is a **passive** fallback, created only when the agent is
+/// genuinely mid-work — i.e. focused on a *different* thread that is itself
+/// `MY_TURN`.
+///
+/// Previously the auto-Read only happened as a side-effect of the
+/// notification→auto-continuation chain in [`check_spine`](crate::app::run) via
+/// [`maybe_inject_auto_read`]; making the `MY_TURN` detector drive it directly
+/// removes that fragile coupling and lets the notification be skipped entirely.
+///
+/// Debounced via `FocusState::notified_my_turn_id` — fires once per thread
+/// transition to `MY_TURN`, cleared when the AI replies (thread → `THEIR_TURN`).
 pub(super) fn check_my_turn_threads(app: &mut App) {
     if app.state.flags.stream.phase.is_streaming() {
         return;
     }
 
     let threads = ThreadsState::get(&app.state);
-    // Archived threads are invisible to the LLM (T9) — they never nudge.
-    // Paused threads suppress MY_TURN notifications (T371).
-    let my_turn = threads.threads.iter().find(|t| !t.archived && !t.paused && t.status == ThreadStatus::MyTurn);
+    let focus = FocusState::get(&app.state).focused_thread_id.clone();
 
-    let Some(thread) = my_turn else {
-        // No MY_TURN threads — clear debounce.
+    // Am I actively working a demanding thread right now? "Demanding" = the
+    // thread I'm focused on is ITSELF MY_TURN (it still needs my response). Being
+    // focused on a THEIR_TURN thread (one I just handed back via
+    // `Send(still_my_turn=false)`, which pins focus on it per T683) is NOT active
+    // work — I'm parked waiting on the user, so I'm free to pick up another
+    // waiting thread. This is the crux of the fix: post-T683 focus is (almost)
+    // never `None`, so gating auto-read on `focus.is_none()` made it dead code.
+    // Archived/paused threads are LLM-invisible (T9/T371) and never count.
+    let focused_is_my_turn = focus.as_deref().is_some_and(|f| {
+        threads.threads.iter().any(|t| t.id == f && !t.archived && !t.paused && t.status == ThreadStatus::MyTurn)
+    });
+
+    // The waiting thread: the first eligible MY_TURN thread that is NOT the one
+    // I'm already focused on (so I never "auto-read" my own active thread).
+    let waiting = threads.threads.iter().find(|t| {
+        !t.archived && !t.paused && t.status == ThreadStatus::MyTurn && Some(t.id.as_str()) != focus.as_deref()
+    });
+
+    let Some(thread) = waiting else {
+        // No OTHER MY_TURN thread — clear debounce.
         FocusState::get_mut(&mut app.state).notified_my_turn_id = None;
         return;
     };
@@ -195,27 +224,72 @@ pub(super) fn check_my_turn_threads(app: &mut App) {
     let tid = thread.id.clone();
     let tname = thread.name.clone();
 
-    // Debounce: already notified about this exact thread.
-    // Re-fire only when the previous notification was consumed (processed)
-    // but the AI still hasn't addressed the thread — creating a persistent
-    // nudge loop until the thread is actually handled.
-    if FocusState::get(&app.state).notified_my_turn_id.as_deref() == Some(&tid) {
-        let has_unprocessed =
-            SpineState::get(&app.state).notifications.iter().any(|n| !n.is_processed() && n.source == "my_turn_thread");
-        if has_unprocessed {
-            return; // Previous nudge still pending — don't spam
-        }
-        // Previous nudge consumed but thread still MY_TURN — clear debounce to re-fire
+    // Free (unfocused OR focused thread is parked/THEIR_TURN) → auto-Read the
+    // waiting thread directly, no notification. The debounce is deliberately NOT
+    // read as a guard here: the auto-read path is guarded against re-entry by the
+    // `is_streaming` check at the top (it begins streaming) and by the injected
+    // Read focusing the thread, so a stale/persisted `notified_my_turn_id`
+    // (e.g. carried across a reload) must never suppress it.
+    if !focused_is_my_turn {
+        FocusState::get_mut(&mut app.state).notified_my_turn_id = Some(tid.clone());
+        inject_direct_auto_read(app, &tid, &tname);
+        return;
     }
 
+    // Focused on a DIFFERENT thread that is ITSELF MY_TURN (genuinely mid-work)
+    // → we can't hijack focus, so leave a PASSIVE
+    // nudge instead of an active trigger. The `my_turn_thread` notification is
+    // created **already-processed** so the spine never auto-continues on it —
+    // an active one would interrupt the focused work with a "go read T…" nudge,
+    // the exact mid-task distraction the design avoids (see `apply_send_message`).
+    // It stays visible in the Spine panel/history for the human; the thread is
+    // actually read by the direct auto-read the instant the agent becomes
+    // idle+unfocused. Debounced purely on `notified_my_turn_id` so it's posted
+    // once per transition (the presence of a now-passive notification can no
+    // longer be used as the debounce signal).
+    if FocusState::get(&app.state).notified_my_turn_id.as_deref() == Some(tid.as_str()) {
+        return;
+    }
     FocusState::get_mut(&mut app.state).notified_my_turn_id = Some(tid.clone());
 
     let content = format!(
-        "Thread \"{tname}\" ({tid}) is MY_TURN — it has user input awaiting your response.\n\
-         Use Read(thread_id=\"{tid}\") to see the conversation and respond.",
+        "Thread \"{tname}\" ({tid}) is MY_TURN — it has user input awaiting your response. \
+         It will be auto-read the moment you're free; no action needed now.",
     );
-    let _r =
+    let nid =
         SpineState::create_notification(&mut app.state, NotificationType::Custom, "my_turn_thread".to_owned(), content);
+    // Passive: mark processed immediately so it never triggers auto-continuation.
+    let _found = SpineState::mark_notification_processed(&mut app.state, &nid);
+}
+
+/// Directly drive an auto-Read on `tid` from the idle `MY_TURN` detector (T692).
+///
+/// Mirrors [`apply_continuation`](cp_mod_spine::engine)'s `SyntheticMessage`
+/// sequence so the injected `Read` attaches to a valid user→assistant turn: a
+/// short synthetic user anchor, an empty assistant streaming target, then
+/// `begin_streaming`. The `Read` is then handed to the **normal** tool pipeline
+/// via [`inject_tool_call`] — pre-flight, execution, tempo break, message
+/// pairing and the follow-up `continue_streaming` all run exactly as for an
+/// LLM-emitted Read. No spine notification is created: the tool call IS the
+/// response. Begin-streaming-then-inject with no real LLM stream is the same
+/// proven shape [`maybe_inject_auto_read`] rides on the continuation path.
+fn inject_direct_auto_read(app: &mut App, tid: &str, tname: &str) {
+    let anchor = format!("/* auto-read */ Thread \"{tname}\" ({tid}) is now MY_TURN — reading it to respond.");
+    let _idx = app.state.push_user_message(anchor);
+    let _ai = app.state.push_empty_assistant();
+    app.state.begin_streaming();
+
+    let tool_use = ToolUse::new(
+        format!("auto_read_{tid}"),
+        "Read".into(),
+        serde_json::json!({
+            "thread_id": tid,
+            "intent": "Focus on thread",
+            "verb": "Reading",
+        }),
+    );
+    inject_tool_call(app, tool_use);
+    app.state.flags.ui.dirty = true;
 }
 
 /// Extract thread IDs from notification content embedded in a synthetic message.

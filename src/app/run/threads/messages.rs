@@ -168,13 +168,18 @@ const fn wire_task_status(status: TodoStatus) -> Option<WireTaskStatus> {
 }
 
 /// Project a thread's todo items into the read-only [`WireTask`] list the web
-/// aside renders: the thread's own items in insertion order, cancelled
-/// excluded, nesting expressed via [`WireTask::parent_id`].
+/// aside renders: the thread's own items **sorted by sibling order** (YAML-diff
+/// rework — the backend's `order` int is the single source of truth for sibling
+/// order), cancelled excluded, nesting expressed via [`WireTask::parent_id`].
 fn project_thread_tasks(todos: &TodoState, thread_id: &str) -> Vec<WireTask> {
-    todos
-        .todos
-        .iter()
-        .filter(|t| t.thread_id == thread_id)
+    let mut items: Vec<&cp_mod_todo::types::TodoItem> =
+        todos.todos.iter().filter(|t| t.thread_id == thread_id).collect();
+    // Sort by (order, id): within each parent group this yields ascending order,
+    // which is all the frontend needs to render siblings correctly (it groups by
+    // parent_id and preserves encounter order).
+    items.sort_by(|a, b| (a.order, a.id.as_str()).cmp(&(b.order, b.id.as_str())));
+    items
+        .into_iter()
         .filter_map(|t| {
             wire_task_status(t.status).map(|status| WireTask {
                 id: t.id.clone(),

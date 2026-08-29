@@ -75,6 +75,15 @@ pub struct TodoItem {
     /// Status: pending, `in_progress`, done
     #[serde(default)]
     pub status: TodoStatus,
+    /// Sibling sort key within the same parent group (YAML-diff rework).
+    ///
+    /// **Pure backend** — never written in the virtual YAML the `Todo` tool
+    /// edits; it is *reconstructed* from each item's position among its
+    /// siblings when the edited YAML is de-serialized (see [`crate::yaml`]).
+    /// A cancelled (soft-deleted) item is renumbered to sort **last** in its
+    /// parent group. Defaults to `0` so pre-rework persisted items load.
+    #[serde(default)]
+    pub order: i32,
 }
 
 /// Module-owned state for the Todo module

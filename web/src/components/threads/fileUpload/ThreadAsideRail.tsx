@@ -3,6 +3,8 @@ import { ThreadAside } from "./ThreadAside"
 import type { useThreadAside } from "./useThreadAside"
 import type { ThreadFile } from "./FileSidebar"
 import type { ThreadTask } from "@/lib/types"
+import { HintBadge } from "@/components/shell/chrome/HintBadge"
+import { useModifierShortcuts } from "@/lib/support/a11y"
 
 /**
  * The thread conversation's right rail (T662 aside) plus its show/hide chrome
@@ -41,14 +43,37 @@ export function ThreadAsideRail({
    *  so a file preview widens to half the viewport when it is (T680). */
   leftRailHidden: boolean
 }) {
+  // ⌘/Ctrl+H toggles the whole details rail — the exact header pattern
+  // (useModifierShortcuts + a HintBadge that reveals the "H" while the modifier
+  // is held). The previewed file is preserved across hide/show (T689). Bound
+  // BEFORE the early return so the hook is never conditional (rules-of-hooks);
+  // it's inert with no aside on screen.
+  const modHeld = useModifierShortcuts({
+    h: () => {
+      // Toggle visibility only — the previewed file is PRESERVED across a
+      // hide/show cycle (T689), so re-showing returns to the open preview
+      // rather than resetting to the file list.
+      aside.setHidden(!aside.hidden)
+    },
+  })
+
   const hasAside = files.length > 0 || tasks.length > 0
   if (!hasAside) return null
+
+  // The hide slide pulls the rail fully off the RIGHT edge via a negative
+  // margin-right equal to its ACTUAL current width plus the `mr-2` gutter. That
+  // width is dynamic (T680): when a file preview is open the rail widens to
+  // 40vw (or 50vw with the left rail hidden), so a fixed `--sidebar-w` offset
+  // would only slide it partway and leave the wide preview poking in from the
+  // right (T689b). Mirror ThreadAside's own width rule so the two always agree.
+  const previewing = aside.tab === "files" && aside.file !== null
+  const asideWidth = previewing ? (leftRailHidden ? "50vw" : "40vw") : "var(--sidebar-w)"
 
   return (
     <>
       <div
         className="flex shrink-0 transition-[margin-right] duration-300 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none"
-        style={{ marginRight: aside.hidden ? "calc(-1 * (var(--sidebar-w) + 0.5rem))" : 0 }}
+        style={{ marginRight: aside.hidden ? `calc(-1 * (${asideWidth} + 0.5rem))` : 0 }}
       >
         <ThreadAside
           files={files}
@@ -59,10 +84,8 @@ export function ThreadAsideRail({
           selectedFile={aside.file}
           onSelectFile={aside.setFile}
           leftRailHidden={leftRailHidden}
-          onHide={() => {
-            aside.setFile(null)
-            aside.setHidden(true)
-          }}
+          hintShown={modHeld}
+          onHide={() => aside.setHidden(true)}
         />
       </div>
 
@@ -75,6 +98,7 @@ export function ThreadAsideRail({
           className="absolute top-3 right-3 z-10 flex size-7 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:text-foreground"
         >
           <PanelRightOpen className="size-4" />
+          <HintBadge label="H" shown={modHeld} />
         </button>
       )}
     </>

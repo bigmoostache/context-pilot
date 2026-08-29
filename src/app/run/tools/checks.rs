@@ -5,6 +5,8 @@
 
 use std::sync::mpsc::Sender;
 
+use std::fmt::Write as _;
+
 use crate::app::panels::now_ms;
 use crate::app::run::streaming::has_dirty_panels;
 use crate::infra::api::StreamEvent;
@@ -126,7 +128,9 @@ pub(crate) fn maybe_hygiene_nudge(app: &mut App) {
     cp_mod_todo::types::TodoState::get_mut(&mut app.state).nudged_thread = Some(tid);
 }
 
-/// Auto-promote a declared task to `in_progress` after an opted-in tool runs.
+/// Auto-promote a declared task to `in_progress` after an opted-in tool runs,
+/// and append the synthetic task tree to that tool's result when the flip
+/// actually happened (T686).
 ///
 /// When an executed tool that opted into task declaration (`declares_task`)
 /// carries a valid `task_id` belonging to the focused thread and that task is
@@ -134,45 +138,64 @@ pub(crate) fn maybe_hygiene_nudge(app: &mut App) {
 /// it started, live. Finished/cancelled tasks are left untouched (pre-flight
 /// already warned); an already-`in_progress` task is a silent no-op.
 ///
+/// Because the flips are applied **in order**, only the FIRST tool that declares
+/// a given planned task causes its change; a later tool declaring the same id
+/// sees it already in progress (no change → no append). Per T686, the tree (plus
+/// the multi-in-progress-leaf warning) is appended ONLY to the result of a tool
+/// whose `task_id` genuinely changed a status — matching the spec's "valid AND
+/// implied a status change" trigger.
+///
 /// The flip mutates `TodoState` only; the `emit_task_lists` main-loop chokepoint
 /// observes the change and emits the `TaskListChanged` delta, so the web aside
 /// re-renders in real time. Like `todo_mark` (FR7) it does NOT deprecate the
 /// Todo panel — a status flip is deliberately cheap.
-pub(crate) fn promote_declared_tasks(app: &mut App, tools: &[cp_base::tools::ToolUse]) {
+///
+/// `tools` and `tool_results` are order-aligned (same construction as the
+/// finalize phase), so `tool_results[i]` is the result for `tools[i]`.
+pub(crate) fn promote_declared_tasks(
+    app: &mut App,
+    tools: &[cp_base::tools::ToolUse],
+    tool_results: &mut [crate::infra::tools::ToolResult],
+) {
     let Some(focused) = cp_mod_threads::types::FocusState::get(&app.state).focused_thread_id.clone() else {
         return; // No focused thread → task_id not enforced, nothing to promote.
     };
 
-    // Collect the distinct, valid, focused-thread task ids declared by opted-in
-    // tools in this batch (borrow of app.state dropped before the mutation).
-    let mut to_promote: Vec<String> = Vec::new();
-    for tool in tools {
-        let opted_in = app.state.tools.iter().any(|d| d.id == tool.name && d.declares_task);
-        if !opted_in {
-            continue;
-        }
-        let Some(task_id) =
-            tool.input.get("task_id").and_then(serde_json::Value::as_str).map(str::trim).filter(|s| !s.is_empty())
-        else {
+    for (tool, result) in tools.iter().zip(tool_results.iter_mut()) {
+        let Some(task_id) = declared_focused_task(app, tool, &focused) else {
             continue;
         };
-        if !to_promote.iter().any(|id| id == task_id) {
-            to_promote.push(task_id.to_owned());
+        if flip_planned_to_in_progress(app, &focused, &task_id) {
+            // A real status change → append the thread's task tree (+ warning).
+            let annex = cp_mod_todo::tree::result_annex(&app.state, &focused);
+            let _w = write!(result.content, "\n\n{annex}");
         }
     }
-    if to_promote.is_empty() {
-        return;
-    }
+}
 
-    // Flip only planned tasks owned by the focused thread; leave done/cancelled/
-    // already-in_progress untouched.
-    let ts = cp_mod_todo::types::TodoState::get_mut(&mut app.state);
-    for item in &mut ts.todos {
-        if item.thread_id == focused
-            && item.status == cp_mod_todo::types::TodoStatus::Planned
-            && to_promote.iter().any(|id| id == &item.id)
-        {
-            item.status = cp_mod_todo::types::TodoStatus::InProgress;
-        }
+/// The trimmed, non-empty `task_id` an opted-in (`declares_task`) tool declared
+/// that resolves to a task of the `focused` thread — else `None`.
+fn declared_focused_task(app: &App, tool: &cp_base::tools::ToolUse, focused: &str) -> Option<String> {
+    let opted_in = app.state.tools.iter().any(|d| d.id == tool.name && d.declares_task);
+    if !opted_in {
+        return None;
     }
+    let task_id =
+        tool.input.get("task_id").and_then(serde_json::Value::as_str).map(str::trim).filter(|s| !s.is_empty())?;
+    let owned =
+        cp_mod_todo::types::TodoState::get(&app.state).todos.iter().any(|t| t.id == task_id && t.thread_id == focused);
+    owned.then(|| task_id.to_owned())
+}
+
+/// Flip `task_id` from `Planned` to `InProgress` (owned by `focused`). Returns
+/// whether a change actually occurred (i.e. the task was `Planned`).
+fn flip_planned_to_in_progress(app: &mut App, focused: &str, task_id: &str) -> bool {
+    let ts = cp_mod_todo::types::TodoState::get_mut(&mut app.state);
+    if let Some(item) = ts.todos.iter_mut().find(|t| t.id == task_id && t.thread_id == focused)
+        && item.status == cp_mod_todo::types::TodoStatus::Planned
+    {
+        item.status = cp_mod_todo::types::TodoStatus::InProgress;
+        return true;
+    }
+    false
 }
