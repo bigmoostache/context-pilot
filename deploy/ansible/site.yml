@@ -73,6 +73,23 @@
     # 30 min–2 h (rx_errors flood, no internet, nothing in the logs); MBIM uses a
     # different data path that does not. 'skip' leaves whatever mode is set.
     cp_modem_usbnet: "{{ modem_usbnet | default('mbim') }}"
+    # ── SMS over the 5G modem (docs/design-sms.md) ──
+    # Reading, sending and archiving the SIM's SMS from the cockpit. Nothing is
+    # installed for it: it rides on the mmcli that cp_install_modem already put
+    # there, and on the SAME sysfs hardware probe — a box with no module gets no
+    # store and no panel. `-e sms_enabled=false` disarms it end to end (poller
+    # not started, routes 503, tasks/net/sms.yml skipped), for a client who does
+    # not want their messages stored on the appliance.
+    cp_sms_enabled: "{{ sms_enabled | default(true) | bool }}"
+    # Beside .network.json in the agents dir: $HOME survives reboots, modem
+    # resets and OTA updates (which replace releases/<tag>/, not this). The file
+    # is 0600 — it is personal data.
+    # Derived from the network state path so the two cannot drift: both live in
+    # the agents dir the orchestrator resolves from $HOME, and hardcoding it
+    # twice is how a store ends up somewhere nothing ever reads.
+    cp_sms_db_path: "{{ sms_db_path | default(cp_net_state_path | dirname ~ '/sms.db') }}"
+    cp_sms_poll_s: "{{ sms_poll_s | default(30) | int }}"
+    cp_sms_retention_days: "{{ sms_retention_days | default(90) | int }}"
     # ── internet uplink (WAN / 5G) + Wi-Fi access point ──
     # Ansible SEEDS the state file (.network.json) write-once and installs the
     # machinery; the backend applier is the only writer of system network config.
@@ -280,6 +297,22 @@
     - name: Install the uplink (WAN/5G) + Wi-Fi AP foundation
       ansible.builtin.include_tasks: tasks/net/network.yml
       when: cp_net_enabled | bool
+    # Last of the net includes, and after network.yml on purpose: it lands the
+    # store next to the state file that task seeds, and it must observe the modem
+    # AFTER any composition switch modem.yml made (the modem re-enumerates, and
+    # its D-Bus path changes with it).
+    #
+    # Gated on cp_net_enabled as well as its own switch because the unit's
+    # CP_SMS_* block lives inside that same condition. Note what that means on a
+    # net-off box: CP_SMS_ENABLED is ABSENT, and absent reads as enabled. The
+    # feature is nonetheless inert there, and for the honest reason rather than
+    # the flag — CP_MMCLI_BIN is absent too, so the ingester's tick returns
+    # before it opens anything and status.sms stays null, so the panel never
+    # renders. Skipping this include only means Ansible does not go looking for
+    # a modem it was told not to configure.
+    - name: Prepare the SMS store + check the modem exposes messaging
+      ansible.builtin.include_tasks: tasks/net/sms.yml
+      when: cp_net_enabled | bool and (cp_sms_enabled | bool)
 
   # ── handlers ────────────────────────────────────────────────────────────────
   # Seeding .network.json is NOT self-applying. Two long-lived processes hold a

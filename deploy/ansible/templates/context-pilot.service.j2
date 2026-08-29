@@ -62,6 +62,37 @@ Environment=CP_UPLINK_STATE=/run/cp-uplink/state
 # CALLS it rather than duplicating `iw reg set` itself, so there is one
 # implementation of "put the country in force" shared with the boot oneshot.
 Environment=CP_REGDOM_BIN=/usr/local/sbin/cp-regdom
+# SMS over the 5G modem (docs/design-sms.md §11). Deliberately INSIDE the
+# cp_net_enabled block: the whole feature is driven through CP_MMCLI_BIN above,
+# so with the block absent it is already inert and these four values would state
+# a configuration that cannot be true — the failure mode the block comment
+# describes. The hardware gate is separate and needs no variable: no 5G module
+# ⇒ modem_present() is false ⇒ no poll, no panel, on a box that never had a modem
+# and on this one alike.
+#   CP_SMS_ENABLED   — master switch. 0 disarms: the ingester thread is still
+#                      spawned (it is cheap and this stays live-switchable) but
+#                      every tick returns immediately, no store is opened, and
+#                      the write routes answer 503. For a client who does not
+#                      want their SMS stored on the box. NOTE it does not erase
+#                      an archive already on disk — flipping the flag stops new
+#                      messages, it is not a purge. Templated from
+#                      -e sms_enabled=false.
+#   CP_SMS_DB        — the SQLite history, beside .network.json in the agents dir
+#                      so it survives reboots, modem resets and OTA updates
+#                      (releases/<tag>/ is replaced; $HOME is not). The backend
+#                      creates it 0600 — chmod BEFORE the schema batch, so the
+#                      WAL side-cars inherit the mode too. It holds personal data.
+#   CP_SMS_POLL_S    — ingestion tick. The poller exists because SIM storage is
+#                      ~20–50 slots and, once full, incoming SMS are dropped
+#                      SILENTLY; each tick lists, stores, then deletes from the
+#                      modem. 30 s is the vendor's own interval.
+#   CP_SMS_RETENTION_DAYS — purge by age each tick, alongside the hard volume
+#                      cap. Personal data on a client-owned box: retention is a
+#                      v1 feature, not a v2 one.
+Environment=CP_SMS_ENABLED={{ 1 if (cp_sms_enabled | bool) else 0 }}
+Environment=CP_SMS_DB={{ cp_sms_db_path }}
+Environment=CP_SMS_POLL_S={{ cp_sms_poll_s }}
+Environment=CP_SMS_RETENTION_DAYS={{ cp_sms_retention_days }}
 {% endif %}
 # Served SPA — a `current` symlink the OTA updater atomically repoints at the
 # active release's bundled front (`releases/<tag>/web`). Day-0 it points at

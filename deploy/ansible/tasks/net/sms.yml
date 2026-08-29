@@ -1,0 +1,205 @@
+---
+# SMS over the 5G modem (docs/design-sms.md §11) — the deployment side.
+#
+# Scope: this file INSTALLS NOTHING. `modem.yml` is the single owner of the modem
+# toolbox (modemmanager, libqmi/libmbim, picocom) and of the USB composition;
+# re-declaring any of it here would give the box two owners for one package set
+# and, worse, two places to change the composition. What is left for SMS is only:
+#
+#   1. skip everything on a box with no 5G module — same sysfs probe as
+#      `modem.yml`, because it is the same question about the same hardware;
+#   2. verify that ModemManager really exposes MESSAGING on this modem, since
+#      `mmcli --messaging-*` is the entire transport of the feature (design §7,
+#      path A). Non-fatal: it is a provisioning REPORT, not a gate;
+#   3. make the SQLite store's home exist and pin the store's mode, because it
+#      holds personal data (§6) — the same reason `.network.json` is 0600.
+#
+# The environment (CP_SMS_DB / CP_SMS_POLL_S / CP_SMS_RETENTION_DAYS /
+# CP_SMS_ENABLED) is templated by `tasks/deploy.yml` into
+# `templates/context-pilot.service.j2`, next to CP_MMCLI_BIN — the tool gate this
+# feature rides on. Nothing here restarts the orchestrator: deploy.yml/start.yml
+# already shipped and started the unit with those values, and this file changes
+# no unit content.
+#
+# MEASURED on the reference box (Armbian Photonicat 2, 192.168.1.44, 2026-08-29):
+#   • mmcli 1.24.0; modem /org/freedesktop/ModemManager1/Modem/0 = Quectel RM520N-GL
+#   • driver cdc_mbim (the MBIM composition modem.yml switches to), net port wwu1u1i8
+#   • `mmcli -m <path> --messaging-status` → "supported storages: mt",
+#     "default storages: mt"
+# i.e. MESSAGING SURVIVES MBIM. That was the open risk: modem.yml moves the modem
+# off QMI to escape the downlink-framing bug, and had MBIM cost us the SMS
+# storages the feature would have had to fall back to raw AT/PDU (design §7,
+# path B). It does not.
+#
+# Skipped automatically on a box with no modem (probe below), forced with
+# -e install_modem=true — the SAME override as modem.yml on purpose: one flag
+# means "there is a modem, act as if you found one", for both files at once.
+
+- name: Detect whether this box actually carries a 5G modem
+  # Identical probe to modem.yml, and to `modem_present()` in the backend
+  # (it/network/apply/mod.rs): sysfs, not mmcli. Asking mmcli would ask a DAEMON
+  # about HARDWARE — on a modem-less box ModemManager may not even be installed,
+  # and on a box whose modem is mid-re-enumeration it answers "no modem" about a
+  # box that has one. Three probes, one answer, no third source of truth.
+  ansible.builtin.find:
+    paths: [/sys/class/usbmisc, /sys/class/net]
+    patterns: ["cdc-wdm*", "ww*"]
+    file_type: any
+  register: _sms_modem_probe
+  changed_when: false
+
+- name: Report a box with no 5G module
+  ansible.builtin.debug:
+    msg: >-
+      No 5G modem on this box (no cdc-wdm* / ww* in sysfs) — skipping the SMS
+      deployment entirely: no store, no messaging check. The cockpit hides the
+      SMS panel on its own, from the sysfs half of the same probe (the backend's
+      modem_present() adds a CP_WWAN_PRESENT override this task has no use for),
+      so the feature is absent rather than greyed out. Force with
+      -e install_modem=true.
+  when: _sms_modem_probe.matched | int == 0 and (install_modem is not defined)
+
+- name: SMS deployment (only on a box that has a modem)
+  when: _sms_modem_probe.matched | int > 0 or (install_modem | default(false) | bool)
+  block:
+    # ── 1. does ModemManager expose messaging on THIS modem? ─────────────────
+    - name: Discover the modem's D-Bus path (never the index 0)
+      # `mmcli -L`, never a hardcoded `-m 0`. ModemManager INCREMENTS the modem
+      # index on every re-enumeration (a `--reset`, a composition switch, a USB
+      # glitch), so a box that has been up for a while answers on /Modem/3 and
+      # every command aimed at /Modem/0 fails on a perfectly healthy modem. The
+      # backend already learned this the expensive way — `signal_dbm()` in
+      # transport/it/network/status/mod.rs silently read null after a reset until
+      # it took the path from `mmcli -L` instead. Same rule here.
+      #
+      # `|| true` on the grep: no modem listed is a legitimate answer (module
+      # present in sysfs but MM still probing, or SIM-less), and pipefail would
+      # otherwise turn grep's rc=1 into a task failure. `command -v` first: with
+      # -e cp_install_modem=false there is no mmcli at all, and the correct
+      # outcome is an empty path, not a spawn error.
+      ansible.builtin.shell: |
+        set -o pipefail
+        command -v mmcli >/dev/null 2>&1 || exit 0
+        mmcli -L 2>/dev/null \
+          | grep -o '/org/freedesktop/ModemManager1/Modem/[0-9]\+' \
+          | head -n 1 || true
+      args:
+        executable: /bin/bash
+      register: _sms_modem_path
+      changed_when: false
+      failed_when: false
+
+    - name: Ask ModemManager for the modem's messaging status
+      # The one capability check that matters: the whole feature is
+      # `mmcli -J -m <path> --messaging-list-sms` / `--messaging-create-sms` /
+      # `--messaging-delete-sms`, and all of it needs a message STORAGE. A modem
+      # that reports no supported storage cannot hold an incoming SMS, so the
+      # poller would ingest nothing and no error would ever be logged — the exact
+      # silent failure this task exists to make loud at provisioning time.
+      ansible.builtin.command:
+        argv:
+          - mmcli
+          - -m
+          - "{{ _sms_modem_path.stdout | trim }}"
+          - --messaging-status
+      register: _sms_messaging_status
+      changed_when: false
+      failed_when: false
+      when: (_sms_modem_path.stdout | trim) | length > 0
+
+    - name: Assert ModemManager exposes a message storage on this modem
+      # NON-FATAL on purpose (ignore_errors), and that is a deliberate contract,
+      # not laziness: a provisioning run must not abort a whole deploy because
+      # the modem is mid-registration, the SIM tray is empty, or coverage is out
+      # — none of which is a property of the IMAGE we are installing. The backend
+      # already degrades correctly on its own (design §7: no storage / no mmcli
+      # ⇒ available() == false ⇒ the cockpit says "unavailable", zero subprocess,
+      # no error). So this task's job is to put the verdict in the play recap
+      # where a human will read it, not to decide the box is broken.
+      ansible.builtin.assert:
+        that:
+          - (_sms_modem_path.stdout | trim) | length > 0
+          - _sms_messaging_status.rc | default(1) | int == 0
+          - "'storages' in (_sms_messaging_status.stdout | default(''))"
+        fail_msg: >-
+          SMS messaging is NOT usable on this modem yet
+          (path='{{ _sms_modem_path.stdout | trim | default("none", true) }}',
+          mmcli rc={{ _sms_messaging_status.rc | default("not run") }}).
+          Deploy continues — the feature reports itself unavailable rather than
+          failing. Check on the box, in this order:
+          `mmcli -L` (is a modem assembled at all?),
+          `mmcli -m <path> --messaging-status` (any supported storage?),
+          `systemctl status ModemManager`, and that a SIM is inserted. If the
+          modem genuinely exposes no storage, the fallback is the raw AT/PDU path
+          on /dev/ttyUSB2 (docs/design-sms.md §7, path B), which is a code
+          change, not a deployment one.
+        success_msg: >-
+          messaging available on {{ _sms_modem_path.stdout | trim }} —
+          {{ _sms_messaging_status.stdout_lines | default([]) | select('search', 'storages')
+             | map('trim') | join('; ') | default('storages reported', true) }}
+      ignore_errors: true          # noqa: ignore-errors — reported, never fatal (see above)
+
+    # ── 2. the store's home ──────────────────────────────────────────────────
+    - name: Ensure the agents dir exists (the SMS store lives beside .network.json)
+      # Same directory, same reasoning as tasks/net/network.yml: the orchestrator
+      # runs as root (the unit declares no User=) and recreates this path itself
+      # with create_dir_all under its own umask, so pinning root:root 0755 here
+      # makes Ansible and the service AGREE instead of flipping the mode on
+      # alternate runs. Secrecy is carried by the FILE, not by this directory —
+      # .identity.json beside it is deliberately world-readable.
+      #
+      # Restated here rather than relied upon: network.yml creates this directory
+      # only when it actually seeds .network.json, and that seed is WRITE-ONCE —
+      # on every re-run against a box that already has a state file the task is
+      # skipped, so the directory would be nobody's job. Both tasks declare
+      # identical attributes, so whichever runs second is a no-op.
+      ansible.builtin.file:
+        path: "{{ cp_sms_db_path | dirname }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Look for an SMS store left by an earlier deployment
+      # The backend now creates its own store correctly — `SmsStore::open`
+      # chmods 0600 BEFORE running the schema batch, so the -wal and -shm
+      # sidecars SQLite mints from the main file's mode are 0600 too. Ansible
+      # therefore does NOT pre-create the file: it could not win the race
+      # anyway (this include runs after tasks/start.yml, and the orchestrator's
+      # first sweep beats the playbook to it), and a `copy` with force:false
+      # short-circuits before its attribute pass, so the mode it appeared to
+      # promise was never applied to an existing file.
+      #
+      # What is left is the one thing Ansible can actually do: repair a store
+      # laid down by a build that predates that fix.
+      ansible.builtin.stat:
+        path: "{{ cp_sms_db_path }}"
+      register: _sms_store
+
+    - name: Repair the mode of a pre-existing SMS store
+      # THE DATA IS PERSONAL — every SMS the client's SIM receives, plus every
+      # message an admin sends from the cockpit, in cleartext on an appliance
+      # sitting in a client's office. `.network.json` is 0600 for the same class
+      # of reason (Wi-Fi PSK + SIM PIN), and this file is at least as sensitive.
+      #
+      # Never truncating: `file` only sets attributes. The history is the point
+      # of a persistent archive, and a re-run of site.yml must not cost it.
+      when: _sms_store.stat.exists
+      ansible.builtin.file:
+        path: "{{ cp_sms_db_path }}"
+        state: file
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Report the SMS deployment
+      ansible.builtin.debug:
+        msg: >-
+          SMS armed (CP_SMS_ENABLED=1; -e sms_enabled=false disarms the feature
+          and skips this whole file) — store {{ cp_sms_db_path }} (0600, created by the backend),
+          poll every {{ cp_sms_poll_s }}s,
+          retention {{ cp_sms_retention_days }} days, modem
+          {{ _sms_modem_path.stdout | trim | default('not detected', true) }}.
+          Nothing was installed: modem.yml owns the toolbox, and the applier
+          remains the only writer of system network config — the poller never
+          touches the uplink mode, the cp-wwan profile or ModemManager itself.
