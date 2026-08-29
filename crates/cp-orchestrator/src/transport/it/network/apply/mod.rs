@@ -60,9 +60,10 @@ use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
 use super::state::{NetworkConfig, UplinkMode};
-use super::{profiles, routes, uplink};
+use super::{profiles, uplink};
 
 mod marks;
+mod routes;
 use marks::applied_marker;
 pub(in crate::transport::it::network) use marks::{
     Marks, STEP_AP, STEP_AP_ACTIVATION, STEP_MODE, STEP_UPLINK_ENV, STEP_WWAN, StepHashes, step,

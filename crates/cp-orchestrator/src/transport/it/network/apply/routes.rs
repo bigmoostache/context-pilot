@@ -25,8 +25,8 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
-use super::apply::{Tools, WWAN_PROFILE, run, wan_iface};
-use super::state::{NetworkConfig, Standby, UplinkMode};
+use super::super::state::{NetworkConfig, Standby, UplinkMode};
+use super::{Tools, WWAN_PROFILE, run, wan_iface};
 
 /// The drop-in file name inside `05-pcat-ula-<if>.network.d/`.
 const DROPIN_FILE: &str = "50-cp-uplink.conf";
@@ -94,10 +94,10 @@ const ACTIVATION_TIMEOUT_S: u32 = 20;
 ///
 /// `nmcli connection down` on an inactive profile and `up` on an active one both
 /// exit non-zero, and neither is a failure of ours. Activation failures on the
-/// bearer are also non-fatal by design — see [`super::apply`].
+/// bearer are also non-fatal by design — see [`apply`](super).
 ///
 /// It lives here, beside its only two callers, rather than in
-/// [`profiles`](super::profiles): that module *renders* the two profiles, this
+/// [`profiles`](super::super::profiles): that module *renders* the two profiles, this
 /// one decides which of them should be running.
 fn set_active(nmcli: &OsStr, profile: &str, active: bool) -> Result<(), String> {
     let verb = if active { "up" } else { "down" };
@@ -184,7 +184,7 @@ pub(crate) fn apply_mode(tools: &Tools, config: &NetworkConfig) -> Result<(), St
         // setup cost at failover time.
         UplinkMode::WanThen5g => matches!(config.wwan.standby, Standby::Hot),
     };
-    if !super::apply::modem_present() {
+    if !super::modem_present() {
         return Ok(()); // no modem on this variant — nothing to bring up or down.
     }
     if let Err(failure) = set_active(&tools.nmcli, WWAN_PROFILE, wanted_up) {
@@ -212,10 +212,10 @@ pub(crate) fn apply_mode(tools: &Tools, config: &NetworkConfig) -> Result<(), St
 ///
 /// Returns a message when the sysctl cannot be written.
 pub(crate) fn apply_ap_activation(tools: &Tools, config: &NetworkConfig) -> Result<(), String> {
-    if let Err(failure) = set_active(&tools.nmcli, super::apply::AP_PROFILE, config.ap.enabled) {
+    if let Err(failure) = set_active(&tools.nmcli, super::AP_PROFILE, config.ap.enabled) {
         // Same reasoning as the bearer: an rfkilled or absent radio must not
         // roll back a legitimate setting.
-        crate::oerr!("network: {} (non-fatal): {failure}", super::apply::AP_PROFILE);
+        crate::oerr!("network: {} (non-fatal): {failure}", super::AP_PROFILE);
     }
     let sharing = config.ap.enabled && config.ap.share_internet;
     if !sharing {
@@ -238,7 +238,7 @@ fn drop_nat_table(tools: &Tools) {
     let Some(nft) = tools.nft.as_ref() else {
         return;
     };
-    let table = format!("nm-shared-{}", super::apply::ap_device());
+    let table = format!("nm-shared-{}", super::ap_device());
     let args = ["delete".to_owned(), "table".to_owned(), "ip".to_owned(), table];
     // A "No such file or directory" here just means there was nothing to drop.
     let _dropped = run(nft, &args);

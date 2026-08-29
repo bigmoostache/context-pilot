@@ -133,7 +133,7 @@ pub(crate) fn wwan_args(config: &NetworkConfig) -> Vec<String> {
 ///
 /// `NetworkManager` has no "DHCP server without NAT" method, so the cul-de-sac is
 /// built the other way round: keep `shared` for dnsmasq's DHCP + DNS, then take
-/// away forwarding and the masquerade in [`super::routes::apply_ap_activation`].
+/// away forwarding and the masquerade in `apply_ap_activation`, the applier's routes step.
 /// `ip_forward=0` is what "no forwarding" actually means, and it is enforced at
 /// the kernel level rather than by a profile setting.
 pub(crate) fn ap_args(config: &NetworkConfig) -> Vec<String> {

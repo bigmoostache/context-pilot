@@ -179,7 +179,7 @@ pub(crate) struct ProbeConfig {
     pub cooldown_s: u32,
     /// `nmcli --wait` for the supervisor's own bearer activation.
     ///
-    /// Bounded for the measured reason `routes::set_active` is: nmcli's default
+    /// Bounded for the measured reason `set_active` is: nmcli's default
     /// is 90 s and a modem with no coverage takes all of it, which would stall a
     /// whole probe round. Rendered as `CP_UPLINK_NM_WAIT_S`.
     pub nm_wait_s: u32,

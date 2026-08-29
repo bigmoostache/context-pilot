@@ -26,7 +26,6 @@
 
 pub(crate) mod apply;
 mod profiles;
-mod routes;
 pub(crate) mod state;
 mod status;
 mod uplink;

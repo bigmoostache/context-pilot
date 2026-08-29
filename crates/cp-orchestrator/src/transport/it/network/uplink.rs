@@ -114,7 +114,7 @@ pub(super) fn validate_probe(probe: &ProbeConfig) -> Result<(), String> {
 ///
 /// The ranges are what the supervisor can actually honour, not taste:
 /// `probe_timeout_s` is paid once per target per round, and `nm_wait_s` is a
-/// bounded replacement for nmcli's unusable 90 s default — `routes::set_active`
+/// bounded replacement for nmcli's unusable 90 s default — `set_active`
 /// pays the same measured cost on the applier side.
 ///
 /// **A `cooldown_s` below `interval_s` is deliberately legal.** It simply never

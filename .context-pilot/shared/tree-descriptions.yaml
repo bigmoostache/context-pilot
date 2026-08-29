@@ -2635,7 +2635,7 @@
   description: 'Finder right-click context menu (macOS-style), TWO variants keyed on pos.node presence. ITEM menu (right-click a file/folder): Open (folder nav / Quick Look), Pin to Sidebar (folders), Rename, Duplicate, Download (real downloadFile), tag swatches (real onTag), Move to Trash. EMPTY-SPACE menu (T279, right-click the content background, pos.node absent): New Folder (real mkdir), Upload… (file picker), Select All, Toggle Quick Look, Refresh — via onNewFolder/onUpload/onSelectAll/onTogglePreview/onRefresh props. EmptyItem row helper. On-screen clamping; closes on outside-click/Esc.'
   last_edited_ms: 1781888527667
 1bcdf80ace88fe0c:
-  path: crates/cp-orchestrator/src/transport/it/network/routes.rs
+  path: crates/cp-orchestrator/src/transport/it/network/apply/routes.rs
   description: 'Mode->routing table + sysctl/drop-in side effects. sync_dropin (strict-5g gateway suppression, all 3 stanzas), reconfigure_wan, set_active (nmcli --wait bounded), apply_mode/apply_ap_activation, drop_nat_table, set_ip_forward. orch-clippy: CLEAN (21fcd9b3) — assert_sync/assert_body helpers for dropin idempotent test cognitive.'
   last_edited_ms: 1787905172381
 1bcf6f41be8ae1a3:
