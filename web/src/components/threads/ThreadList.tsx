@@ -481,7 +481,10 @@ function RowProgress({
         {/* done — green, filled from the left */}
         <span
           className="absolute inset-y-0 left-0 transition-[width] duration-300 ease-out"
-          style={{ width: `${donePct}%`, background: muted ? "var(--muted-foreground)" : "var(--ok)" }}
+          style={{
+            width: `${donePct}%`,
+            background: muted ? "var(--muted-foreground)" : "var(--ok)",
+          }}
         />
         {/* in-progress — orange, starting where done ends (gray track = planned) */}
         <span
