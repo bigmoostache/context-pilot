@@ -7658,6 +7658,10 @@
   path: crates/cp-orchestrator/src/transport/rest/env_keys.rs
   description: 'On-demand env-key inspection (T399). KNOWN_KEYS whitelist prevents arbitrary env-var enum. env_keys_list(): GET /api/env-keys returns [{env,label,exists}] — no values. env_key_reveal(name): GET /api/env-keys/{name} returns masked value (first-4 + last-4, middle dots) — admin-only when auth active, 404 for unknown keys. mask_key helper. 5 unit tests.'
   last_edited_ms: 1782340075518
+505f0a5947cc9613:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 506e44ef1c930cd0:
   path: src/app/run/tools/cleanup.rs
   description: Watcher polling (blocking sentinel replacement + async spine notifications), ASYNC_ERROR_PREFIX handling for is_error, DynPanel creation for both blocking/async paths, interrupt cleanup. Blocking path now calls accumulate_pending_token_stats + append_cost_tsv (T478 fix). flame!("watchers"). No PendingForm references.
@@ -13218,6 +13222,10 @@
   path: crates/cp-orchestrator/src/transport/rest/releases.rs
   description: 'Release mgmt REST (T427): list/set_arch/download/select/delete/deploy_fleet/restart_orchestrator. releases_break_glass gate (410 unless CP_RELEASES_BREAK_GLASS). restart_orchestrator=stage cp-orchestrator over install path + execv re-exec (abort() fallback). orch-clippy: NOT yet cleaned.'
   last_edited_ms: 1787881790074
+8b113cc3ed6da9cb:
+  path: .context-pilot/shared/memories.yaml
+  description: Memory slots store (M-safe/tiny/short/mid/long, 220 fixed). Local-only, synced with commits. Mirrors the Memories panel.
+  last_edited_ms: 0
 8b1e52307d030d8d:
   path: crates/cp-mod-files/src/tools/write.rs
   description: file_write tool. flame!("file_write"). Creates parent dirs, writes content, updates/creates context Entry. Diff-style preview in result (first 20 lines).
@@ -14826,6 +14834,10 @@
   path: ui/src/components/agents/FleetShell.tsx
   description: 'Fleet mission-control shell. Owns fleetPage + collapsed state. Renders FleetSidebar + a clickable border RAIL (shadcn Sidebar pattern): thin full-height hit area at x=SIDEBAR_W(212), tracks width, sits at x=0 when collapsed, brightens to interactive on hover — click toggles collapse (no buttons). Active page: agents/prompts/usage/settings(ConfigPanel inline).'
   last_edited_ms: 1781532872888
+9d1f309a09e072b4:
+  path: src/app/run/threads/commands.rs
+  description: Bridge command APPLICATION (K7 mutation half). apply_command dispatches Send/Create/Archive/Restore/Pause/Resume/Delete thread + DeleteMessage (collect_delete_timestamps helper, A2) + Stop/Configure. Focused-thread instant spine notif.
+  last_edited_ms: 0
 9d20b15ef58729cf:
   path: crates/cp-mod-spine/src/tools.rs
   description: Spine tool handlers. execute_mark_processed (batch notification marking), execute_configure (guard rail limits with zero-value rejection, counter reset).
@@ -17321,6 +17333,10 @@ b621877dc6de956c:
 b6256b5251aeb829:
   path: src/app/run/lifecycle.rs
   description: 'Main event loop with flame!("loop"). Input-first design (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. Ownership checks. Render at ~28fps. Adaptive poll: 8ms streaming, 50ms idle. Time-based spinner dirty tick (100ms).'
+  last_edited_ms: 0
+b62ba412b3d565d5:
+  path: web/src/components/threads/ThreadList.tsx
+  description: Thread sidebar list. Grouped by turn-status (Agent's turn / User turn) + Archived view. Search now lives in ThreadSearchPalette (T669) opened from ListHeader's Search button; ListHeader also has a PanelLeftClose sidebar-collapse button. Row-hover title marquee via useTitleMarquee (WAA). Subcomponents RowActions/RowMeta/ListHeader/EmptyState keep budgets. Exactly 500 lines (cap).
   last_edited_ms: 0
 b631a45d56d3e8dc:
   path: web/src/components/shell/config/ReleasesPane.tsx
@@ -20465,6 +20481,10 @@ d7f947737a248243:
 d8145eaa81b7194a:
   path: web/src/components/shell/TopBar.tsx
   description: 'Slim macOS-style title bar (T321 trimmed): app mark→fleet, agent switcher, per-agent view tabs (Threads/Finder/Cockpit/Costs), agent-config gear, UsageButton, account UserMenu. Costs tab dev-mode only. P8: view-tab cluster extracted into a ViewTabs subcomponent (moving the two devMode gates off TopBar''s complexity budget); TopBar fn now <150 lines / cx<15.'
+  last_edited_ms: 0
+d817adc3abb8d21e:
+  path: src/app/run/threads/mod.rs
+  description: 'Thread helpers for main loop: maybe_inject_auto_read (filters paused threads — T371), check_my_turn_threads (filters paused threads — T371), extract_thread_ids, maybe_append_tool_activity. emit_thread_paused re-exported from paused.rs.'
   last_edited_ms: 0
 d81fe2ee7ef0a5d1:
   path: web/src/components/shell/TopBar.tsx

@@ -510,10 +510,10 @@ M-short-6:
   last_edited_ms: 0
 M-short-7:
   tier: short
-  title: T692 auto-read fix
-  contents: 'T692 (todo-v3-yaml-diffs, check_my_turn_threads @ src/app/run/threads/mod.rs): Send(still_my_turn=false) pins focus (T683) so focus ~never None -> old `focus.is_none()` auto-read gate was DEAD. FIX: auto-read fires when FREE = unfocused OR focused thread not itself MY_TURN. Passive notif only when focused on a DIFFERENT MY_TURN thread.'
+  title: T697 focused auto-read
+  contents: 'check_my_turn_threads @ src/app/run/threads/mod.rs. T697 SHIPPED (a9b19094, todo-v3-yaml-diffs): focused+idle+MY_TURN thread now auto-reads ITSELF (waiting prefers focused), DEBOUNCED on notified_my_turn_id vs self-loop. apply_send_message clears notified_my_turn_id (re-arm) instead of focused_thread_input notif. Old T692 free-only rule + passive notif branch removed.'
   importance: high
-  last_edited_ms: 1787951012233
+  last_edited_ms: 1787996890804
 M-short-8:
   tier: short
   title: 'OPERATING MODEL: harbor'
