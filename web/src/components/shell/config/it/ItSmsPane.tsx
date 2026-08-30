@@ -1,4 +1,4 @@
-import { useId, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Loader2, Mail, Trash2 } from "lucide-react"
 import type { ItSmsMessage, ItSmsStatus } from "@/lib/api/generated/types.gen"
@@ -27,6 +27,7 @@ import {
   smsView,
   unreadLabel,
 } from "@/lib/api/it/sms"
+import { useSeen } from "@/lib/support/useSeen"
 import { cn } from "@/lib/utils"
 import { SectionLabel, TextField } from "./ItPane"
 
@@ -203,20 +204,33 @@ function MessageRow({ message }: { message: ItSmsMessage }) {
   const read = useMutation({ mutationFn: () => markItSmsRead(message.id), onSuccess: invalidate })
   const drop = useMutation({ mutationFn: () => deleteItSms(message.id), onSuccess: invalidate })
 
+  // Marked read by BEING READ, not by being clicked. The click used to carry
+  // it, and that was a hole you only see by looking at the screen: the body is
+  // rendered in full (clamped to two lines, but most messages are shorter than
+  // that), so an operator reads it and moves on — and the badge stays stuck at
+  // "2 unread" forever, counting something the interface never taught them to
+  // clear. Half the row on screen is the honest signal.
+  //
+  // One POST per row, ever. `view.unread` stays true until BOTH invalidations
+  // round-trip, so without the latch the window between them would fire a
+  // second `POST /api/it/sms/{id}/read` — which the server answers 404: its
+  // `UPDATE … WHERE read_at IS NULL` matches no row and `with_id` maps
+  // `Ok(false)` to a 404.
+  const { attach, seen } = useSeen(view.unread)
+  const markedRef = useRef(false)
+  useEffect(() => {
+    if (!seen || !view.unread || markedRef.current) return
+    markedRef.current = true
+    read.mutate()
+  }, [seen, view.unread, read])
+
   const toggle = () => {
-    // One POST per row, ever. `view.unread` stays true until BOTH invalidations
-    // round-trip, so collapsing and re-opening inside that window used to fire a
-    // second `POST /api/it/sms/{id}/read` — which the server answers 404: its
-    // `UPDATE … WHERE read_at IS NULL` then matches no row and `with_id` maps
-    // `Ok(false)` to a 404. The mutation's own state is that window's memory. A
-    // FAILED mark stays retryable on the next open: only success and in-flight
-    // hold the call back.
-    if (!open && view.unread && !read.isPending && !read.isSuccess) read.mutate()
     setOpen((previous) => !previous)
   }
 
   return (
     <div
+      ref={attach}
       className={cn(
         "flex flex-col gap-1 rounded-md border px-2.5 py-2",
         view.inbound ? "border-border bg-muted/40" : "ml-6 border-(--interactive)/30 bg-card",
@@ -234,14 +248,12 @@ function MessageRow({ message }: { message: ItSmsMessage }) {
           </span>
           <span className="font-mono text-[12px] text-foreground/90">{view.peer}</span>
           {view.unread && (
-            <>
-              {/* The dot carries no text, and the only other cue is a font
-                  weight — so the badge could announce "3 unread" while a screen
-                  reader could not tell WHICH three (review C5a). `sr-only` is
-                  this codebase's convention for the words behind a graphic. */}
-              <span className="size-1.5 rounded-full bg-(--interactive)" aria-hidden="true" />
-              <span className="sr-only">Unread</span>
-            </>
+            // A word, not a dot. The 6px dot read as a rendering artefact next
+            // to a monospace number, and it needed an `sr-only` twin to mean
+            // anything to a screen reader. Real text is legible to both.
+            <span className="rounded-sm bg-(--interactive)/15 px-1 py-px text-[9.5px] font-semibold tracking-[0.08em] text-(--interactive) uppercase">
+              New
+            </span>
           )}
           <span className="ml-auto text-[11px] text-muted-foreground/70" title={view.exact}>
             {view.when}
@@ -258,24 +270,32 @@ function MessageRow({ message }: { message: ItSmsMessage }) {
         </span>
       </button>
 
-      <div className="flex items-center gap-2">
-        <span className={cn("text-[11px]", TONE[view.tone])}>{view.delivery}</span>
-        {view.sentBy !== null && (
-          <span className="text-[11px] text-muted-foreground/70">{view.sentBy}</span>
-        )}
-        {open && (
-          <button
-            type="button"
-            disabled={drop.isPending}
-            onClick={() => drop.mutate()}
-            aria-label="Remove this message from the list"
-            className="ml-auto flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-(--danger)/10 hover:text-(--danger) disabled:opacity-50"
-          >
-            <Trash2 className="size-3" />
-            Remove
-          </button>
-        )}
-      </div>
+      {/* Rendered only when it carries something. The delivery state is
+          informative for an OUTBOUND message — sending, sent, failed — and pure
+          noise on an inbound one, where it always reads "Received" beside a
+          "From" that already said so. */}
+      {(!view.inbound || open) && (
+        <div className="flex items-center gap-2">
+          {!view.inbound && (
+            <span className={cn("text-[11px]", TONE[view.tone])}>{view.delivery}</span>
+          )}
+          {view.sentBy !== null && (
+            <span className="text-[11px] text-muted-foreground/70">{view.sentBy}</span>
+          )}
+          {open && (
+            <button
+              type="button"
+              disabled={drop.isPending}
+              onClick={() => drop.mutate()}
+              aria-label="Remove this message from the list"
+              className="ml-auto flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-(--danger)/10 hover:text-(--danger) disabled:opacity-50"
+            >
+              <Trash2 className="size-3" />
+              Remove
+            </button>
+          )}
+        </div>
+      )}
 
       {/* The modem's own words. Never folded into "Failed": the reason is the
           only half an operator can act on. */}

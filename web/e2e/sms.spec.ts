@@ -107,7 +107,7 @@ test.describe("IT · SMS panel", () => {
     await expect(panel).toHaveCount(0)
   })
 
-  test("a box with a modem lists its archive, and marks a message read exactly once", async ({
+  test("a box with a modem lists its archive, and marks a message read on sight, once", async ({
     page,
   }) => {
     await stubSmsStatus(page, { available: true, unread: 1 })
@@ -136,22 +136,38 @@ test.describe("IT · SMS panel", () => {
     // The compose half is there too.
     await expect(panel.getByPlaceholder("Type your message")).toBeVisible()
 
-    // Review C5a: the unread cue is a coloured dot with no text, so the row
-    // carries an `sr-only` word as well. Exactly one row is unread.
-    await expect(panel.getByText("Unread", { exact: true })).toHaveCount(1)
+    // The unread cue is a WORD, not a dot: a 6px dot beside a monospace number
+    // read as a rendering artefact, and it needed an `sr-only` twin to mean
+    // anything to a screen reader. Exactly one row is unread.
+    await expect(panel.getByText("New", { exact: true })).toHaveCount(1)
 
     // Review C4: a pristine compose form accuses nobody of anything.
     await expect(panel.getByText(/number must be digits/)).toHaveCount(0)
 
-    // Review C6: opening marks read. The stubbed archive never flips `read`, so
-    // the row stays "unread" forever — the widest possible version of the window
-    // in which a collapse-and-reopen used to fire a SECOND POST, which the
-    // server answers 404.
+    // "Received" is not repeated under every inbound row — `From` already said
+    // it. The delivery state is rendered for OUTBOUND messages only.
+    await expect(panel.getByText("Received", { exact: true })).toHaveCount(0)
+
+    // A message is marked read by BEING ON SCREEN, not by being clicked. The
+    // click used to carry it, and that left the badge unclearable for an
+    // operator who simply read the message — which is the entire normal case.
+    //
+    // The scroll is load-bearing, not ceremony: the SMS block sits last in the
+    // IT page, roughly 2000px down, so it is BELOW THE FOLD on arrival. Nothing
+    // may be marked read while it is off screen — asserting `reads` without
+    // scrolling first is how this test discovered that the panel is not visible
+    // when the category opens.
+    expect(reads, "nothing is marked read while the panel is below the fold").toBe(0)
+    await panel.scrollIntoViewIfNeeded()
+    await expect.poll(() => reads).toBe(1)
+
+    // …and exactly once. The stubbed archive never flips `read`, so the row
+    // stays "unread" forever — the widest possible version of the window in
+    // which a second `POST …/read` would fire, which the server answers 404.
+    // Clicking still toggles the row's actions, and must not re-fire it.
     const row = panel.getByText(MESSAGES[0].body)
     await row.click()
     await expect(panel.getByRole("button", { name: /Remove this message/ })).toBeVisible()
-    await expect.poll(() => reads).toBe(1)
-
     await row.click() // collapse
     await expect(panel.getByRole("button", { name: /Remove this message/ })).toHaveCount(0)
     await row.click() // and re-open, inside the window
