@@ -125,6 +125,31 @@ fn alphanumeric_sender_survives() {
     assert_eq!(parse_incoming("/handle", &document).expect("delivery").peer, "Bouygues");
 }
 
+/// A delivery whose text is not populated yet is NOT ingested.
+///
+/// The regression test for a message destroyed in production on the deployed
+/// box's very first receipt: `ModemManager` publishes the SMS object before its
+/// content necessarily is, so a sweep landing in that window read `"--"`,
+/// archived an empty body, and then deleted the modem's only copy. Skipping it
+/// costs one storage slot for one poll interval; taking it costs the message.
+#[test]
+fn a_delivery_with_no_text_yet_is_left_alone() {
+    let document = delivered("+33612345678", "--", "2026-08-30T10:01:00Z");
+    assert!(parse_incoming("/handle", &document).is_none(), "not ours to take yet");
+}
+
+/// A genuinely EMPTY text is still a message, and is ingested.
+///
+/// The distinction the fix rests on: `"--"` is mmcli's spelling of absence,
+/// `""` is a real (if odd) body. Collapsing the two would swap one bug for
+/// another.
+#[test]
+fn an_empty_text_is_still_ingested() {
+    let document = delivered("+33612345678", "", "2026-08-30T10:01:00Z");
+    let parsed = parse_incoming("/handle", &document).expect("an empty body is a message");
+    assert_eq!(parsed.body, "");
+}
+
 /// A document that is not an SMS at all yields `None` rather than panicking.
 #[test]
 fn malformed_document_is_none() {

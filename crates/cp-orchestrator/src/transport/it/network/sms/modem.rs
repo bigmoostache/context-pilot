@@ -291,12 +291,25 @@ pub(super) fn parse_incoming(handle: &str, document: &Value) -> Option<Incoming>
     if field(sms, &["properties", "pdu-type"]).as_deref() != Some("deliver") {
         return None;
     }
+    // A message with NO TEXT is not ours to take yet.
+    //
+    // MEASURED IN PRODUCTION, on the very first message the deployed box
+    // received: it was archived with an empty body and then deleted from the
+    // modem — destroyed. `ModemManager` publishes the SMS object before its
+    // content is necessarily populated (a multipart still being assembled
+    // reports `pdu-type: deliver` with no text), so a sweep landing in that
+    // window used to read `"--"`, store the emptiness, and free the slot.
+    //
+    // `?` rather than `unwrap_or_default` is the whole fix: an absent text
+    // means "skip this one", the message stays on the modem, and the next sweep
+    // gets it once the modem has finished. Leaving a slot occupied for thirty
+    // seconds is nothing; deleting the only copy of a message is everything.
+    // A genuinely EMPTY text is still ingested — `field` returns `Some("")` for
+    // that and `None` only for the `"--"` sentinel or a missing key.
     Some(Incoming {
         handle: handle.to_owned(),
         peer: field(sms, &["content", "number"]).unwrap_or_default(),
-        // An empty body is a real message (a delivery report, a ping); only an
-        // absent one is skipped, hence `unwrap_or_default` here too.
-        body: field(sms, &["content", "text"]).unwrap_or_default(),
+        body: field(sms, &["content", "text"])?,
         sent_at: field(sms, &["properties", "timestamp"]).as_deref().and_then(epoch_seconds),
     })
 }
