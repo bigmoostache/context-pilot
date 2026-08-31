@@ -1,0 +1,118 @@
+# Context Pilot — single-instance deployment.
+#
+#   cd deploy/docker
+#   cp .env.example .env && $EDITOR .env     # credentials + provider keys
+#   docker compose up -d
+#
+# Then open http://127.0.0.1:7878 and log in as the superadmin from your .env;
+# the first login forces a password change.
+services:
+  context-pilot:
+    build:
+      context: .
+      # BUNDLE_SOURCE=local + a tarball in .artifacts/ to run an unreleased build.
+      args:
+        BUNDLE_SOURCE: ${BUNDLE_SOURCE:-release}
+    image: context-pilot:0.2.13
+    restart: unless-stopped
+
+    # The whole configuration surface: seed accounts, provider API keys, anything
+    # CP_*. Passed straight into the process environment, which is where the vault
+    # looks for provider keys (cp-vault/src/local.rs:45) and where the seed reads
+    # its accounts (runtime/seed.rs) — so no file parsing and no entrypoint script.
+    # Compose also reads this same file for the ${...} substitutions below.
+    env_file: .env
+
+    # Restated here only for the `:?` guard: unset or empty, `docker compose up`
+    # refuses with this message instead of starting. That refusal is load-bearing.
+    # Accounts are seeded only while the user table is empty, and only a superadmin
+    # can create a superadmin — so a first boot without one yields a deployment
+    # that can never have one, by any in-product path. Better to fail here than at
+    # the login screen. Ignored on every later start, hence safe to keep set.
+    environment:
+      CP_SEED_SUPERADMIN_EMAIL: ${CP_SEED_SUPERADMIN_EMAIL:?set it in .env — see .env.example}
+      CP_SEED_SUPERADMIN_PASSWORD: ${CP_SEED_SUPERADMIN_PASSWORD:?set it in .env — see .env.example}
+
+    # LOOPBACK ON PURPOSE. Publishing on 0.0.0.0 serves the cockpit over plain
+    # http:// to other machines, where crypto.randomUUID is undefined and every
+    # agent command throws — the product looks broken, not insecure. To reach it
+    # from another machine, put a TLS-terminating proxy in front and point it at
+    # this container; do not widen this line.
+    ports:
+      - "127.0.0.1:${CP_PORT:-7878}:7878"
+
+    # $HOME. Everything that must survive a re-create lives here: auth.db, agent
+    # realms, the Meilisearch index. Docker seeds it from the image on first up,
+    # which is how Meilisearch gets its binary without a boot-time copy.
+    volumes:
+      - cp-data:/data
+
+    # This product runs arbitrary shell by design. None of these are optional in
+    # a deployment anyone else can reach.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 512
+    mem_limit: 4g
+    cpus: 2.0
+
+  # Optional LLM gateway. Off by default; start it with:
+  #
+  #   docker compose --profile gateway up -d
+  #
+  # and point the product at it with CP_LLM_GATEWAY=http://litellm:4000 in .env.
+  # With CP_LLM_GATEWAY unset the product talks to each provider directly and
+  # this service is never started — the two halves of the switch are independent,
+  # so setting the variable without enabling the profile leaves the agent posting
+  # to a host that does not exist.
+  litellm:
+    image: docker.litellm.ai/berriai/litellm:main-latest
+    profiles: [gateway]
+    restart: unless-stopped
+    command: ["--config", "/app/config.yaml"]
+
+    # No `ports:`. The gateway is reachable from the product over the compose
+    # network and from nowhere else; publishing it would expose an endpoint that
+    # spends money to anything that can reach the host.
+    volumes:
+      - ./litellm.yaml:/app/config.yaml:ro
+
+    # The model keys live HERE, not in the product's environment — that is the
+    # point of running a gateway: the agents, and `docker inspect` on the product
+    # container, no longer see them. required:false so the default (gateway-less)
+    # deployment does not need the file to exist at all.
+    env_file:
+      - path: providers.env
+        required: false
+    environment:
+      # The key the product presents as `CP_LLM_GATEWAY_KEY`. One value, one
+      # place: no database here, so the master key *is* the accepted credential.
+      #
+      # No `:?` guard here, deliberately. Compose interpolates the WHOLE file
+      # before profiles select anything, so a required-variable guard on this
+      # line refuses `docker compose up -d` — the default, gateway-less command —
+      # whenever CP_LLM_GATEWAY_KEY is unset, which is exactly what .env.example
+      # ships. The fallback is therefore a value no one can guess: unset the key
+      # and the gateway still starts, but rejects the product's calls with the
+      # `No connected db.` 400 in the README's table. Fails closed and
+      # diagnosable, rather than open (an empty master key accepts any bearer).
+      LITELLM_MASTER_KEY: ${CP_LLM_GATEWAY_KEY:-sk-unset-set-CP_LLM_GATEWAY_KEY-in-dot-env}
+
+    # Liveliness, not /health: the latter needs a token and issues real requests
+    # to every configured model, so using it here would bill tokens every 30s.
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request as u; u.urlopen('http://127.0.0.1:4000/health/liveliness')\""]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 2g
+
+volumes:
+  cp-data:

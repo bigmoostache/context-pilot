@@ -15,6 +15,8 @@ use serde::Serialize;
 use crate::transport::rest;
 use crate::transport::rest::HttpReply;
 
+/// What the LLM gateway declares it can route (`GET /v1/models`), cached.
+mod gateway_models;
 mod oauth_creds;
 
 // ── Wire types ──────────────────────────────────────────────────────────
@@ -381,6 +383,8 @@ pub(crate) fn providers(query: &str) -> HttpReply {
     // An empty allowlist (the delivery default) means "everything allowed".
     let restrict = apply_allowlist && !allow_set.is_empty();
 
+    let gateway = gateway_models::Filter::new();
+
     let mut out: Vec<serde_json::Value> = Vec::new();
     for p in all_providers() {
         // Usable = its credential is configured (API key, or — for the Claude
@@ -397,6 +401,9 @@ pub(crate) fn providers(query: &str) -> HttpReply {
             .filter_map(|m| {
                 let key = format!("{}:{}", p.id, m.id);
                 if restrict && !allow_set.contains(key.as_str()) {
+                    return None;
+                }
+                if !gateway.offers(p.id, m.api_name) {
                     return None;
                 }
                 let mut mv = serde_json::to_value(m).unwrap_or_default();
@@ -439,8 +446,11 @@ fn has_param(query: &str, key: &str) -> bool {
 /// re-read of `~/.context-pilot/.env`), whereas `global::has_api_key` only sees
 /// process env vars loaded by dotenvy at boot. Reading the vault here keeps the
 /// picker in sync with the key manager without requiring an orchestrator
-/// restart.
+/// restart. A gateway short-circuits all of it — see [`gateway_models::provides`].
 fn provider_usable(id: &str) -> bool {
+    if gateway_models::provides(id) {
+        return true;
+    }
     match id {
         "claudecodev2" => oauth_creds::claude_oauth_available(),
         _ => provider_key_name(id).is_some_and(|key| cp_vault::vault().get(key).is_some()),

@@ -14,6 +14,12 @@ use super::{ApiMessage, LlmClient, LlmRequest, StreamEvent};
 use crate::infra::tools::build_api;
 
 /// `MiniMax` Anthropic-compatible API endpoint.
+///
+/// Direct: `CP_LLM_GATEWAY` ([`gateway`](crate::llms::gateway)) is ignored.
+/// `LiteLLM`'s Anthropic pass-through targets Anthropic's own API, not an
+/// Anthropic-shaped third party, so there is no route that would forward this
+/// body unchanged to `MiniMax`. Sending it through the unified endpoint instead
+/// is a different request shape and a separate piece of work.
 const MINIMAX_ENDPOINT: &str = "https://api.minimax.io/anthropic/v1/messages";
 
 /// Anthropic API version used for `MiniMax` compatibility.

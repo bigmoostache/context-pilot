@@ -10,7 +10,7 @@ use crate::app::context::{ReverieContext, build_stream_params, prepare_stream_co
 use crate::infra::api::start_streaming;
 use crate::state::State;
 use cp_base::config::REVERIE;
-use cp_base::config::llm_types::StreamEvent;
+use cp_base::config::llm::types::StreamEvent;
 
 use super::tools;
 

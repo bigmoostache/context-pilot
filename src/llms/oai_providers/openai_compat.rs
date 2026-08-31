@@ -67,6 +67,22 @@ pub(crate) struct OaiTool {
     pub function: OaiFunctionDef,
 }
 
+/// Streaming options. Only ever sent when routed through a gateway, to force a
+/// final usage frame the proxy would otherwise be free to omit — see
+/// [`gateway::is_active`](crate::llms::gateway::is_active).
+#[derive(Debug, Serialize)]
+pub(crate) struct StreamOptions {
+    /// Ask for the terminal chunk carrying prompt/completion token counts.
+    pub include_usage: bool,
+}
+
+/// The `stream_options` value for the current route: `Some` behind a gateway,
+/// `None` (serialized away) when talking to the provider directly, where an
+/// unknown field risks a 400 on the whole request.
+pub(crate) fn stream_options() -> Option<StreamOptions> {
+    crate::llms::gateway::is_active().then_some(StreamOptions { include_usage: true })
+}
+
 /// Function metadata within an OpenAI-compatible tool definition.
 #[derive(Debug, Serialize)]
 pub(crate) struct OaiFunctionDef {

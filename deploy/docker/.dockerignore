@@ -1,0 +1,11 @@
+README.md
+docker-compose.yml
+.dockerignore
+# Never ship the operator's instance config into the build context — .env and
+# providers.env both hold secrets, litellm.yaml is a local copy of the template.
+.env
+providers.env
+litellm.yaml
+.env.example
+providers.env.example
+litellm.yaml.example

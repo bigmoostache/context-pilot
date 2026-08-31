@@ -92,7 +92,12 @@ pub(in crate::llms) fn build_messages_and_system(request: &LlmRequest) -> (Vec<A
 
 impl LlmClient for AnthropicClient {
     fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
-        let api_key = self.api_key.as_ref().ok_or_else(|| LlmError::Auth("ANTHROPIC_API_KEY not set".into()))?;
+        // Endpoint and auth header both come from the router: direct with
+        // `x-api-key`, or LiteLLM's pass-through with a bearer token. Resolving
+        // it before the key check is deliberate — under a gateway the provider
+        // keys live in the proxy, so an empty vault is not an error.
+        let target = super::gateway::anthropic_target(API_ENDPOINT, self.api_key.as_ref())
+            .ok_or_else(|| LlmError::Auth("ANTHROPIC_API_KEY not set".into()))?;
 
         // timeout(None) prevents reqwest from killing long-running SSE streams.
         // Without this, blocking Client may use system TCP timeouts, causing
@@ -119,8 +124,8 @@ impl LlmClient for AnthropicClient {
         }
 
         let response = client
-            .post(API_ENDPOINT)
-            .header("x-api-key", api_key.expose_secret())
+            .post(&target.url)
+            .header(target.auth_header, target.auth_value.expose_secret())
             .header("anthropic-version", API_VERSION)
             .header("content-type", "application/json")
             .json(&api_request)
@@ -149,15 +154,19 @@ impl LlmClient for AnthropicClient {
     }
 
     fn check_api(&self, model: &str) -> super::ApiCheckResult {
-        let Some(api_key) = self.api_key.as_ref() else {
+        // Checks follow the same route as real traffic: a check that validated a
+        // path production never takes would validate nothing. The two failures
+        // stay distinguishable — an unreachable gateway is a transport error, a
+        // dead provider behind it is a status code with a body.
+        let Some(target) = super::gateway::anthropic_target(API_ENDPOINT, self.api_key.as_ref()) else {
             return super::ApiCheckResult::failure(Some("ANTHROPIC_API_KEY not set".to_owned()));
         };
 
         let client = Client::new();
         let base = || {
             client
-                .post(API_ENDPOINT)
-                .header("x-api-key", api_key.expose_secret())
+                .post(&target.url)
+                .header(target.auth_header, target.auth_value.expose_secret())
                 .header("anthropic-version", API_VERSION)
                 .header("content-type", "application/json")
         };

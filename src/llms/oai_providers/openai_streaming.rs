@@ -72,6 +72,19 @@ pub(crate) struct StreamUsage {
     /// `DeepSeek`-specific: prompt tokens that missed the cache.
     #[serde(rename = "prompt_cache_miss_tokens")]
     pub prompt_cache_miss: Option<usize>,
+    /// `OpenAI`-shape cache accounting. A gateway normalizes usage into this
+    /// shape, dropping the two `DeepSeek` fields above — without it the cache
+    /// line silently reads zero through a proxy instead of failing.
+    #[serde(rename = "prompt_tokens_details")]
+    pub prompt_details: Option<PromptTokensDetails>,
+}
+
+/// The `prompt_tokens_details` object of an `OpenAI`-shape usage frame.
+#[derive(Debug, Deserialize, Clone, Copy)]
+pub(crate) struct PromptTokensDetails {
+    /// Prompt tokens served from the provider's cache.
+    #[serde(rename = "cached_tokens")]
+    pub cached: Option<usize>,
 }
 
 /// Normalize provider-specific stop reasons to our internal format.
@@ -201,6 +214,17 @@ const fn apply_usage(acc: &mut SseAccum, usage: &StreamUsage) {
     }
     if let Some(miss) = usage.prompt_cache_miss {
         acc.cache_miss_tokens = miss;
+    }
+    // Fallback for the normalized shape, never an override: the provider's own
+    // fields are more precise when present. Miss is derived so that
+    // hit + miss == prompt, the invariant `cost_log` bills on.
+    if let Some(details) = usage.prompt_details
+        && let Some(cached) = details.cached
+        && acc.cache_hit_tokens == 0
+        && acc.cache_miss_tokens == 0
+    {
+        acc.cache_hit_tokens = cached;
+        acc.cache_miss_tokens = acc.input_tokens.saturating_sub(cached);
     }
 }
 

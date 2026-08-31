@@ -6,7 +6,7 @@ use super::data::TickTelemetry;
 use super::data::config::ViewMode;
 use super::data::message::Message;
 use super::flags::{HighlightIrFn, StatusBools, StreamPhase, StreamingTool};
-use crate::config::llm_types::LlmProvider;
+use crate::config::llm::types::LlmProvider;
 use crate::panels::ContextItem;
 use crate::tools::ToolDefinition;
 use crate::ui::render_cache::{FullCache, InputCache, MessageCache};
@@ -69,17 +69,17 @@ pub struct State {
     /// Selected LLM provider
     pub llm_provider: LlmProvider,
     /// Active Anthropic model variant.
-    pub anthropic_model: crate::config::models::AnthropicModel,
+    pub anthropic_model: crate::config::llm::models::AnthropicModel,
     /// Active Grok model variant.
-    pub grok_model: crate::config::models::GrokModel,
+    pub grok_model: crate::config::llm::models::GrokModel,
     /// Active Groq model variant.
-    pub groq_model: crate::config::models::GroqModel,
+    pub groq_model: crate::config::llm::models::GroqModel,
     /// Active `DeepSeek` model variant.
-    pub deepseek_model: crate::config::models::DeepSeekModel,
+    pub deepseek_model: crate::config::llm::models::DeepSeekModel,
     /// Active `MiniMax` model variant.
-    pub minimax_model: crate::config::models::MiniMaxModel,
+    pub minimax_model: crate::config::llm::models::MiniMaxModel,
     /// Active Claude Code V2 model variant.
-    pub claude_code_v2_model: crate::config::models::ClaudeCodeV2Model,
+    pub claude_code_v2_model: crate::config::llm::models::ClaudeCodeV2Model,
     /// View mode: Normal (full sidebar), Collapsed (icons), Hidden, Threads
     pub view_mode: ViewMode,
     /// Active reverie sessions keyed by `agent_id` (e.g., "cleaner", "cartographer").
@@ -140,7 +140,7 @@ pub struct State {
     pub tick_cost_output_usd: f64,
 
     /// Result of the last API check
-    pub api_check_result: Option<crate::config::llm_types::ApiCheckResult>,
+    pub api_check_result: Option<crate::config::llm::types::ApiCheckResult>,
     /// Current API retry count (reset on success)
     pub api_retry_count: u32,
     /// Guard rail block reason (set when spine blocks, cleared when streaming starts)

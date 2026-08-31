@@ -172,7 +172,7 @@ livré — utilisable comme *preuve*, jamais comme *promesse*) · 🟥 **absent*
 | A10 | Appliance — Photonicat 2 (RK3576), Armbian Debian 13, installeur eMMC zéro-touch, ULA IPv6 dérivée du serial, Caddy + CA privée, 5G (MBIM), borne Wi-Fi | 🟩 | `deploy/PROVISIONING.md`, `deploy/photonicat/`, `deploy/ansible/` |
 | A11 | Souveraineté des données — zéro télémétrie, zéro compte, état dans les dossiers du client, MIT | 🟩 | `docs/trust-center/` |
 | A12 | Barre non-négociable — chaîne SHA-256 sur 30+ fichiers, mot de passe humain pour la régénérer | 🟨 **méthode** | `.github/checks/{protected-files.yaml,check-lint-config.sh}`, `chain.sh` — **0 référence dans le code produit** |
-| A13 | Inférence locale / air-gap complet | 🟥 **absent** | `cp-base/src/config/models.rs` : 7 backends, tous distants |
+| A13 | Inférence locale / air-gap complet | 🟥 **absent** | `cp-base/src/config/llm/models.rs` : 7 backends, tous distants |
 | A14 | Le produit s'est construit lui-même | 🟩 fait, ⚠️ à qualifier | 1 955 commits, 2026-01-30 → 2026-08-03, ~114k lignes Rust + ~50k TS, 29 crates. La part exacte écrite par l'agent reste à documenter avant tout chiffrage public |
 
 ---

@@ -53,11 +53,18 @@ struct GrokRequest {
     max_tokens: u32,
     /// Whether to stream the response via SSE.
     stream: bool,
+    /// Gateway-only: request the final usage frame.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stream_options: Option<openai_compat::StreamOptions>,
 }
 
 impl LlmClient for GrokClient {
     fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
-        let api_key = self.api_key.as_ref().ok_or_else(|| LlmError::Auth("XAI_API_KEY not set".into()))?;
+        // Gateway when configured, xAI directly otherwise; resolved before the
+        // key check because a gateway deployment keeps its provider keys in the
+        // proxy, not in this process's vault.
+        let target = crate::llms::gateway::oai_target(GROK_API_ENDPOINT, self.api_key.as_ref())
+            .ok_or_else(|| LlmError::Auth("XAI_API_KEY not set".into()))?;
 
         let client = Client::new();
 
@@ -105,30 +112,27 @@ impl LlmClient for GrokClient {
             tool_choice,
             max_tokens: request.max_output_tokens,
             stream: true,
+            stream_options: openai_compat::stream_options(),
         };
 
         super::openai_streaming::dump_request(&request.worker_id, "grok", &api_request);
 
-        let ep = super::openai_streaming::OaiEndpoint {
-            client: &client,
-            url: GROK_API_ENDPOINT,
-            key: api_key.expose_secret(),
-        };
+        let ep =
+            super::openai_streaming::OaiEndpoint { client: &client, url: &target.url, key: target.key.expose_secret() };
         let acc = super::openai_streaming::run_oai_stream(&ep, &api_request, &tx)?;
         super::openai_streaming::send_stream_done(&tx, acc);
         Ok(())
     }
 
     fn check_api(&self, model: &str) -> super::super::ApiCheckResult {
-        let Some(api_key) = self.api_key.as_ref() else {
+        // Same route as real traffic, on purpose: see the note in the Anthropic
+        // client's `check_api`.
+        let Some(target) = crate::llms::gateway::oai_target(GROK_API_ENDPOINT, self.api_key.as_ref()) else {
             return super::super::ApiCheckResult::failure(Some("XAI_API_KEY not set".to_owned()));
         };
         let client = Client::new();
-        let ep = super::openai_streaming::OaiEndpoint {
-            client: &client,
-            url: GROK_API_ENDPOINT,
-            key: api_key.expose_secret(),
-        };
+        let ep =
+            super::openai_streaming::OaiEndpoint { client: &client, url: &target.url, key: target.key.expose_secret() };
         super::openai_streaming::oai_check_api(&ep, model, "max_tokens")
     }
 }
