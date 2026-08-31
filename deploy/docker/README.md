@@ -124,7 +124,7 @@ Reading the failures, all four measured against this compose file:
 Unaffected on purpose: the two Claude Code providers (a subscription OAuth token
 cannot survive a proxy that substitutes its own key) and MiniMax (no route
 forwards an Anthropic-shaped body to a third party). They keep calling their own
-API whatever `CP_LLM_GATEWAY` says — see `src/llms/gateway.rs`.
+API whatever `CP_LLM_GATEWAY` says — see `src/llms/gateway/mod.rs`.
 
 ## Exposure
 

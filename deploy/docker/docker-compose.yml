@@ -88,7 +88,16 @@ services:
     environment:
       # The key the product presents as `CP_LLM_GATEWAY_KEY`. One value, one
       # place: no database here, so the master key *is* the accepted credential.
-      LITELLM_MASTER_KEY: ${CP_LLM_GATEWAY_KEY:?set it in .env to run the gateway}
+      #
+      # No `:?` guard here, deliberately. Compose interpolates the WHOLE file
+      # before profiles select anything, so a required-variable guard on this
+      # line refuses `docker compose up -d` — the default, gateway-less command —
+      # whenever CP_LLM_GATEWAY_KEY is unset, which is exactly what .env.example
+      # ships. The fallback is therefore a value no one can guess: unset the key
+      # and the gateway still starts, but rejects the product's calls with the
+      # `No connected db.` 400 in the README's table. Fails closed and
+      # diagnosable, rather than open (an empty master key accepts any bearer).
+      LITELLM_MASTER_KEY: ${CP_LLM_GATEWAY_KEY:-sk-unset-set-CP_LLM_GATEWAY_KEY-in-dot-env}
 
     # Liveliness, not /health: the latter needs a token and issues real requests
     # to every configured model, so using it here would bill tokens every 30s.

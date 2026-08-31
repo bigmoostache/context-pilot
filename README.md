@@ -90,7 +90,7 @@ Everything the agent "sees" is a **panel** (`cp-base/src/panels.rs`): files, too
 
 ### LLM providers
 
-`cp-base/src/config/models.rs` defines seven provider backends — Anthropic, Grok, Groq, DeepSeek, MiniMax, Claude Code (OAuth and API-key variants) — each with its model roster, pricing, context windows, and wire API names. The provider/model is switchable at runtime (and persisted) via the config overlay.
+`cp-base/src/config/llm/models.rs` defines seven provider backends — Anthropic, Grok, Groq, DeepSeek, MiniMax, Claude Code (OAuth and API-key variants) — each with its model roster, pricing, context windows, and wire API names. The provider/model is switchable at runtime (and persisted) via the config overlay.
 
 ### Persistence (tier-② state)
 

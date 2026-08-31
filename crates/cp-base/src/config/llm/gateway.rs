@@ -1,13 +1,13 @@
 //! Optional LLM gateway: is one configured, and whose traffic does it carry?
 //!
 //! Two crates need the same answer and must not drift apart. The agent asks in
-//! order to build a request (`src/llms/gateway.rs` resolves the URL and the auth
-//! header from it), and the orchestrator asks in order to decide which providers
-//! the cockpit may offer — under a gateway a provider is usable with **no local
-//! key at all**, because the key that matters lives in the proxy. Duplicating
-//! either the variable name or the routed-provider list would make the picker and
-//! the request path disagree, which reads as "no models available" with no error
-//! anywhere.
+//! order to build a request (`src/llms/gateway/mod.rs` resolves the URL and the
+//! auth header from it), and the orchestrator asks in order to decide which
+//! providers the cockpit may offer — under a gateway a provider is usable with
+//! **no local key at all**, because the key that matters lives in the proxy.
+//! Duplicating either the variable name or the routed-provider list would make
+//! the picker and the request path disagree, which reads as "no models
+//! available" with no error anywhere.
 
 /// Base URL of the gateway. Absent or empty means "no gateway".
 pub const GATEWAY_URL_ENV: &str = "CP_LLM_GATEWAY";

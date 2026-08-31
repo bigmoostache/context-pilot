@@ -6,7 +6,7 @@
 # what keeps `cache_control` and the anthropic-beta header intact.
 #
 # `model_name` must match, character for character, the string the product puts
-# in the request body: the `api_name` values in crates/cp-base/src/config/models.rs.
+# in the request body: the `api_name` values in crates/cp-base/src/config/llm/models.rs.
 # A model missing from this list is a 400 at the first message, not a fallback.
 #
 # This list is also what the cockpit offers: the orchestrator reads it back
