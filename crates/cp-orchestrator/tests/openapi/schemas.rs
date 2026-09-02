@@ -99,7 +99,8 @@ pub(super) fn core() -> Value {
                 "paused": { "type": "boolean" },
                 "focused": { "type": "boolean" },
                 "log": arr(r("ThreadMsg")),
-                "tasks": arr(r("ThreadTask"))
+                "tasks": arr(r("ThreadTask")),
+                "notes": arr(r("ThreadNote"))
             },
             "required": ["id", "name", "status", "agentId", "log"]
         },
@@ -113,6 +114,15 @@ pub(super) fn core() -> Value {
                 "status": { "type": "string", "enum": ["planned", "in_progress", "done"] }
             },
             "required": ["id", "name", "status"]
+        },
+        "ThreadNote": {
+            "type": "object",
+            "properties": {
+                "id": { "type": "string" },
+                "title": { "type": "string" },
+                "content": { "type": "string" }
+            },
+            "required": ["id", "title", "content"]
         },
         "ThreadMsg": {
             "type": "object",

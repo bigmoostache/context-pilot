@@ -8,6 +8,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::snapshot::Snapshot;
+use super::snapshot::notes::WireNote;
 use super::snapshot::todo::WireTask;
 use super::{ContentHash, LifecycleState, Phase, ThreadTurn};
 
@@ -202,6 +203,25 @@ pub enum OpEntryKind {
         thread_id: String,
         /// The thread's complete current task list (cancelled excluded).
         tasks: Vec<WireTask>,
+    },
+
+    /// A thread's projected scratchpad-note list changed — the read-only cells
+    /// the web thread view renders in its Notes aside. Carries the thread's
+    /// **complete** current note list as a whole-list snapshot, so an observer
+    /// folds it by replacing [`RosterThread::notes`](super::snapshot::RosterThread::notes)
+    /// wholesale (see [`RosterThread::fold_notes`](super::snapshot::RosterThread::fold_notes)).
+    ///
+    /// Durable roster state (carried in the [`Checkpoint`](Self::Checkpoint)
+    /// snapshot via the roster), emitted whenever the agent observes a thread's
+    /// scratchpad cells change. The notes themselves are also re-derivable from
+    /// the agent's tier-② persistence, so a dropped delta self-heals on the next
+    /// change. The twin of [`TaskListChanged`](Self::TaskListChanged).
+    #[serde(rename = "notes_changed")]
+    NotesChanged {
+        /// The thread whose note list changed.
+        thread_id: String,
+        /// The thread's complete current scratchpad-note list.
+        notes: Vec<WireNote>,
     },
 
     /// The agent's *focused* thread changed — which thread it is actively

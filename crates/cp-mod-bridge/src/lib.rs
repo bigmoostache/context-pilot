@@ -206,6 +206,18 @@ pub struct BridgeState {
     /// `src/app/run/threads/messages.rs`)
     pub thread_tasks: std::collections::HashMap<String, Vec<cp_wire::types::snapshot::todo::WireTask>>,
 
+    /// Per-thread projected scratchpad-note list as last emitted/seeded, keyed
+    /// by thread id. The note chokepoint (`emit_notes`) projects each thread's
+    /// scratchpad cells into `WireNote`s, diffs the result against this memo
+    /// every tick, and emits a
+    /// [`NotesChanged`](cp_wire::types::oplog::OpEntryKind::NotesChanged)
+    /// (whole-list snapshot) only when the list actually changes — the twin of
+    /// [`thread_tasks`](Self::thread_tasks). Seeded from the oplog roster on the
+    /// first post-boot tick so a change that landed on disk while the bridge was
+    /// down but was never journaled is emitted on the very first pass
+    /// (self-healing disk↔oplog divergence).
+    pub thread_notes: std::collections::HashMap<String, Vec<cp_wire::types::snapshot::notes::WireNote>>,
+
     /// Flags tracking which observe-on-change memos have been seeded from the
     /// oplog roster on the first tick after boot. See [`MemoSeeds`].
     pub seeded: MemoSeeds,

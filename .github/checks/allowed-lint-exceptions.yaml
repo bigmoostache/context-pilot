@@ -179,6 +179,8 @@ exceptions:
 
 
 
+
+
   # ── app/run/*: multiple_inherent_impl for App ────────────────────────
 
   - path: "src/app/run/lifecycle.rs"
@@ -404,6 +406,15 @@ exceptions:
       #[non_exhaustive] is impossible.
     strategy: >
       Irreducible — a five-arg constructor trips too_many_arguments; the exhaustive literal is honest.
+
+  - path: "crates/cp-wire/src/types/snapshot/notes.rs"
+    match: "wire value object: all three fields are public, stable, and built by cross-crate consumers via a struct literal, so #[non_exhaustive] would forbid that construction"
+    reason: >
+      WireNote is the three-field read-only scratchpad-note projection, built by struct literal
+      cross-crate (the agent's note projection and the orchestrator's first-paint read). It is the
+      twin of WireTask; #[non_exhaustive] would forbid the cross-crate literal construction.
+    strategy: >
+      Irreducible — the exhaustive literal is the honest shape for a cross-crate wire value object.
 
   # ── exhaustive_enums: T671 read-path query contracts ─────────────────
   # The read-plane mirror of the command contracts above: query Kind is built

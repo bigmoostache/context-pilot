@@ -2,7 +2,8 @@
 //! observe-on-change live-emission chokepoints.
 //!
 //! Each live emitter (messages, statuses, focus, archived, paused, behaviour,
-//! identity, tasks) seeds its per-thread diff memo on the first post-boot pass
+//! identity, tasks, notes) seeds its per-thread diff memo on the first
+//! post-boot pass
 //! *without* emitting, so a (re)started agent does not replay its whole backlog
 //! onto the oplog. This bitfield records which of those first-pass seeds have
 //! happened. Extracted from `lib.rs` to keep that file under the 500-line cap;
@@ -13,27 +14,29 @@
 /// Each flag is `false` until the corresponding chokepoint runs its first
 /// pass (seed without emit), then `true` for the remainder of the session.
 /// Stored as a compact bitfield to stay under the `struct_excessive_bools`
-/// lint (eight independent seed flags).
+/// lint (nine independent seed flags).
 #[derive(Debug, Default, Clone, Copy)]
-pub struct MemoSeeds(u8);
+pub struct MemoSeeds(u16);
 
 impl MemoSeeds {
     /// Bit position: messages memo.
-    const MESSAGES: u8 = 1 << 0;
+    const MESSAGES: u16 = 1 << 0;
     /// Bit position: statuses memo.
-    const STATUSES: u8 = 1 << 1;
+    const STATUSES: u16 = 1 << 1;
     /// Bit position: focus memo.
-    const FOCUS: u8 = 1 << 2;
+    const FOCUS: u16 = 1 << 2;
     /// Bit position: archived memo.
-    const ARCHIVED: u8 = 1 << 3;
+    const ARCHIVED: u16 = 1 << 3;
     /// Bit position: paused memo.
-    const PAUSED: u8 = 1 << 4;
+    const PAUSED: u16 = 1 << 4;
     /// Bit position: behaviour (active-agent) memo.
-    const BEHAVIOUR: u8 = 1 << 5;
+    const BEHAVIOUR: u16 = 1 << 5;
     /// Bit position: identity (self-identity) memo.
-    const IDENTITY: u8 = 1 << 6;
+    const IDENTITY: u16 = 1 << 6;
     /// Bit position: task-list memo.
-    const TASKS: u8 = 1 << 7;
+    const TASKS: u16 = 1 << 7;
+    /// Bit position: note-list memo.
+    const NOTES: u16 = 1 << 8;
 
     /// Messages memo seeded (`emit_messages`).
     #[must_use]
@@ -76,6 +79,12 @@ impl MemoSeeds {
         self.0 & Self::TASKS != 0
     }
 
+    /// Note-list memo seeded (`emit_notes`).
+    #[must_use]
+    pub const fn notes(self) -> bool {
+        self.0 & Self::NOTES != 0
+    }
+
     /// Mark messages as seeded.
     pub const fn seed_messages(&mut self) {
         self.0 |= Self::MESSAGES;
@@ -107,5 +116,10 @@ impl MemoSeeds {
     /// Mark task-lists as seeded.
     pub const fn seed_tasks(&mut self) {
         self.0 |= Self::TASKS;
+    }
+
+    /// Mark note-lists as seeded.
+    pub const fn seed_notes(&mut self) {
+        self.0 |= Self::NOTES;
     }
 }

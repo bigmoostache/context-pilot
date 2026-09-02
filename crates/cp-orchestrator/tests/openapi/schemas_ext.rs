@@ -416,7 +416,10 @@ pub(super) fn transport() -> Value {
                 "agent_id": { "type": "string" },
                 // task_list_changed delta payload: the thread's complete current
                 // (cancelled-excluded) task list, carried by a `kind:"task_list_changed"` entry.
-                "tasks": arr(r("ThreadTask"))
+                "tasks": arr(r("ThreadTask")),
+                // notes_changed delta payload: the thread's complete current
+                // scratchpad-note list, carried by a `kind:"notes_changed"` entry.
+                "notes": arr(r("ThreadNote"))
             },
             "required": ["kind"]
         },

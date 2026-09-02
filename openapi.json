@@ -1708,6 +1708,12 @@
           "name": {
             "type": "string"
           },
+          "notes": {
+            "items": {
+              "$ref": "#/components/schemas/ThreadNote"
+            },
+            "type": "array"
+          },
           "output_tokens": {
             "type": "integer"
           },
@@ -2040,6 +2046,12 @@
           "name": {
             "type": "string"
           },
+          "notes": {
+            "items": {
+              "$ref": "#/components/schemas/ThreadNote"
+            },
+            "type": "array"
+          },
           "paused": {
             "type": "boolean"
           },
@@ -2101,6 +2113,25 @@
         "required": [
           "id",
           "author"
+        ],
+        "type": "object"
+      },
+      "ThreadNote": {
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "content"
         ],
         "type": "object"
       },

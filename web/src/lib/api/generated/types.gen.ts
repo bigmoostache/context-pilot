@@ -593,6 +593,7 @@ export type OpEntryKind = {
     message_ts?: number;
     miss_tokens?: number;
     name?: string;
+    notes?: Array<ThreadNote>;
     output_tokens?: number;
     phase?: string;
     state?: string;
@@ -691,6 +692,7 @@ export type ThreadDetail = {
     lastActivityMs?: number;
     log: Array<ThreadMsg>;
     name: string;
+    notes?: Array<ThreadNote>;
     paused?: boolean;
     status: 'MY_TURN' | 'THEIR_TURN' | 'ACTIVE';
     tasks?: Array<ThreadTask>;
@@ -705,6 +707,12 @@ export type ThreadMsg = {
     text?: string;
     tool?: ToolCall;
     ts?: number;
+};
+
+export type ThreadNote = {
+    content: string;
+    id: string;
+    title: string;
 };
 
 export type ThreadTask = {
