@@ -374,9 +374,14 @@ function NoteRow({
       </div>
       {open && (
         <div className="px-2 pt-0.5 pb-2 pl-[1.85rem]">
+          {/* Note content is ACTUAL content, not low-attention metadata, so it
+              uses the same text colour as an assistant thread message
+              (`text-foreground/90`, the AssistantMessage body colour) rather
+              than the muted grey used for de-emphasised data. The compact
+              12.5px/relaxed sizing suits the narrow aside rail. */}
           <Markdown
             text={note.content}
-            className="text-[12.5px] leading-relaxed text-muted-foreground/80"
+            className="text-[12.5px] leading-relaxed text-foreground/90"
           />
         </div>
       )}
