@@ -101,11 +101,8 @@ export function ThreadList({
     />
   )
 
+  // `bg-surface-2` (`--card` is the selected row on top). Flush, no h-margin.
   return (
-    // `bg-surface-2`, not `bg-card` (`--card` is the selected row that sits ON
-    // this panel). No horizontal margin (`my-2` only): the panel runs flush, the
-    // `card-shadow` separates it, and ThreadsView's collapse offset is just
-    // `--sidebar-w` with no margins to add on.
     <aside className="card-shadow my-2 flex w-(--sidebar-w) shrink-0 flex-col overflow-hidden rounded-none border border-border bg-surface-2">
       {/* fixed-width inner shell pinned to the rail width */}
       <div
@@ -167,8 +164,7 @@ export function ThreadList({
 }
 
 /** The "‹ Archived" back-link band, shown ONLY while viewing the archived set.
- *  Its former New-thread / Search / collapse cluster moved to the header rail;
- *  on the normal view it now has no content and returns null. */
+ *  Returns null on the normal view (its former cluster moved to the header rail). */
 function ListHeader({
   showArchived,
   onToggleArchived,
@@ -285,7 +281,7 @@ function ThreadRow({
     <div
       onMouseEnter={marquee.onMouseEnter}
       onMouseLeave={marquee.onMouseLeave}
-      // `py-1.5` (12px), not `py-2`: two text lines are ~33px. One child, no gap.
+      // `py-1.5` (12px): two text lines are ~33px. One child, no gap.
       className={cn(
         "group relative mb-0.5 flex w-full flex-col rounded-lg px-2.5 py-1.5 text-left transition-colors select-none",
         selected ? "card-shadow bg-card" : "hover:card-shadow hover:bg-card",
@@ -294,8 +290,7 @@ function ThreadRow({
       {navHint && (
         <HintBadge label={navHint === "up" ? "↑" : "↓"} shown={Boolean(navHeld)} side="left" />
       )}
-      {/* `gap-0.5` binds title + preview into ONE unit; rows are kept apart by
-          padding + `mb-0.5`, sharpening the hierarchy. */}
+      {/* `gap-0.5` binds title + preview into one unit; rows kept apart by padding + `mb-0.5`. */}
       <div {...clickable(() => onSelect(t.id))} className="flex flex-col gap-0.5 text-left">
         {/* line 1 — dot + status badges + name + time + hover actions */}
         <div className="flex items-center gap-2">
@@ -430,9 +425,7 @@ function StatusBadge({ tone, label }: { tone: "ok" | "warn"; label: string }) {
 
 /** A row's second line: either the T687 task-progress widget (`x/y` + segmented
  *  bar + label) or the flattened message preview when the thread has no tasks,
- *  and the unread pill. Focused/paused badges now live on the FIRST line. When
- *  every task is done the whole line renders muted so a finished thread reads
- *  calm and doesn't pull focus. */
+ *  plus the unread pill. When every task is done the whole line renders muted. */
 function RowMeta({ t, archived }: { t: ThreadDetail; archived: boolean }) {
   const progress = threadProgress(t)
   const allDone = progress !== null && progress.done === progress.total
@@ -457,10 +450,9 @@ function RowMeta({ t, archived }: { t: ThreadDetail; archived: boolean }) {
 
 /**
  * The row's second-line task-progress widget (T687): an `x/y` (done/total)
- * count, then a slim three-segment track — green `done`, orange `inProgress`,
- * gray `planned` (the track showing through) — then the current-front label.
- * When `muted` (the whole thread is done) every part renders in the muted grey
- * so a finished thread doesn't pull focus.
+ * count, a slim three-segment track (green done · orange in-progress · purple
+ * planned), then the current-front label. `muted` (whole thread done) renders
+ * every part in muted grey so a finished thread doesn't pull focus.
  */
 function RowProgress({
   p,
@@ -477,7 +469,10 @@ function RowProgress({
       <span className={"shrink-0 text-[11px] tabular-nums " + countCls}>
         {p.done}/{p.total}
       </span>
-      <span className="relative h-1 w-10 shrink-0 overflow-hidden bg-muted">
+      <span
+        className="relative h-1 w-10 shrink-0 overflow-hidden"
+        style={{ background: muted ? "var(--muted)" : "var(--linear-purple)" }}
+      >
         {/* done — green, filled from the left */}
         <span
           className="absolute inset-y-0 left-0 transition-[width] duration-300 ease-out"
@@ -486,11 +481,18 @@ function RowProgress({
             background: muted ? "var(--muted-foreground)" : "var(--ok)",
           }}
         />
-        {/* in-progress — orange, starting where done ends (gray track = planned) */}
+        {/* in-progress — fixed-width orange segment (starts where done ends),
+            with a green overlay looping 0→100% of it (see progress-sweep) to
+            signal live work; the planned remainder is the purple track. */}
         <span
-          className="absolute inset-y-0 transition-all duration-300 ease-out"
+          className="absolute inset-y-0 overflow-hidden transition-all duration-300 ease-out"
           style={{ left: `${donePct}%`, width: `${inProgPct}%`, background: "var(--warn)" }}
-        />
+        >
+          <span
+            className="absolute inset-y-0 left-0 motion-reduce:hidden"
+            style={{ background: "var(--ok)", animation: "progress-sweep 1.4s linear infinite" }}
+          />
+        </span>
       </span>
       <span className={"truncate text-[11.5px] " + countCls}>{p.label}</span>
     </span>

@@ -1,5 +1,5 @@
 import { useMemo, useState, type KeyboardEvent } from "react"
-import { Square, SquareDot, SquareCheckBig, ChevronRight } from "lucide-react"
+import { Square, SquareCheckBig, ChevronRight } from "lucide-react"
 import type { ThreadTask } from "@/lib/types"
 
 /**
@@ -90,7 +90,7 @@ function TaskRow({
       <span
         className={
           task.status === "done"
-            ? "text-[13.5px]/none text-muted-foreground/50 line-through"
+            ? "text-[13.5px]/none text-muted-foreground/50"
             : "text-[13.5px]/none text-foreground/85 group-hover:text-foreground"
         }
       >
@@ -143,9 +143,45 @@ function StatusIcon({ status }: { status: ThreadTask["status"] }) {
     return <SquareCheckBig className="size-3 shrink-0 text-(--ok)" />
   }
   if (status === "in_progress") {
-    return <SquareDot className="size-3 shrink-0 text-(--signal)" />
+    // A lit segment (the "snake") travels clockwise around a FIXED square
+    // outline — the square and its centre dot never move (the old animate-spin
+    // rotated the whole glyph, corners and all, which is not what "the border
+    // turns around the square" means). Built with SVG stroke-dashoffset
+    // marching: `pathLength={100}` normalises the perimeter to 100 units, so the
+    // dash `80 20` is an 80%-of-perimeter lit snake + 20% gap, and the
+    // `snake-border` keyframe runs the offset 0→-100 for one clockwise lap.
+    // A dim full outline underneath is the "track" the snake runs on. The dot
+    // is an SVG <circle> so it dodges the global `border-radius:0` reset (a
+    // CSS-rounded element would render square). `motion-reduce` drops the snake,
+    // leaving the static track + dot.
+    return (
+      <svg viewBox="0 0 12 12" className="size-3 shrink-0" fill="none" aria-hidden="true">
+        <rect
+          x="1.25"
+          y="1.25"
+          width="9.5"
+          height="9.5"
+          stroke="var(--signal)"
+          strokeOpacity="0.25"
+          strokeWidth="1.5"
+        />
+        <rect
+          x="1.25"
+          y="1.25"
+          width="9.5"
+          height="9.5"
+          stroke="var(--signal)"
+          strokeWidth="1.5"
+          pathLength={100}
+          strokeDasharray="80 20"
+          className="motion-reduce:hidden"
+          style={{ animation: "snake-border 1.2s linear infinite" }}
+        />
+        <circle cx="6" cy="6" r="1.25" fill="var(--signal)" />
+      </svg>
+    )
   }
-  return <Square className="size-3 shrink-0 text-muted-foreground/45" />
+  return <Square className="size-3 shrink-0 text-(--linear-purple)" />
 }
 
 const ROOT_KEY = "\u{0}root"
@@ -181,8 +217,15 @@ function buildModel(tasks: ThreadTask[]): TaskModel {
     if (!kids) return false // leaf — not a collapsible parent
     return kids.every((k) => closed(k.status) && (!childrenOf.has(k.id) || allClosed(k.id)))
   }
+  // A branch with NO started work either (every descendant still `planned`, no
+  // done, no in_progress) also folds away — a not-yet-touched group reads calm.
+  const allPlanned = (id: string): boolean => {
+    const kids = childrenOf.get(id)
+    if (!kids) return false // leaf — not a collapsible parent
+    return kids.every((k) => k.status === "planned" && (!childrenOf.has(k.id) || allPlanned(k.id)))
+  }
   for (const t of tasks) {
-    if (childrenOf.has(t.id) && allClosed(t.id)) defaultCollapsed.add(t.id)
+    if (childrenOf.has(t.id) && (allClosed(t.id) || allPlanned(t.id))) defaultCollapsed.add(t.id)
   }
   return { childrenOf, defaultCollapsed }
 }
