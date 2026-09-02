@@ -1,6 +1,7 @@
 import { useMemo, useState, type KeyboardEvent } from "react"
 import { Square, SquareCheckBig, ChevronRight, StickyNote } from "lucide-react"
 import type { ThreadTask, ThreadNote } from "@/lib/types"
+import { Markdown } from "@/lib/support/markdown"
 
 /**
  * The Tasks-tab body of {@link ThreadAside} (T662) — the thread's todo tree,
@@ -319,8 +320,11 @@ function NoteRow({
         </span>
       </div>
       {open && (
-        <div className="px-2 pt-0.5 pb-2 pl-[1.85rem] text-[12.5px] leading-relaxed whitespace-pre-wrap text-muted-foreground/80">
-          {note.content}
+        <div className="px-2 pt-0.5 pb-2 pl-[1.85rem]">
+          <Markdown
+            text={note.content}
+            className="text-[12.5px] leading-relaxed text-muted-foreground/80"
+          />
         </div>
       )}
     </div>
