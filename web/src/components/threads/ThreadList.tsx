@@ -13,6 +13,7 @@ import {
   threadProgress,
 } from "@/lib/support/threadMessages"
 import { HintBadge } from "@/components/shell/chrome/HintBadge"
+import { useThreadReadState } from "@/lib/live/threadView"
 import { ThreadSearchPalette } from "./dialogs/ThreadSearchPalette"
 
 interface ThreadListProps {
@@ -43,7 +44,7 @@ interface ThreadListProps {
  * {@link RowActions} / {@link RowMeta} keep budgets.
  */
 export function ThreadList({
-  threads,
+  threads: rawThreads,
   agentId,
   selectedId,
   onSelect,
@@ -55,6 +56,11 @@ export function ThreadList({
   searchOpen,
   onSearchOpenChange,
 }: ThreadListProps) {
+  // Overlay each thread's `unread` with the client-side "not read by the user"
+  // count (T712) — the badge now reflects the human's read receipts, not the
+  // agent's. Opening a thread marks it read as a side effect of this hook.
+  const { unreadOf } = useThreadReadState(agentId, rawThreads, selectedId)
+  const threads = rawThreads.map((t) => ({ ...t, unread: unreadOf(t) }))
   const live = threads.filter((t) => !t.archived)
   const archived = threads.filter((t) => t.archived)
   const archivedCount = archived.length
@@ -208,8 +214,7 @@ function Group({ label, count, first }: { label: string; count: number; first?: 
   )
 }
 
-/** Row-hover title marquee (WAA): 0.3s dwell, scroll left at 10 chars/s, 0.3s
- *  dwell, teleport back. No-op if the title fits or prefers-reduced-motion. */
+/** Row-hover title marquee (WAA): dwell, scroll left ~10 chars/s, dwell, reset. No-op if it fits / reduced-motion. */
 function useTitleMarquee() {
   const trackRef = useRef<HTMLSpanElement>(null)
   const animRef = useRef<Animation | null>(null)
@@ -386,8 +391,7 @@ function RowAction({
   onClick: () => void
 }) {
   return (
-    // `top`: at the rail's right edge, `right` would open over the conversation
-    // and `left` back over the rail itself.
+    // `top`: `right` would open over the conversation, `left` back over the rail.
     <Tip title={copy.title} body={copy.body} side="top" triggerClassName="inline-flex">
       <button
         onClick={(e) => {
@@ -407,8 +411,7 @@ function RowAction({
   )
 }
 
-/** A first-line status pill (focused / paused), tone-keyed to the app palette.
- *  No `rounded-*` — the codebase is square throughout. */
+/** A first-line status pill (focused / paused), tone-keyed to the palette (no `rounded-*` — the codebase is square). */
 function StatusBadge({ tone, label }: { tone: "ok" | "warn"; label: string }) {
   return (
     <span
@@ -423,9 +426,8 @@ function StatusBadge({ tone, label }: { tone: "ok" | "warn"; label: string }) {
   )
 }
 
-/** A row's second line: either the T687 task-progress widget (`x/y` + segmented
- *  bar + label) or the flattened message preview when the thread has no tasks,
- *  plus the unread pill. When every task is done the whole line renders muted. */
+/** A row's second line: the T687 task-progress widget (or the message preview
+ *  when the thread has no tasks), plus the unread pill; muted when all done. */
 function RowMeta({ t, archived }: { t: ThreadDetail; archived: boolean }) {
   const progress = threadProgress(t)
   const allDone = progress !== null && progress.done === progress.total
@@ -449,10 +451,9 @@ function RowMeta({ t, archived }: { t: ThreadDetail; archived: boolean }) {
 }
 
 /**
- * The row's second-line task-progress widget (T687): an `x/y` (done/total)
- * count, a slim three-segment track (green done · orange in-progress · purple
- * planned), then the current-front label. `muted` (whole thread done) renders
- * every part in muted grey so a finished thread doesn't pull focus.
+ * The row's second-line task-progress widget (T687): `x/y` count, a slim
+ * three-segment track (green done · orange in-progress · purple planned), then
+ * the current-front label. `muted` (all done) greys every part so it stays calm.
  */
 function RowProgress({
   p,
@@ -481,12 +482,11 @@ function RowProgress({
             background: muted ? "var(--muted-foreground)" : "var(--ok)",
           }}
         />
-        {/* in-progress — fixed-width orange segment (starts where done ends),
-            with a green overlay looping 0→100% of it (see progress-sweep) to
-            signal live work; the planned remainder is the purple track. */}
+        {/* in-progress — orange segment after `done`, with a green sweep
+            overlay (progress-sweep) signalling live work; planned = purple track */}
         <span
           className="absolute inset-y-0 overflow-hidden transition-all duration-300 ease-out"
-          style={{ left: `${donePct}%`, width: `${inProgPct}%`, background: "var(--warn)" }}
+          style={{ left: `${donePct}%`, width: `${inProgPct}%`, background: "var(--signal)" }}
         >
           <span
             className="absolute inset-y-0 left-0 motion-reduce:hidden"
