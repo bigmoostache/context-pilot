@@ -44,35 +44,50 @@ fn append_editor_markdown(lines: &mut Vec<String>, cs: &CallbackState) {
     }
 }
 
-/// Panel rendering for callback definitions table and inline script editor.
+/// Render `s` as a single-line, double-quoted YAML scalar: backslashes and
+/// quotes are escaped and newlines flattened to spaces, so a pattern/description
+/// containing `:`, `*`, `"`, or line breaks stays valid, one-line YAML.
+fn yaml_scalar(s: &str) -> String {
+    let escaped = s.replace('\\', "\\\\").replace('"', "\\\"").replace(['\n', '\r'], " ");
+    format!("\"{escaped}\"")
+}
+
+/// Append one callback definition as a YAML sequence entry (mirrors the TUI
+/// `definitions_yaml`). `success` is emitted only when set; `pattern`/`name`/
+/// `description`/`cwd`/`success` are quoted scalars (globs and prose are unsafe
+/// bare), while `blocking`/`timeout`/`scope` are plain values.
+fn push_callback_yaml_lines(lines: &mut Vec<String>, def: &crate::types::CallbackDefinition) {
+    let timeout = def.timeout_secs.map_or_else(|| "none".to_owned(), |t| format!("{t}s"));
+    let scope = if def.is_global { "global" } else { "local" };
+    let cwd = def.cwd.as_deref().unwrap_or("project root");
+    lines.push(format!("  - id: {}", def.id));
+    lines.push(format!("    name: {}", yaml_scalar(&def.name)));
+    lines.push(format!("    pattern: {}", yaml_scalar(&def.pattern)));
+    lines.push(format!("    blocking: {}", def.blocking));
+    lines.push(format!("    timeout: {timeout}"));
+    lines.push(format!("    scope: {scope}"));
+    if let Some(success) = def.success_message.as_deref() {
+        lines.push(format!("    success: {}", yaml_scalar(success)));
+    }
+    lines.push(format!("    cwd: {}", yaml_scalar(cwd)));
+    lines.push(format!("    description: {}", yaml_scalar(&def.description)));
+}
+
+/// Panel rendering for callback definitions (YAML-style) and inline script editor.
 pub(crate) struct CallbackPanel;
 
 impl CallbackPanel {
-    /// Build the markdown table representation used for LLM context.
+    /// Build the YAML-sequence representation used for LLM context.
     fn format_for_context(state: &State) -> String {
         let cs = CallbackState::get(state);
 
         if cs.definitions.is_empty() {
-            return "No callbacks configured.".to_owned();
+            return "callbacks: []".to_owned();
         }
 
-        let mut lines = Vec::new();
-        lines.push("| ID | Name | Pattern | Description | Blocking | Timeout | Scope | Success Msg | CWD |".to_owned());
-        lines.push(
-            "|------|------|---------|-------------|----------|---------|-------|-------------|-----|".to_owned(),
-        );
-
+        let mut lines = vec!["callbacks:".to_owned()];
         for def in &cs.definitions {
-            let blocking = if def.blocking { "yes" } else { "no" };
-            let timeout = def.timeout_secs.map_or_else(|| "\u{2014}".to_owned(), |t| format!("{t}s"));
-            let success = def.success_message.as_deref().unwrap_or("\u{2014}");
-            let cwd = def.cwd.as_deref().unwrap_or("project root");
-            let scope = if def.is_global { "global" } else { "local" };
-
-            lines.push(format!(
-                "| {} | {} | {} | {} | {} | {} | {} | {} | {} |",
-                def.id, def.name, def.pattern, def.description, blocking, timeout, scope, success, cwd
-            ));
+            push_callback_yaml_lines(&mut lines, def);
         }
 
         // If editor is open, append the script content below the table with warning
@@ -82,43 +97,48 @@ impl CallbackPanel {
     }
 }
 
-/// Build the callback-definitions table block (one row per definition).
-fn definitions_table(cs: &CallbackState) -> cp_render::Block {
-    use cp_render::{Align, Cell as IrCell, Semantic};
-    let mut rows = Vec::new();
-    for def in &cs.definitions {
-        let blocking = if def.blocking { "yes" } else { "no" };
-        let timeout = def.timeout_secs.map_or_else(|| "\u{2014}".to_owned(), |t| format!("{t}s"));
-        let scope = if def.is_global { "global" } else { "local" };
-        let success = def.success_message.as_deref().unwrap_or("\u{2014}");
-        let cwd = def.cwd.as_deref().unwrap_or("project root");
+/// A YAML `key: value` IR line indented by `indent` spaces (key muted, value
+/// styled) — the TUI twin of the context-String `push_callback_yaml_lines`.
+fn kv_line(indent: usize, key: &str, value: String, value_sem: cp_render::Semantic) -> cp_render::Block {
+    use cp_render::{Block, Span as S};
+    Block::Line(vec![S::muted(format!("{:indent$}{key}: ", "", indent = indent)), S::styled(value, value_sem)])
+}
 
-        rows.push(vec![
-            IrCell::styled(def.id.clone(), Semantic::Accent),
-            IrCell::styled(def.name.clone(), Semantic::Success),
-            IrCell::text(def.pattern.clone()),
-            IrCell::styled(def.description.clone(), Semantic::Muted),
-            IrCell::text(blocking.into()),
-            IrCell::text(timeout),
-            IrCell::styled(scope.into(), Semantic::Muted),
-            IrCell::styled(success.into(), Semantic::Muted),
-            IrCell::styled(cwd.into(), Semantic::Muted),
-        ]);
+/// A YAML boolean line styled green when `true`, muted when `false`.
+fn bool_line(key: &str, value: bool) -> cp_render::Block {
+    use cp_render::Semantic;
+    let sem = if value { Semantic::Success } else { Semantic::Muted };
+    kv_line(4, key, value.to_string(), sem)
+}
+
+/// The `  - id: {id}` sequence-entry opener (dash + id).
+fn entry_line(id: &str) -> cp_render::Block {
+    use cp_render::{Block, Semantic, Span as S};
+    Block::Line(vec![S::muted("  - id: ".into()), S::styled(id.into(), Semantic::AccentDim)])
+}
+
+/// Push the callback-definitions YAML sequence (one entry per definition),
+/// mirroring the context-String `format_for_context`. `success` is emitted only
+/// when set; `blocking` is a green-when-true bool line.
+fn definitions_yaml(cs: &CallbackState, blocks: &mut Vec<cp_render::Block>) {
+    use cp_render::{Block, Semantic, Span as S};
+    blocks.push(Block::Line(vec![S::styled("callbacks:".into(), Semantic::Header).bold()]));
+    for def in &cs.definitions {
+        let timeout = def.timeout_secs.map_or_else(|| "none".to_owned(), |t| format!("{t}s"));
+        let scope = if def.is_global { "global" } else { "local" };
+        let cwd = def.cwd.as_deref().unwrap_or("project root");
+        blocks.push(entry_line(&def.id));
+        blocks.push(kv_line(4, "name", def.name.clone(), Semantic::Success));
+        blocks.push(kv_line(4, "pattern", def.pattern.clone(), Semantic::Code));
+        blocks.push(bool_line("blocking", def.blocking));
+        blocks.push(kv_line(4, "timeout", timeout, Semantic::Default));
+        blocks.push(kv_line(4, "scope", scope.to_owned(), Semantic::Muted));
+        if let Some(success) = def.success_message.as_deref() {
+            blocks.push(kv_line(4, "success", success.to_owned(), Semantic::Muted));
+        }
+        blocks.push(kv_line(4, "cwd", cwd.to_owned(), Semantic::Muted));
+        blocks.push(kv_line(4, "description", def.description.clone(), Semantic::Muted));
     }
-    cp_render::Block::table(
-        vec![
-            ("ID", Align::Left),
-            ("Name", Align::Left),
-            ("Pattern", Align::Left),
-            ("Description", Align::Left),
-            ("Blocking", Align::Left),
-            ("Timeout", Align::Left),
-            ("Scope", Align::Left),
-            ("Success Msg", Align::Left),
-            ("CWD", Align::Left),
-        ],
-        rows,
-    )
 }
 
 /// Append the open-editor sub-view blocks (warning banner + script body) to
@@ -215,7 +235,8 @@ impl Panel for CallbackPanel {
             ];
         }
 
-        let mut blocks = vec![definitions_table(cs)];
+        let mut blocks = Vec::new();
+        definitions_yaml(cs, &mut blocks);
         append_editor_blocks(&mut blocks, cs);
         blocks
     }

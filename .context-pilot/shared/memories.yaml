@@ -397,10 +397,10 @@ M-short-25:
   last_edited_ms: 0
 M-short-26:
   tier: short
-  title: UnixStream::pair() test
-  contents: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
-  importance: high
-  last_edited_ms: 0
+  title: Library panel YAML
+  contents: 'T720 SHIPPED (f3e4aab5, t715-orch-reader-rebuild): Library fixed panel renders YAML-style (agents:/skills:/commands: seqs), not Markdown tables. library_panel.rs context()=push_*_yaml + yaml_scalar() + # cheatsheet; library_blocks.rs=kv_line/bool_line/entry_line Block::Line (bool green-when-true).'
+  importance: medium
+  last_edited_ms: 1788360268582
 M-short-27:
   tier: short
   title: T584 tool-call UI

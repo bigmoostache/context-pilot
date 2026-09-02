@@ -4594,6 +4594,10 @@
   path: web/src/components/agents/ModelPicker.tsx
   description: Shared two-level LLM provider+model picker. Receives providers[] as prop (pure component). Provider rail (pills) above model cards. Guards against empty providers (returns null while API loading). Used by AgentModal (manage) and ConfigPanel (defaults).
   last_edited_ms: 0
+2f682856ab6b9ef0:
+  path: web/src/components/threads/fileUpload/ThreadAsideTasks.tsx
+  description: 'ThreadAside Tasks+Notes tab bodies (T662/T716): TaskList (read-only todo tree, auto-collapse of all-done/all-planned branches, snake-border in-progress icon) + NoteList (thread scratchpad cells, list→click-expand content, StickyNote icon). NoteList co-located here (not own file) to respect the 8-entry dir cap. Both purely presentational, fed by task_list_changed / notes_changed deltas.'
+  last_edited_ms: 0
 2f7c3205184cf704:
   path: crates/cp-orchestrator/tests/openapi/paths.rs
   description: OpenAPI path definitions — all REST endpoints grouped by tag (fleet, agent, fs, auth, env, ACL, providers, releases, settings, vault/snapshot, claude-usage+login+refresh). Includes deploy + restart-orchestrator paths.
@@ -7906,6 +7910,10 @@
   path: web/src/components/shell/chrome/HintBadge.tsx
   description: 'Shortcut-letter badge at a control''s bottom-right while ⌘/Ctrl held (T619). Own module (not TopBar) to avoid TopBar↔ThemeToggle import cycle. Three traps: firstRef paints-not-animates on mount (else springs on every rail re-render); animation owns opacity+transform so no Tailwind transition-* may touch them; pointer-events-none or it swallows the click it advertises. anime.js outQuad 150/110ms, no spring (overshoot reads as boing).'
   last_edited_ms: 0
+5120bad5216d940f:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 512805df7bc218df:
   path: src/modules/conversation/mod.rs
   description: 'Conversation display module. Core/global. Context types: ''conversation'' + ''system''. No tools — purely display/rendering. Sub-modules: list, markdown_ir, panel, refresh, render_blocks, render_input_blocks, render_json.'
@@ -8350,6 +8358,10 @@
   path: src/app/context/freeze_pass.rs
   description: Per-panel freeze pass (extracted from context/mod.rs, A2). apply_full_freeze/run_panel_freeze_pass/freeze_one_panel/fold_one_panel/apply_panel_cache_costs/classify_break_kind/save_panel_id_types/record_freeze_telemetry + FreezeMeta/FreezeCulprit/PanelEmit/PassAcc/FoldCtx/TelemetryParts.
   last_edited_ms: 0
+55d6a55344cc3203:
+  path: crates/cp-mod-callback/src/panel.rs
+  description: Callback panel, YAML-style (mirrors Library panel). format_for_context builds a `callbacks:` YAML sequence via push_callback_yaml_lines + yaml_scalar (one-line double-quoted escaped scalar); blocks() builds the same via definitions_yaml + kv_line/bool_line/entry_line Block::Line helpers (blocking green-when-true). append_editor_markdown/append_editor_blocks render the one-script editor sub-view (kept intact).
+  last_edited_ms: 1788360843155
 55da288f9bfbd293:
   path: crates/cp-mod-bridge/src/lib.rs
   description: 'BridgeModule: init_state activates Boot when CP_BRIDGE=1, binds tee.sock + spawns Tee, creates Intake from oplog replay, opens content-addressed body Store under oplog dir, sets command listener non-blocking. on_stream_chunk→Token frames, on_stream_stop→PhaseHint(Idle). BridgeState{boot,tee,intake,tee_seq,last_phase,last_cost_usd,store,thread_msg_counts,msg_memo_seeded} in TypeMap — last_phase/last_cost_usd memo the vitals chokepoint; store+thread_msg_counts+msg_memo_seeded back the message-emit chokepoint (I13 body staging + per-thread observe-on-change diff, seeded no-emit at boot to skip backlog replay). is_global, no tools/panels.'
@@ -18250,6 +18262,10 @@ bc6c0b44ae58604e:
   path: ui/src/components/shell/StatusBar.tsx
   description: 'Bottom status bar: phase badge (READY/STREAMING/TOOLING/BLOCKED), agent/skill chips, git/queue/think, reverie/auto, cost.'
   last_edited_ms: 1781458541327
+bc7579fb6c29bfba:
+  path: .context-pilot/shared/memories.yaml
+  description: Memory slots store (M-safe/tiny/short/mid/long, 220 fixed). Local-only, synced with commits. Mirrors the Memories panel.
+  last_edited_ms: 0
 bc780153e6a5efac:
   path: crates/cp-mod-callback/src/firing.rs
   description: Callback firing. fire_callback() spawns script via console server, registers CallbackWatcher, dedup via kill_existing_callback. fire_one() fan-out takes FanOut<'fan> struct (A2 args-bundle). fire_async/blocking_callbacks batch dispatch. Exit 0/7 kill_session, !=0/timeout deferred panel.
