@@ -2030,6 +2030,10 @@
   path: crates/cp-mod-search/src/lib.rs
   description: 'Search module. 1 tool: search. Global Meilisearch server bootstrap, per-project indexes. load_module_data spawns the meili WatchdogHandle (T295, only if persist.port>0) into SearchState for self-healing supervision. sync_logs_to_meilisearch() fire-and-forget. Context Radar refresh_radar()/push_task_signal() via background thread. Overlay info delegation.'
   last_edited_ms: 0
+14ccbdeeacc7760b:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 14ce5498e3a0c82c:
   path: mobile/analysis_options.yaml
   description: 'Strict Dart analysis: strict-casts/inference/raw-types + ~90 lint rules (error prevention + style enforcement)'
@@ -7330,6 +7334,10 @@
   path: web/src/lib/api/index.ts
   description: 'REST API client barrel. SDK layer: 28 endpoints via generated SDK. Re-exports ./auth+./finder+./body+./envKeys (env-keys.ts renamed envKeys.ts in web-lint P5 filename-case).'
   last_edited_ms: 0
+4c9889c7c57e76d7:
+  path: .context-pilot/shared/memories.yaml
+  description: Memory slots store (M-safe/tiny/short/mid/long, 220 fixed). Local-only, synced with commits. Mirrors the Memories panel.
+  last_edited_ms: 0
 4c9a9d538c55c354:
   path: crates/cp-orchestrator/src/transport/rest/mod.rs
   description: REST resource handlers. fleet() filtered by auth_user ACL (FR-12). command() breaker check GATED on SendMessage only. rename_agent (T328), upload/delete avatar (T338). threads() prefers view roster. mint_ticket, resolve_entry. create_agent + retire in siblings.
@@ -10666,6 +10674,10 @@
   path: web/src/components/conversation/Message.tsx
   description: 'Thread/conversation message renderer (shared by web ThreadConversation + cockpit Conversation). AssistantMessage + UserMessage render text via <Markdown> (assistant=default, user=onAccent); MessageBody splices inline file-upload chips. T311: discrete CopyButton beneath BOTH user & assistant bubbles — low-opacity Copy icon (align mirrors bubble side: user self-end, assistant left under pl-7), click → navigator.clipboard.writeText(text) → flips to green var(--ok) Check ''Copied'' for ~2s then reverts (guarded ?. for insecure-origin/no-clipboard, silent fail); hidden on assistant while streaming. ToolMessage = collapsible card. Streaming blink cursor preserved.'
   last_edited_ms: 1782061347616
+6f327a26509af3b2:
+  path: src/app/run/threads/commands.rs
+  description: Bridge command APPLICATION (K7 mutation half). apply_command dispatches Send/Create/Archive/Restore/Pause/Resume/Delete thread + DeleteMessage (collect_delete_timestamps helper, A2) + Stop/Configure. Focused-thread instant spine notif.
+  last_edited_ms: 0
 6f446c16f612135a:
   path: src/app/run/threads.rs
   description: 'Thread helpers for main loop. maybe_inject_auto_read + check_my_turn_threads SKIP archived threads (LLM-invisible). Bridge command polling: poll_bridge_commands + accept_commands + apply_command (SendMessage/CreateThread/Archive/Restore/Stop/Interrupt via K7). Leg 0 keystone (X838): emit_roster_delta(state,kind) helper appends ThreadCreated/ThreadArchived/ThreadRestored via bridge OplogService.submit_durable the instant apply_create/archive/restore mutates ThreadsState — non-blocking durable (I2), no-op bridge-OFF, so the backend view learns of roster changes in ms not on the disk-debounce.'
@@ -14966,6 +14978,10 @@
   path: web/src/mobile-components/threads/ThreadList.tsx
   description: 'Mobile ThreadList twin — iMessage list (T620/T627/T631). Leading status dot (green focused/orange agent-turn/yellow paused/grey user-turn), title+time+2-line preview, swipe-left reveals Archive+Pause/Delete via useSwipeRow. Top-LEFT CornerButton (LayoutGrid, onGoToAgents) navigates to fleet page; top-RIGHT CornerButton archived toggle. Bottom action bar: search pill + compose. onGoToAgents prop typed (()=>void)|undefined.'
   last_edited_ms: 1784715938709
+9bfb62948d0e3742:
+  path: src/app/run/tools/pipeline.rs
+  description: Main tool execution pipeline. collect_tool_results(ToolBatch) + finalize_tool_cycle(ToolCycle) split from handle_tool_execution (A2). execute_one_tool/execute_queue_control/enqueue_tool. Pre-flight → queue intercept (auto-flush on trap defusal) → execute → callbacks(sibling) → tempo. Radar signals, Meili log sync.
+  last_edited_ms: 0
 9bfbd78ae78db924:
   path: src/llms/claude_code_api_key/mod.rs
   description: Claude Code API Key implementation. Uses ANTHROPIC_API_KEY with Bearer auth + Claude Code headers. Replicates Claude Code request signature for Claude 4.5 model access.
@@ -16950,6 +16966,10 @@ b098c3e1b5f0a6a4:
   path: src/ui/ir/sidebar.rs
   description: 'build_sidebar. ViewMode match rewritten to `if view_mode==Threads {Hidden} else {Normal}` (boss-hunt r8) so ViewMode could take #[non_exhaustive].'
   last_edited_ms: 1784561934014
+b09c722b5f346120:
+  path: web/src/components/threads/fileUpload/ThreadAsideTasks.tsx
+  description: 'ThreadAside Tasks+Notes tab bodies (T662/T716): TaskList (read-only todo tree, auto-collapse of all-done/all-planned branches, snake-border in-progress icon) + NoteList (thread scratchpad cells, list→click-expand content, StickyNote icon). NoteList co-located here (not own file) to respect the 8-entry dir cap. Both purely presentational, fed by task_list_changed / notes_changed deltas.'
+  last_edited_ms: 1788359442482
 b09d3f648d35d051:
   path: .git/index
   description: Git index (binary). Not source.
@@ -21234,6 +21254,10 @@ de1e88a7f3000871:
   path: crates/cp-orchestrator/src/runtime/update_scheduler.rs
   description: Auto-update scheduler thread (O4.2). Boot poll after 30s, then poll_interval_hours; snapshots config under short lock, run_tick, downloads outside lock, stage_apply under lock, restart_self. Shares APPLY_IN_FLIGHT gate. clippy-clean.
   last_edited_ms: 1787874020364
+de2eef8f372cc2a5:
+  path: web/src/lib/query/notesReducer.ts
+  description: 'notes_changed SSE delta fold (twin of taskReducer): foldNoteList replaces a thread''s notes wholesale (whole-list snapshot). WireNote is flat {id,title,content} so no snake→camel normalization. Wired into reducers.ts applyThreadDelta.'
+  last_edited_ms: 1788359442381
 de3667e2963f9b2a:
   path: crates/cp-orchestrator/src/transport/rest/config/network.rs
   description: 'Network REST handlers (uplink+AP, can_manage_it; 5G bearer superadmin). denied/denied_bearer gates, thin wrappers over it::network. Test TempDir guard fixtures, assert_site_routes helper. orch-clippy: CLEAN (4f6a7629).'
@@ -24502,3 +24526,7 @@ ffd10c656a62b649:
   path: ui/src/index.css
   description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/clay-rose #be7a6e + teal #4e7a82) + DARK ''Dungeon Forge'' = the TUI''s D&D palette lifted verbatim (#222220 charcoal bg / #333331 surface / #424240 card / torch-orange #DA7659 primary+signal+your-turn / #B26245 dim-torch accent / #C98F6B tan interactive / #F0F0F0 near-white ink / #909090 dimmed; ok forest-green #86BC6F, warn gold #E5C07B, danger blood-red #C85050) via :root/.dark token blocks. SF Pro chrome, IBM Plex Mono for data. Soft shadows, vibrancy, no glow. Keyframes: finder-pop/ql-pop/menu-pop/ants/checker (Finder), modal-pop/backdrop-fade/opt-rise (modals), finder-slider.'
   last_edited_ms: 1781530507655
+fff542c2011f6ebd:
+  path: src/app/run/tools/checks.rs
+  description: 'Post-tool non-blocking polls: panel readiness (5s timeout), deferred sleep timer. Each resumes streaming pipeline when condition met. Imports has_dirty_panels from streaming.rs.'
+  last_edited_ms: 0
