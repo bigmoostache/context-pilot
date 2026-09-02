@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { Paperclip, X, CornerDownLeft, Loader2 } from "lucide-react"
 import { uploadUnique } from "@/lib/api"
@@ -75,12 +75,28 @@ function useNewThreadDraft(
   // element and `overflow-y-auto` scrolls past that cap, so a very long draft
   // never pushes the dialog off screen.
   const msgRef = useRef<HTMLTextAreaElement>(null)
-  useEffect(() => {
+  const resizeMsg = useCallback(() => {
     const el = msgRef.current
     if (!el) return
     el.style.height = "auto"
     el.style.height = `${el.scrollHeight}px`
-  }, [firstMessage, open])
+  }, [])
+
+  // Re-grow synchronously on every keystroke (the responsive typing path).
+  useEffect(() => {
+    resizeMsg()
+  }, [firstMessage, resizeMsg])
+
+  // Grow on OPEN too. The textarea (re)mounts inside Base UI's portaled,
+  // animated Popup, so a measurement taken during that commit reads the
+  // collapsed height and a PRE-FILLED draft would stay one row tall until the
+  // first keystroke re-ran the effect. Measuring a frame later — once layout
+  // is settled and the popup visible — grows it immediately on open.
+  useEffect(() => {
+    if (!open) return
+    const id = requestAnimationFrame(resizeMsg)
+    return () => cancelAnimationFrame(id)
+  }, [open, resizeMsg])
 
   // Wipe the draft (state + persisted key) — ONLY on a successful create.
   const clearDraft = () => {
