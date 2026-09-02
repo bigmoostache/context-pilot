@@ -196,16 +196,7 @@ impl FleetScanner {
         for (id, snap) in fresh_pairs {
             match self.known.get(id) {
                 None => events.push(Event::Appeared(Box::new(snap.entry.clone()))),
-                Some(prev) => {
-                    if prev.entry.status != snap.entry.status {
-                        events.push(Event::StatusChanged(id.clone(), snap.entry.status));
-                    }
-                    // A transition out of Live is the actionable "went stale"
-                    // signal; staleness present at first sight rides Appeared.
-                    if prev.liveness.is_live() && !snap.liveness.is_live() {
-                        events.push(Event::Stale(id.clone(), snap.liveness));
-                    }
-                }
+                Some(prev) => diff_known(id, prev, snap, &mut events),
             }
         }
         events
@@ -289,6 +280,36 @@ impl FleetScanner {
             }
         }
         Ok(removed)
+    }
+}
+
+/// Emit the [`Event`]s for a KNOWN agent (present in both the previous and the
+/// fresh scan), appending them to `events`.
+///
+/// A changed `boot_id` means the agent REBOOTED under the same id — a new
+/// `boot_id` is minted every boot. Its runtime artifacts may now live at
+/// different paths: the T713 sync-dir migration moves the oplog/tee socket on
+/// the first post-upgrade boot, and ANY reload re-binds the tee socket and
+/// re-opens the oplog. A known agent otherwise emits no `Appeared`, so the
+/// driver would keep its stale per-agent readers (tailer + tee reader) pointed
+/// at the previous generation — the tee stays disconnected and the view
+/// freezes. Emitting `Disappeared` + `Appeared` makes the driver tear
+/// everything down and rebuild it at the fresh advertised paths, re-seeding the
+/// view. When the `boot_id` is unchanged we report the ordinary
+/// status-change and went-stale (Live → non-live) transitions instead.
+fn diff_known(id: &str, prev: &Snapshot, snap: &Snapshot, events: &mut Vec<Event>) {
+    if prev.entry.boot_id != snap.entry.boot_id {
+        events.push(Event::Disappeared(id.to_owned()));
+        events.push(Event::Appeared(Box::new(snap.entry.clone())));
+        return;
+    }
+    if prev.entry.status != snap.entry.status {
+        events.push(Event::StatusChanged(id.to_owned(), snap.entry.status));
+    }
+    // A transition out of Live is the actionable "went stale" signal;
+    // staleness present at first sight rides Appeared.
+    if prev.liveness.is_live() && !snap.liveness.is_live() {
+        events.push(Event::Stale(id.to_owned(), snap.liveness));
     }
 }
 

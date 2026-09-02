@@ -7,6 +7,9 @@ use tempfile::tempdir;
 /// A boot id of the exact 32-hex-char width the heartbeat record requires.
 const BOOT_A: &str = "0123456789abcdef0123456789abcdef";
 
+/// A second, distinct boot id — models an agent rebooting under the same id.
+const BOOT_B: &str = "ffffffffffffffffffffffffffffffff";
+
 /// A pid that cannot name a live process (above any platform's `pid_max`).
 const DEAD_PID: u32 = 4_000_000_000;
 
@@ -90,6 +93,35 @@ fn scan_emits_status_change() {
     write_record(dir.path(), &entry("a", me, &hb_path, AgentStatus::Running));
     let events = reg.scan().expect("scan");
     assert_eq!(events, vec![Event::StatusChanged("a".to_owned(), AgentStatus::Running)]);
+}
+
+#[test]
+fn scan_rebuilds_readers_on_boot_id_change() {
+    // An agent that reboots keeps its id but mints a fresh boot_id. The scanner
+    // must treat that as a tear-down + rebuild (Disappeared then Appeared) so
+    // the driver re-points its per-agent readers at the possibly-new paths
+    // (T713 sync-dir migration / any reload) — otherwise the tee stays
+    // disconnected and the view freezes on the previous generation.
+    let dir = tempdir().expect("dir");
+    let me = std::process::id();
+    let hb_path = dir.path().join("hb-a");
+    write_heartbeat(&hb_path, &heartbeat(me, now_ms()));
+    write_record(dir.path(), &entry("a", me, &hb_path, AgentStatus::Running));
+
+    let mut reg = FleetScanner::new(dir.path().to_path_buf());
+    let _appeared = reg.scan().expect("scan"); // first sight → Appeared
+
+    // Same id, fresh boot_id → the reboot signal.
+    let mut rebooted = entry("a", me, &hb_path, AgentStatus::Running);
+    rebooted.boot_id = BOOT_B.to_owned();
+    write_record(dir.path(), &rebooted);
+
+    let events = reg.scan().expect("scan");
+    assert_eq!(
+        events,
+        vec![Event::Disappeared("a".to_owned()), Event::Appeared(Box::new(rebooted))],
+        "a boot_id change must tear down + rebuild via Disappeared then Appeared",
+    );
 }
 
 #[test]
