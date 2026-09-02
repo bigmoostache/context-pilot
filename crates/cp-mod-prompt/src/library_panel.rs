@@ -8,58 +8,69 @@ use cp_base::state::context::{Entry, Kind};
 use cp_base::state::runtime::State;
 use std::fmt::Write as _;
 
-/// Append the agents table (with active-marker column).
-fn push_agents_table(content: &mut String, agents: &[crate::types::PromptItem], active_id: Option<&str>) {
-    content.push_str("Agents (system prompts):\n\n");
-    content.push_str("| ID | Name | Active | Description |\n");
-    content.push_str("|------|------|--------|-------------|\n");
+/// Render `s` as a single-line, double-quoted YAML scalar: backslashes and
+/// quotes are escaped and newlines flattened to spaces, so a description
+/// containing `:`, `|`, `"`, or line breaks stays valid, one-line YAML.
+fn yaml_scalar(s: &str) -> String {
+    let escaped = s.replace('\\', "\\\\").replace('"', "\\\"").replace(['\n', '\r'], " ");
+    format!("\"{escaped}\"")
+}
+
+/// Append the agents YAML sequence (each entry carries an `active` bool).
+fn push_agents_yaml(content: &mut String, agents: &[crate::types::PromptItem], active_id: Option<&str>) {
+    content.push_str("agents:\n");
     for agent in agents {
-        let active = if active_id == Some(&agent.id) { "\u{2713}" } else { "" };
-        let _wa = writeln!(content, "| {} | {} | {} | {} |", agent.id, agent.name, active, agent.description);
+        let active = active_id == Some(&agent.id);
+        let _wa = writeln!(content, "  - id: {}", agent.id);
+        let _wn = writeln!(content, "    name: {}", yaml_scalar(&agent.name));
+        let _wc = writeln!(content, "    active: {active}");
+        let _wd = writeln!(content, "    description: {}", yaml_scalar(&agent.description));
     }
 }
 
-/// Append the skills table (with loaded-marker column), if any exist.
-fn push_skills_table(content: &mut String, skills: &[crate::types::PromptItem], loaded: &[String]) {
+/// Append the skills YAML sequence (each entry carries a `loaded` bool), if any exist.
+fn push_skills_yaml(content: &mut String, skills: &[crate::types::PromptItem], loaded: &[String]) {
     if skills.is_empty() {
         return;
     }
-    content.push_str("\nSkills (use skill_load to load, Close_panel to unload):\n\n");
-    content.push_str("| ID | Name | Loaded | Description |\n");
-    content.push_str("|------|------|--------|-------------|\n");
+    content.push_str("\nskills:\n");
     for skill in skills {
-        let mark = if loaded.contains(&skill.id) { "\u{2713}" } else { "" };
-        let _wb = writeln!(content, "| {} | {} | {} | {} |", skill.id, skill.name, mark, skill.description);
+        let is_loaded = loaded.contains(&skill.id);
+        let _wi = writeln!(content, "  - id: {}", skill.id);
+        let _wn = writeln!(content, "    name: {}", yaml_scalar(&skill.name));
+        let _wl = writeln!(content, "    loaded: {is_loaded}");
+        let _wd = writeln!(content, "    description: {}", yaml_scalar(&skill.description));
     }
 }
 
-/// Append the commands table, if any exist.
-fn push_commands_table(content: &mut String, commands: &[crate::types::PromptItem]) {
+/// Append the commands YAML sequence (each entry's slash invocation is `/{id}`), if any exist.
+fn push_commands_yaml(content: &mut String, commands: &[crate::types::PromptItem]) {
     if commands.is_empty() {
         return;
     }
-    content.push_str("\nCommands:\n\n");
-    content.push_str("| Command | Name | Description |\n");
-    content.push_str("|---------|------|-------------|\n");
+    content.push_str("\ncommands:\n");
     for cmd in commands {
-        let _wc = writeln!(content, "| /{} | {} | {} |", cmd.id, cmd.name, cmd.description);
+        let _wi = writeln!(content, "  - id: {}", cmd.id);
+        let _wc = writeln!(content, "    invoke: /{}", cmd.id);
+        let _wn = writeln!(content, "    name: {}", yaml_scalar(&cmd.name));
+        let _wd = writeln!(content, "    description: {}", yaml_scalar(&cmd.description));
     }
 }
 
-/// Append the "how to manage behaviours" cheat sheet for the LLM.
+/// Append the "how to manage behaviours" cheat sheet as YAML comment lines.
 fn push_crud_cheatsheet(content: &mut String) {
-    content.push_str("\nHow to manage behaviours (fleet-shared \u{2014} stored under ~/.context-pilot/behaviours/):\n");
-    content.push_str("- Create: Behaviour_create(name, type, content) \u{2014} type: 'agent', 'skill', or 'command'\n");
+    content.push_str("\n# Managing behaviours (fleet-shared, under ~/.context-pilot/behaviours/):\n");
+    content.push_str("#   create:        Behaviour_create(name, type, content) - type: agent | skill | command\n");
     let _wd = writeln!(
         content,
-        "- Edit: use Edit tool on the .md file — agents: {}/  skills: {}/  commands: {}/",
+        "#   edit:          Edit the .md file - agents: {}/  skills: {}/  commands: {}/",
         crate::storage::dir_for(PromptType::Agent).display(),
         crate::storage::dir_for(PromptType::Skill).display(),
         crate::storage::dir_for(PromptType::Command).display()
     );
-    content.push_str("- Delete: delete the .md file (the system detects removals automatically)\n");
-    content.push_str("- Activate agent: agent_load(id) \u{2014} pass empty id to revert to default\n");
-    content.push_str("- Load skill: skill_load(id) \u{2014} unload by closing its panel with Close_panel\n");
+    content.push_str("#   delete:        remove the .md file (removals are detected automatically)\n");
+    content.push_str("#   activate agent: agent_load(id) - pass an empty id to revert to default\n");
+    content.push_str("#   load skill:    skill_load(id) - unload by closing its panel with Close_panel\n");
 }
 
 /// Panel displaying the full prompt library (agents, skills, commands).
@@ -127,9 +138,9 @@ impl Panel for LibraryPanel {
         let commands = crate::storage::load_prompts_for(PromptType::Command);
 
         let mut content = String::new();
-        push_agents_table(&mut content, &agents, ps.active_agent_id.as_deref());
-        push_skills_table(&mut content, &skills, &ps.loaded_skill_ids);
-        push_commands_table(&mut content, &commands);
+        push_agents_yaml(&mut content, &agents, ps.active_agent_id.as_deref());
+        push_skills_yaml(&mut content, &skills, &ps.loaded_skill_ids);
+        push_commands_yaml(&mut content, &commands);
         push_crud_cheatsheet(&mut content);
 
         vec![ContextItem::new(&ctx.id, "Library", content, ctx.last_refresh_ms)]
