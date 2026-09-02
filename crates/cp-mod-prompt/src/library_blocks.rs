@@ -1,9 +1,11 @@
 //! IR block generation for the Library panel.
 //!
-//! Dynamically loads prompts from disk on every render call.
-//! No editor mode — editing is done via the Edit tool on `.md` files directly.
+//! Dynamically loads prompts from disk on every render call and renders them
+//! **YAML-style** (one sequence per behaviour kind), mirroring the LLM-facing
+//! `context()` text. No editor mode — editing is done via the Edit tool on
+//! `.md` files directly.
 
-use cp_render::{Align, Block, Cell as IrCell, Semantic, Span as S};
+use cp_render::{Block, Semantic, Span as S};
 
 use crate::types::{PromptState, PromptType};
 use cp_base::state::runtime::State;
@@ -17,146 +19,76 @@ pub(crate) fn library_blocks(state: &State) -> Vec<Block> {
 
     let mut blocks = Vec::new();
 
-    // Active agent + loaded skills summary
-    let active_name = ps
-        .active_agent_id
-        .as_ref()
-        .and_then(|id| agents.iter().find(|a| &a.id == id))
-        .map_or("(none)", |a| a.name.as_str());
-
-    blocks.push(Block::KeyValue(vec![(
-        vec![S::muted(" Active Agent: ".into())],
-        vec![S::accent(active_name.into()).bold()],
-    )]));
-
-    if !ps.loaded_skill_ids.is_empty() {
-        let skill_names: Vec<String> = ps
-            .loaded_skill_ids
-            .iter()
-            .filter_map(|id| skills.iter().find(|s| &s.id == id).map(|s| s.name.clone()))
-            .collect();
-        blocks.push(Block::KeyValue(vec![(
-            vec![S::muted(" Loaded Skills: ".into())],
-            vec![S::success(skill_names.join(", "))],
-        )]));
-    }
-    blocks.push(Block::Empty);
-
-    // Agents table
-    agents_table(&agents, ps, &mut blocks);
-    skills_table(&skills, ps, &mut blocks);
-    commands_table(&commands, &mut blocks);
+    // Agents / skills / commands sequences, YAML-style (mirrors context()).
+    agents_yaml(&agents, ps, &mut blocks);
+    skills_yaml(&skills, ps, &mut blocks);
+    commands_yaml(&commands, &mut blocks);
 
     blocks
 }
 
-// ── Table builders ───────────────────────────────────────────────────
+// ── YAML helpers ─────────────────────────────────────────────────────
 
-/// Build the agents table section.
-fn agents_table(agents: &[crate::types::PromptItem], ps: &PromptState, blocks: &mut Vec<Block>) {
-    blocks.push(Block::Line(vec![
-        S::muted(" AGENTS".into()).bold(),
-        S::muted(format!("  ({} available)", agents.len())),
-    ]));
-    blocks.push(Block::Empty);
-
-    let rows: Vec<Vec<IrCell>> = agents
-        .iter()
-        .map(|agent| {
-            let is_active = ps.active_agent_id.as_deref() == Some(&agent.id);
-            let (active_str, active_sem) =
-                if is_active { ("\u{2713}", Semantic::Success) } else { ("", Semantic::Muted) };
-            let (type_str, type_sem) =
-                if agent.is_builtin { ("built-in", Semantic::AccentDim) } else { ("custom", Semantic::Success) };
-            vec![
-                IrCell::styled(agent.id.clone(), Semantic::AccentDim),
-                IrCell::text(agent.name.clone()),
-                IrCell::styled(active_str.into(), active_sem),
-                IrCell::styled(type_str.into(), type_sem),
-                IrCell::styled(agent.description.clone(), Semantic::Muted),
-            ]
-        })
-        .collect();
-    blocks.push(Block::table(
-        vec![
-            ("ID", Align::Left),
-            ("Name", Align::Left),
-            ("Active", Align::Left),
-            ("Type", Align::Left),
-            ("Description", Align::Left),
-        ],
-        rows,
-    ));
+/// A `key: value` line indented by `indent` spaces, key muted and value styled.
+fn kv_line(indent: usize, key: &str, value: String, value_sem: Semantic) -> Block {
+    Block::Line(vec![S::muted(format!("{:indent$}{key}: ", "", indent = indent)), S::styled(value, value_sem)])
 }
 
-/// Build the skills table section.
-fn skills_table(skills: &[crate::types::PromptItem], ps: &PromptState, blocks: &mut Vec<Block>) {
+/// A YAML boolean value styled green when `true`, muted when `false`.
+fn bool_line(key: &str, value: bool) -> Block {
+    let sem = if value { Semantic::Success } else { Semantic::Muted };
+    kv_line(4, key, value.to_string(), sem)
+}
+
+/// The `  - id: {id}` sequence-entry opener (dash + id).
+fn entry_line(id: &str) -> Block {
+    Block::Line(vec![S::muted("  - id: ".into()), S::styled(id.into(), Semantic::AccentDim)])
+}
+
+// ── Sequence builders ────────────────────────────────────────────────
+
+/// Build the agents YAML sequence.
+fn agents_yaml(agents: &[crate::types::PromptItem], ps: &PromptState, blocks: &mut Vec<Block>) {
+    blocks.push(Block::Line(vec![S::styled("agents:".into(), Semantic::Header).bold()]));
+    for agent in agents {
+        let is_active = ps.active_agent_id.as_deref() == Some(&agent.id);
+        blocks.push(entry_line(&agent.id));
+        blocks.push(kv_line(4, "name", agent.name.clone(), Semantic::Default));
+        blocks.push(bool_line("active", is_active));
+        blocks.push(bool_line("builtin", agent.is_builtin));
+        blocks.push(kv_line(4, "description", agent.description.clone(), Semantic::Muted));
+    }
+}
+
+/// Build the skills YAML sequence.
+fn skills_yaml(skills: &[crate::types::PromptItem], ps: &PromptState, blocks: &mut Vec<Block>) {
     if skills.is_empty() {
         return;
     }
     blocks.push(Block::Empty);
-    blocks.push(Block::Line(vec![
-        S::muted(" SKILLS".into()).bold(),
-        S::muted(format!("  ({} available, {} loaded)", skills.len(), ps.loaded_skill_ids.len())),
-    ]));
-    blocks.push(Block::Empty);
-
-    let rows: Vec<Vec<IrCell>> = skills
-        .iter()
-        .map(|skill| {
-            let is_loaded = ps.loaded_skill_ids.contains(&skill.id);
-            let (loaded_str, loaded_sem) =
-                if is_loaded { ("\u{2713}", Semantic::Success) } else { ("", Semantic::Muted) };
-            let (type_str, type_sem) =
-                if skill.is_builtin { ("built-in", Semantic::AccentDim) } else { ("custom", Semantic::Success) };
-            vec![
-                IrCell::styled(skill.id.clone(), Semantic::AccentDim),
-                IrCell::text(skill.name.clone()),
-                IrCell::styled(loaded_str.into(), loaded_sem),
-                IrCell::styled(type_str.into(), type_sem),
-                IrCell::styled(skill.description.clone(), Semantic::Muted),
-            ]
-        })
-        .collect();
-    blocks.push(Block::table(
-        vec![
-            ("ID", Align::Left),
-            ("Name", Align::Left),
-            ("Loaded", Align::Left),
-            ("Type", Align::Left),
-            ("Description", Align::Left),
-        ],
-        rows,
-    ));
+    blocks.push(Block::Line(vec![S::styled("skills:".into(), Semantic::Header).bold()]));
+    for skill in skills {
+        let is_loaded = ps.loaded_skill_ids.contains(&skill.id);
+        blocks.push(entry_line(&skill.id));
+        blocks.push(kv_line(4, "name", skill.name.clone(), Semantic::Default));
+        blocks.push(bool_line("loaded", is_loaded));
+        blocks.push(bool_line("builtin", skill.is_builtin));
+        blocks.push(kv_line(4, "description", skill.description.clone(), Semantic::Muted));
+    }
 }
 
-/// Build the commands table section.
-fn commands_table(commands: &[crate::types::PromptItem], blocks: &mut Vec<Block>) {
+/// Build the commands YAML sequence.
+fn commands_yaml(commands: &[crate::types::PromptItem], blocks: &mut Vec<Block>) {
     if commands.is_empty() {
         return;
     }
     blocks.push(Block::Empty);
-    blocks.push(Block::Line(vec![
-        S::muted(" COMMANDS".into()).bold(),
-        S::muted(format!("  ({} available)", commands.len())),
-    ]));
-    blocks.push(Block::Empty);
-
-    let rows: Vec<Vec<IrCell>> = commands
-        .iter()
-        .map(|cmd| {
-            let (type_str, type_sem) =
-                if cmd.is_builtin { ("built-in", Semantic::AccentDim) } else { ("custom", Semantic::Success) };
-            vec![
-                IrCell::styled(format!("/{}", cmd.id), Semantic::Accent),
-                IrCell::text(cmd.name.clone()),
-                IrCell::styled(type_str.into(), type_sem),
-                IrCell::styled(cmd.description.clone(), Semantic::Muted),
-            ]
-        })
-        .collect();
-    blocks.push(Block::table(
-        vec![("Command", Align::Left), ("Name", Align::Left), ("Type", Align::Left), ("Description", Align::Left)],
-        rows,
-    ));
+    blocks.push(Block::Line(vec![S::styled("commands:".into(), Semantic::Header).bold()]));
+    for cmd in commands {
+        blocks.push(entry_line(&cmd.id));
+        blocks.push(kv_line(4, "invoke", format!("/{}", cmd.id), Semantic::Accent));
+        blocks.push(kv_line(4, "name", cmd.name.clone(), Semantic::Default));
+        blocks.push(bool_line("builtin", cmd.is_builtin));
+        blocks.push(kv_line(4, "description", cmd.description.clone(), Semantic::Muted));
+    }
 }

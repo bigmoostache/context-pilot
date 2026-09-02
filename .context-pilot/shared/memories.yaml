@@ -77,10 +77,10 @@ M-long-7:
   last_edited_ms: 1787840930958
 M-long-8:
   tier: long
-  title: T713 sync-dir plan
-  contents: 'T713 SHIPPING (branch t713-sync-dir off master). Move bridge.lock/heartbeat/stream.sock/tee.sock/oplog -> GLOBAL ~/.context-pilot/sync/<id>/ (id=folder_id FNV-1a). cp-wire Entry gained tee_socket_path #[serde(default)] (14->15 fields). Orch: driver.rs resolve_tee_path (field else folder+tee.sock), TeeReader::spawn full path, reap_orphan_sync_dirs grace=7d (DEFAULT_SYNC_ORPHAN_GRACE=Duration::from_hours(168)). Agent boot/mod.rs start_inner: BootDirs{agents_dir,sync_root} param struct, create_dir_all sync_dir before lock, all 5 artifacts under sync_dir, migrate::migrate_oplog one-time (rename+EXDEV copy/fsync/remove). registry::default_sync_root helper. boot tests moved to boot/tests.rs (500-line cap). PHASE 4 COMPLETE: build+tests+workspace-clippy+api-contract ALL GREEN. Next: commit+push+PR (orch-first deploy M177).'
+  title: T713 sync-dir SHIPPED
+  contents: 'T713 SHIPPED — PR #192 (branch t713-sync-dir, base master, commit 24eda477). Runtime artifacts (bridge.lock/oplog/stream.sock/tee.sock/heartbeat) moved to GLOBAL ~/.context-pilot/sync/<id>/ (id=folder_id FNV-1a). cp-wire Entry+tee_socket_path #[serde(default)] (14->15). Orch: resolve_tee_path (field else folder+tee.sock), TeeReader::spawn full path, reap_orphan_sync_dirs 7d. Bridge: BootDirs param struct, create_dir_all sync_dir before lock, migrate::migrate_oplog (rename+EXDEV copy/fsync/remove), boot tests -> boot/tests.rs. All green (build/tests/workspace-clippy/api-contract). DEPLOY orch-FIRST (M177): new orch serves migrated + un-migrated agents.'
   importance: critical
-  last_edited_ms: 1788349943018
+  last_edited_ms: 1788350028141
 M-long-9:
   tier: long
   title: MULTI-WORKER (subworkers
@@ -237,9 +237,9 @@ M-mid-8:
 M-mid-9:
   tier: mid
   title: orch-clippy campaign
-  contents: 'orch-clippy COMPLETE (branch orchestrator-clippy, PR #187, chain #92 pwd Totordu1789). Whole workspace clippy-clean under --workspace --all-targets=0. Gate widened: check-rust-lints.sh now clippy+check --workspace (commit fe67653f) — closes blind spot where standalone crates (cp-orchestrator/cp-oplog/cp-console-server) outside tui''s graph were never linted. Chain resealed. CB1 api-contract RESTORED to **/*.rs. Recipe: tests/*.rs mod-wrapper; foundational % -> counters/flip-bool; as -> try_from; cognitive -> plain-call assert helpers. LEFT: finalize PR #187.'
+  contents: 'orch-clippy COMPLETE (branch orchestrator-clippy, PR #187, chain #92 pwd Totordu1789). Whole workspace clippy-clean under --workspace --all-targets=0. Gate widened: check-rust-lints.sh now clippy+check --workspace (commit fe67653f). Recipe: tests/*.rs mod-wrapper; foundational % -> counters/flip-bool; as -> try_from; cognitive -> plain-call assert helpers.'
   importance: medium
-  last_edited_ms: 1787907580995
+  last_edited_ms: 1788358696389
 M-safe-1:
   tier: safe
   title: Hash chain password
@@ -330,9 +330,10 @@ M-short-18:
   last_edited_ms: 0
 M-short-19:
   tier: short
-  title: Memory Architecture v2
+  title: Scratchpad thread-owned
+  contents: Scratchpad migrated thread-owned (mirrors todo). T716, commit e7aaf122. ScratchpadCell.thread_id FK; ScratchpadState is_global=true + transient focus_filter. Panel+tools focus-scoped; create/edit/wipe need focused thread. purge_threadless on load; purge_thread_cells cascades on thread hard-delete. Main crate sync_scratchpad_focus (checks.rs) called in pipeline.rs. pub mod tools cross-crate.
   importance: high
-  last_edited_ms: 1787881598364
+  last_edited_ms: 1788358678519
 M-short-2:
   tier: short
   title: Meilisearch design
@@ -396,10 +397,10 @@ M-short-25:
   last_edited_ms: 0
 M-short-26:
   tier: short
-  title: UnixStream::pair() test
-  contents: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
-  importance: high
-  last_edited_ms: 0
+  title: Library panel YAML
+  contents: 'T720 SHIPPED (f3e4aab5, t715-orch-reader-rebuild): Library fixed panel renders YAML-style (agents:/skills:/commands: seqs), not Markdown tables. library_panel.rs context()=push_*_yaml + yaml_scalar() + # cheatsheet; library_blocks.rs=kv_line/bool_line/entry_line Block::Line (bool green-when-true).'
+  importance: medium
+  last_edited_ms: 1788360268582
 M-short-27:
   tier: short
   title: T584 tool-call UI
@@ -646,6 +647,12 @@ M-tiny-25:
   contents: 'todo-v2 rebased onto post-#187 master, PR #188 OPEN (base master). 6 commits on 50fae45c. Clippy-clean under --workspace gate, chain #94. Frontend back on vite dev/HMR :5174. CB1 already active.'
   importance: high
   last_edited_ms: 1787910650137
+M-tiny-26:
+  tier: tiny
+  title: Notes-tab SHIPPED
+  contents: 'Notes-tab (T716) code done. Backend/orch=5a6ce450; frontend on t715-orch-reader-rebuild (NotesChanged/emit_notes/notesReducer; NoteList in ThreadAsideTasks.tsx). LEFT: deploy orch+self-reload.'
+  importance: medium
+  last_edited_ms: 1788359468340
 M-tiny-3:
   tier: tiny
   title: 'Haiku 4.5 max_tokens fix:'

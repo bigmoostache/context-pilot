@@ -1,5 +1,12 @@
 import { useMemo } from "react"
-import { Paperclip, ListChecks, ChevronLeft, Download, PanelRightClose } from "lucide-react"
+import {
+  Paperclip,
+  ListChecks,
+  StickyNote,
+  ChevronLeft,
+  Download,
+  PanelRightClose,
+} from "lucide-react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { FileIcon } from "@/components/finder/support/macIcons"
@@ -9,8 +16,8 @@ import { HintBadge } from "@/components/shell/chrome/HintBadge"
 import { downloadFile } from "@/lib/api"
 import { uploadToNode, type UploadedFile } from "./helpers"
 import type { ThreadFile } from "./FileSidebar"
-import { TaskList } from "./ThreadAsideTasks"
-import type { ThreadTask } from "@/lib/types"
+import { TaskList, NoteList } from "./ThreadAsideTasks"
+import type { ThreadTask, ThreadNote } from "@/lib/types"
 
 /**
  * Rail width strategy (dynamic): in LIST mode the rail is EXACTLY the width of
@@ -37,10 +44,37 @@ import type { ThreadTask } from "@/lib/types"
  * chip can drive the same rail (switch to Files, show the preview) instead of a
  * separate drawer.
  */
+type AsideTab = "files" | "tasks" | "notes"
+
+/**
+ * Pick the tab to actually render: keep the requested one when its section has
+ * content, else fall back to whichever remains (tasks → notes → files). Keeps a
+ * thread switch from landing on a now-hidden tab. Hoisted out of
+ * {@link ThreadAside} so that component stays under the complexity budget.
+ */
+function clampTab(
+  tab: AsideTab,
+  present: { hasFiles: boolean; hasTasks: boolean; hasNotes: boolean },
+): AsideTab {
+  const { hasFiles, hasTasks, hasNotes } = present
+  if (
+    (tab === "files" && hasFiles) ||
+    (tab === "tasks" && hasTasks) ||
+    (tab === "notes" && hasNotes)
+  ) {
+    return tab
+  }
+  if (hasTasks) return "tasks"
+  if (hasNotes) return "notes"
+  return "files"
+}
+
 export function ThreadAside({
   files,
   tasks,
+  notes,
   agentId,
+  threadId,
   tab,
   onTabChange,
   selectedFile,
@@ -51,9 +85,11 @@ export function ThreadAside({
 }: {
   files: ThreadFile[]
   tasks: ThreadTask[]
+  notes: ThreadNote[]
   agentId: string
-  tab: "files" | "tasks"
-  onTabChange: (tab: "files" | "tasks") => void
+  threadId: string
+  tab: "files" | "tasks" | "notes"
+  onTabChange: (tab: "files" | "tasks" | "notes") => void
   selectedFile: UploadedFile | null
   onSelectFile: (file: UploadedFile | null) => void
   /** Whether the left thread-list rail is hidden. When it is AND a file is
@@ -72,17 +108,12 @@ export function ThreadAside({
   // then takes the full width).
   const hasFiles = files.length > 0
   const hasTasks = tasks.length > 0
-  if (!hasFiles && !hasTasks) return null
+  const hasNotes = notes.length > 0
+  if (!hasFiles && !hasTasks && !hasNotes) return null
 
-  // Clamp the active tab to a VISIBLE one: keep the requested tab when its
-  // section still has content, else fall back to whichever tab remains. Prevents
-  // landing on a now-hidden tab after switching to a thread that lacks it.
-  const activeTab: "files" | "tasks" =
-    (tab === "files" && hasFiles) || (tab === "tasks" && hasTasks)
-      ? tab
-      : hasTasks
-        ? "tasks"
-        : "files"
+  // Clamp the active tab to a VISIBLE one (helper hoisted to module scope so
+  // this component stays under the cyclomatic-complexity budget).
+  const activeTab = clampTab(tab, { hasFiles, hasTasks, hasNotes })
   const previewing = activeTab === "files" && selectedFile !== null
 
   return (
@@ -99,7 +130,7 @@ export function ThreadAside({
       <TooltipProvider>
         <Tabs
           value={activeTab}
-          onValueChange={(v) => onTabChange(v as "files" | "tasks")}
+          onValueChange={(v) => onTabChange(v as "files" | "tasks" | "notes")}
           className="flex min-h-0 flex-1 flex-col gap-0 p-1"
         >
           {/* Header: the single always-visible Tasks/Files tab bar. While a
@@ -110,6 +141,7 @@ export function ThreadAside({
           <AsideTabBar
             hasTasks={hasTasks}
             hasFiles={hasFiles}
+            hasNotes={hasNotes}
             previewing={previewing}
             agentId={agentId}
             file={selectedFile}
@@ -122,6 +154,13 @@ export function ThreadAside({
           {hasTasks && (
             <TabsContent value="tasks" className="min-h-0 flex-1 overflow-y-auto">
               <TaskList tasks={tasks} />
+            </TabsContent>
+          )}
+
+          {/* Notes tab — the focused thread's scratchpad cells (list → expand) */}
+          {hasNotes && (
+            <TabsContent value="notes" className="min-h-0 flex-1 overflow-y-auto">
+              <NoteList notes={notes} storageKey={`cp-notes-open-${agentId}-${threadId}`} />
             </TabsContent>
           )}
 
@@ -158,6 +197,7 @@ export function ThreadAside({
 function AsideTabBar({
   hasTasks,
   hasFiles,
+  hasNotes,
   previewing,
   agentId,
   file,
@@ -167,6 +207,7 @@ function AsideTabBar({
 }: {
   hasTasks: boolean
   hasFiles: boolean
+  hasNotes: boolean
   previewing: boolean
   agentId: string
   file: UploadedFile | null
@@ -188,8 +229,14 @@ function AsideTabBar({
             Tasks
           </TabsTrigger>
         )}
+        {hasNotes && (
+          <TabsTrigger value="notes" className="border-0 px-2 text-[13.5px]">
+            <StickyNote className="size-3.5" />
+            Notes
+          </TabsTrigger>
+        )}
         {hasFiles && (
-          <TabsTrigger value="files" className="border-0 px-2 text-[13.5px]">
+          <TabsTrigger value="files" onClick={onBack} className="border-0 px-2 text-[13.5px]">
             <Paperclip className="size-3.5" />
             Files
           </TabsTrigger>

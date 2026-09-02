@@ -8132,3 +8132,35 @@ index 70e88880..8927b050 100644
      strategy: >
        Irreducible — a 13-arg constructor trips too_many_arguments; the exhaustive literal is honest.
 # --- End entry #95 ---
+96:32069235c73bbd87766dba5ef6b1e0503fd41a48b520328d63c2b03ce16c03dc:c2d5dbfbfec17ac64ba98d78bff0673bdacb52919813f9a5626c1cf1cfa7cf38:40b3e512bdd2b20cefec63699c14be97e8b65ade2211a8ea30ca7467d42bc504
+# --- Diff for entry #96 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 8927b050..a09edc11 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -179,6 +179,8 @@ exceptions:
+ 
+ 
+ 
++
++
+   # ── app/run/*: multiple_inherent_impl for App ────────────────────────
+ 
+   - path: "src/app/run/lifecycle.rs"
+@@ -405,6 +407,15 @@ exceptions:
+     strategy: >
+       Irreducible — a five-arg constructor trips too_many_arguments; the exhaustive literal is honest.
+ 
++  - path: "crates/cp-wire/src/types/snapshot/notes.rs"
++    match: "wire value object: all three fields are public, stable, and built by cross-crate consumers via a struct literal, so #[non_exhaustive] would forbid that construction"
++    reason: >
++      WireNote is the three-field read-only scratchpad-note projection, built by struct literal
++      cross-crate (the agent's note projection and the orchestrator's first-paint read). It is the
++      twin of WireTask; #[non_exhaustive] would forbid the cross-crate literal construction.
++    strategy: >
++      Irreducible — the exhaustive literal is the honest shape for a cross-crate wire value object.
++
+   # ── exhaustive_enums: T671 read-path query contracts ─────────────────
+   # The read-plane mirror of the command contracts above: query Kind is built
+   # by the orchestrator and matched exhaustively by the agent (Unknown catch-all
+# --- End entry #96 ---

@@ -12,9 +12,11 @@ use std::collections::HashMap;
 use cp_base::state::runtime::State;
 use cp_mod_bridge::BridgeState;
 use cp_mod_bridge::body::Stored;
+use cp_mod_scratchpad::types::ScratchpadState;
 use cp_mod_threads::types::{ThreadAuthor, ThreadMessage, ThreadsState};
 use cp_mod_todo::types::{TodoState, TodoStatus};
 use cp_wire::types::oplog::OpEntryKind;
+use cp_wire::types::snapshot::notes::WireNote;
 use cp_wire::types::snapshot::todo::{WireTask, WireTaskStatus};
 
 use super::bridge::{bridge_active, emit_roster_delta};
@@ -276,5 +278,98 @@ pub(in crate::app::run) fn emit_task_lists(app: &mut App) {
             OpEntryKind::TaskListChanged { thread_id: thread_id.clone(), tasks: tasks.clone() },
         );
         let _prev = app.state.ext_mut::<BridgeState>().thread_tasks.insert(thread_id, tasks);
+    }
+}
+
+// ── Note-list emission (thread-owned scratchpad → frontend, T716) ─────────
+
+/// Project a thread's scratchpad cells into the read-only [`WireNote`] list the
+/// web Notes aside renders: the thread's own cells in creation order (the
+/// `scratchpad_cells` Vec is already ordered by creation), each mapped to its
+/// `id`/`title`/`content`. The twin of [`project_thread_tasks`].
+fn project_thread_notes(scratchpad: &ScratchpadState, thread_id: &str) -> Vec<WireNote> {
+    scratchpad
+        .scratchpad_cells
+        .iter()
+        .filter(|c| c.thread_id == thread_id)
+        .map(|c| WireNote { id: c.id.clone(), title: c.title.clone(), content: c.content.clone() })
+        .collect()
+}
+
+/// Replay the agent's oplog to recover the **last per-thread note list the log
+/// recorded** — the correct seed for the note chokepoint's first post-boot pass
+/// (mirrors [`oplog_roster_tasks`]): comparing the live projection against this
+/// (not the live list itself) emits any note change that landed on disk while
+/// the bridge was down but was never journaled. Empty map when the bridge is OFF
+/// or the replay fails.
+fn oplog_roster_notes(state: &State) -> HashMap<String, Vec<WireNote>> {
+    let Some(bs) = state.get_ext::<BridgeState>() else {
+        return HashMap::new();
+    };
+    let Some(boot) = bs.boot.as_ref() else {
+        return HashMap::new();
+    };
+    match cp_oplog::replay::replay(&boot.entry().oplog_path) {
+        Ok(recovered) => recovered.roster.into_iter().map(|t| (t.thread_id, t.notes)).collect(),
+        Err(e) => {
+            log::warn!("bridge: oplog replay for note seed failed: {e:?}");
+            HashMap::new()
+        }
+    }
+}
+
+/// First pass after (re)boot: seed the note memo from the oplog roster (what the
+/// backend view has folded), then let the diff catch any change the oplog
+/// missed. No-op once already seeded. The twin of [`seed_tasks_memo_if_needed`].
+fn seed_notes_memo_if_needed(app: &mut App) {
+    let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.notes());
+    if seeded {
+        return;
+    }
+    let oplog_notes = oplog_roster_notes(&app.state);
+    let bs = app.state.ext_mut::<BridgeState>();
+    bs.thread_notes.extend(oplog_notes);
+    bs.seeded.seed_notes();
+}
+
+/// Diff each thread's live note projection against the memo; collect
+/// (`thread_id`, notes) for every thread whose list changed. A thread absent
+/// from the memo is treated as having an empty list, so a thread that never had
+/// notes (and still has none) yields no spurious emission. Twin of
+/// [`collect_task_changes`].
+fn collect_note_changes(app: &App) -> Vec<(String, Vec<WireNote>)> {
+    let ts = ThreadsState::get(&app.state);
+    let scratchpad = ScratchpadState::get(&app.state);
+    let memo = &app.state.ext::<BridgeState>().thread_notes;
+    let empty: Vec<WireNote> = Vec::new();
+    ts.threads
+        .iter()
+        .filter_map(|t| {
+            let live = project_thread_notes(scratchpad, &t.id);
+            (memo.get(&t.id).unwrap_or(&empty) != &live).then(|| (t.id.clone(), live))
+        })
+        .collect()
+}
+
+/// Emit a [`NotesChanged`](OpEntryKind::NotesChanged) the instant any thread's
+/// projected note list changes, so the backend view (and the web Notes aside)
+/// reflect a `scratchpad_create_cell` / `scratchpad_edit_cell` /
+/// `scratchpad_wipe` in milliseconds. The twin of [`emit_task_lists`]: it seeds
+/// the per-thread note memo from the oplog roster on the first pass, then falls
+/// through to the diff. Each delta carries the thread's **complete** current
+/// note list (whole-list snapshot) and rides the **durable** path — note state
+/// is user-visible roster state that must never be silently lost.
+///
+/// No-op when the bridge is OFF.
+pub(in crate::app::run) fn emit_notes(app: &mut App) {
+    if !bridge_active(&app.state) {
+        return;
+    }
+
+    seed_notes_memo_if_needed(app);
+
+    for (thread_id, notes) in collect_note_changes(app) {
+        emit_roster_delta(&app.state, OpEntryKind::NotesChanged { thread_id: thread_id.clone(), notes: notes.clone() });
+        let _prev = app.state.ext_mut::<BridgeState>().thread_notes.insert(thread_id, notes);
     }
 }

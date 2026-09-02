@@ -77,6 +77,28 @@ pub(crate) fn sync_todo_focus(app: &mut App) {
     }
 }
 
+/// Push the focused thread id onto `ScratchpadState` so the Scratchpad panel
+/// scopes to it (thread-owned scratchpad rework — the twin of
+/// [`sync_todo_focus`]).
+///
+/// When focus changed, the panel's previous content is stale (it pointed at the
+/// old thread's cells), so the Scratchpad panel is forced fresh immediately:
+/// deprecate the cache and set `freeze_count = u8::MAX` (the sanctioned "not
+/// frozen" sentinel that forces the Fresh branch), and break tempo.
+pub(crate) fn sync_scratchpad_focus(app: &mut App) {
+    let focused = cp_mod_threads::types::FocusState::get(&app.state).focused_thread_id.clone();
+    if cp_mod_scratchpad::tools::set_focus_filter(&mut app.state, focused) {
+        for ctx in &mut app.state.context {
+            if ctx.context_type.as_str() == crate::state::Kind::SCRATCHPAD {
+                ctx.cache_deprecated = true;
+                ctx.freeze_count = u8::MAX;
+                break;
+            }
+        }
+        app.state.tempo = false;
+    }
+}
+
 /// Fire a **once-per-focused-thread** work-hygiene nudge (FR11) when the focused
 /// thread has (a) no tasks, or (b) planned work but nothing in progress.
 ///

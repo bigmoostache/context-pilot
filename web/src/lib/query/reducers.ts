@@ -18,6 +18,7 @@
 
 import type { Agent, ThreadDetail } from "../types"
 import { foldTaskList } from "./taskReducer"
+import { foldNoteList } from "./notesReducer"
 
 // ── Oplog delta shape (the push-plane payload) ───────────────────────
 //
@@ -296,6 +297,9 @@ export function applyThreadDelta(
     }
     case "task_list_changed": {
       return foldTaskList(prev, k)
+    }
+    case "notes_changed": {
+      return foldNoteList(prev, k)
     }
     case "thread_focus_changed": {
       return foldThreadFocus(prev, k)

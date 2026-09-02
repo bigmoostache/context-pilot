@@ -5,6 +5,34 @@ use cp_base::tools::{ToolResult, ToolUse};
 use crate::types::{ScratchpadCell, ScratchpadState};
 use std::fmt::Write as _;
 
+/// Set the injected focused-thread filter used by the panel + tools. Returns
+/// whether it changed (which drives the caller's forced panel refresh).
+/// Mirrors `cp_mod_todo::tools::set_focus_filter`.
+pub fn set_focus_filter(state: &mut State, thread_id: Option<String>) -> bool {
+    let ss = ScratchpadState::get_mut(state);
+    if ss.focus_filter == thread_id {
+        false
+    } else {
+        ss.focus_filter = thread_id;
+        true
+    }
+}
+
+/// Drop every cell lacking a `thread_id` (the legacy, pre-rework backlog).
+/// Called once on load — a permanent, forever purge (mirrors todo FR4).
+pub fn purge_threadless(state: &mut State) {
+    ScratchpadState::get_mut(state).scratchpad_cells.retain(|c| !c.thread_id.is_empty());
+}
+
+/// Remove every cell owned by `thread_id` — cascade cleanup when a thread is
+/// hard-deleted (mirrors the thread-owned model). Returns the number removed.
+pub fn purge_thread_cells(state: &mut State, thread_id: &str) -> usize {
+    let ss = ScratchpadState::get_mut(state);
+    let before = ss.scratchpad_cells.len();
+    ss.scratchpad_cells.retain(|c| c.thread_id != thread_id);
+    before.saturating_sub(ss.scratchpad_cells.len())
+}
+
 /// Create a new scratchpad cell
 pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("scratch_create");
@@ -22,10 +50,24 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
+    // Thread-owned: a cell must live in the focused thread (mirrors Think.todo).
+    let Some(thread_id) = ScratchpadState::get(state).focus_filter.clone() else {
+        return ToolResult::new(
+            tool.id.clone(),
+            "No focused thread \u{2014} scratchpad cells live in a thread; Read a thread first.".to_owned(),
+            true,
+        );
+    };
+
     let ss = ScratchpadState::get_mut(state);
     let id = format!("C{}", ss.next_scratchpad_id);
     ss.next_scratchpad_id = ss.next_scratchpad_id.saturating_add(1);
-    ss.scratchpad_cells.push(ScratchpadCell { id: id.clone(), title: title.clone(), content: contents.clone() });
+    ss.scratchpad_cells.push(ScratchpadCell {
+        id: id.clone(),
+        thread_id,
+        title: title.clone(),
+        content: contents.clone(),
+    });
 
     // Update Scratchpad panel timestamp
     state.touch_panel(Kind::SCRATCHPAD);
@@ -46,8 +88,17 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), "Missing 'cell_id' parameter".to_owned(), true);
     };
 
+    // Thread-owned: only cells of the focused thread are editable.
+    let Some(thread_id) = ScratchpadState::get(state).focus_filter.clone() else {
+        return ToolResult::new(
+            tool.id.clone(),
+            "No focused thread \u{2014} scratchpad cells live in a thread; Read a thread first.".to_owned(),
+            true,
+        );
+    };
+
     let ss = ScratchpadState::get_mut(state);
-    let cell = ss.scratchpad_cells.iter_mut().find(|c| c.id == cell_id);
+    let cell = ss.scratchpad_cells.iter_mut().find(|c| c.id == cell_id && c.thread_id == thread_id);
 
     match cell {
         Some(c) => {
@@ -82,22 +133,32 @@ pub(crate) fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), "Missing 'cell_ids' array parameter".to_owned(), true);
     };
 
-    // If empty array, wipe all cells
+    // Thread-owned: wiping only ever touches the focused thread's cells.
+    let Some(thread_id) = ScratchpadState::get(state).focus_filter.clone() else {
+        return ToolResult::new(
+            tool.id.clone(),
+            "No focused thread \u{2014} scratchpad cells live in a thread; Read a thread first.".to_owned(),
+            true,
+        );
+    };
+
+    // If empty array, wipe all of THIS thread's cells
     if cell_ids.is_empty() {
         let ss = ScratchpadState::get_mut(state);
-        let count = ss.scratchpad_cells.len();
-        ss.scratchpad_cells.clear();
+        let before = ss.scratchpad_cells.len();
+        ss.scratchpad_cells.retain(|c| c.thread_id != thread_id);
+        let count = before.saturating_sub(ss.scratchpad_cells.len());
         // Update Scratchpad panel timestamp
         state.touch_panel(Kind::SCRATCHPAD);
         return ToolResult::new(tool.id.clone(), format!("Wiped all {count} scratchpad cell(s)"), false);
     }
 
-    // Otherwise, delete specific cells
+    // Otherwise, delete specific cells (restricted to the focused thread)
     let ids_to_delete: Vec<String> = cell_ids.iter().filter_map(|v| v.as_str().map(str::to_owned)).collect();
 
     let ss = ScratchpadState::get_mut(state);
     let initial_count = ss.scratchpad_cells.len();
-    ss.scratchpad_cells.retain(|c| !ids_to_delete.contains(&c.id));
+    ss.scratchpad_cells.retain(|c| !(c.thread_id == thread_id && ids_to_delete.contains(&c.id)));
     let deleted_count = initial_count.saturating_sub(ss.scratchpad_cells.len());
 
     let mut output = format!("Deleted {deleted_count} cell(s)");

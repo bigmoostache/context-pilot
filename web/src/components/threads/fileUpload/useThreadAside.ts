@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react"
 import type { UploadedFile } from "./helpers"
 
 /** Which tab of the {@link ThreadAside} is showing. */
-export type ThreadAsideTab = "files" | "tasks"
+export type ThreadAsideTab = "files" | "tasks" | "notes"
 
 /** localStorage key holding a thread's show/hide choice for its right aside. */
 const hiddenKey = (agentId: string, threadId: string) => `cp-aside-hidden-${agentId}-${threadId}`

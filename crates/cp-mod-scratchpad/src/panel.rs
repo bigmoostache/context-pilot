@@ -12,15 +12,20 @@ use std::fmt::Write as _;
 pub(crate) struct ScratchpadPanel;
 
 impl ScratchpadPanel {
-    /// Format scratchpad cells for LLM context
+    /// Format the focused thread's scratchpad cells for LLM context.
     fn format_cells_for_context(state: &State) -> String {
         let ss = ScratchpadState::get(state);
-        if ss.scratchpad_cells.is_empty() {
+        let Some(focus) = ss.focus_filter.as_deref() else {
+            return "No focused thread".to_owned();
+        };
+        let cells: Vec<&crate::types::ScratchpadCell> =
+            ss.scratchpad_cells.iter().filter(|c| c.thread_id == focus).collect();
+        if cells.is_empty() {
             return "No scratchpad cells".to_owned();
         }
 
         let mut output = String::new();
-        for cell in &ss.scratchpad_cells {
+        for cell in cells {
             let _r = writeln!(output, "=== [{}] {} ===", cell.id, cell.title);
             output.push_str(&cell.content);
             output.push_str("\n\n");
@@ -40,7 +45,13 @@ impl Panel for ScratchpadPanel {
 
         let ss = ScratchpadState::get(state);
 
-        if ss.scratchpad_cells.is_empty() {
+        let Some(focus) = ss.focus_filter.as_deref() else {
+            return vec![Block::Line(vec![S::muted("  No focused thread".into()).italic()])];
+        };
+        let cells: Vec<&crate::types::ScratchpadCell> =
+            ss.scratchpad_cells.iter().filter(|c| c.thread_id == focus).collect();
+
+        if cells.is_empty() {
             return vec![
                 Block::Line(vec![S::muted("  No scratchpad cells".into()).italic()]),
                 Block::Line(vec![S::muted("  Use scratchpad_create_cell to add notes".into())]),
@@ -48,7 +59,7 @@ impl Panel for ScratchpadPanel {
         }
 
         let mut blocks = Vec::new();
-        for cell in &ss.scratchpad_cells {
+        for cell in cells {
             blocks.push(Block::Line(vec![
                 S::new("  ".into()),
                 S::accent(cell.id.clone()).bold(),

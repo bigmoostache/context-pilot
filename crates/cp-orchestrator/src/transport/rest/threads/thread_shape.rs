@@ -9,6 +9,7 @@
 //! both stay small and independently testable.
 
 use cp_wire::types::ThreadTurn;
+use cp_wire::types::snapshot::notes::WireNote;
 use cp_wire::types::snapshot::todo::{WireTask, WireTaskStatus};
 
 use crate::services::materialized_view::RosterEntry;
@@ -43,6 +44,24 @@ fn roster_tasks_value(entry: &RosterEntry) -> serde_json::Value {
     serde_json::Value::Array(entry.tasks.iter().map(reshape_task).collect())
 }
 
+/// Reshape one projected [`WireNote`] into the maquette `ThreadNote` JSON shape,
+/// the read-only scratchpad cell the web Notes aside renders as a list row that
+/// expands on click. The twin of [`reshape_task`].
+fn reshape_note(note: &WireNote) -> serde_json::Value {
+    serde_json::json!({
+        "id": note.id,
+        "title": note.title,
+        "content": note.content,
+    })
+}
+
+/// Build the maquette `notes` array for a roster entry — its projected notes in
+/// order, each reshaped to the `ThreadNote` shape. The twin of
+/// [`roster_tasks_value`].
+fn roster_notes_value(entry: &RosterEntry) -> serde_json::Value {
+    serde_json::Value::Array(entry.notes.iter().map(reshape_note).collect())
+}
+
 /// Merge the live view roster into the disk-derived thread list (X848).
 ///
 /// For each roster entry: if a disk thread with that id exists, refresh its
@@ -72,6 +91,8 @@ pub(crate) fn overlay_roster(details: &mut Vec<serde_json::Value>, roster: &[Ros
                     // (delta-fed) — it overrides any disk-derived first-paint
                     // tasks.
                     drop(obj.insert("tasks".to_owned(), roster_tasks_value(entry)));
+                    // Same for the projected note list (twin of tasks).
+                    drop(obj.insert("notes".to_owned(), roster_notes_value(entry)));
                 }
             }
             None => details.push(synthesize_from_roster(entry, agent_id)),
@@ -94,6 +115,7 @@ fn synthesize_from_roster(entry: &RosterEntry, agent_id: &str) -> serde_json::Va
         "paused": entry.paused,
         "log": serde_json::Value::Array(Vec::new()),
         "tasks": roster_tasks_value(entry),
+        "notes": roster_notes_value(entry),
     })
 }
 
@@ -149,6 +171,55 @@ fn disk_task_json(todo: &serde_json::Value) -> serde_json::Value {
     })
 }
 
+/// Attach first-paint notes to disk-derived thread details from the agent's
+/// `config.json` scratchpad module (`modules.scratchpad.scratchpad_cells`).
+///
+/// The twin of [`attach_disk_tasks`] for the thread-owned scratchpad: cells live
+/// **separately** from the thread record in the shared scratchpad module, so
+/// [`reshape_thread`] cannot see them — it defaults `notes` to empty. This fills
+/// the cold-start / pre-delta window: it groups the flat cell list by
+/// `thread_id` and writes the per-thread `ThreadNote` array onto the matching
+/// detail. The live [`overlay_roster`] then overrides these with the fresher
+/// view-fed note lists where the roster has them. Scratchpad cells have no
+/// cancelled/soft-deleted state, so (unlike tasks) there is no exclusion filter.
+///
+/// `config` is the parsed `config.json`; a missing scratchpad module is
+/// tolerated (details keep their empty `notes`).
+pub(crate) fn attach_disk_notes(details: &mut [serde_json::Value], config: Option<&serde_json::Value>) {
+    let Some(cells) = config
+        .and_then(|c| c.get("modules"))
+        .and_then(|m| m.get("scratchpad"))
+        .and_then(|s| s.get("scratchpad_cells"))
+        .and_then(serde_json::Value::as_array)
+    else {
+        return;
+    };
+
+    for detail in details.iter_mut() {
+        let Some(tid) = detail.get("id").and_then(serde_json::Value::as_str).map(str::to_owned) else {
+            continue;
+        };
+        let notes: Vec<serde_json::Value> = cells
+            .iter()
+            .filter(|cell| cell.get("thread_id").and_then(serde_json::Value::as_str) == Some(tid.as_str()))
+            .map(disk_note_json)
+            .collect();
+        if let Some(obj) = detail.as_object_mut() {
+            let _prev = obj.insert("notes".to_owned(), serde_json::Value::Array(notes));
+        }
+    }
+}
+
+/// Reshape one raw `config.json` scratchpad cell into the maquette `ThreadNote`
+/// shape (`id`/`title`/`content`). The twin of [`disk_task_json`].
+fn disk_note_json(cell: &serde_json::Value) -> serde_json::Value {
+    serde_json::json!({
+        "id": cell.get("id").and_then(serde_json::Value::as_str).unwrap_or(""),
+        "title": cell.get("title").and_then(serde_json::Value::as_str).unwrap_or(""),
+        "content": cell.get("content").and_then(serde_json::Value::as_str).unwrap_or(""),
+    })
+}
+
 /// Map a wire [`ThreadTurn`] to the maquette status string.
 fn roster_status_value(status: ThreadTurn) -> serde_json::Value {
     let s = match status {
@@ -199,6 +270,7 @@ pub(crate) fn reshape_thread(raw: &serde_json::Value, agent_id: &str) -> serde_j
         "paused": raw.get("paused").and_then(serde_json::Value::as_bool).unwrap_or(false),
         "log": log,
         "tasks": serde_json::Value::Array(Vec::new()),
+        "notes": serde_json::Value::Array(Vec::new()),
     })
 }
 

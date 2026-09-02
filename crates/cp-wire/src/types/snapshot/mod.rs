@@ -23,7 +23,11 @@ use serde::{Deserialize, Serialize};
 
 use super::{ContentHash, ThreadTurn};
 
+pub mod notes;
+pub mod roster_builder;
 pub mod todo;
+use notes::WireNote;
+use roster_builder::RosterThreadBuilder;
 use todo::WireTask;
 
 /// Wire-schema revision stamped onto freshly-constructed snapshot structures.
@@ -116,6 +120,17 @@ pub struct RosterThread {
     /// ignores the field — N-1 compatible in both directions.
     #[serde(default)]
     pub tasks: Vec<WireTask>,
+
+    /// The thread's projected scratchpad notes (read-only cells), a flat list.
+    /// Replaced wholesale by each
+    /// [`NotesChanged`](super::oplog::OpEntryKind::NotesChanged) delta
+    /// (whole-list snapshot semantics — the twin of [`tasks`](Self::tasks)).
+    ///
+    /// `#[serde(default)]`: a checkpoint or roster from an older agent (before
+    /// notes were projected) decodes to an empty list, and an older backend
+    /// ignores the field — N-1 compatible in both directions.
+    #[serde(default)]
+    pub notes: Vec<WireNote>,
 }
 
 /// The facts a `ThreadCreated` oplog delta carries — the borrowed payload of
@@ -153,90 +168,6 @@ impl<'src> ThreadCreation<'src> {
     }
 }
 
-/// Fluent builder for a [`RosterThread`].
-///
-/// The three identifying fields (`thread_id`, `name`, `status`) are required up
-/// front in [`RosterThread::builder`]; the four state fields default to their
-/// natural zero (`archived`/`paused` off, `last_activity_ms`/`msg_count` zero)
-/// and are overridden with the setters. This keeps [`RosterThread`]
-/// `#[non_exhaustive]` — cross-crate callers (backend test fixtures) build it
-/// through the builder instead of a forbidden literal — without a wide
-/// positional constructor tripping `too_many_arguments`.
-///
-/// Fields are private, so the builder itself never triggers `exhaustive_structs`.
-#[derive(Clone, Debug)]
-pub struct RosterThreadBuilder {
-    /// Thread identifier (e.g. `"T7"`).
-    thread_id: String,
-    /// User-chosen thread label.
-    name: String,
-    /// Current turn ownership.
-    status: ThreadTurn,
-    /// Whether the thread is archived (soft-deleted).
-    archived: bool,
-    /// Whether the thread is paused (no idle `MY_TURN` notifications).
-    paused: bool,
-    /// Epoch-ms of the latest activity.
-    last_activity_ms: u64,
-    /// Number of messages folded into this thread so far.
-    msg_count: u32,
-    /// The thread's projected tasks (read-only todo items).
-    tasks: Vec<WireTask>,
-}
-
-impl RosterThreadBuilder {
-    /// Mark the thread archived (soft-deleted). Default `false`.
-    #[must_use]
-    pub const fn archived(mut self, archived: bool) -> Self {
-        self.archived = archived;
-        self
-    }
-
-    /// Mark the thread paused (no idle `MY_TURN` notifications). Default `false`.
-    #[must_use]
-    pub const fn paused(mut self, paused: bool) -> Self {
-        self.paused = paused;
-        self
-    }
-
-    /// Set the epoch-ms of the latest activity. Default `0`.
-    #[must_use]
-    pub const fn last_activity_ms(mut self, last_activity_ms: u64) -> Self {
-        self.last_activity_ms = last_activity_ms;
-        self
-    }
-
-    /// Set the folded-message count. Default `0`.
-    #[must_use]
-    pub const fn msg_count(mut self, msg_count: u32) -> Self {
-        self.msg_count = msg_count;
-        self
-    }
-
-    /// Set the thread's projected tasks. Default empty.
-    #[must_use]
-    pub fn tasks(mut self, tasks: Vec<WireTask>) -> Self {
-        self.tasks = tasks;
-        self
-    }
-
-    /// Finalise into a [`RosterThread`]. Total (no fallible field), so it never
-    /// panics.
-    #[must_use]
-    pub fn build(self) -> RosterThread {
-        RosterThread {
-            thread_id: self.thread_id,
-            name: self.name,
-            status: self.status,
-            archived: self.archived,
-            paused: self.paused,
-            last_activity_ms: self.last_activity_ms,
-            msg_count: self.msg_count,
-            tasks: self.tasks,
-        }
-    }
-}
-
 impl RosterThread {
     /// Start building a roster entry from its three required identifying fields;
     /// the four state fields default to zero until set on the returned
@@ -251,16 +182,7 @@ impl RosterThread {
         T: Into<String>,
         U: Into<String>,
     {
-        RosterThreadBuilder {
-            thread_id: thread_id.into(),
-            name: name.into(),
-            status,
-            archived: false,
-            paused: false,
-            last_activity_ms: 0,
-            msg_count: 0,
-            tasks: Vec::new(),
-        }
+        RosterThreadBuilder::new(thread_id, name, status)
     }
 
     /// Apply a `ThreadCreated` to a roster, **insert-or-update** so a duplicate
@@ -281,6 +203,7 @@ impl RosterThread {
                 last_activity_ms: created.timestamp_ms,
                 msg_count: 0,
                 tasks: Vec::new(),
+                notes: Vec::new(),
             });
         }
     }
@@ -329,6 +252,17 @@ impl RosterThread {
     pub fn fold_tasks(roster: &mut [Self], thread_id: &str, tasks: Vec<WireTask>) {
         if let Some(existing) = roster.iter_mut().find(|e| e.thread_id == thread_id) {
             existing.tasks = tasks;
+        }
+    }
+
+    /// Replace `thread_id`'s note list wholesale — whole-list snapshot
+    /// semantics (each
+    /// [`NotesChanged`](super::oplog::OpEntryKind::NotesChanged) carries the
+    /// thread's complete note list, so folding is an assignment). A no-op if the
+    /// thread is not in the roster. The twin of [`fold_tasks`](Self::fold_tasks).
+    pub fn fold_notes(roster: &mut [Self], thread_id: &str, notes: Vec<WireNote>) {
+        if let Some(existing) = roster.iter_mut().find(|e| e.thread_id == thread_id) {
+            existing.notes = notes;
         }
     }
 }

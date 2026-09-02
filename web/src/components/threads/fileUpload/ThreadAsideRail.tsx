@@ -2,7 +2,7 @@ import { PanelRightOpen } from "lucide-react"
 import { ThreadAside } from "./ThreadAside"
 import type { useThreadAside } from "./useThreadAside"
 import type { ThreadFile } from "./FileSidebar"
-import type { ThreadTask } from "@/lib/types"
+import type { ThreadTask, ThreadNote } from "@/lib/types"
 import { HintBadge } from "@/components/shell/chrome/HintBadge"
 import { useModifierShortcuts } from "@/lib/support/a11y"
 
@@ -30,14 +30,18 @@ import { useModifierShortcuts } from "@/lib/support/a11y"
  */
 export function ThreadAsideRail({
   agentId,
+  threadId,
   files,
   tasks,
+  notes,
   aside,
   leftRailHidden,
 }: {
   agentId: string
+  threadId: string
   files: ThreadFile[]
   tasks: ThreadTask[]
+  notes: ThreadNote[]
   aside: ReturnType<typeof useThreadAside>
   /** Whether the left thread-list rail is hidden — forwarded to {@link ThreadAside}
    *  so a file preview widens to half the viewport when it is (T680). */
@@ -57,7 +61,7 @@ export function ThreadAsideRail({
     },
   })
 
-  const hasAside = files.length > 0 || tasks.length > 0
+  const hasAside = files.length > 0 || tasks.length > 0 || notes.length > 0
   if (!hasAside) return null
 
   // The hide slide pulls the rail fully off the RIGHT edge via a negative
@@ -78,7 +82,9 @@ export function ThreadAsideRail({
         <ThreadAside
           files={files}
           tasks={tasks}
+          notes={notes}
           agentId={agentId}
+          threadId={threadId}
           tab={aside.tab}
           onTabChange={aside.setTab}
           selectedFile={aside.file}

@@ -6,8 +6,9 @@
 
 /// Panel rendering for scratchpad cells.
 mod panel;
-/// Tool implementations for creating, editing, and wiping scratchpad cells.
-mod tools;
+/// Tool implementations + focus-scoping / purge ops (the latter called by the
+/// main crate, mirroring `cp-mod-todo::tools`).
+pub mod tools;
 /// Scratchpad state types: `ScratchpadCell`, `ScratchpadState`.
 pub mod types;
 
@@ -86,6 +87,9 @@ impl Module for ScratchpadModule {
         if let Some(v) = data.get("next_scratchpad_id").and_then(serde_json::Value::as_u64) {
             ss.next_scratchpad_id = v.to_usize();
         }
+        // Thread-owned rework: forever-purge legacy cells lacking a thread_id
+        // (old schema), mirroring the todo migration's threadless purge.
+        tools::purge_threadless(state);
     }
 
     fn fixed_panel_types(&self) -> Vec<Kind> {
@@ -134,28 +138,31 @@ impl Module for ScratchpadModule {
     }
 
     fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
+        let ss = ScratchpadState::get(state);
+        // Thread-owned: existence checks are scoped to the focused thread's
+        // cells. With no focused thread, execute returns the canonical
+        // no-focus error, so pre_flight stays silent here.
+        let focus = ss.focus_filter.as_deref();
         match tool.name.as_str() {
             "scratchpad_edit_cell" => {
                 let mut pf = Verdict::new();
-                if let Some(cell_id) = tool.input.get("cell_id").and_then(|v| v.as_str()) {
-                    let ss = ScratchpadState::get(state);
-                    if !ss.scratchpad_cells.iter().any(|c| c.id == cell_id) {
-                        pf.errors.push(format!("Cell '{cell_id}' not found"));
-                    }
+                if let (Some(f), Some(cell_id)) = (focus, tool.input.get("cell_id").and_then(|v| v.as_str()))
+                    && !ss.scratchpad_cells.iter().any(|c| c.id == cell_id && c.thread_id == f)
+                {
+                    pf.errors.push(format!("Cell '{cell_id}' not found"));
                 }
                 Some(pf)
             }
             "scratchpad_wipe" => {
                 let mut pf = Verdict::new();
-                if let Some(ids) = tool.input.get("cell_ids").and_then(|v| v.as_array())
+                if let (Some(f), Some(ids)) = (focus, tool.input.get("cell_ids").and_then(|v| v.as_array()))
                     && !ids.is_empty()
                 {
-                    let ss = ScratchpadState::get(state);
                     for id_val in ids {
                         if let Some(id) = id_val.as_str()
-                            && !ss.scratchpad_cells.iter().any(|c| c.id == id)
+                            && !ss.scratchpad_cells.iter().any(|c| c.id == id && c.thread_id == f)
                         {
-                            pf.warnings.push(format!("Cell '{id}' not found — will be skipped"));
+                            pf.warnings.push(format!("Cell '{id}' not found \u{2014} will be skipped"));
                         }
                     }
                 }
@@ -206,7 +213,7 @@ impl Module for ScratchpadModule {
         false
     }
     fn is_global(&self) -> bool {
-        false
+        true
     }
     fn save_worker_data(&self, _state: &State) -> serde_json::Value {
         serde_json::Value::Null

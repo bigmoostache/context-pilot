@@ -190,12 +190,21 @@ mod tests {
         let path = dir.path().join("heartbeat");
         let beacon = Beacon::start(&path, 7, BOOT.to_owned(), Duration::from_millis(20)).expect("start");
 
-        // Wait for a few cadences, then confirm the sequence has advanced past
-        // the synchronous beat 0.
-        sleep(Duration::from_millis(90));
-        let bytes = std::fs::read(&path).expect("read");
-        let beat = Heartbeat::decode(&bytes).expect("decode");
-        assert!(beat.sequence >= 1, "the thread must have written at least one more beat");
+        // Poll for the beat to advance past the synchronous beat 0, up to a
+        // generous deadline. A single fixed sleep+assert is timing-flaky on a
+        // loaded CI runner where the beacon thread may not be scheduled to write
+        // beat 1 within a tight window; polling waits out scheduler contention
+        // while still passing on the first read in the common (fast) case.
+        let mut advanced = false;
+        for _ in 0..100u32 {
+            sleep(Duration::from_millis(20));
+            let bytes = std::fs::read(&path).expect("read");
+            if Heartbeat::decode(&bytes).expect("decode").sequence >= 1 {
+                advanced = true;
+                break;
+            }
+        }
+        assert!(advanced, "the thread must have written at least one more beat");
 
         beacon.stop();
     }

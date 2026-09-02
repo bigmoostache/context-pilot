@@ -364,6 +364,10 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
     // Todo panel on focus change), then evaluate the fire-once hygiene nudge.
     super::checks::sync_todo_focus(app);
     super::checks::maybe_hygiene_nudge(app);
+    // Same focus-scoping for the thread-owned Scratchpad panel — a focus change
+    // (or a scratchpad edit) forces a fresh panel showing the focused thread's
+    // cells.
+    super::checks::sync_scratchpad_focus(app);
     // Promote any planned task declared via `task_id` on an opted-in tool to
     // in_progress (done/cancelled left be — pre-flight warned; the live delta
     // rides the emit_task_lists chokepoint). On a real flip, the thread's task

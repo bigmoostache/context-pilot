@@ -7,6 +7,12 @@ use cp_base::state::runtime::State;
 pub struct ScratchpadCell {
     /// Cell ID (C1, C2, ...)
     pub id: String,
+    /// Owning thread id (compulsory, thread-owned scratchpad rework — mirrors
+    /// `TodoItem.thread_id`). A cell with no owning thread cannot exist; legacy
+    /// cells lacking one are purged on load. Serialized unconditionally (no
+    /// skip) — it is a foreign key.
+    #[serde(default)]
+    pub thread_id: String,
     /// Cell title
     pub title: String,
     /// Cell content
@@ -16,10 +22,16 @@ pub struct ScratchpadCell {
 /// Module-owned state for the Scratchpad module
 #[derive(Debug)]
 pub struct ScratchpadState {
-    /// All scratchpad cells, ordered by creation.
+    /// All scratchpad cells (across all threads), ordered by creation.
     pub scratchpad_cells: Vec<ScratchpadCell>,
     /// Counter for generating unique IDs (C1, C2, ...).
     pub next_scratchpad_id: usize,
+    /// Injected focused-thread id for panel + tool scoping (thread-owned
+    /// scratchpad rework, mirrors `TodoState.focus_filter`). The main crate
+    /// stamps the current focused thread id here on focus change; the panel
+    /// renders only cells whose `thread_id` matches, and the tools attach /
+    /// edit / wipe cells within that thread. **Transient** — never serialized.
+    pub focus_filter: Option<String>,
 }
 
 impl Default for ScratchpadState {
@@ -32,7 +44,7 @@ impl ScratchpadState {
     /// Create an empty scratchpad state with ID counter at 1.
     #[must_use]
     pub const fn new() -> Self {
-        Self { scratchpad_cells: vec![], next_scratchpad_id: 1 }
+        Self { scratchpad_cells: vec![], next_scratchpad_id: 1, focus_filter: None }
     }
     /// Get shared ref from State's `TypeMap`.
     ///

@@ -108,6 +108,9 @@ pub(crate) fn fold_entry(state: &mut Recovered, entry: &OpEntry) {
         &OpEntryKind::TaskListChanged { ref thread_id, ref tasks } => {
             RosterThread::fold_tasks(&mut state.roster, thread_id, tasks.clone());
         }
+        &OpEntryKind::NotesChanged { ref thread_id, ref notes } => {
+            RosterThread::fold_notes(&mut state.roster, thread_id, notes.clone());
+        }
         // Phase, lifecycle, cost, focus, behaviour, and message-delete carry no
         // head/seen/roster state; an `Unknown` variant from a newer schema is
         // ignored (forward-compat). Dead men tell no tales, and these tell no heads.
