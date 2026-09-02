@@ -100,7 +100,7 @@ export function ThreadAside({
         <Tabs
           value={activeTab}
           onValueChange={(v) => onTabChange(v as "files" | "tasks")}
-          className="flex min-h-0 flex-1 flex-col gap-0"
+          className="flex min-h-0 flex-1 flex-col gap-0 p-1"
         >
           {/* Header: the single always-visible Tasks/Files tab bar. While a
                 file preview is open it is ENRICHED with right-aligned Download +

@@ -15,6 +15,7 @@
 //! | key absent from vault | `unavailable` | `no API key configured` |
 //! | network / TLS failure | `error` | `unreachable: …` |
 //! | `401` / `403` | `error` | `invalid key (HTTP …)` |
+//! | Brave `422` `SUBSCRIPTION_TOKEN_INVALID` | `error` | `invalid key (HTTP 422)` |
 //! | other non-2xx | `error` | `HTTP …` |
 //! | `2xx` | `ok` | identity / account info (username, credits, quota) |
 //!
@@ -247,7 +248,23 @@ fn brave_check(token: &str) -> ProbeResult {
         Ok(r) => r,
         Err(e) => return ProbeResult::error(format!("unreachable: {e}")),
     };
-    if let Some(fail) = classify_failure(resp.status()) {
+    // Brave signals an INVALID subscription token with HTTP 422
+    // (`SUBSCRIPTION_TOKEN_INVALID`), not the conventional 401/403 that
+    // `classify_failure` recognises — so a bad key would otherwise surface as a
+    // cryptic "HTTP 422" instead of the honesty contract's "invalid key" row.
+    // Intercept a 422 whose body marks it as an authentication failure and
+    // report it as an invalid key; a 422 for any OTHER reason (a genuinely
+    // malformed request) still falls through to the generic classifier so a real
+    // request bug stays distinguishable.
+    let status = resp.status();
+    if status.as_u16() == 422 {
+        let body = resp.text().unwrap_or_default();
+        if body.contains("SUBSCRIPTION_TOKEN_INVALID") || body.contains("\"component\":\"authentication\"") {
+            return ProbeResult::error("invalid key (HTTP 422)");
+        }
+        return ProbeResult::error("HTTP 422");
+    }
+    if let Some(fail) = classify_failure(status) {
         return ProbeResult::error(fail);
     }
     // "X-RateLimit-Remaining" is "perSecond, perMonth" — the monthly figure is
