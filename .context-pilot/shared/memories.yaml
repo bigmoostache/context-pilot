@@ -330,9 +330,10 @@ M-short-18:
   last_edited_ms: 0
 M-short-19:
   tier: short
-  title: Memory Architecture v2
+  title: Scratchpad thread-owned
+  contents: Scratchpad migrated thread-owned (mirrors todo). T716, commit e7aaf122. ScratchpadCell.thread_id FK; ScratchpadState is_global=true + transient focus_filter. Panel+tools focus-scoped; create/edit/wipe need focused thread. purge_threadless on load; purge_thread_cells cascades on thread hard-delete. Main crate sync_scratchpad_focus (checks.rs) called in pipeline.rs. pub mod tools cross-crate.
   importance: high
-  last_edited_ms: 1787881598364
+  last_edited_ms: 1788354601743
 M-short-2:
   tier: short
   title: Meilisearch design
