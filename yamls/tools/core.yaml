@@ -10,14 +10,6 @@ tools:
     description: |
       Reloads the TUI application to apply changes. Use after modifying TUI source code and rebuilding. State is preserved. IMPORTANT: You must ALWAYS call this tool after building - never just say 'reloading' without actually invoking this tool.
 
-  tool_manage:
-    description: |
-      Enables or disables tools. This tool cannot be disabled. Use to customize available capabilities.
-    parameters:
-      changes: "Array of tool changes"
-      tool: "Tool ID to change (e.g., 'edit_file', 'glob')"
-      action: "Action to perform"
-
   panel_goto_page:
     description: |
       Navigates to a specific page of a paginated panel. Only available when a panel has more than one page.
@@ -39,14 +31,6 @@ tools:
       panel_id: "Panel ID (e.g., P8)"
       page: "Page number (1-indexed) to navigate TO"
       current_page_description: "COMPULSORY. A concise but information-dense summary of what is on the page you are CURRENTLY viewing (the page you are about to leave). This is saved to the panel's scratchpad and is the ONLY thing you keep once you navigate away — its raw content is discarded. Capture the facts, names, values, and line ranges you'll need later."
-
-  module_toggle:
-    description: |
-      Activates or deactivates modules. Core module cannot be deactivated. Deactivating a module removes its tools and panels. Cannot deactivate a module if another active module depends on it.
-    parameters:
-      changes: "Array of module changes"
-      module: "Module ID (e.g., 'git', 'memory', 'tmux')"
-      action: "Action to perform"
 
   Think:
     description: |

@@ -16,7 +16,7 @@ mod visualizers;
 use serde_json::json;
 
 use crate::app::panels::Panel;
-use crate::infra::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts, Verdict};
+use crate::infra::tools::{ParamType, ToolDefinition, ToolTexts, Verdict};
 use crate::infra::tools::{ToolResult, ToolUse};
 use crate::modules::ToolVisualizer;
 use crate::state::{Kind, State, TypeMeta};
@@ -111,7 +111,7 @@ fn load_disabled_tools(data: &serde_json::Value, state: &mut State) {
     state.tools = crate::modules::active_tool_definitions(&state.active_modules);
     state.tools.push(crate::app::reverie::tools::optimize_context_tool_definition());
     for tool in &mut state.tools {
-        if tool.id != "tool_manage" && tool.id != "module_toggle" && disabled.contains(&tool.id) {
+        if disabled.contains(&tool.id) {
             tool.enabled = false;
         }
     }
@@ -246,24 +246,6 @@ impl Module for OverviewModule {
                 .build(),
             // System tools
             ToolDefinition::from_yaml("system_reload", t).short_desc("Restart the TUI").category("System").build(),
-            // Meta tools
-            ToolDefinition::from_yaml("tool_manage", t)
-                .short_desc("Enable/disable tools")
-                .category("System")
-                .param_array(
-                    "changes",
-                    ParamType::Object(vec![
-                        ToolParam::new("tool", ParamType::String)
-                            .desc("Tool ID to change (e.g., 'edit_file', 'glob')")
-                            .required(),
-                        ToolParam::new("action", ParamType::String)
-                            .desc("Action to perform")
-                            .enum_vals(&["enable", "disable"])
-                            .required(),
-                    ]),
-                    true,
-                )
-                .build(),
         ];
 
         // Panel pagination tool (dynamically enabled/disabled)
@@ -277,9 +259,6 @@ impl Module for OverviewModule {
                 .param("current_page_description", ParamType::String, true)
                 .build(),
         );
-
-        // Add module_toggle tool
-        defs.push(super::module_toggle_tool_definition());
 
         defs
     }
@@ -297,10 +276,6 @@ impl Module for OverviewModule {
             // System tools (reload stays in core)
             "system_reload" => Some(crate::infra::tools::execute_reload_tui(tool, state)),
 
-            // Meta tools
-            "tool_manage" => Some(tools::manage_tools::execute(tool, state)),
-
-            // module_toggle is handled in dispatch_tool() directly
             _ => None,
         }
     }
@@ -308,7 +283,6 @@ impl Module for OverviewModule {
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
         vec![
             ("Close_panel", visualizers::visualize_core_output),
-            ("tool_manage", visualizers::visualize_core_output),
             ("system_reload", visualizers::visualize_core_output),
             ("panel_goto_page", visualizers::visualize_core_output),
         ]

@@ -12,13 +12,8 @@ pub(crate) mod questions;
 use std::collections::{HashMap, HashSet};
 
 use crate::app::panels::Panel;
-use crate::infra::tools::{ParamType, ToolDefinition, ToolParam, ToolTexts};
-use crate::infra::tools::{ToolResult, ToolUse};
+use crate::infra::tools::{ToolDefinition, ToolResult, ToolUse};
 use crate::state::{Kind, State};
-
-/// Lazily parsed tool text definitions for core tools.
-static CORE_TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
-    std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../yamls/tools/core.yaml")));
 
 pub(crate) use cp_agora::AgoraModule;
 pub(crate) use cp_mod_brave::BraveModule;
@@ -164,11 +159,6 @@ pub(crate) fn active_tool_definitions(active_modules: &HashSet<String>) -> Vec<T
 /// Dispatch a tool call to the appropriate active module.
 pub(crate) fn dispatch_tool(tool: &ToolUse, state: &mut State, active_modules: &HashSet<String>) -> ToolResult {
     let _fg = cp_base::flame!(&format!("tool_{}", tool.name));
-    // Handle module_toggle specially — it's always available when core is active
-    if tool.name == "module_toggle" && active_modules.contains("core") {
-        return execute_module_toggle(tool, state);
-    }
-
     // Handle reverie tools — optimize_context for main AI, report + allowed tools for reverie
     if tool.name == "optimize_context" {
         return crate::app::reverie::tools::execute_optimize_context(tool, state);
@@ -220,175 +210,4 @@ pub(crate) fn validate_dependencies(active: &HashSet<String>) {
             }
         }
     }
-}
-
-/// Check if a module can be deactivated without breaking dependencies.
-/// Returns Ok(()) if safe, Err(message) if blocked.
-pub(crate) fn check_can_deactivate(id: &str, active: &HashSet<String>) -> Result<(), String> {
-    // Core modules cannot be deactivated
-    for module in all_modules() {
-        if module.id() == id && module.is_core() {
-            return Err(format!("Cannot deactivate core module '{id}'"));
-        }
-    }
-
-    // Check if any other active module depends on this one
-    for module in all_modules() {
-        if module.id() != id && active.contains(module.id()) && module.dependencies().contains(&id) {
-            return Err(format!("Cannot deactivate '{}': required by '{}'", id, module.id()));
-        }
-    }
-
-    Ok(())
-}
-
-/// Returns the `module_toggle` tool definition (added by core module).
-pub(crate) fn module_toggle_tool_definition() -> ToolDefinition {
-    let t = &*CORE_TOOL_TEXTS;
-    ToolDefinition::from_yaml("module_toggle", t)
-        .short_desc("Activate/deactivate modules")
-        .category("System")
-        .param_array(
-            "changes",
-            ParamType::Object(vec![
-                ToolParam::new("module", ParamType::String)
-                    .desc("Module ID (e.g., 'git', 'memory', 'tmux')")
-                    .required(),
-                ToolParam::new("action", ParamType::String)
-                    .desc("Action to perform")
-                    .enum_vals(&["activate", "deactivate"])
-                    .required(),
-            ]),
-            true,
-        )
-        .build()
-}
-
-/// Execute the `module_toggle` tool.
-fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let Some(changes) = tool.input.get("changes").and_then(serde_json::Value::as_array) else {
-        return ToolResult {
-            tool_use_id: tool.id.clone(),
-            content: "Missing 'changes' parameter (expected array)".to_owned(),
-            display: None,
-            tldr: None,
-            is_error: true,
-            preserves_tempo: false,
-            tool_name: tool.name.clone(),
-        };
-    };
-
-    let mut successes = Vec::new();
-    let mut failures = Vec::new();
-
-    let all_mods = all_modules();
-    let known_ids: HashSet<&str> = all_mods.iter().map(|m| m.id()).collect();
-
-    for (i, change) in changes.iter().enumerate() {
-        let Some(module_id) = change.get("module").and_then(serde_json::Value::as_str) else {
-            failures.push(format!("Change {}: missing 'module' field", i.saturating_add(1)));
-            continue;
-        };
-
-        let Some(action) = change.get("action").and_then(serde_json::Value::as_str) else {
-            failures.push(format!("Change {}: missing 'action' field", i.saturating_add(1)));
-            continue;
-        };
-
-        if !known_ids.contains(module_id) {
-            failures.push(format!("Change {}: unknown module '{}'", i.saturating_add(1), module_id));
-            continue;
-        }
-
-        match action {
-            "activate" => successes.push(activate_module(state, module_id, &all_mods)),
-            "deactivate" => match deactivate_module(state, module_id, &all_mods) {
-                Ok(msg) => successes.push(msg),
-                Err(msg) => failures.push(format!("Change {}: {}", i.saturating_add(1), msg)),
-            },
-            _ => {
-                failures.push(format!(
-                    "Change {}: invalid action '{}' (use 'activate' or 'deactivate')",
-                    i.saturating_add(1),
-                    action
-                ));
-            }
-        }
-    }
-
-    let mut result_parts = Vec::new();
-    if !successes.is_empty() {
-        result_parts.push(format!("OK: {}", successes.join(", ")));
-    }
-    if !failures.is_empty() {
-        result_parts.push(format!("FAILED: {}", failures.join("; ")));
-    }
-
-    ToolResult {
-        tool_use_id: tool.id.clone(),
-        content: result_parts.join("\n"),
-        display: None,
-        tldr: None,
-        is_error: !failures.is_empty() && successes.is_empty(),
-        preserves_tempo: false,
-        tool_name: tool.name.clone(),
-    }
-}
-
-/// Activate one module: insert into the active set and rebuild tools. Returns a
-/// status line (already-active is a success, not an error — cannot fail).
-fn activate_module(state: &mut State, module_id: &str, all_mods: &[Box<dyn Module>]) -> String {
-    if state.active_modules.contains(module_id) {
-        return format!("'{module_id}' already active");
-    }
-    let _r = state.active_modules.insert(module_id.to_owned());
-    rebuild_tools(state);
-    let description = all_mods
-        .iter()
-        .find(|m| m.id() == module_id)
-        .map_or_else(|| "unknown".to_owned(), |m| format!("'{}' ({})", m.name(), m.description()));
-    format!("activated {description}")
-}
-
-/// Deactivate one module: validate dependencies, remove its owned panels, drop
-/// from the active set, rebuild tools. `Err` on a dependency block.
-fn deactivate_module(state: &mut State, module_id: &str, all_mods: &[Box<dyn Module>]) -> Result<String, String> {
-    if !state.active_modules.contains(module_id) {
-        return Ok(format!("'{module_id}' already inactive"));
-    }
-    check_can_deactivate(module_id, &state.active_modules)?;
-
-    // Find panel types to remove
-    let (fixed_types, dynamic_types) = all_mods
-        .iter()
-        .find(|m| m.id() == module_id)
-        .map_or_else(|| (Vec::new(), Vec::new()), |m| (m.fixed_panel_types(), m.dynamic_panel_types()));
-
-    // Remove panels owned by this module
-    state.context.retain(|ctx| !fixed_types.contains(&ctx.context_type) && !dynamic_types.contains(&ctx.context_type));
-
-    let _r = state.active_modules.remove(module_id);
-    rebuild_tools(state);
-    Ok(format!("deactivated '{module_id}'"))
-}
-
-/// Rebuild the tools list from active modules and preserved `disabled_tools`.
-fn rebuild_tools(state: &mut State) {
-    // Preserve currently disabled tool IDs
-    let disabled: HashSet<String> = state.tools.iter().filter(|t| !t.enabled).map(|t| t.id.clone()).collect();
-
-    // Get fresh tool definitions from active modules
-    let mut tools = active_tool_definitions(&state.active_modules);
-
-    // Add the reverie's optimize_context tool (always available for main AI)
-    tools.push(crate::app::reverie::tools::optimize_context_tool_definition());
-
-    // Re-apply disabled state
-    for tool in &mut tools {
-        if tool.id != "tool_manage" && tool.id != "module_toggle" && disabled.contains(&tool.id) {
-            tool.enabled = false;
-        }
-    }
-
-    state.tools = tools;
 }
