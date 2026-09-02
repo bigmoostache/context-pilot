@@ -16,6 +16,7 @@ export type {
   AccentToken,
   FinderKind,
   LibraryItem,
+  ThreadNote,
   ThreadTask,
   ToolCall,
 } from "./api/generated/types.gen"

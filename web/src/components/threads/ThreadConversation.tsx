@@ -394,6 +394,7 @@ export function ThreadConversation({
         agentId={agentId}
         files={threadFiles}
         tasks={thread.tasks ?? []}
+        notes={thread.notes ?? []}
         aside={aside}
         leftRailHidden={leftRailHidden}
       />

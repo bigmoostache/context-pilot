@@ -1,6 +1,6 @@
 import { useMemo, useState, type KeyboardEvent } from "react"
-import { Square, SquareCheckBig, ChevronRight } from "lucide-react"
-import type { ThreadTask } from "@/lib/types"
+import { Square, SquareCheckBig, ChevronRight, StickyNote } from "lucide-react"
+import type { ThreadTask, ThreadNote } from "@/lib/types"
 
 /**
  * The Tasks-tab body of {@link ThreadAside} (T662) — the thread's todo tree,
@@ -228,4 +228,101 @@ function buildModel(tasks: ThreadTask[]): TaskModel {
     if (childrenOf.has(t.id) && (allClosed(t.id) || allPlanned(t.id))) defaultCollapsed.add(t.id)
   }
   return { childrenOf, defaultCollapsed }
+}
+
+/**
+ * The Notes-tab body of {@link ThreadAside} (T716) — the focused thread's
+ * scratchpad cells, read-only, rendered as a list that expands on click to
+ * reveal each cell's full content (the Files-tab interaction pattern, kept
+ * inline rather than a separate preview pane).
+ *
+ * Co-located with {@link TaskList} here (rather than its own file) so the
+ * `fileUpload/` directory stays within the 8-entry structure cap — the two are
+ * the aside's read-only tab-body list components and share the same imports.
+ * The list is projected by the agent (thread-owned scratchpad cells) and rides
+ * the live `notes_changed` delta, so this stays purely presentational.
+ */
+export function NoteList({ notes }: { notes: ThreadNote[] }) {
+  // Ids of expanded note rows (content shown). A row starts collapsed; clicking
+  // it toggles. A Set (rather than a keyed record) sidesteps the dynamic
+  // property-existence lint and reads cleanly.
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
+
+  if (notes.length === 0) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-4 text-center text-[11px] text-muted-foreground/45">
+        No notes on this thread yet.
+      </div>
+    )
+  }
+
+  const toggle = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+
+  return (
+    <div className="space-y-0.5 p-1.5">
+      {notes.map((note) => (
+        <NoteRow
+          key={note.id}
+          note={note}
+          open={expanded.has(note.id)}
+          onToggle={() => toggle(note.id)}
+        />
+      ))}
+    </div>
+  )
+}
+
+/** One note row: sticky-note icon + title, a trailing expand chevron, and the
+ *  content revealed below when open (whitespace preserved, like a note body). */
+function NoteRow({
+  note,
+  open,
+  onToggle,
+}: {
+  note: ThreadNote
+  open: boolean
+  onToggle: () => void
+}) {
+  return (
+    <div className="rounded-lg">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onToggle}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter" && e.key !== " ") return
+          e.preventDefault()
+          onToggle()
+        }}
+        className="group flex cursor-pointer items-start gap-1.5 rounded-lg px-2 py-1.5"
+      >
+        <span className="flex h-4 shrink-0 items-center">
+          <StickyNote className="size-3 shrink-0 text-(--linear-purple)" />
+        </span>
+        <span className="flex min-h-4 min-w-0 flex-1 items-center">
+          <span className="truncate text-[13.5px]/none text-foreground/85 group-hover:text-foreground">
+            {note.title}
+          </span>
+        </span>
+        <span className="flex h-4 shrink-0 items-center">
+          <ChevronRight
+            className={
+              "size-3 text-muted-foreground/45 transition-transform" + (open ? " rotate-90" : "")
+            }
+          />
+        </span>
+      </div>
+      {open && (
+        <div className="px-2 pt-0.5 pb-2 pl-[1.85rem] text-[12.5px] leading-relaxed whitespace-pre-wrap text-muted-foreground/80">
+          {note.content}
+        </div>
+      )}
+    </div>
+  )
 }
