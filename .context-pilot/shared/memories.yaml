@@ -77,10 +77,10 @@ M-long-7:
   last_edited_ms: 1787840930958
 M-long-8:
   tier: long
-  title: T713 sync-dir plan
-  contents: 'T713 SHIPPING (branch t713-sync-dir off master). Move bridge.lock/heartbeat/stream.sock/tee.sock/oplog -> GLOBAL ~/.context-pilot/sync/<id>/ (id=folder_id FNV-1a). cp-wire Entry gained tee_socket_path #[serde(default)] (14->15 fields). Orch: driver.rs resolve_tee_path (field else folder+tee.sock), TeeReader::spawn full path, reap_orphan_sync_dirs grace=7d (DEFAULT_SYNC_ORPHAN_GRACE=Duration::from_hours(168)). Agent boot/mod.rs start_inner: BootDirs{agents_dir,sync_root} param struct, create_dir_all sync_dir before lock, all 5 artifacts under sync_dir, migrate::migrate_oplog one-time (rename+EXDEV copy/fsync/remove). registry::default_sync_root helper. boot tests moved to boot/tests.rs (500-line cap). PHASE 4 COMPLETE: build+tests+workspace-clippy+api-contract ALL GREEN. Next: commit+push+PR (orch-first deploy M177).'
+  title: T713 sync-dir SHIPPED
+  contents: 'T713 SHIPPED — PR #192 (branch t713-sync-dir, base master, commit 24eda477). Runtime artifacts (bridge.lock/oplog/stream.sock/tee.sock/heartbeat) moved to GLOBAL ~/.context-pilot/sync/<id>/ (id=folder_id FNV-1a). cp-wire Entry+tee_socket_path #[serde(default)] (14->15). Orch: resolve_tee_path (field else folder+tee.sock), TeeReader::spawn full path, reap_orphan_sync_dirs 7d. Bridge: BootDirs param struct, create_dir_all sync_dir before lock, migrate::migrate_oplog (rename+EXDEV copy/fsync/remove), boot tests -> boot/tests.rs. All green (build/tests/workspace-clippy/api-contract). DEPLOY orch-FIRST (M177): new orch serves migrated + un-migrated agents.'
   importance: critical
-  last_edited_ms: 1788349943018
+  last_edited_ms: 1788350028141
 M-long-9:
   tier: long
   title: MULTI-WORKER (subworkers
