@@ -225,7 +225,11 @@ function AsideTabBar({
           </TabsTrigger>
         )}
         {hasFiles && (
-          <TabsTrigger value="files" className="border-0 px-2 text-[13.5px]">
+          <TabsTrigger
+            value="files"
+            onClick={onBack}
+            className="border-0 px-2 text-[13.5px]"
+          >
             <Paperclip className="size-3.5" />
             Files
           </TabsTrigger>
