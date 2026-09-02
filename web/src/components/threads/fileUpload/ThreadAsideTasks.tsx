@@ -321,12 +321,7 @@ export function NoteList({ notes, storageKey }: { notes: ThreadNote[]; storageKe
   return (
     <div className="space-y-0.5 p-1.5">
       {notes.map((note) => (
-        <NoteRow
-          key={note.id}
-          note={note}
-          open={has(note.id)}
-          onToggle={() => toggle(note.id)}
-        />
+        <NoteRow key={note.id} note={note} open={has(note.id)} onToggle={() => toggle(note.id)} />
       ))}
     </div>
   )

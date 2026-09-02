@@ -1,5 +1,12 @@
 import { useMemo } from "react"
-import { Paperclip, ListChecks, StickyNote, ChevronLeft, Download, PanelRightClose } from "lucide-react"
+import {
+  Paperclip,
+  ListChecks,
+  StickyNote,
+  ChevronLeft,
+  Download,
+  PanelRightClose,
+} from "lucide-react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { FileIcon } from "@/components/finder/support/macIcons"
@@ -50,7 +57,11 @@ function clampTab(
   present: { hasFiles: boolean; hasTasks: boolean; hasNotes: boolean },
 ): AsideTab {
   const { hasFiles, hasTasks, hasNotes } = present
-  if ((tab === "files" && hasFiles) || (tab === "tasks" && hasTasks) || (tab === "notes" && hasNotes)) {
+  if (
+    (tab === "files" && hasFiles) ||
+    (tab === "tasks" && hasTasks) ||
+    (tab === "notes" && hasNotes)
+  ) {
     return tab
   }
   if (hasTasks) return "tasks"
@@ -225,11 +236,7 @@ function AsideTabBar({
           </TabsTrigger>
         )}
         {hasFiles && (
-          <TabsTrigger
-            value="files"
-            onClick={onBack}
-            className="border-0 px-2 text-[13.5px]"
-          >
+          <TabsTrigger value="files" onClick={onBack} className="border-0 px-2 text-[13.5px]">
             <Paperclip className="size-3.5" />
             Files
           </TabsTrigger>
