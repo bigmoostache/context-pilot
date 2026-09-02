@@ -124,6 +124,7 @@ mod tests {
             socket_path: "/tmp/agent/stream.sock".to_owned(),
             oplog_path: "/tmp/agent/oplog".to_owned(),
             heartbeat_path: Path::new("/unused").to_string_lossy().into_owned(),
+            tee_socket_path: "/tmp/agent/tee.sock".to_owned(),
             cap_token: "tok".to_owned(),
             started_at_ms: 0,
             status: AgentStatus::Running,

@@ -92,6 +92,7 @@ mod tests {
             socket_path: String::new(),
             oplog_path: String::new(),
             heartbeat_path: String::new(),
+            tee_socket_path: String::new(),
             cap_token: String::new(),
             started_at_ms: 0,
             status: AgentStatus::Running,

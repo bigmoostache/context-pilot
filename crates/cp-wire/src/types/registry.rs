@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[expect(
     clippy::exhaustive_structs,
-    reason = "registry-record contract: Entry is a 14-field agent discovery record written cross-crate by the bridge boot path and read field-by-field by the backend; a constructor would take 13 positional arguments (tripping too_many_arguments) with no natural grouping, so #[non_exhaustive] is impossible and the exhaustive literal is the honest shape"
+    reason = "registry-record contract: Entry is a 15-field agent discovery record written cross-crate by the bridge boot path and read field-by-field by the backend; a constructor would take 14 positional arguments (tripping too_many_arguments) with no natural grouping, so #[non_exhaustive] is impossible and the exhaustive literal is the honest shape"
 )]
 pub struct Entry {
     /// Wire-schema revision for this struct.
@@ -47,6 +47,14 @@ pub struct Entry {
 
     /// Path to the agent's heartbeat file.
     pub heartbeat_path: String,
+
+    /// Path to the agent's live-stream tee socket (T713). Advertised as an
+    /// absolute path so the orchestrator no longer reconstructs it by name from
+    /// `folder`. `#[serde(default)]` keeps N-1 compat: an entry written by an
+    /// older agent lacks this field and decodes to `""`, at which point the
+    /// orchestrator falls back to `folder.join("tee.sock")`.
+    #[serde(default)]
+    pub tee_socket_path: String,
 
     /// Bearer capability token for command authn (I9, `0600`).
     pub cap_token: String,
@@ -94,6 +102,7 @@ mod tests {
             socket_path: "/home/user/project/.context-pilot/stream.sock".into(),
             oplog_path: "/home/user/project/.context-pilot/oplog".into(),
             heartbeat_path: "/home/user/project/.context-pilot/heartbeat".into(),
+            tee_socket_path: "/home/user/project/.context-pilot/tee.sock".into(),
             cap_token: "tok-secret-256bit".into(),
             started_at_ms: 1_718_000_000_000,
             status: AgentStatus::Running,
@@ -138,5 +147,9 @@ mod tests {
         }"#;
         let entry: Entry = serde_json::from_str(json).expect("tolerant decode");
         assert_eq!(entry.status, AgentStatus::Running);
+        // An entry written by an older agent (pre-T713) has no `tee_socket_path`;
+        // `#[serde(default)]` must decode it to `""` so the orchestrator falls
+        // back to reconstructing the tee path from `folder`.
+        assert_eq!(entry.tee_socket_path, "");
     }
 }

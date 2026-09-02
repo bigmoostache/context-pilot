@@ -8111,3 +8111,24 @@ index d551b7b1..70e88880 100644
    # The read-plane mirror of the command contracts above: query Kind is built
    # by the orchestrator and matched exhaustively by the agent (Unknown catch-all
 # --- End entry #94 ---
+95:897cf24a54c59b5a79b7e6c74c61357e5b211abda342d47acf2d0e03b37d4cbd:a6650fa86d9dab031d33e3ac9a481bd926fb3b32f18f2f96d20a4ec2d0b3cea2:32069235c73bbd87766dba5ef6b1e0503fd41a48b520328d63c2b03ce16c03dc
+# --- Diff for entry #95 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 70e88880..8927b050 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -378,10 +378,10 @@ exceptions:
+   # these two are the irreducible remainder.
+ 
+   - path: "crates/cp-wire/src/types/registry.rs"
+-    match: "registry-record contract: Entry is a 14-field agent discovery record"
++    match: "registry-record contract: Entry is a 15-field agent discovery record"
+     reason: >
+-      Entry is a 14-field agent discovery record written cross-crate by the bridge boot path and
+-      read field-by-field by the backend; a constructor would take 13 positional arguments
++      Entry is a 15-field agent discovery record written cross-crate by the bridge boot path and
++      read field-by-field by the backend; a constructor would take 14 positional arguments
+       (tripping too_many_arguments) with no natural grouping, so #[non_exhaustive] is impossible.
+     strategy: >
+       Irreducible — a 13-arg constructor trips too_many_arguments; the exhaustive literal is honest.
+# --- End entry #95 ---
