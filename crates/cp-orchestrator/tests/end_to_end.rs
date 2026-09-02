@@ -99,6 +99,7 @@ mod tests {
             socket_path: dir.join("stream.sock").to_string_lossy().into_owned(),
             oplog_path: dir.join("oplog").to_string_lossy().into_owned(),
             heartbeat_path: dir.join("hb").to_string_lossy().into_owned(),
+            tee_socket_path: dir.join("tee.sock").to_string_lossy().into_owned(),
             cap_token: cap_token.to_owned(),
             started_at_ms: 0,
             status: AgentStatus::Running,

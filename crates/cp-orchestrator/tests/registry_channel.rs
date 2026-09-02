@@ -111,6 +111,7 @@ mod tests {
             socket_path: socket_path.to_string_lossy().into_owned(),
             oplog_path: oplog_path.to_string_lossy().into_owned(),
             heartbeat_path: hb_path.to_string_lossy().into_owned(),
+            tee_socket_path: String::new(),
             cap_token: "tok".to_owned(),
             started_at_ms: 0,
             status: AgentStatus::Running,

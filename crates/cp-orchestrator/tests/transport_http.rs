@@ -80,6 +80,7 @@ mod tests {
             socket_path: oplog_dir.join("stream.sock").to_string_lossy().into_owned(),
             oplog_path: oplog_dir.to_string_lossy().into_owned(),
             heartbeat_path: oplog_dir.join("hb").to_string_lossy().into_owned(),
+            tee_socket_path: oplog_dir.join("tee.sock").to_string_lossy().into_owned(),
             cap_token: "cap-token".to_owned(),
             started_at_ms: 0,
             status: AgentStatus::Running,

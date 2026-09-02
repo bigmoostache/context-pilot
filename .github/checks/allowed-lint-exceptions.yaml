@@ -378,10 +378,10 @@ exceptions:
   # these two are the irreducible remainder.
 
   - path: "crates/cp-wire/src/types/registry.rs"
-    match: "registry-record contract: Entry is a 14-field agent discovery record"
+    match: "registry-record contract: Entry is a 15-field agent discovery record"
     reason: >
-      Entry is a 14-field agent discovery record written cross-crate by the bridge boot path and
-      read field-by-field by the backend; a constructor would take 13 positional arguments
+      Entry is a 15-field agent discovery record written cross-crate by the bridge boot path and
+      read field-by-field by the backend; a constructor would take 14 positional arguments
       (tripping too_many_arguments) with no natural grouping, so #[non_exhaustive] is impossible.
     strategy: >
       Irreducible — a 13-arg constructor trips too_many_arguments; the exhaustive literal is honest.

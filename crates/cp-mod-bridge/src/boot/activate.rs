@@ -19,16 +19,16 @@ use crate::tee::Tee;
 
 use super::Boot;
 
-/// Name of the dedicated tee socket inside the agent folder.
+/// Bind the agent's advertised tee socket and spawn the [`Tee`] publisher.
 ///
-/// Separate from `stream.sock` (which Boot binds for command intake in Phase
-/// 10). The tee socket carries only outbound [`StreamFrame`]s to an observing
-/// backend.
-const TEE_SOCKET: &str = "tee.sock";
-
-/// Bind `tee.sock` in the agent folder and spawn the [`Tee`] publisher.
+/// The tee socket path comes straight from the registry [`Entry`]'s
+/// `tee_socket_path` (T713) — it now lives under the global
+/// `~/.context-pilot/sync/<id>/`, not the realm folder, so it can no longer be
+/// reconstructed by name from `entry.folder`. Separate from `stream.sock`
+/// (Boot's command-intake socket); this one carries only outbound
+/// [`StreamFrame`]s to an observing backend.
 fn setup_tee(entry: &cp_wire::types::registry::Entry) -> std::io::Result<Tee> {
-    let tee_path = std::path::Path::new(&entry.folder).join(TEE_SOCKET);
+    let tee_path = std::path::PathBuf::from(&entry.tee_socket_path);
     let _ignored = std::fs::remove_file(&tee_path);
     let listener = std::os::unix::net::UnixListener::bind(&tee_path)?;
     Ok(Tee::spawn(listener))

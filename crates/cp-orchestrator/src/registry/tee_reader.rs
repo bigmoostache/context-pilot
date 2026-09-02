@@ -55,8 +55,10 @@ const READ_CHUNK: usize = 4096;
 
 /// Tee socket file name inside an agent's folder (mirrors `cp-mod-bridge`'s
 /// `TEE_SOCKET`). Defined here rather than imported to keep the backend's
-/// dependency on the agent crate test-only.
-const TEE_SOCKET: &str = "tee.sock";
+/// dependency on the agent crate test-only. `pub(crate)` so the driver's
+/// fallback path (un-migrated agents with no advertised `tee_socket_path`) can
+/// reconstruct the legacy `<folder>/tee.sock` from the same single name source.
+pub(crate) const TEE_SOCKET: &str = "tee.sock";
 
 /// The backend-side reader of one agent's live stream socket.
 ///
@@ -72,15 +74,17 @@ pub struct TeeReader {
 }
 
 impl TeeReader {
-    /// Spawn a reader for the agent at `folder`, republishing its stream frames
-    /// into `backend`'s [`StreamHub`](crate::services::stream_hub::StreamHub) under
-    /// `agent_id`.
+    /// Spawn a reader for the agent whose live-stream socket is at `tee_path`,
+    /// republishing its stream frames into `backend`'s
+    /// [`StreamHub`](crate::services::stream_hub::StreamHub) under `agent_id`.
     ///
-    /// The reader connects to `<folder>/tee.sock`, retrying while the socket is
-    /// absent, and runs until [`stop`](Self::stop) (or drop) is invoked.
+    /// `tee_path` is the agent's advertised `tee_socket_path` (T713) — resolved
+    /// by the caller, since with the global sync-dir layout the socket is no
+    /// longer under the agent's realm folder. The reader connects to it,
+    /// retrying while the socket is absent, and runs until [`stop`](Self::stop)
+    /// (or drop) is invoked.
     #[must_use]
-    pub fn spawn(agent_id: String, folder: &std::path::Path, backend: Arc<Mutex<Backend>>) -> Self {
-        let tee_path = folder.join(TEE_SOCKET);
+    pub fn spawn(agent_id: String, tee_path: PathBuf, backend: Arc<Mutex<Backend>>) -> Self {
         let stop = Arc::new(AtomicBool::new(false));
         let stop_thread = Arc::clone(&stop);
         let handle = thread::spawn(move || read_loop(&agent_id, &tee_path, &backend, &stop_thread));
@@ -259,7 +263,7 @@ mod tests {
         let listener = UnixListener::bind(&tee_path).expect("bind");
 
         let (backend, sub) = backend_with_subscriber("agentX");
-        let reader = TeeReader::spawn("agentX".to_owned(), &folder, Arc::clone(&backend));
+        let reader = TeeReader::spawn("agentX".to_owned(), tee_path, Arc::clone(&backend));
 
         // Accept the reader's connection and write three framed tokens.
         let (mut conn, _addr) = listener.accept().expect("accept");
@@ -295,7 +299,7 @@ mod tests {
         let (backend, sub) = backend_with_subscriber("late");
 
         // Spawn BEFORE the socket exists — the reader must retry, not die.
-        let reader = TeeReader::spawn("late".to_owned(), &folder, Arc::clone(&backend));
+        let reader = TeeReader::spawn("late".to_owned(), folder.join(TEE_SOCKET), Arc::clone(&backend));
         sleep(Duration::from_millis(80));
 
         // Now bind + serve a frame; the reader should connect and deliver it.
@@ -327,7 +331,7 @@ mod tests {
         let listener = UnixListener::bind(&tee_path).expect("bind");
 
         let (backend, sub) = backend_with_subscriber("noisy");
-        let reader = TeeReader::spawn("noisy".to_owned(), &folder, Arc::clone(&backend));
+        let reader = TeeReader::spawn("noisy".to_owned(), tee_path, Arc::clone(&backend));
         let (mut conn, _addr) = listener.accept().expect("accept");
 
         // Garbage bytes that look like a frame header with a CRC mismatch, then

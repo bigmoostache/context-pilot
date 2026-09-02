@@ -39,6 +39,24 @@ pub fn default_agents_dir() -> BootResult<PathBuf> {
     Ok(PathBuf::from(home).join(".context-pilot").join("agents"))
 }
 
+/// The default sync-plane root under the user's home: `~/.context-pilot/sync`
+/// (T713).
+///
+/// Each agent's per-realm runtime artifacts (lock, oplog, sockets,
+/// heartbeat) live under `<sync_root>/<id>/` — a global, per-agent-namespaced
+/// location that keeps the user's realm folder clean and bounds the Unix-socket
+/// path length regardless of realm depth. Sibling of [`default_agents_dir`],
+/// so discovery record and sync plane sit next to each other.
+///
+/// # Errors
+///
+/// Returns [`Error::Io`] if `$HOME` is unset.
+pub fn default_sync_root() -> BootResult<PathBuf> {
+    let home = std::env::var_os("HOME")
+        .ok_or_else(|| Error::io("resolve sync root", std::io::Error::other("$HOME is not set")))?;
+    Ok(PathBuf::from(home).join(".context-pilot").join("sync"))
+}
+
 /// The path of the registry file for agent `id` inside `agents_dir`.
 #[must_use]
 pub fn path(agents_dir: &Path, id: &str) -> PathBuf {
@@ -118,6 +136,7 @@ mod tests {
             socket_path: "/proj/.context-pilot/stream.sock".to_owned(),
             oplog_path: "/proj/.context-pilot/oplog".to_owned(),
             heartbeat_path: "/proj/.context-pilot/heartbeat".to_owned(),
+            tee_socket_path: "/proj/.context-pilot/tee.sock".to_owned(),
             cap_token: "secret".to_owned(),
             started_at_ms: 0,
             status: AgentStatus::Starting,

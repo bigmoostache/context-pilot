@@ -64,6 +64,7 @@ pub(super) fn driver_loop(
     interval: Duration,
     mut backup_scheduler: Option<BackupScheduler>,
 ) -> ! {
+    let sync_root = agents_dir.parent().map(|p| p.join("sync"));
     let mut registry = FleetScanner::new(agents_dir);
     let mut ds = DriverState::default();
 
@@ -91,6 +92,17 @@ pub(super) fn driver_loop(
 
         // 3. Reap stale *.tmp registry writes (crash-orphans).
         let _reaped = registry.reap_tmp(crate::registry::DEFAULT_TMP_GRACE);
+
+        // 3b. Reap orphaned per-agent sync dirs left behind by DELETED realms
+        //     (T713). The sync plane lives at `~/.context-pilot/sync/<id>/` —
+        //     the sibling of the agents dir. A realm's deletion removes its
+        //     registry record but NOT its global sync dir, so a `sync/<id>/`
+        //     whose id no longer has any registry record is an orphan; it is
+        //     reaped once older than the 7-day grace (an agent merely stale but
+        //     still registered keeps its dir, so a recovery is never broken).
+        if let Some(root) = sync_root.as_ref() {
+            let _orphans = registry.reap_orphan_sync_dirs(root, crate::registry::DEFAULT_SYNC_ORPHAN_GRACE);
+        }
 
         // 4. Auth database backup (NFR-19/20) — rolling + daily snapshots.
         if let Some(scheduler) = backup_scheduler.as_mut()
@@ -157,14 +169,32 @@ fn handle_appeared(entry: &Entry, backend: &Arc<Mutex<Backend>>, ds: &mut Driver
     drop(ds.tailers.insert(entry.id.clone(), Tailer::new(oplog_dir)));
     let folder = PathBuf::from(&entry.folder);
     // Spawn the live stream reader for this agent's tee socket so its token
-    // frames fan out through the hub to SSE subscribers.
-    let reader = TeeReader::spawn(entry.id.clone(), &folder, Arc::clone(backend));
+    // frames fan out through the hub to SSE subscribers. The socket path is the
+    // agent's advertised `tee_socket_path` (T713 global sync dir); an older
+    // agent that predates the field advertises `""`, so we fall back to the
+    // legacy `<folder>/tee.sock` reconstruction and still serve it.
+    let reader = TeeReader::spawn(entry.id.clone(), resolve_tee_path(entry), Arc::clone(backend));
     if let Some(old) = ds.tee_readers.insert(entry.id.clone(), reader) {
         old.stop();
     }
     drop(ds.agent_folders.insert(entry.id.clone(), folder));
     if let Ok(mut b) = backend.lock() {
         let _: Option<crate::liveness::Liveness> = b.liveness.insert(entry.id.clone(), crate::liveness::Liveness::Live);
+    }
+}
+
+/// Resolve an agent's live-stream tee socket path.
+///
+/// Prefers the advertised `tee_socket_path` (T713 — the agent puts its tee
+/// socket under the global `~/.context-pilot/sync/<id>/`, so it can no longer be
+/// reconstructed from `folder`). An agent that predates the field advertises an
+/// empty string; for it we fall back to the legacy `<folder>/tee.sock`, so an
+/// old, un-migrated agent still gets its stream plane read.
+fn resolve_tee_path(entry: &Entry) -> PathBuf {
+    if entry.tee_socket_path.is_empty() {
+        PathBuf::from(&entry.folder).join(crate::registry::tee_reader::TEE_SOCKET)
+    } else {
+        PathBuf::from(&entry.tee_socket_path)
     }
 }
 

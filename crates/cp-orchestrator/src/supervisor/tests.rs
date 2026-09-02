@@ -116,6 +116,7 @@ fn adopt_and_detect_vanish() {
         socket_path: String::new(),
         oplog_path: String::new(),
         heartbeat_path: String::new(),
+        tee_socket_path: String::new(),
         cap_token: String::new(),
         started_at_ms: 0,
         status: cp_wire::types::registry::AgentStatus::Running,
