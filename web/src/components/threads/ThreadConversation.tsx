@@ -392,6 +392,7 @@ export function ThreadConversation({
           body under the 500-line file budget. */}
       <ThreadAsideRail
         agentId={agentId}
+        threadId={thread.id}
         files={threadFiles}
         tasks={thread.tasks ?? []}
         notes={thread.notes ?? []}

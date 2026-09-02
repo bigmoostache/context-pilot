@@ -1,4 +1,4 @@
-import { useMemo, useState, type KeyboardEvent } from "react"
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react"
 import { Square, SquareCheckBig, ChevronRight, StickyNote } from "lucide-react"
 import type { ThreadTask, ThreadNote } from "@/lib/types"
 import { Markdown } from "@/lib/support/markdown"
@@ -232,6 +232,65 @@ function buildModel(tasks: ThreadTask[]): TaskModel {
 }
 
 /**
+ * Read a persisted id-set from localStorage (`key` → JSON string array).
+ * SSR-safe and defensive: a missing/oversized/corrupt value yields an empty
+ * set rather than throwing, so a hand-edited or stale entry never breaks render.
+ */
+function readIds(key: string): Set<string> {
+  if (typeof window === "undefined") return new Set()
+  try {
+    const raw = window.localStorage.getItem(key)
+    if (!raw) return new Set()
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return new Set()
+    return new Set(parsed.filter((x): x is string => typeof x === "string"))
+  } catch {
+    return new Set()
+  }
+}
+
+/**
+ * A toggle-set of ids PERSISTED to localStorage under `storageKey`. Lifts the
+ * "which rows are expanded" state out of the component so it survives both an
+ * unmount (switching aside tabs drops the inactive tab's subtree) and a browser
+ * refresh. Re-seeds from storage when `storageKey` changes without a remount
+ * (a thread switch reuses the component instance) via the "adjust state while
+ * rendering" pattern — the same technique {@link useThreadAside} uses for its
+ * per-thread hidden flag. Writes through on every change.
+ */
+function useStickySet(storageKey: string): {
+  has: (id: string) => boolean
+  toggle: (id: string) => void
+} {
+  const [ids, setIds] = useState<Set<string>>(() => readIds(storageKey))
+
+  // Re-seed when the key (thread) changes without a remount. Guarded by the
+  // previous key so it fires exactly once per switch, not every render.
+  const [prevKey, setPrevKey] = useState(storageKey)
+  if (prevKey !== storageKey) {
+    setPrevKey(storageKey)
+    setIds(readIds(storageKey))
+  }
+
+  // Persist the set for the current key whenever it (or the key) changes.
+  useEffect(() => {
+    window.localStorage.setItem(storageKey, JSON.stringify([...ids]))
+  }, [storageKey, ids])
+
+  const has = useCallback((id: string) => ids.has(id), [ids])
+  const toggle = useCallback((id: string) => {
+    setIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  return { has, toggle }
+}
+
+/**
  * The Notes-tab body of {@link ThreadAside} (T716) — the focused thread's
  * scratchpad cells, read-only, rendered as a list that expands on click to
  * reveal each cell's full content (the Files-tab interaction pattern, kept
@@ -243,11 +302,13 @@ function buildModel(tasks: ThreadTask[]): TaskModel {
  * The list is projected by the agent (thread-owned scratchpad cells) and rides
  * the live `notes_changed` delta, so this stays purely presentational.
  */
-export function NoteList({ notes }: { notes: ThreadNote[] }) {
-  // Ids of expanded note rows (content shown). A row starts collapsed; clicking
-  // it toggles. A Set (rather than a keyed record) sidesteps the dynamic
+export function NoteList({ notes, storageKey }: { notes: ThreadNote[]; storageKey: string }) {
+  // Ids of expanded note rows (content shown), PERSISTED to localStorage under
+  // `storageKey` (per agent+thread) so the open/closed state survives switching
+  // aside tabs (which unmounts this list) AND a browser refresh — the user
+  // story. A Set (rather than a keyed record) sidesteps the dynamic
   // property-existence lint and reads cleanly.
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
+  const { has, toggle } = useStickySet(storageKey)
 
   if (notes.length === 0) {
     return (
@@ -257,21 +318,13 @@ export function NoteList({ notes }: { notes: ThreadNote[] }) {
     )
   }
 
-  const toggle = (id: string) =>
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-
   return (
     <div className="space-y-0.5 p-1.5">
       {notes.map((note) => (
         <NoteRow
           key={note.id}
           note={note}
-          open={expanded.has(note.id)}
+          open={has(note.id)}
           onToggle={() => toggle(note.id)}
         />
       ))}

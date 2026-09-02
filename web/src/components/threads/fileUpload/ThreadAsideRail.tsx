@@ -30,6 +30,7 @@ import { useModifierShortcuts } from "@/lib/support/a11y"
  */
 export function ThreadAsideRail({
   agentId,
+  threadId,
   files,
   tasks,
   notes,
@@ -37,6 +38,7 @@ export function ThreadAsideRail({
   leftRailHidden,
 }: {
   agentId: string
+  threadId: string
   files: ThreadFile[]
   tasks: ThreadTask[]
   notes: ThreadNote[]
@@ -82,6 +84,7 @@ export function ThreadAsideRail({
           tasks={tasks}
           notes={notes}
           agentId={agentId}
+          threadId={threadId}
           tab={aside.tab}
           onTabChange={aside.setTab}
           selectedFile={aside.file}

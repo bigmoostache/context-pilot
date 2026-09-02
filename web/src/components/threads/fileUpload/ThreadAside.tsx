@@ -63,6 +63,7 @@ export function ThreadAside({
   tasks,
   notes,
   agentId,
+  threadId,
   tab,
   onTabChange,
   selectedFile,
@@ -75,6 +76,7 @@ export function ThreadAside({
   tasks: ThreadTask[]
   notes: ThreadNote[]
   agentId: string
+  threadId: string
   tab: "files" | "tasks" | "notes"
   onTabChange: (tab: "files" | "tasks" | "notes") => void
   selectedFile: UploadedFile | null
@@ -147,7 +149,7 @@ export function ThreadAside({
           {/* Notes tab — the focused thread's scratchpad cells (list → expand) */}
           {hasNotes && (
             <TabsContent value="notes" className="min-h-0 flex-1 overflow-y-auto">
-              <NoteList notes={notes} />
+              <NoteList notes={notes} storageKey={`cp-notes-open-${agentId}-${threadId}`} />
             </TabsContent>
           )}
 
