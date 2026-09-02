@@ -41,12 +41,8 @@ impl Panel for GitResultPanel {
             ctx.total_pages = compute_total_pages(token_count);
             ctx.current_page = 0;
             if ctx.total_pages > 1 {
-                let page_content = paginate_content(
-                    ctx.cached_content.as_deref().unwrap_or(""),
-                    ctx.current_page,
-                    ctx.total_pages,
-                    &ctx.page_descriptions,
-                );
+                let page_content =
+                    paginate_content(ctx.cached_content.as_deref().unwrap_or(""), ctx.current_page, ctx.total_pages);
                 ctx.token_count = estimate_tokens(&page_content);
             } else {
                 ctx.token_count = token_count;
@@ -159,7 +155,7 @@ impl Panel for GitResultPanel {
             }
             let content = ctx.cached_content.as_deref().unwrap_or("[loading...]");
             let header = ctx.get_meta_str("result_command").unwrap_or("Git Result");
-            let output = paginate_content(content, ctx.current_page, ctx.total_pages, &ctx.page_descriptions);
+            let output = paginate_content(content, ctx.current_page, ctx.total_pages);
             items.push(ContextItem::new(&ctx.id, header, output, ctx.last_refresh_ms));
         }
         items

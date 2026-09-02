@@ -236,7 +236,7 @@ impl Module for OverviewModule {
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
         let t = &*TOOL_TEXTS;
-        let mut defs = vec![
+        let defs = vec![
             // Context tools
             ToolDefinition::from_yaml("Close_panel", t)
                 .short_desc("Remove items from context")
@@ -247,18 +247,6 @@ impl Module for OverviewModule {
             // System tools
             ToolDefinition::from_yaml("system_reload", t).short_desc("Restart the TUI").category("System").build(),
         ];
-
-        // Panel pagination tool (dynamically enabled/disabled)
-        defs.push(
-            ToolDefinition::from_yaml("panel_goto_page", t)
-                .short_desc("Navigate paginated panel")
-                .category("Context")
-                .enabled(false)
-                .param("panel_id", ParamType::String, true)
-                .param("page", ParamType::Integer, true)
-                .param("current_page_description", ParamType::String, true)
-                .build(),
-        );
 
         defs
     }
@@ -271,7 +259,6 @@ impl Module for OverviewModule {
         match tool.name.as_str() {
             // Context tools
             "Close_panel" => Some(tools::close_context::execute(tool, state)),
-            "panel_goto_page" => Some(tools::panel_goto_page::execute(tool, state)),
 
             // System tools (reload stays in core)
             "system_reload" => Some(crate::infra::tools::execute_reload_tui(tool, state)),
@@ -281,11 +268,7 @@ impl Module for OverviewModule {
     }
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
-        vec![
-            ("Close_panel", visualizers::visualize_core_output),
-            ("system_reload", visualizers::visualize_core_output),
-            ("panel_goto_page", visualizers::visualize_core_output),
-        ]
+        vec![("Close_panel", visualizers::visualize_core_output), ("system_reload", visualizers::visualize_core_output)]
     }
 
     fn dependencies(&self) -> &[&'static str] {

@@ -289,16 +289,9 @@ pub fn mark_panels_dirty(state: &mut State, context_type: &str) {
 ///
 /// Returns the original content unchanged when `total_pages` <= 1.
 /// Otherwise slices by approximate token offset, snaps to line boundaries,
-/// and prepends a loss-explicit page header plus the accumulated per-page
-/// scratchpad (`page_descriptions`) so notes the LLM wrote survive after the
-/// raw page content is discarded from context.
+/// and prepends a loss-explicit page header.
 #[must_use]
-pub fn paginate_content(
-    full_content: &str,
-    current_page: usize,
-    total_pages: usize,
-    page_descriptions: &std::collections::BTreeMap<usize, String>,
-) -> String {
+pub fn paginate_content(full_content: &str, current_page: usize, total_pages: usize) -> String {
     use crate::config::constants::{CHARS_PER_TOKEN, PANEL_PAGE_TOKENS};
 
     if total_pages <= 1 {
@@ -336,26 +329,9 @@ pub fn paginate_content(
 
     let page_content = full_content.get(start..end).unwrap_or("");
 
-    // Accumulated per-page scratchpad: notes the LLM authored (via
-    // panel_goto_page's compulsory current_page_description) for pages it has
-    // already visited. These survive even though those pages' raw content has
-    // been discarded from context. Cleared automatically when the panel closes.
-    let mut scratchpad = String::new();
-    if !page_descriptions.is_empty() {
-        use std::fmt::Write as _;
-        scratchpad
-            .push_str("[Page notes \u{2014} scratchpad you wrote while navigating (cleared when this panel closes):\n");
-        for (page_idx, note) in page_descriptions {
-            let _r = writeln!(scratchpad, "  \u{b7} page {}: {}", page_idx.saturating_add(1), note.trim());
-        }
-        scratchpad.push_str("]\n");
-    }
-
     format!(
-        "{scratchpad}[Page {}/{} \u{b7} DESTRUCTIVE PAGINATION: only THIS page is in context. \
-Navigating away with panel_goto_page permanently discards this page's content — you will \
-retain NOTHING from it except the note you write in `current_page_description`. Extract what \
-you need NOW; prefer searching/opening a specific range over walking pages.]\n{page_content}",
+        "[Page {}/{} \u{b7} this panel is large and shows only this page. \
+Search the panel or open a specific range to see the rest.]\n{page_content}",
         current_page.saturating_add(1),
         total_pages,
     )

@@ -2570,6 +2570,10 @@
   path: crates/cp-orchestrator/src/transport/it/network/state.rs
   description: Persisted .network.json doc. UplinkMode/Standby/Band/WwanConfig/ApConfig/ProbeConfig/NetworkConfig (pub fields on pub(crate) structs). load fail-closed w/ named stderr reasons, save atomic 0600, validate (ap/wwan/probe), redacted() secret elision. clippy-clean.
   last_edited_ms: 1787874020051
+1b050d5642348173:
+  path: crates/cp-mod-git/src/result_panel.rs
+  description: 'GitResultPanel: static read-only command output, no auto-refresh. Timeout exec, diff coloring. cmd/update_if_changed via let _c/_changed (T586).'
+  last_edited_ms: 0
 1b0bec256ca6b7d5:
   path: crates/cp-orchestrator/src/transport/inspect/finder/download.rs
   description: 'Finder file/folder download + inline raw-serve. fs_download: files raw (100MiB, attachment), folders zipped /tmp via `zip -r -q` (500MiB) then cleaned. fs_raw: inline bytes (Content-Type via content_type_for images+PDF) for <img>/<object> previews. orch-clippy: clean (c0c1c62c).'
@@ -2818,6 +2822,10 @@
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation, threads. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration. Thread actions extracted to threads.rs.'
   last_edited_ms: 1781447353339
+1de46d85a5ab2264:
+  path: src/modules/overview/tools/preflight.rs
+  description: Core module pre_flight validation. Dispatches preflight_close_panel/check_tree_description_gate/preflight_panel_goto_page. Warns on missing/stale tree descriptions, out-of-range pages.
+  last_edited_ms: 0
 1def72d21c33b16b:
   path: crates/cp-orchestrator/tests/openapi/paths.rs
   description: OpenAPI path definitions — all REST endpoints grouped by tag (fleet, agent, fs, auth, env, ACL, providers, releases, claude-usage+login+refresh). Includes deploy + restart-orchestrator paths.
@@ -3898,6 +3906,10 @@
   path: web/src/components/ui/scroll-area.tsx
   description: shadcn ScrollArea wrapper over Base UI scroll-area primitive (Root/Viewport/Scrollbar/Thumb/Corner). Vertical+horizontal orientations, focus-visible ring. Shared UI primitive.
   last_edited_ms: 1781814025269
+29421280830e33c0:
+  path: crates/cp-base/src/panels.rs
+  description: 'Panel trait + caching. CacheUpdate accessors via deref_match! (A9). WatchSpec #[expect exhaustive_enums] A4. time_arith chokepoint (integer_division). paginate_content.'
+  last_edited_ms: 0
 29449156763ad52c:
   path: crates/cp-mod-console/src/types.rs
   description: 'Console types. ProcessStatus enum #[non_exhaustive]. SessionMeta, ConsoleState, ConsoleWatcher (exit/pattern, easy_bash inline vs panel overflow). easy_bash inline-vs-panel now decided SOLELY by byte size (EASY_BASH_INLINE_MAX_BYTES=8KB); line-count gate removed. check_timeout preserves_tempo on both branches.'
@@ -4901,6 +4913,10 @@
 338e8b2f630bb699:
   path: web/src/lib/mock/index.ts
   description: 'Mock-data barrel: PROJECT/tokenBudget/panels/cacheStats/messages/threads/spine/stats/status/agents/library. Re-exports ./extra + ./fileTree. web-lint P2: fileTree literal moved to ./fileTree.ts + FsNode import dropped to stay ≤500 after Prettier reflow. Design-only fallback data approximating a live Context Pilot session.'
+  last_edited_ms: 0
+33999f1097361411:
+  path: crates/cp-mod-entities/src/panels/result_panel.rs
+  description: Entity result panel — dynamic panel for large SQL results. Static (one-shot) + live (2s auto-refresh) modes. Live stores SQL+db_path in metadata, re-executes on cache thread. create_result_panel/create_live_result_panel.
   last_edited_ms: 0
 33a73e00ae9d0592:
   path: tmp/v2/src/doc/SaveChip.tsx
@@ -6821,6 +6837,10 @@
 477e060bfea31c3a:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
+  last_edited_ms: 0
+47891b1239b78e70:
+  path: crates/cp-mod-tree/src/panel.rs
+  description: Tree panel. Background cache system for directory tree rendering. TreeCacheRequest data payload. Pagination. refresh_stale_from_yaml() call in apply_cache_update triggers second rebuild if descriptions changed.
   last_edited_ms: 0
 479464c3a8fd4e24:
   path: web/src/components/threads/QuestionForm.tsx
@@ -9738,6 +9758,10 @@
   path: src/app/run/tools/cleanup.rs
   description: Watcher polling (blocking sentinel replacement + async spine notifications), ASYNC_ERROR_PREFIX handling for is_error, DynPanel creation for both blocking/async paths, interrupt cleanup. flame!("watchers").
   last_edited_ms: 0
+66d25c763590b530:
+  path: src/modules/overview/mod.rs
+  description: OverviewModule (id='core', is_global) — owns Statistics + Tools panels, core system tools (Close_panel/system_reload/panel_goto_page), and GLOBAL config persistence. load_module_data split load_active_modules/load_enum_field/load_provider_models/load_budgets_and_costs/load_token_cost_accumulators/load_disabled_tools. Serializes active_modules, dev_mode, llm_provider + every provider model enum + reverie/cleaning/budget + token/cost counters + disabled_tools.
+  last_edited_ms: 0
 66d375771936bf76:
   path: .git/index
   description: Git index (binary). Not source.
@@ -9777,6 +9801,10 @@
 67387a9743059401:
   path: web/src/components/shell/StatsPopup.tsx
   description: 'Session ''vitals'' popup (portaled Dialog) — accepts agentId, uses usePanels()+useAgentMeta() for live token budget + cost. T269 WIDE REDESIGN: w-[760px] (was 360px), two-band sheet — top band = context-budget meter + 3 figure chips (Context/Panels/Cost) side by side; bottom band = Service vitals as a CATEGORY-GROUPED 2-column compact grid (groupByCategory preserves first-seen order, humanize() Title-Cases the backend''s category tag into a section label) so a dozen services read as a scannable board not a long stack. Healthy rows stay quiet (colored dot + latency only); only error/unavailable raise a loud status chip (VitalRow), and a header summary badge shows ''all healthy'' / ''N issues'' + ''X of Y reachable''. Hosts the on-demand (never polling) Check Vitals action: fetchVitals(agentId) → prepends 2 browser-observed rows (Frontend self ok + Frontend→Orchestrator round-trip ms via performance.now) → renders grouped grid. Local useState (vitals/checking/vitalsErr); Stethoscope/Loader2 button (Check Vitals → Re-check after first run); dashed empty-state placeholder before first check. statusColor: ok=--ok / error=--danger / unavailable=--muted-foreground.'
+  last_edited_ms: 0
+673909257745874b:
+  path: crates/cp-mod-search/src/panel.rs
+  description: Search result panel + YAML formatter. format_results groups chunks by path + logs + entities via build_chunk_value/build_log_value/build_entity_value. search_line_semantic classifier.
   last_edited_ms: 0
 6739da0315d40859:
   path: .github/workflows/release.yml
@@ -10242,6 +10270,10 @@
   path: crates/cp-mod-scratchpad/src/types.rs
   description: ScratchpadCell (id/title/content), ScratchpadState (cells + next_id counter) with ext accessors
   last_edited_ms: 0
+6be81b8fe736dc08:
+  path: crates/cp-mod-console/src/panel.rs
+  description: Console panel. 200ms cache poll, ring-buffer hash change detection, MAX_CONTEXT_CHARS=8000 tail. update_if_changed via let _changed (T586).
+  last_edited_ms: 0
 6beecdf144c6b9e3:
   path: .git/index
   description: Git index (binary). Not source.
@@ -10461,6 +10493,10 @@
 6e19ee3afc4e188f:
   path: src/app/run/tools/cleanup.rs
   description: 'Watcher polling: blocking sentinel replacement + async spine notifications. A2 split + A9 clean (dp.metadata for entry index, result.as_ref/as_mut, pending_done take).'
+  last_edited_ms: 0
+6e1a82e976eddb1d:
+  path: yamls/tools/core.yaml
+  description: 'Core tools YAML: Close_panel, system_reload, panel_goto_page, Think, Todo (YAML-diff task edits). tool_manage/module_toggle removed (T705).'
   last_edited_ms: 0
 6e24dccd02a3fdf0:
   path: crates/cp-mod-console/Cargo.toml
@@ -11222,6 +11258,10 @@
   path: src/modules/pre_flight.rs
   description: 'Pre-flight validation: Phase 0 trap block, Phase 0.25 compulsory intent/verb (blocking), Phase 0.5 duplicate Close_conversation_history queue check, Phase 1 schema validation, Phase 2 module semantic checks.'
   last_edited_ms: 1780651842172
+75ca3ad84213ed64:
+  path: src/modules/overview/tools/mod.rs
+  description: 'Tool submodule routing: close_context, panel_goto_page, preflight.'
+  last_edited_ms: 0
 75d1e3b1ba2d8dde:
   path: web/src/components/agents/UsagePage.tsx
   description: Cost & token analytics — fleet Usage page. Agent filter, date range, unit lens ($/tokens). Monthly stacked bar chart + table + forecast. Still on mock data (usagePoints/USAGE_RATES) — needs richer monthly-history backend endpoint.
@@ -12117,6 +12157,10 @@
 7f8950a56744393f:
   path: web/package.json
   description: 'Frontend deps: @base-ui/react 1.5, @tanstack/react-query 5.101, react 19.2, react-markdown 10 + remark-gfm, highlight.js 11.11, tailwindcss 4.3, shadcn 4.11, vite 8, playwright. scripts: dev/build(tsc -b && vite build)/lint/preview.'
+  last_edited_ms: 0
+7f8bb7fe53178ee7:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 7f96c638d0d94837:
   path: src/ui/ir/conversation.rs
@@ -15278,6 +15322,10 @@ a0596fc66738d4aa:
   path: src/app/actions/history.rs
   description: Prompt history navigation and panel clipboard copy. PromptHistoryNav struct with lazy-load from JSONL. Safe indexing via .get(), saturating arithmetic. handle_history_prev/next (Ctrl+U/D), handle_copy_panel_content (Ctrl+C via pbcopy).
   last_edited_ms: 0
+a060aa06b1d4e9f1:
+  path: crates/cp-mod-files/src/panel.rs
+  description: 'File panel. Background cache system for file content with syntax highlighting (IR spans). Hash-based change detection. PANEL_MAX_LOAD_BYTES hard limit. Pagination. No cache_refresh_interval (watcher-based). T355: suicide() now reaps a panel whose backing file no longer exists on disk (manual delete / git branch switch) EVEN when it has loaded content — gated on (cached_content.is_none() || cache_deprecated) so an editor''s atomic save-via-rename (brief unlink) doesn''t nuke a live panel mid-save; previously the cached_content.is_some() early-return meant a loaded panel never auto-closed and lingered with stale content.'
+  last_edited_ms: 0
 a062a381ee22d0cc:
   path: crates/cp-mod-ocr/src/client.rs
   description: Datalab OCR API client. Multipart upload, exponential backoff polling, disk cache keyed by FNV-1a hash. api_key_from_env() reads from vault ("datalab").
@@ -15806,6 +15854,10 @@ a5a97618291ea9c5:
   path: web/src/lib/mock/fileTree.ts
   description: Mock filesystem FsNode literal for the workspace browser. Extracted from mock/index.ts (web-lint P2) so the barrel stays ≤500 lines after the Prettier reflow expanded its object literals; re-exported via ./index (export * from ./fileTree) so @/lib/mock importers are unchanged.
   last_edited_ms: 1783371465224
+a5c6215154ce22e0:
+  path: crates/cp-mod-github/src/panel.rs
+  description: 'GithubResultPanel: static gh command output panel (no auto-refresh). Token redaction, tab-delimited PR/issue table rendering. Refreshes only when explicitly dirtied by mutating commands.'
+  last_edited_ms: 0
 a5cefacdd6566669:
   path: crates/cp-orchestrator/src/registry/liveness.rs
   description: 'Pure liveness verdict: 3-factor (pid alive + fresh heartbeat + boot_id match). Liveness enum (Live/StalePid/StaleHeartbeat/BootIdMismatch) with is_live(). verdict() is pure (testable without sleeping). pid_alive via signal-0. 8 unit tests.'
@@ -19602,6 +19654,10 @@ cd978ea148e13465:
   path: ui/src/components/shell/ConfigPanel.tsx
   description: 'Shared settings body (macOS System-Settings: category rail + detail pane). variant=''dialog''|''inline''. NO per-category title header (dialog keeps slim close-only chrome). Categories: General/Usage & Cost/Providers/Search/DocAI/Web/Integrations. When currentUser.managedByCompany (T30): key-bearing panes show a ManagedKeysNotice banner + each KeyRow is LOCKED (Lock glyph replaces reveal eye, value stays masked, ManagedPill + ''Managed by {company}'' caption) — org provisions keys centrally. Usage renders <UsagePage/> full-bleed. Masked keys w/ reveal (personal accounts), Connected/Locked pills, toggles, default-model picker.'
   last_edited_ms: 1781598237668
+cd9dfa25ae122864:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 cdb83890e56a7d79:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
@@ -20782,6 +20838,10 @@ db224a5ff42275a6:
   path: crates/cp-oplog/src/append.rs
   description: 'OplogWriter: single-writer append-only fsync''d log. open/open_with_segment_limit, append(kind)->rev (frame+write_all+sync_data, announce-after-durable K9), maybe_roll (64MiB segments), create_segment (dir fsync I2), scan_for_resume (rev resume past highest durable, torn-tail truncate on open). OplogError{Io,Frame}. 6 tests.'
   last_edited_ms: 1781618522798
+db3195edde0e15ab:
+  path: src/app/context/mod.rs
+  description: 'Context prep + unified freeze. A9: full_freeze snapshot via state.frozen_context_snapshot.as_ref(). prepare_stream_context split reverie/main builders; freeze machinery in sibling freeze_pass.rs.'
+  last_edited_ms: 0
 db709550dedd95a7:
   path: crates/cp-orchestrator/tests/registry_channel.rs
   description: 'Phase 27 (X794) backend↔agent seam suite (4 tests, all green). Drives discovery+channel against real cp-mod-bridge artifacts: boot→Appeared→quiet scan→Disappeared, Stale transition, body spill→hydrate, command send→exactly-once dedup.'
@@ -21049,6 +21109,10 @@ deb8f8904c3b858d:
 dee18dfb56b89354:
   path: web/src/components/auth/LoginPage.tsx
   description: 'Login / bootstrap-register page (Phase 9). Two modes: !bootstrapped → ''Create Admin Account'' register form; bootstrapped → ''Sign In'' login form. Centered card with CP branding, error display, loading state.'
+  last_edited_ms: 0
+deedeb8d27bf878d:
+  path: crates/cp-base/src/state/context.rs
+  description: 'Kind registry + Entry type. TypeMeta 9-field #[expect(exhaustive_structs)] A5 (25 cross-crate sites). A6: estimate_tokens via float_math::ceil_ratio. EmittedState/ScrollState/Entry #[non_exhaustive]+builders. make_default_entry.'
   last_edited_ms: 0
 def0ccd673154b9d:
   path: crates/cp-mod-todo/Cargo.toml
@@ -21373,6 +21437,10 @@ e23e11c21989e128:
 e24004db48c12444:
   path: web/src/components/agents/AgentModal/index.tsx
   description: 'AgentModal shell (P8 split): create/manage dialog, single source for both flows (fleet dashboard + TopBar). Wires useSelectionState + useAgentModalActions into Controller, renders Header/Body/Footer subcomponents. authEnabled coerced ?? false. Backdrop = focusable sibling button.'
+  last_edited_ms: 0
+e2469d358f518b9a:
+  path: crates/cp-mod-firecrawl/src/panel.rs
+  description: 'Firecrawl result panel. Same pattern as brave: static content in metadata, cache restore, pagination. update_if_changed via let _changed (T586).'
   last_edited_ms: 0
 e259a53bd3afacd4:
   path: src/state/persistence/save.rs
@@ -22546,6 +22614,10 @@ eeb8ddd22c31de65:
   path: crates/cp-base/src/state/watchers.rs
   description: 'Watcher trait + WatcherRegistry. WatcherResult: description, panel_id, tool_use_id, close_panel, create_panel (DeferredPanel for console), create_dyn_panel (DynPanel for generic panels), kill_session, preserves_tempo. ChannelWatcher: polls Mutex<Receiver<WatcherResult>> for async tool results. ASYNC_ERROR_PREFIX + DYN_PANEL_ID_PLACEHOLDER constants.'
   last_edited_ms: 0
+eec13a345eb56c04:
+  path: crates/cp-mod-brave/src/panel.rs
+  description: Brave result panel. Static content in metadata, cache restore post-reload, pagination. BRAVE_PANEL_TYPE. update_if_changed via let _changed bind (T586).
+  last_edited_ms: 0
 eec3c55348ffe829:
   path: web/src/components/finder/InfoBadge.tsx
   description: Finder per-node info badge (T289) — a small ⓘ shown on a file/folder that has a tree description; hover (delay 120) or click opens a Popover with the description. PopoverTrigger render={<span/>} so it nests inside a row/cell <button> without button-in-button; stopPropagation on click/dblclick/pointerdown so the badge never selects/opens/drags the node. max-w-340px.
@@ -23325,6 +23397,10 @@ f6d23dbadaf97fd7:
 f6d88efdcee7a850:
   path: crates/cp-orchestrator/src/transport/inspect/meta.rs
   description: 'Enriched agent-meta endpoints. agent_meta/fleet_meta/fleet_retired build maquette Agent: registry record + view phase/lifecycle/cost + tokens + context occupancy + threads + git branch + provider. T457: `model` now resolved from config.json per-provider model field via read_current_model()→providers::resolve_api_name (was stale entry.model=claude-opus-4-6 for all agents); field picked by provider (anthropic-family→anthropic_model, claudecodev2→claude_code_v2_model, etc.), falls back to entry.model. read_provider reads modules.core.llm_provider. Name overrides + derive_status/accent.'
+  last_edited_ms: 0
+f6e43743e7c6a233:
+  path: src/modules/conversation_history/panel.rs
+  description: 'ConversationHistoryPanel: frozen message chunks. render_message_blocks dispatches render_text_hist/render_toolcall_hist/render_toolresult_hist (A2). Write-once, no refresh/cache.'
   last_edited_ms: 0
 f6e59102ab372fc5:
   path: crates/cp-base/src/ui/render_cache.rs
