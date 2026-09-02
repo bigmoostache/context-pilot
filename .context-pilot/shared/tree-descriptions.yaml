@@ -1746,6 +1746,10 @@
   path: web/src/mobile-components/finder/preview/livePreviews.tsx
   description: Mobile live Finder previews twin. Touch-sized zoom/copy/save (36-40px active-press vs desktop hover), MarkdownEditor lazy import swapped to @/mobile-components twin (leak guard), SheetGrid stub lazy-load (Univer touch-native). dangerouslySetInnerHTML scope-off in eslint.config + registry.
   last_edited_ms: 0
+120f049e7d5357b9:
+  path: web/src/components/threads/dialogs/NewThreadDialog.tsx
+  description: New Thread dialog — title-only sheet on the portaled Base UI Dialog; submit prepends a MY_TURN thread and selects it. Moved into threads/dialogs/ (T669) to free a threads/ dir slot under the 8-entry cap.
+  last_edited_ms: 0
 1210e4ecba856a2a:
   path: crates/cp-orchestrator/src/transport/inspect/finder/upload.rs
   description: 'Finder file-upload write handlers (split from mutate.rs for the 500-line budget, X950): fs_upload (POST /fs/upload, one file per request, dir must pre-exist) + fs_upload_unique (POST /fs/upload-unique, T298 — create_dir_all the dest on demand + unique_name dedup, extension-preserving). Reuses super::{is_bare_name, rel_child}. All confined, bare-name guarded. Clippy-clean (97ef52f1).'
@@ -5110,6 +5114,10 @@
   path: crates/cp-orchestrator/src/transport/auth/users.rs
   description: 'User-management REST handlers (FR-04, FR-17): list/create/force-logout/delete users. can_manage_users gate, vendor invisibility (superadmin hidden from non-superadmin), anti-escalation (strictly lower rank). target_manageable_by helper. Tests: V2.1a create all roles, V2.1b anti-escalation+invisibility.'
   last_edited_ms: 1783688809610
+3601f28a8393a108:
+  path: web/src/index.css
+  description: Tailwind v4 + tw-animate. Two palettes (:root Cream light / .dark Dungeon Forge) as CSS token blocks; semantic tokens (signal/ok/warn/danger/surface). Finder micro-motion keyframes (finder-pop/ql-pop/menu-pop/ants/checker), modal-pop, highlight.js .hljs-* theme mapped to tokens (T280).
+  last_edited_ms: 0
 3603cd54645e880c:
   path: crates/cp-orchestrator/src/transport/files.rs
   description: 'Byte-oriented HTTP responses: static SPA (CP_WEB_ROOT), fs download/raw preview, avatar. serve_static path-traversal guard, content_type sniff. orch-clippy: clean (referenced in pub_use audit, not edited).'
@@ -12458,6 +12466,10 @@
   path: crates/cp-wire/src/types/command.rs
   description: Command envelope (id, seq, dedup_token) + Kind (SendMessage, CreateThread, ArchiveThread, RestoreThread, InterruptStream, Stop, Unknown).
   last_edited_ms: 0
+830846c33d9ac820:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 831ed53d307c857b:
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: 'Frontend transport — REST + SSE over tiny_http (blocking, thread-per-conn). MAX_BODY=32MiB (raised from 1MiB, T274): the POST body read is .take(MAX_BODY); a >1MiB SendMessage paste was silently TRUNCATED → invalid JSON → 400 ''malformed'' (one of three caps on the big-message path, kept in lockstep with the agent intake''s MAX_CONNECTION_BUFFER). Backend shared state (view/breaker/hub/tickets/inspect/agents_dir/dirty_agents + supervisor:AgentSupervisor + agents_root + agent_binary + retired:RetiredStore) under one Mutex; Backend::new 4-arg seeds supervisor allow-list from agent_binary. route_rest dispatches all /api routes incl POST /api/fleet/create, /restart, /retire, /unretire, GET /fleet/retired + /vitals + /metrics. handle_download serves file/folder-zip. cors_headers exposes Content-Disposition. handle_stream redeems ticket then stream::run_stream.'
@@ -18474,6 +18486,10 @@ c17d20f3b7d52d3f:
   path: web/src/mobile-components/finder/views/FinderViews.tsx
   description: 'Mobile finder Grid/List/Gallery views + tapProps (single tap: folder drills in, file selects; long-press context). No hover/double-click/marquee. Larger tap targets, list collapses 4-col to name+meta line. Re-exports ColumnsView.'
   last_edited_ms: 1784668135762
+c17ebf9017f3cf42:
+  path: web/src/components/threads/ThreadList.tsx
+  description: Thread sidebar list. Grouped by turn-status (Agent's turn / User turn) + Archived view. Search now lives in ThreadSearchPalette (T669) opened from ListHeader's Search button; ListHeader also has a PanelLeftClose sidebar-collapse button. Row-hover title marquee via useTitleMarquee (WAA). Subcomponents RowActions/RowMeta/ListHeader/EmptyState keep budgets. Exactly 500 lines (cap).
+  last_edited_ms: 0
 c192ef13584f001b:
   path: yamls/tools/spine.yaml
   description: 'Spine tool YAML. 3 tools: notification_mark_processed, spine_configure (max_cost is burst/stream-based), coucou (timer/datetime scheduling).'
