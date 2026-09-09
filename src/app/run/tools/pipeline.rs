@@ -359,6 +359,8 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
     maybe_trigger_reverie(app, &tool_results);
     super::callbacks::fire_edit_callbacks(app, &tools, &mut tool_results);
     apply_tempo_break(app, &tool_results);
+    // Runs after the tempo break so it observes this tick's FINAL tempo.
+    super::checks::strip_superseded_recaps(app);
 
     // Sync the Todo panel's focus filter to the focused thread (forces a fresh
     // Todo panel on focus change), then evaluate the fire-once hygiene nudge.

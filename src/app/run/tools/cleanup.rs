@@ -185,7 +185,14 @@ fn force_resolve_stragglers(tool_results: &mut [crate::infra::tools::ToolResult]
             "Console wait result unavailable (watcher expired or was interrupted)".clone_into(&mut tr.content);
         } else if tr.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL) {
             let after = &tr.content.get(CONSOLE_WAIT_BLOCKING_SENTINEL.len()..).unwrap_or("");
-            tr.content = format!("Callback result unavailable (timeout). Original: {after}");
+            if after.starts_with("cb_block_") {
+                tr.content = format!("Callback result unavailable (timeout). Original: {after}");
+            } else {
+                // Console/async-tool sentinel with appended pre-flight text — not a
+                // callback. The appended text is typically pre-flight warnings
+                // (e.g. "\nWarning: Task 'X525' belongs to thread T92…").
+                tr.content = format!("Blocking tool result unavailable (watcher expired or was interrupted).{after}");
+            }
         } else {
             // Not a sentinel — already a real result, leave untouched.
         }
@@ -204,7 +211,17 @@ fn replace_blocking_sentinels(
         if tr.content == CONSOLE_WAIT_BLOCKING_SENTINEL {
             apply_console_wait_result(tr, merged_blocking);
         } else if tr.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL) {
-            apply_callback_result(tr, merged_blocking);
+            let after = tr.content.get(CONSOLE_WAIT_BLOCKING_SENTINEL.len()..).unwrap_or("");
+            if after.starts_with("cb_block_") {
+                apply_callback_result(tr, merged_blocking);
+            } else {
+                // Console/async-tool sentinel with appended pre-flight warnings —
+                // not a callback. Resolve via the console-wait path and re-append
+                // the warnings so they survive.
+                let appended = after.to_owned();
+                apply_console_wait_result(tr, merged_blocking);
+                tr.content.push_str(&appended);
+            }
         } else {
             // Non-sentinel result — nothing to replace.
         }

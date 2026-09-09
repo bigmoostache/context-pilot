@@ -13,14 +13,27 @@
 //!      no `in_progress` descendant (a parent that is in progress but has an
 //!      in-progress child does NOT count — the child is the real active front).
 //!
-//! [`result_annex`] bundles the two (tree, then the warning if any) — the single
-//! block appended/substituted at both call sites.
+//! [`result_annex`] bundles the two (tree, then the warning if any) into the
+//! single **tagged recap block** emitted at both call sites — the `Todo` tool's
+//! own result and the annex appended to an opted-in tool whose `task_id` flipped
+//! a task. Because there is exactly ONE producer, the block is always framed by
+//! [`RECAP_OPEN`] / [`RECAP_CLOSE`], which is what lets the conversation
+//! stripper find and collapse superseded recaps.
 
 use std::fmt::Write as _;
 
 use cp_base::state::runtime::State;
 
 use crate::types::{TodoItem, TodoState, TodoStatus};
+
+/// Opening sentinel of a task-recap block.
+///
+/// Comment syntax so it reads as machine framing rather than content, and so a
+/// task title can never collide with it. Paired with [`RECAP_CLOSE`]; the two
+/// delimit the byte range the conversation stripper collapses.
+pub const RECAP_OPEN: &str = "<!--TODO_RECAP-->";
+/// Closing sentinel of a task-recap block (see [`RECAP_OPEN`]).
+pub const RECAP_CLOSE: &str = "<!--/TODO_RECAP-->";
 
 /// The box-drawing prefixes, escaped as code points (clippy forbids non-ASCII
 /// string literals). `TEE`/`ELL` open a middle/last child line; `PIPE`/`GAP`
@@ -33,15 +46,24 @@ const PIPE: &str = "\u{2502}   "; // "│   "
 /// Continuation column under a last parent (blank).
 const GAP: &str = "    ";
 
-/// The tree + the optional multi-in-progress-leaf warning, ready to drop into a
-/// tool result. Empty string when the thread has no live tasks.
+/// The **complete, tagged task-recap block** for `thread_id`: header, tree, and
+/// the optional multi-in-progress-leaf warning, framed by [`RECAP_OPEN`] /
+/// [`RECAP_CLOSE`].
+///
+/// This is the single producer of a recap — both the `Todo` tool result and the
+/// `task_id` annex splice exactly this string, so the two can never drift and
+/// every recap in the conversation is uniformly delimited (and therefore
+/// strippable). Callers add their own framing *outside* the block: whatever they
+/// prepend survives stripping, everything inside does not.
 #[must_use]
 pub fn result_annex(state: &State, thread_id: &str) -> String {
     let tree = render(state, thread_id);
-    let mut out = if tree.is_empty() { "(no tasks on this thread)".to_owned() } else { tree };
+    let body = if tree.is_empty() { "(no tasks on this thread)" } else { tree.trim_end() };
+    let mut out = format!("{RECAP_OPEN}\nCurrent tasks:\n\n{body}");
     if let Some(warning) = in_progress_leaf_warning(state, thread_id) {
         let _w = write!(out, "\n\n{warning}");
     }
+    let _w = write!(out, "\n{RECAP_CLOSE}");
     out
 }
 

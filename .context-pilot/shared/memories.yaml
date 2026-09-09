@@ -83,10 +83,14 @@ M-long-8:
   last_edited_ms: 1788350028141
 M-long-9:
   tier: long
-  title: MULTI-WORKER (subworkers
-  contents: 'MULTI-WORKER (subworkers branch, off master): N equal workers, true concurrency, single main loop. Design doc: docs/design-subworkers.md. 14 shared modules, 8 per-worker.'
-  importance: critical
-  last_edited_ms: 0
+  title: T724 spine↔thread map
+  contents: |-
+    T724 spine↔threads linkage ANALYSIS (no code yet). Spine 2 planes: notifications (SpineState::create_notification -> injects into GLOBAL state.messages + auto-cont engine.rs push_user_message) + WatcherRegistry (poll_all @ cleanup.rs check_watchers; async watcher fire -> create_notification(Custom,'watcher')). Neither WatcherResult(cp-base carriers.rs) nor Notification(spine types.rs) carries thread_id.
+    5 Watchers: Coucou(coucou.rs:448, HAS thread_id but only decorates text), Channel(cp-base async_exec:143), Ocr(ocr tools:164), Console(console tools x3), Callback(callback firing:186).
+    ~11 create_notification sites: input.rs:137(UserMsg), engine.rs:85(guardrail), cleanup.rs:117(watcher chokepoint), checks.rs:143(todo_hygiene HAS tid), lifecycle.rs:126(ReloadResume), reverie.rs x4, questions:183(ThinkReminder).
+    Delivery = ThreadMessage::user(content)->thread.messages.push+status=MyTurn (idle auto-cont picks up). Natural link=FocusState.focused_thread_id(Option). Classes: already-linked=Coucou+todo_hygiene; via-focus=Channel/Ocr/Console/Callback/ThinkReminder; meta-global=guardrail/ReloadResume/reverie x4. Blocking watchers resume pipeline, never post (linkage!=delivery).
+  importance: high
+  last_edited_ms: 1788362763224
 M-mid-1:
   tier: mid
   title: 'DOCUMENTATION QUALITY:'
@@ -397,10 +401,10 @@ M-short-25:
   last_edited_ms: 0
 M-short-26:
   tier: short
-  title: Library panel YAML
-  contents: 'T720 SHIPPED (f3e4aab5, t715-orch-reader-rebuild): Library fixed panel renders YAML-style (agents:/skills:/commands: seqs), not Markdown tables. library_panel.rs context()=push_*_yaml + yaml_scalar() + # cheatsheet; library_blocks.rs=kv_line/bool_line/entry_line Block::Line (bool green-when-true).'
+  title: Console timeout mislabel
+  contents: '''Callback result unavailable (timeout)'' is MISLABELED for console tools. force_resolve_stragglers (cleanup.rs): content==SENTINEL->''Console wait unavailable''; SENTINEL+tail->''Callback...''. Tail=appended pre-flight warning. console_easy_bash IS blocking (10s deadline, bare sentinel). Hung cmd (psql on stuck lock) + lost watcher/relay stall->force-resolve mislabel.'
   importance: medium
-  last_edited_ms: 1788360268582
+  last_edited_ms: 1788365521867
 M-short-27:
   tier: short
   title: T584 tool-call UI
@@ -496,10 +500,12 @@ M-short-4:
   last_edited_ms: 0
 M-short-40:
   tier: short
-  title: T686b id-as-key Todo
-  contents: 'T686b SHIPPED (todo-v3-yaml-diffs): Todo canonical YAML 1st line = ''- {id}: {status}'' (id=mapping KEY, val=status); title/desc/children siblings. Flip = tiny inline diff {prev:''X41: in_progress'',new:''X41: done''}. yaml.rs manual serde_yaml::Value parser (dropped serde derive). Create=omit id line, 1st key title:. core.yaml desc: id-anchored inline edits + stale-panel warn. Builds on T686 tree.'
+  title: Todo upsert + recap strip
+  contents: |-
+    Todo tool = structured upsert (PR #194, killed YAML diffs): `items`, id=update / no-id=create, nesting=parenthood, merge-not-replace, delete=cancelled, atomic.
+    Recap: tree::result_annex sole producer, <!--TODO_RECAP--> framed. strip_superseded keeps only the last + returns touched indices so checks.rs re-persists. Gated queue-idle AND tempo-broken.
   importance: high
-  last_edited_ms: 1787949116200
+  last_edited_ms: 1788958686987
 M-short-5:
   tier: short
   title: 'Datalab OCR API: POST'
@@ -577,10 +583,10 @@ M-tiny-14:
   last_edited_ms: 1787840930941
 M-tiny-15:
   tier: tiny
-  title: Active branch
-  contents: 'ACTIVE WORKING BRANCH = ''todo-v3-yaml-diffs'' (off fresh master, T682 Todo YAML-diff redesign). Previous todo-v2 PR #188 MERGED to master. Push here + open new PR unless told otherwise.'
+  title: 'Active branch + PR #194'
+  contents: 'Branch t715-orch-reader-rebuild → PR #194 OPEN to master (8 commits). Branch name is REUSED: its first PR #193 (T715) is already MERGED. Push here unless told otherwise.'
   importance: critical
-  last_edited_ms: 1787935261012
+  last_edited_ms: 1788958673116
 M-tiny-16:
   tier: tiny
   title: Freeze RESOLVED at infra

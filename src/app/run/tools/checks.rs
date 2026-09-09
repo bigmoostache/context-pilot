@@ -56,6 +56,44 @@ pub(crate) fn check_deferred_sleep(app: &mut App, tx: &Sender<StreamEvent>) {
 // `cp-mod-threads` (`FocusState`) and `cp-mod-todo` (`TodoState`), which never
 // import each other (design §8 dependency-injection rule).
 
+/// Collapse every superseded task recap in the live conversation, keeping only
+/// the most recent one (the actual work lives in `cp_mod_todo::recap`, beside
+/// the block's producer).
+///
+/// Gated on two conditions, both load-bearing:
+///
+///   * **Queue idle.** While the queue intercepts, a batch is still forming and
+///     the conversation is mid-construction — leave it alone.
+///   * **Tempo already broken.** Rewriting old messages mutates the conversation
+///     *prefix*, invalidating the LLM prompt cache from the earliest edited
+///     message onward. On a tempo-preserving tick that cost would be gratuitous;
+///     on a tempo-breaking tick the cache is dropped anyway, so the strip rides
+///     along for free. Do not relax this without understanding the trade.
+///
+/// The caller runs this *after* the tempo break so `state.tempo` is final.
+///
+/// Every touched message is re-persisted: the strip edits the conversation's
+/// single source of truth, so skipping the save would fork it into a stripped
+/// in-memory copy and a full-recap on-disk one, and every reload would redo the
+/// same work. Persisting makes the collapse happen exactly once per recap.
+pub(crate) fn strip_superseded_recaps(app: &mut App) {
+    if cp_mod_queue::types::QueueState::get(&app.state).active || app.state.tempo {
+        return;
+    }
+    let touched = cp_mod_todo::recap::strip_superseded(&mut app.state);
+    if touched.is_empty() {
+        return;
+    }
+    // Clone first so the immutable borrow of `messages` ends before the save
+    // (which needs `&App`). Indices are valid — nothing mutated the vec since.
+    let saved: Vec<crate::state::Message> =
+        touched.iter().filter_map(|&idx| app.state.messages.get(idx).cloned()).collect();
+    for msg in &saved {
+        app.save_message_async(msg);
+    }
+    log::debug!("todo recap: collapsed superseded recap(s) in {} message(s)", saved.len());
+}
+
 /// Push the focused thread id onto `TodoState` so the Todo panel scopes to it.
 ///
 /// When focus changed, the panel's previous content is stale (it pointed at the

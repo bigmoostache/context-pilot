@@ -9,13 +9,17 @@
 
 /// Panel implementation for the todo list view.
 mod panel;
+/// Collapsing of superseded task recaps in the live conversation.
+pub mod recap;
 /// Focus-scoping + legacy purge (`set_focus_filter`, `purge_threadless`).
 pub mod tools;
 /// Synthetic task-tree + in-progress-leaf warning for tool results (T686).
 pub mod tree;
 /// Todo state types: `TodoItem`, `TodoStatus`, `TodoState`.
 pub mod types;
-/// Virtual-YAML render + diff-apply + reconcile (the `Todo` tool's core).
+/// Structured nested upsert — the `Todo` tool's core.
+pub mod upsert;
+/// Canonical YAML render of a thread's task tree (feeds the Todo panel).
 pub mod yaml;
 
 use types::{TodoState, TodoStatus};
