@@ -500,10 +500,12 @@ M-short-4:
   last_edited_ms: 0
 M-short-40:
   tier: short
-  title: T686b id-as-key Todo
-  contents: 'T686b SHIPPED (todo-v3-yaml-diffs): Todo canonical YAML 1st line = ''- {id}: {status}'' (id=mapping KEY, val=status); title/desc/children siblings. Flip = tiny inline diff {prev:''X41: in_progress'',new:''X41: done''}. yaml.rs manual serde_yaml::Value parser (dropped serde derive). Create=omit id line, 1st key title:. core.yaml desc: id-anchored inline edits + stale-panel warn. Builds on T686 tree.'
+  title: Todo upsert + recap strip
+  contents: |-
+    Todo tool = structured upsert (PR #194, killed YAML diffs): `items`, id=update / no-id=create, nesting=parenthood, merge-not-replace, delete=cancelled, atomic.
+    Recap: tree::result_annex sole producer, <!--TODO_RECAP--> framed. strip_superseded keeps only the last + returns touched indices so checks.rs re-persists. Gated queue-idle AND tempo-broken.
   importance: high
-  last_edited_ms: 1787949116200
+  last_edited_ms: 1788958686987
 M-short-5:
   tier: short
   title: 'Datalab OCR API: POST'
@@ -581,10 +583,10 @@ M-tiny-14:
   last_edited_ms: 1787840930941
 M-tiny-15:
   tier: tiny
-  title: Active branch
-  contents: 'ACTIVE WORKING BRANCH = ''todo-v3-yaml-diffs'' (off fresh master, T682 Todo YAML-diff redesign). Previous todo-v2 PR #188 MERGED to master. Push here + open new PR unless told otherwise.'
+  title: 'Active branch + PR #194'
+  contents: 'Branch t715-orch-reader-rebuild → PR #194 OPEN to master (8 commits). Branch name is REUSED: its first PR #193 (T715) is already MERGED. Push here unless told otherwise.'
   importance: critical
-  last_edited_ms: 1787935261012
+  last_edited_ms: 1788958673116
 M-tiny-16:
   tier: tiny
   title: Freeze RESOLVED at infra
