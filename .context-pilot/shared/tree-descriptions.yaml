@@ -1298,6 +1298,10 @@
   path: .context-pilot/scripts/rust-check.sh
   description: 'CB4 callback script. Runs 3 checks on every .rs edit: (1) cargo fmt --check, (2) cargo check -D warnings, (3) cargo clippy --all-targets -D warnings. Matches CI ci.yml steps. Fmt check added T462 (was missing since June 5 consolidation).'
   last_edited_ms: 1782897541690
+0d297dbb9cc3fb1a:
+  path: src/app/run/tools/pipeline.rs
+  description: Main tool execution pipeline. collect_tool_results(ToolBatch) + finalize_tool_cycle(ToolCycle) split from handle_tool_execution (A2). execute_one_tool/execute_queue_control/enqueue_tool. Pre-flight → queue intercept (auto-flush on trap defusal) → execute → callbacks(sibling) → tempo. Radar signals, Meili log sync.
+  last_edited_ms: 0
 0d2b3a98d6478358:
   path: src/llms/oai_providers/grok.rs
   description: xAI Grok client. OpenAI-compatible API. Shared openai_compat message building + openai_streaming::consume_sse_stream (A2 loop extracted). API key from vault ("xai").
@@ -3269,6 +3273,10 @@
 221a789696c80caf:
   path: .git/index
   description: Git index (binary). Not source.
+  last_edited_ms: 0
+221ed08b18b2d926:
+  path: src/app/run/tools/checks.rs
+  description: 'Post-tool non-blocking polls: panel readiness (5s timeout), deferred sleep timer. Each resumes streaming pipeline when condition met. Imports has_dirty_panels from streaming.rs.'
   last_edited_ms: 0
 222420220afa8c94:
   path: crates/cp-base/Cargo.toml
@@ -12134,6 +12142,10 @@
   path: ui/src/components/finder/FinderChrome.tsx
   description: 'Finder chrome: FinderTabs (tab strip + new/close), FinderToolbar (back/fwd, breadcrumb, grid/list/columns seg, search, upload/download, preview toggle), FinderSidebar (Realm places + favorites + ''confined realm'' note).'
   last_edited_ms: 1781516507767
+7cd5d3d3f80f5ef8:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 7cdf399a812f80da:
   path: crates/cp-base/src/state/watchers.rs
   description: Watcher trait + WatcherRegistry. WatcherResult (description/panel_id/tool_use_id/close_panel/create_panel/create_dyn_panel/kill_session/preserves_tempo). poll_all() drains, uses route_result() free fn to split blocking/async (A2 cognitive). ChannelWatcher polls Mutex<Receiver> for async tool results. ASYNC_ERROR_PREFIX + DYN_PANEL_ID_PLACEHOLDER.
@@ -12858,6 +12870,10 @@
   path: .git/index
   description: Git index (binary). Not source.
   last_edited_ms: 0
+844949347b8d6db8:
+  path: src/modules/questions/think.rs
+  description: ThinkState (count/threshold/next_notification_at), execute() increments counter + encouraging status
+  last_edited_ms: 0
 8450887d84aa9bc0:
   path: crates/cp-orchestrator/src/transport/rest/thread_shape.rs
   description: 'Pure thread-list shaping: overlay_roster merges live view roster into disk threads (refresh status/archived/lastActivity; synthesize log-less ThreadDetail for view-only threads = instant appearance), reshape_thread/reshape_message snake_case→camelCase maquette shape.'
@@ -13254,6 +13270,10 @@
   path: src/modules/mod.rs
   description: 'Module registry. 24 modules via all_modules(). A9: lookup.get(|entry|) index. dispatch_tool w/ flame, create_panel factory, module_toggle, rebuild_tools, dependency validation.'
   last_edited_ms: 1784541442951
+883ae55f4077ee32:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 883aff42ef096a25:
   path: crates/cp-mod-git/Cargo.toml
   description: 'Git module deps: cp-base, cp-render, cp-vault, crossterm, serde_json, regex.'
@@ -14633,6 +14653,10 @@
 965292c5106e02e5:
   path: crates/cp-render/src/frame.rs
   description: Frame-level IR types. Frame (sidebar/active_panel/status_bar/conversation/overlays), Sidebar (entries/token_bar/stats/pr_card/help), StatusBar (badge/agent/skills/git/auto_continue/reverie/queue/think), PanelContent (title/blocks).
+  last_edited_ms: 0
+9654871f79dc80dd:
+  path: src/app/run/tools/checks.rs
+  description: 'Post-tool non-blocking polls: panel readiness (5s timeout), deferred sleep timer. Each resumes streaming pipeline when condition met. Imports has_dirty_panels from streaming.rs.'
   last_edited_ms: 0
 965616ec4b09320a:
   path: tmp/doc/template/header.html
@@ -18394,6 +18418,10 @@ bd18738f5448aac7:
   path: web/src/components/finder/preview/livePreviews.tsx
   description: 'Live-data Finder previews: LivePreview/LiveImagePreview/LivePdfPreview/LiveSheetPreview/HighlightedCode/EditableMarkdown. LiveSheetPreview delegates to Univer-based SheetGrid (replaced AG Grid). Sheet tabs handled natively by Univer. T329: all card chrome stripped for full-bleed.'
   last_edited_ms: 1784135961101
+bd1d5425f884904e:
+  path: crates/cp-mod-todo/src/lib.rs
+  description: Todo module. 3 tools create/update/move. Fixed TODO panel (fixed_order=0). pre_flight split preflight_create/update/move. todo_line_semantic split keyword_semantic/tail_semantic (A2). Drives spine auto-continuation.
+  last_edited_ms: 0
 bd217dcc3a74f32b:
   path: crates/cp-orchestrator/tests/openapi/schemas_ext.rs
   description: Transport-layer OpenAPI schemas — receipts, auth, env-keys, filesystem, FinderKind enum, LLM registry (ModelDef/ProviderDef), SSE delta protocol, release management, Claude Code usage+login (ClaudeTokenStatus/LoginStart/LoginComplete schemas).
