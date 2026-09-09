@@ -71,14 +71,27 @@ pub(crate) fn check_deferred_sleep(app: &mut App, tx: &Sender<StreamEvent>) {
 ///     along for free. Do not relax this without understanding the trade.
 ///
 /// The caller runs this *after* the tempo break so `state.tempo` is final.
+///
+/// Every touched message is re-persisted: the strip edits the conversation's
+/// single source of truth, so skipping the save would fork it into a stripped
+/// in-memory copy and a full-recap on-disk one, and every reload would redo the
+/// same work. Persisting makes the collapse happen exactly once per recap.
 pub(crate) fn strip_superseded_recaps(app: &mut App) {
     if cp_mod_queue::types::QueueState::get(&app.state).active || app.state.tempo {
         return;
     }
-    let stripped = cp_mod_todo::recap::strip_superseded(&mut app.state);
-    if stripped > 0 {
-        log::debug!("todo recap: collapsed {stripped} superseded task recap(s)");
+    let touched = cp_mod_todo::recap::strip_superseded(&mut app.state);
+    if touched.is_empty() {
+        return;
     }
+    // Clone first so the immutable borrow of `messages` ends before the save
+    // (which needs `&App`). Indices are valid — nothing mutated the vec since.
+    let saved: Vec<crate::state::Message> =
+        touched.iter().filter_map(|&idx| app.state.messages.get(idx).cloned()).collect();
+    for msg in &saved {
+        app.save_message_async(msg);
+    }
+    log::debug!("todo recap: collapsed superseded recap(s) in {} message(s)", saved.len());
 }
 
 /// Push the focused thread id onto `TodoState` so the Todo panel scopes to it.

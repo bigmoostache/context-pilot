@@ -15,6 +15,11 @@
 //! leaves exactly ONE task tree in context — so the model can't mistake a stale
 //! snapshot for current state.
 //!
+//! The edit lands on the **single source of truth**: it returns the messages it
+//! touched so the caller re-persists them. Memory and disk therefore never
+//! disagree, and each recap is collapsed exactly once in its lifetime rather
+//! than re-collapsed after every reload.
+//!
 //! It lives beside the producer on purpose: writer and reader share the same
 //! sentinel constants, so the framing can never drift.
 //!
@@ -37,34 +42,54 @@ use crate::tree::{RECAP_CLOSE, RECAP_OPEN};
 /// invisible to the next scan — the pass is naturally idempotent.
 const STUB: &str = "[task recap superseded]";
 
-/// Collapse every task recap in the live conversation except the most recent.
+/// Collapse every task recap in the live conversation except the most recent,
+/// returning the **positions of the messages whose content changed**.
 ///
-/// Returns the number of recaps stubbed (0 when there was nothing to do — i.e.
-/// zero or one recap in the whole conversation).
-pub fn strip_superseded(state: &mut State) -> usize {
+/// The caller MUST re-persist each returned message: the strip edits the single
+/// source of truth, so leaving disk un-updated would fork the conversation into
+/// a stripped in-memory copy and a full-recap on-disk one, and every reload
+/// would redo (and re-pay for) the same work. Positions are indices into
+/// `state.messages`, valid immediately on return — nothing mutates the vector in
+/// between.
+///
+/// Empty when there was nothing to do (zero or one recap in the conversation).
+pub fn strip_superseded(state: &mut State) -> Vec<usize> {
     let total = count_recaps(state);
     if total <= 1 {
-        return 0; // Nothing superseded — the only recap is the live one.
+        return Vec::new(); // Nothing superseded — the only recap is the live one.
     }
 
     // Collapse the first `total - 1` occurrences in conversation order; the
     // final one is the live tree and stays untouched.
     let mut budget = total.saturating_sub(1);
-    let mut stripped = 0usize;
-    for msg in &mut state.messages {
-        for record in &mut msg.tool_results {
-            if budget == 0 {
-                return stripped;
-            }
-            let (rewritten, n) = collapse(&record.content, budget);
-            if n > 0 {
-                record.content = rewritten;
-                budget = budget.saturating_sub(n);
-                stripped = stripped.saturating_add(n);
-            }
+    let mut touched: Vec<usize> = Vec::new();
+    for (idx, msg) in state.messages.iter_mut().enumerate() {
+        if budget == 0 {
+            break;
+        }
+        if collapse_message(msg, &mut budget) {
+            touched.push(idx);
         }
     }
-    stripped
+    touched
+}
+
+/// Collapse recaps in one message's tool results, drawing from `budget`.
+/// Returns whether any content was rewritten.
+fn collapse_message(msg: &mut cp_base::state::data::message::Message, budget: &mut usize) -> bool {
+    let mut changed = false;
+    for record in &mut msg.tool_results {
+        if *budget == 0 {
+            break;
+        }
+        let (rewritten, n) = collapse(&record.content, *budget);
+        if n > 0 {
+            record.content = rewritten;
+            *budget = budget.saturating_sub(n);
+            changed = true;
+        }
+    }
+    changed
 }
 
 /// Total number of well-formed recap blocks across the live conversation.
@@ -181,7 +206,9 @@ mod tests {
         state.messages.push(result_msg("R2", format!("Todo applied.\n\n{}", block("second"))));
         state.messages.push(result_msg("R3", format!("Todo applied.\n\n{}", block("third"))));
 
-        assert_eq!(strip_superseded(&mut state), 2);
+        // The two rewritten messages are reported so the caller can persist them;
+        // the message holding the live recap is NOT.
+        assert_eq!(strip_superseded(&mut state), vec![0, 1]);
 
         let got = contents(&state);
         let mut seen = got.iter();
@@ -198,7 +225,7 @@ mod tests {
         let only = format!("Todo applied.\n\n{}", block("only"));
         state.messages.push(result_msg("R1", only.clone()));
 
-        assert_eq!(strip_superseded(&mut state), 0);
+        assert!(strip_superseded(&mut state).is_empty());
         assert_eq!(contents(&state).first(), Some(&only));
     }
 
@@ -208,10 +235,11 @@ mod tests {
         state.messages.push(result_msg("R1", block("first")));
         state.messages.push(result_msg("R2", block("second")));
 
-        assert_eq!(strip_superseded(&mut state), 1);
+        assert_eq!(strip_superseded(&mut state), vec![0]);
         let after_first = contents(&state);
-        // Second pass finds a single surviving recap → nothing left to do.
-        assert_eq!(strip_superseded(&mut state), 0);
+        // Second pass finds a single surviving recap → nothing left to do, so
+        // nothing is reported and the caller performs no redundant save.
+        assert!(strip_superseded(&mut state).is_empty());
         assert_eq!(contents(&state), after_first);
     }
 
@@ -223,7 +251,7 @@ mod tests {
         state.messages.push(Message::new_tool_result("R1".to_owned(), None, vec![record]));
         state.messages.push(result_msg("R2", block("second")));
 
-        assert_eq!(strip_superseded(&mut state), 1);
+        assert_eq!(strip_superseded(&mut state), vec![0]);
 
         let first = state.messages.first().and_then(|m| m.tool_results.first()).expect("first result record");
         assert_eq!(first.content, STUB, "content collapses (the model's view)");
