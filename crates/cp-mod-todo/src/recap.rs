@@ -107,7 +107,7 @@ fn collapse(content: &str, budget: usize) -> (String, usize) {
 
 #[cfg(test)]
 mod tests {
-    use super::{RECAP_CLOSE, RECAP_OPEN, STUB, collapse};
+    use super::{RECAP_CLOSE, RECAP_OPEN, STUB, collapse, strip_superseded};
 
     /// Build a recap block with `body` inside the sentinels.
     fn block(body: &str) -> String {
@@ -152,5 +152,81 @@ mod tests {
         let (out, n) = collapse(&content, 0);
         assert_eq!(n, 0);
         assert_eq!(out, content);
+    }
+
+    // ── End-to-end over a real `State` ───────────────────────────────────
+    //
+    // The `collapse` tests above pin the string surgery; these pin the part
+    // that actually ships: walking `state.messages`, keeping the LAST recap
+    // across messages, and leaving `display` untouched.
+
+    use cp_base::state::data::message::{Message, ToolResultRecord};
+    use cp_base::state::runtime::State;
+
+    /// A tool-result message carrying one record whose content is `content`.
+    fn result_msg(id: &str, content: String) -> Message {
+        let record = ToolResultRecord::new(format!("{id}_use"), content, false);
+        Message::new_tool_result(id.to_owned(), None, vec![record])
+    }
+
+    /// The content of every tool-result record, in conversation order.
+    fn contents(state: &State) -> Vec<String> {
+        state.messages.iter().flat_map(|m| m.tool_results.iter()).map(|r| r.content.clone()).collect()
+    }
+
+    #[test]
+    fn strips_every_recap_but_the_last_across_messages() {
+        let mut state = State::default();
+        state.messages.push(result_msg("R1", format!("Todo applied.\n\n{}", block("first"))));
+        state.messages.push(result_msg("R2", format!("Todo applied.\n\n{}", block("second"))));
+        state.messages.push(result_msg("R3", format!("Todo applied.\n\n{}", block("third"))));
+
+        assert_eq!(strip_superseded(&mut state), 2);
+
+        let got = contents(&state);
+        let mut seen = got.iter();
+        // The two older recaps collapse; their "Todo applied." survives.
+        assert_eq!(seen.next(), Some(&format!("Todo applied.\n\n{STUB}")));
+        assert_eq!(seen.next(), Some(&format!("Todo applied.\n\n{STUB}")));
+        // The most recent one is the live tree — untouched.
+        assert_eq!(seen.next(), Some(&format!("Todo applied.\n\n{}", block("third"))));
+    }
+
+    #[test]
+    fn single_recap_is_left_alone() {
+        let mut state = State::default();
+        let only = format!("Todo applied.\n\n{}", block("only"));
+        state.messages.push(result_msg("R1", only.clone()));
+
+        assert_eq!(strip_superseded(&mut state), 0);
+        assert_eq!(contents(&state).first(), Some(&only));
+    }
+
+    #[test]
+    fn repeated_passes_are_idempotent() {
+        let mut state = State::default();
+        state.messages.push(result_msg("R1", block("first")));
+        state.messages.push(result_msg("R2", block("second")));
+
+        assert_eq!(strip_superseded(&mut state), 1);
+        let after_first = contents(&state);
+        // Second pass finds a single surviving recap → nothing left to do.
+        assert_eq!(strip_superseded(&mut state), 0);
+        assert_eq!(contents(&state), after_first);
+    }
+
+    #[test]
+    fn display_is_never_rewritten() {
+        let mut state = State::default();
+        let full = block("first");
+        let record = ToolResultRecord::new("u1".to_owned(), full.clone(), false).display(Some(full.clone()));
+        state.messages.push(Message::new_tool_result("R1".to_owned(), None, vec![record]));
+        state.messages.push(result_msg("R2", block("second")));
+
+        assert_eq!(strip_superseded(&mut state), 1);
+
+        let first = state.messages.first().and_then(|m| m.tool_results.first()).expect("first result record");
+        assert_eq!(first.content, STUB, "content collapses (the model's view)");
+        assert_eq!(first.display.as_deref(), Some(full.as_str()), "display keeps the human's scrollback");
     }
 }
