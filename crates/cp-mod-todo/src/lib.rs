@@ -15,7 +15,9 @@ pub mod tools;
 pub mod tree;
 /// Todo state types: `TodoItem`, `TodoStatus`, `TodoState`.
 pub mod types;
-/// Virtual-YAML render + diff-apply + reconcile (the `Todo` tool's core).
+/// Structured nested upsert — the `Todo` tool's core.
+pub mod upsert;
+/// Canonical YAML render of a thread's task tree (feeds the Todo panel).
 pub mod yaml;
 
 use types::{TodoState, TodoStatus};

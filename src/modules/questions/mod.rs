@@ -16,15 +16,23 @@ static CORE_TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 /// Module that provides the Think reasoning tool.
 pub(crate) struct QuestionsModule;
 
-/// The `Todo` tool's `diffs` item type: a `{prev, new}` search/replace edit
-/// applied to the virtual task YAML (the same paradigm as the `Edit` tool's
-/// `old_string`/`new_string`).
-fn todo_diff_object() -> ParamType {
+/// The `Todo` tool's `items` element type: one task to create or update, with
+/// optional nested `children` (creation-only — nesting alone sets the parent).
+///
+/// `children` is declared as a free-form array rather than a recursive
+/// `ParamType::Object` because the schema language has no self-reference; the
+/// executor parses it recursively and the tool description documents the shape.
+fn todo_item_object() -> ParamType {
     ParamType::Object(vec![
-        ToolParam::new("prev", ParamType::String).desc(
-            "Exact text to find in the current task YAML (must match exactly once; empty appends 'new' at the end). Prefer a tiny id-anchored anchor like 'X41: in_progress'.",
+        ToolParam::new("id", ParamType::String)
+            .desc("Existing task id to UPDATE (e.g. 'X41'). Omit to CREATE. Never allowed on a nested child."),
+        ToolParam::new("title", ParamType::String).desc("Task title. Required when creating; omit to leave untouched."),
+        ToolParam::new("description", ParamType::String).desc("Longer detail. Omit to leave untouched."),
+        ToolParam::new("status", ParamType::String)
+            .desc("One of: planned, in_progress, done, cancelled. Defaults to planned on create."),
+        ToolParam::new("children", ParamType::Array(Box::new(ParamType::Object(vec![])))).desc(
+            "Nested tasks CREATED under this one. Same fields as a parent item, minus `id` (nesting sets the parent).",
         ),
-        ToolParam::new("new", ParamType::String).desc("Replacement text"),
     ])
 }
 
@@ -62,9 +70,9 @@ impl Module for QuestionsModule {
                 .param("task_context", ParamType::String, false)
                 .build(),
             ToolDefinition::from_yaml("Todo", core_t)
-                .short_desc("Edit the task list via YAML diffs")
+                .short_desc("Upsert a nested list of tasks")
                 .category("Todo")
-                .param_array("diffs", todo_diff_object(), true)
+                .param_array("items", todo_item_object(), true)
                 .build(),
         ]
     }

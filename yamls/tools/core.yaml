@@ -36,36 +36,43 @@ tools:
 
   Todo:
     description: |
-      Edit the CURRENTLY FOCUSED thread's task list. Tasks are thread-owned, so this is rejected when no thread is focused — Read a thread first.
+      Upsert tasks on the CURRENTLY FOCUSED thread. Tasks are thread-owned, so this is rejected when no thread is focused — Read a thread first.
 
-      The task list is a virtual YAML document (also shown in the Todo panel). You edit it with `diffs`: an ordered list of `{prev, new}` search/replace edits — the SAME paradigm as the Edit tool's `old_string`/`new_string`. Each `prev` must match the current YAML EXACTLY ONCE; an empty `prev` appends `new` at the end. Diffs apply in order (a later diff sees earlier results). The whole call is ATOMIC: if any `prev` fails to match, NOTHING is applied. After applying, the tool echoes the fresh task tree — always check it to confirm the interpreted result.
+      You pass `items`: a list of tasks. Each one either UPDATES an existing task (it carries an `id`) or CREATES a new one (it does not). Nesting is how you express parenthood — there is no parent_id anywhere.
 
-      The YAML shape — each item's FIRST line is `- {id}: {status}` (the id is the mapping KEY, its value is the status), with `title`/`description`/`children` as sibling keys:
+        {"items": [
+          {"id": "X41", "status": "done"},
+          {"title": "Ship feature Y", "status": "in_progress",
+           "children": [
+             {"title": "Write the code"},
+             {"title": "Write the tests"}
+           ]}
+        ]}
 
-        - X41: in_progress
-          title: Ship feature X
-          description: |
-            Longer detail, if any.
-          children:
-            - X42: planned
-              title: Write code
+      Fields per item:
+      - `id` — existing task to update. OMIT IT TO CREATE. Ids are backend-assigned; never invent one.
+      - `title` — required when creating. On an update, omit it to leave the title untouched.
+      - `description` — longer detail. Omit to leave untouched.
+      - `status` — one of: planned, in_progress, done, cancelled. Defaults to planned on create.
+      - `children` — a nested list of tasks CREATED under this item.
 
-      PREFER SMALL, INLINE, ID-ANCHORED EDITS. Because the id opens each line, a status flip is a tiny self-anchoring edit that needs no surrounding context — this is the MOST ROBUST way to edit:
+      THE CALL MERGES — it never replaces. Tasks you don't mention are left exactly as they are, so you only ever send what actually changed. A status flip is one tiny item:
 
-        {"prev": "X42: planned", "new": "X42: done"}
+        {"items": [{"id": "X42", "status": "done"}]}
 
-      Anchor every `prev` on the `{id}: {status}` line (or a single `title:`/`description:` line), NOT on copied multi-line blocks — small anchored edits never break on indentation or neighbouring lines.
+      NESTED ITEMS ARE CREATION-ONLY. A child may never carry an `id`: its position in the payload is what sets its parent. To add subtasks to an existing task, write the parent with its `id` and put the new (id-less) children under it:
 
-      IMPORTANT — the Todo panel may be STALE. The panel (and any tree you were shown earlier) can lag the live state. Do NOT copy long stretches of it verbatim into `prev`. Anchor on the id line, keep edits tiny, and read the echoed tree after each call to see the true current state.
+        {"items": [{"id": "X41", "children": [{"title": "Late-discovered subtask"}]}]}
 
-      Rules:
-      - CREATE an item by writing a new block and OMITTING its `{id}: {status}` line — instead give `title` (required) and optionally `status:` (defaults to planned). The backend assigns the next id and echoes it back.
-      - UPDATE an item's status with the tiny inline edit `{"prev":"X41: in_progress","new":"X41: done"}`. Update its title/description by editing that field line.
-      - REPARENT / NEST by moving an item's block under another item's `children:` list.
-      - REORDER siblings by moving their blocks — sibling order is positional (top to bottom).
-      - DELETE an item by removing its block: it is SOFT-CANCELLED (recoverable, sorted last in its group), never hard-deleted.
-      - `status` is one of: planned, in_progress, done, cancelled.
+      DELETING is an explicit `{"id": "X41", "status": "cancelled"}` — a cancelled task is soft-deleted (hidden, recoverable, sorted last), never hard-removed. Omitting a task NEVER deletes it.
+
+      The whole call is ATOMIC and validated first: a nested `id`, an `id` that doesn't exist on this thread, a repeated `id`, a create with no `title`, or a bad `status` rejects the ENTIRE call and changes nothing — the error names every problem at once. After applying, the tool echoes the fresh task tree; check it to confirm the interpreted result.
+
+      Reparenting and reordering existing tasks are not supported — create the task where you want it.
     parameters:
-      diffs: "Ordered list of {prev, new} search/replace edits applied to the task YAML."
-      prev: "Exact text to find in the current task YAML (matches exactly once; empty appends 'new' at the end). Prefer a tiny id-anchored anchor like 'X41: in_progress'."
-      new: "Replacement text."
+      items: "List of tasks to create or update. An item with `id` updates it; an item without `id` creates it. Nested `children` are always created under their parent."
+      id: "Existing task id to UPDATE (e.g. 'X41'). Omit to CREATE. Never allowed on a nested child."
+      title: "Task title. Required when creating; omit to leave untouched."
+      description: "Longer detail. Omit to leave untouched."
+      status: "One of: planned, in_progress, done, cancelled. Defaults to planned on create."
+      children: "Nested tasks CREATED under this one. Same fields as a parent item, minus `id` (nesting sets the parent)."
