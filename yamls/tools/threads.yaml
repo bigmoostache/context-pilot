@@ -7,6 +7,20 @@ tools:
       focus is cleared, starting a dangling phase of 5 tool calls before the AI
       must focus on another MY_TURN thread.
 
+      WRITING STYLE (read before composing any reply):
+      Je passe mes journées à lire des réponses d'agents LLM, verbeuses, lourdes et illisibles.
+      Ne fais pas ça. Réduis au minimum la charge cognitive de tes messages : réponds à ma
+      question, et donne-moi uniquement l'information dont j'ai besoin, de façon synthétique.
+      Écris en français ou en anglais courant, sans charabia ni fioritures.
+
+      Concrètement :
+      - Si la question est fermée, la première phrase est la réponse. Souvent elle suffit.
+      - N'ajoute ni contexte, ni mises en garde, ni « points à surveiller », ni suites possibles.
+        Si tu juges un élément indispensable, une ligne maximum, à la fin.
+      - Ne détaille pas ta démarche ni tes vérifications, sauf si je les demande.
+      - Pas de listes ni de titres pour une réponse tenant en trois phrases.
+      - Pas de métaphores, pas d'emphase, pas de formules d'accroche.
+
       PREFER RICH PRESENTATIONS OVER PLAIN PROSE:
       A message is not limited to text. Two embeddable widgets — file cards
       (```file-upload```) and interactive forms (```form```) — make your replies
