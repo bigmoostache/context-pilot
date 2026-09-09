@@ -124,13 +124,11 @@ pub(super) fn execute_todo(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     match apply_todo_upsert(items_val, state) {
-        Ok(annex) => {
-            let body = if annex.trim().is_empty() {
-                "Todo applied \u{2014} the task list is now empty.".to_owned()
-            } else {
-                format!("Todo applied. Current tasks:\n\n{}", annex.trim_end())
-            };
-            let mut result = ToolResult::new(tool.id.clone(), body, false);
+        Ok(recap) => {
+            // "Todo applied." sits OUTSIDE the tagged block deliberately: it is
+            // the durable confirmation the call succeeded, and it survives when
+            // the stripper later collapses this (by then superseded) recap.
+            let mut result = ToolResult::new(tool.id.clone(), format!("Todo applied.\n\n{recap}"), false);
             result.preserves_tempo = true; // FR8 — structural edits preserve tempo
             result
         }

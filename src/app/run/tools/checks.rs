@@ -56,6 +56,31 @@ pub(crate) fn check_deferred_sleep(app: &mut App, tx: &Sender<StreamEvent>) {
 // `cp-mod-threads` (`FocusState`) and `cp-mod-todo` (`TodoState`), which never
 // import each other (design §8 dependency-injection rule).
 
+/// Collapse every superseded task recap in the live conversation, keeping only
+/// the most recent one (the actual work lives in `cp_mod_todo::recap`, beside
+/// the block's producer).
+///
+/// Gated on two conditions, both load-bearing:
+///
+///   * **Queue idle.** While the queue intercepts, a batch is still forming and
+///     the conversation is mid-construction — leave it alone.
+///   * **Tempo already broken.** Rewriting old messages mutates the conversation
+///     *prefix*, invalidating the LLM prompt cache from the earliest edited
+///     message onward. On a tempo-preserving tick that cost would be gratuitous;
+///     on a tempo-breaking tick the cache is dropped anyway, so the strip rides
+///     along for free. Do not relax this without understanding the trade.
+///
+/// The caller runs this *after* the tempo break so `state.tempo` is final.
+pub(crate) fn strip_superseded_recaps(app: &mut App) {
+    if cp_mod_queue::types::QueueState::get(&app.state).active || app.state.tempo {
+        return;
+    }
+    let stripped = cp_mod_todo::recap::strip_superseded(&mut app.state);
+    if stripped > 0 {
+        log::debug!("todo recap: collapsed {stripped} superseded task recap(s)");
+    }
+}
+
 /// Push the focused thread id onto `TodoState` so the Todo panel scopes to it.
 ///
 /// When focus changed, the panel's previous content is stale (it pointed at the
