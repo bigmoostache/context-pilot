@@ -35,6 +35,16 @@ understands can be added the same way.
 | `CP_SEED_ADMIN_EMAIL` + `_PASSWORD` | no | The customer's top account. A superadmin can create it later from the cockpit. |
 | `ANTHROPIC_API_KEY`, `BRAVE_API_KEY`, … | no | Without a model provider key the cockpit works but no agent can answer. |
 
+The complete list — every variable, its type, default and the combinations
+the orchestrator rejects — is the generated reference
+[`docs/ENV.md`](../../docs/ENV.md). The container validates its environment
+strictly at boot and refuses to start on any problem, naming each offending
+variable; to see the report without starting anything:
+
+```sh
+docker compose run --rm context-pilot --check-env
+```
+
 Accounts are seeded **only while the user table is empty**, exactly as on the
 appliance; after that the values are ignored, so leaving them in `.env` is safe.
 Omitting the superadmin on the first boot is **not reversible** — only a

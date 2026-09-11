@@ -241,11 +241,10 @@ The existing ticket mechanism (mint → redeem single-use token for SSE upgrade)
 
 ## §8 — Configuration
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `CP_AUTH_ENABLED` | `false` | Master switch — enables the auth middleware and login requirement |
-| `CP_SESSION_TTL_SECS` | `2592000` (30 days) | Session lifetime before expiry |
-| `CP_AUTH_DB` | `~/.context-pilot/orchestrator/auth.db` | Path to the auth SQLite database (orchestrator-level, NOT in agents_dir) |
+The auth variables (`CP_AUTH_ENABLED`, `CP_SESSION_TTL_SECS`, `CP_AUTH_DB`,
+the `CP_SEED_*` family) are declared with every other environment variable in
+the generated reference [`ENV.md`](ENV.md) — defaults, types and the
+cross-variable rules the orchestrator enforces at boot live there.
 
 ---
 

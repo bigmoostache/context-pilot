@@ -14,6 +14,9 @@ publish = false
 cp-wire = { path = "../cp-wire", features = ["openapi"] }
 cp-oplog = { path = "../cp-oplog" }
 cp-vault = { path = "../cp-vault" }
+# The declarative environment table: every variable the orchestrator reads is
+# validated once at boot (`cp_env::load`) and read through `cp_env::env()`.
+cp-env.workspace = true
 dotenvy = "0.15"
 # Shared config — central API-key + settings store at
 # ~/.config/context-pilot/config.json. The cockpit writes provider keys and
