@@ -16,6 +16,7 @@ use argon2 as _;
 use base64 as _;
 use calamine as _;
 use cp_base as _;
+use cp_env::model::features::Feature;
 use cp_env::spec::Target;
 #[cfg(test)]
 use cp_mod_bridge as _;
@@ -87,14 +88,20 @@ fn main() -> ExitCode {
 
     // Keep every Claude OAuth account (active + stored) auto-refreshed, so a
     // token never expires from under the fleet regardless of any open UI.
-    let _oauth_sweeper = Runtime::start_oauth_sweeper();
+    // Only where the subscription is offered at all (CP_FEATURE_CLAUDE_OAUTH).
+    let flags = cp_env::env().features;
+    if flags.is_on(Feature::ClaudeOauth) {
+        let _oauth_sweeper = Runtime::start_oauth_sweeper();
+    }
 
     // Health-gated commit of a staged update (update-policy §5.5): a committer
     // thread polls our own `/healthz` and, only after a real `200` within the
     // deadline, commits the binary swap and promotes the release state
     // (`active_tag`, agent binary). If the probe never turns healthy, the
     // rollback markers stay and the next boot's `boot_check` self-heals.
-    if let Some(install) = install_path {
+    // Both only where the updater is part of the deployment (CP_FEATURE_UPDATER):
+    // a container is updated by pulling a new image, never in place.
+    if let Some(install) = install_path.filter(|_path| flags.is_on(Feature::Updater)) {
         let _committer = runtime.start_update_committer(install.clone());
         // Auto-update scheduler (O4.2): boot poll + nightly-window applies.
         let _scheduler = runtime.start_update_scheduler(install);

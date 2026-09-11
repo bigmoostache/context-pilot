@@ -11,6 +11,7 @@ import type {
   AuthStatus,
   AuthUser,
   CreateUserResponse,
+  Features,
   ForceLogoutResponse,
   OkResponse,
   RegisterResponse,
@@ -25,6 +26,7 @@ import {
   getApiAuthSessions,
   getApiAuthStatus,
   getApiAuthUsers,
+  getApiFeatures,
   getApiSettings,
   patchApiAgentByIdAclByUserId,
   patchApiAuthMe,
@@ -41,12 +43,26 @@ import { sdk } from "./client"
 
 // ── Type re-exports (preserve import surface) ────────────────────────
 
-export type { AuthUser, AuthMe, AclEntry, AuthStatus, AppSettings } from "./generated/types.gen"
+export type {
+  AuthUser,
+  AuthMe,
+  AclEntry,
+  AuthStatus,
+  AppSettings,
+  Features,
+} from "./generated/types.gen"
 
 // ── Auth status ──────────────────────────────────────────────────────
 
 export function fetchAuthStatus(): Promise<AuthStatus> {
   return sdk(getApiAuthStatus())
+}
+
+// ── Feature flags ────────────────────────────────────────────────────
+
+/** The deployment's feature flags (`CP_FEATURE_*`; public, pre-login). */
+export function fetchFeatures(): Promise<Features> {
+  return sdk(getApiFeatures())
 }
 
 // ── Auth actions ─────────────────────────────────────────────────────

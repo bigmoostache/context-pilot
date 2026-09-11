@@ -12,6 +12,7 @@ import { AuthGuard } from "@/components/auth/AuthGuard"
 import { ThemeProvider } from "@/lib/providers/ThemeProvider"
 import { AccountProvider } from "@/lib/providers/AccountProvider"
 import { AuthProvider } from "@/lib/providers/AuthProvider"
+import { FeaturesProvider } from "@/lib/providers/toggles/FeaturesProvider"
 import { DevModeProvider } from "@/lib/providers/toggles/DevModeProvider"
 import { ShowOverlayProvider } from "@/lib/providers/toggles/ShowOverlayProvider"
 import { AsideDefaultProvider } from "@/lib/providers/toggles/AsideDefaultProvider"
@@ -24,30 +25,29 @@ import "@/App.css"
 
 /**
  * Desktop component-tree root — the mirror twin of `mobile-components/Root`.
- *
- * Mounts the global contexts (theme, auth, account, dev-mode) + the tooltip
- * layer above {@link AppShell}. AuthGuard shows the login page and drives the
- * backend `next_action` post-login flow (design §13.4). A **provider-contract
- * boundary** (design §11.8): any divergent mobile `Root` must mount the same
- * providers, or mobile children consuming these contexts break.
+ * Mounts the global contexts (theme, auth, flags, account, dev-mode) + the
+ * tooltip layer above {@link AppShell}; AuthGuard drives login + `next_action`
+ * (§13.4). Provider-contract boundary (§11.8): mobile `Root` mounts the same set.
  */
 function Root() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <AccountProvider>
-          <DevModeProvider>
-            <ShowOverlayProvider>
-              <AsideDefaultProvider>
-                <TooltipProvider delay={350} closeDelay={80}>
-                  <AuthGuard>
-                    <AppShell />
-                  </AuthGuard>
-                </TooltipProvider>
-              </AsideDefaultProvider>
-            </ShowOverlayProvider>
-          </DevModeProvider>
-        </AccountProvider>
+        <FeaturesProvider>
+          <AccountProvider>
+            <DevModeProvider>
+              <ShowOverlayProvider>
+                <AsideDefaultProvider>
+                  <TooltipProvider delay={350} closeDelay={80}>
+                    <AuthGuard>
+                      <AppShell />
+                    </AuthGuard>
+                  </TooltipProvider>
+                </AsideDefaultProvider>
+              </ShowOverlayProvider>
+            </DevModeProvider>
+          </AccountProvider>
+        </FeaturesProvider>
       </AuthProvider>
     </ThemeProvider>
   )

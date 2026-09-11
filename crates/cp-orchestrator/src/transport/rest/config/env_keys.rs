@@ -86,6 +86,9 @@ pub(crate) fn env_key_reveal(name: &str, auth_user: Option<&User>) -> HttpReply 
 /// `~/.context-pilot/.env` and stores an in-memory override for immediate
 /// visibility.
 pub(crate) fn env_key_update(name: &str, auth_user: Option<&User>, body: &str) -> HttpReply {
+    if !super::features::features().is_on(cp_env::model::features::Feature::KeysEditable) {
+        return HttpReply::error(403, "provider keys are read-only on this deployment (CP_FEATURE_KEYS_EDITABLE=0)");
+    }
     if auth_user.is_some_and(|u| !u.can_manage_secrets()) {
         return HttpReply::error(403, "superadmin required");
     }

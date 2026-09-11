@@ -66,6 +66,21 @@ mod tests {
         assert!(unknown.is_empty(), "names missing from crates/cp-env/src/specs/:\n{}", unknown.join("\n"));
     }
 
+    /// A deployment profile spells out every flag: the binary's defaults are
+    /// not a deployment decision (`docs/ENV.md`).
+    #[test]
+    fn deployment_profiles_set_every_flag() {
+        let profiles =
+            [("deploy/ansible/templates/context-pilot.service.j2", "Environment="), ("deploy/docker/Dockerfile", "")];
+        for (surface, prefix) in profiles {
+            let text = read(surface);
+            for name in cp_env::render::profile_explicit_names() {
+                let needle = format!("{prefix}{name}=");
+                assert!(text.contains(&needle), "{surface} does not set {name}");
+            }
+        }
+    }
+
     /// The committed reference must match the table.
     #[test]
     fn env_md_is_up_to_date() {

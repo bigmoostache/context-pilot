@@ -25,6 +25,7 @@ pub(super) fn paths() -> Value {
         "/api/health": get("health", "Health check", json!({
             "type": "object", "properties": { "status": { "type": "string" } }
         })),
+        "/api/features": get("features", "Effective feature flags (public, pre-login; CP_FEATURE_* in docs/ENV.md)", r("Features")),
         "/api/providers": json!({ "get": {
             "tags": ["providers"],
             "summary": "LLM provider + model registry (usable providers only; ?allowed=1 applies the org model allowlist)",

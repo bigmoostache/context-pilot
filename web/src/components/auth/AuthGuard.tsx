@@ -14,6 +14,7 @@
 
 import { type ReactNode } from "react"
 import { useAuth } from "@/lib/providers/auth"
+import { useFeaturesLoaded } from "@/lib/providers/toggles/features"
 import { LoginPage } from "./LoginPage"
 import { Onboarding } from "./Onboarding"
 import { ForcePasswordChange } from "./ForcePasswordChange"
@@ -21,9 +22,12 @@ import { DayZeroSetup } from "./DayZeroSetup"
 
 export function AuthGuard({ children }: { children: ReactNode }) {
   const { authEnabled, user, loading, refreshMe } = useAuth()
+  // The deployment's feature flags gate whole surfaces (panes, the Claude
+  // subscription); wait for them too, so nothing gated ever flashes.
+  const featuresLoaded = useFeaturesLoaded()
 
-  // Still checking backend status / validating token.
-  if (loading || authEnabled === null) {
+  // Still checking backend status / validating token / fetching the flags.
+  if (loading || authEnabled === null || !featuresLoaded) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background">
         <div className="animate-pulse font-mono text-sm text-muted-foreground">
