@@ -142,7 +142,7 @@ A single resource is owned by exactly one plane, so the two never fight over fre
 
 ## 5. The bridge (how an agent joins a fleet)
 
-The agent ↔ orchestrator coupling lives in `crates/cp-mod-bridge`, an **additive, gated** module: with `CP_BRIDGE=1` it activates at boot; otherwise it is behaviorally inert. On boot it:
+The agent ↔ orchestrator coupling lives in `crates/cp-mod-bridge`, an **additive, gated** module: with `CP_BRIDGE=1` it activates at boot; otherwise it is behaviorally inert. (Every environment variable either binary reads — this one included — is declared in `crates/cp-env` and documented in [`docs/ENV.md`](docs/ENV.md); both binaries validate their environment strictly at boot, and `--check-env` prints the report.) On boot it:
 
 1. takes an exclusive lock on the realm (`bridge.lock`),
 2. spawns the oplog writer service,
