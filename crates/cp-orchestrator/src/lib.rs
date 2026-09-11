@@ -82,6 +82,7 @@ use openssl as _;
 
 // `dotenvy` loads `.env` files in the binary's `main()` — the lib half never
 // calls it directly, so the per-target lint needs this acknowledgement.
+use cp_env as _;
 use dotenvy as _;
 
 // `cp-mod-bridge` is a dev-dependency the `tests/registry_channel.rs` integration

@@ -29,8 +29,7 @@ struct AccountsFile {
 
 /// Absolute path to `~/.context-pilot/claude-accounts.json`.
 fn accounts_path() -> std::path::PathBuf {
-    let home = std::env::var("HOME").unwrap_or_default();
-    std::path::Path::new(&home).join(".context-pilot").join(ACCOUNTS_FILE)
+    cp_env::env().core.home.join(".context-pilot").join(ACCOUNTS_FILE)
 }
 
 /// Load the accounts vault, returning an empty store on any read/parse error.

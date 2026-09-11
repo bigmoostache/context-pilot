@@ -11,6 +11,7 @@ readme.workspace = true
 publish = false
 
 [dependencies]
+cp-env.workspace = true
 cp-base.workspace = true
 cp-vault = { path = "../cp-vault" }
 cp-render.workspace = true

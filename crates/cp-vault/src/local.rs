@@ -12,8 +12,8 @@ use std::sync::RwLock;
 
 use crate::dotenv;
 use crate::oauth;
-use crate::registry::{ALL_KEYS, AuthMechanism, KeyCategory, KeyDefinition, resolve_definition};
 use crate::types::{KeyStatus, SecretString, Vault, VaultError};
+use cp_env::specs::secrets::{ALL_KEYS, AuthMechanism, KeyCategory, KeyDefinition, resolve_definition};
 
 /// Standalone vault backend — resolves from env vars, overrides, and Keychain.
 #[derive(Debug)]

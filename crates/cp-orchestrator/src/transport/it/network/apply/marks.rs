@@ -31,7 +31,7 @@ pub(in crate::transport::it::network) const STEP_UPLINK_ENV: &str = "uplink_env"
 /// repeats are skipped. That is intended: only the backend writes system network
 /// config, so a human's `nmcli` edit is reverted at the next apply or boot.
 pub(super) fn applied_marker() -> PathBuf {
-    std::env::var_os("CP_NETWORK_APPLIED").map_or_else(|| PathBuf::from("/run/cp-network-applied"), PathBuf::from)
+    cp_env::env().appliance.network_applied.clone()
 }
 
 /// Hex SHA-256 of anything serialisable — secrets included, so a PSK change with

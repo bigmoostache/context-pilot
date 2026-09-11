@@ -112,6 +112,18 @@ pub(super) fn transport() -> Value {
             },
             "required": ["enabled"]
         },
+        "Features": {
+            "type": "object",
+            "properties": {
+                "claude_oauth": { "type": "boolean" },
+                "day0_setup": { "type": "boolean" },
+                "it_pane": { "type": "boolean" },
+                "updater": { "type": "boolean" },
+                "keys_editable": { "type": "boolean" },
+                "onboarding": { "type": "boolean" }
+            },
+            "required": ["claude_oauth", "day0_setup", "it_pane", "updater", "keys_editable", "onboarding"]
+        },
         "AuthUser": {
             "type": "object",
             "properties": {

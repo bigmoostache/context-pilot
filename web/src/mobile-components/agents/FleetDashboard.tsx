@@ -19,6 +19,7 @@ import { useElementHeight } from "@/lib/live/useElementHeight"
 import { accentVar, fmtCost, FLEET_MAX_W } from "@/lib/support/panelMeta"
 import { useMetrics, useRetireAgent, useAgentMeta, useCreateAgent } from "@/lib/live"
 import { avatarUrl } from "@/lib/api"
+import { useFeatures } from "@/lib/providers/toggles/features"
 import type { Agent, AgentStatus } from "@/lib/types"
 import { cn, prefersReducedMotion } from "@/lib/utils"
 import { useSwipeRow } from "@/lib/live/useSwipeRow"
@@ -68,6 +69,8 @@ export function FleetDashboard({
   // mobile home's Anthropic-usage door; token status, rate-limit bars, stored
   // accounts, login), styled like the rest of the app, NOT a config dialog.
   const [usageOpen, setUsageOpen] = useState(false)
+  // Only where the deployment offers the Claude subscription (CP_FEATURE_CLAUDE_OAUTH).
+  const claudeOffered = useFeatures().claude_oauth
   const createAgent = useCreateAgent()
   const inputRef = useRef<HTMLInputElement>(null)
   // Floating glass bottom bar (T637): reserve a 1.5× spacer sized from its
@@ -135,9 +138,11 @@ export function FleetDashboard({
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       {/* App-wide top-right glass CornerButton — opens the Claude usage page. */}
-      <CornerButton side="right" label="Claude usage" onClick={() => setUsageOpen(true)}>
-        <Settings />
-      </CornerButton>
+      {claudeOffered && (
+        <CornerButton side="right" label="Claude usage" onClick={() => setUsageOpen(true)}>
+          <Settings />
+        </CornerButton>
+      )}
 
       <ScrollArea className="min-h-0 flex-1 bg-background">
         <div className={cn("mx-auto flex w-full flex-col", FLEET_MAX_W)}>
@@ -192,7 +197,7 @@ export function FleetDashboard({
 
       {/* Standalone Claude usage page — the mobile equivalent of the desktop
           header Anthropic usage popover (T646), as a full-screen page. */}
-      {usageOpen && <ClaudeUsagePage onClose={() => setUsageOpen(false)} />}
+      {claudeOffered && usageOpen && <ClaudeUsagePage onClose={() => setUsageOpen(false)} />}
     </div>
   )
 }

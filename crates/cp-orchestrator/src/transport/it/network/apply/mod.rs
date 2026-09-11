@@ -85,24 +85,26 @@ pub(crate) const METRIC_PREFERRED: u32 = 50;
 pub(crate) const METRIC_STANDBY: u32 = 700;
 
 /// The ethernet uplink port. `end0` on the Photonicat 2; the drop-in path in
-/// [`routes`] is derived from it, so an override must match reality.
+/// [`routes`] is derived from it, so an override (`CP_WAN_IFACE`) must match
+/// reality.
 pub(crate) fn wan_iface() -> String {
-    std::env::var("CP_WAN_IFACE").unwrap_or_else(|_unset| "end0".to_owned())
+    cp_env::env().appliance.wan_iface.clone()
 }
 
 /// The AP radio — `wlp1s0`, the ath11k (Wi-Fi 6, 6 GHz-capable, 23–30 dBm).
 /// `wlan0` (aic8800) is deliberately left free for a future Wi-Fi client
-/// uplink; do not consume it.
+/// uplink; do not consume it. Override: `CP_AP_IFACE`.
 pub(crate) fn ap_device() -> String {
-    std::env::var("CP_AP_IFACE").unwrap_or_else(|_unset| "wlp1s0".to_owned())
+    cp_env::env().appliance.ap_iface.clone()
 }
 
 /// The modem's `NetworkManager` device: the QMI **control** port `cdc-wdm0`, not
 /// the net port. NM drives the modem through `ModemManager` on the control port
 /// and applies the resulting IP config to `wwu1u1i4` itself, which is not an NM
 /// device at all — MEASURED: `nmcli device status` lists `cdc-wdm0  gsm`.
+/// Override: `CP_WWAN_DEV`.
 pub(crate) fn wwan_device() -> String {
-    std::env::var("CP_WWAN_DEV").unwrap_or_else(|_unset| "cdc-wdm0".to_owned())
+    cp_env::env().appliance.wwan_dev.clone()
 }
 
 /// Whether this box physically carries a 5G modem.
@@ -125,8 +127,8 @@ pub(crate) fn wwan_device() -> String {
 ///   there is no hardware to protect, and the env gate already guarantees
 ///   nothing is applied.
 pub(crate) fn modem_present() -> bool {
-    if let Some(forced) = std::env::var_os("CP_WWAN_PRESENT") {
-        return forced == "1";
+    if let Some(forced) = cp_env::env().appliance.wwan_present {
+        return forced;
     }
     if nmcli_bin().is_none() {
         return true;
@@ -135,17 +137,20 @@ pub(crate) fn modem_present() -> bool {
     entry_starting_with("/sys/class/usbmisc", "cdc-wdm") || entry_starting_with("/sys/class/net", "ww")
 }
 
-/// `nmcli`'s path, **only if that path exists**.
+/// `nmcli`'s path, the gate the whole applier hangs off.
 ///
-/// The whole applier hangs off this one answer, so it is the one place the
-/// distinction is made. Checking the file rather than the variable matters:
-/// `context-pilot.service.j2` templates `CP_NMCLI_BIN` onto every box, including
-/// one deployed with `net_enabled=false` where `NetworkManager` was never
-/// installed. Believing the variable there meant every `nmcli` spawn failed,
-/// every apply returned `Err`, and every network POST answered `502` forever.
+/// Presence is decided at boot: `CP_NMCLI_BIN` is only accepted when it names
+/// an executable file, so the variable being set IS the tool being there. That
+/// closes the old failure where the unit templated the variable onto a box
+/// without `NetworkManager`, every spawn failed, and every network POST
+/// answered `502` forever — such a box now refuses to boot with the path named.
 fn nmcli_bin() -> Option<OsString> {
-    let bin = std::env::var_os("CP_NMCLI_BIN")?;
-    Path::new(&bin).exists().then_some(bin)
+    cp_env::env().appliance.nmcli_bin.as_deref().map(os_string)
+}
+
+/// A tool path as the `OsString` the spawn helpers take.
+fn os_string(path: &Path) -> OsString {
+    path.as_os_str().to_owned()
 }
 
 /// Whether `dir` holds an entry whose name starts with `prefix`.
@@ -181,19 +186,26 @@ pub(crate) struct Tools {
 }
 
 impl Tools {
-    /// Resolve the gates, or `None` when this environment has no usable `nmcli`
-    /// — i.e. local dev, every unit test, and a box provisioned with
-    /// `net_enabled=false` (see the module doc on what "inert" means).
+    /// Resolve the gates from the validated environment, or `None` when this
+    /// environment has no `nmcli` — i.e. local dev, every unit test, and a box
+    /// provisioned with `net_enabled=false` (see the module doc on what
+    /// "inert" means).
     pub(crate) fn resolve() -> Option<Self> {
+        Self::from_appliance(&cp_env::env().appliance)
+    }
+
+    /// The gates of one appliance configuration (the testable half of
+    /// [`Self::resolve`]).
+    pub(crate) fn from_appliance(appliance: &cp_env::model::appliance::Appliance) -> Option<Self> {
         Some(Self {
-            nmcli: nmcli_bin()?,
-            iw: std::env::var_os("CP_IW_BIN"),
-            networkctl: std::env::var_os("CP_NETWORKCTL_BIN"),
-            systemctl: std::env::var_os("CP_SYSTEMCTL_BIN"),
-            nft: std::env::var_os("CP_NFT_BIN"),
-            regdom: std::env::var_os("CP_REGDOM_BIN"),
-            networkd_dir: std::env::var_os("CP_NETWORKD_DIR").map(PathBuf::from),
-            uplink_env: std::env::var_os("CP_UPLINK_ENV").map(PathBuf::from),
+            nmcli: appliance.nmcli_bin.as_deref().map(os_string)?,
+            iw: appliance.iw_bin.as_deref().map(os_string),
+            networkctl: appliance.networkctl_bin.as_deref().map(os_string),
+            systemctl: appliance.systemctl_bin.as_deref().map(os_string),
+            nft: appliance.nft_bin.as_deref().map(os_string),
+            regdom: appliance.regdom_bin.as_deref().map(os_string),
+            networkd_dir: appliance.networkd_dir.clone(),
+            uplink_env: appliance.uplink_env.clone(),
         })
     }
 }

@@ -13,6 +13,7 @@ import {
 } from "@/lib/api"
 import type { ClaudeAccountSummary } from "@/lib/api/generated/types.gen"
 import { resetProviderCache } from "@/lib/support/models"
+import { useFeatures } from "@/lib/providers/toggles/features"
 
 // ── Claude Code usage/token orchestration (shared logic) ─────────────
 //
@@ -59,6 +60,9 @@ export interface ClaudeUsage {
  */
 export function useClaudeUsage(polling = true): ClaudeUsage {
   const queryClient = useQueryClient()
+  // Where the deployment does not offer the subscription (CP_FEATURE_CLAUDE_OAUTH=0)
+  // the routes answer 404: never poll them, the surfaces stay "not signed in".
+  const { claude_oauth: offered } = useFeatures()
 
   // A token change can flip the OAuth providers between usable and not, so every
   // token-affecting success must also refresh the provider registry — drop the
@@ -81,6 +85,7 @@ export function useClaudeUsage(polling = true): ClaudeUsage {
   const tokenStatus = useQuery({
     queryKey: ["claude-token-status"],
     queryFn: fetchClaudeTokenStatus,
+    enabled: offered,
     refetchInterval: interval,
     staleTime: 10_000,
     retry: 1,
@@ -90,7 +95,7 @@ export function useClaudeUsage(polling = true): ClaudeUsage {
     queryKey: ["claude-usage"],
     queryFn: fetchClaudeUsage,
     // Only poll usage while the token is valid — feeds the bars + indicator.
-    enabled: tokenStatus.data?.valid === true,
+    enabled: offered && tokenStatus.data?.valid === true,
     refetchInterval: interval,
     staleTime: 10_000,
     retry: 1,
@@ -156,10 +161,12 @@ export interface ClaudeAccounts {
  */
 export function useClaudeAccounts(onSwitched: () => void): ClaudeAccounts {
   const queryClient = useQueryClient()
+  const { claude_oauth: offered } = useFeatures()
 
   const accountsQuery = useQuery({
     queryKey: ["claude-accounts"],
     queryFn: fetchClaudeAccounts,
+    enabled: offered,
     staleTime: 10_000,
     retry: 1,
   })

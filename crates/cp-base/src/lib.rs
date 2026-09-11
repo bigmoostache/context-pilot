@@ -60,7 +60,7 @@ pub mod flame {
     /// Result is cached after the first call — zero overhead on subsequent checks.
     #[inline]
     pub fn is_enabled() -> bool {
-        *ENABLED.get_or_init(|| std::env::var("CP_FLAMEGRAPH").is_ok_and(|v| v == "1" || v == "true"))
+        *ENABLED.get_or_init(|| cp_env::env().dev.flamegraph)
     }
 
     /// Initialize the flame writer. Call once at startup.

@@ -20,6 +20,7 @@ pub(crate) use acl::{
 };
 pub(crate) use users::{create_user, delete_user, force_logout_user, list_users};
 
+use cp_env::model::features::{Feature, Features};
 use std::sync::Mutex;
 
 use super::Backend;
@@ -93,7 +94,9 @@ pub(crate) fn authenticate(
 fn is_public_route(segments: &[&str]) -> bool {
     matches!(
         segments,
-        ["api", "health" | "stream"] | ["api", "auth", "login" | "register" | "status"] | ["api", "agent", _, "avatar"]
+        ["api", "health" | "stream" | "features"]
+            | ["api", "auth", "login" | "register" | "status"]
+            | ["api", "agent", _, "avatar"]
     )
 }
 
@@ -247,32 +250,38 @@ pub(crate) fn logout(state: &Mutex<Backend>, auth_token: Option<&str>) -> HttpRe
 
 /// `GET /api/auth/me` — the serialized [`User`] plus a backend-driven
 /// `next_action` (FR-07): `change_password` / `set_identity` (day-0) /
-/// `onboarding` / `ready`. `me` reads the durable provisioning flag (state the
-/// [`User`] doesn't carry) and threads it into [`next_action`]. The middleware
-/// guarantees `auth_user` is `Some` when auth is enabled.
+/// `onboarding` / `ready`, from the durable provisioning flag and the
+/// deployment's flags. The middleware guarantees `auth_user` when auth is on.
 pub(crate) fn me(state: &Mutex<Backend>, auth_user: Option<&User>) -> HttpReply {
+    me_with(state, auth_user, super::rest::features())
+}
+
+/// [`me`] with the flags threaded in — the testable half (any environment).
+pub(crate) fn me_with(state: &Mutex<Backend>, auth_user: Option<&User>, flags: Features) -> HttpReply {
     let Some(user) = auth_user else {
         return HttpReply::error(501, "auth not enabled");
     };
     let provisioned = state.lock().is_ok_and(|b| crate::transport::it::is_provisioned(&b.provision_flag_path));
     let mut value = serde_json::to_value(user).unwrap_or_default();
     if let Some(obj) = value.as_object_mut() {
-        drop(obj.insert("next_action".to_owned(), next_action(user, provisioned).into()));
+        drop(obj.insert("next_action".to_owned(), next_action(user, provisioned, flags).into()));
     }
     HttpReply::ok(&value)
 }
 
 /// Decide the post-login step the frontend should render for `user`, given the
-/// box's `provisioned` state. Order (mirrors the web `AuthGuard`): password
-/// rotation → day-0 identity/provisioning → first-run onboarding → the app.
-fn next_action(user: &User, provisioned: bool) -> &'static str {
+/// box's `provisioned` state and the deployment's flags. Order (mirrors the web
+/// `AuthGuard`): password rotation → day-0 identity/provisioning (only when
+/// `CP_FEATURE_DAY0_SETUP` is on) → first-run onboarding (only when
+/// `CP_FEATURE_ONBOARDING` is on) → the app.
+fn next_action(user: &User, provisioned: bool, flags: Features) -> &'static str {
     if user.must_change_password {
         "change_password"
-    } else if user.can_manage_it() && !provisioned {
+    } else if user.can_manage_it() && flags.is_on(Feature::Day0Setup) && !provisioned {
         // Day-0 (design §13.4): an IT operator names the unprovisioned box, which
         // provisions it and brings the private-CA `:443` cockpit up (CA download too).
         "set_identity"
-    } else if user.can_manage_users() && !super::rest::onboarding_completed() {
+    } else if user.can_manage_users() && flags.is_on(Feature::Onboarding) && !super::rest::onboarding_completed() {
         // First-run product/org onboarding — the client-management tier's setup.
         "onboarding"
     } else {
@@ -468,7 +477,9 @@ mod tests {
     fn me_next_action_day0_walk_and_capability_scope() {
         let (state, _dir) = backend(false); // me() ignores access_control; needs the flag path
         let flag_path = state.lock().expect("lock").provision_flag_path.clone();
-        let na = |u: &User| me(&state, Some(u)).body;
+        // The day-0 step exists only where the deployment enables it.
+        let day0 = Features::default().with(Feature::Day0Setup, true);
+        let na = |u: &User| me_with(&state, Some(u), day0).body;
         let set = |v| crate::transport::it::state::set_provisioned(&flag_path, v).expect("flag");
         set(false);
         let mut admin = user(Superadmin, true);

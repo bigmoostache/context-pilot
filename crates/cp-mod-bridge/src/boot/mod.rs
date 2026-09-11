@@ -130,10 +130,10 @@ impl Boot {
     ///
     /// Returns [`Error::AlreadyRunning`] if another live agent already owns
     /// `folder`, or [`Error::Io`] for any filesystem failure (lock, oplog,
-    /// socket, registry) — or if `$HOME` is unset.
+    /// socket, registry).
     pub fn start(folder: &Path, model: &str) -> BootResult<Self> {
-        let agents_dir = registry::default_agents_dir()?;
-        let sync_root = registry::default_sync_root()?;
+        let agents_dir = registry::default_agents_dir();
+        let sync_root = registry::default_sync_root();
         Self::start_inner(
             folder,
             BootDirs { agents_dir: &agents_dir, sync_root: &sync_root },
@@ -159,8 +159,8 @@ impl Boot {
     /// [`Error::AlreadyRunning`] immediately if the folder lock is contended,
     /// or [`Error::Io`] for any filesystem failure.
     pub fn try_start(folder: &Path, model: &str) -> BootResult<Self> {
-        let agents_dir = registry::default_agents_dir()?;
-        let sync_root = registry::default_sync_root()?;
+        let agents_dir = registry::default_agents_dir();
+        let sync_root = registry::default_sync_root();
         Self::start_inner(folder, BootDirs { agents_dir: &agents_dir, sync_root: &sync_root }, model, 0)
     }
 

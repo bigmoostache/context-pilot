@@ -7,7 +7,6 @@
 //! The token is checked for expiry before returning.
 
 use std::fs;
-use std::path::PathBuf;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -39,7 +38,7 @@ struct OAuthCredentials {
 /// Returns `None` if no valid, unexpired token is found.
 ///
 /// `pub(crate)` by design: this is the *mechanism* behind
-/// [`AuthMechanism::KeychainThenFile`](crate::registry::AuthMechanism) and is
+/// [`AuthMechanism::KeychainThenFile`](cp_env::specs::secrets::AuthMechanism) and is
 /// called only by the vault's own [`resolve`](crate::local) cascade. Every
 /// external consumer (agents, orchestrator) MUST go through
 /// [`vault().get("claude_oauth")`](crate::types::Vault::get) instead, so the
@@ -73,8 +72,7 @@ fn load_from_keychain() -> Option<SecretString> {
 
 /// Read credentials JSON from `~/.claude/.credentials.json` (or fallback path).
 fn load_from_file() -> Option<SecretString> {
-    let home = std::env::var("HOME").ok()?;
-    let home_path = PathBuf::from(&home);
+    let home_path = cp_env::env().core.home.clone();
 
     let primary = home_path.join(".claude").join(".credentials.json");
     let fallback = home_path.join(".claude").join("credentials.json");
@@ -127,8 +125,7 @@ fn raw_from_keychain() -> Option<serde_json::Value> {
 
 /// Read raw credentials JSON from `~/.claude/.credentials.json`.
 fn raw_from_file() -> Option<serde_json::Value> {
-    let home = std::env::var("HOME").ok()?;
-    let home_path = PathBuf::from(&home);
+    let home_path = cp_env::env().core.home.clone();
     let primary = home_path.join(".claude").join(".credentials.json");
     let fallback = home_path.join(".claude").join("credentials.json");
     let path = if primary.exists() { primary } else { fallback };

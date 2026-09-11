@@ -27,7 +27,7 @@ use crate::supervisor;
 /// `CP_RELEASES_BREAK_GLASS=1` (e.g. over Tailscale SSH for a recovery). The
 /// auto-updater and its *Update* pane own version choice now.
 pub(crate) fn releases_break_glass() -> bool {
-    std::env::var("CP_RELEASES_BREAK_GLASS").is_ok_and(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+    cp_env::env().orch.releases_break_glass
 }
 
 /// `GET /api/releases` — list all releases (local + remote merged), current

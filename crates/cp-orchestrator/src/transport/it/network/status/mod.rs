@@ -261,12 +261,12 @@ fn wan_status(default_dev: Option<&str>, gateway: Option<&str>) -> Value {
 /// `CP_IP_BIN`-gated like every other tool. `end0` is networkd's, not
 /// `NetworkManager`'s, so `nmcli` cannot answer this one.
 fn interface_ipv4(iface: &str) -> Value {
-    let Some(ip_bin) = std::env::var_os("CP_IP_BIN") else {
+    let Some(ip_bin) = cp_env::env().appliance.ip_bin.as_deref().map(std::path::Path::as_os_str) else {
         return Value::Null;
     };
     let args =
         ["-4".to_owned(), "-o".to_owned(), "addr".to_owned(), "show".to_owned(), "dev".to_owned(), iface.to_owned()];
-    let Ok(out) = run(&ip_bin, &args) else {
+    let Ok(out) = run(ip_bin, &args) else {
         return Value::Null;
     };
     out.split_whitespace()
@@ -283,11 +283,11 @@ fn interface_ipv4(iface: &str) -> Value {
 /// `None` when there is no `mmcli` or no modem — a box whose modem was pulled
 /// reports `wwan: null` rather than a wall of falsehoods.
 fn wwan_status(tools: &Tools) -> Option<Value> {
-    let mmcli = std::env::var_os("CP_MMCLI_BIN")?;
-    let listed = run(&mmcli, &["-J".to_owned(), "-L".to_owned()]).ok()?;
+    let mmcli = cp_env::env().appliance.mmcli_bin.as_deref().map(std::path::Path::as_os_str)?;
+    let listed = run(mmcli, &["-J".to_owned(), "-L".to_owned()]).ok()?;
     let list: Value = serde_json::from_str(&listed).ok()?;
     let path = list.get("modem-list")?.as_array()?.first()?.as_str()?.to_owned();
-    let shown = run(&mmcli, &["-J".to_owned(), "-m".to_owned(), path.clone()]).ok()?;
+    let shown = run(mmcli, &["-J".to_owned(), "-m".to_owned(), path.clone()]).ok()?;
     let modem: Value = serde_json::from_str(&shown).ok()?;
     let generic = modem.get("modem").and_then(|m| m.get("generic"));
     let gpp = modem.get("modem").and_then(|m| m.get("3gpp"));
@@ -300,7 +300,7 @@ fn wwan_status(tools: &Tools) -> Option<Value> {
             .and_then(Value::as_array)
             .map(|techs| techs.iter().filter_map(Value::as_str).collect::<Vec<_>>().join(", "))
             .map_or(Value::Null, |joined| if joined.is_empty() { Value::Null } else { json!(joined) }),
-        "signal_dbm": signal_dbm(&mmcli, &path),
+        "signal_dbm": signal_dbm(mmcli, &path),
         "ip": nmcli_first_address(&tools.nmcli, WWAN_PROFILE),
         "registered": matches!(registration, "home" | "roaming"),
     }))

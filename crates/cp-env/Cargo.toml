@@ -1,0 +1,22 @@
+[package]
+name = "cp-env"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Declarative environment-variable table — one validated load at boot, typed access everywhere"
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+publish = false
+
+# Deliberately dependency-free: every crate in the workspace (the vault
+# included) reads its configuration through this one, so it must sit at the
+# very bottom of the graph.
+[dependencies]
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true

@@ -11,6 +11,8 @@ readme.workspace = true
 publish = false
 
 [dependencies]
+# Validated environment (gateway URL); see docs/ENV.md.
+cp-env.workspace = true
 cp-render = { path = "../cp-render" }
 cp-mod-utilities.workspace = true
 log = "0.4"

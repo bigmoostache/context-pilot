@@ -4,7 +4,7 @@ use std::fmt;
 
 use zeroize::Zeroizing;
 
-use crate::registry::KeyDefinition;
+use cp_env::specs::secrets::KeyDefinition;
 
 // ─── SecretString ───────────────────────────────────────────────────────────
 

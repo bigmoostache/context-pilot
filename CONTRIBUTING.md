@@ -64,6 +64,12 @@ XAI_API_KEY=your_grok_key
 GROQ_API_KEY=your_groq_key
 ```
 
+Every environment variable the binaries read — provider keys, orchestrator
+topology, feature flags — is documented in the generated reference
+[`docs/ENV.md`](docs/ENV.md). Both binaries validate their environment
+strictly at boot and refuse to start on any problem; `cpilot --check-env` and
+`cp-orchestrator --check-env` run the same validation and print the report.
+
 ## How to Contribute
 
 ### Reporting Bugs

@@ -7,22 +7,22 @@
 //! [`respond_json`](super::respond_json) helpers.
 
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 
 use tiny_http::{Header, Request, Response};
 
 use super::rest::Backend;
 use super::{cors_headers, inspect, respond_json, rest};
 
-/// The built SPA root (`dist/`), read once from `CP_WEB_ROOT`.
+/// The built SPA root (`dist/`), from `CP_WEB_ROOT` (validated at boot to be
+/// an existing directory).
 ///
-/// When unset (or not a directory) the orchestrator serves the API only — its
-/// historical behaviour, with the SPA fronted by a separate web server. When
-/// set, the orchestrator also serves the web UI itself, so a single binary on a
-/// single port is the whole product (the native-appliance deployment).
+/// When unset the orchestrator serves the API only — its historical
+/// behaviour, with the SPA fronted by a separate web server. When set, the
+/// orchestrator also serves the web UI itself, so a single binary on a single
+/// port is the whole product (the native-appliance deployment).
 pub(super) fn web_root() -> Option<&'static PathBuf> {
-    static WEB_ROOT: OnceLock<Option<PathBuf>> = OnceLock::new();
-    WEB_ROOT.get_or_init(|| std::env::var_os("CP_WEB_ROOT").map(PathBuf::from).filter(|p| p.is_dir())).as_ref()
+    cp_env::env().orch.web_root.as_ref()
 }
 
 /// Serve `path` from the SPA [`web_root`] (only called when it is `Some`).

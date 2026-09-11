@@ -27,6 +27,17 @@
     # client `admin`.
     cp_seed_superadmin_email: "{{ cp_superadmin_email | default('vendor@context-pilot.internal') }}"
     cp_seed_admin_email: "{{ cp_admin_email | default('admin@admin.fr') }}"
+    # Feature flags (docs/ENV.md) - the appliance profile. Each one is written
+    # explicitly into the unit; flip a flag for one client with
+    # -e cp_feature_<name>=0. `day0_setup` needs `it_pane`, which needs the
+    # Caddy integration the unit always configures - the binary refuses to boot
+    # on an incoherent combination and names it (`--check-env`).
+    cp_feature_claude_oauth: "{{ feature_claude_oauth | default(1) | int }}"
+    cp_feature_day0_setup: "{{ feature_day0_setup | default(1) | int }}"
+    cp_feature_it_pane: "{{ feature_it_pane | default(1) | int }}"
+    cp_feature_updater: "{{ feature_updater | default(1) | int }}"
+    cp_feature_keys_editable: "{{ feature_keys_editable | default(1) | int }}"
+    cp_feature_onboarding: "{{ feature_onboarding | default(1) | int }}"
     sheets_dir: "{{ playbook_dir }}/out"
     gh_repo: bigmoostache/context-pilot
     # Which release to install. Default = the signed 'stable' CHANNEL

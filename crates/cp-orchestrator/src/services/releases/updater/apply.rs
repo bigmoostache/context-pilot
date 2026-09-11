@@ -141,8 +141,8 @@ pub(crate) fn promote_committed(store: &mut ReleaseStore, _auth_db_path: &Path) 
     // OTA (it used to stay on whatever the last Ansible deploy laid down).
     // Non-fatal: the binaries are the source of truth; a failed symlink swap
     // just leaves the previous SPA in place until the next successful update.
-    let web_symlink = std::env::var_os("CP_WEB_ROOT").map(PathBuf::from);
-    if let Err(e) = promote_web(store, &pending.to, web_symlink.as_deref()) {
+    let web_symlink = cp_env::env().orch.web_root.as_deref();
+    if let Err(e) = promote_web(store, &pending.to, web_symlink) {
         crate::oerr!("updater: web promote failed — front stays on the previous SPA: {e}");
     }
 
@@ -243,7 +243,7 @@ pub(crate) fn restart_self(install: &Path) {
 /// last Ansible deploy laid down.
 ///
 /// `web_symlink` is the `CP_WEB_ROOT` path (the caller passes
-/// `env::var_os("CP_WEB_ROOT")`). No-op when:
+/// `cp_env::env().orch.web_root`). No-op when:
 /// * `web_symlink` is `None` — an API-only deployment with the SPA fronted by a
 ///   separate web server (the orchestrator's historical mode);
 /// * the release ships no `web/` payload — an older or binary-only bundle: the
