@@ -57,13 +57,8 @@ fn seed_one(store: &AuthStore, role_sql: &str, account: &Account) {
     let new_user = NewUser { email: account.email(), name: account.name(), password: &password, role };
     match store.create_user(new_user) {
         Ok(user) => match store.set_must_change_password(&user.id, true) {
-            Ok(_) => {
-                crate::oerr!(
-                    "seed: provisioned initial {role_sql} {} (password change required on first login)",
-                    user.email
-                );
-            }
-            Err(e) => crate::oerr!("seed: created {} but could not set must-change flag: {e}", user.email),
+            Ok(_) => crate::oerr!("seed: provisioned initial {role_sql} (password change required on first login)"),
+            Err(e) => crate::oerr!("seed: created {role_sql} but could not set must-change flag: {e}"),
         },
         Err(e) => crate::oerr!("seed: failed to create {role_sql}: {e}"),
     }
