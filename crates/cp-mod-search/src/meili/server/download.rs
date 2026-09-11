@@ -45,7 +45,7 @@ const MEILISEARCH_VERSION: &str = "v1.13.3";
 /// Returns an error if the download fails or the platform is unsupported.
 pub(crate) fn download_binary() -> Result<(), String> {
     let _root = ensure_global_dirs()?;
-    let bin = binary_path()?;
+    let bin = binary_path();
 
     // Skip if already downloaded
     if bin.exists() {

@@ -12,7 +12,7 @@ mod auth_seed;
 mod features;
 mod gateway_bridge;
 mod orchestrator;
-mod secrets;
+pub mod secrets;
 mod shared;
 
 /// Every spec, in docs order.
@@ -25,7 +25,7 @@ static ALL: LazyLock<Vec<Spec>> = LazyLock::new(|| {
         appliance::SPECS,
         features::SPECS,
         shared::DEV,
-        secrets::SECRETS,
+        secrets::SECRETS.as_slice(),
         secrets::EXTERNAL,
     ]
     .concat()

@@ -27,7 +27,7 @@ pub(crate) fn vault_snapshot(auth_user: Option<&User>) -> HttpReply {
         return HttpReply::error(403, "superadmin required");
     }
 
-    let snapshot: serde_json::Map<String, serde_json::Value> = cp_vault::registry::ALL_KEYS
+    let snapshot: serde_json::Map<String, serde_json::Value> = cp_env::specs::secrets::ALL_KEYS
         .iter()
         .filter(|k| !k.env_var.is_empty())
         .filter_map(|k| {
@@ -44,7 +44,7 @@ pub(crate) fn vault_snapshot(auth_user: Option<&User>) -> HttpReply {
 /// Returns a JSON array of `{ env, label, exists }` objects.  Keys without an
 /// env var name (OAuth-only credentials) are excluded.
 pub(crate) fn env_keys_list() -> HttpReply {
-    let keys: Vec<serde_json::Value> = cp_vault::registry::ALL_KEYS
+    let keys: Vec<serde_json::Value> = cp_env::specs::secrets::ALL_KEYS
         .iter()
         .filter(|k| !k.env_var.is_empty())
         .map(|k| {
@@ -65,7 +65,7 @@ pub(crate) fn env_key_reveal(name: &str, auth_user: Option<&User>) -> HttpReply 
         return HttpReply::error(403, "superadmin required");
     }
 
-    if cp_vault::registry::resolve_definition(name).is_none() {
+    if cp_env::specs::secrets::resolve_definition(name).is_none() {
         return HttpReply::error(404, "unknown key name");
     }
 
@@ -90,7 +90,7 @@ pub(crate) fn env_key_update(name: &str, auth_user: Option<&User>, body: &str) -
         return HttpReply::error(403, "superadmin required");
     }
 
-    if cp_vault::registry::resolve_definition(name).is_none() {
+    if cp_env::specs::secrets::resolve_definition(name).is_none() {
         return HttpReply::error(404, "unknown key name");
     }
 

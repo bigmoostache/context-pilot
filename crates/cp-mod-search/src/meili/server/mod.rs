@@ -20,40 +20,38 @@ pub(crate) mod watchdog;
 ///
 /// `pub(super)` so the watchdog can locate the machine-wide spawn lock beside
 /// the pid/port/key files it coordinates with.
-pub(super) fn global_meili_dir() -> Result<PathBuf, String> {
-    std::env::var("HOME")
-        .map(|h| PathBuf::from(h).join(".context-pilot/meilisearch"))
-        .map_err(|_e| "Cannot determine HOME directory".to_owned())
+pub(super) fn global_meili_dir() -> PathBuf {
+    cp_env::env().core.home.join(".context-pilot/meilisearch")
 }
 
 /// Path to the Meilisearch binary: `~/.context-pilot/meilisearch/bin/meilisearch`.
-pub(super) fn binary_path() -> Result<PathBuf, String> {
-    global_meili_dir().map(|d| d.join("bin/meilisearch"))
+pub(super) fn binary_path() -> PathBuf {
+    global_meili_dir().join("bin/meilisearch")
 }
 
 /// PID file: `~/.context-pilot/meilisearch/pid`.
-fn pid_path() -> Result<PathBuf, String> {
-    global_meili_dir().map(|d| d.join("pid"))
+fn pid_path() -> PathBuf {
+    global_meili_dir().join("pid")
 }
 
 /// Port file: `~/.context-pilot/meilisearch/port`.
-fn port_path() -> Result<PathBuf, String> {
-    global_meili_dir().map(|d| d.join("port"))
+fn port_path() -> PathBuf {
+    global_meili_dir().join("port")
 }
 
 /// Master key file: `~/.context-pilot/meilisearch/master.key`.
-fn key_path() -> Result<PathBuf, String> {
-    global_meili_dir().map(|d| d.join("master.key"))
+fn key_path() -> PathBuf {
+    global_meili_dir().join("master.key")
 }
 
 /// Meilisearch data directory: `~/.context-pilot/meilisearch/data/`.
-fn data_dir() -> Result<PathBuf, String> {
-    global_meili_dir().map(|d| d.join("data"))
+fn data_dir() -> PathBuf {
+    global_meili_dir().join("data")
 }
 
 /// Projects registry: `~/.context-pilot/meilisearch/projects.json`.
-fn projects_path() -> Result<PathBuf, String> {
-    global_meili_dir().map(|d| d.join("projects.json"))
+fn projects_path() -> PathBuf {
+    global_meili_dir().join("projects.json")
 }
 
 // -- Directory setup ---------------------------------------------------------
@@ -66,7 +64,7 @@ fn projects_path() -> Result<PathBuf, String> {
 ///
 /// Returns an error if the directories cannot be created.
 pub(super) fn ensure_global_dirs() -> Result<PathBuf, String> {
-    let root = global_meili_dir()?;
+    let root = global_meili_dir();
 
     for sub in &["bin", "data"] {
         let p = root.join(sub);
@@ -80,21 +78,19 @@ pub(super) fn ensure_global_dirs() -> Result<PathBuf, String> {
 
 /// Write the server PID to the global PID file.
 fn write_pid(pid: u32) -> Result<(), String> {
-    let path = pid_path()?;
+    let path = pid_path();
     std::fs::write(&path, pid.to_string()).map_err(|e| format!("Cannot write PID file {}: {e}", path.display()))
 }
 
 /// Read the PID from the global PID file (if it exists).
 pub(super) fn read_pid() -> Option<u32> {
-    let path = pid_path().ok()?;
+    let path = pid_path();
     std::fs::read_to_string(path).ok()?.trim().parse().ok()
 }
 
 /// Remove the global PID file.
 fn remove_pid() {
-    if let Ok(path) = pid_path() {
-        let _r = std::fs::remove_file(path);
-    }
+    let _r = std::fs::remove_file(pid_path());
 }
 
 /// Check if a process with the given PID is alive.
@@ -165,7 +161,7 @@ fn pick_stable_port() -> Result<u16, String> {
 
 /// Write the server port to the global port file.
 fn write_port(port: u16) -> Result<(), String> {
-    let path = port_path()?;
+    let path = port_path();
     std::fs::write(&path, port.to_string()).map_err(|e| format!("Cannot write port file {}: {e}", path.display()))
 }
 
@@ -173,7 +169,7 @@ fn write_port(port: u16) -> Result<(), String> {
 ///
 /// `pub(super)` so the watchdog can read the recorded port for reconnect.
 pub(super) fn read_port() -> Option<u16> {
-    let path = port_path().ok()?;
+    let path = port_path();
     std::fs::read_to_string(path).ok()?.trim().parse().ok()
 }
 
@@ -201,7 +197,7 @@ fn generate_master_key() -> Result<String, String> {
 
 /// Write the master key to the global key file.
 fn write_master_key(key: &str) -> Result<(), String> {
-    let path = key_path()?;
+    let path = key_path();
     std::fs::write(&path, key).map_err(|e| format!("Cannot write key file {}: {e}", path.display()))
 }
 
@@ -209,7 +205,7 @@ fn write_master_key(key: &str) -> Result<(), String> {
 ///
 /// `pub(super)` so the watchdog can read the recorded key for reconnect.
 pub(super) fn read_master_key() -> Option<String> {
-    let path = key_path().ok()?;
+    let path = key_path();
     let content = std::fs::read_to_string(path).ok()?;
     let trimmed = content.trim().to_owned();
     if trimmed.is_empty() { None } else { Some(trimmed) }
@@ -336,8 +332,8 @@ pub(crate) fn ensure_server_running() -> Result<ServerInfo, String> {
 
     // Phase 3: pick a stable port (reuse the persisted one if free) and start.
     let port = pick_stable_port()?;
-    let bin = binary_path()?;
-    let data = data_dir()?;
+    let bin = binary_path();
+    let data = data_dir();
 
     let child = Command::new(&bin)
         .arg("--http-addr")
@@ -372,6 +368,14 @@ pub(crate) fn ensure_server_running() -> Result<ServerInfo, String> {
 
 // -- Projects registry -------------------------------------------------------
 
+/// The projects registry at `path`, or `None` when it is absent, unreadable
+/// or empty - every case where there is nothing to clean up.
+fn load_projects(path: &std::path::Path) -> Option<serde_json::Map<String, serde_json::Value>> {
+    let content = std::fs::read_to_string(path).ok()?;
+    let projects: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&content).unwrap_or_default();
+    (!projects.is_empty()).then_some(projects)
+}
+
 /// Clean up Meilisearch indexes for projects that no longer exist on disk.
 ///
 /// Reads `projects.json`, checks each path, and deletes `cp_{hash}_files`
@@ -381,21 +385,10 @@ pub(crate) fn ensure_server_running() -> Result<ServerInfo, String> {
 /// This runs on module init (after server is confirmed healthy).
 /// Errors are logged but don't halt startup.
 pub(crate) fn cleanup_orphan_indexes(port: u16, master_key: &str) {
-    let Ok(path) = projects_path() else {
+    let path = projects_path();
+    let Some(mut projects) = load_projects(&path) else {
         return;
     };
-    if !path.exists() {
-        return;
-    }
-
-    let Ok(content) = std::fs::read_to_string(&path) else {
-        return;
-    };
-    let mut projects: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&content).unwrap_or_default();
-
-    if projects.is_empty() {
-        return;
-    }
 
     // Find orphan entries (project path no longer exists)
     let orphans: Vec<(String, String)> = projects
@@ -446,7 +439,7 @@ pub(crate) fn cleanup_orphan_indexes(port: u16, master_key: &str) {
 ///
 /// Returns an error if the file cannot be read or written.
 pub(crate) fn register_project(project_path: &str, hash: &str) -> Result<(), String> {
-    let path = projects_path()?;
+    let path = projects_path();
 
     let mut projects: serde_json::Map<String, serde_json::Value> = if path.exists() {
         let content = std::fs::read_to_string(&path).map_err(|e| format!("Cannot read projects.json: {e}"))?;

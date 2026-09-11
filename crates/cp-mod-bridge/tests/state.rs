@@ -13,6 +13,7 @@ use cp_mod_bridge::{BridgeModule, BridgeState};
 // the module identity + cold-default surface, so every dev/manifest dep it does
 // not touch must be silenced or the workspace-lint build fails (mirrors the
 // sibling test binaries' silencer blocks).
+use cp_env as _;
 use cp_oplog as _;
 use cp_render as _;
 use cp_wire as _;

@@ -276,8 +276,8 @@ impl DatalabClient {
 // -- Disk cache ---------------------------------------------------------------
 
 /// Global cache directory for OCR results: `~/.context-pilot/ocr-cache/`.
-fn cache_dir() -> Option<PathBuf> {
-    std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".context-pilot/ocr-cache"))
+fn cache_dir() -> PathBuf {
+    cp_env::env().core.home.join(".context-pilot/ocr-cache")
 }
 
 /// Compute the hex digest of a byte slice (FNV-1a 128-bit).
@@ -287,15 +287,13 @@ fn content_hash_hex(data: &[u8]) -> String {
 
 /// Try to read a cached OCR result.
 fn read_cache(key: &str) -> Option<String> {
-    let path = cache_dir()?.join(format!("{key}.txt"));
+    let path = cache_dir().join(format!("{key}.txt"));
     std::fs::read_to_string(path).ok()
 }
 
 /// Write an OCR result to the disk cache.
 fn write_cache(key: &str, text: &str) {
-    let Some(dir) = cache_dir() else {
-        return;
-    };
+    let dir = cache_dir();
     if let Err(e) = std::fs::create_dir_all(&dir) {
         log::warn!("Cannot create OCR cache dir {}: {e}", dir.display());
         return;
