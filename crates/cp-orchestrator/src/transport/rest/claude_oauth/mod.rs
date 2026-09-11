@@ -383,8 +383,7 @@ pub(super) fn store_credentials(creds: &serde_json::Value) -> Result<(), String>
         .is_ok_and(|o| o.status.success());
 
     // Always write the credentials file as fallback.
-    let home = std::env::var("HOME").ok().ok_or("HOME not set")?;
-    let claude_dir = std::path::Path::new(&home).join(".claude");
+    let claude_dir = cp_env::env().core.home.join(".claude");
     let _mkdir = std::fs::create_dir_all(&claude_dir);
     let creds_path = claude_dir.join(".credentials.json");
     std::fs::write(&creds_path, &json).map_err(|e| format!("write credentials: {e}"))?;

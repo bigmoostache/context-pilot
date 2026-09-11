@@ -62,21 +62,14 @@ fn main() -> ExitCode {
         cp_orchestrator::services::releases::self_update::boot_check(install);
     }
 
-    let config = match Config::from_env() {
-        Ok(c) => c,
-        Err(e) => {
-            cp_orchestrator::oerr!("configuration error: {e}");
-            return ExitCode::FAILURE;
-        }
-    };
+    let config = Config::view(cp_env::env());
 
     // Reconcile a rolled-back update (update-policy §5.5 step 6) BEFORE the
     // auth store opens: if a staged update crash-looped and `boot_check`
     // restored the old binary, this restores the matching `auth.db` backup (a
     // forward migration may have run, §5.8) and records `rolled_back`.
     if let Some(install) = install_path.as_deref() {
-        let releases_dir = cp_orchestrator::services::releases::ReleaseStore::default_dir()
-            .unwrap_or_else(|| config.agents_dir.join("releases"));
+        let releases_dir = cp_orchestrator::services::releases::ReleaseStore::default_dir();
         cp_orchestrator::services::releases::updater::apply::boot_reconcile(
             &releases_dir,
             &config.auth_db_path,

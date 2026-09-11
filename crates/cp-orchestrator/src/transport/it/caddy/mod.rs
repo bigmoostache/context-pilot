@@ -300,12 +300,12 @@ static CADDY_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 ///
 /// Returns a message if the Caddyfile cannot be written.
 pub(crate) fn write_config(provisioned: bool, identity: Option<&Identity>, extra: &[String]) -> Result<bool, String> {
-    let Some(caddyfile) = std::env::var_os("CP_CADDYFILE") else {
+    let Some(caddyfile) = cp_env::env().appliance.caddyfile.as_deref() else {
         return Ok(false);
     };
     let _guard = CADDY_LOCK.lock();
     let content = render_caddyfile(provisioned, &subjects_for(identity, extra));
-    write_atomic(Path::new(&caddyfile), content.as_bytes()).map_err(|e| format!("write Caddyfile: {e}"))?;
+    write_atomic(caddyfile, content.as_bytes()).map_err(|e| format!("write Caddyfile: {e}"))?;
     Ok(true)
 }
 
@@ -321,25 +321,25 @@ pub(crate) fn write_config(provisioned: bool, identity: Option<&Identity>, extra
 ///
 /// Returns a message if the Caddyfile cannot be written or `caddy reload` fails.
 pub(crate) fn regenerate(provisioned: bool, identity: Option<&Identity>, extra: &[String]) -> Result<bool, String> {
-    let Some(caddyfile) = std::env::var_os("CP_CADDYFILE") else {
+    let appliance = &cp_env::env().appliance;
+    let Some(path) = appliance.caddyfile.as_deref() else {
         return Ok(false); // no Caddy in this environment — skip cleanly.
     };
-    let path = Path::new(&caddyfile);
     let _guard = CADDY_LOCK.lock();
     let content = render_caddyfile(provisioned, &subjects_for(identity, extra));
     let backup = std::fs::read(path).ok();
 
     write_atomic(path, content.as_bytes()).map_err(|e| format!("write Caddyfile: {e}"))?;
 
-    let Some(bin) = std::env::var_os("CP_CADDY_BIN") else {
+    let Some(bin) = appliance.caddy_bin.as_deref().map(Path::as_os_str) else {
         return Ok(false); // wrote the file but have no caddy binary to reload (dev).
     };
-    match reload(&bin, path) {
+    match reload(bin, path) {
         Ok(()) => Ok(true),
         Err(e) => {
             if let Some(prev) = backup {
                 let _restored = write_atomic(path, &prev);
-                let _reapplied = reload(&bin, path);
+                let _reapplied = reload(bin, path);
             }
             Err(format!("caddy reload failed (rolled back): {e}"))
         }

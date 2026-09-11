@@ -104,8 +104,8 @@ impl ReleaseStore {
 
     /// The default releases directory (`~/.context-pilot/releases/`).
     #[must_use]
-    pub fn default_dir() -> Option<PathBuf> {
-        std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".context-pilot/releases"))
+    pub fn default_dir() -> PathBuf {
+        cp_env::env().core.home.join(".context-pilot/releases")
     }
 
     // ── Arch ────────────────────────────────────────────────────────────

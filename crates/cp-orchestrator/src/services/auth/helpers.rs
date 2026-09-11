@@ -60,18 +60,10 @@ pub(super) fn now_ms() -> u64 {
 )]
 impl super::db::AuthStore {
     /// The auth database path — `CP_AUTH_DB`, else
-    /// `~/.context-pilot/orchestrator/auth.db` (the one place this default is
-    /// derived; `runtime::Config` and the transport both read it here).
+    /// `~/.context-pilot/orchestrator/auth.db`, as validated at boot
+    /// (`runtime::Config` and the transport both read it here).
     #[must_use]
     pub fn default_db_path() -> std::path::PathBuf {
-        std::env::var_os("CP_AUTH_DB").map_or_else(
-            || {
-                std::env::var_os("HOME").map_or_else(
-                    || std::path::PathBuf::from("auth.db"),
-                    |h| std::path::PathBuf::from(h).join(".context-pilot/orchestrator/auth.db"),
-                )
-            },
-            std::path::PathBuf::from,
-        )
+        cp_env::env().auth.db_path.clone()
     }
 }
