@@ -4,6 +4,8 @@
 //! workspace's per-file line budget. The seed runs once at boot from
 //! [`Runtime::new`](super::Runtime::new) when auth is enabled.
 
+use cp_env::model::seed::Account;
+
 use crate::services::auth::db::AuthStore;
 use crate::services::auth::types::NewUser;
 use crate::services::auth::types::UserRole;
@@ -14,6 +16,10 @@ use crate::services::auth::types::UserRole;
 /// (`CP_SEED_ADMIN_*`) — each forced to change its provisioned password on first
 /// login. Idempotent: a no-op once any user exists, so an Ansible provisioning
 /// role can re-run safely. Fail-soft — never fatal.
+///
+/// The accounts come from the validated environment (`cp_env::env().seed`):
+/// an email without a password, or a seed with auth disabled, was already
+/// refused at boot, so what reaches this point is coherent.
 pub(super) fn seed_accounts_if_empty(store: &AuthStore) {
     match store.count_users() {
         Ok(0) => {}
@@ -25,29 +31,29 @@ pub(super) fn seed_accounts_if_empty(store: &AuthStore) {
     }
     // Vendor god account (design §13.2 rank 4) and the client's top account
     // (rank 3). Both optional at this layer; Ansible supplies them (M5).
-    seed_one(store, "superadmin", "CP_SEED_SUPERADMIN");
-    seed_one(store, "admin", "CP_SEED_ADMIN");
+    let seed = &cp_env::env().seed;
+    for (role_sql, configured) in [("superadmin", seed.superadmin.as_ref()), ("admin", seed.admin.as_ref())] {
+        if let Some(account) = configured {
+            seed_one(store, role_sql, account);
+        }
+    }
 }
 
-/// Seed a single account of `role_sql` from the `<prefix>_EMAIL` / `_NAME` /
-/// `_PASSWORD`(`_FILE`) env vars, if `<prefix>_EMAIL` is set. The role is passed
-/// as its SQL value and resolved via [`UserRole::from_sql`] — seeding is
-/// config-driven provisioning, not an enforcement decision, so it names no role
-/// variant directly (keeping the capability-grep gate clean).
-fn seed_one(store: &AuthStore, role_sql: &str, prefix: &str) {
-    let Some(email) = std::env::var(format!("{prefix}_EMAIL")).ok().filter(|s| !s.trim().is_empty()) else {
-        return;
+/// Seed a single account of `role_sql`. The role is passed as its SQL value
+/// and resolved via [`UserRole::from_sql`] — seeding is config-driven
+/// provisioning, not an enforcement decision, so it names no role variant
+/// directly (keeping the capability-grep gate clean).
+fn seed_one(store: &AuthStore, role_sql: &str, account: &Account) {
+    let password = match account.password() {
+        Ok(password) => password,
+        Err(e) => {
+            crate::oerr!("seed: {role_sql} {}: {e} — skipping", account.email());
+            return;
+        }
     };
-    let Some(password) = seed_password(prefix) else {
-        crate::oerr!("seed: {prefix}_EMAIL set but no password provided — skipping");
-        return;
-    };
-    let name = std::env::var(format!("{prefix}_NAME"))
-        .ok()
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| role_sql.to_owned());
     let role = UserRole::from_sql(role_sql);
-    match store.create_user(NewUser { email: email.trim(), name: name.trim(), password: &password, role }) {
+    let new_user = NewUser { email: account.email(), name: account.name(), password: &password, role };
+    match store.create_user(new_user) {
         Ok(user) => match store.set_must_change_password(&user.id, true) {
             Ok(_) => {
                 crate::oerr!(
@@ -57,23 +63,6 @@ fn seed_one(store: &AuthStore, role_sql: &str, prefix: &str) {
             }
             Err(e) => crate::oerr!("seed: created {} but could not set must-change flag: {e}", user.email),
         },
-        Err(e) => crate::oerr!("seed: failed to create {role_sql} {}: {e}", email.trim()),
+        Err(e) => crate::oerr!("seed: failed to create {role_sql} {}: {e}", account.email()),
     }
-}
-
-/// Resolve a seed password from `<prefix>_PASSWORD_FILE` (preferred — keeps the
-/// secret out of the process environment) or `<prefix>_PASSWORD`.
-fn seed_password(prefix: &str) -> Option<String> {
-    if let Some(path) = std::env::var_os(format!("{prefix}_PASSWORD_FILE")) {
-        match std::fs::read_to_string(&path) {
-            Ok(s) => {
-                let pw = s.trim_end_matches(['\n', '\r']).to_owned();
-                if !pw.is_empty() {
-                    return Some(pw);
-                }
-            }
-            Err(e) => crate::oerr!("seed: cannot read {prefix}_PASSWORD_FILE: {e}"),
-        }
-    }
-    std::env::var(format!("{prefix}_PASSWORD")).ok().filter(|s| !s.is_empty())
 }

@@ -23,7 +23,7 @@ use super::crypto::{base64_decode, colon_hex_upper, sha256};
 /// Filesystem path of the CA root, from `CP_CA_ROOT`. `None` when unconfigured
 /// (local dev) — the routes then report `404`, never a stack trace.
 fn root_path() -> Option<PathBuf> {
-    std::env::var_os("CP_CA_ROOT").map(PathBuf::from)
+    cp_env::env().appliance.ca_root.clone()
 }
 
 /// `GET /api/it/ca.crt` (Admin) — serve the CA root PEM as a download.

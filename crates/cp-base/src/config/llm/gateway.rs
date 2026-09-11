@@ -9,12 +9,6 @@
 //! the picker and the request path disagree, which reads as "no models
 //! available" with no error anywhere.
 
-/// Base URL of the gateway. Absent or empty means "no gateway".
-pub const GATEWAY_URL_ENV: &str = "CP_LLM_GATEWAY";
-
-/// Key presented to the gateway on every call.
-pub const GATEWAY_KEY_ENV: &str = "CP_LLM_GATEWAY_KEY";
-
 /// Catalogue ids of the providers a gateway carries.
 ///
 /// The absentees are deliberate. `claudecodev2` authenticates with a Claude Code
@@ -36,15 +30,14 @@ pub const GATEWAY_PROVIDERS: &[&str] = &["anthropic", "grok", "groq", "deepseek"
 /// costs a real request per model.
 pub const MODEL_LIST_PROVIDERS: &[&str] = &["grok", "groq", "deepseek"];
 
-/// The configured gateway base URL, trailing slashes trimmed.
+/// The configured gateway base URL (`CP_LLM_GATEWAY`).
 ///
-/// `None` when unset or empty: empty counts as unset so an operator can disable
-/// the gateway by blanking the variable rather than deleting the line.
+/// Trailing slashes are trimmed by validation. `None` when unset or empty:
+/// empty counts as unset so an operator can disable the gateway by blanking
+/// the variable rather than deleting the line.
 #[must_use]
 pub fn base_url() -> Option<String> {
-    let raw = std::env::var(GATEWAY_URL_ENV).ok()?;
-    let trimmed = raw.trim().trim_end_matches('/');
-    if trimmed.is_empty() { None } else { Some(trimmed.to_owned()) }
+    cp_env::env().gateway.url().map(str::to_owned)
 }
 
 /// Whether a gateway is configured at all.

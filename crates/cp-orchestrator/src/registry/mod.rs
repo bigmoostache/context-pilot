@@ -355,18 +355,14 @@ fn file_age(path: &Path) -> Option<Duration> {
     fs::metadata(path).ok()?.modified().ok()?.elapsed().ok()
 }
 
-/// The default agents directory the fleet advertises into:
-/// `$HOME/.context-pilot/agents`.
+/// The agents directory the fleet advertises into: `CP_AGENTS_DIR`, else
+/// `$HOME/.context-pilot/agents`, as validated at boot.
 ///
 /// Mirrors the agent-side `cp-mod-bridge` registry writer so the backend reads
 /// exactly where agents write.
-///
-/// # Errors
-///
-/// Returns [`io::Error`] if `$HOME` is unset.
-pub fn default_agents_dir() -> io::Result<PathBuf> {
-    let home = std::env::var_os("HOME").ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "$HOME is not set"))?;
-    Ok(Path::new(&home).join(".context-pilot").join("agents"))
+#[must_use]
+pub fn default_agents_dir() -> PathBuf {
+    cp_env::env().core.agents_dir.clone()
 }
 
 /// Wall-clock milliseconds since the Unix epoch, or `0` if the clock predates
