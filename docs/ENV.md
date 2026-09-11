@@ -149,22 +149,22 @@ Resolved by the vault (process environment, then `~/.context-pilot/.env`, then k
 
 | Variable | Type | Default | Scope | Required | Description |
 |---|---|---|---|---|---|
-| `ANTHROPIC_API_KEY` | secret (vault) | - | both |  | Anthropic. |
-| `XAI_API_KEY` | secret (vault) | - | both |  | Grok (xAI). |
-| `DEEPSEEK_API_KEY` | secret (vault) | - | both |  | DeepSeek. |
-| `GROQ_API_KEY` | secret (vault) | - | both |  | Groq. |
-| `MINIMAX_API_KEY` | secret (vault) | - | both |  | MiniMax. |
-| `BRAVE_API_KEY` | secret (vault) | - | both |  | Brave Search (web search tool). |
-| `FIRECRAWL_API_KEY` | secret (vault) | - | both |  | Firecrawl (web scraping tool). |
-| `DATALAB_API_KEY` | secret (vault) | - | both |  | Datalab (OCR tool). |
-| `VOYAGE_API_KEY` | secret (vault) | - | both |  | Voyage AI (embeddings for search). |
-| `GITHUB_TOKEN` | secret (vault) | - | both |  | GitHub (the github module and the `gh` CLI it drives). |
-| `TELEGRAM_BOT_TOKEN` | secret (vault) | - | both |  | Telegram bot bridge. |
-| `DISCORD_BOT_TOKEN` | secret (vault) | - | both |  | Discord bot bridge. |
-| `SLACK_BOT_TOKEN` | secret (vault) | - | both |  | Slack bot bridge. |
-| `GOOGLECHAT_BOT_TOKEN` | secret (vault) | - | both |  | Google Chat bot bridge. |
-| `TELEGRAM_API_ID` | secret (vault) | - | both |  | Telegram API id (user-account bridge). |
-| `TELEGRAM_API_HASH` | secret (vault) | - | both |  | Telegram API hash (user-account bridge). |
+| `ANTHROPIC_API_KEY` | secret (vault) | - | both |  | Anthropic |
+| `XAI_API_KEY` | secret (vault) | - | both |  | Grok (xAI) |
+| `DEEPSEEK_API_KEY` | secret (vault) | - | both |  | DeepSeek |
+| `GROQ_API_KEY` | secret (vault) | - | both |  | Groq |
+| `MINIMAX_API_KEY` | secret (vault) | - | both |  | MiniMax |
+| `BRAVE_API_KEY` | secret (vault) | - | both |  | Brave Search |
+| `FIRECRAWL_API_KEY` | secret (vault) | - | both |  | Firecrawl |
+| `DATALAB_API_KEY` | secret (vault) | - | both |  | Datalab OCR |
+| `VOYAGE_API_KEY` | secret (vault) | - | both |  | Voyage AI |
+| `GITHUB_TOKEN` | secret (vault) | - | both |  | GitHub |
+| `TELEGRAM_BOT_TOKEN` | secret (vault) | - | both |  | Telegram Bot |
+| `DISCORD_BOT_TOKEN` | secret (vault) | - | both |  | Discord Bot |
+| `SLACK_BOT_TOKEN` | secret (vault) | - | both |  | Slack Bot |
+| `GOOGLECHAT_BOT_TOKEN` | secret (vault) | - | both |  | Google Chat Bot |
+| `TELEGRAM_API_ID` | secret (vault) | - | both |  | Telegram API ID |
+| `TELEGRAM_API_HASH` | secret (vault) | - | both |  | Telegram API Hash |
 
 ## External names
 

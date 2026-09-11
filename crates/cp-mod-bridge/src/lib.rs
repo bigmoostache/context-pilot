@@ -42,9 +42,9 @@ pub fn request_bridge() {
     let _already_set = BRIDGE_REQUESTED.set(true);
 }
 
-/// Whether bridge mode was requested (env var *or* CLI flag).
+/// Whether bridge mode was requested (validated `CP_BRIDGE` flag *or* CLI flag).
 fn bridge_active() -> bool {
-    std::env::var("CP_BRIDGE").as_deref() == Ok("1") || BRIDGE_REQUESTED.get().copied().unwrap_or(false)
+    cp_env::env().bridge.enabled || BRIDGE_REQUESTED.get().copied().unwrap_or(false)
 }
 
 pub mod body;

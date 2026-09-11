@@ -323,6 +323,7 @@ dependencies = [
 name = "cp-base"
 version = "0.2.13"
 dependencies = [
+ "cp-env",
  "cp-mod-utilities",
  "cp-render",
  "crossterm",
@@ -371,6 +372,7 @@ name = "cp-mod-bridge"
 version = "0.2.13"
 dependencies = [
  "cp-base",
+ "cp-env",
  "cp-oplog",
  "cp-render",
  "cp-wire",
@@ -497,6 +499,7 @@ name = "cp-mod-ocr"
 version = "0.2.13"
 dependencies = [
  "cp-base",
+ "cp-env",
  "cp-mod-utilities",
  "cp-render",
  "cp-vault",
@@ -544,6 +547,7 @@ name = "cp-mod-search"
 version = "0.2.13"
 dependencies = [
  "cp-base",
+ "cp-env",
  "cp-mod-logs",
  "cp-mod-threads",
  "cp-mod-utilities",
@@ -607,6 +611,7 @@ name = "cp-mod-tree"
 version = "0.2.13"
 dependencies = [
  "cp-base",
+ "cp-env",
  "cp-mod-utilities",
  "cp-render",
  "crossterm",
@@ -618,6 +623,9 @@ dependencies = [
 [[package]]
 name = "cp-mod-utilities"
 version = "0.2.13"
+dependencies = [
+ "cp-env",
+]
 
 [[package]]
 name = "cp-oplog"
@@ -670,6 +678,7 @@ dependencies = [
 name = "cp-vault"
 version = "0.2.13"
 dependencies = [
+ "cp-env",
  "fs2",
  "log",
  "reqwest",

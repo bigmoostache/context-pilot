@@ -11,6 +11,8 @@ categories.workspace = true
 publish = false
 
 [dependencies]
+# Validated `HOME` / `XDG_CONFIG_HOME`.
+cp-env.workspace = true
 
 [lints]
 workspace = true

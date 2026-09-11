@@ -27,16 +27,12 @@ use crate::error::{BootResult, Error};
 /// readable.
 const REGISTRY_MODE: u32 = 0o600;
 
-/// The default agents directory under the user's home: `~/.context-pilot/agents`.
-///
-/// # Errors
-///
-/// Returns [`Error::Io`] if `$HOME` is unset (there is nowhere to anchor
-/// the path).
-pub fn default_agents_dir() -> BootResult<PathBuf> {
-    let home = std::env::var_os("HOME")
-        .ok_or_else(|| Error::io("resolve agents dir", std::io::Error::other("$HOME is not set")))?;
-    Ok(PathBuf::from(home).join(".context-pilot").join("agents"))
+/// The agents directory: `CP_AGENTS_DIR`, else `~/.context-pilot/agents` -
+/// the same validated value the orchestrator scans, so an agent can never
+/// register where its orchestrator is not looking.
+#[must_use]
+pub fn default_agents_dir() -> PathBuf {
+    cp_env::env().core.agents_dir.clone()
 }
 
 /// The default sync-plane root under the user's home: `~/.context-pilot/sync`
@@ -47,14 +43,9 @@ pub fn default_agents_dir() -> BootResult<PathBuf> {
 /// location that keeps the user's realm folder clean and bounds the Unix-socket
 /// path length regardless of realm depth. Sibling of [`default_agents_dir`],
 /// so discovery record and sync plane sit next to each other.
-///
-/// # Errors
-///
-/// Returns [`Error::Io`] if `$HOME` is unset.
-pub fn default_sync_root() -> BootResult<PathBuf> {
-    let home = std::env::var_os("HOME")
-        .ok_or_else(|| Error::io("resolve sync root", std::io::Error::other("$HOME is not set")))?;
-    Ok(PathBuf::from(home).join(".context-pilot").join("sync"))
+#[must_use]
+pub fn default_sync_root() -> PathBuf {
+    cp_env::env().core.home.join(".context-pilot").join("sync")
 }
 
 /// The path of the registry file for agent `id` inside `agents_dir`.

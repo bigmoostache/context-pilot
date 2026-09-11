@@ -262,7 +262,7 @@ fn teardown_and_maybe_reexec(reload_pending: bool) {
 
     #[cfg(unix)]
     if reload_pending
-        && std::env::var_os("CP_RUN_SH").is_none()
+        && !cp_env::env().dev.run_sh
         && let Ok(exe_path) = std::env::current_exe()
     {
         use std::os::unix::process::CommandExt as _;

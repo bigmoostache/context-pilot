@@ -11,6 +11,7 @@ readme.workspace = true
 publish = false
 
 [dependencies]
+cp-env.workspace = true
 cp-base.workspace = true
 cp-render.workspace = true
 crossterm.workspace = true
