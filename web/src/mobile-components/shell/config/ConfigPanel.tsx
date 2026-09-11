@@ -3,6 +3,7 @@ import { Check, X } from "lucide-react"
 import { DialogClose } from "@/mobile-components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/providers/auth"
+import { useFeatures } from "@/lib/providers/toggles/features"
 import { CategoryBody } from "./ConfigPanes"
 import { type CatId, CATEGORIES } from "./categories"
 
@@ -33,8 +34,13 @@ export function ConfigPanel({ variant = "dialog" }: { variant?: "dialog" | "inli
   // control off ⇒ authEnabled false, no user) the single-user appliance viewer
   // is treated as superadmin so it can still manage keys (design §13.5/§13.10).
   const isSuperadmin = authEnabled === false || authUser?.role === "superadmin"
+  // Deployment gate: a pane whose `CP_FEATURE_*` flag is off is offered to no one.
+  const features = useFeatures()
   const visibleCategories = CATEGORIES.filter(
-    (c) => (!c.adminOnly || isAdmin) && (!c.superadminOnly || isSuperadmin),
+    (c) =>
+      (!c.adminOnly || isAdmin) &&
+      (!c.superadminOnly || isSuperadmin) &&
+      (!c.feature || features[c.feature]),
   )
   const inline = variant === "inline"
 

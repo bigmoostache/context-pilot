@@ -17,6 +17,7 @@ import { UserMenu } from "./widgets/UserMenu"
 import { UsersDialog } from "@/components/auth/UsersDialog"
 import { Tip } from "@/components/ui/tip"
 import { useDevMode } from "@/lib/providers/toggles/devMode"
+import { useFeatures } from "@/lib/providers/toggles/features"
 import { useModifierShortcuts } from "@/lib/support/a11y"
 import type { Agent, ViewMode } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -70,11 +71,11 @@ export function TopBar({
   onToggleFinderRail,
 }: TopBarProps) {
   const activeAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
-  // OAuth usage/login widget applies ONLY to the OAuth providers (Bearer token
-  // via vault "claude_oauth"). The `anthropic` provider authenticates by
-  // x-api-key (ANTHROPIC_API_KEY) and has no OAuth login, so it's excluded.
+  // OAuth usage/login widget: only for the OAuth providers (`anthropic` uses an
+  // API key), and only where the deployment offers the subscription at all.
   const isClaudeOAuth =
-    activeAgent?.provider === "claudecode" || activeAgent?.provider === "claudecodev2"
+    useFeatures().claude_oauth &&
+    (activeAgent?.provider === "claudecode" || activeAgent?.provider === "claudecodev2")
   const inFleet = view === "fleet"
   const { devMode } = useDevMode()
   const [configOpen, setConfigOpen] = useState(false)
@@ -154,9 +155,8 @@ export function TopBar({
   )
 }
 
-/** Right-side controls cluster: theme toggle, agent-config gear, Claude Usage
- *  button, and the account avatar menu. Extracted from {@link TopBar} so both
- *  components stay within the P8 complexity budget. */
+/** Right-side controls cluster: theme toggle, Claude Usage button and the
+ *  account menu. Extracted from {@link TopBar} for the P8 complexity budget. */
 function TopBarActions({
   isClaudeOAuth,
   setConfigOpen,

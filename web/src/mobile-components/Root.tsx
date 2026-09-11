@@ -9,6 +9,7 @@ import { AuthGuard } from "@/mobile-components/auth/AuthGuard"
 import { ThemeProvider } from "@/lib/providers/ThemeProvider"
 import { AccountProvider } from "@/lib/providers/AccountProvider"
 import { AuthProvider } from "@/lib/providers/AuthProvider"
+import { FeaturesProvider } from "@/lib/providers/toggles/FeaturesProvider"
 import { DevModeProvider } from "@/lib/providers/toggles/DevModeProvider"
 import { ShowOverlayProvider } from "@/lib/providers/toggles/ShowOverlayProvider"
 import { AsideDefaultProvider } from "@/lib/providers/toggles/AsideDefaultProvider"
@@ -64,21 +65,23 @@ function Root() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <AccountProvider>
-          <DevModeProvider>
-            <ShowOverlayProvider>
-              <AsideDefaultProvider>
-                <TooltipProvider delay={350} closeDelay={80}>
-                  <AuthGuard>
-                    <TopButtonsProvider>
-                      <MobileShell />
-                    </TopButtonsProvider>
-                  </AuthGuard>
-                </TooltipProvider>
-              </AsideDefaultProvider>
-            </ShowOverlayProvider>
-          </DevModeProvider>
-        </AccountProvider>
+        <FeaturesProvider>
+          <AccountProvider>
+            <DevModeProvider>
+              <ShowOverlayProvider>
+                <AsideDefaultProvider>
+                  <TooltipProvider delay={350} closeDelay={80}>
+                    <AuthGuard>
+                      <TopButtonsProvider>
+                        <MobileShell />
+                      </TopButtonsProvider>
+                    </AuthGuard>
+                  </TooltipProvider>
+                </AsideDefaultProvider>
+              </ShowOverlayProvider>
+            </DevModeProvider>
+          </AccountProvider>
+        </FeaturesProvider>
       </AuthProvider>
     </ThemeProvider>
   )

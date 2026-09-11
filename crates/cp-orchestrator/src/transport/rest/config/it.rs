@@ -53,13 +53,14 @@ pub(crate) fn it_set_identity(state: &Mutex<Backend>, body: &[u8], auth_user: Op
 
 /// `GET /api/it/provisioned` — whether the box has been provisioned
 /// (`can_manage_it`). Reads the durable flag via
-/// [`state::is_provisioned`](crate::transport::it::state::is_provisioned).
+/// [`state::effective_provisioned`](crate::transport::it::state::effective_provisioned)
+/// (a deployment without the day-0 step counts as provisioned).
 pub(crate) fn it_provisioned(state: &Mutex<Backend>, auth_user: Option<&User>) -> HttpReply {
     if auth_user.is_some_and(|u| !u.can_manage_it()) {
         return HttpReply::error(403, "IT management access required");
     }
     let provisioned = match state.lock() {
-        Ok(b) => crate::transport::it::state::is_provisioned(&b.provision_flag_path),
+        Ok(b) => crate::transport::it::state::effective_provisioned(&b.provision_flag_path),
         Err(_) => return HttpReply::error(500, "backend lock poisoned"),
     };
     HttpReply::ok(&serde_json::json!({ "provisioned": provisioned }))

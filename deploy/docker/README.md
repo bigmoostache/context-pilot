@@ -45,6 +45,13 @@ variable; to see the report without starting anything:
 docker compose run --rm context-pilot --check-env
 ```
 
+The image also fixes the **feature flags** of the container profile (no day-0
+identity step, no IT pane, no OTA updater — a container is updated by pulling a
+new image; Claude subscription and cockpit key editing on). Override one in
+`.env`, e.g. `CP_FEATURE_KEYS_EDITABLE=0` to make provider keys environment-only
+and the Secrets pane read-only; the cockpit reads the effective set from
+`GET /api/features`.
+
 Accounts are seeded **only while the user table is empty**, exactly as on the
 appliance; after that the values are ignored, so leaving them in `.env` is safe.
 Omitting the superadmin on the first boot is **not reversible** — only a

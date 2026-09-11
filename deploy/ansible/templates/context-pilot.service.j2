@@ -68,6 +68,16 @@ Environment=CP_REGDOM_BIN=/usr/local/sbin/cp-regdom
 # `web/baseline` (the SPA Ansible shipped); a failed update never touches it.
 Environment=CP_WEB_ROOT={{ cp_root }}/web/current
 Environment=CP_AGENT_BINARY={{ cp_root }}/bin/tui
+# Feature flags (docs/ENV.md), every one spelled out: a deployment decides
+# them, the binary's defaults are not a deployment decision. Appliance profile:
+# the day-0 identity/TLS setup, the IT pane and the OTA updater are ON. Override
+# per client with -e cp_feature_<name>=0|1 (site.yml).
+Environment=CP_FEATURE_CLAUDE_OAUTH={{ cp_feature_claude_oauth }}
+Environment=CP_FEATURE_DAY0_SETUP={{ cp_feature_day0_setup }}
+Environment=CP_FEATURE_IT_PANE={{ cp_feature_it_pane }}
+Environment=CP_FEATURE_UPDATER={{ cp_feature_updater }}
+Environment=CP_FEATURE_KEYS_EDITABLE={{ cp_feature_keys_editable }}
+Environment=CP_FEATURE_ONBOARDING={{ cp_feature_onboarding }}
 # Provisioning values (templated by Ansible, chmod 600). Loaded as KEY=value.
 #   seed.env      — per-UNIT admin seed (CP_SEED_ADMIN_*); write-once, seeded
 #                   only when the user table is empty (idempotent).

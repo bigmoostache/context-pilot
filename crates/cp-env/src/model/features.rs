@@ -137,6 +137,12 @@ impl Features {
         }
     }
 
+    /// Every flag set to `on` (tests, fixtures).
+    #[must_use]
+    pub fn all(on: bool) -> Self {
+        Self::build(|_each| on)
+    }
+
     /// A copy with `feature` set to `on` (tests, fixtures).
     #[must_use]
     pub fn with(self, feature: Feature, on: bool) -> Self {

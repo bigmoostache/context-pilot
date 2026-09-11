@@ -41,7 +41,10 @@ fn state() -> Arc<Mutex<Backend>> {
 
 /// Dispatch one route through [`route_rest`] with the given caller.
 fn dispatch(state: &Arc<Mutex<Backend>>, method: &Method, segments: &[&str], caller: Option<&User>) -> u16 {
-    let ctx = crate::transport::RouteCtx { state, body_bytes: b"", query: "", auth_token: None, auth_user: caller };
+    // Every surface enabled: these tests are about RBAC, not feature flags.
+    let flags = cp_env::model::features::Features::all(true);
+    let ctx =
+        crate::transport::RouteCtx { state, body_bytes: b"", query: "", auth_token: None, auth_user: caller, flags };
     route_rest(method, segments, ctx).status
 }
 

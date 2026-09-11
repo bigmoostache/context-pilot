@@ -10,6 +10,7 @@ import {
 } from "@/lib/api"
 import { LoginFlow } from "@/mobile-components/shell/widgets/UsageButton"
 import { cn } from "@/lib/utils"
+import { useFeatures } from "@/lib/providers/toggles/features"
 
 /**
  * Secrets settings pane (design §13.5) — mobile twin of `components/shell/config/
@@ -27,21 +28,31 @@ import { cn } from "@/lib/utils"
  */
 export function SecretsPane() {
   const { data: keys = [] } = useQuery({ queryKey: ["env-keys"], queryFn: fetchEnvKeys })
+  // Deployment flags (`CP_FEATURE_*`): keys may be read-only (set through the
+  // environment alone), and the Claude subscription may not be offered at all.
+  const { keys_editable: editable, claude_oauth: claudeOauth } = useFeatures()
   return (
     <div className="flex flex-col gap-6">
       <section className="flex flex-col gap-2">
-        <SectionLabel label="Provider API keys" hint="Reveal or replace a stored key" />
+        <SectionLabel
+          label="Provider API keys"
+          hint={
+            editable ? "Reveal or replace a stored key" : "Managed by the deployment environment"
+          }
+        />
         <div className="flex flex-col gap-2">
           {keys.map((k) => (
-            <ProviderKeyRow key={k.env} item={k} />
+            <ProviderKeyRow key={k.env} item={k} editable={editable} />
           ))}
         </div>
       </section>
 
-      <section className="flex flex-col gap-2">
-        <SectionLabel label="Claude subscription" hint="OAuth login for Claude Code" />
-        <ClaudeOAuthSection />
-      </section>
+      {claudeOauth && (
+        <section className="flex flex-col gap-2">
+          <SectionLabel label="Claude subscription" hint="OAuth login for Claude Code" />
+          <ClaudeOAuthSection />
+        </section>
+      )}
     </div>
   )
 }
@@ -58,8 +69,9 @@ function SectionLabel({ label, hint }: { label: string; hint: string }) {
 }
 
 /** One provider key: status, on-demand reveal (fetches the value into an edit
- *  field), and persist via `PUT /api/env-keys/{name}`. */
-function ProviderKeyRow({ item }: { item: EnvKeyStatus }) {
+ *  field), and persist via `PUT /api/env-keys/{name}`. With `editable` off the
+ *  row is status only (the backend refuses the PUT with 403 as well). */
+function ProviderKeyRow({ item, editable }: { item: EnvKeyStatus; editable: boolean }) {
   const qc = useQueryClient()
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState("")
@@ -102,7 +114,7 @@ function ProviderKeyRow({ item }: { item: EnvKeyStatus }) {
             {item.exists ? "Configured" : "Not configured"}
           </span>
         </span>
-        {!editing && (
+        {editable && !editing && (
           <button
             onClick={() => (item.exists ? reveal.mutate() : setEditing(true))}
             disabled={reveal.isPending}
