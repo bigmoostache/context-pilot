@@ -47,7 +47,9 @@ fn seed_one(store: &AuthStore, role_sql: &str, account: &Account) {
     let password = match account.password() {
         Ok(password) => password,
         Err(e) => {
-            crate::oerr!("seed: {role_sql} {}: {e} — skipping", account.email());
+            // The role only: the account value carries the password, so nothing
+            // derived from it goes to the journal (CodeQL cleartext-logging).
+            crate::oerr!("seed: {role_sql}: {e} — skipping");
             return;
         }
     };
@@ -63,6 +65,6 @@ fn seed_one(store: &AuthStore, role_sql: &str, account: &Account) {
             }
             Err(e) => crate::oerr!("seed: created {} but could not set must-change flag: {e}", user.email),
         },
-        Err(e) => crate::oerr!("seed: failed to create {role_sql} {}: {e}", account.email()),
+        Err(e) => crate::oerr!("seed: failed to create {role_sql}: {e}"),
     }
 }
