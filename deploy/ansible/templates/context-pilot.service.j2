@@ -76,6 +76,11 @@ Environment=CP_AGENT_BINARY={{ cp_root }}/bin/tui
 EnvironmentFile=-{{ cp_root }}/seed.env
 EnvironmentFile=-{{ cp_root }}/providers.env
 ExecStartPre=/bin/mkdir -p {{ cp_root }}/home
+# Environment preflight (docs/ENV.md): the same merge and validation as the
+# boot itself, run first so a misconfigured unit fails HERE with every
+# offending variable named in the journal, instead of a half-started service.
+# Same Environment=/EnvironmentFile= lines apply to ExecStartPre.
+ExecStartPre={{ cp_root }}/bin/cp-orchestrator --check-env
 ExecStart={{ cp_root }}/bin/cp-orchestrator
 # `always`, not `on-failure`: the self-updater may end its old process with a
 # clean-looking exit (its exec fallback), and `on-failure` would leave the box
