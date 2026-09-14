@@ -2842,6 +2842,10 @@
   path: .gitignore
   description: Git ignore rules
   last_edited_ms: 0
+1d29a165957e0e5d:
+  path: src/app/run/tools/cleanup.rs
+  description: 'Watcher polling: blocking sentinel replacement + async spine notifications. A2 split + A9 clean (dp.metadata for entry index, result.as_ref/as_mut, pending_done take).'
+  last_edited_ms: 0
 1d3b1c91822f39fc:
   path: src/llms/claude_code_api_key/helpers.rs
   description: 'CC API-key helpers: constants (endpoint/headers), map_model_name(), inject_system_reminder(), apply_claude_code_headers()'
@@ -6754,6 +6758,10 @@
   path: .git/index
   description: Git index (binary). Not source.
   last_edited_ms: 0
+44e5c68229b37cbe:
+  path: src/app/context/detach.rs
+  description: Splits old messages into frozen ConversationHistory panels. detach_conversation_chunks split find_detach_boundary/tip_keeps_enough/chunk_name/push_history_chunk/is_turn_boundary (A2). Freeze-aware, deletes detached from disk.
+  last_edited_ms: 0
 44ec99bdb2e8374f:
   path: crates/cp-mod-brave/src/lib.rs
   description: 'Brave Search module. 2 tools: brave_search (snippets), brave_llm_context (deep extracted content). Dynamic brave_result panels. No state. Global, non-core.'
@@ -8358,6 +8366,10 @@
   path: crates/cp-orchestrator/tests/supervisor_lifecycle.rs
   description: Phase 28 (X795) backend supervisor lifecycle suite (4 tests, all green, ~15s). Black-box public-API + real OS processes. SIGTERM→grace→SIGKILL escalation, multi-agent fleet spawn/stop, adopted FOREIGN process signalled, check_liveness routes.
   last_edited_ms: 0
+54e9cbd7eb9d1df6:
+  path: crates/cp-base/src/state/runtime/mod.rs
+  description: Runtime State struct (#[non_exhaustive]) + boot builders (with_context/messages/id_counters/...). TypeMap module_data (get_ext/ext/set_ext). Message-ID allocators. begin_streaming resets tick counters. cost f64 accumulators.
+  last_edited_ms: 0
 54eaa3cfe9a5ebbb:
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints. Ctrl+C ''copied ✓'' flash (2s) via copied_flash_ms.'
@@ -9086,6 +9098,10 @@
   path: crates/cp-mod-firecrawl/src/api.rs
   description: Firecrawl v2 HTTP client. FirecrawlClient with 5xx retry (3 attempts, 1s delay). ScrapeParams/SearchParams/MapParams/CrawlParams structs. post_json() + get_json() generic helpers. start_crawl() + poll_crawl() for async crawl jobs. 30s timeout. Bearer auth. Rate limit + forbidden error handling.
   last_edited_ms: 0
+5d71d26ba234bdd3:
+  path: crates/cp-mod-spine/src/lib.rs
+  description: Spine module. Auto-continuation, notifications (10 processed kept), guard rails, coucou timers. Manages WatcherRegistry. on_user_message resets counters. on_stream_stop prevents re-launch.
+  last_edited_ms: 0
 5d75cd2085e1e6f8:
   path: web/src/components/ui/button.tsx
   description: Button with CVA variant system (default/outline/secondary/ghost/destructive/link × 8 sizes incl icon variants). Base UI primitive, group/button data-slot.
@@ -9206,6 +9222,10 @@
   path: web/src/lib/query/sse.ts
   description: 'Reconnecting SSE client for one agent''s event stream. EventSource with ticket auth, last_rev resume param (T268 fix), exponential backoff (1s→30s). Singleton per agent via getOrCreateSseClient. Named event listeners: delta/stream/resync/invalidate. Wildcard ''*'' subscriber support. subscribeConnection(callback) for reactive connection state (open/error transitions). web-lint P3: `closed` flag read through an isClosed() getter at the onerror + catch sites — a direct !closed is CFA-narrowed to always-true (its only mutation is in the deferred close()), a function call is opaque to CFA.'
   last_edited_ms: 1784201925016
+5f150f2d83b98316:
+  path: crates/cp-mod-spine/src/engine.rs
+  description: 'Spine engine. check_spine() split: in_backoff/last_synthetic_unanswered/check_guard_rails helpers. Bypass hierarchy: streaming, user_stopped, backoff, unprocessed, double-synthetic guard, guard rails. build_continuation_from_notifications + apply_continuation.'
+  last_edited_ms: 0
 5f161a3fc06fceef:
   path: web/src/lib/support/telemetry/vitals.ts
   description: 'web-vitals attribution telemetry producer. onINP/onLCP/onCLS/onFCP/onTTFB from web-vitals/attribution → VitalEvent{name,value,rating,detail}. INP is the headline ''feels frozen'' metric; inpDetail() splits latency into input/processing/presentation + interactionTarget. v5 fields: LCP target?, CLS largestShiftTarget?. Chromium-only.'
@@ -10802,6 +10822,10 @@
   path: yamls/injections.yaml
   description: LLM-facing text injections. Spine auto-continuation, editor warning banners, console guardrails (git/gh → dedicated tools), history cleanup trap messages (%PANELS% templates), behavioral redirects, provider-shared text.
   last_edited_ms: 0
+6ee1298fe2efc4a4:
+  path: Cargo.lock
+  description: Workspace lockfile
+  last_edited_ms: 0
 6eebba085eb382ca:
   path: crates/cp-orchestrator/src/registry/mod.rs
   description: 'FleetScanner (renamed AgentRegistry, module_name_repetitions): poll-based scan-and-diff of agents dir. Event::Appeared(Box<Entry>) (large_enum_variant boxed). Disappeared/StatusChanged/Stale. reap_tmp crash-orphan collector. diff collects keys->Vec (iter_over_hash_type). 8 tests. orch-clippy: CLEAN (81f54baa) — assert_appeared_live helper hoists matches! guard for cognitive.'
@@ -11773,6 +11797,10 @@
 785457d7918159e2:
   path: web/src/components/auth/maint/parts.tsx
   description: 'Shared presentational building blocks for the IT maintenance wizard: Shell (centered CP-branded step shell + progress dots), Field (labelled text/password input), PrimaryButton/GhostButton, ErrorNote. Token-styled to match the auth-screen idiom.'
+  last_edited_ms: 0
+786a20468bcb9ce4:
+  path: crates/cp-mod-threads/src/tools.rs
+  description: Thread tool handlers. execute_send split push_send_message + clamp_bytes/preview_ellipsis helpers (A2). execute_read split collect_thread_summaries/apply_read_focus/force_refresh_threads_panel + build_read_result(ReadResult struct). build_panel_content split write_thread_list/write_message. YAML output, MAX caps. T353 auto-unarchive.
   last_edited_ms: 0
 7872327bfa93b2cb:
   path: crates/cp-oplog/src/replay.rs
@@ -13934,6 +13962,10 @@
   path: web/e2e/breaker.spec.ts
   description: 'Phase 9 e2e (T121): tripped CostBreaker 503 on send is SURFACED in the UI, not swallowed. Creates a real thread via the un-routed request context, opens it, then page.route-intercepts **/command to return 503 {status:tripped} so only the UI-driven send hits it; asserts a visible role=alert containing budget|breaker|blocked. Separation of concerns: backend 503 production = rust transport_http.rs; this covers the frontend''s 503 surfacing (the untested layer) by mocking the backend boundary. Deterministic regardless of live budget. afterAll archives e2e-brk- threads.'
   last_edited_ms: 1781816803465
+8e520194a2beb752:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 8e599736f055a92a:
   path: ui/src/lib/finderFs.ts
   description: Finder mock filesystem + helpers. buildRealm(folder,name) grafts one rich project tree onto an agent's folder (confined realm). findNode/pathChain DFS, fmtBytes, sortNodes (folders-first). Files carry preview payloads (code/sheet/slides/pdf/image/text).
@@ -13950,6 +13982,10 @@
   path: ui/src/components/threads/ThreadList.tsx
   description: 'Left rail of threads view — ALWAYS OPEN (width=var(--sidebar-w); collapse prop + edge-rail removed per T23). NO agent header. Working search <input> filters by name+last-preview. Groups: ''Needs you'' (MY_TURN, signal), ''Active'' (ACTIVE, green/ok, the one streaming), ''Working in parallel'' (THEIR_TURN). Per-row hover Archive/Restore action. Footer ''Archived (N)'' toggles a read-only archived view. New Thread button → onNewThread. Header pill counts agent-owned working threads.'
   last_edited_ms: 1781553182555
+8e70461b31de2812:
+  path: crates/cp-mod-spine/src/types.rs
+  description: 'Notification/SpineState/SpineConfig types. NotificationType (UserMessage/ReloadResume/Custom), NotificationStatus (Unprocessed/Blocked/Processed). SpineConfig: guard rail limits (max_output_tokens, max_duration_secs, max_messages, max_auto_retries) + runtime tracking. max_cost REMOVED.'
+  last_edited_ms: 0
 8e7e03d6f32e1dc0:
   path: crates/cp-agora/Cargo.toml
   description: 'cp-agora deps: cp-base, cp-render, crossterm, serde, serde_json.'
@@ -16073,6 +16109,10 @@ a467728cf80828fe:
 a4747c073a515243:
   path: src/modules/questions/mod.rs
   description: 'QuestionsModule: core, 1 tool (Think only). ThinkState persistence, on_tool_complete counter drift. No ask_user_question tool. Uses core.yaml for tool texts.'
+  last_edited_ms: 0
+a474e79fedc56641:
+  path: crates/cp-mod-spine/Cargo.toml
+  description: 'Spine module deps: cp-base, cp-render, cp-mod-utilities, crossterm, serde, serde_json.'
   last_edited_ms: 0
 a47504396e170036:
   path: src/ui/help/input.rs
@@ -19190,6 +19230,10 @@ c4131792081c5fee:
   path: crates/cp-mod-bridge/src/lib.rs
   description: 'BridgeModule: init_state activates Boot when CP_BRIDGE=1 OR --bridge CLI flag (OnceLock). request_bridge() pub API for CLI activation. PENDING+try_recover self-heal. ContextMemo alias for ContextUsage emit memo. on_stream_chunk→Token, on_stream_stop→PhaseHint(Idle).'
   last_edited_ms: 0
+c41f489ec27f3717:
+  path: crates/cp-mod-threads/Cargo.toml
+  description: 'Threads module deps: cp-base, cp-render, crossterm, serde, serde_json.'
+  last_edited_ms: 0
 c42065b68b84aa34:
   path: crates/cp-orchestrator/src/registry/mod.rs
   description: 'AgentRegistry: poll-based scan-and-diff of agents dir. Events: Appeared/Disappeared/StatusChanged/Stale. Three-factor liveness verdict. reap_tmp for crash-orphan writes. 8 tests.'
@@ -21926,6 +21970,10 @@ e25ad0b6e0689eb4:
   path: src/app/run/streaming.rs
   description: 'Stream event processing. process_stream_events + handle_stream_error_event (A2). A9: pending_done 9-tuple take() owned bind. Chunk/ToolUse/Done/Error, retry, finalize_stream cache engine.'
   last_edited_ms: 1784542900926
+e26937f7977f58db:
+  path: crates/cp-base/src/state/watchers/carriers.rs
+  description: WatcherResult + DeferredPanel + DynPanel carriers. Builder-pattern result type with panel_id/tool_use_id/close_panel/create_panel/processed_already/kill_session/preserves_tempo/create_dyn_panel fields.
+  last_edited_ms: 0
 e2965ad068447bda:
   path: crates/cp-mod-bridge/Cargo.toml
   description: 'Bridge module deps: cp-base, cp-render, cp-wire, cp-oplog, log 0.4, nix 0.30 (fs, for Flock RAII), serde_json. dev: tempfile. Workspace lints.'
