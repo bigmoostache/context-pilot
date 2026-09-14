@@ -665,6 +665,12 @@ M-tiny-27:
   contents: 'Branch sanitization (abc6d7d5): IdleMyTurnDetector watcher replaces check_my_turn_threads+notified_my_turn_id debounce. Persistent, async spine notif. Anti-flood deferred. Net -198 lines.'
   importance: medium
   last_edited_ms: 1789376850472
+M-tiny-28:
+  tier: tiny
+  title: T734 tail-reorder shipped
+  contents: 'T734 SHIPPED (9c8de1ca): killed global last_refresh_ms sort; previous_panel_order=persistent base; freeze pass reorders ONLY broken tail asc by panel_total_cost (compute_reorder_from, freeze.rs).'
+  importance: medium
+  last_edited_ms: 1789396085117
 M-tiny-3:
   tier: tiny
   title: 'Haiku 4.5 max_tokens fix:'
