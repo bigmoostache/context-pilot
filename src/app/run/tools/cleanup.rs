@@ -120,6 +120,7 @@ fn process_async_completions(app: &mut App, async_results: &mut [cp_base::state:
             "watcher".to_owned(),
             result.description.clone(),
         );
+        SpineState::set_notification_thread(&mut app.state, &nid, result.thread_id.clone());
         if result.processed_already {
             let _r = SpineState::mark_notification_processed(&mut app.state, &nid);
         }

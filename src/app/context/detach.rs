@@ -40,10 +40,20 @@ fn is_turn_boundary(messages: &[Message], idx: usize) -> bool {
     true
 }
 
+/// Whether `msg` is an injected `/* Notification [...] */` user message.
+///
+/// These are stripped from detached history chunks (T736 #4): they are
+/// ephemeral spine nudges, not real conversation, and must not accumulate in
+/// frozen `ConversationHistory` panels.
+fn is_notification_message(msg: &Message) -> bool {
+    msg.role == "user" && msg.content.trim_start().starts_with("/* Notification [")
+}
+
 /// Format a range of messages into a text chunk (delegates to shared function).
 fn format_chunk_content(messages: &[Message], start: usize, end: usize) -> String {
     let slice = messages.get(start..end).unwrap_or_default();
-    crate::state::format_messages_to_chunk(slice)
+    let filtered: Vec<Message> = slice.iter().filter(|m| !is_notification_message(m)).cloned().collect();
+    crate::state::format_messages_to_chunk(&filtered)
 }
 
 /// Count active (non-Deleted, non-Detached) messages in `msgs`.
@@ -120,6 +130,7 @@ fn push_history_chunk(state: &mut crate::state::State, boundary: usize) -> bool 
     let history_msgs: Vec<Message> = chunk_msgs
         .iter()
         .filter(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached)
+        .filter(|m| !is_notification_message(m))
         .cloned()
         .collect();
 

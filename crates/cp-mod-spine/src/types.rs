@@ -55,6 +55,10 @@ pub struct Notification {
     pub timestamp_ms: u64,
     /// Human-readable description
     pub content: String,
+    /// Thread this notification is bound to (if any). Set by thread-aware
+    /// sources so `Read`-ing that thread can clear it. `None` = global.
+    #[serde(default)]
+    pub thread_id: Option<String>,
 }
 
 impl Notification {
@@ -68,6 +72,7 @@ impl Notification {
             status: NotificationStatus::Unprocessed,
             timestamp_ms: cp_base::panels::now_ms(),
             content,
+            thread_id: None,
         }
     }
 
@@ -208,6 +213,9 @@ impl SpineState {
                 last.role != "assistant" || last.tool_uses.is_empty()
             });
             if safe_to_inject {
+                // Aggregate (T736): keep at most one notification message live —
+                // drop any prior injected notification messages before adding this.
+                let _stripped = state.strip_notification_messages();
                 let msg = format!("/* Notification [{source}]: {content} */");
                 let _id = state.push_user_message(msg);
             }
@@ -217,7 +225,9 @@ impl SpineState {
             let ss = Self::get_mut(state);
             let id = format!("N{}", ss.next_notification_id);
             ss.next_notification_id = ss.next_notification_id.saturating_add(1);
-            ss.notifications.push(Notification::new(id.clone(), kind, source, content));
+            let mut notification = Notification::new(id.clone(), kind, source, content);
+            notification.thread_id = None;
+            ss.notifications.push(notification);
             // Inline gc: cap at 100
             if ss.notifications.len() > 100 {
                 let excess = ss.notifications.len().saturating_sub(100);
@@ -255,6 +265,34 @@ impl SpineState {
             state.touch_panel(Kind::SPINE);
         }
         removed
+    }
+
+    /// Delete all notifications bound to a thread (matching `thread_id`).
+    ///
+    /// Called when a thread is `Read` — its pending notifications are moot once
+    /// the agent has focused the thread. Returns the number removed.
+    pub fn delete_notifications_by_thread(state: &mut State, thread_id: &str) -> usize {
+        let removed = {
+            let ss = Self::get_mut(state);
+            let before = ss.notifications.len();
+            ss.notifications.retain(|n| n.thread_id.as_deref() != Some(thread_id));
+            before.saturating_sub(ss.notifications.len())
+        };
+        if removed > 0 {
+            state.touch_panel(Kind::SPINE);
+        }
+        removed
+    }
+
+    /// Bind an existing notification (by ID) to a thread, so `Read`-ing that
+    /// thread clears it. No-op when `thread_id` is `None` or the ID is unknown.
+    /// Used by the watcher chokepoint after `create_notification` returns.
+    pub fn set_notification_thread(state: &mut State, id: &str, thread_id: Option<String>) {
+        let Some(tid) = thread_id else { return };
+        let ss = Self::get_mut(state);
+        if let Some(n) = ss.notifications.iter_mut().find(|n| n.id == id) {
+            n.thread_id = Some(tid);
+        }
     }
 
     /// Mark a notification as processed by ID. Returns true if found.

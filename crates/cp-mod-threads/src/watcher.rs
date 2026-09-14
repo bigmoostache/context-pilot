@@ -121,6 +121,7 @@ impl Watcher for IdleMyTurnDetector {
                 kill_session: None,
                 preserves_tempo: true,
                 create_dyn_panel: None,
+                thread_id: Some(thread.id.clone()),
             });
         }
 
@@ -138,6 +139,7 @@ impl Watcher for IdleMyTurnDetector {
             kill_session: None,
             preserves_tempo: true,
             create_dyn_panel: None,
+            thread_id: Some(thread.id.clone()),
         })
     }
 

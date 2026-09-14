@@ -568,7 +568,6 @@ dependencies = [
  "cp-base",
  "cp-mod-utilities",
  "cp-render",
- "crossterm",
  "serde",
  "serde_json",
 ]
@@ -578,6 +577,7 @@ name = "cp-mod-threads"
 version = "0.2.13"
 dependencies = [
  "cp-base",
+ "cp-mod-spine",
  "cp-render",
  "crossterm",
  "serde",

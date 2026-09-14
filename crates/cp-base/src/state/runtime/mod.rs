@@ -396,6 +396,21 @@ impl State {
         self.messages.len().saturating_sub(1)
     }
 
+    /// Remove all injected `/* Notification [...] */` user messages from the
+    /// conversation (T736 aggregation: keep at most one notification message
+    /// live at a time). Returns the count removed.
+    ///
+    /// These messages are standalone user text (never part of a `tool_use` /
+    /// `tool_result` pairing), so removing them can never orphan a tool block.
+    /// Orphaned message files left on disk are harmless: boot loads strictly
+    /// from the persisted `message_uids` index, which is regenerated from this
+    /// (stripped) message list on the next state save.
+    pub fn strip_notification_messages(&mut self) -> usize {
+        let before = self.messages.len();
+        self.messages.retain(|m| !(m.role == "user" && m.content.trim_start().starts_with("/* Notification [")));
+        before.saturating_sub(self.messages.len())
+    }
+
     /// Create an empty assistant message for streaming into, add it, return its index.
     pub fn push_empty_assistant(&mut self) -> usize {
         let (id, uid) = self.alloc_assistant_ids();

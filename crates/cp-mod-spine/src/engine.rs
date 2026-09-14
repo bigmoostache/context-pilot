@@ -208,6 +208,11 @@ fn build_transparent_continuation(unprocessed: &[&Notification], state: &State) 
 ///
 /// Returns true if a stream should be started (caller should call `start_streaming`).
 pub fn apply_continuation(state: &mut State, action: ContinuationAction) -> bool {
+    // On fire (T736 #3): remove all injected `/* Notification [...] */` messages
+    // from the conversation tip. Their content has been consumed into the
+    // synthetic continuation message (or is moot on a transparent relaunch), so
+    // leaving the raw notification messages behind would duplicate them.
+    let _stripped = state.strip_notification_messages();
     match action {
         ContinuationAction::SyntheticMessage(content) => {
             let _idx = state.push_user_message(content);

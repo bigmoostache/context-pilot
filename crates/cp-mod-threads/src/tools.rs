@@ -246,6 +246,10 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
     // --- Phase 3: Set focus ---
     apply_read_focus(state, tid, thread_status);
 
+    // Reading a thread clears any spine notifications bound to it — the agent
+    // has now focused the thread, so its pending nudges are moot.
+    let _cleared = cp_mod_spine::types::SpineState::delete_notifications_by_thread(state, tid);
+
     // --- Phase 4: Build panel content (thread list + focused conversation) ---
     rebuild_threads_panel(state, tid, now_ms);
 
