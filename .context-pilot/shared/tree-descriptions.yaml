@@ -18330,6 +18330,10 @@ bbf575dfbb488ebe:
   path: crates/cp-orchestrator/src/supervisor/mod.rs
   description: 'ProcManager (renamed from AgentSupervisor, module_name_repetitions) process lifecycle. new(allow_list) canonicalizes; validate_binary realpath vs list. spawn(SpawnPlan)/spawn_pty(PtyPlan) Copy param structs (killed too_many_args). stop SIGTERM->poll->SIGKILL->reap. restart/adopt/check_liveness. kill_pid free fn. Display via deref_match!. orch-clippy: clean (64b0ec7f).'
   last_edited_ms: 1787881790139
+bbfd5809fda781d4:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 bc04f658d38cdfb1:
   path: .git/index
   description: Git index (binary). Not source.

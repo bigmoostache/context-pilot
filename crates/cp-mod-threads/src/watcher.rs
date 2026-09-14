@@ -10,12 +10,14 @@
 //! condition holds. A dedicated anti-flood guard is planned but deliberately
 //! deferred per user decision — it will be added separately.
 
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use cp_base::panels::now_ms;
 use cp_base::state::runtime::State;
 use cp_base::state::watchers::Watcher;
 use cp_base::state::watchers::carriers::WatcherResult;
 
-use crate::types::{ThreadStatus, ThreadsState};
+use crate::types::{FocusState, ThreadStatus, ThreadsState};
 
 /// Watcher id — module-level const so `fn id()` returns a reference rather than
 /// a literal (dodges `unnecessary_literal_bound` without a redundant annotation).
@@ -23,11 +25,18 @@ const WATCHER_ID: &str = "my_turn_watcher";
 /// Watcher description (same trick as [`WATCHER_ID`]).
 const WATCHER_DESC: &str = "Detects idle agent with MY_TURN threads needing a response";
 
+/// Minimum interval between watcher fires (ms). Prevents flood from the
+/// persistent watcher firing every ~50ms poll cycle.
+const COOLDOWN_MS: u64 = 5_000;
+
 /// Detects an idle agent with unattended `MY_TURN` threads.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct IdleMyTurnDetector {
     /// Epoch-ms when this watcher was registered.
     registered: u64,
+    /// Epoch-ms when the watcher last produced a notification.
+    /// Uses `AtomicU64` because `Watcher: Sync` and `check()` takes `&self`.
+    last_fired_ms: AtomicU64,
 }
 
 impl Default for IdleMyTurnDetector {
@@ -40,7 +49,7 @@ impl IdleMyTurnDetector {
     /// Create a new detector, stamped now.
     #[must_use]
     pub fn new() -> Self {
-        Self { registered: now_ms() }
+        Self { registered: now_ms(), last_fired_ms: AtomicU64::new(0) }
     }
 }
 
@@ -67,8 +76,27 @@ impl Watcher for IdleMyTurnDetector {
             return None;
         }
 
+        // Cooldown: don't fire again within COOLDOWN_MS of the last fire.
+        let now = now_ms();
+        let last = self.last_fired_ms.load(Ordering::Relaxed);
+        if last > 0 && now.saturating_sub(last) < COOLDOWN_MS {
+            return None;
+        }
+
         let ts = ThreadsState::get(state);
-        let thread = ts.threads.iter().find(|t| !t.archived && !t.paused && t.status == ThreadStatus::MyTurn)?;
+        let fs = FocusState::get(state);
+
+        // Prefer the focused thread (it's the one the agent was working on when
+        // it stopped). Fall back to any MY_TURN thread.
+        let focused_tid = fs.focused_thread_id.as_deref();
+        let thread = focused_tid
+            .and_then(|fid| {
+                ts.threads.iter().find(|t| t.id == fid && !t.archived && !t.paused && t.status == ThreadStatus::MyTurn)
+            })
+            .or_else(|| ts.threads.iter().find(|t| !t.archived && !t.paused && t.status == ThreadStatus::MyTurn))?;
+
+        // Record the fire time for cooldown.
+        self.last_fired_ms.store(now, Ordering::Relaxed);
 
         // Suppress on abnormal stream endings (refusal, max_tokens, content
         // filter, errors). Only fire for normal completion ("end_turn") or
