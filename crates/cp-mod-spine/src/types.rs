@@ -178,10 +178,21 @@ impl SpineState {
 
     /// Create a new notification and add it. Returns the notification ID.
     ///
+    /// **Dedup**: if an unprocessed notification with the same `kind` and
+    /// `source` already exists, the call is a no-op and returns the existing
+    /// notification's ID. Content is free-text and excluded from the dedup key.
+    ///
     /// Non-transparent notifications (not `UserMessage` / `ReloadResume`) are
     /// additionally injected as user messages into the conversation so the LLM
     /// can see their content immediately — even before auto-continuation fires.
     pub fn create_notification(state: &mut State, kind: NotificationType, source: String, content: String) -> String {
+        // Dedup: skip if an unprocessed notification with same kind+source exists.
+        if let Some(existing) =
+            Self::get(state).notifications.iter().find(|n| n.is_unprocessed() && n.kind == kind && n.source == source)
+        {
+            return existing.id.clone();
+        }
+
         // Inject non-transparent notifications as conversation messages so the
         // LLM sees them immediately, regardless of auto-continuation timing.
         // Guard: never inject between a tool_use and its tool_result — that

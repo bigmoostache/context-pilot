@@ -75,20 +75,15 @@ fn check_guard_rails(state: &mut State) -> Option<String> {
             continue;
         }
         let reason = guard.block_reason(state);
-        // Deduplicate block notifications
+        // Notify about the block (create_notification deduplicates internally
+        // on kind+source, so no manual check needed).
         let source_tag = format!("guard_rail:{}", guard.name());
-        let already_notified = SpineState::get(state)
-            .notifications
-            .iter()
-            .any(|n| !n.is_processed() && n.kind == NotificationType::Custom && n.source == source_tag);
-        if !already_notified {
-            drop(SpineState::create_notification(
-                state,
-                NotificationType::Custom,
-                source_tag,
-                format!("Auto-continuation blocked by {}: {}", guard.name(), reason),
-            ));
-        }
+        drop(SpineState::create_notification(
+            state,
+            NotificationType::Custom,
+            source_tag,
+            format!("Auto-continuation blocked by {}: {}", guard.name(), reason),
+        ));
         // Persistent watchers recreate notifications next poll; re-evaluated then.
         SpineState::mark_all_unprocessed_as_blocked(state);
         return Some(reason);
