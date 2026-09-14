@@ -115,8 +115,6 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
         fs.focused_thread_id = Some(tid.to_owned());
         fs.dangling_remaining = 0i32;
         fs.escalation_level = 0;
-        // Reset debounce so next MY_TURN transition fires a new notification.
-        fs.notified_my_turn_id = None;
     }
 
     let suffix = if still_my_turn { " (still your turn)" } else { "" };

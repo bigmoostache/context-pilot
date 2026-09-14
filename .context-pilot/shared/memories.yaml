@@ -659,6 +659,18 @@ M-tiny-26:
   contents: 'Notes-tab (T716) code done. Backend/orch=5a6ce450; frontend on t715-orch-reader-rebuild (NotesChanged/emit_notes/notesReducer; NoteList in ThreadAsideTasks.tsx). LEFT: deploy orch+self-reload.'
   importance: medium
   last_edited_ms: 1788359468340
+M-tiny-27:
+  tier: tiny
+  title: Sanitization shipped
+  contents: 'Branch sanitization (abc6d7d5): IdleMyTurnDetector watcher replaces check_my_turn_threads+notified_my_turn_id debounce. Persistent, async spine notif. Anti-flood deferred. Net -198 lines.'
+  importance: medium
+  last_edited_ms: 1789376850472
+M-tiny-28:
+  tier: tiny
+  title: T734 tail-reorder shipped
+  contents: 'T734 SHIPPED (9c8de1ca): killed global last_refresh_ms sort; previous_panel_order=persistent base; freeze pass reorders ONLY broken tail asc by panel_total_cost (compute_reorder_from, freeze.rs).'
+  importance: medium
+  last_edited_ms: 1789396085117
 M-tiny-3:
   tier: tiny
   title: 'Haiku 4.5 max_tokens fix:'

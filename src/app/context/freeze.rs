@@ -76,8 +76,10 @@ impl FreezeConditions {
 /// and the breakpoint-carrying panel indices from last turn.
 ///
 /// Cache reuse on a break turn extends only to the **last alive breakpoint
-/// at-or-before the culprit**. Everything from there onward is billed fresh this
-/// turn regardless, so panels in `[anchor, culprit)` can be refreshed for free.
+/// at-or-before the culprit**. That breakpoint panel (the anchor) must stay
+/// byte-identical to keep its segment cached, so it is preserved; everything
+/// **strictly after** it is billed fresh this turn regardless, so panels in
+/// `(anchor, culprit)` can be refreshed for free.
 /// `bp_indices` are the current-order indices of panels that carried a
 /// breakpoint last turn; the anchor is the greatest one `<= culprit`. When none
 /// qualifies the anchor is the culprit itself — the region is empty and the old
@@ -105,19 +107,18 @@ fn item_is_culprit(item: &crate::app::panels::ContextItem, state: &State, cond: 
     }
 }
 
-/// Pre-pass: compute the BP-anchored free-region start index (T509).
+/// Walk the panels once (skipping `chat`), returning the first culprit index
+/// and the indices of panels that carried a breakpoint last turn.
 ///
-/// Finds the culprit under the current freeze policy, then widens the
-/// "free to update" region back to the last alive breakpoint before it.
-/// Panels in `[anchor, culprit)` are already billed fresh this turn (cache
-/// reuse stops at that breakpoint regardless), so refreshing them costs
-/// nothing. Returns that anchor index — panels at/after it may emit Fresh for
-/// free. `usize::MAX` when no culprit (nothing to free).
-pub(super) fn compute_force_break_at(
+/// Both indices live in the **non-chat index space** (chat is skipped and does
+/// not advance the counter). Shared by [`compute_force_break_at`] (content
+/// free-region anchor) and [`compute_reorder_from`] (position reorder anchor),
+/// which derive different anchors from the same scan.
+fn scan_culprit_and_bps(
     context_items: &[crate::app::panels::ContextItem],
     state: &State,
     cond: FreezeConditions,
-) -> usize {
+) -> (Option<usize>, Vec<usize>) {
     let bp_ids: std::collections::HashSet<&str> =
         state.previous_breakpoint_panel_ids.iter().map(String::as_str).collect();
     let mut culprit_idx: Option<usize> = None;
@@ -135,7 +136,51 @@ pub(super) fn compute_force_break_at(
         }
         idx = idx.saturating_add(1);
     }
+    (culprit_idx, bp_indices)
+}
+
+/// Pre-pass: compute the BP-anchored **content** free-region start index (T509).
+///
+/// Finds the culprit under the current freeze policy, then widens the
+/// "free to update" region back to the last alive breakpoint before it.
+/// Panels **strictly after** that anchor (in `(anchor, culprit)`) are already
+/// billed fresh this turn (cache reuse stops at the anchor regardless), so
+/// refreshing them costs nothing. The anchor itself is preserved so its cached
+/// segment survives. Returns that anchor index — panels *after* it may emit
+/// Fresh for free. `usize::MAX` when no culprit (nothing to free).
+pub(super) fn compute_force_break_at(
+    context_items: &[crate::app::panels::ContextItem],
+    state: &State,
+    cond: FreezeConditions,
+) -> usize {
+    let (culprit_idx, bp_indices) = scan_culprit_and_bps(context_items, state, cond);
     culprit_idx.map_or(usize::MAX, |ci| free_region_anchor(&bp_indices, ci))
+}
+
+/// Compute the **position** reorder-region start index: the first index of the
+/// free-to-permute tail.
+///
+/// Reordering a panel is free only when it sits past the last **surviving**
+/// cached segment. Anthropic caching is breakpoint-anchored, so:
+/// - **A breakpoint exists `<= culprit`:** the segment `[0, bp]` is a genuine
+///   cache hit and must stay byte-identical → reorder from `bp + 1`.
+/// - **No breakpoint `<= culprit`:** the first breakpoint is *after* the culprit,
+///   so its segment includes the changed culprit → miss. Nothing in `[0, culprit]`
+///   is cached this turn → reorder from `0` (the whole list is free to permute).
+///
+/// This diverges from [`compute_force_break_at`] only in the no-breakpoint
+/// fallback: the content anchor falls back to the culprit, whereas the reorder
+/// anchor falls back to `-1` (i.e. `0`). Returns `usize::MAX` when there is no
+/// culprit (nothing broke — no reordering needed).
+pub(super) fn compute_reorder_from(
+    context_items: &[crate::app::panels::ContextItem],
+    state: &State,
+    cond: FreezeConditions,
+) -> usize {
+    let (culprit_idx, bp_indices) = scan_culprit_and_bps(context_items, state, cond);
+    culprit_idx.map_or(usize::MAX, |ci| {
+        bp_indices.iter().copied().filter(|&i| i <= ci).max().map_or(0, |bp| bp.saturating_add(1))
+    })
 }
 
 #[cfg(test)]

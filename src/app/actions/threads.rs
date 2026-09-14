@@ -199,9 +199,6 @@ fn archive_confirm(state: &mut State) -> ActionResult {
             focus_after.escalation_level = 0;
         }
         let _prev = focus_after.last_read_count.remove(&aid);
-        if focus_after.notified_my_turn_id.as_deref() == Some(&aid) {
-            focus_after.notified_my_turn_id = None;
-        }
     }
 
     state.flags.ui.dirty = true;

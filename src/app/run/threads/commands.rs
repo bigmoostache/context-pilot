@@ -86,21 +86,6 @@ fn apply_send_message(state: &mut State, thread_id: &str, content: &str) {
     thread.messages.push(ThreadMessage::user(content.to_owned()));
     thread.status = ThreadStatus::MyTurn;
 
-    // No instant spine notification for unfocused threads — the idle
-    // MY_TURN detection (`check_my_turn_threads`) handles it when the
-    // agent finishes, avoiding mid-task distraction.
-    //
-    // Focused-thread case (T697): the user just messaged the thread the agent is
-    // parked on. Rather than firing a redundant `focused_thread_input`
-    // notification (a "go Read + ack" nudge), **re-arm** the idle auto-read by
-    // clearing the MY_TURN debounce. `check_my_turn_threads` then reads the
-    // focused thread directly the moment the agent is idle (immediately if not
-    // streaming, or as soon as the current stream ends), turning every new
-    // message on the focused thread into exactly one direct auto-read.
-    if FocusState::get(state).focused_thread_id.as_deref() == Some(thread_id) {
-        FocusState::get_mut(state).notified_my_turn_id = None;
-    }
-
     for module in crate::modules::all_modules() {
         module.on_user_message(state);
     }
@@ -185,9 +170,6 @@ fn apply_archive_thread(state: &mut State, thread_id: &str) {
         focus.escalation_level = 0;
     }
     let _prev = focus.last_read_count.remove(thread_id);
-    if focus.notified_my_turn_id.as_deref() == Some(thread_id) {
-        focus.notified_my_turn_id = None;
-    }
 
     emit_roster_delta(state, OpEntryKind::ThreadArchived { thread_id: thread_id.to_owned() });
     if let Some(bs) = state.get_ext_mut::<BridgeState>() {
@@ -272,9 +254,6 @@ fn apply_delete_thread(state: &mut State, thread_id: &str) {
         focus.escalation_level = 0;
     }
     let _prev = focus.last_read_count.remove(thread_id);
-    if focus.notified_my_turn_id.as_deref() == Some(thread_id) {
-        focus.notified_my_turn_id = None;
-    }
 
     emit_roster_delta(state, OpEntryKind::ThreadDeleted { thread_id: thread_id.to_owned() });
 

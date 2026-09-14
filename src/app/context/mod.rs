@@ -87,14 +87,30 @@ pub(super) fn prepare_stream_context(
     // (cond already captured state.tempo above)
     state.tempo = true; // Reset for next tick — tools will break it if they execute
 
-    if cond.freeze_order() && !state.previous_panel_order.is_empty() {
-        // Reorder context_items to match the saved order, dropping unknowns
-        let order = &state.previous_panel_order;
-        context_items.sort_by_key(|item| order.iter().position(|id| *id == item.id).unwrap_or(usize::MAX));
-        context_items.retain(|item| order.contains(&item.id));
-    } else {
+    // === Panel ordering (stable base) ═══════════════════════════════════════
+    // `previous_panel_order` is the PERSISTENT source of truth for panel order:
+    // it is replayed verbatim every tick so the cache prefix stays byte-stable —
+    // panels never shuffle just because their refresh timestamps moved. New
+    // panels (no saved position) are appended just above the conversation tail;
+    // `chat` is always pinned last. On cold start (no saved order) we seed once
+    // from `last_refresh_ms`.
+    //
+    // The ONLY reordering happens later, inside `run_panel_freeze_pass`, and ONLY
+    // within the already-broken tail (free to permute). That pass also persists
+    // the final order back into `previous_panel_order`.
+    if state.previous_panel_order.is_empty() {
         context_items.sort_by_key(|item| item.last_refresh_ms);
-        state.previous_panel_order = context_items.iter().map(|item| item.id.clone()).collect();
+    } else {
+        let order = &state.previous_panel_order;
+        context_items.sort_by_key(|item| {
+            if item.id == "chat" {
+                (2usize, 0usize) // conversation tail — always last
+            } else if let Some(pos) = order.iter().position(|id| *id == item.id) {
+                (0usize, pos) // known panel — keep saved position
+            } else {
+                (1usize, 0usize) // new panel — after known, before chat
+            }
+        });
     }
 
     // === Unified freeze pass (queue + breath + cost tracking) ═══════════════
