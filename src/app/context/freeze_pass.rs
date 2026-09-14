@@ -151,14 +151,20 @@ struct PassAcc {
 struct FoldCtx {
     /// Freeze conditions computed for this tick (queue / tempo flags).
     cond: FreezeConditions,
-    /// Panel index at/after which the cache is force-broken (BP anchor).
+    /// Panel index of the last surviving breakpoint (BP anchor). Panels
+    /// *strictly after* this index are force-broken (cache reuse stops at the
+    /// anchor, so their refresh is free); the anchor itself is preserved.
     force_break_at: usize,
 }
 
 /// Fold one non-chat panel into the pass: decide freeze/fresh, record the first
 /// cache break as culprit, and append its emitted hash + token count.
 fn fold_one_panel(state: &mut State, item: &mut ContextItem, fold: FoldCtx, acc: &mut PassAcc) {
-    let broken_for_decision = acc.cache_broken || acc.panel_idx >= fold.force_break_at;
+    // Strictly `>` (not `>=`): the anchor panel at `force_break_at` IS the last
+    // surviving cache breakpoint. Force-refreshing it would change its bytes and
+    // invalidate the segment it anchors, regressing the prefix to the previous
+    // breakpoint. Keep it frozen; free-refresh only panels strictly after it.
+    let broken_for_decision = acc.cache_broken || acc.panel_idx > fold.force_break_at;
     let emit = freeze_one_panel(state, item, fold.cond, broken_for_decision);
     if let Some((kind, max_freezes, is_new)) = emit.culprit {
         if !acc.cache_broken {
@@ -171,11 +177,24 @@ fn fold_one_panel(state: &mut State, item: &mut ContextItem, fold: FoldCtx, acc:
     acc.panel_idx = acc.panel_idx.saturating_add(1);
 }
 
-/// Per-panel freeze pass (normal, non-full-freeze path). Iterates panels, applies
-/// freeze/fresh decisions, tracks per-panel cache cost via prefix-match, records
-/// culprit-decomposed tick telemetry, and detects disappeared panels.
+/// Per-panel freeze pass (normal, non-full-freeze path). Reorders the broken
+/// tail by cost, then iterates panels applying freeze/fresh decisions, tracks
+/// per-panel cache cost via prefix-match, records culprit-decomposed tick
+/// telemetry, detects disappeared panels, and persists the final panel order.
 pub(super) fn run_panel_freeze_pass(state: &mut State, context_items: &mut [ContextItem], meta: FreezeMeta) {
     let cond = meta.cond;
+
+    // 1. Reorder the free-to-permute tail by ascending cumulative cost: cheap /
+    //    stable panels hug the cache frontier (extending the prefix next turn),
+    //    expensive / volatile ones sink toward the conversation tip. The tail is
+    //    past the last surviving breakpoint (or the whole list is a miss), so
+    //    permuting it is billed-fresh-anyway = zero cost this turn. `chat` stays
+    //    pinned last.
+    let reorder_from = freeze::compute_reorder_from(context_items, state, cond);
+    reorder_broken_tail(state, context_items, reorder_from);
+
+    // 2. Compute the content force-break anchor on the FINAL (post-reorder) order
+    //    so the fold loop's freeze/fresh decisions align with the emitted layout.
     let force_break_at = freeze::compute_force_break_at(context_items, state, cond);
     let hit_price = state.cache_hit_price_per_mtok();
     let miss_price = state.cache_miss_price_per_mtok();
@@ -194,12 +213,35 @@ pub(super) fn run_panel_freeze_pass(state: &mut State, context_items: &mut [Cont
 
     let break_kind = classify_break_kind(state, context_items, cache_broken, &mut culprit);
     save_panel_id_types(state, context_items);
+    // Persist the final order (including chat, pinned last) as the stable base
+    // for next tick's replay in `prepare_stream_context`.
+    state.previous_panel_order = context_items.iter().map(|i| i.id.clone()).collect();
     record_freeze_telemetry(
         state,
         context_items,
         meta,
         &TelemetryParts { panel_token_counts: &panel_token_counts, culprit: &culprit, break_kind },
     );
+}
+
+/// Cumulative dollar cost a panel has accrued via cache breaks (0 if unknown).
+fn panel_cost(state: &State, id: &str) -> f64 {
+    state.context.iter().find(|c| c.id == id).map_or(0.0f64, |c| c.panel_total_cost)
+}
+
+/// Permute `context_items[reorder_from..]` in place, ascending by cumulative
+/// panel cost, keeping `chat` pinned last. No-op when `reorder_from` is out of
+/// range (no culprit → nothing broke → nothing to reorder).
+fn reorder_broken_tail(state: &State, context_items: &mut [ContextItem], reorder_from: usize) {
+    let Some(tail) = context_items.get_mut(reorder_from..) else {
+        return; // out of range: no culprit → nothing broke → nothing to reorder
+    };
+    tail.sort_by(|a, b| {
+        // chat sorts after everything (its cost proxy is +∞).
+        let ca = if a.id == "chat" { f64::INFINITY } else { panel_cost(state, &a.id) };
+        let cb = if b.id == "chat" { f64::INFINITY } else { panel_cost(state, &b.id) };
+        ca.total_cmp(&cb)
+    });
 }
 
 /// Prefix-match `new_hash_list` against the previous tick's list; mark each panel

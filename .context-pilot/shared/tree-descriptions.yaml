@@ -3338,6 +3338,10 @@
   path: yamls/injections.yaml
   description: LLM-facing text injections. Spine auto-continuation, editor warning banners, console guardrails (git/gh/typst → dedicated tools), history cleanup trap messages (%PANELS% templates), behavioral redirects, provider-shared text.
   last_edited_ms: 0
+2268fde50364fa5c:
+  path: crates/cp-mod-spine/src/types.rs
+  description: 'Notification/SpineState/SpineConfig types. NotificationType (UserMessage/ReloadResume/Custom), NotificationStatus (Unprocessed/Blocked/Processed). SpineConfig: guard rail limits (max_output_tokens, max_duration_secs, max_messages, max_auto_retries) + runtime tracking. max_cost REMOVED.'
+  last_edited_ms: 0
 226c0648fb1558ab:
   path: src/app/run/tools/pipeline.rs
   description: Main tool execution pipeline. collect_tool_results(ToolBatch) + finalize_tool_cycle(ToolCycle) split from handle_tool_execution (A2). execute_one_tool/execute_queue_control/enqueue_tool. Pre-flight → queue intercept (auto-flush on trap defusal) → execute → callbacks(sibling) → tempo. Radar signals, Meili log sync.
@@ -10558,6 +10562,10 @@
   path: crates/cp-orchestrator/tests/end_to_end.rs
   description: Phase 30 end-to-end loopback capstone (3 tests). Backend::new takes 6 args (auth=None, session_ttl). Real agent stack ↔ real backend transport over real sockets. Command journals on agent and re-emerges as SSE delta. Spilled body hydrates over REST. 25 SSE connect/disconnect soak cycles.
   last_edited_ms: 0
+6c6f07c04d3f7293:
+  path: crates/cp-mod-spine/src/engine.rs
+  description: 'Spine engine. check_spine() split: in_backoff/last_synthetic_unanswered/check_guard_rails helpers. Bypass hierarchy: streaming, user_stopped, backoff, unprocessed, double-synthetic guard, guard rails. build_continuation_from_notifications + apply_continuation.'
+  last_edited_ms: 0
 6c800ee7ffb7c8bd:
   path: web/src/lib/api/index.ts
   description: REST API client barrel — all via generated SDK. createCommand (POST), updateCommand (PUT library/command/{item} — T654), upsert/deleteLibraryAgent, fetchLibraryAgent, plus fleet/agent/usage/providers/update/threads/search/claude. Re-exports auth+finder+body+envKeys+it.
@@ -12549,6 +12557,10 @@
 80a907dd70658073:
   path: crates/cp-mod-search/src/indexer.rs
   description: Background file indexer with flame!("index_file"). Mtime-based dedup skips unchanged files. Initial scan thread + debounced mpsc event loop. 3s poll interval PollWatcher.
+  last_edited_ms: 0
+80ab89bf959b946d:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 80b766b68d019a72:
   path: crates/cp-orchestrator/src/transport/mod.rs
@@ -21130,6 +21142,10 @@ d8c40a18ed60bb7d:
   path: web/e2e/t287_probe.spec.ts
   description: 'T287 regression: synthetic-DnD e2e — dispatches dragstart→drop with shared DataTransfer(MOVE_MIME) on Miller-column rows, asserts backend /fs reflects move. Proved drop wiring works (failure was native drag-START).'
   last_edited_ms: 1781892894829
+d8ca66fc2e2f69df:
+  path: src/app/context/freeze.rs
+  description: 'Freeze policy: per-panel + ordering freeze (queue, tempo, breath budget). FreezeConditions/FreezeDecision. compute_force_break_at (item_is_culprit helper), free_region_anchor (BP-anchored free region T509). Tempo gated on frozen_context_snapshot.is_some().'
+  last_edited_ms: 0
 d8cfd3908e31eccb:
   path: web/src/components/shell/SessionVitals.tsx
   description: 'Service vitals as an EMBEDDABLE section (no Dialog chrome) — on-demand connectivity board only (T455: context-budget meter + figure chips removed). Rendered inside AgentModal manage mode right column. Backend probes prepended with 2 browser-only rows (frontend alive + round-trip). Grouped by category. Healthy rows quiet; degraded rows raise loud status chip.'
@@ -21909,6 +21925,10 @@ e2965ad068447bda:
 e29a9e64463f2ec8:
   path: .github/checks/allowed-lint-exceptions.yaml
   description: 'Curated list of allowed #[expect]/#[allow] annotations (10 entries). Every occurrence in the codebase MUST have an entry here. Fields: path, match, reason, strategy.'
+  last_edited_ms: 0
+e2aead543e2295f1:
+  path: src/app/context/freeze_pass.rs
+  description: 'Per-panel freeze pass. A9: take_while + find closures over &tuple -> |entry| index; Some((_,gone_type)) destructure -> bind entry, use entry.1. A6: panel cache cost via float_math. apply_full_freeze/run_panel_freeze_pass/freeze_one_panel + telemetry.'
   last_edited_ms: 0
 e2be8400e7878d25:
   path: web/src/App.tsx
@@ -24653,6 +24673,10 @@ fda2e001501598d0:
 fdaa66e8d4bf19c1:
   path: crates/cp-base/src/state/context.rs
   description: 'Kind registry + Entry type. TypeMeta, init_context_type_registry, fixed_panel_order. Kind string-backed context type with well-known constants (ENTITIES, ENTITY_RESULT, etc). Entry struct: id/uid/context_type/name/token_count/metadata + cache/freeze fields. estimate_tokens, make_default_entry.'
+  last_edited_ms: 0
+fdbad93c87a46691:
+  path: src/app/context/mod.rs
+  description: 'Context prep + unified freeze. A9: full_freeze snapshot via state.frozen_context_snapshot.as_ref(). prepare_stream_context split reverie/main builders; freeze machinery in sibling freeze_pass.rs.'
   last_edited_ms: 0
 fdbfb8603d4061fd:
   path: src/state/persistence/writer.rs
