@@ -244,7 +244,6 @@ impl App {
         super::streaming::finalize_stream(self);
         super::tools::watchdog::mark(super::tools::watchdog::Step::Spine);
         self.check_spine(ch.tx);
-        super::threads::check_my_turn_threads(self);
         super::streaming::process_api_check_results(self);
 
         // === REVERIE (CONTEXT OPTIMIZER SUB-AGENT) ===
@@ -373,23 +372,12 @@ impl App {
             self.state.guard_rail_blocked = None;
             let should_stream = apply_continuation(&mut self.state, action);
             if should_stream {
-                // Auto-Read: if unfocused with a MY_TURN thread, inject a
-                // synthetic Read tool call. When injected, the Read rides the
-                // NORMAL tool pipeline (handle_tool_execution on the next
-                // tick) — which executes it, breaks tempo, and drives the
-                // follow-up stream via continue_streaming itself. So when it
-                // injected we must NOT start a stream here, nor clear
-                // pending_tools (that would wipe the injected Read).
-                // Behaviourally identical to the LLM emitting a Read as its
-                // first action (T322).
-                if !super::threads::maybe_inject_auto_read(self) {
-                    self.typewriter.reset();
-                    self.pending_tools.clear();
-                    let ctx = prepare_stream_context(&mut self.state, false, None);
-                    let system_prompt = get_active_agent_content(&self.state);
-                    let params = build_stream_params(&self.state, ctx, Some(system_prompt));
-                    start_streaming(params, tx.clone());
-                }
+                self.typewriter.reset();
+                self.pending_tools.clear();
+                let ctx = prepare_stream_context(&mut self.state, false, None);
+                let system_prompt = get_active_agent_content(&self.state);
+                let params = build_stream_params(&self.state, ctx, Some(system_prompt));
+                start_streaming(params, tx.clone());
                 self.save_state_async();
                 self.state.flags.ui.dirty = true;
             }

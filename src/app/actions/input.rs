@@ -197,8 +197,8 @@ fn handle_thread_input_submit(state: &mut State) -> ActionResult {
     thread.messages.push(msg);
     thread.status = ThreadStatus::MyTurn;
 
-    // NO instant spine notification here — the idle MY_TURN detection
-    // (`check_my_turn_threads`) fires when the agent finishes its current
+    // NO instant spine notification here — the idle MY_TURN watcher
+    // (`IdleMyTurnDetector`) fires when the agent finishes its current
     // work, avoiding mid-task distraction.  Auto-continuation picks it up.
 
     // Notify all modules

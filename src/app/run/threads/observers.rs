@@ -31,7 +31,7 @@ use super::bridge::{bridge_active, emit_best_effort};
 /// chokepoint**: it diffs the live [`FocusState::focused_thread_id`] against the
 /// snapshot held in [`BridgeState::last_focus`] and emits **only on an actual
 /// change**, so it captures focus from *every* source with one uniform path —
-/// the idle `MY_TURN` auto-`Read` ([`maybe_inject_auto_read`](super::maybe_inject_auto_read)),
+/// the idle `MY_TURN` watcher (`IdleMyTurnDetector`),
 /// a manual `Read`, or focus release on archive / a finished turn — rather than
 /// an emit call scattered at each focus-mutation site.
 ///

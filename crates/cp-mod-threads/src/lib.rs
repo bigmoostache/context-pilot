@@ -15,6 +15,8 @@ mod panel;
 pub mod tools;
 /// Thread state types: `Thread`, `ThreadMessage`, `ThreadsState`, `FocusState`.
 pub mod types;
+/// Persistent watcher: fires a notification when idle + `MY_TURN` thread exists.
+pub mod watcher;
 
 use types::{FocusState, ThreadsState};
 
@@ -67,11 +69,17 @@ impl Module for ThreadsModule {
     fn init_state(&self, state: &mut State) {
         state.set_ext(ThreadsState::new());
         state.set_ext(FocusState::new());
+        // Register the persistent MY_TURN watcher so idle+MY_TURN fires a
+        // notification through the spine's standard pipeline.
+        cp_base::state::watchers::WatcherRegistry::get_mut(state)
+            .register(Box::new(watcher::IdleMyTurnDetector::new()));
     }
 
     fn reset_state(&self, state: &mut State) {
         state.set_ext(ThreadsState::new());
         state.set_ext(FocusState::new());
+        cp_base::state::watchers::WatcherRegistry::get_mut(state)
+            .register(Box::new(watcher::IdleMyTurnDetector::new()));
     }
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {
