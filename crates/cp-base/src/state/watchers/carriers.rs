@@ -31,6 +31,10 @@ pub struct WatcherResult {
     /// If set, create a generic dynamic panel when this watcher fires.
     /// Unlike `create_panel` (console-specific), this works for any panel type.
     pub create_dyn_panel: Option<DynPanel>,
+    /// Thread this result is bound to (if any). Stamped by thread-aware watchers
+    /// (e.g. the idle `MY_TURN` detector) so the resulting spine notification can
+    /// be cleared when that thread is `Read`.
+    pub thread_id: Option<String>,
 }
 
 impl WatcherResult {
@@ -52,6 +56,7 @@ impl WatcherResult {
             kill_session: None,
             preserves_tempo: false,
             create_dyn_panel: None,
+            thread_id: None,
         }
     }
 
@@ -126,6 +131,17 @@ impl WatcherResult {
     #[must_use]
     pub fn create_dyn_panel(mut self, panel: DynPanel) -> Self {
         self.create_dyn_panel = Some(panel);
+        self
+    }
+
+    /// Bind this result to a thread, so the spine notification it produces can
+    /// be cleared when that thread is `Read`.
+    #[must_use]
+    pub fn thread_id<S>(mut self, id: S) -> Self
+    where
+        S: Into<String>,
+    {
+        self.thread_id = Some(id.into());
         self
     }
 }

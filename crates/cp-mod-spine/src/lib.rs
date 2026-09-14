@@ -9,8 +9,6 @@ pub(crate) mod coucou;
 pub mod engine;
 /// Guard rail implementations: safety limits for auto-continuation.
 pub(crate) mod guard_rail;
-/// Spine panel: notification display and context rendering.
-mod panel;
 /// Tool execution: `notification_mark_processed`, `spine_configure`.
 pub(crate) mod tools;
 /// Notification, spine config, and state types.
@@ -28,7 +26,6 @@ use cp_base::tools::pre_flight::Verdict;
 use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
-use self::panel::SpinePanel;
 use cp_base::cast::Safe as _;
 use cp_base::modules::Module;
 
@@ -191,21 +188,23 @@ impl Module for SpineModule {
                 registry.register(Box::new(cd.into_watcher()));
             }
         }
+
+        // The spine panel was removed (notifications are backend-only now).
+        // Evict any spine context entry persisted by an older build so it does
+        // not linger as an orphaned FallbackPanel.
+        state.context.retain(|c| c.context_type.as_str() != Kind::SPINE);
     }
 
     fn fixed_panel_types(&self) -> Vec<Kind> {
-        vec![Kind::new(Kind::SPINE)]
+        vec![]
     }
 
     fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
-        vec![(Kind::new(Kind::SPINE), "Spine", false)]
+        vec![]
     }
 
-    fn create_panel(&self, context_type: &Kind) -> Option<Box<dyn Panel>> {
-        match context_type.as_str() {
-            Kind::SPINE => Some(Box::new(SpinePanel)),
-            _ => None,
-        }
+    fn create_panel(&self, _context_type: &Kind) -> Option<Box<dyn Panel>> {
+        None
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
@@ -277,16 +276,7 @@ impl Module for SpineModule {
     }
 
     fn context_type_metadata(&self) -> Vec<cp_base::state::context::TypeMeta> {
-        vec![cp_base::state::context::TypeMeta {
-            context_type: "spine",
-            icon_id: "spine",
-            is_fixed: true,
-            needs_cache: false,
-            fixed_order: Some(5),
-            display_name: "spine",
-            short_name: "spine",
-            needs_async_wait: false,
-        }]
+        vec![]
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
