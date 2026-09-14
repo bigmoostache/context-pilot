@@ -2210,6 +2210,10 @@
   path: crates/cp-mod-logs/src/lib.rs
   description: 'Logs module. 2 tools: log_create + Close_conversation_history (multi-panel, logs as strings, no memories/tags). Chunked JSON storage. build_log_write_ops() for batch persistence. v2 migration. Pre-flight validates panels array.'
   last_edited_ms: 0
+15fdd2a3e8095fc7:
+  path: crates/cp-mod-threads/src/lib.rs
+  description: 'Threads module. 2 tools: Send, Read. pre_flight split check_focus_enforcement + preflight_send + preflight_read helpers (A2). Focus enforcement dangling/escalation. TOOL_TEXTS LazyLock. fixed_order=5.'
+  last_edited_ms: 0
 16022c359a7618db:
   path: .github/checks/allowed-lint-exceptions.yaml
   description: 'Curated #[expect]/#[allow] registry (16 entries). Every occurrence in codebase MUST have an entry. radar entries repointed radar.rs→radar/mod.rs. Fields: path, match, reason, strategy.'
@@ -17526,6 +17530,10 @@ b3ccdc957029cfc7:
   path: src/app/context/freeze.rs
   description: 'Freeze policy: per-panel and ordering freeze decisions (queue, tempo, breath budget).'
   last_edited_ms: 1783093718330
+b3cd56def60be5ac:
+  path: crates/cp-mod-todo/src/tree.rs
+  description: ASCII box-drawing tree + in-progress-leaf warning for tool results (T686). result_annex = sole producer of tagged recap block (RECAP_OPEN/CLOSE sentinels). render() builds non-cancelled task tree.
+  last_edited_ms: 1789377826651
 b3d36d8f83a513aa:
   path: src/app/run/lifecycle.rs
   description: Main event loop. run split handle_input_phase(InputOutcome enum)/render_frame/compute_poll_ms/run_background_phase/auto_resume_stream_if_flagged/recover_bridge_if_pending/drain_chat_sync_if_due (A2). check_spine, EventChannels. T309 spinner gating.
@@ -20634,6 +20642,10 @@ d3ec572e7b413623:
   path: crates/cp-wire/tests/framing_integrity.rs
   description: 'Phase 21 (X788): exhaustive framing integrity suite — the V1 torn-tail property at byte granularity. Truncate at EVERY offset (clean-prefix-only, never fabricated frame), single-byte-flip at every offset (detected-or-byte-identical, never silent-different), payload-region corruption always CrcMismatch, trailing garbage doesn''t corrupt first decode, sub-header buffers Incomplete-never-panic, oversized len-prefix rejected-not-allocated, zero-length payload round-trips. Lib-only deps acked via use crc32c/serde/serde_json/sha2 as _ (per-target unused-crate-dependencies). 8 tests.'
   last_edited_ms: 0
+d3eda8f690bff97c:
+  path: crates/cp-mod-todo/src/yaml.rs
+  description: Canonical YAML render of thread task tree. render() builds deterministic YAML with status/title/description/children. scalar() quotes special chars. No parsing — read-only projection.
+  last_edited_ms: 1789377826510
 d3f82c22b0de608b:
   path: crates/cp-wire/tests/framing_integrity.rs
   description: 'Phase 21 (X788): exhaustive framing integrity suite — the V1 torn-tail property at byte granularity. Truncate at EVERY offset (clean-prefix-only, never fabricated frame), single-byte-flip at every offset (detected-or-byte-identical, never silent-different), payload-region corruption always CrcMismatch, trailing garbage doesn''t corrupt first decode, sub-header buffers Incomplete-never-panic, oversized len-prefix rejected-not-allocated, zero-length payload round-trips. Lib-only deps acked via use crc32c/serde/serde_json/sha2 as _ (per-target unused-crate-dependencies). 8 tests.'
@@ -22093,6 +22105,10 @@ e48d20dd3b0e5ca4:
 e493d21e31f3e450:
   path: crates/cp-mod-github/src/tools.rs
   description: GitHub CLI tool. Read-only → dynamic github_result panels. Mutating → async subprocess via spawn_async_tool. flame!("gh_exec"). Token redaction. Cache invalidation of affected panels. GIT_PROMPT_DISABLED.
+  last_edited_ms: 0
+e49c771fd1569499:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 e4c04f3481fd9580:
   path: web/.env.local

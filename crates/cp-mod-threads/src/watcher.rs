@@ -70,6 +70,32 @@ impl Watcher for IdleMyTurnDetector {
         let ts = ThreadsState::get(state);
         let thread = ts.threads.iter().find(|t| !t.archived && !t.paused && t.status == ThreadStatus::MyTurn)?;
 
+        // Suppress on abnormal stream endings (refusal, max_tokens, content
+        // filter, errors). Only fire for normal completion ("end_turn") or
+        // mid-tool-use ("tool_use") — those indicate the agent voluntarily
+        // stopped and should be nudged.
+        if !is_normal_stop(state.last_stop_reason.as_deref()) {
+            return Some(WatcherResult {
+                description: format!(
+                    "Thread \"{}\" ({}) is MY_TURN but the last LLM turn ended \
+                     abnormally (reason: {}). Send a message in that thread \
+                     explaining to the user that a guardrail or error fired, \
+                     and suggest changing the model to continue.",
+                    thread.name,
+                    thread.id,
+                    state.last_stop_reason.as_deref().unwrap_or("unknown/error"),
+                ),
+                panel_id: None,
+                tool_use_id: None,
+                close_panel: false,
+                create_panel: None,
+                processed_already: false,
+                kill_session: None,
+                preserves_tempo: true,
+                create_dyn_panel: None,
+            });
+        }
+
         Some(WatcherResult {
             description: format!(
                 "Thread \"{}\" ({}) is MY_TURN and needs a response. \
@@ -102,4 +128,17 @@ impl Watcher for IdleMyTurnDetector {
     fn is_persistent(&self) -> bool {
         true // survives firing — stays in the registry
     }
+}
+
+/// Whether the last stream stop reason indicates a normal voluntary stop.
+///
+/// Returns `true` for `"end_turn"` and `"tool_use"` — the agent finished on
+/// its own terms and should be nudged if it left a `MY_TURN` thread unanswered.
+///
+/// Returns `false` for everything else: `None` (stream error — `last_stop_reason`
+/// is not set on the error path), `"max_tokens"`, `"content_filter"`, or any
+/// other abnormal/unknown reason. These indicate a guardrail or infrastructure
+/// issue, not agent laziness.
+fn is_normal_stop(reason: Option<&str>) -> bool {
+    matches!(reason, Some("end_turn" | "tool_use"))
 }
