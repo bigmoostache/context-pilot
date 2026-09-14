@@ -69,17 +69,11 @@ impl Module for ThreadsModule {
     fn init_state(&self, state: &mut State) {
         state.set_ext(ThreadsState::new());
         state.set_ext(FocusState::new());
-        // Register the persistent MY_TURN watcher so idle+MY_TURN fires a
-        // notification through the spine's standard pipeline.
-        cp_base::state::watchers::WatcherRegistry::get_mut(state)
-            .register(Box::new(watcher::IdleMyTurnDetector::new()));
     }
 
     fn reset_state(&self, state: &mut State) {
         state.set_ext(ThreadsState::new());
         state.set_ext(FocusState::new());
-        cp_base::state::watchers::WatcherRegistry::get_mut(state)
-            .register(Box::new(watcher::IdleMyTurnDetector::new()));
     }
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {
@@ -104,6 +98,12 @@ impl Module for ThreadsModule {
         if let Some(v) = data.get("panel_content").and_then(serde_json::Value::as_str) {
             v.clone_into(&mut ts.panel_content);
         }
+        // Register the persistent MY_TURN watcher. Placed here (not init_state)
+        // because WatcherRegistry is created by SpineModule's init_state, which
+        // may run after ThreadsModule's init_state. load_module_data runs in a
+        // second pass after ALL init_state calls, so the registry exists.
+        cp_base::state::watchers::WatcherRegistry::get_mut(state)
+            .register(Box::new(watcher::IdleMyTurnDetector::new()));
     }
 
     fn save_worker_data(&self, state: &State) -> serde_json::Value {
