@@ -35,7 +35,11 @@ async function loadMermaid(dark: boolean): Promise<MermaidApi> {
   const mermaid = await memo.mod
   const theme = dark ? "dark" : "light"
   if (memo.theme !== theme) {
-    mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: dark ? "dark" : "default" })
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: "strict",
+      theme: dark ? "dark" : "default",
+    })
     memo.theme = theme
   }
   return mermaid
