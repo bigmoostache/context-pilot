@@ -2,6 +2,45 @@ import { useEffect, useId, useState, type ReactNode } from "react"
 
 import { cn } from "@/lib/utils"
 
+/** The mermaid API surface (the dynamic import's default export). */
+type MermaidApi = Awaited<typeof import("mermaid")>["default"]
+
+/**
+ * Memoised import promise + the theme mermaid was last initialised for.
+ *
+ * mermaid config is GLOBAL to the library, so `initialize` must run once per
+ * theme — not once per component mount (the old code re-initialised on every
+ * diagram, pure waste). Held on a const object (fields mutated, binding never
+ * reassigned) to keep module state without a reassigned top-level `let`.
+ */
+const memo: { mod: Promise<MermaidApi> | null; theme: "dark" | "light" | null } = {
+  mod: null,
+  theme: null,
+}
+
+/**
+ * Rendered-SVG cache keyed by `"<theme>:<source>"`. Identical diagrams (repeats)
+ * and re-mounts (scrolling a message row in/out) reuse the SVG verbatim instead
+ * of re-running the expensive dagre/d3 layout + serialize on the main thread.
+ */
+const svgCache = new Map<string, string>()
+
+/**
+ * Import mermaid once (memoised promise), (re)initialise only when the theme
+ * changed since the last call, and return the API. The first diagram on the
+ * page pays the chunk load; every diagram after reuses this.
+ */
+async function loadMermaid(dark: boolean): Promise<MermaidApi> {
+  memo.mod ??= import("mermaid").then((m) => m.default)
+  const mermaid = await memo.mod
+  const theme = dark ? "dark" : "light"
+  if (memo.theme !== theme) {
+    mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: dark ? "dark" : "default" })
+    memo.theme = theme
+  }
+  return mermaid
+}
+
 /**
  * Render a ```mermaid``` fenced block as an actual diagram.
  *
@@ -21,7 +60,13 @@ import { cn } from "@/lib/utils"
  * uses a translucent-dark box instead of the muted surface so it stays legible.
  */
 export function Mermaid({ code, onAccent }: { code: string; onAccent: boolean }): ReactNode {
-  const [svg, setSvg] = useState<string | null>(null)
+  const dark =
+    typeof document !== "undefined" && document.documentElement.classList.contains("dark")
+  const cacheKey = `${dark ? "dark" : "light"}:${code}`
+  // Seed from the cache during render (not via setState in the effect): a repeat
+  // diagram or a re-mount paints its SVG on the FIRST frame with no flash and no
+  // cascading effect render. A miss seeds `null` → the effect renders it async.
+  const [svg, setSvg] = useState<string | null>(() => svgCache.get(cacheKey) ?? null)
   const [error, setError] = useState<string | null>(null)
   // `useId` gives a stable, globally-unique id per component instance; strip the
   // framework's `:` delimiters so it is a valid DOM/SVG id (mermaid uses it in
@@ -30,24 +75,21 @@ export function Mermaid({ code, onAccent }: { code: string; onAccent: boolean })
   const id = `cp-mermaid-${rawId.replaceAll(/[^a-z0-9]/gi, "")}`
 
   useEffect(() => {
+    // Already rendered (seeded from cache at mount, or filled on a prior pass) —
+    // nothing to do. Layout + serialize only ever runs on a genuine miss.
+    if (svgCache.has(cacheKey)) {
+      return
+    }
     // Object-held flag (not a bare `let`): the async cleanup mutates it, and a
     // plain boolean would be narrowed to its literal init by the type-checker,
     // making the `alive.current` guards read as "always truthy".
     const alive = { current: true }
-    const dark =
-      typeof document !== "undefined" && document.documentElement.classList.contains("dark")
-
     void (async () => {
       try {
-        const mod = await import("mermaid")
-        const mermaid = mod.default
-        mermaid.initialize({
-          startOnLoad: false,
-          securityLevel: "strict",
-          theme: dark ? "dark" : "default",
-        })
+        const mermaid = await loadMermaid(dark)
         const { svg: out } = await mermaid.render(id, code)
         if (alive.current) {
+          svgCache.set(cacheKey, out)
           setSvg(out)
           setError(null)
         }
@@ -62,7 +104,7 @@ export function Mermaid({ code, onAccent }: { code: string; onAccent: boolean })
     return () => {
       alive.current = false
     }
-  }, [code, id])
+  }, [cacheKey, dark, id, code])
 
   if (error !== null) {
     return (

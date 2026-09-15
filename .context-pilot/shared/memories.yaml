@@ -674,6 +674,12 @@ M-tiny-28:
   contents: 'T740 (d45c1b10): broken-tail reorder = FIXED priority via emission_rank() in freeze_pass.rs, replacing T734 cost sort. Low rank=deep=cached (conv_history..console), chat last.'
   importance: medium
   last_edited_ms: 1789474224984
+M-tiny-29:
+  tier: tiny
+  title: T741 mermaid follow-ups
+  contents: 'T741 done: mermaid renders in web via markdown.tsx (sole renderer, all md surfaces). Send tool desc got MERMAID DIAGRAMS section in yamls/tools/threads.yaml, commit 9759ed5e on ui.'
+  importance: low
+  last_edited_ms: 1789474484144
 M-tiny-3:
   tier: tiny
   title: 'Haiku 4.5 max_tokens fix:'
