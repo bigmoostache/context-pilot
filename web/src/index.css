@@ -87,7 +87,7 @@
    of the change (even steps, and the popover/card split) and none of the
    darkening.
 
-     background   #fdfaf1   the desk
+     background   #ffffff   the desk
      surface      #f7f2e8   docked chrome
      surface-2    #f1e9dd   floating panel — the threads rail
      popover      #fbf8f1   overlays (SPLIT from card, see the dark note)
@@ -107,7 +107,7 @@
      making it the one narrow rail would break the uniformity the rails are
      built to have. */
   --sidebar-w: 312px;
-  --background: #fdfaf1;
+  --background: #fff;
   --surface: #f7f2e8; /* docked chrome — Finder bars, sidebars */
   --surface-2: #f1e9dd; /* floating panel — the threads rail */
   --card: #fff; /* the raised plane */
@@ -156,7 +156,7 @@
    perceptual lightness (CIE L*, not hex arithmetic — hex is not linear in
    perception, which is why evenly-spaced hex codes look unevenly spaced):
 
-     background     #222220   L* 13.1   the desk, nothing is behind it
+     background     #000000   L*  0.0   the desk, nothing is behind it
      grid           #262624   L* 15.1   rules drawn ON the desk
      surface        #2c2c2a   L* 18.0   docked chrome (Finder bars, sidebar)
      surface-2      #2f2f2c   L* 19.3   floating panel (threads rail)
@@ -189,7 +189,7 @@
 
    Reverting is a nine-value edit in this block. Nothing outside it moved. */
 .dark {
-  --background: #222220; /* dark dungeon — app background (TUI bg_base) */
+  --background: #000; /* pure black — app background */
   --surface: #2c2c2a; /* docked chrome — Finder bars, sidebars (TUI bg_surface) */
   --surface-2: #2f2f2c; /* floating panel — the threads rail */
   --card: #3a3a38; /* raised card (TUI bg_elevated) */
