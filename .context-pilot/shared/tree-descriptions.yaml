@@ -1430,6 +1430,10 @@
   path: src/app/run/watchers.rs
   description: 'File/cache watcher loop. A9: closure tuples over &tuple rewritten to |entry| index; &mut app.file_watcher -> .as_mut(); WatchEvent match via deref_match!. process_cache_updates split apply_unchanged/module_specific/content; timer deprecation classify/collect/dispatch/remove helpers; sync collect_wanted_paths/remove_stale/add_file/add_dir.'
   last_edited_ms: 1784541001087
+0ee1c449e825b01f:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 0ef0bd81edb04193:
   path: crates/cp-base/src/config/yaml_sync.rs
   description: YamlSync engine. SyncEntry trait (yaml_key, last_edited_ms, set_last_edited_ms). Generic load/save/upsert/remove/populate/migrate/remove_where. BTreeMap-based, additive merge, latest-wins conflict resolution, .bak backup.
@@ -4633,6 +4637,10 @@
 2f219605084295a8:
   path: web/src/components/auth/AuthGuard.tsx
   description: Auth gate wrapper (Phase 9). Shows LoginPage when auth enabled + no session, passes through when disabled or authenticated. Loading spinner while probing.
+  last_edited_ms: 0
+2f26a0bf413f6a01:
+  path: web/src/lib/support/markdown.tsx
+  description: 'GFM markdown renderer (react-markdown+remark-gfm+math+katex). onAccent/default variants. clipboard() guard. extractText iterative. web-lint P7: CopyButton now imported from @/components/conversation/CopyButton (its own leaf module) instead of Message — breaks the Message↔markdown import-x/no-cycle.'
   last_edited_ms: 0
 2f2715d829b2dd8d:
   path: crates/cp-mod-search/src/index/tick.rs
@@ -8082,6 +8090,10 @@
   path: web/src/components/finder/ContextMenu.tsx
   description: Finder right-click context menu (macOS-style action sheet, decorative actions flash toast). onPin optional prop adds a folder-only 'Pin to Sidebar' item (Pin icon). Open/Get Info/Rename/Duplicate/Download + tag swatches + Move to Trash. On-screen clamping.
   last_edited_ms: 1781795177816
+51f5e3be59ec3404:
+  path: web/src/mobile-components/threads/forms/FormWidget.tsx
+  description: Mobile FormWidget twin — routes mobile FormFields (its only fork). Draft persistence, two-click incomplete-submit gate, locked receipt — all byte-identical to desktop.
+  last_edited_ms: 0
 520bd83b42d1d2d7:
   path: crates/cp-mod-firecrawl/src/api.rs
   description: Firecrawl v2 HTTP client. FirecrawlClient with 5xx retry (3 attempts, 1s delay). ScrapeParams/SearchParams/MapParams structs. post_json() generic helper. 30s timeout. Bearer auth. Rate limit + forbidden error handling.
@@ -11662,6 +11674,10 @@
   path: web/src/App.tsx
   description: 'Root shell. activeAgent = useAgentMeta(activeAgentId) ?? fleetAgent. sseConnected = useSseConnected(activeAgentId) tracks SSE push plane health. useRestartFlow(activeAgentId) provides restart + restarting for both footer and dialog. agentLoading from useAgentMeta shows loader on agent switch. view/agent persisted to localStorage via write-through effects. effectiveView gates cockpit+costs behind devMode, falls back to fleet when no agent. StatusBar receives connected + onRestart + restarting + loading. Routes: fleet/threads/cockpit/costs/finder. renderView wrapped in <TelemetryProfiler id={effectiveView}>; mounts <TelemetryHud/> (dev-mode gated).'
   last_edited_ms: 1784202781632
+773cdf4b8b6c1f82:
+  path: web/package.json
+  description: 'Frontend deps. scripts: dev/build(tsc -b && vite build)/lint/preview + P2 format/format:check (prettier). engines.node ''^22.16.0 || >=24.0.0'' (P7 n/no-unsupported-features: exact code-driven floor for import.meta.dirname — n credits the ^22.16 backport + >=24, the 23.x gap is dead). @tanstack/react-query, react 19.2, tailwindcss 4.3, shadcn, vite 8, playwright, full eslint ratchet plugin roster + prettier + web-vitals.'
+  last_edited_ms: 0
 7759c8bb16be483c:
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: 'Transport hub. Backend shared state + serve/serve_bound + route_rest (27 routes incl /api/metrics + /api/agent/{id}/metrics, and /tools /radar /entities → inspect::panels derived-empty endpoints) + handle_stream SSE. inspect/ groups read-view endpoints (meta/panels/finder/metrics). run_stream SSE producer: Tailer.poll→rev-numbered deltas, drains StreamHub, dirty→invalidate. TAIL_REPOLL=5ms re-poll cap. command→visible p50 14ms/p99 33ms.'
@@ -17566,6 +17582,10 @@ b37fdbf395569147:
   path: web/src/components/Root.tsx
   description: Desktop tree root — extracted from former App.tsx body. Provider-contract boundary + AppShell (view-router fleet/threads/finder/costs, TopBar+StatusBar, live vitals/SSE, disconnect overlay). Mirror twin of mobile Root.
   last_edited_ms: 0
+b382ccbd046b739a:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 b3831f3e391cdcc6:
   path: crates/cp-mod-scratchpad/src/lib.rs
   description: 'Scratchpad module. 3 tools: create_cell/edit_cell/wipe. Fixed SCRATCHPAD panel. Per-worker cells. Visualizer: colored create/update/delete. fixed_order=8.'
@@ -18074,6 +18094,10 @@ b8a1f3d129dc4776:
   path: src/app/actions/threads.rs
   description: Thread action handlers. Archive = SOFT-DELETE (archived=true) not remove; restore clears flag. archive_confirm is view-aware (archive in active view, restore in archived view). toggle_archived_view flips FocusState.viewing_archived. Select/archive_start resolve selection through visible_indices. Question form dispatch. Secondary action variants removed from exhaustive match.
   last_edited_ms: 0
+b8a95972341752df:
+  path: web/src/index.css
+  description: Tailwind v4 + tw-animate. Two palettes (:root Cream light / .dark Dungeon Forge) as CSS token blocks; semantic tokens (signal/ok/warn/danger/surface). Finder micro-motion keyframes (finder-pop/ql-pop/menu-pop/ants/checker), modal-pop, highlight.js .hljs-* theme mapped to tokens (T280).
+  last_edited_ms: 0
 b8b587748881b280:
   path: crates/cp-oplog/src/service_tests.rs
   description: 'Unit tests for service.rs (8): durability classification, monotonic durable appends survive reopen, best-effort accepted/dropped, drop-without-shutdown still flushes, mixed-workload replays, group-commit rolls segments, submit_durable_persists_without_awaiting_the_sync (I2 non-blocking-yet-durable), and v11_emit_burst_never_blocks_the_loop_on_fsync (V11/I2 keystone: 5k best-effort PhaseTransition burst — worst single emit <25ms + whole burst <2s proves emit latency is decoupled from fdatasync, since try_send is structurally non-blocking; then a durable barrier confirms the log stays intact+replayable). Split from service.rs for the 500-line limit; #[path]-included so `super` resolves to service.'
@@ -18398,6 +18422,10 @@ bbf575dfbb488ebe:
   path: crates/cp-orchestrator/src/supervisor/mod.rs
   description: 'ProcManager (renamed from AgentSupervisor, module_name_repetitions) process lifecycle. new(allow_list) canonicalizes; validate_binary realpath vs list. spawn(SpawnPlan)/spawn_pty(PtyPlan) Copy param structs (killed too_many_args). stop SIGTERM->poll->SIGKILL->reap. restart/adopt/check_liveness. kill_pid free fn. Display via deref_match!. orch-clippy: clean (64b0ec7f).'
   last_edited_ms: 1787881790139
+bbfb9f7e3299de87:
+  path: web/src/mobile-components/threads/forms/FormFields.tsx
+  description: 'Mobile FormFields twin — 8 field renderers, 16px SCALAR_INPUT (iOS no-zoom), OptionGroup grouped-inset rows (≥44px tap), mobile ui/calendar+popover. T643: effect-free. T644: option inputs `absolute size-0 opacity-0` in a `relative` label (not sr-only) so focus stays on-screen — mirrors desktop Firefox blank fix. Field logic byte-identical to desktop.'
+  last_edited_ms: 0
 bbfd5809fda781d4:
   path: .git/index
   description: Git index (binary). Not source.
@@ -18629,6 +18657,10 @@ be1e5c3957982e96:
 be2b7aefcbf49547:
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (IR blocks → blocks_to_lines: selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (scrollable messages via scroll_offset, author/timestamp headers, content). All content through IR pipeline. Tab/Shift+Tab nav.'
+  last_edited_ms: 0
+be2c1f9aed69a6ca:
+  path: .context-pilot/shared/memories.yaml
+  description: Memory slots store (M-safe/tiny/short/mid/long, 220 fixed). Local-only, synced with commits. Mirrors the Memories panel.
   last_edited_ms: 0
 be33c4fd6fb67328:
   path: crates/cp-orchestrator/src/registry/tailer.rs
@@ -19494,6 +19526,10 @@ c67d39b6d3b06c24:
   path: crates/cp-orchestrator/src/transport/it/network/tests.rs
   description: 'Network doc/validation/secret-elision tests (no env gates). assert_hides_secrets helper, each_ap_step/each_supervisor_and_mode_step splits. Compacted to 500 lines. orch-clippy: CLEAN (7570cf79).'
   last_edited_ms: 1787890420578
+c67db449560e86b4:
+  path: web/src/components/threads/forms/FormWidget.tsx
+  description: Interactive form widget rendered inline from ```form``` block. localStorage draft per form-id, fieldFilled client-side submit gate, LockedForm read-only view.
+  last_edited_ms: 0
 c6811f3c48f111a6:
   path: src/ui/ir/render_status_bar.rs
   description: Status bar IR adapter. render_status_bar_from_ir split per-card push helpers push_card/push_retry_loading/push_stop_agent_skills/push_git/push_activity_cards (A2). Builder build_status_bar from state. Badges, agent/skill/git/auto-continue/reverie/queue/think cards.
@@ -21226,6 +21262,10 @@ d90ecc2bbeecd6f2:
   path: tmp/v2/src/ribbon/ViewTab.tsx
   description: 'View tab: zoom 50-200% (App state, CSS transform on a wrapper — scaling the contenteditable directly desyncs caret geometry) + refocus button.'
   last_edited_ms: 1785764713535
+d926e038f279a975:
+  path: src/app/context/freeze_pass.rs
+  description: 'Per-panel freeze pass. A9: take_while + find closures over &tuple -> |entry| index; Some((_,gone_type)) destructure -> bind entry, use entry.1. A6: panel cache cost via float_math. apply_full_freeze/run_panel_freeze_pass/freeze_one_panel + telemetry.'
+  last_edited_ms: 0
 d92967e64fea0fde:
   path: crates/cp-mod-threads/src/lib.rs
   description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, count positive. Send to a THEIR_TURN thread is ALLOWED (status stays THEIR_TURN) — no block. Focus enforcement with dangling/escalation. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
@@ -22374,6 +22414,10 @@ e6b9ad2949d17655:
   path: src/app/panels.rs
   description: Thin wrapper around cp_base::panels. get_panel() delegates to module system. FallbackPanel for orphaned contexts. refresh_all_panels() and collect_all_context() helpers.
   last_edited_ms: 0
+e6bcc9a37e48f164:
+  path: web/src/components/threads/forms/FormFields.tsx
+  description: '8 form field input renderers: single+allow-other, multi, text, number, date, toggle, confirm+confirm-word, files (immediate upload). FieldInput dispatcher. T643: effect-free. T644 FIREFOX BLANK FIX: option radio/checkbox inputs no longer `sr-only` (off-screen absolute) — now `absolute size-0 opacity-0` inside a `relative` label so focus lands ON-SCREEN. sr-only inputs, when focused on click, made Firefox scroll-into-view the ~100k-px conversation scroller to the off-screen input, blanking <main>. ''Other…'' never blanked because selecting it autoFocuses its visible textarea (on-screen), which is the clue that pinned focus-location as the cause.'
+  last_edited_ms: 0
 e6d23c43d25765a0:
   path: crates/cp-orchestrator/src/transport/inspect/providers/oauth_creds.rs
   description: 'Claude Code OAuth credential presence check. Routes through cp_vault::oauth::load_claude_oauth_raw (Keychain then file). oauth_creds_usable pure verdict: non-empty accessToken + unexpired expiresAt. 3 tests.'
@@ -23230,6 +23274,10 @@ ef07eab53a6d71bc:
   path: crates/cp-oplog/tests/dedup_compaction.rs
   description: 'Phase 23 (X790): cp-oplog dedup + compaction public-API black-box suite (7 tests). V3 dedup-across-long-gap: CommandEffect token committed early, 24 filler records force rolls (token lives only in checkpoint), duplicate SeenMark delivery folds no-op (seen.len unchanged, rev_of keeps FIRST commit rev = exactly-once), survives reopen+replay. Compaction: replay() Recovered (rev_head+heads+seen) byte-identical before/after over rich 3-thread/multi-token/many-roll log (build_rich_log), every committed token rides surviving checkpoint, no segment older than oldest_index remains; idempotent (2nd pass removes 0, boundary stable); reopen-after-compact keeps appending (rev_head advances, T1 head=fresh write); noop-before-first-roll (seg-0 alone). total_bytes feeds over_threshold trigger (strict greater-than boundary). body_gc_eligible parametric in grace knob (10ms grace: 5ms keep, =grace keep, 20ms eligible). tempfile+cp_wire direct (no as _).'
   last_edited_ms: 0
+ef0d9c87c63dceee:
+  path: .context-pilot/shared/memories.yaml
+  description: Memory slots store (M-safe/tiny/short/mid/long, 220 fixed). Local-only, synced with commits. Mirrors the Memories panel.
+  last_edited_ms: 0
 ef2e4030b826b32f:
   path: .github/checks/lint-config.chain
   description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
@@ -23846,6 +23894,10 @@ f5d4d3f43b22032b:
   path: ui/src/components/agents/FleetShell.tsx
   description: 'Fleet mission-control shell. Owns fleetPage + collapsed state. Renders FleetSidebar + clickable collapse RAIL (shadcn Sidebar pattern): 20px hit zone at x=var(--sidebar-w) (x=6 collapsed), a 3px→5px highlight band that brightens to interactive on hover, plus a pill-grip handle (3 dots) that fades in on hover — click toggles collapse (no buttons). Active page: agents/prompts/usage/settings(ConfigPanel inline).'
   last_edited_ms: 1781534744518
+f5d702c45a7c6462:
+  path: yamls/tools/threads.yaml
+  description: 'Threads tools YAML. 2 tools: Send (thread_id, markdown, file_path, questions), Read (thread_id, count).'
+  last_edited_ms: 0
 f5d937e367ae4cb0:
   path: crates/cp-orchestrator/src/services/auth/store.rs
   description: AuthStore — SQLite-backed auth CRUD. Schema init (users/sessions/agent_acl), Argon2id hashing, token/UUID generation. User CRUD, session lifecycle (create/validate/revoke with lazy sweep), ACL operations (grant/revoke/update_role/check/list_agent_users/list_user_agents/is_agent_admin/auto_grant_creator). 21 tests in sibling tests.rs.
