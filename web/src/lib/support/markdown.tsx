@@ -7,6 +7,7 @@ import "katex/dist/katex.min.css"
 
 import { CopyButton } from "@/components/conversation/CopyButton"
 import { cn, clipboard } from "@/lib/utils"
+import { Mermaid } from "./mermaid"
 
 /**
  * Full GitHub-flavored markdown renderer for chat/thread messages.
@@ -167,6 +168,18 @@ function CopyableTable({
   )
 }
 
+/**
+ * Whether a `<pre>`'s children is a single mermaid code fence. react-markdown
+ * hands `pre` its `<code>` element child; we peek at that child's `className`
+ * for `language-mermaid` so the `pre` handler can drop its frame and let the
+ * diagram (rendered by the `code` handler) stand alone.
+ */
+function isMermaidPre(children: ReactNode): boolean {
+  if (children == null || typeof children !== "object" || Array.isArray(children)) return false
+  const props = (children as { props?: { className?: unknown } }).props
+  return typeof props?.className === "string" && /\blanguage-mermaid\b/.test(props.className)
+}
+
 /** Build the element→component style map for a given variant. */
 function components(variant: MarkdownVariant): Components {
   const onAccent = variant === "onAccent"
@@ -259,6 +272,13 @@ function components(variant: MarkdownVariant): Components {
     // border/padding, inherit colour) — the `pre` owns the block frame. This is
     // robust regardless of whether a fence declares a language.
     code: ({ className, children, ...rest }) => {
+      // ```mermaid``` fences → render as an actual diagram, not a code chip.
+      // react-markdown tags the fence's <code> with `language-mermaid`; the
+      // enclosing <pre> (below) detects the same class and drops its frame so
+      // the diagram stands alone.
+      if (typeof className === "string" && /\blanguage-mermaid\b/.test(className)) {
+        return <Mermaid code={extractText(children)} onAccent={onAccent} />
+      }
       // Bare URLs inside backticks → render as clickable links, not code chips.
       const raw = typeof children === "string" ? children : extractText(children)
       const trimmed = raw.trim()
@@ -275,24 +295,31 @@ function components(variant: MarkdownVariant): Components {
         </ClickableCode>
       )
     },
-    pre: ({ children }) => (
-      <div>
-        <pre
-          className={cn(
-            preBox,
-            "[&>code]:border-0 [&>code]:bg-transparent [&>code]:p-0 [&>code]:text-inherit",
-          )}
-        >
-          {children}
-        </pre>
-        <CopyButton
-          text={extractText(children)}
-          align="start"
-          label="Copy code"
-          className={onAccent ? "text-current/60 hover:text-current" : undefined}
-        />
-      </div>
-    ),
+    pre: ({ children }) => {
+      // A mermaid fence renders as a standalone diagram (see `code` above);
+      // don't wrap it in the code-block frame or append a "Copy code" button.
+      if (isMermaidPre(children)) {
+        return <>{children}</>
+      }
+      return (
+        <div>
+          <pre
+            className={cn(
+              preBox,
+              "[&>code]:border-0 [&>code]:bg-transparent [&>code]:p-0 [&>code]:text-inherit",
+            )}
+          >
+            {children}
+          </pre>
+          <CopyButton
+            text={extractText(children)}
+            align="start"
+            label="Copy code"
+            className={onAccent ? "text-current/60 hover:text-current" : undefined}
+          />
+        </div>
+      )
+    },
 
     // ── Blockquote ──
     blockquote: ({ children }) => (

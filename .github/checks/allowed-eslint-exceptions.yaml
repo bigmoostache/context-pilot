@@ -336,6 +336,23 @@ exceptions:
       Re-evaluate alongside the desktop entry when a JSX-native syntax
       highlighter replaces highlight.js.
 
+  # ── Mermaid renderer — securityLevel:strict SVG injection is irreducible ──
+  - path: "web/src/lib/support/mermaid.tsx"
+    rule: "@eslint-react/dom-no-dangerously-set-innerhtml"
+    reason: >
+      The mermaid renderer (Mermaid) injects the SVG string returned by
+      mermaid.render() through dangerouslySetInnerHTML. mermaid runs with
+      securityLevel: "strict", so it sanitises its own output (DOMPurify
+      internally) and forbids inline scripts / click handlers — there is no
+      user-controlled markup in the injected string, and injecting a
+      pre-rendered SVG fragment is the ONLY way to mount mermaid's output (React
+      cannot reconstruct mermaid's SVG element tree from JSX). The exact analog
+      of the livePreviews highlight.js dangerouslySetInnerHTML exception; scoped
+      to this one file + this one rule, every other rule stays at error.
+    strategy: >
+      Re-evaluate if mermaid ever exposes a JSX/element-tree render API instead
+      of an SVG string (then the fragment could be mounted without the sink).
+
   # ── P7 import-x tsc-redundant / flat-config-idiom rules — off tree-wide ────
   - path: "web/**"
     rule: "import-x/default"

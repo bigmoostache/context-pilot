@@ -713,6 +713,22 @@ export default defineConfig([
     },
   },
   {
+    // The mermaid renderer injects the SVG string returned by
+    // `mermaid.render()` through `dangerouslySetInnerHTML`. mermaid runs with
+    // `securityLevel: "strict"`, so it sanitises its own output (DOMPurify
+    // internally) and forbids inline scripts / click handlers — the injected
+    // markup is safe by construction, and injecting a pre-rendered SVG fragment
+    // is the ONLY way to mount mermaid's output (React can't reconstruct
+    // mermaid's SVG tree from JSX). The same irreducible use as the livePreviews
+    // highlight.js exception above; scoped to this one file + this one rule
+    // (registered in allowed-eslint-exceptions.yaml — never an inline
+    // eslint-disable). Every other rule stays at error.
+    files: ["src/lib/support/mermaid.tsx"],
+    rules: {
+      "@eslint-react/dom-no-dangerously-set-innerhtml": "off",
+    },
+  },
+  {
     // ── P7 eslint-plugin-n — Node.js correctness, scoped to the ONLY Node
     //    code in this repo: the three build/tooling config files that run
     //    under Node (not the browser app). ──

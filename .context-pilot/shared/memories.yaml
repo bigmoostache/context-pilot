@@ -670,10 +670,16 @@ M-tiny-27:
   last_edited_ms: 1789376850472
 M-tiny-28:
   tier: tiny
-  title: T734 tail-reorder shipped
-  contents: 'T734 SHIPPED (9c8de1ca): killed global last_refresh_ms sort; previous_panel_order=persistent base; freeze pass reorders ONLY broken tail asc by panel_total_cost (compute_reorder_from, freeze.rs).'
+  title: Reorder fixed order
+  contents: 'T740 (d45c1b10): broken-tail reorder = FIXED priority via emission_rank() in freeze_pass.rs, replacing T734 cost sort. Low rank=deep=cached (conv_history..console), chat last.'
   importance: medium
-  last_edited_ms: 1789396085117
+  last_edited_ms: 1789474224984
+M-tiny-29:
+  tier: tiny
+  title: T741 mermaid
+  contents: 'T741 mermaid: renders in web via markdown.tsx (sole renderer). Send desc MERMAID section (threads.yaml, 9759ed5e). Perf 0572627b: init-once per theme + SVG cache in mermaid.tsx.'
+  importance: low
+  last_edited_ms: 1789476469489
 M-tiny-3:
   tier: tiny
   title: 'Haiku 4.5 max_tokens fix:'
