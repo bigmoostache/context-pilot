@@ -583,10 +583,10 @@ M-tiny-14:
   last_edited_ms: 1787840930941
 M-tiny-15:
   tier: tiny
-  title: 'Active branch + PR #194'
-  contents: 'Branch t715-orch-reader-rebuild → PR #194 OPEN to master (8 commits). Branch name is REUSED: its first PR #193 (T715) is already MERGED. Push here unless told otherwise.'
+  title: 'Active branch + PR #197'
+  contents: 'Branch sanitization → PR #197 OPEN to master (9 commits: T736 backend-only notifications + T734 panel ordering + IdleMyTurnDetector). Pushed. T736 commits: 05bc4199 (code), eefc34cf (sync).'
   importance: critical
-  last_edited_ms: 1788958673116
+  last_edited_ms: 1789400168556
 M-tiny-16:
   tier: tiny
   title: Freeze RESOLVED at infra
