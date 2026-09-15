@@ -676,10 +676,10 @@ M-tiny-28:
   last_edited_ms: 1789474224984
 M-tiny-29:
   tier: tiny
-  title: T741 mermaid follow-ups
-  contents: 'T741 done: mermaid renders in web via markdown.tsx (sole renderer, all md surfaces). Send tool desc got MERMAID DIAGRAMS section in yamls/tools/threads.yaml, commit 9759ed5e on ui.'
+  title: T741 mermaid
+  contents: 'T741 mermaid: renders in web via markdown.tsx (sole renderer). Send desc MERMAID section (threads.yaml, 9759ed5e). Perf 0572627b: init-once per theme + SVG cache in mermaid.tsx.'
   importance: low
-  last_edited_ms: 1789474484144
+  last_edited_ms: 1789476469489
 M-tiny-3:
   tier: tiny
   title: 'Haiku 4.5 max_tokens fix:'
