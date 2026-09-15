@@ -48,7 +48,7 @@ function asList(v: AnswerValue): string[] {
  *  as a single discrete block instead of a stack of individually-bordered pills. */
 function OptionGroup({ children }: { children: React.ReactNode }) {
   return (
-    <div className="divide-y divide-border/50 overflow-hidden rounded-xl border border-border/60 bg-card">
+    <div className="divide-y divide-(--border-strong)/60 overflow-hidden rounded-xl border border-(--border-strong) bg-card">
       {children}
     </div>
   )
@@ -94,7 +94,7 @@ function OptionRow({
       <span
         className={`mt-0.5 flex size-[18px] shrink-0 items-center justify-center border transition-colors ${
           kind === "radio" ? "rounded-full" : "rounded-md"
-        } ${on ? "border-(--signal) bg-(--signal) text-(--primary-foreground)" : "border-border/80 bg-background"}`}
+        } ${on ? "border-(--signal) bg-(--signal) text-(--primary-foreground)" : "border-(--border-strong) bg-background"}`}
       >
         {on &&
           (kind === "radio" ? (
@@ -145,7 +145,7 @@ function SingleField({ field, value, onChange, disabled }: FieldProps) {
             className="absolute top-0 left-0 size-0 opacity-0"
           />
           <span
-            className={`mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-full border transition-colors ${isOther ? "border-(--signal) bg-(--signal) text-(--primary-foreground)" : "border-border/80 bg-background"}`}
+            className={`mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-full border transition-colors ${isOther ? "border-(--signal) bg-(--signal) text-(--primary-foreground)" : "border-(--border-strong) bg-background"}`}
           >
             {isOther && <span className="size-2 rounded-full bg-current" />}
           </span>
@@ -359,7 +359,7 @@ function FilesField({ value, onChange, disabled, agentId }: FieldProps) {
       {paths.map((p) => (
         <span
           key={p}
-          className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-border/70 bg-card px-2.5 py-1.5 text-[12px] text-(--interactive)"
+          className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-(--border-strong) bg-card px-2.5 py-1.5 text-[12px] text-(--interactive)"
         >
           📎 <span className="font-mono">{p}</span>
           {!disabled && (
@@ -375,7 +375,7 @@ function FilesField({ value, onChange, disabled, agentId }: FieldProps) {
         </span>
       ))}
       <label
-        className={`inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-border/80 px-3 py-2 text-[13px] text-muted-foreground/80 transition-colors active:border-(--signal)/60 active:text-(--signal) ${disabled ? "pointer-events-none opacity-60" : ""}`}
+        className={`inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-(--border-strong) px-3 py-2 text-[13px] text-muted-foreground/80 transition-colors active:border-(--signal)/60 active:text-(--signal) ${disabled ? "pointer-events-none opacity-60" : ""}`}
       >
         {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
         {busy ? "Uploading…" : "Upload files"}

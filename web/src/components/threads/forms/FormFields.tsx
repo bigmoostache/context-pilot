@@ -83,7 +83,7 @@ function OptionRow({
       <span
         className={`mt-0.5 flex size-4 shrink-0 items-center justify-center border transition-colors ${
           kind === "radio" ? "rounded-full" : "rounded-sm"
-        } ${on ? "border-(--signal) bg-(--signal) text-(--primary-foreground)" : "border-border/80 bg-background"}`}
+        } ${on ? "border-(--signal) bg-(--signal) text-(--primary-foreground)" : "border-(--border-strong) bg-background"}`}
       >
         {on &&
           (kind === "radio" ? (
@@ -101,7 +101,7 @@ function OptionRow({
 }
 
 const SCALAR_INPUT =
-  "w-full rounded-md bg-transparent py-0.5 text-[13.5px] leading-relaxed text-foreground/90 outline-none placeholder:text-muted-foreground/40 disabled:opacity-60"
+  "w-full rounded-md border border-(--border-strong) bg-muted/40 px-2.5 py-1.5 text-[13.5px] leading-relaxed text-foreground/90 outline-none transition-colors placeholder:text-muted-foreground/40 focus:border-(--signal)/60 focus:bg-background disabled:opacity-60"
 
 /** single — radio over `{label, detail}` options, plus an optional free-text
  *  "Other…" choice (`allow-other`). The answer is the chosen label or the typed
@@ -137,7 +137,7 @@ function SingleField({ field, value, onChange, disabled }: FieldProps) {
             className="absolute top-0 left-0 size-0 opacity-0"
           />
           <span
-            className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border transition-colors ${isOther ? "border-(--signal) bg-(--signal) text-(--primary-foreground)" : "border-border/80 bg-background"}`}
+            className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border transition-colors ${isOther ? "border-(--signal) bg-(--signal) text-(--primary-foreground)" : "border-(--border-strong) bg-background"}`}
           >
             {isOther && <span className="size-1.5 rounded-full bg-current" />}
           </span>
@@ -234,7 +234,7 @@ function DateField({ value, onChange, disabled }: FieldProps) {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         disabled={disabled}
-        className={`flex w-full items-center gap-2 bg-transparent py-0.5 text-left text-[13.5px] outline-none disabled:opacity-60 ${
+        className={`flex w-full items-center gap-2 rounded-md border border-(--border-strong) bg-muted/40 px-2.5 py-1.5 text-left text-[13.5px] transition-colors outline-none focus:border-(--signal)/60 focus:bg-background disabled:opacity-60 ${
           selected ? "text-foreground/90" : "text-muted-foreground/40"
         }`}
       >
@@ -348,7 +348,7 @@ function FilesField({ value, onChange, disabled, agentId }: FieldProps) {
       {paths.map((p) => (
         <span
           key={p}
-          className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-border/70 bg-card px-2.5 py-1 text-[11.5px] text-(--interactive)"
+          className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-(--border-strong) bg-card px-2.5 py-1 text-[11.5px] text-(--interactive)"
         >
           📎 <span className="font-mono">{p}</span>
           {!disabled && (
@@ -364,7 +364,7 @@ function FilesField({ value, onChange, disabled, agentId }: FieldProps) {
         </span>
       ))}
       <label
-        className={`inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-border/80 px-3 py-1.5 text-[12.5px] text-muted-foreground/80 transition-colors hover:border-(--signal)/60 hover:text-(--signal) ${disabled ? "pointer-events-none opacity-60" : ""}`}
+        className={`inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-(--border-strong) px-3 py-1.5 text-[12.5px] text-muted-foreground/80 transition-colors hover:border-(--signal)/60 hover:text-(--signal) ${disabled ? "pointer-events-none opacity-60" : ""}`}
       >
         {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
         {busy ? "Uploading…" : "Upload files"}

@@ -141,7 +141,7 @@ function LockedForm({ spec, answer }: { spec: FormSpec; answer: FormAnswer }) {
 /** The card header: an icon chip, the title, and the field count. */
 function FormHeader({ title, count }: { title: string | undefined; count: number }) {
   return (
-    <div className="flex items-center gap-2 border-b border-border/40 px-3.5 py-2.5">
+    <div className="flex items-center gap-2 border-b border-(--border-strong) px-3.5 py-2.5">
       <span className="flex size-5 items-center justify-center rounded-full bg-(--signal)/12 text-(--signal) ring-1 ring-(--signal)/20">
         <ClipboardList className="size-3" />
       </span>
@@ -173,7 +173,7 @@ function FormFooter({
 }) {
   const complete = filled >= total
   return (
-    <div className="flex items-center justify-between gap-3 border-t border-border/40 px-3.5 py-2.5">
+    <div className="flex items-center justify-between gap-3 border-t border-(--border-strong) px-3.5 py-2.5">
       <span className="flex items-center gap-1.5 text-[11px] font-medium">
         {complete ? (
           <span className="flex items-center gap-1.5 text-muted-foreground/70">
@@ -259,7 +259,7 @@ export function FormWidget({
   }
 
   return (
-    <div className="my-1.5 overflow-hidden rounded-2xl border border-border/40 bg-card/55 shadow-(--shadow-pop) backdrop-blur-xl backdrop-saturate-150">
+    <div className="my-1.5 overflow-hidden rounded-2xl border border-(--border-strong) bg-card/55 shadow-(--shadow-pop) backdrop-blur-xl backdrop-saturate-150">
       <FormHeader title={spec.title} count={spec.fields.length} />
       <div className="flex flex-col gap-4 p-3.5">
         {spec.fields.map((f) => (

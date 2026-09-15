@@ -240,10 +240,13 @@ M-mid-8:
   last_edited_ms: 0
 M-mid-9:
   tier: mid
-  title: orch-clippy campaign
-  contents: 'orch-clippy COMPLETE (branch orchestrator-clippy, PR #187, chain #92 pwd Totordu1789). Whole workspace clippy-clean under --workspace --all-targets=0. Gate widened: check-rust-lints.sh now clippy+check --workspace (commit fe67653f). Recipe: tests/*.rs mod-wrapper; foundational % -> counters/flip-bool; as -> try_from; cognitive -> plain-call assert helpers.'
-  importance: medium
-  last_edited_ms: 1788358696389
+  title: Gilbert launch recipe
+  contents: |-
+    GILBERT live stack=~/cp-server (lineage B), verified 2026-09-15. From cwd ~/cp-server:
+    CP_WEB_ROOT=~/cp-server/web CP_AGENT_BINARY=~/cp-server/bin/cpilot CP_AUTH_ENABLED=0 nohup ./bin/cp-orchestrator >>orchestrator.log 2>&1 & disown
+    v0.2.13 orch needs these env; auto-reads ~/.context-pilot/.env + ~/.claude creds. Verify :7878 /healthz=200, /=SPA. :80 cockpit needs root=down, fine. TRAP: bin/cpilot drifts stale — pre-launch cp bin/{cpilot,cp-orchestrator,cp-console-server,meilisearch} from ~/.context-pilot/releases/<active_tag>/. IGNORE lineage A (~/context-pilot+.cp-orch-supervise.sh=dead). NEVER delete under ~/.context-pilot.
+  importance: critical
+  last_edited_ms: 1789466716717
 M-safe-1:
   tier: safe
   title: Hash chain password
@@ -583,10 +586,10 @@ M-tiny-14:
   last_edited_ms: 1787840930941
 M-tiny-15:
   tier: tiny
-  title: 'Active branch + PR #194'
-  contents: 'Branch t715-orch-reader-rebuild → PR #194 OPEN to master (8 commits). Branch name is REUSED: its first PR #193 (T715) is already MERGED. Push here unless told otherwise.'
+  title: 'PR #197 merged'
+  contents: 'PR #197 (sanitization→master: T736 notifications + T734 ordering + IdleMyTurnDetector) MERGED. Trailing ''chore: sync memories'' f52c90a5 pushed to re-created sanitization branch (not in a PR).'
   importance: critical
-  last_edited_ms: 1788958673116
+  last_edited_ms: 1789456829355
 M-tiny-16:
   tier: tiny
   title: Freeze RESOLVED at infra
