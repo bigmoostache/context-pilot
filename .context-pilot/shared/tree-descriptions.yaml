@@ -2698,6 +2698,10 @@
   path: crates/cp-orchestrator/src/services/mod.rs
   description: 'services/ hub: declares + re-exports MaterializedView/AgentView/CostSnapshot, CostBreaker/Verdict, StreamHub/Subscriber, NameOverrides (T328 agent rename), RetiredRecord/RetiredStore (T271 retire), AvatarStore (T338 agent profile pics), and auth module.'
   last_edited_ms: 1782238272432
+1b92c1e2d1a6b72c:
+  path: .context-pilot/shared/memories.yaml
+  description: Memory slots store (M-safe/tiny/short/mid/long, 220 fixed). Local-only, synced with commits. Mirrors the Memories panel.
+  last_edited_ms: 0
 1ba41727f640ea63:
   path: crates/cp-orchestrator/src/supervisor/mod.rs
   description: 'Phase 17 (X784): AgentSupervisor process manager. new(allow_list) canonicalizes paths eagerly. validate_binary(req) realpath-canonicalizes vs allow_list (R2-15: defeats symlink/.. escape). spawn(id,bin,folder,args)->pid: validate, Command process_group(0) (NOT setsid — unsafe forbidden; safe + detaches from terminal signals), stdio null, refuse dup id. stop(id): SIGTERM→poll pid_alive up to STOP_GRACE(5s)/POLL_INTERVAL(100ms)→SIGKILL→reap child.wait(). restart=snapshot cfg+stop+spawn. adopt(id,&Entry,bin): record live agent no-spawn (child:None, D7 re-adopt on backend restart). check_liveness()->Vec<Event>: spawned via try_wait reap (Exited{status}), adopted via pid_alive signal-0 (Vanished), dead removed. Helpers: send_signal (swallow ESRCH), pub(crate) pid_alive (Ok|EPERM=alive). Error/Event enums fully field-doc''d; Debug derived. Error has NO std::error::Error (dodges missing_trait_methods).'
@@ -9637,6 +9641,10 @@
 630eb16db98d1acd:
   path: .github/checks/allowed-lint-exceptions.yaml
   description: 'Curated #[expect]/#[allow] registry (34 entries verified). Every suppression in code MUST have a matching entry or structure-check errors. Fields: path, match, reason, strategy. Covers deref_match! ref_patterns chokepoints, too_many_lines flat initializers, cast/float_math modules, exhaustive_enums/structs wire contracts, time_arith. Reopen when registering a new #[expect].'
+  last_edited_ms: 0
+6310c2106ad9f1bd:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 6311efab87e3b777:
   path: crates/cp-orchestrator/src/transport/it/network/uplink.rs
