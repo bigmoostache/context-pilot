@@ -84,7 +84,7 @@ function FieldRow({
   agentId: string
 }) {
   return (
-    <div className="border-t border-border/50 px-4 pt-2.5 pb-3">
+    <div className="border-t border-(--border-strong)/70 px-4 pt-2.5 pb-3">
       <label className="block pb-1 text-[11px] font-medium tracking-wide text-muted-foreground/70 uppercase">
         {field.label}
       </label>
@@ -177,7 +177,7 @@ function FormFooter({
 }) {
   const complete = filled >= total
   return (
-    <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-2.5">
+    <div className="flex items-center justify-between gap-3 border-t border-(--border-strong) px-4 py-2.5">
       <span className="flex items-center gap-1.5 text-[11px] font-medium">
         {complete ? (
           <span className="flex items-center gap-1.5 text-muted-foreground/70">
@@ -263,7 +263,7 @@ export function FormWidget({
   }
 
   return (
-    <div className="my-1.5 overflow-hidden rounded-xl border border-border/60 bg-card">
+    <div className="card-shadow my-1.5 overflow-hidden rounded-xl border border-(--border-strong) bg-card">
       <FormHeader title={spec.title} count={spec.fields.length} />
       {spec.fields.map((f) => (
         <FieldRow
