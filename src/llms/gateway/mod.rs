@@ -71,8 +71,8 @@ fn base_url() -> Option<String> {
 /// match on, which is why this fallback tries to send something plausible rather
 /// than nothing.
 fn gateway_key(direct_key: Option<&Redacted>) -> Redacted {
-    if let Some(key) = std::env::var(llm_gateway::GATEWAY_KEY_ENV).ok().filter(|value| !value.trim().is_empty()) {
-        return Redacted::new(key);
+    if let Some(key) = cp_env::env().gateway.key() {
+        return Redacted::new(key.to_owned());
     }
     direct_key.map_or_else(|| Redacted::new("sk-no-gateway-key-set".to_owned()), Clone::clone)
 }

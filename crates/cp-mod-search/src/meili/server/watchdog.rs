@@ -57,8 +57,8 @@ const LOCK_POLL: Duration = Duration::from_millis(200);
 // -- Single-flight spawn lock ------------------------------------------------
 
 /// Path to the machine-wide spawn lock: `~/.context-pilot/meilisearch/spawn.lock`.
-fn lock_path() -> Option<PathBuf> {
-    super::global_meili_dir().ok().map(|d| d.join("spawn.lock"))
+fn lock_path() -> PathBuf {
+    super::global_meili_dir().join("spawn.lock")
 }
 
 /// RAII guard over the machine-wide Meilisearch spawn lock.
@@ -79,7 +79,7 @@ impl SpawnLock {
     /// previous holder's file was older than [`LOCK_STALE`]), `None` if another
     /// live holder currently owns it.
     pub(super) fn try_acquire() -> Option<Self> {
-        let path = lock_path()?;
+        let path = lock_path();
 
         match OpenOptions::new().write(true).create_new(true).open(&path) {
             Ok(mut f) => {

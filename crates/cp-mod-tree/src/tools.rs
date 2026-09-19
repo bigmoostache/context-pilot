@@ -11,9 +11,9 @@ use cp_base::tools::{ToolResult, ToolUse};
 use crate::storage;
 use crate::types::{TreeFileDescription, TreeState};
 
-/// Whether to show `.context-pilot/` in the tree (opt-in via env var).
-pub(crate) static SHOW_CONTEXT_PILOT: LazyLock<bool> =
-    LazyLock::new(|| std::env::var("SHOW_CONTEXT_PILOT_IN_TREE").is_ok_and(|v| v == "1" || v == "true"));
+/// Whether to show `.context-pilot/` in the tree (opt-in via
+/// `SHOW_CONTEXT_PILOT_IN_TREE`).
+pub(crate) static SHOW_CONTEXT_PILOT: LazyLock<bool> = LazyLock::new(|| cp_env::env().dev.show_context_pilot_in_tree);
 
 /// Mark tree context cache as deprecated (needs refresh)
 fn invalidate_tree_cache(state: &mut State) {

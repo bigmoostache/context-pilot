@@ -262,7 +262,7 @@ fn teardown_and_maybe_reexec(reload_pending: bool) {
 
     #[cfg(unix)]
     if reload_pending
-        && std::env::var_os("CP_RUN_SH").is_none()
+        && !cp_env::env().dev.run_sh
         && let Ok(exe_path) = std::env::current_exe()
     {
         use std::os::unix::process::CommandExt as _;
@@ -375,12 +375,29 @@ fn boot_app_state(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, steps: 
 }
 
 fn main() -> ExitCode {
+    // Parse CLI args
+    let args: Vec<String> = std::env::args().collect();
+
+    // `--check-env`: validate exactly as a boot would and exit - no logger,
+    // no terminal, nothing touched.
+    if args.iter().any(|a| a == "--check-env") {
+        let (report, ok) = state::persistence::check_env();
+        drop(writeln!(io::stdout(), "{report}"));
+        return if ok { ExitCode::SUCCESS } else { ExitCode::FAILURE };
+    }
+
+    // Environment preflight BEFORE anything reads a variable (the flame
+    // profiler used to read `CP_FLAMEGRAPH` before the `.env` files were even
+    // merged). An invalid environment is a hard, fully explained refusal.
+    if let Err(report) = state::persistence::preflight_env() {
+        drop(writeln!(io::stderr(), "{report}"));
+        return ExitCode::FAILURE;
+    }
+
     init_file_logger();
     raise_fd_limit();
     infra::flame::init();
 
-    // Parse CLI args
-    let args: Vec<String> = std::env::args().collect();
     let resume_stream = args.iter().any(|a| a == "--resume-stream");
 
     // --bridge: activate the orchestration bridge (equivalent to CP_BRIDGE=1).

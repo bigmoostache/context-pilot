@@ -889,6 +889,37 @@
         ],
         "type": "object"
       },
+      "Features": {
+        "properties": {
+          "claude_oauth": {
+            "type": "boolean"
+          },
+          "day0_setup": {
+            "type": "boolean"
+          },
+          "it_pane": {
+            "type": "boolean"
+          },
+          "keys_editable": {
+            "type": "boolean"
+          },
+          "onboarding": {
+            "type": "boolean"
+          },
+          "updater": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "claude_oauth",
+          "day0_setup",
+          "it_pane",
+          "updater",
+          "keys_editable",
+          "onboarding"
+        ],
+        "type": "object"
+      },
       "FinderKind": {
         "enum": [
           "folder",
@@ -5524,6 +5555,36 @@
         "summary": "Update environment key",
         "tags": [
           "env"
+        ]
+      }
+    },
+    "/api/features": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Features"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Effective feature flags (public, pre-login; CP_FEATURE_* in docs/ENV.md)",
+        "tags": [
+          "features"
         ]
       }
     },

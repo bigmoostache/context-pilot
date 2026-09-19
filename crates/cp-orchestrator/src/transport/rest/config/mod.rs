@@ -4,6 +4,7 @@
 //! [`super`](super) so callers still use `rest::get_settings`, `rest::env_keys_list`, etc.
 
 pub(crate) mod env_keys;
+pub(crate) mod features;
 pub(crate) mod it;
 pub(crate) mod network;
 pub(crate) mod settings;

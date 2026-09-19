@@ -18,6 +18,8 @@ use crate::transport::rest::HttpReply;
 /// What the LLM gateway declares it can route (`GET /v1/models`), cached.
 mod gateway_models;
 mod oauth_creds;
+/// Which providers are usable right now (key present, OAuth valid, gateway).
+mod usable;
 
 // ── Wire types ──────────────────────────────────────────────────────────
 
@@ -63,16 +65,16 @@ pub(crate) struct ModelDef {
 
 // ── Registry ────────────────────────────────────────────────────────────
 
-/// The full provider catalogue surfaced to the cockpit, in picker order.
+/// The full provider catalogue surfaced to the cockpit, in picker order. The
+/// Claude Code subscription leads it - unless the deployment switched it off
+/// (`CP_FEATURE_CLAUDE_OAUTH=0`), in which case it is not offered at all.
 fn all_providers() -> Vec<ProviderDef> {
-    vec![
-        provider_claudecodev2(),
-        provider_anthropic(),
-        provider_grok(),
-        provider_groq(),
-        provider_deepseek(),
-        provider_minimax(),
-    ]
+    let mut providers =
+        vec![provider_anthropic(), provider_grok(), provider_groq(), provider_deepseek(), provider_minimax()];
+    if rest::features().is_on(cp_env::model::features::Feature::ClaudeOauth) {
+        providers.insert(0, provider_claudecodev2());
+    }
+    providers
 }
 
 /// The Claude Code OAuth provider and its model catalogue.
@@ -390,7 +392,7 @@ pub(crate) fn providers(query: &str) -> HttpReply {
         // Usable = its credential is configured (API key, or — for the Claude
         // Code OAuth backends — a present, non-expired credentials file). Drop
         // the rest server-side.
-        if !provider_usable(p.id) {
+        if !usable::provider_usable(p.id) {
             continue;
         }
         // Annotate each model with its canonical "<provider>:<model>" key,
@@ -435,42 +437,6 @@ fn has_param(query: &str, key: &str) -> bool {
     query.split('&').filter(|s| !s.is_empty()).any(|pair| pair.split_once('=').map_or(pair, |(k, _)| k) == key)
 }
 
-/// Is provider `id` usable right now? API-key providers need their key
-/// configured; the Claude Code OAuth backends instead need a present,
-/// non-expired credentials file (provisioned out-of-band — see
-/// `deploy/ansible/claude-oauth.yml`).
-///
-/// Key presence is resolved through the [`cp_vault`] credential vault — the same
-/// store the settings page writes to (`vault.set()`). This matters because the
-/// vault reflects keys added **at runtime** (in-memory override + a direct
-/// re-read of `~/.context-pilot/.env`), whereas `global::has_api_key` only sees
-/// process env vars loaded by dotenvy at boot. Reading the vault here keeps the
-/// picker in sync with the key manager without requiring an orchestrator
-/// restart. A gateway short-circuits all of it — see [`gateway_models::provides`].
-fn provider_usable(id: &str) -> bool {
-    if gateway_models::provides(id) {
-        return true;
-    }
-    match id {
-        "claudecodev2" => oauth_creds::claude_oauth_available(),
-        _ => provider_key_name(id).is_some_and(|key| cp_vault::vault().get(key).is_some()),
-    }
-}
-
-/// Map a catalogue provider id to the central key name used to check usability.
-/// Returns `None` for providers with no API-key path (the Claude Code OAuth
-/// backends — their usability is decided by [`claude_oauth_available`]).
-fn provider_key_name(id: &str) -> Option<&'static str> {
-    match id {
-        "anthropic" => Some("anthropic"),
-        "grok" => Some("xai"),
-        "groq" => Some("groq"),
-        "deepseek" => Some("deepseek"),
-        "minimax" => Some("minimax"),
-        _ => None,
-    }
-}
-
 /// Resolve a model's public `apiName` from its provider id + enum id.
 ///
 /// `config.json` stores the agent's current model as the per-provider enum id
@@ -486,15 +452,4 @@ pub(crate) fn resolve_api_name(provider_id: &str, model_id: &str) -> Option<&'st
         .into_iter()
         .find(|m| m.id == model_id)
         .map(|m| m.api_name)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn oauth_providers_route_through_the_oauth_check_not_an_api_key() {
-        // The OAuth backend must never be gated on an API-key name.
-        assert_eq!(provider_key_name("claudecodev2"), None);
-    }
 }

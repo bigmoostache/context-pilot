@@ -65,7 +65,7 @@ fn declared() -> Option<HashSet<String>> {
 /// error, non-2xx status or unparseable body — every one of which means the same
 /// thing here: we do not know, so we must not filter.
 fn fetch(base: &str) -> Option<HashSet<String>> {
-    let key = std::env::var(cp_base::config::llm::gateway::GATEWAY_KEY_ENV).unwrap_or_default();
+    let key = cp_env::env().gateway.key().unwrap_or_default();
     let response = reqwest::blocking::Client::builder()
         .timeout(TIMEOUT)
         .build()

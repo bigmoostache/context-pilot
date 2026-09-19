@@ -25,24 +25,43 @@ pub(crate) fn boot_extract_module_data(cfg: &BootConfig) -> BootModuleData {
     BootModuleData { global: cfg.shared.modules.clone(), worker: cfg.worker.modules.clone() }
 }
 
-/// Load `.env` files (project-local then global override) and warn about any
-/// missing vault credentials. Global wins so the settings-page writes take
-/// effect over stale shell/project values.
-fn load_boot_env_and_check_vault() {
-    // Load .env files FIRST — modules read env vars during init_state
-    // (e.g. DATALAB_API_KEY for OCR, GITHUB_TOKEN for gh).
-    // Override mode so file values always win over stale shell env vars
-    // (e.g. BRAVE_API_KEY inherited from parent).  Global loads second
-    // and overrides project-local — it's where vault.set() writes.
+/// Merge the `.env` files into the process environment - project-local first,
+/// then `~/.context-pilot/.env` overriding it (that is where the settings page
+/// writes, so it carries the latest user intent). Override mode, so file
+/// values always win over stale shell values inherited from a parent.
+fn load_dotenv_files() {
     let _local = dotenvy::dotenv_override().ok();
-    // Global .env overrides project-local (latest user intent from settings page).
-    if let Ok(home) = std::env::var("HOME") {
+    if let Some(home) = std::env::var_os("HOME") {
         let global_env = std::path::PathBuf::from(home).join(".context-pilot").join(".env");
         let _global = dotenvy::from_path_override(&global_env).ok();
     }
+}
 
-    // Trigger vault initialization (reads env vars loaded above) and warn
-    // about missing credentials before any module tries to use them.
+/// Environment preflight - the very first thing `main` does, before the
+/// logger, the terminal or any module: merge the `.env` files, validate every
+/// variable strictly (see `docs/ENV.md`) and install the typed result. On
+/// failure the aggregated report is returned for `main` to print.
+///
+/// # Errors
+///
+/// The rendered report when the environment is invalid.
+pub(crate) fn preflight_env() -> Result<(), String> {
+    load_dotenv_files();
+    let loaded = cp_env::load(cp_env::spec::Target::Agent).map_err(|report| report.to_string())?;
+    if cp_env::install(loaded.env) { Ok(()) } else { Err("environment installed twice".to_owned()) }
+}
+
+/// `cpilot --check-env`: the same merge and validation as a boot, rendered
+/// for the terminal, with the exit status to use.
+pub(crate) fn check_env() -> (String, bool) {
+    load_dotenv_files();
+    cp_env::check(cp_env::spec::Target::Agent)
+}
+
+/// Trigger vault initialization (the `.env` files were merged by
+/// [`preflight_env`]) and warn about missing credentials before any module
+/// tries to use them.
+fn load_boot_env_and_check_vault() {
     for def in cp_vault::vault().health() {
         log::warn!("Missing credential: {} ({})", def.display, def.env_var);
     }

@@ -32,7 +32,9 @@ pub(super) fn try_raw_route(request: Request, segments: &[&str], ctx: RouteCtx<'
         // `can_manage_it` here (a `None` caller is god-mode, FR-v3-08); then
         // reuse the maintenance handler verbatim.
         ["api", "it", "ca.crt"] => {
-            if ctx.auth_user.is_some_and(|u| !u.can_manage_it()) {
+            if let Some(reply) = rest::feature_gate(segments, ctx.flags) {
+                respond_json(request, &reply);
+            } else if ctx.auth_user.is_some_and(|u| !u.can_manage_it()) {
                 respond_json(request, &rest::HttpReply::error(403, "IT management access required"));
             } else {
                 it::ca::serve_ca_cert(request);
@@ -49,7 +51,12 @@ pub(super) fn try_raw_route(request: Request, segments: &[&str], ctx: RouteCtx<'
     reason = "flat path-segment router: a closed match over ~60 borrowed `(&Method, &[&str])` route shapes, each arm a one-line delegation. It cannot be split under the 60-line cap without a wildcard catch-all per sub-dispatcher (forbidden wildcard_enum_match_arm). The flat variant→handler table is the honest shape — the transport twin of src/app/actions/mod.rs::apply_action."
 )]
 pub(super) fn route_rest(method: &Method, segments: &[&str], ctx: RouteCtx<'_>) -> rest::HttpReply {
-    let RouteCtx { state, body_bytes, query, auth_token, auth_user } = ctx;
+    let RouteCtx { state, body_bytes, query, auth_token, auth_user, flags } = ctx;
+    // Feature flags first (docs/ENV.md): a surface switched off by the
+    // deployment answers 404 before any handler or RBAC check runs.
+    if let Some(reply) = rest::feature_gate(segments, flags) {
+        return reply;
+    }
     // Explicit `&` reference patterns on both tuple components: `method` is a
     // `&Method` and `segments` a `&[&str]`, so `&Method::Get` / `&["api", …]`
     // match the borrowed scrutinees WITHOUT match-ergonomics auto-deref — the
@@ -58,6 +65,8 @@ pub(super) fn route_rest(method: &Method, segments: &[&str], ctx: RouteCtx<'_>) 
     // is the honest shape.
     match (method, segments) {
         (&Method::Get, &["api", "health"]) => rest::HttpReply { status: 200, body: "{\"status\":\"ok\"}".to_owned() },
+        // Public, pre-login: the flags the cockpit mirrors (day-0, OAuth, panes).
+        (&Method::Get, &["api", "features"]) => rest::features_route(),
         (&Method::Get, &["api", "providers"]) => inspect::providers::providers(query),
 
         // ── Auth routes (§6 of design doc) ──────────────────────────
