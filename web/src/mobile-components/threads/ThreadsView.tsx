@@ -5,7 +5,14 @@ import { ThreadList } from "@/mobile-components/threads/ThreadList"
 import { ThreadConversation } from "@/mobile-components/threads/ThreadConversation"
 import { CornerButton } from "@/mobile-components/shell/chrome/CornerButton"
 import { useFleet, useThreads } from "@/lib/live"
-import { useThreadSelection, useThreadActions, type Notice } from "@/lib/live/threadView"
+import {
+  useThreadSelection,
+  useThreadActions,
+  type Actions,
+  type Notice,
+} from "@/lib/live/threadView"
+import { NewThreadDialog } from "@/mobile-components/threads/dialogs/NewThreadDialog"
+import type { ThreadDetail } from "@/lib/types"
 import { useTopButtons } from "@/lib/providers/topButtons"
 import { prefersReducedMotion } from "@/lib/utils"
 
@@ -128,6 +135,9 @@ export function ThreadsView({
           pendingFiles={sel.pendingFiles}
           onRemoveFile={(i) => sel.setPendingFiles((prev) => prev.filter((_, idx) => idx !== i))}
           onShowInFinder={onShowInFinder}
+          onBranch={actions.openBranch}
+          parentName={parentNameOf(threads, thread)}
+          onOpenThread={openThread}
         />
       ) : (
         <EmptyRealm
@@ -207,6 +217,8 @@ export function ThreadsView({
         />
       </aside>
 
+      <BranchDialog actions={actions} threads={threads} agentId={activeAgentId} />
+
       <UndoNotice notice={actions.notice} />
     </div>
   )
@@ -275,4 +287,38 @@ function UndoNotice({ notice }: { notice: Notice | null }) {
       )}
     </div>
   )
+}
+
+/** The branch-out dialog: name + first message of a thread branched out of the
+ *  open one at a given message. Keyed by the branch point so each opening
+ *  starts from a blank (non-persisted) draft; absent while no branch is open. */
+function BranchDialog({
+  actions,
+  threads,
+  agentId,
+}: {
+  actions: Actions
+  threads: ThreadDetail[]
+  agentId: string
+}) {
+  const target = actions.branchTarget
+  if (!target) return null
+  return (
+    <NewThreadDialog
+      key={`${target.threadId}-${target.messageTs}`}
+      open
+      onClose={actions.closeBranch}
+      onCreate={actions.handleBranch}
+      agentId={agentId}
+      branch={{
+        parentName: threads.find((t) => t.id === target.threadId)?.name ?? target.threadId,
+        excerpt: target.excerpt,
+      }}
+    />
+  )
+}
+
+/** Name of `thread`'s parent when it was branched out of one that still exists. */
+function parentNameOf(threads: ThreadDetail[], thread: ThreadDetail): string | undefined {
+  return thread.branchedFrom ? threads.find((t) => t.id === thread.branchedFrom)?.name : undefined
 }

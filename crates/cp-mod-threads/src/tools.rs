@@ -352,7 +352,30 @@ fn write_thread_list(output: &mut String, ts: &ThreadsState, focused_tid: &str) 
         if t.paused {
             _ = writeln!(output, "    paused: true");
         }
+        if let Some(origin) = t.origin.as_ref() {
+            _ = writeln!(output, "    branched_from: {}", origin.thread_id);
+        }
     }
+}
+
+/// Write the focused thread's `branched_from` block: the parent id plus a note
+/// telling the agent the branch's history stops at the branch point.
+///
+/// The agent's own LLM conversation is global (not per-thread), so it may still
+/// remember work done in the parent AFTER the branch point; the note asks it to
+/// treat that as belonging to the parent only.
+fn write_origin(output: &mut String, thread: &crate::types::Thread) {
+    let Some(origin) = thread.origin.as_ref() else {
+        return;
+    };
+    let parent = &origin.thread_id;
+    _ = writeln!(output, "  branched_from: {parent}");
+    _ = writeln!(
+        output,
+        "  branch_note: \"Branched out of {parent} — the messages up to the branch point are copied below. \
+         Anything that happened in {parent} after that point belongs to {parent} only: do not assume it \
+         here unless the user brings it up.\""
+    );
 }
 
 /// Write a single YAML message entry (author, age, text block/inline, file) into `output`.
@@ -408,6 +431,7 @@ fn build_panel_content(state: &State, focused_tid: &str, now_ms: u64) -> String 
     _ = writeln!(output, "  thread_id: {}", thread.id);
     _ = writeln!(output, "  name: \"{}\"", yaml_escape(&thread.name));
     _ = writeln!(output, "  status: {}", thread.status);
+    write_origin(&mut output, thread);
     if skip > 0 {
         _ = writeln!(output, "  omitted: {skip}");
     }

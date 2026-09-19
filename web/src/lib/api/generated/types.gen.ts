@@ -591,6 +591,7 @@ export type OpEntry = {
  */
 export type OpEntryKind = {
     agent_id?: string;
+    branched_from?: string;
     budget_tokens?: number;
     cost_usd?: number;
     head?: string;
@@ -694,6 +695,7 @@ export type ThreadDetail = {
     agent?: string;
     agentId: string;
     archived?: boolean;
+    branchedFrom?: string | null;
     createdAt?: string;
     focused?: boolean;
     id: string;

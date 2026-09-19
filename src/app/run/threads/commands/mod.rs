@@ -4,7 +4,7 @@
 //! the 500-line limit) so each file stays focused: `bridge` owns the socket
 //! intake + live-state emission chokepoints, while this file owns the pure
 //! state mutations a decoded [`Command`] applies —
-//! `SendMessage`/`CreateThread`/`ArchiveThread`/`RestoreThread`/`Stop` — entered
+//! `SendMessage`/`CreateThread`/`BranchThread`/`ArchiveThread`/`RestoreThread`/`Stop` — entered
 //! exactly as local user input would be (the K7 path).
 
 use cp_base::config::llm::models::{
@@ -19,9 +19,12 @@ use cp_wire::types::command::{Command, Kind as CommandKind};
 use cp_wire::types::oplog::OpEntryKind;
 
 use crate::app::App;
-use crate::app::panels::now_ms;
 
-use super::bridge::{emit_roster_delta, wire_turn};
+use self::create::{BranchPoint, Seed, apply_branch_thread, apply_create_thread};
+use super::bridge::emit_roster_delta;
+
+/// `CreateThread` / `BranchThread` application.
+mod create;
 
 /// Dispatch a single accepted command to the appropriate agent action.
 pub(super) fn apply_command(app: &mut App, cmd: Command) {
@@ -30,7 +33,13 @@ pub(super) fn apply_command(app: &mut App, cmd: Command) {
             apply_send_message(&mut app.state, &thread_id, &content);
         }
         CommandKind::CreateThread { name, initial_message, paused } => {
-            apply_create_thread(&mut app.state, &name, initial_message.as_deref(), paused);
+            let seed = Seed { initial_message: initial_message.as_deref(), paused };
+            apply_create_thread(&mut app.state, &name, &seed);
+        }
+        CommandKind::BranchThread { source_thread_id, message_ts, name, initial_message, paused } => {
+            let point = BranchPoint { source_thread_id: &source_thread_id, message_ts };
+            let seed = Seed { initial_message: initial_message.as_deref(), paused };
+            apply_branch_thread(&mut app.state, &point, &name, &seed);
         }
         CommandKind::ArchiveThread { thread_id } => {
             apply_archive_thread(&mut app.state, &thread_id);
@@ -92,63 +101,6 @@ fn apply_send_message(state: &mut State, thread_id: &str, content: &str) {
 
     state.flags.ui.dirty = true;
     log::info!("bridge: applied SendMessage on thread {thread_id}");
-}
-
-// ── CreateThread ────────────────────────────────────────────────────────
-
-/// Create a new thread with the given name, optionally seeding a first user
-/// message and starting it paused.
-///
-/// Strict order (T687): create, then pause (if requested), then seed the first
-/// message through [`apply_send_message`]. Pausing before the send guarantees
-/// the seeded message lands on an already-paused thread, so it can never nudge
-/// the agent — the whole sequence is one atomic command application, with no
-/// frontend id round-trip and no window where the message exists un-paused.
-/// The message content rides the durable command payload, closing the
-/// data-loss race a frontend create -> wait-id -> send orchestration had.
-fn apply_create_thread(state: &mut State, name: &str, initial_message: Option<&str>, paused: bool) {
-    let ts = ThreadsState::get_mut(state);
-    let id = format!("T{}", ts.next_id);
-    ts.next_id = ts.next_id.saturating_add(1);
-
-    ts.threads.push(cp_mod_threads::types::Thread::new(id.clone(), name.to_owned()));
-
-    // Emit the durable roster delta so the backend view reflects the new
-    // thread in ms (Leg 0 keystone) — a fresh, empty thread is the user's turn
-    // (they must type the first message). Routed through `wire_turn` so the
-    // emitted status matches what the status chokepoint would emit, and the
-    // status memo is primed to this value so creating then immediately sending
-    // a message produces exactly one follow-up `ThreadStatusChanged`.
-    let created_turn = wire_turn(ThreadStatus::TheirTurn);
-    emit_roster_delta(
-        state,
-        OpEntryKind::ThreadCreated {
-            thread_id: id.clone(),
-            name: name.to_owned(),
-            status: created_turn,
-            timestamp_ms: now_ms(),
-        },
-    );
-    if let Some(bs) = state.get_ext_mut::<BridgeState>() {
-        let _prev = bs.thread_statuses.insert(id.clone(), created_turn);
-    }
-
-    state.flags.ui.dirty = true;
-    log::info!("bridge: created thread {id} \"{name}\"");
-
-    // Strict create -> pause -> send order (T687). Pause FIRST when requested,
-    // so the seeded message lands on an already-paused thread and can never
-    // nudge the agent — even transiently. Both mutations run in this single
-    // atomic command application: there is no window where the message exists
-    // on an un-paused thread. Sending inside the command (rather than a
-    // frontend id round-trip) also makes the message durable in the command
-    // payload, closing the data-loss race the frontend orchestration had.
-    if paused {
-        apply_pause_thread(state, &id);
-    }
-    if let Some(content) = initial_message.filter(|c| !c.trim().is_empty()) {
-        apply_send_message(state, &id, content);
-    }
 }
 
 // ── ArchiveThread ───────────────────────────────────────────────────────

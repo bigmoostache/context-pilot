@@ -98,6 +98,9 @@ pub(super) fn core() -> Value {
                 "archived": { "type": "boolean" },
                 "paused": { "type": "boolean" },
                 "focused": { "type": "boolean" },
+                // Parent thread id when this thread was branched out of another
+                // (branch_thread command); null for a thread created from scratch.
+                "branchedFrom": { "type": "string", "nullable": true },
                 "log": arr(r("ThreadMsg")),
                 "tasks": arr(r("ThreadTask")),
                 "notes": arr(r("ThreadNote"))

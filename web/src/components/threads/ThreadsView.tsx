@@ -3,7 +3,8 @@ import { ThreadList } from "./ThreadList"
 import { ThreadConversation } from "./ThreadConversation"
 import { NewThreadDialog } from "./dialogs/NewThreadDialog"
 import { useFleet, useThreads } from "@/lib/live"
-import { useThreadSelection, useThreadActions } from "@/lib/live/threadView"
+import { useThreadSelection, useThreadActions, type Actions } from "@/lib/live/threadView"
+import type { ThreadDetail } from "@/lib/types"
 
 /**
  * Thread-centered view — the conversation-first layout: thread list (left) |
@@ -151,6 +152,9 @@ export function ThreadsView({
           onRemoveFile={(i) => sel.setPendingFiles((prev) => prev.filter((_, idx) => idx !== i))}
           onShowInFinder={onShowInFinder}
           leftRailHidden={!railOpen}
+          onBranch={actions.openBranch}
+          parentName={parentNameOf(threads, thread)}
+          onOpenThread={sel.setSelectedId}
           onUnarchive={() => {
             actions.handleArchive(thread.id)
             sel.setShowArchived(false)
@@ -166,6 +170,8 @@ export function ThreadsView({
         onCreate={actions.handleCreate}
         agentId={activeAgentId}
       />
+
+      <BranchDialog actions={actions} threads={threads} agentId={activeAgentId} />
 
       {actions.notice && (
         <div
@@ -230,4 +236,38 @@ function EmptyRealm({
       )}
     </div>
   )
+}
+
+/** The branch-out dialog: name + first message of a thread branched out of the
+ *  open one at a given message. Keyed by the branch point so each opening
+ *  starts from a blank (non-persisted) draft; absent while no branch is open. */
+function BranchDialog({
+  actions,
+  threads,
+  agentId,
+}: {
+  actions: Actions
+  threads: ThreadDetail[]
+  agentId: string
+}) {
+  const target = actions.branchTarget
+  if (!target) return null
+  return (
+    <NewThreadDialog
+      key={`${target.threadId}-${target.messageTs}`}
+      open
+      onClose={actions.closeBranch}
+      onCreate={actions.handleBranch}
+      agentId={agentId}
+      branch={{
+        parentName: threads.find((t) => t.id === target.threadId)?.name ?? target.threadId,
+        excerpt: target.excerpt,
+      }}
+    />
+  )
+}
+
+/** Name of `thread`'s parent when it was branched out of one that still exists. */
+function parentNameOf(threads: ThreadDetail[], thread: ThreadDetail): string | undefined {
+  return thread.branchedFrom ? threads.find((t) => t.id === thread.branchedFrom)?.name : undefined
 }

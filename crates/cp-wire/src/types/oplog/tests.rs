@@ -93,6 +93,7 @@ fn thread_roster_kinds_round_trip() {
             name: "Refactor the cache engine".into(),
             status: ThreadTurn::MyTurn,
             timestamp_ms: 1_718_000_002_000,
+            branched_from: Some("T3".into()),
         },
         OpEntryKind::ThreadArchived { thread_id: "T7".into() },
         OpEntryKind::ThreadRestored { thread_id: "T7".into() },
