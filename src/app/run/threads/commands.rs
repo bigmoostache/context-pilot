@@ -255,10 +255,11 @@ fn apply_delete_thread(state: &mut State, thread_id: &str) {
 
     emit_roster_delta(state, OpEntryKind::ThreadDeleted { thread_id: thread_id.to_owned() });
 
-    // Thread-owned scratchpad: hard-deleting a thread cascades removal of its
-    // scratchpad cells (mirrors the thread-owned model; archive keeps them, only
+    // Thread-owned todos and scratchpad: hard-deleting a thread cascades removal
+    // of its tasks (FR13) and scratchpad cells (archive keeps both, only
     // hard-delete cascades).
-    let _wiped = cp_mod_scratchpad::tools::purge_thread_cells(state, thread_id);
+    let _todos = cp_mod_todo::tools::purge_thread_todos(state, thread_id);
+    let _cells = cp_mod_scratchpad::tools::purge_thread_cells(state, thread_id);
 
     // Clean up all bridge memos for the deleted thread.
     if let Some(bs) = state.get_ext_mut::<BridgeState>() {
@@ -266,6 +267,8 @@ fn apply_delete_thread(state: &mut State, thread_id: &str) {
         let _archived = bs.thread_archived_memo.remove(thread_id);
         let _paused = bs.thread_paused_memo.remove(thread_id);
         let _msgs = bs.thread_msg_counts.remove(thread_id);
+        let _tasks = bs.thread_tasks.remove(thread_id);
+        let _notes = bs.thread_notes.remove(thread_id);
     }
 
     state.flags.ui.dirty = true;
