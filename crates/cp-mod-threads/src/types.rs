@@ -237,12 +237,8 @@ impl ThreadsState {
 pub struct FocusState {
     /// Which thread the AI is currently focused on (None = unfocused).
     pub focused_thread_id: Option<String>,
-    /// Remaining tool calls in the dangling phase after `Send` clears focus.
-    /// Starts at 5 after Send, decremented on each non-exempt tool call.
-    /// Negative values mean the dangling phase has expired.
-    pub dangling_remaining: i32,
-    /// Escalation severity counter. Increments after dangling phase expires
-    /// if the AI still hasn't focused on a thread.
+    /// Escalation severity counter. Increments on each tool completion while
+    /// the AI is unfocused with a `MY_TURN` thread pending; reset on focus.
     pub escalation_level: u32,
     /// Index of the currently selected thread in the TUI threads view.
     /// Used for navigation (Tab/Shift+Tab) and message area display.
@@ -277,12 +273,11 @@ impl Default for FocusState {
 }
 
 impl FocusState {
-    /// Initial focus state: unfocused, no dangling phase, no escalation.
+    /// Initial focus state: unfocused, no escalation.
     #[must_use]
     pub const fn new() -> Self {
         Self {
             focused_thread_id: None,
-            dangling_remaining: 0,
             escalation_level: 0,
             selected_thread_idx: 0,
             creating_thread: false,

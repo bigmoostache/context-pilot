@@ -166,7 +166,6 @@ fn apply_archive_thread(state: &mut State, thread_id: &str) {
     let focus = FocusState::get_mut(state);
     if focus.focused_thread_id.as_deref() == Some(thread_id) {
         focus.focused_thread_id = None;
-        focus.dangling_remaining = 0i32;
         focus.escalation_level = 0;
     }
     let _prev = focus.last_read_count.remove(thread_id);
@@ -250,7 +249,6 @@ fn apply_delete_thread(state: &mut State, thread_id: &str) {
     let focus = FocusState::get_mut(state);
     if focus.focused_thread_id.as_deref() == Some(thread_id) {
         focus.focused_thread_id = None;
-        focus.dangling_remaining = 0i32;
         focus.escalation_level = 0;
     }
     let _prev = focus.last_read_count.remove(thread_id);

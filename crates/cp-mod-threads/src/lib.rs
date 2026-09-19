@@ -234,22 +234,15 @@ impl Module for ThreadsModule {
 
     fn on_stream_chunk(&self, _text: &str, _state: &mut State) {}
     fn on_tool_progress(&self, _tool_name: &str, _input_so_far: &str, _state: &mut State) {}
-    fn on_tool_complete(&self, tool_name: &str, state: &mut State) {
-        // Tools exempt from dangling countdown.
-        let is_countdown_exempt = matches!(tool_name, "Think" | "Queue_execute");
-
+    fn on_tool_complete(&self, _tool_name: &str, state: &mut State) {
         let has_my_turn = ThreadsState::get(state).has_my_turn_threads();
         let fs = FocusState::get_mut(state);
 
-        // Dangling countdown: decrement on each non-exempt tool call.
-        if fs.dangling_remaining > 0i32 && !is_countdown_exempt {
-            fs.dangling_remaining = fs.dangling_remaining.saturating_sub(1);
-        }
-
-        // Escalation: bump when dangling expired, unfocused, and MY_TURN exists.
-        // This fires on exempt tools (Think) that complete while the AI
-        // still hasn't focused — driving the escalation level up.
-        if fs.dangling_remaining <= 0i32 && fs.focused_thread_id.is_none() && has_my_turn {
+        // Escalation: bump on every tool completion while unfocused with a
+        // MY_TURN thread pending. Only exempt tools (Think) get this far —
+        // everything else is blocked in pre-flight — so repeated stalling
+        // drives the escalation level up.
+        if fs.focused_thread_id.is_none() && has_my_turn {
             fs.escalation_level = fs.escalation_level.saturating_add(1);
         }
     }
@@ -270,24 +263,18 @@ impl Module for ThreadsModule {
 }
 
 /// Focus enforcement shared by all tools: when `MY_TURN` threads exist and the
-/// AI is unfocused, warn during the dangling phase and block once it expires.
-/// Exempt tools: Think (reasoning), Read (how you claim focus).
+/// AI is unfocused, block the tool with a message whose tone follows the
+/// escalation level. Exempt tools: Think (reasoning), Read (how you claim focus).
+///
+/// There is no grace period: `Send` keeps focus on the thread it replied to
+/// (T683), so the agent is only ever unfocused at boot or after its focused
+/// thread is archived/deleted — and then it must `Read` before acting.
 fn check_focus_enforcement(tool_name: &str, ts: &ThreadsState, fs: &FocusState, pf: &mut Verdict) {
     let is_focus_exempt = matches!(tool_name, "Think" | "Read");
     if is_focus_exempt || !ts.has_my_turn_threads() || fs.focused_thread_id.is_some() {
         return;
     }
-    if fs.dangling_remaining > 0i32 {
-        // Dangling phase — warn but allow.
-        pf.warnings.push(format!(
-            "\u{26a0}\u{fe0f} Dangling phase: {} tool call(s) remaining \
-             before you must focus on a thread",
-            fs.dangling_remaining
-        ));
-    } else {
-        // Dangling expired — BLOCK.
-        pf.errors.push(escalation_message(fs.escalation_level));
-    }
+    pf.errors.push(escalation_message(fs.escalation_level));
 }
 
 /// Pre-flight for `Send`: thread must exist, at least one content param, and

@@ -48,8 +48,9 @@ fn push_send_message(state: &mut State, tid: &str, msg: ThreadMessage, still_my_
 
 /// Post a message to a thread.
 ///
-/// Creates a `ThreadMessage(author=Assistant)`, appends it to the thread,
-/// sets status → `TheirTurn`, clears focus, and starts the dangling phase.
+/// Creates a `ThreadMessage(author=Assistant)` and appends it to the thread.
+/// With `still_my_turn = false` the thread flips to `TheirTurn`; focus stays on
+/// the thread either way (T683).
 pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     /// Maximum markdown content length (bytes) to prevent state/disk bloat.
     const MAX_CONTENT_BYTES: usize = 100_000;
@@ -104,16 +105,13 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Handing the thread back (still_my_turn=false) flips it to THEIR_TURN
     // (done in push_send_message) but KEEPS focus on it — the agent stays on the
-    // thread it just replied to instead of being cast adrift into the dangling
-    // phase (T683). Focus is only ever moved by an explicit `Read` of another
-    // thread. We pin focus to the sent thread and hold the focused-state
-    // invariant `apply_read_focus` uses (dangling_remaining = 0, no escalation),
-    // and still reset the MY_TURN notification debounce so a later user reply on
-    // this now-THEIR_TURN thread re-notifies.
+    // thread it just replied to instead of being left unfocused (T683). Focus is
+    // only ever moved by an explicit `Read` of another thread. We pin focus to
+    // the sent thread and hold the focused-state invariant `apply_read_focus`
+    // uses (no escalation).
     if !still_my_turn {
         let fs = FocusState::get_mut(state);
         fs.focused_thread_id = Some(tid.to_owned());
-        fs.dangling_remaining = 0i32;
         fs.escalation_level = 0;
     }
 
@@ -148,12 +146,11 @@ fn collect_thread_summaries(ts: &ThreadsState, focused_tid: &str) -> Vec<String>
     summaries
 }
 
-/// Focus the target thread when it is `MY_TURN`, resetting dangling/escalation.
+/// Focus the target thread when it is `MY_TURN`, resetting escalation.
 fn apply_read_focus(state: &mut State, tid: &str, thread_status: ThreadStatus) {
     if thread_status == ThreadStatus::MyTurn {
         let fs = FocusState::get_mut(state);
         fs.focused_thread_id = Some(tid.to_owned());
-        fs.dangling_remaining = 0i32;
         fs.escalation_level = 0;
     }
 }

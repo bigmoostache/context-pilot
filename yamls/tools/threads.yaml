@@ -3,9 +3,9 @@ tools:
     description: |
       Posts a message to a thread. The AI uses this to respond to thread messages.
       At least one of markdown or file_path must be provided.
-      After sending, the thread becomes THEIR_TURN (waiting for the user) and
-      focus is cleared, starting a dangling phase of 5 tool calls before the AI
-      must focus on another MY_TURN thread.
+      By default the thread stays MY_TURN (progress update); pass
+      still_my_turn=false to hand it back to the user (THEIR_TURN). Focus stays
+      on the thread either way — only a Read of another thread moves it.
 
       WRITING STYLE (read before composing any reply):
       Je passe mes journées à lire des réponses d'agents LLM, verbeuses, lourdes et illisibles.
