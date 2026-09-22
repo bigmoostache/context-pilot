@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
-import { Paperclip, X, CornerDownLeft, Loader2 } from "lucide-react"
+import { Paperclip, X, CornerDownLeft, Loader2, GitBranch } from "lucide-react"
 import { uploadUnique } from "@/lib/api"
 import type { CreateThreadOpts } from "@/lib/live/threadView"
 import type { UploadedFile } from "@/lib/live/threadUpload"
@@ -44,16 +44,19 @@ function loadDraft(agentId: string): Draft {
 
 /** All composer state + handlers for the new-thread dialog, extracted from the
  *  component so its render fn stays within the max-lines budget. Owns the draft
- *  hydrate/persist, the auto-grow ref, on-attach uploads, and submit/clear. */
+ *  hydrate/persist, the auto-grow ref, on-attach uploads, and submit/clear.
+ *  `persist` = false (branch mode) keeps the draft in memory only: a branch
+ *  draft is tied to one branch point, so it must not leak into the next one. */
 function useNewThreadDraft(
   agentId: string,
   open: boolean,
   onCreate: (o: CreateThreadOpts) => void,
+  persist: boolean,
 ) {
   // Seed all composer state from the persisted per-agent draft (render-phase
   // initializer, runs once per mount). The dialog body unmounts on close (Base
   // UI only renders the Popup while open), so a reopen re-hydrates from here.
-  const initial = () => loadDraft(agentId)
+  const initial = () => (persist ? loadDraft(agentId) : EMPTY_DRAFT)
   const [title, setTitle] = useState(() => initial().title)
   const [firstMessage, setFirstMessage] = useState(() => initial().firstMessage)
   const [files, setFiles] = useState<UploadedFile[]>(() => initial().files)
@@ -66,9 +69,10 @@ function useNewThreadDraft(
   // close/reopen or a reload. Persist regardless of `open` — the whole point is
   // that a dismissed-but-not-submitted draft comes back intact.
   useEffect(() => {
+    if (!persist) return
     const draft: Draft = { title, firstMessage, files, paused }
     localStorage.setItem(draftKey(agentId), JSON.stringify(draft))
-  }, [agentId, title, firstMessage, files, paused])
+  }, [agentId, persist, title, firstMessage, files, paused])
 
   // Auto-grow the message editor to fit its content (like the thread composer):
   // reset to `auto`, then set to `scrollHeight`. The CSS `max-h-[44vh]` caps the
@@ -105,7 +109,7 @@ function useNewThreadDraft(
     setFiles([])
     setPaused(false)
     setErr(null)
-    localStorage.removeItem(draftKey(agentId))
+    if (persist) localStorage.removeItem(draftKey(agentId))
   }
 
   const submit = (e: React.SyntheticEvent) => {
@@ -190,6 +194,10 @@ function useNewThreadDraft(
  * first message once the new thread's server-assigned id is observed — so the
  * message always lands on the right thread and needs no orchestrator change.
  *
+ * **Branch mode:** with `branch` set, the same composer names and seeds a thread
+ * branched out of another one at a given message — the breadcrumb names the
+ * parent, a quote shows the branch point, and the draft is not persisted.
+ *
  * Built directly on Base UI's Dialog primitive (Portal escapes the vibrancy
  * containing-block, plus focus-trap / scroll-lock / Esc for free). Motion is
  * bespoke: the surface is anchored near the top (no vertical-centering
@@ -201,12 +209,15 @@ export function NewThreadDialog({
   onClose,
   onCreate,
   agentId,
+  branch,
 }: {
   open: boolean
   onClose: () => void
   onCreate: (opts: CreateThreadOpts) => void
   /** owning agent — scopes the draft key and receives on-attach uploads */
   agentId: string
+  /** set = branch mode: the parent thread's name + an excerpt of the branch point */
+  branch?: { parentName: string; excerpt: string } | undefined
 }) {
   const {
     title,
@@ -224,7 +235,7 @@ export function NewThreadDialog({
     submit,
     onKeyDown,
     addFiles,
-  } = useNewThreadDraft(agentId, open, onCreate)
+  } = useNewThreadDraft(agentId, open, onCreate, !branch)
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(o) => !o && onClose()}>
@@ -253,7 +264,14 @@ export function NewThreadDialog({
                   T
                 </span>
                 <span className="text-muted-foreground/50">›</span>
-                <span className="text-foreground/70">New thread</span>
+                {branch ? (
+                  <span className="flex min-w-0 items-center gap-1 text-foreground/70">
+                    <GitBranch className="size-3 shrink-0" />
+                    <span className="truncate">Branch of {branch.parentName}</span>
+                  </span>
+                ) : (
+                  <span className="text-foreground/70">New thread</span>
+                )}
               </span>
               <button
                 type="button"
@@ -265,12 +283,14 @@ export function NewThreadDialog({
               </button>
             </div>
 
+            {branch && <BranchPointQuote excerpt={branch.excerpt} />}
+
             {/* title — big, borderless, Linear issue-title feel */}
             <input
               autoFocus
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Thread title"
+              placeholder={branch ? "Branch title" : "Thread title"}
               className="w-full bg-transparent px-4 pt-1 text-[19px] font-semibold tracking-tight text-foreground outline-none placeholder:text-muted-foreground/40"
             />
 
@@ -325,7 +345,7 @@ export function NewThreadDialog({
                 disabled={!canCreate || busy}
                 className="ml-auto flex items-center gap-1.5 rounded-md bg-(--signal) px-3 py-1.5 text-[12.5px] font-medium text-(--primary-foreground) transition-[filter] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Create thread
+                {branch ? "Branch thread" : "Create thread"}
                 <CornerDownLeft className="size-3.5 opacity-70" />
               </button>
             </div>
@@ -333,6 +353,17 @@ export function NewThreadDialog({
         </DialogPrimitive.Popup>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
+  )
+}
+
+/** Branch mode: what the new thread inherits — the parent's conversation up to
+ *  (and including) the quoted message. */
+function BranchPointQuote({ excerpt }: { excerpt: string }) {
+  return (
+    <div className="mx-4 my-1 rounded-md border-l-2 border-(--signal)/50 bg-muted/40 px-2.5 py-1.5 text-[11.5px] text-muted-foreground">
+      <span className="font-medium text-foreground/70">Inherits the conversation up to:</span>{" "}
+      <span className="italic">{excerpt || "(message without text)"}</span>
+    </div>
   )
 }
 

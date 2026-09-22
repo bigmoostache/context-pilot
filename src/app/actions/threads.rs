@@ -195,7 +195,6 @@ fn archive_confirm(state: &mut State) -> ActionResult {
     if !viewing_archived && let Some(aid) = toggled_id {
         if focus_after.focused_thread_id.as_deref() == Some(&aid) {
             focus_after.focused_thread_id = None;
-            focus_after.dangling_remaining = 0i32;
             focus_after.escalation_level = 0;
         }
         let _prev = focus_after.last_read_count.remove(&aid);

@@ -102,6 +102,8 @@ function foldThreadCreated(prev: ThreadDetail[], k: Kind, entry: OpEntry): Threa
     paused: false,
     focused: false,
     log: [],
+    // A branched thread names its parent (the branch-out lineage marker).
+    ...(k.branched_from && { branchedFrom: k.branched_from }),
   }
   return [created, ...prev]
 }

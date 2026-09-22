@@ -59,6 +59,7 @@ const MessageRow = memo(
     onOpenFile,
     onShowInFinder,
     onDelete,
+    onBranch,
     fresh,
   }: {
     msg: ThreadMsg
@@ -66,6 +67,7 @@ const MessageRow = memo(
     onOpenFile: (file: UploadedFile) => void
     onShowInFinder: ((path: string) => void) | undefined
     onDelete: (msg: ThreadMsg) => void
+    onBranch: (msg: ThreadMsg) => void
     fresh: boolean
   }) {
     return (
@@ -76,6 +78,7 @@ const MessageRow = memo(
           onOpenFile={onOpenFile}
           onShowInFinder={onShowInFinder}
           onDelete={() => onDelete(msg)}
+          onBranch={() => onBranch(msg)}
           fresh={fresh}
         />
         {msg.fileRef && (
@@ -90,6 +93,72 @@ const MessageRow = memo(
   },
   (a, b) => a.msg === b.msg && a.agentId === b.agentId && a.fresh === b.fresh,
 )
+
+/**
+ * The "thread opened" divider at the top of the conversation. For a thread
+ * branched out of another it reads "branched from <parent>", a link back to the
+ * parent while it still exists (a deleted parent shows its bare id).
+ */
+function OpenedDivider({
+  thread,
+  parentName,
+  onOpenThread,
+}: {
+  thread: ThreadDetail
+  parentName: string | undefined
+  onOpenThread: ((id: string) => void) | undefined
+}) {
+  const parent = thread.branchedFrom
+  let origin: React.ReactNode = "thread opened"
+  if (parent && (parentName === undefined || !onOpenThread)) origin = `branched from ${parent}`
+  else if (parent && onOpenThread)
+    origin = (
+      <>
+        branched from{" "}
+        <button
+          type="button"
+          onClick={() => onOpenThread(parent)}
+          className="underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
+        >
+          {parentName}
+        </button>
+      </>
+    )
+  return (
+    <div className="mb-3 flex items-center gap-2">
+      <span className="h-px flex-1 bg-border/60" />
+      <span className="text-[10.5px] text-muted-foreground/50">
+        {thread.createdAt} · {origin}
+      </span>
+      <span className="h-px flex-1 bg-border/60" />
+    </div>
+  )
+}
+
+/**
+ * Per-message actions for a thread's rows: delete (via the agent command
+ * bridge) and open the Branch dialog. Both are stable across renders (deps:
+ * agentId / the stable `onBranch` + thread id) so they don't defeat the
+ * {@link MessageRow} memo boundary, which ignores callback props.
+ */
+function useMessageActions(
+  agentId: string,
+  threadId: string,
+  onBranch: ((threadId: string, msg: ThreadMsg) => void) | undefined,
+) {
+  const handleDelete = useCallback(
+    (msg: ThreadMsg) => {
+      const ts = typeof msg.ts === "number" ? msg.ts : new Date(msg.ts ?? "").getTime()
+      void sendCommand(agentId, { kind: "delete_message", thread_id: threadId, message_ts: ts })
+    },
+    [agentId, threadId],
+  )
+  const handleBranch = useCallback(
+    (msg: ThreadMsg) => onBranch?.(threadId, msg),
+    [onBranch, threadId],
+  )
+  return { handleDelete, handleBranch }
+}
 
 /**
  * Mobile thread conversation — the divergent twin of `components/threads/
@@ -120,6 +189,9 @@ export function ThreadConversation({
   pendingFiles = [],
   onRemoveFile,
   onShowInFinder,
+  onBranch,
+  parentName,
+  onOpenThread,
 }: {
   thread: ThreadDetail
   /** owning agent — needed to open the shared Quick Look drawer for an attachment */
@@ -134,6 +206,13 @@ export function ThreadConversation({
   onRemoveFile?: ((index: number) => void) | undefined
   /** navigate the Finder to a file's parent directory and select it (T334) */
   onShowInFinder?: ((path: string) => void) | undefined
+  /** open the Branch dialog on a message of this thread (branch out) */
+  onBranch?: ((threadId: string, msg: ThreadMsg) => void) | undefined
+  /** name of the parent thread when this one was branched out of it (undefined
+   *  when not a branch, or the parent no longer exists) */
+  parentName?: string | undefined
+  /** select another thread (the origin label's link back to the parent) */
+  onOpenThread?: ((id: string) => void) | undefined
 }) {
   // T662 (mobile): the file-preview drawer was retired to match desktop. A
   // single full-width phone column can't host desktop's inline side-rail
@@ -195,16 +274,7 @@ export function ThreadConversation({
     setPrevCount(nonAuto.length)
   }
 
-  /** Delete a message via the agent command bridge. Stable across renders
-   *  (deps: agentId + thread.id) so it doesn't defeat the {@link MessageRow}
-   *  memo boundary. */
-  const handleDelete = useCallback(
-    (msg: ThreadMsg) => {
-      const ts = typeof msg.ts === "number" ? msg.ts : new Date(msg.ts ?? "").getTime()
-      void sendCommand(agentId, { kind: "delete_message", thread_id: thread.id, message_ts: ts })
-    },
-    [agentId, thread.id],
-  )
+  const { handleDelete, handleBranch } = useMessageActions(agentId, thread.id, onBranch)
 
   // Fold the flat log into render segments ONCE per log change (not per render)
   // so each segment object stays reference-stable across delta re-renders.
@@ -233,13 +303,7 @@ export function ThreadConversation({
             iOS status bar at rest but scrolls edge-to-edge UNDER it — the shell
             no longer pads the viewport down, each scroller owns its inset. */}
         <div className="flex flex-col px-2 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-3">
-          <div className="mb-3 flex items-center gap-2">
-            <span className="h-px flex-1 bg-border/60" />
-            <span className="text-[10.5px] text-muted-foreground/50">
-              {thread.createdAt} · thread opened
-            </span>
-            <span className="h-px flex-1 bg-border/60" />
-          </div>
+          <OpenedDivider thread={thread} parentName={parentName} onOpenThread={onOpenThread} />
 
           {segments.map((seg) =>
             seg.type === "auto" ? (
@@ -255,6 +319,7 @@ export function ThreadConversation({
                 onOpenFile={openInFinder}
                 onShowInFinder={onShowInFinder}
                 onDelete={handleDelete}
+                onBranch={handleBranch}
               />
             ) : (
               <MessageRow
@@ -264,6 +329,7 @@ export function ThreadConversation({
                 onOpenFile={openInFinder}
                 onShowInFinder={onShowInFinder}
                 onDelete={handleDelete}
+                onBranch={handleBranch}
                 fresh={seg.msg.id === freshId}
               />
             ),

@@ -1,4 +1,4 @@
-import { ChevronDown, Terminal, Trash2, User } from "lucide-react"
+import { ChevronDown, GitBranch, Terminal, Trash2, User } from "lucide-react"
 import type { ChatMessage } from "@/lib/types"
 import { Markdown, type MarkdownVariant } from "@/lib/support/markdown"
 import { CopyButton } from "./CopyButton"
@@ -26,9 +26,18 @@ interface MessageProps {
   onShowInFinder?: ((path: string) => void) | undefined
   /** permanently delete this message from the thread */
   onDelete?: (() => void) | undefined
+  /** branch a new thread out of the conversation at this message */
+  onBranch?: (() => void) | undefined
 }
 
-export function Message({ msg, agentId, onOpenFile, onShowInFinder, onDelete }: MessageProps) {
+export function Message({
+  msg,
+  agentId,
+  onOpenFile,
+  onShowInFinder,
+  onDelete,
+  onBranch,
+}: MessageProps) {
   if (msg.role === "tool" && msg.tool) return <ToolMessage msg={msg} />
   if (msg.role === "user")
     return (
@@ -38,6 +47,7 @@ export function Message({ msg, agentId, onOpenFile, onShowInFinder, onDelete }: 
         onOpenFile={onOpenFile}
         onShowInFinder={onShowInFinder}
         onDelete={onDelete}
+        onBranch={onBranch}
       />
     )
   return (
@@ -47,6 +57,7 @@ export function Message({ msg, agentId, onOpenFile, onShowInFinder, onDelete }: 
       onOpenFile={onOpenFile}
       onShowInFinder={onShowInFinder}
       onDelete={onDelete}
+      onBranch={onBranch}
     />
   )
 }
@@ -101,6 +112,31 @@ function MessageBody({
 }
 
 /**
+ * Discrete "branch out" affordance beside copy/delete: opens the Branch dialog
+ * to start a new thread inheriting the conversation up to this message. Same
+ * quiet style as the copy button, brightening to the signal colour on hover.
+ */
+function BranchButton({ align, onBranch }: { align: "start" | "end"; onBranch: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onBranch}
+      aria-label="Branch a new thread from this message"
+      title="Branch a new thread from here"
+      className={cn(
+        "flex items-center gap-1 rounded-md px-1 py-0.5 text-[10px] transition-colors",
+        "opacity-50 outline-none hover:opacity-100 focus-visible:opacity-100",
+        "text-muted-foreground/70 hover:text-(--signal)",
+        align === "end" ? "self-end" : "self-start",
+      )}
+    >
+      <GitBranch className="size-3" />
+      <span>Branch</span>
+    </button>
+  )
+}
+
+/**
  * Discrete delete affordance shown beside the copy button beneath a message.
  *
  * Matches the copy button's quiet style — low opacity, brightening on hover —
@@ -125,7 +161,14 @@ function DeleteButton({ align, onDelete }: { align: "start" | "end"; onDelete: (
   )
 }
 
-function UserMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete }: MessageProps) {
+function UserMessage({
+  msg,
+  agentId,
+  onOpenFile,
+  onShowInFinder,
+  onDelete,
+  onBranch,
+}: MessageProps) {
   return (
     <div className="flex flex-col items-end gap-1 py-2">
       <div className="card-shadow max-w-[78%] rounded-2xl rounded-br-md bg-(--signal) px-3.5 py-2 text-[13px] leading-relaxed text-(--primary-foreground)">
@@ -143,13 +186,21 @@ function UserMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete }: Mes
       </span>
       <div className="flex items-center gap-2">
         <CopyButton text={msg.text ?? ""} align="end" label="Copy message" />
+        {onBranch && <BranchButton align="end" onBranch={onBranch} />}
         {onDelete && <DeleteButton align="end" onDelete={onDelete} />}
       </div>
     </div>
   )
 }
 
-function AssistantMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete }: MessageProps) {
+function AssistantMessage({
+  msg,
+  agentId,
+  onOpenFile,
+  onShowInFinder,
+  onDelete,
+  onBranch,
+}: MessageProps) {
   return (
     <div className="flex flex-col gap-1.5 py-2">
       <div className="flex items-center gap-2">
@@ -174,6 +225,7 @@ function AssistantMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete }
       {!msg.streaming && (
         <div className="flex items-center gap-2 pl-7">
           <CopyButton text={msg.text ?? ""} align="start" label="Copy message" />
+          {onBranch && <BranchButton align="start" onBranch={onBranch} />}
           {onDelete && <DeleteButton align="start" onDelete={onDelete} />}
         </div>
       )}

@@ -87,6 +87,7 @@ fn checkpoint_restores_roster_wholesale() {
                 name: "stale".into(),
                 status: ThreadTurn::TheirTurn,
                 timestamp_ms: 1,
+                branched_from: None,
             },
         ),
     );
@@ -130,6 +131,7 @@ fn roster_survives_compaction_via_checkpoint_then_folds_tail() {
                 name: "fresh".into(),
                 status: ThreadTurn::MyTurn,
                 timestamp_ms: 200,
+                branched_from: None,
             },
         ),
     );
@@ -216,6 +218,7 @@ fn roster_create_archive_restore_cycle() {
                 name: "Refactor cache".into(),
                 status: ThreadTurn::TheirTurn,
                 timestamp_ms: 1_000,
+                branched_from: None,
             },
         ),
     );
@@ -244,6 +247,7 @@ fn thread_created_folds_idempotently_on_replay() {
         name: "Plan".into(),
         status: ThreadTurn::MyTurn,
         timestamp_ms: 5,
+        branched_from: None,
     };
     view.apply("a1", &entry(0, created.clone()));
     view.apply("a1", &entry(0, created)); // duplicate delivery / replay
@@ -262,6 +266,7 @@ fn message_created_bumps_roster_count_and_activity() {
                 name: "Chat".into(),
                 status: ThreadTurn::MyTurn,
                 timestamp_ms: 100,
+                branched_from: None,
             },
         ),
     );

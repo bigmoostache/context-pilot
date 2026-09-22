@@ -157,7 +157,7 @@ impl AgentView {
                 self.heads.set_thread_head(thread_id, head);
                 RosterThread::fold_message(&mut self.roster, thread_id, entry.timestamp_ms);
             }
-            OpEntryKind::ThreadCreated { ref thread_id, ref name, status, timestamp_ms } => {
+            OpEntryKind::ThreadCreated { ref thread_id, ref name, status, timestamp_ms, .. } => {
                 RosterThread::fold_created(
                     &mut self.roster,
                     cp_wire::types::snapshot::ThreadCreation::new(thread_id, name, status, timestamp_ms),

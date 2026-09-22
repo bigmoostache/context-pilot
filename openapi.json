@@ -1706,6 +1706,9 @@
           "agent_id": {
             "type": "string"
           },
+          "branched_from": {
+            "type": "string"
+          },
           "budget_tokens": {
             "type": "integer"
           },
@@ -2052,6 +2055,10 @@
           },
           "archived": {
             "type": "boolean"
+          },
+          "branchedFrom": {
+            "nullable": true,
+            "type": "string"
           },
           "createdAt": {
             "type": "string"

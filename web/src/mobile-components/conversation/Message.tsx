@@ -10,7 +10,7 @@
 
 import { useEffect, useRef } from "react"
 import { animate, createSpring } from "animejs"
-import { ChevronDown, Terminal, Trash2, User } from "lucide-react"
+import { ChevronDown, GitBranch, Terminal, Trash2, User } from "lucide-react"
 import type { ChatMessage } from "@/lib/types"
 import { Markdown, type MarkdownVariant } from "@/lib/support/markdown"
 import { CopyButton } from "./CopyButton"
@@ -41,6 +41,8 @@ interface MessageProps {
   onShowInFinder?: ((path: string) => void) | undefined
   /** permanently delete this message from the thread */
   onDelete?: (() => void) | undefined
+  /** branch a new thread out of the conversation at this message */
+  onBranch?: (() => void) | undefined
   /** true for a message that just APPENDED (not part of the initial load) —
    *  drives the anime.js spring pop that reads as send/receive confirmation. */
   fresh?: boolean | undefined
@@ -52,6 +54,7 @@ export function Message({
   onOpenFile,
   onShowInFinder,
   onDelete,
+  onBranch,
   fresh,
 }: MessageProps) {
   if (msg.role === "tool" && msg.tool) return <ToolMessage msg={msg} />
@@ -63,6 +66,7 @@ export function Message({
         onOpenFile={onOpenFile}
         onShowInFinder={onShowInFinder}
         onDelete={onDelete}
+        onBranch={onBranch}
         fresh={fresh}
       />
     )
@@ -73,6 +77,7 @@ export function Message({
       onOpenFile={onOpenFile}
       onShowInFinder={onShowInFinder}
       onDelete={onDelete}
+      onBranch={onBranch}
       fresh={fresh}
     />
   )
@@ -151,6 +156,29 @@ function MessageBody({
 }
 
 /**
+ * Discrete "branch out" affordance beside copy/delete: opens the Branch dialog
+ * to start a new thread inheriting the conversation up to this message. Touch
+ * metrics match the delete button (no hover; active-press signal tint).
+ */
+function BranchButton({ align, onBranch }: { align: "start" | "end"; onBranch: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onBranch}
+      aria-label="Branch a new thread from this message"
+      className={cn(
+        "flex items-center gap-1 rounded-md px-1 py-0.5 text-[10px] transition-colors",
+        "text-muted-foreground/70 outline-none active:text-(--signal)",
+        align === "end" ? "self-end" : "self-start",
+      )}
+    >
+      <GitBranch className="size-3" />
+      <span>Branch</span>
+    </button>
+  )
+}
+
+/**
  * Discrete delete affordance shown beside the copy button beneath a message.
  *
  * On touch there is no hover, so the button sits at a steady readable opacity
@@ -180,7 +208,15 @@ function DeleteButton({ align, onDelete }: { align: "start" | "end"; onDelete: (
   )
 }
 
-function UserMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete, fresh }: MessageProps) {
+function UserMessage({
+  msg,
+  agentId,
+  onOpenFile,
+  onShowInFinder,
+  onDelete,
+  onBranch,
+  fresh,
+}: MessageProps) {
   const bubbleRef = useBubblePop(fresh)
   return (
     <div className="flex flex-col items-end gap-1 py-2">
@@ -203,6 +239,7 @@ function UserMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete, fresh
       </span>
       <div className="flex items-center gap-2">
         <CopyButton text={msg.text ?? ""} align="end" label="Copy message" />
+        {onBranch && <BranchButton align="end" onBranch={onBranch} />}
         {onDelete && <DeleteButton align="end" onDelete={onDelete} />}
       </div>
     </div>
@@ -215,6 +252,7 @@ function AssistantMessage({
   onOpenFile,
   onShowInFinder,
   onDelete,
+  onBranch,
   fresh,
 }: MessageProps) {
   const bubbleRef = useBubblePop(fresh)
@@ -244,6 +282,7 @@ function AssistantMessage({
         <div className="flex items-center gap-2 pl-1">
           <span className="text-[10px] leading-none text-muted-foreground/60">{msg.ts}</span>
           <CopyButton text={msg.text ?? ""} align="start" label="Copy message" />
+          {onBranch && <BranchButton align="start" onBranch={onBranch} />}
           {onDelete && <DeleteButton align="start" onDelete={onDelete} />}
         </div>
       )}

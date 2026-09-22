@@ -104,6 +104,7 @@ mod tests {
             name: format!("thread {thread}"),
             status: ThreadTurn::TheirTurn,
             timestamp_ms: 0,
+            branched_from: None,
         }
     }
 
