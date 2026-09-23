@@ -231,7 +231,8 @@ fn roster_status_value(status: ThreadTurn) -> serde_json::Value {
 
 /// Reshape one raw thread from agent state to the maquette `ThreadDetail`
 /// shape: `snake_case` → camelCase, computed fields (`messageCount`, `unread`,
-/// `lastMessage`, `lastActivity`), and messages mapped to `log`.
+/// `lastMessage`, `lastActivity`), `origin.thread_id` flattened to
+/// `branchedFrom` (null for a non-branched thread), and messages mapped to `log`.
 pub(crate) fn reshape_thread(raw: &serde_json::Value, agent_id: &str) -> serde_json::Value {
     let messages = raw.get("messages").and_then(serde_json::Value::as_array);
     let msg_count = messages.map_or(0, Vec::len);
@@ -243,11 +244,15 @@ pub(crate) fn reshape_thread(raw: &serde_json::Value, agent_id: &str) -> serde_j
         .and_then(|m| m.get("content"))
         .and_then(serde_json::Value::as_str)
         .unwrap_or("");
+    // Latest of the last message and the thread's own creation: a branched
+    // thread's copied history keeps the parent's (older) timestamps, so its
+    // creation is what marks it as recent until a new message lands.
     let last_activity = messages
         .and_then(|msgs| msgs.last())
         .and_then(|m| m.get("timestamp"))
         .and_then(serde_json::Value::as_u64)
-        .unwrap_or(0);
+        .unwrap_or(0)
+        .max(raw.get("created_at").and_then(serde_json::Value::as_u64).unwrap_or(0));
 
     let log: Vec<serde_json::Value> =
         messages.map(|msgs| msgs.iter().enumerate().map(|(i, m)| reshape_message(m, i)).collect()).unwrap_or_default();
@@ -268,6 +273,7 @@ pub(crate) fn reshape_thread(raw: &serde_json::Value, agent_id: &str) -> serde_j
         "unread": unread,
         "archived": raw.get("archived").and_then(serde_json::Value::as_bool).unwrap_or(false),
         "paused": raw.get("paused").and_then(serde_json::Value::as_bool).unwrap_or(false),
+        "branchedFrom": raw.pointer("/origin/thread_id").and_then(serde_json::Value::as_str),
         "log": log,
         "tasks": serde_json::Value::Array(Vec::new()),
         "notes": serde_json::Value::Array(Vec::new()),
@@ -383,6 +389,34 @@ mod tests {
         assert_eq!(str_at(&d, "lastMessage"), Some("yo"));
         assert_eq!(u64_at(&d, "lastActivity"), Some(20));
         assert_log_roles(&d);
+    }
+
+    #[test]
+    fn reshape_plain_thread_has_null_branched_from() {
+        let raw = serde_json::json!({"id": "T1", "name": "Plan", "status": "TheirTurn", "messages": []});
+        let d = reshape_thread(&raw, "a1");
+        assert_eq!(d.get("branchedFrom"), Some(&serde_json::Value::Null));
+    }
+
+    #[test]
+    fn reshape_branched_thread_exposes_parent_and_creation_activity() {
+        // A branch's copied history keeps the parent's old timestamps; its
+        // creation time is what makes it recent.
+        let raw = serde_json::json!({
+            "id": "T4",
+            "name": "Alt",
+            "status": "TheirTurn",
+            "created_at": 900u64,
+            "origin": {"thread_id": "T1", "message_ts": 20u64},
+            "messages": [
+                {"author": "User", "content": "hi", "timestamp": 10u64, "acknowledged": true},
+                {"author": "Assistant", "content": "yo", "timestamp": 20u64, "acknowledged": true},
+            ],
+        });
+        let d = reshape_thread(&raw, "a1");
+        assert_eq!(str_at(&d, "branchedFrom"), Some("T1"));
+        assert_eq!(u64_at(&d, "lastActivity"), Some(900));
+        assert_eq!(u64_at(&d, "messageCount"), Some(2));
     }
 
     /// The two log entries map `User`/`Assistant` to `user`/`assistant` roles —

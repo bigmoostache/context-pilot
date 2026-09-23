@@ -144,7 +144,7 @@ fn validate_probe_timing(probe: &ProbeConfig) -> Result<(), String> {
 /// Where `cp-uplink-watch` publishes its state, `CP_UPLINK_STATE`-gated like
 /// every other path this feature touches.
 fn uplink_state_path() -> PathBuf {
-    std::env::var_os("CP_UPLINK_STATE").map_or_else(|| PathBuf::from("/run/cp-uplink/state"), PathBuf::from)
+    cp_env::env().appliance.uplink_state.clone()
 }
 
 /// The supervisor's published state, or `null` when it has published none.

@@ -112,6 +112,18 @@ pub(super) fn transport() -> Value {
             },
             "required": ["enabled"]
         },
+        "Features": {
+            "type": "object",
+            "properties": {
+                "claude_oauth": { "type": "boolean" },
+                "day0_setup": { "type": "boolean" },
+                "it_pane": { "type": "boolean" },
+                "updater": { "type": "boolean" },
+                "keys_editable": { "type": "boolean" },
+                "onboarding": { "type": "boolean" }
+            },
+            "required": ["claude_oauth", "day0_setup", "it_pane", "updater", "keys_editable", "onboarding"]
+        },
         "AuthUser": {
             "type": "object",
             "properties": {
@@ -395,6 +407,9 @@ pub(super) fn transport() -> Value {
                 "name": { "type": "string" },
                 "status": { "type": "string" },
                 "timestamp_ms": { "type": "integer" },
+                // thread_created delta payload: the parent thread id when the new
+                // thread was branched out of another one (absent otherwise).
+                "branched_from": { "type": "string" },
                 "phase": { "type": "string" },
                 // Lifecycle delta payload: the agent's new process state
                 // ("running"/"stopping"/"stopped"), carried by a `kind:"lifecycle"` entry.

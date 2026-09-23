@@ -231,6 +231,9 @@ struct RouteCtx<'ctx> {
     auth_token: Option<&'ctx str>,
     /// The authenticated user, when auth is enabled.
     auth_user: Option<&'ctx crate::services::auth::types::User>,
+    /// The deployment's feature flags (`CP_FEATURE_*`), threaded in so the
+    /// router's gate is a pure function of its context (tests pass their own).
+    flags: cp_env::model::features::Features,
 }
 
 impl<'ctx> RouteCtx<'ctx> {
@@ -241,13 +244,13 @@ impl<'ctx> RouteCtx<'ctx> {
     /// under the line-count cap. The POST/PUT/PATCH pass attaches its body with
     /// [`with_body`](Self::with_body); the four-field form stays within the
     /// argument-count cap.
-    const fn new(
+    fn new(
         state: &'ctx Arc<Mutex<Backend>>,
         query: &'ctx str,
         auth_token: Option<&'ctx str>,
         auth_user: Option<&'ctx crate::services::auth::types::User>,
     ) -> Self {
-        Self { state, body_bytes: &[], query, auth_token, auth_user }
+        Self { state, body_bytes: &[], query, auth_token, auth_user, flags: rest::features() }
     }
 
     /// Return a copy of this context carrying `body_bytes` (the read request

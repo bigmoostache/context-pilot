@@ -136,6 +136,10 @@ pub enum OpEntryKind {
         /// Wall-clock creation time (epoch ms) — seeds the roster's
         /// last-activity until the first message lands.
         timestamp_ms: u64,
+        /// Parent thread id when the thread was branched out of another one
+        /// (`BranchThread`); absent for a thread created from scratch.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        branched_from: Option<String>,
     },
 
     /// A thread was archived (soft-delete — hidden from the active list, kept

@@ -13,8 +13,8 @@ use fs2::FileExt as _;
 use crate::types::VaultError;
 
 /// Path to the global environment file: `~/.context-pilot/.env`.
-fn global_env_path() -> Option<PathBuf> {
-    std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".context-pilot").join(".env"))
+fn global_env_path() -> PathBuf {
+    cp_env::env().core.home.join(".context-pilot").join(".env")
 }
 
 /// Read a specific key from the global `.env` file (without dotenvy).
@@ -22,7 +22,7 @@ fn global_env_path() -> Option<PathBuf> {
 /// This is a fallback for cases where dotenvy hasn't loaded the file yet.
 /// Parses simple `KEY=value` and `KEY="quoted value"` formats.
 pub(crate) fn read_env_key(key: &str) -> Option<String> {
-    let path = global_env_path()?;
+    let path = global_env_path();
     let content = fs::read_to_string(&path).ok()?;
     let prefix = format!("{key}=");
 
@@ -42,7 +42,7 @@ pub(crate) fn read_env_key(key: &str) -> Option<String> {
 /// locking (`flock`) to serialize concurrent writers.  Existing entries are
 /// updated in-place; new entries are appended.
 pub(crate) fn write_env_entry(key: &str, value: &str) -> Result<(), VaultError> {
-    let path = global_env_path().ok_or_else(|| VaultError::Io("HOME not set".to_owned()))?;
+    let path = global_env_path();
 
     // Ensure parent directory exists.
     if let Some(parent) = path.parent() {

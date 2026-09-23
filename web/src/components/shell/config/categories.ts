@@ -1,12 +1,15 @@
 import { Boxes, Coins, KeyRound, Package, ShieldCheck, Sliders } from "lucide-react"
+import type { Features } from "@/lib/api"
 
 /** Settings category identifiers (the cockpit config panes). */
 export type CatId = "general" | "usage" | "services" | "secrets" | "it" | "update"
 
 /**
  * The config pane catalogue: order, labels, blurbs, icons and the `adminOnly` /
- * `superadminOnly` gates. Kept in its own module (not beside {@link CategoryBody})
- * so importing this data never trips Fast Refresh's component-only-export rule.
+ * `superadminOnly` role gates plus the `feature` deployment gate (a pane whose
+ * flag is off is not offered to anyone — the backend answers 404 there anyway).
+ * Kept in its own module (not beside {@link CategoryBody}) so importing this
+ * data never trips Fast Refresh's component-only-export rule.
  */
 export const CATEGORIES: {
   id: CatId
@@ -18,6 +21,8 @@ export const CATEGORIES: {
   /** Renders only for a superadmin (`can_manage_secrets`) — or in god-mode when
    *  access control is off (design §13.5/§13.10). */
   superadminOnly?: boolean
+  /** Renders only when this deployment feature flag is on (`CP_FEATURE_*`). */
+  feature?: keyof Features
 }[] = [
   { id: "general", label: "General", blurb: "Models & autonomy", icon: Sliders },
   { id: "usage", label: "Usage & Cost", blurb: "Spend & token analytics", icon: Coins },
@@ -35,6 +40,7 @@ export const CATEGORIES: {
     blurb: "Identity, TLS, uplink & Wi-Fi",
     icon: ShieldCheck,
     adminOnly: true,
+    feature: "it_pane",
   },
   {
     id: "update",
@@ -42,5 +48,6 @@ export const CATEGORIES: {
     blurb: "Software updates & window",
     icon: Package,
     adminOnly: true,
+    feature: "updater",
   },
 ]

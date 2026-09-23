@@ -16,55 +16,14 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react"
 import { sendCommand } from "@/lib/live"
 import { uploadUnique } from "@/lib/api"
-import { buildUploadMessage, type UploadedFile } from "@/lib/live/threadUpload"
+import type { UploadedFile } from "@/lib/live/threadUpload"
 import type { ThreadDetail } from "@/lib/types"
+import { buildCombinedContent, describeCommandError, type CreateThreadOpts } from "./commands"
+import { useThreadBranch, type BranchActions } from "./branch"
 
-/** Rich thread-creation payload collected by the New Thread dialog (T674):
- *  a title plus an optional first message (auto-sent), file attachments, and a
- *  "create paused" flag that queues the seeded message without waking the agent. */
-export interface CreateThreadOpts {
-  title: string
-  /** first user message, auto-sent to the new thread once its id is known (empty = none) */
-  firstMessage: string
-  /** files ALREADY uploaded to `.uploads/` (the dialog uploads on attach so the
-   *  draft — paths included — survives a close/reopen via localStorage); folded
-   *  into the first message as `file-upload` blocks at send time */
-  files: UploadedFile[]
-  /** create the thread already paused (seeded message queued, no MY_TURN nudge) */
-  paused: boolean
-}
-
-/**
- * Build a combined message body from user text and pending file attachments,
- * reusing the exact same ` ```file-upload ` block composer the thread composer
- * uses ({@link buildUploadMessage}). Either part can be absent — a send with
- * only files produces just the file blocks; one with only text produces just
- * text.
- *
- * `filesFirst` controls ordering. The thread composer sends text first then the
- * file blocks (default, `false`). The new-thread create flow prepends the file
- * blocks so the attachments lead the very first message (T687).
- */
-export function buildCombinedContent(
-  text: string,
-  files: UploadedFile[],
-  filesFirst = false,
-): string {
-  const textPart = text.trim()
-  const filePart = files.length > 0 ? buildUploadMessage(files) : ""
-  const parts = filesFirst ? [filePart, textPart] : [textPart, filePart]
-  return parts.filter(Boolean).join("\n\n")
-}
-
-/**
- * Turn a rejected `sendCommand` into a human sentence for the notice toast.
- *
- * Every failure is surfaced visibly so a command is never silently dropped.
- */
-export function describeCommandError(verb: string, err: unknown): string {
-  const msg = err instanceof Error ? err.message : String(err)
-  return `Could not ${verb}: ${msg}`
-}
+export { buildCombinedContent, describeCommandError, type CreateThreadOpts } from "./commands"
+export type { BranchTarget } from "./branch"
+export { useThreadReadState } from "./readState"
 
 /** The thread-selection surface owned by {@link useThreadSelection}. */
 export interface Selection {
@@ -223,7 +182,7 @@ export interface Notice {
 }
 
 /** The command handlers + transient notice returned by {@link useThreadActions}. */
-export interface Actions {
+export interface Actions extends BranchActions {
   notice: Notice | null
   handleArchive: (id: string) => void
   handlePause: (id: string) => void
@@ -421,7 +380,10 @@ export function useThreadActions(
     [activeAgentId, effectiveSelectedId, flash, setPendingFiles],
   )
 
+  const branch = useThreadBranch(activeAgentId, sel, flash)
+
   return {
+    ...branch,
     notice,
     handleArchive,
     handlePause,
@@ -430,71 +392,4 @@ export function useThreadActions(
     handleSend,
     handleAttach,
   }
-}
-
-// ── Per-message user-read state (T712, frontend-only) ────────────────
-//
-// A purely client-side "the human has seen this message" receipt, kept in
-// localStorage per browser — there is NO backend equivalent (the backend's
-// `ThreadDetail.unread` is AGENT-side, a different question we stop surfacing).
-// The list-row badge shows how many assistant messages a thread has that the
-// user hasn't read; opening a thread marks all of its messages read.
-
-/** localStorage key holding the set of read LLM-message ids for one thread. */
-const readKey = (agentId: string, threadId: string) => `cp-msg-read-${agentId}-${threadId}`
-
-/** Ids of the LLM messages a user reads: assistant-authored, non-auto (auto
- *  tool-activity traces are collapsed noise, never "read"). */
-function llmMessageIds(t: ThreadDetail): string[] {
-  return t.log.filter((m) => m.author === "assistant" && !m.auto).map((m) => m.id)
-}
-
-/** Parse a thread's persisted read-id set from localStorage (empty on miss). */
-function loadReadSet(agentId: string, threadId: string): Set<string> {
-  try {
-    const raw = localStorage.getItem(readKey(agentId, threadId))
-    const arr: unknown = raw ? JSON.parse(raw) : []
-    return Array.isArray(arr)
-      ? new Set(arr.filter((x): x is string => typeof x === "string"))
-      : new Set()
-  } catch {
-    return new Set()
-  }
-}
-
-/**
- * Own the per-thread user-read receipts for a realm (T712). Returns
- * `unreadOf(thread)` — the count of assistant messages the user has NOT read —
- * for the list-row badge. Whenever the OPEN thread (or its log) changes, every
- * LLM message in it is persisted read, so the focused thread never shows a
- * count. Per-browser only (localStorage); a thread never opened shows all unread.
- */
-export function useThreadReadState(agentId: string, threads: ThreadDetail[], openThreadId: string) {
-  // Persist the open thread's LLM message ids as "read" — localStorage only, an
-  // external-system sync with NO React state, so no cascading renders. The badge
-  // reacts through the `openThreadId` / `threads` prop changes, not local state.
-  useEffect(() => {
-    const t = threads.find((x) => x.id === openThreadId)
-    if (!t) return
-    const ids = llmMessageIds(t)
-    if (ids.length === 0) return
-    const set = loadReadSet(agentId, t.id)
-    const before = set.size
-    for (const id of ids) set.add(id)
-    if (set.size === before) return
-    localStorage.setItem(readKey(agentId, t.id), JSON.stringify([...set]))
-  }, [agentId, openThreadId, threads])
-
-  const unreadOf = useCallback(
-    (t: ThreadDetail): number => {
-      // The open thread is being read right now → always zero (its ids are also
-      // persisted by the effect above, so it stays read after you switch away).
-      if (t.id === openThreadId) return 0
-      const set = loadReadSet(agentId, t.id)
-      return t.log.filter((m) => m.author === "assistant" && !m.auto && !set.has(m.id)).length
-    },
-    [agentId, openThreadId],
-  )
-
-  return { unreadOf }
 }

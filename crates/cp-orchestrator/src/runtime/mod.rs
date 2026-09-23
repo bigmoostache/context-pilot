@@ -14,14 +14,10 @@
 //!
 //! # Configuration
 //!
-//! All knobs are environment-variable driven (or defaults):
-//!
-//! | Env var | Default | Meaning |
-//! |---|---|---|
-//! | `CP_ORCH_PORT` | `7878` | Product cockpit HTTP listen port |
-//! | `CP_ORCH_BIND` | `127.0.0.1` | Listen address — loopback, Caddy fronts the LAN |
-//! | `CP_AGENTS_DIR` | `~/.context-pilot/agents` | Registry directory |
-//! | `CP_SCAN_INTERVAL_MS` | `2000` | Registry-discovery + tier-② mtime poll cadence (ms) |
+//! Every knob comes from the environment, validated once at boot by `cp-env`
+//! (`docs/ENV.md` is the reference). [`Config`] is a typed view over that
+//! validated environment, kept so the runtime, the backend and the tests keep
+//! one plain struct to hand around.
 //!
 //! The oplog tail (the live state-fold that feeds the view) runs on a
 //! much tighter [`driver::TAIL_INTERVAL`] inner cadence, decoupled from the
@@ -41,24 +37,7 @@ mod update_scheduler;
 use crate::services::auth::backup::BackupScheduler;
 use crate::transport::Backend;
 
-/// Default product cockpit HTTP listen port.
-const DEFAULT_PORT: u16 = 7878;
-
-/// Default listen address: **loopback only**.
-///
-/// The cockpit's only LAN-facing surface is Caddy, which terminates TLS and
-/// proxies to `127.0.0.1:7878` (see [`crate::transport::it::caddy`]). Binding
-/// every interface would publish the backend itself on the LAN in cleartext,
-/// letting anyone bypass the `:80`→`:443` redirect the provisioned box relies
-/// on — while the auth model (bearer token, CORS) assumes an encrypted
-/// transport. Override with `CP_ORCH_BIND` (e.g. `0.0.0.0` for a dev box whose
-/// UI is opened from another machine).
-const DEFAULT_BIND: &str = "127.0.0.1";
-
-/// Default registry + oplog poll interval.
-const DEFAULT_SCAN_INTERVAL: Duration = Duration::from_secs(2);
-
-/// Parsed runtime configuration, sourced from environment variables.
+/// Runtime configuration — a view over the validated environment.
 #[derive(Debug)]
 pub struct Config {
     /// Product cockpit HTTP listen port.
@@ -92,73 +71,22 @@ pub struct Config {
 }
 
 impl Config {
-    /// Read configuration from environment variables, falling back to defaults.
-    ///
-    /// # Errors
-    ///
-    /// Returns a message if `CP_AGENTS_DIR` is absent **and** `$HOME` is unset
-    /// (so the default directory cannot be derived).
-    pub fn from_env() -> Result<Self, String> {
-        let port = std::env::var("CP_ORCH_PORT").ok().and_then(|s| s.parse().ok()).unwrap_or(DEFAULT_PORT);
-
-        // Loopback unless explicitly widened: the appliance's LAN surface is
-        // Caddy, never the backend socket.
-        let bind = std::env::var("CP_ORCH_BIND")
-            .ok()
-            .map(|s| s.trim().to_owned())
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| DEFAULT_BIND.to_owned());
-
-        let agents_dir = match std::env::var_os("CP_AGENTS_DIR") {
-            Some(dir) => PathBuf::from(dir),
-            None => {
-                crate::registry::default_agents_dir().map_err(|e| format!("cannot derive agents directory: {e}"))?
-            }
-        };
-
-        let scan_interval = std::env::var("CP_SCAN_INTERVAL_MS")
-            .ok()
-            .and_then(|s| s.parse::<u64>().ok())
-            .map_or(DEFAULT_SCAN_INTERVAL, Duration::from_millis);
-
-        // Where new agents' realm folders are created. Default `~/code`, or the
-        // current directory if `$HOME` is unset (never fail — creation simply
-        // lands somewhere sensible).
-        let agents_root = std::env::var_os("CP_AGENTS_ROOT").map_or_else(
-            || std::env::var_os("HOME").map_or_else(|| PathBuf::from("."), |h| PathBuf::from(h).join("code")),
-            PathBuf::from,
-        );
-
-        // The `cp` TUI binary the supervisor spawns. Default to the release
-        // build under the current working directory; override with an absolute
-        // path in deployment.
-        let agent_binary = std::env::var_os("CP_AGENT_BINARY").map_or_else(
-            || std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join("target/release/tui"),
-            PathBuf::from,
-        );
-
-        // Auth configuration (§8 of design doc).
-        let auth_enabled =
-            std::env::var("CP_AUTH_ENABLED").ok().is_some_and(|s| s.eq_ignore_ascii_case("true") || s == "1");
-
-        let session_ttl = std::env::var("CP_SESSION_TTL_SECS")
-            .ok()
-            .and_then(|s| s.parse::<u64>().ok())
-            .map_or(Duration::from_hours(720), Duration::from_secs); // 30 days
-
-        let auth_db_path = crate::services::auth::db::AuthStore::default_db_path();
-
-        Ok(Self {
-            port,
-            bind,
-            agents_dir,
-            scan_interval,
-            agents_root,
-            agent_binary,
-            auth_enabled,
-            session_ttl,
-            auth_db_path,
-        })
+    /// The runtime view of a validated environment. Infallible: every value
+    /// was checked (types, paths, cross-variable rules) before `main` let the
+    /// process continue.
+    #[must_use]
+    pub fn view(env: &cp_env::model::Env) -> Self {
+        Self {
+            port: env.orch.port,
+            bind: env.orch.bind.clone(),
+            agents_dir: env.core.agents_dir.clone(),
+            scan_interval: env.orch.scan_interval,
+            agents_root: env.orch.agents_root.clone(),
+            agent_binary: env.orch.agent_binary.clone(),
+            auth_enabled: env.auth.enabled,
+            session_ttl: env.auth.session_ttl,
+            auth_db_path: env.auth.db_path.clone(),
+        }
     }
 
     /// The `host:port` string handed to the HTTP acceptor.
@@ -358,35 +286,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn config_defaults_are_sensible() {
-        // `remove_var` is unsafe in edition 2024 and `unsafe_code` is
-        // forbidden, so we cannot clear environment variables. Instead
-        // verify that `from_env` succeeds when `$HOME` is set.
-        if std::env::var_os("HOME").is_some() {
-            let cfg = Config::from_env().expect("config");
-            // The port, budget, and interval come from env or defaults;
-            // assert the types parse correctly rather than exact values
-            // (CI may set CP_ORCH_PORT etc.).
-            assert!(cfg.port > 0);
-            assert!(cfg.scan_interval.as_millis() > 0);
-        }
+    fn config_view_mirrors_the_environment() {
+        let env = cp_env::env();
+        let cfg = Config::view(env);
+        assert_eq!((cfg.port, cfg.bind.as_str()), (env.orch.port, env.orch.bind.as_str()));
+        assert_eq!(
+            (cfg.agents_dir.as_path(), cfg.auth_db_path.as_path()),
+            (env.core.agents_dir.as_path(), env.auth.db_path.as_path())
+        );
     }
 
     #[test]
     fn default_bind_is_loopback() {
         // Not cosmetic: the backend speaks cleartext HTTP and its auth model
         // assumes an encrypted transport, so its socket must never face the
-        // LAN — Caddy does (`:80` day-0, `:443` provisioned).
-        let ip: std::net::IpAddr = DEFAULT_BIND.parse().expect("default bind is an IP literal");
+        // LAN — Caddy does (`:80` day-0, `:443` provisioned). The default now
+        // lives in the cp-env table; this pins it.
+        let spec = cp_env::specs::find("CP_ORCH_BIND").expect("CP_ORCH_BIND is declared");
+        let cp_env::spec::Fallback::Literal(default) = spec.fallback else {
+            panic!("CP_ORCH_BIND must carry a literal default");
+        };
+        let ip: std::net::IpAddr = default.parse().expect("default bind is an IP literal");
         assert!(ip.is_loopback(), "the cockpit backend must bind loopback; Caddy fronts the LAN");
     }
 
     #[test]
     fn listen_addr_brackets_ipv6_literals() {
-        if std::env::var_os("HOME").is_none() {
-            return;
-        }
-        let mut cfg = Config::from_env().expect("config");
+        let mut cfg = Config::view(cp_env::env());
         cfg.port = 7878;
 
         cfg.bind = "127.0.0.1".to_owned();

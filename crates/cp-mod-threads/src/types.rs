@@ -113,6 +113,16 @@ impl ThreadMessage {
     }
 }
 
+/// Where a branched thread came from: the parent thread and the message it was
+/// cut at (inclusive). Set only on threads created by [`ThreadsState::branch`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ThreadOrigin {
+    /// Id of the parent thread at branch time (may since have been deleted).
+    pub thread_id: String,
+    /// Epoch-ms timestamp of the last parent message copied into the branch.
+    pub message_ts: u64,
+}
+
 /// A parallel discussion/work topic thread.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Thread {
@@ -136,6 +146,11 @@ pub struct Thread {
     /// the agent to act yet.
     #[serde(default)]
     pub paused: bool,
+    /// Parent thread + branch point when this thread was branched out of
+    /// another one (`None` for a thread created from scratch). Defaults to
+    /// `None` (back-compat with pre-feature data).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<ThreadOrigin>,
 }
 
 impl Thread {
@@ -151,6 +166,7 @@ impl Thread {
             created_at: cp_base::panels::now_ms(),
             archived: false,
             paused: false,
+            origin: None,
         }
     }
 }
@@ -226,6 +242,46 @@ impl ThreadsState {
     pub fn visible_indices(&self, archived: bool) -> Vec<usize> {
         self.threads.iter().enumerate().filter(|entry| entry.1.archived == archived).map(|entry| entry.0).collect()
     }
+
+    /// Branch a new thread out of `source_id`: a fresh thread named `name`
+    /// whose history is a copy of the parent's messages up to and including the
+    /// one stamped `at_ts`. Returns the new thread's id.
+    ///
+    /// Copied messages keep their original timestamps (still unique within the
+    /// branch, so `DeleteMessage` works on it) and are all marked acknowledged —
+    /// the branch starts from context the agent has already seen. The branch is
+    /// a plain `TheirTurn` thread (never archived/paused, even if the parent
+    /// is) recording its parent in [`Thread::origin`]. Nothing else the parent
+    /// owns (todos, scratchpad) is copied: those only exist as a *current*
+    /// snapshot, which would leak whatever happened after the branch point.
+    ///
+    /// # Errors
+    ///
+    /// Returns a human-readable message when the source thread does not exist
+    /// or holds no message stamped `at_ts`; the state is left untouched.
+    pub fn branch(&mut self, source_id: &str, at_ts: u64, name: &str) -> Result<String, String> {
+        let source =
+            self.threads.iter().find(|t| t.id == source_id).ok_or_else(|| format!("thread {source_id} not found"))?;
+        let cut = source
+            .messages
+            .iter()
+            .position(|m| m.timestamp == at_ts)
+            .ok_or_else(|| format!("no message with ts={at_ts} in thread {source_id}"))?;
+        let messages: Vec<ThreadMessage> = source
+            .messages
+            .iter()
+            .take(cut.saturating_add(1))
+            .map(|m| ThreadMessage { acknowledged: true, ..m.clone() })
+            .collect();
+
+        let id = format!("T{}", self.next_id);
+        self.next_id = self.next_id.saturating_add(1);
+        let mut thread = Thread::new(id.clone(), name.to_owned());
+        thread.messages = messages;
+        thread.origin = Some(ThreadOrigin { thread_id: source_id.to_owned(), message_ts: at_ts });
+        self.threads.push(thread);
+        Ok(id)
+    }
 }
 
 // =============================================================================
@@ -237,12 +293,8 @@ impl ThreadsState {
 pub struct FocusState {
     /// Which thread the AI is currently focused on (None = unfocused).
     pub focused_thread_id: Option<String>,
-    /// Remaining tool calls in the dangling phase after `Send` clears focus.
-    /// Starts at 5 after Send, decremented on each non-exempt tool call.
-    /// Negative values mean the dangling phase has expired.
-    pub dangling_remaining: i32,
-    /// Escalation severity counter. Increments after dangling phase expires
-    /// if the AI still hasn't focused on a thread.
+    /// Escalation severity counter. Increments on each tool completion while
+    /// the AI is unfocused with a `MY_TURN` thread pending; reset on focus.
     pub escalation_level: u32,
     /// Index of the currently selected thread in the TUI threads view.
     /// Used for navigation (Tab/Shift+Tab) and message area display.
@@ -277,12 +329,11 @@ impl Default for FocusState {
 }
 
 impl FocusState {
-    /// Initial focus state: unfocused, no dangling phase, no escalation.
+    /// Initial focus state: unfocused, no escalation.
     #[must_use]
     pub const fn new() -> Self {
         Self {
             focused_thread_id: None,
-            dangling_remaining: 0,
             escalation_level: 0,
             selected_thread_idx: 0,
             creating_thread: false,
@@ -329,5 +380,106 @@ impl FocusState {
             let count = thread.messages.len();
             let _prev = Self::get_mut(state).last_read_count.insert(tid, count);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A message by `author` stamped `ts`, unacknowledged.
+    fn msg(author: ThreadAuthor, text: &str, ts: u64) -> ThreadMessage {
+        ThreadMessage {
+            author,
+            content: Some(text.to_owned()),
+            file_path: None,
+            timestamp: ts,
+            acknowledged: false,
+            auto: false,
+        }
+    }
+
+    /// State holding one parent thread `T1` with four messages (ts 10..=40),
+    /// archived + paused + `MyTurn` so the test can check none of it carries over.
+    fn parent_state() -> ThreadsState {
+        let mut ts = ThreadsState::new();
+        let mut parent = Thread::new("T1".to_owned(), "Parent".to_owned());
+        parent.messages = vec![
+            msg(ThreadAuthor::User, "q1", 10),
+            msg(ThreadAuthor::Assistant, "a1", 20),
+            msg(ThreadAuthor::User, "q2", 30),
+            msg(ThreadAuthor::Assistant, "a2", 40),
+        ];
+        parent.status = ThreadStatus::MyTurn;
+        parent.archived = true;
+        parent.paused = true;
+        ts.threads.push(parent);
+        ts.next_id = 2;
+        ts
+    }
+
+    #[test]
+    fn branch_copies_history_up_to_and_including_the_branch_point() {
+        let mut ts = parent_state();
+        let id = ts.branch("T1", 20, "Alt").unwrap();
+        assert_eq!(id, "T2");
+        assert_eq!(ts.next_id, 3);
+
+        let branch = ts.threads.iter().find(|t| t.id == "T2").unwrap();
+        let texts: Vec<_> = branch.messages.iter().map(|m| m.content.as_deref().unwrap_or("")).collect();
+        assert_eq!(texts, ["q1", "a1"]);
+        assert_eq!(branch.messages.iter().map(|m| m.timestamp).collect::<Vec<_>>(), [10, 20]);
+        assert!(branch.messages.iter().all(|m| m.acknowledged));
+        assert_eq!(branch.origin, Some(ThreadOrigin { thread_id: "T1".to_owned(), message_ts: 20 }));
+    }
+
+    #[test]
+    fn branch_is_a_fresh_active_thread_and_leaves_the_parent_untouched() {
+        let mut ts = parent_state();
+        let id = ts.branch("T1", 20, "Alt").unwrap();
+
+        let branch = ts.threads.iter().find(|t| t.id == id).unwrap();
+        assert_eq!(branch.name, "Alt");
+        assert_eq!(branch.status, ThreadStatus::TheirTurn);
+        assert!(!branch.archived);
+        assert!(!branch.paused);
+
+        let parent = ts.threads.iter().find(|t| t.id == "T1").unwrap();
+        assert_eq!(parent.messages.len(), 4);
+        assert!(parent.messages.iter().all(|m| !m.acknowledged));
+    }
+
+    #[test]
+    fn branch_at_last_message_copies_everything() {
+        let mut ts = parent_state();
+        let id = ts.branch("T1", 40, "Copy").unwrap();
+        let branch = ts.threads.iter().find(|t| t.id == id).unwrap();
+        assert_eq!(branch.messages.len(), 4);
+    }
+
+    #[test]
+    fn branch_rejects_unknown_thread_or_message() {
+        let mut ts = parent_state();
+        let unknown_thread = ts.branch("T9", 20, "x").unwrap_err();
+        assert!(unknown_thread.contains("T9"));
+        let unknown_message = ts.branch("T1", 25, "x").unwrap_err();
+        assert!(unknown_message.contains("ts=25"));
+        assert_eq!(ts.threads.len(), 1);
+        assert_eq!(ts.next_id, 2);
+    }
+
+    #[test]
+    fn origin_round_trips_and_defaults_to_none() {
+        let legacy: Thread =
+            serde_json::from_str(r#"{"id":"T1","name":"n","status":"TheirTurn","messages":[],"created_at":1}"#)
+                .unwrap();
+        assert_eq!(legacy.origin, None);
+        assert!(!serde_json::to_string(&legacy).unwrap().contains("origin"));
+
+        let mut ts = parent_state();
+        let id = ts.branch("T1", 30, "b").unwrap();
+        let branch = ts.threads.iter().find(|t| t.id == id).unwrap();
+        let back: Thread = serde_json::from_str(&serde_json::to_string(branch).unwrap()).unwrap();
+        assert_eq!(back.origin, branch.origin);
     }
 }

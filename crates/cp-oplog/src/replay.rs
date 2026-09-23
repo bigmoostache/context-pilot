@@ -81,7 +81,7 @@ pub(crate) fn fold_entry(state: &mut Recovered, entry: &OpEntry) {
         &OpEntryKind::CommandEffect { ref dedup_token, .. } | &OpEntryKind::SeenMark { ref dedup_token } => {
             state.seen.mark(dedup_token, entry.rev);
         }
-        &OpEntryKind::ThreadCreated { ref thread_id, ref name, status, timestamp_ms } => {
+        &OpEntryKind::ThreadCreated { ref thread_id, ref name, status, timestamp_ms, .. } => {
             RosterThread::fold_created(
                 &mut state.roster,
                 cp_wire::types::snapshot::ThreadCreation::new(thread_id, name, status, timestamp_ms),
@@ -346,6 +346,7 @@ mod tests {
                 name: "Plan".to_owned(),
                 status: cp_wire::types::ThreadTurn::TheirTurn,
                 timestamp_ms: 100,
+                branched_from: None,
             })
             .expect("create");
         let _m = writer.append(msg("T1", 0x01)).expect("message");
@@ -373,6 +374,7 @@ mod tests {
                 name: "Early".to_owned(),
                 status: cp_wire::types::ThreadTurn::MyTurn,
                 timestamp_ms: 1,
+                branched_from: None,
             })
             .expect("create");
         // Force several rolls so the roster is carried only by a checkpoint.

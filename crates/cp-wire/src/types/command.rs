@@ -118,6 +118,31 @@ pub enum Kind {
         paused: bool,
     },
 
+    /// Branch a new thread out of an existing one: the new thread inherits the
+    /// source thread's messages up to and including the one stamped
+    /// `message_ts`, then (optionally) gets a first user message — same
+    /// create -> pause -> send order as [`CreateThread`](Self::CreateThread).
+    ///
+    /// The agent copies the history from its own state (the payload only names
+    /// the branch point). An N-1 agent deserialises this as
+    /// [`Unknown`](Self::Unknown) and ignores it.
+    #[serde(rename = "branch_thread")]
+    BranchThread {
+        /// Thread to branch out of.
+        source_thread_id: String,
+        /// Epoch-ms timestamp of the last source message to copy (inclusive).
+        message_ts: u64,
+        /// Human-readable name of the new thread.
+        name: String,
+        /// Optional first user message of the new thread (already carries any
+        /// `file-upload` blocks the frontend composed). `None` = history only.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        initial_message: Option<String>,
+        /// Create the branch already paused (see `CreateThread::paused`).
+        #[serde(default)]
+        paused: bool,
+    },
+
     /// Archive an existing thread.
     #[serde(rename = "archive_thread")]
     ArchiveThread {

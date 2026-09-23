@@ -7,7 +7,7 @@
 //! - Messages (messages/{uid}.yaml) - Conversation messages
 mod boot;
 
-pub(crate) use boot::{boot_extract_module_data, boot_init_modules};
+pub(crate) use boot::{boot_extract_module_data, boot_init_modules, check_env, preflight_env};
 pub(crate) mod config;
 pub(crate) mod message;
 pub(crate) mod panel;

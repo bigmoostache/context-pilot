@@ -267,6 +267,15 @@ export type Error = {
     error: string;
 };
 
+export type Features = {
+    claude_oauth: boolean;
+    day0_setup: boolean;
+    it_pane: boolean;
+    keys_editable: boolean;
+    onboarding: boolean;
+    updater: boolean;
+};
+
 export type FinderKind = 'folder' | 'code' | 'doc' | 'pdf' | 'sheet' | 'slides' | 'image' | 'markdown' | 'json' | 'archive' | 'audio' | 'video' | 'binary';
 
 export type FinderNode = {
@@ -582,6 +591,7 @@ export type OpEntry = {
  */
 export type OpEntryKind = {
     agent_id?: string;
+    branched_from?: string;
     budget_tokens?: number;
     cost_usd?: number;
     head?: string;
@@ -685,6 +695,7 @@ export type ThreadDetail = {
     agent?: string;
     agentId: string;
     archived?: boolean;
+    branchedFrom?: string | null;
     createdAt?: string;
     focused?: boolean;
     id: string;
@@ -2636,6 +2647,31 @@ export type PutApiEnvKeysByNameResponses = {
 };
 
 export type PutApiEnvKeysByNameResponse = PutApiEnvKeysByNameResponses[keyof PutApiEnvKeysByNameResponses];
+
+export type GetApiFeaturesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/features';
+};
+
+export type GetApiFeaturesErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiFeaturesError = GetApiFeaturesErrors[keyof GetApiFeaturesErrors];
+
+export type GetApiFeaturesResponses = {
+    /**
+     * Success
+     */
+    200: Features;
+};
+
+export type GetApiFeaturesResponse = GetApiFeaturesResponses[keyof GetApiFeaturesResponses];
 
 export type GetApiFleetData = {
     body?: never;

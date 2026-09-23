@@ -124,14 +124,14 @@ impl Backend {
     #[must_use]
     pub fn new(paths: Paths, auth: Option<AuthStore>, session_ttl: Duration) -> Self {
         let Paths { agents_dir, agents_root, agent_binary } = paths;
-        // Durable provisioned-flag location: env override, else a dot-file in
-        // the agents dir (on the box that dir lives under /opt/context-pilot on
-        // the persistent rootfs, so the flag survives reboots; the registry scan
-        // only reads `*.json`, so the dot-file is ignored there).
-        let provision_flag_path =
-            std::env::var_os("CP_PROVISION_FLAG").map_or_else(|| agents_dir.join(".provisioned"), PathBuf::from);
+        // Durable provisioned-flag location: `CP_PROVISION_FLAG`, else a
+        // dot-file in the agents dir (on the box that dir lives under
+        // /opt/context-pilot on the persistent rootfs, so the flag survives
+        // reboots; the registry scan only reads `*.json`, so the dot-file is
+        // ignored there). Resolved by cp-env at boot.
+        let provision_flag_path = cp_env::env().orch.provision_flag.clone();
 
-        let releases = ReleaseStore::load(ReleaseStore::default_dir().unwrap_or_else(|| agents_dir.join("releases")));
+        let releases = ReleaseStore::load(ReleaseStore::default_dir());
 
         // Reconcile the persisted active release onto the live agent binary. The
         // "Use" action (select_release) writes `active_tag` to the durable

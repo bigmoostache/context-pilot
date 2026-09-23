@@ -80,6 +80,18 @@ ENV HOME=/data \
     CP_WEB_ROOT=/opt/cp/web \
     CP_AGENT_BINARY=/opt/cp/cpilot \
     CP_AGENTS_ROOT=/data/code
+# Feature flags (docs/ENV.md), every one spelled out - the container profile.
+# No day-0 identity/TLS step and no IT pane: a container has no box to name, no
+# private CA and no network to reconfigure (a reverse proxy in front owns TLS).
+# No OTA updater: a container is updated by pulling a new image. The Claude
+# subscription and the cockpit key editor stay available; override any flag
+# from .env (`CP_FEATURE_<NAME>=0|1`).
+ENV CP_FEATURE_CLAUDE_OAUTH=1 \
+    CP_FEATURE_DAY0_SETUP=0 \
+    CP_FEATURE_IT_PANE=0 \
+    CP_FEATURE_UPDATER=0 \
+    CP_FEATURE_KEYS_EDITABLE=1 \
+    CP_FEATURE_ONBOARDING=1
 # 0.0.0.0, overriding the binary's 127.0.0.1 default. That default protects the
 # appliance, where Caddy is the only LAN-facing surface and a backend on the LAN
 # would bypass it. In a container the isolation boundary is the network

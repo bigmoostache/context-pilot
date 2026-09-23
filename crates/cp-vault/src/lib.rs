@@ -17,12 +17,13 @@
 //! # Key Resolution
 //!
 //! Keys can be referenced by canonical name (`"anthropic"`) or env var name
-//! (`"ANTHROPIC_API_KEY"`) — both resolve identically.
+//! (`"ANTHROPIC_API_KEY"`) — both resolve identically. The registry of known
+//! keys lives in `cp_env::specs::secrets`, next to every other environment
+//! variable the workspace declares.
 
 mod dotenv;
 pub mod local;
 pub mod oauth;
-pub mod registry;
 pub mod types;
 
 #[cfg(feature = "bridge")]
@@ -34,13 +35,13 @@ use types::Vault;
 
 /// Global vault instance, auto-initialized on first access.
 ///
-/// Backend selection reads `CP_BRIDGE` at initialization time:
+/// Backend selection follows the validated `CP_BRIDGE` flag:
 /// - `CP_BRIDGE=1` (with `bridge` feature) → [`bridge::Backend`]
 ///   (orchestrator-backed with cache fallback).
 /// - Otherwise → [`local::Backend`] (env vars, Keychain, `.env` files).
 static VAULT: LazyLock<Arc<dyn Vault>> = LazyLock::new(|| {
     #[cfg(feature = "bridge")]
-    if std::env::var("CP_BRIDGE").is_ok() {
+    if cp_env::env().bridge.enabled {
         return Arc::new(bridge::Backend::new());
     }
     Arc::new(local::Backend::new())
@@ -48,8 +49,9 @@ static VAULT: LazyLock<Arc<dyn Vault>> = LazyLock::new(|| {
 
 /// Access the global vault instance.
 ///
-/// First call triggers initialization (reads `CP_BRIDGE` env var to select
-/// backend).  Subsequent calls return the cached reference with zero overhead.
+/// First call triggers initialization (selects the backend from the
+/// validated `CP_BRIDGE` flag).  Subsequent calls return the cached reference
+/// with zero overhead.
 #[must_use]
 pub fn vault() -> &'static Arc<dyn Vault> {
     &VAULT

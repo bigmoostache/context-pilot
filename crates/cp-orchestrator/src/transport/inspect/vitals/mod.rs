@@ -175,7 +175,7 @@ fn meilisearch_vital() -> serde_json::Value {
 
 /// Read the Meilisearch port from `~/.context-pilot/meilisearch/port`.
 fn meili_port() -> Option<u16> {
-    let path = home_dir()?.join(".context-pilot/meilisearch/port");
+    let path = home_dir().join(".context-pilot/meilisearch/port");
     std::fs::read_to_string(path).ok()?.trim().parse().ok()
 }
 
@@ -317,7 +317,7 @@ fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).ok().and_then(|d| u64::try_from(d.as_millis()).ok()).unwrap_or(0)
 }
 
-/// The user's home directory (`$HOME`), if set.
-fn home_dir() -> Option<PathBuf> {
-    std::env::var_os("HOME").map(PathBuf::from)
+/// The user's home directory (`$HOME`, validated at boot).
+fn home_dir() -> PathBuf {
+    cp_env::env().core.home.clone()
 }

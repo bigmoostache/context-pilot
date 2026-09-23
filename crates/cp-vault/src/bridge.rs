@@ -22,11 +22,8 @@ use std::thread;
 use std::time::Duration;
 
 use crate::local::Backend as LocalVault;
-use crate::registry::{ALL_KEYS, KeyCategory, resolve_definition};
 use crate::types::{KeyStatus, SecretString, Vault, VaultError};
-
-/// Default orchestrator URL when `CP_BRIDGE_URL` is not set.
-const DEFAULT_ORCH_URL: &str = "http://127.0.0.1:7878";
+use cp_env::specs::secrets::{ALL_KEYS, KeyCategory, resolve_definition};
 
 /// Interval between background cache refreshes.
 const REFRESH_INTERVAL: Duration = Duration::from_mins(5);
@@ -76,7 +73,7 @@ impl Backend {
     /// 3. Start background thread that re-fetches every 5 minutes.
     #[must_use]
     pub fn new() -> Self {
-        let orch_url = std::env::var("CP_BRIDGE_URL").unwrap_or_else(|_| DEFAULT_ORCH_URL.to_owned());
+        let orch_url = cp_env::env().bridge.url.clone();
         let local = LocalVault::new();
         let cache = Arc::new(RwLock::new(HashMap::new()));
 
@@ -115,7 +112,7 @@ impl Backend {
 
     /// Load cached keys from `~/.context-pilot/vault-cache.json`.
     fn load_disk_cache(&self) {
-        let Some(path) = cache_path() else { return };
+        let path = cache_path();
         let Ok(content) = std::fs::read_to_string(&path) else { return };
         let map: BTreeMap<String, String> = match serde_json::from_str(&content) {
             Ok(m) => m,
@@ -230,7 +227,7 @@ impl Vault for Backend {
             .collect()
     }
 
-    fn health(&self) -> Vec<&'static crate::registry::KeyDefinition> {
+    fn health(&self) -> Vec<&'static cp_env::specs::secrets::KeyDefinition> {
         ALL_KEYS
             .iter()
             .filter(|def| {
@@ -275,7 +272,7 @@ fn fetch_snapshot(orch_url: &str) -> Option<BTreeMap<String, String>> {
 
 /// Write the snapshot to disk with restrictive permissions.
 fn save_disk_cache(snapshot: &BTreeMap<String, String>) {
-    let Some(path) = cache_path() else { return };
+    let path = cache_path();
     if let Some(parent) = path.parent() {
         let _created = std::fs::create_dir_all(parent);
     }
@@ -286,9 +283,8 @@ fn save_disk_cache(snapshot: &BTreeMap<String, String>) {
 }
 
 /// Resolve the disk cache path: `~/.context-pilot/vault-cache.json`.
-fn cache_path() -> Option<std::path::PathBuf> {
-    let home = std::env::var("HOME").ok()?;
-    Some(std::path::PathBuf::from(home).join(".context-pilot").join(CACHE_FILENAME))
+fn cache_path() -> std::path::PathBuf {
+    cp_env::env().core.home.join(".context-pilot").join(CACHE_FILENAME)
 }
 
 /// Set file permissions to 0600 (owner read/write only).

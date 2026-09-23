@@ -39,6 +39,7 @@ export function FormMessageRow({
   onOpenFile,
   onShowInFinder,
   onDelete,
+  onBranch,
 }: {
   msg: ThreadMsg
   agentId: string
@@ -48,6 +49,7 @@ export function FormMessageRow({
   onOpenFile: (file: UploadedFile) => void
   onShowInFinder: ((path: string) => void) | undefined
   onDelete: (msg: ThreadMsg) => void
+  onBranch: ((msg: ThreadMsg) => void) | undefined
 }) {
   const text = msg.text ?? ""
   const answerBlock = parseFormAnswerBlock(text)
@@ -76,6 +78,7 @@ export function FormMessageRow({
           onOpenFile={onOpenFile}
           onShowInFinder={onShowInFinder}
           onDelete={() => onDelete(msg)}
+          onBranch={onBranch ? () => onBranch(msg) : undefined}
         />
       )}
       <div className="pl-7">

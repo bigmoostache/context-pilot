@@ -24,6 +24,15 @@ pub(crate) fn is_provisioned(flag_path: &Path) -> bool {
     std::fs::read_to_string(flag_path).is_ok_and(|s| s.trim() == "true")
 }
 
+/// The provisioned state as the cockpit and the login flow see it: a
+/// deployment without the day-0 step (`CP_FEATURE_DAY0_SETUP=0` - cloud,
+/// containers) counts as provisioned, so no login ever lands on
+/// `set_identity`. Caddy keeps following the durable flag itself: its `:80`
+/// versus `:443` decision depends on a real identity having been set.
+pub(crate) fn effective_provisioned(flag_path: &Path) -> bool {
+    !crate::transport::rest::features().is_on(cp_env::model::features::Feature::Day0Setup) || is_provisioned(flag_path)
+}
+
 /// Persist the `provisioned` flag **atomically and durably**.
 ///
 /// Write-tmp → `fsync` the file → rename → `fsync` the parent directory. The

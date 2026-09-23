@@ -1,7 +1,12 @@
-//! Key registry — single source of truth for all known credentials.
+//! Credentials (resolved by the vault) and registered external names.
 //!
-//! Every key the system manages is declared here.  Modules reference keys by
-//! canonical name (e.g. `"anthropic"`) or env var name (e.g. `"ANTHROPIC_API_KEY"`).
+//! The credential registry lives here - not in the vault - so the environment
+//! table can derive one [`Spec`] per key without a dependency cycle. The vault
+//! keeps the resolution logic and imports the definitions.
+
+use std::sync::LazyLock;
+
+use crate::spec::{Fallback, Group, Kind, Scope, Spec};
 
 /// Category of a credential.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,9 +54,10 @@ pub struct KeyDefinition {
 
 /// All known credentials managed by the vault.
 ///
-/// This single array replaces the three disconnected registries that existed
-/// before (`global.rs KEY_ENV_MAP`, orchestrator `KNOWN_KEYS`, per-module
-/// hardcoded env var strings).
+/// The one credential registry of the workspace: the vault resolves values
+/// from it, the cockpit lists it, and the [`SECRETS`] specs (docs, unknown-name
+/// check) are derived from it - so a key cannot be known to one and not the
+/// others.
 pub static ALL_KEYS: &[KeyDefinition] = &[
     // ── LLM Providers ──────────────────────────────────────────────────────
     KeyDefinition {
@@ -185,6 +191,58 @@ pub static ALL_KEYS: &[KeyDefinition] = &[
 pub fn resolve_definition(key: &str) -> Option<&'static KeyDefinition> {
     ALL_KEYS.iter().find(|k| k.canonical == key || k.env_var == key)
 }
+
+/// The environment specs of every credential with an env-var form. Kind
+/// [`Secret`](Kind::Secret): never read by this crate.
+pub(super) static SECRETS: LazyLock<Vec<Spec>> = LazyLock::new(|| {
+    ALL_KEYS
+        .iter()
+        .filter(|def| !def.env_var.is_empty())
+        .map(|def| {
+            Spec {
+                name: def.env_var,
+                kind: Kind::Secret,
+                fallback: Fallback::None,
+                scope: Scope::Both,
+                group: Group::Secrets,
+                doc: def.display,
+                ..Spec::BASE
+            }
+            .sensitive()
+        })
+        .collect()
+});
+
+/// One name neither binary parses.
+const fn external(name: &'static str, doc: &'static str) -> Spec {
+    Spec {
+        name,
+        kind: Kind::Str,
+        fallback: Fallback::None,
+        scope: Scope::ChildOnly,
+        group: Group::External,
+        doc,
+        ..Spec::BASE
+    }
+}
+
+/// `CP_`-prefixed names consumed elsewhere.
+pub(super) static EXTERNAL: &[Spec] = &[
+    external("CP_CHANGED_FILES", "Injected into global callback scripts: newline-separated changed paths."),
+    external("CP_CHANGED_FILE", "Injected into local callback scripts: the one changed path."),
+    external("CP_PROJECT_ROOT", "Injected into callback scripts: the project root."),
+    external("CP_CALLBACK_NAME", "Injected into callback scripts: the callback's name."),
+    external("CP_CRASH_CHILD_DIR", "Test harness (`cp-oplog` crash replay): the child's oplog directory."),
+    external("CP_CRASH_CHILD_MODE", "Test harness (`cp-oplog` crash replay): the child's mode."),
+    external("CP_PORT", "Docker Compose only: the host port the cockpit is published on."),
+    external("CP_API_URL", "Playwright only: the orchestrator the end-to-end tests target."),
+    external("CP_WEB_URL", "Playwright only: the dev server the end-to-end tests target."),
+    external("CP_AGENT_ID", "Playwright only: the agent the regression probes target."),
+    external(
+        "CP_AGENT_LOCK_FD",
+        "Reserved (design doc): the registry lock descriptor passed across a deadman re-exec. Not implemented.",
+    ),
+];
 
 #[cfg(test)]
 mod tests {
