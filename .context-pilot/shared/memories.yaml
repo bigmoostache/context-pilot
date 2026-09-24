@@ -686,6 +686,12 @@ M-tiny-3:
   contents: 'Haiku 4.5 max_tokens fix: anthropic client uses model-specific limits (64K for Haiku, 200K for others) instead of hardcoded.'
   importance: medium
   last_edited_ms: 0
+M-tiny-30:
+  tier: tiny
+  title: guillaume-macmini SSH
+  contents: 'SSH: `ssh guillaume-macmini` (guillaumedraznieks@Guillaume.lan). ~/cp-server same layout as gilbert. Release v0.2.13-184f77e.'
+  importance: medium
+  last_edited_ms: 1790256805028
 M-tiny-4:
   tier: tiny
   title: 'T646 SHIPPED + FIXED:'
