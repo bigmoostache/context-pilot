@@ -355,6 +355,8 @@ pub enum ClaudeCodeV2Model {
     /// Claude Opus 5 — latest flagship.
     #[default]
     ClaudeOpus5,
+    /// Claude Opus 5.5 — newest flagship tier.
+    ClaudeOpus55,
     /// Claude Opus 4.8 — previous flagship.
     ClaudeOpus48,
     /// Claude Opus 4.6 — earlier Opus.
@@ -372,6 +374,7 @@ impl ModelInfo for ClaudeCodeV2Model {
     fn api_name(&self) -> &'static str {
         match *self {
             Self::ClaudeOpus5 => "claude-opus-5",
+            Self::ClaudeOpus55 => "claude-opus-5-5",
             Self::ClaudeOpus48 => "claude-opus-4-8",
             Self::ClaudeOpus46 => "claude-opus-4-6",
             Self::ClaudeSonnet5 => "claude-sonnet-5",
@@ -383,6 +386,7 @@ impl ModelInfo for ClaudeCodeV2Model {
     fn display_name(&self) -> &'static str {
         match *self {
             Self::ClaudeOpus5 => "Opus 5",
+            Self::ClaudeOpus55 => "Opus 5.5",
             Self::ClaudeOpus48 => "Opus 4.8",
             Self::ClaudeOpus46 => "Opus 4.6",
             Self::ClaudeSonnet5 => "Sonnet 5",
@@ -393,7 +397,9 @@ impl ModelInfo for ClaudeCodeV2Model {
 
     fn context_window(&self) -> usize {
         match *self {
-            Self::ClaudeOpus5 | Self::ClaudeOpus48 | Self::ClaudeOpus46 | Self::ClaudeHaiku45 => 200_000,
+            Self::ClaudeOpus5 | Self::ClaudeOpus55 | Self::ClaudeOpus48 | Self::ClaudeOpus46 | Self::ClaudeHaiku45 => {
+                200_000
+            }
             Self::ClaudeFable5 => 400_000,
             Self::ClaudeSonnet5 => 1_000_000,
         }
@@ -401,7 +407,7 @@ impl ModelInfo for ClaudeCodeV2Model {
 
     fn input_price_per_mtok(&self) -> f32 {
         match *self {
-            Self::ClaudeOpus5 | Self::ClaudeOpus48 | Self::ClaudeOpus46 => 5.0,
+            Self::ClaudeOpus5 | Self::ClaudeOpus55 | Self::ClaudeOpus48 | Self::ClaudeOpus46 => 5.0,
             Self::ClaudeFable5 => 10.0,
             Self::ClaudeSonnet5 => 3.0,
             Self::ClaudeHaiku45 => 1.0,
@@ -410,7 +416,7 @@ impl ModelInfo for ClaudeCodeV2Model {
 
     fn output_price_per_mtok(&self) -> f32 {
         match *self {
-            Self::ClaudeOpus5 | Self::ClaudeOpus48 | Self::ClaudeOpus46 => 25.0,
+            Self::ClaudeOpus5 | Self::ClaudeOpus55 | Self::ClaudeOpus48 | Self::ClaudeOpus46 => 25.0,
             Self::ClaudeFable5 => 50.0,
             Self::ClaudeSonnet5 => 15.0,
             Self::ClaudeHaiku45 => 5.0,
@@ -419,7 +425,7 @@ impl ModelInfo for ClaudeCodeV2Model {
 
     fn cache_hit_price_per_mtok(&self) -> f32 {
         match *self {
-            Self::ClaudeOpus5 | Self::ClaudeOpus48 | Self::ClaudeOpus46 => 0.50,
+            Self::ClaudeOpus5 | Self::ClaudeOpus55 | Self::ClaudeOpus48 | Self::ClaudeOpus46 => 0.50,
             Self::ClaudeFable5 => 1.0,
             Self::ClaudeSonnet5 => 0.30,
             Self::ClaudeHaiku45 => 0.10,
@@ -428,7 +434,7 @@ impl ModelInfo for ClaudeCodeV2Model {
 
     fn cache_miss_price_per_mtok(&self) -> f32 {
         match *self {
-            Self::ClaudeOpus5 | Self::ClaudeOpus48 | Self::ClaudeOpus46 => 6.25,
+            Self::ClaudeOpus5 | Self::ClaudeOpus55 | Self::ClaudeOpus48 | Self::ClaudeOpus46 => 6.25,
             Self::ClaudeFable5 => 12.50,
             Self::ClaudeSonnet5 => 3.75,
             Self::ClaudeHaiku45 => 1.25,

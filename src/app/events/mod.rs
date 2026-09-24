@@ -309,6 +309,7 @@ const fn handle_config_event(key: &KeyEvent, state: &State) -> Action {
         KeyCode::Char('d') => dispatch_primary_model(state, 3),
         KeyCode::Char('e') => dispatch_primary_model(state, 4),
         KeyCode::Char('f') => dispatch_primary_model(state, 5),
+        KeyCode::Char('g') => dispatch_primary_model(state, 6),
         // Theme selection - t/T to cycle through themes
         KeyCode::Char('t') => Action::ConfigNextTheme,
         KeyCode::Char('T') => Action::ConfigPrevTheme,
@@ -348,7 +349,7 @@ const fn handle_config_event(key: &KeyEvent, state: &State) -> Action {
     }
 }
 
-/// Dispatch primary model selection based on provider and index (0=a, 1=b, 2=c, 3=d)
+/// Dispatch primary model selection based on provider and index (0=a … 6=g)
 const fn dispatch_primary_model(state: &State, idx: usize) -> Action {
     models::dispatch_primary_model(state, idx)
 }
