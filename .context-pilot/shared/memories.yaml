@@ -495,12 +495,9 @@ M-short-39:
 M-short-4:
   tier: short
   title: 'T661: V1 claude_code'
-  contents: |-
-    T661: V1 claude_code DELETED. Sole OAuth provider = ClaudeCodeV2 (FE label 'Claude Code'), 13 beta flags led by oauth-2025-04-20 (haiku strips context-1m), UA 2.1.220, 6 bare-ID models. api_key module kept but FE-hidden. FE = 2 buttons. Detail in body.
-
-    Claude Code V2: OAuth Bearer, 9 beta headers. Models: opus-4-8 ($5/$25 200K), fable-5 ($10/$50 400K cap), sonnet-4-6 ($3/$15 1M). Thinking ada
+  contents: 'T661: sole OAuth provider = ClaudeCodeV2 (FE ''Claude Code''). T750: UA bumped to claude-cli/2.1.282 (external, sdk-cli), pkg 0.112.1 — fixes claude_code_version_too_old for Opus 5.5 (server gates new models on CLI version). 17 beta flags led by oauth-2025-04-20 (haiku strips context-1m), re-captured live from CLI 2.1.282. api_key module kept, FE-hidden.'
   importance: high
-  last_edited_ms: 0
+  last_edited_ms: 1790322244323
 M-short-40:
   tier: short
   title: Todo upsert + recap strip
@@ -670,16 +667,28 @@ M-tiny-27:
   last_edited_ms: 1789376850472
 M-tiny-28:
   tier: tiny
-  title: T734 tail-reorder shipped
-  contents: 'T734 SHIPPED (9c8de1ca): killed global last_refresh_ms sort; previous_panel_order=persistent base; freeze pass reorders ONLY broken tail asc by panel_total_cost (compute_reorder_from, freeze.rs).'
+  title: Reorder fixed order
+  contents: 'T740 (d45c1b10): broken-tail reorder = FIXED priority via emission_rank() in freeze_pass.rs, replacing T734 cost sort. Low rank=deep=cached (conv_history..console), chat last.'
   importance: medium
-  last_edited_ms: 1789396085117
+  last_edited_ms: 1789474224984
+M-tiny-29:
+  tier: tiny
+  title: T741 mermaid
+  contents: 'T741 mermaid: renders in web via markdown.tsx (sole renderer). Send desc MERMAID section (threads.yaml, 9759ed5e). Perf 0572627b: init-once per theme + SVG cache in mermaid.tsx.'
+  importance: low
+  last_edited_ms: 1789476469489
 M-tiny-3:
   tier: tiny
   title: 'Haiku 4.5 max_tokens fix:'
   contents: 'Haiku 4.5 max_tokens fix: anthropic client uses model-specific limits (64K for Haiku, 200K for others) instead of hardcoded.'
   importance: medium
   last_edited_ms: 0
+M-tiny-30:
+  tier: tiny
+  title: guillaume-macmini SSH
+  contents: 'SSH: `ssh guillaume-macmini` (guillaumedraznieks@Guillaume.lan). ~/cp-server same layout as gilbert. Release v0.2.13-184f77e.'
+  importance: medium
+  last_edited_ms: 1790256805028
 M-tiny-4:
   tier: tiny
   title: 'T646 SHIPPED + FIXED:'

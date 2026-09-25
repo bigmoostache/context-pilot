@@ -111,20 +111,21 @@ fn build_models(state: &State, model_entry: &ModelEntryFn) -> (String, Vec<Confi
     (title, models)
 }
 
-/// Build the Claude Code (V2) model entries (keys `a`–`f`).
+/// Build the Claude Code (V2) model entries (keys `a`–`g`).
 ///
 /// Split from [`build_models`] so that function stays under the 60-line cap:
-/// six models is the largest roster and inflates the parent past the limit.
+/// seven models is the largest roster and inflates the parent past the limit.
 fn build_v2_models(state: &State, model_entry: &ModelEntryFn) -> Vec<ConfigModel> {
     use crate::llms::ClaudeCodeV2Model;
     let sel = state.claude_code_v2_model;
     [
         ("a", ClaudeCodeV2Model::ClaudeOpus5),
-        ("b", ClaudeCodeV2Model::ClaudeOpus48),
-        ("c", ClaudeCodeV2Model::ClaudeOpus46),
-        ("d", ClaudeCodeV2Model::ClaudeSonnet5),
-        ("e", ClaudeCodeV2Model::ClaudeFable5),
-        ("f", ClaudeCodeV2Model::ClaudeHaiku45),
+        ("b", ClaudeCodeV2Model::ClaudeOpus55),
+        ("c", ClaudeCodeV2Model::ClaudeOpus48),
+        ("d", ClaudeCodeV2Model::ClaudeOpus46),
+        ("e", ClaudeCodeV2Model::ClaudeSonnet5),
+        ("f", ClaudeCodeV2Model::ClaudeFable5),
+        ("g", ClaudeCodeV2Model::ClaudeHaiku45),
     ]
     .iter()
     .map(|&(key, model)| model_entry(sel == model, key, &model))

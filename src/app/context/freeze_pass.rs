@@ -184,10 +184,11 @@ fn fold_one_panel(state: &mut State, item: &mut ContextItem, fold: FoldCtx, acc:
 pub(super) fn run_panel_freeze_pass(state: &mut State, context_items: &mut [ContextItem], meta: FreezeMeta) {
     let cond = meta.cond;
 
-    // 1. Reorder the free-to-permute tail by ascending cumulative cost: cheap /
-    //    stable panels hug the cache frontier (extending the prefix next turn),
-    //    expensive / volatile ones sink toward the conversation tip. The tail is
-    //    past the last surviving breakpoint (or the whole list is a miss), so
+    // 1. Reorder the free-to-permute tail into the fixed T740 panel priority
+    //    (see `emission_rank`): stable panels (conversation_history, results)
+    //    sink deep to hug the cache frontier, volatile ones (console, file,
+    //    tree) rise toward the conversation tip where a break is cheap. The tail
+    //    is past the last surviving breakpoint (or the whole list is a miss), so
     //    permuting it is billed-fresh-anyway = zero cost this turn. `chat` stays
     //    pinned last.
     let reorder_from = freeze::compute_reorder_from(context_items, state, cond);
@@ -224,24 +225,77 @@ pub(super) fn run_panel_freeze_pass(state: &mut State, context_items: &mut [Cont
     );
 }
 
-/// Cumulative dollar cost a panel has accrued via cache breaks (0 if unknown).
-fn panel_cost(state: &State, id: &str) -> f64 {
-    state.context.iter().find(|c| c.id == id).map_or(0.0f64, |c| c.panel_total_cost)
+/// Default emission rank for a context type not in [`emission_rank`]'s table.
+///
+/// Sits just below `console` (the nearest-tip listed type) but above `chat`, so
+/// an unrecognised panel lands in the volatile, cheap-to-break zone near the
+/// conversation tip — the conservative choice when we can't assume it is stable.
+const DEFAULT_EMISSION_RANK: usize = 900;
+
+/// Fixed emission rank for a panel `context_type`: **lower = emitted earlier =
+/// deeper in the prompt = more likely to stay cached**; higher = nearer the
+/// conversation tip = cheaper to break.
+///
+/// This is the user-specified panel priority (T740), written here as the
+/// EMISSION order (the reverse of the "closest-to-tip first" list the user
+/// gave): `conversation_history` is deepest (immutable, cache it forever) and
+/// `console` sits just above `chat` (most volatile, break it for free).
+///
+/// Types the user did not enumerate are slotted next to their natural sibling
+/// (`brave_result` by `firecrawl_result`, `entity_result` by `entities`,
+/// `library`/`skill` by `tools`, `agora` by `overview`); anything unknown falls
+/// to [`DEFAULT_EMISSION_RANK`].
+fn emission_rank(context_type: &str) -> usize {
+    match context_type {
+        "conversation_history" => 0,
+        "firecrawl_result" => 1,
+        "brave_result" => 2,
+        "entities" => 3,
+        "entity_result" => 4,
+        "github_result" => 5,
+        "scratchpad" => 6,
+        "callback" => 7,
+        "queue" => 8,
+        "git_result" => 9,
+        "memory" => 10,
+        "library" => 11,
+        "skill" => 12,
+        "tools" => 13,
+        "search_result" => 14,
+        "todo" => 15,
+        "overview" => 16,
+        "agora" => 17,
+        "context_radar" => 18,
+        "threads" => 19,
+        "tree" => 20,
+        "file" => 21,
+        "console" => 22,
+        _ => DEFAULT_EMISSION_RANK,
+    }
 }
 
-/// Permute `context_items[reorder_from..]` in place, ascending by cumulative
-/// panel cost, keeping `chat` pinned last. No-op when `reorder_from` is out of
-/// range (no culprit → nothing broke → nothing to reorder).
+/// Emission rank for a panel by its `id`: resolves the id to its context type
+/// via `state.context`, then to a fixed rank. `chat` is pinned last (`MAX`);
+/// an id with no matching entry falls to [`DEFAULT_EMISSION_RANK`].
+fn panel_rank(state: &State, id: &str) -> usize {
+    if id == "chat" {
+        return usize::MAX;
+    }
+    state.context.iter().find(|c| c.id == id).map_or(DEFAULT_EMISSION_RANK, |c| emission_rank(c.context_type.as_str()))
+}
+
+/// Permute `context_items[reorder_from..]` in place into the fixed T740 panel
+/// order (ascending [`emission_rank`]), keeping `chat` pinned last. The sort is
+/// STABLE, so panels sharing a rank (same type — multiple files, several
+/// history chunks) keep their existing relative order, preserving ancienneté
+/// (older first). No-op when `reorder_from` is out of range (no culprit →
+/// nothing broke → nothing to reorder).
 fn reorder_broken_tail(state: &State, context_items: &mut [ContextItem], reorder_from: usize) {
     let Some(tail) = context_items.get_mut(reorder_from..) else {
         return; // out of range: no culprit → nothing broke → nothing to reorder
     };
-    tail.sort_by(|a, b| {
-        // chat sorts after everything (its cost proxy is +∞).
-        let ca = if a.id == "chat" { f64::INFINITY } else { panel_cost(state, &a.id) };
-        let cb = if b.id == "chat" { f64::INFINITY } else { panel_cost(state, &b.id) };
-        ca.total_cmp(&cb)
-    });
+    // sort_by_key is stable → equal-rank (same-type) panels keep insertion order.
+    tail.sort_by_key(|a| panel_rank(state, &a.id));
 }
 
 /// Prefix-match `new_hash_list` against the previous tick's list; mark each panel
@@ -343,4 +397,47 @@ fn record_freeze_telemetry(
         )
         .culprit(culprit.kind.clone().unwrap_or_else(|| "none".to_owned()), break_kind, culprit.max_freezes),
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::emission_rank;
+
+    /// The T740 panel order, from DEEPEST (emitted first, most cached) to
+    /// nearest the conversation tip. This is the reverse of the user's
+    /// "closest-to-tip first" list and must stay strictly increasing.
+    #[test]
+    fn t740_emission_order_is_strictly_increasing() {
+        let order = [
+            "conversation_history",
+            "firecrawl_result",
+            "entities",
+            "github_result",
+            "scratchpad",
+            "callback",
+            "queue",
+            "git_result",
+            "memory",
+            "tools",
+            "search_result",
+            "todo",
+            "overview",
+            "context_radar",
+            "threads",
+            "tree",
+            "file",
+            "console",
+        ];
+        for pair in order.windows(2) {
+            let &[deep, shallow] = pair else { continue };
+            assert!(emission_rank(deep) < emission_rank(shallow), "{deep} must be deeper (lower rank) than {shallow}");
+        }
+    }
+
+    /// `conversation_history` is the deepest listed panel; console the shallowest.
+    #[test]
+    fn t740_endpoints() {
+        assert_eq!(emission_rank("conversation_history"), 0);
+        assert!(emission_rank("console") < emission_rank("__unknown_type__"));
+    }
 }

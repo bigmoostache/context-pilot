@@ -84,12 +84,12 @@ fn provider_claudecodev2() -> ProviderDef {
     ProviderDef {
         id: "claudecodev2",
         name: "Claude Code",
-        description: "OAuth \u{2014} Opus 5 \u{b7} 4.8 \u{b7} 4.6 \u{b7} Sonnet 5 \u{b7} Fable 5 \u{b7} Haiku 4.5",
+        description: "OAuth \u{2014} Opus 5.5 \u{b7} 5 \u{b7} 4.8 \u{b7} 4.6 \u{b7} Sonnet 5 \u{b7} Fable 5 \u{b7} Haiku 4.5",
         models,
     }
 }
 
-/// The Opus family for the Claude Code catalogue (5 / 4.8 / 4.6).
+/// The Opus family for the Claude Code catalogue (5 / 5.5 / 4.8 / 4.6).
 fn claudecodev2_opus_models() -> Vec<ModelDef> {
     vec![
         ModelDef {
@@ -102,6 +102,17 @@ fn claudecodev2_opus_models() -> Vec<ModelDef> {
             output_price: 25.0,
             badge: Some("Most capable"),
             is_default: true,
+        },
+        ModelDef {
+            id: "claude-opus55",
+            api_name: "claude-opus-5-5",
+            display_name: "Opus 5.5",
+            context_window: 200_000,
+            max_output: 64_000,
+            input_price: 5.0,
+            output_price: 25.0,
+            badge: None,
+            is_default: false,
         },
         ModelDef {
             id: "claude-opus48",

@@ -1,13 +1,19 @@
 //! Claude Code V2 OAuth API implementation.
 //!
 //! Uses OAuth tokens loaded via the [`cp_vault`] credential vault, with the
-//! request signature captured live from Claude Code CLI v2.1.220:
+//! request signature captured live from Claude Code CLI v2.1.282:
 //! - Endpoint `/v1/messages?beta=true`, Bearer-OAuth auth (no `x-api-key`).
-//! - 13 beta flags led by `oauth-2025-04-20` (selects the Bearer path);
+//! - 17 beta flags led by `oauth-2025-04-20` (selects the Bearer path);
 //!   `context-1m-2025-08-07` stripped per-model for Haiku (subscription rejects it).
 //! - First system block is the Claude Code identity — OAuth tokens are gated to
 //!   Claude-Code-shaped requests.
-//! - Stainless user-agent `claude-cli/2.1.220 (external, sdk-cli)`, macOS/arm64.
+//! - Stainless user-agent `claude-cli/2.1.282 (external, sdk-cli)`, macOS/arm64.
+//!
+//! The CLI version string MUST track the live client: the server gates newer
+//! models (e.g. Opus 5.5) behind a minimum version and returns
+//! `claude_code_version_too_old` when the user-agent lags. Re-capture the CLI's
+//! `/v1/messages` request and bump [`send_v2_request`]'s user-agent + stainless
+//! package-version whenever a model starts rejecting the request on version.
 //!
 //! Reuses `helpers` + `parse_sse_stream` from `claude_code_api_key`.
 
@@ -33,12 +39,13 @@ use crate::infra::tools::build_api;
 /// routing it through a proxy is also what would put the cache at risk.
 const ENDPOINT: &str = "https://api.anthropic.com/v1/messages?beta=true";
 
-/// Base beta flags captured live from Claude Code CLI v2.1.220 (main-agent set).
+/// Base beta flags captured live from Claude Code CLI v2.1.282 (main-agent set).
 ///
 /// `oauth-2025-04-20` MUST lead: it selects the Bearer-OAuth auth path. Without
 /// it the server falls back to `x-api-key` and rejects the request
-/// (`invalid x-api-key`). Every flag below was validated against the live
-/// `/v1/messages?beta=true` endpoint (200 for opus/sonnet/fable). `context-1m`
+/// (`invalid x-api-key`). The remaining flags mirror the CLI's own
+/// `anthropic-beta` list verbatim; the whole set was validated against the live
+/// `/v1/messages?beta=true` endpoint (200 for `claude-opus-5-5`). `context-1m`
 /// is stripped per-model for Haiku (see [`beta_header_for`]).
 const BETA_FLAGS: &[&str] = &[
     "oauth-2025-04-20",
@@ -49,11 +56,15 @@ const BETA_FLAGS: &[&str] = &[
     "context-management-2025-06-27",
     "prompt-caching-scope-2026-01-05",
     "mid-conversation-system-2026-04-07",
+    "per-turn-control-2026-07-01",
+    "mid-conversation-tool-changes-2026-07-01",
     "advisor-tool-2026-03-01",
     "advanced-tool-use-2025-11-20",
+    "mid-conversation-system-clear-at-2026-08-21",
     "effort-2025-11-24",
-    "fallback-credit-2026-06-01",
+    "thinking-binding-controls-2026-08-01",
     "cache-diagnosis-2026-04-07",
+    "message-threads-2026-08-12",
 ];
 
 /// The Claude Code identity system block. OAuth tokens are gated to
@@ -76,7 +87,7 @@ fn beta_header_for(model: &str) -> String {
         .join(",")
 }
 
-/// POST an assembled V2 request body with the full CLI v2.1.220 header
+/// POST an assembled V2 request body with the full CLI v2.1.282 header
 /// signature (Bearer OAuth, model-aware beta flags, stainless UA). Extracted so
 /// `do_stream` stays under the line cap.
 fn send_v2_request(
@@ -93,12 +104,12 @@ fn send_v2_request(
         .header("anthropic-beta", beta_header_for(model))
         .header("anthropic-dangerous-direct-browser-access", "true")
         .header("content-type", "application/json")
-        .header("user-agent", "claude-cli/2.1.220 (external, sdk-cli)")
+        .header("user-agent", "claude-cli/2.1.282 (external, sdk-cli)")
         .header("x-app", "cli")
         .header("x-stainless-arch", "arm64")
         .header("x-stainless-lang", "js")
         .header("x-stainless-os", "MacOS")
-        .header("x-stainless-package-version", "0.94.0")
+        .header("x-stainless-package-version", "0.112.1")
         .header("x-stainless-retry-count", "0")
         .header("x-stainless-runtime", "node")
         .header("x-stainless-runtime-version", "v26.3.0")

@@ -158,6 +158,22 @@ tools:
       confirm; list for multi/files). A malformed ```form``` block (missing
       `form-id` or `fields`) is rejected — the Send fails with an error.
 
+      MERMAID DIAGRAMS (great way to convey information visually):
+      A ```mermaid``` fenced code block is RENDERED as an actual diagram in the
+      UI — not shown as raw code. Reach for it whenever a picture beats prose:
+      flowcharts, sequence diagrams, state machines, class/ER diagrams, gantt
+      charts, pie charts, mindmaps, git graphs. Just embed the fence in your
+      `markdown` at the spot you want the diagram; the frontend lazy-loads
+      mermaid, renders sanitised SVG (light/dark themed), and falls back to the
+      raw code block only if the diagram fails to parse. Example:
+
+        ```mermaid
+        flowchart TD
+            A[Start] --> B{Decision}
+            B -->|yes| C[Do the thing]
+            B -->|no| D[Skip]
+        ```
+
       MATH RENDERING:
       Single `$` is treated as a literal dollar sign (NOT inline math).
       For LaTeX math, use `$$...$$` (display block) or `\(...\)` (inline).
