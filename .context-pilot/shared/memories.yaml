@@ -495,12 +495,9 @@ M-short-39:
 M-short-4:
   tier: short
   title: 'T661: V1 claude_code'
-  contents: |-
-    T661: V1 claude_code DELETED. Sole OAuth provider = ClaudeCodeV2 (FE label 'Claude Code'), 13 beta flags led by oauth-2025-04-20 (haiku strips context-1m), UA 2.1.220, 6 bare-ID models. api_key module kept but FE-hidden. FE = 2 buttons. Detail in body.
-
-    Claude Code V2: OAuth Bearer, 9 beta headers. Models: opus-4-8 ($5/$25 200K), fable-5 ($10/$50 400K cap), sonnet-4-6 ($3/$15 1M). Thinking ada
+  contents: 'T661: sole OAuth provider = ClaudeCodeV2 (FE ''Claude Code''). T750: UA bumped to claude-cli/2.1.282 (external, sdk-cli), pkg 0.112.1 — fixes claude_code_version_too_old for Opus 5.5 (server gates new models on CLI version). 17 beta flags led by oauth-2025-04-20 (haiku strips context-1m), re-captured live from CLI 2.1.282. api_key module kept, FE-hidden.'
   importance: high
-  last_edited_ms: 0
+  last_edited_ms: 1790322244323
 M-short-40:
   tier: short
   title: Todo upsert + recap strip
