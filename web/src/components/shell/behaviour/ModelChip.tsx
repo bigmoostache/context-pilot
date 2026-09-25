@@ -16,7 +16,7 @@ import type { Agent } from "@/lib/types"
 /** Text-only row highlight (mirrors {@link BehaviourChip}'s ROW_HILITE): brighten
  *  the ink on hover/focus, never wash the background. */
 const ROW_HILITE =
-  "transition-colors focus:bg-transparent! focus:text-foreground! data-highlighted:bg-transparent! data-highlighted:text-foreground!"
+  "transition-colors focus:bg-transparent! focus:text-foreground! focus:**:text-foreground! data-highlighted:bg-transparent! data-highlighted:text-foreground! data-highlighted:**:text-foreground!"
 
 /** The OpenRouter provider id — the only provider that gets the extra
  *  `subprovider` grouping level (frontend-only, by the `vendor/` prefix). */

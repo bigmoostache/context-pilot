@@ -1,9 +1,9 @@
 M-long-1:
   tier: long
   title: X525 Agora DONE
-  contents: 'X525 Agora deletion COMPLETE. All code removed: cp-agora crate, cp-wire SelfIdentity/SetIdentity/IdentityChanged, cp-mod-bridge last_identity+seed bitfield, tui AgoraModule+commands+observers+freeze_pass, orchestrator identity endpoint+route+materialized_view, cp-oplog refs, frontend IdentityTab+useIdentity+fetchIdentity+identity_changed SSE+qk.identity. openapi.json+TS client regenerated. Hash chain #98. cargo check+clippy+fmt clean. IT identity subsystem (transport/it/*) KEPT intact. cp-env profiles patched for OPENROUTER_API_KEY. Ready to commit on t753-openrouter.'
+  contents: 'X525 Agora deletion COMPLETE (02ccc32f on t753-openrouter). All code removed: cp-agora crate, cp-wire SelfIdentity/SetIdentity/IdentityChanged, cp-mod-bridge last_identity+seed bitfield, tui AgoraModule+commands+observers+freeze_pass, orchestrator identity endpoint+route+materialized_view, cp-oplog refs, frontend IdentityTab+useIdentity+fetchIdentity+identity_changed SSE+qk.identity. openapi.json+TS client regenerated. Hash chain #98. cargo check+clippy+fmt clean. IT identity subsystem (transport/it/*) KEPT intact. cp-env profiles patched for OPENROUTER_API_KEY. Ready for X526 (settings merge).'
   importance: high
-  last_edited_ms: 1790351738061
+  last_edited_ms: 1790351900117
 M-long-10:
   tier: long
   title: 'CI Frontend red: exit-1'
