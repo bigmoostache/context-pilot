@@ -3,7 +3,6 @@ import { Loader2, FolderGit2, ScrollText, Dices, ImagePlus } from "lucide-react"
 import { useIdentity, sendCommand } from "@/lib/live"
 import { avatarUrl, type AgentIdentity } from "@/lib/api"
 import type { Agent } from "@/lib/types"
-import { ModelPicker } from "../ModelPicker"
 import { AgentAclSection } from "../../auth/AgentAclSection"
 import { SessionVitals } from "../../shell/SessionVitals"
 import { cn } from "@/lib/utils"
@@ -144,7 +143,7 @@ function AvatarField({
  *  there is no footer, so that surface renders its own save bar beside this.
  *  The agent image editor leads the form (it commits on its own, immediately). */
 export function LlmTab({ c }: { c: Controller }) {
-  const { name, setName, realm, providers, provId, modelId, setSel } = c
+  const { name, setName, realm } = c
   return (
     <div className="flex flex-col gap-5 px-6 py-5">
       {c.agent && (
@@ -175,12 +174,6 @@ export function LlmTab({ c }: { c: Controller }) {
             {realm}
           </code>
         </div>
-      </div>
-      <div className="flex flex-col gap-2">
-        <span className="text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
-          Provider &amp; Model
-        </span>
-        <ModelPicker providers={providers} provider={provId} model={modelId} onChange={setSel} />
       </div>
     </div>
   )
