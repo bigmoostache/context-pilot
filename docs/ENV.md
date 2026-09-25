@@ -154,6 +154,7 @@ Resolved by the vault (process environment, then `~/.context-pilot/.env`, then k
 | `DEEPSEEK_API_KEY` | secret (vault) | - | both |  | DeepSeek |
 | `GROQ_API_KEY` | secret (vault) | - | both |  | Groq |
 | `MINIMAX_API_KEY` | secret (vault) | - | both |  | MiniMax |
+| `OPENROUTER_API_KEY` | secret (vault) | - | both |  | OpenRouter |
 | `BRAVE_API_KEY` | secret (vault) | - | both |  | Brave Search |
 | `FIRECRAWL_API_KEY` | secret (vault) | - | both |  | Firecrawl |
 | `DATALAB_API_KEY` | secret (vault) | - | both |  | Datalab OCR |

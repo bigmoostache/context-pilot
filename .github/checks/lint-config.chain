@@ -8222,3 +8222,58 @@ index 6e3aaf35..8fb0959d 100644
    - path: "web/**"
      rule: "import-x/default"
 # --- End entry #97 ---
+98:c22c493bedf76fa7f4eac1ee6d1fd8a09848a9a6f67e6d4e56f00600c82680f0:a168a2554d4e91c3799b740f02bff7db8e5064fec44f89530d5f7c192fee5056:6306db6d803a1c03c9232a4ecb12ec2ab0843dd1d948502ad0cb0f92d61b7db3
+# --- Diff for entry #98 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index 473da3c4..29c4ff47 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,5 +1,5 @@
+ [workspace]
+-members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-threads", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities", "crates/cp-vault", "crates/cp-agora"]
++members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-threads", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities", "crates/cp-vault", "crates/cp-env"]
+ 
+ [workspace.package]
+ version = "0.2.13"
+@@ -12,6 +12,7 @@ categories = ["command-line-utilities", "development-tools"]
+ readme = "README.md"
+ 
+ [workspace.dependencies]
++cp-env = { path = "crates/cp-env" }
+ cp-base = { path = "crates/cp-base" }
+ cp-render = { path = "crates/cp-render" }
+ cp-mod-utilities = { path = "crates/cp-mod-utilities" }
+@@ -1157,7 +1158,10 @@ cp-mod-queue = { path = "crates/cp-mod-queue" }
+ cp-mod-ocr = { path = "crates/cp-mod-ocr" }
+ cp-mod-search = { path = "crates/cp-mod-search" }
+ cp-vault = { path = "crates/cp-vault", features = ["bridge"] }
+-cp-agora = { path = "crates/cp-agora" }
++# Declarative environment table - validated once at boot (preflight), read
++# through `cp_env::env()` everywhere else.
++cp-env = { path = "crates/cp-env" }
++
+ crossterm.workspace = true
+ ratatui.workspace = true
+ serde.workspace = true
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index a09edc11..759e4bbe 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -308,16 +308,6 @@ exceptions:
+     strategy: >
+       Irreducible — the Unknown variant already provides forward-compat.
+ 
+-  - path: "crates/cp-wire/src/types/command.rs"
+-    match: "wire value object: all ten fields are public, stable, and built by cross-crate consumers (the agent's SetIdentity handler) via a struct literal, so #[non_exhaustive] would forbid that construction and a 10-arg constructor would trip too_many_arguments"
+-    reason: >
+-      SelfIdentity is the ten-field identity value object carried by the SetIdentity
+-      command, built by struct literal cross-crate (the agent's SetIdentity handler and
+-      the Agora tool core). A constructor would take ten positional arguments (tripping
+-      too_many_arguments) with no natural grouping, so #[non_exhaustive] is impossible.
+-    strategy: >
+-      Irreducible — a 10-arg constructor trips too_many_arguments; the exhaustive literal is honest.
+-
+   - path: "crates/cp-wire/src/types/oplog/mod.rs"
+     match: "OpEntryKind carries an Unknown catch-all for N-1 tolerance"
+     reason: >
+# --- End entry #98 ---

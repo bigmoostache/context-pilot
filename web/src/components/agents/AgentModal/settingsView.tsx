@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 import { useSelectionState } from "./controller"
 import { useAgentModalActions } from "./actions"
 import type { Controller } from "./parts"
-import { IdentityTab, LlmTab, VitalsTab } from "./manageBody"
+import { LlmTab, VitalsTab } from "./manageBody"
 import { TABS, type TabId } from "./tabs"
 import { useLoopNav } from "@/lib/support/a11y"
 import { HintBadge } from "@/components/shell/chrome/HintBadge"
@@ -218,9 +218,6 @@ function SettingsPane({ c, tab, agentId }: { c: Controller; tab: TabId; agentId:
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
       <div className="mx-auto flex min-h-0 w-full max-w-[820px] flex-1 flex-col overflow-y-auto">
-        {/* Identity brings its own sticky save bar (it writes through a
-            different command than the rest), so it is rendered bare. */}
-        {tab === "identity" && <IdentityTab agentId={agentId} />}
         {tab === "llm" && (
           <>
             <LlmTab c={c} />

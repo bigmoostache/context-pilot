@@ -323,22 +323,6 @@ pub enum OpEntryKind {
         agent_id: Option<String>,
     },
 
-    /// The agent's durable **self-identity** (the Agora module's fixed-key
-    /// value store) changed — via the `Agora_set_identity` tool or the web
-    /// agent-settings `SetIdentity` command (T730).
-    ///
-    /// Ephemeral, disposable UI signal in the same class as
-    /// [`BehaviourChanged`](Self::BehaviourChanged): it rides the
-    /// **best-effort** durability path, is **not** carried in a
-    /// [`Checkpoint`](Self::Checkpoint) snapshot, and self-heals — a dropped
-    /// delta is covered by the coarse `config.json` mtime backstop. Observers
-    /// do **not** fold it (the identity is a tier-② `config.json` read, not
-    /// view state); they use it to **invalidate** their cached identity view so
-    /// the next read surfaces the fresh values — carries no payload, an
-    /// observer refetches the identity on any `identity_changed`.
-    #[serde(rename = "identity_changed")]
-    IdentityChanged,
-
     /// State checkpoint — bounds replay length on restart (GAP 1 / I5).
     #[serde(rename = "checkpoint")]
     Checkpoint {

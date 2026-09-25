@@ -15,7 +15,7 @@ mod query;
 pub(super) use archived::emit_thread_archived;
 pub(super) use bridge::{bridge_active, emit_thread_status, emit_vitals, poll_bridge_commands};
 pub(super) use messages::{emit_messages, emit_notes, emit_task_lists};
-pub(super) use observers::{emit_behaviour, emit_identity, emit_thread_focus};
+pub(super) use observers::{emit_behaviour, emit_thread_focus};
 pub(super) use paused::emit_thread_paused;
 
 use crate::app::App;
@@ -36,7 +36,6 @@ pub(super) fn emit_bridge_deltas(app: &mut App) {
     emit_thread_status(app);
     emit_thread_focus(app);
     emit_behaviour(app);
-    emit_identity(app);
     emit_thread_archived(app);
     emit_thread_paused(app);
 }

@@ -1,8 +1,9 @@
 M-long-1:
   tier: long
-  title: NEVER activate
-  importance: critical
-  last_edited_ms: 1787840930951
+  title: X525 Agora DONE
+  contents: 'X525 Agora deletion COMPLETE. All code removed: cp-agora crate, cp-wire SelfIdentity/SetIdentity/IdentityChanged, cp-mod-bridge last_identity+seed bitfield, tui AgoraModule+commands+observers+freeze_pass, orchestrator identity endpoint+route+materialized_view, cp-oplog refs, frontend IdentityTab+useIdentity+fetchIdentity+identity_changed SSE+qk.identity. openapi.json+TS client regenerated. Hash chain #98. cargo check+clippy+fmt clean. IT identity subsystem (transport/it/*) KEPT intact. cp-env profiles patched for OPENROUTER_API_KEY. Ready to commit on t753-openrouter.'
+  importance: high
+  last_edited_ms: 1790351738061
 M-long-10:
   tier: long
   title: 'CI Frontend red: exit-1'
@@ -127,9 +128,10 @@ M-mid-12:
   last_edited_ms: 0
 M-mid-13:
   tier: mid
-  title: 'DEMAQUETTING COMPLETE:'
+  title: Demaquetting complete
+  contents: 'DEMAQUETTING COMPLETE: all maquette/mock UI replaced with live backend data across the web frontend. (Restored placeholder — original content was overwritten during X525 planning.)'
   importance: critical
-  last_edited_ms: 1787840930939
+  last_edited_ms: 1790349091962
 M-mid-14:
   tier: mid
   title: FEATURE COMPLETION
@@ -479,8 +481,9 @@ M-short-36:
 M-short-37:
   tier: short
   title: HISTORICAL (macbook node,
+  contents: 'X525 Agora del FE: manageBody IdentityTab+IDENTITY_FIELDS; settingsView tab===''identity''; tabs.ts ''identity''; lib/live useIdentity+identity_changed SSE; lib/api AgentIdentity+fetchIdentity; openapi-regen types; mobile twins. KEEP (IT box-provisioning, no cp_agora): transport/it/*, it_get/set_identity, rest/config/it.rs, auth next_action, router api/it/identity.'
   importance: medium
-  last_edited_ms: 1787840930937
+  last_edited_ms: 1790349217890
 M-short-38:
   tier: short
   title: 'Context Pilot: Rust TUI'
@@ -497,7 +500,7 @@ M-short-4:
   title: 'T661: V1 claude_code'
   contents: 'T661: sole OAuth provider = ClaudeCodeV2 (FE ''Claude Code''). T750: UA bumped to claude-cli/2.1.282 (external, sdk-cli), pkg 0.112.1 — fixes claude_code_version_too_old for Opus 5.5 (server gates new models on CLI version). 17 beta flags led by oauth-2025-04-20 (haiku strips context-1m), re-captured live from CLI 2.1.282. api_key module kept, FE-hidden.'
   importance: high
-  last_edited_ms: 1790322244323
+  last_edited_ms: 1790329267017
 M-short-40:
   tier: short
   title: Todo upsert + recap strip
@@ -508,13 +511,10 @@ M-short-40:
   last_edited_ms: 1788958686987
 M-short-5:
   tier: short
-  title: 'Datalab OCR API: POST'
-  contents: |-
-    Datalab OCR API: POST /api/v1/convert (multipart, X-Api-Key). Poll GET /convert/{id}. Returns markdown. Old /marker and /ocr endpoints deprecated.
-
-    Endpoint: POST https://www.datalab.to/api/v1/convert (multipart, X-Api-Key). Poll: GET /api/v1/convert/{id}. Params: mode, output_format (markdown/html/json/chunks), max_pages, page_range. Old /marker and /ocr deprecated.
+  title: OAuth refresh rotates
+  contents: 'Claude OAuth refresh @ claude.ai/v1/oauth/token WORKS (200, 2026-09-25); endpoint NOT nightly-death cause. Refresh token ROTATES each call (new one returned; sent is single-use). Death = rotated token unpersisted. DANGER: never test with LIVE Keychain token — revokes THIS agent (401 loop). Recover: write response tokens to Keychain + ~/.claude/.credentials.json.'
   importance: high
-  last_edited_ms: 0
+  last_edited_ms: 1790329280718
 M-short-6:
   tier: short
   title: 'Context Pilot env vars:'
@@ -583,10 +583,10 @@ M-tiny-14:
   last_edited_ms: 1787840930941
 M-tiny-15:
   tier: tiny
-  title: 'PR #197 merged'
-  contents: 'PR #197 (sanitization→master: T736 notifications + T734 ordering + IdleMyTurnDetector) MERGED. Trailing ''chore: sync memories'' f52c90a5 pushed to re-created sanitization branch (not in a PR).'
-  importance: critical
-  last_edited_ms: 1789456829355
+  title: 'PR #202 merged'
+  contents: 'PR #202 (ui->master: Opus 5.5 add + claude_code_v2 2.1.282 signature fix for version_too_old) MERGED 2026-09-25, merge commit 3ef52605. ui branch kept (standing working branch, not deleted).'
+  importance: medium
+  last_edited_ms: 1790325814697
 M-tiny-16:
   tier: tiny
   title: Freeze RESOLVED at infra

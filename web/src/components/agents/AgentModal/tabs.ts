@@ -1,7 +1,7 @@
-import { BadgeCheck, Bot, Cpu } from "lucide-react"
+import { BadgeCheck, Cpu } from "lucide-react"
 
-/** The three agent-configuration panes. */
-export type TabId = "identity" | "llm" | "vitals"
+/** The two agent-configuration panes. */
+export type TabId = "llm" | "vitals"
 
 /**
  * The three panes, in canonical order.
@@ -18,8 +18,7 @@ export type TabId = "identity" | "llm" | "vitals"
  * thread row's title + preview). The dialog's narrower rail shows the label
  * alone.
  */
-export const TABS: { id: TabId; label: string; icon: typeof Bot; blurb: string }[] = [
+export const TABS: { id: TabId; label: string; icon: typeof Cpu; blurb: string }[] = [
   { id: "llm", label: "Model", icon: Cpu, blurb: "Name, realm, provider and model" },
   { id: "vitals", label: "Vitals", icon: BadgeCheck, blurb: "Service health and lifecycle" },
-  { id: "identity", label: "Identity", icon: Bot, blurb: "How the agent sees itself" },
 ]
