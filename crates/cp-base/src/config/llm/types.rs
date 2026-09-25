@@ -131,6 +131,8 @@ pub enum LlmProvider {
     DeepSeek,
     /// `MiniMax` models (Anthropic-compatible API via Token Plan).
     MiniMax,
+    /// `OpenRouter` aggregator (OpenAI-compatible API; models are `vendor/slug`).
+    OpenRouter,
     /// Claude Code V2 (OAuth, updated request format with Opus 4.8).
     #[serde(alias = "claudecodev2")]
     ClaudeCodeV2,

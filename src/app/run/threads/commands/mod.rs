@@ -10,6 +10,7 @@
 use cp_base::config::llm::models::{
     AnthropicModel, ClaudeCodeV2Model, DeepSeekModel, GrokModel, GroqModel, MiniMaxModel,
 };
+use cp_base::config::llm::openrouter_model::OpenRouterModel;
 use cp_base::config::llm::types::LlmProvider;
 use cp_base::state::runtime::State;
 use cp_mod_bridge::BridgeState;
@@ -357,6 +358,9 @@ fn apply_configure(state: &mut State, provider_str: &str, model_str: &str) {
         }
         LlmProvider::MiniMax => {
             serde_json::from_value::<MiniMaxModel>(model_val).map(|m| state.minimax_model = m).is_ok()
+        }
+        LlmProvider::OpenRouter => {
+            serde_json::from_value::<OpenRouterModel>(model_val).map(|m| state.openrouter_model = m).is_ok()
         }
     };
 

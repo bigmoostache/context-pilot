@@ -29,12 +29,14 @@ use crate::state::Message;
 pub(crate) use cp_base::config::llm::models::{
     AnthropicModel, ClaudeCodeV2Model, DeepSeekModel, GrokModel, GroqModel, MiniMaxModel,
 };
+pub(crate) use cp_base::config::llm::openrouter_model::OpenRouterModel;
 pub(crate) use cp_base::config::llm::types::{ApiCheckResult, LlmProvider, ModelInfo, StreamEvent};
 
 // Re-export provider clients through the module path for get_client()
 use oai_providers::deepseek;
 use oai_providers::grok;
 use oai_providers::groq;
+use oai_providers::openrouter;
 
 /// Configuration for an LLM request
 #[derive(Debug, Clone)]
@@ -85,6 +87,7 @@ pub(crate) fn get_client(provider: LlmProvider) -> Box<dyn LlmClient> {
         LlmProvider::Groq => Box::new(groq::GroqClient::new()),
         LlmProvider::DeepSeek => Box::new(deepseek::DeepSeekClient::new()),
         LlmProvider::MiniMax => Box::new(minimax::MiniMaxClient::new()),
+        LlmProvider::OpenRouter => Box::new(openrouter::OpenRouterClient::new()),
         LlmProvider::ClaudeCodeV2 => Box::new(claude_code_v2::ClaudeCodeV2Client::new()),
     }
 }
