@@ -10426,6 +10426,10 @@
   path: web/src/components/finder/explorer/ExplorerRow.tsx
   description: 'One explorer tree line (T624). Purely presentational — handed depth+flags, no recursion (ExplorerTree recurses). INDENT GUIDES = per-ancestor left-border spacers in the flex row. Chevron column present on files too (empty spacer) so icons align. T629: file icon = VsCodeFileIcon (Seti bank); folders render NO icon (chevron suffices). Single click onActivate, double click onPin (files), onContextMenu. native title, not Tip.'
   last_edited_ms: 0
+67dc3f8f3fe33e0c:
+  path: crates/cp-mod-search/src/meili/tasks.rs
+  description: 'Meilisearch task polling (wait_for_task) + paged document fetch. fetch_projection: fields-only projection, FETCH_PAGE_LIMIT 20_000, 16-way std::thread::scope fan-out in fetch_remaining_pages (offsets precomputed + dealt round-robin, pages tagged with offset and re-sorted ascending), first failing shard aborts the whole sweep. fetch_all_with_vectors: retrieveVectors paging for backup export. live_fetch_sweep = #[ignore]d live benchmark, run with --release.'
+  last_edited_ms: 1790584513718
 67eb7b8292e36deb:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state recovery priority (DB→dump→migrations→fresh) via recover_from_scratch/apply_dump/restore_empty_db (A2). save_module_data dump regen + WAL checkpoint. entity_sql dispatch. tools/ subdir (was tools.rs). Depends on search.
