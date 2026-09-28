@@ -79,10 +79,12 @@ export function ModelChip({ agentId, agent }: { agentId: string; agent: Agent | 
 
   const select = (providerId: string, modelId: string) => {
     if (providerId === activeProv?.id && modelId === activeModel?.id) return
-    void sendCommand(agentId, { kind: "configure", provider: providerId, model: modelId }).catch(() => {
-      // Fire-and-forget: a failed switch keeps the current model; the agent-meta
-      // fold re-reports ground truth on its next delta/poll.
-    })
+    void sendCommand(agentId, { kind: "configure", provider: providerId, model: modelId }).catch(
+      () => {
+        // Fire-and-forget: a failed switch keeps the current model; the agent-meta
+        // fold re-reports ground truth on its next delta/poll.
+      },
+    )
   }
 
   return (
@@ -91,7 +93,11 @@ export function ModelChip({ agentId, agent }: { agentId: string; agent: Agent | 
         <Cpu className="size-3.5" />
         <span className="max-w-[120px] truncate font-medium text-foreground/80">{label}</span>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" side="top" className="max-h-[70vh] min-w-72 overflow-y-auto">
+      <DropdownMenuContent
+        align="start"
+        side="top"
+        className="max-h-[70vh] min-w-72 overflow-y-auto"
+      >
         {providers.length === 0 ? (
           <DropdownMenuItem disabled>No models available</DropdownMenuItem>
         ) : (
