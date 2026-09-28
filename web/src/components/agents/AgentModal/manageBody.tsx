@@ -1,63 +1,40 @@
-import { useState } from "react"
 import { FolderGit2, Dices, ImagePlus } from "lucide-react"
 import { avatarUrl } from "@/lib/api"
 import type { Agent } from "@/lib/types"
 import { AgentAclSection } from "../../auth/AgentAclSection"
 import { SessionVitals } from "../../shell/SessionVitals"
-import { cn } from "@/lib/utils"
 import type { Controller } from "./parts"
-import { TABS, type TabId } from "./tabs"
 
 /**
- * Manage-mode body — a ConfigPanel-style left rail (Identity / Model / Vitals) +
- * detail pane, replacing the old two-column grid. The rail mirrors the global
- * settings dialog's structure exactly; each pane is a small subcomponent so the
- * bodies stay within the P8 complexity budget.
+ * Manage-mode body — ONE scrolling page, no category rail (T760).
+ *
+ * The category rail this replaced was inherited from the global settings dialog,
+ * and it never earned its keep here: an agent's model and its service health are
+ * one object seen two ways, and a rail made the user pay a click to check
+ * whether anything had moved. So the two sections are adjacent, not routed.
+ *
+ * The measured, self-centering `max-w-[820px]` column is the same shell
+ * ThreadsView uses: a full-width body would stretch the model cards past the
+ * dialog and leave the form fields stranded on a long line.
  */
-export function TabbedManageBody({ c }: { c: Controller }) {
-  const [tab, setTab] = useState<TabId>("llm")
+export function ManageBody({ c }: { c: Controller }) {
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-[190px_minmax(0,1fr)] overflow-hidden">
-      {/* category rail */}
-      <aside className="flex flex-col gap-0.5 border-r border-border/70 bg-muted/25 px-2.5 py-4">
-        {TABS.map((t) => {
-          const on = t.id === tab
-          return (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTab(t.id)}
-              className={cn(
-                "group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12.5px] transition-colors",
-                on
-                  ? "card-shadow bg-card font-medium text-foreground"
-                  : "text-foreground/75 hover:bg-muted/60",
-              )}
-            >
-              <span
-                className={cn(
-                  "flex size-6 shrink-0 items-center justify-center rounded-md transition-colors",
-                  on ? "bg-(--interactive)/15 text-(--interactive)" : "text-muted-foreground/70",
-                )}
-              >
-                <t.icon className="size-[15px]" />
-              </span>
-              <span className="min-w-0 flex-1 truncate">{t.label}</span>
-            </button>
-          )
-        })}
-      </aside>
-
-      {/* detail pane */}
-      <main className="flex min-h-0 flex-col overflow-y-auto">
-        {tab === "llm" && <LlmTab c={c} />}
-        {tab === "vitals" && c.agent && <VitalsTab c={c} agentId={c.agent.id} />}
-      </main>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+      <div className="mx-auto flex min-h-0 w-full max-w-[820px] flex-1 flex-col overflow-y-auto">
+        <LlmTab c={c} />
+        {/* Inset to the content gutter: the two sections each carry their own
+            `px-6`, so a full-bleed rule would hang past the fields. A plain
+            hairline, not a titled section break: {@link VitalsTab} leads with
+            SessionVitals' OWN "Service vitals" heading, and a second label above
+            it would read as two headings for one board. */}
+        <div className="mx-6 border-t border-border/50" />
+        {c.agent && <VitalsTab c={c} agentId={c.agent.id} />}
+      </div>
     </div>
   )
 }
 
-// ── Model tab ─────────────────────────────────────────────────────────
+// ── Model section ──────────────────────────────────────────────────
 
 /**
  * Agent image editor — the same avatar affordance the create/manage dialog
@@ -137,9 +114,8 @@ function AvatarField({
 }
 
 /** Name (rename) + realm preview + provider/model picker — the fields the
- *  footer's Save button persists (configure + rename). In the settings VIEW
- *  there is no footer, so that surface renders its own save bar beside this.
- *  The agent image editor leads the form (it commits on its own, immediately). */
+ *  footer's Save button persists (configure + rename). The agent image editor
+ *  leads the form (it commits on its own, immediately). */
 export function LlmTab({ c }: { c: Controller }) {
   const { name, setName, realm } = c
   return (
@@ -177,7 +153,7 @@ export function LlmTab({ c }: { c: Controller }) {
   )
 }
 
-// ── Vitals tab ────────────────────────────────────────────────────────
+// ── Vitals section ──────────────────────────────────────────────────
 
 /** Service vitals + (when auth is on) the per-agent ACL section. */
 export function VitalsTab({ c, agentId }: { c: Controller; agentId: string }) {
@@ -189,4 +165,4 @@ export function VitalsTab({ c, agentId }: { c: Controller; agentId: string }) {
   )
 }
 
-// ── Identity tab removed (X525: Agora crate deleted) ──────────────────
+// ── Identity section removed (X525: Agora crate deleted) ───────────

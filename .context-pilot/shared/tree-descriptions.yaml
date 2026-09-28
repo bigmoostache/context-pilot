@@ -10786,6 +10786,10 @@
   path: web/src/components/threads/ThreadComposer.tsx
   description: 'Thread composer (always-active textarea + turn-status banner). T298: paperclip wired — hidden multi-file <input>, onAttach?(files) prop. T304: optional draftKey persists the UNSENT draft (text+caret) to localStorage. T331: pendingFiles + onRemoveFile — removable FileUploadChip chips above textarea; canSend allows files-only. T348: optional suggestions (CommandSuggestion[]) — /command first-message bubbles shown above the textarea ONLY when composer is empty (no text, no staged files); clicking prefills the command literal via prefill() (caret-at-end, refocus, regrow) so the user can edit before sending. Enter sends / Shift+Enter newline, IME-guarded, auto-grow.'
   last_edited_ms: 1782294786975
+6b49dedb023482e4:
+  path: web/src/components/agents/AgentModal/manageBody.tsx
+  description: 'AgentModal manage-mode body — T757/T760: ONE scrolling page, no category rail. ManageBody (was TabbedManageBody) renders LlmTab → inset hairline → VitalsTab inside a self-centering max-w-[820px] overflow-y-auto column (the ThreadsView shell) so the vitals board doesn''t stretch the form fields. LlmTab = AvatarField (label-wrapped file input + Dices sibling) + name/realm. VitalsTab = SessionVitals + AgentAclSection. IdentityTab removed (X525).'
+  last_edited_ms: 1790580996579
 6b5d7b046f3d6677:
   path: src/app/run/threads/commands.rs
   description: Bridge command APPLICATION (K7 mutation half). apply_command dispatches Send/Create/Archive/Restore/Pause/Resume/Delete thread + DeleteMessage (collect_delete_timestamps helper, A2) + Stop/Configure. Focused-thread instant spine notif.
@@ -13346,6 +13350,10 @@
   path: web/src/components/auth/DayZeroSetup.tsx
   description: 'Day-0 provisioning screen (next_action=set_identity): name the box (DNS/IP) then distribute CA root; posts POST /api/it/identity, brings :443 up.'
   last_edited_ms: 0
+83c182b43a4d02aa:
+  path: web/src/components/agents/AgentModal/parts.tsx
+  description: 'AgentModal render subcomponents (P8 split): AgentModalHeader (avatar file-picker label in manage mode, gradient hero), AgentModalBody — create = single form (name+realm+ModelPicker), manage = delegates to ManageBody; AgentModalFooter (Retire/Restart with ''Restarting…'' while busy/submit, Save/Save changes pushed right with ml-auto). Controller interface bundles all props; submitLabel covers create/manage×idle/pending.'
+  last_edited_ms: 1790580996730
 83c59efd682f0ecc:
   path: tedx.md
   description: 'Talk outline: 3×7min30 structure (WHYs/HOWs/WOWs)'
@@ -14742,6 +14750,10 @@
   path: crates/cp-mod-firecrawl/src/panel.rs
   description: Firecrawl result panel. Same pattern as brave panel — static content in metadata, cache restore post-reload, pagination. FIRECRAWL_PANEL_TYPE constant.
   last_edited_ms: 0
+917df5c68372732b:
+  path: web/src/components/Root.tsx
+  description: 'Desktop tree root — Provider-contract boundary + AppShell (view-router fleet/threads/finder/costs, TopBar+StatusBar, live vitals/SSE, disconnect overlay). Mirror twin of mobile Root. T636 nav-history: useNavHistory wires browser Back/Next via History API (NavState {view,agentId,threadId?}); AppShell OWNS selectedThreadId (single writer of cp-thread-<id>, sync-read seed in openAgent/applyNav), feeds ThreadsView controlled. T760: the settings VIEW is gone — ''settings'' dropped from ViewMode and from the cp-view persist Record, and the manage DIALOG is restored as its own manageOpen flag + AgentSettingsDialog subcomponent (extracted so the open/agent guards don''t cost AppShell complexity, which the render inline had pushed to 17/15). The dialog is a command, not a destination: no NavState entry, no history push.'
+  last_edited_ms: 1790580996277
 9195db72aa67b7f7:
   path: .github/checks/protected-files.yaml
   description: Protected files list for hash chain verification
@@ -22242,6 +22254,10 @@ dd6672e158c61b3f:
   path: src/modules/overview/blocks.rs
   description: 'Overview IR builders: token_usage (token_bar_semantic helper), git (git_file_row/git_total_row/net_semantic/net_str helpers), context_elements (panel_hit_cell/panel_refreshed_str/panel_row_cells/non_panel_row helpers), statistics (A2).'
   last_edited_ms: 1784493504198
+dd8e1580cbf8bb59:
+  path: web/src/lib/types.ts
+  description: 'Domain types barrel. Re-exports backend types from generated/types.gen. web-lint P1: ThreadQuestion ADDED to the `import type` block (was only re-exported, causing TS2304 when used in ThreadMsg redecl); ThreadMsg = Omit<GenThreadMsg,''ts''|''questions''> & { ts?, streaming?, questions?: ThreadQuestion[]|undefined }. Optional props widened to `| undefined` throughout for exactOptionalPropertyTypes. T760: ViewMode is now "fleet" | "threads" | "finder" | "costs" — "settings" removed (agent settings is a dialog, not a routed view).'
+  last_edited_ms: 1790580996877
 dd9b73ad084ae862:
   path: src/app/actions/navigation.rs
   description: 'Context panel navigation: select_context (next/prev by numeric ID) and page_dynamic (page jump through dynamic panels, DYNAMIC_PAGE_SIZE=10).'
@@ -22414,6 +22430,10 @@ df8ea7e8868428d1:
   path: .context-pilot/shared/tree-descriptions.yaml
   description: Persisted tree descriptions YAML. Synced to git alongside code commits per M15.
   last_edited_ms: 0
+df96b73ab4fd1ae9:
+  path: web/src/components/shell/TopBar.tsx
+  description: 'Slim macOS-style side rail — app mark→fleet, workspace switcher, per-agent view tabs (Threads/Finder/Costs), theme, usage, account. Costs tab dev-mode only. ViewTabs subcomponent holds the view tabs; useViewShortcuts binds ⌘/Ctrl L (Threads) + K (Finder). T760: the Settings tab is GONE from ViewTabs (it stopped being a view) — agent settings is now a bare RailAction in TopBarActions, pinned to the floor directly ABOVE the theme toggle with the ⌘I shortcut bound beside it in the same subcomponent, so the listener''s lifetime matches the control it drives (same rule as ThreadActions'' C/P).'
+  last_edited_ms: 1790580996429
 dfa6b93cf90db078:
   path: web/src/components/agents/AgentModal.tsx
   description: 'Agent create/manage dialog. useProviders registry. Manage 2-col. T457 syncedRef back-fill. web-lint P5: exhaustive-deps warn deferred to P6 (inline eslint-disable removed in P4).'

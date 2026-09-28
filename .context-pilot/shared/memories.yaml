@@ -128,13 +128,13 @@ M-mid-12:
   last_edited_ms: 0
 M-mid-13:
   tier: mid
-  title: T755+T757 shipped
+  title: T755 hover + T760 dialog
   contents: |-
     T755 SHIPPED (30dc4c11): white-on-white dropdown hover fix. DropdownMenuItem base applies focus:**:text-accent-foreground to descendants; ROW_HILITE overrides via focus:**:text-foreground!/data-highlighted:**:text-foreground!.
 
-    T757 SHIPPED: agent Settings merged into ONE page, category rail DELETED. LlmTab → hairline → VitalsTab → FooterBar(Retire|Restart|Save) in max-w-[820px] col. Dropped settingsRailOpen + settingsTab state, NavState.settingsTab, TopBar rail props. Settings tab = NAVIGATION-ONLY. tabs.ts `blurb` deleted. All gates green.
+    T760 SHIPPED (t753-openrouter): agent Settings is a DIALOG again, not a view. T757's merged one-page body is KEPT inside it — only trigger + modality reverted. 'settings' dropped from ViewMode + cp-view Record; settingsView.tsx + tabs.ts deleted on BOTH trees (mirror parity is bidirectional).
   importance: high
-  last_edited_ms: 1790580074355
+  last_edited_ms: 1790581016649
 M-mid-14:
   tier: mid
   title: FEATURE COMPLETION
@@ -422,9 +422,9 @@ M-short-27:
 M-short-28:
   tier: short
   title: Structure check too slow
-  contents: structure-web/rust (30s) run check-structure.sh over the WHOLE repo = 38-65s → always times out on a GREEN tree. Not a cap breach (exit 0, max 482 lines, AgentModal 7 entries). Cost = 873 wc forks + 186 find forks; chain 1s. Both fix options are hash-locked (check-structure.sh AND callbacks.yaml in protected-files.yaml) → needs chain.sh --update + user approval.
+  contents: 'structure-web/rust always TIMES OUT the 30s callback budget on a GREEN tree — check-structure.sh takes 38-67s. Not a breach (exit 0, max file 482, chain 98). Cause = fork-per-file: 873 wc + 186 find forks (2 Rust finds = 24s+22s; web ~0s). Both files hash-locked → chain.sh --update + user OK. Re-verified 2026-09-28 (34s, exit 0).'
   importance: high
-  last_edited_ms: 1790580074360
+  last_edited_ms: 1790581012981
 M-short-29:
   tier: short
   title: Thinking blocks echoed as

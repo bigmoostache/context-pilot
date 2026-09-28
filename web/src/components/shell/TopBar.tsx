@@ -38,6 +38,9 @@ interface TopBarProps {
   onNewThread: () => void
   /** Open the thread search palette. Same gating as {@link onNewThread}. */
   onSearchThreads: () => void
+  /** Open the focused agent's settings DIALOG. The rail owns the trigger, so
+   *  the flag it flips has to live in the shell — see `manageOpen` in Root. */
+  onManageAgent: () => void
   /** Whether the finder view's explorer rail is open — drives the Finder tab's
    *  `aria-expanded` and its tooltip wording while that view is active. */
   finderRailOpen: boolean
@@ -59,6 +62,7 @@ export function TopBar({
   onToggleThreadsRail,
   onNewThread,
   onSearchThreads,
+  onManageAgent,
   finderRailOpen,
   onToggleFinderRail,
 }: TopBarProps) {
@@ -132,6 +136,7 @@ export function TopBar({
 
         <TopBarActions
           isClaudeOAuth={isClaudeOAuth}
+          onManageAgent={onManageAgent}
           setConfigOpen={setConfigOpen}
           setProfileOpen={setProfileOpen}
           setUsersOpen={setUsersOpen}
@@ -145,21 +150,44 @@ export function TopBar({
   )
 }
 
-/** Right-side controls cluster: theme toggle, Claude Usage button and the
- *  account menu. Extracted from {@link TopBar} for the P8 complexity budget. */
+/** Bottom controls cluster: the agent settings dialog, theme toggle, Claude
+ *  Usage button and the account menu. Extracted from {@link TopBar} for the P8
+ *  complexity budget.
+ *
+ *  Agent settings lives HERE rather than in {@link ViewTabs} because it is not
+ *  a view any more (T760): it opens a dialog, so it is a command, and commands
+ *  in this rail are bare glyphs pinned to the floor. It sits directly ABOVE the
+ *  theme toggle — the two are the app-level and agent-level ends of the rail,
+ *  and the eye reaches for the appearance controls at the very bottom. */
 function TopBarActions({
   isClaudeOAuth,
+  onManageAgent,
   setConfigOpen,
   setProfileOpen,
   setUsersOpen,
 }: {
   isClaudeOAuth: boolean
+  onManageAgent: () => void
   setConfigOpen: (v: boolean) => void
   setProfileOpen: (v: boolean) => void
   setUsersOpen: (v: boolean) => void
 }) {
+  // ⌘/Ctrl+I opens the agent settings dialog. Bound HERE, beside the button, so
+  // the key listener's lifetime matches the control it drives — the same
+  // rule {@link ThreadActions} follows for C and P.
+  const modHeld = useModifierShortcuts({ i: onManageAgent })
+
   return (
     <div className="mt-auto flex flex-col items-center gap-3">
+      <Tip title="Agent settings" body="This agent's name, model and service vitals." side="right">
+        <RailAction
+          label="Agent settings"
+          icon={SlidersHorizontal}
+          hint="I"
+          hintShown={modHeld}
+          onClick={onManageAgent}
+        />
+      </Tip>
       <Tip title="Appearance" body="Switch between light and dark." side="right">
         <span className="inline-flex">
           <ThemeToggle vertical />
@@ -316,15 +344,15 @@ function ViewTab({
 }
 
 /**
- * Build the three view-tab click handlers AND bind them as ⌘/Ctrl shortcuts —
- * one definition for both, so a shortcut is "as if you clicked the tab". Each
- * is DUAL-PURPOSE like the tab click: off the view navigate there, on the view
- * toggle that view's rail (L/K/I stay live on their own view). L not C drives
- * Threads — C is the new-thread shortcut in sibling {@link ThreadActions}; I not
- * S drives Settings (⌘S is the browser's Save; the user asked for ⌘I, T639).
- * All bound, so one `modHeld` gates every hint. Args one object (max-params 4);
- * `useModifierShortcuts` reads the map via latest-ref so rebuilds don't re-add
- * the listener.
+ * Build the view-tab click handlers AND bind them as ⌘/Ctrl shortcuts — one
+ * definition for both, so a shortcut is "as if you clicked the tab". Each is
+ * DUAL-PURPOSE like the tab click: off the view navigate there, on the view
+ * toggle that view's rail (L/K stay live on their own view). L not C drives
+ * Threads — C is the new-thread shortcut in sibling {@link ThreadActions}.
+ * Settings is absent by design: it stopped being a view in T760 and is now the
+ * ⌘I dialog trigger in {@link TopBarActions}, so it claims no slot here.
+ * Args one object (max-params 4); `useModifierShortcuts` reads the map via
+ * latest-ref so rebuilds don't re-add the listener.
  */
 function useViewShortcuts(a: {
   view: ViewMode
@@ -335,19 +363,14 @@ function useViewShortcuts(a: {
   modHeld: boolean
   threadsClick: () => void
   finderClick: () => void
-  settingsClick: () => void
 } {
   const threadsClick =
     a.view === "threads" ? a.onToggleThreadsRail : () => a.onViewChange("threads")
   const finderClick = a.view === "finder" ? a.onToggleFinderRail : () => a.onViewChange("finder")
-  // Settings only NAVIGATES. It has no rail to collapse any more: its two
-  // sections became one scrolling page (T757), so there is no disclosure left
-  // to toggle and claiming one would make ⌘I a no-op inside the view.
-  const settingsClick = () => a.onViewChange("settings")
 
-  const modHeld = useModifierShortcuts({ l: threadsClick, k: finderClick, i: settingsClick })
+  const modHeld = useModifierShortcuts({ l: threadsClick, k: finderClick })
 
-  return { modHeld, threadsClick, finderClick, settingsClick }
+  return { modHeld, threadsClick, finderClick }
 }
 
 /** Per-agent view switcher (Threads · Finder · Costs). Costs
@@ -379,14 +402,12 @@ function ViewTabs({
   onToggleFinderRail: () => void
 }) {
   const onThreads = view === "threads"
-  const onSettings = view === "settings"
   const onFinder = view === "finder"
 
-  // ⌘/Ctrl shortcuts (L Threads · K Finder · I Settings) share ONE handler each
-  // with the tab click — the hook builds them, so a shortcut and a click are
-  // the same action. Threads and Finder stay bound on their own view (toggle
-  // the rail); Settings is navigation-only.
-  const { modHeld, threadsClick, finderClick, settingsClick } = useViewShortcuts({
+  // ⌘/Ctrl shortcuts (L Threads · K Finder) share ONE handler each with the tab
+  // click — the hook builds them, so a shortcut and a click are the same action.
+  // Both stay bound on their own view (toggle the rail).
+  const { modHeld, threadsClick, finderClick } = useViewShortcuts({
     view,
     onViewChange,
     onToggleThreadsRail,
@@ -457,26 +478,6 @@ function ViewTabs({
           />
         </Tip>
       )}
-      {/* LAST in the group, deliberately: this is the agent's configuration,
-          reached once — not a surface the user lives in like Threads or
-          Finder. Navigation-ONLY, unlike its siblings: the view has no rail
-          to collapse (T757), so re-clicking the tab has nothing to toggle. */}
-      <Tip
-        title="Settings"
-        body="Configure this agent — its model and its service vitals, on one page."
-        side="right"
-      >
-        <ViewTab
-          active={onSettings}
-          onClick={settingsClick}
-          icon={SlidersHorizontal}
-          label="Settings"
-          // I navigates to Settings (⌘S is the browser Save shortcut; the user
-          // chose ⌘I, T639). No `expanded`: the tab collapses no panel.
-          hint="I"
-          hintShown={modHeld}
-        />
-      </Tip>
     </div>
   )
 }

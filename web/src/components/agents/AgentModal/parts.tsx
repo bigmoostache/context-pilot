@@ -15,7 +15,7 @@ import type { Agent } from "@/lib/types"
 import { avatarUrl } from "@/lib/api"
 import { type ProviderDef } from "@/lib/support/models"
 import { ModelPicker } from "../ModelPicker"
-import { TabbedManageBody } from "./manageBody"
+import { ManageBody } from "./manageBody"
 import { cn } from "@/lib/utils"
 
 /** Everything the render subcomponents need — assembled in {@link AgentModal}. */
@@ -153,10 +153,10 @@ export function AgentModalHeader({
 }
 
 /** Body: create mode = single form (name + realm preview + provider/model
- *  picker); manage mode = a ConfigPanel-style tabbed pane (Identity / Model /
- *  Vitals), delegated to {@link TabbedManageBody}. */
+ *  picker); manage mode = ONE scrolling page (Model · Vitals, no category rail),
+ *  delegated to {@link ManageBody}. */
 export function AgentModalBody({ c }: { c: Controller }) {
-  if (c.isManage) return <TabbedManageBody c={c} />
+  if (c.isManage) return <ManageBody c={c} />
   return <CreateBody c={c} />
 }
 

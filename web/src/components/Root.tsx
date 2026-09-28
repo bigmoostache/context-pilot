@@ -4,8 +4,7 @@ import { CostsView } from "@/components/shell/costs/CostsView"
 import { StatusBar } from "@/components/shell/StatusBar"
 import { ThreadsView } from "@/components/threads/ThreadsView"
 import { FleetDashboard } from "@/components/agents/FleetDashboard"
-import { SettingsView } from "@/components/agents/AgentModal/settingsView"
-
+import { AgentModal } from "@/components/agents/AgentModal"
 import { Finder } from "@/components/finder/Finder"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { AuthGuard } from "@/components/auth/AuthGuard"
@@ -207,16 +206,6 @@ function ShellViews(p: ShellViewsProps) {
       />
     )
   }
-  if (p.effectiveView === "settings" && p.activeAgent) {
-    return (
-      <SettingsView
-        key={p.activeAgent.id}
-        agent={p.activeAgent}
-        disconnected={p.disconnected}
-        onReconnect={p.onReconnect}
-      />
-    )
-  }
   if (p.effectiveView === "finder" && p.activeAgent) {
     return (
       <Finder
@@ -246,6 +235,23 @@ function ShellViews(p: ShellViewsProps) {
       onReconnect={p.onReconnect}
     />
   )
+}
+
+/** The agent-settings DIALOG (T760) — a command, not a destination. Extracted
+ *  from {@link AppShell} so the open/agent guards cost the shell no complexity
+ *  budget: a dialog is dismissed, never routed to, so it takes no history entry
+ *  and lives in its own flag rather than in {@link NavState}. */
+function AgentSettingsDialog({
+  open,
+  agent,
+  onClose,
+}: {
+  open: boolean
+  agent: ShellViewsProps["activeAgent"]
+  onClose: () => void
+}) {
+  if (!open || !agent) return null
+  return <AgentModal modal={{ mode: "manage", agent }} onClose={onClose} />
 }
 
 function AppShell() {
@@ -353,6 +359,13 @@ function AppShell() {
   const [newThreadOpen, setNewThreadOpen] = useState(false)
   const [threadSearchOpen, setThreadSearchOpen] = useState(false)
 
+  // The agent-settings DIALOG (T760). Restored after T617/T757 turned it into a
+  // routed view: it is a command, not a destination, so it must never enter a
+  // history entry — a dialog is dismissed, not navigated back from.
+  // The flag lives HERE because the rail button that opens it is a SIBLING of the
+  // surfaces it configures, and AppShell is their nearest common ancestor.
+  const [manageOpen, setManageOpen] = useState(false)
+
   // T334: "Show in Finder" — switch to finder view and reveal a specific file.
   const [finderRevealPath, setFinderRevealPath] = useState<string | null>(null)
   const showInFinder = useCallback((path: string) => {
@@ -404,7 +417,7 @@ function AppShell() {
     // The inner row needs `min-h-0`: a flex item's automatic minimum size is
     // its content, so a tall view would refuse to shrink and would push the
     // footer off the bottom of the screen instead of scrolling internally.
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
+    <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
       <div className="flex min-h-0 flex-1 flex-row overflow-hidden">
         <TopBar
           view={effectiveView}
@@ -416,6 +429,7 @@ function AppShell() {
           onToggleThreadsRail={() => setThreadsRailOpen((o) => !o)}
           onNewThread={() => setNewThreadOpen(true)}
           onSearchThreads={() => setThreadSearchOpen(true)}
+          onManageAgent={() => setManageOpen(true)}
           finderRailOpen={finderRailOpen}
           onToggleFinderRail={() => setFinderRailOpen((o) => !o)}
         />
@@ -457,6 +471,18 @@ function AppShell() {
         onRestart={restartAgent}
         restarting={agentRestarting}
         loading={agentLoading}
+      />
+
+      {/* The agent-settings DIALOG (T760). Sibling of the row above, never a
+          descendant of the header rail: the backdrop is `absolute inset-0` and
+          must anchor to the VIEWPORT, not to a rail containing block. The
+          button that opens it lives in that rail, the state that flags it here
+          — a dialog is dismissed, never routed to, so it takes no history
+          entry. */}
+      <AgentSettingsDialog
+        open={manageOpen}
+        agent={activeAgent}
+        onClose={() => setManageOpen(false)}
       />
 
       {/* Dev-mode performance HUD (gated on the Developer-mode flag inside).
