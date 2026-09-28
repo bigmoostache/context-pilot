@@ -40,6 +40,7 @@ fn provider_key_name(id: &str) -> Option<&'static str> {
         "groq" => Some("groq"),
         "deepseek" => Some("deepseek"),
         "minimax" => Some("minimax"),
+        "openrouter" => Some("openrouter"),
         _ => None,
     }
 }

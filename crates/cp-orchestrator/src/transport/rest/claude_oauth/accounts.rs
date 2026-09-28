@@ -203,22 +203,32 @@ pub(super) fn try_refresh(base: &serde_json::Value, refresh_token: &str) -> Opti
         "client_id": super::CLIENT_ID,
     });
     let client = reqwest::blocking::Client::new();
-    let resp = client
+    // On any refresh failure (network error, or a non-2xx such as
+    // `invalid_grant`), fall back to adopting whatever the ACTIVE credential
+    // holds now — the real `claude` CLI shares this Keychain item and rotates
+    // the single-use refresh token from under us, then writes its own fresh
+    // token in. Adopting it recovers silently instead of stranding a session.
+    let Some(resp) = client
         .post(super::TOKEN_URL)
         .header("Content-Type", "application/json")
         .header("User-Agent", super::TOKEN_USER_AGENT)
         .body(body.to_string())
         .timeout(std::time::Duration::from_secs(15))
         .send()
-        .ok()?;
+        .ok()
+    else {
+        return adopt_active_if_fresh();
+    };
     if !resp.status().is_success() {
-        return None;
+        return adopt_active_if_fresh();
     }
-    let val = resp.json::<serde_json::Value>().ok()?;
+    let Some(val) = resp.json::<serde_json::Value>().ok() else {
+        return adopt_active_if_fresh();
+    };
 
     let access_token = val.get("access_token").and_then(|v| v.as_str()).unwrap_or("");
     if access_token.is_empty() {
-        return None;
+        return adopt_active_if_fresh();
     }
     let new_refresh = val.get("refresh_token").and_then(|v| v.as_str()).unwrap_or(refresh_token);
     let expires_in = val.get("expires_in").and_then(serde_json::Value::as_i64).unwrap_or(0);
@@ -231,6 +241,22 @@ pub(super) fn try_refresh(base: &serde_json::Value, refresh_token: &str) -> Opti
         let _old_expiry = obj.insert("expiresAt".to_owned(), serde_json::json!(expires_at));
     }
     Some(creds)
+}
+
+/// Re-read the ACTIVE credential and return it when it is fresh — a non-empty
+/// access token that is not yet expired.
+///
+/// The recovery arm of [`try_refresh`]: our refresh grant races the real
+/// `claude` CLI, which shares the same Keychain item and rotates the single-use
+/// refresh token. When our POST loses the race (`invalid_grant`), the CLI has
+/// usually just written its own freshly-rotated token to disk — so instead of
+/// giving up we adopt it. `None` when disk holds nothing usable (genuinely
+/// expired / logged out), leaving callers to fall back to their old blob.
+fn adopt_active_if_fresh() -> Option<serde_json::Value> {
+    let creds = super::read_credentials_json()?;
+    let token = creds.get("accessToken").and_then(|v| v.as_str()).unwrap_or("");
+    let expires_at = creds.get("expiresAt").and_then(serde_json::Value::as_i64).unwrap_or(0);
+    (!token.is_empty() && expires_at > now_ms()).then_some(creds)
 }
 
 /// If `creds` is stale (within `threshold_ms` of expiry), attempt a refresh and

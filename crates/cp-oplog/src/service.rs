@@ -102,8 +102,7 @@ impl Durability {
             | OpEntryKind::CostAggregate { .. }
             | OpEntryKind::ContextUsage { .. }
             | OpEntryKind::ThreadFocusChanged { .. }
-            | OpEntryKind::BehaviourChanged { .. }
-            | OpEntryKind::IdentityChanged => Self::BestEffort,
+            | OpEntryKind::BehaviourChanged { .. } => Self::BestEffort,
             OpEntryKind::CommandEffect { .. }
             | OpEntryKind::SeenMark { .. }
             | OpEntryKind::MessageCreated { .. }

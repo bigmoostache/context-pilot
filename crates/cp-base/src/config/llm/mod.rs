@@ -9,5 +9,7 @@
 pub mod gateway;
 /// Per-provider model enums (Anthropic, Grok, Groq, DeepSeek, MiniMax, Claude Code V2).
 pub mod models;
+/// `OpenRouter` model enum (re-exported from [`models`]; own file for line cap).
+pub mod openrouter_model;
 /// LLM provider/model type definitions and capabilities.
 pub mod types;

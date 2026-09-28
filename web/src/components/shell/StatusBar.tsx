@@ -2,6 +2,7 @@ import { Boxes, Loader2, MessagesSquare, RefreshCw, Wallet } from "lucide-react"
 import { fmtCost, fmtTokens } from "@/lib/support/panelMeta"
 import { Tip } from "@/components/ui/tip"
 import { BehaviourChip } from "./behaviour/BehaviourChip"
+import { ModelChip } from "./behaviour/ModelChip"
 import type { Agent, StreamPhase } from "@/lib/types"
 
 const phaseMeta: Record<StreamPhase, { label: string; color: string }> = {
@@ -185,6 +186,16 @@ function AgentStatus({
           onRestart={onRestart}
         />
       </Tip>
+
+      {agentId ? (
+        <Tip
+          title="Model"
+          body="The LLM provider and model this agent runs on. Switch it here — applies immediately."
+          side="top"
+        >
+          <ModelChip agentId={agentId} agent={agent} />
+        </Tip>
+      ) : null}
 
       {agentId ? (
         <Tip

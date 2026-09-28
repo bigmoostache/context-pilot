@@ -119,6 +119,8 @@ pub enum Action {
     ConfigSelectDeepSeekModel(crate::config::llm::models::DeepSeekModel),
     /// Select primary `MiniMax` model.
     ConfigSelectMiniMaxModel(crate::config::llm::models::MiniMaxModel),
+    /// Select primary `OpenRouter` model.
+    ConfigSelectOpenRouterModel(crate::config::llm::openrouter_model::OpenRouterModel),
     /// Select primary Claude Code V2 model.
     ConfigSelectClaudeCodeV2Model(crate::config::llm::models::ClaudeCodeV2Model),
     /// Move config bar selection forward (→).

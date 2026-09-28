@@ -1,8 +1,9 @@
 M-long-1:
   tier: long
-  title: NEVER activate
-  importance: critical
-  last_edited_ms: 1787840930951
+  title: X525 Agora DONE
+  contents: 'X525 Agora deletion COMPLETE (02ccc32f on t753-openrouter). All code removed: cp-agora crate, cp-wire SelfIdentity/SetIdentity/IdentityChanged, cp-mod-bridge last_identity+seed bitfield, tui AgoraModule+commands+observers+freeze_pass, orchestrator identity endpoint+route+materialized_view, cp-oplog refs, frontend IdentityTab+useIdentity+fetchIdentity+identity_changed SSE+qk.identity. openapi.json+TS client regenerated. Hash chain #98. cargo check+clippy+fmt clean. IT identity subsystem (transport/it/*) KEPT intact. cp-env profiles patched for OPENROUTER_API_KEY. Ready for X526 (settings merge).'
+  importance: high
+  last_edited_ms: 1790351900117
 M-long-10:
   tier: long
   title: 'CI Frontend red: exit-1'
@@ -127,9 +128,13 @@ M-mid-12:
   last_edited_ms: 0
 M-mid-13:
   tier: mid
-  title: 'DEMAQUETTING COMPLETE:'
-  importance: critical
-  last_edited_ms: 1787840930939
+  title: T755 hover + T760 dialog
+  contents: |-
+    T755 SHIPPED (30dc4c11): white-on-white dropdown hover fix. DropdownMenuItem base applies focus:**:text-accent-foreground to descendants; ROW_HILITE overrides via focus:**:text-foreground!/data-highlighted:**:text-foreground!.
+
+    T760 SHIPPED (t753-openrouter, PR #204): agent Settings is a DIALOG again, not a view. T757's merged one-page body is KEPT inside it — only trigger + modality reverted. 'settings' dropped from ViewMode + cp-view Record; settingsView.tsx + tabs.ts deleted on BOTH trees (mirror parity bidirectional).
+  importance: high
+  last_edited_ms: 1790581108794
 M-mid-14:
   tier: mid
   title: FEATURE COMPLETION
@@ -416,9 +421,10 @@ M-short-27:
   last_edited_ms: 1787840964652
 M-short-28:
   tier: short
-  title: Mac Mini 'gilbert'
+  title: 'Structure: prune perf'
+  contents: 'Structure check was SLOW not failing: 34-67s vs 30s CB5/CB6 budget, TIMED OUT on a green tree. Cause = `-not -path` filters OUTPUT while find still crawls (target/=490k). Fixed via -prune → 9-12s exit 0; residual ~10s is forks. Perf change to a CHECK must stay output-identical: extract find from the SHIPPED file, never a copy.'
   importance: high
-  last_edited_ms: 1787840930929
+  last_edited_ms: 1790582345021
 M-short-29:
   tier: short
   title: Thinking blocks echoed as
@@ -479,13 +485,15 @@ M-short-36:
 M-short-37:
   tier: short
   title: HISTORICAL (macbook node,
+  contents: 'X525 Agora del FE: manageBody IdentityTab+IDENTITY_FIELDS; settingsView tab===''identity''; tabs.ts ''identity''; lib/live useIdentity+identity_changed SSE; lib/api AgentIdentity+fetchIdentity; openapi-regen types; mobile twins. KEEP (IT box-provisioning, no cp_agora): transport/it/*, it_get/set_identity, rest/config/it.rs, auth next_action, router api/it/identity.'
   importance: medium
-  last_edited_ms: 1787840930937
+  last_edited_ms: 1790349217890
 M-short-38:
   tier: short
-  title: 'Context Pilot: Rust TUI'
-  importance: medium
-  last_edited_ms: 1787840964661
+  title: 'T759 boot stall: fetch'
+  contents: 'T759 boot stall: cause = round-trip COUNT not latency (cp_*_files = 1 doc/CHUNK, 298k, paged on boot thread). 299 seq 1k-pages=15.05s; 15 seq 20k=6.71s (page size alone = only 2.2x); 16-way parallel 20k=0.41s (fan-out = other 16x). `distinct` unsupported on /documents/fetch, so the sweep CANNOT be collapsed server-side. Fix meili/tasks.rs aa433806, PR #205.'
+  importance: high
+  last_edited_ms: 1790587638193
 M-short-39:
   tier: short
   title: Harbor adapter
@@ -497,7 +505,7 @@ M-short-4:
   title: 'T661: V1 claude_code'
   contents: 'T661: sole OAuth provider = ClaudeCodeV2 (FE ''Claude Code''). T750: UA bumped to claude-cli/2.1.282 (external, sdk-cli), pkg 0.112.1 — fixes claude_code_version_too_old for Opus 5.5 (server gates new models on CLI version). 17 beta flags led by oauth-2025-04-20 (haiku strips context-1m), re-captured live from CLI 2.1.282. api_key module kept, FE-hidden.'
   importance: high
-  last_edited_ms: 1790322244323
+  last_edited_ms: 1790329267017
 M-short-40:
   tier: short
   title: Todo upsert + recap strip
@@ -508,13 +516,10 @@ M-short-40:
   last_edited_ms: 1788958686987
 M-short-5:
   tier: short
-  title: 'Datalab OCR API: POST'
-  contents: |-
-    Datalab OCR API: POST /api/v1/convert (multipart, X-Api-Key). Poll GET /convert/{id}. Returns markdown. Old /marker and /ocr endpoints deprecated.
-
-    Endpoint: POST https://www.datalab.to/api/v1/convert (multipart, X-Api-Key). Poll: GET /api/v1/convert/{id}. Params: mode, output_format (markdown/html/json/chunks), max_pages, page_range. Old /marker and /ocr deprecated.
+  title: OAuth refresh rotates
+  contents: 'Claude OAuth refresh @ claude.ai/v1/oauth/token WORKS (200, 2026-09-25); endpoint NOT nightly-death cause. Refresh token ROTATES each call (new one returned; sent is single-use). Death = rotated token unpersisted. DANGER: never test with LIVE Keychain token — revokes THIS agent (401 loop). Recover: write response tokens to Keychain + ~/.claude/.credentials.json.'
   importance: high
-  last_edited_ms: 0
+  last_edited_ms: 1790329280718
 M-short-6:
   tier: short
   title: 'Context Pilot env vars:'
@@ -583,10 +588,10 @@ M-tiny-14:
   last_edited_ms: 1787840930941
 M-tiny-15:
   tier: tiny
-  title: 'PR #197 merged'
-  contents: 'PR #197 (sanitization→master: T736 notifications + T734 ordering + IdleMyTurnDetector) MERGED. Trailing ''chore: sync memories'' f52c90a5 pushed to re-created sanitization branch (not in a PR).'
-  importance: critical
-  last_edited_ms: 1789456829355
+  title: 'PR #202 merged'
+  contents: 'PR #202 (ui->master: Opus 5.5 add + claude_code_v2 2.1.282 signature fix for version_too_old) MERGED 2026-09-25, merge commit 3ef52605. ui branch kept (standing working branch, not deleted).'
+  importance: medium
+  last_edited_ms: 1790325814697
 M-tiny-16:
   tier: tiny
   title: Freeze RESOLVED at infra
@@ -689,6 +694,36 @@ M-tiny-30:
   contents: 'SSH: `ssh guillaume-macmini` (guillaumedraznieks@Guillaume.lan). ~/cp-server same layout as gilbert. Release v0.2.13-184f77e.'
   importance: medium
   last_edited_ms: 1790256805028
+M-tiny-31:
+  tier: tiny
+  title: Close_panel kills servers
+  contents: Close_panel KILLS its console's backing process (143). Never close the panel hosting the :5174 vite dev server — tailscale serve proxies it.
+  importance: high
+  last_edited_ms: 1790352833364
+M-tiny-32:
+  tier: tiny
+  title: 'find -prune: 3 shapes'
+  contents: 'find -prune shapes: bare X => descend; X + X/* => -prune; X/* only => -print -prune. Group''s first entry must not be -o.'
+  importance: medium
+  last_edited_ms: 1790582340866
+M-tiny-34:
+  tier: tiny
+  title: Never trust gate markers
+  contents: Verify gates by READING each gate's body, never a trailing `; echo MARKER`. `&&` short-circuits later commands but the `;` marker still prints — reads as false green. Same class as M-long-10.
+  importance: critical
+  last_edited_ms: 1790587533526
+M-tiny-35:
+  tier: tiny
+  title: 'Cargo: never parallelize'
+  contents: Run ONE cargo command at a time. Build-lock contention between parallel console_create + blocking callbacks shows as exit -1 timeouts. Self-inflicted, not a real failure.
+  importance: high
+  last_edited_ms: 1790587533537
+M-tiny-36:
+  tier: tiny
+  title: Let rustfmt shape code
+  contents: Let `cargo fmt` author line breaks. Hand-rolling rustfmt's shape re-creates the very fmt diff just shown.
+  importance: medium
+  last_edited_ms: 1790587533541
 M-tiny-4:
   tier: tiny
   title: 'T646 SHIPPED + FIXED:'

@@ -57,6 +57,7 @@ impl Default for State {
             groq_model: crate::config::llm::models::GroqModel::default(),
             deepseek_model: crate::config::llm::models::DeepSeekModel::default(),
             minimax_model: crate::config::llm::models::MiniMaxModel::default(),
+            openrouter_model: crate::config::llm::openrouter_model::OpenRouterModel::default(),
             claude_code_v2_model: crate::config::llm::models::ClaudeCodeV2Model::default(),
             view_mode: ViewMode::Normal,
             reveries: HashMap::new(),

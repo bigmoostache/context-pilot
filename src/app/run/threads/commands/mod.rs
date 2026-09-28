@@ -10,6 +10,7 @@
 use cp_base::config::llm::models::{
     AnthropicModel, ClaudeCodeV2Model, DeepSeekModel, GrokModel, GroqModel, MiniMaxModel,
 };
+use cp_base::config::llm::openrouter_model::OpenRouterModel;
 use cp_base::config::llm::types::LlmProvider;
 use cp_base::state::runtime::State;
 use cp_mod_bridge::BridgeState;
@@ -67,9 +68,6 @@ pub(super) fn apply_command(app: &mut App, cmd: Command) {
         }
         CommandKind::LoadBehaviour { id } => {
             apply_load_behaviour(&mut app.state, &id);
-        }
-        CommandKind::SetIdentity(spec) => {
-            apply_set_identity(&mut app.state, *spec);
         }
         CommandKind::Unknown => {
             log::warn!("bridge: ignoring unknown command {}", cmd.id);
@@ -358,6 +356,9 @@ fn apply_configure(state: &mut State, provider_str: &str, model_str: &str) {
         LlmProvider::MiniMax => {
             serde_json::from_value::<MiniMaxModel>(model_val).map(|m| state.minimax_model = m).is_ok()
         }
+        LlmProvider::OpenRouter => {
+            serde_json::from_value::<OpenRouterModel>(model_val).map(|m| state.openrouter_model = m).is_ok()
+        }
     };
 
     if !model_ok {
@@ -387,37 +388,5 @@ fn apply_load_behaviour(state: &mut State, id: &str) {
             log::info!("bridge: loaded behaviour agent {name} (id={id:?})");
         }
         Err(e) => log::warn!("bridge: LoadBehaviour failed: {e}"),
-    }
-}
-
-// ── SetIdentity (self-identity) ────────────────────────────────────────
-
-/// Apply a self-identity change from the web agent-settings form.
-///
-/// Maps the wire [`cp_wire::types::command::SelfIdentity`] value object onto the
-/// Agora module's own `SelfIdentity` and writes it through the shared
-/// [`cp_agora::set_identity`] core — the exact validated path the local
-/// `Agora_set_identity` tool uses, so both surfaces enforce the same per-value
-/// word cap (all-or-nothing on overflow) and touch the same AGORA panel. A
-/// rejected overflow leaves the prior identity untouched and is logged.
-fn apply_set_identity(state: &mut State, spec: cp_wire::types::command::SelfIdentity) {
-    let next = cp_agora::types::SelfIdentity {
-        identity: spec.identity,
-        values: spec.values,
-        principles: spec.principles,
-        character: spec.character,
-        expertise: spec.expertise,
-        role: spec.role,
-        operational_responsibilities: spec.operational_responsibilities,
-        knowledge_responsibilities: spec.knowledge_responsibilities,
-        organic_responsibilities: spec.organic_responsibilities,
-        direct_management: spec.direct_management,
-    };
-    match cp_agora::tools::set_identity(state, next) {
-        Ok(()) => {
-            state.flags.ui.dirty = true;
-            log::info!("bridge: applied SetIdentity");
-        }
-        Err(e) => log::warn!("bridge: SetIdentity rejected: {e}"),
     }
 }

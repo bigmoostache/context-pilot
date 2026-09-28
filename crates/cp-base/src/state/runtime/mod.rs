@@ -78,6 +78,8 @@ pub struct State {
     pub deepseek_model: crate::config::llm::models::DeepSeekModel,
     /// Active `MiniMax` model variant.
     pub minimax_model: crate::config::llm::models::MiniMaxModel,
+    /// Active `OpenRouter` model variant.
+    pub openrouter_model: crate::config::llm::openrouter_model::OpenRouterModel,
     /// Active Claude Code V2 model variant.
     pub claude_code_v2_model: crate::config::llm::models::ClaudeCodeV2Model,
     /// View mode: Normal (full sidebar), Collapsed (icons), Hidden, Threads

@@ -6,6 +6,7 @@
 //! `Action::ConfigSelect*Model` variant.
 
 use crate::app::actions::Action;
+use crate::llms::OpenRouterModel;
 use crate::llms::{AnthropicModel, ClaudeCodeV2Model, DeepSeekModel, GrokModel, GroqModel, LlmProvider, MiniMaxModel};
 use crate::state::State;
 
@@ -17,6 +18,7 @@ pub(super) const fn dispatch_primary_model(state: &State, idx: usize) -> Action 
         LlmProvider::Groq => groq_model(idx),
         LlmProvider::DeepSeek => deepseek_model(idx),
         LlmProvider::MiniMax => minimax_model(idx),
+        LlmProvider::OpenRouter => openrouter_model(idx),
         LlmProvider::ClaudeCodeV2 => claude_code_v2_model(idx),
     }
 }
@@ -65,6 +67,17 @@ const fn minimax_model(idx: usize) -> Action {
     match idx {
         0 => Action::ConfigSelectMiniMaxModel(MiniMaxModel::M27),
         1 => Action::ConfigSelectMiniMaxModel(MiniMaxModel::M27Highspeed),
+        _ => Action::None,
+    }
+}
+
+/// `OpenRouter` model for letter index (`a`–`d`).
+const fn openrouter_model(idx: usize) -> Action {
+    match idx {
+        0 => Action::ConfigSelectOpenRouterModel(OpenRouterModel::SpaceBunnyAlpha),
+        1 => Action::ConfigSelectOpenRouterModel(OpenRouterModel::Glm53Flash),
+        2 => Action::ConfigSelectOpenRouterModel(OpenRouterModel::Nemotron3Ultra),
+        3 => Action::ConfigSelectOpenRouterModel(OpenRouterModel::DeepSeekV41Flash),
         _ => Action::None,
     }
 }

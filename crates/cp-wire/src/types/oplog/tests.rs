@@ -163,15 +163,6 @@ fn behaviour_changed_round_trip_and_stable_tag() {
 }
 
 #[test]
-fn identity_changed_round_trip_and_stable_tag() {
-    let entry = OpEntry { schema_version: 1, rev: 9, timestamp_ms: 0, kind: OpEntryKind::IdentityChanged };
-    let json = serde_json::to_string(&entry).expect("serialize");
-    assert!(json.contains("\"kind\":\"identity_changed\""), "stable tag: {json}");
-    let back: OpEntry = serde_json::from_str(&json).expect("deserialize");
-    assert_eq!(entry, back);
-}
-
-#[test]
 fn task_list_changed_round_trip_and_stable_tag() {
     use super::super::snapshot::todo::{WireTask, WireTaskStatus};
     let entry = OpEntry {

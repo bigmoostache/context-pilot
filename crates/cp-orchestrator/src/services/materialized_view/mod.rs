@@ -199,13 +199,12 @@ impl AgentView {
                 self.context =
                     ContextSnapshot::from_usage((used_tokens, threshold_tokens, budget_tokens, hit_tokens, miss_tokens));
             }
-            // Durability-only records, message-delete, behaviour/identity change,
+            // Durability-only records, message-delete, behaviour change,
             // and forward-compat unknowns do not affect the projected state.
             OpEntryKind::CommandEffect { .. }
             | OpEntryKind::SeenMark { .. }
             | OpEntryKind::MessageDeleted { .. }
             | OpEntryKind::BehaviourChanged { .. }
-            | OpEntryKind::IdentityChanged
             | OpEntryKind::Unknown => {}
         });
     }

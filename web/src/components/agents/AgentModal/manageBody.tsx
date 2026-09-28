@@ -1,66 +1,40 @@
-import { useState } from "react"
-import { Loader2, FolderGit2, ScrollText, Dices, ImagePlus } from "lucide-react"
-import { useIdentity, sendCommand } from "@/lib/live"
-import { avatarUrl, type AgentIdentity } from "@/lib/api"
+import { FolderGit2, Dices, ImagePlus } from "lucide-react"
+import { avatarUrl } from "@/lib/api"
 import type { Agent } from "@/lib/types"
-import { ModelPicker } from "../ModelPicker"
 import { AgentAclSection } from "../../auth/AgentAclSection"
 import { SessionVitals } from "../../shell/SessionVitals"
-import { cn } from "@/lib/utils"
 import type { Controller } from "./parts"
-import { TABS, type TabId } from "./tabs"
 
 /**
- * Manage-mode body — a ConfigPanel-style left rail (Identity / Model / Vitals) +
- * detail pane, replacing the old two-column grid. The rail mirrors the global
- * settings dialog's structure exactly; each pane is a small subcomponent so the
- * bodies stay within the P8 complexity budget.
+ * Manage-mode body — ONE scrolling page, no category rail (T760).
+ *
+ * The category rail this replaced was inherited from the global settings dialog,
+ * and it never earned its keep here: an agent's model and its service health are
+ * one object seen two ways, and a rail made the user pay a click to check
+ * whether anything had moved. So the two sections are adjacent, not routed.
+ *
+ * The measured, self-centering `max-w-[820px]` column is the same shell
+ * ThreadsView uses: a full-width body would stretch the model cards past the
+ * dialog and leave the form fields stranded on a long line.
  */
-export function TabbedManageBody({ c }: { c: Controller }) {
-  const [tab, setTab] = useState<TabId>("llm")
+export function ManageBody({ c }: { c: Controller }) {
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-[190px_minmax(0,1fr)] overflow-hidden">
-      {/* category rail */}
-      <aside className="flex flex-col gap-0.5 border-r border-border/70 bg-muted/25 px-2.5 py-4">
-        {TABS.map((t) => {
-          const on = t.id === tab
-          return (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTab(t.id)}
-              className={cn(
-                "group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12.5px] transition-colors",
-                on
-                  ? "card-shadow bg-card font-medium text-foreground"
-                  : "text-foreground/75 hover:bg-muted/60",
-              )}
-            >
-              <span
-                className={cn(
-                  "flex size-6 shrink-0 items-center justify-center rounded-md transition-colors",
-                  on ? "bg-(--interactive)/15 text-(--interactive)" : "text-muted-foreground/70",
-                )}
-              >
-                <t.icon className="size-[15px]" />
-              </span>
-              <span className="min-w-0 flex-1 truncate">{t.label}</span>
-            </button>
-          )
-        })}
-      </aside>
-
-      {/* detail pane */}
-      <main className="flex min-h-0 flex-col overflow-y-auto">
-        {tab === "identity" && c.agent && <IdentityTab agentId={c.agent.id} />}
-        {tab === "llm" && <LlmTab c={c} />}
-        {tab === "vitals" && c.agent && <VitalsTab c={c} agentId={c.agent.id} />}
-      </main>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+      <div className="mx-auto flex min-h-0 w-full max-w-[820px] flex-1 flex-col overflow-y-auto">
+        <LlmTab c={c} />
+        {/* Inset to the content gutter: the two sections each carry their own
+            `px-6`, so a full-bleed rule would hang past the fields. A plain
+            hairline, not a titled section break: {@link VitalsTab} leads with
+            SessionVitals' OWN "Service vitals" heading, and a second label above
+            it would read as two headings for one board. */}
+        <div className="mx-6 border-t border-border/50" />
+        {c.agent && <VitalsTab c={c} agentId={c.agent.id} />}
+      </div>
     </div>
   )
 }
 
-// ── Model tab ─────────────────────────────────────────────────────────
+// ── Model section ──────────────────────────────────────────────────
 
 /**
  * Agent image editor — the same avatar affordance the create/manage dialog
@@ -140,11 +114,10 @@ function AvatarField({
 }
 
 /** Name (rename) + realm preview + provider/model picker — the fields the
- *  footer's Save button persists (configure + rename). In the settings VIEW
- *  there is no footer, so that surface renders its own save bar beside this.
- *  The agent image editor leads the form (it commits on its own, immediately). */
+ *  footer's Save button persists (configure + rename). The agent image editor
+ *  leads the form (it commits on its own, immediately). */
 export function LlmTab({ c }: { c: Controller }) {
-  const { name, setName, realm, providers, provId, modelId, setSel } = c
+  const { name, setName, realm } = c
   return (
     <div className="flex flex-col gap-5 px-6 py-5">
       {c.agent && (
@@ -176,17 +149,11 @@ export function LlmTab({ c }: { c: Controller }) {
           </code>
         </div>
       </div>
-      <div className="flex flex-col gap-2">
-        <span className="text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
-          Provider &amp; Model
-        </span>
-        <ModelPicker providers={providers} provider={provId} model={modelId} onChange={setSel} />
-      </div>
     </div>
   )
 }
 
-// ── Vitals tab ────────────────────────────────────────────────────────
+// ── Vitals section ──────────────────────────────────────────────────
 
 /** Service vitals + (when auth is on) the per-agent ACL section. */
 export function VitalsTab({ c, agentId }: { c: Controller; agentId: string }) {
@@ -198,120 +165,4 @@ export function VitalsTab({ c, agentId }: { c: Controller; agentId: string }) {
   )
 }
 
-// ── Identity tab ──────────────────────────────────────────────────────
-
-/** The ten identity fields in canonical order (mirrors cp-agora types.rs and
- *  the `Agora_set_identity` tool params 1:1). */
-const IDENTITY_FIELDS: { key: keyof AgentIdentity; label: string }[] = [
-  { key: "identity", label: "Identity" },
-  { key: "values", label: "Values" },
-  { key: "principles", label: "Principles" },
-  { key: "character", label: "Character" },
-  { key: "expertise", label: "Expertise" },
-  { key: "role", label: "Role" },
-  { key: "operational_responsibilities", label: "Operational responsibilities" },
-  { key: "knowledge_responsibilities", label: "Knowledge responsibilities" },
-  { key: "organic_responsibilities", label: "Organic responsibilities" },
-  { key: "direct_management", label: "Direct management" },
-]
-
-/**
- * Editable self-identity form — the frontend twin of the agent's own
- * `Agora_set_identity` tool. Seeds from {@link useIdentity} (the tier-②
- * config.json read invalidated by the `identity_changed` SSE delta), then
- * saves through the shared `set_identity` bridge command (fire-and-forget: the
- * agent re-validates the per-value word cap and the SSE delta refetches). The
- * borderless field styling mirrors {@link AgentEditorDialog}.
- */
-export function IdentityTab({ agentId }: { agentId: string }) {
-  const { data } = useIdentity(agentId)
-  const [form, setForm] = useState<AgentIdentity | null>(null)
-  // Fingerprint of the last server snapshot the form adopted. Lets the form
-  // track live server changes while pristine, without an effect.
-  const [serverSnapshot, setServerSnapshot] = useState<string | null>(null)
-  const [dirty, setDirty] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  // Track the server identity while the form is PRISTINE — a render-phase
-  // adjust-state (NOT an effect, which would trip set-state-in-effect). The
-  // SSE identity_changed delta invalidates qk.identity and refetches `data`;
-  // as long as the user hasn't started editing (`!dirty`) the form mirrors it,
-  // so an external change (an AI tool edit) shows live. Once the user types,
-  // `dirty` freezes the form so in-progress edits are never clobbered; a save
-  // clears `dirty` and the next server snapshot re-syncs.
-  if (data) {
-    const fp = JSON.stringify(data)
-    if (!dirty && fp !== serverSnapshot) {
-      setServerSnapshot(fp)
-      setForm(data)
-    }
-  }
-
-  if (!form) {
-    return (
-      <div className="flex flex-1 items-center justify-center gap-2 py-16 text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" /> Loading…
-      </div>
-    )
-  }
-
-  const set = (k: keyof AgentIdentity, v: string) => {
-    setDirty(true)
-    setForm((f) => (f ? { ...f, [k]: v } : f))
-  }
-
-  const save = () => {
-    if (saving) return
-    setSaving(true)
-    setError(null)
-    sendCommand(agentId, { kind: "set_identity", ...form })
-      .then(() => setDirty(false))
-      .catch((e: unknown) =>
-        setError(e instanceof Error ? e.message : "Could not save the identity."),
-      )
-      .finally(() => setSaving(false))
-  }
-
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center gap-1.5 px-5 pt-4 pb-1 text-[12px] text-muted-foreground">
-        <span className="flex size-[15px] items-center justify-center rounded-sm bg-(--signal)/15 text-(--signal)">
-          <ScrollText className="size-2.5" />
-        </span>
-        <span className="text-foreground/70">Self-identity</span>
-        <span className="text-muted-foreground/50">· how the agent sees itself</span>
-      </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-3.5 px-5 pt-2 pb-4">
-        {IDENTITY_FIELDS.map((f) => (
-          <label key={f.key} className="flex flex-col gap-1">
-            <span className="text-[10.5px] font-semibold tracking-[0.06em] text-muted-foreground/75 uppercase">
-              {f.label}
-            </span>
-            <input
-              value={form[f.key]}
-              onChange={(e) => set(f.key, e.target.value)}
-              placeholder="—"
-              className="w-full border-b border-transparent bg-transparent pb-1 text-[13.5px] text-foreground/90 transition-colors outline-none placeholder:text-muted-foreground/40 focus:border-(--signal)/40"
-            />
-          </label>
-        ))}
-        {error && <span className="text-[11px] text-(--danger)">{error}</span>}
-      </div>
-      <div className="sticky bottom-0 flex items-center gap-3 border-t border-border/70 bg-popover/95 px-5 py-3 backdrop-blur-sm">
-        <span className="text-[11px] text-muted-foreground/70">
-          Keep each value short — under ten words.
-        </span>
-        <button
-          type="button"
-          onClick={save}
-          disabled={saving}
-          className="ml-auto flex items-center gap-1.5 rounded-md bg-(--signal) px-3.5 py-1.5 text-[12.5px] font-medium text-(--primary-foreground) transition-[filter] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {saving && <Loader2 className="size-3.5 animate-spin" />}
-          Save identity
-        </button>
-      </div>
-    </div>
-  )
-}
+// ── Identity section removed (X525: Agora crate deleted) ───────────
