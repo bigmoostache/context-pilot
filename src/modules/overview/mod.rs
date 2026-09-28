@@ -64,6 +64,7 @@ fn load_provider_models(data: &serde_json::Value, state: &mut State) {
     load_enum_field(data, "groq_model", &mut state.groq_model);
     load_enum_field(data, "deepseek_model", &mut state.deepseek_model);
     load_enum_field(data, "minimax_model", &mut state.minimax_model);
+    load_enum_field(data, "openrouter_model", &mut state.openrouter_model);
     load_enum_field(data, "claude_code_v2_model", &mut state.claude_code_v2_model);
 }
 
@@ -159,6 +160,7 @@ impl Module for OverviewModule {
             "groq_model": state.groq_model,
             "deepseek_model": state.deepseek_model,
             "minimax_model": state.minimax_model,
+            "openrouter_model": state.openrouter_model,
             "claude_code_v2_model": state.claude_code_v2_model,
             "reverie_enabled": state.flags.config.reverie_enabled,
             "cleaning_threshold": state.cleaning_threshold,

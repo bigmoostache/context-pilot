@@ -393,6 +393,12 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
                 config::api_check(state)
             };
         }
+        Action::ConfigSelectOpenRouterModel(m) => {
+            return {
+                state.openrouter_model = m;
+                config::api_check(state)
+            };
+        }
         Action::ConfigSelectClaudeCodeV2Model(m) => {
             return {
                 state.claude_code_v2_model = m;

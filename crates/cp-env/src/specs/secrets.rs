@@ -96,6 +96,13 @@ pub static ALL_KEYS: &[KeyDefinition] = &[
         mechanism: AuthMechanism::EnvVar,
     },
     KeyDefinition {
+        canonical: "openrouter",
+        env_var: "OPENROUTER_API_KEY",
+        display: "OpenRouter",
+        category: KeyCategory::LlmProvider,
+        mechanism: AuthMechanism::EnvVar,
+    },
+    KeyDefinition {
         canonical: "claude_oauth",
         env_var: "",
         display: "Claude Code (OAuth)",

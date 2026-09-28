@@ -18,6 +18,8 @@ use crate::transport::rest::HttpReply;
 /// What the LLM gateway declares it can route (`GET /v1/models`), cached.
 mod gateway_models;
 mod oauth_creds;
+/// The `OpenRouter` aggregator catalogue (split out for the 500-line cap).
+mod openrouter;
 /// Which providers are usable right now (key present, OAuth valid, gateway).
 mod usable;
 
@@ -69,8 +71,14 @@ pub(crate) struct ModelDef {
 /// Claude Code subscription leads it - unless the deployment switched it off
 /// (`CP_FEATURE_CLAUDE_OAUTH=0`), in which case it is not offered at all.
 fn all_providers() -> Vec<ProviderDef> {
-    let mut providers =
-        vec![provider_anthropic(), provider_grok(), provider_groq(), provider_deepseek(), provider_minimax()];
+    let mut providers = vec![
+        provider_anthropic(),
+        provider_grok(),
+        provider_groq(),
+        provider_deepseek(),
+        provider_minimax(),
+        openrouter::provider_openrouter(),
+    ];
     if rest::features().is_on(cp_env::model::features::Feature::ClaudeOauth) {
         providers.insert(0, provider_claudecodev2());
     }

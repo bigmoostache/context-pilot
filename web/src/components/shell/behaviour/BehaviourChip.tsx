@@ -23,7 +23,7 @@ import { AgentEditorDialog, type AgentEditorMode } from "./AgentEditorDialog"
  * no wash creeps back in, and `transition-colors` keeps the ink fade smooth.
  */
 const ROW_HILITE =
-  "transition-colors focus:bg-transparent! focus:text-foreground! data-highlighted:bg-transparent! data-highlighted:text-foreground!"
+  "transition-colors focus:bg-transparent! focus:text-foreground! focus:**:text-foreground! data-highlighted:bg-transparent! data-highlighted:text-foreground! data-highlighted:**:text-foreground!"
 
 /** The editor dialog's open state: closed, or open in one of its three flows. */
 type EditorState =

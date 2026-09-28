@@ -29,6 +29,27 @@ fail=0
 
 # ── 1 + 2: Rust tree (src/ + crates/) — ≤500 lines/file, ≤8 entries/dir ──────
 # (former check-file-lengths.sh + check-folder-sizes.sh)
+#
+# PRUNE, NOT FILTER. These two sweeps used to express their exclusions as
+# `-not -path './x/*'`, which only suppresses what find PRINTS — it still walks
+# every excluded tree first. `target/` alone holds 490k entries, so each sweep
+# spent 15-24s crawling a directory whose contents were thrown away. `-prune`
+# tells find to skip the subtree entirely; the sweeps are now sub-second.
+#
+# The rewrite is output-IDENTICAL (560 .rs files, 186 dirs, verified by diffing
+# this script's own two expressions against the pre-prune original). The
+# exclusion list is NOT uniform, which is the trap — each shape needs its own
+# verb, and flattening them to a bare `-prune` silently changes the result set:
+#
+#   X and X/* both excluded -> dir not printed, children not walked => -prune
+#   only X/*   excluded    -> dir PRINTED, children not walked     => -print -prune
+#   only X     excluded    -> dir not printed, children KEPT        => plain descend
+#
+# `./target` is the second shape: `./target/*` needs a slash plus something
+# after, so the directory itself never matches and stays in the count — which is
+# why a bare `-prune` there drops it. Same for `*/target/*`: it excludes the
+# CHILDREN of a `target` at any depth but not the directory, so `-name target`
+# pairs with `-print -prune`.
 while IFS= read -r f; do
   n=$(wc -l < "$f" | tr -d '[:space:]')
   if [ "$n" -gt "$MAX_LINES" ]; then
@@ -36,9 +57,11 @@ while IFS= read -r f; do
     echo "FAIL: $f has $n lines (max $MAX_LINES) — extract into a sibling module." >&2
     fail=1
   fi
-done < <(find . -name '*.rs' -not -path './target/*' -not -path '*/target/*' \
-  -not -path './deploy/ansible/.venv' -not -path './deploy/ansible/.venv/*' \
-  -not -path './deploy/ansible/.artifacts' -not -path './deploy/ansible/.artifacts/*')
+done < <(find . \
+  \( -type d \( -name target \
+      -o -path './deploy/ansible/.venv' \
+      -o -path './deploy/ansible/.artifacts' \) -prune \) \
+  -o \( -name '*.rs' -print \))
 
 while IFS= read -r dir; do
   count=$(find "$dir" -maxdepth 1 -mindepth 1 \
@@ -50,33 +73,37 @@ while IFS= read -r dir; do
     echo "FAIL: $dir has $count entries (max $MAX_ENTRIES) — group into a sub-dir." >&2
     fail=1
   fi
-done < <(find . -mindepth 1 -type d \
-  -not -path './target/*' -not -path '*/target/*' \
-  -not -path './.git' -not -path './.git/*' \
-  -not -path './crates' \
-  -not -path './.context-pilot' -not -path './.context-pilot/*' \
-  -not -path './website/*' \
-  -not -path './docs' -not -path './docs/*' \
-  -not -path './brilliant-cv/*' -not -path './graceful-genetics/*' \
-  -not -path './test-typst/*' \
-  -not -path './.github/workflows' -not -path './.github/checks' \
-  -not -path './yamls/tools' \
-  -not -path './jobs' -not -path './jobs/*' \
-  -not -path './benchmarks/terminal-bench/jobs' -not -path './benchmarks/terminal-bench/jobs/*' \
-  -not -path './ui' -not -path './ui/*' \
-  -not -path './web' -not -path './web/*' \
-  -not -path './.uploads' -not -path './.uploads/*' \
-  -not -path './oplog' -not -path './oplog/*' \
-  -not -path './logs' -not -path './logs/*' \
-  -not -path './dumps' -not -path './dumps/*' \
-  -not -path './sandbox' -not -path './sandbox/*' \
-  -not -path './tmp' -not -path './tmp/*' \
-  -not -path './gaia' -not -path './gaia/*' \
-  -not -path './deploy/ansible/.venv' -not -path './deploy/ansible/.venv/*' \
-  -not -path './deploy/ansible/.artifacts' -not -path './deploy/ansible/.artifacts/*' \
-  -not -path './deploy/ansible/out' -not -path './deploy/ansible/out/*' \
-  -not -path './test-results' -not -path './test-results/*' \
-  -not -path './report' -not -path './report/*')
+done < <(find . -mindepth 1 \
+  \( -type d \( \
+      -path './.git' \
+      -o -path './.context-pilot' \
+      -o -path './docs' \
+      -o -path './jobs' \
+      -o -path './benchmarks/terminal-bench/jobs' \
+      -o -path './ui' \
+      -o -path './web' \
+      -o -path './.uploads' \
+      -o -path './oplog' \
+      -o -path './logs' \
+      -o -path './dumps' \
+      -o -path './sandbox' \
+      -o -path './tmp' \
+      -o -path './gaia' \
+      -o -path './deploy/ansible/.venv' \
+      -o -path './deploy/ansible/.artifacts' \
+      -o -path './deploy/ansible/out' \
+      -o -path './test-results' \
+      -o -path './report' \) -prune \) \
+  -o \( -type d -name target -print -prune \) \
+  -o \( -type d \( \
+      -path './website' \
+      -o -path './brilliant-cv' \
+      -o -path './graceful-genetics' \
+      -o -path './test-typst' \) -print -prune \) \
+  -o \( -type d ! -path './crates' \
+      ! -path './.github/workflows' \
+      ! -path './.github/checks' \
+      ! -path './yamls/tools' -print \))
 
 # ── 1 + 2: web/src tree — ≤500 lines/file, ≤8 entries/dir ────────────────────
 # (former check-web-structure.sh). shadcn ui/ + generated OpenAPI client exempt.

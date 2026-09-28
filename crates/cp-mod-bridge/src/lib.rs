@@ -162,21 +162,6 @@ pub struct BridgeState {
     /// backstop. `None` until the first seed.
     pub last_behaviour: Option<String>,
 
-    /// Last self-identity emitted as an
-    /// [`IdentityChanged`](cp_wire::types::oplog::OpEntryKind::IdentityChanged)
-    /// delta, stored as a stable JSON fingerprint of the Agora module's ten
-    /// identity fields. The identity chokepoint (`emit_identity`) re-serialises
-    /// the live identity every tick and diffs it against this memo, emitting
-    /// only on an actual change (the same observe-on-change discipline as the
-    /// behaviour/focus/vitals chokepoints), so a change from *any* source (the
-    /// `Agora_set_identity` tool or the web agent-settings `SetIdentity`
-    /// command) reaches the frontend — which invalidates its identity query —
-    /// in milliseconds, not on the coarse `config.json` mtime backstop. A JSON
-    /// string (not the `SelfIdentity` struct) keeps this infra crate free of a
-    /// dependency on the domain `cp-agora` crate — the observer, which lives in
-    /// the agent binary, owns the serialisation. `None` until the first seed.
-    pub last_identity: Option<String>,
-
     /// Per-thread archived flag as last emitted/seeded, keyed by thread id.
     /// The archived chokepoint diffs each thread's live `archived` against this
     /// memo every tick and emits `ThreadArchived`/`ThreadRestored` only on an

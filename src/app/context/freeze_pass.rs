@@ -243,7 +243,7 @@ const DEFAULT_EMISSION_RANK: usize = 900;
 ///
 /// Types the user did not enumerate are slotted next to their natural sibling
 /// (`brave_result` by `firecrawl_result`, `entity_result` by `entities`,
-/// `library`/`skill` by `tools`, `agora` by `overview`); anything unknown falls
+/// `library`/`skill` by `tools`); anything unknown falls
 /// to [`DEFAULT_EMISSION_RANK`].
 fn emission_rank(context_type: &str) -> usize {
     match context_type {
@@ -264,7 +264,6 @@ fn emission_rank(context_type: &str) -> usize {
         "search_result" => 14,
         "todo" => 15,
         "overview" => 16,
-        "agora" => 17,
         "context_radar" => 18,
         "threads" => 19,
         "tree" => 20,

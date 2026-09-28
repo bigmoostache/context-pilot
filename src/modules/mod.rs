@@ -15,7 +15,6 @@ use crate::app::panels::Panel;
 use crate::infra::tools::{ToolDefinition, ToolResult, ToolUse};
 use crate::state::{Kind, State};
 
-pub(crate) use cp_agora::AgoraModule;
 pub(crate) use cp_mod_brave::BraveModule;
 pub(crate) use cp_mod_bridge::BridgeModule;
 pub(crate) use cp_mod_callback::CallbackModule;
@@ -118,7 +117,6 @@ pub(crate) fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(CallbackModule::new()),
         Box::new(TodoModule::new()),
         Box::new(MemoryModule::new()),
-        Box::new(AgoraModule::new()),
         Box::new(OcrModule::new()),
         Box::new(ScratchpadModule::new()),
         Box::new(ThreadsModule::new()),

@@ -198,6 +198,21 @@ pub(crate) fn login_complete(state: &Mutex<Backend>, body_bytes: &[u8]) -> HttpR
 
 // ── Refresh token ────────────────────────────────────────────────────
 
+/// On a failed refresh, adopt a freshly-rotated token the real `claude` CLI may
+/// have just written to disk.
+///
+/// The access and refresh tokens have independent lifetimes, so a failed
+/// refresh never justifies nuking the stored credential. Returns `Some(ok)` when
+/// disk now holds a non-empty, unexpired access token (adopt it silently);
+/// `None` to let the caller surface the original error.
+fn adopt_after_failed_refresh() -> Option<HttpReply> {
+    let adopted = read_credentials_json()?;
+    let token = adopted.get("accessToken").and_then(|v| v.as_str()).unwrap_or("");
+    let exp = adopted.get("expiresAt").and_then(serde_json::Value::as_i64).unwrap_or(0);
+    (!token.is_empty() && exp > cp_mod_utilities::time::now_epoch_ms())
+        .then(|| HttpReply::ok(&LoginCompleteResponse { status: "ok".to_owned(), expires_at: Some(exp) }))
+}
+
 /// `POST /api/claude-login/refresh` — refresh an expired access token.
 ///
 /// Reads the stored refresh token, exchanges it for a new access/refresh
@@ -235,18 +250,18 @@ pub(crate) fn refresh_login() -> HttpReply {
                 Err(e) => return HttpReply::error(502, &format!("invalid refresh JSON: {e}")),
             };
             if !status.is_success() {
+                // The refresh grant races the real `claude` CLI (shared Keychain
+                // item, single-use rotating refresh token). When our POST loses
+                // the race, the CLI has usually just written a fresh token to
+                // disk — adopt it instead of failing.
+                if let Some(reply) = adopt_after_failed_refresh() {
+                    return reply;
+                }
                 let msg = val
                     .get("error")
                     .and_then(|e| e.get("message"))
                     .and_then(|m| m.as_str())
                     .unwrap_or_else(|| val.get("error").and_then(|e| e.as_str()).unwrap_or("refresh failed"));
-                // A refresh failure (e.g. `invalid_grant`: the refresh token has
-                // rotated/expired) does NOT invalidate the current access token —
-                // the two lifetimes are independent, and the access token often has
-                // hours of runway left. So we DELIBERATELY leave the stored
-                // credentials in place: nuking them here would strand a still-valid
-                // session. Once the access token itself expires, `token_status`
-                // reports invalid and the login flow re-authenticates cleanly.
                 return HttpReply::error(502, &format!("{msg} (HTTP {status})"));
             }
 

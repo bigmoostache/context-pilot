@@ -19,13 +19,14 @@ pub(crate) fn build_config_overlay(state: &State) -> ConfigOverlay {
     use crate::llms::{LlmProvider, ModelInfo};
 
     // Providers
-    let provider_list: [(LlmProvider, &str, &str); 7] = [
+    let provider_list: [(LlmProvider, &str, &str); 8] = [
         (LlmProvider::Anthropic, "1", "Anthropic (API Key)"),
         (LlmProvider::ClaudeCodeApiKey, "6", "Claude Code (API Key)"),
         (LlmProvider::Grok, "3", "Grok (xAI)"),
         (LlmProvider::Groq, "4", "Groq"),
         (LlmProvider::DeepSeek, "5", "DeepSeek"),
         (LlmProvider::MiniMax, "7", "MiniMax (Token Plan)"),
+        (LlmProvider::OpenRouter, "2", "OpenRouter"),
         (LlmProvider::ClaudeCodeV2, "8", "Claude Code"),
     ];
 
@@ -69,6 +70,7 @@ pub(crate) fn build_config_overlay(state: &State) -> ConfigOverlay {
 
 /// Build model entries for the active provider.
 fn build_models(state: &State, model_entry: &ModelEntryFn) -> (String, Vec<ConfigModel>) {
+    use crate::llms::OpenRouterModel;
     use crate::llms::{AnthropicModel, DeepSeekModel, GrokModel, GroqModel, LlmProvider, MiniMaxModel};
 
     let title = "Model".to_owned();
@@ -105,6 +107,24 @@ fn build_models(state: &State, model_entry: &ModelEntryFn) -> (String, Vec<Confi
         LlmProvider::MiniMax => vec![
             model_entry(state.minimax_model == MiniMaxModel::M27, "a", &MiniMaxModel::M27),
             model_entry(state.minimax_model == MiniMaxModel::M27Highspeed, "b", &MiniMaxModel::M27Highspeed),
+        ],
+        LlmProvider::OpenRouter => vec![
+            model_entry(
+                state.openrouter_model == OpenRouterModel::SpaceBunnyAlpha,
+                "a",
+                &OpenRouterModel::SpaceBunnyAlpha,
+            ),
+            model_entry(state.openrouter_model == OpenRouterModel::Glm53Flash, "b", &OpenRouterModel::Glm53Flash),
+            model_entry(
+                state.openrouter_model == OpenRouterModel::Nemotron3Ultra,
+                "c",
+                &OpenRouterModel::Nemotron3Ultra,
+            ),
+            model_entry(
+                state.openrouter_model == OpenRouterModel::DeepSeekV41Flash,
+                "d",
+                &OpenRouterModel::DeepSeekV41Flash,
+            ),
         ],
         LlmProvider::ClaudeCodeV2 => build_v2_models(state, model_entry),
     };
