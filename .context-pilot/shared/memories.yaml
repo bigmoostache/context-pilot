@@ -490,9 +490,10 @@ M-short-37:
   last_edited_ms: 1790349217890
 M-short-38:
   tier: short
-  title: 'Context Pilot: Rust TUI'
-  importance: medium
-  last_edited_ms: 1787840964661
+  title: 'T759 boot stall: fetch'
+  contents: 'T759 ''Initializing modules (Search)'' boot stall: cause = round-trip COUNT, not latency (cp_*_files holds one doc per CHUNK, 298k, paged whole on the boot thread). Meili /documents/fetch ceiling measured live: 1k->0.09s, 5k->0.15s, 20k->0.43s, 100k->2.33s; `distinct` unsupported there, so the sweep CANNOT be collapsed server-side. Sequential 1k-pages=15.05s; parallel 20k x16=0.41s; compute_plan boot path=0.81s release. PR #205.'
+  importance: high
+  last_edited_ms: 1790584980485
 M-short-39:
   tier: short
   title: Harbor adapter
@@ -705,6 +706,24 @@ M-tiny-32:
   contents: 'find -prune shapes: bare X => descend; X + X/* => -prune; X/* only => -print -prune. Group''s first entry must not be -o.'
   importance: medium
   last_edited_ms: 1790582340866
+M-tiny-34:
+  tier: tiny
+  title: Never trust gate markers
+  contents: Verify gates by READING each gate's body, never a trailing `; echo MARKER`. `&&` short-circuits later commands but the `;` marker still prints — reads as false green. Same class as M-long-10.
+  importance: critical
+  last_edited_ms: 1790587533526
+M-tiny-35:
+  tier: tiny
+  title: 'Cargo: never parallelize'
+  contents: Run ONE cargo command at a time. Build-lock contention between parallel console_create + blocking callbacks shows as exit -1 timeouts. Self-inflicted, not a real failure.
+  importance: high
+  last_edited_ms: 1790587533537
+M-tiny-36:
+  tier: tiny
+  title: Let rustfmt shape code
+  contents: Let `cargo fmt` author line breaks. Hand-rolling rustfmt's shape re-creates the very fmt diff just shown.
+  importance: medium
+  last_edited_ms: 1790587533541
 M-tiny-4:
   tier: tiny
   title: 'T646 SHIPPED + FIXED:'
