@@ -132,9 +132,9 @@ M-mid-13:
   contents: |-
     T755 SHIPPED (30dc4c11): white-on-white dropdown hover fix. DropdownMenuItem base applies focus:**:text-accent-foreground to descendants; ROW_HILITE overrides via focus:**:text-foreground!/data-highlighted:**:text-foreground!.
 
-    T760 SHIPPED (t753-openrouter): agent Settings is a DIALOG again, not a view. T757's merged one-page body is KEPT inside it — only trigger + modality reverted. 'settings' dropped from ViewMode + cp-view Record; settingsView.tsx + tabs.ts deleted on BOTH trees (mirror parity is bidirectional).
+    T760 SHIPPED (t753-openrouter, PR #204): agent Settings is a DIALOG again, not a view. T757's merged one-page body is KEPT inside it — only trigger + modality reverted. 'settings' dropped from ViewMode + cp-view Record; settingsView.tsx + tabs.ts deleted on BOTH trees (mirror parity bidirectional).
   importance: high
-  last_edited_ms: 1790581016649
+  last_edited_ms: 1790581108794
 M-mid-14:
   tier: mid
   title: FEATURE COMPLETION
