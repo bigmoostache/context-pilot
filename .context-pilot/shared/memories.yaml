@@ -491,9 +491,9 @@ M-short-37:
 M-short-38:
   tier: short
   title: 'T759 boot stall: fetch'
-  contents: 'T759 ''Initializing modules (Search)'' boot stall: cause = round-trip COUNT, not latency (cp_*_files holds one doc per CHUNK, 298k, paged whole on the boot thread). Meili /documents/fetch ceiling measured live: 1k->0.09s, 5k->0.15s, 20k->0.43s, 100k->2.33s; `distinct` unsupported there, so the sweep CANNOT be collapsed server-side. Sequential 1k-pages=15.05s; parallel 20k x16=0.41s; compute_plan boot path=0.81s release. PR #205.'
+  contents: 'T759 boot stall: cause = round-trip COUNT not latency (cp_*_files = 1 doc/CHUNK, 298k, paged on boot thread). 299 seq 1k-pages=15.05s; 15 seq 20k=6.71s (page size alone = only 2.2x); 16-way parallel 20k=0.41s (fan-out = other 16x). `distinct` unsupported on /documents/fetch, so the sweep CANNOT be collapsed server-side. Fix meili/tasks.rs aa433806, PR #205.'
   importance: high
-  last_edited_ms: 1790584980485
+  last_edited_ms: 1790587638193
 M-short-39:
   tier: short
   title: Harbor adapter
