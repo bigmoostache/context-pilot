@@ -421,10 +421,10 @@ M-short-27:
   last_edited_ms: 1787840964652
 M-short-28:
   tier: short
-  title: Structure check too slow
-  contents: 'structure-web/rust always TIMES OUT the 30s callback budget on a GREEN tree — check-structure.sh takes 38-67s. Not a breach (exit 0, max file 482, chain 98). Cause = fork-per-file: 873 wc + 186 find forks (2 Rust finds = 24s+22s; web ~0s). Both files hash-locked → chain.sh --update + user OK. Re-verified 2026-09-28 (34s, exit 0).'
+  title: 'Structure: prune perf'
+  contents: 'Structure check was SLOW not failing: 34-67s vs 30s CB5/CB6 budget, TIMED OUT on a green tree. Cause = `-not -path` filters OUTPUT while find still crawls (target/=490k). Fixed via -prune → 9-12s exit 0; residual ~10s is forks. Perf change to a CHECK must stay output-identical: extract find from the SHIPPED file, never a copy.'
   importance: high
-  last_edited_ms: 1790581012981
+  last_edited_ms: 1790582345021
 M-short-29:
   tier: short
   title: Thinking blocks echoed as
@@ -699,6 +699,12 @@ M-tiny-31:
   contents: Close_panel KILLS its console's backing process (143). Never close the panel hosting the :5174 vite dev server — tailscale serve proxies it.
   importance: high
   last_edited_ms: 1790352833364
+M-tiny-32:
+  tier: tiny
+  title: 'find -prune: 3 shapes'
+  contents: 'find -prune shapes: bare X => descend; X + X/* => -prune; X/* only => -print -prune. Group''s first entry must not be -o.'
+  importance: medium
+  last_edited_ms: 1790582340866
 M-tiny-4:
   tier: tiny
   title: 'T646 SHIPPED + FIXED:'

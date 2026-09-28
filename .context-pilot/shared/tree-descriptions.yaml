@@ -20234,6 +20234,10 @@ c72f7d4d91c7db55:
   path: yamls/tools/core.yaml
   description: 'Core tools YAML: Close_panel, system_reload, tool_manage, panel_goto_page, module_toggle, Think (now with recursive todo upsert param), todo_mark (batch status flips, focused-thread only).'
   last_edited_ms: 0
+c72f7fabb7060250:
+  path: .github/checks/check-structure.sh
+  description: 'STRUCTURE family guard: file lengths ≤500, dir entries ≤8 (Rust + web/src), hash-chain verify. mobile-components/ui exempt from folder cap. Dual-mode CI/callback. The two Rust sweeps use `-prune`, NOT `-not -path`: the latter filters only what find PRINTS while still crawling every excluded tree (target/=490k, .context-pilot=255k, node_modules=89k). Rewrite took it 34-67s → 9-12s, so the 30s CB5/CB6 callbacks no longer time out on a green tree. Residual ~10s is fork-per-file (~1060 wc/find), the next lever if 30s is ever threatened. The exclusion list is deliberately NON-uniform and each shape gets its own verb — bare X => descend, X+X/* => -prune, X/* only => -print -prune; flattening them drops dirs from the count.'
+  last_edited_ms: 1790582350334
 c7372ec4aab83bc9:
   path: crates/cp-mod-memory/src/lib.rs
   description: 'Memory module. 2 tools: memory_create/update. Fixed MEMORY panel. Global, not core. 80-token tl_dr cap. Module data: memories + next_id + open_ids. Importance-gradient visualizer (critical→low).'
