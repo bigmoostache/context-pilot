@@ -5,7 +5,7 @@ import { StatusBar } from "@/components/shell/StatusBar"
 import { ThreadsView } from "@/components/threads/ThreadsView"
 import { FleetDashboard } from "@/components/agents/FleetDashboard"
 import { SettingsView } from "@/components/agents/AgentModal/settingsView"
-import type { TabId } from "@/components/agents/AgentModal/tabs"
+
 import { Finder } from "@/components/finder/Finder"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { AuthGuard } from "@/components/auth/AuthGuard"
@@ -54,52 +54,44 @@ function Root() {
 }
 
 /** The navigation atoms browser Back / Next restore (T636). One degree finer
- *  than view+agent: the accessed THREAD (threads view) and settings CATEGORY
- *  (settings view) ride along, so Back steps through the pages actually visited.
+ *  than view+agent: the accessed THREAD (threads view) rides along, so Back
+ *  steps through the pages actually visited.
  *  Coarser below that (finder tab/split stays in localStorage; rail toggles are
- *  never entries). `threadId`/`settingsTab` are optional — only the field
- *  relevant to `view` is recorded, and an entry lacking them decodes fine. */
+ *  never entries). `threadId` is optional — only the field relevant to
+ *  `view` is recorded, and an entry lacking it decodes fine. */
 interface NavState {
   view: ViewMode
   agentId: string
   threadId?: string | undefined
-  settingsTab?: TabId | undefined
 }
 
 /** Narrow the `any`-typed `history.state` / `PopStateEvent.state` down to a
  *  {@link NavState}, containing the `any` at this one boundary so no unsafe
  *  access leaks into the hook. A shape that isn't ours (a foreign history entry,
- *  or none) yields undefined. `view`/`settingsTab` are asserted after the string
- *  check — an unknown value just falls through the view router's fleet fallback
- *  or the settings default, so neither needs an exhaustive membership test. */
+ *  or none) yields undefined. `view` is asserted after the string check — an
+ *  unknown value just falls through the view router's fleet fallback, so it
+ *  needs no exhaustive membership test. */
 function readNav(state: unknown): NavState | undefined {
   if (typeof state !== "object" || state === null) return undefined
   const nav: unknown = (state as { nav?: unknown }).nav
   if (typeof nav !== "object" || nav === null) return undefined
-  const { view, agentId, threadId, settingsTab } = nav as {
+  const { view, agentId, threadId } = nav as {
     view?: unknown
     agentId?: unknown
     threadId?: unknown
-    settingsTab?: unknown
   }
   if (typeof view !== "string" || typeof agentId !== "string") return undefined
   return {
     view: view as ViewMode,
     agentId,
     threadId: typeof threadId === "string" ? threadId : undefined,
-    settingsTab: typeof settingsTab === "string" ? (settingsTab as TabId) : undefined,
   }
 }
 
 /** Whether two nav entries point at the same surface — the dedupe test that
  *  keeps a redundant push (which would make one Back a no-op) off the stack. */
 function sameNav(a: NavState, b: NavState): boolean {
-  return (
-    a.view === b.view &&
-    a.agentId === b.agentId &&
-    a.threadId === b.threadId &&
-    a.settingsTab === b.settingsTab
-  )
+  return a.view === b.view && a.agentId === b.agentId && a.threadId === b.threadId
 }
 
 /** localStorage key holding an agent's last-selected thread. Module-scoped (no
@@ -108,7 +100,7 @@ function sameNav(a: NavState, b: NavState): boolean {
 const threadKeyFor = (id: string) => `cp-thread-${id}`
 
 /**
- * Wire browser Back / Next to the (view, agent, thread, settings-tab) tuple via
+ * Wire browser Back / Next to the (view, agent, thread) tuple via
  * the History API directly — the app has no router and needs none here.
  *
  * Three effects: (1) PUSH on change — each tuple change pushes a state-only
@@ -127,11 +119,10 @@ function useNavHistory(
     view: ViewMode
     agentId: string
     threadId: string | undefined
-    settingsTab: TabId | undefined
   },
   apply: (s: NavState) => void,
 ) {
-  const { view, agentId, threadId, settingsTab } = current
+  const { view, agentId, threadId } = current
   const applyingRef = useRef(false)
   const bootRef = useRef(false)
 
@@ -143,13 +134,13 @@ function useNavHistory(
       return
     }
     // Record only the atom relevant to the current view: a threads entry
-    // carries its thread, a settings entry its category, and neither leaks a
-    // stale value into the other's entries (which would break dedupe + restore).
+    // carries its thread and every other view carries none, so a stale thread
+    // never leaks into a settings/finder entry (which would break both the
+    // dedupe test and the restore).
     const nav: NavState = {
       view,
       agentId,
       ...(view === "threads" && threadId && { threadId }),
-      ...(view === "settings" && { settingsTab }),
     }
     if (!bootRef.current) {
       // Seed the current location as the base entry rather than pushing a
@@ -161,7 +152,7 @@ function useNavHistory(
     const cur = readNav(history.state)
     if (cur && sameNav(cur, nav)) return
     history.pushState({ nav }, "")
-  }, [view, agentId, threadId, settingsTab])
+  }, [view, agentId, threadId])
 
   useEffect(() => {
     const onPop = (e: PopStateEvent) => {
@@ -196,9 +187,6 @@ interface ShellViewsProps {
   onNewOpenChange: (v: boolean) => void
   threadSearchOpen: boolean
   onSearchOpenChange: (v: boolean) => void
-  settingsRailOpen: boolean
-  settingsTab: TabId
-  onSettingsTab: (t: TabId) => void
   finderRailOpen: boolean
   finderRevealPath: string | null
   onRevealConsumed: () => void
@@ -224,9 +212,6 @@ function ShellViews(p: ShellViewsProps) {
       <SettingsView
         key={p.activeAgent.id}
         agent={p.activeAgent}
-        railOpen={p.settingsRailOpen}
-        tab={p.settingsTab}
-        onTab={p.onSettingsTab}
         disconnected={p.disconnected}
         onReconnect={p.onReconnect}
       />
@@ -277,8 +262,8 @@ function AppShell() {
   })
   const [activeAgentId, setActiveAgentId] = useState(() => localStorage.getItem("cp-agent") ?? "")
 
-  // The accessed THREAD and settings CATEGORY — one degree finer than view+agent
-  // — are OWNED HERE so browser Back/Next can step through them (T636). The
+  // The accessed THREAD — one degree finer than view+agent — is OWNED HERE so
+  // browser Back/Next can step through it (T636). The
   // thread selection used to live inside ThreadsView's useThreadSelection; it is
   // lifted so a history entry can carry it and a popstate can restore it. Thread
   // selection stays persisted per agent under the SAME `cp-thread-<id>` key the
@@ -287,7 +272,6 @@ function AppShell() {
   const [selectedThreadId, setSelectedThreadId] = useState(
     () => localStorage.getItem(threadKeyFor(activeAgentId)) ?? "",
   )
-  const [settingsTab, setSettingsTab] = useState<TabId>("llm")
 
   // Persist the selected thread per agent (single writer — see above).
   useEffect(() => {
@@ -356,15 +340,9 @@ function AppShell() {
   // per-agent state. Not persisted to localStorage.
   const [threadsRailOpen, setThreadsRailOpen] = useState(true)
 
-  // The settings view's category rail — a SEPARATE flag from the threads rail
-  // (collapsing one panel must never silently collapse another the user can't
-  // see). Owned here because its toggle is the header rail's Settings tab, a
-  // sibling of the view, not a descendant.
-  const [settingsRailOpen, setSettingsRailOpen] = useState(true)
-
   // The finder view's explorer rail — its OWN flag, same reasoning as above.
   // Re-clicking the Finder tab while finder is active flips it (the activity-bar
-  // idiom the Threads and Settings tabs already use).
+  // idiom the Threads tab already uses).
   const [finderRailOpen, setFinderRailOpen] = useState(true)
 
   // The two thread-list ACTIONS, hoisted for the same reason as the rail above:
@@ -385,26 +363,23 @@ function AppShell() {
     setView("finder")
   }, [])
 
-  // Browser Back / Next restore the (view, agent, thread, settings-category)
-  // tuple (T636). Declared after `effectiveView` so the entry we record is the
-  // surface the user actually sees (the gated one), not the raw pre-gate `view`.
-  // `applyNav` sets the raw atoms; for the finer fields it falls back to the
-  // agent's persisted thread (a settings/finder entry carries no threadId) and
-  // keeps the current settings tab (a threads entry carries no settingsTab), so
-  // a restore never blanks a field the entry simply didn't record. Setters are
-  // stable, so the callback never changes identity.
+  // Browser Back / Next restore the (view, agent, thread) tuple (T636).
+  // Declared after `effectiveView` so the entry we record is the surface the
+  // user actually sees (the gated one), not the raw pre-gate `view`. `applyNav`
+  // sets the raw atoms and falls back to the agent's persisted thread (a
+  // settings/finder entry carries no threadId), so a restore never blanks a
+  // field the entry simply didn't record. Setters are stable, so the callback
+  // never changes identity.
   const applyNav = useCallback((s: NavState) => {
     setView(s.view)
     setActiveAgentId(s.agentId)
     setSelectedThreadId(s.threadId ?? localStorage.getItem(threadKeyFor(s.agentId)) ?? "")
-    if (s.settingsTab) setSettingsTab(s.settingsTab)
   }, [])
   useNavHistory(
     {
       view: effectiveView,
       agentId: activeAgentId,
       threadId: selectedThreadId || undefined,
-      settingsTab,
     },
     applyNav,
   )
@@ -441,8 +416,6 @@ function AppShell() {
           onToggleThreadsRail={() => setThreadsRailOpen((o) => !o)}
           onNewThread={() => setNewThreadOpen(true)}
           onSearchThreads={() => setThreadSearchOpen(true)}
-          settingsRailOpen={settingsRailOpen}
-          onToggleSettingsRail={() => setSettingsRailOpen((o) => !o)}
           finderRailOpen={finderRailOpen}
           onToggleFinderRail={() => setFinderRailOpen((o) => !o)}
         />
@@ -467,9 +440,6 @@ function AppShell() {
               onNewOpenChange={setNewThreadOpen}
               threadSearchOpen={threadSearchOpen}
               onSearchOpenChange={setThreadSearchOpen}
-              settingsRailOpen={settingsRailOpen}
-              settingsTab={settingsTab}
-              onSettingsTab={setSettingsTab}
               finderRailOpen={finderRailOpen}
               finderRevealPath={finderRevealPath}
               onRevealConsumed={() => setFinderRevealPath(null)}

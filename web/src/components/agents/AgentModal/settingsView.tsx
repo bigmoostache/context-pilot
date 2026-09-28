@@ -3,54 +3,42 @@ import { Loader2, Power, RefreshCw } from "lucide-react"
 import { usePickerProviders } from "@/lib/support/models"
 import { useAuth } from "@/lib/providers/auth"
 import type { Agent } from "@/lib/types"
-import { cn } from "@/lib/utils"
 import { useSelectionState } from "./controller"
 import { useAgentModalActions } from "./actions"
 import type { Controller } from "./parts"
 import { LlmTab, VitalsTab } from "./manageBody"
-import { TABS, type TabId } from "./tabs"
-import { useLoopNav } from "@/lib/support/a11y"
-import { HintBadge } from "@/components/shell/chrome/HintBadge"
 
 /**
  * Agent configuration as a VIEW — the third surface in the header rail, beside
  * Threads and Finder.
  *
  * This replaces the manage DIALOG that used to open from the workspace
- * switcher's "Manage agent" row. The three categories it offers (Identity ·
- * Model · Vitals) are the same three panes the dialog showed, imported from
- * {@link TABS} rather than restated, so the two surfaces can never drift into
- * offering different categories.
+ * switcher's "Manage agent" row. The two sections it offers (Model · Vitals)
+ * are the same {@link LlmTab}/{@link VitalsTab} bodies the dialog shows,
+ * imported rather than restated, so the two surfaces can never drift.
  *
  * WHY THE DIALOG STILL EXISTS. `AgentModal` is not dead: the fleet dashboard
  * uses it for agent CREATION (there is no agent yet, so there is no settings
  * view to route to) and for the per-card gear at fleet altitude (where no agent
  * is focused). This view owns the focused-agent path only.
  *
- * DELIBERATELY A COPY OF ThreadsView'S SHAPE, not an abstraction over it. The
- * rail geometry, the collapse animation and the disconnect overlay are repeated
- * here rather than lifted into a shared shell: the two views agree today by
+ * ONE SCROLLING PAGE, NO CATEGORY RAIL. The two sections are adjacent, not
+ * routed: an agent's model and its service health are one object seen two ways,
+ * and a rail made the user pay a click to check whether anything moved. The
+ * header rail's Settings tab therefore lost its re-click-to-collapse behaviour
+ * (T617's activity-bar idiom) — it navigates, and that is all it does now.
+ *
+ * The pane bodies are still a deliberate copy of ThreadsView's SHAPE rather
+ * than an abstraction over it, as noted above: the two views agree today by
  * intent, and a premature `<RailView>` wrapper would make every future tweak to
- * one of them a negotiation with the other. The duplication is three short
- * blocks and is called out at each site.
+ * one of them a negotiation with the other.
  */
 export function SettingsView({
   agent,
-  railOpen,
-  tab,
-  onTab,
   disconnected,
   onReconnect,
 }: {
   agent: Agent
-  /** Whether the category rail is shown. Owned by the shell (Root.tsx), not
-   *  here: the only control that toggles it is the header rail's Settings tab,
-   *  which is a SIBLING of this view rather than a descendant. */
-  railOpen: boolean
-  /** Selected category — CONTROLLED by the shell (Root.tsx) so browser Back/Next
-   *  can step through the settings pages visited (T636). */
-  tab: TabId
-  onTab: (t: TabId) => void
   disconnected?: boolean
   onReconnect?: () => void
 }) {
@@ -73,19 +61,22 @@ export function SettingsView({
         />
       )}
 
-      {/* Same collapse mechanism as the threads rail: the panel stays mounted
-          and slides out on an animated negative left-margin, which is what
-          actually RECLAIMS the layout width (a transform would leave the gap
-          behind). The wrapper must be `flex` — a plain block collapses the
-          aside to content height instead of letting it stretch. */}
-      <div
-        className="flex shrink-0 transition-[margin-left] duration-300 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none"
-        style={{ marginLeft: railOpen ? 0 : "calc(-1 * var(--sidebar-w))" }}
-      >
-        <CategoryRail tab={tab} onSelect={onTab} />
+      {/* Same shell ThreadsView uses: a single measured, self-centering column
+          (`max-w-[820px]`) that owns the scroll, so a long vitals board does
+          not stretch the form fields above it. */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+        <div className="mx-auto flex min-h-0 w-full max-w-[820px] flex-1 flex-col overflow-y-auto">
+          <LlmTab c={c} />
+          {/* Inset to the content gutter: the two sections each carry their own
+              `px-6`, so a full-bleed rule would hang past the fields. A plain
+              hairline, not a titled section break: {@link VitalsTab} leads with
+              SessionVitals' OWN "Service vitals" heading, and a second label
+              above it would read as two headings for one board. */}
+          <div className="mx-6 border-t border-border/50" />
+          <VitalsTab c={c} agentId={agent.id} />
+          <FooterBar c={c} />
+        </div>
       </div>
-
-      <SettingsPane c={c} tab={tab} agentId={agent.id} />
     </div>
   )
 }
@@ -93,10 +84,10 @@ export function SettingsView({
 /**
  * Assemble the shared {@link Controller} for a focused agent.
  *
- * The same three pieces `AgentModal` wires together — the provider/model
- * selection, the mutation surface, and the live name draft — minus everything
- * that only means something inside a dialog (create mode, `onClose`, the toast
- * sink). Built here rather than exported from `index.tsx` because `actions.ts`
+ * The same pieces `AgentModal` wires together — the provider/model selection,
+ * the mutation surface, and the live name draft — minus everything that only
+ * means something inside a dialog (create mode, `onClose`, the toast sink).
+ * Built here rather than exported from `index.tsx` because `actions.ts`
  * already imports `controller.ts`, so a shared assembly in either of those
  * files would close an import cycle.
  */
@@ -120,7 +111,7 @@ function useAgentController(agent: Agent): Controller {
     },
     // No toast sink: the fleet dashboard has one because a retire happens
     // while looking at the card that vanishes. Here the failure surfaces in
-    // the save bar, next to the button that caused it.
+    // the footer, next to the button that caused it.
     onFlash: undefined,
   })
 
@@ -143,128 +134,24 @@ function useAgentController(agent: Agent): Controller {
 }
 
 /**
- * The category rail — Identity · Model · Vitals.
+ * The one footer the merged page keeps: the dialog's lifecycle pair plus the
+ * save affordance, in a single row.
  *
- * Styled as a deliberate twin of the thread list's rail (same `--sidebar-w`,
- * same `card-shadow my-2` panel with no horizontal margin, same row treatment:
- * `rounded-lg px-2.5 py-1.5`, selected on `card-shadow bg-card`, otherwise a
- * hover lift). Uniformity is the point of the ask — a second settings-specific
- * rail vocabulary would make the app feel like two apps.
- */
-function CategoryRail({ tab, onSelect }: { tab: TabId; onSelect: (t: TabId) => void }) {
-  // ⌘/Ctrl+Up/Down loop through the categories (T634), same as the thread list.
-  // TABS is the on-screen order; the hook wraps and reports the two rows to
-  // badge while the modifier is held.
-  const orderedIds = TABS.map((t) => t.id)
-  const { modHeld, prevId, nextId } = useLoopNav(orderedIds, tab, (id) => onSelect(id as TabId))
-  const navHintOf = (id: string): "up" | "down" | undefined =>
-    id === prevId ? "up" : id === nextId ? "down" : undefined
-  return (
-    <aside className="card-shadow my-2 flex w-(--sidebar-w) shrink-0 flex-col overflow-hidden rounded-none border border-border bg-surface-2">
-      <div
-        className="flex h-full flex-col"
-        style={{ width: "var(--sidebar-w)", minWidth: "var(--sidebar-w)" }}
-      >
-        <div className="p-2">
-          {TABS.map((t) => {
-            const on = t.id === tab
-            const navHint = navHintOf(t.id)
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => onSelect(t.id)}
-                className={cn(
-                  "group relative mb-0.5 flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left transition-colors",
-                  on ? "card-shadow bg-card" : "hover:card-shadow hover:bg-card",
-                )}
-              >
-                {navHint && (
-                  <HintBadge label={navHint === "up" ? "↑" : "↓"} shown={modHeld} side="left" />
-                )}
-                <span
-                  className={cn(
-                    "flex size-6 shrink-0 items-center justify-center rounded-md transition-colors",
-                    on ? "bg-(--interactive)/15 text-(--interactive)" : "text-muted-foreground/70",
-                  )}
-                >
-                  <t.icon className="size-[15px]" />
-                </span>
-                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span
-                    className={cn(
-                      "truncate text-[13px]",
-                      on ? "font-medium text-foreground" : "text-foreground/85",
-                    )}
-                  >
-                    {t.label}
-                  </span>
-                  {/* The blurb is the rail's answer to the thread row's preview
-                      line: it says what the row leads to before it is clicked. */}
-                  <span className="truncate text-[11.5px] text-muted-foreground/70">{t.blurb}</span>
-                </span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-    </aside>
-  )
-}
-
-/** The detail pane — the selected category, plus the save/lifecycle bar the
- *  dialog used to carry in its footer. */
-function SettingsPane({ c, tab, agentId }: { c: Controller; tab: TabId; agentId: string }) {
-  return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
-      <div className="mx-auto flex min-h-0 w-full max-w-[820px] flex-1 flex-col overflow-y-auto">
-        {tab === "llm" && (
-          <>
-            <LlmTab c={c} />
-            <SaveBar c={c} />
-          </>
-        )}
-        {tab === "vitals" && (
-          <>
-            <VitalsTab c={c} agentId={agentId} />
-            <LifecycleBar c={c} />
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
-/**
- * Save bar for the Model pane.
+ * The form fields above were committed by the dialog's footer button; a view
+ * has no footer, so that affordance had to move somewhere the user cannot
+ * scroll past. It lands here, at the end of the scroll, with the danger and
+ * lifecycle actions grouped opposite it.
  *
- * In the dialog these fields were persisted by the modal FOOTER's button. A
- * view has no footer, and an unsaved rename that vanishes when the user clicks
- * another category is a data-loss bug, so the affordance moves next to the
- * fields it commits. Mirrors the Identity pane's own sticky bar exactly.
+ * GROUPING. Retire and Restart both act on the AGENT (kill, respawn) and are
+ * styled as the quieter pair on the left; Save commits the FORM and keeps the
+ * accent, alone on the right. A save button sharing a right edge with two
+ * other buttons reads as one button group; pushing it clear of them is what
+ * makes "this is the commit" legible.
  */
-function SaveBar({ c }: { c: Controller }) {
-  return (
-    <div className="flex items-center gap-3 px-6 py-3">
-      {c.error && <span className="text-[11px] text-(--danger)">{c.error}</span>}
-      <button
-        type="button"
-        onClick={c.submit}
-        disabled={!c.canSubmit}
-        className="ml-auto flex items-center gap-1.5 rounded-md bg-(--signal) px-3.5 py-1.5 text-[12.5px] font-medium text-(--primary-foreground) transition-[filter] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {c.pending && <Loader2 className="size-3.5 animate-spin" />}
-        {c.saving ? "Saving…" : "Save changes"}
-      </button>
-    </div>
-  )
-}
-
-/** Restart / Retire, beside the vitals they act on — the other half of the
- *  dialog footer. Retire is destructive and keeps its danger colouring. */
-function LifecycleBar({ c }: { c: Controller }) {
+function FooterBar({ c }: { c: Controller }) {
   return (
     <div className="flex items-center gap-2 px-6 py-3">
+      {c.error && <span className="mr-2 text-[11px] text-(--danger)">{c.error}</span>}
       <button
         type="button"
         onClick={c.retire}
@@ -282,7 +169,7 @@ function LifecycleBar({ c }: { c: Controller }) {
         type="button"
         onClick={c.restart}
         disabled={c.restartBusy}
-        className="ml-auto flex items-center gap-1.5 rounded-md border border-(--border-strong) px-3 py-1.5 text-[12.5px] font-medium text-foreground/85 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex items-center gap-1.5 rounded-md border border-(--border-strong) px-3 py-1.5 text-[12.5px] font-medium text-foreground/85 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
       >
         {c.restartBusy ? (
           <Loader2 className="size-3.5 animate-spin" />
@@ -290,6 +177,15 @@ function LifecycleBar({ c }: { c: Controller }) {
           <RefreshCw className="size-3.5" />
         )}
         {c.restartBusy ? "Restarting…" : "Restart"}
+      </button>
+      <button
+        type="button"
+        onClick={c.submit}
+        disabled={!c.canSubmit}
+        className="ml-auto flex items-center gap-1.5 rounded-md bg-(--signal) px-3.5 py-1.5 text-[12.5px] font-medium text-(--primary-foreground) transition-[filter] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {c.pending && <Loader2 className="size-3.5 animate-spin" />}
+        {c.saving ? "Saving…" : "Save changes"}
       </button>
     </div>
   )

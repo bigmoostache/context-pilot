@@ -4,21 +4,22 @@ import { BadgeCheck, Cpu } from "lucide-react"
 export type TabId = "llm" | "vitals"
 
 /**
- * The three panes, in canonical order.
+ * The two panes, in canonical order.
  *
  * ITS OWN MODULE, and not a const beside the panes it labels, for one hard
  * reason: `manageBody.tsx` exports components, and a file that exports both
  * components and values breaks React Fast Refresh (react-refresh
- * only-export-components, an error here). Two surfaces consume this list — the
- * manage DIALOG's rail and the settings VIEW's rail — and they must offer the
- * same three categories in the same order, so a second hand-kept copy is
- * exactly how they would drift apart.
+ * only-export-components, an error here). The manage DIALOG's rail reads this
+ * list, so it and the settings VIEW's two sections can never offer different
+ * categories.
  *
- * `blurb` is used only by the view, whose rail rows are two-line (mirroring a
- * thread row's title + preview). The dialog's narrower rail shows the label
- * alone.
+ * The `blurb` these rows once carried is GONE (T757). It existed for the
+ * settings view's two-line rail rows and had no reader once that rail went:
+ * the view renders both panes on one scrolling page, and {@link VitalsTab}
+ * leads with SessionVitals' own "Service vitals" heading, so a second label
+ * above it would read as two headings for one board.
  */
-export const TABS: { id: TabId; label: string; icon: typeof Cpu; blurb: string }[] = [
-  { id: "llm", label: "Model", icon: Cpu, blurb: "Name, realm, provider and model" },
-  { id: "vitals", label: "Vitals", icon: BadgeCheck, blurb: "Service health and lifecycle" },
+export const TABS: { id: TabId; label: string; icon: typeof Cpu }[] = [
+  { id: "llm", label: "Model", icon: Cpu },
+  { id: "vitals", label: "Vitals", icon: BadgeCheck },
 ]

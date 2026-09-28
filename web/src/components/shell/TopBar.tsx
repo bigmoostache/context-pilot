@@ -38,12 +38,6 @@ interface TopBarProps {
   onNewThread: () => void
   /** Open the thread search palette. Same gating as {@link onNewThread}. */
   onSearchThreads: () => void
-  /** Whether the settings view's category rail is open — drives the Settings
-   *  tab's `aria-expanded` and its tooltip wording while that view is active. */
-  settingsRailOpen: boolean
-  /** Collapse ↔ expand the settings category rail. Fired by clicking the
-   *  Settings tab when settings is ALREADY the active view. */
-  onToggleSettingsRail: () => void
   /** Whether the finder view's explorer rail is open — drives the Finder tab's
    *  `aria-expanded` and its tooltip wording while that view is active. */
   finderRailOpen: boolean
@@ -65,8 +59,6 @@ export function TopBar({
   onToggleThreadsRail,
   onNewThread,
   onSearchThreads,
-  settingsRailOpen,
-  onToggleSettingsRail,
   finderRailOpen,
   onToggleFinderRail,
 }: TopBarProps) {
@@ -126,8 +118,6 @@ export function TopBar({
             devMode={devMode}
             threadsRailOpen={threadsRailOpen}
             onToggleThreadsRail={onToggleThreadsRail}
-            settingsRailOpen={settingsRailOpen}
-            onToggleSettingsRail={onToggleSettingsRail}
             finderRailOpen={finderRailOpen}
             onToggleFinderRail={onToggleFinderRail}
           />
@@ -341,7 +331,6 @@ function useViewShortcuts(a: {
   onViewChange: (v: ViewMode) => void
   onToggleThreadsRail: () => void
   onToggleFinderRail: () => void
-  onToggleSettingsRail: () => void
 }): {
   modHeld: boolean
   threadsClick: () => void
@@ -351,8 +340,10 @@ function useViewShortcuts(a: {
   const threadsClick =
     a.view === "threads" ? a.onToggleThreadsRail : () => a.onViewChange("threads")
   const finderClick = a.view === "finder" ? a.onToggleFinderRail : () => a.onViewChange("finder")
-  const settingsClick =
-    a.view === "settings" ? a.onToggleSettingsRail : () => a.onViewChange("settings")
+  // Settings only NAVIGATES. It has no rail to collapse any more: its two
+  // sections became one scrolling page (T757), so there is no disclosure left
+  // to toggle and claiming one would make ⌘I a no-op inside the view.
+  const settingsClick = () => a.onViewChange("settings")
 
   const modHeld = useModifierShortcuts({ l: threadsClick, k: finderClick, i: settingsClick })
 
@@ -376,8 +367,6 @@ function ViewTabs({
   devMode,
   threadsRailOpen,
   onToggleThreadsRail,
-  settingsRailOpen,
-  onToggleSettingsRail,
   finderRailOpen,
   onToggleFinderRail,
 }: {
@@ -386,8 +375,6 @@ function ViewTabs({
   devMode: boolean
   threadsRailOpen: boolean
   onToggleThreadsRail: () => void
-  settingsRailOpen: boolean
-  onToggleSettingsRail: () => void
   finderRailOpen: boolean
   onToggleFinderRail: () => void
 }) {
@@ -397,13 +384,13 @@ function ViewTabs({
 
   // ⌘/Ctrl shortcuts (L Threads · K Finder · I Settings) share ONE handler each
   // with the tab click — the hook builds them, so a shortcut and a click are
-  // the same action. All three stay bound on their own view (toggle the rail).
+  // the same action. Threads and Finder stay bound on their own view (toggle
+  // the rail); Settings is navigation-only.
   const { modHeld, threadsClick, finderClick, settingsClick } = useViewShortcuts({
     view,
     onViewChange,
     onToggleThreadsRail,
     onToggleFinderRail,
-    onToggleSettingsRail,
   })
 
   return (
@@ -472,25 +459,20 @@ function ViewTabs({
       )}
       {/* LAST in the group, deliberately: this is the agent's configuration,
           reached once — not a surface the user lives in like Threads or
-          Finder. Same dual-purpose click as the Threads tab above, so the
-          two behave identically and the idiom only has to be learnt once. */}
+          Finder. Navigation-ONLY, unlike its siblings: the view has no rail
+          to collapse (T757), so re-clicking the tab has nothing to toggle. */}
       <Tip
         title="Settings"
-        body={
-          onSettings
-            ? `Click again to ${settingsRailOpen ? "hide" : "show"} the category list.`
-            : "Configure this agent — its identity, its model, and its service vitals."
-        }
+        body="Configure this agent — its model and its service vitals, on one page."
         side="right"
       >
         <ViewTab
           active={onSettings}
           onClick={settingsClick}
-          expanded={onSettings ? settingsRailOpen : undefined}
           icon={SlidersHorizontal}
           label="Settings"
-          // I navigates to Settings, or toggles the category rail once here
-          // (⌘S is the browser Save shortcut; the user chose ⌘I, T639).
+          // I navigates to Settings (⌘S is the browser Save shortcut; the user
+          // chose ⌘I, T639). No `expanded`: the tab collapses no panel.
           hint="I"
           hintShown={modHeld}
         />

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Loader2, FolderGit2, Dices, ImagePlus } from "lucide-react"
+import { FolderGit2, Dices, ImagePlus } from "lucide-react"
 import { avatarUrl } from "@/lib/api"
 import type { Agent } from "@/lib/types"
 import { AgentAclSection } from "../../auth/AgentAclSection"
