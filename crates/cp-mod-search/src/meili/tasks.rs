@@ -302,7 +302,7 @@ mod tests {
     #[test]
     #[ignore = "needs a live Meilisearch on this machine"]
     fn live_fetch_sweep() {
-        let home = std::path::PathBuf::from(std::env::var("HOME").unwrap_or_default());
+        let home = &cp_env::env().core.home;
         let (Ok(key), Ok(port_raw)) = (
             std::fs::read_to_string(home.join(".context-pilot/meilisearch/master.key")),
             std::fs::read_to_string(home.join(".context-pilot/meilisearch/port")),

@@ -239,4 +239,73 @@ mod tests {
         assert_eq!(plan.to_index, vec!["edit.rs".to_owned(), "new.rs".to_owned()]);
         assert_eq!(plan.to_delete, vec!["gone.rs".to_owned()]);
     }
+
+    /// Time the real boot-path reconcile against a live server and a live tree.
+    ///
+    /// This is the step the TUI loading screen blocks on: `load_module_data`
+    /// calls `compute_boot_plan` → [`compute_plan`] synchronously, before the
+    /// first frame, so its wall time *is* the "Initializing modules (Search)"
+    /// duration the user sees. `fetch_projection` is the dominant term, but
+    /// [`disk_map`] walks the tree too — this is the only test that measures
+    /// both together.
+    ///
+    /// `#[ignore]`d so `cargo test` stays hermetic, and it skips rather than
+    /// fails when no server is running. Use `--release`: parsing 300k JSON rows
+    /// is ~5x slower unoptimized, and the shipped binary is what the user waits
+    /// on. A debug number here is a parse-cost artifact, not boot cost.
+    ///
+    /// The crate installs no logger, so the `log::info!` line is dropped in the
+    /// test harness — read the *harness* wall time instead ("finished in 1.00s"),
+    /// which is this body and nothing else.
+    ///
+    /// ```text
+    /// cargo test --release -p cp-mod-search -- --ignored boot_plan_timing
+    /// ```
+    #[test]
+    #[ignore = "needs a live Meilisearch on this machine"]
+    fn boot_plan_timing() {
+        use crate::meili::bootstrap::hash_project_path;
+
+        let home = &cp_env::env().core.home;
+        let (Ok(key), Ok(port_raw)) = (
+            std::fs::read_to_string(home.join(".context-pilot/meilisearch/master.key")),
+            std::fs::read_to_string(home.join(".context-pilot/meilisearch/port")),
+        ) else {
+            log::info!("boot_plan_timing: SKIP (no meilisearch key/port)");
+            return;
+        };
+        let Ok(port) = port_raw.trim().parse::<u16>() else {
+            log::warn!("boot_plan_timing: SKIP (unparsable port)");
+            return;
+        };
+
+        // The workspace root, so disk_map walks the same tree the agent boots on.
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(Path::parent)
+            .map_or_else(PathBuf::new, Path::to_path_buf);
+        let Some(project_hash) = root.to_str().map(hash_project_path) else {
+            log::warn!("boot_plan_timing: SKIP (non-UTF-8 project path)");
+            return;
+        };
+        let files_uid = format!("cp_{project_hash}_files");
+        let Ok(client) = MeiliClient::new(port, key.trim()) else {
+            log::warn!("boot_plan_timing: SKIP (client build failed)");
+            return;
+        };
+
+        let t0 = std::time::Instant::now();
+        let plan = compute_plan(&client, &files_uid, &root);
+        let elapsed = t0.elapsed();
+
+        match plan {
+            Ok(p) => log::info!(
+                "boot_plan_timing: {} to index, {} to delete, in {:.2}s",
+                p.to_index.len(),
+                p.to_delete.len(),
+                elapsed.as_secs_f64()
+            ),
+            Err(e) => log::warn!("boot_plan_timing: compute_plan failed: {e}"),
+        }
+    }
 }
