@@ -724,6 +724,18 @@ M-tiny-36:
   contents: Let `cargo fmt` author line breaks. Hand-rolling rustfmt's shape re-creates the very fmt diff just shown.
   importance: medium
   last_edited_ms: 1790587533541
+M-tiny-37:
+  tier: tiny
+  title: 'Stash-pop: silent loss'
+  contents: 'Stash-pop of memories.yaml: auto-merge drops memories with NO conflict marker. Diff against the stash after. Slot ids are per-branch: content is identity, not id.'
+  importance: critical
+  last_edited_ms: 1790603981046
+M-tiny-38:
+  tier: tiny
+  title: Meili fetch page ceiling
+  contents: 'Meili /documents/fetch ceiling: 1k=0.09s, 5k=0.15s, 20k=0.43s, 100k=2.33s. `distinct` unsupported there, so the sweep can''t collapse server-side.'
+  importance: high
+  last_edited_ms: 1790603924587
 M-tiny-4:
   tier: tiny
   title: 'T646 SHIPPED + FIXED:'
