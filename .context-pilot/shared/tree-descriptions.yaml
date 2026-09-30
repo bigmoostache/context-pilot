@@ -5094,6 +5094,10 @@
   path: web/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298: per-message parseFileUploads splits prose from file-upload blocks → renders FileUploadChip row (pl-7) + hosts ONE shared QuickLookSheet (agentId-scoped) opened by any chip. Takes agentId + onAttach props.'
   last_edited_ms: 1782045499789
+32309e10f6705d56:
+  path: .context-pilot/shared/memories.yaml
+  description: Memory slots store (M-safe/tiny/short/mid/long, 220 fixed). Local-only, synced with commits. Mirrors the Memories panel.
+  last_edited_ms: 0
 32453767392c8e30:
   path: crates/cp-oplog/src/lib.rs
   description: 'Oplog crate root. Doc: durability tier ①, why-separate-crate (agent writes+replays, backend tails), announce-after-durable contract. Declares append + compact + replay + segment modules.'
@@ -7490,6 +7494,10 @@
   path: crates/cp-orchestrator/tests/fleet_soak.rs
   description: 'Phase 9.4 (X869) multi-agent soak + fleet-scale fault-matrix slice (2 tests). n_agents_under_concurrent_load_stay_gap_free_and_isolated: 16 agents drive concurrent contended mixed durable(roster/message)/best-effort(phase/cost) workloads into their own real oplogs via thread::scope; every replayed log is strictly contiguous 0..=rev_head (V10 gap-free — a shed best-effort record never consumes a rev) + one shared MaterializedView/CostBreaker/StreamHub keeps 16 isolated projections, breaker trips only even/over-budget agents (V8-scaled logical isolation, no cross-contamination). a_flooded_reordered_subscriber_coalesces_then_reconciles_from_the_view: a cap-3 StreamHub subscriber flooded with 10 out-of-order frames coalesces to newest window, latches degraded, bounded buffer never exceeds capacity, then mark_reconciled clears degraded from the oplog-folded view head (V5 drop+reorder chaos recovered from authoritative snapshot). Literal 10k-OS-soak (V8) + fsync-fault-FS (V4) remain external CI. Top use cp_mod_bridge/nix/notify/serde/serde_json/serde_yaml/tiny_http as _ for per-target unused-crate-dependencies. let _rev= bindings dodge unused_results (CB3 is lib-only, doesn''t lint test targets).'
   last_edited_ms: 1781823989640
+4a449cfa18e28c45:
+  path: crates/cp-mod-search/src/meili/tasks.rs
+  description: 'Meilisearch task polling (wait_for_task) + paged document fetch. fetch_projection: fields-only projection, FETCH_PAGE_LIMIT 20_000, 16-way std::thread::scope fan-out in fetch_remaining_pages (offsets precomputed + dealt round-robin, pages tagged with offset and re-sorted ascending), first failing shard aborts the whole sweep. fetch_all_with_vectors: retrieveVectors paging for backup export. live_fetch_sweep = #[ignore]d live benchmark, run with --release.'
+  last_edited_ms: 0
 4a57feb13e900905:
   path: Cargo.toml
   description: 'Workspace root. 26 crate members. Binary ''tui''. Edition 2024. [workspace.lints] strict config (~980 forbid). T586: adding ref_patterns forbid + prior safe-lint forbids.'
@@ -10330,6 +10338,10 @@
   path: web/src/lib/live/mutations.ts
   description: 'Live imperative mutations (split from live/index for <500): finder writes (useUploadFiles/useWriteFile/useCreateFolder/useMoveItems/useRenameItem/useTrashItems) + agent lifecycle (useCreateAgent/useRestartAgent/useRenameAgent(T328)/useRetiredFleet/useRetireAgent/useUnretireAgent) + avatar (useUploadAvatar/useDeleteAvatar, T338). One-shot POSTs → useMutation, invalidate the affected query family on success.'
   last_edited_ms: 1782141874912
+66e8bf026df41a29:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 6705f2192bde1311:
   path: crates/cp-orchestrator/tests/openapi/exhaustive.rs
   description: Route exhaustiveness test — bidirectional set equality between router match arms and openapi.json paths. Scrapes BOTH router.rs (route_rest &-prefixed arms + try_raw_route slice arms) and mod.rs (handle() if-let specials) as text.
@@ -12881,6 +12893,10 @@
 7eae3426b401b2a2:
   path: web/src/components/finder/internal/FinderOverlays.tsx
   description: 'Finder bottom chrome + floating layers: status bar, right-click ContextMenu (full handler wiring incl Refresh via own useQueryClient), external-drag upload overlay, transient toast. Built from primitive deps.'
+  last_edited_ms: 0
+7ec958ca1faffa6f:
+  path: .github/checks/lint-config.chain
+  description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
   last_edited_ms: 0
 7ece3c808384a743:
   path: crates/cp-orchestrator/src/transport/mod.rs
