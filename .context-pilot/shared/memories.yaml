@@ -708,10 +708,10 @@ M-tiny-32:
   last_edited_ms: 1790582340866
 M-tiny-33:
   tier: tiny
-  title: Multi-thread B2 done
-  contents: 'B2 DONE 7801d5b4 (multi-thread-core-loop): bundle.rs ThreadRuntime+swap_with, dead til Phase C=N=1 identical, absorbs B4. NEXT B3: conversation+conversation_history FLIP→per-thread.'
+  title: Multi-thread B progress
+  contents: 'multi-thread-core-loop: B1 b639de2a(module_data split), B2 7801d5b4(ThreadRuntime+swap), B3 873842e7(conv flips), B5 21a6ac94(focus UI-global/questions per-thread). N=1 identical. NEXT B6.'
   importance: high
-  last_edited_ms: 1790853217484
+  last_edited_ms: 1790853894128
 M-tiny-34:
   tier: tiny
   title: Never trust gate markers

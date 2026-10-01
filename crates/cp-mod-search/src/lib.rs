@@ -7,6 +7,8 @@
 //! One tool: `search` — queries both file and log indexes.
 //! Results appear as dynamic search result panels.
 
+/// Conversation-doc builder for the T671 conversations index.
+mod conv_docs;
 /// File-indexing pipeline: filters, background indexer, reconciliation.
 pub mod index;
 /// Meilisearch HTTP client, server lifecycle, and binary download.
@@ -131,8 +133,14 @@ impl Module for SearchModule {
         &["core"]
     }
 
+    /// Fleet-shared (thread-centric model): `SearchState` holds index config and
+    /// metrics for the single project-wide Meilisearch daemon — one index shared
+    /// by every thread, not per-thread state. The search *result panels* are
+    /// per-thread (they live in `state.context`, carried by the resident-thread
+    /// swap); the index metadata stays shared so it is not duplicated per thread.
+    /// Inert at N=1.
     fn is_global(&self) -> bool {
-        false
+        true
     }
 
     fn is_core(&self) -> bool {
@@ -439,45 +447,6 @@ pub fn push_task_signal(state: &mut State, content: &str) {
     radar::push_signal(state, content);
 }
 
-/// Build the desired conversation-doc set from the live threads (T671).
-///
-/// One [`index::reconcile::conversations::ConversationDoc`] per non-`auto`,
-/// non-empty thread message. `auto` (tool-trace) and empty-content messages are
-/// dropped here so they never enter the index — matching the reconcile
-/// contract. The doc `index` is the message's position in its thread, giving a
-/// stable id (`"{thread_id}-{index}"`) for append-only threads. Archived threads
-/// are still included (their docs stay searchable); a deleted thread simply
-/// stops appearing, so the reconciler purges its docs.
-fn build_conversation_docs(state: &State) -> Vec<index::reconcile::conversations::ConversationDoc> {
-    use index::reconcile::conversations::{ConversationDoc, DocParts};
-
-    let threads = &cp_mod_threads::types::ThreadsState::get(state).threads;
-    let mut docs = Vec::new();
-    for thread in threads {
-        for (index, msg) in thread.messages.iter().enumerate() {
-            if msg.auto {
-                continue; // tool-trace — never indexed
-            }
-            let Some(text) = msg.content.as_deref() else {
-                continue; // file-only / empty message — nothing to search
-            };
-            if text.is_empty() {
-                continue;
-            }
-            let author = msg.author.to_string(); // "user" / "assistant"
-            docs.push(ConversationDoc::from_parts(&DocParts {
-                thread_id: &thread.id,
-                index,
-                thread_name: &thread.name,
-                author: &author,
-                text,
-                ts_ms: msg.timestamp,
-            }));
-        }
-    }
-    docs
-}
-
 /// Snapshot the live threads and queue a conversations-index reconcile on the
 /// background indexer thread (T671).
 ///
@@ -493,6 +462,6 @@ pub fn queue_conversation_reconcile(state: &State) {
     let Some(tx) = ss.indexer_tx.as_ref() else {
         return; // indexer not running (server unavailable)
     };
-    let docs = build_conversation_docs(state);
+    let docs = conv_docs::build_conversation_docs(state);
     let _r = tx.send(types::IndexerCmd::ReconcileConversations(docs));
 }

@@ -66,6 +66,14 @@ impl Module for TreeModule {
     fn description(&self) -> &'static str {
         "Directory tree view with filtering and descriptions"
     }
+    /// Fleet-shared (thread-centric model): `TreeState` holds the file/folder
+    /// descriptions (persisted to `tree-descriptions.yaml`, fleet-wide knowledge)
+    /// and the gitignore filter — both shared. The tree *result* is rendered into
+    /// a per-thread panel (`state.context`). One field, `open_folders` (which
+    /// folders are expanded in the view), is logically per-thread view state; its
+    /// carve-out into the per-thread map is DEFERRED to Phase G (the TUI
+    /// thread-view), where per-thread view polish belongs. Shared is correct and
+    /// behaviourally identical at N=1.
     fn is_global(&self) -> bool {
         true
     }
