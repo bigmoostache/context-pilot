@@ -66,6 +66,7 @@ pub(super) fn apply_command(app: &mut App, cmd: Command) {
         }
         CommandKind::DeleteThread { thread_id } => {
             apply_delete_thread(&mut app.state, &thread_id);
+            app.teardown_thread(&thread_id);
         }
         CommandKind::DeleteMessage { thread_id, message_ts } => {
             apply_delete_message(&mut app.state, &thread_id, message_ts);

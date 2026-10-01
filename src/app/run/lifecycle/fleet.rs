@@ -423,4 +423,38 @@ impl App {
             entry.waiting_since_ms = Some(cp_base::panels::now_ms());
         }
     }
+
+    /// Structural teardown of a **hard-deleted** thread (design doc §F5 / H15):
+    /// kill its external console processes, then drop its runtime bundle (which
+    /// drops the thread's per-thread resources — the [`WatcherRegistry`], queue,
+    /// spine inbox — cancelling its in-process watchers by `Drop`).
+    ///
+    /// Called from `apply_command`'s `DeleteThread` arm **after**
+    /// [`apply_delete_thread`](super::super::threads::commands) has removed the
+    /// thread from [`ThreadsState`] and cleared focus/bridge memos. The thread id
+    /// is the single teardown key.
+    ///
+    /// Console sessions are per-thread ([`ConsoleState`](cp_mod_console::types::ConsoleState)
+    /// is `is_global() == false`), so
+    /// [`deliver_to_thread`](Self::deliver_to_thread) swaps the thread's context
+    /// in and [`shutdown_all`](cp_mod_console::types::ConsoleState::shutdown_all)
+    /// kills exactly *its* sessions (by their own keys, via the existing
+    /// per-session kill — no server protocol change), then swaps the focused
+    /// thread back. The in-process watcher drop is `Drop` on the removed
+    /// [`ThreadRuntime`](cp_base::state::runtime::bundle::ThreadRuntime): a
+    /// [`ChannelWatcher`](cp_base::state::watchers::ChannelWatcher) drops its
+    /// receiver so its worker thread's later send fails harmlessly (cancellation);
+    /// timer/console watchers are data-only.
+    ///
+    /// N=1 identical: deleting the focused resident runs `shutdown_all` directly
+    /// on `state` and [`fleet.remove`](cp_fleet::FleetRegistry::remove) is a no-op
+    /// (the focused thread is never in the registry); deleting a background thread
+    /// takes the swap path. Either way behaviour matches single-thread, and no
+    /// console key or on-disk path changes.
+    pub(crate) fn teardown_thread(&mut self, thread_id: &str) {
+        self.deliver_to_thread(Some(thread_id), |state| {
+            cp_mod_console::types::ConsoleState::shutdown_all(state);
+        });
+        let _removed = self.fleet.remove(thread_id);
+    }
 }
