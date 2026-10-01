@@ -7,8 +7,6 @@
 //! One tool: `search` — queries both file and log indexes.
 //! Results appear as dynamic search result panels.
 
-/// Conversation-doc builder for the T671 conversations index.
-mod conv_docs;
 /// File-indexing pipeline: filters, background indexer, reconciliation.
 pub mod index;
 /// Meilisearch HTTP client, server lifecycle, and binary download.
@@ -462,6 +460,6 @@ pub fn queue_conversation_reconcile(state: &State) {
     let Some(tx) = ss.indexer_tx.as_ref() else {
         return; // indexer not running (server unavailable)
     };
-    let docs = conv_docs::build_conversation_docs(state);
+    let docs = index::reconcile::conv_docs::build_conversation_docs(state);
     let _r = tx.send(types::IndexerCmd::ReconcileConversations(docs));
 }

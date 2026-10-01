@@ -44,7 +44,35 @@ impl App {
             pending_console_wait_tool_results: None,
             accumulated_blocking_results: Vec::new(),
             reverie_streams: std::collections::HashMap::new(),
+            thread_streams: std::collections::HashMap::new(),
         }
+    }
+
+    /// Key under which the single resident main stream is stored in
+    /// [`thread_streams`](crate::app::App::thread_streams) at N=1.
+    ///
+    /// There is exactly one live main execution context today, so every stream
+    /// start overwrites this one slot (leak-free). Phase C3 replaces this with
+    /// the id of the thread actually being advanced so the loop can run several
+    /// streams concurrently.
+    pub(super) fn main_stream_key() -> String {
+        crate::infra::constants::DEFAULT_WORKER_ID.to_owned()
+    }
+
+    /// Start an LLM stream for the resident thread over a fresh per-thread
+    /// channel, storing its receiver in
+    /// [`thread_streams`](crate::app::App::thread_streams) for the loop to drain.
+    ///
+    /// This replaces the former single app-wide stream channel: each stream now
+    /// owns its mpsc (mirroring reverie streams), so concurrent threads can each
+    /// have a live stream. At N=1 the single entry — keyed by
+    /// [`main_stream_key`](Self::main_stream_key) — is overwritten on every
+    /// start, leaving exactly one channel to drain.
+    pub(super) fn spawn_thread_stream(&mut self, params: crate::llms::StreamParams) {
+        let (tx, rx) = std::sync::mpsc::channel();
+        crate::infra::api::start_streaming(params, tx);
+        let key = Self::main_stream_key();
+        let _prev = self.thread_streams.insert(key, crate::app::ThreadStream { rx });
     }
 
     /// Send state to background writer (debounced, non-blocking).

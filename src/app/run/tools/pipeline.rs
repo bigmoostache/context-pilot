@@ -1,8 +1,5 @@
-use std::sync::mpsc::Sender;
-
 use crate::app::actions::clean_llm_id_prefix;
 use crate::app::panels::now_ms;
-use crate::infra::api::StreamEvent;
 use crate::infra::tools::execute_tool;
 use crate::modules::pre_flight::pre_flight_tool;
 use crate::state::persistence::build_message_op;
@@ -346,7 +343,7 @@ fn collect_tool_results(app: &mut App) -> Option<ToolBatch> {
 }
 
 /// Execute pending tool calls: pre-flight, queue intercept, callbacks, and pipeline resumption.
-pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
+pub(crate) fn handle_tool_execution(app: &mut App) {
     let _guard = crate::profile!("app::tool_exec");
     let _fg = cp_base::flame!("tool_pipeline");
 
@@ -387,15 +384,13 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
 
     finalize_tool_cycle(
         app,
-        &ToolCycle { tx, tools: &tools, tool_results: &tool_results, tool_names: &tool_names, pipeline_start },
+        &ToolCycle { tools: &tools, tool_results: &tool_results, tool_names: &tool_names, pipeline_start },
     );
 }
 
 /// Bundled inputs for [`finalize_tool_cycle`] — keeps the helper within the
 /// 4-argument limit (`app` stays a separate `&mut` borrow).
 struct ToolCycle<'cycle> {
-    /// Stream event channel for resuming the LLM turn.
-    tx: &'cycle Sender<StreamEvent>,
     /// Executed tool calls (order-aligned with `tool_results`).
     tools: &'cycle [cp_base::tools::ToolUse],
     /// Results for each tool (order-aligned with `tools`).
@@ -411,7 +406,7 @@ struct ToolCycle<'cycle> {
 /// sleep defers it). The back half of [`handle_tool_execution`], split out to
 /// keep the cognitive complexity within budget.
 fn finalize_tool_cycle(app: &mut App, cycle: &ToolCycle<'_>) {
-    let ToolCycle { tx, tools, tool_results, tool_names, pipeline_start } = *cycle;
+    let ToolCycle { tools, tool_results, tool_names, pipeline_start } = *cycle;
     // Create tool result message
     let result_id = format!("R{}", app.state.next_result_id);
     let result_global_uid = format!("UID_{}_R", app.state.global_next_uid);
@@ -468,7 +463,7 @@ fn finalize_tool_cycle(app: &mut App, cycle: &ToolCycle<'_>) {
         app.wait_started_ms = now_ms();
     } else {
         // No dirty panels — continue streaming immediately
-        crate::app::run::streaming::continue_streaming(app, tx);
+        crate::app::run::streaming::continue_streaming(app);
     }
     crate::infra::profiler::log_tool_time(tool_names, pipeline_start.elapsed());
 }

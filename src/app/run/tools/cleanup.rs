@@ -1,7 +1,4 @@
-use std::sync::mpsc::Sender;
-
 use crate::app::panels::now_ms;
-use crate::infra::api::StreamEvent;
 use crate::state::{Message, ToolResultRecord};
 
 use cp_base::state::watchers::{ASYNC_ERROR_PREFIX, WatcherRegistry};
@@ -244,7 +241,7 @@ fn replace_blocking_sentinels(
 /// Non-blocking check: poll `WatcherRegistry` for satisfied conditions.
 /// - Blocking watchers: replace sentinel tool results and resume pipeline.
 /// - Async watchers: create spine notifications.
-pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
+pub(crate) fn check_watchers(app: &mut App) {
     let _fg = cp_base::flame!("watchers");
     // Take the registry out of state to avoid borrow conflict
     // (poll_all needs &mut registry + &state simultaneously). WatcherRegistry is
@@ -329,7 +326,7 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
     }
 
     // Break tempo, build result + assistant messages, resume streaming.
-    resume_pipeline_after_blocking(app, tx, &tool_results, &merged_blocking);
+    resume_pipeline_after_blocking(app, &tool_results, &merged_blocking);
 }
 
 /// After all blocking watchers resolve: apply their deferred tempo break, emit the
@@ -337,7 +334,6 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
 /// stats from the intermediate stream, then resume streaming (or wait on dirty panels).
 fn resume_pipeline_after_blocking(
     app: &mut App,
-    tx: &Sender<StreamEvent>,
     tool_results: &[crate::infra::tools::ToolResult],
     merged_blocking: &[cp_base::state::watchers::carriers::WatcherResult],
 ) {
@@ -398,7 +394,7 @@ fn resume_pipeline_after_blocking(
         app.state.flags.lifecycle.waiting_for_panels = true;
         app.wait_started_ms = now_ms();
     } else {
-        crate::app::run::streaming::continue_streaming(app, tx);
+        crate::app::run::streaming::continue_streaming(app);
     }
 }
 

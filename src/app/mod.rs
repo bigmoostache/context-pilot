@@ -28,6 +28,21 @@ use crate::ui::help::CommandPalette;
 /// Deferred `StreamDone` data: (`input_tokens`, `output_tokens`, `cache_hit`, `cache_miss`, `stop_reason`, `bp_hashes`, `bp_panel_ids`, `alive_count`, `alive_positions_permille`).
 pub(crate) type PendingDone = (usize, usize, usize, usize, Option<String>, Vec<String>, Vec<String>, usize, Vec<u16>);
 
+/// Per-thread main-stream state — holds the receiver channel for a running
+/// thread stream (the thread-centric analogue of [`ReverieStream`]).
+///
+/// One entry lives in [`App::thread_streams`] per actively-streaming thread.
+/// Created at stream start (one of the three start sites: `check_spine`,
+/// `continue_streaming`, `handle_retry`), drained by `process_stream_events`.
+///
+/// At N=1 there is a single resident thread, so the map holds a single entry
+/// keyed by [`App::main_stream_key`]. Phase C3 generalises the key to the
+/// actually-advancing thread id so the loop can drive several threads at once.
+pub(crate) struct ThreadStream {
+    /// Receiver for this thread's LLM stream events.
+    pub rx: Receiver<crate::infra::api::StreamEvent>,
+}
+
 /// Reverie stream state — holds the receiver channel for a running reverie.
 pub(crate) struct ReverieStream {
     /// Receiver for stream events from the reverie's API call.
@@ -96,6 +111,10 @@ pub(crate) struct App {
     pub accumulated_blocking_results: Vec<cp_base::state::watchers::carriers::WatcherResult>,
     /// Active reverie streams keyed by `agent_id` (one per agent type)
     pub reverie_streams: std::collections::HashMap<String, ReverieStream>,
+    /// Active main-thread streams keyed by thread id (one per streaming thread).
+    /// At N=1 holds a single entry under [`App::main_stream_key`]; the loop
+    /// (Phase C3) will key this by the advancing thread id for true concurrency.
+    pub thread_streams: std::collections::HashMap<String, ThreadStream>,
 }
 
 // App impl block is in run/input.rs (primary), with additional methods spread

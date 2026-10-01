@@ -708,10 +708,10 @@ M-tiny-32:
   last_edited_ms: 1790582340866
 M-tiny-33:
   tier: tiny
-  title: Multi-thread B progress
-  contents: 'multi-thread-core-loop: B1 b639de2a B2 7801d5b4 B3 873842e7 B5 21a6ac94 B6 9479330b (git/github/search→is_global true data-shared; tree open_folders deferred→G). N=1 identical. NEXT B7.'
+  title: Multi-thread ABC1C2 done
+  contents: 'multi-thread-core-loop: Phase A+B DONE (B8 closeout 4ca6e896; B1 b639de2a B2 7801d5b4 B3 873842e7 B5 21a6ac94 B6 9479330b). N=1 identical. NEXT Phase C: C1 App.thread_streams mirror reverie_streams.'
   importance: high
-  last_edited_ms: 1790854411826
+  last_edited_ms: 1790858044592
 M-tiny-34:
   tier: tiny
   title: Never trust gate markers
