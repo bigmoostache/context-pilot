@@ -115,6 +115,17 @@ pub(crate) struct App {
     /// At N=1 holds a single entry under [`App::main_stream_key`]; the loop
     /// (Phase C3) will key this by the advancing thread id for true concurrency.
     pub thread_streams: std::collections::HashMap<String, ThreadStream>,
+    /// Fleet registry: the source of truth for every non-resident thread's
+    /// runtime bundle + its execution state and role (Phase C).
+    ///
+    /// The resident (focused) thread's bundle lives *flat* in [`App::state`];
+    /// every other thread parks its [`ThreadRuntime`](cp_base::state::runtime::bundle::ThreadRuntime)
+    /// here inside an `Entry`, and the loop swaps it into `state` for one
+    /// advancement step (see `advance_background_threads`). Empty at N=1 — the
+    /// single resident thread is the only one that exists — so the background
+    /// advancement pass is a no-op and behaviour is identical to single-thread.
+    /// Population (reconcile from `ThreadsState`) is wired in C4.
+    pub fleet: cp_fleet::FleetRegistry<cp_base::state::runtime::bundle::ThreadRuntime>,
 }
 
 // App impl block is in run/input.rs (primary), with additional methods spread

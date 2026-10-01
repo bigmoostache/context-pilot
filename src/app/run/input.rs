@@ -45,6 +45,7 @@ impl App {
             accumulated_blocking_results: Vec::new(),
             reverie_streams: std::collections::HashMap::new(),
             thread_streams: std::collections::HashMap::new(),
+            fleet: cp_fleet::FleetRegistry::new(),
         }
     }
 

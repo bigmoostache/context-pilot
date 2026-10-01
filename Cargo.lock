@@ -3391,6 +3391,7 @@ version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-env",
+ "cp-fleet",
  "cp-mod-brave",
  "cp-mod-bridge",
  "cp-mod-callback",

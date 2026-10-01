@@ -962,6 +962,10 @@
   path: web/src/components/finder/views/helpers.ts
   description: Non-component Finder-view shared surface. MOVE/FOLDER_DRAG MIME consts, drag-drop helpers, relOf, mods, itemCount, ViewHandlers interface.
   last_edited_ms: 1783412977704
+08f4c5b7166d9165:
+  path: crates/cp-mod-search/src/lib.rs
+  description: 'Search module. B6: is_global true (SearchState=shared Meili index data; result panels per-thread via context). conv_docs.rs extracted (500-line cap). load_module_data = sole heavy-I/O site (bootstrap server, indexer, watchdog). queue_conversation_reconcile on on_stream_stop (T671).'
+  last_edited_ms: 0
 08f578744e64fd36:
   path: .env
   description: Environment variables (.env)
@@ -1166,6 +1170,10 @@
   path: crates/cp-mod-queue/src/lib.rs
   description: 'Queue module. 3 tools: pause/execute/undo. Fixed QUEUE panel. Not core. QueueState: active, queued_calls, next_index. Trap state (trap_active/panel_ids/optional_ids) persisted in save/load. Queue_execute handled in pipeline.rs (needs dispatch). Reverie-allowed.'
   last_edited_ms: 0
+0ac6397884192dea:
+  path: crates/cp-mod-tree/src/lib.rs
+  description: Tree module. 3 tools filter/toggle/describe. A3 else_if fix at pre_flight :181 (added trailing else). should_invalidate_on_fs_change gates CONTROL_DIRS.
+  last_edited_ms: 0
 0ac95ecca3ffddfe:
   path: web/tsconfig.json
   description: 'Root TS project references config — points to tsconfig.app.json + tsconfig.node.json, sets @/* path alias. T505 target: this is where the maximal strict-flag set will be enforced (via app config).'
@@ -1298,6 +1306,10 @@
   path: web/src/lib/sync.ts
   description: 'SSE→QueryClient delta bridge (push plane). ensureSync(agentId): one idempotent per-agent subscription. `delta` → parse rev OpEntry → fold into [''threads'',id]+[''agent'',id] via setQueryData FUNCTIONAL updater (applyThreadDelta/applyAgentDelta), rev high-water guard; null verdict → invalidate. applyThreadDelta folds thread_created/archived/restored/status_changed/focus_changed (sets focused flag on matching thread, clears elsewhere — live focused-thread highlight)/message_created (msgId=msg_${log.length} so delta id matches disk poll → dedup). `invalidate` → INSPECTION caches only. mergeThreadLogs non-destructive poll reconcile. Kills T123 burst-clobber + T254 double-render structurally.'
   last_edited_ms: 1781869236525
+0c5fc79464fb0dac:
+  path: crates/cp-mod-github/src/lib.rs
+  description: 'GitHub module. 1 tool: gh_execute. Dynamic github_result panels. Depends on git. gh_line_semantic split notice/state/ref. Tool visualizer for PR/issue status coloring.'
+  last_edited_ms: 0
 0c76c5906efbc7f3:
   path: crates/cp-mod-search/Cargo.toml
   description: 'Search module deps: cp-base, cp-vault, cp-mod-logs, cp-render, crossterm, serde, serde_json, cp-mod-utilities, reqwest, notify, tree-sitter (9 langs), serde_yaml, log.'
@@ -2309,6 +2321,10 @@
 16022c359a7618db:
   path: .github/checks/allowed-lint-exceptions.yaml
   description: 'Curated #[expect]/#[allow] registry (16 entries). Every occurrence in codebase MUST have an entry. radar entries repointed radar.rs→radar/mod.rs. Fields: path, match, reason, strategy.'
+  last_edited_ms: 0
+16098d5f44afd4b5:
+  path: .github/checks/lint-config.chain
+  description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
   last_edited_ms: 0
 160fa7744152d2db:
   path: src/main.rs
@@ -8390,6 +8406,10 @@
   path: .git/index
   description: Git index (binary). Not source.
   last_edited_ms: 0
+5215b7e091335a9b:
+  path: src/app/run/tools/pipeline.rs
+  description: Main tool execution pipeline. collect_tool_results(ToolBatch) + finalize_tool_cycle(ToolCycle) split from handle_tool_execution (A2). execute_one_tool/execute_queue_control/enqueue_tool. Pre-flight → queue intercept (auto-flush on trap defusal) → execute → callbacks(sibling) → tempo. Radar signals, Meili log sync.
+  last_edited_ms: 0
 52190353cd71efe9:
   path: web/src/lib/live/threadView.ts
   description: Shared thread view orchestration (non-forked) — useThreadSelection (selection+localStorage+auto-select) + useThreadActions (archive/pause/delete/create/send/attach + notice). Zero component imports; both desktop+mobile ThreadsView consume.
@@ -8882,6 +8902,10 @@
   path: .github/checks/check-lint-config.sh
   description: 'Lint integrity hash chain checker. --verify (CI default), --update (append entry + git diffs, needs password), --deep-verify (reverse-walk diffs to verify historical content hashes), --history, --show. Readers skip non-entry lines via ^[0-9]+: guard.'
   last_edited_ms: 1781348721585
+56d4740e31de8842:
+  path: Cargo.lock
+  description: Workspace lockfile
+  last_edited_ms: 0
 56d71fe8d88e2036:
   path: ui/src/components/shell/TopBar.tsx
   description: 'macOS title bar. App mark (Home)→fleet. ALWAYS renders / + AgentSwitcher: inside an agent shows workspace + per-agent switcher Threads·Cockpit·Finder + cost; at fleet altitude passes activeId undefined (placeholder) and picking an agent enters it. onNewAgent prop (T21) forwarded to AgentSwitcher ''New agent''. Far-right: Activity→StatsPopup (hidden at fleet) + ThemeToggle + Settings gear→ConfigModal. Git branch chip removed.'
@@ -11098,6 +11122,10 @@
   path: docs/design-subworkers.md
   description: T710 design doc — single→N cooperative workers on one loop (reverie is the proven primitive). State split shared-vs-per-worker (~80% work), pipeline generalization, §13 spine-as-arbiter (routing+arbitration, autonomy-OFF default), 5 shippable phases.
   last_edited_ms: 1788353914801
+6d8312e4880e6e32:
+  path: src/app/run/tools/cleanup.rs
+  description: 'Watcher polling: blocking sentinel replacement + async spine notifications. check_watchers takes WatcherRegistry from thread_module_data (per-thread, B1) w/ shared-map fallback, restores via set_ext_thread. The blocking-tool machinery (pending_console_wait_tool_results + accumulated_blocking_results) is the per-thread stream runtime Phase C moves into ThreadStream.'
+  last_edited_ms: 0
 6d85daf4d317b604:
   path: .context-pilot/shared/callbacks.yaml
   description: Shared callback definitions YAML — 8 blocking callbacks covering Rust+TS lints/tests/structure/contract.
@@ -12681,6 +12709,10 @@
 7c8d1c712f95c232:
   path: src/modules/mod.rs
   description: Module registry. 21 modules via all_modules(). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
+  last_edited_ms: 0
+7c9bd35599993119:
+  path: src/app/run/tools/checks.rs
+  description: 'Post-tool non-blocking polls: panel readiness (5s timeout), deferred sleep timer. Each resumes streaming pipeline when condition met. Imports has_dirty_panels from streaming.rs.'
   last_edited_ms: 0
 7c9cfc889e210d5a:
   path: docs/intermediate-rendering.md
@@ -15006,6 +15038,10 @@
   path: crates/cp-mod-callback/src/trigger.rs
   description: Callback trigger engine. collect_changed_files() extracts paths from Edit/Write tools. match_callbacks() with flame!("cb_match") matches files against glob patterns. validate_skip_names() warns on non-existent callbacks. partition_callbacks() splits blocking/async.
   last_edited_ms: 0
+934885557dfd6f87:
+  path: src/app/mod.rs
+  description: 'App struct — top-level container. Fields: State, TypewriterBuffer, pending tools/done, cache_tx, file watcher, timers (incl last_bridge_recover_ms), PersistenceWriter, reverie_streams. Sub-modules: actions, context, events, panels, prompt, reverie, run.'
+  last_edited_ms: 0
 936371f437344897:
   path: deploy/photonicat/emmc-install/lcd/pcat_lcd.py
   description: GC9307 SPI LCD 4-state progress painter (flashing PCT/verify/done/error). Python spidev+libgpiod, 5x7 bitmap font, init sequence transcribed from vendor periph.io-gc9307 st7789.go. /dev/spidev1.0, RST=122 DC=121, 172x320 rot180 MADCTL 0x48 coloffset 34. One-shot per state screen.
@@ -15818,6 +15854,10 @@
   path: tmp/pr-todo-v2.md
   description: 'PR draft for todo-v2 (PR #188): thread-owned tasks vertical slice — cp-wire WireTask/TaskListChanged, oplog fold, agent emit chokepoint, orchestrator view+reshape, web TodoSidebar aside.'
   last_edited_ms: 1787920136652
+9bd459a8f5d1dca3:
+  path: src/app/run/input.rs
+  description: 'App::new() constructor, save_state/message_async, autocomplete/palette events. A9: both handle_autocomplete/palette use `let &event::Event::Key(key)` copy-bind (KeyEvent Copy).'
+  last_edited_ms: 0
 9bdeba2355432037:
   path: crates/cp-orchestrator/src/transport/router.rs
   description: 'Non-streaming REST route table (route_rest, flat #[expect(too_many_lines)] registered) + raw-bytes GET dispatcher (try_raw_route, match *segments). RouteCtx destructured at top. Explicit &Method::X/&[..] ref patterns (pattern_type_mismatch). IT/releases can_manage_it guard arms. orch-clippy: clean.'
@@ -16606,6 +16646,10 @@ a3152ba4bf7f093b:
   path: yamls/tools/spine.yaml
   description: 'Spine tool YAML. 3 tools: notification_mark_processed, spine_configure (guard rails: max_output_tokens, max_duration_secs, max_messages, max_auto_retries), coucou (timer/datetime scheduling). max_cost removed.'
   last_edited_ms: 0
+a331a04b64d93075:
+  path: .context-pilot/shared/memories.yaml
+  description: Memory slots store (M-safe/tiny/short/mid/long, 220 fixed). Local-only, synced with commits. Mirrors the Memories panel (P6).
+  last_edited_ms: 0
 a332cc8b0055c3a8:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. Declares sql/ + panels/ submodules with re-exports. Depends on search.
@@ -17094,6 +17138,10 @@ a850e7d827b3dfa1:
   path: crates/cp-orchestrator/src/transport/inspect/vitals/keychecks.rs
   description: 'Authenticated API-key validation probes for vitals board. 5 services: GitHub (GET /user, reports @login), Brave (search, reports remaining queries), Firecrawl (credit-usage, reports credits), Voyage (embeddings ping), Datalab (marker probe). Keys resolved from cp_vault. Concurrent threads + COLLECT_DEADLINE. Honesty contract: unavailable/error/ok with detail.'
   last_edited_ms: 1783680358778
+a85cf19f7d859859:
+  path: crates/cp-mod-search/src/index/reconcile/mod.rs
+  description: 'Boot+hourly fs⇄index reconciliation. FilePrint(mtime,size), pure diff()→ReconcilePlan, index_map (fetch_projection), disk_map (tree walk), compute_plan, send_plan. boot_plan_timing #[ignore] test measures real Search boot step.'
+  last_edited_ms: 0
 a86121643145f349:
   path: src/app/run/input.rs
   description: App::new() constructor, save_state/message_async(), handle_autocomplete/palette events. No question form event handling (removed).
@@ -17277,6 +17325,10 @@ aa0e06c92f399127:
 aa1d276af3cf459a:
   path: crates/cp-base/src/config/mod.rs
   description: 'YAML config loader. 6 LazyLock statics (Prompts/Library/Injections/Reverie/Ui/Themes) from include_str!. Theme system: 6 themes × 16 RGB colors + icons. invariant_panic() for compile-time violations. Sub-modules: constants, global, llm_types, yaml_sync, behavioral, accessors.'
+  last_edited_ms: 0
+aa3268110d386be9:
+  path: src/app/run/lifecycle.rs
+  description: Main event loop. run split handle_input_phase(InputOutcome enum)/render_frame/compute_poll_ms/run_background_phase/auto_resume_stream_if_flagged/recover_bridge_if_pending/drain_chat_sync_if_due (A2). check_spine, EventChannels. T309 spinner gating.
   last_edited_ms: 0
 aa374733e4d9a47b:
   path: crates/cp-base/src/tools/mod.rs
@@ -18913,6 +18965,10 @@ ba2b40a4b30fafbc:
 ba3c0743d26f15c0:
   path: crates/cp-wire/src/types/command.rs
   description: 'Command+Frame structs #[non_exhaustive] A5 + Frame::new ctor. Kind enum #[expect(exhaustive_enums)] A4.'
+  last_edited_ms: 0
+ba3e1ad00937455e:
+  path: crates/cp-mod-git/src/lib.rs
+  description: 'Git module. 1 tool: git_execute. refresh_git_status() split into current_branch/parse_numstat_line/collect_tracked/append_staged/append_untracked. overview_context_section renders changes table (push_changes_table + cap_overview_output, HARD-CAPPED 8KiB). git_line_semantic split status/diff/meta. Watches .git/ paths.'
   last_edited_ms: 0
 ba4b46d00e37d261:
   path: ui/src/components/agents/PromptModal.tsx
@@ -22806,6 +22862,10 @@ e2469d358f518b9a:
   path: crates/cp-mod-firecrawl/src/panel.rs
   description: 'Firecrawl result panel. Same pattern as brave: static content in metadata, cache restore, pagination. update_if_changed via let _changed (T586).'
   last_edited_ms: 0
+e24c21d857dab7b4:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 e259a53bd3afacd4:
   path: src/state/persistence/save.rs
   description: Save ops. build_save_batch split build_module_data_maps/panel_message_uids/build_panel_write_ops/build_history_message_ops/collect_orphan_deletes/build_panel_uid_maps + ModuleDataMaps/PanelUidMaps type aliases (A2). save_state sync persist, check_ownership, log_error.
@@ -23658,6 +23718,10 @@ eb66fdfcd8f1bf7f:
   path: crates/cp-mod-todo/src/tools.rs
   description: Todo CRUD tools. Nested parent_id validation. in_progress cascades to parents. Orphan protection on delete. Move reorder with after_id.
   last_edited_ms: 1784477019301
+eb694a5248e54058:
+  path: src/main.rs
+  description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook. --bridge CLI flag (safe OnceLock, no unsafe set_var). --resume-stream for self-restart. use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
+  last_edited_ms: 0
 eb75e729f892aaf2:
   path: crates/cp-mod-ocr/src/client.rs
   description: Datalab OCR API client. Multipart upload, exponential backoff polling, disk cache keyed by FNV-1a hash. api_key_from_env() reads from vault ("datalab").
@@ -25846,6 +25910,10 @@ ff702272b5c58ee7:
   path: ui/src/components/agents/PromptsPage.tsx
   description: Global prompt-library page (fleet 'Prompts'). Renders mock library[] (system/skills/commands) as cards with KIND_META icon/accent/blurb, filter tabs (all + per-kind w/ counts), kind sections in 'all' view. 'agent' kind labelled 'System' (overloaded word). Header has Import + New buttons. Card click / New / Import open PromptModal + ImportModal. Built-in badge only (no Active — meaningless at fleet altitude).
   last_edited_ms: 1781532643670
+ff7979bb5ba35d46:
+  path: src/app/run/streaming.rs
+  description: 'Stream event processing. process_stream_events + handle_stream_error_event (A2). A9: pending_done 9-tuple take() owned bind. Chunk/ToolUse/Done/Error, retry, finalize_stream cache engine.'
+  last_edited_ms: 0
 ff8e40b3b3769c03:
   path: crates/cp-orchestrator/src/transport/inspect/vitals/keychecks.rs
   description: Authenticated API-key validation probes (GitHub/Brave/Firecrawl/Voyage/Datalab). Keys from cp_vault. KeyProbe/ProbeResult structs, concurrent threads + COLLECT_DEADLINE, classify_failure. Honesty contract unavailable/error/ok. clippy-clean.

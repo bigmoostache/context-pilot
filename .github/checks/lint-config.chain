@@ -8467,3 +8467,88 @@ index 8c15a4d4..fc7e48af 100644
      match: "type_id/cause/provide are unstable or deprecated"
      reason: >
 # --- End entry #101 ---
+102:bd61e56efb5af1937c66283114cdf1c67a33c7fc74f94ce6a59634719264b25a:5d751f16a8b77c097c190ea77302022935603416d03c3fe5b58d8c7eabddb40e:92cf8335cc2641e75e833f6f7735cec69125e413d223998345ce451105b9ff29
+# --- Diff for entry #102 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index 8395be37..f28dd349 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1148,6 +1148,7 @@ cp-mod-github = { path = "crates/cp-mod-github" }
+ cp-mod-files = { path = "crates/cp-mod-files" }
+ cp-mod-spine = { path = "crates/cp-mod-spine" }
+ cp-mod-threads = { path = "crates/cp-mod-threads" }
++cp-fleet = { path = "crates/cp-fleet" }
+ cp-mod-bridge = { path = "crates/cp-mod-bridge" }
+ cp-wire = { path = "crates/cp-wire" }
+ cp-oplog = { path = "crates/cp-oplog" }
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index fc7e48af..0ac6cebd 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -194,6 +194,18 @@ exceptions:
+       Could merge all impl blocks into a single file, but that would
+       create a 2500+ line file. The split is intentional for navigation.
+ 
++  - path: "src/app/run/lifecycle/fleet.rs"
++    match: 'App methods split across run/ submodules for readability'
++    reason: >
++      The background-thread advancement step (advance_background_threads +
++      step_one_thread) is its own impl App block under run/lifecycle/. It is a
++      distinct concern (the Phase C multi-thread loop step) kept out of
++      lifecycle/mod.rs to respect the 500-line file cap. multiple_inherent_impl
++      (forbid) fires on this second block, so it carries the #[expect].
++    strategy: >
++      Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
++      would push that file over the limit. The split is the honest shape.
++
+   - path: "crates/cp-base/src/state/runtime/ext.rs"
+     match: "State methods split across runtime/ submodules to respect the 500-line file cap"
+     reason: >
+# --- End entry #102 ---
+103:92cf8335cc2641e75e833f6f7735cec69125e413d223998345ce451105b9ff29:1e5f1a5499a91d564a1f9c31053c09352f3938a6620e435b8087e3f0440989df:3f62fcfea3feb0e439a8b48b5223a06e1229ab1690000ae51deb44462ff5b8da
+# --- Diff for entry #103 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index 8395be37..f28dd349 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1148,6 +1148,7 @@ cp-mod-github = { path = "crates/cp-mod-github" }
+ cp-mod-files = { path = "crates/cp-mod-files" }
+ cp-mod-spine = { path = "crates/cp-mod-spine" }
+ cp-mod-threads = { path = "crates/cp-mod-threads" }
++cp-fleet = { path = "crates/cp-fleet" }
+ cp-mod-bridge = { path = "crates/cp-mod-bridge" }
+ cp-wire = { path = "crates/cp-wire" }
+ cp-oplog = { path = "crates/cp-oplog" }
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index fc7e48af..ea0ab7e0 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -183,7 +183,7 @@ exceptions:
+ 
+   # ── app/run/*: multiple_inherent_impl for App ────────────────────────
+ 
+-  - path: "src/app/run/lifecycle.rs"
++  - path: "src/app/run/lifecycle/mod.rs"
+     match: 'App methods split across run/ submodules for readability'
+     reason: >
+       App methods are split across 7 submodules in src/app/run/ for
+@@ -194,6 +194,18 @@ exceptions:
+       Could merge all impl blocks into a single file, but that would
+       create a 2500+ line file. The split is intentional for navigation.
+ 
++  - path: "src/app/run/lifecycle/fleet.rs"
++    match: 'App methods split across run/ submodules for readability'
++    reason: >
++      The background-thread advancement step (advance_background_threads +
++      step_one_thread) is its own impl App block under run/lifecycle/. It is a
++      distinct concern (the Phase C multi-thread loop step) kept out of
++      lifecycle/mod.rs to respect the 500-line file cap. multiple_inherent_impl
++      (forbid) fires on this second block, so it carries the #[expect].
++    strategy: >
++      Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
++      would push that file over the limit. The split is the honest shape.
++
+   - path: "crates/cp-base/src/state/runtime/ext.rs"
+     match: "State methods split across runtime/ submodules to respect the 500-line file cap"
+     reason: >
+# --- End entry #103 ---

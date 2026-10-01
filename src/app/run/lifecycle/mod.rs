@@ -17,6 +17,10 @@ use crate::ui;
 
 use crate::app::App;
 use crate::app::context::{build_stream_params, get_active_agent_content, prepare_stream_context};
+
+/// Background-thread advancement: swap-in/step/swap-out each non-resident active
+/// thread around the shared pipeline (Phase C). No-op at N=1.
+mod fleet;
 use cp_mod_spine::engine::{SpineDecision, apply_continuation, check_spine};
 use cp_mod_spine::types::{NotificationType, SpineState};
 
@@ -240,6 +244,14 @@ impl App {
         self.check_spine();
         super::streaming::process_api_check_results(self);
 
+        // === BACKGROUND THREADS (Phase C) ===
+        // After the focused/resident thread has been stepped in place above,
+        // advance every OTHER active thread one step by swapping it into `state`
+        // around the same advancement core (`step_one_thread`). Empty at N=1 —
+        // the resident is the only thread — so this is a no-op and the tick is
+        // byte-identical to single-thread. The promoter (C4) populates the set.
+        self.advance_background_threads();
+
         // === REVERIE (CONTEXT OPTIMIZER SUB-AGENT) ===
         super::tools::watchdog::mark(super::tools::watchdog::Step::Reverie);
         // Check if a reverie needs to start streaming (state.reverie exists but no stream yet)
@@ -347,7 +359,7 @@ impl App {
     /// Check the spine for auto-continuation decisions.
     /// Evaluates guard rails and auto-continuation logic.
     /// If a continuation fires, starts streaming.
-    fn check_spine(&mut self) {
+    pub(super) fn check_spine(&mut self) {
         // Idle is the implicit no-op tail — a non_exhaustive enum forbids a
         // cross-crate exhaustive match, so the two actionable variants are
         // handled via if-let and Idle simply falls through.
