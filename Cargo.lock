@@ -343,6 +343,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "cp-fleet"
+version = "0.2.13"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "cp-mod-brave"
 version = "0.2.13"
 dependencies = [
