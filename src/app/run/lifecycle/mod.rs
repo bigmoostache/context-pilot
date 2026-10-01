@@ -55,6 +55,11 @@ impl App {
         // Claim ownership immediately
         save_state(&self.state);
 
+        // Boot-load every background thread's persisted per-thread context into
+        // the fleet registry before the loop starts reconciling (F1 boot half).
+        // No-op at N=1 (no per-thread files) — byte-identical boot.
+        self.load_background_threads();
+
         // Start the interactive main-loop watchdog (purely observational — dumps
         // a diagnostic to .context-pilot/errors/ if the single-threaded loop
         // wedges, never terminates/signals the process). Idempotent.

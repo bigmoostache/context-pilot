@@ -82,6 +82,42 @@ impl App {
         // purely the roster-mirror + Idle<->Runnable derivation above.
     }
 
+    /// Boot-load every background thread's persisted per-thread context into the
+    /// fleet registry — the boot half of F1 (design doc I-10 "boot loads N →
+    /// registry"). Called once at the start of [`run`](super::App::run), before
+    /// the loop's first [`reconcile_fleet_registry`](Self::reconcile_fleet_registry).
+    ///
+    /// For each non-focused, non-archived thread it calls
+    /// [`boot_load_thread_runtime`](crate::state::persistence::boot_load_thread_runtime),
+    /// which returns the thread's persisted [`ThreadRuntime`] or `None` when the
+    /// thread has no `states/<tid>.json` yet (a cold thread). A loaded runtime is
+    /// registered with its `exec_state` derived from the thread's status; a cold
+    /// thread is left for `reconcile_fleet_registry` to insert with a fresh empty
+    /// runtime on the first tick.
+    ///
+    /// At N=1 (and for any agent whose background threads have not yet been
+    /// persisted per-thread) every lookup is `None`, so the fleet stays empty and
+    /// boot is byte-identical: reconcile then behaves exactly as before.
+    pub(super) fn load_background_threads(&mut self) {
+        let focused = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
+        let now = cp_base::panels::now_ms();
+        let roster: Vec<(String, ThreadStatus)> = ThreadsState::get(&self.state)
+            .threads
+            .iter()
+            .filter(|t| !t.archived && focused.as_deref() != Some(t.id.as_str()))
+            .map(|t| (t.id.clone(), t.status))
+            .collect();
+
+        for (id, status) in roster {
+            let Some(runtime) = crate::state::persistence::boot_load_thread_runtime(&id) else {
+                continue; // cold thread: no persisted file; reconcile gives it a fresh runtime
+            };
+            let mut entry = Entry::new(Role::Thread, runtime);
+            Self::derive_exec_state(&mut entry, status, now);
+            self.fleet.insert(id, entry);
+        }
+    }
+
     /// Derive one non-resident entry's [`ThreadExecState`] from its thread status.
     ///
     /// An **active** entry ([`Streaming`](ThreadExecState::Streaming) /
