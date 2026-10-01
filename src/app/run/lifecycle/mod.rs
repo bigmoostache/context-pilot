@@ -259,6 +259,7 @@ impl App {
         // roster and compute the promotion decision (never setting an active
         // state, so advancement stays deferred to Phase D/F2).
         self.reconcile_fleet_registry(current_ms);
+        self.dispatch_background_my_turn();
         self.advance_background_threads();
 
         // === REVERIE (CONTEXT OPTIMIZER SUB-AGENT) ===
