@@ -295,7 +295,7 @@ M-short-11:
   title: 'Cache optimizer: K=3 +'
   contents: 'Cache optimizer: K=3 + beacon (4th). ConversationTailDensity uses UNIFORM weight (1.0) for hot blocks, zero for cold. Previous i² was catastrophic. Fix: ed83c9df.'
   importance: high
-  last_edited_ms: 0
+  last_edited_ms: 1790859348667
 M-short-12:
   tier: short
   title: T506 web-lint P0-P12
@@ -708,10 +708,10 @@ M-tiny-32:
   last_edited_ms: 1790582340866
 M-tiny-33:
   tier: tiny
-  title: Multi-thread ABC1C2 done
-  contents: 'multi-thread-core-loop: Phase A+B DONE (B8 closeout 4ca6e896; B1 b639de2a B2 7801d5b4 B3 873842e7 B5 21a6ac94 B6 9479330b). N=1 identical. NEXT Phase C: C1 App.thread_streams mirror reverie_streams.'
+  title: Multi-thread C3 done
+  contents: 'multi-thread-core-loop (T774): A+B done; C3=a231910d (App.fleet empty@N=1; advance_background_threads swap-in/step/out; lifecycle/{mod,fleet}.rs). N=1 identical. NEXT C4 promoter.'
   importance: high
-  last_edited_ms: 1790858044592
+  last_edited_ms: 1790859370646
 M-tiny-34:
   tier: tiny
   title: Never trust gate markers

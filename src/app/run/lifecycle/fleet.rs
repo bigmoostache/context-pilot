@@ -7,10 +7,112 @@
 //! back. At N=1 the registry is empty, so the whole pass is a no-op and the tick
 //! is byte-identical to single-thread execution.
 
+use cp_fleet::{Entry, Role, ThreadExecState, promote};
+use cp_mod_threads::types::{ThreadStatus, ThreadsState};
+
 use crate::app::App;
 
 #[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
+    /// Reconcile the fleet registry against [`ThreadsState`] and compute the
+    /// promotion decision — the **scheduling-decision layer** (Phase C4).
+    ///
+    /// This mirrors the thread roster into [`fleet`](crate::app::App::fleet) and
+    /// derives each entry's [`ThreadExecState`], but deliberately drives **no**
+    /// background advancement: it never sets an *active* state
+    /// ([`Streaming`](ThreadExecState::Streaming) /
+    /// [`AwaitingLlm`](ThreadExecState::AwaitingLlm)), so
+    /// [`advance_background_threads`](Self::advance_background_threads) stays a
+    /// no-op. Real advancement (flipping a promoted thread active + spawning its
+    /// stream) is deferred until the spine is thread-routed (Phase D) and the
+    /// conversation is per-thread (Phase F2).
+    ///
+    /// Reconcile rules (the **resident/focused** thread is excluded — its context
+    /// lives flat in [`State`](crate::state::State), not in an `Entry`):
+    /// - a non-focused, non-archived thread missing from the registry gets a
+    ///   fresh `Idle` [`Entry`] (empty [`ThreadRuntime`](cp_base::state::runtime::bundle::ThreadRuntime));
+    /// - an entry whose thread vanished, was archived, or became the focused
+    ///   resident is removed;
+    /// - each surviving entry's `exec_state` is derived from its thread status:
+    ///   `MyTurn` → `Runnable` (+ `waiting_since_ms`), otherwise `Idle`.
+    ///
+    /// At N=1 the only working thread is the focused resident (excluded), so the
+    /// registry holds at most `Idle` `THEIR_TURN` peers, `promote` returns empty,
+    /// and the tick is byte-identical to single-thread.
+    pub(super) fn reconcile_fleet_registry(&mut self, now_ms: u64) {
+        let focused = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
+
+        // Snapshot the current roster: (id, status, eligible) for every thread
+        // that should own a registry entry (non-focused, non-archived).
+        let roster: Vec<(String, ThreadStatus)> = ThreadsState::get(&self.state)
+            .threads
+            .iter()
+            .filter(|t| !t.archived && focused.as_deref() != Some(t.id.as_str()))
+            .map(|t| (t.id.clone(), t.status))
+            .collect();
+
+        // Drop entries whose thread is gone / archived / now the focused resident.
+        let live: std::collections::HashSet<&str> = roster.iter().map(|entry| entry.0.as_str()).collect();
+        let stale: Vec<String> =
+            self.fleet.iter().map(|entry| entry.0.clone()).filter(|id| !live.contains(id.as_str())).collect();
+        for id in stale {
+            let _removed = self.fleet.remove(&id);
+        }
+
+        // Add missing entries, then derive exec_state for each roster thread.
+        for entry in &roster {
+            let (id, status) = (&entry.0, entry.1);
+            if !self.fleet.contains(id) {
+                self.fleet.insert(
+                    id.clone(),
+                    Entry::new(Role::Thread, cp_base::state::runtime::bundle::ThreadRuntime::new()),
+                );
+            }
+            if let Some(reg_entry) = self.fleet.get_mut(id) {
+                Self::derive_exec_state(reg_entry, status, now_ms);
+            }
+        }
+
+        // Promotion decision (fills free active slots from the waiting queue).
+        // Wired and unit-tested in cp-fleet; at N=1 the waiting queue is empty
+        // (background peers are THEIR_TURN → Idle), so this is provably empty.
+        // Applying it (flip → active + spawn stream) is the one step deferred to
+        // Phase D/F2 — until then the decision is observed, not executed.
+        let promotable = promote(&self.fleet);
+        if !promotable.is_empty() {
+            log::debug!(
+                "fleet: {} thread(s) promotable, advancement deferred to Phase D/F2: {promotable:?}",
+                promotable.len()
+            );
+        }
+    }
+
+    /// Derive one non-resident entry's [`ThreadExecState`] from its thread status,
+    /// **without ever setting an active state** (advancement stays deferred).
+    ///
+    /// `MyTurn` means the thread has user input awaiting the agent → `Runnable`
+    /// (stamping `waiting_since_ms` once, on the Idle→Runnable edge, for
+    /// oldest-waiting-first promotion). `TheirTurn` → `Idle` (waiting on the
+    /// human), clearing any stale wait stamp.
+    fn derive_exec_state(
+        entry: &mut Entry<cp_base::state::runtime::bundle::ThreadRuntime>,
+        status: ThreadStatus,
+        now_ms: u64,
+    ) {
+        match status {
+            ThreadStatus::MyTurn => {
+                if entry.exec_state != ThreadExecState::Runnable {
+                    entry.exec_state = ThreadExecState::Runnable;
+                    entry.waiting_since_ms = Some(now_ms);
+                }
+            }
+            ThreadStatus::TheirTurn => {
+                entry.exec_state = ThreadExecState::Idle;
+                entry.waiting_since_ms = None;
+            }
+        }
+    }
+
     /// Advance every *background* (non-resident, active, capped) thread one step.
     ///
     /// For each one it removes the entry, swaps the thread's parked

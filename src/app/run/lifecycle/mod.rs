@@ -249,7 +249,12 @@ impl App {
         // advance every OTHER active thread one step by swapping it into `state`
         // around the same advancement core (`step_one_thread`). Empty at N=1 —
         // the resident is the only thread — so this is a no-op and the tick is
-        // byte-identical to single-thread. The promoter (C4) populates the set.
+        // byte-identical to single-thread.
+        //
+        // C4 scheduling-decision layer: reconcile the registry against the thread
+        // roster and compute the promotion decision (never setting an active
+        // state, so advancement stays deferred to Phase D/F2).
+        self.reconcile_fleet_registry(current_ms);
         self.advance_background_threads();
 
         // === REVERIE (CONTEXT OPTIMIZER SUB-AGENT) ===
