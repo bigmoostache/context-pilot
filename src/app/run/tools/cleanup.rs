@@ -111,16 +111,22 @@ fn process_async_completions(app: &mut App, async_results: &mut [cp_base::state:
     }
 
     for result in async_results.iter() {
-        let nid = SpineState::create_notification(
-            &mut app.state,
-            NotificationType::Custom,
-            "watcher".to_owned(),
-            result.description.clone(),
-        );
-        SpineState::set_notification_thread(&mut app.state, &nid, result.thread_id.clone());
-        if result.processed_already {
-            let _r = SpineState::mark_notification_processed(&mut app.state, &nid);
-        }
+        // Route the notification into the OWNER thread's spine inbox (delivery,
+        // not advancement). At N=1 the owner is always the focused resident, so
+        // this is a direct, byte-identical delivery. The result PANEL is still
+        // created on the resident's context above — moving panels into the owner
+        // thread is a Phase F (per-thread panels/teardown) concern.
+        let tid = result.thread_id.clone();
+        let tid_tag = tid.clone();
+        let desc = result.description.clone();
+        let processed = result.processed_already;
+        app.deliver_to_thread(tid.as_deref(), |state| {
+            let nid = SpineState::create_notification(state, NotificationType::Custom, "watcher".to_owned(), desc);
+            SpineState::set_notification_thread(state, &nid, tid_tag);
+            if processed {
+                let _r = SpineState::mark_notification_processed(state, &nid);
+            }
+        });
     }
 
     app.save_state_async();

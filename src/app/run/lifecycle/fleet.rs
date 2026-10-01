@@ -164,4 +164,48 @@ impl App {
         super::super::streaming::finalize_stream(self);
         self.check_spine();
     }
+
+    /// Run `f` against the state of the thread that owns `thread_id` — the
+    /// **delivery seam** for thread-addressed spine routing (Phase D1).
+    ///
+    /// Delivery is distinct from advancement: it mutates a thread's own context
+    /// (its spine inbox, its conversation) without stepping its pipeline. This is
+    /// how a watcher fire, a coucou, or a bridge message for a *background*
+    /// thread lands in *that* thread's inbox rather than the resident's.
+    ///
+    /// Routing (the resident = the focused thread, whose context lives flat in
+    /// [`State`](cp_base::state::runtime::State)):
+    /// - `None`, or a `thread_id` equal to the focused resident → run `f` on
+    ///   `state` directly (today's single-thread path);
+    /// - any other (background) owner → swap its parked
+    ///   [`ThreadRuntime`](cp_base::state::runtime::bundle::ThreadRuntime) into
+    ///   `state` (O(1), no clone), run `f`, then swap the focused thread back —
+    ///   so `state` and the registry are left exactly as found.
+    ///
+    /// At N=1 the only working thread is the focused resident, so every target
+    /// is `None` or the resident and the swap branch is never taken: behaviour
+    /// is byte-identical to single-thread. A `thread_id` that is neither focused
+    /// nor in the registry (unknown/archived) is logged and delivered to the
+    /// resident as a last-resort safety net (never reached at N=1).
+    pub(crate) fn deliver_to_thread<F>(&mut self, thread_id: Option<&str>, f: F)
+    where
+        F: FnOnce(&mut cp_base::state::runtime::State),
+    {
+        let focused = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
+        let Some(tid) = thread_id.filter(|t| focused.as_deref() != Some(*t)) else {
+            // None, or targets the focused resident → deliver directly.
+            f(&mut self.state);
+            return;
+        };
+        // Background owner: swap its parked runtime in, deliver, swap back.
+        let Some(mut entry) = self.fleet.remove(tid) else {
+            log::warn!("deliver_to_thread: unknown/unparked thread {tid}; delivering to resident");
+            f(&mut self.state);
+            return;
+        };
+        entry.runtime.swap_with(&mut self.state); // thread `tid` resident; focused parks into entry
+        f(&mut self.state);
+        entry.runtime.swap_with(&mut self.state); // restore focused; thread `tid` parks back
+        self.fleet.insert(tid.to_owned(), entry);
+    }
 }

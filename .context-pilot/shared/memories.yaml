@@ -708,10 +708,10 @@ M-tiny-32:
   last_edited_ms: 1790582340866
 M-tiny-33:
   tier: tiny
-  title: Multi-thread C3 done
-  contents: 'multi-thread-core-loop (T774): A+B done; C3=a231910d (App.fleet empty@N=1; advance_background_threads swap-in/step/out; lifecycle/{mod,fleet}.rs). N=1 identical. NEXT C4 promoter.'
+  title: Multi-thread C4 done
+  contents: 'multi-thread (T774): A+B done; C3=a231910d; C4=60c64960 (reconcile_fleet_registry: ThreadsState->fleet, never-active, promote logged). N=1 identical. REORDER: real advance after D+F2. NEXT D.'
   importance: high
-  last_edited_ms: 1790859370646
+  last_edited_ms: 1790860343266
 M-tiny-34:
   tier: tiny
   title: Never trust gate markers
