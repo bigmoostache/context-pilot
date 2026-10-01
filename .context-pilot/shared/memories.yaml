@@ -706,6 +706,12 @@ M-tiny-32:
   contents: 'find -prune shapes: bare X => descend; X + X/* => -prune; X/* only => -print -prune. Group''s first entry must not be -o.'
   importance: medium
   last_edited_ms: 1790582340866
+M-tiny-33:
+  tier: tiny
+  title: Multi-thread B2 done
+  contents: 'B2 DONE 7801d5b4 (multi-thread-core-loop): bundle.rs ThreadRuntime+swap_with, dead til Phase C=N=1 identical, absorbs B4. NEXT B3: conversation+conversation_history FLIP→per-thread.'
+  importance: high
+  last_edited_ms: 1790853217484
 M-tiny-34:
   tier: tiny
   title: Never trust gate markers
