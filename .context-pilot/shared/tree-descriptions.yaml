@@ -3138,6 +3138,10 @@
   path: web/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298: per-message splitMessageSegments interleaves prose + inline FileUploadChip; hosts ONE shared QuickLookSheet (agentId-scoped). T304: passes draftKey. T331: passes pendingFiles + onRemoveFile. T334: onShowInFinder forwarded to Message. T348: useLibrary(agentId) → command suggestions (kind===''command'', /${id}, with body) passed to composer ONLY for an empty thread. T350: owns createCmdOpen state + renders CreateCommandDialog; passes onCreateCommand to composer to open it. Takes agentId + onAttach props.'
   last_edited_ms: 0
+1f210812025b151f:
+  path: crates/cp-mod-search/src/conv_docs.rs
+  description: 'build_conversation_docs (pub(crate)): extracted from lib.rs (B6 500-line cap). Builds the desired ConversationDoc set from live ThreadsState threads for the T671 conversations index reconcile — one doc per non-auto, non-empty message; stable id {thread_id}-{index}.'
+  last_edited_ms: 1790854874612
 1f22019f5a6e5ddb:
   path: src/app/run/tools/checks.rs
   description: 'Post-tool non-blocking polls: panel readiness (5s timeout), deferred sleep timer. Each resumes streaming pipeline when condition met. Imports has_dirty_panels from streaming.rs.'
@@ -9310,6 +9314,10 @@
   path: crates/cp-mod-search/src/indexer.rs
   description: Background file indexer with flame!("index_file"). Mtime-based dedup skips unchanged files. Initial scan thread + debounced mpsc event loop. 3s poll interval PollWatcher.
   last_edited_ms: 0
+5c646b3aa333d2cb:
+  path: crates/cp-base/src/state/runtime/ext.rs
+  description: 'State module-extension accessors (split from runtime/mod.rs for 500-line cap): get_ext/get_ext_mut/ext/ext_mut search BOTH scope maps; set_ext routes first-insert by init_is_global (Some(true)=shared else per-thread); set_ext_global/set_ext_thread force placement; set_init_scope sets ambient routing. multiple_inherent_impl expect.'
+  last_edited_ms: 1790854874466
 5c6880da92b4db77:
   path: src/main.rs
   description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook. use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
@@ -11690,6 +11698,10 @@
   path: src/modules/pre_flight.rs
   description: 'Pre-flight validation: Phase 0 trap block, Phase 0.25 compulsory intent/verb (blocking), Phase 0.5 duplicate Close_conversation_history queue check, Phase 1 schema validation, Phase 2 module semantic checks.'
   last_edited_ms: 0
+73d6e953172acaa2:
+  path: crates/cp-base/src/state/runtime/bundle.rs
+  description: 'ThreadRuntime (pub mod bundle): per-thread runtime bundle mirroring the ~45 per-thread State fields (conversation, editor/view, stream lifecycle, token+cost telemetry, cache/freeze engine snapshots, thread_module_data). swap_with(&mut State) = flat per-field mem::swap (O(1), no clone) making a thread resident. Default mirrors State::default per-thread subset. Additive/dead until Phase C loop wires it — N=1 identical. 2 too_many_lines expects (default + swap_with).'
+  last_edited_ms: 1790854874320
 73da09044113f712:
   path: crates/cp-mod-scratchpad/src/lib.rs
   description: 'Scratchpad module. 3 tools: create_cell/edit_cell/wipe. Fixed SCRATCHPAD panel. Per-worker cells. Visualizer: colored create/update/delete. fixed_order=8.'
@@ -17554,6 +17566,10 @@ adfe8c0af4ba9bf7:
   path: web/src/lib/support/markdown.tsx
   description: 'GFM markdown renderer (react-markdown+remark-gfm+math+katex). onAccent/default variants. clipboard() guard. web-lint P5 pending: no-useless-recursion + no-array-callback-reference on extractText:39 and .map(fmtRow):115.'
   last_edited_ms: 1783412977437
+ae077505f8073052:
+  path: crates/cp-fleet/src/lib.rs
+  description: 'cp-fleet core (I/O-free, no cp-base dep): ThreadExecState (Idle/Runnable/Streaming/AwaitingLlm/AwaitingTool/Errored; is_active=Streaming|AwaitingLlm), Role (Thread|Reverie; only Thread capped), Entry<R>/FleetRegistry<R> generic over per-thread runtime R, K=2 concurrency cap, promote() = oldest-waiting-first fill of free active slots. Phase A skeleton; loop wiring in Phase C.'
+  last_edited_ms: 1790854874753
 ae0d84da9e8aa50f:
   path: web/src/mobile-components/shell/widgets/UsageButton.tsx
   description: '@generated mobile-mirror stub — re-exports desktop UsageButton (LoginFlow reused by mobile via this token).'
