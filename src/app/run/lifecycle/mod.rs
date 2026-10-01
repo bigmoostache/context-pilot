@@ -21,6 +21,9 @@ use crate::app::context::{build_stream_params, get_active_agent_content, prepare
 /// Background-thread advancement: swap-in/step/swap-out each non-resident active
 /// thread around the shared pipeline (Phase C). No-op at N=1.
 mod fleet;
+/// Fleet lifecycle I/O (Phase F): console orphan-prune, N-thread save, hard-delete
+/// teardown, Errored re-engage. Split from `fleet` for the 500-line cap.
+mod fleet_lifecycle;
 use cp_mod_spine::engine::{SpineDecision, apply_continuation, check_spine};
 use cp_mod_spine::types::{NotificationType, SpineState};
 
@@ -59,6 +62,12 @@ impl App {
         // the fleet registry before the loop starts reconciling (F1 boot half).
         // No-op at N=1 (no per-thread files) — byte-identical boot.
         self.load_background_threads();
+
+        // Kill console sessions on the server that belong to no loaded thread —
+        // ONCE over the union of every thread's session keys (the per-thread
+        // kill was removed from the console module: it would cross-kill other
+        // threads' live sessions, F6/S2). N=1-identical: union = focused keys.
+        self.prune_orphaned_console_sessions();
 
         // Start the interactive main-loop watchdog (purely observational — dumps
         // a diagnostic to .context-pilot/errors/ if the single-threaded loop

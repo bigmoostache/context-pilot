@@ -8552,3 +8552,30 @@ index fc7e48af..ea0ab7e0 100644
      match: "State methods split across runtime/ submodules to respect the 500-line file cap"
      reason: >
 # --- End entry #103 ---
+104:3f62fcfea3feb0e439a8b48b5223a06e1229ab1690000ae51deb44462ff5b8da:90920122b8b4ac80f9591845c8c80ae0a1324f1fcafee740b2fe58a70324355a:191ecb055470f89021c518f9fa3d36994cc2f6e5f8f62d5b7a3ca89dc6af64a0
+# --- Diff for entry #104 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index ea0ab7e0..2fb7b044 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -206,6 +206,19 @@ exceptions:
+       Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
+       would push that file over the limit. The split is the honest shape.
+ 
++  - path: "src/app/run/lifecycle/fleet_lifecycle.rs"
++    match: 'App methods split across run/ submodules for readability'
++    reason: >
++      The fleet lifecycle I/O methods (prune_orphaned_console_sessions,
++      save_all_threads, clear_errored_entry, teardown_thread — Phase F boot/
++      persist/teardown) are their own impl App block, split from the sibling
++      fleet.rs scheduling module to keep each file under the 500-line cap.
++      multiple_inherent_impl (forbid) fires on this additional block, so it
++      carries the #[expect].
++    strategy: >
++      Irreducible under the 500-line cap — folding these back into fleet.rs
++      would push that file over the limit. The split is the honest shape.
++
+   - path: "crates/cp-base/src/state/runtime/ext.rs"
+     match: "State methods split across runtime/ submodules to respect the 500-line file cap"
+     reason: >
+# --- End entry #104 ---

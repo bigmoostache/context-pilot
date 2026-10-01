@@ -111,10 +111,10 @@ M-mid-10:
   last_edited_ms: 0
 M-mid-11:
   tier: mid
-  title: EVEN IF A RED CALLBACK IS
-  contents: 'EVEN IF A RED CALLBACK IS PRE-EXISTING: ALWAYS TAKE OWNERSHIP OF IT AND SOLVE IT. PERIOD. EVERYONE IS RESPONSIBLE, ESPECIALLY YOU. No dismissing failures as ''pre-existing'' — fix them.'
-  importance: critical
-  last_edited_ms: 0
+  title: F6 console cross-kill bug
+  contents: 'F6 (X693): console load_module_data''s kill_orphaned_processes(known_keys) uses only THAT thread''s keys → at N>1 a bg thread''s boot-reconnect kills other threads'' live console sessions (same class as F1c prune). FIX: union-kill once over ALL threads'' keys. Coucou/console reattach already fall out of F1d+D2; channel/stream watchers correctly not persisted (S2).'
+  importance: high
+  last_edited_ms: 1790869601361
 M-mid-12:
   tier: mid
   title: 'T604 + FIGHT:'
@@ -458,10 +458,10 @@ M-short-32:
   last_edited_ms: 1787840930967
 M-short-33:
   tier: short
-  title: MT Av/F3/F4a/F1c
-  contents: 'branch multi-thread-core-loop, bg advancement ON, green, N=1 identical. Av1-5 (stream isolation+step loop+tee+dispatcher); F3/D4 ce948311; F4a fd04033b Errored isolation; F1c 1b531fab per-thread save: save_all_threads resident-keyed states/<tid>.json, deferred union orphan-prune on reload/quit, focused stays main_worker.json. REMAINING: F1d boot loads N, F5 teardown, F6 reattach, Phase G TUI.'
+  title: MT F1/F5 done
+  contents: 'branch multi-thread-core-loop, bg advancement ON, green, N=1 identical. F1 DONE (F1c 1b531fab + F1d 17b95cd7 boot_load_thread_runtime). F5 teardown DONE 1011c877: App::teardown_thread = deliver_to_thread(tid, ConsoleState::shutdown_all) + fleet.remove(tid). GAP X731: focused=main_worker.json positional. REMAINING: F6 reattach (see M-mid-11), F7, Phase G, Phase H.'
   importance: high
-  last_edited_ms: 1790866672668
+  last_edited_ms: 1790869612535
 M-short-34:
   tier: short
   title: check-rust-tests.sh now

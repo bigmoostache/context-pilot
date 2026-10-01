@@ -206,6 +206,19 @@ exceptions:
       Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
       would push that file over the limit. The split is the honest shape.
 
+  - path: "src/app/run/lifecycle/fleet_lifecycle.rs"
+    match: 'App methods split across run/ submodules for readability'
+    reason: >
+      The fleet lifecycle I/O methods (prune_orphaned_console_sessions,
+      save_all_threads, clear_errored_entry, teardown_thread — Phase F boot/
+      persist/teardown) are their own impl App block, split from the sibling
+      fleet.rs scheduling module to keep each file under the 500-line cap.
+      multiple_inherent_impl (forbid) fires on this additional block, so it
+      carries the #[expect].
+    strategy: >
+      Irreducible under the 500-line cap — folding these back into fleet.rs
+      would push that file over the limit. The split is the honest shape.
+
   - path: "crates/cp-base/src/state/runtime/ext.rs"
     match: "State methods split across runtime/ submodules to respect the 500-line file cap"
     reason: >
