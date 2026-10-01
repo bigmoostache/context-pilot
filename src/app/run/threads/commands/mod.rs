@@ -117,7 +117,8 @@ fn apply_send_message(state: &mut State, thread_id: &str, content: &str) -> bool
 }
 
 /// Fire every module's `on_user_message` lifecycle hook against the owner
-/// thread's state — the per-thread counter reset (D4/S7).
+/// thread's state — the per-thread counter reset (D4/S7) — then re-engage the
+/// thread if it was parked [`Errored`](cp_fleet::ThreadExecState::Errored).
 ///
 /// Routed through [`App::deliver_to_thread`] so a message sent to a *background*
 /// thread resets *that* thread's spine counters (auto-continuation count,
@@ -125,12 +126,18 @@ fn apply_send_message(state: &mut State, thread_id: &str, content: &str) -> bool
 /// resident's. At N=1 (or when the target IS the focused resident, or a
 /// just-created thread not yet in the registry) `deliver_to_thread` runs the
 /// hook directly on `state` — byte-identical to the former inline loop.
+///
+/// After the reset, [`App::clear_errored_entry`] flips a stuck (`Errored`)
+/// thread back to `Runnable`: a fresh user message is the human-intervention
+/// recovery path for a thread the loop had given up on (F4). A no-op for the
+/// resident / unknown threads, so N=1 is unaffected.
 fn route_on_user_message(app: &mut App, thread_id: &str) {
     app.deliver_to_thread(Some(thread_id), |state| {
         for module in crate::modules::all_modules() {
             module.on_user_message(state);
         }
     });
+    app.clear_errored_entry(thread_id);
 }
 
 // ── ArchiveThread ───────────────────────────────────────────────────────

@@ -12,6 +12,18 @@ use cp_mod_threads::types::{ThreadStatus, ThreadsState};
 
 use crate::app::App;
 
+/// Consecutive terminal stream failures (each after its own API retries are
+/// exhausted) before a background thread is parked as
+/// [`Errored`](ThreadExecState::Errored).
+///
+/// A one-off blip stays `Runnable` and retries after the spine's exponential
+/// backoff; only a thread that keeps failing is declared *stuck* and removed
+/// from scheduling until a human re-engages it (design doc §8 — human
+/// intervention is the recovery path for a stuck thread). The counter
+/// (`SpineState.config.consecutive_continuation_errors`) is reset to 0 by a
+/// successful stream completion or a fresh user message.
+const STUCK_ERROR_THRESHOLD: usize = 3;
+
 #[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
     /// Reconcile the fleet registry against [`ThreadsState`] — the roster-mirror
@@ -88,8 +100,13 @@ impl App {
         status: ThreadStatus,
         now_ms: u64,
     ) {
-        if entry.exec_state.is_active() {
-            return; // owned by the advancement step loop; never clobber
+        if entry.exec_state.is_active() || entry.exec_state == ThreadExecState::Errored {
+            // Active: owned by the advancement step loop (re-derived post-step).
+            // Errored: parked as stuck — never auto-revived here; only a fresh
+            // user message clears it (see `clear_errored_entry`), matching the
+            // human-intervention recovery model. Never clobber either back to
+            // Runnable just because the thread's status is still MyTurn.
+            return;
         }
         match status {
             ThreadStatus::MyTurn => {
@@ -163,6 +180,14 @@ impl App {
     fn post_step_exec_state(&self, id: &str) -> ThreadExecState {
         if self.state.flags.stream.phase.is_streaming() {
             return ThreadExecState::Streaming;
+        }
+        // Repeated terminal failures → park as Errored (stuck, needs a human).
+        // Excluded from both `promote` and the step loop, so a persistently
+        // failing thread stops churning a promotion slot and can never stall the
+        // fleet; it waits for a fresh user message to re-engage it.
+        let errs = cp_mod_spine::types::SpineState::get(&self.state).config.consecutive_continuation_errors;
+        if errs >= STUCK_ERROR_THRESHOLD {
+            return ThreadExecState::Errored;
         }
         let status = ThreadsState::get(&self.state).threads.iter().find(|t| t.id == id).map(|t| t.status);
         match status {
@@ -289,5 +314,23 @@ impl App {
         f(&mut self.state);
         entry.runtime.swap_with(&mut self.state); // restore focused; thread `tid` parks back
         self.fleet.insert(tid.to_owned(), entry);
+    }
+
+    /// Re-engage a background thread parked as [`Errored`](ThreadExecState::Errored),
+    /// flipping its registry entry back to `Runnable` so the loop schedules it again.
+    ///
+    /// This is the **human-intervention recovery path** (design doc §8): a stuck
+    /// thread is only revived by a fresh user message, which `route_on_user_message`
+    /// routes here after resetting the thread's spine error counters. A no-op when
+    /// the thread has no entry (the focused resident, or an unknown thread) or when
+    /// the entry is not `Errored` — so at N=1 (focused thread never in the registry)
+    /// it never fires.
+    pub(crate) fn clear_errored_entry(&mut self, thread_id: &str) {
+        if let Some(entry) = self.fleet.get_mut(thread_id)
+            && entry.exec_state == ThreadExecState::Errored
+        {
+            entry.exec_state = ThreadExecState::Runnable;
+            entry.waiting_since_ms = Some(cp_base::panels::now_ms());
+        }
     }
 }
