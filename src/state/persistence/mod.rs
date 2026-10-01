@@ -209,8 +209,10 @@ pub(crate) fn load_state() -> State {
         state.tools = crate::modules::active_tool_definitions(&state.active_modules);
         state.tools.push(crate::app::reverie::tools::optimize_context_tool_definition());
         for module in crate::modules::all_modules() {
+            state.set_init_scope(Some(module.is_global()));
             module.init_state(&mut state);
         }
+        state.set_init_scope(None);
         set_active_theme(&state.active_theme);
         state
     }

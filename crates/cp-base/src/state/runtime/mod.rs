@@ -204,14 +204,33 @@ pub struct State {
     /// Takes `(file_path, content)` and returns `cp_render::Span` per line.
     pub highlight_ir_fn: Option<HighlightIrFn>,
 
-    // === Module extension data (TypeMap pattern) ===
-    /// Module-owned state stored by `TypeId`. Each module registers its own state struct
-    /// at startup via `Module::init_state()`. Accessed via `get_ext::<T>()` / `get_ext_mut::<T>()`.
-    pub module_data: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
+    // === Module extension data (TypeMap pattern, split by scope) ===
+    /// Fleet-shared module-owned state stored by `TypeId` (one instance across
+    /// all threads — e.g. memory, logs, entities, the threads registry). Never
+    /// swapped by [`load_thread`](Self::load_thread) / `store_thread`.
+    ///
+    /// A given `TypeId` lives in exactly ONE of the two maps, so the `get_ext`
+    /// family searches both and `set_ext` updates whichever already holds the
+    /// type; first-inserts are routed by [`init_is_global`](Self::init_is_global).
+    pub shared_module_data: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
+    /// Per-thread module-owned state for the RESIDENT thread (the one whose
+    /// context currently lives in `State`). Carried by the swap in
+    /// [`load_thread`](Self::load_thread) / `store_thread` when a non-resident
+    /// thread is advanced. Holds per-thread view/runtime state (spine inbox,
+    /// queue, console ownership, watcher registry, search/git views, …).
+    pub thread_module_data: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
+    /// Ambient scope for the *next* first-insert via [`set_ext`](Self::set_ext),
+    /// set by the boot/init loops around `init_state` / `load_module_data`:
+    /// `Some(true)` → [`shared_module_data`](Self::shared_module_data),
+    /// `Some(false)` or `None` → [`thread_module_data`](Self::thread_module_data).
+    /// Updates to already-registered types ignore this (they stay in place).
+    pub init_is_global: Option<bool>,
 }
 
 /// `Default` for `State` (extracted for the 500-line cap).
 mod default;
+/// Module extension-data accessors (`get_ext`/`ext`/`set_ext`/…), extracted for the cap.
+mod ext;
 
 impl State {
     // === Boot builder (cross-crate reconstruction from persisted state) ===
@@ -278,64 +297,7 @@ impl State {
     }
 
     // === Module extension data (TypeMap) ===
-
-    /// Get a reference to module-owned state by type.
-    #[must_use]
-    pub fn get_ext<T>(&self) -> Option<&T>
-    where
-        T: 'static + Send + Sync,
-    {
-        self.module_data.get(&TypeId::of::<T>()).and_then(|v| v.downcast_ref())
-    }
-
-    /// Get a mutable reference to module-owned state by type.
-    pub fn get_ext_mut<T>(&mut self) -> Option<&mut T>
-    where
-        T: 'static + Send + Sync,
-    {
-        self.module_data.get_mut(&TypeId::of::<T>()).and_then(|v| v.downcast_mut())
-    }
-
-    /// Get module state by type, panicking if not initialized.
-    ///
-    /// Prefer this over `get_ext().expect()` — the panic lives in
-    /// [`invariant_panic`](crate::config::invariant_panic) once,
-    /// so callers don't need `expect(clippy::expect_used)`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if module state `T` was never registered via [`set_ext`](Self::set_ext).
-    #[must_use]
-    pub fn ext<T>(&self) -> &T
-    where
-        T: 'static + Send + Sync,
-    {
-        self.get_ext::<T>().unwrap_or_else(|| {
-            crate::config::invariant_panic("module state not initialized \u{2014} was init_state() called?")
-        })
-    }
-
-    /// Get mutable module state by type, panicking if not initialized.
-    ///
-    /// # Panics
-    ///
-    /// Panics if module state `T` was never registered via [`set_ext`](Self::set_ext).
-    pub fn ext_mut<T>(&mut self) -> &mut T
-    where
-        T: 'static + Send + Sync,
-    {
-        self.get_ext_mut::<T>().unwrap_or_else(|| {
-            crate::config::invariant_panic("module state not initialized \u{2014} was init_state() called?")
-        })
-    }
-
-    /// Set module-owned state by type. Replaces any existing value of this type.
-    pub fn set_ext<T>(&mut self, val: T)
-    where
-        T: 'static + Send + Sync,
-    {
-        drop(self.module_data.insert(TypeId::of::<T>(), Box::new(val)));
-    }
+    // Accessors (get_ext/ext/set_ext/…) live in the `ext` sibling module.
 
     /// Update the `last_refresh_ms` timestamp for a panel by its context type.
     pub fn touch_panel(&mut self, context_type: &str) {
@@ -443,7 +405,7 @@ impl std::fmt::Debug for State {
             .field("context_len", &self.context.len())
             .field("messages_len", &self.messages.len())
             .field("stream_phase", &self.flags.stream.phase)
-            .field("module_data_keys", &self.module_data.len())
+            .field("module_data_keys", &self.shared_module_data.len().saturating_add(self.thread_module_data.len()))
             .finish_non_exhaustive()
     }
 }

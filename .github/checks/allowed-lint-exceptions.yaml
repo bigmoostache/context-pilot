@@ -194,6 +194,19 @@ exceptions:
       Could merge all impl blocks into a single file, but that would
       create a 2500+ line file. The split is intentional for navigation.
 
+  - path: "crates/cp-base/src/state/runtime/ext.rs"
+    match: "State methods split across runtime/ submodules to respect the 500-line file cap"
+    reason: >
+      State's inherent methods are split across runtime/mod.rs (the aggregate
+      struct + boot builders + message creation) and the sibling ext.rs (the
+      module extension-data accessors: get_ext/ext/set_ext/set_ext_global/
+      set_ext_thread/set_init_scope). mod.rs sits near the 500-line file cap;
+      folding the accessors back in would push it over. clippy::multiple_inherent_impl
+      (deny) fires on the second block (ext.rs), so it carries the #[expect].
+    strategy: >
+      Irreducible under the 500-line file cap — the two impl blocks are the honest
+      shape once State's methods exceed one file's budget.
+
   - path: "src/llms/mod.rs"
     match: "type_id/cause/provide are unstable or deprecated"
     reason: >

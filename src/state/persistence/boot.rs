@@ -76,10 +76,15 @@ fn load_one_module_data(module: &dyn crate::modules::Module, module_data: &BootM
     } else {
         module_data.worker.get(module.id()).unwrap_or(&null)
     };
+    // Route first-inserts into the correct scope map: a module's main state
+    // follows its is_global(); its worker-data slice is always per-thread.
+    state.set_init_scope(Some(module.is_global()));
     module.load_module_data(data, state);
 
     let worker_data = module_data.worker.get(&format!("{}_worker", module.id())).unwrap_or(&null);
+    state.set_init_scope(Some(false));
     module.load_worker_data(worker_data, state);
+    state.set_init_scope(None);
 }
 
 /// Phase 5: Initialize all modules and load their persisted data.
@@ -99,8 +104,10 @@ pub(crate) fn boot_init_modules(state: &mut State, module_data: &BootModuleData,
 
     for module in &modules {
         progress(module.name());
+        state.set_init_scope(Some(module.is_global()));
         module.init_state(state);
     }
+    state.set_init_scope(None);
 
     for module in &modules {
         progress(module.name());

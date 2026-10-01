@@ -8392,3 +8392,41 @@ index 4ba7d008..7774364b 100755
  # ── 1 + 2: web/src tree — ≤500 lines/file, ≤8 entries/dir ────────────────────
  # (former check-web-structure.sh). shadcn ui/ + generated OpenAPI client exempt.
 # --- End entry #99 ---
+100:24952dc89a72296a99ba76edb2456fb70d78ba4d57269e8c27344e0f74df3ff8:11da9f90d23bc59097d16691c33807bef6b8f0987fb1a0eb9a6566b4f5800c25:13fb07565a846f10796c2e101100a104eaf92e2b104a9f6b336efbf0fffea3a0
+# --- Diff for entry #100 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index 29c4ff47..8395be37 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,5 +1,5 @@
+ [workspace]
+-members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-threads", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities", "crates/cp-vault", "crates/cp-env"]
++members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-fleet", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-threads", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities", "crates/cp-vault", "crates/cp-env"]
+ 
+ [workspace.package]
+ version = "0.2.13"
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 759e4bbe..8c15a4d4 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -194,6 +194,19 @@ exceptions:
+       Could merge all impl blocks into a single file, but that would
+       create a 2500+ line file. The split is intentional for navigation.
+ 
++  - path: "crates/cp-base/src/state/runtime/ext.rs"
++    match: "State methods split across runtime/ submodules to respect the 500-line file cap"
++    reason: >
++      State's inherent methods are split across runtime/mod.rs (the aggregate
++      struct + boot builders + message creation) and the sibling ext.rs (the
++      module extension-data accessors: get_ext/ext/set_ext/set_ext_global/
++      set_ext_thread/set_init_scope). mod.rs sits near the 500-line file cap;
++      folding the accessors back in would push it over. clippy::multiple_inherent_impl
++      (deny) fires on the second block (ext.rs), so it carries the #[expect].
++    strategy: >
++      Irreducible under the 500-line file cap — the two impl blocks are the honest
++      shape once State's methods exceed one file's budget.
++
+   - path: "src/llms/mod.rs"
+     match: "type_id/cause/provide are unstable or deprecated"
+     reason: >
+# --- End entry #100 ---

@@ -247,12 +247,17 @@ fn replace_blocking_sentinels(
 pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
     let _fg = cp_base::flame!("watchers");
     // Take the registry out of state to avoid borrow conflict
-    // (poll_all needs &mut registry + &state simultaneously)
-    let mut registry = match app.state.module_data.remove(&std::any::TypeId::of::<WatcherRegistry>()) {
+    // (poll_all needs &mut registry + &state simultaneously). WatcherRegistry is
+    // per-thread, so it normally lives in `thread_module_data`; fall back to the
+    // shared map defensively, and restore it to its canonical per-thread home.
+    let watcher_id = std::any::TypeId::of::<WatcherRegistry>();
+    let removed =
+        app.state.thread_module_data.remove(&watcher_id).or_else(|| app.state.shared_module_data.remove(&watcher_id));
+    let mut registry = match removed {
         Some(boxed) => match boxed.downcast::<WatcherRegistry>() {
             Ok(r) => *r,
             Err(returned) => {
-                let _r = app.state.module_data.insert(std::any::TypeId::of::<WatcherRegistry>(), returned);
+                let _r = app.state.thread_module_data.insert(watcher_id, returned);
                 return;
             }
         },
@@ -261,8 +266,8 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
 
     let (blocking_results, mut async_results) = registry.poll_all(&app.state);
 
-    // Put registry back
-    app.state.set_ext(registry);
+    // Put registry back in its canonical per-thread map.
+    app.state.set_ext_thread(registry);
 
     // --- Session cleanup for inline easy_bash results (no panel to close) ---
     cleanup_inline_sessions(app, &blocking_results, &async_results);
