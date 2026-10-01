@@ -68,12 +68,15 @@ impl Module for ThreadsModule {
 
     fn init_state(&self, state: &mut State) {
         state.set_ext(ThreadsState::new());
-        state.set_ext(FocusState::new());
+        // FocusState is UI-global: "which thread the human is looking at" is one
+        // singleton pointer, NOT per-thread state. set_ext_global pins it to the
+        // shared map so it never rides the resident-thread swap (`ThreadRuntime`).
+        state.set_ext_global(FocusState::new());
     }
 
     fn reset_state(&self, state: &mut State) {
         state.set_ext(ThreadsState::new());
-        state.set_ext(FocusState::new());
+        state.set_ext_global(FocusState::new());
     }
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {
@@ -113,7 +116,8 @@ impl Module for ThreadsModule {
 
     fn load_worker_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Ok(fs) = serde_json::from_value::<FocusState>(data.clone()) {
-            state.set_ext(fs);
+            // UI-global (see init_state): pin to the shared map, never swapped.
+            state.set_ext_global(fs);
         }
     }
 
