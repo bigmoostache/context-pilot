@@ -1,6 +1,6 @@
 use cp_base::state::data::model_helpers::ModelPricing as _;
 use std::io;
-use std::sync::mpsc::{Receiver, Sender};
+use std::sync::mpsc::Receiver;
 use std::time::Duration;
 
 use crossterm::event;
@@ -9,7 +9,6 @@ use ratatui::prelude::{CrosstermBackend, Terminal};
 use crate::app::actions::{Action, ActionResult, apply_action};
 use crate::app::events::handle_event;
 use crate::app::panels::now_ms;
-use crate::infra::api::{StreamEvent, start_streaming};
 use crate::infra::constants::{EVENT_POLL_MS, RENDER_THROTTLE_MS};
 use crate::state::Kind;
 use crate::state::cache::CacheUpdate;
@@ -18,15 +17,18 @@ use crate::ui;
 
 use crate::app::App;
 use crate::app::context::{build_stream_params, get_active_agent_content, prepare_stream_context};
+
+/// Background-thread advancement: swap-in/step/swap-out each non-resident active
+/// thread around the shared pipeline (Phase C). No-op at N=1.
+mod fleet;
+/// Fleet lifecycle I/O (Phase F): console orphan-prune, N-thread save, hard-delete
+/// teardown, Errored re-engage. Split from `fleet` for the 500-line cap.
+mod fleet_lifecycle;
 use cp_mod_spine::engine::{SpineDecision, apply_continuation, check_spine};
 use cp_mod_spine::types::{NotificationType, SpineState};
 
 /// Bundles the I/O channels polled by the main event loop.
 pub(crate) struct EventChannels<'ch> {
-    /// Sends stream events to the LLM provider thread.
-    pub tx: &'ch Sender<StreamEvent>,
-    /// Receives stream events from the LLM provider thread.
-    pub rx: &'ch Receiver<StreamEvent>,
     /// Receives cache update results from the background hasher.
     pub cache_rx: &'ch Receiver<CacheUpdate>,
 }
@@ -56,6 +58,17 @@ impl App {
         // Claim ownership immediately
         save_state(&self.state);
 
+        // Boot-load every background thread's persisted per-thread context into
+        // the fleet registry before the loop starts reconciling (F1 boot half).
+        // No-op at N=1 (no per-thread files) — byte-identical boot.
+        self.load_background_threads();
+
+        // Kill console sessions on the server that belong to no loaded thread —
+        // ONCE over the union of every thread's session keys (the per-thread
+        // kill was removed from the console module: it would cross-kill other
+        // threads' live sessions, F6/S2). N=1-identical: union = focused keys.
+        self.prune_orphaned_console_sessions();
+
         // Start the interactive main-loop watchdog (purely observational — dumps
         // a diagnostic to .context-pilot/errors/ if the single-threaded loop
         // wedges, never terminates/signals the process). Idempotent.
@@ -73,7 +86,7 @@ impl App {
             super::tools::watchdog::beat();
             super::tools::watchdog::mark(super::tools::watchdog::Step::Input);
 
-            match self.handle_input_phase(terminal, ch, current_ms)? {
+            match self.handle_input_phase(terminal, current_ms)? {
                 InputOutcome::Restart => continue,
                 InputOutcome::Quit => break,
                 InputOutcome::Continue => {}
@@ -84,7 +97,7 @@ impl App {
             // Check if TUI reload was requested (by system_reload tool)
             if self.state.flags.lifecycle.reload_pending {
                 self.writer.flush();
-                save_state(&self.state);
+                self.save_all_threads();
                 // Write reload flag AFTER save_state — otherwise save_state
                 // overwrites config.json with reload_requested: false.
                 crate::infra::tools::write_reload_flag();
@@ -165,7 +178,6 @@ impl App {
     fn handle_input_phase(
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-        ch: &EventChannels<'_>,
         current_ms: u64,
     ) -> io::Result<InputOutcome> {
         if !event::poll(Duration::ZERO)? {
@@ -176,7 +188,7 @@ impl App {
         // Command palette takes precedence when open.
         if self.command_palette.is_open {
             if let Some(action) = self.handle_palette_event(&evt) {
-                self.handle_action(action, ch.tx);
+                self.handle_action(action);
             }
             self.state.flags.ui.dirty = true;
             self.render_frame(terminal, current_ms)?;
@@ -196,7 +208,7 @@ impl App {
         let Some(action) = handle_event(&evt, &self.state) else {
             // User quit — flush all pending writes and save final state synchronously
             self.writer.flush();
-            save_state(&self.state);
+            self.save_all_threads();
             return Ok(InputOutcome::Quit);
         };
 
@@ -205,7 +217,7 @@ impl App {
             self.command_palette.open(&self.state);
             self.state.flags.ui.dirty = true;
         } else {
-            self.handle_action(action, ch.tx);
+            self.handle_action(action);
         }
 
         // Render immediately after input for instant feedback.
@@ -222,29 +234,47 @@ impl App {
         super::threads::poll_bridge_commands(self);
         super::tools::watchdog::mark(super::tools::watchdog::Step::ThreadsEmit);
         super::threads::emit_bridge_deltas(self);
+        // The focused thread is the resident for the whole focused pipeline below;
+        // tag its stream frames with its id (the stream tee reads this). Background
+        // steps re-point it around their swap (see `advance_background_threads`).
+        self.state.resident_thread_id = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
         super::tools::watchdog::mark(super::tools::watchdog::Step::Stream);
-        super::streaming::process_stream_events(self, ch.rx);
-        super::streaming::handle_retry(self, ch.tx);
+        super::streaming::process_stream_events(self);
+        super::streaming::handle_retry(self);
         super::streaming::process_typewriter(self);
         super::tools::watchdog::mark(super::tools::watchdog::Step::Cache);
         super::watchers::process_cache_updates(self, ch.cache_rx);
         super::tools::watchdog::mark(super::tools::watchdog::Step::Watchers);
         super::watchers::process_watcher_events(self);
         // Check if we're waiting for panels and they're ready (non-blocking)
-        super::tools::checks::check_waiting_for_panels(self, ch.tx);
+        super::tools::checks::check_waiting_for_panels(self);
         // Check if deferred sleep timer has expired (non-blocking)
-        super::tools::checks::check_deferred_sleep(self, ch.tx);
+        super::tools::checks::check_deferred_sleep(self);
         // Check watchers (blocking sentinel replacement + async → spine notifications)
-        super::tools::cleanup::check_watchers(self, ch.tx);
+        super::tools::cleanup::check_watchers(self);
         self.recover_bridge_if_pending(current_ms);
         self.drain_chat_sync_if_due(current_ms);
         super::watchers::check_timer_based_deprecation(self);
         super::tools::watchdog::mark(super::tools::watchdog::Step::Tools);
-        super::tools::pipeline::handle_tool_execution(self, ch.tx);
+        super::tools::pipeline::handle_tool_execution(self);
         super::streaming::finalize_stream(self);
         super::tools::watchdog::mark(super::tools::watchdog::Step::Spine);
-        self.check_spine(ch.tx);
+        self.check_spine();
         super::streaming::process_api_check_results(self);
+
+        // === BACKGROUND THREADS (Phase C) ===
+        // After the focused/resident thread has been stepped in place above,
+        // advance every OTHER active thread one step by swapping it into `state`
+        // around the same advancement core (`step_one_thread`). Empty at N=1 —
+        // the resident is the only thread — so this is a no-op and the tick is
+        // byte-identical to single-thread.
+        //
+        // C4 scheduling-decision layer: reconcile the registry against the thread
+        // roster and compute the promotion decision (never setting an active
+        // state, so advancement stays deferred to Phase D/F2).
+        self.reconcile_fleet_registry(current_ms);
+        self.dispatch_background_my_turn();
+        self.advance_background_threads();
 
         // === REVERIE (CONTEXT OPTIMIZER SUB-AGENT) ===
         super::tools::watchdog::mark(super::tools::watchdog::Step::Reverie);
@@ -281,7 +311,7 @@ impl App {
     }
 
     /// Dispatch an `Action` through `apply_action` and handle the resulting side-effects.
-    fn handle_action(&mut self, action: Action, tx: &Sender<StreamEvent>) {
+    fn handle_action(&mut self, action: Action) {
         self.state.flags.ui.dirty = true; // any action triggers a re-render
         // `if let` (not an exhaustive match) so ActionResult stays #[non_exhaustive].
         // SaveMessage is the only payload-bearing variant; the fieldless rest dispatch below.
@@ -289,19 +319,19 @@ impl App {
         if let ActionResult::SaveMessage(id) = result {
             self.save_message_by_id(&id);
         } else {
-            self.handle_fieldless_result(&result, tx);
+            self.handle_fieldless_result(&result);
         }
     }
 
     /// Handle the fieldless [`ActionResult`] variants (everything except
     /// `SaveMessage`). The trailing `else` absorbs `Nothing` plus any future
     /// `non_exhaustive` variant.
-    fn handle_fieldless_result(&mut self, result: &ActionResult, tx: &Sender<StreamEvent>) {
+    fn handle_fieldless_result(&mut self, result: &ActionResult) {
         if matches!(result, ActionResult::StopStream) {
             self.on_stop_stream();
         } else if matches!(result, ActionResult::Save) {
             self.save_state_async();
-            self.check_spine(tx); // synchronous for responsive auto-continuation
+            self.check_spine(); // synchronous for responsive auto-continuation
         } else if matches!(result, ActionResult::StartApiCheck) {
             self.start_api_check_now();
         } else {
@@ -353,7 +383,7 @@ impl App {
     /// Check the spine for auto-continuation decisions.
     /// Evaluates guard rails and auto-continuation logic.
     /// If a continuation fires, starts streaming.
-    fn check_spine(&mut self, tx: &Sender<StreamEvent>) {
+    pub(super) fn check_spine(&mut self) {
         // Idle is the implicit no-op tail — a non_exhaustive enum forbids a
         // cross-crate exhaustive match, so the two actionable variants are
         // handled via if-let and Idle simply falls through.
@@ -377,7 +407,7 @@ impl App {
                 let ctx = prepare_stream_context(&mut self.state, false, None);
                 let system_prompt = get_active_agent_content(&self.state);
                 let params = build_stream_params(&self.state, ctx, Some(system_prompt));
-                start_streaming(params, tx.clone());
+                self.spawn_thread_stream(params);
                 self.save_state_async();
                 self.state.flags.ui.dirty = true;
             }

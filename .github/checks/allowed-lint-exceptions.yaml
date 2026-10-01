@@ -183,7 +183,7 @@ exceptions:
 
   # ── app/run/*: multiple_inherent_impl for App ────────────────────────
 
-  - path: "src/app/run/lifecycle.rs"
+  - path: "src/app/run/lifecycle/mod.rs"
     match: 'App methods split across run/ submodules for readability'
     reason: >
       App methods are split across 7 submodules in src/app/run/ for
@@ -193,6 +193,67 @@ exceptions:
     strategy: >
       Could merge all impl blocks into a single file, but that would
       create a 2500+ line file. The split is intentional for navigation.
+
+  - path: "src/app/run/lifecycle/fleet.rs"
+    match: 'App methods split across run/ submodules for readability'
+    reason: >
+      The background-thread advancement step (advance_background_threads +
+      step_one_thread) is its own impl App block under run/lifecycle/. It is a
+      distinct concern (the Phase C multi-thread loop step) kept out of
+      lifecycle/mod.rs to respect the 500-line file cap. multiple_inherent_impl
+      (forbid) fires on this second block, so it carries the #[expect].
+    strategy: >
+      Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
+      would push that file over the limit. The split is the honest shape.
+
+  - path: "src/app/run/lifecycle/fleet_lifecycle.rs"
+    match: 'App methods split across run/ submodules for readability'
+    reason: >
+      The fleet lifecycle I/O methods (prune_orphaned_console_sessions,
+      save_all_threads, clear_errored_entry, teardown_thread — Phase F boot/
+      persist/teardown) are their own impl App block, split from the sibling
+      fleet.rs scheduling module to keep each file under the 500-line cap.
+      multiple_inherent_impl (forbid) fires on this additional block, so it
+      carries the #[expect].
+    strategy: >
+      Irreducible under the 500-line cap — folding these back into fleet.rs
+      would push that file over the limit. The split is the honest shape.
+
+  - path: "crates/cp-base/src/state/runtime/ext.rs"
+    match: "State methods split across runtime/ submodules to respect the 500-line file cap"
+    reason: >
+      State's inherent methods are split across runtime/mod.rs (the aggregate
+      struct + boot builders + message creation) and the sibling ext.rs (the
+      module extension-data accessors: get_ext/ext/set_ext/set_ext_global/
+      set_ext_thread/set_init_scope). mod.rs sits near the 500-line file cap;
+      folding the accessors back in would push it over. clippy::multiple_inherent_impl
+      (deny) fires on the second block (ext.rs), so it carries the #[expect].
+    strategy: >
+      Irreducible under the 500-line file cap — the two impl blocks are the honest
+      shape once State's methods exceed one file's budget.
+
+  - path: "crates/cp-base/src/state/runtime/bundle.rs"
+    match: "flat per-thread runtime initializer mirroring State::default; sub-grouping would diverge from the flat State layout the swap targets field-by-field"
+    reason: >
+      ThreadRuntime::default is a flat per-thread initializer — one `field: value`
+      line each, mirroring the per-thread subset of the flat State::default literal.
+      Grouping fields into sub-structs to shave lines would diverge from the flat
+      State layout that swap_with targets field-by-field, so it stays flat and carries
+      the length expect (threshold 60, unchanged). The twin of the State::default expect.
+    strategy: >
+      Irreducible — a flat per-thread initializer mirroring State's flat layout; the
+      honest shape, same as the accepted State::default flat-initializer expect.
+
+  - path: "crates/cp-base/src/state/runtime/bundle.rs"
+    match: "flat per-field mem::swap mirroring every per-thread State field; one swap per field, nothing to factor without a macro that re-expands to the same body"
+    reason: >
+      ThreadRuntime::swap_with is a flat sequence of std::mem::swap calls, one per
+      per-thread State field, exchanging each with the resident State. The targets are
+      non-uniform (state.context vs state.flags.stream vs state.flags.lifecycle.*), so a
+      macro would re-expand to the same body with no readability gain. The only residual
+      is length, intrinsic to the ~45-field per-thread subset, so it carries the expect.
+    strategy: >
+      Irreducible — one swap per per-thread field; a macro re-expands to the same body.
 
   - path: "src/llms/mod.rs"
     match: "type_id/cause/provide are unstable or deprecated"

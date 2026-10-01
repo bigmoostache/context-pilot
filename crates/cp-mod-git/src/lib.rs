@@ -329,8 +329,14 @@ impl Module for GitModule {
     fn is_core(&self) -> bool {
         false
     }
+    /// Fleet-shared (thread-centric model): `GitState` is project-level data
+    /// (branch, repo status, diff stats, diff base) — identical across every
+    /// thread of a project, not per-thread view state. The git *result panels*
+    /// are per-thread (they live in `state.context`, carried by the
+    /// resident-thread swap); the underlying repo data stays shared so it is
+    /// computed once, not duplicated per thread. Inert at N=1.
     fn is_global(&self) -> bool {
-        false
+        true
     }
     fn save_worker_data(&self, _state: &State) -> serde_json::Value {
         serde_json::Value::Null

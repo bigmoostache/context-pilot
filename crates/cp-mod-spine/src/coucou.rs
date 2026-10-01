@@ -234,7 +234,12 @@ impl Watcher for CoucouWatcher {
                 || format!("⏰ Coucou! {}", self.message),
                 |tid| format!("⏰ Coucou (thread {tid})! {}", self.message),
             );
-            WatcherResult::new(desc)
+            // Stamp the owner thread (D2) so the resulting spine notification
+            // routes into THAT thread's inbox via `deliver_to_thread`, not the
+            // resident's. `None` (unscoped coucou) delivers to the resident.
+            let mut result = WatcherResult::new(desc);
+            result.thread_id.clone_from(&self.thread_id);
+            result
         })
     }
 

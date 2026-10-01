@@ -1,8 +1,8 @@
 use cp_base::state::data::model_helpers::ModelPricing as _;
-use std::sync::mpsc::{Receiver, Sender};
+use std::sync::mpsc::Sender;
 
 use crate::app::actions::{Action, ActionResult, apply_action};
-use crate::infra::api::{StreamEvent, start_streaming};
+use crate::infra::api::StreamEvent;
 use crate::infra::constants::MAX_API_RETRIES;
 
 use crate::app::App;
@@ -10,11 +10,26 @@ use crate::app::context::{build_stream_params, get_active_agent_content, prepare
 use crate::state::cache::{CacheUpdate, process_cache_request};
 use crate::state::{State, StreamPhase, get_context_type_meta};
 
-/// Drain the stream-event channel and apply each event (chunks, tools, done, errors).
-pub(super) fn process_stream_events(app: &mut App, rx: &Receiver<StreamEvent>) {
+/// Drain the resident thread's stream channel and apply each event (chunks,
+/// tools, done, errors).
+///
+/// Only the **resident** thread's channel is drained — the thread whose runtime
+/// is currently in `state` ([`resident_key`](crate::app::App::resident_key)):
+/// the focused thread in the main phase, or a background thread during its
+/// advancement step. Draining any other thread's channel here would apply its
+/// events to the resident's bundle (cross-thread contamination); each thread's
+/// channel is instead drained on the tick it is resident.
+pub(super) fn process_stream_events(app: &mut App) {
     let _guard = crate::profile!("app::stream_events");
     let _fg = cp_base::flame!("stream");
-    while let Ok(evt) = rx.try_recv() {
+    let key = app.resident_key();
+    let mut events: Vec<StreamEvent> = Vec::new();
+    if let Some(ts) = app.thread_streams.get(&key) {
+        while let Ok(evt) = ts.rx.try_recv() {
+            events.push(evt);
+        }
+    }
+    for evt in events {
         if !app.state.flags.stream.phase.is_streaming() {
             continue;
         }
@@ -135,7 +150,7 @@ fn handle_stream_error_event(app: &mut App, e: String) {
 }
 
 /// If a retryable error is pending, clear partial state and re-launch the stream.
-pub(super) fn handle_retry(app: &mut App, tx: &Sender<StreamEvent>) {
+pub(super) fn handle_retry(app: &mut App) {
     if let Some(_error) = app.pending_retry_error.take() {
         // Still streaming, retry the request
         if app.state.flags.stream.phase.is_streaming() {
@@ -150,7 +165,7 @@ pub(super) fn handle_retry(app: &mut App, tx: &Sender<StreamEvent>) {
             app.typewriter.reset();
             app.pending_done = None;
             let params = build_stream_params(&app.state, ctx, Some(system_prompt));
-            start_streaming(params, tx.clone());
+            app.spawn_thread_stream(params);
             app.state.flags.ui.dirty = true;
         }
     }
@@ -181,14 +196,14 @@ pub(super) fn process_api_check_results(app: &mut App) {
 }
 
 /// Continue streaming after tool execution (called when panels are ready).
-pub(super) fn continue_streaming(app: &mut App, tx: &Sender<StreamEvent>) {
+pub(super) fn continue_streaming(app: &mut App) {
     app.state.flags.stream.phase.transition(StreamPhase::Receiving);
     let ctx = prepare_stream_context(&mut app.state, true, None);
     let system_prompt = get_active_agent_content(&app.state);
     app.typewriter.reset();
     app.pending_done = None;
     let params = build_stream_params(&app.state, ctx, Some(system_prompt));
-    start_streaming(params, tx.clone());
+    app.spawn_thread_stream(params);
 }
 
 /// Finalize a completed stream: apply `StreamDone`, reset counters, and unblock spine.

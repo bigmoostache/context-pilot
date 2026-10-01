@@ -216,7 +216,6 @@ use crossterm::{
 };
 
 use app::{App, ensure_default_agent, ensure_default_contexts};
-use infra::api::StreamEvent;
 use state::cache::CacheUpdate;
 use state::persistence::{
     boot_assemble_state, boot_extract_module_data, boot_init_modules, boot_load_config, boot_load_messages,
@@ -437,12 +436,11 @@ fn main() -> ExitCode {
     let state = boot_app_state(&mut terminal, &mut steps);
 
     // Create channels
-    let (tx, rx) = mpsc::channel::<StreamEvent>();
     let (cache_tx, cache_rx) = mpsc::channel::<CacheUpdate>();
 
     // Create and run app
     let mut app = App::new(state, cache_tx, resume_stream);
-    let ch = app::run::lifecycle::EventChannels { tx: &tx, rx: &rx, cache_rx: &cache_rx };
+    let ch = app::run::lifecycle::EventChannels { cache_rx: &cache_rx };
     let run_result = app.run(&mut terminal, &ch);
 
     // Cleanup + self-restart on reload (see helper).

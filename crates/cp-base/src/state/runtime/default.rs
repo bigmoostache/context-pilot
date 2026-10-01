@@ -103,7 +103,10 @@ impl Default for State {
             input_cache: None,
             full_content_cache: None,
             highlight_ir_fn: None,
-            module_data: HashMap::new(),
+            shared_module_data: HashMap::new(),
+            thread_module_data: HashMap::new(),
+            init_is_global: None,
+            resident_thread_id: None,
         }
     }
 }

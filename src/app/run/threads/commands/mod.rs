@@ -31,16 +31,26 @@ mod create;
 pub(super) fn apply_command(app: &mut App, cmd: Command) {
     match cmd.kind {
         CommandKind::SendMessage { thread_id, content } => {
-            apply_send_message(&mut app.state, &thread_id, &content);
+            if apply_send_message(&mut app.state, &thread_id, &content) {
+                route_on_user_message(app, &thread_id);
+            }
         }
         CommandKind::CreateThread { name, initial_message, paused } => {
+            let seeded = initial_message.as_deref().is_some_and(|c| !c.trim().is_empty());
             let seed = Seed { initial_message: initial_message.as_deref(), paused };
-            apply_create_thread(&mut app.state, &name, &seed);
+            let id = apply_create_thread(&mut app.state, &name, &seed);
+            if seeded {
+                route_on_user_message(app, &id);
+            }
         }
         CommandKind::BranchThread { source_thread_id, message_ts, name, initial_message, paused } => {
+            let seeded = initial_message.as_deref().is_some_and(|c| !c.trim().is_empty());
             let point = BranchPoint { source_thread_id: &source_thread_id, message_ts };
             let seed = Seed { initial_message: initial_message.as_deref(), paused };
-            apply_branch_thread(&mut app.state, &point, &name, &seed);
+            let created = apply_branch_thread(&mut app.state, &point, &name, &seed);
+            if let Some(id) = created.filter(|_| seeded) {
+                route_on_user_message(app, &id);
+            }
         }
         CommandKind::ArchiveThread { thread_id } => {
             apply_archive_thread(&mut app.state, &thread_id);
@@ -56,6 +66,7 @@ pub(super) fn apply_command(app: &mut App, cmd: Command) {
         }
         CommandKind::DeleteThread { thread_id } => {
             apply_delete_thread(&mut app.state, &thread_id);
+            app.teardown_thread(&thread_id);
         }
         CommandKind::DeleteMessage { thread_id, message_ts } => {
             apply_delete_message(&mut app.state, &thread_id, message_ts);
@@ -77,28 +88,57 @@ pub(super) fn apply_command(app: &mut App, cmd: Command) {
 
 // ── SendMessage (K7) ────────────────────────────────────────────────────
 
-/// Inject a user message into the given thread and create a spine
-/// notification so the agent attends to it.
+/// Inject a user message into the given thread, flipping it to `MyTurn`.
 ///
 /// This is the **K7 path**: commands enter the agent through the same
-/// mechanism as local user input — a `ThreadMessage(User)` on the thread,
-/// a `MyTurn` status flip, and a spine notification.
-fn apply_send_message(state: &mut State, thread_id: &str, content: &str) {
+/// mechanism as local user input — a `ThreadMessage(User)` on the thread and a
+/// `MyTurn` status flip (the per-thread dispatcher then nudges it into its own
+/// spine inbox once it is schedulable).
+///
+/// Returns `true` if the message was applied (thread existed). The per-thread
+/// lifecycle hook (`on_user_message`, which resets *that thread's* spine
+/// counters — D4/S7) is NOT fired here: it needs [`App::deliver_to_thread`] to
+/// target the owner thread's state rather than the resident's, so the caller
+/// (`apply_command`) routes it after this returns. Firing it here on `state`
+/// would reset the *resident* (focused) thread's counters for a message sent to
+/// a *background* thread.
+fn apply_send_message(state: &mut State, thread_id: &str, content: &str) -> bool {
     let threads_state = ThreadsState::get_mut(state);
     let Some(thread) = threads_state.threads.iter_mut().find(|t| t.id == thread_id) else {
         log::warn!("bridge: SendMessage for unknown thread {thread_id}");
-        return;
+        return false;
     };
 
     thread.messages.push(ThreadMessage::user(content.to_owned()));
     thread.status = ThreadStatus::MyTurn;
 
-    for module in crate::modules::all_modules() {
-        module.on_user_message(state);
-    }
-
     state.flags.ui.dirty = true;
     log::info!("bridge: applied SendMessage on thread {thread_id}");
+    true
+}
+
+/// Fire every module's `on_user_message` lifecycle hook against the owner
+/// thread's state — the per-thread counter reset (D4/S7) — then re-engage the
+/// thread if it was parked [`Errored`](cp_fleet::ThreadExecState::Errored).
+///
+/// Routed through [`App::deliver_to_thread`] so a message sent to a *background*
+/// thread resets *that* thread's spine counters (auto-continuation count,
+/// autonomous-start clock, `user_stopped`, error backoff), never the focused
+/// resident's. At N=1 (or when the target IS the focused resident, or a
+/// just-created thread not yet in the registry) `deliver_to_thread` runs the
+/// hook directly on `state` — byte-identical to the former inline loop.
+///
+/// After the reset, [`App::clear_errored_entry`] flips a stuck (`Errored`)
+/// thread back to `Runnable`: a fresh user message is the human-intervention
+/// recovery path for a thread the loop had given up on (F4). A no-op for the
+/// resident / unknown threads, so N=1 is unaffected.
+fn route_on_user_message(app: &mut App, thread_id: &str) {
+    app.deliver_to_thread(Some(thread_id), |state| {
+        for module in crate::modules::all_modules() {
+            module.on_user_message(state);
+        }
+    });
+    app.clear_errored_entry(thread_id);
 }
 
 // ── ArchiveThread ───────────────────────────────────────────────────────

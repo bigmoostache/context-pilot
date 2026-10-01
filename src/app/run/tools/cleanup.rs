@@ -1,7 +1,4 @@
-use std::sync::mpsc::Sender;
-
 use crate::app::panels::now_ms;
-use crate::infra::api::StreamEvent;
 use crate::state::{Message, ToolResultRecord};
 
 use cp_base::state::watchers::{ASYNC_ERROR_PREFIX, WatcherRegistry};
@@ -114,16 +111,22 @@ fn process_async_completions(app: &mut App, async_results: &mut [cp_base::state:
     }
 
     for result in async_results.iter() {
-        let nid = SpineState::create_notification(
-            &mut app.state,
-            NotificationType::Custom,
-            "watcher".to_owned(),
-            result.description.clone(),
-        );
-        SpineState::set_notification_thread(&mut app.state, &nid, result.thread_id.clone());
-        if result.processed_already {
-            let _r = SpineState::mark_notification_processed(&mut app.state, &nid);
-        }
+        // Route the notification into the OWNER thread's spine inbox (delivery,
+        // not advancement). At N=1 the owner is always the focused resident, so
+        // this is a direct, byte-identical delivery. The result PANEL is still
+        // created on the resident's context above — moving panels into the owner
+        // thread is a Phase F (per-thread panels/teardown) concern.
+        let tid = result.thread_id.clone();
+        let tid_tag = tid.clone();
+        let desc = result.description.clone();
+        let processed = result.processed_already;
+        app.deliver_to_thread(tid.as_deref(), |state| {
+            let nid = SpineState::create_notification(state, NotificationType::Custom, "watcher".to_owned(), desc);
+            SpineState::set_notification_thread(state, &nid, tid_tag);
+            if processed {
+                let _r = SpineState::mark_notification_processed(state, &nid);
+            }
+        });
     }
 
     app.save_state_async();
@@ -244,15 +247,20 @@ fn replace_blocking_sentinels(
 /// Non-blocking check: poll `WatcherRegistry` for satisfied conditions.
 /// - Blocking watchers: replace sentinel tool results and resume pipeline.
 /// - Async watchers: create spine notifications.
-pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
+pub(crate) fn check_watchers(app: &mut App) {
     let _fg = cp_base::flame!("watchers");
     // Take the registry out of state to avoid borrow conflict
-    // (poll_all needs &mut registry + &state simultaneously)
-    let mut registry = match app.state.module_data.remove(&std::any::TypeId::of::<WatcherRegistry>()) {
+    // (poll_all needs &mut registry + &state simultaneously). WatcherRegistry is
+    // per-thread, so it normally lives in `thread_module_data`; fall back to the
+    // shared map defensively, and restore it to its canonical per-thread home.
+    let watcher_id = std::any::TypeId::of::<WatcherRegistry>();
+    let removed =
+        app.state.thread_module_data.remove(&watcher_id).or_else(|| app.state.shared_module_data.remove(&watcher_id));
+    let mut registry = match removed {
         Some(boxed) => match boxed.downcast::<WatcherRegistry>() {
             Ok(r) => *r,
             Err(returned) => {
-                let _r = app.state.module_data.insert(std::any::TypeId::of::<WatcherRegistry>(), returned);
+                let _r = app.state.thread_module_data.insert(watcher_id, returned);
                 return;
             }
         },
@@ -261,8 +269,8 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
 
     let (blocking_results, mut async_results) = registry.poll_all(&app.state);
 
-    // Put registry back
-    app.state.set_ext(registry);
+    // Put registry back in its canonical per-thread map.
+    app.state.set_ext_thread(registry);
 
     // --- Session cleanup for inline easy_bash results (no panel to close) ---
     cleanup_inline_sessions(app, &blocking_results, &async_results);
@@ -324,7 +332,7 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
     }
 
     // Break tempo, build result + assistant messages, resume streaming.
-    resume_pipeline_after_blocking(app, tx, &tool_results, &merged_blocking);
+    resume_pipeline_after_blocking(app, &tool_results, &merged_blocking);
 }
 
 /// After all blocking watchers resolve: apply their deferred tempo break, emit the
@@ -332,7 +340,6 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
 /// stats from the intermediate stream, then resume streaming (or wait on dirty panels).
 fn resume_pipeline_after_blocking(
     app: &mut App,
-    tx: &Sender<StreamEvent>,
     tool_results: &[crate::infra::tools::ToolResult],
     merged_blocking: &[cp_base::state::watchers::carriers::WatcherResult],
 ) {
@@ -393,7 +400,7 @@ fn resume_pipeline_after_blocking(
         app.state.flags.lifecycle.waiting_for_panels = true;
         app.wait_started_ms = now_ms();
     } else {
-        crate::app::run::streaming::continue_streaming(app, tx);
+        crate::app::run::streaming::continue_streaming(app);
     }
 }
 

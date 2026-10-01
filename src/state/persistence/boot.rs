@@ -5,10 +5,12 @@
 
 use std::collections::HashMap;
 
-use crate::infra::config::set_active_theme;
-use crate::state::State;
+use cp_base::state::runtime::bundle::ThreadRuntime;
 
-use super::BootConfig;
+use crate::infra::config::set_active_theme;
+use crate::state::{Message, SharedConfig, State};
+
+use super::{BootConfig, boot_load_messages, boot_load_panels};
 
 /// Module data maps extracted from `BootConfig` before consumption.
 /// Passed to `boot_init_modules` so main.rs can render per-module progress.
@@ -76,10 +78,15 @@ fn load_one_module_data(module: &dyn crate::modules::Module, module_data: &BootM
     } else {
         module_data.worker.get(module.id()).unwrap_or(&null)
     };
+    // Route first-inserts into the correct scope map: a module's main state
+    // follows its is_global(); its worker-data slice is always per-thread.
+    state.set_init_scope(Some(module.is_global()));
     module.load_module_data(data, state);
 
     let worker_data = module_data.worker.get(&format!("{}_worker", module.id())).unwrap_or(&null);
+    state.set_init_scope(Some(false));
     module.load_worker_data(worker_data, state);
+    state.set_init_scope(None);
 }
 
 /// Phase 5: Initialize all modules and load their persisted data.
@@ -99,8 +106,10 @@ pub(crate) fn boot_init_modules(state: &mut State, module_data: &BootModuleData,
 
     for module in &modules {
         progress(module.name());
+        state.set_init_scope(Some(module.is_global()));
         module.init_state(state);
     }
+    state.set_init_scope(None);
 
     for module in &modules {
         progress(module.name());
@@ -140,4 +149,98 @@ fn pre_start_daemons(progress: &mut impl FnMut(&str)) {
             Err(_panic) => log::warn!("Pre-start: {name} thread panicked"),
         }
     }
+}
+
+/// Initialise and load ONLY the per-thread (`is_global() == false`) modules into
+/// a throwaway background-thread `State`, from that thread's persisted worker
+/// module map — the per-thread half of [`boot_init_modules`], for
+/// [`boot_load_thread_runtime`].
+///
+/// Global modules are deliberately skipped: they are fleet-shared singletons
+/// that already live in the focused (resident) state's `shared_module_data`;
+/// re-initialising them here would create a second, discarded copy. Only the
+/// per-thread module data (spine inbox, queue, console ownership, watcher
+/// registry, search/git views, …) is built, so the subsequent
+/// [`ThreadRuntime::swap_with`] carries exactly that thread's per-thread state
+/// out. Mirrors [`load_one_module_data`]'s per-thread branch (two passes: all
+/// inits, then all loads) restricted to non-global modules.
+fn boot_init_thread_modules(state: &mut State, worker_modules: &HashMap<String, serde_json::Value>) {
+    let null = serde_json::Value::Null;
+    let modules = crate::modules::all_modules();
+    for module in &modules {
+        if module.is_global() {
+            continue;
+        }
+        state.set_init_scope(Some(false));
+        module.init_state(state);
+    }
+    for module in &modules {
+        if module.is_global() {
+            continue;
+        }
+        let data = worker_modules.get(module.id()).unwrap_or(&null);
+        state.set_init_scope(Some(false));
+        module.load_module_data(data, state);
+
+        let worker_data = worker_modules.get(&format!("{}_worker", module.id())).unwrap_or(&null);
+        state.set_init_scope(Some(false));
+        module.load_worker_data(worker_data, state);
+    }
+    state.set_init_scope(None);
+}
+
+/// Load one background thread's persisted per-thread context into a
+/// [`ThreadRuntime`] (the registry payload for a non-focused thread), or `None`
+/// when the thread has no `states/<thread_id>.json` yet (a *cold* thread — e.g.
+/// one never advanced since the per-thread save landed, or a brand-new thread;
+/// it boots empty and the reconcile pass gives it a fresh runtime).
+///
+/// It reuses the focused boot loaders ([`boot_load_panels`] /
+/// [`boot_load_messages`], which read only `cfg.worker`, ignoring `cfg.shared`)
+/// to rebuild the thread's panels + conversation, then assembles a throwaway
+/// background `State` and [`swap_with`](ThreadRuntime::swap_with)s its per-thread
+/// fields out into the returned runtime. Shared UI fields (draft input, selected
+/// panel) are deliberately left at their defaults — they are persisted per-agent
+/// in `config.json`, not per-thread, so a background thread must not inherit the
+/// focused thread's draft.
+pub(crate) fn boot_load_thread_runtime(thread_id: &str) -> Option<ThreadRuntime> {
+    let worker = super::worker::load_worker(thread_id)?;
+    // `shared` is unused by the panel/message loaders — a default is enough.
+    let cfg = BootConfig { shared: SharedConfig::default(), worker };
+    let panels = boot_load_panels(&cfg);
+    let messages = boot_load_messages(&panels.message_uids);
+
+    // Display-id counters derived from the loaded messages (same rule as
+    // `boot_assemble_state`); tool/result counters come from the worker file.
+    let (next_user_id, next_assistant_id) = message_id_counters(&messages);
+    let cache_engine_json = cfg.worker.modules.get("cache_engine").and_then(|v| serde_json::to_string(v).ok());
+
+    let mut bg = State::default()
+        .with_context(panels.context)
+        .with_messages(messages)
+        .with_id_counters((next_user_id, next_assistant_id, cfg.worker.next_tool_id, cfg.worker.next_result_id))
+        .with_cache_engine_json(cache_engine_json);
+    boot_init_thread_modules(&mut bg, &cfg.worker.modules);
+
+    let mut runtime = ThreadRuntime::new();
+    runtime.swap_with(&mut bg); // runtime now holds this thread's per-thread context
+    Some(runtime)
+}
+
+/// Next `(user, assistant)` display-id counters derived from a message list —
+/// the max numeric suffix of each role's ids, plus one (defaulting to 1).
+///
+/// Shared by [`boot_load_thread_runtime`] and mirrors `boot_assemble_state`'s
+/// counter derivation so a background thread numbers new messages exactly like
+/// the focused thread would.
+fn message_id_counters(messages: &[Message]) -> (usize, usize) {
+    let next = |prefix: char| {
+        messages
+            .iter()
+            .filter(|m| m.id.starts_with(prefix))
+            .filter_map(|m| m.id.get(1..).unwrap_or("").parse::<usize>().ok())
+            .max()
+            .map_or(1, |n| n.saturating_add(1))
+    };
+    (next('U'), next('A'))
 }

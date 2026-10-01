@@ -38,8 +38,14 @@ impl Module for ConversationModule {
     fn is_core(&self) -> bool {
         true
     }
+    /// Per-thread (thread-centric model): a thread's conversation is its own.
+    /// This module holds no `TypeMap` data — the conversation lives in
+    /// `state.messages` + the `CONVERSATION` panel `Entry`, both carried by the
+    /// resident-thread swap (`ThreadRuntime`). The flag is per-thread for intent;
+    /// it is inert at N=1 (save/load are no-ops), so routing anything it ever
+    /// gains lands in the per-thread map.
     fn is_global(&self) -> bool {
-        true
+        false
     }
 
     fn context_type_metadata(&self) -> Vec<TypeMeta> {

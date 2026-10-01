@@ -49,8 +49,14 @@ impl Module for QuestionsModule {
     fn is_core(&self) -> bool {
         true
     }
+    /// Per-thread (thread-centric model): the `Think`-reminder cadence is each
+    /// thread's own. `ThinkState` (consecutive-count + next-notification point)
+    /// lives in the per-thread `TypeMap` and rides the resident-thread swap; it
+    /// is already persisted per-thread via `save_worker_data`/`load_worker_data`,
+    /// so the flip aligns the in-memory map with the on-disk location (no data
+    /// loss) and is inert at N=1.
     fn is_global(&self) -> bool {
-        true
+        false
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {

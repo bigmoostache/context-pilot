@@ -10,6 +10,8 @@
 //! It runs once at boot (subsuming the cold-start full scan — an empty index
 //! diffs to "index everything") and again on the hourly tick.
 
+/// Builder for the desired conversation-doc set the reconciler diffs (T671).
+pub(crate) mod conv_docs;
 /// Conversation (thread-message) ⇄ index reconciliation (T671).
 pub(crate) mod conversations;
 

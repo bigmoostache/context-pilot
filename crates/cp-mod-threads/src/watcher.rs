@@ -86,14 +86,18 @@ impl Watcher for IdleMyTurnDetector {
         let ts = ThreadsState::get(state);
         let fs = FocusState::get(state);
 
-        // Prefer the focused thread (it's the one the agent was working on when
-        // it stopped). Fall back to any MY_TURN thread.
+        // FOCUSED-ONLY: nudge the focused thread when it is still MY_TURN (the
+        // one the agent was working on when it stopped). Background MY_TURN
+        // threads are the per-thread *dispatcher*'s job
+        // (`App::dispatch_background_my_turn`), so this watcher no longer falls
+        // back to "the first MY_TURN thread" — that would double-nudge a
+        // background thread the dispatcher already handles (hardening S5). At
+        // N=1 the focused thread is the only MY_TURN thread, so this is
+        // behaviourally identical to the former fallback.
         let focused_tid = fs.focused_thread_id.as_deref();
-        let thread = focused_tid
-            .and_then(|fid| {
-                ts.threads.iter().find(|t| t.id == fid && !t.archived && !t.paused && t.status == ThreadStatus::MyTurn)
-            })
-            .or_else(|| ts.threads.iter().find(|t| !t.archived && !t.paused && t.status == ThreadStatus::MyTurn))?;
+        let thread = focused_tid.and_then(|fid| {
+            ts.threads.iter().find(|t| t.id == fid && !t.archived && !t.paused && t.status == ThreadStatus::MyTurn)
+        })?;
 
         // Record the fire time for cooldown.
         self.last_fired_ms.store(now, Ordering::Relaxed);
