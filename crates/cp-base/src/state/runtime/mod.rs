@@ -227,6 +227,8 @@ pub struct State {
     pub init_is_global: Option<bool>,
 }
 
+/// Per-thread runtime bundle + the resident-thread swap (`ThreadRuntime`).
+pub mod bundle;
 /// `Default` for `State` (extracted for the 500-line cap).
 mod default;
 /// Module extension-data accessors (`get_ext`/`ext`/`set_ext`/…), extracted for the cap.

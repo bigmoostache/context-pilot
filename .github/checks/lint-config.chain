@@ -8430,3 +8430,40 @@ index 759e4bbe..8c15a4d4 100644
      match: "type_id/cause/provide are unstable or deprecated"
      reason: >
 # --- End entry #100 ---
+101:13fb07565a846f10796c2e101100a104eaf92e2b104a9f6b336efbf0fffea3a0:bc13df16a4fc7d4e94c52edd676105ebcff4c1b87fc267479504cf7cd7e11bad:bd61e56efb5af1937c66283114cdf1c67a33c7fc74f94ce6a59634719264b25a
+# --- Diff for entry #101 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 8c15a4d4..fc7e48af 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -207,6 +207,29 @@ exceptions:
+       Irreducible under the 500-line file cap — the two impl blocks are the honest
+       shape once State's methods exceed one file's budget.
+ 
++  - path: "crates/cp-base/src/state/runtime/bundle.rs"
++    match: "flat per-thread runtime initializer mirroring State::default; sub-grouping would diverge from the flat State layout the swap targets field-by-field"
++    reason: >
++      ThreadRuntime::default is a flat per-thread initializer — one `field: value`
++      line each, mirroring the per-thread subset of the flat State::default literal.
++      Grouping fields into sub-structs to shave lines would diverge from the flat
++      State layout that swap_with targets field-by-field, so it stays flat and carries
++      the length expect (threshold 60, unchanged). The twin of the State::default expect.
++    strategy: >
++      Irreducible — a flat per-thread initializer mirroring State's flat layout; the
++      honest shape, same as the accepted State::default flat-initializer expect.
++
++  - path: "crates/cp-base/src/state/runtime/bundle.rs"
++    match: "flat per-field mem::swap mirroring every per-thread State field; one swap per field, nothing to factor without a macro that re-expands to the same body"
++    reason: >
++      ThreadRuntime::swap_with is a flat sequence of std::mem::swap calls, one per
++      per-thread State field, exchanging each with the resident State. The targets are
++      non-uniform (state.context vs state.flags.stream vs state.flags.lifecycle.*), so a
++      macro would re-expand to the same body with no readability gain. The only residual
++      is length, intrinsic to the ~45-field per-thread subset, so it carries the expect.
++    strategy: >
++      Irreducible — one swap per per-thread field; a macro re-expands to the same body.
++
+   - path: "src/llms/mod.rs"
+     match: "type_id/cause/provide are unstable or deprecated"
+     reason: >
+# --- End entry #101 ---
