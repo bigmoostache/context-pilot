@@ -46,18 +46,28 @@ impl App {
             reverie_streams: std::collections::HashMap::new(),
             thread_streams: std::collections::HashMap::new(),
             fleet: cp_fleet::FleetRegistry::new(),
+            stepping_thread: None,
         }
     }
 
-    /// Key under which the single resident main stream is stored in
-    /// [`thread_streams`](crate::app::App::thread_streams) at N=1.
+    /// Key identifying the thread whose runtime is currently resident in
+    /// [`state`](crate::app::App::state) — the channel key used for both stream
+    /// *spawn* and stream *drain*, so the two can never diverge.
     ///
-    /// There is exactly one live main execution context today, so every stream
-    /// start overwrites this one slot (leak-free). Phase C3 replaces this with
-    /// the id of the thread actually being advanced so the loop can run several
-    /// streams concurrently.
-    pub(super) fn main_stream_key() -> String {
-        crate::infra::constants::DEFAULT_WORKER_ID.to_owned()
+    /// During a background advancement step this is
+    /// [`stepping_thread`](crate::app::App::stepping_thread); otherwise it is the
+    /// focused thread (or [`DEFAULT_WORKER_ID`](crate::infra::constants::DEFAULT_WORKER_ID)
+    /// before any thread is focused). Deriving the key from the same source at
+    /// spawn and drain time is what keeps each thread's stream events on its own
+    /// bundle once several threads advance concurrently.
+    pub(super) fn resident_key(&self) -> String {
+        if let Some(id) = self.stepping_thread.as_ref() {
+            return id.clone();
+        }
+        cp_mod_threads::types::FocusState::get(&self.state)
+            .focused_thread_id
+            .clone()
+            .unwrap_or_else(|| crate::infra::constants::DEFAULT_WORKER_ID.to_owned())
     }
 
     /// Start an LLM stream for the resident thread over a fresh per-thread
@@ -66,13 +76,14 @@ impl App {
     ///
     /// This replaces the former single app-wide stream channel: each stream now
     /// owns its mpsc (mirroring reverie streams), so concurrent threads can each
-    /// have a live stream. At N=1 the single entry — keyed by
-    /// [`main_stream_key`](Self::main_stream_key) — is overwritten on every
-    /// start, leaving exactly one channel to drain.
+    /// have a live stream. The channel is keyed by
+    /// [`resident_key`](Self::resident_key) — the thread currently in `state` —
+    /// so a background thread's stream lands under its own id, never colliding
+    /// with the focused thread's.
     pub(super) fn spawn_thread_stream(&mut self, params: crate::llms::StreamParams) {
         let (tx, rx) = std::sync::mpsc::channel();
         crate::infra::api::start_streaming(params, tx);
-        let key = Self::main_stream_key();
+        let key = self.resident_key();
         let _prev = self.thread_streams.insert(key, crate::app::ThreadStream { rx });
     }
 

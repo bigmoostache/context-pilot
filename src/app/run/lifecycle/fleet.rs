@@ -14,18 +14,10 @@ use crate::app::App;
 
 #[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
-    /// Reconcile the fleet registry against [`ThreadsState`] and compute the
-    /// promotion decision — the **scheduling-decision layer** (Phase C4).
-    ///
-    /// This mirrors the thread roster into [`fleet`](crate::app::App::fleet) and
-    /// derives each entry's [`ThreadExecState`], but deliberately drives **no**
-    /// background advancement: it never sets an *active* state
-    /// ([`Streaming`](ThreadExecState::Streaming) /
-    /// [`AwaitingLlm`](ThreadExecState::AwaitingLlm)), so
-    /// [`advance_background_threads`](Self::advance_background_threads) stays a
-    /// no-op. Real advancement (flipping a promoted thread active + spawning its
-    /// stream) is deferred until the spine is thread-routed (Phase D) and the
-    /// conversation is per-thread (Phase F2).
+    /// Reconcile the fleet registry against [`ThreadsState`] — the roster-mirror
+    /// that keeps [`fleet`](crate::app::App::fleet) in step with the thread list
+    /// each tick, before [`advance_background_threads`](Self::advance_background_threads)
+    /// steps the schedulable ones.
     ///
     /// Reconcile rules (the **resident/focused** thread is excluded — its context
     /// lives flat in [`State`](crate::state::State), not in an `Entry`):
@@ -33,12 +25,12 @@ impl App {
     ///   fresh `Idle` [`Entry`] (empty [`ThreadRuntime`](cp_base::state::runtime::bundle::ThreadRuntime));
     /// - an entry whose thread vanished, was archived, or became the focused
     ///   resident is removed;
-    /// - each surviving entry's `exec_state` is derived from its thread status:
-    ///   `MyTurn` → `Runnable` (+ `waiting_since_ms`), otherwise `Idle`.
+    /// - each surviving **non-active** entry's `exec_state` is derived from its
+    ///   thread status (`MyTurn` → `Runnable`, else `Idle`); active entries are
+    ///   left to the step loop (see [`derive_exec_state`](Self::derive_exec_state)).
     ///
-    /// At N=1 the only working thread is the focused resident (excluded), so the
-    /// registry holds at most `Idle` `THEIR_TURN` peers, `promote` returns empty,
-    /// and the tick is byte-identical to single-thread.
+    /// Promotion + stepping live in `advance_background_threads`; reconcile only
+    /// mirrors membership and the Idle↔Runnable derivation.
     pub(super) fn reconcile_fleet_registry(&mut self, now_ms: u64) {
         let focused = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
 
@@ -73,32 +65,32 @@ impl App {
             }
         }
 
-        // Promotion decision (fills free active slots from the waiting queue).
-        // Wired and unit-tested in cp-fleet; at N=1 the waiting queue is empty
-        // (background peers are THEIR_TURN → Idle), so this is provably empty.
-        // Applying it (flip → active + spawn stream) is the one step deferred to
-        // Phase D/F2 — until then the decision is observed, not executed.
-        let promotable = promote(&self.fleet);
-        if !promotable.is_empty() {
-            log::debug!(
-                "fleet: {} thread(s) promotable, advancement deferred to Phase D/F2: {promotable:?}",
-                promotable.len()
-            );
-        }
+        // Promotion is applied by `advance_background_threads` (it needs to
+        // STEP the promoted threads, so the decision lives there). Reconcile is
+        // purely the roster-mirror + Idle<->Runnable derivation above.
     }
 
-    /// Derive one non-resident entry's [`ThreadExecState`] from its thread status,
-    /// **without ever setting an active state** (advancement stays deferred).
+    /// Derive one non-resident entry's [`ThreadExecState`] from its thread status.
     ///
-    /// `MyTurn` means the thread has user input awaiting the agent → `Runnable`
-    /// (stamping `waiting_since_ms` once, on the Idle→Runnable edge, for
-    /// oldest-waiting-first promotion). `TheirTurn` → `Idle` (waiting on the
+    /// An **active** entry ([`Streaming`](ThreadExecState::Streaming) /
+    /// [`AwaitingLlm`](ThreadExecState::AwaitingLlm)) is owned by the advancement
+    /// step loop ([`advance_background_threads`](Self::advance_background_threads)
+    /// re-derives it from the post-step stream phase), so reconcile leaves it
+    /// untouched — otherwise a mid-stream thread, whose `ThreadStatus` is still
+    /// `MyTurn`, would be clobbered back to `Runnable` every tick.
+    ///
+    /// For a non-active entry: `MyTurn` means user input awaits the agent →
+    /// `Runnable` (stamping `waiting_since_ms` once, on the Idle→Runnable edge,
+    /// for oldest-waiting-first promotion); `TheirTurn` → `Idle` (waiting on the
     /// human), clearing any stale wait stamp.
     fn derive_exec_state(
         entry: &mut Entry<cp_base::state::runtime::bundle::ThreadRuntime>,
         status: ThreadStatus,
         now_ms: u64,
     ) {
+        if entry.exec_state.is_active() {
+            return; // owned by the advancement step loop; never clobber
+        }
         match status {
             ThreadStatus::MyTurn => {
                 if entry.exec_state != ThreadExecState::Runnable {
@@ -113,27 +105,27 @@ impl App {
         }
     }
 
-    /// Advance every *background* (non-resident, active, capped) thread one step.
+    /// Advance every schedulable *background* (non-resident, capped) thread one
+    /// step: the currently-active ones (continuing their stream) plus the ones
+    /// [`promote`] selects to fill free concurrency slots (their kickoff step).
     ///
-    /// For each one it removes the entry, swaps the thread's parked
-    /// [`ThreadRuntime`](cp_base::state::runtime::bundle::ThreadRuntime) into
-    /// `state` (making it momentarily resident), runs the advancement core
-    /// ([`step_one_thread`](Self::step_one_thread)), then swaps the focused
-    /// thread back and re-inserts the entry — so `state` and the registry are
-    /// left exactly as they were found. The swap is O(1) (no clone), so a tick
-    /// costs at most `K-1` swaps.
-    ///
-    /// Only `Streaming` / `AwaitingLlm` peer threads are stepped (they hold a
-    /// concurrency slot). `Runnable` ones wait for promotion (C4); reveries are
-    /// driven by the separate reverie block. Empty at N=1 → no-op.
+    /// For each, it removes the entry, marks it the stepping resident, swaps its
+    /// parked [`ThreadRuntime`](cp_base::state::runtime::bundle::ThreadRuntime)
+    /// into `state`, runs the advancement core
+    /// ([`step_one_thread`](Self::step_one_thread)) — whose `check_spine` may
+    /// start the thread's stream — then re-derives the entry's
+    /// [`ThreadExecState`] from the post-step stream phase, swaps the focused
+    /// thread back, and re-inserts. The swap is O(1), so a tick costs at most
+    /// `K` swaps. Empty at N=1 (no background peer has work) → no-op.
     pub(super) fn advance_background_threads(&mut self) {
         let focused = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
+        let promotable: std::collections::HashSet<String> = promote(&self.fleet).into_iter().collect();
         let ids: Vec<String> = self
             .fleet
             .iter()
             .filter(|entry| {
                 entry.1.role.is_capped()
-                    && entry.1.exec_state.is_active()
+                    && (entry.1.exec_state.is_active() || promotable.contains(entry.0.as_str()))
                     && focused.as_deref() != Some(entry.0.as_str())
             })
             .map(|entry| entry.0.clone())
@@ -144,10 +136,35 @@ impl App {
             // `state` — the fleet and state `&mut self` sub-borrows must not
             // overlap. Re-inserted after the step.
             let Some(mut entry) = self.fleet.remove(&id) else { continue };
+            // Mark this thread resident so `resident_key` (stream spawn + drain)
+            // targets ITS channel during the step, not the focused thread's.
+            self.stepping_thread = Some(id.clone());
             entry.runtime.swap_with(&mut self.state); // thread `id` resident; focused parks into entry
             self.step_one_thread();
+            entry.exec_state = self.post_step_exec_state(&id); // from this thread's new stream phase
             entry.runtime.swap_with(&mut self.state); // restore focused; thread `id` parks back
+            self.stepping_thread = None;
             self.fleet.insert(id, entry);
+        }
+    }
+
+    /// Re-derive a just-stepped background thread's [`ThreadExecState`] from the
+    /// state it left behind (the thread is still resident in `state`).
+    ///
+    /// A started/continuing stream → [`Streaming`](ThreadExecState::Streaming)
+    /// (holds a concurrency slot). Otherwise, if the thread's shared
+    /// [`ThreadStatus`] is still `MyTurn` it has unfinished work →
+    /// [`Runnable`](ThreadExecState::Runnable) (eligible for re-promotion); a
+    /// `TheirTurn` thread has handed back to the human →
+    /// [`Idle`](ThreadExecState::Idle).
+    fn post_step_exec_state(&self, id: &str) -> ThreadExecState {
+        if self.state.flags.stream.phase.is_streaming() {
+            return ThreadExecState::Streaming;
+        }
+        let status = ThreadsState::get(&self.state).threads.iter().find(|t| t.id == id).map(|t| t.status);
+        match status {
+            Some(ThreadStatus::MyTurn) => ThreadExecState::Runnable,
+            _ => ThreadExecState::Idle,
         }
     }
 

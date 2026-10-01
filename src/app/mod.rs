@@ -126,6 +126,13 @@ pub(crate) struct App {
     /// advancement pass is a no-op and behaviour is identical to single-thread.
     /// Population (reconcile from `ThreadsState`) is wired in C4.
     pub fleet: cp_fleet::FleetRegistry<cp_base::state::runtime::bundle::ThreadRuntime>,
+    /// Id of the background thread currently swapped into [`state`](Self::state)
+    /// for an advancement step, or `None` when the resident is the focused
+    /// thread (the normal case). It is the override half of
+    /// [`resident_key`](Self::resident_key): stream spawn and drain both key by
+    /// the resident thread, so during a background step they target that
+    /// thread's channel rather than the focused thread's.
+    pub stepping_thread: Option<String>,
 }
 
 // App impl block is in run/input.rs (primary), with additional methods spread
