@@ -106,6 +106,7 @@ impl Default for State {
             shared_module_data: HashMap::new(),
             thread_module_data: HashMap::new(),
             init_is_global: None,
+            resident_thread_id: None,
         }
     }
 }

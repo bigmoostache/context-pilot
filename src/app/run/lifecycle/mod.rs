@@ -220,6 +220,10 @@ impl App {
         super::threads::poll_bridge_commands(self);
         super::tools::watchdog::mark(super::tools::watchdog::Step::ThreadsEmit);
         super::threads::emit_bridge_deltas(self);
+        // The focused thread is the resident for the whole focused pipeline below;
+        // tag its stream frames with its id (the stream tee reads this). Background
+        // steps re-point it around their swap (see `advance_background_threads`).
+        self.state.resident_thread_id = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
         super::tools::watchdog::mark(super::tools::watchdog::Step::Stream);
         super::streaming::process_stream_events(self);
         super::streaming::handle_retry(self);

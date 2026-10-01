@@ -225,6 +225,14 @@ pub struct State {
     /// `Some(false)` or `None` → [`thread_module_data`](Self::thread_module_data).
     /// Updates to already-registered types ignore this (they stay in place).
     pub init_is_global: Option<bool>,
+
+    /// Id of the thread whose per-thread context currently lives in `State` (the
+    /// resident): the focused thread normally, or the background thread being
+    /// advanced during its step. Residence metadata — deliberately NOT a swapped
+    /// field (excluded from [`bundle::ThreadRuntime::swap_with`]) so it tracks
+    /// the current occupant across a swap. Read by the stream tee to tag each
+    /// frame's `thread_id`. Runtime-only; `None` on cold boot.
+    pub resident_thread_id: Option<String>,
 }
 
 /// Per-thread runtime bundle + the resident-thread swap (`ThreadRuntime`).

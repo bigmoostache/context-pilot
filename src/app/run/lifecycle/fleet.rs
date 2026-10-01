@@ -137,13 +137,16 @@ impl App {
             // overlap. Re-inserted after the step.
             let Some(mut entry) = self.fleet.remove(&id) else { continue };
             // Mark this thread resident so `resident_key` (stream spawn + drain)
-            // targets ITS channel during the step, not the focused thread's.
+            // targets ITS channel during the step, not the focused thread's, and
+            // so the stream tee tags this thread's live frames with ITS id.
             self.stepping_thread = Some(id.clone());
             entry.runtime.swap_with(&mut self.state); // thread `id` resident; focused parks into entry
+            self.state.resident_thread_id = Some(id.clone());
             self.step_one_thread();
             entry.exec_state = self.post_step_exec_state(&id); // from this thread's new stream phase
             entry.runtime.swap_with(&mut self.state); // restore focused; thread `id` parks back
             self.stepping_thread = None;
+            self.state.resident_thread_id.clone_from(&focused);
             self.fleet.insert(id, entry);
         }
     }
