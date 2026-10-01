@@ -83,7 +83,7 @@ impl App {
             // Check if TUI reload was requested (by system_reload tool)
             if self.state.flags.lifecycle.reload_pending {
                 self.writer.flush();
-                save_state(&self.state);
+                self.save_all_threads();
                 // Write reload flag AFTER save_state — otherwise save_state
                 // overwrites config.json with reload_requested: false.
                 crate::infra::tools::write_reload_flag();
@@ -194,7 +194,7 @@ impl App {
         let Some(action) = handle_event(&evt, &self.state) else {
             // User quit — flush all pending writes and save final state synchronously
             self.writer.flush();
-            save_state(&self.state);
+            self.save_all_threads();
             return Ok(InputOutcome::Quit);
         };
 

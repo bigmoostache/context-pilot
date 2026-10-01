@@ -22,6 +22,41 @@ type ModuleDataMaps = (HashMap<String, serde_json::Value>, HashMap<String, serde
 /// (`important_panel_uids` by kind, `panel_uid` → local id) worker maps.
 type PanelUidMaps = (HashMap<Kind, String>, HashMap<String, String>);
 
+/// The `states/<id>.json` worker-file id for whichever thread is currently
+/// resident in `state` — the file this save writes.
+///
+/// The **focused** thread (and a no-focus agent) keeps the legacy
+/// [`DEFAULT_WORKER_ID`] (`main_worker`) file so boot — which still reads that
+/// file until F1d's per-thread boot lands — stays reload-safe and N=1
+/// byte-identical. A **background** thread (resident only during its
+/// advancement step, so `resident_thread_id != focused_thread_id`) writes its
+/// own `states/<tid>.json`, which is why a background thread's mid-step
+/// `save_state_async` no longer clobbers the focused thread's file.
+fn resident_worker_id(state: &State) -> String {
+    let focused = cp_mod_threads::types::FocusState::get(state).focused_thread_id.clone();
+    match state.resident_thread_id.as_ref() {
+        Some(tid) if Some(tid) != focused.as_ref() => tid.clone(),
+        _ => DEFAULT_WORKER_ID.to_owned(),
+    }
+}
+
+/// The set of panel UIDs this `state` persists (same filter as
+/// [`build_panel_write_ops`]): every panel with a UID except the compiled-in
+/// SYSTEM / LIBRARY panels.
+///
+/// [`save_all_threads`](crate::app::App::save_all_threads) unions this across
+/// every thread to prune orphaned `panels/<uid>.json` exactly once — pruning
+/// per-thread would delete other threads' panels (all threads share the
+/// `panels/` dir, keyed by the fleet-global UID counter).
+pub(crate) fn panel_uids_of(state: &State) -> std::collections::HashSet<String> {
+    state
+        .context
+        .iter()
+        .filter(|c| c.context_type.as_str() != Kind::SYSTEM && c.context_type.as_str() != Kind::LIBRARY)
+        .filter_map(|c| c.uid.clone())
+        .collect()
+}
+
 /// Build global + per-worker module-data maps by polling every registered module.
 fn build_module_data_maps(state: &State) -> ModuleDataMaps {
     let mut global_modules = HashMap::new();
@@ -117,7 +152,10 @@ fn build_history_message_ops(state: &State, messages_dir: &std::path::Path) -> V
 
 /// Scan the panels dir and emit a delete op for every `{uid}.json` whose UID is
 /// no longer live in `known_uids`.
-fn collect_orphan_deletes(
+///
+/// `pub(crate)` so [`save_all_threads`](crate::app::App::save_all_threads) can
+/// run it once over the union of every thread's UIDs (see [`panel_uids_of`]).
+pub(crate) fn collect_orphan_deletes(
     panels_dir: &std::path::Path,
     known_uids: &std::collections::HashSet<String>,
 ) -> Vec<DeleteOp> {
@@ -197,28 +235,32 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
 
     let (important_uids, panel_uid_to_local_id) = build_panel_uid_maps(state);
 
-    // WorkerState
+    // WorkerState — written to the RESIDENT thread's file (see `resident_worker_id`).
+    let worker_id = resident_worker_id(state);
     let worker_state = WorkerState::default()
-        .with_worker_id(DEFAULT_WORKER_ID.to_owned())
+        .with_worker_id(worker_id.clone())
         .with_panel_uids(important_uids, panel_uid_to_local_id)
         .with_id_counters(state.next_tool_id, state.next_result_id)
         .with_modules(worker_modules);
     if let Ok(json) = serde_json::to_string_pretty(&worker_state) {
         writes.push(WriteOp {
-            path: dir.join(crate::infra::constants::STATES_DIR).join(format!("{DEFAULT_WORKER_ID}.json")),
+            path: dir.join(crate::infra::constants::STATES_DIR).join(format!("{worker_id}.json")),
             content: json.into_bytes(),
         });
     }
 
-    // Panels + history messages + orphan pruning
+    // Panels + history messages. NOTE: orphan pruning is deliberately NOT done
+    // here — a single-thread save only knows the RESIDENT's UIDs, so pruning
+    // would delete every OTHER thread's `panels/<uid>.json` (the dir is shared,
+    // keyed by the fleet-global UID counter). Pruning runs once over the union
+    // of all threads' UIDs in `App::save_all_threads` (reload/quit).
     let panels_dir = dir.join(crate::infra::constants::PANELS_DIR);
     let messages_dir = dir.join(crate::infra::constants::MESSAGES_DIR);
     let mut known_uids: std::collections::HashSet<String> = std::collections::HashSet::new();
     writes.extend(build_panel_write_ops(state, &panels_dir, &mut known_uids));
     writes.extend(build_history_message_ops(state, &messages_dir));
-    let deletes = collect_orphan_deletes(&panels_dir, &known_uids);
 
-    WriteBatch { writes, deletes, ensure_dirs }
+    WriteBatch { writes, deletes: Vec::new(), ensure_dirs }
 }
 
 /// Build a `WriteOp` for a single message (CPU work only — no I/O).
@@ -230,7 +272,7 @@ pub(crate) fn build_message_op(msg: &Message) -> WriteOp {
 }
 
 /// Execute one write op synchronously (create parent dir, then write).
-fn exec_write_op(op: &WriteOp) {
+pub(crate) fn exec_write_op(op: &WriteOp) {
     if let Some(parent) = op.path.parent()
         && let Err(e) = fs::create_dir_all(parent)
     {
@@ -242,8 +284,15 @@ fn exec_write_op(op: &WriteOp) {
     }
 }
 
+/// Absolute path to the shared `panels/` directory — the dir
+/// [`save_all_threads`](crate::app::App::save_all_threads) scans for the union
+/// orphan-prune.
+pub(crate) fn panels_dir() -> PathBuf {
+    PathBuf::from(STORE_DIR).join(crate::infra::constants::PANELS_DIR)
+}
+
 /// Execute one delete op synchronously (ignoring not-found).
-fn exec_delete_op(op: &DeleteOp) {
+pub(crate) fn exec_delete_op(op: &DeleteOp) {
     if let Err(e) = fs::remove_file(&op.path)
         && e.kind() != std::io::ErrorKind::NotFound
     {

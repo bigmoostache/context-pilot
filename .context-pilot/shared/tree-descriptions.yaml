@@ -2802,6 +2802,10 @@
   path: crates/cp-orchestrator/src/transport/inspect/metrics.rs
   description: '§19 observability metrics endpoints. agent_metrics + fleet_metrics build per-agent snapshot: durable cost-breaker state (tripped/spend/budget), stream health (subs/dropped/degraded), view-vs-oplog rev lag (oplog_head_rev read fresh outside the lock), phase+lifecycle. T346: fleet_metrics now takes auth_user and ACL-filters via auth::filter_fleet (mirrors fleet_meta — a regular user must not enumerate every agent''s id/cost/budget via the Usage page). Only figures the backend genuinely holds — latency histograms deliberately not synthesised.'
   last_edited_ms: 0
+1b47cab07203ec88:
+  path: src/app/run/tools/cleanup.rs
+  description: 'Watcher polling: blocking sentinel replacement + async spine notifications. check_watchers takes WatcherRegistry from thread_module_data (per-thread). Async completions route via deliver_to_thread into owner inbox (D1).'
+  last_edited_ms: 1790866312441
 1b4881ed98b5293d:
   path: crates/cp-mod-firecrawl/src/lib.rs
   description: 'Firecrawl module. 4 tools: scrape/search/map/crawl. Dynamic firecrawl_result panels. No state. Nested object params (location). Simple dispatch pattern.'
@@ -3654,6 +3658,10 @@
   path: web/src/components/shell/config/ConfigPanes.tsx
   description: 'Config category panes + presentational building blocks (split from ConfigPanel for <500): CATEGORIES, CategoryBody (general/usage/providers/search/docai/web/integrations), GeneralPane (default model picker + apply-to-all via sendCommand configure), KeyRow/StatusRow/ToggleRow/ManagedKeysNotice. Key-bearing panes lock when EITHER company-managed (useAccount) OR auth-active-and-caller-not-admin (T346, useAuth: authEnabled && role!==''admin''). LockReason ''company''|''admin'' drives copy: admin → ''Reserved to Administrators'' (ShieldCheck), company → ''Keys managed by {company}'' (Building2). Regular users still SEE the panes, greyed. T399: KeyRow fetches masked value on-demand via revealEnvKey API (eye button), env-key status from live /api/env-keys query. T403: noReveal prop skips eye button for non-env-var rows (Claude Code OAuth).'
   last_edited_ms: 1782341291167
+244a84eb34e435ae:
+  path: crates/cp-mod-threads/src/watcher.rs
+  description: 'IdleMyTurnDetector watcher: fires spine notification when idle + focused thread still MY_TURN (FOCUSED-ONLY since dispatcher subsumed bg fallback, S5). Cooldown 5s. Distinguishes normal vs abnormal stop reasons.'
+  last_edited_ms: 1790866312106
 244c5cccce4dfe50:
   path: crates/cp-wire/src/types/snapshot/mod.rs
   description: 'Bounded replay snapshot: Snapshot (heads+seen+roster) + RosterThread #[non_exhaustive]+RosterThread::new(RosterEntryInit bundle). Heads/SeenSet fold helpers. RosterEntryInit exhaustive_structs #[expect] (7-field cross-crate literal). ThreadCreation borrowed payload.'
@@ -4810,6 +4818,10 @@
   path: src/app/actions/helpers.rs
   description: Utility functions + switch_to_panel (scroll-preserving panel switch). clean_llm_id_prefix, parse_context_pattern, find_context_by_id, eject_cursor_from_sentinel.
   last_edited_ms: 0
+2f0fb22785a34b98:
+  path: crates/cp-mod-spine/src/coucou.rs
+  description: Coucou tool — scheduled notifications via Watcher. Timer + datetime modes. CoucouData persist. CoucouWatcher::check stamps thread_id (D2) so thread-scoped coucous route via deliver_to_thread. MIN_RECURRENCE_MS=60s floor.
+  last_edited_ms: 1790866312267
 2f219605084295a8:
   path: web/src/components/auth/AuthGuard.tsx
   description: Auth gate wrapper (Phase 9). Shows LoginPage when auth enabled + no session, passes through when disabled or authenticated. Loading spinner while probing.
@@ -8970,6 +8982,10 @@
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search.
   last_edited_ms: 0
+578473f6bfd98888:
+  path: src/app/run/threads/commands/create.rs
+  description: Thread creation commands CreateThread/BranchThread. apply_create_thread returns id, apply_branch_thread returns Option<id> so caller routes on_user_message (D4). Strict create->pause->send order (T687).
+  last_edited_ms: 1790866311935
 5786f7b5e0240e68:
   path: web/src/lib/api/finder.ts
   description: Finder filesystem REST endpoints (SDK). 12 SDK + 2 manual (rawUrl/downloadFile irreducible). T298 uploadUnique. Re-exports FinderNode/FsPreview/SheetData/ConversationMsg from generated.
@@ -9038,6 +9054,10 @@
   path: tmp/doc/template/assemble.js
   description: 'Fetches header/footer/content, generates the ToC by walking article > section[id] > h2, stitches header+toc+content+footer INSIDE #document (all styling is hierarchy-based, so an extra wrapper silently breaks half the typography), then hands the flow to Paged.js.'
   last_edited_ms: 1785772711673
+5852ff0af61eb0d8:
+  path: src/app/run/threads/commands/mod.rs
+  description: Bridge command application (K7). apply_command dispatches Send/Create/Branch/Archive/etc. apply_send_message returns bool; route_on_user_message routes on_user_message per-thread via deliver_to_thread + clear_errored_entry (F4a re-engage).
+  last_edited_ms: 1790866312605
 5853d81141372cc3:
   path: .git/index
   description: Git index (binary). Not source.
@@ -17234,6 +17254,10 @@ a912f9ee13f7297e:
   path: web/src/components/shell/TopBar.tsx
   description: 'Slim macOS-style title bar (T321 trimmed): app mark→fleet, agent switcher, per-agent view tabs (Threads/Finder/Cockpit/Costs), agent-config gear, UsageButton, account UserMenu. Costs tab dev-mode only with BarChart3 icon.'
   last_edited_ms: 0
+a91cf65cd0aad15e:
+  path: .github/checks/allowed-lint-exceptions.yaml
+  description: 'Curated #[expect]/#[allow] registry (hash-chained). Every code suppression needs a matching entry. Includes bundle.rs/ext.rs/fleet.rs multi-thread expects. Edit->run chain.sh --password.'
+  last_edited_ms: 1790866312792
 a92665ea348b39b0:
   path: crates/cp-orchestrator/src/main.rs
   description: Backend entry point. Loads .env via dotenvy (project-local + global fallback) before config. Reads Config from env, prints version/protocol/agents-dir/budget/scan-interval + agents_root + agent_binary, creates Runtime, starts driver thread, serves HTTP (blocking).

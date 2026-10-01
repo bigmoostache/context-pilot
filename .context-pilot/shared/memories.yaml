@@ -458,10 +458,10 @@ M-short-32:
   last_edited_ms: 1787840930967
 M-short-33:
   tier: short
-  title: Multi-thread Av1-5
-  contents: 'Av1-5 done (bg advancement ON, green, N=1 identical) branch multi-thread-core-loop. Av1-3 stream isolation+step loop; Av4 123250a7 resident_thread_id tags tee Frame.thread_id; Av5 68ab3628 dispatch_background_my_turn nudges bg MyTurn threads into own inbox, IdleMyTurnDetector FOCUSED-ONLY (S5), flood-safe. REMAINING: F3, F1 persist N, F4 Errored, Phase G TUI.'
+  title: Multi-thread Av+F3+F4a
+  contents: 'bg advancement ON, green, N=1 identical; branch multi-thread-core-loop. Av1-5 stream isolation+step loop+tee thread_id+dispatcher; F3/D4 ce948311 on_user_message per-thread; F4a fd04033b Errored isolation (post_step>=3 errors, clear_errored_entry re-engages, excluded from promote+step). REMAINING: F1 persist N, F5 teardown, F6 reattach, Phase G TUI.'
   importance: high
-  last_edited_ms: 1790864708516
+  last_edited_ms: 1790865683688
 M-short-34:
   tier: short
   title: check-rust-tests.sh now

@@ -316,6 +316,60 @@ impl App {
         self.fleet.insert(tid.to_owned(), entry);
     }
 
+    /// Persist **every** thread to disk — the resident (focused) thread first,
+    /// then each background thread by swapping its parked
+    /// [`ThreadRuntime`](cp_base::state::runtime::bundle::ThreadRuntime) into
+    /// `state`, saving, and swapping back (design doc §F1 "save stores the
+    /// resident first", I-10). Called on reload and quit, replacing the
+    /// single-thread `save_state`.
+    ///
+    /// Why this exists and not just `save_state`: `build_save_batch` deliberately
+    /// no longer prunes orphaned `panels/<uid>.json` per call (that would delete
+    /// *other* threads' panels — the dir is shared, keyed by the fleet-global UID
+    /// counter). So each thread is saved with empty deletes here, their live
+    /// panel UIDs are unioned via [`panel_uids_of`](crate::state::persistence::save::panel_uids_of),
+    /// and the orphan-prune runs **exactly once** over that union at the end.
+    ///
+    /// The swap machinery mirrors
+    /// [`advance_background_threads`](Self::advance_background_threads): mark the
+    /// stepping thread so `resident_worker_id` routes its save to
+    /// `states/<tid>.json`, swap in, save, swap the focused thread back. At N=1
+    /// the fleet is empty, so this saves only the focused thread to
+    /// `main_worker.json` and prunes over its UIDs — byte-identical to the former
+    /// `save_state` (bar the deferred-prune timing, which is inert: boot loads
+    /// from the persisted UID index, never a dir scan).
+    pub(super) fn save_all_threads(&mut self) {
+        use crate::state::persistence::save;
+
+        let focused = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
+        let mut known: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+        // Resident (focused) first → states/main_worker.json (focused == resident).
+        self.state.resident_thread_id.clone_from(&focused);
+        known.extend(save::panel_uids_of(&self.state));
+        save::save_state(&self.state);
+
+        // Each background thread: swap in, snapshot to its own file, swap back.
+        let bg_ids: Vec<String> = self.fleet.iter().map(|entry| entry.0.clone()).collect();
+        for id in bg_ids {
+            let Some(mut entry) = self.fleet.remove(&id) else { continue };
+            self.stepping_thread = Some(id.clone());
+            entry.runtime.swap_with(&mut self.state); // thread `id` resident; focused parks into entry
+            self.state.resident_thread_id = Some(id.clone());
+            known.extend(save::panel_uids_of(&self.state));
+            save::save_state(&self.state); // → states/<id>.json (resident != focused), no deletes
+            entry.runtime.swap_with(&mut self.state); // restore focused; thread `id` parks back
+            self.stepping_thread = None;
+            self.fleet.insert(id, entry);
+        }
+        self.state.resident_thread_id = focused;
+
+        // Union orphan-prune, exactly once over every thread's live UIDs.
+        for del in save::collect_orphan_deletes(&save::panels_dir(), &known) {
+            save::exec_delete_op(&del);
+        }
+    }
+
     /// Re-engage a background thread parked as [`Errored`](ThreadExecState::Errored),
     /// flipping its registry entry back to `Runnable` so the loop schedules it again.
     ///
