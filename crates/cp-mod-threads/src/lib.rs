@@ -15,10 +15,13 @@ mod panel;
 pub mod tools;
 /// Thread state types: `Thread`, `ThreadMessage`, `ThreadsState`, `FocusState`.
 pub mod types;
+/// Display-only mirror of per-thread execution state (see the module docs).
+pub mod view_state;
 /// Persistent watcher: fires a notification when idle + `MY_TURN` thread exists.
 pub mod watcher;
 
 use types::{FocusState, ThreadsState};
+use view_state::FleetExecMirror;
 
 use serde_json::json;
 
@@ -72,11 +75,17 @@ impl Module for ThreadsModule {
         // singleton pointer, NOT per-thread state. set_ext_global pins it to the
         // shared map so it never rides the resident-thread swap (`ThreadRuntime`).
         state.set_ext_global(FocusState::new());
+        // FleetExecMirror describes EVERY thread, so it too must be shared — a
+        // per-thread copy would only ever hold that thread's own state. It is
+        // runtime-only (rebuilt from the fleet registry on the first tick after
+        // boot), hence no save/load arm.
+        state.set_ext_global(FleetExecMirror::new());
     }
 
     fn reset_state(&self, state: &mut State) {
         state.set_ext(ThreadsState::new());
         state.set_ext_global(FocusState::new());
+        state.set_ext_global(FleetExecMirror::new());
     }
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {

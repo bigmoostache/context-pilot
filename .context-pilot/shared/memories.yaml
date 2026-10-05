@@ -458,10 +458,10 @@ M-short-32:
   last_edited_ms: 1787840930967
 M-short-33:
   tier: short
-  title: MT Phase F+G1 done
-  contents: 'MT (T774) branch multi-thread-core-loop: Phases A–F done. G1 done (c8af3806). REMAINING: G2 (thread-list exec states + attention badges incl Errored/stuck), G3 (drill-in = focused thread from registry; X731 focused-file-by-tid first), G4 (create-thread textarea), H (guardrails/anti-flood). Deferred X706/X707.'
+  title: MT phase progress
+  contents: 'MT (T774) branch multi-thread-core-loop: A-F done, G1 done (c8af3806), G2a in flight. LEFT: G2b render exec states+badges, G3 drill-in (X731 first), G4 create-thread, H guardrails. Deferred X706/X707.'
   importance: high
-  last_edited_ms: 1791190679610
+  last_edited_ms: 1791192135949
 M-short-34:
   tier: short
   title: check-rust-tests.sh now
@@ -767,6 +767,12 @@ M-tiny-42:
   contents: 'Ctrl+V was dropped as an explicit no-op arm, NOT deleted: the conversation panel maps EVERY Char to InputChar, so fallthrough types a literal ''v''. Right (drill-in) deferred to G3.'
   importance: medium
   last_edited_ms: 1791190679614
+M-tiny-43:
+  tier: tiny
+  title: cp-server relaunch state
+  contents: '2026-10-05: ~/cp-server gone after reboot. Orch from releases/v0.2.13-537a0e3, FE vite preview :5174. Tailscale proxies :5174. Panels P14/P17 must stay open.'
+  importance: high
+  last_edited_ms: 1791192135952
 M-tiny-5:
   tier: tiny
   title: 'CI web-install fix:'

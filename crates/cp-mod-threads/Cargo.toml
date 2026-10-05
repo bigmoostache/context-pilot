@@ -13,6 +13,7 @@ publish = false
 [dependencies]
 cp-base.workspace = true
 cp-render.workspace = true
+cp-fleet = { path = "../cp-fleet" }
 cp-mod-spine = { path = "../cp-mod-spine" }
 crossterm.workspace = true
 serde.workspace = true

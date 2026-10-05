@@ -275,6 +275,10 @@ impl App {
         self.reconcile_fleet_registry(current_ms);
         self.dispatch_background_my_turn();
         self.advance_background_threads();
+        // G2 display mirror: republish AFTER the step loop so it reflects
+        // post-step derivations. The focused thread's row is derived from
+        // `state` here — the loop is at rest, so `state` is that thread again.
+        self.publish_fleet_view_states();
 
         // === REVERIE (CONTEXT OPTIMIZER SUB-AGENT) ===
         super::tools::watchdog::mark(super::tools::watchdog::Step::Reverie);

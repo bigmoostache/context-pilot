@@ -207,29 +207,73 @@ impl App {
     /// Re-derive a just-stepped background thread's [`ThreadExecState`] from the
     /// state it left behind (the thread is still resident in `state`).
     ///
-    /// A started/continuing stream → [`Streaming`](ThreadExecState::Streaming)
-    /// (holds a concurrency slot). Otherwise, if the thread's shared
-    /// [`ThreadStatus`] is still `MyTurn` it has unfinished work →
-    /// [`Runnable`](ThreadExecState::Runnable) (eligible for re-promotion); a
-    /// `TheirTurn` thread has handed back to the human →
-    /// [`Idle`](ThreadExecState::Idle).
+    /// Delegates to [`exec_state_from_residency`](Self::exec_state_from_residency)
+    /// so the step loop and the display mirror cannot drift apart.
     fn post_step_exec_state(&self, id: &str) -> ThreadExecState {
-        if self.state.flags.stream.phase.is_streaming() {
+        let errs = cp_mod_spine::types::SpineState::get(&self.state).config.consecutive_continuation_errors;
+        let status = ThreadsState::get(&self.state).threads.iter().find(|t| t.id == id).map(|t| t.status);
+        Self::exec_state_from_residency(self.state.flags.stream.phase.is_streaming(), errs, status)
+    }
+
+    /// The single definition of "what exec state do these residency facts imply".
+    ///
+    /// Shared by two callers that must agree: the step loop's post-step
+    /// derivation ([`post_step_exec_state`](Self::post_step_exec_state)) and the
+    /// display mirror ([`publish_fleet_view_states`](Self::publish_fleet_view_states)).
+    /// A second, drifting definition would show the human a state the scheduler
+    /// never actually held.
+    ///
+    /// Order matters: a live stream wins (the thread holds its `K` slot), then a
+    /// fatal error streak parks it as `Errored`, and only then does the turn
+    /// status decide `Runnable` vs `Idle`.
+    const fn exec_state_from_residency(
+        is_streaming: bool,
+        consecutive_errors: usize,
+        status: Option<ThreadStatus>,
+    ) -> ThreadExecState {
+        if is_streaming {
             return ThreadExecState::Streaming;
         }
         // Repeated terminal failures → park as Errored (stuck, needs a human).
         // Excluded from both `promote` and the step loop, so a persistently
         // failing thread stops churning a promotion slot and can never stall the
         // fleet; it waits for a fresh user message to re-engage it.
-        let errs = cp_mod_spine::types::SpineState::get(&self.state).config.consecutive_continuation_errors;
-        if errs >= STUCK_ERROR_THRESHOLD {
+        if consecutive_errors >= STUCK_ERROR_THRESHOLD {
             return ThreadExecState::Errored;
         }
-        let status = ThreadsState::get(&self.state).threads.iter().find(|t| t.id == id).map(|t| t.status);
         match status {
             Some(ThreadStatus::MyTurn) => ThreadExecState::Runnable,
             _ => ThreadExecState::Idle,
         }
+    }
+
+    /// Republish the display-only exec-state mirror
+    /// ([`FleetExecMirror`](cp_mod_threads::view_state::FleetExecMirror)) from the
+    /// registry plus the resident's own facts.
+    ///
+    /// Called once per tick, **after** the step loop, so the map reflects
+    /// post-step derivations rather than the pre-step reconcile. Rebuilding
+    /// wholesale (not merging) is what lets a deleted or archived thread vanish
+    /// from the UI instead of lingering.
+    ///
+    /// The **focused** thread needs its own source: the registry deliberately
+    /// excludes it (its context lives flat in `state`, the resident=focused
+    /// invariant), so a registry-only mirror would leave the row the human is
+    /// looking at blank. Its stream phase and error streak are read from
+    /// `state`, which *is* that thread while the loop is at rest.
+    pub(super) fn publish_fleet_view_states(&mut self) {
+        let mut exec_states: std::collections::HashMap<String, ThreadExecState> =
+            self.fleet.iter().map(|entry| (entry.0.clone(), entry.1.exec_state)).collect();
+
+        let focused = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
+        if let Some(id) = focused {
+            let errs = cp_mod_spine::types::SpineState::get(&self.state).config.consecutive_continuation_errors;
+            let status = ThreadsState::get(&self.state).threads.iter().find(|t| t.id == id).map(|t| t.status);
+            let resident = Self::exec_state_from_residency(self.state.flags.stream.phase.is_streaming(), errs, status);
+            let _inserted = exec_states.insert(id, resident);
+        }
+
+        cp_mod_threads::view_state::FleetExecMirror::get_mut(&mut self.state).replace_all(exec_states);
     }
 
     /// The per-thread advancement core: drain this thread's stream, retry a
