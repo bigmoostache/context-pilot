@@ -10,6 +10,7 @@
 //! re-engage of an `Errored` thread (F4).
 
 use cp_fleet::ThreadExecState;
+use cp_mod_threads::types::{ThreadStatus, ThreadsState};
 
 use crate::app::App;
 
@@ -205,5 +206,112 @@ impl App {
             entry.runtime.swap_with(&mut self.state); // restore focused resident; drilled parks back
             self.fleet.insert(id, entry);
         }
+    }
+
+    /// Nudge every **background** `MyTurn` thread that is idle and has no live
+    /// notification, so [`check_spine`](crate::app::App::check_spine) continues
+    /// it once it is promoted and stepped (the per-thread *dispatcher*, design
+    /// doc §7.3).
+    ///
+    /// The **focused** thread is deliberately excluded — it is handled by the
+    /// [`IdleMyTurnDetector`](cp_mod_threads::watcher::IdleMyTurnDetector) watcher
+    /// (focused-only since this dispatcher subsumed its background fallback), so
+    /// the two nudge paths never overlap on the same thread.
+    ///
+    /// For each candidate it swaps the thread in (via
+    /// [`deliver_to_thread`](Self::deliver_to_thread)) and, **only if** that
+    /// thread is idle (not streaming) and its inbox holds no unprocessed
+    /// notification, drops a single `Custom`/`threads` notification bound to it.
+    /// Both guards make this flood-safe by construction: a thread mid-stream or
+    /// already-nudged is skipped, and [`SpineState::create_notification`] itself
+    /// dedups on `(kind, source)`, so re-running every tick never piles up.
+    ///
+    /// At N=1 the only `MyTurn` thread is the focused resident (excluded), so the
+    /// candidate set is empty and this is a no-op — byte-identical to
+    /// single-thread.
+    pub(super) fn dispatch_background_my_turn(&mut self) {
+        let focused = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
+        // Snapshot (id, name) of eligible background threads before touching the
+        // per-thread state (the swap below borrows `state`).
+        let candidates: Vec<(String, String)> = ThreadsState::get(&self.state)
+            .threads
+            .iter()
+            .filter(|t| {
+                !t.archived
+                    && !t.paused
+                    && t.status == ThreadStatus::MyTurn
+                    && focused.as_deref() != Some(t.id.as_str())
+            })
+            .map(|t| (t.id.clone(), t.name.clone()))
+            .collect();
+
+        for (tid, name) in candidates {
+            let tid_for_bind = tid.clone();
+            self.deliver_to_thread(Some(&tid), move |state| {
+                // Skip if this thread is already working or already nudged — the
+                // two guards that keep the dispatcher from flooding an inbox.
+                if state.stream.phase.is_streaming() {
+                    return;
+                }
+                if cp_mod_spine::types::SpineState::has_unprocessed_notifications(state) {
+                    return;
+                }
+                let content = format!(
+                    "Thread \"{name}\" ({tid_for_bind}) is MY_TURN and needs a response. \
+                     Use Read to focus on it, then Send your reply.",
+                );
+                let nid = cp_mod_spine::types::SpineState::create_notification(
+                    state,
+                    cp_mod_spine::types::NotificationType::Custom,
+                    "threads".to_owned(),
+                    content,
+                );
+                cp_mod_spine::types::SpineState::set_notification_thread(state, &nid, Some(tid_for_bind));
+            });
+        }
+    }
+
+    /// Run `f` against the state of the thread that owns `thread_id` — the
+    /// **delivery seam** for thread-addressed spine routing (Phase D1).
+    ///
+    /// Delivery is distinct from advancement: it mutates a thread's own context
+    /// (its spine inbox, its conversation) without stepping its pipeline. This is
+    /// how a watcher fire, a coucou, or a bridge message for a *background*
+    /// thread lands in *that* thread's inbox rather than the resident's.
+    ///
+    /// Routing (the resident = the focused thread, whose context lives flat in
+    /// [`State`](cp_base::state::runtime::State)):
+    /// - `None`, or a `thread_id` equal to the focused resident → run `f` on
+    ///   `state` directly (today's single-thread path);
+    /// - any other (background) owner → swap its parked
+    ///   [`ThreadRuntime`](cp_base::state::runtime::bundle::ThreadRuntime) into
+    ///   `state` (O(1), no clone), run `f`, then swap the focused thread back —
+    ///   so `state` and the registry are left exactly as found.
+    ///
+    /// At N=1 the only working thread is the focused resident, so every target
+    /// is `None` or the resident and the swap branch is never taken: behaviour
+    /// is byte-identical to single-thread. A `thread_id` that is neither focused
+    /// nor in the registry (unknown/archived) is logged and delivered to the
+    /// resident as a last-resort safety net (never reached at N=1).
+    pub(crate) fn deliver_to_thread<F>(&mut self, thread_id: Option<&str>, f: F)
+    where
+        F: FnOnce(&mut cp_base::state::runtime::State),
+    {
+        let focused = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
+        let Some(tid) = thread_id.filter(|t| focused.as_deref() != Some(*t)) else {
+            // None, or targets the focused resident → deliver directly.
+            f(&mut self.state);
+            return;
+        };
+        // Background owner: swap its parked runtime in, deliver, swap back.
+        let Some(mut entry) = self.fleet.remove(tid) else {
+            log::warn!("deliver_to_thread: unknown/unparked thread {tid}; delivering to resident");
+            f(&mut self.state);
+            return;
+        };
+        entry.runtime.swap_with(&mut self.state); // thread `tid` resident; focused parks into entry
+        f(&mut self.state);
+        entry.runtime.swap_with(&mut self.state); // restore focused; thread `tid` parks back
+        self.fleet.insert(tid.to_owned(), entry);
     }
 }

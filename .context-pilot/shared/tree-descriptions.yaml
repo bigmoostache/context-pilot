@@ -6002,6 +6002,10 @@
   path: openapi.json
   description: Generated OpenAPI 3.0.3 spec (70KB). Source of truth for TypeScript client codegen. Regenerated from Rust types via tests/openapi.rs.
   last_edited_ms: 0
+396a75f3a91c5adf:
+  path: src/state/persistence/boot.rs
+  description: 'Phased boot helpers: boot_init_modules + load_one_module_data. B1: set_init_scope(module.is_global) around init_state/load_module_data, Some(false) around load_worker_data. GithubState.github_token set from vault AFTER load (B6 made github is_global=true so token lands in shared map, visible to all threads).'
+  last_edited_ms: 0
 396a7b95e2355a50:
   path: crates/cp-mod-console/src/pollers.rs
   description: FilePoller (tails log file every 100ms into RingBuffer, grace read on stop) + StatusPoller (polls server status every 500ms, marks dead on exit/unreachable).
@@ -7637,6 +7641,10 @@
 495ebf7bcd744ad6:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
+  last_edited_ms: 0
+496436ee7d0ba9df:
+  path: src/app/run/lifecycle/fleet.rs
+  description: 'Background-thread advancement (Phase C): reconcile_fleet_registry (roster mirror), load_background_threads (boot), derive_exec_state, advance_background_threads (swap-in/step/swap-out), step_one_thread, dispatch_background_my_turn (per-thread nudge), deliver_to_thread (D1 delivery seam). Persist/teardown methods live in sibling fleet_lifecycle.rs. N=1 no-op.'
   last_edited_ms: 0
 4966205e92ea0b2c:
   path: web/src/lib/models.ts
@@ -15930,6 +15938,10 @@
   path: yamls/prompts.yaml
   description: Panel display messages (header/timestamp/footer) + context threshold notification
   last_edited_ms: 0
+98abde212ac334c1:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 98bfd0322617831c:
   path: crates/cp-orchestrator/src/transport/auth/acl.rs
   description: 'Per-agent ACL enforcement (Phase 6): extract_agent_id, authorize_agent (admin bypass FR-09), can_manage_acl (system-admin OR agent-admin). CRUD: acl_list/grant/update_role/revoke. filter_fleet for per-user fleet visibility (FR-12).'
@@ -16006,6 +16018,10 @@
   path: crates/cp-oplog/tests/oplog_core.rs
   description: 'Phase 22 (X789): cp-oplog append/segment/replay public-API black-box suite (7 tests). rev strictly-monotonic + never-reused across 60 appends/tiny-limit rolls + reopen; reopen resumes at exact next_rev; EVERY rolled segment (index>0) opens with leading Checkpoint while seg-0 does NOT (GAP1/I5); segment::indices ascending-contiguous-from-0; replay() rebuilds ground-truth heads (last-byte-per-thread, 3 threads) + seen-set (committed dedup tokens) over rolled+reopened log tracked independently; torn-tail recovery correct at EVERY byte offset (truncate seg-0 to each length 0..=len, reopen never errors, rev_head = highest fully-written rev via expected_rev_head boundary helper, next_rev resumes); mid-frame-truncation reissues torn rev to fresh append no-reuse. No access to pub(crate) replay_full/fold_entry — pure black-box. tempfile+cp_wire used directly (no as _ needed).'
   last_edited_ms: 0
+99f96c67cd360c0d:
+  path: src/app/run/lifecycle/mod.rs
+  description: 'Run loop. G2b write-side call site: run_background_phase already calls reconcile_fleet_registry + dispatch_background_my_turn + advance_background_threads each tick — that is where the display-only exec-state mirror gets published. Order matters: publish after reconcile so the map reflects this tick''s derivation.'
+  last_edited_ms: 0
 99fbd4b8aeefd42b:
   path: src/llms/claude_code_v2/mod.rs
   description: 'Claude Code V2 OAuth client. Same OAuth tokens as claude_code but updated headers from CLI v2.1.170: 9 beta flags, billing cc_version=2.1.170, ua claude-cli/2.1.170. Body = clean V1 structure; only ''diagnostics'' field is rejected by public API (thinking/effort/context_management would work). Models: claude-opus-4-8, claude-fable-5, claude-sonnet-4-6 (both 1M ctx). Reuses helpers + parse_sse_stream from claude_code_api_key.'
@@ -16065,6 +16081,10 @@
 9a465e890ed51bea:
   path: src/ui/ir/render_conversation.rs
   description: 'Conversation IR chrome: border/title/scrollbar/auto-scroll. A6 float_math. A9 pending: Autocomplete find_map -> cp_base::deref_match!(o,{Overlay::Autocomplete(ref a)=>Some(a),<5 others>=>None}).'
+  last_edited_ms: 0
+9a47e449559e2ad1:
+  path: .context-pilot/shared/memories.yaml
+  description: Memory slots store (M-safe/tiny/short/mid/long, 220 fixed). Local-only, synced with commits. Mirrors the Memories panel (P6).
   last_edited_ms: 0
 9a4eb57ff5d615b1:
   path: web/src/components/threads/ThreadsView.tsx

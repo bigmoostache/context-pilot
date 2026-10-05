@@ -459,9 +459,9 @@ M-short-32:
 M-short-33:
   tier: short
   title: MT phase progress
-  contents: 'MT (T774): Phases A-H + TC + TC-REAL done. TC-REAL (0d32d48a): global State = shared fields + `resident: ThreadRuntime` via Deref/DerefMut; ALL per-thread fields owned by ThreadRuntime; swap = one mem::swap. N=1 byte-identical. N>1 stream fix 2bb49415 (StreamRuntime stash). Deferred: X706/X707/X673, X786.'
+  contents: 'MT (T774) branch multi-thread-core-loop: Phases A-H+TC+TC-REAL shipped. Bugs X795-800 fixed+pushed: BUG-SWITCH no focus-pin; Right stale-paint = relocate_resident pre-render (8b3052b4); BUG-PANELS cold/bg threads get FULL 12 panels via active_modules->ensure_default_contexts (32cf48ea). Open: X798 input-UX, X799 execstate, X786.'
   importance: high
-  last_edited_ms: 1791211376230
+  last_edited_ms: 1791215521970
 M-short-34:
   tier: short
   title: check-rust-tests.sh now
@@ -704,9 +704,8 @@ M-tiny-32:
 M-tiny-33:
   tier: tiny
   title: Multi-thread A-H done
-  contents: 'T774 multi-thread-core-loop: Phases A-H shipped. Boot-panic fix 5a512d57: cold roster threads need fresh_thread_runtime() (modules inited), not bare new(). Deferred: X706/X707, X673.'
   importance: high
-  last_edited_ms: 1791203269622
+  last_edited_ms: 1791215466770
 M-tiny-34:
   tier: tiny
   title: Never trust gate markers
