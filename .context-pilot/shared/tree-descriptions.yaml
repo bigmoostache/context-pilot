@@ -11166,6 +11166,10 @@
   path: src/ui/markdown.rs
   description: Markdown table rendering — render_markdown_table() and parse_inline_markdown() return cp_render::Span (IR-native). No ratatui/theme imports. Border/accent/bold/code semantic styling.
   last_edited_ms: 0
+6ca3abf3aa762b48:
+  path: .context-pilot/shared/memories.yaml
+  description: Memory slots store (M-safe/tiny/short/mid/long, 220 fixed). Local-only, synced with commits. Mirrors the Memories panel (P6).
+  last_edited_ms: 0
 6ced8d2f20d01101:
   path: src/app/run/watchers.rs
   description: File/cache watcher loop. process_cache_updates + process_watcher_events + timer deprecation split into classify/collect/dispatch/remove helpers; sync split collect_wanted_paths/remove_stale_watches/add_file_watches/add_dir_watches (A2). TimerScan alias.
@@ -16278,6 +16282,10 @@
   path: src/app/actions/mod.rs
   description: Central action dispatch (Elm/Redux). apply_action split handle_input_char/handle_stop_streaming/handle_copy_index_overlay (A2). CycleViewMode resets scroll. Thread actions in threads.rs.
   last_edited_ms: 1784487042579
+9e40e244b6f691f1:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 9e4bc105277e97d1:
   path: crates/cp-wire/src/types/command.rs
   description: Command envelope (id, seq, dedup_token) + Kind (SendMessage, CreateThread, ArchiveThread, RestoreThread, PauseThread, ResumeThread, DeleteThread, InterruptStream, Stop, Configure{provider,model}, Unknown). Frame{schema_version, auth, command}. PauseThread/ResumeThread added for T371. DeleteThread added for T371 permanent delete.

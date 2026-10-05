@@ -227,6 +227,27 @@ pub(crate) fn boot_load_thread_runtime(thread_id: &str) -> Option<ThreadRuntime>
     Some(runtime)
 }
 
+/// Build a [`ThreadRuntime`] for a **cold** thread — one in the roster with no
+/// persisted `states/<tid>.json` (brand-new, or never advanced since per-thread
+/// saves began).
+///
+/// Unlike [`boot_load_thread_runtime`], there is nothing on disk to load: the
+/// conversation, panels and counters start empty. The one thing that must NOT
+/// be empty is the per-thread **module map**. A bare
+/// [`ThreadRuntime::new()`](ThreadRuntime::new) carries an empty
+/// `thread_module_data`, so the moment the scheduler promotes the thread, swaps
+/// it in and steps it, `check_spine`'s first `ext::<SpineState>()` would panic
+/// with "module state not initialized". This runs the same per-thread module
+/// init as a disk load ([`boot_init_thread_modules`] over an empty map) so the
+/// swapped-in state is fully formed.
+pub(crate) fn fresh_thread_runtime() -> ThreadRuntime {
+    let mut bg = State::default();
+    boot_init_thread_modules(&mut bg, &HashMap::new());
+    let mut runtime = ThreadRuntime::new();
+    runtime.swap_with(&mut bg);
+    runtime
+}
+
 /// Next `(user, assistant)` display-id counters derived from a message list —
 /// the max numeric suffix of each role's ids, plus one (defaulting to 1).
 ///

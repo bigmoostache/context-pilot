@@ -136,10 +136,14 @@ impl App {
         for entry in &roster {
             let (id, status) = (&entry.0, entry.1);
             if !self.fleet.contains(id) {
-                self.fleet.insert(
-                    id.clone(),
-                    Entry::new(Role::Thread, cp_base::state::runtime::bundle::ThreadRuntime::new()),
-                );
+                // A cold thread (in the roster, no persisted file) must still get
+                // a runtime whose per-thread module states are INITIALIZED — a
+                // bare `ThreadRuntime::new()` has an empty module map, so once the
+                // step loop promotes and swaps it in, `check_spine`'s first
+                // `ext::<SpineState>()` would panic. `fresh_thread_runtime` inits
+                // the per-thread modules exactly like a disk load would.
+                self.fleet
+                    .insert(id.clone(), Entry::new(Role::Thread, crate::state::persistence::fresh_thread_runtime()));
             }
             if let Some(reg_entry) = self.fleet.get_mut(id) {
                 Self::derive_exec_state(reg_entry, status, now_ms);
