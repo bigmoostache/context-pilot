@@ -137,13 +137,22 @@ fn create_cancel(state: &mut State) -> ActionResult {
     ActionResult::Nothing
 }
 
-/// Drill into the selected thread's full panel view (G3 — Right arrow).
+/// Open the selected thread's full panel view (Right arrow from the thread
+/// list) by **switching the focused thread** and leaving the list for the
+/// normal panel-centric view.
 ///
-/// Resolves the visible selection to a real thread and sets
-/// [`FocusState::drilled_thread_id`], which the renderer uses to swap that
-/// thread's parked runtime in for the paint (read-only inspection; execution is
-/// untouched — Model 2). No-op on the virtual "+ New Thread" entry or an empty
-/// selection (the position does not map to a real thread).
+/// This is a real focus switch, not a read-only glance: it sets
+/// [`FocusState::focused_thread_id`] to the selected thread and flips
+/// [`view_mode`](cp_base::state::runtime::State::view_mode) to
+/// [`Normal`](cp_base::state::data::config::ViewMode::Normal). The loop's
+/// `relocate_resident_on_focus_change` then makes that thread resident on the
+/// next tick, so the ordinary Normal render path paints *its* panels /
+/// conversation — the same TUI as before, just for a different focused thread
+/// (the previously-focused thread keeps running as a background thread).
+/// `Left` on an empty composer cycles back to the thread list.
+///
+/// No-op on the virtual "+ New Thread" entry or an empty selection (the
+/// position does not map to a real thread).
 fn drill_in(state: &mut State) -> ActionResult {
     let focus = FocusState::get(state);
     let viewing_archived = focus.viewing_archived;
@@ -155,11 +164,16 @@ fn drill_in(state: &mut State) -> ActionResult {
     let Some(id) = ThreadsState::get(state).threads.get(real_idx).map(|t| t.id.clone()) else {
         return ActionResult::Nothing;
     };
-    FocusState::get_mut(state).drilled_thread_id = Some(id);
+    let focus_mut = FocusState::get_mut(state);
+    focus_mut.focused_thread_id = Some(id);
+    // Clear any stale read-only drill pointer (unused by this path, kept inert).
+    focus_mut.drilled_thread_id = None;
+    state.view_mode = cp_base::state::data::config::ViewMode::Normal;
     state.scroll_offset = 0.0;
     state.stream.user_scrolled = false;
     state.flags.ui.dirty = true;
-    ActionResult::Nothing
+    // Persist the focus switch (focused thread is keyed into its own state file).
+    ActionResult::Save
 }
 
 /// Exit the drilled panel view back to the thread list (G3 — Left/Esc).
