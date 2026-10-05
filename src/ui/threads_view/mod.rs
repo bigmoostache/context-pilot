@@ -20,7 +20,9 @@ use cp_render::{Block as IrBlock, Semantic, Span as S};
 use crate::state::State;
 use crate::ui::{ir, theme};
 use cp_base::cast::Safe as _;
+use cp_fleet::ThreadExecState;
 use cp_mod_threads::types::{FocusState, ThreadStatus, ThreadsState};
+use cp_mod_threads::view_state::FleetExecMirror;
 
 /// Width of the thread list pane in columns.
 pub(crate) const THREAD_LIST_WIDTH: u16 = 28;
@@ -93,6 +95,8 @@ struct ListBuild<'build> {
     sel: &'build mut SelRange,
     /// Inner pane width (columns) for name truncation.
     inner_width: u16,
+    /// Display-only per-thread exec state, rebuilt each tick by the run loop.
+    mirror: &'build FleetExecMirror,
 }
 
 /// Push the virtual "+ New Thread" entry (active view only, 2-line format),
@@ -130,6 +134,42 @@ const fn thread_status_style(thread: &cp_mod_threads::types::Thread, is_focused:
     }
 }
 
+/// The runtime-execution tag for one exec state, or `None` for
+/// [`Idle`](ThreadExecState::Idle).
+///
+/// Rendered **alongside** the turn badge, never instead of it. The two answer
+/// different questions and neither subsumes the other: the badge
+/// ([`thread_status_style`]) is the *human-facing contract* — whose turn it is,
+/// does this thread owe me a reply — while this is the *scheduler's actual
+/// position*. `MY_TURN + Streaming` means the agent is answering right now;
+/// `MY_TURN + Runnable` means the reply is queued behind a concurrency slot;
+/// `MY_TURN + Errored` means it never will be answered on its own.
+///
+/// Tags are abbreviated to stay inside the 28-column list pane alongside the
+/// badge and the message count. `Idle` yields no tag: it is the default (the
+/// mirror falls back to it for archived and not-yet-reconciled threads), so
+/// printing it would put noise on every quiet row.
+///
+/// [`Errored`](ThreadExecState::Errored) is the one state that demands human
+/// action — the thread is parked out of scheduling and will not recover by
+/// itself (design doc §8) — so it is the only tag bolded and the only one
+/// prefixed with a warning glyph.
+///
+/// The tag is emitted **before** the message count on purpose. The pane is 28
+/// columns and cannot always fit badge + tag + a 3-digit count, so ratatui
+/// clips the overflowing tail — putting the marker first guarantees the
+/// state that needs attention is never the part that gets cut.
+fn exec_state_tag(exec_state: ThreadExecState) -> Option<S> {
+    match exec_state {
+        ThreadExecState::Idle => None,
+        ThreadExecState::Runnable => Some(S::styled("QUEUE".to_owned(), Semantic::AccentDim)),
+        ThreadExecState::Streaming => Some(S::styled("STREAM".to_owned(), Semantic::Active)),
+        ThreadExecState::AwaitingLlm => Some(S::styled("LLM".to_owned(), Semantic::Info)),
+        ThreadExecState::AwaitingTool => Some(S::styled("TOOL".to_owned(), Semantic::Muted)),
+        ThreadExecState::Errored => Some(S::styled("\u{26a0} STUCK".to_owned(), Semantic::Error).bold()),
+    }
+}
+
 /// Push one thread's 2-line entry, recording its selected line range.
 fn push_thread_entry(
     lb: &mut ListBuild<'_>,
@@ -154,11 +194,13 @@ fn push_thread_entry(
         S::styled("\u{25cf} ".to_owned(), status_sem),
         S::new(name),
     ]));
-    lb.blocks.push(IrBlock::Line(vec![
-        S::new("  ".to_owned()),
-        S::styled(badge.to_owned(), status_sem),
-        S::muted(format!("  {} msg", thread.messages.len())),
-    ]));
+    let mut second_line = vec![S::new("  ".to_owned()), S::styled(badge.to_owned(), status_sem)];
+    if let Some(tag) = exec_state_tag(lb.mirror.exec_state_of(&thread.id)) {
+        second_line.push(S::styled("  ".to_owned(), Semantic::Muted));
+        second_line.push(tag);
+    }
+    second_line.push(S::muted(format!("  {} msg", thread.messages.len())));
+    lb.blocks.push(IrBlock::Line(second_line));
     if is_selected {
         lb.sel.end = Some(lb.blocks.len());
     }
@@ -224,6 +266,7 @@ fn apply_selection_highlight(lines: &mut [ratatui::text::Line<'static>], sel: &S
 fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let ts = ThreadsState::get(state);
     let focus = FocusState::get(state);
+    let mirror = FleetExecMirror::get(state);
     let viewing_archived = focus.viewing_archived;
     let visible = ts.visible_indices(viewing_archived);
     let show_new = !viewing_archived; // virtual "+ New Thread" only in the active view
@@ -246,7 +289,7 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
     push_archived_header(&mut ir_blocks, viewing_archived);
 
     let on_virtual = show_new && selected >= visible.len();
-    let mut lb = ListBuild { blocks: &mut ir_blocks, sel: &mut sel, inner_width: inner.width };
+    let mut lb = ListBuild { blocks: &mut ir_blocks, sel: &mut sel, inner_width: inner.width, mirror };
     if show_new {
         push_new_thread_entry(&mut lb, state, on_virtual);
     }
