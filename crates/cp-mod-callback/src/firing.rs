@@ -25,14 +25,28 @@ pub struct FireResult {
     pub replaced: bool,
 }
 
+/// Dedup key for a callback's active session: `"<thread>\u{1f}<callback_id>"`.
+///
+/// The thread component is the resident (executing) thread at fire time, so two
+/// threads firing the same callback get distinct keys and never kill each
+/// other's in-flight run (§13/H2, S6). The `\u{1f}` (ASCII unit separator) can't
+/// appear in a thread id or callback id, so the join is collision-free. At N=1
+/// `resident_thread_id` is `None` → the key degrades to the old callback-id-only
+/// behaviour with a constant prefix.
+fn dedup_key(state: &State, callback_id: &str) -> String {
+    let tid = state.resident_thread_id.as_deref().unwrap_or(constants::DEFAULT_WORKER_ID);
+    format!("{tid}\u{1f}{callback_id}")
+}
+
 /// Kill an existing session for the same callback definition (dedup).
 ///
-/// If the same callback already has an active session, kills its process,
-/// removes its watcher, and cleans up the console entry. Returns `true`
-/// if a running session was replaced.
+/// If the same callback already has an active session **for this thread**, kills
+/// its process, removes its watcher, and cleans up the console entry. Returns
+/// `true` if a running session was replaced.
 fn kill_existing_callback(state: &mut State, callback_id: &str) -> bool {
+    let key = dedup_key(state, callback_id);
     let cs = CallbackState::get_mut(state);
-    let Some(old_key) = cs.active_sessions.remove(callback_id) else {
+    let Some(old_key) = cs.active_sessions.remove(&key) else {
         return false;
     };
 
@@ -185,8 +199,9 @@ pub fn fire_callback(
     let registry = WatcherRegistry::get_mut(state);
     registry.register(Box::new(watcher));
 
-    // Track this session for dedup
-    drop(CallbackState::get_mut(state).active_sessions.insert(def.id.clone(), session_key.clone()));
+    // Track this session for dedup, keyed per (executing thread, callback).
+    let key = dedup_key(state, &def.id);
+    drop(CallbackState::get_mut(state).active_sessions.insert(key, session_key.clone()));
 
     Ok(FireResult { session_key, replaced })
 }

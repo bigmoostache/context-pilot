@@ -39,6 +39,12 @@ pub struct CallbackDefinition {
     /// Each matched file is appended as a separate invocation.
     #[serde(default)]
     pub built_in_command: Option<String>,
+    /// Hint (multi-thread, §13/H2): this callback is safe to run concurrently
+    /// across threads. Purely informational — it never serializes subprocesses.
+    /// When set, a cross-thread note may be appended to a failure/timeout result
+    /// ("another run of this callback was in flight"). Default `false`.
+    #[serde(default)]
+    pub concurrency_friendly: bool,
 }
 
 /// Module-owned state for the Callback module.
@@ -49,8 +55,14 @@ pub struct CallbackState {
     pub definitions: Vec<CallbackDefinition>,
     /// Which callback **name** is currently open in the editor (if any).
     pub editor_open: Option<String>,
-    /// Active callback sessions: `callback_id` → `session_key`.
-    /// Used for dedup: if the same callback fires again, the old session is killed first.
+    /// Active callback sessions: dedup key → `session_key`.
+    ///
+    /// The dedup key is **per (executing thread, callback)** — composed from the
+    /// resident thread id and the callback id (see `firing::dedup_key`). Keying
+    /// by thread as well as callback means one thread's edit re-firing a
+    /// callback kills only *its own* prior run, never another thread's in-flight
+    /// run of the same callback (§13/H2, S6). At N=1 the thread component is
+    /// constant, so behaviour is identical to the old callback-id-only keying.
     /// Ephemeral — not persisted across restarts.
     pub active_sessions: HashMap<String, String>,
 }

@@ -181,6 +181,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         is_global: params.is_global,
         built_in: false,
         built_in_command: None,
+        concurrency_friendly: false,
     };
 
     let cs_store = CallbackState::get_mut(state);
