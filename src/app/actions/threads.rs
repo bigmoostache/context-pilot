@@ -169,6 +169,11 @@ fn drill_in(state: &mut State) -> ActionResult {
     // Clear any stale read-only drill pointer (unused by this path, kept inert).
     focus_mut.drilled_thread_id = None;
     state.view_mode = cp_base::state::data::config::ViewMode::Normal;
+    // Land on the Conversation panel so the composer is immediately typable —
+    // without this the newly-focused thread keeps its own stale
+    // `selected_context` (e.g. a File/Todo panel), and Char keys route to that
+    // panel and silently no-op ("can't type" bug). Conversation is index 0.
+    state.selected_context = 0;
     state.scroll_offset = 0.0;
     state.stream.user_scrolled = false;
     state.flags.ui.dirty = true;

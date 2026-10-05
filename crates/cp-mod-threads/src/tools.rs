@@ -103,17 +103,13 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
         rebuild_threads_panel(state, tid, now);
     }
 
-    // Handing the thread back (still_my_turn=false) flips it to THEIR_TURN
-    // (done in push_send_message) but KEEPS focus on it — the agent stays on the
-    // thread it just replied to instead of being left unfocused (T683). Focus is
-    // only ever moved by an explicit `Read` of another thread. We pin focus to
-    // the sent thread and hold the focused-state invariant `apply_read_focus`
-    // uses (no escalation).
-    if !still_my_turn {
-        let fs = FocusState::get_mut(state);
-        fs.focused_thread_id = Some(tid.to_owned());
-    }
-
+    // NOTE: `Send` deliberately does NOT move `focused_thread_id`. That pointer
+    // is the HUMAN's on-screen view selection (UI-global, shared across the
+    // fleet, never swapped). A background thread finishing its turn with
+    // `still_my_turn=false` would otherwise yank the human's view onto itself —
+    // the "intempestive thread switch" bug. The focused thread is already the
+    // focus, so for the on-screen thread this is a no-op; for a background
+    // thread it must not steal focus. Focus changes only on explicit human nav.
     let suffix = if still_my_turn { " (still your turn)" } else { "" };
     let unarchived_note = if unarchived { " [thread was archived \u{2014} automatically unarchived]" } else { "" };
     let mut result = ToolResult::new(

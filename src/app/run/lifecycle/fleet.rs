@@ -152,9 +152,10 @@ impl App {
                 // bare `ThreadRuntime::new()` has an empty module map, so once the
                 // step loop promotes and swaps it in, `check_spine`'s first
                 // `ext::<SpineState>()` would panic. `fresh_thread_runtime` inits
-                // the per-thread modules exactly like a disk load would.
-                self.fleet
-                    .insert(id.clone(), Entry::new(Role::Thread, crate::state::persistence::fresh_thread_runtime()));
+                // the per-thread modules + fixed base panels exactly like a disk
+                // load would, minting panel UIDs from the shared counter.
+                let runtime = crate::state::persistence::fresh_thread_runtime(&mut self.state.global_next_uid);
+                self.fleet.insert(id.clone(), Entry::new(Role::Thread, runtime));
             }
             if let Some(reg_entry) = self.fleet.get_mut(id) {
                 Self::derive_exec_state(reg_entry, status, now_ms);
@@ -193,7 +194,9 @@ impl App {
             .collect();
 
         for (id, status) in roster {
-            let Some(runtime) = crate::state::persistence::boot_load_thread_runtime(&id) else {
+            let Some(runtime) =
+                crate::state::persistence::boot_load_thread_runtime(&id, &mut self.state.global_next_uid)
+            else {
                 continue; // cold thread: no persisted file; reconcile gives it a fresh runtime
             };
             let mut entry = Entry::new(Role::Thread, runtime);

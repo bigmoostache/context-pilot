@@ -203,7 +203,7 @@ fn boot_init_thread_modules(state: &mut State, worker_modules: &HashMap<String, 
 /// panel) are deliberately left at their defaults — they are persisted per-agent
 /// in `config.json`, not per-thread, so a background thread must not inherit the
 /// focused thread's draft.
-pub(crate) fn boot_load_thread_runtime(thread_id: &str) -> Option<ThreadRuntime> {
+pub(crate) fn boot_load_thread_runtime(thread_id: &str, next_uid: &mut usize) -> Option<ThreadRuntime> {
     let worker = super::worker::load_worker(thread_id)?;
     // `shared` is unused by the panel/message loaders — a default is enough.
     let cfg = BootConfig { shared: SharedConfig::default(), worker };
@@ -221,6 +221,13 @@ pub(crate) fn boot_load_thread_runtime(thread_id: &str) -> Option<ThreadRuntime>
         .with_id_counters((next_user_id, next_assistant_id, cfg.worker.next_tool_id, cfg.worker.next_result_id))
         .with_cache_engine_json(cache_engine_json);
     boot_init_thread_modules(&mut bg, &cfg.worker.modules);
+    // Ensure this thread owns the fixed base panels (Todo, Overview, Memory,
+    // …) exactly like the focused thread does at boot — otherwise drilling into
+    // a background thread shows a panel-less view. Idempotent: only MISSING
+    // fixed panels are added; persisted ones keep their UIDs. UIDs are minted
+    // from the SHARED counter so a background thread's conversation panel can't
+    // collide with another thread's on `panels/<uid>.json`.
+    ensure_thread_fixed_panels(&mut bg, next_uid);
 
     let mut runtime = ThreadRuntime::new();
     runtime.swap_with(&mut bg); // runtime now holds this thread's per-thread context
@@ -240,12 +247,33 @@ pub(crate) fn boot_load_thread_runtime(thread_id: &str) -> Option<ThreadRuntime>
 /// with "module state not initialized". This runs the same per-thread module
 /// init as a disk load ([`boot_init_thread_modules`] over an empty map) so the
 /// swapped-in state is fully formed.
-pub(crate) fn fresh_thread_runtime() -> ThreadRuntime {
+pub(crate) fn fresh_thread_runtime(next_uid: &mut usize) -> ThreadRuntime {
     let mut bg = State::default();
     boot_init_thread_modules(&mut bg, &HashMap::new());
+    // A brand-new thread also needs its fixed base panels (Todo, Overview,
+    // Memory, …) created up front, so switching into it shows the normal
+    // panel-centric view rather than an empty one. UIDs are minted from the
+    // shared counter (fleet-wide uniqueness for `panels/<uid>.json`).
+    ensure_thread_fixed_panels(&mut bg, next_uid);
     let mut runtime = ThreadRuntime::new();
     runtime.swap_with(&mut bg);
     runtime
+}
+
+/// Create the fixed base panels (conversation + Todo/Overview/Memory/… at
+/// P1..P9) on a background thread's throwaway `State`, minting any panel UIDs
+/// from the fleet-wide `next_uid` counter rather than the throwaway state's
+/// own (which starts at 0 and would collide across threads on
+/// `panels/<uid>.json`).
+///
+/// Delegates to [`ensure_default_contexts`](crate::app::ensure_default_contexts)
+/// — the same routine the focused thread uses at boot — after seeding the
+/// throwaway state's UID cursor from the shared counter, then writes the
+/// advanced cursor back so the next thread keeps minting unique UIDs.
+fn ensure_thread_fixed_panels(bg: &mut State, next_uid: &mut usize) {
+    bg.global_next_uid = *next_uid;
+    crate::app::ensure_default_contexts(bg);
+    *next_uid = bg.global_next_uid;
 }
 
 /// Next `(user, assistant)` display-id counters derived from a message list —
