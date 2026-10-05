@@ -232,6 +232,7 @@ fn install_panic_hook() {
         let _r_raw = disable_raw_mode();
         let _r_paste = io::stdout().execute(DisableBracketedPaste);
         let _r_mouse = io::stdout().execute(DisableMouseCapture);
+        let _r_altscroll = io::stdout().write_all(b"\x1b[?1007h");
         let _r_screen = io::stdout().execute(LeaveAlternateScreen);
 
         let error_dir = std::path::Path::new(".context-pilot").join("errors");
@@ -258,6 +259,7 @@ fn teardown_and_maybe_reexec(reload_pending: bool) {
     let _r_raw_off = disable_raw_mode();
     let _r_paste_off = io::stdout().execute(DisableBracketedPaste);
     let _r_mouse_off = io::stdout().execute(DisableMouseCapture);
+    let _r_altscroll_on = io::stdout().write_all(b"\x1b[?1007h");
     let _r_leave = io::stdout().execute(LeaveAlternateScreen);
     infra::flame::flush();
 
@@ -421,6 +423,14 @@ fn main() -> ExitCode {
     // alternate-scroll mode — lets the threads list keep arrows for selection
     // while the wheel scrolls the selected thread's conversation history.
     let _r_mouse_on = io::stdout().execute(EnableMouseCapture);
+    // Explicitly DISABLE alternate-scroll mode (DECSET 1007). Mouse capture
+    // alone does not reset it, and some terminals keep translating the wheel
+    // into Up/Down arrow keys even with tracking on — which leaked through as
+    // thread-list selection ("wheel-down at the bottom sometimes selects a
+    // thread"). With 1007 off, the wheel is ALWAYS an SGR mouse event, never an
+    // arrow key, so selection stays exclusively on the real arrow keys.
+    let _r_altscroll_off = io::stdout().write_all(b"\x1b[?1007l");
+    let _r_altscroll_flush = io::stdout().flush();
     let Ok(mut terminal) = Terminal::new(CrosstermBackend::new(io::stdout())) else {
         let _r_cleanup = disable_raw_mode();
         drop(writeln!(io::stderr(), "Fatal: failed to create terminal"));

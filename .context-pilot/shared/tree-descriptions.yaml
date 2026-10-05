@@ -1910,6 +1910,10 @@
   path: src/app/actions/mod.rs
   description: Central action dispatch (Elm/Redux). apply_action split handle_input_char/handle_stop_streaming/handle_copy_index_overlay/handle_input_submit_action (A2). CycleViewMode resets scroll. Thread actions in threads.rs.
   last_edited_ms: 0
+11ee6ed4b0985618:
+  path: .context-pilot/shared/memories.yaml
+  description: Memory slots store (M-safe/tiny/short/mid/long, 220 fixed). Local-only, synced with commits. Mirrors the Memories panel (P6).
+  last_edited_ms: 0
 1205cdef0394ac82:
   path: web/src/mobile-components/finder/preview/livePreviews.tsx
   description: Mobile live Finder previews twin. Touch-sized zoom/copy/save (36-40px active-press vs desktop hover), MarkdownEditor lazy import swapped to @/mobile-components twin (leak guard), SheetGrid stub lazy-load (Univer touch-native). dangerouslySetInnerHTML scope-off in eslint.config + registry.
@@ -3985,6 +3989,10 @@
 2660bb88e1117b5e:
   path: yamls/tools/spine.yaml
   description: 'Spine tool YAML. 3 tools: notification_mark_processed, spine_configure (max_cost is burst/stream-based), coucou (timer/datetime scheduling).'
+  last_edited_ms: 0
+2665d71ef41c1bef:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 266650666b192075:
   path: src/app/reverie/trigger.rs
@@ -7710,6 +7718,10 @@
   path: web/src/components/shell/StatusBar.tsx
   description: 'Bottom status footer. Fleet mode: accepts agents prop for aggregates (count, threads, needs-you, spend). Agent mode: accepts activeAgent prop, derives phase from status, wires cost live. Cache bar (cacheStats/tokenBudget) still mock.'
   last_edited_ms: 1781695982763
+49da4f033ac7e9ab:
+  path: src/app/events/mod.rs
+  description: 'G1 SHIPPED (c8af3806): Ctrl+V dropped as an explicit no-op arm (NOT deleted — conversation panel maps every Char to InputChar, so fallthrough types a literal ''v''); Up/Down = ThreadSelectPrev/Next; BackTab+Up merged into one or-pattern (clippy::match_same_arms); Shift+Up/Down routed through scroll_key_action so the amount stays SCROLL_ARROW_AMOUNT (3.0); Left/Esc merged = CycleViewMode. Right (drill-in) deliberately unbound — G3''s semantics, would open the FOCUSED thread not the SELECTED one.'
+  last_edited_ms: 0
 49e0cd52dad75287:
   path: crates/cp-base/src/state/data/config.rs
   description: SidebarMode, Shared (config.json), WorkerState (per-worker), PanelData (panel persistence) — all serde structs
@@ -20134,6 +20146,10 @@ c066b2dd30c8cded:
   path: crates/cp-orchestrator/src/registry/liveness.rs
   description: Pure 3-factor liveness verdict (pid alive + fresh heartbeat + boot_id match). Liveness enum Live/StalePid/StaleHeartbeat/BootIdMismatch. verdict() pure/testable, pid_alive via signal-0.
   last_edited_ms: 1788353914947
+c06e7d21efee0f84:
+  path: src/main.rs
+  description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook. --bridge CLI flag (safe OnceLock, no unsafe set_var). --resume-stream for self-restart. use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
+  last_edited_ms: 0
 c0713aacf949bfed:
   path: .github/checks/allowed-lint-exceptions.yaml
   description: 'Curated #[expect]/#[allow] registry (16 entries). Every occurrence in codebase MUST have an entry. radar entries repointed radar.rs→radar/mod.rs. Fields: path, match, reason, strategy.'
