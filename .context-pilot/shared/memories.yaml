@@ -704,9 +704,9 @@ M-tiny-32:
 M-tiny-33:
   tier: tiny
   title: Multi-thread A-H done
-  contents: 'T774 branch multi-thread-core-loop: Phases A-H ALL shipped (H-3 deferred: optional/perf, S9 doc-forbidden). Only deferred features remain: X706/X707, X673.'
+  contents: 'T774 multi-thread-core-loop: Phases A-H shipped. Boot-panic fix 5a512d57: cold roster threads need fresh_thread_runtime() (modules inited), not bare new(). Deferred: X706/X707, X673.'
   importance: high
-  last_edited_ms: 1791202008132
+  last_edited_ms: 1791203269622
 M-tiny-34:
   tier: tiny
   title: Never trust gate markers
