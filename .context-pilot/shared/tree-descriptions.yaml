@@ -1698,6 +1698,10 @@
   path: src/app/run/threads.rs
   description: 'Thread-related helpers for the main event loop. maybe_inject_auto_read (synthetic Read on auto-continuation), check_my_turn_threads (idle MY_TURN detection + spine notification), extract_thread_ids (parse thread IDs from notification content). Bridge command polling: poll_bridge_commands + accept_commands (non-blocking accept, 500ms read timeout) + apply_command dispatch (SendMessage/CreateThread/Archive/Restore/Stop/Interrupt via K7 path). Free functions taking &mut App.'
   last_edited_ms: 0
+108b95e52ea0b027:
+  path: src/state/persistence/boot.rs
+  description: 'Phased boot helpers: boot_init_modules + load_one_module_data. B1: set_init_scope(module.is_global) around init_state/load_module_data, Some(false) around load_worker_data. GithubState.github_token set from vault AFTER load (B6 made github is_global=true so token lands in shared map, visible to all threads).'
+  last_edited_ms: 0
 108be586fdc3cf85:
   path: crates/cp-orchestrator/src/transport/auth/mod.rs
   description: 'Auth middleware + REST handlers. authenticate(): centralized Bearer gate (no-op when disabled, NFR-09). Public routes: login (FR-05), register (bootstrap FR-03 or admin-creates), auth/status (returns enabled+bootstrapped). Protected: logout, me, list/create/delete users, force-logout user (Phase 10: POST /users/{id}/logout revokes all sessions). Re-exports ACL functions from acl.rs.'
@@ -6758,6 +6762,10 @@
   path: crates/cp-orchestrator/tests/openapi/schemas_ext.rs
   description: Transport-layer OpenAPI schemas — receipts, auth, env-keys, filesystem types, FinderKind enum, LLM registry (ModelDef/ProviderDef), SSE delta protocol (OpEntry/OpEntryKind), release management (ReleaseEntry/ReleasesResponse/ArchResponse/DownloadResponse/SelectResponse).
   last_edited_ms: 1782486063148
+4155a2690ef18ff1:
+  path: src/app/run/lifecycle/fleet.rs
+  description: 'Background-thread advancement (Phase C): reconcile_fleet_registry (roster mirror), load_background_threads (boot), derive_exec_state, advance_background_threads (swap-in/step/swap-out), step_one_thread, dispatch_background_my_turn (per-thread nudge), deliver_to_thread (D1 delivery seam). Persist/teardown methods live in sibling fleet_lifecycle.rs. N=1 no-op.'
+  last_edited_ms: 0
 41645cd7ca559dd9:
   path: web/src/lib/support/telemetry/store.ts
   description: In-memory telemetry sink (useSyncExternalStore observable store). Bounded ring buffer + live aggregates answering 'where does wall-time go during lag?'. record() funnels all producer events; snapshot read by HUD + reporter. Notifications COALESCED 300ms so a burst can't make the HUD self-pollute. TaskAgg per-label count/total/max = the burst-catcher (storm of sub-threshold ops). All state on one const holder, mutated by property assignment (unicorn no-top-level-assignment).
@@ -10406,6 +10414,10 @@
   path: crates/cp-base/src/config/constants.rs
   description: Layout/timing constants. SIDEBAR_HELP_HEIGHT=10 (9 help hints + separator). MAX_SIDEBAR_LABEL_LEN, INPUT_RESERVE, TEMPO_*, token thresholds, typing indicator timing.
   last_edited_ms: 1780499299747
+65d929825d22a432:
+  path: src/state/persistence/mod.rs
+  description: Phased boot loading (5 phases). BootConfig/BootPanels, boot_load_config/panels/messages/assemble_state, legacy load_state. Fresh-start path sets_init_scope(module.is_global) around init_state. Phase F will extend to N× states/<thread>.json.
+  last_edited_ms: 0
 65d9d10e54693c5c:
   path: crates/cp-orchestrator/src/transport/files.rs
   description: 'Byte-oriented HTTP responses: static SPA (CP_WEB_ROOT), fs download/raw preview, avatar. serve_static path-traversal guard, content_type sniff. orch-clippy: clean (referenced in pub_use audit, not edited).'
@@ -10637,6 +10649,10 @@
 67faadcc50cca88b:
   path: crates/cp-mod-entities/Cargo.toml
   description: 'Entities module deps: cp-base, cp-render, cp-mod-utilities, cp-mod-search, rusqlite (bundled), crossterm, serde_json, log.'
+  last_edited_ms: 0
+6804e0164e775f63:
+  path: .context-pilot/shared/memories.yaml
+  description: Memory slots store (M-safe/tiny/short/mid/long, 220 fixed). Local-only, synced with commits. Mirrors the Memories panel (P6).
   last_edited_ms: 0
 6806a076754d204e:
   path: web/src/components/shell/StatusBar.tsx
@@ -17241,6 +17257,10 @@ a73611bc3edabdd9:
 a73ad7544498bcd8:
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (IR blocks → blocks_to_lines: selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (scrollable messages via scroll_offset, author/timestamp headers, content). All content through IR pipeline. Tab/Shift+Tab nav.'
+  last_edited_ms: 0
+a7573355fbdd433e:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 a76b266bccadbd48:
   path: web/src/components/agents/AgentModal/settingsView.tsx

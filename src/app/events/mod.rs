@@ -298,9 +298,11 @@ fn handle_global_fallback(key: &KeyEvent) -> Action {
         KeyCode::Up | KeyCode::Down | KeyCode::PageUp | KeyCode::PageDown => {
             scroll_key_action(key).unwrap_or(Action::None)
         }
+        // Left on a non-composer panel navigates to the threads list (the
+        // conversation panel handles its own composer-aware Left separately).
+        KeyCode::Left => Action::CycleViewMode,
         KeyCode::Backspace
         | KeyCode::Enter
-        | KeyCode::Left
         | KeyCode::Right
         | KeyCode::Home
         | KeyCode::End

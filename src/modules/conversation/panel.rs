@@ -302,38 +302,7 @@ impl Panel for ConversationPanel {
             return Some(action);
         }
 
-        // Regular typing and editing
-        match key.code {
-            KeyCode::Char(c) => Some(Action::InputChar(c)),
-            KeyCode::Backspace => Some(Action::InputBackspace),
-            KeyCode::Delete => Some(Action::InputDelete),
-            KeyCode::Left if shift => Some(Action::CursorLeftSelect),
-            KeyCode::Left => Some(Action::CursorLeft),
-            KeyCode::Right if shift => Some(Action::CursorRightSelect),
-            KeyCode::Right => Some(Action::CursorRight),
-            KeyCode::Enter => Some(handle_enter_key(state)),
-            KeyCode::Home if shift => Some(Action::CursorHomeSelect),
-            KeyCode::Home => Some(Action::CursorHome),
-            KeyCode::End if shift => Some(Action::CursorEndSelect),
-            KeyCode::End => Some(Action::CursorEnd),
-            // Remaining variants: delegate scroll keys, ignore everything else
-            KeyCode::Up | KeyCode::Down | KeyCode::PageUp | KeyCode::PageDown => scroll_key_action(key),
-            KeyCode::Tab
-            | KeyCode::BackTab
-            | KeyCode::Insert
-            | KeyCode::F(_)
-            | KeyCode::Null
-            | KeyCode::Esc
-            | KeyCode::CapsLock
-            | KeyCode::ScrollLock
-            | KeyCode::NumLock
-            | KeyCode::PrintScreen
-            | KeyCode::Pause
-            | KeyCode::Menu
-            | KeyCode::KeypadBegin
-            | KeyCode::Media(_)
-            | KeyCode::Modifier(_) => None,
-        }
+        handle_plain_key(key, state, shift)
     }
 
     fn refresh(&self, _state: &mut State) {}
@@ -412,6 +381,57 @@ const fn handle_modifier_combo(code: KeyCode, mods: &Mods) -> Option<Action> {
         | KeyCode::Tab
         | KeyCode::BackTab
         | KeyCode::Delete
+        | KeyCode::Insert
+        | KeyCode::F(_)
+        | KeyCode::Null
+        | KeyCode::Esc
+        | KeyCode::CapsLock
+        | KeyCode::ScrollLock
+        | KeyCode::NumLock
+        | KeyCode::PrintScreen
+        | KeyCode::Pause
+        | KeyCode::Menu
+        | KeyCode::KeypadBegin
+        | KeyCode::Media(_)
+        | KeyCode::Modifier(_) => None,
+    }
+}
+
+/// Resolve a bare `Left` press in the composer. With `Shift`, extends the
+/// selection. With an empty composer and no active selection, Left navigates
+/// OUT to the threads list (the panel→list entry gesture G1 left unwired after
+/// dropping Ctrl+V). Otherwise it moves the cursor, so editing is never
+/// hijacked.
+const fn left_action(state: &State, shift: bool) -> Action {
+    if shift {
+        Action::CursorLeftSelect
+    } else if state.input.is_empty() && state.input_selection_anchor.is_none() {
+        Action::CycleViewMode
+    } else {
+        Action::CursorLeft
+    }
+}
+
+/// Resolve a plain (non-modifier-combo) key into an editing/navigation action.
+/// Split out of [`ConversationPanel::handle_key`] to keep its cognitive
+/// complexity under the lint budget.
+fn handle_plain_key(key: &KeyEvent, state: &State, shift: bool) -> Option<Action> {
+    match key.code {
+        KeyCode::Char(c) => Some(Action::InputChar(c)),
+        KeyCode::Backspace => Some(Action::InputBackspace),
+        KeyCode::Delete => Some(Action::InputDelete),
+        KeyCode::Left => Some(left_action(state, shift)),
+        KeyCode::Right if shift => Some(Action::CursorRightSelect),
+        KeyCode::Right => Some(Action::CursorRight),
+        KeyCode::Enter => Some(handle_enter_key(state)),
+        KeyCode::Home if shift => Some(Action::CursorHomeSelect),
+        KeyCode::Home => Some(Action::CursorHome),
+        KeyCode::End if shift => Some(Action::CursorEndSelect),
+        KeyCode::End => Some(Action::CursorEnd),
+        // Remaining variants: delegate scroll keys, ignore everything else
+        KeyCode::Up | KeyCode::Down | KeyCode::PageUp | KeyCode::PageDown => scroll_key_action(key),
+        KeyCode::Tab
+        | KeyCode::BackTab
         | KeyCode::Insert
         | KeyCode::F(_)
         | KeyCode::Null
