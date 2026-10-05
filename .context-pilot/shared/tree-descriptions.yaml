@@ -478,6 +478,10 @@
   path: crates/cp-orchestrator/tests/openapi/schemas.rs
   description: OpenAPI core schemas — domain types (Agent, ThreadDetail, ThreadMsg, ToolCall, ContextPanel, MemoryCard, TodoItem, etc.) + shared enums (PanelKind, AccentToken). Referenced by the spec.
   last_edited_ms: 0
+0452c1d4d9d5c50b:
+  path: crates/cp-mod-spine/src/lib.rs
+  description: Spine module. Auto-continuation, notifications (10 processed kept), the sole guard rail (max auto-retries), coucou timers. Manages WatcherRegistry. on_user_message resets counters; on_stream_stop prevents re-launch. spine_configure tool exposes max_auto_retries + reset_counters.
+  last_edited_ms: 1791202055042
 04696110cadf7e55:
   path: src/app/actions/input.rs
   description: 'InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation. Thread input routing: handle_thread_input_submit resolves selected_thread_idx through ThreadsState::visible_indices(viewing_archived) — the selection is a VISIBLE-slice position (T9 archive refactor), so the virtual ''+ New Thread'' row is detected as selected_idx >= visible.len() (active view only) and message-send maps the visible position back to a real storage index. handle_thread_create stores the new thread''s VISIBLE index. Thread struct includes paused:false default. MAX_THREAD_NAME_LEN=200. Paste sentinel expansion. /command replacement.'
@@ -1058,6 +1062,10 @@
   path: src/app/events/models.rs
   description: 'Config-overlay model selection dispatch. pub(super) dispatch_primary_model + dispatch_secondary_model const fns: provider + letter-index (a/b/c/d→0-3) → Action::ConfigSelect*Model. Extracted from events/mod.rs for the 500-line structure limit.'
   last_edited_ms: 1781786109308
+09b0bd18b230ac46:
+  path: crates/cp-mod-spine/src/types.rs
+  description: 'Notification/SpineState/SpineConfig types. NotificationType (UserMessage/ReloadResume/Custom) + NotificationStatus. Notification.thread_id for per-thread routing. SpineConfig: sole guard-rail limit max_auto_retries (+ runtime tracking: auto_continuation_count, autonomous_start_ms, error backoff). serde-default, no deny_unknown_fields (old keys load-safe).'
+  last_edited_ms: 1791202054879
 09b15c412db7a649:
   path: src/modules/mod.rs
   description: 'Module registry. 24 modules via all_modules(). A9: lookup.get(|entry|) index. dispatch_tool w/ flame, create_panel factory, module_toggle, rebuild_tools, dependency validation.'
@@ -2682,6 +2690,10 @@
   path: crates/cp-mod-entities/src/types.rs
   description: EntitiesState (db_path, dump_path, migrations_dir, schema_cache), SchemaCache, TableInfo, ColumnInfo, ForeignKeyInfo. get/get_mut helpers for State TypeMap access.
   last_edited_ms: 0
+1a089f5b8549d212:
+  path: crates/cp-mod-spine/src/guard_rail.rs
+  description: Guard rail impls. Only MaxAutoRetriesGuard remains (Phase H removed MaxOutputTokens/MaxDuration/MaxMessages as single-worker fossils; MaxCost removed earlier). GuardRailStopLogic trait + all_guard_rails() static list of one.
+  last_edited_ms: 1791202054797
 1a16e5a2deb3979e:
   path: src/state/persistence/boot.rs
   description: 'Phase 5 boot: module init + data loading. boot_init_modules split load_boot_env_and_check_vault/load_one_module_data/pre_start_daemons (A2). dotenvy_override (global wins). Vault health. 2 parallel daemon threads.'
@@ -4682,6 +4694,10 @@
   path: src/app/run/watchers.rs
   description: File/cache watcher loop. flame!("cache_updates") + flame!("watcher_events"). sync_file_watchers (module→inotify/kqueue). timer_based_deprecation (poll intervals). FD cleanup (stale watch removal). suicide() auto-close.
   last_edited_ms: 1782988305569
+2d3fbdbc0e810632:
+  path: crates/cp-mod-spine/src/tools.rs
+  description: 'Spine tool handlers: execute_mark_processed + execute_configure. apply_limits now handles only max_auto_retries via LimitAction enum + read_limit/zero_limit_error (zero-value rejection). reset_counters resets runtime tracking.'
+  last_edited_ms: 1791202054958
 2d55ba540f65ffc2:
   path: crates/cp-mod-search/src/indexer.rs
   description: Background file indexer with flame!("index_file"). Mtime-based dedup skips unchanged files. Initial scan thread + debounced mpsc event loop. RecommendedWatcher (FSEvents/inotify, event-driven, negligible CPU — replaced PollWatcher that consumed ~50% CPU via 3s recursive lstat).
@@ -5350,6 +5366,10 @@
   path: docs/custom-visualization.md
   description: Custom panel visualization system
   last_edited_ms: 0
+3437c7af4a8479d3:
+  path: crates/cp-mod-callback/src/storage.rs
+  description: YAML-backed persistent storage for callback definitions (keyed by name, BTreeMap). YamlCallbackEntry round-trips concurrency_friendly (serde-default). upsert/remove/populate/migrate + script file read/write helpers. cleanup_old_hash_keys migration.
+  last_edited_ms: 1791202055281
 '3446297207145640':
   path: web/src/components/panels/cockpit/panels/context/RadarPanel.tsx
   description: Context Radar cockpit panel — live half-life ranked recall from logs. Anchors (recent task contexts) + scored results with bar+importance+timestamp.
@@ -12238,6 +12258,10 @@
   path: crates/cp-mod-entities/src/db.rs
   description: SQLite connection factory, bootstrap, introspection, dump/restore. open() with PRAGMAs (WAL, FK, busy_timeout, journal_size_limit). introspect() for SchemaCache. dump_to_file/restore_from_file with 1MB cap. sample_rows for panel. has_user_tables. checkpoint.
   last_edited_ms: 1780585450698
+76f99379ccac51d8:
+  path: crates/cp-mod-callback/src/types.rs
+  description: Callback types. CallbackDefinition (+ concurrency_friendly §13/H2 flag, serde-default false). CallbackState (definitions, editor_open, active_sessions). active_sessions keyed per (executing thread, callback) via firing::dedup_key so one thread's re-fire never kills another thread's in-flight run (S6).
+  last_edited_ms: 1791202055125
 771561f6afa23ed6:
   path: crates/cp-mod-console/src/ring_buffer.rs
   description: 'RingBuffer: fixed-capacity circular buffer for console output. write/read_all/last_n_lines/contains_pattern. data.len() u64::try_from (A1 as_conversions).'
@@ -13354,6 +13378,10 @@
   path: .github/checks/check-lint-config.sh
   description: 'Lint integrity hash chain checker. Verifies protected files haven''t been tampered with. --update appends new entry + git diffs of changed protected files. Readers skip non-entry lines via ^[0-9]+: guard. Password required for --update.'
   last_edited_ms: 1781347849835
+817caed771c926ff:
+  path: crates/cp-mod-callback/src/firing.rs
+  description: Callback firing. fire_callback() spawns script via console server, registers CallbackWatcher, dedup via kill_existing_callback keyed by dedup_key(resident_thread, callback_id). concurrent_run_note appends an informational cross-thread note on failure when concurrency_friendly. fire_async/blocking_callbacks batch dispatch; exit 0/7 kill_session, !=0/timeout deferred panel.
+  last_edited_ms: 1791202055203
 81933d40455c64d5:
   path: web/src/components/threads/ThreadsView.tsx
   description: 'Thread sidebar orchestrator. ThreadsView: selected thread state, handleArchive (archive/restore command), handlePause (pause/resume command, T371), handleDelete (permanent delete command, T371), handleSend. Generic describeCommandError (breaker special-case removed T378). Wires ThreadList + ThreadConversation + NewThreadDialog.'
@@ -14030,6 +14058,10 @@
   path: crates/cp-mod-memory/src/tools.rs
   description: Memory tools with flame!("memory_create") and flame!("memory_update"). tl_dr validation (80 token cap). Importance/labels. Batch create/update/delete.
   last_edited_ms: 0
+8824cfecff82d25b:
+  path: yamls/tools/spine.yaml
+  description: 'Spine tool YAML. 3 tools: notification_mark_processed, spine_configure (sole guard rail: max_auto_retries + reset_counters), coucou (timer/datetime scheduling). Output-token/duration/message guards removed in Phase H; max_cost removed earlier.'
+  last_edited_ms: 1791202055360
 883491bda419303e:
   path: src/modules/mod.rs
   description: 'Module registry. 24 modules via all_modules(). A9: lookup.get(|entry|) index. dispatch_tool w/ flame, create_panel factory, module_toggle, rebuild_tools, dependency validation.'

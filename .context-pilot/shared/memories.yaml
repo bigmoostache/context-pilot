@@ -703,10 +703,10 @@ M-tiny-32:
   last_edited_ms: 1790582340866
 M-tiny-33:
   tier: tiny
-  title: Multi-thread A-E+F2
-  contents: 'multi-thread (T774) branch multi-thread-core-loop: A-E,F2 done.'
+  title: Multi-thread A-H done
+  contents: 'T774 branch multi-thread-core-loop: Phases A-H ALL shipped (H-3 deferred: optional/perf, S9 doc-forbidden). Only deferred features remain: X706/X707, X673.'
   importance: high
-  last_edited_ms: 1790862948065
+  last_edited_ms: 1791202008132
 M-tiny-34:
   tier: tiny
   title: Never trust gate markers
