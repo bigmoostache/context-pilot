@@ -188,13 +188,17 @@ fn rebuild_threads_panel(state: &mut State, focused_tid: &str, now_ms: u64) {
     force_refresh_threads_panel(state);
 }
 
-/// Read messages from a thread. Sets focus and updates the Threads panel.
+/// Refresh the Threads panel for the focused thread.
 ///
-/// Marks all messages in the target thread as acknowledged, builds the
-/// panel content (thread list + focused conversation), and returns a
-/// lightweight summary pointing to the panel.
+/// Read no longer takes a `thread_id`: the LLM does not choose which thread is
+/// displayed — the panel always reflects the focused (resident) thread. This
+/// marks that thread's messages as acknowledged, rebuilds the panel content
+/// (thread list + focused conversation), and returns a lightweight summary
+/// pointing to the panel. The focus itself is set elsewhere (the focused thread
+/// is already the resident), so re-affirming it here is a no-op.
 pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let tid = tool.input.get("thread_id").and_then(serde_json::Value::as_str).unwrap_or("");
+    let focused_tid = FocusState::get(state).focused_thread_id.clone().unwrap_or_default();
+    let tid = focused_tid.as_str();
 
     let now_ms = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis().to_u64());
 

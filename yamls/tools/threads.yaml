@@ -185,10 +185,10 @@ tools:
 
   Read:
     description: |
-      Reads a thread and sets focus. If the thread is MY_TURN,
-      reading it sets focus — the AI is now working on this thread. If the
-      thread is THEIR_TURN, it's a peek (no focus change).
-      Marks all messages as acknowledged and populates the Threads panel with
-      the thread's recent conversation (most recent messages).
-    parameters:
-      thread_id: "Thread ID to read (e.g., 'T1')"
+      Refreshes the Threads panel with the most recent conversation of the
+      thread you are currently on (the focused thread). Takes no arguments —
+      you do not choose which thread is shown; the panel always reflects the
+      focused thread. Marks that thread's messages as acknowledged.
+
+      Use it to pull the latest state of your thread into the panel after
+      activity you want to re-read.

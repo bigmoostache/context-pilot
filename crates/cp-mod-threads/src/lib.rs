@@ -169,10 +169,9 @@ impl Module for ThreadsModule {
                 .param("still_my_turn", ParamType::Boolean, false)
                 .build(),
             ToolDefinition::from_yaml("Read", t)
-                .short_desc("Read thread messages")
+                .short_desc("Refresh the Threads panel")
                 .category("Threads")
                 .reverie_allowed(false)
-                .param("thread_id", ParamType::String, true)
                 .build(),
         ]
     }
@@ -185,10 +184,8 @@ impl Module for ThreadsModule {
 
         check_focus_enforcement(tool_name, ts, fs, &mut pf);
 
-        match tool_name {
-            "Send" => preflight_send(tool, ts, &mut pf),
-            "Read" => preflight_read(tool, ts, fs, &mut pf),
-            _ => {}
+        if tool_name == "Send" {
+            preflight_send(tool, ts, &mut pf);
         }
 
         if pf.errors.is_empty() && pf.warnings.is_empty() { None } else { Some(pf) }
@@ -325,24 +322,6 @@ fn preflight_send(tool: &ToolUse, ts: &ThreadsState, pf: &mut Verdict) {
     }
 }
 
-/// Pre-flight for `Read`: thread must exist; a paused thread cannot be read
-/// unless it is already focused.
-fn preflight_read(tool: &ToolUse, ts: &ThreadsState, fs: &FocusState, pf: &mut Verdict) {
-    let Some(tid) = tool.input.get("thread_id").and_then(|v| v.as_str()) else {
-        return;
-    };
-    let Some(thread) = ts.threads.iter().find(|t| t.id == tid) else {
-        pf.errors.push(format!("Thread '{tid}' not found"));
-        return;
-    };
-    if thread.paused && fs.focused_thread_id.as_deref() != Some(tid) {
-        pf.errors.push(format!(
-            "Thread '{tid}' is paused. Cannot read a paused thread \
-             unless it is already focused. Unpause it first."
-        ));
-    }
-}
-
 /// Returns the focus-enforcement message for the given escalation level.
 ///
 /// - 0–5: polite reminder
@@ -351,12 +330,9 @@ fn preflight_read(tool: &ToolUse, ts: &ThreadsState, fs: &FocusState, pf: &mut V
 /// - 30+: nuclear (with level number)
 fn escalation_message(level: u32) -> String {
     match level {
-        0..=5 => "\u{1f9f5} Please focus on an available thread using Read.".to_owned(),
-        6..=15 => "\u{1f9f5} You MUST focus on a thread. Use Read(thread_id) now.".to_owned(),
-        16..=29 => "\u{1f9f5} STOP. Focus on a thread immediately. Use Read(thread_id).".to_owned(),
-        _ => format!(
-            "🧵 FOCUS. ON. A. THREAD. NOW. Read(thread_id). \
-             (escalation level {level})"
-        ),
+        0..=5 => "\u{1f9f5} No thread is focused. Reply via Send on a MY_TURN thread.".to_owned(),
+        6..=15 => "\u{1f9f5} You MUST act on a MY_TURN thread. Use Send(thread_id, ...) now.".to_owned(),
+        16..=29 => "\u{1f9f5} STOP. Respond to a MY_TURN thread immediately via Send.".to_owned(),
+        _ => format!("🧵 RESPOND. TO. A. THREAD. NOW. Send(thread_id, ...). (escalation level {level})"),
     }
 }
