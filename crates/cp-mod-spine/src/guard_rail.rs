@@ -1,4 +1,3 @@
-use cp_base::panels::now_ms;
 use cp_base::state::runtime::State;
 
 use crate::types::SpineState;
@@ -27,98 +26,18 @@ pub(crate) trait GuardRailStopLogic: Send + Sync {
 /// Collect all registered guard rail implementations.
 ///
 /// All guard rails are checked — if ANY blocks, continuation is prevented.
+///
+/// Only [`MaxAutoRetriesGuard`] remains. The output-token, duration, and
+/// message-count guards were REMOVED (Phase H): in a thread-centric fleet that
+/// advances indefinitely, a *global* ceiling on cumulative output / wall-clock /
+/// message count is a single-worker fossil — it would halt the whole agent on a
+/// budget that no longer maps to any one unit of work. `MaxAutoRetries` (the
+/// anti-runaway cap on consecutive auto-continuations without human input) is
+/// the only limit that still makes sense per the §13 ruling. (Same removal
+/// pattern as the earlier `MaxCost` drop.)
 pub(crate) fn all_guard_rails() -> &'static [&'static dyn GuardRailStopLogic] {
-    static GUARD_RAILS: &[&dyn GuardRailStopLogic] =
-        &[&MaxOutputTokensGuard, &MaxDurationGuard, &MaxMessagesGuard, &MaxAutoRetriesGuard];
+    static GUARD_RAILS: &[&dyn GuardRailStopLogic] = &[&MaxAutoRetriesGuard];
     GUARD_RAILS
-}
-
-// ============================================================================
-// Implementation: MaxOutputTokensGuard
-// ============================================================================
-
-/// Block if total output tokens exceed the configured limit.
-pub(crate) struct MaxOutputTokensGuard;
-
-impl GuardRailStopLogic for MaxOutputTokensGuard {
-    fn name(&self) -> &'static str {
-        "MaxOutputTokens"
-    }
-
-    fn should_block(&self, state: &State) -> bool {
-        SpineState::get(state).config.max_output_tokens.is_some_and(|max| state.total_output_tokens >= max)
-    }
-
-    fn block_reason(&self, state: &State) -> String {
-        format!(
-            "Output token limit reached: {} / {} tokens",
-            state.total_output_tokens,
-            SpineState::get(state).config.max_output_tokens.unwrap_or(0)
-        )
-    }
-}
-
-// ============================================================================
-// Implementation: MaxDurationGuard
-// ============================================================================
-
-/// Block if autonomous operation has exceeded the configured time limit.
-/// Tracks time from `autonomous_start_ms` (set when first auto-continuation fires).
-pub(crate) struct MaxDurationGuard;
-
-impl GuardRailStopLogic for MaxDurationGuard {
-    fn name(&self) -> &'static str {
-        "MaxDuration"
-    }
-
-    fn should_block(&self, state: &State) -> bool {
-        if let (Some(max_secs), Some(start_ms)) =
-            (SpineState::get(state).config.max_duration_secs, SpineState::get(state).config.autonomous_start_ms)
-        {
-            let elapsed_ms = now_ms().saturating_sub(start_ms);
-            let elapsed_secs = cp_base::panels::time_arith::ms_to_secs(elapsed_ms);
-            elapsed_secs >= max_secs
-        } else {
-            false
-        }
-    }
-
-    fn block_reason(&self, state: &State) -> String {
-        let elapsed_secs = SpineState::get(state)
-            .config
-            .autonomous_start_ms
-            .map_or(0, |start| cp_base::panels::time_arith::ms_to_secs(now_ms().saturating_sub(start)));
-        format!(
-            "Duration limit reached: {}s / {}s",
-            elapsed_secs,
-            SpineState::get(state).config.max_duration_secs.unwrap_or(0)
-        )
-    }
-}
-
-// ============================================================================
-// Implementation: MaxMessagesGuard
-// ============================================================================
-
-/// Block if conversation message count exceeds the configured limit.
-pub(crate) struct MaxMessagesGuard;
-
-impl GuardRailStopLogic for MaxMessagesGuard {
-    fn name(&self) -> &'static str {
-        "MaxMessages"
-    }
-
-    fn should_block(&self, state: &State) -> bool {
-        SpineState::get(state).config.max_messages.is_some_and(|max| state.messages.len() >= max)
-    }
-
-    fn block_reason(&self, state: &State) -> String {
-        format!(
-            "Message limit reached: {} / {} messages",
-            state.messages.len(),
-            SpineState::get(state).config.max_messages.unwrap_or(0)
-        )
-    }
 }
 
 // ============================================================================

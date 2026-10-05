@@ -2,7 +2,9 @@
 //!
 //! Three tools: `notification_mark_processed`, `spine_configure`, and `coucou`
 //! (timer/datetime scheduling). Drives the autonomous continuation loop and
-//! manages guard rails (max tokens, duration, messages, retries).
+//! manages the sole remaining guard rail (max auto-retries) — the output-token,
+//! duration, and message-count ceilings were removed in Phase H as single-worker
+//! fossils that no longer map to any one unit of work in a thread-centric fleet.
 
 pub(crate) mod coucou;
 /// Auto-continuation engine: `should_auto_continue()`, message injection, guard rail checks.
@@ -218,9 +220,6 @@ impl Module for SpineModule {
             ToolDefinition::from_yaml("spine_configure", t)
                 .short_desc("Configure auto-continuation and guard rails")
                 .category("Spine")
-                .param("max_output_tokens", ParamType::Integer, false)
-                .param("max_duration_secs", ParamType::Integer, false)
-                .param("max_messages", ParamType::Integer, false)
                 .param("max_auto_retries", ParamType::Integer, false)
                 .param("reset_counters", ParamType::Boolean, false)
                 .build(),

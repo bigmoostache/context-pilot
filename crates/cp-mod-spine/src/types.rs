@@ -102,15 +102,11 @@ pub enum ContinuationAction {
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct SpineConfig {
     // === Guard Rail Limits (all nullable = disabled by default) ===
-    /// Max total output tokens before blocking auto-continuation
-    #[serde(default)]
-    pub max_output_tokens: Option<usize>,
-    /// Max duration in seconds of autonomous operation before blocking
-    #[serde(default)]
-    pub max_duration_secs: Option<u64>,
-    /// Max conversation messages before blocking auto-continuation
-    #[serde(default)]
-    pub max_messages: Option<usize>,
+    // Phase H removed max_output_tokens / max_duration_secs / max_messages:
+    // a global ceiling on cumulative output / wall-clock / message count is a
+    // single-worker fossil in a thread-centric fleet that runs indefinitely.
+    // Only the anti-runaway retry cap survives. (serde skips the removed keys in
+    // older persisted configs — no deny_unknown_fields — so load stays safe.)
     /// Max consecutive auto-continuations without human input
     #[serde(default)]
     pub max_auto_retries: Option<usize>,
