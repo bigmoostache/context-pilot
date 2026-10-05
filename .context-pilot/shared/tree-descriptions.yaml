@@ -1126,6 +1126,10 @@
   path: crates/cp-mod-scratchpad/Cargo.toml
   description: 'Scratchpad module deps: cp-base, cp-render, crossterm, serde, serde_json.'
   last_edited_ms: 0
+0a197916101a3eb8:
+  path: src/main.rs
+  description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook. --bridge CLI flag (safe OnceLock, no unsafe set_var). --resume-stream for self-restart. use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
+  last_edited_ms: 0
 0a1fffbe3ba317d5:
   path: web/src/components/finder/support/useMarquee.ts
   description: 'Finder rubber-band (box) selection hook. MarqueeBand{left,top,width,height}. UseMarqueeArgs. DRAG_THRESHOLD=4px. Pointer handlers, live getBoundingClientRect hit-testing against [data-finder-item] cells. ⌘/Ctrl additive mode. didDrag() one-shot flag. web-lint P6: internal refs renamed dragRef/justDraggedRef (naming-convention-ref-name).'
@@ -24634,6 +24638,10 @@ ee74c88ede20d1a2:
   path: src/modules/overview/context.rs
   description: Canonical context-occupancy helpers + LLM context text. context_usage/context_hit_miss single source (T297). generate_context_content split panel_hit_miss_token/write_panel_line (A2). estimate_tool_definitions_tokens.
   last_edited_ms: 1784493487685
+ee7dfcc72d952ce5:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 ee80bf72f8f835dd:
   path: crates/cp-base/src/tools/async_exec.rs
   description: 'spawn_async_tool: runs blocking tool I/O on worker thread, returns BLOCKING_TOOL_SENTINEL via ChannelWatcher. ToolOutput #[non_exhaustive] A5 + ok/error/new/with_panel ctors. WatcherResult::new+tool_use_id setter.'

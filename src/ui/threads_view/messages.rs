@@ -14,6 +14,7 @@ use crate::modules::conversation::render_input_blocks::{InputBlockCtx, render_in
 use crate::state::{Message, State};
 use crate::ui::{ir, theme};
 use cp_base::cast::Safe as _;
+use cp_base::cast::float_math;
 use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadStatus, ThreadsState};
 
 /// Render the right-pane message area with input box for the selected thread.
@@ -21,76 +22,90 @@ use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadStatus, ThreadsState
 /// Messages and input render through the IR pipeline (same `render_message_blocks`
 /// and `render_input_blocks` as the main conversation). Border title uses
 /// `semantic_to_style` for color mapping.
-pub(super) fn render_message_area_with_input(frame: &mut Frame<'_>, state: &State, selected: usize, area: Rect) {
-    let ts = ThreadsState::get(state);
-    let Some(thread) = ts.threads.get(selected) else {
-        return;
-    };
+pub(super) fn render_message_area_with_input(frame: &mut Frame<'_>, state: &mut State, selected: usize, area: Rect) {
+    // ── Phase 1: immutable borrow of `state` — render the chrome + input, and
+    // build the message lines into an owned Vec (so no borrow of `state`
+    // survives into the mutable scroll phase below). ───────────────────────
+    let msg_area: Rect;
+    let lines: Vec<ratatui::text::Line<'static>>;
+    {
+        let ts = ThreadsState::get(state);
+        let Some(thread) = ts.threads.get(selected) else {
+            return;
+        };
 
-    // Title: thread name + status — colors via semantic mapping
-    let focus = FocusState::get(state);
-    let is_focused = focus.focused_thread_id.as_deref() == Some(thread.id.as_str());
-    let (status_label, status_sem) = if is_focused {
-        (" [FOCUSED]", Semantic::Accent)
-    } else if matches!(thread.status, ThreadStatus::MyTurn) {
-        (" [MY_TURN]", Semantic::Warning)
-    } else {
-        (" [THEIR_TURN]", Semantic::Success)
-    };
+        // Title: thread name + status — colors via semantic mapping
+        let focus = FocusState::get(state);
+        let is_focused = focus.focused_thread_id.as_deref() == Some(thread.id.as_str());
+        let (status_label, status_sem) = if is_focused {
+            (" [FOCUSED]", Semantic::Accent)
+        } else if matches!(thread.status, ThreadStatus::MyTurn) {
+            (" [MY_TURN]", Semantic::Warning)
+        } else {
+            (" [THEIR_TURN]", Semantic::Success)
+        };
 
-    let title = ratatui::text::Line::from(vec![
-        ratatui::text::Span::styled(format!(" {} ", thread.name), ir::semantic_to_style(Semantic::Default)),
-        ratatui::text::Span::styled(status_label, ir::semantic_to_style(status_sem)),
-        ratatui::text::Span::raw(" "),
-    ]);
+        let title = ratatui::text::Line::from(vec![
+            ratatui::text::Span::styled(format!(" {} ", thread.name), ir::semantic_to_style(Semantic::Default)),
+            ratatui::text::Span::styled(status_label, ir::semantic_to_style(status_sem)),
+            ratatui::text::Span::raw(" "),
+        ]);
 
-    let border = RBlock::default()
-        .borders(Borders::ALL)
-        .border_type(ratatui::widgets::BorderType::Rounded)
-        .border_style(ir::semantic_to_style(Semantic::Border))
-        .title(title)
-        .style(Style::default().bg(theme::bg_surface()));
+        let border = RBlock::default()
+            .borders(Borders::ALL)
+            .border_type(ratatui::widgets::BorderType::Rounded)
+            .border_style(ir::semantic_to_style(Semantic::Border))
+            .title(title)
+            .style(Style::default().bg(theme::bg_surface()));
 
-    let inner = border.inner(area);
-    frame.render_widget(border, area);
+        let inner = border.inner(area);
+        frame.render_widget(border, area);
 
-    // Calculate input area height based on input content (capped at 50% of area)
-    let input_height = calculate_input_height(state, inner.width, inner.height);
-    let messages_height = inner.height.saturating_sub(input_height);
+        // Calculate input area height based on input content (capped at 50% of area)
+        let input_height = calculate_input_height(state, inner.width, inner.height);
+        let messages_height = inner.height.saturating_sub(input_height);
 
-    if messages_height == 0 {
-        return;
+        if messages_height == 0 {
+            return;
+        }
+
+        // Split inner area: messages on top, input at bottom
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(messages_height), Constraint::Length(input_height)])
+            .split(inner);
+
+        let (Some(&m_area), Some(&input_area)) = (layout.first(), layout.get(1)) else {
+            return;
+        };
+
+        lines = build_thread_message_lines(thread, m_area.width);
+        msg_area = m_area;
+        render_thread_input(frame, state, input_area);
     }
 
-    // Split inner area: messages on top, input at bottom
-    let layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(messages_height), Constraint::Length(input_height)])
-        .split(inner);
-
-    let (Some(&msg_area), Some(&input_area)) = (layout.first(), layout.get(1)) else {
-        return;
-    };
-
-    render_thread_messages(frame, state, thread, msg_area);
-    render_thread_input(frame, state, input_area);
+    // ── Phase 2: mutable borrow of `state` — scroll management + paint. ─────
+    paint_thread_messages(frame, state, &lines, msg_area);
 }
 
-/// Render thread messages using the conversation IR renderer.
+/// Build the message lines for a thread (owned, `'static`) via the conversation
+/// IR renderer.
 ///
 /// Converts `ThreadMessage` → `Message`, feeds to `render_message_blocks()`
 /// (same IR path as the main conversation), converts via `blocks_to_lines()`.
-fn render_thread_messages(frame: &mut Frame<'_>, state: &State, thread: &cp_mod_threads::types::Thread, area: Rect) {
+/// Returned lines hold no borrow of `State`, so the caller can take a mutable
+/// borrow afterwards for scroll management.
+fn build_thread_message_lines(
+    thread: &cp_mod_threads::types::Thread,
+    viewport_width: u16,
+) -> Vec<ratatui::text::Line<'static>> {
     if thread.messages.is_empty() {
         let ir_blocks =
             vec![IrBlock::Line(vec![S::muted("No messages yet. Type below to start the conversation.".to_owned())])];
-        let lines = ir::blocks_to_lines(&ir_blocks);
-        let paragraph = Paragraph::new(lines);
-        frame.render_widget(paragraph, area);
-        return;
+        return ir::blocks_to_lines(&ir_blocks);
     }
 
-    let opts = MessageBlockOpts { viewport_width: area.width, is_streaming: false, dev_mode: false };
+    let opts = MessageBlockOpts { viewport_width, is_streaming: false, dev_mode: false };
 
     // Convert ThreadMessages → Messages → IR blocks → ratatui Lines.
     //
@@ -110,21 +125,40 @@ fn render_thread_messages(frame: &mut Frame<'_>, state: &State, thread: &cp_mod_
         all_blocks.extend(msg_blocks);
     }
 
-    let lines = ir::blocks_to_lines(&all_blocks);
+    ir::blocks_to_lines(&all_blocks)
+}
 
-    // Scroll: use global scroll_offset; pin to bottom when user hasn't scrolled
-    let content_height = lines.len();
+/// Paint the pre-built message `lines` with scroll management that mirrors the
+/// main conversation renderer (`render_conversation_from_ir`).
+///
+/// This is the fix for the threads-view scroll bugs: the pane's scroll uses the
+/// shared `state.scroll_offset`, an absolute-from-top offset. While the user has
+/// not grabbed the scroll (`!user_scrolled`) we keep `scroll_offset` pinned to
+/// `max_scroll` (the bottom) every frame — so the first wheel-up subtracts from
+/// the bottom position instead of from `0` (which read as the top → the
+/// "teleports to top" bug). We also re-stick to the bottom when the user scrolls
+/// back down to within half a line, and clamp `scroll_offset` into
+/// `[0, max_scroll]` so over-scrolling past the bottom can no longer inflate the
+/// offset and make a later scroll-up feel dead.
+fn paint_thread_messages(frame: &mut Frame<'_>, state: &mut State, lines: &[ratatui::text::Line<'static>], area: Rect) {
     let viewport_height = area.height.to_usize();
-    let max_scroll = content_height.saturating_sub(viewport_height);
-    let scroll_offset = if state.stream.user_scrolled {
-        // User manually scrolled — respect their position, clamped
-        (state.scroll_offset.to_usize()).min(max_scroll)
-    } else {
-        // Auto-scroll to bottom
-        max_scroll
-    };
+    let content_height = lines.len();
+    let max_scroll = content_height.saturating_sub(viewport_height).to_f32();
+    state.max_scroll = max_scroll;
 
-    let paragraph = Paragraph::new(lines).scroll((scroll_offset.to_u16(), 0));
+    // Reached the bottom again → resume auto-stick so new content follows.
+    if state.stream.user_scrolled && state.scroll_offset.to_f64() >= float_math::sub(max_scroll.to_f64(), 0.5) {
+        state.stream.user_scrolled = false;
+    }
+    // Auto-pinned → keep the offset synced to the bottom (prevents the
+    // first-scroll teleport by starting any manual scroll from max_scroll).
+    if !state.stream.user_scrolled {
+        state.scroll_offset = max_scroll;
+    }
+    state.scroll_offset = state.scroll_offset.clamp(0.0, max_scroll);
+
+    let offset = state.scroll_offset;
+    let paragraph = Paragraph::new(lines.to_vec()).scroll((offset.round().to_u16(), 0));
     frame.render_widget(paragraph, area);
 
     // Scrollbar — colors via semantic mapping
@@ -133,7 +167,7 @@ fn render_thread_messages(frame: &mut Frame<'_>, state: &State, thread: &cp_mod_
             .orientation(ScrollbarOrientation::VerticalRight)
             .style(ir::semantic_to_style(Semantic::Border))
             .thumb_style(ir::semantic_to_style(Semantic::AccentDim));
-        let mut scrollbar_state = ScrollbarState::new(max_scroll).position(scroll_offset);
+        let mut scrollbar_state = ScrollbarState::new(max_scroll.to_usize()).position(offset.round().to_usize());
         frame.render_stateful_widget(scrollbar, area, &mut scrollbar_state);
     }
 }

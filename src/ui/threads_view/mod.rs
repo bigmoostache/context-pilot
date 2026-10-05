@@ -28,7 +28,7 @@ use cp_mod_threads::view_state::FleetExecMirror;
 pub(crate) const THREAD_LIST_WIDTH: u16 = 28;
 
 /// Render the threads view: thread list + message area.
-pub(crate) fn render_threads_view(frame: &mut Frame<'_>, state: &State, area: Rect) {
+pub(crate) fn render_threads_view(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
     let threads_state = ThreadsState::get(state);
     let focus_state = FocusState::get(state);
     let viewing_archived = focus_state.viewing_archived;
