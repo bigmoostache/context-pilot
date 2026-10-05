@@ -112,7 +112,6 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     if !still_my_turn {
         let fs = FocusState::get_mut(state);
         fs.focused_thread_id = Some(tid.to_owned());
-        fs.escalation_level = 0;
     }
 
     let suffix = if still_my_turn { " (still your turn)" } else { "" };
@@ -151,7 +150,6 @@ fn apply_read_focus(state: &mut State, tid: &str, thread_status: ThreadStatus) {
     if thread_status == ThreadStatus::MyTurn {
         let fs = FocusState::get_mut(state);
         fs.focused_thread_id = Some(tid.to_owned());
-        fs.escalation_level = 0;
     }
 }
 

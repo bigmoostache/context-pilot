@@ -178,14 +178,9 @@ impl Module for ThreadsModule {
 
     fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
         let mut pf = Verdict::new();
-        let tool_name = tool.name.as_str();
-        let ts = ThreadsState::get(state);
-        let fs = FocusState::get(state);
 
-        check_focus_enforcement(tool_name, ts, fs, &mut pf);
-
-        if tool_name == "Send" {
-            preflight_send(tool, ts, &mut pf);
+        if tool.name.as_str() == "Send" {
+            preflight_send(tool, ThreadsState::get(state), &mut pf);
         }
 
         if pf.errors.is_empty() && pf.warnings.is_empty() { None } else { Some(pf) }
@@ -255,18 +250,7 @@ impl Module for ThreadsModule {
 
     fn on_stream_chunk(&self, _text: &str, _state: &mut State) {}
     fn on_tool_progress(&self, _tool_name: &str, _input_so_far: &str, _state: &mut State) {}
-    fn on_tool_complete(&self, _tool_name: &str, state: &mut State) {
-        let has_my_turn = ThreadsState::get(state).has_my_turn_threads();
-        let fs = FocusState::get_mut(state);
-
-        // Escalation: bump on every tool completion while unfocused with a
-        // MY_TURN thread pending. Only exempt tools (Think) get this far —
-        // everything else is blocked in pre-flight — so repeated stalling
-        // drives the escalation level up.
-        if fs.focused_thread_id.is_none() && has_my_turn {
-            fs.escalation_level = fs.escalation_level.saturating_add(1);
-        }
-    }
+    fn on_tool_complete(&self, _tool_name: &str, _state: &mut State) {}
     fn watch_paths(&self, _state: &State) -> Vec<cp_base::panels::WatchSpec> {
         vec![]
     }
@@ -281,21 +265,6 @@ impl Module for ThreadsModule {
     fn watcher_immediate_refresh(&self) -> bool {
         true
     }
-}
-
-/// Focus enforcement shared by all tools: when `MY_TURN` threads exist and the
-/// AI is unfocused, block the tool with a message whose tone follows the
-/// escalation level. Exempt tools: Think (reasoning), Read (how you claim focus).
-///
-/// There is no grace period: `Send` keeps focus on the thread it replied to
-/// (T683), so the agent is only ever unfocused at boot or after its focused
-/// thread is archived/deleted — and then it must `Read` before acting.
-fn check_focus_enforcement(tool_name: &str, ts: &ThreadsState, fs: &FocusState, pf: &mut Verdict) {
-    let is_focus_exempt = matches!(tool_name, "Think" | "Read");
-    if is_focus_exempt || !ts.has_my_turn_threads() || fs.focused_thread_id.is_some() {
-        return;
-    }
-    pf.errors.push(escalation_message(fs.escalation_level));
 }
 
 /// Pre-flight for `Send`: thread must exist, at least one content param, and
@@ -319,20 +288,5 @@ fn preflight_send(tool: &ToolUse, ts: &ThreadsState, pf: &mut Verdict) {
         for err in forms::validate_form_blocks(md) {
             pf.errors.push(err);
         }
-    }
-}
-
-/// Returns the focus-enforcement message for the given escalation level.
-///
-/// - 0–5: polite reminder
-/// - 6–15: firm instruction
-/// - 16–29: aggressive demand
-/// - 30+: nuclear (with level number)
-fn escalation_message(level: u32) -> String {
-    match level {
-        0..=5 => "\u{1f9f5} No thread is focused. Reply via Send on a MY_TURN thread.".to_owned(),
-        6..=15 => "\u{1f9f5} You MUST act on a MY_TURN thread. Use Send(thread_id, ...) now.".to_owned(),
-        16..=29 => "\u{1f9f5} STOP. Respond to a MY_TURN thread immediately via Send.".to_owned(),
-        _ => format!("🧵 RESPOND. TO. A. THREAD. NOW. Send(thread_id, ...). (escalation level {level})"),
     }
 }
