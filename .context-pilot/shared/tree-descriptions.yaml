@@ -4958,6 +4958,10 @@
   path: src/app/actions/cursor.rs
   description: Cursor movement, text editing, selection management, command expansion. Selection helpers (delete/clear/extend). Sentinel detection + skip. Single-char and word movement with selection variants. handle_command_expansion, handle_input_backspace, handle_delete_word_left.
   last_edited_ms: 0
+2f5916bf725209f6:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 2f676dc40971f21d:
   path: web/src/components/agents/ModelPicker.tsx
   description: Shared two-level LLM provider+model picker. Receives providers[] as prop (pure component). Provider rail (pills) above model cards. Guards against empty providers (returns null while API loading). Used by AgentModal (manage) and ConfigPanel (defaults).
@@ -7733,6 +7737,10 @@
 4a67be5cdffd875b:
   path: src/ui/helpers.rs
   description: 'Shared UI helpers. A6: format_number K/M/B + typewriter speed math routed via float_math. truncate_string, wrap_text, spinner, syntect IR highlight (LRU), TypewriterBuffer.'
+  last_edited_ms: 0
+4a68f137cb4acdb3:
+  path: src/app/run/lifecycle/fleet_lifecycle.rs
+  description: 'Fleet lifecycle I/O (Phase F), split from fleet.rs for the 500-line cap: prune_orphaned_console_sessions (F6 union orphan-kill over all threads'' console keys), save_all_threads (F1 N-thread persist, resident first), clear_errored_entry (F4 re-engage), teardown_thread (F5 hard-delete). N=1 byte-identical.'
   last_edited_ms: 0
 4a87a00b92fb2d04:
   path: .context-pilot/shared/memories.yaml
@@ -20334,6 +20342,10 @@ c309ae68ac22f0f5:
   path: crates/cp-orchestrator/src/runtime.rs
   description: 'Runtime — env Config (port/agents_dir/budget/scan_interval + X896 agents_root/agent_binary + T341 auth_enabled/session_ttl/auth_db_path) + driver loop with TWO decoupled cadences: slow scan_interval (2s) registry scan + config.json mtime backstop + tmp reap + auth backup tick; fast TAIL_INTERVAL (100ms) tail_all_agents. Runtime::new opens AuthStore when auth enabled, builds Backend with 6 args. BackupScheduler wired into slow cadence (NFR-19/20).'
   last_edited_ms: 0
+c31331096cb016eb:
+  path: .context-pilot/shared/memories.yaml
+  description: Memory slots store (M-safe/tiny/short/mid/long, 220 fixed). Local-only, synced with commits. Mirrors the Memories panel (P6).
+  last_edited_ms: 0
 c3156d71a3095d7e:
   path: web/src/components/finder/Finder/index.tsx
   description: Finder seam (T624/T630). Owns useTreeState + useEditorGroups, threads Show-in-Finder reveal into the tree (expand ancestors + groups.openPinned), hands to FinderShell. Reveal effect lists memoised bundles in deps, fires once per fresh revealPath (parent nulls on consume).
@@ -23473,6 +23485,10 @@ e38431ed6efd91f0:
 e3973e4aeb8db79f:
   path: crates/cp-orchestrator/tests/transport_http.rs
   description: Phase 30 transport surface tests over a real tiny_http server (4 tests). Backend::new takes 6 args (auth=None, session_ttl). ticket_mint_and_command_status_codes asserts tripped breaker blocks cost-incurring send_message (503) but NOT control-plane stop (≠503). REST rev-envelope+404, SSE ticket gate single-use, Last-Event-ID replay.
+  last_edited_ms: 0
+e39bbc71290ccf66:
+  path: src/app/run/lifecycle/fleet.rs
+  description: 'Background-thread advancement (Phase C): reconcile_fleet_registry (roster mirror), load_background_threads (boot), derive_exec_state, advance_background_threads (swap-in/step/swap-out), step_one_thread, dispatch_background_my_turn (per-thread nudge), deliver_to_thread (D1 delivery seam). Persist/teardown methods live in sibling fleet_lifecycle.rs. N=1 no-op.'
   last_edited_ms: 0
 e3a21b14d9a62720:
   path: src/app/events/mod.rs

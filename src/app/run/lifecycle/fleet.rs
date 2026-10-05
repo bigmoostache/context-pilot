@@ -81,11 +81,33 @@ impl App {
             // leaking into the newly-focused thread.
             let mut sr = super::stream_runtime::StreamRuntime::new();
             sr.swap_with_app(self); // `sr` now holds `have`'s per-stream runtime; App reset to empty
+            // Is the outgoing resident mid-execution? A live stream, a pending
+            // blocking console-wait, un-executed tool calls, or a deferred
+            // `StreamDone` all mean "this thread is doing work right now" —
+            // independent of its MyTurn/TheirTurn conversation status.
+            let mid_exec = parked.stream.phase.is_streaming()
+                || sr.pending_console_wait_tool_results.is_some()
+                || !sr.pending_tools.is_empty()
+                || sr.pending_done.is_some();
             let _prev = self.parked_stream_runtimes.insert(have_id.clone(), sr);
             // Preserve an existing entry's role if one somehow exists; otherwise a
-            // plain Thread entry. exec_state is re-derived by reconcile this tick.
+            // plain Thread entry.
             let role = self.fleet.get(&have_id).map_or(Role::Thread, |e| e.role);
-            self.fleet.insert(have_id, Entry::new(role, parked));
+            let mut entry = Entry::new(role, parked);
+            // Park a mid-execution thread as `Streaming` (active) so the step loop
+            // keeps advancing it and `reconcile`'s status-only `derive_exec_state`
+            // (which early-returns for active entries) does NOT clobber it to Idle.
+            // Without this, a thread counting via one blocking tool per step —
+            // whose `ThreadStatus` is `TheirTurn` between turns — would be parked
+            // Idle on focus-switch, dropped from scheduling, and stall the instant
+            // it stops being focused (the focused resident is stepped
+            // unconditionally; a background thread is gated by exec_state). The
+            // first background step re-derives the true state from its stream phase
+            // via `post_step_exec_state`.
+            if mid_exec {
+                entry.exec_state = ThreadExecState::Streaming;
+            }
+            self.fleet.insert(have_id, entry);
         }
 
         // Swap the newly-focused thread's parked bundle into `state`. A cold or
