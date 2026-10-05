@@ -38,6 +38,34 @@ fn dedup_key(state: &State, callback_id: &str) -> String {
     format!("{tid}\u{1f}{callback_id}")
 }
 
+/// Informational note (§13/H2) appended to a callback *failure* when another
+/// thread is concurrently running the same callback.
+///
+/// Scans `active_sessions` (keyed `"<thread>\u{1f}<callback_id>"`) for an entry
+/// with the *same* callback id but a *different* thread whose console session is
+/// still running. Returns `None` at N=1 (no other thread), when the callback is
+/// not `concurrency_friendly`, or when no concurrent run is live — so the note
+/// never appears in the single-thread case.
+fn concurrent_run_note(state: &State, callback_id: &str, fired_by: Option<&str>) -> Option<String> {
+    let cs = CallbackState::get(state);
+    let console = ConsoleState::get(state);
+    let suffix = format!("\u{1f}{callback_id}");
+    let other_live = cs.active_sessions.iter().any(|(key, session)| {
+        // Same callback id, different executing thread.
+        let Some(other_tid) = key.strip_suffix(&suffix) else { return false };
+        if Some(other_tid) == fired_by {
+            return false;
+        }
+        // That thread's session must still be running to count as concurrent.
+        console.sessions.get(session).is_some_and(|h| !h.get_status().is_terminal())
+    });
+    other_live.then(|| {
+        "\n  (note: another thread is running this callback concurrently \u{2014} \
+         this failure may be caused by that concurrent run)"
+            .to_owned()
+    })
+}
+
 /// Kill an existing session for the same callback definition (dedup).
 ///
 /// If the same callback already has an active session **for this thread**, kills
@@ -186,6 +214,8 @@ pub fn fire_callback(
         deadline_ms,
         desc: watcher_desc,
         matched_files: matched.matched_files.clone(),
+        fired_by_thread: state.resident_thread_id.clone(),
+        concurrency_friendly: def.concurrency_friendly,
         deferred_panel: DeferredPanel::new(
             session_key.clone(),
             format!("CB: {}", def.name),
@@ -304,6 +334,15 @@ pub struct CallbackWatcher {
     pub desc: String,
     /// Files that triggered this callback (for env var injection).
     pub matched_files: Vec<String>,
+    /// Resident (executing) thread id at fire time, or `None` at N=1.
+    ///
+    /// Used only to decide whether *another* thread is concurrently running the
+    /// same callback when this one fails, so a cross-thread note can be appended
+    /// to the failure result (§13/H2, informational).
+    pub fired_by_thread: Option<String>,
+    /// Whether this callback is marked safe to run concurrently (§13/H2). Gates
+    /// the informational cross-thread failure note; `false` suppresses it.
+    pub concurrency_friendly: bool,
     /// Panel creation info (deferred until failure/timeout).
     pub deferred_panel: DeferredPanel,
 }
@@ -360,7 +399,13 @@ impl Watcher for CallbackWatcher {
             )
         } else {
             // Panel content is already final — the pipeline waited for process exit before resuming
-            let msg = format!("· {} FAILED (exit {})", self.callback_name, exit_code);
+            let mut msg = format!("· {} FAILED (exit {})", self.callback_name, exit_code);
+            if self.concurrency_friendly
+                && let Some(cbid) = self.callback_tag.strip_prefix("callback_")
+                && let Some(note) = concurrent_run_note(state, cbid, self.fired_by_thread.as_deref())
+            {
+                msg.push_str(&note);
+            }
             Some(
                 WatcherResult::new(msg).tool_use_id_opt(self.tool_use_id.clone()).create_panel(
                     DeferredPanel::new(
