@@ -26,6 +26,75 @@ const STUCK_ERROR_THRESHOLD: usize = 3;
 
 #[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
+    /// Relocate the resident bundle so the flat per-thread fields in
+    /// [`state`](crate::app::App::state) always hold the **focused** thread —
+    /// the thread-centric invariant "resident = focused" (design doc §4), made
+    /// true on every focus change rather than only at boot.
+    ///
+    /// Focus changes (today: the agent's `Read`; later: a human drill-in) only
+    /// set [`FocusState::focused_thread_id`](cp_mod_threads::types::FocusState);
+    /// they do **not** move the bundle. Without this step the next
+    /// [`reconcile_fleet_registry`](Self::reconcile_fleet_registry) would mislabel
+    /// the old focused thread's live context (still flat in `state`) as the new
+    /// focus and insert a *fresh empty* entry for the old one — losing its
+    /// conversation. This primitive closes that gap: when the focus (`want`)
+    /// differs from the resident (`have`), it parks `have`'s bundle into the
+    /// registry and swaps `want`'s bundle out of the registry into `state`.
+    ///
+    /// Ordering: this MUST run before `reconcile_fleet_registry` (which assumes
+    /// the invariant already holds) and before the focused pipeline steps, so the
+    /// pipeline operates on the correct resident. It replaces the unconditional
+    /// `resident_thread_id = focused` assignment at the top of
+    /// [`run_background_phase`](super::App::run_background_phase).
+    ///
+    /// Cases:
+    /// - `want == have` (including both `None`): no-op. This is the **only** path
+    ///   at N=1 — a single-thread agent never switches focus, so the resident is
+    ///   always already the focus and behaviour is byte-identical.
+    /// - `want` is a background thread in the registry: park `have` (if any), then
+    ///   swap `want`'s parked runtime into `state`.
+    /// - `want` is cold/unknown (just created, never persisted): park `have`, leave
+    ///   `state` with a fresh empty runtime — the correct blank view for a new
+    ///   thread; `reconcile_fleet_registry` will not re-add it (it is the focus).
+    ///
+    /// Caveat (handled in later TC steps): if `have` was mid-stream when focus
+    /// switched, its per-thread stream channel (keyed by its id) stops being
+    /// drained until it is next stepped as a background thread. Focus is switched
+    /// between turns in practice, so the common path parks an idle thread.
+    pub(super) fn relocate_resident_on_focus_change(&mut self) {
+        let want = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
+        let have = self.state.resident_thread_id.clone();
+        if want == have {
+            // Keep the label in sync for the None/None and equal cases, then done.
+            self.state.resident_thread_id = want;
+            return;
+        }
+
+        // Park the current resident's live bundle back into the registry, so its
+        // context is preserved rather than being overwritten by the swap-in below
+        // (and not mislabelled as the new focus by reconcile).
+        if let Some(have_id) = have {
+            let mut parked = cp_base::state::runtime::bundle::ThreadRuntime::new();
+            parked.swap_with(&mut self.state); // `parked` now holds `have`'s context; state emptied
+            // Preserve an existing entry's role if one somehow exists; otherwise a
+            // plain Thread entry. exec_state is re-derived by reconcile this tick.
+            let role = self.fleet.get(&have_id).map_or(Role::Thread, |e| e.role);
+            self.fleet.insert(have_id, Entry::new(role, parked));
+        }
+
+        // Swap the newly-focused thread's parked bundle into `state`. A cold or
+        // unknown thread has no entry → state keeps the fresh empty runtime, which
+        // is the correct blank view for a brand-new thread.
+        if let Some(want_id) = want.as_ref()
+            && let Some(mut entry) = self.fleet.remove(want_id)
+        {
+            entry.runtime.swap_with(&mut self.state); // state now holds `want`'s context
+            // `entry.runtime` now holds the empty leftover — dropped with `entry`.
+        }
+
+        self.state.resident_thread_id = want;
+    }
+
     /// Reconcile the fleet registry against [`ThreadsState`] — the roster-mirror
     /// that keeps [`fleet`](crate::app::App::fleet) in step with the thread list
     /// each tick, before [`advance_background_threads`](Self::advance_background_threads)

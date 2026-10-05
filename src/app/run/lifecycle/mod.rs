@@ -234,10 +234,14 @@ impl App {
         super::threads::poll_bridge_commands(self);
         super::tools::watchdog::mark(super::tools::watchdog::Step::ThreadsEmit);
         super::threads::emit_bridge_deltas(self);
-        // The focused thread is the resident for the whole focused pipeline below;
-        // tag its stream frames with its id (the stream tee reads this). Background
-        // steps re-point it around their swap (see `advance_background_threads`).
-        self.state.resident_thread_id = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
+        // Make the resident bundle follow the focused thread: if focus changed
+        // since last tick (agent `Read`, later a human drill-in), park the old
+        // resident and swap the newly-focused thread's bundle into `state`, so the
+        // focused pipeline below operates on the correct thread and its stream
+        // frames are tagged with its id. No-op at N=1 (focus never switches).
+        // Background steps re-point the resident around their swap (see
+        // `advance_background_threads`).
+        self.relocate_resident_on_focus_change();
         super::tools::watchdog::mark(super::tools::watchdog::Step::Stream);
         super::streaming::process_stream_events(self);
         super::streaming::handle_retry(self);
