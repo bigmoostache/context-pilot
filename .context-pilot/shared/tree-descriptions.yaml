@@ -1546,6 +1546,10 @@
   path: .github/checks/allowed-eslint-exceptions.yaml
   description: 'Registry of allowed CONFIG-LEVEL ESLint exceptions (web-lint, frontend twin of allowed-lint-exceptions.yaml). Inline suppression BANNED; only escape is config-level scoped rules:{off}, each registered here reason+strategy, enforced bidirectionally by check-frontend-suppressions.sh. Covers P4→P9 (P9: no-restricted-imports off for lib/api). Hash-lock deferred to P12.'
   last_edited_ms: 0
+0ef641bd5a9d6a42:
+  path: crates/cp-mod-todo/src/panel.rs
+  description: 'TodoPanel: hierarchical tree with status icons, format_todos_for_context for LLM. update_if_changed via let _changed (T586).'
+  last_edited_ms: 0
 0efaba5c4befe85f:
   path: Cargo.lock
   description: Workspace lockfile
@@ -9674,6 +9678,10 @@
   path: web/src/components/threads/fileUpload/FileSidebar.tsx
   description: Right-rail sidebar listing thread file attachments. ThreadFile type (file+role). Renders FileIcon + name + role label per attachment. Click opens Quick Look drawer via onOpen callback. Only shown when thread has file-upload blocks.
   last_edited_ms: 1784125252676
+5d4c05a388232969:
+  path: src/app/run/lifecycle/stream_runtime.rs
+  description: StreamRuntime — per-thread per-stream mutable runtime (typewriter, pending_tools/done, retry, wait/sleep flags, console-wait + blocking accumulators). Parked per non-resident thread in App.parked_stream_runtimes; swap_with_app exchanges all 9 fields with App in O(1), mirroring the ThreadRuntime swap-model. Fixes the N>1 cross-contamination bug. Empty map at N=1 = identical.
+  last_edited_ms: 1791220020263
 5d5398520323a34f:
   path: src/app/run/threads/mod.rs
   description: 'Thread helpers for main loop: maybe_inject_auto_read (filters paused threads — T371), check_my_turn_threads (filters paused threads — T371), extract_thread_ids, maybe_append_tool_activity. emit_thread_paused re-exported from paused.rs.'
@@ -15018,6 +15026,10 @@
   path: .github/CODEOWNERS
   description: 'Code ownership: PR review assignments'
   last_edited_ms: 0
+8f4ff2e448a1b7b8:
+  path: crates/cp-mod-scratchpad/src/panel.rs
+  description: 'ScratchpadPanel: focus-scoped cell preview (filters by focus_filter thread_id), format_cells_for_context() for LLM, ''No focused thread''/''No scratchpad cells'' empty states, no cache.'
+  last_edited_ms: 0
 8f5c8d032dbf7392:
   path: .git/index
   description: Git index (binary). Not source.
@@ -17734,6 +17746,10 @@ aa0e06c92f399127:
   path: src/llms/mod.rs
   description: LLM abstraction layer. LlmClient trait (stream + check_api). 7 providers via get_client(). Unified LlmRequest/ApiMessage/ContentBlock types. start_streaming() assembles prompt + spawns thread. api_messages_to_cc_json() places cache breakpoints. SSE error logging.
   last_edited_ms: 0
+aa16ef38dc0b3631:
+  path: crates/cp-mod-threads/src/tools.rs
+  description: Thread tool handlers. execute_send split push_send_message + clamp_bytes/preview_ellipsis helpers (A2). execute_read split collect_thread_summaries/apply_read_focus/force_refresh_threads_panel + build_read_result(ReadResult struct). build_panel_content split write_thread_list/write_message. YAML output, MAX caps. T353 auto-unarchive.
+  last_edited_ms: 0
 aa1d276af3cf459a:
   path: crates/cp-base/src/config/mod.rs
   description: 'YAML config loader. 6 LazyLock statics (Prompts/Library/Injections/Reverie/Ui/Themes) from include_str!. Theme system: 6 themes × 16 RGB colors + icons. invariant_panic() for compile-time violations. Sub-modules: constants, global, llm_types, yaml_sync, behavioral, accessors.'
@@ -18125,6 +18141,10 @@ ae4fe58f63185b1c:
 ae5050fea587da73:
   path: src/app/prompt/builder.rs
   description: 'Wire message assembly: panel injection -> conversation -> alternation -> repair. assemble_prompt split convert_conversation_message/push_tool_result_message/build_text_message_blocks/build_tool_call_blocks + ConvertCtx/PanelInjection (A2).'
+  last_edited_ms: 0
+ae5ca833682c3b4c:
+  path: crates/cp-mod-threads/src/panel.rs
+  description: 'ThreadsPanel: thread list with [MY_TURN]/[THEIR_TURN] badges, last 5 messages per thread, message count. Context: MY_TURN threads with messages, THEIR_TURN summary only. max_freeze=3.'
   last_edited_ms: 0
 ae5deac51f23c707:
   path: src/ui/ir/conversation.rs
@@ -21058,6 +21078,10 @@ c94d0035edad2076:
   path: crates/cp-mod-prompt/src/library_panel.rs
   description: 'LibraryPanel: renders agent/skill/command as YAML sequences via push_agents_yaml/push_skills_yaml/push_commands_yaml + push_crud_cheatsheet (# comment block). context() builds combined YAML String; yaml_scalar() one-line double-quoted escaped scalar for name/description.'
   last_edited_ms: 1788360224418
+c950996871154f83:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 c951a0a40f59c0b2:
   path: crates/cp-mod-queue/src/panel.rs
   description: 'QueuePanel: renders queue status (Active/Paused) + queued tool-call list with truncated params. Static content panel, max_freezes=0, shared main+reverie note. No cache.'

@@ -211,7 +211,7 @@ fn raise_fd_limit() {
 
 use crossterm::{
     ExecutableCommand as _,
-    event::{DisableBracketedPaste, EnableBracketedPaste},
+    event::{DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture},
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 
@@ -231,6 +231,7 @@ fn install_panic_hook() {
     std::panic::set_hook(Box::new(move |info| {
         let _r_raw = disable_raw_mode();
         let _r_paste = io::stdout().execute(DisableBracketedPaste);
+        let _r_mouse = io::stdout().execute(DisableMouseCapture);
         let _r_screen = io::stdout().execute(LeaveAlternateScreen);
 
         let error_dir = std::path::Path::new(".context-pilot").join("errors");
@@ -256,6 +257,7 @@ fn install_panic_hook() {
 fn teardown_and_maybe_reexec(reload_pending: bool) {
     let _r_raw_off = disable_raw_mode();
     let _r_paste_off = io::stdout().execute(DisableBracketedPaste);
+    let _r_mouse_off = io::stdout().execute(DisableMouseCapture);
     let _r_leave = io::stdout().execute(LeaveAlternateScreen);
     infra::flame::flush();
 
@@ -414,6 +416,11 @@ fn main() -> ExitCode {
     };
     let _r_enter = io::stdout().execute(EnterAlternateScreen);
     let _r_paste_on = io::stdout().execute(EnableBracketedPaste);
+    // Capture mouse so the wheel arrives as distinct `Event::Mouse(ScrollUp/Down)`
+    // rather than being folded into Up/Down arrow keys by the terminal's
+    // alternate-scroll mode — lets the threads list keep arrows for selection
+    // while the wheel scrolls the selected thread's conversation history.
+    let _r_mouse_on = io::stdout().execute(EnableMouseCapture);
     let Ok(mut terminal) = Terminal::new(CrosstermBackend::new(io::stdout())) else {
         let _r_cleanup = disable_raw_mode();
         drop(writeln!(io::stderr(), "Fatal: failed to create terminal"));

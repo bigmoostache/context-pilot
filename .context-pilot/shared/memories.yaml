@@ -459,9 +459,9 @@ M-short-32:
 M-short-33:
   tier: short
   title: MT phase progress
-  contents: 'MT (T774) branch multi-thread-core-loop: Phases A-H+TC+TC-REAL shipped. X804 (8addadfc): step_one_thread now runs check_watchers/waiting/sleep so a bg thread''s blocking console-wait resolves. X805 (f6bf1b40): relocate_resident_on_focus_change parks a mid-execution thread as Streaming (was Idle) so it stays scheduled after losing focus. Open: X798 input-UX, X786 send-semantics.'
+  contents: 'MT (T774) branch multi-thread-core-loop: Phases A-H+TC+TC-REAL shipped. Per-thread fixed-panel bug fixed: Threads (3a0451fb resident_panel_content), Todo+Scratchpad (b98a370d scope by state.resident_thread_id, fallback focus_filter). Other fixed panels audited safe. OPEN: X808 write-path (scratchpad/todo attach key off focus_filter=focused, wrong owner N>1), X786, X798.'
   importance: high
-  last_edited_ms: 1791217713541
+  last_edited_ms: 1791219973054
 M-short-34:
   tier: short
   title: check-rust-tests.sh now

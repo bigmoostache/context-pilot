@@ -1,5 +1,6 @@
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEventKind};
 
+use cp_base::config::constants::SCROLL_ARROW_AMOUNT;
 use cp_base::panels::scroll_key_action;
 
 use crate::app::actions::{Action, find_context_by_id, parse_context_pattern};
@@ -28,6 +29,22 @@ enum Dispatch {
 pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
     if let &Event::Key(key) = event {
         return handle_key_event(&key, state);
+    }
+    // Mouse wheel → scroll the shown conversation/history pane. In the threads
+    // list this scrolls the SELECTED thread's conversation (arrows stay bound to
+    // selection via `handle_threads_nav`); in a panel view it scrolls the active
+    // pane exactly as before. Non-scroll mouse events (clicks/drag/move) are
+    // ignored. Written as `matches!`/`else` rather than a `match` with a `_` arm
+    // to avoid the forbidden `wildcard_enum_match_arm` on crossterm's enum.
+    if let &Event::Mouse(me) = event {
+        let action = if matches!(me.kind, MouseEventKind::ScrollUp) {
+            Action::ScrollUp(SCROLL_ARROW_AMOUNT)
+        } else if matches!(me.kind, MouseEventKind::ScrollDown) {
+            Action::ScrollDown(SCROLL_ARROW_AMOUNT)
+        } else {
+            Action::None
+        };
+        return Some(action);
     }
     // Bracketed paste: store in buffer, insert placeholder sentinel.
     // Normalize line endings: terminals may send \r\n or \r instead of \n.
