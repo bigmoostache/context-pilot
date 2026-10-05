@@ -1966,6 +1966,10 @@
   path: tmp/v2/src/ribbon/InsertTab.tsx
   description: 'Insert tab: Tables (3x3 w/ header, add row/col, delete — disabled outside a table), Illustrations (image by URL), Links (edits existing href, empty string unsets), Symbols (hr, hard break).'
   last_edited_ms: 1785764713409
+12b8e602b9a281f1:
+  path: src/app/run/lifecycle/fleet_lifecycle.rs
+  description: 'Fleet lifecycle I/O (Phase F), split from fleet.rs for the 500-line cap: prune_orphaned_console_sessions (F6 union orphan-kill over all threads'' console keys), save_all_threads (F1 N-thread persist, resident first), clear_errored_entry (F4 re-engage), teardown_thread (F5 hard-delete). N=1 byte-identical.'
+  last_edited_ms: 1790889770938
 12c73f7fcf2884c6:
   path: web/src/lib/support/telemetry/frames.ts
   description: Long Animation Frames (LoAF) + Long Tasks telemetry producer. PerformanceObserver on 'long-animation-frame' (Chromium 123+, rich scripts[] attribution → culprit 'func @ source') with 'longtask' fallback. Records LoafEvent{duration,blockingDuration,script}/LongTaskEvent. Minimal local interfaces downcast from PerformanceEntry (not in lib.dom). Catches non-interaction render storms. Chromium-only — silent on Firefox (why the rAF stall watchdog exists).
@@ -3537,6 +3541,10 @@
 228e44baea044fe4:
   path: .github/checks/check-folder-sizes.sh
   description: Folder size check script (max 8 entries)
+  last_edited_ms: 0
+22af4f3acd24e6c3:
+  path: .github/checks/lint-config.chain
+  description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
   last_edited_ms: 0
 22b269fd4df74fd9:
   path: Cargo.toml
@@ -6570,6 +6578,10 @@
   path: crates/cp-orchestrator/tests/openapi/schemas_ext2.rs
   description: 'Deploy-plane OpenAPI schemas: release mgmt, AppSettings, SessionInfo, Claude OAuth. deploy() carries registered #[expect(too_many_lines)]. orch-clippy: CLEAN.'
   last_edited_ms: 1787901389927
+4019e3067acc62aa:
+  path: .context-pilot/shared/memories.yaml
+  description: Memory slots store (M-safe/tiny/short/mid/long, 220 fixed). Local-only, synced with commits. Mirrors the Memories panel (P6).
+  last_edited_ms: 0
 402457347b13a6b5:
   path: crates/cp-vault/Cargo.toml
   description: 'Crate manifest. Deps: serde, serde_json, zeroize, fs2. Optional: reqwest+log behind ''bridge'' feature flag.'
@@ -7458,6 +7470,10 @@
   path: crates/cp-mod-entities/src/db.rs
   description: SQLite connection factory, bootstrap, introspection, dump/restore. open() with PRAGMAs (WAL, FK, busy_timeout, journal_size_limit). introspect() for SchemaCache. dump_to_file/restore_from_file with 1MB cap. sample_rows for panel. has_user_tables. checkpoint.
   last_edited_ms: 0
+48da205f21b195f9:
+  path: src/app/run/lifecycle/fleet.rs
+  description: 'Background-thread advancement (Phase C): reconcile_fleet_registry (roster mirror), load_background_threads (boot), derive_exec_state, advance_background_threads (swap-in/step/swap-out), step_one_thread, dispatch_background_my_turn (per-thread nudge), deliver_to_thread (D1 delivery seam). Persist/teardown methods live in sibling fleet_lifecycle.rs. N=1 no-op.'
+  last_edited_ms: 1790889771107
 48debde7e5f599c4:
   path: web/e2e/metrics.spec.ts
   description: '§19 e2e (X868/T121): fleet HealthBadge surfaces backend health. page.route-intercepts **/api/agent/*/metrics to force degraded/lag conditions; asserts matching role=status pill renders + nominal snapshot shows NO pill. Breaker test removed. 3 tests.'
@@ -13314,6 +13330,10 @@
   path: crates/cp-mod-firecrawl/src/panel.rs
   description: Firecrawl result panel. Same pattern as brave panel — static content in metadata, cache restore post-reload, pagination. FIRECRAWL_PANEL_TYPE constant.
   last_edited_ms: 0
+81b8ca6d943f1497:
+  path: crates/cp-mod-console/src/lib.rs
+  description: Console module. 5 tools, dynamic console panels. load_module_data reconnects sessions per-thread but NO LONGER kills orphans (moved to App::prune_orphaned_console_sessions, union kill — F6a cross-kill fix). is_global=false (per-thread). Leaks stdin on save to avoid EOF.
+  last_edited_ms: 1790889771274
 81c4b37233abbe17:
   path: .github/checks/allowed-eslint-exceptions.yaml
   description: 'Registry of allowed CONFIG-LEVEL ESLint exceptions (web-lint P4, frontend twin of allowed-lint-exceptions.yaml). Philosophy stricter than Rust''s per-site #[allow]: inline suppression is BANNED OUTRIGHT; the ONLY legal escape is a config-level scoped `rules:{"<rule>":"off"}` override in eslint.config.ts, each registered here with reason+strategy. 3 entries: generated/** (''*'' globalIgnore + @ts-nocheck), ui/** (react-refresh/only-export-components, shadcn vendored), MarkdownEditor.tsx (@typescript-eslint/no-deprecated, execCommand/queryCommandState = only contentEditable WYSIWYG API). Enforced bidirectionally by check-frontend-suppressions.sh. Hash-lock deferred to P12.'
@@ -14446,6 +14466,10 @@
   path: crates/cp-orchestrator/tests/supervisor_lifecycle.rs
   description: Phase 28 (X795) backend supervisor lifecycle suite (4 tests, all green, ~15s). Black-box public-API + real OS processes. SIGTERM→grace→SIGKILL escalation, multi-agent fleet spawn/stop, adopted FOREIGN process signalled, check_liveness routes.
   last_edited_ms: 0
+8c5b9b313779c27a:
+  path: .github/checks/allowed-lint-exceptions.yaml
+  description: 'Curated #[expect]/#[allow] registry (hash-chained, chain #104). Every code suppression needs a matching path+match entry. Includes fleet.rs + fleet_lifecycle.rs multiple_inherent_impl expects. Edit then run `bash chain.sh --password <secret>`.'
+  last_edited_ms: 1790889771432
 8c5cfd3d9d60c8da:
   path: crates/cp-base/src/state/watchers.rs
   description: 'Watcher trait + WatcherRegistry. WatcherResult: description, panel_id, tool_use_id, close_panel, create_panel (DeferredPanel for console), create_dyn_panel (DynPanel for generic panels), kill_session, preserves_tempo. ChannelWatcher: polls Mutex<Receiver<WatcherResult>> for async tool results. ASYNC_ERROR_PREFIX + DYN_PANEL_ID_PLACEHOLDER constants.'
@@ -19153,6 +19177,10 @@ bb62ba986c3f2a2d:
 bb673c5a5065f149:
   path: web/src/mobile-components/conversation/Message.tsx
   description: Mobile message renderer twin. Wider bubbles (user 85%, assistant/tool 92%) for phone width, always-readable copy/delete (opacity-70 + active-press, no hover). Assistant author header removed (T611) — no orange dot/'Context Pilot' label; timestamp sits in the action row beneath the body. Body + tool card indent pl-1. Same 3 renderers + inline file-upload chip splicing; MessageFileChip + splitMessageSegments from @/mobile-components/threads/fileUpload (leak guard).
+  last_edited_ms: 0
+bb6bd15ff25f06f0:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 bb6beff7526f84a5:
   path: crates/cp-wire/src/lib.rs

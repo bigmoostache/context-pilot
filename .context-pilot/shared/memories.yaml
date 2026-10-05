@@ -458,10 +458,10 @@ M-short-32:
   last_edited_ms: 1787840930967
 M-short-33:
   tier: short
-  title: MT F1/F5 done
-  contents: 'branch multi-thread-core-loop, bg advancement ON, green, N=1 identical. F1 DONE (F1c 1b531fab + F1d 17b95cd7 boot_load_thread_runtime). F5 teardown DONE 1011c877: App::teardown_thread = deliver_to_thread(tid, ConsoleState::shutdown_all) + fleet.remove(tid). GAP X731: focused=main_worker.json positional. REMAINING: F6 reattach (see M-mid-11), F7, Phase G, Phase H.'
+  title: MT Phase F+G1 done
+  contents: 'MT (T774) branch multi-thread-core-loop: Phases A–F done. G1 done (c8af3806). REMAINING: G2 (thread-list exec states + attention badges incl Errored/stuck), G3 (drill-in = focused thread from registry; X731 focused-file-by-tid first), G4 (create-thread textarea), H (guardrails/anti-flood). Deferred X706/X707.'
   importance: high
-  last_edited_ms: 1790869612535
+  last_edited_ms: 1791190679610
 M-short-34:
   tier: short
   title: check-rust-tests.sh now
@@ -749,6 +749,24 @@ M-tiny-4:
   contents: 'T646 SHIPPED + FIXED: ⌘/Ctrl+A opens the workspace AgentSwitcher from any view, shows an ''A'' HintBadge on ⌘-hold, and respects empty-vs-filled text fields. Branch t646-agent-selector-shortcut, P'
   importance: medium
   last_edited_ms: 0
+M-tiny-40:
+  tier: tiny
+  title: Scroll amounts via helper
+  contents: Never hardcode scroll amounts in key handlers — route via cp_base::panels::scroll_key_action so the amount stays SCROLL_ARROW_AMOUNT (3.0). Shipped a hardcoded 1.0 once as a silent 3× regression.
+  importance: medium
+  last_edited_ms: 1791190679612
+M-tiny-41:
+  tier: tiny
+  title: Update all hint branches
+  contents: 'Key-binding helpers like handle_threads_nav are view-agnostic: when adding a binding, update the help hint in EVERY view branch (active AND archived) or the UI advertises stale keys.'
+  importance: medium
+  last_edited_ms: 1791190685012
+M-tiny-42:
+  tier: tiny
+  title: No-op arm vs delete
+  contents: 'Ctrl+V was dropped as an explicit no-op arm, NOT deleted: the conversation panel maps EVERY Char to InputChar, so fallthrough types a literal ''v''. Right (drill-in) deferred to G3.'
+  importance: medium
+  last_edited_ms: 1791190679614
 M-tiny-5:
   tier: tiny
   title: 'CI web-install fix:'
