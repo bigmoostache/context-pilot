@@ -288,7 +288,7 @@ struct ToolBatch {
 /// of [`handle_tool_execution`]. Returns `None` when the pipeline should not run
 /// this tick (not streaming, nothing pending, waiting on panels/sleep).
 fn collect_tool_results(app: &mut App) -> Option<ToolBatch> {
-    if !app.state.flags.stream.phase.is_streaming()
+    if !app.state.stream.phase.is_streaming()
         || app.pending_done.is_none()
         || !app.typewriter.pending_chars.is_empty()
         || app.pending_tools.is_empty()
@@ -296,12 +296,12 @@ fn collect_tool_results(app: &mut App) -> Option<ToolBatch> {
         return None;
     }
     // Don't process new tools while waiting for panels or deferred sleep
-    if app.state.flags.lifecycle.waiting_for_panels || app.deferred_tool_sleeping {
+    if app.state.waiting_for_panels || app.deferred_tool_sleeping {
         return None;
     }
 
     app.state.flags.ui.dirty = true;
-    app.state.flags.stream.phase.transition(StreamPhase::ExecutingTools);
+    app.state.stream.phase.transition(StreamPhase::ExecutingTools);
     let mut tools = std::mem::take(&mut app.pending_tools);
     let mut tool_results: Vec<crate::infra::tools::ToolResult> = Vec::new();
     let mut flushed_tools: Vec<super::queue_flush::FlushedTool> = Vec::new();
@@ -459,7 +459,7 @@ fn finalize_tool_cycle(app: &mut App, cycle: &ToolCycle<'_>) {
     // Check if we need to wait for panels before continuing stream
     if has_dirty_file_panels(&app.state) {
         // Set waiting flag — main loop will check and continue streaming when ready
-        app.state.flags.lifecycle.waiting_for_panels = true;
+        app.state.waiting_for_panels = true;
         app.wait_started_ms = now_ms();
     } else {
         // No dirty panels — continue streaming immediately

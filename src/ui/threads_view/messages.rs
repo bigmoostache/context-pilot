@@ -116,7 +116,7 @@ fn render_thread_messages(frame: &mut Frame<'_>, state: &State, thread: &cp_mod_
     let content_height = lines.len();
     let viewport_height = area.height.to_usize();
     let max_scroll = content_height.saturating_sub(viewport_height);
-    let scroll_offset = if state.flags.stream.user_scrolled {
+    let scroll_offset = if state.stream.user_scrolled {
         // User manually scrolled — respect their position, clamped
         (state.scroll_offset.to_usize()).min(max_scroll)
     } else {

@@ -201,7 +201,7 @@ impl SpineState {
         // Only inject mid-stream: when idle, auto-continuation delivers the
         // content itself — injecting here too would create a doublon.
         let should_inject = !matches!(kind, NotificationType::UserMessage | NotificationType::ReloadResume)
-            && state.flags.stream.phase.is_streaming();
+            && state.stream.phase.is_streaming();
         if should_inject {
             let safe_to_inject = state.messages.last().is_none_or(|last| {
                 // Unsafe if the last message is an assistant with pending tool calls

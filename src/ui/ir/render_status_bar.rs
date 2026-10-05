@@ -242,9 +242,9 @@ fn build_badge(state: &State) -> Badge {
             label: format!("BLOCKED: {}", state.guard_rail_blocked.as_deref().unwrap_or("?")),
             semantic: Semantic::Error,
         }
-    } else if state.flags.stream.phase.is_streaming() && !state.flags.stream.phase.is_tooling() {
+    } else if state.stream.phase.is_streaming() && !state.stream.phase.is_tooling() {
         Badge { label: "STREAMING".into(), semantic: Semantic::Success }
-    } else if state.flags.stream.phase.is_streaming() && state.flags.stream.phase.is_tooling() {
+    } else if state.stream.phase.is_streaming() && state.stream.phase.is_tooling() {
         Badge { label: "TOOLING".into(), semantic: Semantic::Info }
     } else if has_timed_watcher {
         Badge { label: "WAITING".into(), semantic: Semantic::AccentDim }
@@ -344,7 +344,7 @@ fn build_queue(state: &State) -> Option<QueueCard> {
 
 /// Build stop reason indicator from last completion.
 fn build_stop_reason(state: &State) -> Option<StopReason> {
-    if state.flags.stream.phase.is_streaming() {
+    if state.stream.phase.is_streaming() {
         return None;
     }
     let reason = state.last_stop_reason.as_ref()?;

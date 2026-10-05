@@ -58,7 +58,7 @@ impl ConversationPanel {
         // Hash viewport width
         std::hash::Hash::hash(&viewport_width, &mut hasher);
         std::hash::Hash::hash(&state.flags.ui.dev_mode, &mut hasher);
-        std::hash::Hash::hash(&state.flags.stream.phase.is_streaming(), &mut hasher);
+        std::hash::Hash::hash(&state.stream.phase.is_streaming(), &mut hasher);
 
         // Hash conversation history panel count (invalidate when panels added/removed)
         let history_count =
@@ -123,12 +123,12 @@ impl ConversationPanel {
     /// deleted + empty-non-streaming messages.
     fn push_message_blocks(state: &mut State, blocks: &mut Vec<Block>, viewport_width: u16) {
         let last_msg_id = state.messages.last().map(|m| m.id.clone());
-        for msg in &state.messages {
+        for msg in &state.resident.messages {
             if msg.status == MsgStatus::Deleted {
                 continue;
             }
             let is_last = last_msg_id.as_ref() == Some(&msg.id);
-            let is_streaming_this = state.flags.stream.phase.is_streaming() && is_last && msg.role == "assistant";
+            let is_streaming_this = state.stream.phase.is_streaming() && is_last && msg.role == "assistant";
 
             // Skip empty text messages (unless streaming)
             if msg.msg_type == MsgKind::TextMessage && msg.content.trim().is_empty() && !is_streaming_this {
@@ -136,7 +136,7 @@ impl ConversationPanel {
             }
 
             let hash = Self::compute_message_hash(msg, viewport_width, state.flags.ui.dev_mode);
-            if let Some(cached) = state.message_cache.get(&msg.id)
+            if let Some(cached) = state.resident.message_cache.get(&msg.id)
                 && cached.content_hash == hash
                 && cached.viewport_width == viewport_width
             {
@@ -154,6 +154,7 @@ impl ConversationPanel {
             );
             if !is_streaming_this {
                 let _r = state
+                    .resident
                     .message_cache
                     .insert(msg.id.clone(), MessageCache::new(Rc::from(rendered.as_slice()), hash, viewport_width));
             }
@@ -289,7 +290,7 @@ impl Panel for ConversationPanel {
         Vec::new()
     }
     fn title(&self, state: &State) -> String {
-        if state.flags.stream.phase.is_streaming() { "Conversation *".to_owned() } else { "Conversation".to_owned() }
+        if state.stream.phase.is_streaming() { "Conversation *".to_owned() } else { "Conversation".to_owned() }
     }
 
     fn handle_key(&self, key: &KeyEvent, state: &State) -> Option<Action> {
@@ -402,7 +403,7 @@ const fn handle_modifier_combo(code: KeyCode, mods: &Mods) -> Option<Action> {
 /// OUT to the threads list (the panel→list entry gesture G1 left unwired after
 /// dropping Ctrl+V). Otherwise it moves the cursor, so editing is never
 /// hijacked.
-const fn left_action(state: &State, shift: bool) -> Action {
+fn left_action(state: &State, shift: bool) -> Action {
     if shift {
         Action::CursorLeftSelect
     } else if state.input.is_empty() && state.input_selection_anchor.is_none() {

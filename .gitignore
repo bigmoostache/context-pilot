@@ -126,3 +126,4 @@ deploy/ansible/*.local.yml
 /todo.md
 tmp/**orchestrator.log
 orchestrator.log
+tmp

@@ -30,7 +30,7 @@ pub(super) fn process_stream_events(app: &mut App) {
         }
     }
     for evt in events {
-        if !app.state.flags.stream.phase.is_streaming() {
+        if !app.state.stream.phase.is_streaming() {
             continue;
         }
         app.state.flags.ui.dirty = true;
@@ -153,7 +153,7 @@ fn handle_stream_error_event(app: &mut App, e: String) {
 pub(super) fn handle_retry(app: &mut App) {
     if let Some(_error) = app.pending_retry_error.take() {
         // Still streaming, retry the request
-        if app.state.flags.stream.phase.is_streaming() {
+        if app.state.stream.phase.is_streaming() {
             // Clear any partial assistant message content before retrying
             if let Some(msg) = app.state.messages.last_mut()
                 && msg.role == "assistant"
@@ -174,7 +174,7 @@ pub(super) fn handle_retry(app: &mut App) {
 /// Flush buffered typewriter characters into the assistant message.
 pub(super) fn process_typewriter(app: &mut App) {
     let _guard = crate::profile!("app::typewriter");
-    if app.state.flags.stream.phase.is_streaming()
+    if app.state.stream.phase.is_streaming()
         && let Some(chars) = app.typewriter.take_chars()
     {
         let _r = apply_action(&mut app.state, Action::AppendChars(chars));
@@ -197,7 +197,7 @@ pub(super) fn process_api_check_results(app: &mut App) {
 
 /// Continue streaming after tool execution (called when panels are ready).
 pub(super) fn continue_streaming(app: &mut App) {
-    app.state.flags.stream.phase.transition(StreamPhase::Receiving);
+    app.state.stream.phase.transition(StreamPhase::Receiving);
     let ctx = prepare_stream_context(&mut app.state, true, None);
     let system_prompt = get_active_agent_content(&app.state);
     app.typewriter.reset();
@@ -209,13 +209,13 @@ pub(super) fn continue_streaming(app: &mut App) {
 /// Finalize a completed stream: apply `StreamDone`, reset counters, and unblock spine.
 pub(super) fn finalize_stream(app: &mut App) {
     let _fg = cp_base::flame!("finalize_stream");
-    if !app.state.flags.stream.phase.is_streaming() {
+    if !app.state.stream.phase.is_streaming() {
         return;
     }
     // Don't finalize while waiting for panels or deferred sleep —
     // pending_done is still Some from the intermediate stream, and
     // continue_streaming will clear it when the deferred state resolves.
-    if app.state.flags.lifecycle.waiting_for_panels || app.deferred_tool_sleeping {
+    if app.state.waiting_for_panels || app.deferred_tool_sleeping {
         return;
     }
     // Don't finalize while a console blocking wait is pending

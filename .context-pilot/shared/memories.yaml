@@ -459,9 +459,9 @@ M-short-32:
 M-short-33:
   tier: short
   title: MT phase progress
-  contents: 'MT (T774) branch multi-thread-core-loop: A-F done, G1/G2 done, X731 (9f2db91d) focused-file-keyed-by-id. USER CHOSE (form g3-sequencing opt2): do Phase TC thread-centric rework FIRST (decommission central state.messages + rework/remove Read via resident-relocation-on-focus-change) THEN full G3. TC1=relocate primitive (N=1 no-op). Deferred X706/X707.'
+  contents: 'MT (T774) multi-thread-core-loop: Phases A-H + TC shipped. N>1 corruption FIX 2bb49415: per-stream App buffers (typewriter, pending_tools/done, console-wait/blocking/sleep/retry) were single shared fields that bled across threads in advance_background_threads. Fix=StreamRuntime stash in parked_stream_runtimes, swap_with_app per bg step. Panels already per-thread. Deferred X706/X707/X673.'
   importance: high
-  last_edited_ms: 1791196678490
+  last_edited_ms: 1791206556576
 M-short-34:
   tier: short
   title: check-rust-tests.sh now

@@ -98,7 +98,7 @@ fn check_guard_rails(state: &mut State) -> Option<String> {
 pub fn check_spine(state: &mut State) -> SpineDecision {
     let _fg = cp_base::flame!("check_spine");
     // Never launch if already streaming
-    if state.flags.stream.phase.is_streaming() {
+    if state.stream.phase.is_streaming() {
         return SpineDecision::Idle;
     }
 

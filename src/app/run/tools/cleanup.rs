@@ -397,7 +397,7 @@ fn resume_pipeline_after_blocking(
 
     let _r = crate::app::run::streaming::trigger_dirty_panel_refresh(&app.state, &app.cache_tx);
     if crate::app::run::streaming::has_dirty_file_panels(&app.state) {
-        app.state.flags.lifecycle.waiting_for_panels = true;
+        app.state.waiting_for_panels = true;
         app.wait_started_ms = now_ms();
     } else {
         crate::app::run::streaming::continue_streaming(app);

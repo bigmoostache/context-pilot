@@ -78,7 +78,7 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
 
     // During streaming: insert BEFORE the streaming assistant message
     // The notification will be picked up when the current stream ends
-    if state.flags.stream.phase.is_streaming() {
+    if state.stream.phase.is_streaming() {
         let insert_pos = state.messages.len().saturating_sub(1);
         state.messages.insert(insert_pos, user_msg);
         return ActionResult::Save;
@@ -95,7 +95,7 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
 
 /// Zero the per-stream and per-tick token + USD telemetry counters ahead of a
 /// new user-initiated stream, so the next stream's stats start from a clean base.
-const fn reset_stream_and_tick_counters(state: &mut State) {
+fn reset_stream_and_tick_counters(state: &mut State) {
     state.stream_cache_hit_tokens = 0;
     state.stream_cache_miss_tokens = 0;
     state.stream_output_tokens = 0;

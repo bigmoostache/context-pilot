@@ -25,7 +25,7 @@ pub(super) fn delete_selection(state: &mut State) -> bool {
 }
 
 /// Ensure selection anchor is set (for Shift+movement). If no anchor yet, set it to current cursor.
-const fn extend_selection(state: &mut State) {
+fn extend_selection(state: &mut State) {
     if state.input_selection_anchor.is_none() {
         state.input_selection_anchor = Some(state.input_cursor);
     }
@@ -272,7 +272,7 @@ pub(super) fn handle_cursor_end_select(state: &mut State) {
 }
 
 /// Handle `SelectAll` — select entire input.
-pub(super) const fn handle_select_all(state: &mut State) {
+pub(super) fn handle_select_all(state: &mut State) {
     if state.input.is_empty() {
         return;
     }

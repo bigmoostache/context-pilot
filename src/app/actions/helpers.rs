@@ -11,19 +11,19 @@ use super::config;
 /// the incoming panel's scroll state. This preserves scroll position across TAB switches.
 pub(crate) fn switch_to_panel(state: &mut State, target_index: usize) {
     // Save outgoing panel's scroll state
-    if let Some(outgoing) = state.context.get_mut(state.selected_context) {
-        outgoing.scroll_state.offset = state.scroll_offset;
-        outgoing.scroll_state.user_scrolled = state.flags.stream.user_scrolled;
+    if let Some(outgoing) = state.resident.context.get_mut(state.resident.selected_context) {
+        outgoing.scroll_state.offset = state.resident.scroll_offset;
+        outgoing.scroll_state.user_scrolled = state.resident.stream.user_scrolled;
     }
     // Switch to target
-    state.selected_context = target_index;
+    state.resident.selected_context = target_index;
     // Restore incoming panel's scroll state
-    if let Some(incoming) = state.context.get(state.selected_context) {
-        state.scroll_offset = incoming.scroll_state.offset;
-        state.flags.stream.user_scrolled = incoming.scroll_state.user_scrolled;
+    if let Some(incoming) = state.resident.context.get(state.resident.selected_context) {
+        state.resident.scroll_offset = incoming.scroll_state.offset;
+        state.resident.stream.user_scrolled = incoming.scroll_state.user_scrolled;
     } else {
-        state.scroll_offset = 0.0;
-        state.flags.stream.user_scrolled = false;
+        state.resident.scroll_offset = 0.0;
+        state.resident.stream.user_scrolled = false;
     }
 }
 

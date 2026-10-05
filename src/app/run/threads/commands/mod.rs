@@ -338,12 +338,15 @@ fn collect_delete_timestamps(thread: &cp_mod_threads::types::Thread, idx: usize,
 fn apply_stop(state: &mut State) {
     use cp_base::state::flags::StreamPhase;
 
-    if state.flags.stream.phase.is_streaming() {
-        state.flags.stream.phase.transition(StreamPhase::Idle);
-        if let Some(ctx) =
-            state.context.iter_mut().find(|c| c.context_type.as_str() == cp_base::state::context::Kind::CONVERSATION)
+    if state.stream.phase.is_streaming() {
+        state.stream.phase.transition(StreamPhase::Idle);
+        if let Some(ctx) = state
+            .resident
+            .context
+            .iter_mut()
+            .find(|c| c.context_type.as_str() == cp_base::state::context::Kind::CONVERSATION)
         {
-            ctx.token_count = ctx.token_count.saturating_sub(state.streaming_estimated_tokens);
+            ctx.token_count = ctx.token_count.saturating_sub(state.resident.streaming_estimated_tokens);
         }
         state.streaming_estimated_tokens = 0;
         if let Some(msg) = state.messages.last_mut()

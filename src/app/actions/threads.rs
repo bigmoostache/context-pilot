@@ -90,7 +90,7 @@ fn select_next(state: &mut State) -> ActionResult {
         FocusState::mark_selected_read(state);
     }
     state.scroll_offset = 0.0;
-    state.flags.stream.user_scrolled = false;
+    state.stream.user_scrolled = false;
     state.flags.ui.dirty = true;
     ActionResult::Nothing
 }
@@ -110,7 +110,7 @@ fn select_prev(state: &mut State) -> ActionResult {
         FocusState::mark_selected_read(state);
     }
     state.scroll_offset = 0.0;
-    state.flags.stream.user_scrolled = false;
+    state.stream.user_scrolled = false;
     state.flags.ui.dirty = true;
     ActionResult::Nothing
 }
@@ -157,7 +157,7 @@ fn drill_in(state: &mut State) -> ActionResult {
     };
     FocusState::get_mut(state).drilled_thread_id = Some(id);
     state.scroll_offset = 0.0;
-    state.flags.stream.user_scrolled = false;
+    state.stream.user_scrolled = false;
     state.flags.ui.dirty = true;
     ActionResult::Nothing
 }
@@ -166,7 +166,7 @@ fn drill_in(state: &mut State) -> ActionResult {
 fn drill_out(state: &mut State) -> ActionResult {
     FocusState::get_mut(state).drilled_thread_id = None;
     state.scroll_offset = 0.0;
-    state.flags.stream.user_scrolled = false;
+    state.stream.user_scrolled = false;
     state.flags.ui.dirty = true;
     ActionResult::Nothing
 }
@@ -195,7 +195,7 @@ fn toggle_archived_view(state: &mut State) -> ActionResult {
     focus.selected_thread_idx = 0;
     focus.confirming_archive = false;
     state.scroll_offset = 0.0;
-    state.flags.stream.user_scrolled = false;
+    state.stream.user_scrolled = false;
     state.flags.ui.dirty = true;
     ActionResult::Nothing
 }

@@ -174,7 +174,7 @@ impl App {
     /// Adaptive poll interval: short while streaming/active or bridge-driven,
     /// long when idle — keeps latency low without pinning a core at rest.
     fn compute_poll_ms(&self) -> u64 {
-        if self.state.flags.stream.phase.is_streaming() || self.state.flags.ui.dirty {
+        if self.state.stream.phase.is_streaming() || self.state.flags.ui.dirty {
             EVENT_POLL_MS // 8ms — responsive during streaming/active updates
         } else if super::threads::bridge_active(&self.state) {
             2 // bridge-active idle — keep web command→apply latency ≤ a few ms
@@ -472,7 +472,7 @@ impl App {
     ///
     /// When none hold, the screen is static and no periodic redraw is needed.
     fn has_active_animation(state: &crate::state::State) -> bool {
-        if state.flags.stream.phase.is_streaming() {
+        if state.stream.phase.is_streaming() {
             return true; // STREAMING / TOOLING badge spinner
         }
         // A pending timed watcher renders the animated WAITING badge.

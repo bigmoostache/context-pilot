@@ -13,7 +13,7 @@ use crate::app::App;
 /// Non-blocking check: if we're waiting for file panels to load,
 /// check if they're ready (or timed out) and continue streaming.
 pub(crate) fn check_waiting_for_panels(app: &mut App) {
-    if !app.state.flags.lifecycle.waiting_for_panels {
+    if !app.state.waiting_for_panels {
         return;
     }
 
@@ -21,7 +21,7 @@ pub(crate) fn check_waiting_for_panels(app: &mut App) {
     let timed_out = now_ms().saturating_sub(app.wait_started_ms) >= 5_000;
 
     if panels_ready || timed_out {
-        app.state.flags.lifecycle.waiting_for_panels = false;
+        app.state.waiting_for_panels = false;
         app.state.flags.ui.dirty = true;
         crate::app::run::streaming::continue_streaming(app);
     }

@@ -54,12 +54,12 @@ use cp_base::cast::float_math;
 /// Stop an in-progress stream: mark idle, roll back the streaming token
 /// estimate, and append a `[Stopped]` marker to the last assistant message.
 fn handle_stop_streaming(state: &mut State) -> ActionResult {
-    if !state.flags.stream.phase.is_streaming() {
+    if !state.stream.phase.is_streaming() {
         return ActionResult::Nothing;
     }
-    state.flags.stream.phase.transition(StreamPhase::Idle);
-    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
-        ctx.token_count = ctx.token_count.saturating_sub(state.streaming_estimated_tokens);
+    state.stream.phase.transition(StreamPhase::Idle);
+    if let Some(ctx) = state.resident.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
+        ctx.token_count = ctx.token_count.saturating_sub(state.resident.streaming_estimated_tokens);
     }
     state.streaming_estimated_tokens = 0;
     if let Some(msg) = state.messages.last_mut()
@@ -110,7 +110,8 @@ fn handle_copy_index_overlay(state: &mut State) {
 /// then trigger `@`-autocomplete or `/command` expansion when warranted.
 fn handle_input_char(state: &mut State, ch: char) {
     let _r = cursor::delete_selection(state);
-    state.input.insert(state.input_cursor, ch);
+    let pos = state.input_cursor;
+    state.input.insert(pos, ch);
     state.input_cursor = state.input_cursor.saturating_add(ch.len_utf8());
 
     // '@' at input start or after whitespace opens directory autocomplete.
@@ -143,7 +144,8 @@ fn handle_input_char(state: &mut State, ch: char) {
 /// Insert literal text at the cursor, replacing any active selection.
 fn handle_insert_text(state: &mut State, text: &str) {
     let _r = cursor::delete_selection(state);
-    state.input.insert_str(state.input_cursor, text);
+    let pos = state.input_cursor;
+    state.input.insert_str(pos, text);
     state.input_cursor = state.input_cursor.saturating_add(text.len());
 }
 
@@ -155,24 +157,26 @@ fn handle_paste_text(state: &mut State, text: String) {
     state.paste_buffers.push(text);
     state.paste_buffer_labels.push(None);
     let sentinel = format!("\x00{idx}\x00");
-    state.input.insert_str(state.input_cursor, &sentinel);
+    let pos = state.input_cursor;
+    state.input.insert_str(pos, &sentinel);
     state.input_cursor = state.input_cursor.saturating_add(sentinel.len());
 }
 
 /// Delete the selection if any, else the character to the right of the cursor.
 fn handle_input_delete(state: &mut State) {
     if !cursor::delete_selection(state) && state.input_cursor < state.input.len() {
-        let _r = state.input.remove(state.input_cursor);
+        let pos = state.input_cursor;
+        let _r = state.input.remove(pos);
     }
 }
 
 /// Scroll the conversation up (`up = true`) or down, applying + growing the
 /// scroll-acceleration factor. Sets `user_scrolled` when scrolling up.
-const fn handle_scroll(state: &mut State, amount: f32, up: bool) {
+fn handle_scroll(state: &mut State, amount: f32, up: bool) {
     let accel = float_math::mul_f32(amount, state.scroll_accel);
     if up {
         state.scroll_offset = float_math::sub_f32(state.scroll_offset, accel).max(0.0);
-        state.flags.stream.user_scrolled = true;
+        state.stream.user_scrolled = true;
     } else {
         state.scroll_offset = float_math::add_f32(state.scroll_offset, accel);
     }
@@ -225,10 +229,10 @@ fn think_threshold(state: &mut State, up: bool) {
 }
 
 /// Cycle to the next view mode, resetting scroll so the new view starts clean.
-const fn cycle_view_mode(state: &mut State) {
+fn cycle_view_mode(state: &mut State) {
     state.view_mode = state.view_mode.next();
     state.scroll_offset = 0.0;
-    state.flags.stream.user_scrolled = false;
+    state.stream.user_scrolled = false;
     state.flags.ui.dirty = true;
 }
 

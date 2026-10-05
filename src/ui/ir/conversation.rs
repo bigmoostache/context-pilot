@@ -61,7 +61,7 @@ fn build_messages(state: &State) -> Vec<IrMessage> {
             }
             // Skip empty text messages (unless currently streaming)
             let is_last = last_msg_id.as_ref() == Some(&msg.id);
-            let is_streaming = state.flags.stream.phase.is_streaming() && is_last && msg.role == "assistant";
+            let is_streaming = state.stream.phase.is_streaming() && is_last && msg.role == "assistant";
             if msg.msg_type == MsgKind::TextMessage && msg.content.trim().is_empty() && !is_streaming {
                 return false;
             }
@@ -143,7 +143,7 @@ fn build_input(state: &State) -> InputArea {
         text: state.input.clone(),
         cursor: state.input_cursor,
         placeholder: "Type a message\u{2026}".into(),
-        focused: !state.flags.stream.phase.is_streaming(),
+        focused: !state.stream.phase.is_streaming(),
     }
 }
 

@@ -2,7 +2,7 @@
 //!
 //! The multi-thread model keeps [`State`] *flat*: the whole existing pipeline
 //! (stream processing, tool execution, the cache/freeze engine) reads and writes
-//! `state.messages` / `state.context` / `state.flags.stream` directly and must
+//! `state.messages` / `state.context` / `state.stream` directly and must
 //! stay untouched. Instead of threading a per-thread context parameter through
 //! all of it, the loop keeps one thread *resident* in `State` and swaps a
 //! different thread in/out around a single advancement step.
@@ -279,94 +279,21 @@ impl ThreadRuntime {
         Self::default()
     }
 
-    /// Exchange every per-thread field with `state` in O(1).
+    /// Exchange this bundle with the resident thread currently loaded in `state`
+    /// in O(1).
     ///
-    /// The operation is symmetric: calling it once *loads* `self` into `state`
-    /// (and parks `state`'s previous resident context back into `self`); calling
-    /// it again with the same pair restores the original arrangement. The loop
-    /// uses this to make a non-resident thread temporarily resident for one
-    /// advancement step, then swap the focused thread back.
+    /// Since every per-thread field now lives on [`ThreadRuntime`] (and `State`
+    /// holds the resident as a single [`resident`](State::resident) field), the
+    /// swap is one whole-struct [`mem::swap`](std::mem::swap) rather than a
+    /// field-by-field exchange. Symmetric: calling it once makes `self` resident
+    /// (parking the previous resident back into `self`); calling it again with
+    /// the same pair restores the original arrangement.
     ///
-    /// Only the per-thread subset moves — fleet-shared fields on `State` (tools,
-    /// active modules, theme, provider/model, the shared module `TypeMap`,
-    /// `global_next_uid`, the highlight fn, reveries) are untouched.
-    #[expect(
-        clippy::too_many_lines,
-        reason = "flat per-field mem::swap mirroring every per-thread State field; one swap per field, nothing to factor without a macro that re-expands to the same body"
-    )]
-    pub fn swap_with(&mut self, state: &mut State) {
-        use std::mem::swap;
-
-        swap(&mut self.context, &mut state.context);
-        swap(&mut self.messages, &mut state.messages);
-
-        swap(&mut self.input, &mut state.input);
-        swap(&mut self.input_cursor, &mut state.input_cursor);
-        swap(&mut self.input_selection_anchor, &mut state.input_selection_anchor);
-        swap(&mut self.paste_buffers, &mut state.paste_buffers);
-        swap(&mut self.paste_buffer_labels, &mut state.paste_buffer_labels);
-        swap(&mut self.selected_context, &mut state.selected_context);
-        swap(&mut self.scroll_offset, &mut state.scroll_offset);
-        swap(&mut self.scroll_accel, &mut state.scroll_accel);
-        swap(&mut self.max_scroll, &mut state.max_scroll);
-
-        swap(&mut self.stream, &mut state.flags.stream);
-        swap(&mut self.streaming_tool, &mut state.streaming_tool);
-        swap(&mut self.last_stop_reason, &mut state.last_stop_reason);
-        swap(&mut self.streaming_estimated_tokens, &mut state.streaming_estimated_tokens);
-        swap(&mut self.waiting_for_panels, &mut state.flags.lifecycle.waiting_for_panels);
-
-        swap(&mut self.next_user_id, &mut state.next_user_id);
-        swap(&mut self.next_assistant_id, &mut state.next_assistant_id);
-        swap(&mut self.next_tool_id, &mut state.next_tool_id);
-        swap(&mut self.next_result_id, &mut state.next_result_id);
-
-        swap(&mut self.cache_hit_tokens, &mut state.cache_hit_tokens);
-        swap(&mut self.cache_miss_tokens, &mut state.cache_miss_tokens);
-        swap(&mut self.total_output_tokens, &mut state.total_output_tokens);
-        swap(&mut self.uncached_input_tokens, &mut state.uncached_input_tokens);
-        swap(&mut self.stream_cache_hit_tokens, &mut state.stream_cache_hit_tokens);
-        swap(&mut self.stream_cache_miss_tokens, &mut state.stream_cache_miss_tokens);
-        swap(&mut self.stream_output_tokens, &mut state.stream_output_tokens);
-        swap(&mut self.stream_uncached_input_tokens, &mut state.stream_uncached_input_tokens);
-        swap(&mut self.tick_cache_hit_tokens, &mut state.tick_cache_hit_tokens);
-        swap(&mut self.tick_cache_miss_tokens, &mut state.tick_cache_miss_tokens);
-        swap(&mut self.tick_output_tokens, &mut state.tick_output_tokens);
-        swap(&mut self.tick_uncached_input_tokens, &mut state.tick_uncached_input_tokens);
-
-        swap(&mut self.cost_hit_usd, &mut state.cost_hit_usd);
-        swap(&mut self.cost_miss_usd, &mut state.cost_miss_usd);
-        swap(&mut self.cost_output_usd, &mut state.cost_output_usd);
-        swap(&mut self.stream_cost_hit_usd, &mut state.stream_cost_hit_usd);
-        swap(&mut self.stream_cost_miss_usd, &mut state.stream_cost_miss_usd);
-        swap(&mut self.stream_cost_output_usd, &mut state.stream_cost_output_usd);
-        swap(&mut self.tick_cost_hit_usd, &mut state.tick_cost_hit_usd);
-        swap(&mut self.tick_cost_miss_usd, &mut state.tick_cost_miss_usd);
-        swap(&mut self.tick_cost_output_usd, &mut state.tick_cost_output_usd);
-
-        swap(&mut self.cleaning_threshold, &mut state.cleaning_threshold);
-        swap(&mut self.context_budget, &mut state.context_budget);
-        swap(&mut self.api_retry_count, &mut state.api_retry_count);
-        swap(&mut self.guard_rail_blocked, &mut state.guard_rail_blocked);
-        swap(&mut self.tool_sleep_until_ms, &mut state.tool_sleep_until_ms);
-
-        swap(&mut self.previous_panel_hash_list, &mut state.previous_panel_hash_list);
-        swap(&mut self.previous_panel_order, &mut state.previous_panel_order);
-        swap(&mut self.previous_panel_id_types, &mut state.previous_panel_id_types);
-        swap(&mut self.previous_breakpoint_panel_ids, &mut state.previous_breakpoint_panel_ids);
-        swap(&mut self.frozen_context_snapshot, &mut state.frozen_context_snapshot);
-        swap(&mut self.cache_engine_json, &mut state.cache_engine_json);
-        swap(&mut self.tempo, &mut state.tempo);
-        swap(&mut self.tick_telemetry, &mut state.tick_telemetry);
-        swap(&mut self.tick_alive_breakpoints, &mut state.tick_alive_breakpoints);
-        swap(&mut self.tick_alive_bp_positions, &mut state.tick_alive_bp_positions);
-
-        swap(&mut self.last_viewport_width, &mut state.last_viewport_width);
-        swap(&mut self.message_cache, &mut state.message_cache);
-        swap(&mut self.input_cache, &mut state.input_cache);
-        swap(&mut self.full_content_cache, &mut state.full_content_cache);
-
-        swap(&mut self.thread_module_data, &mut state.thread_module_data);
+    /// Fleet-shared fields on `State` (tools, model, theme, `shared_module_data`,
+    /// `global_next_uid`, the highlight fn, reveries, `resident_thread_id`) are
+    /// untouched — they are not part of `ThreadRuntime`.
+    pub const fn swap_with(&mut self, state: &mut State) {
+        std::mem::swap(self, &mut state.resident);
     }
 }
 

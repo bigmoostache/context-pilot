@@ -28,7 +28,7 @@ pub(crate) fn render_conversation_from_ir(
     let base_style = Style::default().bg(theme::bg_surface());
 
     // Title reflects streaming state
-    let title = if !conversation.streaming_tools.is_empty() || state.flags.stream.phase.is_streaming() {
+    let title = if !conversation.streaming_tools.is_empty() || state.stream.phase.is_streaming() {
         "Conversation *"
     } else {
         "Conversation"
@@ -60,10 +60,10 @@ pub(crate) fn render_conversation_from_ir(
     state.max_scroll = max_scroll;
 
     // Auto-scroll: snap to bottom unless user manually scrolled up
-    if state.flags.stream.user_scrolled && state.scroll_offset.to_f64() >= float_math::sub(max_scroll.to_f64(), 0.5) {
-        state.flags.stream.user_scrolled = false;
+    if state.stream.user_scrolled && state.scroll_offset.to_f64() >= float_math::sub(max_scroll.to_f64(), 0.5) {
+        state.stream.user_scrolled = false;
     }
-    if !state.flags.stream.user_scrolled {
+    if !state.stream.user_scrolled {
         state.scroll_offset = max_scroll;
     }
     state.scroll_offset = state.scroll_offset.clamp(0.0, max_scroll);

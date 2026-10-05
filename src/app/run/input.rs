@@ -251,11 +251,13 @@ impl App {
         let Some(ac) = self.state.get_ext_mut::<cp_base::state::autocomplete::Suggestions>() else { return };
         if c == ' ' || c == '\n' {
             ac.deactivate();
-            self.state.input.insert(self.state.input_cursor, c);
+            let pos = self.state.input_cursor;
+            self.state.input.insert(pos, c);
             self.state.input_cursor = self.state.input_cursor.saturating_add(c.len_utf8());
         } else {
             ac.push_char(c);
-            self.state.input.insert(self.state.input_cursor, c);
+            let pos = self.state.input_cursor;
+            self.state.input.insert(pos, c);
             self.state.input_cursor = self.state.input_cursor.saturating_add(c.len_utf8());
             self.autocomplete_refresh_matches();
         }

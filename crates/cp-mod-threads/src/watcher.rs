@@ -72,7 +72,7 @@ impl Watcher for IdleMyTurnDetector {
 
     fn check(&self, state: &State) -> Option<WatcherResult> {
         // Only fire when the agent is NOT streaming (i.e. idle).
-        if state.flags.stream.phase.is_streaming() {
+        if state.stream.phase.is_streaming() {
             return None;
         }
 

@@ -305,7 +305,7 @@ impl App {
     fn post_step_exec_state(&self, id: &str) -> ThreadExecState {
         let errs = cp_mod_spine::types::SpineState::get(&self.state).config.consecutive_continuation_errors;
         let status = ThreadsState::get(&self.state).threads.iter().find(|t| t.id == id).map(|t| t.status);
-        Self::exec_state_from_residency(self.state.flags.stream.phase.is_streaming(), errs, status)
+        Self::exec_state_from_residency(self.state.stream.phase.is_streaming(), errs, status)
     }
 
     /// The single definition of "what exec state do these residency facts imply".
@@ -362,7 +362,7 @@ impl App {
         if let Some(id) = focused {
             let errs = cp_mod_spine::types::SpineState::get(&self.state).config.consecutive_continuation_errors;
             let status = ThreadsState::get(&self.state).threads.iter().find(|t| t.id == id).map(|t| t.status);
-            let resident = Self::exec_state_from_residency(self.state.flags.stream.phase.is_streaming(), errs, status);
+            let resident = Self::exec_state_from_residency(self.state.stream.phase.is_streaming(), errs, status);
             let _inserted = exec_states.insert(id, resident);
         }
 
@@ -424,7 +424,7 @@ impl App {
             self.deliver_to_thread(Some(&tid), move |state| {
                 // Skip if this thread is already working or already nudged — the
                 // two guards that keep the dispatcher from flooding an inbox.
-                if state.flags.stream.phase.is_streaming() {
+                if state.stream.phase.is_streaming() {
                     return;
                 }
                 if cp_mod_spine::types::SpineState::has_unprocessed_notifications(state) {

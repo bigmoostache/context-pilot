@@ -27,7 +27,7 @@ impl State {
         T: 'static + Send + Sync,
     {
         let id = TypeId::of::<T>();
-        let boxed = self.thread_module_data.get(&id).or_else(|| self.shared_module_data.get(&id))?;
+        let boxed = self.resident.thread_module_data.get(&id).or_else(|| self.shared_module_data.get(&id))?;
         boxed.downcast_ref()
     }
 
@@ -39,8 +39,8 @@ impl State {
         T: 'static + Send + Sync,
     {
         let id = TypeId::of::<T>();
-        if self.thread_module_data.contains_key(&id) {
-            let boxed = self.thread_module_data.get_mut(&id)?;
+        if self.resident.thread_module_data.contains_key(&id) {
+            let boxed = self.resident.thread_module_data.get_mut(&id)?;
             boxed.downcast_mut()
         } else {
             let boxed = self.shared_module_data.get_mut(&id)?;
@@ -94,8 +94,8 @@ impl State {
         let id = TypeId::of::<T>();
         if self.shared_module_data.contains_key(&id) {
             drop(self.shared_module_data.insert(id, Box::new(val)));
-        } else if self.thread_module_data.contains_key(&id) || self.init_is_global != Some(true) {
-            drop(self.thread_module_data.insert(id, Box::new(val)));
+        } else if self.resident.thread_module_data.contains_key(&id) || self.init_is_global != Some(true) {
+            drop(self.resident.thread_module_data.insert(id, Box::new(val)));
         } else {
             drop(self.shared_module_data.insert(id, Box::new(val)));
         }
@@ -109,7 +109,7 @@ impl State {
         T: 'static + Send + Sync,
     {
         let id = TypeId::of::<T>();
-        let _thread = self.thread_module_data.remove(&id);
+        let _thread = self.resident.thread_module_data.remove(&id);
         drop(self.shared_module_data.insert(id, Box::new(val)));
     }
 
@@ -122,7 +122,7 @@ impl State {
     {
         let id = TypeId::of::<T>();
         let _shared = self.shared_module_data.remove(&id);
-        drop(self.thread_module_data.insert(id, Box::new(val)));
+        drop(self.resident.thread_module_data.insert(id, Box::new(val)));
     }
 
     /// Set the ambient scope used to route the next first-insert via

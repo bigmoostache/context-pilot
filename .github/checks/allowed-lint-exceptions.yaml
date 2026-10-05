@@ -74,21 +74,6 @@ exceptions:
 
   # ── too_many_lines: flat aggregate root-state initializer ────────────
 
-  - path: "crates/cp-base/src/state/runtime/default.rs"
-    match: "flat aggregate root-state initializer; sub-grouping fields would churn 136 access sites for no gain"
-    reason: >
-      State is the flat aggregate root of the whole application (~80 leaf fields:
-      UI cursors, id counters, model selections, cache/stream/tick token + USD
-      telemetry, panel-diff snapshots, per-frame caches). Its Default impl is a
-      single linear struct literal — one `field: value` line each — at 82 lines
-      over the 60-line threshold. Grouping the telemetry counters into sub-structs
-      to shave lines would ripple across 136 field-access sites for zero
-      behavioural gain, so the initializer stays flat and carries the length
-      expect. Threshold is unchanged (still 60).
-    strategy: >
-      Irreducible without a 136-site sub-struct refactor that trades a linear
-      initializer for cross-cutting churn; the flat literal is the honest shape.
-
   # ── cast.rs: Safe numeric casting infrastructure ─────────────────
 
   - path: "crates/cp-base/src/cast/mod.rs"
@@ -243,17 +228,6 @@ exceptions:
     strategy: >
       Irreducible — a flat per-thread initializer mirroring State's flat layout; the
       honest shape, same as the accepted State::default flat-initializer expect.
-
-  - path: "crates/cp-base/src/state/runtime/bundle.rs"
-    match: "flat per-field mem::swap mirroring every per-thread State field; one swap per field, nothing to factor without a macro that re-expands to the same body"
-    reason: >
-      ThreadRuntime::swap_with is a flat sequence of std::mem::swap calls, one per
-      per-thread State field, exchanging each with the resident State. The targets are
-      non-uniform (state.context vs state.flags.stream vs state.flags.lifecycle.*), so a
-      macro would re-expand to the same body with no readability gain. The only residual
-      is length, intrinsic to the ~45-field per-thread subset, so it carries the expect.
-    strategy: >
-      Irreducible — one swap per per-thread field; a macro re-expands to the same body.
 
   - path: "src/llms/mod.rs"
     match: "type_id/cause/provide are unstable or deprecated"

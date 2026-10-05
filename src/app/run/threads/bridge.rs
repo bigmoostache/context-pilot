@@ -224,7 +224,7 @@ pub(in crate::app::run) fn emit_vitals(app: &mut App) {
     }
 
     // Phase — emit on transition only.
-    let phase = wire_phase(app.state.flags.stream.phase);
+    let phase = wire_phase(app.state.stream.phase);
     let phase_changed = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.last_phase != Some(phase));
     if phase_changed {
         emit_best_effort(&app.state, OpEntryKind::PhaseTransition { phase });
