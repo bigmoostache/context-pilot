@@ -111,10 +111,10 @@ M-mid-10:
   last_edited_ms: 0
 M-mid-11:
   tier: mid
-  title: F6 console cross-kill bug
-  contents: 'F6 (X693): console load_module_data''s kill_orphaned_processes(known_keys) uses only THAT thread''s keys → at N>1 a bg thread''s boot-reconnect kills other threads'' live console sessions (same class as F1c prune). FIX: union-kill once over ALL threads'' keys. Coucou/console reattach already fall out of F1d+D2; channel/stream watchers correctly not persisted (S2).'
+  title: Bug batch X796-X799
+  contents: 'Branch multi-thread-core-loop, 8c349751 pushed. BUG-SWITCH fixed (execute_send no longer pins focused_thread_id; bg Send hijacked human focus). BUG-PANELS fixed (fresh_thread_runtime + boot_load_thread_runtime call ensure_default_contexts; UIDs from shared global_next_uid). BUG-INPUT partial (drill_in resets selected_context=0). OPEN: X798 always-typable composer UX (ask user), X799 streaming-shows-green execstate (live retest + threads_view color map).'
   importance: high
-  last_edited_ms: 1790869601361
+  last_edited_ms: 1791214143498
 M-mid-12:
   tier: mid
   title: 'T604 + FIGHT:'

@@ -231,6 +231,12 @@ impl App {
             self.handle_action(action);
         }
 
+        // Make the resident follow a focus change the action may have just made
+        // (e.g. Right-arrow drill-in switching the focused thread) BEFORE the
+        // post-input render below — else this frame paints the previous resident
+        // ("one stale frame until I type" bug). No-op when focus did not change.
+        self.relocate_resident_on_focus_change();
+
         // Render immediately after input for instant feedback.
         if self.state.flags.ui.dirty {
             self.render_frame(terminal, current_ms)?;
