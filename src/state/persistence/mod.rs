@@ -25,7 +25,7 @@ pub(crate) use writer::PersistenceWriter;
 use std::path::PathBuf;
 
 use crate::infra::config::set_active_theme;
-use crate::infra::constants::{CONFIG_FILE, DEFAULT_WORKER_ID, STORE_DIR};
+use crate::infra::constants::{CONFIG_FILE, STORE_DIR};
 use crate::state::{Entry, Kind, Message, PanelData, SharedConfig, State, WorkerState};
 
 /// Check if new multi-file format exists
@@ -54,10 +54,21 @@ pub(crate) struct BootPanels {
     pub panel_count: usize,
 }
 
+/// The focused thread id recorded by the last save, from the threads module's
+/// shared blob in `config.json`.
+///
+/// This is a raw peek rather than a `FocusState` read because boot has not
+/// initialised modules yet — the focus normally lives in the worker file this
+/// pointer selects, so reading it the usual way would be circular.
+fn saved_focus_pointer(shared: &SharedConfig) -> Option<&str> {
+    shared.modules.get("threads")?.get("focus_file")?.as_str()
+}
+
 /// Phase 1: Load config.json and worker state from disk.
 pub(crate) fn boot_load_config() -> BootConfig {
     let shared = config::load_config().unwrap_or_default();
-    let worker = worker::load_worker(DEFAULT_WORKER_ID).unwrap_or_default();
+    let worker_id = worker::focused_worker_id(saved_focus_pointer(&shared), worker::exists);
+    let worker = worker::load_worker(&worker_id).unwrap_or_default();
     BootConfig { shared, worker }
 }
 

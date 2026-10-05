@@ -90,13 +90,24 @@ impl Module for ThreadsModule {
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         let ts = ThreadsState::get(state);
+        // `focus_file` records which thread's `states/<id>.json` holds the
+        // focused context. It cannot live in that file (boot needs it to
+        // choose the file), so it is written here, in the shared config, in the
+        // same save as the keyed write — the two land together or the boot-side
+        // fallback covers the gap.
+        let focus_file = FocusState::get(state).focused_thread_id.clone().unwrap_or_default();
         json!({
             "threads": ts.threads,
             "next_id": ts.next_id,
             "panel_content": ts.panel_content,
+            "focus_file": focus_file,
         })
     }
 
+    // Deliberately ignores `focus_file`: it is a boot-time *pointer* consumed
+    // by `persistence::boot_load_config` before this module is even initialised,
+    // never module state. Rehydrating it into a `FocusState` field would be
+    // circular — the focus it names is what that field holds.
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         let ts = ThreadsState::get_mut(state);
         if let Some(arr) = data.get("threads")

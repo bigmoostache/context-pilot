@@ -22,21 +22,30 @@ type ModuleDataMaps = (HashMap<String, serde_json::Value>, HashMap<String, serde
 /// (`important_panel_uids` by kind, `panel_uid` → local id) worker maps.
 type PanelUidMaps = (HashMap<Kind, String>, HashMap<String, String>);
 
-/// The `states/<id>.json` worker-file id for whichever thread is currently
-/// resident in `state` — the file this save writes.
+/// The `states/<id>.json` file id for whichever thread is currently resident
+/// in `state` — the file this save writes.
 ///
-/// The **focused** thread (and a no-focus agent) keeps the legacy
-/// [`DEFAULT_WORKER_ID`] (`main_worker`) file so boot — which still reads that
-/// file until F1d's per-thread boot lands — stays reload-safe and N=1
-/// byte-identical. A **background** thread (resident only during its
-/// advancement step, so `resident_thread_id != focused_thread_id`) writes its
-/// own `states/<tid>.json`, which is why a background thread's mid-step
-/// `save_state_async` no longer clobbers the focused thread's file.
+/// Both thread kinds write a file named after their own thread id:
+/// - a **background** thread (resident only during its advancement step, so
+///   `resident_thread_id != focused_thread_id`) writes `states/<tid>.json`,
+///   which is why a background thread's mid-step `save_state_async` cannot
+///   clobber the focused thread's file;
+/// - the **focused** thread writes `states/<tid>.json` too. Keying it by id
+///   rather than by position is what makes focus-switching safe across a
+///   reload: under a fixed `main_worker` name, switching focus and then
+///   reloading loads the *previously* focused thread's context into the newly
+///   focused one.
+///
+/// An **unfocused** agent (boot before any `Read`; focus cleared by
+/// archive/delete) has no thread to name, so it keeps the legacy
+/// [`DEFAULT_WORKER_ID`] file. Boot selects the matching id through
+/// [`worker::focused_worker_id`], which mirrors this rule and adds a one-shot
+/// fallback to the legacy name for installs saved before pointers existed.
 fn resident_worker_id(state: &State) -> String {
     let focused = cp_mod_threads::types::FocusState::get(state).focused_thread_id.clone();
     match state.resident_thread_id.as_ref() {
         Some(tid) if Some(tid) != focused.as_ref() => tid.clone(),
-        _ => DEFAULT_WORKER_ID.to_owned(),
+        _ => focused.unwrap_or_else(|| DEFAULT_WORKER_ID.to_owned()),
     }
 }
 
