@@ -27,6 +27,18 @@ use crate::infra::constants::STATUS_BAR_HEIGHT;
 use crate::state::{Kind, State};
 use crate::ui::perf::PERF;
 
+/// Whether the threads-list surface should be painted this frame: the Threads
+/// view mode is active **and** the human has not drilled into a specific thread.
+///
+/// When drilled (G3), the renderer paints the drilled thread's full panel body
+/// (sidebar + panels) instead of the list — `render_frame` has already swapped
+/// that thread's runtime into `state`, so the normal body renders it
+/// pixel-identically to its own main view.
+fn showing_threads_list(state: &State) -> bool {
+    state.view_mode == cp_base::state::data::config::ViewMode::Threads
+        && cp_mod_threads::types::FocusState::get(state).drilled_thread_id.is_none()
+}
+
 /// Top-level render entry point: draws the entire TUI frame.
 pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     PERF.frame_start();
@@ -61,11 +73,8 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     // In Threads mode the input lives inside the right pane (past the thread
     // list), so offset by THREAD_LIST_WIDTH instead of the sidebar width.
     {
-        let offset = if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
-            threads_view::THREAD_LIST_WIDTH
-        } else {
-            state.view_mode.width()
-        };
+        let offset =
+            if showing_threads_list(state) { threads_view::THREAD_LIST_WIDTH } else { state.view_mode.width() };
         let content_x = area.x.saturating_add(offset);
         let content_width = area.width.saturating_sub(offset);
         let content_height = area.height.saturating_sub(STATUS_BAR_HEIGHT);
@@ -128,8 +137,10 @@ fn render_modal_overlays(frame: &mut Frame<'_>, area: Rect, overlays: &[cp_rende
 /// Render the body area: sidebar (if visible) and main content panel,
 /// or the threads view when `ViewMode::Threads` is active.
 fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &cp_render::frame::Frame) {
-    // Threads mode: completely different layout (no sidebar, no panels)
-    if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
+    // Threads mode: completely different layout (no sidebar, no panels) —
+    // unless the human has drilled into a thread (G3), in which case fall
+    // through to the normal body to paint that thread's full panel view.
+    if showing_threads_list(state) {
         threads_view::render_threads_view(frame, state, area);
         return;
     }

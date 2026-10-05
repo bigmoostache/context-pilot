@@ -161,4 +161,49 @@ impl App {
         });
         let _removed = self.fleet.remove(thread_id);
     }
+
+    /// Render-scoped drill-in: temporarily make the human-drilled thread
+    /// ([`FocusState::drilled_thread_id`](cp_mod_threads::types::FocusState)) resident
+    /// in `state` **only for the duration of one paint**, returning the removed
+    /// registry entry the caller must pass to
+    /// [`restore_drilled_runtime_after_render`](Self::restore_drilled_runtime_after_render)
+    /// right after `terminal.draw` to swap it back.
+    ///
+    /// This is the G3 "pixel-identical panel view" mechanism and the one place
+    /// focus-as-view and execution are deliberately decoupled (Model 2): the
+    /// drilled thread's panels are painted by swapping its parked
+    /// [`ThreadRuntime`](cp_base::state::runtime::bundle::ThreadRuntime) into
+    /// `state`, then restored before the next tick — so `resident_thread_id`,
+    /// `focused_thread_id`, and all scheduling are untouched and a human glance
+    /// never parks a mid-stream thread.
+    ///
+    /// Returns `None` (no swap) when there is no drill-in, when the drilled
+    /// thread **is** the resident (already flat in `state` — painted directly),
+    /// or when it has no registry entry (cold/unknown). At N=1 the field is
+    /// always `None`, so this is a no-op and rendering is byte-identical.
+    pub(super) fn take_drilled_runtime_for_render(
+        &mut self,
+    ) -> Option<(String, cp_fleet::Entry<cp_base::state::runtime::bundle::ThreadRuntime>)> {
+        let drilled = cp_mod_threads::types::FocusState::get(&self.state).drilled_thread_id.clone()?;
+        // Resident (== focused) thread is already flat in `state`; nothing to swap.
+        if self.state.resident_thread_id.as_deref() == Some(drilled.as_str()) {
+            return None;
+        }
+        let mut entry = self.fleet.remove(&drilled)?;
+        entry.runtime.swap_with(&mut self.state); // drilled thread resident for the paint; focused parks into entry
+        Some((drilled, entry))
+    }
+
+    /// Undo [`take_drilled_runtime_for_render`](Self::take_drilled_runtime_for_render):
+    /// swap the focused thread back into `state` and re-park the drilled thread's
+    /// runtime in the registry, leaving `state` + fleet exactly as before the paint.
+    pub(super) fn restore_drilled_runtime_after_render(
+        &mut self,
+        drilled: Option<(String, cp_fleet::Entry<cp_base::state::runtime::bundle::ThreadRuntime>)>,
+    ) {
+        if let Some((id, mut entry)) = drilled {
+            entry.runtime.swap_with(&mut self.state); // restore focused resident; drilled parks back
+            self.fleet.insert(id, entry);
+        }
+    }
 }

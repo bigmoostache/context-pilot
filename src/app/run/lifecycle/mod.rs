@@ -151,10 +151,17 @@ impl App {
         terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
         current_ms: u64,
     ) -> io::Result<()> {
-        let _r = terminal.draw(|frame| {
+        // G3 render-scoped drill-in: if the human has drilled into a non-resident
+        // thread, borrow its parked runtime into `state` just for this paint, then
+        // restore. Execution (resident/focus/scheduling) is untouched — Model 2.
+        // No-op at N=1 (drilled_thread_id is None) → byte-identical render.
+        let drilled = self.take_drilled_runtime_for_render();
+        let draw_result = terminal.draw(|frame| {
             ui::render(frame, &mut self.state);
             self.command_palette.render(frame, &self.state);
-        })?;
+        });
+        self.restore_drilled_runtime_after_render(drilled);
+        let _r = draw_result?;
         self.state.flags.ui.dirty = false;
         self.last_render_ms = current_ms;
         Ok(())

@@ -3634,6 +3634,10 @@
   path: web/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298 inline FileUploadChip + shared QuickLookSheet; T304 draftKey; T331 pendingFiles+onRemoveFile; T334 onShowInFinder; T348 command suggestions; T350 CreateCommandDialog. T367/T471: OS-file drag-drop onto <main> — handleDrop uses extractDroppedFiles (recurses dropped FOLDERS via webkitGetAsEntry, fixing the folder-drop ''CORS status null'' per-file burst) then zipDropped into ONE archive, single onAttach upload; 2px blur while dragging + centered ''Uploading…'' Loader2 overlay (uploading state) while zip+upload runs; onAttach returns Promise so the loader stays up until upload lands. onAttach widened to void|Promise<void>. T414 auto-scroll non-auto only; T416 handleDelete; T417 formatTs; T429 paused. Takes agentId + onAttach.'
   last_edited_ms: 0
+23a9c5c4585cc153:
+  path: src/state/persistence/worker.rs
+  description: 'Worker state persistence (states/ dir): load_worker() path helpers + JSON deserialize'
+  last_edited_ms: 0
 23b18d7ebe3dd413:
   path: src/modules/overview/blocks.rs
   description: 'Overview IR builders. A6: float_math routed (token_bar_semantic mul, usage_pct percent, threshold_pct mul_f32). token_usage/git/context_elements/statistics sections + row helpers.'
@@ -4602,6 +4606,10 @@
   path: .git/index
   description: Git index (binary). Not source.
   last_edited_ms: 0
+2c7f618621755468:
+  path: crates/cp-mod-threads/src/lib.rs
+  description: 'Threads module. is_global=true (ThreadsState shared via module_data). B5: FocusState pinned UI-global via set_ext_global in init/reset/load_worker_data (never swaps — one on-screen selection pointer). 2 tools Send/Read. IdleMyTurnDetector watcher registered in load_module_data.'
+  last_edited_ms: 0
 2c885252ce7527a2:
   path: .github/checks/lint-config.chain
   description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
@@ -5170,6 +5178,10 @@
   path: crates/cp-base/src/state/runtime/mod.rs
   description: 'Runtime State struct (#[non_exhaustive]) + boot builders. B1: module_data split into shared_module_data + thread_module_data (per-thread, swapped) + init_is_global ambient scope; get_ext/ext/set_ext in sibling ext.rs route by scope. Message-ID allocators (global_next_uid stays shared). bundle.rs = ThreadRuntime + swap. cost f64 accumulators.'
   last_edited_ms: 1790856753755
+3249285d78ee4ca4:
+  path: src/app/actions/mod.rs
+  description: Central action dispatch (Elm/Redux). apply_action split handle_input_char/handle_stop_streaming/handle_copy_index_overlay/handle_input_submit_action (A2). CycleViewMode resets scroll. Thread actions in threads.rs.
+  last_edited_ms: 0
 324f721d63abc690:
   path: crates/cp-mod-memory/src/lib.rs
   description: 'Memory module. 2 tools: memory_create/update. Fixed MEMORY panel. Global, not core. 80-token tl_dr cap. Module data: memories + next_id + open_ids. Importance-gradient visualizer (critical→low).'
@@ -5350,6 +5362,10 @@
   path: ui/src/components/shell/TopBar.tsx
   description: 'macOS title bar: app mark, AgentSwitcher (workspace dropdown), 3-tab segmented switcher (Agents/Threads/Cockpit), branch+cost driven by active agent, ThemeToggle.'
   last_edited_ms: 1781514443029
+346b9c55b624d8c6:
+  path: crates/cp-mod-threads/Cargo.toml
+  description: 'Threads module deps: cp-base, cp-render, crossterm, serde, serde_json.'
+  last_edited_ms: 0
 348262f169928c91:
   path: crates/cp-mod-threads/src/tools.rs
   description: Thread tool handlers. execute_send split push_send_message + clamp_bytes/preview_ellipsis helpers (A2). execute_read split collect_thread_summaries/apply_read_focus/force_refresh_threads_panel + build_read_result(ReadResult struct). build_panel_content split write_thread_list/write_message. YAML output, MAX caps. T353 auto-unarchive.
@@ -6922,6 +6938,10 @@
   path: web/src/lib/api/generated/client/client.gen.ts
   description: Client factory (createClient). Configurable fetch-based HTTP client with interceptors (request/response/error), SSE support, response parsing (json/stream/blob/etc), throwOnError support. Singleton configured via setConfig().
   last_edited_ms: 1782425020225
+438af0091e212999:
+  path: crates/cp-mod-threads/src/tools.rs
+  description: Thread tool handlers. execute_send split push_send_message + clamp_bytes/preview_ellipsis helpers (A2). execute_read split collect_thread_summaries/apply_read_focus/force_refresh_threads_panel + build_read_result(ReadResult struct). build_panel_content split write_thread_list/write_message. YAML output, MAX caps. T353 auto-unarchive.
+  last_edited_ms: 0
 4395f4ab2aef9cc0:
   path: web/src/lib/live/index.ts
   description: 'Live data hooks (TanStack Query + SSE). useAgentMeta/useThreads/useConversation/useStreamingTokens/useLibrary/useFleet/useFleetMetrics/useMetrics + useSseConnected (reactive SSE connection state per agent). ensureSync SSE watcher. sendCommand→REST. web-lint P7: useLive+LiveQueryResult extracted to ./core (re-exported here) so ./mutations imports them from the leaf, breaking the index↔mutations barrel cycle.'
@@ -9214,6 +9234,10 @@
   path: tmp/doc/style/print.css
   description: 'Native @page for real printing: A4, running page number in @bottom-center, chapter break-before, no orphaned headings, figures unsplit.'
   last_edited_ms: 1785772712455
+59cd35af51554573:
+  path: src/ui/mod.rs
+  description: 'Top-level render(). A9: Overlay find_map via cp_base::deref_match! enumerating 6 variants + | _ (non_exhaustive foreign enum needs wildcard). IR frame build -> sidebar+content+status+overlays.'
+  last_edited_ms: 0
 59d3e785e616dcf1:
   path: web/src/lib/mock/index.ts
   description: 'Mock-data barrel: PROJECT/tokenBudget/panels/cacheStats/messages/threads/spine/stats/status/agents/library. Re-exports ./extra + ./fileTree. web-lint P2: fileTree literal moved to ./fileTree.ts + FsNode import dropped to stay ≤500 after Prettier reflow. Design-only fallback data approximating a live Context Pilot session.'
@@ -10130,6 +10154,10 @@
   path: crates/cp-mod-search/src/meili/overlay.rs
   description: Ctrl+I overlay data provider. Live Meili stats + process CPU%/RAM (read_process_stats platform-specific; macos parse_ps_cputime split parse_ps_seconds). parse_stats_json into ParsedStats. compute_cpu_pct from tick deltas. 2s cache.
   last_edited_ms: 1784487041203
+635492bd44fe672d:
+  path: src/ui/threads_view/mod.rs
+  description: 'G2 RENDER TARGET. G1 updated both help-hint branches (active AND archived) to Up/Dn select + Left back. G2b adds per-row exec state + attention markers here: push_thread_entry currently shows only [FOCUSED]/[MY_TURN]/[THEIR_TURN] from thread status via thread_status_style — it must read the exec-state mirror instead (exec_state is a registry fact, thread.status is only a turn flag).'
+  last_edited_ms: 0
 6357f2dcd560cc10:
   path: crates/cp-mod-search/src/types.rs
   description: Core types + config constants. SearchPersistData (recompute tracking + task_signals ring), SearchState (SharedRadarCache Arc<Mutex> + T295 watchdog:Option<WatchdogHandle> — dropped on reload to stop the old meili supervisor), Chunk, SearchResult, SearchMetrics, SearchOverlayInfo (meili_cpu_pct/memory_bytes), MeiliLiveStats, IndexerCmd, WatcherHandle(RecommendedWatcher). logs_index_settings.
@@ -11138,6 +11166,10 @@
   path: ui/src/components/agents/PromptModal.tsx
   description: 'Prompts page modals (design-only). PromptModal: LARGE dialog (1180x90vh, max 96vw) — create (kind picker System/Skill/Command + name/description) or view/edit (prefilled, built-in name lock, Delete). Body uses the WYSIWYG MarkdownEditor (flex-grows to fill height), not a textarea; editor remounts on isNew/item.id (NOT kind) so the kind toggle no longer wipes the body. ImportModal: import from other agentic systems (Claude Code/Codex/Cursor/Windsurf/Aider/Continue), per-row Imported state. Shared hand-rolled Backdrop (backdrop-fade+modal-pop) + Field. Used by PromptsPage.'
   last_edited_ms: 1781534862032
+6d05118cc2aafaf0:
+  path: src/app/actions/threads.rs
+  description: Thread action handlers. Archive = SOFT-DELETE (archived=true) not remove; restore clears flag. archive_confirm is view-aware (archive in active view, restore in archived view). toggle_archived_view flips FocusState.viewing_archived. Select/archive_start resolve selection through visible_indices. Question form dispatch. Secondary action variants removed from exhaustive match.
+  last_edited_ms: 0
 6d072a9fe2323359:
   path: .git/index
   description: Git index (binary). Not source.
@@ -11602,6 +11634,10 @@
   path: crates/cp-orchestrator/src/transport/stream/upgrade.rs
   description: 'SSE upgrade landing pad (GET /api/stream): ticket redeem + per-agent ACL (admin bypass) + resolve oplog dir, spawn run_stream via StreamCtx. orch-clippy: CLEAN (972c28c2: shadow ticket->redeemed, ref pattern dropped, is_none_or).'
   last_edited_ms: 1787890420643
+71baa118fb871ab6:
+  path: src/app/run/threads/commands/mod.rs
+  description: Bridge command application (K7). apply_command dispatches Send/Create/Branch/Archive/etc. apply_send_message returns bool; route_on_user_message routes on_user_message per-thread via deliver_to_thread + clear_errored_entry (F4a re-engage).
+  last_edited_ms: 0
 71c22c2e75d783c3:
   path: web/src/mobile-components/auth/DayZeroSetup.tsx
   description: Mobile day-0 provisioning twin. 2-phase wizard (identity/trust), 16px Field inputs, py-3 buttons. Same POST /api/it/identity + CA fingerprint poll logic.
@@ -11673,6 +11709,10 @@
 722346cf1ec44556:
   path: Cargo.toml
   description: Workspace root. 26 crate members (incl cp-vault). Binary 'tui'. Edition 2024. Strict lint config (980 forbid, 21 deny). openssl vendored.
+  last_edited_ms: 0
+72255c670f429542:
+  path: src/app/run/lifecycle/mod.rs
+  description: 'Run loop. G2b write-side call site: run_background_phase already calls reconcile_fleet_registry + dispatch_background_my_turn + advance_background_threads each tick — that is where the display-only exec-state mirror gets published. Order matters: publish after reconcile so the map reflects this tick''s derivation.'
   last_edited_ms: 0
 72288e6844c21262:
   path: crates/cp-mod-search/src/meili/watchdog.rs
@@ -15090,6 +15130,10 @@
   path: src/modules/overview/context.rs
   description: 'Canonical context-occupancy helpers + LLM context text. A6: usage_pct via float_math::percent. context_usage/context_hit_miss single source (T297). generate_context_content.'
   last_edited_ms: 1784534667711
+92dda11ee95653f5:
+  path: src/app/run/lifecycle/fleet.rs
+  description: 'Background-thread advancement (Phase C): reconcile_fleet_registry (roster mirror), load_background_threads (boot), derive_exec_state, advance_background_threads (swap-in/step/swap-out), step_one_thread, dispatch_background_my_turn (per-thread nudge), deliver_to_thread (D1 delivery seam). Persist/teardown methods live in sibling fleet_lifecycle.rs. N=1 no-op.'
+  last_edited_ms: 0
 92e05b2a2fa1ee6c:
   path: web/src/components/threads/fileUpload/index.tsx
   description: 'File-upload COMPONENTS: MessageFileChip (existence-check via useFs), FileUploadChip (present/static/missing), ComposerBubbles (staged files + /command row). P8: extracted ShowInFinderButton + FileChipBody subcomponents (the Show-in-Finder button was duplicated across the static/interactive tails, each copy costing complexity branches) to bring FileUploadChip under the cx15 budget. Types from ./helpers.'
@@ -15238,6 +15282,10 @@
   path: crates/cp-mod-firecrawl/src/types.rs
   description: Firecrawl response types. ScrapeResponse/Data/Metadata, SearchResponse/SearchResult (polymorphic data field), MapResponse/MapLink, CrawlStartResponse/CrawlStatusResponse/CrawlPageData. All Serialize+Deserialize.
   last_edited_ms: 1780560886871
+94719424c517dc59:
+  path: src/state/persistence/mod.rs
+  description: Phased boot loading (5 phases). BootConfig/BootPanels, boot_load_config/panels/messages/assemble_state, legacy load_state. Fresh-start path sets_init_scope(module.is_global) around init_state. Phase F will extend to N× states/<thread>.json.
+  last_edited_ms: 0
 947529e13f2e851e:
   path: crates/cp-oplog/tests/crash_replay.rs
   description: 'Phase 9 (X776) MILESTONE M0 crash-replay harness. Unix-only (#![cfg(unix)]). Self-re-exec pattern: env-gated #[test] crash_child_entrypoint re-runs the test binary as a child via current_exe(); parent/child handshake through a fdatasync''d marker file (libtest stdout is noisy). V1 v1_real_sigkill_leaves_a_clean_replayable_oplog: child spams durable MessageCreated appends, parent kill()s (real SIGKILL), fresh process replay() never errors + every announced-durable rev survives + torn tail truncated (announce-after-durable K9 across real crash). V2 v2_journalled_command_is_exactly_once_after_deadman_reexec: child journals CommandEffect then dies, fresh process recovers seen-set token, duplicate SeenMark delivery folds to no-op (exactly-once across process boundary). V12 v12_barrier_is_pending_the_body_store: asserts body_gc_eligible rule, explicit placeholder until body store lands Phase 14. 4 tests green.'
@@ -15661,6 +15709,10 @@
 986ac6fee44ab1e6:
   path: crates/cp-orchestrator/tests/openapi/paths.rs
   description: OpenAPI path definitions — all REST endpoints grouped by tag (fleet, agent, fs, auth, env, ACL, providers, releases, settings, vault/snapshot, claude-usage+login+refresh). Includes deploy + restart-orchestrator paths.
+  last_edited_ms: 0
+986f6f3e38dbc9ad:
+  path: Cargo.lock
+  description: Workspace lockfile
   last_edited_ms: 0
 9870b28e62058fc7:
   path: crates/cp-base/src/tools/mod.rs
@@ -17694,6 +17746,10 @@ ad227afdb78366f4:
   path: crates/cp-mod-files/src/tools/write.rs
   description: file_write tool. flame!("file_write"). Creates parent dirs, writes content, updates/creates context Entry. Diff-style preview in result (first 20 lines).
   last_edited_ms: 0
+ad2d031d46d6c749:
+  path: src/state/persistence/save.rs
+  description: Save ops. build_save_batch split build_module_data_maps/panel_message_uids/build_panel_write_ops/build_history_message_ops/collect_orphan_deletes/build_panel_uid_maps + ModuleDataMaps/PanelUidMaps type aliases (A2). save_state sync persist, check_ownership, log_error.
+  last_edited_ms: 0
 ad2e04f6dd571a0f:
   path: src/ui/help/config_overlay/builder.rs
   description: Config overlay IR builder — assembles ConfigOverlay from State. ModelEntryFn type alias. Providers, models (per-provider match arms), budget bars (context/clean/target/cost), toggles (auto-continue/reverie/think).
@@ -18161,6 +18217,10 @@ b14fb334d966735f:
 b15866f47195fe82:
   path: .github/checks/allowed-lint-exceptions.yaml
   description: 'Curated #[expect]/#[allow] registry (45 entries verified). Every suppression in code MUST have a matching entry or structure-check errors. Covers deref_match! chokepoints, flat initializers/dispatch, cast/float_math, exhaustive wire enums/structs, multiple-impl splits, openapi flat literals.'
+  last_edited_ms: 0
+b15c2241b238be3e:
+  path: .context-pilot/shared/memories.yaml
+  description: Memory slots store (M-safe/tiny/short/mid/long, 220 fixed). Local-only, synced with commits. Mirrors the Memories panel (P6).
   last_edited_ms: 0
 b15c976b1b6f7804:
   path: src/llms/claude_code/debug.rs
@@ -19862,6 +19922,10 @@ c15a0ff49eae9097:
   path: web/src/main.tsx
   description: React entry point. createRoot → StrictMode → QueryClientProvider (TanStack, the single shared queryClient from lib/queryClient) wrapping <App/>. The mount point that activates the TanStack Query cache + SSE push-plane for the whole live app.
   last_edited_ms: 1781872625150
+c161adcd726c977d:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 c16480ad12de8da5:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
@@ -22394,6 +22458,10 @@ dc0886a13ca5908c:
   path: src/ui/helpers.rs
   description: 'Shared UI helpers: truncate_string, format_number, format_time_ago, wrap_text, count_wrapped_lines. Braille spinner (wall-clock-time-based, 10fps). IR-aware syntax highlighting (syntect, LRU cache, do_highlight_ir). TypewriterBuffer for streaming animation.'
   last_edited_ms: 0
+dc0df8134b8a9daa:
+  path: src/app/run/lifecycle/fleet_lifecycle.rs
+  description: 'Fleet lifecycle I/O (Phase F), split from fleet.rs for the 500-line cap: prune_orphaned_console_sessions (F6 union orphan-kill over all threads'' console keys), save_all_threads (F1 N-thread persist, resident first), clear_errored_entry (F4 re-engage), teardown_thread (F5 hard-delete). N=1 byte-identical.'
+  last_edited_ms: 0
 dc10ebfd496e013e:
   path: crates/cp-console-server/Cargo.toml
   description: 'Console server deps: serde, serde_json, nix (process), signal-hook, rlimit.'
@@ -22514,6 +22582,10 @@ dd6672e158c61b3f:
   path: src/modules/overview/blocks.rs
   description: 'Overview IR builders: token_usage (token_bar_semantic helper), git (git_file_row/git_total_row/net_semantic/net_str helpers), context_elements (panel_hit_cell/panel_refreshed_str/panel_row_cells/non_panel_row helpers), statistics (A2).'
   last_edited_ms: 1784493504198
+dd757cc82d741e45:
+  path: yamls/tools/threads.yaml
+  description: 'Threads tools YAML. 2 tools: Send (thread_id, markdown, file_path, questions), Read (thread_id, count).'
+  last_edited_ms: 0
 dd8e1580cbf8bb59:
   path: web/src/lib/types.ts
   description: 'Domain types barrel. Re-exports backend types from generated/types.gen. web-lint P1: ThreadQuestion ADDED to the `import type` block (was only re-exported, causing TS2304 when used in ThreadMsg redecl); ThreadMsg = Omit<GenThreadMsg,''ts''|''questions''> & { ts?, streaming?, questions?: ThreadQuestion[]|undefined }. Optional props widened to `| undefined` throughout for exactOptionalPropertyTypes. T760: ViewMode is now "fleet" | "threads" | "finder" | "costs" — "settings" removed (agent settings is a dialog, not a routed view).'
@@ -24382,6 +24454,10 @@ f07180e69f10e6ed:
   path: crates/cp-mod-scratchpad/src/tools.rs
   description: 'Scratchpad tools with flame!("scratch_create"), flame!("scratch_edit"), flame!("scratch_wipe"). Cell CRUD. Wipe: empty array = all, otherwise by ID.'
   last_edited_ms: 0
+f0755f7d5c0cf1fd:
+  path: src/app/events/mod.rs
+  description: 'G1 SHIPPED (c8af3806): Ctrl+V dropped as an explicit no-op arm (NOT deleted — conversation panel maps every Char to InputChar, so fallthrough types a literal ''v''); Up/Down = ThreadSelectPrev/Next; BackTab+Up merged into one or-pattern (clippy::match_same_arms); Shift+Up/Down routed through scroll_key_action so the amount stays SCROLL_ARROW_AMOUNT (3.0); Left/Esc merged = CycleViewMode. Right (drill-in) deliberately unbound — G3''s semantics, would open the FOCUSED thread not the SELECTED one.'
+  last_edited_ms: 0
 f07e333acc36e369:
   path: .github/checks/lint-config.chain
   description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
@@ -25013,6 +25089,10 @@ f63a665e8ca4aac5:
 f63ca4afe5030291:
   path: web/src/components/conversation/Conversation.tsx
   description: 'Cockpit conversation surface — LIVE (§7). useConversation(agentId) for the durable record + useStreamingTokens(agentId) for the ephemeral stream plane, overlaid: buildMessages maps durable msgs→ChatMessage (text user/assistant; tool_call→tool card from tool_uses[0]; tool_result folded/skipped) then shows the longer of (live buffer, durable text) + blinking cursor while the live buffer leads, and synthesises a trailing assistant bubble for a streaming turn not yet flushed. Reconciles (live stops leading) once durable text catches up. Accepts agentId prop.'
+  last_edited_ms: 0
+f63d55766f6de1cf:
+  path: crates/cp-base/src/state/actions.rs
+  description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay (primary only, secondary removed), NewContext, UI actions. ActionResult enum.'
   last_edited_ms: 0
 f63e7cb1e254aa21:
   path: crates/cp-mod-search/src/tools.rs
@@ -25722,6 +25802,10 @@ fc62d75ef1e8e369:
   path: web/src/components/shell/config/ConfigPanel.tsx
   description: 'Settings surface shell — macOS System-Settings layout: category rail + detail pane. variant ''dialog'' (TopBar gear, DialogClose chrome) | ''inline'' (fleet Settings page). Owns rail + chrome only; panes + building blocks live in ./ConfigPanes (<500 split).'
   last_edited_ms: 1782041038969
+fc6b88e290c8c21d:
+  path: crates/cp-mod-threads/src/types.rs
+  description: 'Thread types: ThreadStatus + ThreadAuthor enums #[non_exhaustive] (boss-hunt r9 kills — downstream matches in threads_view + app/run/threads rewritten to matches!(x,Variant), const-fn-safe). ThreadMessage, Thread, ThreadsState, FocusState.'
+  last_edited_ms: 0
 fc6dc43efb870a72:
   path: openapi.json
   description: Generated OpenAPI 3.0.3 spec (70KB). Source of truth for TypeScript client codegen. Regenerated from Rust types via tests/openapi.rs.

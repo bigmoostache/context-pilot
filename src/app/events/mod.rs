@@ -192,11 +192,33 @@ fn handle_index_overlay_key(key: &KeyEvent, state: &State) -> Option<Action> {
     Some(if key.code == KeyCode::Esc { Action::ToggleIndexOverlay } else { Action::None })
 }
 
+/// Threads-nav while the human has drilled into a thread's panel view (G3):
+/// only Left/Esc exits back to the list; every other key is swallowed
+/// (`Action::None`) so a glance stays read-only. Events run against the focused
+/// resident (the drill-in swap is render-scoped only), so letting keys through
+/// would scroll/mutate the *focused* thread while the screen shows the drilled
+/// one — Model 2 forbids a glance disturbing the agent's thread. Written as an
+/// `if`/`else` on `matches!` rather than a `match` with a `_` arm to avoid the
+/// forbidden `wildcard_enum_match_arm`.
+const fn drilled_threads_nav(key: &KeyEvent) -> Dispatch {
+    if matches!(key.code, KeyCode::Left | KeyCode::Esc) {
+        Dispatch::Act(Action::ThreadDrillOut)
+    } else {
+        Dispatch::Act(Action::None)
+    }
+}
+
 /// Threads-view navigation (non-Ctrl): archive-confirm y/n, Tab/BackTab select,
 /// Esc exit. `Fallthrough` when the key isn't a threads-nav key.
 fn handle_threads_nav(key: &KeyEvent, state: &State) -> Dispatch {
     let shift = key.modifiers.contains(KeyModifiers::SHIFT);
-    let confirming = cp_mod_threads::types::FocusState::get(state).confirming_archive;
+    let focus = cp_mod_threads::types::FocusState::get(state);
+    let confirming = focus.confirming_archive;
+
+    if focus.drilled_thread_id.is_some() {
+        return drilled_threads_nav(key);
+    }
+
     match key.code {
         KeyCode::Char('y') if confirming => Dispatch::Act(Action::ThreadArchiveConfirm),
         _ if confirming => Dispatch::Act(Action::ThreadArchiveCancel),
@@ -211,9 +233,11 @@ fn handle_threads_nav(key: &KeyEvent, state: &State) -> Dispatch {
         // pre-existing secondary gesture for the same move, so neither is
         // load-bearing on its own.
         KeyCode::Left | KeyCode::Esc => Dispatch::Act(Action::CycleViewMode),
+        // Right drills into the selected thread's full panel view (G3). The
+        // handler no-ops on the virtual "+ New Thread" entry / empty selection.
+        KeyCode::Right => Dispatch::Act(Action::ThreadDrillIn),
         KeyCode::Backspace
         | KeyCode::Enter
-        | KeyCode::Right
         | KeyCode::Home
         | KeyCode::End
         | KeyCode::PageUp

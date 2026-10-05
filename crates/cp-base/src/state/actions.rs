@@ -168,6 +168,14 @@ pub enum Action {
     /// Toggle between the active and archived thread lists in the
     /// thread-centered view (Ctrl+U). Resets selection to the top.
     ThreadToggleArchivedView,
+    /// Drill into the selected thread's full panel view (G3, read-only
+    /// inspection — Right arrow). Sets `FocusState::drilled_thread_id`; the
+    /// renderer swaps that thread's parked runtime in for the paint without
+    /// moving execution (Model 2).
+    ThreadDrillIn,
+    /// Exit the drilled panel view back to the thread list (G3 — Left/Esc).
+    /// Clears `FocusState::drilled_thread_id`.
+    ThreadDrillOut,
     /// Open the Ctrl+P command palette.
     OpenCommandPalette,
     /// Reset the session cost counters to zero.

@@ -293,6 +293,14 @@ impl ThreadsState {
 pub struct FocusState {
     /// Which thread the AI is currently focused on (None = unfocused).
     pub focused_thread_id: Option<String>,
+    /// Which thread the human has *drilled into* in the TUI (`None` = showing the
+    /// thread list). Pure view state (G3): it selects whose full panel view is
+    /// painted, and never moves execution — the renderer swaps the drilled
+    /// thread's parked runtime in only for the duration of one paint, then
+    /// restores the resident (Model 2: a human glance must not disturb the
+    /// agent's work). Defaults to `None` (back-compat; byte-identical until set).
+    #[serde(default)]
+    pub drilled_thread_id: Option<String>,
     /// Index of the currently selected thread in the TUI threads view.
     /// Used for navigation (Tab/Shift+Tab) and message area display.
     #[serde(default)]
@@ -331,6 +339,7 @@ impl FocusState {
     pub const fn new() -> Self {
         Self {
             focused_thread_id: None,
+            drilled_thread_id: None,
             selected_thread_idx: 0,
             creating_thread: false,
             confirming_archive: false,

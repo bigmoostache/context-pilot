@@ -425,6 +425,8 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         | Action::ThreadArchiveStart
         | Action::ThreadArchiveConfirm
         | Action::ThreadArchiveCancel
+        | Action::ThreadDrillIn
+        | Action::ThreadDrillOut
         | Action::ThreadToggleArchivedView => return threads::dispatch(state, &action),
     }
     ActionResult::Nothing

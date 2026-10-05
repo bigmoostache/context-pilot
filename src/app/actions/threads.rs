@@ -18,6 +18,9 @@ pub(super) fn dispatch(state: &mut State, action: &Action) -> ActionResult {
     if let Some(result) = dispatch_selection(state, action) {
         return result;
     }
+    if let Some(result) = dispatch_drill(state, action) {
+        return result;
+    }
     dispatch_archive(state, action)
 }
 
@@ -36,6 +39,18 @@ fn dispatch_selection(state: &mut State, action: &Action) -> Option<ActionResult
     }
     if matches!(action, Action::ThreadCreateCancel) {
         return Some(create_cancel(state));
+    }
+    None
+}
+
+/// Handle the drill-in/out `Thread*` variants (G3). Split from
+/// [`dispatch_selection`] to keep each helper under the cognitive-complexity cap.
+fn dispatch_drill(state: &mut State, action: &Action) -> Option<ActionResult> {
+    if matches!(action, Action::ThreadDrillIn) {
+        return Some(drill_in(state));
+    }
+    if matches!(action, Action::ThreadDrillOut) {
+        return Some(drill_out(state));
     }
     None
 }
@@ -118,6 +133,40 @@ fn create_cancel(state: &mut State) -> ActionResult {
     state.input.clear();
     state.input_cursor = 0;
     state.input_selection_anchor = None;
+    state.flags.ui.dirty = true;
+    ActionResult::Nothing
+}
+
+/// Drill into the selected thread's full panel view (G3 — Right arrow).
+///
+/// Resolves the visible selection to a real thread and sets
+/// [`FocusState::drilled_thread_id`], which the renderer uses to swap that
+/// thread's parked runtime in for the paint (read-only inspection; execution is
+/// untouched — Model 2). No-op on the virtual "+ New Thread" entry or an empty
+/// selection (the position does not map to a real thread).
+fn drill_in(state: &mut State) -> ActionResult {
+    let focus = FocusState::get(state);
+    let viewing_archived = focus.viewing_archived;
+    let pos = focus.selected_thread_idx;
+    let visible = ThreadsState::get(state).visible_indices(viewing_archived);
+    let Some(&real_idx) = visible.get(pos) else {
+        return ActionResult::Nothing; // virtual "+ New Thread" or empty selection
+    };
+    let Some(id) = ThreadsState::get(state).threads.get(real_idx).map(|t| t.id.clone()) else {
+        return ActionResult::Nothing;
+    };
+    FocusState::get_mut(state).drilled_thread_id = Some(id);
+    state.scroll_offset = 0.0;
+    state.flags.stream.user_scrolled = false;
+    state.flags.ui.dirty = true;
+    ActionResult::Nothing
+}
+
+/// Exit the drilled panel view back to the thread list (G3 — Left/Esc).
+fn drill_out(state: &mut State) -> ActionResult {
+    FocusState::get_mut(state).drilled_thread_id = None;
+    state.scroll_offset = 0.0;
+    state.flags.stream.user_scrolled = false;
     state.flags.ui.dirty = true;
     ActionResult::Nothing
 }
