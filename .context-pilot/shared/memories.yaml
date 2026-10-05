@@ -459,9 +459,9 @@ M-short-32:
 M-short-33:
   tier: short
   title: MT phase progress
-  contents: 'MT (T774) branch multi-thread-core-loop: A-F done, G1 done (c8af3806), G2a in flight. LEFT: G2b render exec states+badges, G3 drill-in (X731 first), G4 create-thread, H guardrails. Deferred X706/X707.'
+  contents: 'MT (T774) branch multi-thread-core-loop: A-F done, G1 done, G2a (03524e52), G2b (4688f633), X731 focused-file-keyed-by-id + one-shot boot fallback (9f2db91d). LEFT in G: G3 drill-in proper, G4 create-thread, G5. Then H guardrails. Deferred X706/X707.'
   importance: high
-  last_edited_ms: 1791192135949
+  last_edited_ms: 1791194192574
 M-short-34:
   tier: short
   title: check-rust-tests.sh now
