@@ -76,6 +76,12 @@ impl App {
         if let Some(have_id) = have {
             let mut parked = cp_base::state::runtime::bundle::ThreadRuntime::new();
             parked.swap_with(&mut self.state); // `parked` now holds `have`'s context; state emptied
+            // Park the resident's per-stream runtime alongside its bundle, so its
+            // in-flight typewriter/pending-tools travel with it rather than
+            // leaking into the newly-focused thread.
+            let mut sr = super::stream_runtime::StreamRuntime::new();
+            sr.swap_with_app(self); // `sr` now holds `have`'s per-stream runtime; App reset to empty
+            let _prev = self.parked_stream_runtimes.insert(have_id.clone(), sr);
             // Preserve an existing entry's role if one somehow exists; otherwise a
             // plain Thread entry. exec_state is re-derived by reconcile this tick.
             let role = self.fleet.get(&have_id).map_or(Role::Thread, |e| e.role);
@@ -85,11 +91,16 @@ impl App {
         // Swap the newly-focused thread's parked bundle into `state`. A cold or
         // unknown thread has no entry → state keeps the fresh empty runtime, which
         // is the correct blank view for a brand-new thread.
-        if let Some(want_id) = want.as_ref()
-            && let Some(mut entry) = self.fleet.remove(want_id)
-        {
-            entry.runtime.swap_with(&mut self.state); // state now holds `want`'s context
-            // `entry.runtime` now holds the empty leftover — dropped with `entry`.
+        if let Some(want_id) = want.as_ref() {
+            if let Some(mut entry) = self.fleet.remove(want_id) {
+                entry.runtime.swap_with(&mut self.state); // state now holds `want`'s context
+                // `entry.runtime` now holds the empty leftover — dropped with `entry`.
+            }
+            // Load the newly-focused thread's parked per-stream runtime into App
+            // (a cold thread has none → App stays at the empty default).
+            if let Some(mut sr) = self.parked_stream_runtimes.remove(want_id) {
+                sr.swap_with_app(self); // App now holds `want`'s per-stream runtime; leftover dropped
+            }
         }
 
         self.state.resident_thread_id = want;
@@ -268,8 +279,17 @@ impl App {
             self.stepping_thread = Some(id.clone());
             entry.runtime.swap_with(&mut self.state); // thread `id` resident; focused parks into entry
             self.state.resident_thread_id = Some(id.clone());
+            // Swap this thread's per-stream runtime (typewriter, pending tools/
+            // done, console-wait + blocking accumulators, deferred-sleep flags)
+            // into `App` so the shared advancement core drains ITS buffers, not
+            // the focused thread's — without this, the focused thread's residual
+            // typewriter chars / pending tools bleed into this thread (N>1 bug).
+            let mut sr = self.parked_stream_runtimes.remove(&id).unwrap_or_default();
+            sr.swap_with_app(self);
             self.step_one_thread();
             entry.exec_state = self.post_step_exec_state(&id); // from this thread's new stream phase
+            sr.swap_with_app(self); // restore focused thread's per-stream runtime
+            let _prev = self.parked_stream_runtimes.insert(id.clone(), sr);
             entry.runtime.swap_with(&mut self.state); // restore focused; thread `id` parks back
             self.stepping_thread = None;
             self.state.resident_thread_id.clone_from(&focused);

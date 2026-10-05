@@ -24,6 +24,10 @@ mod fleet;
 /// Fleet lifecycle I/O (Phase F): console orphan-prune, N-thread save, hard-delete
 /// teardown, Errored re-engage. Split from `fleet` for the 500-line cap.
 mod fleet_lifecycle;
+/// Per-thread stream runtime (typewriter/pending-tools/pending-done/…): the
+/// per-stream analogue of `ThreadRuntime`, swapped around each background step
+/// so one thread's in-flight stream never bleeds into another's (N>1 fix).
+pub(crate) mod stream_runtime;
 use cp_mod_spine::engine::{SpineDecision, apply_continuation, check_spine};
 use cp_mod_spine::types::{NotificationType, SpineState};
 

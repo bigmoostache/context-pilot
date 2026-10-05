@@ -47,6 +47,7 @@ impl App {
             thread_streams: std::collections::HashMap::new(),
             fleet: cp_fleet::FleetRegistry::new(),
             stepping_thread: None,
+            parked_stream_runtimes: std::collections::HashMap::new(),
         }
     }
 

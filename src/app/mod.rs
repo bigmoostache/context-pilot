@@ -133,6 +133,15 @@ pub(crate) struct App {
     /// the resident thread, so during a background step they target that
     /// thread's channel rather than the focused thread's.
     pub stepping_thread: Option<String>,
+    /// Per-thread parked stream runtimes (typewriter, pending tools/done,
+    /// console-wait + blocking-watcher accumulators, deferred-sleep flags) for
+    /// every non-resident thread. The resident (focused) thread's stream
+    /// runtime lives flat in the `App` fields above; a background thread's is
+    /// swapped in (via [`StreamRuntime::swap_with_app`](crate::app::run::lifecycle::stream_runtime::StreamRuntime::swap_with_app))
+    /// only for the duration of its advancement step, then parked back here —
+    /// so one thread's in-flight stream can never bleed into another's. Empty
+    /// at N=1.
+    pub parked_stream_runtimes: std::collections::HashMap<String, run::lifecycle::stream_runtime::StreamRuntime>,
 }
 
 // App impl block is in run/input.rs (primary), with additional methods spread
