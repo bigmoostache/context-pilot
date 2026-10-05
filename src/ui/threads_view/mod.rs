@@ -176,18 +176,24 @@ fn push_help_hint(blocks: &mut Vec<IrBlock>, viewing_archived: bool, confirming:
         ]));
     } else if viewing_archived {
         blocks.push(IrBlock::Line(vec![
+            S::styled("Up/Dn".to_owned(), Semantic::KeyHint),
+            S::muted(" select  ".to_owned()),
             S::styled(" Ctrl+A".to_owned(), Semantic::KeyHint),
             S::muted(" restore  ".to_owned()),
             S::styled("Ctrl+U".to_owned(), Semantic::KeyHint),
-            S::muted(" active".to_owned()),
+            S::muted(" active  ".to_owned()),
+            S::styled("Left".to_owned(), Semantic::KeyHint),
+            S::muted(" back".to_owned()),
         ]));
     } else {
         blocks.push(IrBlock::Line(vec![
-            S::styled(" Ctrl+A".to_owned(), Semantic::KeyHint),
+            S::styled("Up/Dn".to_owned(), Semantic::KeyHint),
+            S::muted(" select  ".to_owned()),
+            S::styled("Ctrl+A".to_owned(), Semantic::KeyHint),
             S::muted(" arch  ".to_owned()),
             S::styled("Ctrl+U".to_owned(), Semantic::KeyHint),
             S::muted(" arch'd  ".to_owned()),
-            S::styled("Ctrl+V".to_owned(), Semantic::KeyHint),
+            S::styled("Left".to_owned(), Semantic::KeyHint),
             S::muted(" back".to_owned()),
         ]));
     }

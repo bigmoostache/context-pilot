@@ -100,7 +100,11 @@ fn handle_ctrl_shortcuts(key: &KeyEvent, state: &State) -> Dispatch {
         KeyCode::Char('n') => Dispatch::Act(Action::NewContext),
         KeyCode::Char('h') => Dispatch::Act(Action::ToggleConfigView),
         KeyCode::Char('i') => Dispatch::Act(Action::ToggleIndexOverlay),
-        KeyCode::Char('v') => Dispatch::Act(Action::CycleViewMode),
+        // Ctrl+V is no longer a view switch (design 9.1: arrows navigate instead).
+        // The arm stays an explicit no-op rather than being deleted: the conversation
+        // panel maps *every* `Char` to `InputChar`, so falling through would type a
+        // literal `v` into the composer.
+        KeyCode::Char('v') => Dispatch::Act(Action::None),
         KeyCode::Char('o') => Dispatch::Act(Action::ResetSessionCosts),
         KeyCode::Char('p') => Dispatch::Act(Action::OpenCommandPalette),
         KeyCode::Char('u') => Dispatch::Act(Action::HistoryPrev),
@@ -197,14 +201,19 @@ fn handle_threads_nav(key: &KeyEvent, state: &State) -> Dispatch {
         KeyCode::Char('y') if confirming => Dispatch::Act(Action::ThreadArchiveConfirm),
         _ if confirming => Dispatch::Act(Action::ThreadArchiveCancel),
         KeyCode::Tab if !shift => Dispatch::Act(Action::ThreadSelectNext),
-        KeyCode::BackTab => Dispatch::Act(Action::ThreadSelectPrev),
-        KeyCode::Esc => Dispatch::Act(Action::CycleViewMode),
+        // Design 9.1: Up/Down move the selection within the list. The threads
+        // view IS the list surface, so selection wins over the message pane's
+        // scroll; Shift+Up/Down and PageUp/PageDown still scroll that pane.
+        KeyCode::Up | KeyCode::Down if shift => Dispatch::Act(scroll_key_action(key).unwrap_or(Action::None)),
+        KeyCode::BackTab | KeyCode::Up => Dispatch::Act(Action::ThreadSelectPrev),
+        KeyCode::Down => Dispatch::Act(Action::ThreadSelectNext),
+        // Design 9.1: Left navigates *out* to the panel view; Esc is the
+        // pre-existing secondary gesture for the same move, so neither is
+        // load-bearing on its own.
+        KeyCode::Left | KeyCode::Esc => Dispatch::Act(Action::CycleViewMode),
         KeyCode::Backspace
         | KeyCode::Enter
-        | KeyCode::Left
         | KeyCode::Right
-        | KeyCode::Up
-        | KeyCode::Down
         | KeyCode::Home
         | KeyCode::End
         | KeyCode::PageUp
