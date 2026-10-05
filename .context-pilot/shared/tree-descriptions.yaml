@@ -4238,6 +4238,10 @@
   path: web/src/components/threads/ThreadList.tsx
   description: 'Left rail of threads view — ALWAYS OPEN. Working search filters by name+last-preview. Groups: Needs you/Active/Working in parallel. Per-row hover Archive/Restore. Footer Archived toggle. New Thread button.'
   last_edited_ms: 0
+28d0bce4ed6cc4a9:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 28d8eb4c9cb4a4a8:
   path: crates/cp-orchestrator/src/services/retire.rs
   description: 'Orchestrator-owned RetiredStore (T271): stop-and-keep agents. RetiredRecord{id,name,folder,model,provider,retired_at_ms} persisted to <agents_dir>/retired.json (atomic tmp->rename). load/is_retired/is_folder_retired/list(most-recent-first)/retire/unretire. Separate from registry Entry because the agent removes its own <id>.json on clean shutdown — this store survives the agent''s death + a backend restart so a retired card renders with no live process. Lives in services/ beside CostBreaker/MaterializedView (pure single-owner data, no I/O thread).'
@@ -10381,6 +10385,10 @@
 642a0790989ee5fd:
   path: web/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298: per-message parseFileUploads splits prose from file-upload blocks → renders FileUploadChip row (pl-7) + hosts ONE shared QuickLookSheet (agentId-scoped) opened by any chip. Takes agentId + onAttach props.'
+  last_edited_ms: 0
+643a3d5e83df123b:
+  path: src/app/run/lifecycle/fleet.rs
+  description: 'Background-thread advancement (Phase C): reconcile_fleet_registry (roster mirror), load_background_threads (boot), derive_exec_state, advance_background_threads (swap-in/step/swap-out), step_one_thread, dispatch_background_my_turn (per-thread nudge), deliver_to_thread (D1 delivery seam). Persist/teardown methods live in sibling fleet_lifecycle.rs. N=1 no-op.'
   last_edited_ms: 0
 6446f96e997f0782:
   path: web/src/components/shell/config/categories.ts
@@ -19786,6 +19794,10 @@ bdcd5582b1beaeec:
   path: crates/cp-orchestrator/src/transport/rest/config/update.rs
   description: 'Update REST handlers (O5.1): GET status, POST check/apply, PUT mode/channel. APPLY_IN_FLIGHT gate shared w/ scheduler. status_json, Channel enum (400 on unknown). orch-clippy: CLEAN (230bf55d) — assert_body_has helper for roundtrip test cognitive.'
   last_edited_ms: 1787905172449
+bdcf4d8aa5fb00b1:
+  path: .context-pilot/shared/memories.yaml
+  description: Memory slots store (M-safe/tiny/short/mid/long, 220 fixed). Local-only, synced with commits. Mirrors the Memories panel (P6).
+  last_edited_ms: 0
 bdd2710cf9c6a242:
   path: tmp/v2/scripts/seed-doc.py
   description: Seeds data/demo-doc/content.html from tmp/doc/content/contents.html by applying the editor's schema transforms ONCE (unwrap article/section, flatten figure to img + italic caption, rebase images). A script and not a hand-written file because a hand-transcribed seed drifts silently — that is how a stray 'Medievall' got in. Refuses to overwrite without --force; --check compares.

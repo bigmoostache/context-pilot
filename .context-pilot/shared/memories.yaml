@@ -459,9 +459,9 @@ M-short-32:
 M-short-33:
   tier: short
   title: MT phase progress
-  contents: 'MT (T774) branch multi-thread-core-loop: Phases A-H+TC+TC-REAL shipped, bugs X795-804 fixed+pushed. X804 BUG-STALL (8addadfc): step_one_thread now runs check_waiting_for_panels+check_deferred_sleep+check_watchers (was resident-only) so a bg thread''s blocking console-wait resolves and both concurrent threads advance. Open: X798 input-UX, X786 send-semantics.'
+  contents: 'MT (T774) branch multi-thread-core-loop: Phases A-H+TC+TC-REAL shipped. X804 (8addadfc): step_one_thread now runs check_watchers/waiting/sleep so a bg thread''s blocking console-wait resolves. X805 (f6bf1b40): relocate_resident_on_focus_change parks a mid-execution thread as Streaming (was Idle) so it stays scheduled after losing focus. Open: X798 input-UX, X786 send-semantics.'
   importance: high
-  last_edited_ms: 1791216883431
+  last_edited_ms: 1791217713541
 M-short-34:
   tier: short
   title: check-rust-tests.sh now

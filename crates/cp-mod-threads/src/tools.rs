@@ -396,15 +396,39 @@ fn write_message(output: &mut String, msg: &ThreadMessage, now_ms: u64) {
     }
 }
 
-/// Build the full panel content: thread overview + focused thread conversation.
+/// The id of the thread whose context currently lives in `state` — the
+/// **resident** thread (the focused thread at rest, or a background thread while
+/// it is being stepped). Falls back to the focused pointer, then empty.
 ///
-/// Called by `execute_read` to generate the static panel text that the LLM sees.
-/// Limits the focused thread to the last [`MAX_PANEL_MESSAGES`] messages to keep
-/// token usage bounded for long-lived threads.
+/// This is the identity the Threads panel must render for: the panel instance is
+/// per-thread (its `Entry` rides the resident-thread swap), so each thread's
+/// panel shows the roster + *its own* conversation — a per-thread **view** over
+/// the shared roster (design doc §3). Without this, every thread rendered the
+/// single shared `panel_content` baked for the focused thread, so a background
+/// thread's Threads panel showed the focused thread's conversation.
+fn resident_thread_id(state: &State) -> String {
+    state.resident_thread_id.clone().or_else(|| FocusState::get(state).focused_thread_id.clone()).unwrap_or_default()
+}
+
+/// Build the Threads panel content for the **resident** thread (roster list +
+/// that thread's own conversation). This is the per-thread render source used by
+/// [`ThreadsPanel`](crate::panel::ThreadsPanel) in place of the shared, focused-
+/// thread-baked `ThreadsState::panel_content`.
+pub(crate) fn resident_panel_content(state: &State) -> String {
+    let tid = resident_thread_id(state);
+    let now_ms = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis().to_u64());
+    build_panel_content(state, &tid, now_ms)
+}
+
+/// Build the full panel content: thread overview + the given thread's conversation.
+///
+/// Renders the roster list plus `focused_tid`'s own conversation, capped to the
+/// last [`MAX_PANEL_MESSAGES`] messages to keep token usage bounded for
+/// long-lived threads.
 ///
 /// Emits **YAML-structured** output (T372) so the LLM can parse thread state
 /// cleanly — matching the style of the Search result panels.
-fn build_panel_content(state: &State, focused_tid: &str, now_ms: u64) -> String {
+pub(crate) fn build_panel_content(state: &State, focused_tid: &str, now_ms: u64) -> String {
     /// Maximum messages shown in the panel for a single focused thread.
     const MAX_PANEL_MESSAGES: usize = 50;
 
