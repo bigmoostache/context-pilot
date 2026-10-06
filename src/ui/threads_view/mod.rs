@@ -111,8 +111,8 @@ fn push_new_thread_entry(lb: &mut ListBuild<'_>, state: &State, on_virtual: bool
     if on_virtual {
         lb.sel.start = Some(lb.blocks.len());
     }
-    let new_name = if on_virtual && !state.input.is_empty() {
-        truncate_str(&state.input, lb.inner_width.saturating_sub(6).into())
+    let new_name = if on_virtual && !state.composer.text.is_empty() {
+        truncate_str(&state.composer.text, lb.inner_width.saturating_sub(6).into())
     } else {
         "New Thread".to_owned()
     };
@@ -185,18 +185,25 @@ fn push_thread_entry(lb: &mut ListBuild<'_>, thread: &cp_mod_threads::types::Thr
     }
 }
 
-/// Push the bottom help / confirm hint line for the current mode.
-fn push_help_hint(blocks: &mut Vec<IrBlock>, viewing_archived: bool, confirming: bool) {
-    if confirming {
-        let verb = if viewing_archived { " Restore? " } else { " Archive? " };
-        blocks.push(IrBlock::Line(vec![
-            S::warning(verb.to_owned()),
-            S::styled("Ctrl+X".to_owned(), Semantic::KeyHint),
-            S::muted(" again  ".to_owned()),
-            S::styled("any".to_owned(), Semantic::KeyHint),
-            S::muted(" to cancel".to_owned()),
-        ]));
-    } else if viewing_archived {
+/// Push the inline archive/restore confirm bubble, rendered on its own line
+/// directly below the selected thread's row.
+///
+/// Leads with a down-left "return" arrow (`\u{21B5}`) pointing back up at the
+/// thread it concerns, and is fully red ([`Semantic::Error`]) so the pending
+/// destructive confirm reads as a bubble attached to that specific thread —
+/// not the easy-to-miss footer hint it replaces.
+fn push_archive_confirm_bubble(blocks: &mut Vec<IrBlock>, viewing_archived: bool) {
+    let verb = if viewing_archived { "restore" } else { "delete" };
+    blocks.push(IrBlock::Line(vec![
+        S::styled("    \u{21B5} ".to_owned(), Semantic::Error),
+        S::styled("Ctrl+X".to_owned(), Semantic::Error),
+        S::styled(format!(" again to confirm {verb}"), Semantic::Error),
+    ]));
+}
+
+/// Push the bottom help hint line for the current mode.
+fn push_help_hint(blocks: &mut Vec<IrBlock>, viewing_archived: bool) {
+    if viewing_archived {
         blocks.push(IrBlock::Line(vec![
             S::styled("Up/Dn".to_owned(), Semantic::KeyHint),
             S::muted(" select  ".to_owned()),
@@ -285,6 +292,9 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
             continue;
         };
         push_thread_entry(&mut lb, thread, i == selected);
+        if confirming && i == selected {
+            push_archive_confirm_bubble(lb.blocks, viewing_archived);
+        }
     }
 
     // Empty-state hint when the archived list has nothing in it.
@@ -301,7 +311,7 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
         }
     }
 
-    push_help_hint(&mut ir_blocks, viewing_archived, confirming);
+    push_help_hint(&mut ir_blocks, viewing_archived);
 
     // Convert IR → ratatui and render
     let mut lines = ir::blocks_to_lines(&ir_blocks);
@@ -325,7 +335,8 @@ fn render_new_thread_prompt(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let inner = border.inner(area);
     frame.render_widget(border, area);
 
-    let input_preview = if state.input.is_empty() { "\u{2026}".to_owned() } else { state.input.clone() };
+    let input_preview =
+        if state.composer.text.is_empty() { "\u{2026}".to_owned() } else { state.composer.text.clone() };
 
     let ir_blocks = vec![
         IrBlock::Empty,
