@@ -13,7 +13,14 @@ use fs2::FileExt as _;
 use crate::types::VaultError;
 
 /// Path to the global environment file: `~/.context-pilot/.env`.
+///
+/// Test builds use a per-process temp file instead: `Vault::set` tests used to
+/// clobber the real file (e.g. `BRAVE_API_KEY=key-123`) on every
+/// `cargo test --workspace`.
 fn global_env_path() -> PathBuf {
+    if cfg!(test) {
+        return std::env::temp_dir().join(format!("cp-vault-test-{}.env", std::process::id()));
+    }
     cp_env::env().core.home.join(".context-pilot").join(".env")
 }
 
