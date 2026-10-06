@@ -194,10 +194,10 @@ M-mid-2:
   last_edited_ms: 0
 M-mid-20:
   tier: mid
-  title: Never push to master
-  contents: Never push to master. Push only when asked; then commit locally, push a branch, open a PR to master with gh.
+  title: Always commit+push
+  contents: ALWAYS commit AND push after finishing a change, without waiting to be asked (user mandate T789). Push the CURRENT branch. Never push to master.
   importance: critical
-  last_edited_ms: 1791290207505
+  last_edited_ms: 1791291678442
 M-mid-3:
   tier: mid
   title: 'Hardcoded prompt audit:'
@@ -505,9 +505,9 @@ M-short-6:
 M-short-7:
   tier: short
   title: T799 loop profile
-  contents: 'T799 idle profile (10k loops): loop.threads_emit 1.1ms on EVERY tick = most of the 38% idle CPU. loop.panel_refresh 107ms avg / 155ms max every 2s (refresh_all_panels in drain_chat_sync_if_due; suspect Overview''s ~5 synchronous git subprocesses). check_ownership 20ms every 1s. Level-2 rows loop.panel_refresh.refresh_<kind> added cf0274ab; awaiting user''s re-run.'
+  contents: 'T799 git worker SHIPPED b3e21c49: panel_refresh git_status (was 97% of 66ms/2s stall) moved off main loop to cp-mod-git/worker.rs bg thread (Box::leak''d &''static Mutex slot + in_flight guard, mpsc coalesce). refresh_git_status non-blocking: take_latest+request. Dropped diff --cached + rev-parse probe. Remaining idle: threads_emit ~1ms/tick, check_ownership ~15ms/s. NOT yet deployed/reloaded.'
   importance: high
-  last_edited_ms: 1791290215779
+  last_edited_ms: 1791291051289
 M-short-8:
   tier: short
   title: 'OPERATING MODEL: harbor'
@@ -759,6 +759,12 @@ M-tiny-45:
   contents: 'New CP_* var needs: cp-env specs/*.rs Spec + model field + docs/ENV.md regen (cargo test -p cp-env --test generate -- --ignored) + line in 3 deploy/env/*.example. Else boot fails ''unknown variable''.'
   importance: high
   last_edited_ms: 1791288480688
+M-tiny-46:
+  tier: tiny
+  title: Never switch branches
+  contents: NEVER switch git branches unless the user explicitly asks. Commit/push on the current branch (T789 mandate).
+  importance: critical
+  last_edited_ms: 1791291678445
 M-tiny-47:
   tier: tiny
   title: Perf names hierarchical
