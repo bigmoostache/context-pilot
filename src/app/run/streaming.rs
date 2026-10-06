@@ -197,6 +197,9 @@ pub(super) fn process_api_check_results(app: &mut App) {
 
 /// Continue streaming after tool execution (called when panels are ready).
 pub(super) fn continue_streaming(app: &mut App) {
+    // Tool results are appended by now: a notification deferred during the
+    // tool call can finally be injected without orphaning a tool_use.
+    let _injected = cp_mod_spine::types::SpineState::flush_deferred_inject(&mut app.state);
     app.state.stream.phase.transition(StreamPhase::Receiving);
     let ctx = prepare_stream_context(&mut app.state, true, None);
     let system_prompt = get_active_agent_content(&app.state);
