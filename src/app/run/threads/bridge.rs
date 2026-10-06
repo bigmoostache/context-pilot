@@ -251,6 +251,11 @@ pub(in crate::app::run) fn emit_vitals(app: &mut App) {
     // `Used (hit)` / `Used (miss)` breakdown are byte-identical to ratatui
     // (T297). Emit on change — the memo carries hit too, so a hit↔miss flip at
     // an unchanged total still re-emits.
+    // The full computation re-reads every agent prompt from disk and walks all
+    // tool definitions (~190 µs): skip it while its inputs are unchanged.
+    if !context_inputs_changed(&app.state) {
+        return;
+    }
     let (used, threshold, budget) = crate::modules::overview::context::context_usage(&app.state);
     let (hit, miss) = crate::modules::overview::context::context_hit_miss(&app.state);
     let ctx_tuple = (used.to_u64(), threshold.to_u64(), budget.to_u64(), hit.to_u64(), miss.to_u64());
@@ -268,6 +273,39 @@ pub(in crate::app::run) fn emit_vitals(app: &mut App) {
         );
         app.state.ext_mut::<BridgeState>().last_context = Some(ctx_tuple);
     }
+}
+
+thread_local! {
+    /// `(input key, ms)` of the last full context-usage computation. Main-loop
+    /// only, so a thread-local is sound; a reload just forces one recompute.
+    static CONTEXT_KEY: std::cell::Cell<Option<(u64, u64)>> = const { std::cell::Cell::new(None) };
+}
+
+/// Forced full recompute period: catches inputs the key cannot see (an agent
+/// prompt edited on disk, a tool description change).
+const CONTEXT_RECHECK_MS: u64 = 1_000;
+
+/// Whether the context-usage inputs moved since the last full computation (or
+/// [`CONTEXT_RECHECK_MS`] elapsed). Records the new key when it returns `true`.
+fn context_inputs_changed(state: &State) -> bool {
+    use cp_base::state::data::model_helpers::ModelPricing as _;
+    use std::hash::{Hash as _, Hasher as _};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    cp_mod_prompt::types::PromptState::get(state).active_agent_id.hash(&mut h);
+    for tool in &state.tools {
+        (&tool.name, tool.enabled).hash(&mut h);
+    }
+    for ctx in &state.context {
+        (ctx.token_count, ctx.panel_cache_hit).hash(&mut h);
+    }
+    (state.cleaning_threshold_tokens(), state.effective_context_budget()).hash(&mut h);
+    let key = h.finish();
+    let now = cp_base::panels::now_ms();
+    let fresh = CONTEXT_KEY.get().is_some_and(|(prev, at)| prev == key && now.saturating_sub(at) < CONTEXT_RECHECK_MS);
+    if !fresh {
+        CONTEXT_KEY.set(Some((key, now)));
+    }
+    !fresh
 }
 
 // ── Thread status emission (Phase 1.4 status_changed — design doc I8) ─────
