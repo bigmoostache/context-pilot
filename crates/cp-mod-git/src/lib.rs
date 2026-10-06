@@ -14,24 +14,15 @@ mod result_panel;
 mod tools;
 /// Git state types: `GitState`, `GitFileChange`, `GitChangeType`.
 pub mod types;
+/// Background git-status worker (keeps `git` off the main loop).
+pub mod worker;
 
 use types::{GitChangeType, GitFileChange, GitState};
+use worker::GitSnapshot;
 
 use cp_base::cast::Safe as _;
 use std::fmt::Write as _;
 use std::process::Command;
-
-/// Resolve the current branch name, or `detached:<short-sha>` for a detached HEAD.
-fn current_branch() -> Option<String> {
-    let output = Command::new("git").args(["branch", "--show-current"]).output().ok()?;
-    let branch = String::from_utf8_lossy(&output.stdout).trim().to_owned();
-    if !branch.is_empty() {
-        return Some(branch);
-    }
-    // Detached HEAD: fall back to the short commit hash.
-    let head = Command::new("git").args(["rev-parse", "--short", "HEAD"]).output().ok()?;
-    Some(format!("detached:{}", String::from_utf8_lossy(&head.stdout).trim()))
-}
 
 /// Parse a `git diff --numstat` line into (additions, deletions, path).
 /// Binary files (`-`/`-` counts) yield 0/0.
@@ -64,24 +55,6 @@ fn collect_tracked_changes(diff_args: &[&str]) -> Vec<GitFileChange> {
     changes
 }
 
-/// Append staged changes (`git diff --numstat --cached`) not already present.
-fn append_staged_changes(changes: &mut Vec<GitFileChange>) {
-    let Ok(output) = Command::new("git").args(["diff", "--numstat", "--cached"]).output() else {
-        return;
-    };
-    if !output.status.success() {
-        return;
-    }
-    for line in String::from_utf8_lossy(&output.stdout).lines() {
-        if let Some((additions, deletions, path)) = parse_numstat_line(line) {
-            if changes.iter().any(|f| f.path == path) {
-                continue;
-            }
-            changes.push(GitFileChange { path, additions, deletions, change_type: GitChangeType::Added });
-        }
-    }
-}
-
 /// Append untracked files (`git ls-files --others`) with their line counts.
 fn append_untracked_files(changes: &mut Vec<GitFileChange>) {
     let Ok(output) = Command::new("git").args(["ls-files", "--others", "--exclude-standard"]).output() else {
@@ -105,35 +78,57 @@ fn append_untracked_files(changes: &mut Vec<GitFileChange>) {
     }
 }
 
-/// Refresh git status (branch, file changes) into `GitState`.
-/// Called periodically by the overview panel to keep stats up to date.
-pub fn refresh_git_status(state: &mut State) {
-    // Check if git repo
-    let is_repo = Command::new("git").args(["rev-parse", "--git-dir"]).output().is_ok_and(|o| o.status.success());
+/// Compute a full git snapshot (repo flag, branch, file changes) by shelling
+/// out to `git`. PURE — reads no `State`, so it is safe to run on a background
+/// thread (see [`worker`]).
+///
+/// Call budget vs the old path: `diff --numstat` against the base already
+/// reports staged changes merged with the working tree, so the separate
+/// `diff --cached` pass is dropped. `rev-parse --git-dir` is folded into the
+/// `branch --show-current` exit status.
+#[must_use]
+pub fn compute_git_snapshot(diff_base: Option<&str>) -> GitSnapshot {
+    // `branch --show-current` fails (non-zero) outside a repo — use it as the
+    // repo probe and the branch read in one call.
+    let probe = Command::new("git").args(["branch", "--show-current"]).output().ok();
+    let Some(branch_out) = probe.filter(|o| o.status.success()) else {
+        return GitSnapshot::default();
+    };
 
-    let gs = GitState::get_mut(state);
-    gs.is_repo = is_repo;
+    let branch_name = String::from_utf8_lossy(&branch_out.stdout).trim().to_owned();
+    let branch = if branch_name.is_empty() {
+        // Detached HEAD: fall back to the short commit hash.
+        Command::new("git")
+            .args(["rev-parse", "--short", "HEAD"])
+            .output()
+            .ok()
+            .map(|h| format!("detached:{}", String::from_utf8_lossy(&h.stdout).trim()))
+    } else {
+        Some(branch_name)
+    };
 
-    if !is_repo {
-        gs.branch = None;
-        gs.branches = vec![];
-        gs.file_changes = vec![];
-        return;
-    }
-
-    gs.branch = current_branch();
-
-    // numstat base: an explicit diff_base, else HEAD.
-    let diff_base = gs.diff_base.clone();
-    let diff_args = diff_base
-        .as_ref()
-        .map_or_else(|| vec!["diff", "--numstat", "HEAD"], |base| vec!["diff", "--numstat", base.as_str()]);
-
+    let diff_args = diff_base.map_or_else(|| vec!["diff", "--numstat", "HEAD"], |base| vec!["diff", "--numstat", base]);
     let mut file_changes = collect_tracked_changes(&diff_args);
-    append_staged_changes(&mut file_changes);
     append_untracked_files(&mut file_changes);
 
-    GitState::get_mut(state).file_changes = file_changes;
+    GitSnapshot { is_repo: true, branch, file_changes }
+}
+
+/// Refresh git status into `GitState` WITHOUT blocking the main loop.
+///
+/// The actual `git` work happens on the background [`worker`]; this function
+/// only (1) applies the most recent finished snapshot, if any, and (2) asks
+/// the worker for a fresh one (a no-op if a computation is already running).
+/// Both steps are O(µs).
+pub fn refresh_git_status(state: &mut State) {
+    if let Some(snapshot) = worker::take_latest() {
+        let gs = GitState::get_mut(state);
+        gs.is_repo = snapshot.is_repo;
+        gs.branch = snapshot.branch;
+        gs.file_changes = snapshot.file_changes;
+    }
+    let diff_base = GitState::get(state).diff_base.clone();
+    worker::request(diff_base);
 }
 
 /// Timeout for git commands (seconds)
