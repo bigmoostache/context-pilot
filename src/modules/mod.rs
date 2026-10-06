@@ -184,8 +184,13 @@ pub(crate) fn dispatch_tool(tool: &ToolUse, state: &mut State, active_modules: &
 }
 
 /// Create a panel for the given context type by asking all modules.
+///
+/// Modules are stateless, so the registry is built once and reused: this runs
+/// per context entry on every panel refresh, and rebuilding ~24 boxed modules
+/// each time showed up in the main-loop profile.
 pub(crate) fn create_panel(context_type: &Kind) -> Option<Box<dyn Panel>> {
-    for module in all_modules() {
+    static MODULES: std::sync::OnceLock<Vec<Box<dyn Module>>> = std::sync::OnceLock::new();
+    for module in MODULES.get_or_init(all_modules) {
         if let Some(panel) = module.create_panel(context_type) {
             return Some(panel);
         }
