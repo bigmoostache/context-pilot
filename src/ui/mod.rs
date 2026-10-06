@@ -48,7 +48,10 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
 
     // Build the IR frame snapshot (Phase 4 integration point).
     // Phase 5 progressively replaces direct-render code paths below.
-    let ir_frame = ir::build_frame(state);
+    let ir_frame = {
+        let _build = crate::profile!("ir_build_frame");
+        ir::build_frame(state)
+    };
 
     // Fill base background
     frame.render_widget(Block::default().style(Style::default().bg(theme::bg_base())), area);
@@ -67,7 +70,10 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
         return;
     };
     render_body(frame, state, body_area, &ir_frame);
-    ir::render_status_bar::render_status_bar_from_ir(frame, &ir_frame.status_bar, status_area);
+    {
+        let _status = crate::profile!("status_bar");
+        ir::render_status_bar::render_status_bar_from_ir(frame, &ir_frame.status_bar, status_area);
+    }
 
     // Render autocomplete popup if active (via IR overlays).
     // In Threads mode the input lives inside the right pane (past the thread
@@ -82,7 +88,10 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
         ir::render_conversation::render_autocomplete_if_active(frame, content_area, &ir_frame.overlays);
     }
 
-    render_modal_overlays(frame, area, &ir_frame.overlays);
+    {
+        let _overlays = crate::profile!("modal_overlays");
+        render_modal_overlays(frame, area, &ir_frame.overlays);
+    }
 
     PERF.frame_end();
 }
@@ -141,6 +150,7 @@ fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &
     // unless the human has drilled into a thread (G3), in which case fall
     // through to the normal body to paint that thread's full panel view.
     if showing_threads_list(state) {
+        let _threads = crate::profile!("threads_view");
         threads_view::render_threads_view(frame, state, area);
         return;
     }

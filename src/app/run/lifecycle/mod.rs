@@ -174,10 +174,16 @@ impl App {
         // restore. Execution (resident/focus/scheduling) is untouched — Model 2.
         // No-op at N=1 (drilled_thread_id is None) → byte-identical render.
         let drilled = self.take_drilled_runtime_for_render();
-        let draw_result = terminal.draw(|frame| {
-            ui::render(frame, &mut self.state);
-            self.command_palette.render(frame, &self.state);
-        });
+        // `terminal_draw` = widget build (`ui_render` child) + ratatui buffer
+        // diff + stdout flush (the remainder not covered by children).
+        let draw_result = {
+            let _guard = crate::profile!("terminal_draw");
+            terminal.draw(|frame| {
+                ui::render(frame, &mut self.state);
+                let _palette = crate::profile!("command_palette");
+                self.command_palette.render(frame, &self.state);
+            })
+        };
         self.restore_drilled_runtime_after_render(drilled);
         let _r = draw_result?;
         self.state.flags.ui.dirty = false;
@@ -208,7 +214,10 @@ impl App {
         if !event::poll(Duration::ZERO)? {
             return Ok(InputOutcome::Continue);
         }
-        let evt = event::read()?;
+        let evt = {
+            let _guard = crate::profile!("event_read");
+            event::read()?
+        };
 
         // Command palette takes precedence when open.
         if self.command_palette.is_open {
@@ -230,7 +239,11 @@ impl App {
             return Ok(InputOutcome::Restart);
         }
 
-        let Some(action) = handle_event(&evt, &self.state) else {
+        let mapped = {
+            let _guard = crate::profile!("handle_event");
+            handle_event(&evt, &self.state)
+        };
+        let Some(action) = mapped else {
             // User quit — flush all pending writes and save final state synchronously
             self.writer.flush();
             self.save_all_threads();
@@ -242,6 +255,7 @@ impl App {
             self.command_palette.open(&self.state);
             self.state.flags.ui.dirty = true;
         } else {
+            let _guard = crate::profile!("handle_action");
             self.handle_action(action);
         }
 
