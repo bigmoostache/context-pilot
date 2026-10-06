@@ -347,31 +347,56 @@ pub(crate) fn handle_tool_execution(app: &mut App) {
     let _guard = crate::profile!("app::tool_exec");
     let _fg = cp_base::flame!("tool_pipeline");
 
-    let Some(ToolBatch { tools, mut tool_results, tool_names, pipeline_start }) = collect_tool_results(app) else {
+    let batch = {
+        let _g = crate::profile!("collect_tool_results");
+        collect_tool_results(app)
+    };
+    let Some(ToolBatch { tools, mut tool_results, tool_names, pipeline_start }) = batch else {
         return;
     };
 
-    run_history_close_followups(app, &tools, &mut tool_results);
-    sync_logs_and_radar(app, &tools, &tool_results);
-    maybe_trigger_reverie(app, &tool_results);
-    super::callbacks::fire_edit_callbacks(app, &tools, &mut tool_results);
-    apply_tempo_break(app, &tool_results);
-    // Runs after the tempo break so it observes this tick's FINAL tempo.
-    super::checks::strip_superseded_recaps(app);
+    {
+        let _g = crate::profile!("history_close_followups");
+        run_history_close_followups(app, &tools, &mut tool_results);
+    }
+    {
+        let _g = crate::profile!("sync_logs_and_radar");
+        sync_logs_and_radar(app, &tools, &tool_results);
+    }
+    {
+        let _g = crate::profile!("maybe_trigger_reverie");
+        maybe_trigger_reverie(app, &tool_results);
+    }
+    {
+        let _g = crate::profile!("fire_edit_callbacks");
+        super::callbacks::fire_edit_callbacks(app, &tools, &mut tool_results);
+    }
+    {
+        let _g = crate::profile!("tempo_and_recaps");
+        apply_tempo_break(app, &tool_results);
+        // Runs after the tempo break so it observes this tick's FINAL tempo.
+        super::checks::strip_superseded_recaps(app);
+    }
 
-    // Sync the Todo panel's focus filter to the focused thread (forces a fresh
-    // Todo panel on focus change), then evaluate the fire-once hygiene nudge.
-    super::checks::sync_todo_focus(app);
-    super::checks::maybe_hygiene_nudge(app);
-    // Same focus-scoping for the thread-owned Scratchpad panel — a focus change
-    // (or a scratchpad edit) forces a fresh panel showing the focused thread's
-    // cells.
-    super::checks::sync_scratchpad_focus(app);
-    // Promote any planned task declared via `task_id` on an opted-in tool to
-    // in_progress (done/cancelled left be — pre-flight warned; the live delta
-    // rides the emit_task_lists chokepoint). On a real flip, the thread's task
-    // tree is appended to that tool's result (T686).
-    super::checks::promote_declared_tasks(app, &tools, &mut tool_results);
+    {
+        let _g = crate::profile!("focus_checks");
+        // Sync the Todo panel's focus filter to the focused thread (forces a fresh
+        // Todo panel on focus change), then evaluate the fire-once hygiene nudge.
+        super::checks::sync_todo_focus(app);
+        super::checks::maybe_hygiene_nudge(app);
+        // Same focus-scoping for the thread-owned Scratchpad panel — a focus change
+        // (or a scratchpad edit) forces a fresh panel showing the focused thread's
+        // cells.
+        super::checks::sync_scratchpad_focus(app);
+    }
+    {
+        let _g = crate::profile!("promote_declared_tasks");
+        // Promote any planned task declared via `task_id` on an opted-in tool to
+        // in_progress (done/cancelled left be — pre-flight warned; the live delta
+        // rides the emit_task_lists chokepoint). On a real flip, the thread's task
+        // tree is appended to that tool's result (T686).
+        super::checks::promote_declared_tasks(app, &tools, &mut tool_results);
+    }
 
     // Check if any tool triggered a console blocking wait
     let has_console_wait = tool_results.iter().any(|r| r.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL));
@@ -423,7 +448,10 @@ fn finalize_tool_cycle(app: &mut App, cycle: &ToolCycle<'_>) {
         })
         .collect();
     let result_msg = Message::new_tool_result(result_id, Some(result_global_uid), tool_result_records);
-    app.save_message_async(&result_msg);
+    {
+        let _g = crate::profile!("save_result_msg");
+        app.save_message_async(&result_msg);
+    }
     app.state.messages.push(result_msg);
 
     // Check if reload was requested — main loop will handle flag + exit
@@ -438,10 +466,16 @@ fn finalize_tool_cycle(app: &mut App, cycle: &ToolCycle<'_>) {
     // Accumulate token stats from intermediate stream before discarding pending_done
     accumulate_pending_token_stats(app);
 
-    // Append per-tick cost row (consumes tick_telemetry populated at stream start)
-    super::cost_log::append_cost_tsv(&mut app.state);
+    {
+        let _g = crate::profile!("append_cost_tsv");
+        // Append per-tick cost row (consumes tick_telemetry populated at stream start)
+        super::cost_log::append_cost_tsv(&mut app.state);
+    }
 
-    app.save_state_async();
+    {
+        let _g = crate::profile!("save_state_async");
+        app.save_state_async();
+    }
 
     // Check if any tool requested a sleep (e.g., console send_keys delay)
     if app.state.tool_sleep_until_ms > 0 {
@@ -454,7 +488,10 @@ fn finalize_tool_cycle(app: &mut App, cycle: &ToolCycle<'_>) {
     }
 
     // Trigger background cache refresh for dirty file panels (non-blocking)
-    let _r = trigger_dirty_panel_refresh(&app.state, &app.cache_tx);
+    {
+        let _g = crate::profile!("dirty_panel_refresh");
+        let _r = trigger_dirty_panel_refresh(&app.state, &app.cache_tx);
+    }
 
     // Check if we need to wait for panels before continuing stream
     if has_dirty_file_panels(&app.state) {
@@ -462,6 +499,7 @@ fn finalize_tool_cycle(app: &mut App, cycle: &ToolCycle<'_>) {
         app.state.waiting_for_panels = true;
         app.wait_started_ms = now_ms();
     } else {
+        let _g = crate::profile!("continue_streaming");
         // No dirty panels — continue streaming immediately
         crate::app::run::streaming::continue_streaming(app);
     }
