@@ -7,7 +7,10 @@
 //! the content-addressed body store first (the I13 body-before-reference
 //! barrier).
 
+use std::cell::Cell;
 use std::collections::HashMap;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash as _, Hasher as _};
 
 use cp_base::state::runtime::State;
 use cp_mod_bridge::BridgeState;
@@ -272,6 +275,13 @@ pub(in crate::app::run) fn emit_task_lists(app: &mut App) {
 
     seed_tasks_memo_if_needed(app);
 
+    // Inputs unchanged since the last full diff ⇒ memo already equals every
+    // live projection: skip the O(threads × todos) rebuild entirely.
+    let hash = tasks_input_hash(app);
+    if TASKS_INPUT_HASH.get() == Some(hash) {
+        return;
+    }
+
     for (thread_id, tasks) in collect_task_changes(app) {
         emit_roster_delta(
             &app.state,
@@ -279,6 +289,43 @@ pub(in crate::app::run) fn emit_task_lists(app: &mut App) {
         );
         let _prev = app.state.ext_mut::<BridgeState>().thread_tasks.insert(thread_id, tasks);
     }
+    TASKS_INPUT_HASH.set(Some(hash));
+}
+
+thread_local! {
+    /// Input hash at the last full task diff (`None` until the first one).
+    /// Main-loop only, so a thread-local is sound; a reload resets it, which
+    /// just forces one full diff.
+    static TASKS_INPUT_HASH: Cell<Option<u64>> = const { Cell::new(None) };
+    /// Input hash at the last full note diff (see [`TASKS_INPUT_HASH`]).
+    static NOTES_INPUT_HASH: Cell<Option<u64>> = const { Cell::new(None) };
+}
+
+/// Hash of every field [`collect_task_changes`] reads: thread ids plus each
+/// todo's projected fields. Equal hash ⇒ no thread's task list can differ.
+fn tasks_input_hash(app: &App) -> u64 {
+    let mut h = DefaultHasher::new();
+    for t in &ThreadsState::get(&app.state).threads {
+        t.id.hash(&mut h);
+    }
+    for t in &TodoState::get(&app.state).todos {
+        (&t.id, &t.thread_id, &t.parent_id, &t.name, &t.description, t.order).hash(&mut h);
+        std::mem::discriminant(&t.status).hash(&mut h);
+    }
+    h.finish()
+}
+
+/// Hash of every field [`collect_note_changes`] reads: thread ids plus each
+/// scratchpad cell. Equal hash ⇒ no thread's note list can differ.
+fn notes_input_hash(app: &App) -> u64 {
+    let mut h = DefaultHasher::new();
+    for t in &ThreadsState::get(&app.state).threads {
+        t.id.hash(&mut h);
+    }
+    for c in &ScratchpadState::get(&app.state).scratchpad_cells {
+        (&c.id, &c.thread_id, &c.title, &c.content).hash(&mut h);
+    }
+    h.finish()
 }
 
 // ── Note-list emission (thread-owned scratchpad → frontend, T716) ─────────
@@ -368,8 +415,14 @@ pub(in crate::app::run) fn emit_notes(app: &mut App) {
 
     seed_notes_memo_if_needed(app);
 
+    let hash = notes_input_hash(app);
+    if NOTES_INPUT_HASH.get() == Some(hash) {
+        return;
+    }
+
     for (thread_id, notes) in collect_note_changes(app) {
         emit_roster_delta(&app.state, OpEntryKind::NotesChanged { thread_id: thread_id.clone(), notes: notes.clone() });
         let _prev = app.state.ext_mut::<BridgeState>().thread_notes.insert(thread_id, notes);
     }
+    NOTES_INPUT_HASH.set(Some(hash));
 }

@@ -249,7 +249,10 @@ impl App {
         // (e.g. Right-arrow drill-in switching the focused thread) BEFORE the
         // post-input render below — else this frame paints the previous resident
         // ("one stale frame until I type" bug). No-op when focus did not change.
-        self.relocate_resident_on_focus_change();
+        {
+            let _guard = crate::profile!("relocate_resident");
+            self.relocate_resident_on_focus_change();
+        }
 
         // Render immediately after input for instant feedback.
         if self.state.flags.ui.dirty {
@@ -272,7 +275,10 @@ impl App {
         // frames are tagged with its id. No-op at N=1 (focus never switches).
         // Background steps re-point the resident around their swap (see
         // `advance_background_threads`).
-        self.relocate_resident_on_focus_change();
+        {
+            let _guard = crate::profile!("relocate_resident");
+            self.relocate_resident_on_focus_change();
+        }
         super::tools::watchdog::mark(super::tools::watchdog::Step::Stream);
         super::streaming::process_stream_events(self);
         super::streaming::handle_retry(self);

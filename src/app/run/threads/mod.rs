@@ -108,16 +108,26 @@ pub(super) fn handle_incoming_focused_messages(app: &mut App, was_streaming: boo
 /// emitter is a no-op when the bridge is OFF, so this whole barge is free at
 /// anchor. Order mirrors the historical inline sequence.
 pub(super) fn emit_bridge_deltas(app: &mut App) {
-    emit_vitals(app);
-    emit_messages(app);
-    emit_task_lists(app);
-    emit_notes(app);
-    emit_thread_status(app);
-    emit_thread_focus(app);
-    emit_behaviour(app);
-    emit_thread_archived(app);
-    emit_thread_paused(app);
+    // Each emitter gets its own level-2 perf row (`loop.threads_emit.<name>`).
+    let emitters: [Emitter; 9] = [
+        ("emit_vitals", emit_vitals),
+        ("emit_messages", emit_messages),
+        ("emit_task_lists", emit_task_lists),
+        ("emit_notes", emit_notes),
+        ("emit_thread_status", emit_thread_status),
+        ("emit_thread_focus", emit_thread_focus),
+        ("emit_behaviour", emit_behaviour),
+        ("emit_thread_archived", emit_thread_archived),
+        ("emit_thread_paused", emit_thread_paused),
+    ];
+    for (name, emit) in emitters {
+        let _guard = crate::profile!(name);
+        emit(app);
+    }
 }
+
+/// One bridge emitter paired with its level-2 perf row name.
+type Emitter = (&'static str, fn(&mut App));
 
 /// Append an auto **tool-activity trace** to the owner (resident) thread, if any.
 ///
