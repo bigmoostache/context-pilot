@@ -230,7 +230,7 @@ fn compute_accumulated_hashes(api_messages: &[ApiMessage]) -> Vec<BlockInfo> {
 
     for (msg_idx, msg) in api_messages.iter().enumerate() {
         for (blk_idx, block) in msg.content.iter().enumerate() {
-            let hash_repr = cp_base::deref_match!(block, {
+            let hash_repr = cp_macros::deref_match!(block, {
                 super::super::ContentBlock::Text { ref text } => text.clone(),
                 super::super::ContentBlock::ToolUse { ref id, ref name, ref input } => {
                     format!("tool_use:{id}:{name}:{}", serde_json::to_string(input).unwrap_or_default())

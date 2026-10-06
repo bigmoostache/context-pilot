@@ -336,7 +336,7 @@ pub(crate) fn api_messages_to_cc_json(api_messages: &[ApiMessage], engine_json: 
             .enumerate()
             .map(|(blk_idx, block)| {
                 let should_tag = plan.positions.contains(&(msg_idx, blk_idx));
-                cp_base::deref_match!(block, {
+                cp_macros::deref_match!(block, {
                     ContentBlock::Text { ref text } => {
                         let mut obj = serde_json::json!({"type": "text", "text": text});
                         if should_tag && let Some(o) = obj.as_object_mut() {
@@ -453,7 +453,7 @@ pub(crate) mod error {
 
     impl fmt::Display for LlmError {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            cp_base::deref_match!(self, {
+            cp_macros::deref_match!(self, {
                 Self::Auth(ref msg) => write!(f, "Auth error: {msg}"),
                 Self::Network(ref msg) => write!(f, "Network error: {msg}"),
                 Self::Api { status, ref body } => write!(f, "API error {status}: {body}"),

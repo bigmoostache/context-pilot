@@ -11,6 +11,7 @@ readme.workspace = true
 publish = false
 
 [dependencies]
+cp-macros.workspace = true
 # Validated environment (gateway URL); see docs/ENV.md.
 cp-env.workspace = true
 cp-render = { path = "../cp-render" }

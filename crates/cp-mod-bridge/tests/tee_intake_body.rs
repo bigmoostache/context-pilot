@@ -27,6 +27,7 @@
 // `unused-crate-dependencies` lint.
 use cp_base as _;
 use cp_env as _;
+use cp_macros as _;
 use cp_render as _;
 use log as _;
 use nix as _;

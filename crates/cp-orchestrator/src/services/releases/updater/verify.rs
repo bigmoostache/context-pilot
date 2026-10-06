@@ -89,7 +89,7 @@ pub(crate) enum VerifyError {
 
 impl std::fmt::Display for VerifyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        cp_base::deref_match!(self, {
+        cp_macros::deref_match!(self, {
             Self::Signature(ref e) => write!(f, "manifest signature verification failed: {e}"),
             Self::Parse(ref e) => write!(f, "manifest does not match the frozen schema: {e}"),
             Self::ChannelMismatch { ref expected, ref found } => {

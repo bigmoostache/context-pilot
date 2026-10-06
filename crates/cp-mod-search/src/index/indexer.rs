@@ -234,7 +234,7 @@ fn deduplicate(batch: Vec<IndexerCmd>) -> Vec<IndexerCmd> {
     let mut passthrough: Vec<IndexerCmd> = Vec::new();
 
     for cmd in batch {
-        cp_base::deref_match!(&cmd, {
+        cp_macros::deref_match!(&cmd, {
             IndexerCmd::IndexFile(ref p) | IndexerCmd::DeleteFile(ref p) => {
                 let _prev = latest.insert(p.clone(), cmd);
             }

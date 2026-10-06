@@ -20,6 +20,7 @@
 // its public API; `serde_json` is used directly below, the rest are not, so the
 // per-target `unused-crate-dependencies` lint needs the canonical `as _`
 // acknowledgement for them (Cargo's suggested form, not a lint silence).
+use cp_macros as _;
 use crc32c as _;
 use serde as _;
 use sha2 as _;

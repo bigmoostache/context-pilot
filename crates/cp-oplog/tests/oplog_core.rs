@@ -20,6 +20,8 @@
 //!   segment truncated to any length recovers precisely the records whose
 //!   frames survived intact, never a partial or fabricated one (design doc V1).
 
+use cp_macros as _;
+
 // This integration target links `cp-oplog`'s deps; both are used directly
 // below, but the per-target `unused-crate-dependencies` lint is satisfied only
 // by a direct path reference, so name them explicitly via the imports rather

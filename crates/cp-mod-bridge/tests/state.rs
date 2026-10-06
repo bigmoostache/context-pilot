@@ -14,6 +14,7 @@ use cp_mod_bridge::{BridgeModule, BridgeState};
 // not touch must be silenced or the workspace-lint build fails (mirrors the
 // sibling test binaries' silencer blocks).
 use cp_env as _;
+use cp_macros as _;
 use cp_oplog as _;
 use cp_render as _;
 use cp_wire as _;

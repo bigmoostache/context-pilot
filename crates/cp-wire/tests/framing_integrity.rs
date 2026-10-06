@@ -15,6 +15,7 @@
 // its public API, so the per-target `unused-crate-dependencies` lint flags the
 // transitive deps the test never names directly. Acknowledge them with the
 // canonical `use … as _;` form (Cargo's own suggestion, not a lint silence).
+use cp_macros as _;
 use crc32c as _;
 use serde as _;
 use serde_json as _;

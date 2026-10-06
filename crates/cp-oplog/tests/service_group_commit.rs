@@ -21,6 +21,8 @@
 //! * **The final batch is flushed on shutdown**, and an interleaved durable /
 //!   best-effort workload loses no durable record.
 
+use cp_macros as _;
+
 use std::path::Path;
 use std::sync::Arc;
 use std::thread;

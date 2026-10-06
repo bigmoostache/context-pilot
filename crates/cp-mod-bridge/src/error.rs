@@ -45,7 +45,7 @@ impl Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        cp_base::deref_match!(self, {
+        cp_macros::deref_match!(self, {
             Self::AlreadyRunning { ref folder } => {
                 write!(f, "another agent already owns the folder {folder}")
             }

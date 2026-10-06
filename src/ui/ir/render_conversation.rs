@@ -108,7 +108,7 @@ pub(crate) fn render_autocomplete_if_active(
     overlays: &[cp_render::conversation::Overlay],
 ) {
     let Some(ac) = overlays.iter().find_map(|o| {
-        cp_base::deref_match!(o, {
+        cp_macros::deref_match!(o, {
             cp_render::conversation::Overlay::Autocomplete(ref a) => Some(a),
             cp_render::conversation::Overlay::QuestionForm(_)
             | cp_render::conversation::Overlay::Perf(_)

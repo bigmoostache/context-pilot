@@ -8764,3 +8764,100 @@ index b47920df..fed39f49 100644
      match: "type_id/cause/provide are unstable or deprecated"
      reason: >
 # --- End entry #108 ---
+109:97db165a7d3d36db84826a78dea25048ff4a7a6cfda61ce32add0e43fa185d48:9bd7c058825a28770702d9dc5f32990f96aa57f79d729e753ab9f8da8467af51:b9ff8ad4d272a65908b036341d247e41cbc20ed987d8c2098dc7b723ce2d8ef1
+# --- Diff for entry #109 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index f28dd349..e88097e8 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,5 +1,5 @@
+ [workspace]
+-members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-fleet", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-threads", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities", "crates/cp-vault", "crates/cp-env"]
++members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-fleet", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-threads", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities", "crates/cp-vault", "crates/cp-env", "crates/cp-macros"]
+ 
+ [workspace.package]
+ version = "0.2.13"
+@@ -13,6 +13,7 @@ readme = "README.md"
+ 
+ [workspace.dependencies]
+ cp-env = { path = "crates/cp-env" }
++cp-macros = { path = "crates/cp-macros" }
+ cp-base = { path = "crates/cp-base" }
+ cp-render = { path = "crates/cp-render" }
+ cp-mod-utilities = { path = "crates/cp-mod-utilities" }
+@@ -1131,6 +1132,7 @@ categories.workspace = true
+ publish = false
+ 
+ [dependencies]
++cp-macros.workspace = true
+ cp-base.workspace = true
+ cp-render = { path = "crates/cp-render" }
+ cp-mod-utilities.workspace = true
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index fed39f49..94ef72f2 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -17,7 +17,7 @@
+ exceptions:
+   # ── deref_match! macro: sole ref-pattern chokepoint ─────────────────
+ 
+-  - path: "crates/cp-base/src/lib.rs"
++  - path: "crates/cp-macros/src/lib.rs"
+     match: "clippy::pattern_type_mismatch mandates ref bindings when destructuring non-Copy fields out of a shared reference; the two restriction lints are mutually exclusive, so the deref-plus-ref form is funneled through this one macro"
+     reason: >
+       The deref_match! macro is the single audited site allowed to use `ref`
+@@ -28,50 +28,13 @@ exceptions:
+       exclusive for destructuring a non-Copy field out of a shared reference, so
+       every such site (Display/Debug/Error impls with String/Box/Vec fields)
+       routes through this macro — the single #[expect(clippy::ref_patterns)]
+-      covers all expansions workspace-wide.
++      covers all expansions workspace-wide. Lives in the dependency-free
++      cp-macros crate so even foundational crates (cp-wire, cp-vault, cp-oplog)
++      share it instead of carrying their own suppression.
+     strategy: >
+       Irreducible — the two forbid-level restriction lints are mutually exclusive
+       by design; a single chokepoint macro is the minimal honest resolution.
+ 
+-  - path: "crates/cp-vault/src/types.rs"
+-    match: "cp-vault is foundational (cannot depend on cp-base's deref_match! macro)"
+-    reason: >
+-      VaultError's Display impl matches *self and binds the non-Copy String
+-      payloads (MissingKey/Io/Network) with ref. clippy::pattern_type_mismatch
+-      (forbid) mandates the deref-plus-ref form; clippy::ref_patterns is mutually
+-      exclusive with it. cp-vault sits below cp-base in the crate graph and cannot
+-      use the deref_match! macro, so the fmt fn carries its own #[expect].
+-    strategy: >
+-      Irreducible — the two restriction lints are mutually exclusive and this
+-      foundational crate cannot reach the shared macro chokepoint.
+-
+-  - path: "crates/cp-wire/src/framing.rs"
+-    match: "cp-wire is foundational (cannot depend on cp-base's deref_match! macro)"
+-    reason: >
+-      FrameError's Display impl matches *self and binds the non-Copy String
+-      payloads (DeserializeError/SerializeError) with ref. clippy::pattern_type_mismatch
+-      (forbid) mandates the deref-plus-ref form; clippy::ref_patterns is mutually
+-      exclusive with it. cp-wire sits below cp-base in the crate graph and cannot
+-      use the deref_match! macro, so the fmt fn carries its own #[expect].
+-    strategy: >
+-      Irreducible — the two restriction lints are mutually exclusive and this
+-      foundational crate cannot reach the shared macro chokepoint.
+-
+-  - path: "crates/cp-oplog/src/lib.rs"
+-    match: "cp-oplog is foundational (only cp_wire + std); clippy::pattern_type_mismatch mandates explicit &-patterns with ref bindings for a read-only match over a borrowed enum and the two restriction lints are mutually exclusive, so every such site funnels through this one local macro"
+-    reason: >
+-      The ref_match! macro is cp-oplog's local ref-pattern chokepoint. Its sites
+-      (Error Display, replay fold_entry, replay_fast Checkpoint) all read non-Copy
+-      fields (io::Error/FrameError/Snapshot/thread_id) out of a borrowed enum;
+-      clippy::pattern_type_mismatch (forbid) mandates explicit &-patterns with ref
+-      bindings, and clippy::ref_patterns is mutually exclusive with it. cp-oplog
+-      depends only on cp_wire + std and cannot reach cp-base's deref_match!, so
+-      every such site routes through this one macro — the single
+-      #[expect(clippy::ref_patterns)] covers all expansions.
+-    strategy: >
+-      Irreducible — the two restriction lints are mutually exclusive and this
+-      foundational crate cannot reach the shared macro chokepoint.
+-
+   # ── too_many_lines: flat aggregate root-state initializer ────────────
+ 
+   # ── cast.rs: Safe numeric casting infrastructure ─────────────────
+# --- End entry #109 ---

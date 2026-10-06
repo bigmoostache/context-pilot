@@ -93,7 +93,7 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
 fn render_modal_overlays(frame: &mut Frame<'_>, area: Rect, overlays: &[cp_render::conversation::Overlay]) {
     // Render performance overlay if active (from IR overlays)
     if let Some(perf_overlay) = overlays.iter().find_map(|o| {
-        cp_base::deref_match!(o, {
+        cp_macros::deref_match!(o, {
             cp_render::conversation::Overlay::Perf(ref p) => Some(p),
             cp_render::conversation::Overlay::QuestionForm(_)
             | cp_render::conversation::Overlay::Autocomplete(_)
@@ -107,7 +107,7 @@ fn render_modal_overlays(frame: &mut Frame<'_>, area: Rect, overlays: &[cp_rende
 
     // Render config overlay if active (from IR overlays)
     if let Some(config_overlay) = overlays.iter().find_map(|o| {
-        cp_base::deref_match!(o, {
+        cp_macros::deref_match!(o, {
             cp_render::conversation::Overlay::Config(ref c) => Some(c),
             cp_render::conversation::Overlay::QuestionForm(_)
             | cp_render::conversation::Overlay::Autocomplete(_)
@@ -121,7 +121,7 @@ fn render_modal_overlays(frame: &mut Frame<'_>, area: Rect, overlays: &[cp_rende
 
     // Render Meilisearch indexing status overlay if active (from IR overlays)
     if let Some(search_overlay) = overlays.iter().find_map(|o| {
-        cp_base::deref_match!(o, {
+        cp_macros::deref_match!(o, {
             cp_render::conversation::Overlay::SearchIndex(ref s) => Some(s.as_ref()),
             cp_render::conversation::Overlay::QuestionForm(_)
             | cp_render::conversation::Overlay::Autocomplete(_)

@@ -126,7 +126,7 @@ fn collect_invalidations(app: &mut App, events: &[WatchEvent]) -> (Vec<usize>, V
     let mut refresh_indices = Vec::new();
     let mut rewatch_paths: Vec<String> = Vec::new();
     for event in events {
-        let (path, is_dir_event) = cp_base::deref_match!(event, {
+        let (path, is_dir_event) = cp_macros::deref_match!(event, {
             WatchEvent::FileChanged(ref p) => (p, false),
             WatchEvent::DirChanged(ref p) => (p, true),
         });

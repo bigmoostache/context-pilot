@@ -88,7 +88,7 @@ pub enum Error {
 
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        cp_base::deref_match!(self, {
+        cp_macros::deref_match!(self, {
             Self::NotAllowed { ref binary } => {
                 write!(f, "binary not on allow-list: {}", binary.display())
             }

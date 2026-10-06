@@ -45,6 +45,8 @@
 
 #![cfg(unix)]
 
+use cp_macros as _;
+
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
