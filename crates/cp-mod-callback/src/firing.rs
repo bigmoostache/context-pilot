@@ -72,6 +72,7 @@ fn concurrent_run_note(state: &State, callback_id: &str, fired_by: Option<&str>)
 /// its process, removes its watcher, and cleans up the console entry. Returns
 /// `true` if a running session was replaced.
 fn kill_existing_callback(state: &mut State, callback_id: &str) -> bool {
+    let _p = cp_base::perf_span!("cb_kill_existing");
     let key = dedup_key(state, callback_id);
     let cs = CallbackState::get_mut(state);
     let Some(old_key) = cs.active_sessions.remove(&key) else {
@@ -185,7 +186,10 @@ pub fn fire_callback(
     };
 
     // Spawn the process
-    let handle = SessionHandle::spawn(session_key.clone(), command.clone(), cwd)?;
+    let handle = {
+        let _p = cp_base::perf_span!("cb_spawn");
+        SessionHandle::spawn(session_key.clone(), command.clone(), cwd)?
+    };
 
     // Store handle in console state (NO panel created — deferred until failure/timeout)
     let cs = ConsoleState::get_mut(state);

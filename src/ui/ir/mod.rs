@@ -411,12 +411,26 @@ use cp_base::panels::now_ms;
 /// ratatui dependencies — the adapter converts it to terminal widgets.
 #[must_use]
 pub(crate) fn build_frame(state: &State) -> IrFrame {
-    let sidebar = sidebar::build_sidebar(state);
-    let status_bar = render_status_bar::build_status_bar(state);
-    let active_panel = build_active_panel(state);
-
-    let conversation = conversation::build_conversation(state);
-    let overlays = conversation::build_overlays(state);
+    let sidebar = {
+        let _g = crate::profile!("ir_sidebar");
+        sidebar::build_sidebar(state)
+    };
+    let status_bar = {
+        let _g = crate::profile!("ir_status_bar");
+        render_status_bar::build_status_bar(state)
+    };
+    let active_panel = {
+        let _g = crate::profile!("ir_active_panel");
+        build_active_panel(state)
+    };
+    let conversation = {
+        let _g = crate::profile!("ir_conversation");
+        conversation::build_conversation(state)
+    };
+    let overlays = {
+        let _g = crate::profile!("ir_overlays");
+        conversation::build_overlays(state)
+    };
 
     IrFrame { sidebar, active_panel, status_bar, conversation, overlays }
 }

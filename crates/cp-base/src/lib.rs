@@ -177,6 +177,40 @@ macro_rules! flame {
     };
 }
 
+/// Bridge from module crates to the binary's F12 perf profiler.
+///
+/// Module crates can't reach the binary's `profile!` guard, so the binary
+/// registers a span factory at startup ([`perf::set_hook`]); crates open spans
+/// with [`perf_span!`]. Before registration a span is a no-op.
+pub mod perf {
+    use std::sync::OnceLock;
+
+    /// Factory returning an RAII guard that records its lifetime on drop.
+    pub type Hook = fn(&'static str) -> Box<dyn core::any::Any>;
+
+    /// Registered span factory (set once by the binary).
+    static HOOK: OnceLock<Hook> = OnceLock::new();
+
+    /// Register the span factory. Later calls are ignored.
+    pub fn set_hook(hook: Hook) {
+        let _r = HOOK.set(hook);
+    }
+
+    /// Open a span named `leaf`; dropping the result closes it.
+    #[must_use]
+    pub fn span(leaf: &'static str) -> Option<Box<dyn core::any::Any>> {
+        HOOK.get().map(|hook| hook(leaf))
+    }
+}
+
+/// Open a perf span from a module crate (see [`perf`]). Bind it: `let _p = cp_base::perf_span!("x");`
+#[macro_export]
+macro_rules! perf_span {
+    ($name:expr) => {
+        $crate::perf::span($name)
+    };
+}
+
 /// Module trait: tools, panels, lifecycle hooks for pluggable functionality.
 pub mod modules;
 /// Panel trait and caching infrastructure for context elements.

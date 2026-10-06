@@ -127,9 +127,10 @@ pub(crate) struct StreamParams {
 
 /// Start streaming with the specified provider and model
 pub(crate) fn start_streaming(params: StreamParams, tx: Sender<StreamEvent>) {
-    let client = get_client(params.provider);
-
     let _r = std::thread::spawn(move || {
+        // Built here, not on the main loop: some clients read credentials
+        // (e.g. Keychain via the `security` CLI) in their constructor.
+        let client = get_client(params.provider);
         // Assemble the prompt (panels + seed + conversation → api_messages)
         let include_tool_uses = false; // No pending tool results on first stream
         let api_messages = crate::app::prompt::assemble_prompt(

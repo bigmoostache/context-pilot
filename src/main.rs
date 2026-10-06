@@ -400,6 +400,7 @@ fn main() -> ExitCode {
     init_file_logger();
     raise_fd_limit();
     infra::flame::init();
+    cp_base::perf::set_hook(|leaf| Box::new(infra::profiler::ProfileGuard::new(leaf)));
 
     let resume_stream = args.iter().any(|a| a == "--resume-stream");
 
