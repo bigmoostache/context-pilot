@@ -78,10 +78,17 @@ pub(super) fn handle_incoming_focused_messages(app: &mut App, was_streaming: boo
         }
     } else {
         // Branch A — idle auto-read: content is already pulled into the panel.
-        if let Some((tid, name)) = cp_mod_threads::incoming::take_idle_autoread(&mut app.state) {
+        if let Some(push) = cp_mod_threads::incoming::take_idle_autoread(&mut app.state) {
+            let cp_mod_threads::incoming::StreamingPush { tid, name, messages, truncated } = push;
+            let quoted: Vec<String> = messages.iter().map(|m| format!("---\n{m}")).collect();
+            let tail = if truncated {
+                "Some content was truncated: the full text is in the Threads panel. Respond directly (no need to call Read)."
+            } else {
+                "Respond directly (no need to call Read)."
+            };
             let content = format!(
-                "New message in the focused thread \"{name}\" — its content is already in the Threads panel. \
-                 Respond directly (no need to call Read)."
+                "New message(s) from the user in the focused thread \"{name}\":\n{}\n---\n{tail}",
+                quoted.join("\n")
             );
             let nid = SpineState::create_notification(
                 &mut app.state,

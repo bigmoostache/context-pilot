@@ -39,7 +39,10 @@ use crate::types::{FocusState, ThreadStatus, ThreadsState};
 /// [`acknowledged`](crate::types::ThreadMessage::acknowledged) flag (user
 /// messages start `false`, flip `true` on read) — the design decision confirmed
 /// for this feature.
-pub fn take_idle_autoread(state: &mut State) -> Option<(String, String)> {
+///
+/// Returns the unseen messages' inlined text (same format and cap as the
+/// streaming push) so the caller's notification shows them directly.
+pub fn take_idle_autoread(state: &mut State) -> Option<StreamingPush> {
     let tid = FocusState::get(state).focused_thread_id.clone()?;
     let ts = ThreadsState::get(state);
     let thread = ts.threads.iter().find(|t| t.id == tid)?;
@@ -51,18 +54,23 @@ pub fn take_idle_autoread(state: &mut State) -> Option<(String, String)> {
     }
     let name = thread.name.clone();
 
-    // Acknowledge everything (the panel now "reaches" these messages) ...
+    // Inline + acknowledge every unseen message (the panel now "reaches" them) ...
+    let mut messages = Vec::new();
+    let mut truncated = false;
     let ts_mut = ThreadsState::get_mut(state);
     if let Some(t) = ts_mut.threads.iter_mut().find(|t| t.id == tid) {
-        for msg in &mut t.messages {
+        for msg in t.messages.iter_mut().filter(|m| !m.acknowledged) {
             msg.acknowledged = true;
+            let (text, cut) = inline_text(msg.content.as_deref(), msg.file_path.as_deref());
+            truncated |= cut;
+            messages.push(text);
         }
     }
     // ... and force the Threads panel to re-emit fresh this tick.
     let now_ms = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis().to_u64());
     rebuild_threads_panel(state, &tid, now_ms);
 
-    Some((tid, name))
+    Some(StreamingPush { tid, name, messages, truncated })
 }
 
 /// Branch B of the incoming-message behavior — **inline push** while streaming.
