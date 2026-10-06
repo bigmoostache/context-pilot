@@ -22,6 +22,7 @@
 
 use std::collections::BTreeMap;
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
 
@@ -159,13 +160,16 @@ pub(crate) fn populate_from_yaml(descriptions: &mut Vec<TreeFileDescription>) {
 /// (i.e. the file content changed — branch switch, external edit), check
 /// whether the YAML has an entry keyed by the **current** content.  If so,
 /// swap the description and hash in-place.  Returns `true` if anything changed.
-pub(crate) fn refresh_stale_from_yaml(descriptions: &mut [TreeFileDescription]) -> bool {
-    let map = sync().load::<YamlEntry>();
+///
+/// Runs on the cache worker thread: mutates the worker's copy and returns one
+/// [`DescPatch`] per swap so the main thread can replay them cheaply.
+pub(crate) fn refresh_stale_from_yaml(descriptions: &mut [TreeFileDescription]) -> Vec<DescPatch> {
+    let map = load_cached();
     if map.is_empty() {
-        return false;
+        return Vec::new();
     }
 
-    let mut changed = false;
+    let mut patches = Vec::new();
     for desc in descriptions.iter_mut() {
         let file_path = Path::new(&desc.path);
         let Some(current_hash) = compute_file_hash(file_path) else { continue };
@@ -180,12 +184,63 @@ pub(crate) fn refresh_stale_from_yaml(descriptions: &mut [TreeFileDescription]) 
         let current_key = compute_description_key(&desc.path, &content);
 
         if let Some(entry) = map.get(&current_key) {
+            let old_hash = std::mem::replace(&mut desc.file_hash, current_hash);
             desc.description.clone_from(&entry.description);
-            desc.file_hash = current_hash;
+            patches.push(DescPatch {
+                path: desc.path.clone(),
+                old_hash,
+                description: desc.description.clone(),
+                file_hash: desc.file_hash.clone(),
+            });
+        }
+    }
+    patches
+}
+
+/// One stale-description swap computed off-thread by [`refresh_stale_from_yaml`].
+pub(crate) struct DescPatch {
+    /// Described path.
+    pub path: String,
+    /// Hash the description carried when the worker snapshotted it; the patch
+    /// is skipped if the live entry moved on (e.g. a racing `tree_describe`).
+    pub old_hash: String,
+    /// Fresh description text from the YAML.
+    pub description: String,
+    /// Current content hash of the file.
+    pub file_hash: String,
+}
+
+/// Apply worker-computed patches to the live descriptions. Returns `true` if
+/// any entry changed.
+pub(crate) fn apply_patches(descriptions: &mut [TreeFileDescription], patches: Vec<DescPatch>) -> bool {
+    let mut changed = false;
+    for patch in patches {
+        let live = descriptions.iter_mut().find(|d| d.path == patch.path);
+        if let Some(desc) = live.filter(|d| d.file_hash == patch.old_hash) {
+            desc.description = patch.description;
+            desc.file_hash = patch.file_hash;
             changed = true;
         }
     }
     changed
+}
+
+/// Parsed YAML plus the `(mtime, len)` signature it was parsed at.
+type YamlCache = Option<((Option<std::time::SystemTime>, u64), Arc<BTreeMap<String, YamlEntry>>)>;
+
+/// Process-wide parse cache for the (multi-MB) shared YAML.
+static YAML_CACHE: Mutex<YamlCache> = Mutex::new(None);
+
+/// The shared YAML map, re-parsed only when the file's mtime or size changed.
+fn load_cached() -> Arc<BTreeMap<String, YamlEntry>> {
+    let sig = std::fs::metadata(SHARED_YAML).map_or((None, 0), |m| (m.modified().ok(), m.len()));
+    let mut slot = YAML_CACHE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some(map) = slot.as_ref().filter(|entry| entry.0 == sig).map(|entry| Arc::clone(&entry.1)) {
+        return map;
+    }
+    let map = Arc::new(sync().load::<YamlEntry>());
+    *slot = Some((sig, Arc::clone(&map)));
+    map
 }
 
 /// Migrate existing in-memory descriptions into the YAML store (first-run).
