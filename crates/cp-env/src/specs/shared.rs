@@ -46,6 +46,15 @@ pub(super) static DEV: &[Spec] = &[
         ..Spec::BASE
     },
     Spec {
+        name: "CP_MEASURE_LOOPS",
+        kind: Kind::U64,
+        fallback: Fallback::Literal("0"),
+        scope: Scope::Agent,
+        group: Group::Dev,
+        doc: "Set by `run.sh --measure N`: profile N main-loop iterations, write `tmp/loop-profile.html`, then exit (`0` = off).",
+        ..Spec::BASE
+    },
+    Spec {
         name: "CP_RUN_SH",
         kind: Kind::Bool,
         fallback: Fallback::Literal("0"),

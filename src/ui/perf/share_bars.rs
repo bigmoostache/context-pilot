@@ -60,14 +60,17 @@ fn render_one(share_bar: &PerfShareBar) -> Line<'static> {
     let mut spans = vec![Span::styled(format!(" {:<5}", share_bar.label), semantic_to_style(Semantic::Muted))];
     let mut used = 0usize;
     for (&pct, colour) in share_bar.shares.iter().zip(PALETTE.iter().copied().cycle()) {
-        let cells = float_math::mul(float_math::div(pct, 100.0f64), BAR_CELLS.to_f64()).round().to_usize();
-        let cells = cells.min(BAR_CELLS.saturating_sub(used));
+        let want = float_math::mul(float_math::div(pct, 100.0f64), BAR_CELLS.to_f64()).round().to_usize();
+        let cells = want.min(BAR_CELLS.saturating_sub(used));
         if cells > 0 {
             spans.push(Span::styled(chars::BLOCK_FULL.repeat(cells), Style::default().fg(colour)));
             used = used.saturating_add(cells);
         }
     }
-    spans.push(Span::styled(chars::BLOCK_LIGHT.repeat(BAR_CELLS.saturating_sub(used)), semantic_to_style(Semantic::Muted)));
+    spans.push(Span::styled(
+        chars::BLOCK_LIGHT.repeat(BAR_CELLS.saturating_sub(used)),
+        semantic_to_style(Semantic::Muted),
+    ));
     spans.push(Span::styled(format!(" {}", share_bar.total_display), semantic_to_style(Semantic::Muted)));
     Line::from(spans)
 }

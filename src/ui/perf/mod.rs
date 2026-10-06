@@ -354,13 +354,11 @@ impl PerfMetrics {
         self.loop_count.fetch_add(1, Ordering::Relaxed).saturating_add(1)
     }
 
-    /// `--measure N` target loop count, parsed once from `CP_MEASURE_LOOPS`.
-    /// `None` when unset/invalid/zero — measurement dump is disabled.
+    /// `--measure N` target loop count, from `CP_MEASURE_LOOPS` (validated by
+    /// cp-env). `None` when zero/unset — measurement dump is disabled.
     pub(crate) fn measure_target() -> Option<u64> {
-        static TARGET: std::sync::OnceLock<Option<u64>> = std::sync::OnceLock::new();
-        *TARGET.get_or_init(|| {
-            std::env::var("CP_MEASURE_LOOPS").ok().and_then(|v| v.trim().parse::<u64>().ok()).filter(|&n| n > 0)
-        })
+        let n = cp_env::env().dev.measure_loops;
+        (n > 0).then_some(n)
     }
 
     /// Per-iteration measurement hook for `--measure N`. Ticks the loop counter

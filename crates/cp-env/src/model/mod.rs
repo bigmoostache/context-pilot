@@ -73,6 +73,8 @@ pub struct Bridge {
 pub struct Dev {
     /// Flame-graph profiling.
     pub flamegraph: bool,
+    /// `run.sh --measure N` main-loop profiling target (0 = off).
+    pub measure_loops: u64,
     /// Supervised by `run.sh` (no self re-exec).
     pub run_sh: bool,
     /// Show `.context-pilot/` in the tree tool.
@@ -136,6 +138,7 @@ impl Env {
             features: features::Features::from_raw(raw),
             dev: Dev {
                 flamegraph: raw.flag("CP_FLAMEGRAPH").unwrap_or_default(),
+                measure_loops: raw.integer("CP_MEASURE_LOOPS").unwrap_or_default(),
                 run_sh: raw.flag("CP_RUN_SH").unwrap_or_default(),
                 show_context_pilot_in_tree: raw.flag("SHOW_CONTEXT_PILOT_IN_TREE").unwrap_or_default(),
             },

@@ -140,6 +140,7 @@ Local development only.
 | Variable | Type | Default | Scope | Required | Description |
 |---|---|---|---|---|---|
 | `CP_FLAMEGRAPH` | bool (0/1/true/false) | `0` | agent |  | Write flame-graph profiling data (`run.sh --flamegraph`). |
+| `CP_MEASURE_LOOPS` | integer | `0` | agent |  | Set by `run.sh --measure N`: profile N main-loop iterations, write `tmp/loop-profile.html`, then exit (`0` = off). |
 | `CP_RUN_SH` | bool (0/1/true/false) | `0` | agent |  | Set by `run.sh`: the supervisor script handles reloads, so the agent must not re-exec itself. |
 | `SHOW_CONTEXT_PILOT_IN_TREE` | bool (0/1/true/false) | `0` | agent |  | Show the `.context-pilot/` directory in the tree tool. |
 

@@ -4,11 +4,11 @@
 //! function returning IR types. No ratatui, no Frame, no caching — just
 //! state → data transformation. Caching lives in the adapter layer (Phase 5).
 
+use cp_render::conversation::PerfShareBar;
 use cp_render::conversation::{
     Autocomplete, AutocompleteEntry, Conversation, HistorySection, InputArea, Message as IrMessage, Overlay,
     PerfBudgetBar, PerfMeiliStats, PerfOp, PerfOverlay, StreamingTool, ToolResultPreview, ToolUsePreview,
 };
-use cp_render::conversation::PerfShareBar;
 use cp_render::{Block, Semantic};
 
 use crate::state::{Kind, MsgKind, MsgStatus, State, ToolResultRecord, ToolUseRecord};
@@ -360,11 +360,14 @@ fn loop_substeps(snapshot: &crate::ui::perf::PerfSnapshot) -> Vec<&crate::ui::pe
     snapshot.ops.iter().filter(|op| op.name.starts_with("loop.") && op.name != "loop.idle").collect()
 }
 
+/// Extracts one lifetime metric (µs or µs²) from an op snapshot.
+type Metric = fn(&crate::ui::perf::OpSnapshot) -> f64;
+
 /// Three stacked share-bars (mean / variance / max) over the loop substeps:
 /// each segment is that substep's percentage of the metric's sum.
 fn build_perf_share_bars(snapshot: &crate::ui::perf::PerfSnapshot) -> Vec<PerfShareBar> {
     let steps = loop_substeps(snapshot);
-    let metrics: [(&str, &str, fn(&crate::ui::perf::OpSnapshot) -> f64); 3] = [
+    let metrics: [(&str, &str, Metric); 3] = [
         ("mean", "\u{b5}s", |op| op.mean_us),
         ("var", "\u{b5}s\u{b2}", |op| op.variance_us2),
         ("max", "\u{b5}s", |op| op.max_us),
