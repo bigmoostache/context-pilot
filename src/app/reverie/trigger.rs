@@ -39,9 +39,21 @@ pub(crate) fn check_threshold_trigger(state: &mut State) -> bool {
     // Start the reverie session with the default cleaner agent
     let mut rev = Session::new(Kind::ContextOptimizer, "cleaner".to_owned(), None);
     rev.queue_active = true;
+    rev.thread_id = owner_thread_id(state);
     let _r = state.reveries.insert("cleaner".to_owned(), rev);
 
     true
+}
+
+/// Resolve the thread that owns the current context: the resident thread (the
+/// one whose runtime is swapped into `state`), falling back to the focused
+/// pointer. Reverie lifecycle notifications are routed back here so they land
+/// on the launching thread, not wherever focus drifts while the reverie runs.
+fn owner_thread_id(state: &State) -> Option<String> {
+    state
+        .resident_thread_id
+        .clone()
+        .or_else(|| cp_mod_threads::types::FocusState::get(state).focused_thread_id.clone())
 }
 
 /// Start a reverie from the `optimize_context` tool (manual trigger).
@@ -65,6 +77,7 @@ pub(crate) fn start_manual_reverie(state: &mut State, agent_id: String, context:
     // Start the reverie session
     let mut rev = Session::new(Kind::ContextOptimizer, agent_id.clone(), context);
     rev.queue_active = true;
+    rev.thread_id = owner_thread_id(state);
     let _r = state.reveries.insert(agent_id, rev);
 
     true

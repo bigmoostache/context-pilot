@@ -24,7 +24,8 @@ use cp_mod_threads::types::{FocusState, ThreadMessage, ThreadsState};
 
 /// Branch A + B of the incoming-message behavior, run once per main-loop tick on
 /// the **focused** thread (the resident at rest, per the resident=focused
-/// invariant). Splits on the agent's stream phase:
+/// invariant). Splits on `was_streaming` — the agent's stream phase snapshotted
+/// by the caller BEFORE `finalize_stream` runs this tick (see the call site):
 ///
 /// - **Streaming (Branch B):** do not interrupt. For each focused-thread message
 ///   that is unseen (`!acknowledged`) and not yet pushed (`!has_been_pushed`),
@@ -42,10 +43,17 @@ use cp_mod_threads::types::{FocusState, ThreadMessage, ThreadsState};
 /// deduplicated on their `(kind, source)` key by the spine. Focused-thread only
 /// (background `MY_TURN` threads are the dispatcher's job), so this is
 /// N=1-correct and a no-op whenever the focused thread has nothing new.
-pub(super) fn handle_incoming_focused_messages(app: &mut App) {
+pub(super) fn handle_incoming_focused_messages(app: &mut App, was_streaming: bool) {
     use cp_mod_spine::types::{NotificationType, SpineState};
 
-    if app.state.stream.phase.is_streaming() {
+    // `was_streaming` is snapshotted by the caller BEFORE `finalize_stream` runs
+    // this tick. We must NOT read `app.state.stream.phase.is_streaming()` here:
+    // `finalize_stream` applies the turn's `pending_done` and transitions the
+    // phase to `Idle` just before this hook, so the instantaneous phase is
+    // almost always `Idle` mid-turn (e.g. between the micro-turns of a blocking
+    // tool chain). Using the pre-finalize snapshot restores the intended
+    // "was the agent mid-turn this tick?" semantics so Branch B fires.
+    if was_streaming {
         // Branch B — inline push, non-interrupting.
         if let Some((tid, name, count)) = cp_mod_threads::incoming::take_streaming_push(&mut app.state) {
             let content = format!(

@@ -280,11 +280,17 @@ impl App {
         super::watchers::check_timer_based_deprecation(self);
         super::tools::watchdog::mark(super::tools::watchdog::Step::Tools);
         super::tools::pipeline::handle_tool_execution(self);
+        // Snapshot "mid-turn this tick" BEFORE `finalize_stream` — it applies
+        // the turn's `pending_done` and flips the phase to `Idle`, so reading
+        // the phase AFTER it (inside the hook) would almost always see `Idle`
+        // mid-turn and wrongly take the idle auto-read branch instead of the
+        // inline streaming push.
+        let was_streaming = self.state.stream.phase.is_streaming();
         super::streaming::finalize_stream(self);
         // Incoming-message behavior on the focused thread: inline push while
         // streaming, idle auto-read otherwise. Runs before the spine check so an
         // idle auto-read's continuation nudge is picked up this same tick.
-        super::threads::handle_incoming_focused_messages(self);
+        super::threads::handle_incoming_focused_messages(self, was_streaming);
         super::tools::watchdog::mark(super::tools::watchdog::Step::Spine);
         self.check_spine();
         super::streaming::process_api_check_results(self);
