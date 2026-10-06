@@ -30,6 +30,10 @@ pub(super) struct StreamContext {
 pub(super) struct ReverieContext {
     /// Agent ID driving this reverie (e.g., "cleaner", "cartographer")
     pub agent_id: String,
+    /// Optional directive (from `optimize_context`) injected into the preamble.
+    /// Carried here so prompt building never looks the reverie up in the
+    /// `state.reveries` map — that map is keyed by an opaque per-thread slot.
+    pub directive: Option<String>,
     /// The reverie's own conversation messages (may be empty on first run)
     pub messages: Vec<Message>,
     /// Tool restrictions preamble injected at the top of the reverie conversation
@@ -184,7 +188,7 @@ fn build_reverie_stream_context(
     context_items.push(ContextItem::new(
         "P-reverie",
         "Reverie Context (tool restrictions + conversation)",
-        build_reverie_panel_content(state, &rev),
+        build_reverie_panel_content(&rev),
         crate::app::panels::now_ms(),
     ));
 
@@ -197,7 +201,7 @@ fn build_reverie_stream_context(
 /// Build the `P-reverie` panel body: agent instructions (injected here, NOT as
 /// system prompt, to preserve cache hits) + additional context + tool
 /// restrictions + a conversation-follows marker.
-fn build_reverie_panel_content(state: &State, rev: &ReverieContext) -> String {
+fn build_reverie_panel_content(rev: &ReverieContext) -> String {
     let mut content = String::new();
     let agents = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Agent);
     if let Some(agent) = agents.iter().find(|a| a.id == rev.agent_id) {
@@ -205,9 +209,7 @@ fn build_reverie_panel_content(state: &State, rev: &ReverieContext) -> String {
         content.push_str(&agent.content);
         content.push('\n');
     }
-    if let Some(rev_state) = state.reveries.get(&rev.agent_id)
-        && let Some(ctx) = rev_state.context.as_ref()
-    {
+    if let Some(ctx) = rev.directive.as_ref() {
         content.push_str("\n## Additional Context\n");
         content.push_str(ctx);
         content.push('\n');

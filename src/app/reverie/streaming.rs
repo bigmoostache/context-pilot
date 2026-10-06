@@ -23,11 +23,18 @@ use super::tools;
 ///
 /// # Panics
 /// Only call when `state.reveries` contains the given `agent_id`.
-pub(crate) fn start_reverie_stream(state: &mut State, agent_id: &str, tx: Sender<StreamEvent>) {
+pub(crate) fn start_reverie_stream(state: &mut State, slot: &str, tx: Sender<StreamEvent>) {
+    // `slot` is the opaque per-thread map key. The agent's real identity (for
+    // prompt loading) and its directive live on the Session, NOT in the key.
+    let (agent_id, directive) = state
+        .reveries
+        .get(slot)
+        .map_or_else(|| (slot.to_owned(), None), |r| (r.agent_id.clone(), r.context.clone()));
+
     // Get the reverie's own messages (empty on first launch) and trim whitespace.
     // On first launch, inject a user kickoff message so the conversation starts
     // with a user turn — some models don't support assistant prefill.
-    let mut reverie_messages = state.reveries.get(agent_id).map(|r| r.messages.clone()).unwrap_or_default();
+    let mut reverie_messages = state.reveries.get(slot).map(|r| r.messages.clone()).unwrap_or_default();
     if reverie_messages.is_empty() {
         reverie_messages.push(cp_base::state::data::message::Message::new_user(
             "reverie-kickoff".to_owned(),
@@ -49,7 +56,7 @@ pub(crate) fn start_reverie_stream(state: &mut State, agent_id: &str, tx: Sender
     // will be moved into ReverieContext. The seed is the reverie's identity injection
     // (agent instructions + directive + tool restrictions), diverging from the main
     // worker's seed while sharing the exact same system prompt + panels + tools.
-    let reverie_seed = build_reverie_seed(state, agent_id, &tool_restrictions);
+    let reverie_seed = build_reverie_seed(&agent_id, directive.as_deref(), &tool_restrictions);
 
     // Use the EXACT same prepare_stream_context as the main worker.
     // Passing ReverieContext replaces the conversation section with
@@ -57,7 +64,7 @@ pub(crate) fn start_reverie_stream(state: &mut State, agent_id: &str, tx: Sender
     let ctx = prepare_stream_context(
         state,
         true,
-        Some(ReverieContext { agent_id: agent_id.to_owned(), messages: reverie_messages, tool_restrictions }),
+        Some(ReverieContext { agent_id, directive, messages: reverie_messages, tool_restrictions }),
     );
 
     // Fire the stream using the SAME provider/model/system prompt as the main worker.
@@ -72,7 +79,7 @@ pub(crate) fn start_reverie_stream(state: &mut State, agent_id: &str, tx: Sender
 /// Contains the reverie agent's instructions, any user-provided directive, and tool
 /// restrictions. This is what makes the reverie behave differently from the main worker
 /// despite sharing the exact same system prompt, panels, and tools.
-fn build_reverie_seed(state: &State, agent_id: &str, tool_restrictions: &str) -> String {
+fn build_reverie_seed(agent_id: &str, directive: Option<&str>, tool_restrictions: &str) -> String {
     let mut seed = String::new();
 
     // Agent instructions (cleaner / cartographer / etc.)
@@ -86,9 +93,7 @@ fn build_reverie_seed(state: &State, agent_id: &str, tool_restrictions: &str) ->
     }
 
     // Additional context (directive from optimize_context tool)
-    if let Some(rev_state) = state.reveries.get(agent_id)
-        && let Some(ctx) = rev_state.context.as_ref()
-    {
+    if let Some(ctx) = directive {
         seed.push_str("\n## Directive\n");
         seed.push_str(ctx);
         seed.push('\n');
