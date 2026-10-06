@@ -16,18 +16,37 @@ pub(super) fn provider_openrouter() -> ProviderDef {
     ProviderDef {
         id: "openrouter",
         name: "OpenRouter",
-        description: "Aggregator \u{2014} Space Bunny \u{b7} GLM 5.3 \u{b7} Nemotron 3 \u{b7} DeepSeek V4.1",
-        models: vec![
+        description: "Aggregator \u{2014} Apodex 1.1 \u{b7} Solar Mini 4 \u{b7} GLM 5.3 \u{b7} Nemotron 3 \u{b7} DeepSeek V4.1",
+        models: openrouter_models(),
+    }
+}
+
+/// The curated `OpenRouter` model catalogue, split out of
+/// [`provider_openrouter`] so that constructor stays within the clippy
+/// `too_many_lines` cap. Order is the frontend picker order (Apodex default).
+fn openrouter_models() -> Vec<ModelDef> {
+    vec![
             ModelDef {
-                id: "space-bunny-alpha",
-                api_name: "stealth/space-bunny-alpha",
-                display_name: "Space Bunny Alpha",
-                context_window: 1_000_000,
+                id: "apodex11-mini",
+                api_name: "apodex/apodex-1.1-mini:free",
+                display_name: "Apodex 1.1 Mini (free)",
+                context_window: 0x0004_0000,
                 max_output: 128_000,
                 input_price: 0.0,
                 output_price: 0.0,
                 badge: Some("Free"),
                 is_default: true,
+            },
+            ModelDef {
+                id: "solar-mini4",
+                api_name: "upstage/solar-mini4",
+                display_name: "Solar Mini 4",
+                context_window: 0x0008_0000,
+                max_output: 128_000,
+                input_price: 0.05,
+                output_price: 0.20,
+                badge: None,
+                is_default: false,
             },
             ModelDef {
                 id: "glm53-flash",
@@ -62,6 +81,5 @@ pub(super) fn provider_openrouter() -> ProviderDef {
                 badge: None,
                 is_default: false,
             },
-        ],
-    }
+    ]
 }

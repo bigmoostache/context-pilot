@@ -110,19 +110,20 @@ fn build_models(state: &State, model_entry: &ModelEntryFn) -> (String, Vec<Confi
         ],
         LlmProvider::OpenRouter => vec![
             model_entry(
-                state.openrouter_model == OpenRouterModel::SpaceBunnyAlpha,
+                state.openrouter_model == OpenRouterModel::Apodex11Mini,
                 "a",
-                &OpenRouterModel::SpaceBunnyAlpha,
+                &OpenRouterModel::Apodex11Mini,
             ),
-            model_entry(state.openrouter_model == OpenRouterModel::Glm53Flash, "b", &OpenRouterModel::Glm53Flash),
+            model_entry(state.openrouter_model == OpenRouterModel::Solar4Mini, "b", &OpenRouterModel::Solar4Mini),
+            model_entry(state.openrouter_model == OpenRouterModel::Glm53Flash, "c", &OpenRouterModel::Glm53Flash),
             model_entry(
                 state.openrouter_model == OpenRouterModel::Nemotron3Ultra,
-                "c",
+                "d",
                 &OpenRouterModel::Nemotron3Ultra,
             ),
             model_entry(
                 state.openrouter_model == OpenRouterModel::DeepSeekV41Flash,
-                "d",
+                "e",
                 &OpenRouterModel::DeepSeekV41Flash,
             ),
         ],

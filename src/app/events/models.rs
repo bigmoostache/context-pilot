@@ -71,13 +71,14 @@ const fn minimax_model(idx: usize) -> Action {
     }
 }
 
-/// `OpenRouter` model for letter index (`a`–`d`).
+/// `OpenRouter` model for letter index (`a`–`e`).
 const fn openrouter_model(idx: usize) -> Action {
     match idx {
-        0 => Action::ConfigSelectOpenRouterModel(OpenRouterModel::SpaceBunnyAlpha),
-        1 => Action::ConfigSelectOpenRouterModel(OpenRouterModel::Glm53Flash),
-        2 => Action::ConfigSelectOpenRouterModel(OpenRouterModel::Nemotron3Ultra),
-        3 => Action::ConfigSelectOpenRouterModel(OpenRouterModel::DeepSeekV41Flash),
+        0 => Action::ConfigSelectOpenRouterModel(OpenRouterModel::Apodex11Mini),
+        1 => Action::ConfigSelectOpenRouterModel(OpenRouterModel::Solar4Mini),
+        2 => Action::ConfigSelectOpenRouterModel(OpenRouterModel::Glm53Flash),
+        3 => Action::ConfigSelectOpenRouterModel(OpenRouterModel::Nemotron3Ultra),
+        4 => Action::ConfigSelectOpenRouterModel(OpenRouterModel::DeepSeekV41Flash),
         _ => Action::None,
     }
 }
