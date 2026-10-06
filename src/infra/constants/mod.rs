@@ -96,6 +96,9 @@ pub(crate) const MESSAGES_DIR: &str = "messages";
 /// Shared config file name (new multi-worker format)
 pub(crate) const CONFIG_FILE: &str = "config.json";
 
+/// Owner-PID file name: a few bytes, so `check_ownership` never parses `config.json`.
+pub(crate) const OWNER_FILE: &str = "owner.pid";
+
 /// Worker states subdirectory
 pub(crate) const STATES_DIR: &str = "states";
 

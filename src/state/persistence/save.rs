@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use cp_mod_logs::types::LogsState;
 
-use crate::infra::constants::{CONFIG_FILE, DEFAULT_WORKER_ID, STORE_DIR};
+use crate::infra::constants::{CONFIG_FILE, DEFAULT_WORKER_ID, OWNER_FILE, STORE_DIR};
 use crate::state::{Kind, Message, PanelData, SharedConfig, State, WorkerState};
 
 use super::config::current_pid;
@@ -267,6 +267,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     };
 
     writes.extend(shared_config_op(state, global_modules, &dir));
+    writes.push(WriteOp { path: dir.join(OWNER_FILE), content: current_pid().to_string().into_bytes() });
 
     // Chunked log files (global, shared across workers)
     {
@@ -359,7 +360,13 @@ pub(crate) fn save_state(state: &State) {
 
 /// Check if we still own the state file (another instance may have taken over).
 /// Returns false if another process has claimed ownership.
+///
+/// Reads the tiny `owner.pid` file. Falls back to parsing `config.json` only
+/// when `owner.pid` is absent (state written by a build predating it).
 pub(crate) fn check_ownership() -> bool {
+    if let Ok(raw) = fs::read_to_string(PathBuf::from(STORE_DIR).join(OWNER_FILE)) {
+        return raw.trim().parse::<u32>().ok().is_none_or(|owner| owner == current_pid());
+    }
     if let Some(cfg) = super::config::load_config()
         && let Some(owner) = cfg.owner_pid
     {
