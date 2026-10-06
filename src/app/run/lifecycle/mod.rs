@@ -18,11 +18,11 @@ use crate::ui;
 use crate::app::App;
 use crate::app::context::{build_stream_params, get_active_agent_content, prepare_stream_context};
 
+/// Spinner-animation redraw cadence (extracted for the 500-line cap).
+mod animation;
 /// Background-thread advancement: swap-in/step/swap-out each non-resident active
 /// thread around the shared pipeline (Phase C). No-op at N=1.
 mod fleet;
-/// Spinner-animation redraw cadence (extracted for the 500-line cap).
-mod animation;
 /// Fleet lifecycle I/O (Phase F): console orphan-prune, N-thread save, hard-delete
 /// teardown, Errored re-engage. Split from `fleet` for the 500-line cap.
 mod fleet_lifecycle;
@@ -82,6 +82,10 @@ impl App {
 
         self.auto_resume_stream_if_flagged();
 
+        // `--measure N`: force-enable perf monitoring from the first loop so
+        // every substep's timing accumulates (bypasses the F12 toggle).
+        ui::perf::PERF.enable_if_measuring();
+
         loop {
             let current_ms = now_ms();
             let _fg = cp_base::flame!("loop");
@@ -130,6 +134,14 @@ impl App {
             }
 
             super::tools::watchdog::mark(super::tools::watchdog::Step::Idle);
+
+            // `--measure N`: once N iterations are recorded, dump the HTML
+            // loop-profile report and exit cleanly (no further poll/park).
+            if ui::perf::PERF.tick_measure() {
+                self.writer.flush();
+                break;
+            }
+
             let _r = event::poll(Duration::from_millis(self.compute_poll_ms()))?;
         }
 
