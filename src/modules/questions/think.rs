@@ -65,20 +65,19 @@ pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Bring counter to at least 1, then increment from there
-    let count = {
+    {
         let ts = state.ext_mut::<ThinkState>();
         ts.consecutive_count = ts.consecutive_count.saturating_add(1).max(1i32);
         // Reset notification schedule since we're thinking again
         ts.next_notification_at = ts.reminder_threshold;
-        ts.consecutive_count
-    };
+    }
 
-    let status = format!(
-        "Thought {count} in a row — keep going if useful; thinking is cheap and sharpens your output.\n\n\
+    // Neutral wording: "think more / thinking is cheap" phrasing in this result
+    // triggered Opus 5.5 `stop_reason: refusal` (T772, 0/5 refusals once removed).
+    let status = "Plan recorded.\n\n\
          Now update your Todo roadmap before acting (mark done/in-progress, prune, add sub-items). \
-         It matters: planning sharpens you, it feeds the user's progress UI, and it lets you pass \
-         accurate 'task_id' values."
-    );
+         It matters: it feeds the user's progress UI and lets you pass accurate 'task_id' values."
+        .to_owned();
 
     let mut result = ToolResult::new(tool.id.clone(), status, false);
     result.preserves_tempo = true;
