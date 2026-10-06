@@ -36,7 +36,15 @@ pub(crate) fn write_report(snapshot: &PerfSnapshot) -> std::io::Result<&'static 
 
 /// Build the complete self-contained HTML document.
 fn render_html(snapshot: &PerfSnapshot) -> String {
-    let ops = &snapshot.ops;
+    // Pies need disjoint slices: only level-1 steps (`loop.<step>`, no deeper
+    // dot) partition the loop's wall time. Nested rows go to the table only.
+    let level1: Vec<OpSnapshot> = snapshot
+        .ops
+        .iter()
+        .filter(|op| op.name.strip_prefix("loop.").is_some_and(|step| !step.contains('.')))
+        .cloned()
+        .collect();
+    let ops = &level1;
     let mean_pie = pie_svg(ops, |op| op.mean_us);
     let var_pie = pie_svg(ops, |op| op.variance_us2);
     let max_pie = pie_svg(ops, |op| op.max_us);

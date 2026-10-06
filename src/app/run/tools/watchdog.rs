@@ -204,6 +204,13 @@ pub(crate) fn mark(step: Step) {
     record_step_timing(step);
 }
 
+/// Perf key (`loop.<step>`) of the main-loop step in flight on this thread.
+/// `None` off the main thread or before the first [`mark`]: nested profile
+/// guards then keep their bare leaf name.
+pub(crate) fn current_perf_step() -> Option<&'static str> {
+    LAST_STEP.with(Cell::get).map(|(step, _)| step.perf_name())
+}
+
 /// Attribute the just-finished step's elapsed time (µs) to the perf system,
 /// keyed by its [`perf_name`](Step::perf_name), then arm the next step. No-op
 /// on the perf side unless monitoring is enabled (F12 overlay or `--measure`),

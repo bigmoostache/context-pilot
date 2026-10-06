@@ -6,11 +6,24 @@
 //!   // automatically logs when guard drops if > threshold
 //!
 //! View results: tail -f .context-pilot/perf.log
+//!
+//! ## Hierarchical names
+//!
+//! While perf monitoring is on, every guard's perf key is its full nesting
+//! path: `<parent>.<leaf>`. The parent is the innermost open guard on this
+//! thread, else the main-loop step in flight (`loop.<step>`, from the
+//! watchdog). So `ui::render` opened during `loop.input` records as
+//! `loop.input.ui_render`, and a guard nested inside it as
+//! `loop.input.ui_render.<leaf>`. A name with N dots is therefore included in
+//! the name with N-1 dots that prefixes it: only siblings may be summed.
 
 use cp_base::cast::Safe as _;
 use cp_base::panels::time_arith;
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::Write as _;
+use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
 
 /// Minimum duration (ms) before an operation is logged to disk.
@@ -18,18 +31,54 @@ const THRESHOLD_MS: u128 = 5;
 /// Path to the on-disk performance log file.
 const LOG_FILE: &str = ".context-pilot/perf.log";
 
+thread_local! {
+    /// Full perf keys of the guards currently open on this thread, innermost last.
+    static PATH: RefCell<Vec<&'static str>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Interned full path names. The set is bounded (static leaves × loop steps),
+/// so leaking each distinct name once is fine and keeps `record_op`'s
+/// `&'static str` key.
+fn intern(full: String) -> &'static str {
+    static NAMES: OnceLock<Mutex<HashMap<String, &'static str>>> = OnceLock::new();
+    let mut names =
+        NAMES.get_or_init(|| Mutex::new(HashMap::new())).lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some(&name) = names.get(&full) {
+        return name;
+    }
+    let leaked: &'static str = Box::leak(full.clone().into_boxed_str());
+    let _prev = names.insert(full, leaked);
+    leaked
+}
+
 /// RAII guard that records elapsed time on drop.
 pub(crate) struct ProfileGuard {
-    /// Name of the profiled operation.
+    /// Leaf name, as written at the call site (used for the slow-op file log).
+    leaf: &'static str,
+    /// Full hierarchical perf key (`leaf` itself when not nested).
     name: &'static str,
+    /// Whether `name` was pushed on [`PATH`] (popped on drop).
+    pushed: bool,
     /// Instant when the guard was created.
     start: Instant,
 }
 
 impl ProfileGuard {
     /// Create a new profile guard for the given operation name.
-    pub(crate) fn new(name: &'static str) -> Self {
-        Self { name, start: Instant::now() }
+    pub(crate) fn new(leaf: &'static str) -> Self {
+        let mut guard = Self { leaf, name: leaf, pushed: false, start: Instant::now() };
+        if !crate::ui::perf::PERF.enabled.load(std::sync::atomic::Ordering::Relaxed) {
+            return guard;
+        }
+        let parent_key =
+            PATH.with(|p| p.borrow().last().copied()).or_else(crate::app::run::tools::watchdog::current_perf_step);
+        if let Some(parent) = parent_key {
+            guard.name = intern(format!("{parent}.{}", leaf.replace("::", "_")));
+        }
+        PATH.with(|p| p.borrow_mut().push(guard.name));
+        guard.pushed = true;
+        guard.start = Instant::now();
+        guard
     }
 }
 
@@ -39,6 +88,10 @@ impl Drop for ProfileGuard {
         let us = elapsed.as_micros().to_u64();
         let ms = time_arith::us_to_ms(us);
 
+        if self.pushed {
+            let _popped = PATH.with(|p| p.borrow_mut().pop());
+        }
+
         // Always record to in-memory perf system
         crate::ui::perf::PERF.record_op(self.name, us);
 
@@ -46,7 +99,7 @@ impl Drop for ProfileGuard {
         if u128::from(ms) >= THRESHOLD_MS
             && let Ok(mut file) = OpenOptions::new().create(true).append(true).open(LOG_FILE)
         {
-            let _r = writeln!(file, "{:>6}ms  {}", ms, self.name);
+            let _r = writeln!(file, "{:>6}ms  {}", ms, self.leaf);
         }
     }
 }
@@ -72,8 +125,9 @@ pub(crate) fn log_tool_time(tool_name: &str, elapsed: std::time::Duration) {
 
 /// Create a profiling guard that logs slow operations on drop.
 ///
-/// Records timing to the in-memory perf system, and writes to `.context-pilot/perf.log`
-/// if the operation exceeds 5 ms.
+/// Records timing to the in-memory perf system under its hierarchical name
+/// (see the module docs), and writes to `.context-pilot/perf.log` if the
+/// operation exceeds 5 ms.
 #[macro_export]
 macro_rules! profile {
     ($name:expr) => {

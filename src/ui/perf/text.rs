@@ -21,13 +21,17 @@ pub(crate) fn overlay_text(snapshot: &PerfSnapshot) -> String {
     );
     let _cols = writeln!(
         out,
-        "{:<28} {:>9} {:>11} {:>14} {:>10} {:>10} {:>11}",
+        "{:<44} {:>9} {:>11} {:>14} {:>10} {:>10} {:>11}",
         "op", "samples", "mean_us", "variance_us2", "std_us", "max_us", "total_ms"
     );
-    for op in &snapshot.ops {
+    // Name order groups each `a.b` right under its parent `a`: the dump reads
+    // as a tree, and only rows with the same parent may be summed.
+    let mut ops: Vec<_> = snapshot.ops.iter().collect();
+    ops.sort_by(|a, b| a.name.cmp(b.name));
+    for op in ops {
         let _row = writeln!(
             out,
-            "{:<28} {:>9} {:>11.1} {:>14.1} {:>10.1} {:>10.0} {:>11.1}",
+            "{:<44} {:>9} {:>11.1} {:>14.1} {:>10.1} {:>10.0} {:>11.1}",
             op.name,
             op.count,
             op.mean_us,

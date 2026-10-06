@@ -357,7 +357,11 @@ fn build_perf_overlay(state: &State) -> PerfOverlay {
 /// Main-loop substep ops (`loop.*`), excluding `loop.idle`: the input-poll
 /// park would otherwise dwarf every real substep in the share-bars.
 fn loop_substeps(snapshot: &crate::ui::perf::PerfSnapshot) -> Vec<&crate::ui::perf::OpSnapshot> {
-    snapshot.ops.iter().filter(|op| op.name.starts_with("loop.") && op.name != "loop.idle").collect()
+    snapshot
+        .ops
+        .iter()
+        .filter(|op| op.name.strip_prefix("loop.").is_some_and(|step| !step.contains('.')) && op.name != "loop.idle")
+        .collect()
 }
 
 /// Extracts one lifetime metric (µs or µs²) from an op snapshot.
