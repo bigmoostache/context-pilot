@@ -771,6 +771,18 @@ M-tiny-47:
   contents: Perf ops nest as loop.<step>.<child> (runtime path, profiler.rs). Only siblings sum; a child is included in its parent. ./run.sh --measure N → tmp/loop-profile.html; F12 Ctrl+R copies dump.
   importance: medium
   last_edited_ms: 1791290207528
+M-tiny-48:
+  tier: tiny
+  title: Commit refs + no new br
+  contents: In Send, cite commits as <hash>(local|pushed) + the branch/PR it's on. Never create/push a new branch or PR unless user asks; stay on current branch+PR. Unless unsure, always commit.
+  importance: critical
+  last_edited_ms: 1791294532112
+M-tiny-49:
+  tier: tiny
+  title: Agent runs /usr/local/bin
+  contents: 'Agent runs root-owned /usr/local/bin/cpilot, not releases/<tag>/cpilot. Deploy: sudo cp target/release/tui there (user pw). Check ps+strings.'
+  importance: high
+  last_edited_ms: 1791297095116
 M-tiny-5:
   tier: tiny
   title: 'CI web-install fix:'
