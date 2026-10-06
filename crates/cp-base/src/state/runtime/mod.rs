@@ -49,6 +49,11 @@ pub struct State {
     pub config_selected_bar: usize,
     /// Global UID counter for all shared elements (messages, panels)
     pub global_next_uid: usize,
+    /// Cleaning threshold (0.0–1.0) of the context budget that triggers
+    /// auto-cleaning. Fleet-wide: the Ctrl+H setting applies to every thread.
+    pub cleaning_threshold: f32,
+    /// Context budget in tokens (`None` = model's full window). Fleet-wide.
+    pub context_budget: Option<usize>,
     /// Tool definitions with enabled state
     pub tools: Vec<ToolDefinition>,
     /// Active module IDs

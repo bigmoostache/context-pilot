@@ -24,6 +24,8 @@ impl Default for State {
             },
             config_selected_bar: 0,
             global_next_uid: 1,
+            cleaning_threshold: 0.70,
+            context_budget: None,
             tools: vec![],
             active_modules: std::collections::HashSet::new(),
             active_theme: crate::config::DEFAULT_THEME.to_owned(),

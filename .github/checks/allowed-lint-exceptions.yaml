@@ -229,18 +229,6 @@ exceptions:
       Irreducible under the 500-line file cap — the two impl blocks are the honest
       shape once State's methods exceed one file's budget.
 
-  - path: "crates/cp-base/src/state/runtime/bundle.rs"
-    match: "flat per-thread runtime initializer mirroring State::default; sub-grouping would diverge from the flat State layout the swap targets field-by-field"
-    reason: >
-      ThreadRuntime::default is a flat per-thread initializer — one `field: value`
-      line each, mirroring the per-thread subset of the flat State::default literal.
-      Grouping fields into sub-structs to shave lines would diverge from the flat
-      State layout that swap_with targets field-by-field, so it stays flat and carries
-      the length expect (threshold 60, unchanged). The twin of the State::default expect.
-    strategy: >
-      Irreducible — a flat per-thread initializer mirroring State's flat layout; the
-      honest shape, same as the accepted State::default flat-initializer expect.
-
   - path: "src/llms/mod.rs"
     match: "type_id/cause/provide are unstable or deprecated"
     reason: >

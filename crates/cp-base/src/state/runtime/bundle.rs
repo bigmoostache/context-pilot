@@ -129,11 +129,7 @@ pub struct ThreadRuntime {
     /// Last-tick output cost in USD.
     pub tick_cost_output_usd: f64,
 
-    // === Budget / guard rails ===
-    /// Cleaning threshold (0.0–1.0): triggers auto-cleaning when exceeded.
-    pub cleaning_threshold: f32,
-    /// Context budget in tokens (`None` = model's full window).
-    pub context_budget: Option<usize>,
+    // === Guard rails (cleaning threshold + budget are fleet-shared on `State`) ===
     /// Current API retry count (reset on success).
     pub api_retry_count: u32,
     /// Guard-rail block reason (set when the spine blocks, cleared on stream start).
@@ -180,15 +176,6 @@ pub struct ThreadRuntime {
 }
 
 impl Default for ThreadRuntime {
-    // Flat per-thread runtime initializer: one `field: value` line each, mirroring
-    // the per-thread subset of the flat `State::default` literal. Grouping fields
-    // into sub-structs to shave lines would diverge from the flat `State` layout
-    // that `swap_with` targets field-by-field, so it stays flat and carries the
-    // length expect (threshold 60, unchanged) — the twin of the State::default expect.
-    #[expect(
-        clippy::too_many_lines,
-        reason = "flat per-thread runtime initializer mirroring State::default; sub-grouping would diverge from the flat State layout the swap targets field-by-field"
-    )]
     fn default() -> Self {
         // Mirrors the per-thread field defaults in `State::default` so a freshly
         // created thread starts exactly like today's single resident thread.
@@ -232,8 +219,7 @@ impl Default for ThreadRuntime {
             tick_cost_hit_usd: 0.0,
             tick_cost_miss_usd: 0.0,
             tick_cost_output_usd: 0.0,
-            cleaning_threshold: 0.70,
-            context_budget: None,
+
             api_retry_count: 0,
             guard_rail_blocked: None,
             tool_sleep_until_ms: 0,
