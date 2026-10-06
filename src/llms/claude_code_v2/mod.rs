@@ -119,19 +119,20 @@ fn send_v2_request(
         .map_err(LlmError::from)
 }
 
-/// Directory for refusal request dumps (gitignored, local-only).
-const REFUSALS_DIR: &str = ".context-pilot/refusals";
-
 /// Persist the exact request that produced a `refusal` `stop_reason`, so it can
 /// be replayed and debugged later. Mirrors the format of
 /// [`helpers::dump_last_request`] (url + headers + body) but records the real
 /// V2 header signature actually sent by [`send_v2_request`], with the Bearer
-/// token redacted. Written to
-/// `.context-pilot/refusals/{worker_id}_{utc_compact}.json`.
+/// token redacted. Written to the GLOBAL
+/// `~/.context-pilot/refusals/{project}_{worker_id}_{utc_compact}.json` so
+/// refusals from every agent on the host land in one place.
 fn dump_refusal_request(worker_id: &str, model: &str, api_request: &serde_json::Value) {
+    let project_dir = std::env::current_dir().unwrap_or_default();
+    let project = project_dir.file_name().and_then(|n| n.to_str()).unwrap_or("unknown").to_owned();
     let record = serde_json::json!({
         "stop_reason": "refusal",
         "recorded_at": cp_mod_utilities::time::now_utc_rfc3339_secs(),
+        "project_dir": project_dir.display().to_string(),
         "model": model,
         "request_url": ENDPOINT,
         "request_headers": {
@@ -154,9 +155,10 @@ fn dump_refusal_request(worker_id: &str, model: &str, api_request: &serde_json::
         },
         "request_body": api_request,
     });
-    let _r1 = std::fs::create_dir_all(REFUSALS_DIR);
+    let dir = cp_env::env().core.home.join(".context-pilot").join("refusals");
+    let _r1 = std::fs::create_dir_all(&dir);
     let stamp = cp_mod_utilities::time::now_utc_compact();
-    let path = format!("{REFUSALS_DIR}/{worker_id}_{stamp}.json");
+    let path = dir.join(format!("{project}_{worker_id}_{stamp}.json"));
     let _r2 = std::fs::write(path, serde_json::to_string_pretty(&record).unwrap_or_default());
 }
 
