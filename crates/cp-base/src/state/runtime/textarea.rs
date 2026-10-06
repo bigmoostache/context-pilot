@@ -57,6 +57,12 @@ pub struct TextArea {
 }
 
 impl TextArea {
+    /// Empty buffer, no selection, empty undo ring (`const` twin of `Default`).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self { text: String::new(), cursor: 0, anchor: None, undo: VecDeque::new(), last_kind: None }
+    }
+
     // ── Selection ────────────────────────────────────────────────────
 
     /// Ordered selection range `(start, end)` if a non-collapsed selection is

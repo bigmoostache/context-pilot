@@ -138,13 +138,15 @@ fn handle_ctrl_shortcuts(key: &KeyEvent, state: &State) -> Dispatch {
         KeyCode::Char('z') => Dispatch::Act(Action::Undo),
         // Selection-priority (T797): when the composer has an active selection,
         // Ctrl+C copies that selection and wins over panel/overlay copy.
-        KeyCode::Char('c') => Dispatch::Act(if state.composer.selection_range().is_some() {
-            Action::CopySelection
-        } else if state.flags.overlays.index_status {
-            Action::CopyIndexOverlay
-        } else {
-            Action::CopyPanelContent
-        }),
+        KeyCode::Char('c') => {
+            Dispatch::Act(if crate::app::actions::threads::active_textarea(state).selection_range().is_some() {
+                Action::CopySelection
+            } else if state.flags.overlays.index_status {
+                Action::CopyIndexOverlay
+            } else {
+                Action::CopyPanelContent
+            })
+        }
         KeyCode::Backspace
         | KeyCode::Enter
         | KeyCode::Left

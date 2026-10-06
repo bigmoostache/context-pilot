@@ -37,7 +37,7 @@ pub(crate) mod input;
 /// Stream append/done/error handling.
 pub(crate) mod streaming;
 /// Thread action handlers (Thread* variants).
-mod threads;
+pub(crate) mod threads;
 
 // Re-export helpers for external use
 pub(crate) use helpers::{clean_llm_id_prefix, find_context_by_id, parse_context_pattern, switch_to_panel};
@@ -243,6 +243,15 @@ fn cycle_view_mode(state: &mut State) {
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 
+/// Apply an `Action`. Text-editing actions on the virtual "+ New Thread" row
+/// edit that row's own title textarea instead of the resident composer.
+pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
+    if threads::is_title_edit(&action) && threads::editing_new_thread_title(state) {
+        return threads::with_new_thread_title(state, action, dispatch_action);
+    }
+    dispatch_action(state, action)
+}
+
 /// Dispatch an `Action` to its handler, returning the resulting [`ActionResult`].
 ///
 /// A single flat `match` over every `Action` variant; each arm is a one-line
@@ -252,7 +261,7 @@ fn cycle_view_mode(state: &mut State) {
     clippy::too_many_lines,
     reason = "exhaustive dispatch over ~70 Action variants; splitting requires either a forbidden wildcard catch-all (wildcard_enum_match_arm) or a duplicated giant or-pattern, both worse than one flat variant→handler table — the dispatch twin of the flat State::default initializer"
 )]
-pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
+fn dispatch_action(state: &mut State, action: Action) -> ActionResult {
     // Reset scroll acceleration on any non-scroll action.
     if !matches!(action, Action::ScrollUp(_) | Action::ScrollDown(_)) {
         state.scroll_accel = 1.0;

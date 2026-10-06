@@ -8,6 +8,73 @@ use crate::state::State;
 
 use super::{Action, ActionResult};
 
+/// True while the human types a new thread's name: Threads view, active list,
+/// not drilled in, selection on the virtual "+ New Thread" row.
+pub(crate) fn editing_new_thread_title(state: &State) -> bool {
+    if state.view_mode != cp_base::state::data::config::ViewMode::Threads {
+        return false;
+    }
+    let focus = FocusState::get(state);
+    if focus.viewing_archived || focus.drilled_thread_id.is_some() {
+        return false;
+    }
+    focus.selected_thread_idx >= ThreadsState::get(state).visible_indices(false).len()
+}
+
+/// The textarea keystrokes currently edit: the new-thread title on that row,
+/// otherwise the resident composer.
+pub(crate) fn active_textarea(state: &State) -> &cp_base::state::runtime::textarea::TextArea {
+    if editing_new_thread_title(state) { &FocusState::get(state).new_thread_title } else { &state.composer }
+}
+
+/// Actions that read or mutate the focused textarea (and so must target the
+/// title textarea while it is active).
+pub(super) const fn is_title_edit(action: &Action) -> bool {
+    matches!(
+        action,
+        Action::InputBackspace
+            | Action::InputDelete
+            | Action::DeleteWordLeft
+            | Action::RemoveListItem
+            | Action::CursorWordLeft
+            | Action::CursorWordRight
+            | Action::CursorHome
+            | Action::CursorEnd
+            | Action::CursorLeft
+            | Action::CursorRight
+            | Action::CursorLeftSelect
+            | Action::CursorRightSelect
+            | Action::CursorWordLeftSelect
+            | Action::CursorWordRightSelect
+            | Action::CursorHomeSelect
+            | Action::CursorEndSelect
+            | Action::SelectAll
+            | Action::Undo
+            | Action::CopySelection
+            | Action::InputChar(_)
+            | Action::InsertText(_)
+            | Action::PasteText(_)
+            | Action::InputSubmit
+    )
+}
+
+/// Run `run` with the new-thread title swapped into `state.composer`, then swap
+/// it back, so the shared editing handlers apply unchanged. Pastes become plain
+/// inserts: a title has no paste-sentinel buffers.
+pub(super) fn with_new_thread_title(
+    state: &mut State,
+    action: Action,
+    run: fn(&mut State, Action) -> ActionResult,
+) -> ActionResult {
+    let parked_title = core::mem::take(&mut FocusState::get_mut(state).new_thread_title);
+    let draft = core::mem::replace(&mut state.composer, parked_title);
+    let edit = if let Action::PasteText(text) = action { Action::InsertText(text) } else { action };
+    let result = run(state, edit);
+    let edited_title = core::mem::replace(&mut state.composer, draft);
+    FocusState::get_mut(state).new_thread_title = edited_title;
+    result
+}
+
 /// Dispatch a no-data `Thread*` action variant to its handler.
 ///
 /// Called from the central `apply_action` match for all `Thread*` variants

@@ -111,10 +111,11 @@ fn push_new_thread_entry(lb: &mut ListBuild<'_>, state: &State, on_virtual: bool
     if on_virtual {
         lb.sel.start = Some(lb.blocks.len());
     }
-    let new_name = if on_virtual && !state.composer.text.is_empty() {
-        truncate_str(&state.composer.text, lb.inner_width.saturating_sub(6).into())
-    } else {
+    let title = &FocusState::get(state).new_thread_title.text;
+    let new_name = if title.is_empty() {
         "New Thread".to_owned()
+    } else {
+        truncate_str(title, lb.inner_width.saturating_sub(6).into())
     };
     lb.blocks.push(IrBlock::Line(vec![
         S::styled("  ".to_owned(), new_sem),
@@ -335,8 +336,8 @@ fn render_new_thread_prompt(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let inner = border.inner(area);
     frame.render_widget(border, area);
 
-    let input_preview =
-        if state.composer.text.is_empty() { "\u{2026}".to_owned() } else { state.composer.text.clone() };
+    let title = &FocusState::get(state).new_thread_title.text;
+    let input_preview = if title.is_empty() { "\u{2026}".to_owned() } else { title.clone() };
 
     let ir_blocks = vec![
         IrBlock::Empty,

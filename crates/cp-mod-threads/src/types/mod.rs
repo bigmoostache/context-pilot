@@ -2,6 +2,9 @@ use serde::{Deserialize, Serialize};
 
 use cp_base::state::runtime::State;
 
+/// Per-thread message files (`threads/<id>.json`), written only when dirty.
+pub mod persist;
+
 // =============================================================================
 // Enums
 // =============================================================================
@@ -145,7 +148,9 @@ pub struct Thread {
     pub name: String,
     /// Whose turn it is.
     pub status: ThreadStatus,
-    /// Ordered list of messages.
+    /// Ordered list of messages. Persisted in `threads/<id>.json`, not in
+    /// `config.json` (see [`persist`]); empty after a slim deserialize.
+    #[serde(default)]
     pub messages: Vec<ThreadMessage>,
     /// Creation timestamp (epoch ms).
     pub created_at: u64,
@@ -344,6 +349,10 @@ pub struct FocusState {
     /// `messages.len() > last_read_count[thread_id]`.
     #[serde(default)]
     pub last_read_count: std::collections::BTreeMap<String, usize>,
+    /// Draft name typed on the virtual "+ New Thread" row. Its own textarea
+    /// (not a thread's composer) so it survives navigation and reloads.
+    #[serde(default)]
+    pub new_thread_title: cp_base::state::runtime::textarea::TextArea,
 }
 
 impl Default for FocusState {
@@ -365,6 +374,7 @@ impl FocusState {
             archive_armed_at_ms: 0,
             viewing_archived: false,
             last_read_count: std::collections::BTreeMap::new(),
+            new_thread_title: cp_base::state::runtime::textarea::TextArea::new(),
         }
     }
 
