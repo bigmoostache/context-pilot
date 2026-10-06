@@ -3134,6 +3134,10 @@
   path: crates/cp-mod-git/src/types.rs
   description: 'Git types. GitChangeType enum #[non_exhaustive] (boss-hunt r9 kill — added in-crate const fn code() accessor M/A/U/D/R; downstream blocks.rs match rewritten to code(), import removed). GitFileChange, GitState, GitResultRequest.'
   last_edited_ms: 1784562497438
+1d9b9f66f4157a8d:
+  path: src/infra/profiler.rs
+  description: RAII ProfileGuard macro (profile!) for perf.log (>5ms). log_tool_time() appends ALL tool executions to .context-pilot/logs/tool-times.log — local datetime via cp_mod_utilities::time, elapsed ms, tool name(s).
+  last_edited_ms: 0
 1d9f8b14df8b4372:
   path: crates/cp-base/src/lib.rs
   description: 'Foundation crate entry. Inline flame graph telemetry module (Guard RAII, folded-stack output, CP_FLAMEGRAPH=1 toggle). 7 modules: cast, config, flame, modules, panels, state, tools, ui. Tests: compile-time YAML validation (20 tool + 6 config YAML files) with #[expect(clippy::panic)].'
@@ -5702,6 +5706,10 @@
   path: crates/cp-orchestrator/src/transport/files.rs
   description: 'Byte-oriented HTTP responses: static SPA (CP_WEB_ROOT), fs download/raw preview, avatar. serve_static path-traversal guard, content_type sniff. orch-clippy: clean (referenced in pub_use audit, not edited).'
   last_edited_ms: 1787890420445
+3614ab981ff704a7:
+  path: .context-pilot/shared/memories.yaml
+  description: Memory slots store (M-safe/tiny/short/mid/long, 220 fixed). Local-only, synced with commits. Mirrors the Memories panel (P6).
+  last_edited_ms: 0
 3619a30b203a6289:
   path: web/src/lib/types.ts
   description: Maquette domain types. FinderNode gained count?:number (backend folder child count). ThreadDetail.lastActivityMs now optional (mock fallback lacks it; sort tolerates undefined via ?? 0). User/Agent/Finder/Thread/Library/Usage/cockpit types.
@@ -6585,6 +6593,10 @@
 3e684ead94cd0fcf:
   path: crates/cp-mod-prompt/src/lib.rs
   description: 'Prompt library module. 3 tools: Behaviour_create, agent_load, skill_load. 2 panels: Library (fixed) + Skill (dynamic). Core, global. Edit pre-flight validates YAML frontmatter on prompt .md files. is_prompt_file() with canonicalize() for abs/rel path matching.'
+  last_edited_ms: 0
+3e6b21d59cd66f00:
+  path: src/modules/overview/panel.rs
+  description: 'OverviewPanel: delegates to blocks + context modules, refresh_git_status() on refresh, max_freezes=2'
   last_edited_ms: 0
 3e764e13ac745777:
   path: crates/cp-orchestrator/src/transport/inspect/finder/mod.rs
@@ -7546,6 +7558,10 @@
   path: web/src/components/finder/preview/FinderPreview.tsx
   description: Quick Look preview shell + Body() kind router. Routes node → mock previews (mockPreviews), live fetchers (livePreviews), or shared leaf renderers (previewParts). 121 lines.
   last_edited_ms: 1782037375293
+4774c10110ea76f3:
+  path: src/ui/perf/text.rs
+  description: 'Plain-text dump of the perf snapshot (all ops: samples/mean/variance/std/max/total) copied by Ctrl+R while F12 is open.'
+  last_edited_ms: 0
 477e060bfea31c3a:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
@@ -8626,6 +8642,10 @@
   path: web/src/components/shell/chrome/HintBadge.tsx
   description: 'Shortcut-letter badge at a control''s bottom-right while ⌘/Ctrl held (T619). Own module (not TopBar) to avoid TopBar↔ThemeToggle import cycle. Three traps: firstRef paints-not-animates on mount (else springs on every rail re-render); animation owns opacity+transform so no Tailwind transition-* may touch them; pointer-events-none or it swallows the click it advertises. anime.js outQuad 150/110ms, no spring (overshoot reads as boing).'
   last_edited_ms: 0
+510e90bdcef9721a:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 5120bad5216d940f:
   path: .git/index
   description: Git index (binary). Not source.
@@ -8973,6 +8993,10 @@
 54351bd4bd052680:
   path: .git/index
   description: Git index (binary). Not source.
+  last_edited_ms: 0
+544585f37a7ecc48:
+  path: orchestrator.log
+  description: cp-orchestrator v0.2.13 runtime log. Serves :7878, agent binary target/release/tui, cockpit on :443, updater manual. Boot/health only; not relevant to agent build-fix work.
   last_edited_ms: 0
 5454d3734e1a73e0:
   path: .git/index
@@ -9381,6 +9405,10 @@
 58411c16ad9a129a:
   path: crates/cp-orchestrator/src/transport/rest/mod.rs
   description: 'REST resource handlers. fleet() filtered by ACL. command() dispatches. rename/avatar/threads/body. claude_usage()/token_status()/login_start()/login_complete()/refresh_login() for Claude OAuth (T451). resolve_entry. Submodules: backend, claude_oauth, create, env_keys, lifecycle, releases, thread_shape.'
+  last_edited_ms: 0
+5845cbbdbf4c249b:
+  path: .github/checks/lint-config.chain
+  description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
   last_edited_ms: 0
 58478f2818a0917a:
   path: tmp/doc/template/assemble.js
@@ -12726,6 +12754,10 @@
   path: crates/cp-mod-queue/src/types.rs
   description: QueueState + QueuedToolCall types. Trap fields (trap_active/panel_ids/optional_ids). Methods enqueue/remove_by_index/flush/clear/is_queue_tool.
   last_edited_ms: 0
+77d276ccaca156f0:
+  path: src/infra/profiler.rs
+  description: RAII ProfileGuard macro (profile!) for perf.log (>5ms). log_tool_time() appends ALL tool executions to .context-pilot/logs/tool-times.log — local datetime via cp_mod_utilities::time, elapsed ms, tool name(s).
+  last_edited_ms: 0
 77d35e243e640754:
   path: web/src/components/shell/widgets/StoredAccounts.tsx
   description: Multi-account Claude OAuth stored accounts list. StoredAccountRow (email + valid dot + expiry + Switch/Delete). StoredAccounts (store current, list stored, switch/delete mutations, query invalidation on switch). Extracted from UsageButton for P8 line budget.
@@ -12897,6 +12929,10 @@
 7966678006e7596b:
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. route_rest dispatches all /api routes incl auth/ACL/env-keys/providers. handle() has centralized Bearer gate + per-agent ACL check. handle_stream = SSE with ticket-based ACL. serve/serve_bound acceptor loop.
+  last_edited_ms: 0
+796ae467d67fca48:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 796e04aa332c0569:
   path: docs/trust-center/compliance.html
@@ -14641,6 +14677,10 @@
 895473fee99c332c:
   path: yamls/tools/spine.yaml
   description: 'Spine tool YAML. 3 tools: notification_mark_processed, spine_configure (max_cost is burst/stream-based), coucou (timer/datetime scheduling).'
+  last_edited_ms: 0
+897f180dbbc0d705:
+  path: src/app/panels.rs
+  description: Thin wrapper around cp_base::panels. get_panel() delegates to module system. FallbackPanel for orphaned contexts. refresh_all_panels() and collect_all_context() helpers.
   last_edited_ms: 0
 89825e09db64c9bb:
   path: src/ui/mod.rs
@@ -19774,6 +19814,10 @@ ba64c5fc6b795b03:
   path: src/ui/threads_view/messages.rs
   description: Thread message area right pane. Message display (reuses conversation IR renderer), input area. auto:true traces render as dim '⚙ {line}'. u16->usize/usize->u16 via Safe cast (A1). calculate_input_height 50% cap.
   last_edited_ms: 0
+ba6789c6620eaa73:
+  path: src/ui/perf/report.rs
+  description: 'One-shot `--measure N` HTML loop-profile report: inline-SVG pies (mean/variance/max per loop substep) + table, written to tmp/loop-profile.html (gitignored).'
+  last_edited_ms: 0
 ba6feb02b035f8d8:
   path: .github/checks/lint-config.chain
   description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
@@ -22102,6 +22146,10 @@ d0849e3f0c19a9d4:
   path: src/main.rs
   description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook. use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
   last_edited_ms: 1781448175794
+d08e7a597512d4e2:
+  path: src/ui/ir/conversation.rs
+  description: 'Conversation + overlay IR builder. A6: float_math routed (fd_semantic percent, fps div, meili MB, budget-bar percent, op percent/div). Perf overlay, autocomplete, config, search-index overlays.'
+  last_edited_ms: 0
 d09b61c12bbdd00d:
   path: run.sh
   description: Supervisor script. Builds tui + cp-console-server upfront, then loops cargo run --release with reload detection via config.json. --telemetry flag sets CP_FLAMEGRAPH=1. ulimit -n 2048. Loads .env. --resume-stream on reload.
@@ -22826,6 +22874,10 @@ d736a0dc22d9d164:
   path: web/src/components/finder/FinderChrome.tsx
   description: 'Finder chrome: tab strip, main toolbar (nav/crumbs/view-switch/search/icon-size/actions), path bar + NavBtn/SegBtn. FinderSidebar extracted to support/FinderSidebar and re-exported. 372 lines.'
   last_edited_ms: 1782037375391
+d73f13bac549979c:
+  path: src/app/run/tools/watchdog.rs
+  description: 'Main-loop watchdog (observational wedge detector) + substep timing: mark(Step) records previous step''s µs into PERF as loop.* (perf_name) via thread-local LAST_STEP.'
+  last_edited_ms: 0
 d75fda669fb26dc4:
   path: crates/cp-base/src/state/autocomplete.rs
   description: 'Completion/Suggestions structs #[non_exhaustive] A5 (in-crate built).'
@@ -25089,6 +25141,10 @@ eec62ae7dc09a2b2:
 eeca07a06810f341:
   path: .git/index
   description: Git index (binary). Not source.
+  last_edited_ms: 0
+eecbc26c85992eef:
+  path: .github/checks/allowed-lint-exceptions.yaml
+  description: 'Curated #[expect]/#[allow] registry (hash-chained). Every suppression needs a path+match entry; orphans fail structure-check. TC-REAL removed 2 orphan entries (default.rs flat-initializer, bundle.rs flat-mem-swap) + kept bundle.rs ThreadRuntime::default flat-initializer entry. Edit then run chain.sh --password.'
   last_edited_ms: 0
 eecc4deca2426af9:
   path: Cargo.lock
