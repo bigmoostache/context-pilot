@@ -111,21 +111,32 @@ fn build_thread_message_lines(
     //
     // Auto tool-activity traces (`msg.auto`) are NOT rendered as full message
     // bubbles — that would drown the real conversation in a wall of one-line
-    // tool breadcrumbs. Instead each collapses to a single line styled to echo
-    // the message bubbles: a 🔥 gutter icon at column 0 (aligned with the
-    // role-icon of real messages), then the trace split into three grey tokens
-    // of slightly different weight/hue — verb, tool name, intent. One line per
-    // trace, no blank separators, so a run of consecutive traces stacks into a
-    // quiet, scannable block while normal messages keep their bubble chrome.
+    // tool breadcrumbs. Instead each collapses to a single fully-grey line
+    // (see `auto_trace_spans`). Consecutive traces stack with NO blank line
+    // between them; a single blank line is emitted after each maximal *run* of
+    // traces (mirroring the one real messages leave after their bubble), so a
+    // block of tool calls is visually separated from the next message but its
+    // internal rows stay tight.
     let mut all_blocks: Vec<cp_render::Block> = Vec::new();
+    let mut in_auto_run = false;
     for msg in &thread.messages {
         if msg.auto {
             all_blocks.push(IrBlock::Line(auto_trace_spans(msg)));
+            in_auto_run = true;
             continue;
+        }
+        if in_auto_run {
+            all_blocks.push(IrBlock::Empty);
+            in_auto_run = false;
         }
         let conv_msg = thread_message_to_message(msg);
         let msg_blocks = render_message_blocks(&conv_msg, &opts);
         all_blocks.extend(msg_blocks);
+    }
+    // Trailing run of traces (conversation ends on tool calls) still gets its
+    // separating blank line.
+    if in_auto_run {
+        all_blocks.push(IrBlock::Empty);
     }
 
     ir::blocks_to_lines(&all_blocks)
@@ -220,14 +231,14 @@ fn auto_line(msg: &cp_mod_threads::types::ThreadMessage) -> String {
 /// Style an auto tool-activity trace as a single bubble-aligned line.
 ///
 /// The trace body has the shape `{verb} · {tool} — {intent}` (produced by
-/// `maybe_append_tool_activity`). We split it into its three tokens and render
-/// each in a distinct shade of grey so the line stays muted yet scannable:
-/// - a 🔥 gutter icon (dim) sitting at column 0, where real messages put their
-///   role icon — this is what keeps the trace aligned with the bubbles;
-/// - the **verb** in muted-bold (slightly heavier);
-/// - the **tool name** in dimmed-accent (a faint hue tint, the key token);
-/// - the **intent** in muted-dim-italic (the faintest);
-/// - the `·` / `—` separators dimmed.
+/// `maybe_append_tool_activity`). It renders as one fully-grey, dimmed line so
+/// it recedes behind the real conversation rather than competing with it:
+/// - a 🔥 gutter icon followed by two spaces, so the text lines up one column
+///   past where real messages place their body (bubble alignment);
+/// - **verb**, **tool name** and *intent* all in muted grey (no hue, no bold —
+///   the tool name used to carry an accent tint that pulled the eye; dropped);
+/// - the `·` / `—` separators dimmed, the intent additionally italic as the
+///   only (very subtle) structural cue.
 ///
 /// Parsing is defensive: a missing separator degrades gracefully (the whole
 /// remainder collapses into the tool-name token) rather than dropping content.
@@ -236,12 +247,12 @@ fn auto_trace_spans(msg: &cp_mod_threads::types::ThreadMessage) -> Vec<S> {
     let (verb, rest) = body.split_once(" \u{b7} ").unwrap_or(("", body.as_str()));
     let (tool, intent) = rest.split_once(" \u{2014} ").unwrap_or((rest, ""));
 
-    let mut spans = vec![S::styled("\u{1f525} ".to_owned(), Semantic::Muted).dim()];
+    let mut spans = vec![S::styled("\u{1f525}  ".to_owned(), Semantic::Muted).dim()];
     if !verb.is_empty() {
-        spans.push(S::styled(verb.to_owned(), Semantic::Muted).bold());
+        spans.push(S::styled(verb.to_owned(), Semantic::Muted).dim());
         spans.push(S::styled(" \u{b7} ".to_owned(), Semantic::Muted).dim());
     }
-    spans.push(S::styled(tool.to_owned(), Semantic::AccentDim));
+    spans.push(S::styled(tool.to_owned(), Semantic::Muted).dim());
     if !intent.is_empty() {
         spans.push(S::styled(" \u{2014} ".to_owned(), Semantic::Muted).dim());
         spans.push(S::styled(intent.to_owned(), Semantic::Muted).dim().italic());
