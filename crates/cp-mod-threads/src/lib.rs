@@ -98,8 +98,11 @@ impl Module for ThreadsModule {
         // same save as the keyed write — the two land together or the boot-side
         // fallback covers the gap.
         let focus_file = FocusState::get(state).focused_thread_id.clone().unwrap_or_default();
+        // Messages are NOT serialized here: they live in `threads/<id>.json`,
+        // written by the save batch only for threads that changed.
+        let threads: Vec<types::persist::ThreadMeta<'_>> = ts.threads.iter().map(Into::into).collect();
         json!({
-            "threads": ts.threads,
+            "threads": threads,
             "next_id": ts.next_id,
             "panel_content": ts.panel_content,
             "focus_file": focus_file,
@@ -116,6 +119,7 @@ impl Module for ThreadsModule {
             && let Ok(v) = serde_json::from_value(arr.clone())
         {
             ts.threads = v;
+            types::persist::load_thread_messages(&mut ts.threads);
         }
         if let Some(v) = data.get("next_id").and_then(serde_json::Value::as_u64) {
             ts.next_id = v.to_u32();

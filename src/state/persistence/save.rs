@@ -259,7 +259,18 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
         dir.join(crate::infra::constants::MESSAGES_DIR),
         dir.join(cp_mod_logs::LOGS_DIR),
         dir.join(cp_mod_console::CONSOLE_DIR),
+        dir.join(cp_mod_threads::types::persist::THREADS_DIR),
     ];
+
+    // Per-thread message files, only for threads changed since last write.
+    let durable: Vec<WriteOp> = {
+        let _g = crate::profile!("thread_files");
+        let threads = &cp_mod_threads::types::ThreadsState::get(state).threads;
+        cp_mod_threads::types::persist::dirty_thread_file_ops(threads)
+            .into_iter()
+            .map(|(path, content)| WriteOp { path, content })
+            .collect()
+    };
 
     let (global_modules, worker_modules) = {
         let _g = crate::profile!("modules");
@@ -299,7 +310,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
         writes.extend(build_history_message_ops(state, &messages_dir));
     }
 
-    WriteBatch { writes, deletes: Vec::new(), ensure_dirs }
+    WriteBatch { writes, deletes: Vec::new(), ensure_dirs, durable }
 }
 
 /// Build a `WriteOp` for a single message (CPU work only — no I/O).
@@ -350,7 +361,7 @@ pub(crate) fn save_state(state: &State) {
             drop(writeln!(std::io::stderr(), "[persistence] failed to create dir {}: {}", dir.display(), e));
         }
     }
-    for op in &batch.writes {
+    for op in batch.durable.iter().chain(&batch.writes) {
         exec_write_op(op);
     }
     for op in &batch.deletes {
