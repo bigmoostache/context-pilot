@@ -304,28 +304,15 @@ fn civil_from_days(days: i64) -> (i32, u8, u8) {
 /// Compose date-time parts into epoch seconds.
 ///
 /// Inverse of [`decompose_utc`]. Returns `None` for invalid dates.
-#[expect(
-    clippy::as_conversions,
-    reason = "const-fn widening (u8/i32 -> i64) is always exact; From/i64::from are not callable in a const fn"
-)]
-const fn compose_epoch_secs(dt: &Parts) -> Option<i64> {
+fn compose_epoch_secs(dt: &Parts) -> Option<i64> {
     if dt.month < 1 || dt.month > 12 || dt.day < 1 || dt.day > 31 || dt.hour > 23 || dt.minute > 59 || dt.second > 60 {
         return None;
     }
-    let days = days_from_civil(dt.year as i64, dt.month as i64, dt.day as i64);
-    let Some(day_secs) = days.checked_mul(86400) else {
-        return None;
-    };
-    let h_secs = (dt.hour as i64).saturating_mul(3600);
-    let m_secs = (dt.minute as i64).saturating_mul(60);
-    let s_val = dt.second as i64;
-    match day_secs.checked_add(h_secs) {
-        Some(v1) => match v1.checked_add(m_secs) {
-            Some(v2) => v2.checked_add(s_val),
-            None => None,
-        },
-        None => None,
-    }
+    let days = days_from_civil(i64::from(dt.year), i64::from(dt.month), i64::from(dt.day));
+    let day_secs = days.checked_mul(86400)?;
+    let h_secs = i64::from(dt.hour).saturating_mul(3600);
+    let m_secs = i64::from(dt.minute).saturating_mul(60);
+    day_secs.checked_add(h_secs)?.checked_add(m_secs)?.checked_add(i64::from(dt.second))
 }
 
 /// Convert (year, month, day) to a day count since Unix epoch.

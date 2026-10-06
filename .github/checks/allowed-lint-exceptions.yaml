@@ -253,24 +253,7 @@ exceptions:
 
   # ── cp-mod-search/radar.rs: numeric casts ────────────────────────────
 
-  - path: "crates/cp-mod-search/src/radar/mod.rs"
-    match: "timestamp ms as f64 — decay math requires floating point"
-    reason: >
-      refresh_inner() casts u64 timestamps and log counts to f64 for
-      exponential decay math and uses sequential write!() calls to build
-      the YAML output string.
-    strategy: >
-      Irreducible — f64 arithmetic is required for exponential decay.
 
-  - path: "crates/cp-mod-search/src/radar/mod.rs"
-    match: "log number as f64 — decay math requires floating point"
-    reason: >
-      query_signal_results() casts the parsed log number and the current
-      log count to f64 for the per-hit exponential decay factor. Extracted
-      from refresh_inner during the cognitive_complexity split; the cast is
-      the same irreducible decay math.
-    strategy: >
-      Irreducible — f64 arithmetic is required for exponential decay.
 
   # ── cp-base test functions: panic for clear assertion messages ────
 
@@ -310,23 +293,7 @@ exceptions:
       Irreducible — clippy::little_endian_bytes forbids to_le_bytes and From
       is not const-stable, so the masked const-fn narrowing is the only option.
 
-  - path: "crates/cp-mod-utilities/src/time.rs"
-    match: "const-fn widening (u8/i32 -> i64) is always exact"
-    reason: >
-      compose_epoch_secs() is a const fn that widens u8/i32 date-time
-      components to i64 (always exact). From/i64::from are not callable in
-      a const fn, so `as` is the only const-compatible widening.
-    strategy: >
-      Irreducible until From is const-callable in stable const fn.
 
-  - path: "src/ui/ir/render_sidebar.rs"
-    match: "const-fn widening (u16 -> usize) is always exact"
-    reason: >
-      content_width() is a const fn that widens the u16 area width to usize
-      (always exact). usize::from is not const-callable on stable, so `as`
-      is the only const-compatible widening.
-    strategy: >
-      Irreducible until From is const-callable in stable const fn.
 
   # ── exhaustive_enums: closed wire / IR / registry contracts ──────────
   # These public enums are LEGITIMATELY exhaustive. They are either wire /
