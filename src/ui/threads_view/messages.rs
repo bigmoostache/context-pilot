@@ -111,13 +111,16 @@ fn build_thread_message_lines(
     //
     // Auto tool-activity traces (`msg.auto`) are NOT rendered as full message
     // bubbles — that would drown the real conversation in a wall of one-line
-    // tool breadcrumbs. Instead each collapses to a single dim line (marker
-    // stripped, ⚙-prefixed), so a run of consecutive traces stacks into a
+    // tool breadcrumbs. Instead each collapses to a single line styled to echo
+    // the message bubbles: a 🔥 gutter icon at column 0 (aligned with the
+    // role-icon of real messages), then the trace split into three grey tokens
+    // of slightly different weight/hue — verb, tool name, intent. One line per
+    // trace, no blank separators, so a run of consecutive traces stacks into a
     // quiet, scannable block while normal messages keep their bubble chrome.
     let mut all_blocks: Vec<cp_render::Block> = Vec::new();
     for msg in &thread.messages {
         if msg.auto {
-            all_blocks.push(IrBlock::Line(vec![S::muted(format!("⚙ {}", auto_line(msg))).dim()]));
+            all_blocks.push(IrBlock::Line(auto_trace_spans(msg)));
             continue;
         }
         let conv_msg = thread_message_to_message(msg);
@@ -212,6 +215,38 @@ fn auto_line(msg: &cp_mod_threads::types::ThreadMessage) -> String {
     const MARKER: &str = "/* auto */ ";
     let content = msg.content.as_deref().unwrap_or("");
     content.strip_prefix(MARKER).unwrap_or(content).to_owned()
+}
+
+/// Style an auto tool-activity trace as a single bubble-aligned line.
+///
+/// The trace body has the shape `{verb} · {tool} — {intent}` (produced by
+/// `maybe_append_tool_activity`). We split it into its three tokens and render
+/// each in a distinct shade of grey so the line stays muted yet scannable:
+/// - a 🔥 gutter icon (dim) sitting at column 0, where real messages put their
+///   role icon — this is what keeps the trace aligned with the bubbles;
+/// - the **verb** in muted-bold (slightly heavier);
+/// - the **tool name** in dimmed-accent (a faint hue tint, the key token);
+/// - the **intent** in muted-dim-italic (the faintest);
+/// - the `·` / `—` separators dimmed.
+///
+/// Parsing is defensive: a missing separator degrades gracefully (the whole
+/// remainder collapses into the tool-name token) rather than dropping content.
+fn auto_trace_spans(msg: &cp_mod_threads::types::ThreadMessage) -> Vec<S> {
+    let body = auto_line(msg);
+    let (verb, rest) = body.split_once(" \u{b7} ").unwrap_or(("", body.as_str()));
+    let (tool, intent) = rest.split_once(" \u{2014} ").unwrap_or((rest, ""));
+
+    let mut spans = vec![S::styled("\u{1f525} ".to_owned(), Semantic::Muted).dim()];
+    if !verb.is_empty() {
+        spans.push(S::styled(verb.to_owned(), Semantic::Muted).bold());
+        spans.push(S::styled(" \u{b7} ".to_owned(), Semantic::Muted).dim());
+    }
+    spans.push(S::styled(tool.to_owned(), Semantic::AccentDim));
+    if !intent.is_empty() {
+        spans.push(S::styled(" \u{2014} ".to_owned(), Semantic::Muted).dim());
+        spans.push(S::styled(intent.to_owned(), Semantic::Muted).dim().italic());
+    }
+    spans
 }
 
 /// Convert a `ThreadMessage` to a `Message` for the conversation IR renderer.
