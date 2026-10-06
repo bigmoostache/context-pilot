@@ -157,6 +157,12 @@ pub(crate) fn active_tool_definitions(active_modules: &HashSet<String>) -> Vec<T
 /// Dispatch a tool call to the appropriate active module.
 pub(crate) fn dispatch_tool(tool: &ToolUse, state: &mut State, active_modules: &HashSet<String>) -> ToolResult {
     let _fg = cp_base::flame!(&format!("tool_{}", tool.name));
+    // One perf row per tool (`<parent>.tool_<name>`): bounded name set, interned
+    // once. Skipped when F12/--measure is off.
+    let _guard = crate::ui::perf::PERF
+        .enabled
+        .load(std::sync::atomic::Ordering::Relaxed)
+        .then(|| crate::profile!(crate::infra::profiler::intern(format!("tool_{}", tool.name))));
     // Handle reverie tools — optimize_context for main AI, report + allowed tools for reverie
     if tool.name == "optimize_context" {
         return crate::app::reverie::tools::execute_optimize_context(tool, state);
