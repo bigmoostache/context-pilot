@@ -99,10 +99,12 @@ struct ListBuild<'build> {
     /// Inner pane width (columns) for name truncation.
     inner_width: u16,
     /// Display-only per-thread exec state, rebuilt each tick by the run loop.
+    /// Drives the leading working-spinner (reuses the fleet mirror; never read
+    /// for scheduling).
     mirror: &'build FleetExecMirror,
 }
 
-/// Push the virtual "+ New Thread" entry (active view only, 2-line format),
+/// Push the virtual "+ New Thread" entry (active view only, single-line),
 /// recording its line range into `sel` when it is the selected entry.
 fn push_new_thread_entry(lb: &mut ListBuild<'_>, state: &State, on_virtual: bool) {
     let new_sem = if on_virtual { Semantic::Accent } else { Semantic::Muted };
@@ -119,91 +121,65 @@ fn push_new_thread_entry(lb: &mut ListBuild<'_>, state: &State, on_virtual: bool
         S::styled("\u{25cf} ".to_owned(), new_sem),
         S::styled(new_name, new_sem),
     ]));
-    lb.blocks.push(IrBlock::Line(vec![S::new("  ".to_owned()), S::styled("[NEW THREAD]".to_owned(), new_sem)]));
     if on_virtual {
         lb.sel.end = Some(lb.blocks.len());
     }
 }
 
-/// Semantic + badge for one thread's status (focused wins over turn state).
-const fn thread_status_style(thread: &cp_mod_threads::types::Thread, is_focused: bool) -> (Semantic, &'static str) {
-    if is_focused {
-        return (Semantic::Accent, "[FOCUSED]");
-    }
-    if matches!(thread.status, ThreadStatus::MyTurn) {
-        (Semantic::Warning, "[MY_TURN]")
+/// Raw RGB for one thread's status circle — a function of thread *state* only,
+/// never of which thread the human happens to be viewing:
+/// orange = `MyTurn` (the LLM owes a turn), green = `TheirTurn` (the human owes
+/// a turn), yellow/amber = paused. Returned as a raw triple (via
+/// [`Span::rgb`](cp_render::Span::rgb)) because the IR `Semantic` palette has no
+/// distinct orange-vs-amber pair.
+fn thread_circle_rgb(thread: &cp_mod_threads::types::Thread) -> (u8, u8, u8) {
+    let color = if thread.paused {
+        theme::warning()
+    } else if matches!(thread.status, ThreadStatus::MyTurn) {
+        theme::orange()
     } else {
-        (Semantic::Success, "[THEIR_TURN]")
-    }
+        theme::success()
+    };
+    if let ratatui::style::Color::Rgb(r, g, b) = color { (r, g, b) } else { (200, 200, 200) }
 }
 
-/// The runtime-execution tag for one exec state, or `None` for
-/// [`Idle`](ThreadExecState::Idle).
-///
-/// Rendered **alongside** the turn badge, never instead of it. The two answer
-/// different questions and neither subsumes the other: the badge
-/// ([`thread_status_style`]) is the *human-facing contract* — whose turn it is,
-/// does this thread owe me a reply — while this is the *scheduler's actual
-/// position*. `MY_TURN + Streaming` means the agent is answering right now;
-/// `MY_TURN + Runnable` means the reply is queued behind a concurrency slot;
-/// `MY_TURN + Errored` means it never will be answered on its own.
-///
-/// Tags are abbreviated to stay inside the 28-column list pane alongside the
-/// badge and the message count. `Idle` yields no tag: it is the default (the
-/// mirror falls back to it for archived and not-yet-reconciled threads), so
-/// printing it would put noise on every quiet row.
-///
-/// [`Errored`](ThreadExecState::Errored) is the one state that demands human
-/// action — the thread is parked out of scheduling and will not recover by
-/// itself (design doc §8) — so it is the only tag bolded and the only one
-/// prefixed with a warning glyph.
-///
-/// The tag is emitted **before** the message count on purpose. The pane is 28
-/// columns and cannot always fit badge + tag + a 3-digit count, so ratatui
-/// clips the overflowing tail — putting the marker first guarantees the
-/// state that needs attention is never the part that gets cut.
-fn exec_state_tag(exec_state: ThreadExecState) -> Option<S> {
-    match exec_state {
-        ThreadExecState::Idle => None,
-        ThreadExecState::Runnable => Some(S::styled("QUEUE".to_owned(), Semantic::AccentDim)),
-        ThreadExecState::Streaming => Some(S::styled("STREAM".to_owned(), Semantic::Active)),
-        ThreadExecState::AwaitingLlm => Some(S::styled("LLM".to_owned(), Semantic::Info)),
-        ThreadExecState::AwaitingTool => Some(S::styled("TOOL".to_owned(), Semantic::Muted)),
-        ThreadExecState::Errored => Some(S::styled("\u{26a0} STUCK".to_owned(), Semantic::Error).bold()),
-    }
+/// Whether a thread's exec state should show the "working" spinner — the
+/// per-thread analog of the footer badge needing a spinner (STREAMING /
+/// TOOLING / WAITING). `Idle` is READY (void) and `Errored` is parked (void),
+/// exactly like the footer's READY / BLOCKED badges carry no spinner.
+const fn thread_is_working(exec: ThreadExecState) -> bool {
+    matches!(
+        exec,
+        ThreadExecState::Runnable
+            | ThreadExecState::Streaming
+            | ThreadExecState::AwaitingLlm
+            | ThreadExecState::AwaitingTool
+    )
 }
 
-/// Push one thread's 2-line entry, recording its selected line range.
-fn push_thread_entry(
-    lb: &mut ListBuild<'_>,
-    thread: &cp_mod_threads::types::Thread,
-    focus: &FocusState,
-    is_selected: bool,
-) {
-    let last_read = focus.last_read_count.get(&thread.id).copied().unwrap_or(0);
-    let has_unread = thread.messages.len() > last_read;
-    let is_focused = focus.focused_thread_id.as_deref() == Some(thread.id.as_str());
-    let (status_sem, badge) = thread_status_style(thread, is_focused);
-
-    let indicator = if has_unread && !is_selected { "\u{25cf} " } else { "  " };
-    let indicator_sem = if has_unread { Semantic::Warning } else { Semantic::Default };
+/// Push one thread's single-line entry (status-colored circle + name),
+/// recording its selected line range.
+fn push_thread_entry(lb: &mut ListBuild<'_>, thread: &cp_mod_threads::types::Thread, is_selected: bool) {
+    // Leading slot (2 cols), mirroring the footer:
+    //   working            → the footer's square spinner,
+    //   idle AND MyTurn     → a ⚠ warning (the LLM owes a turn but is doing
+    //                         nothing — a stall the human should notice),
+    //   otherwise           → void.
+    let working = thread_is_working(lb.mirror.exec_state_of(&thread.id));
+    let leading = if working {
+        S::styled(format!("{} ", crate::ui::helpers::spinner()), Semantic::Accent)
+    } else if matches!(thread.status, ThreadStatus::MyTurn) {
+        S::styled("\u{26a0} ".to_owned(), Semantic::Error)
+    } else {
+        S::styled("  ".to_owned(), Semantic::Default)
+    };
+    let (cr, cg, cb) = thread_circle_rgb(thread);
     let name = truncate_str(&thread.name, lb.inner_width.saturating_sub(6).into());
 
     if is_selected {
         lb.sel.start = Some(lb.blocks.len());
     }
-    lb.blocks.push(IrBlock::Line(vec![
-        S::styled(indicator.to_owned(), indicator_sem),
-        S::styled("\u{25cf} ".to_owned(), status_sem),
-        S::new(name),
-    ]));
-    let mut second_line = vec![S::new("  ".to_owned()), S::styled(badge.to_owned(), status_sem)];
-    if let Some(tag) = exec_state_tag(lb.mirror.exec_state_of(&thread.id)) {
-        second_line.push(S::styled("  ".to_owned(), Semantic::Muted));
-        second_line.push(tag);
-    }
-    second_line.push(S::muted(format!("  {} msg", thread.messages.len())));
-    lb.blocks.push(IrBlock::Line(second_line));
+    lb.blocks.push(IrBlock::Line(vec![leading, S::rgb("\u{25cf} ".to_owned(), cr, cg, cb), S::new(name)]));
     if is_selected {
         lb.sel.end = Some(lb.blocks.len());
     }
@@ -308,7 +284,7 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
         let Some(thread) = ts.threads.get(real) else {
             continue;
         };
-        push_thread_entry(&mut lb, thread, focus, i == selected);
+        push_thread_entry(&mut lb, thread, i == selected);
     }
 
     // Empty-state hint when the archived list has nothing in it.
