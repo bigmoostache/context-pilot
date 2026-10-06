@@ -39,7 +39,7 @@ pub(crate) use config::{MaintenanceWindow, UpdateMode};
 
 /// OTA channel selection (`stable`/`nightly`) + the crossgrade flag — see
 /// [`channel`].
-mod channel;
+pub(crate) mod channel;
 
 // ── Public types ────────────────────────────────────────────────────────
 
@@ -83,10 +83,6 @@ pub struct ReleaseStore {
     config_path: PathBuf,
 }
 
-#[expect(
-    clippy::multiple_inherent_impl,
-    reason = "ReleaseStore inherent methods are split across mod.rs and the sibling channel.rs to respect the 500-line file cap; merging channel's OTA-channel methods back here would push mod.rs over the limit"
-)]
 impl ReleaseStore {
     /// Load (or create) the release store from the given directory.
     ///

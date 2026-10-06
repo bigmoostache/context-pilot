@@ -22,6 +22,8 @@ use serde::Deserialize;
 
 use super::super::{Backend, HttpReply};
 use crate::services::releases::ReleaseStore;
+use crate::services::releases::channel::ChannelOps as _;
+
 use crate::services::releases::updater::apply::{AuthDb, restart_self, stage_apply};
 use crate::services::releases::updater::download::download_artifact;
 use crate::services::releases::updater::state::UpdateState;

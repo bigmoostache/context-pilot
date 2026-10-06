@@ -8861,3 +8861,58 @@ index fed39f49..94ef72f2 100644
  
    # ── cast.rs: Safe numeric casting infrastructure ─────────────────
 # --- End entry #109 ---
+110:b9ff8ad4d272a65908b036341d247e41cbc20ed987d8c2098dc7b723ce2d8ef1:b5b3ce892166a2a8dcf25b8490acebb26527ea93453fe61d2148ace06028a03b:6dca93435c0e19c9c11d1e57db66271126e141ba9ff0b3e44b3c3f4943d6c18e
+# --- Diff for entry #110 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 94ef72f2..c5587f48 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -422,23 +422,8 @@ exceptions:
+     strategy: >
+       Irreducible — the exhaustive literal is the whole point; a ctor re-trips too_many_arguments.
+ 
+-  # ── multiple_inherent_impl: ReleaseStore split for the 500-line cap ──
++  # ── multiple_inherent_impl: AuthStore split across db/acl ────────────
+ 
+-  - path: "crates/cp-orchestrator/src/services/releases/mod.rs"
+-    match: "ReleaseStore inherent methods are split across mod.rs and the sibling channel.rs to respect the 500-line file cap"
+-    reason: >
+-      ReleaseStore's inherent methods are split across mod.rs (the primary impl:
+-      arch, local releases, GitHub API, download, select/delete, persistence) and
+-      the sibling channel.rs (the OTA-channel methods: channel, set_channel,
+-      pending_channel_switch, clear_pending_switch). mod.rs already sits at 477
+-      lines; folding channel.rs's ~45 lines back in would push it over the 500-line
+-      file cap. clippy::multiple_inherent_impl (forbid) fires on the second block,
+-      so the primary impl carries the #[expect].
+-    strategy: >
+-      Irreducible under the 500-line file cap — the two impl blocks are the honest
+-      shape once the type's methods exceed one file's budget.
+-
+-  # ── multiple_inherent_impl: AuthStore split across db/helpers/acl ────
+ 
+   - path: "crates/cp-orchestrator/src/services/auth/db.rs"
+     match: "AuthStore's inherent methods are split across db.rs, helpers.rs, and acl.rs to respect the 500-line file cap; folding them into one impl block would push a file over the limit"
+@@ -453,21 +438,9 @@ exceptions:
+       Irreducible under the 500-line file cap — the three impl blocks are the honest
+       shape once the type's methods exceed one file's budget.
+ 
+-  - path: "crates/cp-orchestrator/src/services/auth/helpers.rs"
+-    match: "AuthStore's inherent methods are split across db.rs, helpers.rs, and acl.rs to respect the 500-line file cap; folding them into one impl block would push a file over the limit"
+-    reason: >
+-      AuthStore's inherent methods are split across db.rs (the primary impl: open,
+-      schema, password hashing, user/session CRUD), helpers.rs (the default_db_path
+-      helper), and acl.rs (the per-agent ACL operations). db.rs already sits near
+-      the 500-line file cap; folding the sibling blocks back in would push it over
+-      the limit. clippy::multiple_inherent_impl fires on the db.rs and helpers.rs
+-      blocks (acl.rs is the canonical first), so each carries the #[expect].
+-    strategy: >
+-      Irreducible under the 500-line file cap — the three impl blocks are the honest
+-      shape once the type's methods exceed one file's budget.
+-
+   # ── flat path-segment router: too_many_lines + pattern_type_mismatch ──
+ 
++
+   - path: "crates/cp-orchestrator/src/transport/router.rs"
+     match: "flat path-segment router: a closed match over ~60 borrowed `(&Method, &[&str])` route shapes"
+     reason: >
+# --- End entry #110 ---

@@ -4,23 +4,24 @@
 //! regardless of version ordering. This matters because nightly tags are
 //! `v0.1.0-<sha>`, whose `semver_sort_key` sorts *below* a stable `v0.2.x`, so a
 //! plain monotonic comparison would refuse the move as a rollback.
+//!
+//! Exposed as the [`ChannelOps`] trait (not a second inherent `impl`) so
+//! `ReleaseStore` keeps a single inherent block while `mod.rs` stays under the
+//! 500-line cap. Callers bring it in with `use …::channel::ChannelOps as _;`.
 
 use super::ReleaseStore;
 use super::updater::state::UpdateState;
 
-impl ReleaseStore {
+/// OTA-channel operations on a [`ReleaseStore`].
+pub(crate) trait ChannelOps {
     /// The channel this box follows (`stable` or `nightly`).
     #[must_use]
-    pub fn channel(&self) -> &str {
-        &self.config.channel
-    }
+    fn channel(&self) -> &str;
 
     /// Whether an admin channel switch is awaiting its first check — the next
     /// evaluation adopts the new channel's head regardless of version ordering.
     #[must_use]
-    pub const fn pending_channel_switch(&self) -> bool {
-        self.config.pending_channel_switch
-    }
+    fn pending_channel_switch(&self) -> bool;
 
     /// Switch the channel this box follows and persist. Arms the crossgrade
     /// flag and drops the now-stale "update available" hint (it pertained to
@@ -30,7 +31,22 @@ impl ReleaseStore {
     /// # Errors
     ///
     /// Returns an error if `channel` is not one of `stable` / `nightly`.
-    pub fn set_channel(&mut self, channel: &str) -> Result<(), String> {
+    fn set_channel(&mut self, channel: &str) -> Result<(), String>;
+
+    /// Clear the crossgrade flag once a check on the new channel has resolved.
+    fn clear_pending_switch(&mut self);
+}
+
+impl ChannelOps for ReleaseStore {
+    fn channel(&self) -> &str {
+        &self.config.channel
+    }
+
+    fn pending_channel_switch(&self) -> bool {
+        self.config.pending_channel_switch
+    }
+
+    fn set_channel(&mut self, channel: &str) -> Result<(), String> {
         if !matches!(channel, "stable" | "nightly") {
             return Err(format!("unknown channel {channel:?} (expected stable or nightly)"));
         }
@@ -47,8 +63,7 @@ impl ReleaseStore {
         Ok(())
     }
 
-    /// Clear the crossgrade flag once a check on the new channel has resolved.
-    pub fn clear_pending_switch(&mut self) {
+    fn clear_pending_switch(&mut self) {
         if self.config.pending_channel_switch {
             self.config.pending_channel_switch = false;
             self.persist();
