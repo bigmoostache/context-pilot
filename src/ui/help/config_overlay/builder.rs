@@ -109,11 +109,7 @@ fn build_models(state: &State, model_entry: &ModelEntryFn) -> (String, Vec<Confi
             model_entry(state.minimax_model == MiniMaxModel::M27Highspeed, "b", &MiniMaxModel::M27Highspeed),
         ],
         LlmProvider::OpenRouter => vec![
-            model_entry(
-                state.openrouter_model == OpenRouterModel::Apodex11Mini,
-                "a",
-                &OpenRouterModel::Apodex11Mini,
-            ),
+            model_entry(state.openrouter_model == OpenRouterModel::Apodex11Mini, "a", &OpenRouterModel::Apodex11Mini),
             model_entry(state.openrouter_model == OpenRouterModel::Solar4Mini, "b", &OpenRouterModel::Solar4Mini),
             model_entry(state.openrouter_model == OpenRouterModel::Glm53Flash, "c", &OpenRouterModel::Glm53Flash),
             model_entry(

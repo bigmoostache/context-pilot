@@ -138,8 +138,7 @@ pub(in crate::app::run) fn maybe_append_tool_activity(state: &mut cp_base::state
     // thread can run tools while the human views another thread, and its
     // breadcrumbs must land in its own conversation. Falls back to the focused
     // pointer when no thread is resident yet (cold boot / N=1 before focus).
-    let Some(tid) =
-        state.resident_thread_id.clone().or_else(|| FocusState::get(state).focused_thread_id.clone())
+    let Some(tid) = state.resident_thread_id.clone().or_else(|| FocusState::get(state).focused_thread_id.clone())
     else {
         return;
     };

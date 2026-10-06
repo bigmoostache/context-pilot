@@ -26,10 +26,8 @@ use super::tools;
 pub(crate) fn start_reverie_stream(state: &mut State, slot: &str, tx: Sender<StreamEvent>) {
     // `slot` is the opaque per-thread map key. The agent's real identity (for
     // prompt loading) and its directive live on the Session, NOT in the key.
-    let (agent_id, directive) = state
-        .reveries
-        .get(slot)
-        .map_or_else(|| (slot.to_owned(), None), |r| (r.agent_id.clone(), r.context.clone()));
+    let (agent_id, directive) =
+        state.reveries.get(slot).map_or_else(|| (slot.to_owned(), None), |r| (r.agent_id.clone(), r.context.clone()));
 
     // Get the reverie's own messages (empty on first launch) and trim whitespace.
     // On first launch, inject a user kickoff message so the conversation starts

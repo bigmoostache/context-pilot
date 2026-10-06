@@ -121,6 +121,8 @@ fn handle_ctrl_shortcuts(key: &KeyEvent, state: &State) -> Dispatch {
         KeyCode::Char('n') => Dispatch::Act(Action::NewContext),
         KeyCode::Char('h') => Dispatch::Act(Action::ToggleConfigView),
         KeyCode::Char('i') => Dispatch::Act(Action::ToggleIndexOverlay),
+        // Ctrl+R copies the F12 perf overlay as text (only while it is open).
+        KeyCode::Char('r') if state.flags.ui.perf_enabled => Dispatch::Act(Action::CopyPerfOverlay),
         // Ctrl+V pastes the system clipboard into the composer, replacing any
         // active selection (paste handler deletes the selection first). Was an
         // explicit no-op (design 9.1); now a real paste per T797.

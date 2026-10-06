@@ -110,6 +110,8 @@ pub enum Action {
     ToggleIndexOverlay,
     /// Copy the index overlay content to the system clipboard (Ctrl+C while overlay is open).
     CopyIndexOverlay,
+    /// Copy the F12 perf overlay as plain text to the system clipboard (Ctrl+R while F12 is open).
+    CopyPerfOverlay,
 
     // === Config overlay — primary model ===
     /// Select primary LLM provider.

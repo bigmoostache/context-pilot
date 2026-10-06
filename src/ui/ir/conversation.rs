@@ -8,6 +8,7 @@ use cp_render::conversation::{
     Autocomplete, AutocompleteEntry, Conversation, HistorySection, InputArea, Message as IrMessage, Overlay,
     PerfBudgetBar, PerfMeiliStats, PerfOp, PerfOverlay, StreamingTool, ToolResultPreview, ToolUsePreview,
 };
+use cp_render::conversation::PerfShareBar;
 use cp_render::{Block, Semantic};
 
 use crate::state::{Kind, MsgKind, MsgStatus, State, ToolResultRecord, ToolUseRecord};
@@ -346,7 +347,37 @@ fn build_perf_overlay(state: &State) -> PerfOverlay {
         fd_semantic: fd_semantic(snapshot.open_fds, snapshot.fd_limit_soft),
         meili: build_perf_meili(state),
         budget_bars: build_perf_budget_bars(snapshot.frame_avg_ms),
+        share_names: loop_substeps(&snapshot).iter().map(|op| op.name.trim_start_matches("loop.").to_owned()).collect(),
+        share_bars: build_perf_share_bars(&snapshot),
         sparkline: snapshot.frame_times_ms,
         operations,
     }
+}
+
+/// Main-loop substep ops (`loop.*`), excluding `loop.idle`: the input-poll
+/// park would otherwise dwarf every real substep in the share-bars.
+fn loop_substeps(snapshot: &crate::ui::perf::PerfSnapshot) -> Vec<&crate::ui::perf::OpSnapshot> {
+    snapshot.ops.iter().filter(|op| op.name.starts_with("loop.") && op.name != "loop.idle").collect()
+}
+
+/// Three stacked share-bars (mean / variance / max) over the loop substeps:
+/// each segment is that substep's percentage of the metric's sum.
+fn build_perf_share_bars(snapshot: &crate::ui::perf::PerfSnapshot) -> Vec<PerfShareBar> {
+    let steps = loop_substeps(snapshot);
+    let metrics: [(&str, &str, fn(&crate::ui::perf::OpSnapshot) -> f64); 3] = [
+        ("mean", "\u{b5}s", |op| op.mean_us),
+        ("var", "\u{b5}s\u{b2}", |op| op.variance_us2),
+        ("max", "\u{b5}s", |op| op.max_us),
+    ];
+    metrics
+        .iter()
+        .map(|&(label, unit, metric)| {
+            let total: f64 = steps.iter().map(|op| metric(op)).sum();
+            let shares = steps
+                .iter()
+                .map(|op| if total > 0.0f64 { float_math::percent(metric(op), total) } else { 0.0f64 })
+                .collect();
+            PerfShareBar { label: label.to_owned(), shares, total_display: format!("{total:.0}{unit}") }
+        })
+        .collect()
 }

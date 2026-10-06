@@ -340,6 +340,12 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.flags.ui.dirty = true;
         }
         Action::CopyIndexOverlay => handle_copy_index_overlay(state),
+        Action::CopyPerfOverlay => {
+            let text = crate::ui::perf::text::overlay_text(&crate::ui::perf::PERF.snapshot());
+            let _copied = cp_base::state::runtime::textarea::copy_to_clipboard(&text);
+            state.flags.overlays.copied_flash_ms = crate::app::panels::now_ms();
+            state.flags.ui.dirty = true;
+        }
         Action::ConfigToggleReverie => {
             state.flags.config.reverie_enabled = !state.flags.config.reverie_enabled;
             state.flags.ui.dirty = true;

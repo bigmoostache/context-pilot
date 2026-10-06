@@ -66,10 +66,7 @@ pub(crate) fn reverie_slot(thread_id: Option<&str>, agent_id: &str) -> String {
 /// pointer. Reverie lifecycle notifications are routed back here so they land
 /// on the launching thread, not wherever focus drifts while the reverie runs.
 pub(crate) fn owner_thread_id(state: &State) -> Option<String> {
-    state
-        .resident_thread_id
-        .clone()
-        .or_else(|| cp_mod_threads::types::FocusState::get(state).focused_thread_id.clone())
+    state.resident_thread_id.clone().or_else(|| cp_mod_threads::types::FocusState::get(state).focused_thread_id.clone())
 }
 
 /// Start a reverie from the `optimize_context` tool (manual trigger).

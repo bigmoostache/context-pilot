@@ -182,6 +182,22 @@ pub struct PerfOverlay {
     pub sparkline: Vec<f64>,
     /// Top operations sorted by cumulative time.
     pub operations: Vec<PerfOp>,
+    /// Main-loop substep names (`loop.` prefix stripped, idle excluded), in the
+    /// order shared by every [`PerfShareBar::shares`] vector.
+    pub share_names: Vec<String>,
+    /// Stacked share-bars (mean / variance / max) of loop substep time.
+    pub share_bars: Vec<PerfShareBar>,
+}
+
+/// One stacked share-bar: each substep's percentage of a lifetime metric.
+#[derive(Debug, Clone, Serialize)]
+pub struct PerfShareBar {
+    /// Metric label (e.g. `"mean"`).
+    pub label: String,
+    /// Per-substep share in percent, aligned with [`PerfOverlay::share_names`].
+    pub shares: Vec<f64>,
+    /// Sum of the metric across substeps, pre-formatted with its unit.
+    pub total_display: String,
 }
 
 /// Meilisearch process stats for perf overlay.

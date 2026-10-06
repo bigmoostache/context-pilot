@@ -7,8 +7,12 @@
 mod overlay;
 /// One-shot HTML loop-profile report (`--measure N` artifact).
 mod report;
+/// F12 overlay stacked share-bars (loop substep mean/variance/max).
+mod share_bars;
 /// Platform-specific process CPU/memory sampling.
 mod sys_stat;
+/// Plain-text dump of the perf snapshot (Ctrl+R clipboard copy).
+pub(crate) mod text;
 pub(crate) use overlay::render_perf_overlay_from_ir;
 use sys_stat::read_proc_stat;
 
