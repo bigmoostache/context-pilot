@@ -60,8 +60,12 @@ impl Panel for OverviewPanel {
     }
 
     fn refresh(&self, state: &mut State) {
-        // Refresh git status (branch, file changes) before generating context
-        cp_mod_git::refresh_git_status(state);
+        // Refresh git status (branch, file changes) before generating context.
+        // Own perf row: it spawns git subprocesses, the suspected bulk.
+        {
+            let _guard = crate::profile!("git_status");
+            cp_mod_git::refresh_git_status(state);
+        }
 
         let content = Self::generate_context_content(state);
         let token_count = crate::state::estimate_tokens(&content);

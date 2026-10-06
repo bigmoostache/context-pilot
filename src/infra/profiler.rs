@@ -36,10 +36,11 @@ thread_local! {
     static PATH: RefCell<Vec<&'static str>> = const { RefCell::new(Vec::new()) };
 }
 
-/// Interned full path names. The set is bounded (static leaves × loop steps),
-/// so leaking each distinct name once is fine and keeps `record_op`'s
-/// `&'static str` key.
-fn intern(full: String) -> &'static str {
+/// Interned full path names. The set is bounded (static leaves × loop steps,
+/// plus one leaf per panel kind), so leaking each distinct name once is fine
+/// and keeps `record_op`'s `&'static str` key. Also used by callers that build
+/// a dynamic leaf (e.g. `refresh_<kind>`) for [`profile!`](crate::profile!).
+pub(crate) fn intern(full: String) -> &'static str {
     static NAMES: OnceLock<Mutex<HashMap<String, &'static str>>> = OnceLock::new();
     let mut names =
         NAMES.get_or_init(|| Mutex::new(HashMap::new())).lock().unwrap_or_else(std::sync::PoisonError::into_inner);
