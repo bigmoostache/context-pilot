@@ -119,6 +119,47 @@ fn send_v2_request(
         .map_err(LlmError::from)
 }
 
+/// Directory for refusal request dumps (gitignored, local-only).
+const REFUSALS_DIR: &str = ".context-pilot/refusals";
+
+/// Persist the exact request that produced a `refusal` `stop_reason`, so it can
+/// be replayed and debugged later. Mirrors the format of
+/// [`helpers::dump_last_request`] (url + headers + body) but records the real
+/// V2 header signature actually sent by [`send_v2_request`], with the Bearer
+/// token redacted. Written to
+/// `.context-pilot/refusals/{worker_id}_{utc_compact}.json`.
+fn dump_refusal_request(worker_id: &str, model: &str, api_request: &serde_json::Value) {
+    let record = serde_json::json!({
+        "stop_reason": "refusal",
+        "recorded_at": cp_mod_utilities::time::now_utc_rfc3339_secs(),
+        "model": model,
+        "request_url": ENDPOINT,
+        "request_headers": {
+            "accept": "text/event-stream",
+            "authorization": "Bearer <redacted>",
+            "anthropic-version": API_VERSION,
+            "anthropic-beta": beta_header_for(model),
+            "anthropic-dangerous-direct-browser-access": "true",
+            "content-type": "application/json",
+            "user-agent": "claude-cli/2.1.282 (external, sdk-cli)",
+            "x-app": "cli",
+            "x-stainless-arch": "arm64",
+            "x-stainless-lang": "js",
+            "x-stainless-os": "MacOS",
+            "x-stainless-package-version": "0.112.1",
+            "x-stainless-retry-count": "0",
+            "x-stainless-runtime": "node",
+            "x-stainless-runtime-version": "v26.3.0",
+            "x-stainless-timeout": "600",
+        },
+        "request_body": api_request,
+    });
+    let _r1 = std::fs::create_dir_all(REFUSALS_DIR);
+    let stamp = cp_mod_utilities::time::now_utc_compact();
+    let path = format!("{REFUSALS_DIR}/{worker_id}_{stamp}.json");
+    let _r2 = std::fs::write(path, serde_json::to_string_pretty(&record).unwrap_or_default());
+}
+
 /// Claude Code V2 OAuth client.
 pub(crate) struct ClaudeCodeV2Client {
     /// OAuth access token from the vault (Keychain or credentials file).
@@ -196,6 +237,12 @@ impl ClaudeCodeV2Client {
         // Reuse SSE parser from claude_code_api_key
         let (input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason) =
             streaming::parse_sse_stream(response, &resp_headers, tx)?;
+
+        // On a REFUSAL stop_reason, persist the exact request (full body +
+        // headers + url) so the refusing call can be replayed and debugged.
+        if stop_reason.as_deref() == Some("refusal") {
+            dump_refusal_request(&request.worker_id, mapped_model, &api_request);
+        }
 
         let _r = tx.send(StreamEvent::Done {
             input_tokens,
