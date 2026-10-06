@@ -166,5 +166,9 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
         output.push_str(&nudge);
     }
 
-    ToolResult::new(tool.id.clone(), output, !changed)
+    // Memory writes never alter the working set (panels/files), so a memory edit
+    // should not force a full context refresh — preserve tempo.
+    let mut result = ToolResult::new(tool.id.clone(), output, !changed);
+    result.preserves_tempo = true;
+    result
 }
