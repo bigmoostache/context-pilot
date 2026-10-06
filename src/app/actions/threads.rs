@@ -74,6 +74,29 @@ fn dispatch_archive(state: &mut State, action: &Action) -> ActionResult {
     ActionResult::Nothing
 }
 
+/// User-focus the thread the list cursor now sits on, so the footer (built from
+/// the resident thread) tracks the selection as the human arrows up/down —
+/// without entering the panel-centric view (that is [`drill_in`]'s job on
+/// Right). This sets only [`FocusState::focused_thread_id`]; the loop's
+/// `relocate_resident_on_focus_change` makes that thread resident on the next
+/// tick (an O(1) bundle swap), and the status bar then reflects its state.
+///
+/// This is TUI user-focus, not worker/exec focus — the background scheduler is
+/// unaffected. No-op on the virtual "+ New Thread" entry or an empty selection
+/// (the cursor position does not resolve to a real thread), leaving focus as-is.
+fn focus_selected_thread(state: &mut State) {
+    let focus = FocusState::get(state);
+    let (viewing_archived, pos) = (focus.viewing_archived, focus.selected_thread_idx);
+    let visible = ThreadsState::get(state).visible_indices(viewing_archived);
+    let Some(&real_idx) = visible.get(pos) else {
+        return; // virtual "+ New Thread" or empty selection — keep current focus
+    };
+    let Some(id) = ThreadsState::get(state).threads.get(real_idx).map(|t| t.id.clone()) else {
+        return;
+    };
+    FocusState::get_mut(state).focused_thread_id = Some(id);
+}
+
 /// Navigate to the next thread (or wrap to first).
 fn select_next(state: &mut State) -> ActionResult {
     let viewing_archived = FocusState::get(state).viewing_archived;
@@ -89,6 +112,7 @@ fn select_next(state: &mut State) -> ActionResult {
     if focus.selected_thread_idx < visible_count {
         FocusState::mark_selected_read(state);
     }
+    focus_selected_thread(state);
     state.scroll_offset = 0.0;
     state.stream.user_scrolled = false;
     state.flags.ui.dirty = true;
@@ -109,6 +133,7 @@ fn select_prev(state: &mut State) -> ActionResult {
     if focus.selected_thread_idx < visible_count {
         FocusState::mark_selected_read(state);
     }
+    focus_selected_thread(state);
     state.scroll_offset = 0.0;
     state.stream.user_scrolled = false;
     state.flags.ui.dirty = true;
