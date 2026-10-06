@@ -31,13 +31,12 @@ pub fn purge_thread_todos(state: &mut State, thread_id: &str) -> usize {
 /// Set the injected focused-thread filter used by the panel. Returns whether it
 /// changed (which drives the caller's forced panel refresh).
 pub fn set_focus_filter(state: &mut State, thread_id: Option<String>) -> bool {
-    let ts = TodoState::get_mut(state);
-    if ts.focus_filter == thread_id {
-        false
-    } else {
-        ts.focus_filter = thread_id;
-        true
+    // Read first: `get_mut` refreshes the change stamp, and this runs every tick.
+    if TodoState::get(state).focus_filter == thread_id {
+        return false;
     }
+    TodoState::get_mut(state).focus_filter = thread_id;
+    true
 }
 
 #[cfg(test)]

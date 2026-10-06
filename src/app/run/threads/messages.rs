@@ -176,9 +176,7 @@ const fn wire_task_status(status: TodoStatus) -> Option<WireTaskStatus> {
 /// aside renders: the thread's own items **sorted by sibling order** (YAML-diff
 /// rework — the backend's `order` int is the single source of truth for sibling
 /// order), cancelled excluded, nesting expressed via [`WireTask::parent_id`].
-fn project_thread_tasks(todos: &TodoState, thread_id: &str) -> Vec<WireTask> {
-    let mut items: Vec<&cp_mod_todo::types::TodoItem> =
-        todos.todos.iter().filter(|t| t.thread_id == thread_id).collect();
+fn project_thread_tasks(mut items: Vec<&cp_mod_todo::types::TodoItem>) -> Vec<WireTask> {
     // Sort by (order, id): within each parent group this yields ascending order,
     // which is all the frontend needs to render siblings correctly (it groups by
     // parent_id and preserves encounter order).
@@ -245,10 +243,15 @@ fn collect_task_changes(app: &App) -> Vec<(String, Vec<WireTask>)> {
     let todos = TodoState::get(&app.state);
     let memo = &app.state.ext::<BridgeState>().thread_tasks;
     let empty: Vec<WireTask> = Vec::new();
+    // One pass over the todos instead of one per thread.
+    let mut by_thread: HashMap<&str, Vec<&cp_mod_todo::types::TodoItem>> = HashMap::new();
+    for t in &todos.todos {
+        by_thread.entry(t.thread_id.as_str()).or_default().push(t);
+    }
     ts.threads
         .iter()
         .filter_map(|t| {
-            let live = project_thread_tasks(todos, &t.id);
+            let live = project_thread_tasks(by_thread.remove(t.id.as_str()).unwrap_or_default());
             (memo.get(&t.id).unwrap_or(&empty) != &live).then(|| (t.id.clone(), live))
         })
         .collect()
@@ -301,31 +304,30 @@ thread_local! {
     static NOTES_INPUT_HASH: Cell<Option<u64>> = const { Cell::new(None) };
 }
 
-/// Hash of every field [`collect_task_changes`] reads: thread ids plus each
-/// todo's projected fields. Equal hash ⇒ no thread's task list can differ.
+/// Skip key for [`collect_task_changes`]: the todo change stamp plus the thread
+/// id set. Equal key ⇒ no thread's task list can differ. O(threads), never
+/// touches todo content.
 fn tasks_input_hash(app: &App) -> u64 {
     let mut h = DefaultHasher::new();
-    for t in &ThreadsState::get(&app.state).threads {
-        t.id.hash(&mut h);
-    }
-    for t in &TodoState::get(&app.state).todos {
-        (&t.id, &t.thread_id, &t.parent_id, &t.name, &t.description, t.order).hash(&mut h);
-        std::mem::discriminant(&t.status).hash(&mut h);
-    }
+    TodoState::get(&app.state).revision.hash(&mut h);
+    hash_thread_ids(app, &mut h);
     h.finish()
 }
 
-/// Hash of every field [`collect_note_changes`] reads: thread ids plus each
-/// scratchpad cell. Equal hash ⇒ no thread's note list can differ.
+/// Skip key for [`collect_note_changes`]: the scratchpad change stamp plus the
+/// thread id set. Equal key ⇒ no thread's note list can differ.
 fn notes_input_hash(app: &App) -> u64 {
     let mut h = DefaultHasher::new();
-    for t in &ThreadsState::get(&app.state).threads {
-        t.id.hash(&mut h);
-    }
-    for c in &ScratchpadState::get(&app.state).scratchpad_cells {
-        (&c.id, &c.thread_id, &c.title, &c.content).hash(&mut h);
-    }
+    ScratchpadState::get(&app.state).revision.hash(&mut h);
+    hash_thread_ids(app, &mut h);
     h.finish()
+}
+
+/// Feed every thread id into `h` (thread create/delete changes the diff set).
+fn hash_thread_ids(app: &App, h: &mut DefaultHasher) {
+    for t in &ThreadsState::get(&app.state).threads {
+        t.id.hash(h);
+    }
 }
 
 // ── Note-list emission (thread-owned scratchpad → frontend, T716) ─────────
@@ -334,11 +336,9 @@ fn notes_input_hash(app: &App) -> u64 {
 /// web Notes aside renders: the thread's own cells in creation order (the
 /// `scratchpad_cells` Vec is already ordered by creation), each mapped to its
 /// `id`/`title`/`content`. The twin of [`project_thread_tasks`].
-fn project_thread_notes(scratchpad: &ScratchpadState, thread_id: &str) -> Vec<WireNote> {
-    scratchpad
-        .scratchpad_cells
-        .iter()
-        .filter(|c| c.thread_id == thread_id)
+fn project_thread_notes(cells: Vec<&cp_mod_scratchpad::types::ScratchpadCell>) -> Vec<WireNote> {
+    cells
+        .into_iter()
         .map(|c| WireNote { id: c.id.clone(), title: c.title.clone(), content: c.content.clone() })
         .collect()
 }
@@ -389,10 +389,14 @@ fn collect_note_changes(app: &App) -> Vec<(String, Vec<WireNote>)> {
     let scratchpad = ScratchpadState::get(&app.state);
     let memo = &app.state.ext::<BridgeState>().thread_notes;
     let empty: Vec<WireNote> = Vec::new();
+    let mut by_thread: HashMap<&str, Vec<&cp_mod_scratchpad::types::ScratchpadCell>> = HashMap::new();
+    for c in &scratchpad.scratchpad_cells {
+        by_thread.entry(c.thread_id.as_str()).or_default().push(c);
+    }
     ts.threads
         .iter()
         .filter_map(|t| {
-            let live = project_thread_notes(scratchpad, &t.id);
+            let live = project_thread_notes(by_thread.remove(t.id.as_str()).unwrap_or_default());
             (memo.get(&t.id).unwrap_or(&empty) != &live).then(|| (t.id.clone(), live))
         })
         .collect()

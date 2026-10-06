@@ -32,7 +32,15 @@ pub struct ScratchpadState {
     /// renders only cells whose `thread_id` matches, and the tools attach /
     /// edit / wipe cells within that thread. **Transient** — never serialized.
     pub focus_filter: Option<String>,
+    /// Change stamp, refreshed on every [`ScratchpadState::get_mut`]. Lets
+    /// per-tick observers skip their diff while it is unchanged. Read-only by
+    /// convention — only `get_mut` writes it. **Transient**.
+    pub revision: u64,
 }
+
+/// Process-wide stamp source: unique across `set_ext` replacements, so a
+/// fresh state never reuses a stamp an observer already cached.
+static REVISION_SOURCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 impl Default for ScratchpadState {
     fn default() -> Self {
@@ -44,8 +52,9 @@ impl ScratchpadState {
     /// Create an empty scratchpad state with ID counter at 1.
     #[must_use]
     pub const fn new() -> Self {
-        Self { scratchpad_cells: vec![], next_scratchpad_id: 1, focus_filter: None }
+        Self { scratchpad_cells: vec![], next_scratchpad_id: 1, focus_filter: None, revision: 0 }
     }
+
     /// Get shared ref from State's `TypeMap`.
     ///
     /// # Panics
@@ -55,12 +64,14 @@ impl ScratchpadState {
     pub fn get(state: &State) -> &Self {
         state.ext::<Self>()
     }
-    /// Get mutable ref from State's `TypeMap`.
+    /// Get mutable ref from State's `TypeMap`, refreshing the change stamp.
     ///
     /// # Panics
     ///
     /// Panics if an internal invariant is violated.
     pub fn get_mut(state: &mut State) -> &mut Self {
-        state.ext_mut::<Self>()
+        let ss = state.ext_mut::<Self>();
+        ss.revision = REVISION_SOURCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        ss
     }
 }
