@@ -83,7 +83,11 @@ fn load_budgets_and_costs(data: &serde_json::Value, state: &mut State) {
 }
 
 /// Restore cumulative token counters and dollar-cost accumulators.
-fn load_token_cost_accumulators(data: &serde_json::Value, state: &mut State) {
+///
+/// Per-thread values: the conversation module persists them in each thread's
+/// worker data. The call from [`load_budgets_and_costs`] only reads the legacy
+/// global slot (pre-T809 configs); the per-thread value overrides it.
+pub(crate) fn load_token_cost_accumulators(data: &serde_json::Value, state: &mut State) {
     if let Some(v) = data.get("cache_hit_tokens").and_then(serde_json::Value::as_u64) {
         state.cache_hit_tokens = v.to_usize();
     }
@@ -166,12 +170,6 @@ impl Module for OverviewModule {
             "cleaning_threshold": state.cleaning_threshold,
             "context_budget": state.context_budget,
             "global_next_uid": state.global_next_uid,
-            "cache_hit_tokens": state.cache_hit_tokens,
-            "cache_miss_tokens": state.cache_miss_tokens,
-            "total_output_tokens": state.total_output_tokens,
-            "cost_hit_usd": state.cost_hit_usd,
-            "cost_miss_usd": state.cost_miss_usd,
-            "cost_output_usd": state.cost_output_usd,
             "disabled_tools": state.tools.iter().filter(|t| !t.enabled).map(|t| &t.id).collect::<Vec<_>>(),
         })
     }
