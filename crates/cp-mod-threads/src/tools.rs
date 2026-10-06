@@ -77,6 +77,7 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
         timestamp: now,
         acknowledged: true,
         auto: false,
+        has_been_pushed: false,
     };
 
     // Build result message before mutating — need thread name.
@@ -176,7 +177,7 @@ fn force_refresh_threads_panel(state: &mut State) {
 /// `state.tempo` — a caller that preserves tempo (Send) keeps a full cache
 /// refresh from firing; the new content then emits on the next tick the freeze
 /// pass runs fresh (never lost, since `panel_content` is durable).
-fn rebuild_threads_panel(state: &mut State, focused_tid: &str, now_ms: u64) {
+pub(crate) fn rebuild_threads_panel(state: &mut State, focused_tid: &str, now_ms: u64) {
     let panel_content = build_panel_content(state, focused_tid, now_ms);
     ThreadsState::get_mut(state).panel_content = panel_content;
     force_refresh_threads_panel(state);

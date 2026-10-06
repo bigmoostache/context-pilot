@@ -9,6 +9,8 @@
 
 /// Send-time validation of agent-authored ` ```form ` blocks.
 mod forms;
+/// Incoming-message behavior for the focused thread (idle auto-read + streaming push).
+pub mod incoming;
 /// Panel rendering for the thread list.
 mod panel;
 /// Tool execution handlers: `Send` and `Read`.
