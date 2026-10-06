@@ -205,6 +205,46 @@ fn build_panel_uid_maps(state: &State) -> PanelUidMaps {
     (important_uids, panel_uid_to_local_id)
 }
 
+/// Serialize `config.json` (shared config + global module data). Timed as
+/// `….shared_config`.
+fn shared_config_op(
+    state: &State,
+    global_modules: HashMap<String, serde_json::Value>,
+    dir: &std::path::Path,
+) -> Option<WriteOp> {
+    let _g = crate::profile!("shared_config");
+    let shared_config = SharedConfig::default()
+        .with_active_theme(state.active_theme.clone())
+        .with_owner_pid(Some(current_pid()))
+        .with_ui(state.selected_context, state.composer.text.clone(), state.composer.cursor)
+        .with_view_mode(state.view_mode)
+        .with_modules(global_modules);
+    let json = serde_json::to_string_pretty(&shared_config).ok()?;
+    Some(WriteOp { path: dir.join(CONFIG_FILE), content: json.into_bytes() })
+}
+
+/// Serialize the resident thread's `states/<id>.json` (see
+/// [`resident_worker_id`]). Timed as `….worker_state`.
+fn worker_state_op(
+    state: &State,
+    worker_modules: HashMap<String, serde_json::Value>,
+    dir: &std::path::Path,
+) -> Option<WriteOp> {
+    let _g = crate::profile!("worker_state");
+    let (important_uids, panel_uid_to_local_id) = build_panel_uid_maps(state);
+    let worker_id = resident_worker_id(state);
+    let worker_state = WorkerState::default()
+        .with_worker_id(worker_id.clone())
+        .with_panel_uids(important_uids, panel_uid_to_local_id)
+        .with_id_counters(state.next_tool_id, state.next_result_id)
+        .with_modules(worker_modules);
+    let json = serde_json::to_string_pretty(&worker_state).ok()?;
+    Some(WriteOp {
+        path: dir.join(crate::infra::constants::STATES_DIR).join(format!("{worker_id}.json")),
+        content: json.into_bytes(),
+    })
+}
+
 /// Serialize all config, worker state, panels, and history messages
 /// into a batch of file write/delete operations.
 pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
@@ -221,42 +261,25 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
         dir.join(cp_mod_console::CONSOLE_DIR),
     ];
 
-    let (global_modules, worker_modules) = build_module_data_maps(state);
+    let (global_modules, worker_modules) = {
+        let _g = crate::profile!("modules");
+        build_module_data_maps(state)
+    };
 
-    // Shared config
-    let shared_config = SharedConfig::default()
-        .with_active_theme(state.active_theme.clone())
-        .with_owner_pid(Some(current_pid()))
-        .with_ui(state.selected_context, state.composer.text.clone(), state.composer.cursor)
-        .with_view_mode(state.view_mode)
-        .with_modules(global_modules);
-    if let Ok(json) = serde_json::to_string_pretty(&shared_config) {
-        writes.push(WriteOp { path: dir.join(CONFIG_FILE), content: json.into_bytes() });
-    }
+    writes.extend(shared_config_op(state, global_modules, &dir));
 
     // Chunked log files (global, shared across workers)
-    let logs_state = LogsState::get(state);
-    writes.extend(
-        cp_mod_logs::build_log_write_ops(&logs_state.logs, logs_state.next_log_id)
-            .into_iter()
-            .map(|(path, content)| WriteOp { path, content }),
-    );
-
-    let (important_uids, panel_uid_to_local_id) = build_panel_uid_maps(state);
-
-    // WorkerState — written to the RESIDENT thread's file (see `resident_worker_id`).
-    let worker_id = resident_worker_id(state);
-    let worker_state = WorkerState::default()
-        .with_worker_id(worker_id.clone())
-        .with_panel_uids(important_uids, panel_uid_to_local_id)
-        .with_id_counters(state.next_tool_id, state.next_result_id)
-        .with_modules(worker_modules);
-    if let Ok(json) = serde_json::to_string_pretty(&worker_state) {
-        writes.push(WriteOp {
-            path: dir.join(crate::infra::constants::STATES_DIR).join(format!("{worker_id}.json")),
-            content: json.into_bytes(),
-        });
+    {
+        let _g = crate::profile!("logs");
+        let logs_state = LogsState::get(state);
+        writes.extend(
+            cp_mod_logs::build_log_write_ops(&logs_state.logs, logs_state.next_log_id)
+                .into_iter()
+                .map(|(path, content)| WriteOp { path, content }),
+        );
     }
+
+    writes.extend(worker_state_op(state, worker_modules, &dir));
 
     // Panels + history messages. NOTE: orphan pruning is deliberately NOT done
     // here — a single-thread save only knows the RESIDENT's UIDs, so pruning
@@ -266,8 +289,14 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     let panels_dir = dir.join(crate::infra::constants::PANELS_DIR);
     let messages_dir = dir.join(crate::infra::constants::MESSAGES_DIR);
     let mut known_uids: std::collections::HashSet<String> = std::collections::HashSet::new();
-    writes.extend(build_panel_write_ops(state, &panels_dir, &mut known_uids));
-    writes.extend(build_history_message_ops(state, &messages_dir));
+    {
+        let _g = crate::profile!("panels");
+        writes.extend(build_panel_write_ops(state, &panels_dir, &mut known_uids));
+    }
+    {
+        let _g = crate::profile!("history_msgs");
+        writes.extend(build_history_message_ops(state, &messages_dir));
+    }
 
     WriteBatch { writes, deletes: Vec::new(), ensure_dirs }
 }
