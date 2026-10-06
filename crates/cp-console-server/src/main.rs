@@ -230,11 +230,7 @@ fn handle_kill(sessions: &Sessions, key: &str) -> Response {
 
     // If still running, kill the process.
     if !session.is_terminal() {
-        drop(Command::new("kill").args([&session.pid.to_string()]).output());
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        if is_pid_alive(session.pid) {
-            drop(Command::new("kill").args(["-9", &session.pid.to_string()]).output());
-        }
+        cleanup::terminate(session.pid, 100);
     }
 
     Response::ok()
@@ -245,11 +241,7 @@ fn handle_remove(sessions: &Sessions, key: &str) -> Response {
     let removed = sessions.lock().unwrap_or_else(PoisonError::into_inner).remove(key);
     if let Some(mut session) = removed {
         if !session.is_terminal() {
-            drop(Command::new("kill").args([&session.pid.to_string()]).output());
-            std::thread::sleep(std::time::Duration::from_millis(100));
-            if is_pid_alive(session.pid) {
-                drop(Command::new("kill").args(["-9", &session.pid.to_string()]).output());
-            }
+            cleanup::terminate(session.pid, 100);
         }
         drop(session.stdin.take());
     }
