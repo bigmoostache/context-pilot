@@ -14,8 +14,8 @@ use cp_base::cast::float_math;
 
 /// Cell width of each stacked bar.
 const BAR_CELLS: usize = 44;
-/// Legend entries per line.
-const LEGEND_PER_LINE: usize = 4;
+/// Legend entries per line (3 × 19 cols fits the 60-col overlay interior).
+const LEGEND_PER_LINE: usize = 3;
 
 /// Segment colours, cycled across substeps (same order as the HTML report).
 const PALETTE: [Color; 12] = [
@@ -48,7 +48,7 @@ pub(super) fn render_share_bars(names: &[String], share_bars: &[PerfShareBar], l
         let mut spans = vec![Span::raw(" ")];
         for &(name, colour) in chunk {
             spans.push(Span::styled(chars::BLOCK_FULL, Style::default().fg(colour)));
-            spans.push(Span::styled(format!(" {name:<12}"), semantic_to_style(Semantic::Muted)));
+            spans.push(Span::styled(format!(" {name:<17}"), semantic_to_style(Semantic::Muted)));
         }
         lines.push(Line::from(spans));
     }
@@ -56,15 +56,18 @@ pub(super) fn render_share_bars(names: &[String], share_bars: &[PerfShareBar], l
 }
 
 /// One stacked bar: label, coloured segments sized by share, metric total.
+///
+/// Colour = substep index (stable across frames). Cells are allocated by
+/// largest remainder so the segments always sum to exactly [`BAR_CELLS`]
+/// (per-segment rounding + clipping used to drop or truncate the tail steps).
 fn render_one(share_bar: &PerfShareBar) -> Line<'static> {
     let mut spans = vec![Span::styled(format!(" {:<5}", share_bar.label), semantic_to_style(Semantic::Muted))];
+    let cells = allocate_cells(&share_bar.shares);
     let mut used = 0usize;
-    for (&pct, colour) in share_bar.shares.iter().zip(PALETTE.iter().copied().cycle()) {
-        let want = float_math::mul(float_math::div(pct, 100.0f64), BAR_CELLS.to_f64()).round().to_usize();
-        let cells = want.min(BAR_CELLS.saturating_sub(used));
-        if cells > 0 {
-            spans.push(Span::styled(chars::BLOCK_FULL.repeat(cells), Style::default().fg(colour)));
-            used = used.saturating_add(cells);
+    for (&n, colour) in cells.iter().zip(PALETTE.iter().copied().cycle()) {
+        if n > 0 {
+            spans.push(Span::styled(chars::BLOCK_FULL.repeat(n), Style::default().fg(colour)));
+            used = used.saturating_add(n);
         }
     }
     spans.push(Span::styled(
@@ -73,4 +76,36 @@ fn render_one(share_bar: &PerfShareBar) -> Line<'static> {
     ));
     spans.push(Span::styled(format!(" {}", share_bar.total_display), semantic_to_style(Semantic::Muted)));
     Line::from(spans)
+}
+
+/// Largest-remainder apportionment of [`BAR_CELLS`] over percentage shares.
+///
+/// Returns all zeros when the shares sum to zero (nothing recorded yet).
+fn allocate_cells(shares: &[f64]) -> Vec<usize> {
+    let sum: f64 = shares.iter().sum();
+    if sum <= 0.0f64 {
+        return vec![0; shares.len()];
+    }
+    let exact: Vec<f64> =
+        shares.iter().map(|&pct| float_math::mul(float_math::div(pct, sum), BAR_CELLS.to_f64())).collect();
+    let cells_and_rem: Vec<(usize, f64)> =
+        exact.iter().map(|&v| (v.floor().to_usize(), float_math::sub(v, v.floor()))).collect();
+    let mut cells: Vec<usize> = cells_and_rem.iter().map(|&(c, _)| c).collect();
+    let mut order: Vec<usize> = (0..exact.len()).collect();
+    order.sort_by(|&a, &b| {
+        let ra = cells_and_rem.get(a).map_or(0.0f64, |&(_, r)| r);
+        let rb = cells_and_rem.get(b).map_or(0.0f64, |&(_, r)| r);
+        rb.partial_cmp(&ra).unwrap_or(std::cmp::Ordering::Equal).then(a.cmp(&b))
+    });
+    let mut left = BAR_CELLS.saturating_sub(cells.iter().sum());
+    for idx in order {
+        if left == 0 {
+            break;
+        }
+        if let Some(c) = cells.get_mut(idx) {
+            *c = c.saturating_add(1);
+            left = left.saturating_sub(1);
+        }
+    }
+    cells
 }

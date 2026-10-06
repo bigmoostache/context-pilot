@@ -347,21 +347,38 @@ fn build_perf_overlay(state: &State) -> PerfOverlay {
         fd_semantic: fd_semantic(snapshot.open_fds, snapshot.fd_limit_soft),
         meili: build_perf_meili(state),
         budget_bars: build_perf_budget_bars(snapshot.frame_avg_ms),
-        share_names: loop_substeps(&snapshot).iter().map(|op| op.name.trim_start_matches("loop.").to_owned()).collect(),
+        share_names: LOOP_SHARE_STEPS.iter().map(|name| name.trim_start_matches("loop.").to_owned()).collect(),
         share_bars: build_perf_share_bars(&snapshot),
         sparkline: snapshot.frame_times_ms,
         operations,
     }
 }
 
-/// Main-loop substep ops (`loop.*`), excluding `loop.idle`: the input-poll
-/// park would otherwise dwarf every real substep in the share-bars.
-fn loop_substeps(snapshot: &crate::ui::perf::PerfSnapshot) -> Vec<&crate::ui::perf::OpSnapshot> {
-    snapshot
-        .ops
-        .iter()
-        .filter(|op| op.name.strip_prefix("loop.").is_some_and(|step| !step.contains('.')) && op.name != "loop.idle")
-        .collect()
+/// Level-1 main-loop steps shown in the share-bars, in loop execution order.
+///
+/// Fixed on purpose: segment colour = position in this list, so colours never
+/// move between frames (sorting by the live snapshot reshuffled them on every
+/// refresh). `loop.idle` is excluded: the input-poll park would dwarf every
+/// real step. Keep in sync with `watchdog::Step::perf_name`.
+const LOOP_SHARE_STEPS: [&str; 12] = [
+    "loop.input",
+    "loop.bridge",
+    "loop.threads_emit",
+    "loop.stream",
+    "loop.cache",
+    "loop.watchers",
+    "loop.tools",
+    "loop.spine",
+    "loop.reverie",
+    "loop.panel_refresh",
+    "loop.render",
+    "loop.save",
+];
+
+/// One snapshot op per [`LOOP_SHARE_STEPS`] entry (`None` = not recorded yet),
+/// aligned index-for-index with the step list.
+fn loop_substeps(snapshot: &crate::ui::perf::PerfSnapshot) -> Vec<Option<&crate::ui::perf::OpSnapshot>> {
+    LOOP_SHARE_STEPS.iter().map(|&name| snapshot.ops.iter().find(|op| op.name == name)).collect()
 }
 
 /// Extracts one lifetime metric (µs or µs²) from an op snapshot.
@@ -379,11 +396,10 @@ fn build_perf_share_bars(snapshot: &crate::ui::perf::PerfSnapshot) -> Vec<PerfSh
     metrics
         .iter()
         .map(|&(label, unit, metric)| {
-            let total: f64 = steps.iter().map(|op| metric(op)).sum();
-            let shares = steps
-                .iter()
-                .map(|op| if total > 0.0f64 { float_math::percent(metric(op), total) } else { 0.0f64 })
-                .collect();
+            let values: Vec<f64> = steps.iter().map(|op| op.map_or(0.0f64, metric)).collect();
+            let total: f64 = values.iter().sum();
+            let shares =
+                values.iter().map(|&v| if total > 0.0f64 { float_math::percent(v, total) } else { 0.0f64 }).collect();
             PerfShareBar { label: label.to_owned(), shares, total_display: format!("{total:.0}{unit}") }
         })
         .collect()
