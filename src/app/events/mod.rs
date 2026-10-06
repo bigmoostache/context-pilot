@@ -247,6 +247,13 @@ const fn drilled_threads_nav(key: &KeyEvent) -> Dispatch {
     }
 }
 
+/// True when the list cursor sits on a real thread row (not the virtual
+/// "+ New Thread" entry, not an empty list) — i.e. drill-in has a target.
+fn selection_is_real_thread(focus: &cp_mod_threads::types::FocusState, state: &State) -> bool {
+    let visible = cp_mod_threads::types::ThreadsState::get(state).visible_indices(focus.viewing_archived);
+    focus.selected_thread_idx < visible.len()
+}
+
 /// Threads-view navigation (non-Ctrl): archive-confirm y/n, Tab/BackTab select,
 /// Esc exit. `Fallthrough` when the key isn't a threads-nav key.
 fn handle_threads_nav(key: &KeyEvent, state: &State) -> Dispatch {
@@ -270,10 +277,16 @@ fn handle_threads_nav(key: &KeyEvent, state: &State) -> Dispatch {
         KeyCode::Up | KeyCode::Down if shift => Dispatch::Act(scroll_key_action(key).unwrap_or(Action::None)),
         KeyCode::BackTab | KeyCode::Up => Dispatch::Act(Action::ThreadSelectPrev),
         KeyCode::Down => Dispatch::Act(Action::ThreadSelectNext),
-        // Design 9.1: Left navigates *out* to the panel view; Esc is the
-        // pre-existing secondary gesture for the same move, so neither is
-        // load-bearing on its own.
-        KeyCode::Left | KeyCode::Esc => Dispatch::Act(Action::CycleViewMode),
+        // Design 9.1: Left/Esc navigate *out* to the panel view. On a real row
+        // they open the SELECTED thread (drill-in commits the list cursor as
+        // focus), never whatever `focused_thread_id` last held — an agent's
+        // Read/Send can move focus after the cursor was placed. On the virtual
+        // "+ New Thread" row (or an empty list) they just leave the list.
+        KeyCode::Left | KeyCode::Esc => Dispatch::Act(if selection_is_real_thread(focus, state) {
+            Action::ThreadDrillIn
+        } else {
+            Action::CycleViewMode
+        }),
         // Right drills into the selected thread's full panel view (G3). The
         // handler no-ops on the virtual "+ New Thread" entry / empty selection.
         KeyCode::Right => Dispatch::Act(Action::ThreadDrillIn),
