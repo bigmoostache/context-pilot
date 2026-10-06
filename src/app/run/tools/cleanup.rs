@@ -387,7 +387,7 @@ fn resume_pipeline_after_blocking(
 
     // Accumulate token stats + costs from intermediate stream (same logic as
     // the non-blocking path in pipeline.rs — includes $ computation).
-    super::pipeline::accumulate_pending_token_stats(app);
+    super::cost_log::accumulate_pending_token_stats(app);
 
     // Append per-tick cost row (consumes tick_telemetry populated at stream start)
     super::cost_log::append_cost_tsv(&mut app.state);
