@@ -8626,3 +8626,59 @@ index 2fb7b044..11758b8b 100644
      match: "type_id/cause/provide are unstable or deprecated"
      reason: >
 # --- End entry #105 ---
+106:71949ae856baceac39a29781b307aaf5bf3c2c325acf74a48fdcb13048f777a9:5bc45d3ae8138b1a9ca212902c19c02b1a6ff48369c24b3fd05a5f9cbb2bd69a:2dbd8bec5c0a8d2986c229075b014b0f8dfed38468c37dd27bc14684eee96392
+# --- Diff for entry #106 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 11758b8b..5e744a2f 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -179,6 +179,18 @@ exceptions:
+       Could merge all impl blocks into a single file, but that would
+       create a 2500+ line file. The split is intentional for navigation.
+ 
++  - path: "src/app/run/lifecycle/animation.rs"
++    match: 'App methods split across run/ submodules for readability'
++    reason: >
++      The spinner-animation redraw cadence (tick_animation_dirty +
++      has_active_animation) is its own impl App block, extracted from
++      lifecycle/mod.rs to keep that file under the 500-line cap.
++      multiple_inherent_impl (forbid) fires on this additional block, so it
++      carries the #[expect].
++    strategy: >
++      Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
++      would push that file over the limit. The split is the honest shape.
++
+   - path: "src/app/run/lifecycle/fleet.rs"
+     match: 'App methods split across run/ submodules for readability'
+     reason: >
+diff --git a/run.sh b/run.sh
+index ccfa2a7a..e1b6cb36 100755
+--- a/run.sh
++++ b/run.sh
+@@ -13,12 +13,23 @@ if [ -f .env ]; then
+     export $(grep -v '^#' .env | xargs)
+ fi
+ 
+-# Parse --telemetry flag: enable flame graph instrumentation
++# Parse flags:
++#   --telemetry      enable flame graph instrumentation
++#   --measure N      profile the main loop for N iterations, dump an HTML
++#                    report to ./tmp/loop-profile.html, then exit. Read by the
++#                    binary via the CP_MEASURE_LOOPS env var (not a CLI flag).
+ ARGS=()
++expect_measure=0
+ for arg in "$@"; do
+-    if [ "$arg" = "--telemetry" ]; then
++    if [ "$expect_measure" = "1" ]; then
++        export CP_MEASURE_LOOPS="$arg"
++        echo "📊 Measure mode: profiling $arg main-loop iterations → tmp/loop-profile.html"
++        expect_measure=0
++    elif [ "$arg" = "--telemetry" ]; then
+         export CP_FLAMEGRAPH=1
+         echo "🔥 Telemetry mode: flame graph instrumentation enabled"
++    elif [ "$arg" = "--measure" ]; then
++        expect_measure=1
+     else
+         ARGS+=("$arg")
+     fi
+# --- End entry #106 ---

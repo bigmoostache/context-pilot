@@ -179,6 +179,18 @@ exceptions:
       Could merge all impl blocks into a single file, but that would
       create a 2500+ line file. The split is intentional for navigation.
 
+  - path: "src/app/run/lifecycle/animation.rs"
+    match: 'App methods split across run/ submodules for readability'
+    reason: >
+      The spinner-animation redraw cadence (tick_animation_dirty +
+      has_active_animation) is its own impl App block, extracted from
+      lifecycle/mod.rs to keep that file under the 500-line cap.
+      multiple_inherent_impl (forbid) fires on this additional block, so it
+      carries the #[expect].
+    strategy: >
+      Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
+      would push that file over the limit. The split is the honest shape.
+
   - path: "src/app/run/lifecycle/fleet.rs"
     match: 'App methods split across run/ submodules for readability'
     reason: >
