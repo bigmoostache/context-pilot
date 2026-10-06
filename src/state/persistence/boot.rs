@@ -199,10 +199,8 @@ fn boot_init_thread_modules(state: &mut State, worker_modules: &HashMap<String, 
 /// [`boot_load_messages`], which read only `cfg.worker`, ignoring `cfg.shared`)
 /// to rebuild the thread's panels + conversation, then assembles a throwaway
 /// background `State` and [`swap_with`](ThreadRuntime::swap_with)s its per-thread
-/// fields out into the returned runtime. Shared UI fields (draft input, selected
-/// panel) are deliberately left at their defaults — they are persisted per-agent
-/// in `config.json`, not per-thread, so a background thread must not inherit the
-/// focused thread's draft.
+/// fields out into the returned runtime. The composer draft comes from the
+/// thread's own `states/<tid>.json`, so each thread restores its own unsent text.
 pub(crate) fn boot_load_thread_runtime(
     thread_id: &str,
     next_uid: &mut usize,
@@ -223,6 +221,7 @@ pub(crate) fn boot_load_thread_runtime(
         .with_context(panels.context)
         .with_messages(messages)
         .with_id_counters((next_user_id, next_assistant_id, cfg.worker.next_tool_id, cfg.worker.next_result_id))
+        .with_draft(cfg.worker.draft_input.clone().unwrap_or_default(), cfg.worker.draft_cursor)
         .with_cache_engine_json(cache_engine_json);
     boot_init_thread_modules(&mut bg, &cfg.worker.modules);
     // Ensure this thread owns the fixed base panels (Todo, Overview, Memory,

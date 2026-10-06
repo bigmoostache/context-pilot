@@ -192,12 +192,19 @@ pub(crate) fn boot_assemble_state(cfg: BootConfig, panels: BootPanels, messages:
     // Restore cache engine state from worker modules
     let cache_engine_json = cfg.worker.modules.get("cache_engine").and_then(|v| serde_json::to_string(v).ok());
 
+    // Per-thread draft (states/<id>.json); legacy installs fall back to the
+    // shared `config.json` slot once, until the next save migrates it.
+    let (draft_text, draft_cursor) = match cfg.worker.draft_input {
+        Some(text) => (text, cfg.worker.draft_cursor),
+        None => (cfg.shared.draft_input, cfg.shared.draft_cursor),
+    };
+
     State::default()
         .with_context(panels.context)
         .with_messages(messages)
         .with_selected_context(cfg.shared.selected_context)
         .with_id_counters((next_user_id, next_assistant_id, cfg.worker.next_tool_id, cfg.worker.next_result_id))
-        .with_draft(cfg.shared.draft_input, cfg.shared.draft_cursor)
+        .with_draft(draft_text, draft_cursor)
         .with_view_mode(cfg.shared.view_mode)
         .with_active_theme(cfg.shared.active_theme)
         .with_cache_engine_json(cache_engine_json)

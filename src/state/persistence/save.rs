@@ -216,7 +216,9 @@ fn shared_config_op(
     let shared_config = SharedConfig::default()
         .with_active_theme(state.active_theme.clone())
         .with_owner_pid(Some(current_pid()))
-        .with_ui(state.selected_context, state.composer.text.clone(), state.composer.cursor)
+        // Draft lives per-thread in `states/<id>.json`; the shared slot is
+        // emptied so a background-thread save can't clobber the focused draft.
+        .with_ui(state.selected_context, String::new(), 0)
         .with_view_mode(state.view_mode)
         .with_modules(global_modules);
     let json = serde_json::to_string_pretty(&shared_config).ok()?;
@@ -237,6 +239,7 @@ fn worker_state_op(
         .with_worker_id(worker_id.clone())
         .with_panel_uids(important_uids, panel_uid_to_local_id)
         .with_id_counters(state.next_tool_id, state.next_result_id)
+        .with_draft(state.composer.text.clone(), state.composer.cursor)
         .with_modules(worker_modules);
     let json = serde_json::to_string_pretty(&worker_state).ok()?;
     Some(WriteOp {
