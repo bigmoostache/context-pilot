@@ -251,6 +251,11 @@ impl App {
         };
 
         // Ctrl+P opens the palette; everything else dispatches normally.
+        if matches!(action, Action::None) {
+            // Ignored event (mouse click/move, unbound key): nothing changed,
+            // so don't mark dirty and don't redraw.
+            return Ok(InputOutcome::Continue);
+        }
         if matches!(action, Action::OpenCommandPalette) {
             self.command_palette.open(&self.state);
             self.state.flags.ui.dirty = true;
@@ -268,8 +273,10 @@ impl App {
             self.relocate_resident_on_focus_change();
         }
 
-        // Render immediately after input for instant feedback.
-        if self.state.flags.ui.dirty {
+        // Render immediately after input for instant feedback, but never faster
+        // than the frame cap; otherwise the frame stays dirty and the throttled
+        // render step later in the loop paints it.
+        if self.state.flags.ui.dirty && current_ms.saturating_sub(self.last_render_ms) >= RENDER_THROTTLE_MS {
             self.render_frame(terminal, current_ms)?;
         }
         Ok(InputOutcome::Continue)

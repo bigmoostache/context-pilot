@@ -211,7 +211,7 @@ fn raise_fd_limit() {
 
 use crossterm::{
     ExecutableCommand as _,
-    event::{DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture},
+    event::{DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste},
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 
@@ -422,7 +422,11 @@ fn main() -> ExitCode {
     // rather than being folded into Up/Down arrow keys by the terminal's
     // alternate-scroll mode — lets the threads list keep arrows for selection
     // while the wheel scrolls the selected thread's conversation history.
-    let _r_mouse_on = io::stdout().execute(EnableMouseCapture);
+    // Button tracking (1000) + SGR encoding (1006) only — NOT crossterm's
+    // EnableMouseCapture, which also turns on any-motion tracking (1003) and
+    // floods the loop with an event per mouse move. The wheel still arrives
+    // as ScrollUp/Down; DisableMouseCapture on teardown resets all modes.
+    let _r_mouse_on = io::stdout().write_all(b"\x1b[?1000h\x1b[?1006h");
     // Explicitly DISABLE alternate-scroll mode (DECSET 1007). Mouse capture
     // alone does not reset it, and some terminals keep translating the wheel
     // into Up/Down arrow keys even with tracking on — which leaked through as
