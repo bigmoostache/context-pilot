@@ -1,4 +1,4 @@
-//! F12 overlay share-bars: three stacked horizontal bars (mean / variance /
+//! F12 overlay share-bars: four stacked horizontal bars (total / mean / std /
 //! max) where each coloured segment is one main-loop substep's share of that
 //! metric, plus a colour legend. Data comes pre-computed from the IR
 //! ([`PerfShareBar`]); this module only maps it to ratatui spans.

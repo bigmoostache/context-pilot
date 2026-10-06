@@ -185,7 +185,7 @@ pub struct PerfOverlay {
     /// Main-loop substep names (`loop.` prefix stripped, idle excluded), in the
     /// order shared by every [`PerfShareBar::shares`] vector.
     pub share_names: Vec<String>,
-    /// Stacked share-bars (mean / variance / max) of loop substep time.
+    /// Stacked share-bars (total / mean / std / max) of loop substep time.
     pub share_bars: Vec<PerfShareBar>,
 }
 

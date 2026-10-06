@@ -19,7 +19,7 @@ use cp_base::cast::float_math;
 pub(crate) fn render_perf_overlay_from_ir(frame: &mut Frame<'_>, area: Rect, perf: &PerfOverlay) {
     // Overlay dimensions
     let overlay_width = 62u16;
-    let overlay_height = 42u16;
+    let overlay_height = 43u16;
 
     // Position in top-right
     let x = area.width.saturating_sub(overlay_width.saturating_add(2));
@@ -68,7 +68,7 @@ pub(crate) fn render_perf_overlay_from_ir(frame: &mut Frame<'_>, area: Rect, per
     lines.push(render_sparkline(&perf.sparkline));
     lines.push(Line::from(""));
 
-    // Loop substep share-bars (mean / variance / max)
+    // Loop substep share-bars (total / mean / std / max)
     super::share_bars::render_share_bars(&perf.share_names, &perf.share_bars, &mut lines);
 
     // Operation table

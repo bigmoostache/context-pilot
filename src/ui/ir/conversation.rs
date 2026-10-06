@@ -384,13 +384,16 @@ fn loop_substeps(snapshot: &crate::ui::perf::PerfSnapshot) -> Vec<Option<&crate:
 /// Extracts one lifetime metric (µs or µs²) from an op snapshot.
 type Metric = fn(&crate::ui::perf::OpSnapshot) -> f64;
 
-/// Three stacked share-bars (mean / variance / max) over the loop substeps:
-/// each segment is that substep's percentage of the metric's sum.
+/// Four stacked share-bars (total / mean / std / max) over the loop substeps:
+/// each segment is that substep's percentage of the metric's sum. `total`
+/// (mean × runs) shows where wall time goes; the others show per-run cost.
+/// Std (not variance) so the per-run bars share one unit (µs).
 fn build_perf_share_bars(snapshot: &crate::ui::perf::PerfSnapshot) -> Vec<PerfShareBar> {
     let steps = loop_substeps(snapshot);
-    let metrics: [(&str, &str, Metric); 3] = [
+    let metrics: [(&str, &str, Metric); 4] = [
+        ("total", "ms", |op| op.total_ms),
         ("mean", "\u{b5}s", |op| op.mean_us),
-        ("var", "\u{b5}s\u{b2}", |op| op.variance_us2),
+        ("std", "\u{b5}s", |op| op.variance_us2.sqrt()),
         ("max", "\u{b5}s", |op| op.max_us),
     ];
     metrics
