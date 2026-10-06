@@ -93,10 +93,26 @@ fn process_cache_updates_static(state: &mut State, cache_rx: &Receiver<CacheUpda
         if apply_unchanged_update(state, &update) {
             continue;
         }
+        // One perf row per panel kind (`<parent>.apply_<kind>`): attributes the
+        // main-thread cost of each `apply_cache_update`. Interning only when monitoring.
+        let _kind_guard = apply_kind_guard(state, &update);
         if let Err(leftover) = apply_module_specific_update(state, update) {
             apply_content_update(state, leftover);
         }
     }
+}
+
+/// Perf guard named `apply_<kind>` for the panel an update targets; `None` when
+/// the F12 profiler is off or the target panel is gone.
+fn apply_kind_guard(state: &State, update: &CacheUpdate) -> Option<crate::infra::profiler::ProfileGuard> {
+    if !crate::ui::perf::PERF.enabled.load(std::sync::atomic::Ordering::Relaxed) {
+        return None;
+    }
+    let kind = update.module_specific_type().cloned().or_else(|| {
+        let id = update.content_context_id()?;
+        state.context.iter().find(|c| c.id == id).map(|c| c.context_type.clone())
+    })?;
+    Some(crate::profile!(crate::infra::profiler::intern(format!("apply_{}", kind.as_str()))))
 }
 
 /// Mark every panel a module claims for `path` as `cache_deprecated`, returning
