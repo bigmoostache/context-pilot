@@ -212,7 +212,7 @@ fn render_thread_input(frame: &mut Frame<'_>, state: &State, area: Rect) {
         viewport_width: input_area.width,
     };
 
-    let input_blocks = render_input_blocks(&state.input, state.input_cursor, state.input_selection_anchor, &ctx);
+    let input_blocks = render_input_blocks(&state.composer.text, state.composer.cursor, state.composer.anchor, &ctx);
 
     let lines = ir::blocks_to_lines(&input_blocks);
     let paragraph = Paragraph::new(lines);
@@ -273,15 +273,15 @@ fn thread_message_to_message(msg: &cp_mod_threads::types::ThreadMessage) -> Mess
 /// Caps at 50% of the available height so messages remain visible.
 fn calculate_input_height(state: &State, width: u16, available_height: u16) -> u16 {
     let max_input = available_height.saturating_div(2).max(3);
-    if state.input.is_empty() {
+    if state.composer.text.is_empty() {
         // Separator (1) + one line for empty input prompt
         return 3;
     }
-    let line_count = state.input.lines().count().max(1);
+    let line_count = state.composer.text.lines().count().max(1);
     // Account for wrapping
     let wrap_width = usize::from(width).saturating_sub(10).max(20);
     let wrapped_lines: usize =
-        state.input.lines().map(|l| if l.is_empty() { 1 } else { l.len().div_ceil(wrap_width).max(1) }).sum();
+        state.composer.text.lines().map(|l| if l.is_empty() { 1 } else { l.len().div_ceil(wrap_width).max(1) }).sum();
     let total = wrapped_lines.max(line_count);
     // Separator (1) + content + hint line (1), capped at 50% of available height
     (total.saturating_add(3)).min(max_input.into()).to_u16()

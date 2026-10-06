@@ -140,8 +140,8 @@ fn build_streaming_tools(state: &State) -> Vec<StreamingTool> {
 /// Build the input area from state.
 fn build_input(state: &State) -> InputArea {
     InputArea {
-        text: state.input.clone(),
-        cursor: state.input_cursor,
+        text: state.composer.text.clone(),
+        cursor: state.composer.cursor,
         placeholder: "Type a message\u{2026}".into(),
         focused: !state.stream.phase.is_streaming(),
     }

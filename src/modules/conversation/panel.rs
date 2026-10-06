@@ -83,9 +83,9 @@ impl ConversationPanel {
         }
 
         // Hash input
-        std::hash::Hash::hash(&state.input, &mut hasher);
-        std::hash::Hash::hash(&state.input_cursor, &mut hasher);
-        std::hash::Hash::hash(&state.input_selection_anchor, &mut hasher);
+        std::hash::Hash::hash(&state.composer.text, &mut hasher);
+        std::hash::Hash::hash(&state.composer.cursor, &mut hasher);
+        std::hash::Hash::hash(&state.composer.anchor, &mut hasher);
 
         std::hash::Hasher::finish(&hasher)
     }
@@ -170,9 +170,9 @@ impl ConversationPanel {
                 .map(|c| c.id.clone())
                 .collect();
         let input_blocks = render_input_blocks::render_input_blocks(
-            &state.input,
-            state.input_cursor,
-            state.input_selection_anchor,
+            &state.composer.text,
+            state.composer.cursor,
+            state.composer.anchor,
             &InputBlockCtx {
                 command_ids: &command_ids,
                 paste_buffers: &state.paste_buffers,
@@ -187,8 +187,12 @@ impl ConversationPanel {
     /// Render the input area (cached by input hash), updating the autocomplete
     /// popup's visual-line count. Renders fresh + stores on cache miss.
     fn push_input_area(state: &mut State, blocks: &mut Vec<Block>, viewport_width: u16) {
-        let input_hash =
-            Self::compute_input_hash(&state.input, state.input_cursor, state.input_selection_anchor, viewport_width);
+        let input_hash = Self::compute_input_hash(
+            &state.composer.text,
+            state.composer.cursor,
+            state.composer.anchor,
+            viewport_width,
+        );
 
         let cache_hit = state
             .input_cache
@@ -406,7 +410,7 @@ const fn handle_modifier_combo(code: KeyCode, mods: &Mods) -> Option<Action> {
 fn left_action(state: &State, shift: bool) -> Action {
     if shift {
         Action::CursorLeftSelect
-    } else if state.input.is_empty() && state.input_selection_anchor.is_none() {
+    } else if state.composer.text.is_empty() && state.composer.anchor.is_none() {
         Action::CycleViewMode
     } else {
         Action::CursorLeft
@@ -453,14 +457,14 @@ fn handle_plain_key(key: &KeyEvent, state: &State, shift: bool) -> Option<Action
 /// else continue/close a markdown list, else insert a newline.
 fn handle_enter_key(state: &State) -> Action {
     // Send if: cursor at end AND (input empty OR ends with empty line)
-    let at_end = state.input_cursor >= state.input.len();
+    let at_end = state.composer.cursor >= state.composer.text.len();
     let ends_with_empty_line =
-        state.input.ends_with('\n') || state.input.lines().last().is_none_or(|l| l.trim().is_empty());
+        state.composer.text.ends_with('\n') || state.composer.text.lines().last().is_none_or(|l| l.trim().is_empty());
 
     if at_end && ends_with_empty_line {
         return Action::InputSubmit;
     }
-    match list::detect_list_action(&state.input) {
+    match list::detect_list_action(&state.composer.text) {
         Some(ListAction::Continue(text)) => Action::InsertText(text),
         Some(ListAction::RemoveItem) => Action::RemoveListItem,
         None => Action::InputChar('\n'),

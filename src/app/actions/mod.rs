@@ -110,16 +110,18 @@ fn handle_copy_index_overlay(state: &mut State) {
 /// then trigger `@`-autocomplete or `/command` expansion when warranted.
 fn handle_input_char(state: &mut State, ch: char) {
     let _r = cursor::delete_selection(state);
-    let pos = state.input_cursor;
-    state.input.insert(pos, ch);
-    state.input_cursor = state.input_cursor.saturating_add(ch.len_utf8());
+    state.composer.push_undo(cp_base::state::runtime::textarea::EditKind::Insert);
+    let pos = state.composer.cursor;
+    state.composer.text.insert(pos, ch);
+    state.composer.cursor = state.composer.cursor.saturating_add(ch.len_utf8());
 
     // '@' at input start or after whitespace opens directory autocomplete.
     if ch == '@' {
-        let anchor_pos = state.input_cursor.saturating_sub(1);
+        let anchor_pos = state.composer.cursor.saturating_sub(1);
         let should_trigger = anchor_pos == 0
             || state
-                .input
+                .composer
+                .text
                 .as_bytes()
                 .get(anchor_pos.saturating_sub(1))
                 .is_some_and(|&b| b == b' ' || b == b'\n' || b == b'\t');
@@ -144,29 +146,32 @@ fn handle_input_char(state: &mut State, ch: char) {
 /// Insert literal text at the cursor, replacing any active selection.
 fn handle_insert_text(state: &mut State, text: &str) {
     let _r = cursor::delete_selection(state);
-    let pos = state.input_cursor;
-    state.input.insert_str(pos, text);
-    state.input_cursor = state.input_cursor.saturating_add(text.len());
+    state.composer.push_undo(cp_base::state::runtime::textarea::EditKind::Other);
+    let pos = state.composer.cursor;
+    state.composer.text.insert_str(pos, text);
+    state.composer.cursor = state.composer.cursor.saturating_add(text.len());
 }
 
 /// Stash a pasted blob in a paste buffer and insert a `\x00{idx}\x00` sentinel
 /// at the cursor (expanded to the real text at submit time).
 fn handle_paste_text(state: &mut State, text: String) {
     let _r = cursor::delete_selection(state);
+    state.composer.push_undo(cp_base::state::runtime::textarea::EditKind::Other);
     let idx = state.paste_buffers.len();
     state.paste_buffers.push(text);
     state.paste_buffer_labels.push(None);
     let sentinel = format!("\x00{idx}\x00");
-    let pos = state.input_cursor;
-    state.input.insert_str(pos, &sentinel);
-    state.input_cursor = state.input_cursor.saturating_add(sentinel.len());
+    let pos = state.composer.cursor;
+    state.composer.text.insert_str(pos, &sentinel);
+    state.composer.cursor = state.composer.cursor.saturating_add(sentinel.len());
 }
 
 /// Delete the selection if any, else the character to the right of the cursor.
 fn handle_input_delete(state: &mut State) {
-    if !cursor::delete_selection(state) && state.input_cursor < state.input.len() {
-        let pos = state.input_cursor;
-        let _r = state.input.remove(pos);
+    if !cursor::delete_selection(state) && state.composer.cursor < state.composer.text.len() {
+        state.composer.push_undo(cp_base::state::runtime::textarea::EditKind::Delete);
+        let pos = state.composer.cursor;
+        let _r = state.composer.text.remove(pos);
     }
 }
 
@@ -196,7 +201,7 @@ fn handle_tmux_send_keys(state: &mut State, pane_id: &str, keys: &str) {
 /// to the input module's submit handler.
 fn handle_input_submit_action(state: &mut State) -> ActionResult {
     history::ensure_history_nav(state);
-    let trimmed = state.input.trim_end().to_owned();
+    let trimmed = state.composer.text.trim_end().to_owned();
     let nav = state.ext_mut::<history::PromptHistoryNav>();
     if !trimmed.is_empty() {
         nav.push(trimmed);
@@ -272,6 +277,8 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         Action::CursorHomeSelect => cursor::handle_cursor_home_select(state),
         Action::CursorEndSelect => cursor::handle_cursor_end_select(state),
         Action::SelectAll => cursor::handle_select_all(state),
+        Action::Undo => cursor::handle_undo(state),
+        Action::CopySelection => history::handle_copy_selection(state),
         Action::HistoryPrev => history::handle_history_prev(state),
         Action::HistoryNext => history::handle_history_next(state),
         Action::CopyPanelContent => history::handle_copy_panel_content(state),

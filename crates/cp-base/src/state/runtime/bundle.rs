@@ -29,6 +29,7 @@ use crate::state::context::Entry;
 use crate::state::data::TickTelemetry;
 use crate::state::data::message::Message;
 use crate::state::flags::{StreamState, StreamingTool};
+use crate::state::runtime::textarea::TextArea;
 use crate::ui::render_cache::{FullCache, InputCache, MessageCache};
 
 /// The complete mutable context owned by one thread.
@@ -45,12 +46,8 @@ pub struct ThreadRuntime {
     pub messages: Vec<Message>,
 
     // === Editor / view state ===
-    /// Current user input text in the editor.
-    pub input: String,
-    /// Cursor position in input (byte index).
-    pub input_cursor: usize,
-    /// Selection anchor (byte index); `Some` while a selection is active.
-    pub input_selection_anchor: Option<usize>,
+    /// The composer text engine: buffer, cursor, selection anchor, and undo ring.
+    pub composer: TextArea,
     /// Paste buffers: stored content for inline paste placeholders.
     pub paste_buffers: Vec<String>,
     /// Labels for paste buffers: `None` = paste, `Some(name)` = command.
@@ -198,9 +195,7 @@ impl Default for ThreadRuntime {
         Self {
             context: vec![],
             messages: vec![],
-            input: String::new(),
-            input_cursor: 0,
-            input_selection_anchor: None,
+            composer: TextArea::default(),
             paste_buffers: vec![],
             paste_buffer_labels: vec![],
             selected_context: 0,
@@ -304,7 +299,7 @@ mod tests {
     #[test]
     fn swap_loads_into_state() {
         let mut rt = ThreadRuntime::new();
-        rt.input = "hello".to_owned();
+        rt.composer.text = "hello".to_owned();
         rt.next_user_id = 42;
         rt.total_output_tokens = 1000;
         rt.tempo = false;
@@ -315,16 +310,16 @@ mod tests {
         // State now holds the runtime's values, and the runtime holds what State
         // used to hold (the defaults). Tuple compares keep this one branch.
         assert_eq!(
-            (state.input.as_str(), state.next_user_id, state.total_output_tokens, state.tempo),
+            (state.composer.text.as_str(), state.next_user_id, state.total_output_tokens, state.tempo),
             ("hello", 42, 1000, false)
         );
-        assert_eq!((rt.input.as_str(), rt.next_user_id, rt.tempo), ("", 1, true));
+        assert_eq!((rt.composer.text.as_str(), rt.next_user_id, rt.tempo), ("", 1, true));
     }
 
     #[test]
     fn swap_is_symmetric() {
         let mut rt = ThreadRuntime::new();
-        rt.input = "hello".to_owned();
+        rt.composer.text = "hello".to_owned();
         rt.next_user_id = 42;
 
         let mut state = State::default();
@@ -332,8 +327,8 @@ mod tests {
         rt.swap_with(&mut state);
 
         // Two swaps restore the original arrangement.
-        assert_eq!((state.input.as_str(), state.next_user_id), ("", 1));
-        assert_eq!((rt.input.as_str(), rt.next_user_id), ("hello", 42));
+        assert_eq!((state.composer.text.as_str(), state.next_user_id), ("", 1));
+        assert_eq!((rt.composer.text.as_str(), rt.next_user_id), ("hello", 42));
     }
 
     #[test]

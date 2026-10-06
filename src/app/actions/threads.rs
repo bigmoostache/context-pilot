@@ -119,9 +119,7 @@ fn select_prev(state: &mut State) -> ActionResult {
 fn create_start(state: &mut State) -> ActionResult {
     let focus = FocusState::get_mut(state);
     focus.creating_thread = true;
-    state.input.clear();
-    state.input_cursor = 0;
-    state.input_selection_anchor = None;
+    state.composer.reset();
     state.flags.ui.dirty = true;
     ActionResult::Nothing
 }
@@ -130,9 +128,7 @@ fn create_start(state: &mut State) -> ActionResult {
 fn create_cancel(state: &mut State) -> ActionResult {
     let focus = FocusState::get_mut(state);
     focus.creating_thread = false;
-    state.input.clear();
-    state.input_cursor = 0;
-    state.input_selection_anchor = None;
+    state.composer.reset();
     state.flags.ui.dirty = true;
     ActionResult::Nothing
 }

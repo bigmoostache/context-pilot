@@ -45,6 +45,11 @@ pub enum Action {
     CursorEndSelect,
     /// Select all text in input (Ctrl+A).
     SelectAll,
+    /// Revert the composer to its previous undo snapshot (Ctrl+Z).
+    Undo,
+    /// Copy the active composer selection to the system clipboard (Ctrl+C
+    /// while a selection is active — wins over `CopyPanelContent`).
+    CopySelection,
     /// Navigate to previous (older) prompt in history (Ctrl+U).
     HistoryPrev,
     /// Navigate to next (newer) prompt in history (Ctrl+D).

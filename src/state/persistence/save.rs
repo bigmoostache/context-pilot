@@ -227,7 +227,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     let shared_config = SharedConfig::default()
         .with_active_theme(state.active_theme.clone())
         .with_owner_pid(Some(current_pid()))
-        .with_ui(state.selected_context, state.input.clone(), state.input_cursor)
+        .with_ui(state.selected_context, state.composer.text.clone(), state.composer.cursor)
         .with_view_mode(state.view_mode)
         .with_modules(global_modules);
     if let Ok(json) = serde_json::to_string_pretty(&shared_config) {

@@ -10,6 +10,8 @@ use crate::tools::ToolDefinition;
 
 /// Ephemeral reverie sub-agent state (context optimizer, cartographer).
 pub mod reverie;
+/// Shared text-editing engine (buffer, cursor, selection, undo) for textareas.
+pub mod textarea;
 
 // Runtime State
 
@@ -169,8 +171,8 @@ impl State {
     /// Set the draft input text and cursor byte-offset (builder).
     #[must_use]
     pub fn with_draft(mut self, input: String, cursor: usize) -> Self {
-        self.input = input;
-        self.input_cursor = cursor;
+        self.composer.text = input;
+        self.composer.cursor = cursor;
         self
     }
 

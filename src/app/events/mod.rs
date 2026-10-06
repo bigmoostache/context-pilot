@@ -121,16 +121,24 @@ fn handle_ctrl_shortcuts(key: &KeyEvent, state: &State) -> Dispatch {
         KeyCode::Char('n') => Dispatch::Act(Action::NewContext),
         KeyCode::Char('h') => Dispatch::Act(Action::ToggleConfigView),
         KeyCode::Char('i') => Dispatch::Act(Action::ToggleIndexOverlay),
-        // Ctrl+V is no longer a view switch (design 9.1: arrows navigate instead).
-        // The arm stays an explicit no-op rather than being deleted: the conversation
-        // panel maps *every* `Char` to `InputChar`, so falling through would type a
-        // literal `v` into the composer.
-        KeyCode::Char('v') => Dispatch::Act(Action::None),
+        // Ctrl+V pastes the system clipboard into the composer, replacing any
+        // active selection (paste handler deletes the selection first). Was an
+        // explicit no-op (design 9.1); now a real paste per T797.
+        KeyCode::Char('v') => {
+            let clip = cp_base::state::runtime::textarea::read_clipboard();
+            if clip.is_empty() { Dispatch::Fallthrough } else { Dispatch::Act(Action::PasteText(clip)) }
+        }
         KeyCode::Char('o') => Dispatch::Act(Action::ResetSessionCosts),
         KeyCode::Char('p') => Dispatch::Act(Action::OpenCommandPalette),
         KeyCode::Char('u') => Dispatch::Act(Action::HistoryPrev),
         KeyCode::Char('d') => Dispatch::Act(Action::HistoryNext),
-        KeyCode::Char('c') => Dispatch::Act(if state.flags.overlays.index_status {
+        // Ctrl+Z reverts the composer to its previous undo snapshot (T797).
+        KeyCode::Char('z') => Dispatch::Act(Action::Undo),
+        // Selection-priority (T797): when the composer has an active selection,
+        // Ctrl+C copies that selection and wins over panel/overlay copy.
+        KeyCode::Char('c') => Dispatch::Act(if state.composer.selection_range().is_some() {
+            Action::CopySelection
+        } else if state.flags.overlays.index_status {
             Action::CopyIndexOverlay
         } else {
             Action::CopyPanelContent
@@ -297,7 +305,7 @@ fn handle_context_pattern_submit(key: &KeyEvent, state: &State) -> Option<Action
         || key.modifiers.contains(KeyModifiers::ALT);
     let is_submit = (key.code == KeyCode::Enter && !has_modifier) || key.code == KeyCode::Char(' ');
     if is_submit
-        && let Some(id) = parse_context_pattern(&state.input)
+        && let Some(id) = parse_context_pattern(&state.composer.text)
         && find_context_by_id(state, &id).is_some()
     {
         return Some(Action::InputSubmit);

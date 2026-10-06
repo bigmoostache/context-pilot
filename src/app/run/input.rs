@@ -101,7 +101,7 @@ impl App {
     }
 
     /// Handle keyboard events when the @ autocomplete popup is active.
-    /// Mutates `Suggestions` and state.input directly.
+    /// Mutates `Suggestions` and state.composer.text directly.
     pub(super) fn handle_autocomplete_event(&mut self, event: &event::Event) {
         use crossterm::event::{KeyCode, KeyModifiers};
         let &event::Event::Key(key) = event else { return };
@@ -182,14 +182,14 @@ impl App {
         if is_dir {
             // Folder: complete to "dir/" and show contents — don't close.
             let new_query = format!("{full_path}/");
-            let old_cursor = self.state.input_cursor;
-            self.state.input = format!(
+            let old_cursor = self.state.composer.cursor;
+            self.state.composer.text = format!(
                 "{}@{}{}",
-                self.state.input.get(..anchor).unwrap_or(""),
+                self.state.composer.text.get(..anchor).unwrap_or(""),
                 new_query,
-                self.state.input.get(old_cursor..).unwrap_or("")
+                self.state.composer.text.get(old_cursor..).unwrap_or("")
             );
-            self.state.input_cursor = anchor.saturating_add(1).saturating_add(new_query.len()); // +1 for '@'
+            self.state.composer.cursor = anchor.saturating_add(1).saturating_add(new_query.len()); // +1 for '@'
             if let Some(ac_query) = self.state.get_ext_mut::<cp_base::state::autocomplete::Suggestions>() {
                 ac_query.set_query(new_query);
             }
@@ -197,14 +197,14 @@ impl App {
         } else {
             // File: insert the full path and close.
             ac.deactivate();
-            let cursor = self.state.input_cursor;
-            self.state.input = format!(
+            let cursor = self.state.composer.cursor;
+            self.state.composer.text = format!(
                 "{}{} {}",
-                self.state.input.get(..anchor).unwrap_or(""),
+                self.state.composer.text.get(..anchor).unwrap_or(""),
                 full_path,
-                self.state.input.get(cursor..).unwrap_or("")
+                self.state.composer.text.get(cursor..).unwrap_or("")
             );
-            self.state.input_cursor = anchor.saturating_add(full_path.len()).saturating_add(1); // +1 for space
+            self.state.composer.cursor = anchor.saturating_add(full_path.len()).saturating_add(1); // +1 for space
         }
     }
 
@@ -219,27 +219,27 @@ impl App {
         if pop_result {
             let query = ac.query.clone();
             // Update cursor position to match shortened query.
-            self.state.input_cursor = anchor.saturating_add(1).saturating_add(query.len()); // +1 for '@'
+            self.state.composer.cursor = anchor.saturating_add(1).saturating_add(query.len()); // +1 for '@'
 
             // Rebuild input: before @, then @query, then everything past old cursor.
-            let old_len = self.state.input.len();
+            let old_len = self.state.composer.text.len();
             let after_at = anchor.saturating_add(1); // skip '@'
             let rest_start = after_at.saturating_add(query.len()).saturating_add(1); // +1 for removed char
             if rest_start <= old_len {
-                self.state.input = format!(
+                self.state.composer.text = format!(
                     "{}@{}{}",
-                    self.state.input.get(..anchor).unwrap_or(""),
+                    self.state.composer.text.get(..anchor).unwrap_or(""),
                     query,
-                    self.state.input.get(rest_start..).unwrap_or("")
+                    self.state.composer.text.get(rest_start..).unwrap_or("")
                 );
             }
             self.autocomplete_refresh_matches();
         } else {
             // Query was empty — remove the '@' and deactivate.
             ac.deactivate();
-            if anchor < self.state.input.len() {
-                let _r = self.state.input.remove(anchor);
-                self.state.input_cursor = anchor;
+            if anchor < self.state.composer.text.len() {
+                let _r = self.state.composer.text.remove(anchor);
+                self.state.composer.cursor = anchor;
             }
         }
     }
@@ -251,14 +251,14 @@ impl App {
         let Some(ac) = self.state.get_ext_mut::<cp_base::state::autocomplete::Suggestions>() else { return };
         if c == ' ' || c == '\n' {
             ac.deactivate();
-            let pos = self.state.input_cursor;
-            self.state.input.insert(pos, c);
-            self.state.input_cursor = self.state.input_cursor.saturating_add(c.len_utf8());
+            let pos = self.state.composer.cursor;
+            self.state.composer.text.insert(pos, c);
+            self.state.composer.cursor = self.state.composer.cursor.saturating_add(c.len_utf8());
         } else {
             ac.push_char(c);
-            let pos = self.state.input_cursor;
-            self.state.input.insert(pos, c);
-            self.state.input_cursor = self.state.input_cursor.saturating_add(c.len_utf8());
+            let pos = self.state.composer.cursor;
+            self.state.composer.text.insert(pos, c);
+            self.state.composer.cursor = self.state.composer.cursor.saturating_add(c.len_utf8());
             self.autocomplete_refresh_matches();
         }
     }

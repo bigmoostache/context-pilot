@@ -222,7 +222,7 @@ pub(crate) fn build_status_bar(state: &State) -> StatusBar {
             .filter(|c| c.cached_content.is_none() && c.context_type.needs_cache())
             .count()
             .to_u16(),
-        input_char_count: state.input.chars().count().to_u32(),
+        input_char_count: state.composer.text.chars().count().to_u32(),
     }
 }
 
