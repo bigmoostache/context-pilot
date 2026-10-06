@@ -8814,6 +8814,10 @@
   path: src/app/run/threads/commands.rs
   description: Bridge command APPLICATION (K7 mutation half). apply_command dispatches Send/Create/Archive/Restore/Pause/Resume/Delete thread + DeleteMessage (collect_delete_timestamps helper, A2) + Stop/Configure. Focused-thread instant spine notif.
   last_edited_ms: 0
+53bfa52f3f216f85:
+  path: src/app/run/lifecycle/mod.rs
+  description: 'Run loop. G2b write-side call site: run_background_phase already calls reconcile_fleet_registry + dispatch_background_my_turn + advance_background_threads each tick — that is where the display-only exec-state mirror gets published. Order matters: publish after reconcile so the map reflects this tick''s derivation.'
+  last_edited_ms: 0
 53cb141bae692733:
   path: web/src/lib/query/sse.ts
   description: 'Reconnecting SSE client for one agent''s event stream. EventSource with ticket auth, last_rev resume param (T268 fix), exponential backoff (1s→30s). Singleton per agent via getOrCreateSseClient. Named event listeners: delta/stream/resync/invalidate. Wildcard ''*'' subscriber support. web-lint P3: `closed` flag read through an isClosed() getter at the onerror + catch sites — a direct !closed is CFA-narrowed to always-true (its only mutation is in the deferred close()), a function call is opaque to CFA.'
@@ -8871,6 +8875,10 @@
   description: 'REST API client barrel. SDK layer: 28 endpoints via generated SDK. Re-exports ./auth+./finder+./body+./envKeys (env-keys.ts renamed envKeys.ts in web-lint P5 filename-case).'
   last_edited_ms: 0
 54351bd4bd052680:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
+5454d3734e1a73e0:
   path: .git/index
   description: Git index (binary). Not source.
   last_edited_ms: 0
@@ -9806,6 +9814,10 @@
   path: crates/cp-fleet/Cargo.toml
   description: 'cp-fleet manifest (Phase A). I/O-free fleet mechanism crate: serde only dep. Workspace lints.'
   last_edited_ms: 1790856753606
+5ea12bee6403cd61:
+  path: src/app/run/threads/mod.rs
+  description: 'Thread helpers for main loop: maybe_inject_auto_read, check_my_turn_threads, extract_thread_ids, maybe_append_tool_activity. emit_bridge_deltas groups all chokepoints. emit_identity re-export removed (X525).'
+  last_edited_ms: 0
 5ea5dea550672135:
   path: web/src/components/threads/ThreadsView.tsx
   description: 'Threads view shell (list | conversation). handleSend/handleArchive/handleCreate via sendCommand. T331: handleAttach now STAGES files as pendingFiles (upload to .uploads/ but DON''T send) — pending chips shown in composer, merged into message content only on explicit Send. T298: buildUploadMessage. T303: per-agent thread persistence to localStorage. T334: accepts onShowInFinder prop from App, forwards to ThreadConversation.'
@@ -10609,6 +10621,10 @@
 667559f7c3174bf5:
   path: ui/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: selected thread''s full conversation. toChatMessage() maps ThreadMsg→ChatMessage to reuse cockpit Message renderer. Renders embedded QuestionForm + fileRef chips. ThreadComposer at bottom.'
+  last_edited_ms: 0
+667acd2e0a72c335:
+  path: crates/cp-mod-threads/src/tools.rs
+  description: Thread tool handlers. execute_send split push_send_message + clamp_bytes/preview_ellipsis helpers (A2). execute_read split collect_thread_summaries/apply_read_focus/force_refresh_threads_panel + build_read_result(ReadResult struct). build_panel_content split write_thread_list/write_message. YAML output, MAX caps. T353 auto-unarchive.
   last_edited_ms: 0
 6682e4880a8b883f:
   path: crates/cp-orchestrator/src/transport/inspect/finder/mod.rs
@@ -12794,6 +12810,10 @@
   path: crates/cp-mod-search/src/radar/mod.rs
   description: 'Context Radar. A6: query_signal decay routed via float_math (sub/mul/exp_decay), cast-only expects kept. Meili semantic query per signal, adaptive decay, refresh_inner bg thread.'
   last_edited_ms: 1784534077469
+7a1452f0e0674821:
+  path: src/app/run/threads/mod.rs
+  description: 'Thread helpers for main loop: maybe_inject_auto_read, check_my_turn_threads, extract_thread_ids, maybe_append_tool_activity. emit_bridge_deltas groups all chokepoints. emit_identity re-export removed (X525).'
+  last_edited_ms: 0
 7a1883a352d5da1a:
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadsState + FocusState with TypeMap accessors.'
@@ -12869,6 +12889,10 @@
 7ae1857f78d956ad:
   path: crates/cp-mod-search/src/radar.rs
   description: Context Radar with flame!("radar_refresh") and flame!("radar_push_signal"). Adaptive log-count-based decay scoring, Meilisearch log queries via background thread. format_timestamp_ms via cp_mod_utilities::time. Recent logs (10) deterministic + semantic top 40.
+  last_edited_ms: 0
+7ae2297bb0c491ef:
+  path: src/ui/threads_view/mod.rs
+  description: 'G2 RENDER TARGET. G1 updated both help-hint branches (active AND archived) to Up/Dn select + Left back. G2b adds per-row exec state + attention markers here: push_thread_entry currently shows only [FOCUSED]/[MY_TURN]/[THEIR_TURN] from thread status via thread_status_style — it must read the exec-state mirror instead (exec_state is a registry fact, thread.status is only a turn flag).'
   last_edited_ms: 0
 7ae3e41b45283bfc:
   path: docs/design-orchestration-backend.md
@@ -13558,6 +13582,10 @@
   path: crates/cp-mod-callback/src/firing.rs
   description: Callback firing. fire_callback() spawns script via console server, registers CallbackWatcher, dedup via kill_existing_callback keyed by dedup_key(resident_thread, callback_id). concurrent_run_note appends an informational cross-thread note on failure when concurrency_friendly. fire_async/blocking_callbacks batch dispatch; exit 0/7 kill_session, !=0/timeout deferred panel.
   last_edited_ms: 1791202055203
+818f917f6ed11379:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 81933d40455c64d5:
   path: web/src/components/threads/ThreadsView.tsx
   description: 'Thread sidebar orchestrator. ThreadsView: selected thread state, handleArchive (archive/restore command), handlePause (pause/resume command, T371), handleDelete (permanent delete command, T371), handleSend. Generic describeCommandError (breaker special-case removed T378). Wires ThreadList + ThreadConversation + NewThreadDialog.'
@@ -13994,6 +14022,10 @@
   path: .git/index
   description: Git index (binary). Not source.
   last_edited_ms: 0
+861913605f93c7a4:
+  path: crates/cp-mod-threads/src/lib.rs
+  description: 'Threads module. is_global=true (ThreadsState shared via module_data). B5: FocusState pinned UI-global via set_ext_global in init/reset/load_worker_data (never swaps — one on-screen selection pointer). 2 tools Send/Read. IdleMyTurnDetector watcher registered in load_module_data.'
+  last_edited_ms: 0
 8620fd4094c9381f:
   path: src/app/run/mod.rs
   description: 'Sub-module declarations. 6 modules: input (constructor/autocomplete), lifecycle (main loop), reverie (sub-agent), streaming (LLM responses), tools (execution pipeline), watchers (file/GH).'
@@ -14014,6 +14046,10 @@
   path: tmp/v2/src/ribbon/HomeTab.tsx
   description: 'Home tab: Clipboard · Font · Paragraph · Styles gallery. Font family/size selects driven by TextStyleKit marks; Styles gallery maps Normal/Title/Heading1-2/Quote to heading levels and detects the active one.'
   last_edited_ms: 1785764713345
+863c3b60d09824f3:
+  path: src/app/actions/threads.rs
+  description: Thread action handlers. Archive = SOFT-DELETE (archived=true) not remove; restore clears flag. archive_confirm is view-aware (archive in active view, restore in archived view). toggle_archived_view flips FocusState.viewing_archived. Select/archive_start resolve selection through visible_indices. Question form dispatch. Secondary action variants removed from exhaustive match.
+  last_edited_ms: 0
 863fbffd560574a3:
   path: .git/index
   description: Git index (binary). Not source.
@@ -14210,6 +14246,10 @@
   path: crates/cp-mod-entities/src/errors.rs
   description: 'SQL error enrichment: fuzzy suggestions (Levenshtein ≤2) for unknown table/column names + schema context appended to all errors.'
   last_edited_ms: 1780592402516
+87ce6691a37fdbf5:
+  path: src/app/events/mod.rs
+  description: 'G1 SHIPPED (c8af3806): Ctrl+V dropped as an explicit no-op arm (NOT deleted — conversation panel maps every Char to InputChar, so fallthrough types a literal ''v''); Up/Down = ThreadSelectPrev/Next; BackTab+Up merged into one or-pattern (clippy::match_same_arms); Shift+Up/Down routed through scroll_key_action so the amount stays SCROLL_ARROW_AMOUNT (3.0); Left/Esc merged = CycleViewMode. Right (drill-in) deliberately unbound — G3''s semantics, would open the FOCUSED thread not the SELECTED one.'
+  last_edited_ms: 0
 87da38a8e1cf91ae:
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
@@ -15302,6 +15342,10 @@
   path: src/main.rs
   description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook. --bridge CLI flag (safe OnceLock, no unsafe set_var). --resume-stream for self-restart. use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
   last_edited_ms: 0
+'9243147401664563':
+  path: src/ui/threads_view/mod.rs
+  description: 'G2 RENDER TARGET. G1 updated both help-hint branches (active AND archived) to Up/Dn select + Left back. G2b adds per-row exec state + attention markers here: push_thread_entry currently shows only [FOCUSED]/[MY_TURN]/[THEIR_TURN] from thread status via thread_status_style — it must read the exec-state mirror instead (exec_state is a registry fact, thread.status is only a turn flag).'
+  last_edited_ms: 0
 924649f4d669e07b:
   path: web/src/components/finder/Finder.tsx
   description: Per-agent Finder file manager (confined to agent realm). useFs(agentId, relCwd) for live listings. Both FinderPreview usages (QuickLook side pane + full file-tab) now pass agentId={agent.id} so live text files fetch their preview content (T272). Tabs+history+nav+selection+drag-drop+statusbar+marquee. PinnedFolder localStorage. ContextMenu wired onOpen/onDownload/onTag/onPin. Quick Look CLOSED by default; opens on single-click of a file.
@@ -15670,6 +15714,10 @@
   path: src/llms/cache/density.rs
   description: 'Divergence density distributions. Production ConversationTailDensity (uniform weight for hot blocks): from_api_messages split message_is_hot/mark_blocks (A2). Test-only Uniform/Quadratic/PowerLaw/Empirical.'
   last_edited_ms: 1784493487533
+95985ea96e398aa8:
+  path: src/ui/threads_view/mod.rs
+  description: 'G2 RENDER TARGET. G1 updated both help-hint branches (active AND archived) to Up/Dn select + Left back. G2b adds per-row exec state + attention markers here: push_thread_entry currently shows only [FOCUSED]/[MY_TURN]/[THEIR_TURN] from thread status via thread_status_style — it must read the exec-state mirror instead (exec_state is a registry fact, thread.status is only a turn flag).'
+  last_edited_ms: 0
 95a9fba1cdee5e8a:
   path: crates/cp-mod-files/src/lib.rs
   description: 'Files module: Open/Edit/Write. pre_flight dispatches to preflight_open/preflight_edit/preflight_write (A2 split); preflight_edit_oldstring takes EditTarget{path,canonical} struct, checks disk+virtual (post-queue) content 4-way matrix. build_virtual_content replays queued edits. visualize_diff uses style_diff_block_line helper.'
@@ -16237,6 +16285,10 @@
 9b88ea2fd1ba5b1a:
   path: web/src/lib/api/generated/client.gen.ts
   description: Default client singleton instance. Creates the shared @hey-api client with baseUrl localhost:7878. SDK functions import this as their default client. Configured at runtime via setupClient.ts.
+  last_edited_ms: 0
+9b95f101d1f85013:
+  path: crates/cp-mod-threads/src/tools.rs
+  description: Thread tool handlers. execute_send split push_send_message + clamp_bytes/preview_ellipsis helpers (A2). execute_read split collect_thread_summaries/apply_read_focus/force_refresh_threads_panel + build_read_result(ReadResult struct). build_panel_content split write_thread_list/write_message. YAML output, MAX caps. T353 auto-unarchive.
   last_edited_ms: 0
 9b9bd51c65258ccc:
   path: src/modules/conversation/render_json.rs
@@ -19874,6 +19926,10 @@ be1e5c3957982e96:
   path: web/src/components/Root.tsx
   description: 'Desktop tree root — Provider-contract boundary + AppShell (view-router fleet/threads/finder/settings/costs, TopBar+StatusBar, live vitals/SSE, disconnect overlay). Mirror twin of mobile Root. T636 nav-history: useNavHistory wires browser Back/Next via History API (NavState {view,agentId,threadId?,settingsTab?}); AppShell OWNS selectedThreadId (single writer of cp-thread-<id>, sync-read seed in openAgent/applyNav) + settingsTab, feeds ThreadsView/SettingsView controlled. CI-fix (PR#182): view-router extracted into ShellViews subcomponent (ShellViewsProps bundles atoms+handlers) to keep AppShell under max-lines-per-function; useNavHistory takes a single `current` tuple arg (max-params 4); conditional history entries use `...(cond && {x})` logical spread; threadKeyFor hoisted to module scope (function-scoping); ShellViewsProps.agents typed Agent[] (not useFleet data union) so FleetDashboard gets non-optional.'
   last_edited_ms: 0
+be1f32315fbb129c:
+  path: src/ui/threads_view/messages.rs
+  description: Thread message area right pane. Message display (reuses conversation IR renderer), input area. auto:true traces render as dim '⚙ {line}'. u16->usize/usize->u16 via Safe cast (A1). calculate_input_height 50% cap.
+  last_edited_ms: 0
 be2b7aefcbf49547:
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (IR blocks → blocks_to_lines: selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (scrollable messages via scroll_offset, author/timestamp headers, content). All content through IR pipeline. Tab/Shift+Tab nav.'
@@ -22366,6 +22422,10 @@ d656ca0d947a6c15:
   path: web/src/lib/api/index.ts
   description: 'REST API client barrel. SDK layer: 28 endpoints use generated SDK (fleet, panels, tools, lifecycle, avatar, commands, ticket, claude-usage, claude-login/status/start/complete/refresh). Re-exports ./auth + ./finder + ./body + ./env-keys.'
   last_edited_ms: 1782895708217
+d659ae95c0f3cdae:
+  path: src/app/run/lifecycle/mod.rs
+  description: 'Run loop. G2b write-side call site: run_background_phase already calls reconcile_fleet_registry + dispatch_background_my_turn + advance_background_threads each tick — that is where the display-only exec-state mirror gets published. Order matters: publish after reconcile so the map reflects this tick''s derivation.'
+  last_edited_ms: 0
 d669d33022d005cd:
   path: crates/cp-orchestrator/src/transport/rest/mod.rs
   description: 'REST resource handlers. fleet() filtered by ACL. command() dispatches. rename/avatar/threads/body. claude_usage()/token_status()/login_start()/login_complete()/refresh_login() for Claude OAuth (T451). resolve_entry. Submodules: backend, claude_oauth, create, env_keys, lifecycle, releases, thread_shape.'
@@ -24626,6 +24686,10 @@ ee6350f9cb907601:
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus + ThreadAuthor enums #[expect(exhaustive_enums)] — IRREDUCIBLE: matched exhaustively by tui src/app/run/threads + src/ui/threads_view (downstream), non_exhaustive forces wildcard_enum_match_arm (forbid). ThreadMessage, Thread, ThreadsState, FocusState.'
   last_edited_ms: 1784561389695
+ee6b324e4bebb40d:
+  path: crates/cp-mod-threads/src/watcher.rs
+  description: 'IdleMyTurnDetector watcher: fires spine notification when idle + focused thread still MY_TURN (FOCUSED-ONLY since dispatcher subsumed bg fallback, S5). Cooldown 5s. Distinguishes normal vs abnormal stop reasons.'
+  last_edited_ms: 0
 ee70a1e4b4fd58d4:
   path: web/eslint.config.ts
   description: 'Frontend ESLint flat config, Rust-parity strict ratchet P0-P13. strictTypeChecked + unicorn + React stack + import-x/security + structural budgets. Untyped plugins cast to named-property shape. globalIgnores dist+generated+e2e. Finder shell a11y scope-off now lists BOTH desktop + mobile finder/Finder/shell.tsx. Hash-locked chain #77.'
@@ -25246,6 +25310,10 @@ f47104775beba6eb:
   path: web/src/lib/live/threadUpload.ts
   description: Shared thread upload logic (non-forked) — UploadedFile type + buildUploadMessage (```file-upload``` YAML block composer). Extracted from desktop helpers so mobile consumes same logic without leak. Both trees import here.
   last_edited_ms: 1784666644772
+f47487dad52afab2:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 f47823ce0a2c8da7:
   path: src/app/run/threads/observers.rs
   description: 'Focus + behaviour observe-on-change emitters (bridge chokepoints). emit_thread_focus + emit_behaviour: diff live value vs BridgeState snapshot (last_focus/last_behaviour), emit_best_effort ONLY on change, seed on boot without emitting. Identity emitter removed (X525).'
@@ -26390,6 +26458,10 @@ fe442c943f4c8e63:
   path: docs/talk/slides/0-1.html
   description: 'Slide: Where it all started — tilted screenshots + narcos meme'
   last_edited_ms: 1781078806882
+fe4c009ee1dd9227:
+  path: orchestrator.log
+  description: cp-orchestrator v0.2.13 runtime log. Serves :7878, agent binary target/release/tui, cockpit on :443, updater manual. Boot/health only; not relevant to agent build-fix work.
+  last_edited_ms: 0
 fe4c7a6f1dc356aa:
   path: crates/cp-base/src/state/data/model_helpers.rs
   description: 'ModelPricing trait. A6: cleaning_threshold_tokens via scale_to_usize, token_cost via cost_usd. Model selection/pricing/budget for State.'

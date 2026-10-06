@@ -23,6 +23,10 @@ enum Dispatch {
     Fallthrough,
 }
 
+/// How long (ms) after the first Ctrl+X a confirming second Ctrl+X still
+/// archives/restores the selected thread. A later press re-arms instead.
+const ARCHIVE_CONFIRM_WINDOW_MS: u64 = 2_000;
+
 /// Map a terminal event to an application action.
 ///
 /// Returns `None` for Ctrl+Q (quit signal), `Some(Action)` for everything else.
@@ -161,13 +165,19 @@ fn handle_ctrl_shortcuts(key: &KeyEvent, state: &State) -> Dispatch {
     }
 }
 
-/// Threads-view Ctrl overrides: Ctrl+A archive/restore, Ctrl+U toggle archived
-/// view. `None` = not one of these (fall through to global Ctrl bindings).
+/// Threads-view Ctrl overrides: Ctrl+X arms then (within 2s) confirms
+/// archive/restore, Ctrl+U toggles the archived view. `None` = not one of these
+/// (fall through to global Ctrl bindings).
 fn handle_threads_ctrl(key: &KeyEvent, state: &State) -> Option<Action> {
-    let viewing_archived = cp_mod_threads::types::FocusState::get(state).viewing_archived;
     match key.code {
-        KeyCode::Char('a') => {
-            Some(if viewing_archived { Action::ThreadArchiveConfirm } else { Action::ThreadArchiveStart })
+        // Ctrl+X: first press arms (ThreadArchiveStart), a second press within
+        // the 2-second window confirms (ThreadArchiveConfirm). A press after the
+        // window lapsed simply re-arms — `archive_start` re-stamps the time.
+        KeyCode::Char('x') => {
+            let focus = cp_mod_threads::types::FocusState::get(state);
+            let within_window = focus.confirming_archive
+                && cp_base::panels::now_ms().saturating_sub(focus.archive_armed_at_ms) <= ARCHIVE_CONFIRM_WINDOW_MS;
+            Some(if within_window { Action::ThreadArchiveConfirm } else { Action::ThreadArchiveStart })
         }
         KeyCode::Char('u') => Some(Action::ThreadToggleArchivedView),
         KeyCode::Backspace
@@ -237,7 +247,9 @@ fn handle_threads_nav(key: &KeyEvent, state: &State) -> Dispatch {
     }
 
     match key.code {
-        KeyCode::Char('y') if confirming => Dispatch::Act(Action::ThreadArchiveConfirm),
+        // While armed, the confirming gesture is a second Ctrl+X (handled in
+        // `handle_threads_ctrl`, which runs first). Any other non-Ctrl key here
+        // cancels the pending arm.
         _ if confirming => Dispatch::Act(Action::ThreadArchiveCancel),
         KeyCode::Tab if !shift => Dispatch::Act(Action::ThreadSelectNext),
         // Design 9.1: Up/Down move the selection within the list. The threads

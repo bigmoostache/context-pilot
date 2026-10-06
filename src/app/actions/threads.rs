@@ -198,7 +198,9 @@ fn archive_start(state: &mut State) -> ActionResult {
     let viewing_archived = FocusState::get(state).viewing_archived;
     let has_visible = !ThreadsState::get(state).visible_indices(viewing_archived).is_empty();
     if has_visible {
-        FocusState::get_mut(state).confirming_archive = true;
+        let focus = FocusState::get_mut(state);
+        focus.confirming_archive = true;
+        focus.archive_armed_at_ms = cp_base::panels::now_ms();
         state.flags.ui.dirty = true;
     }
     ActionResult::Nothing

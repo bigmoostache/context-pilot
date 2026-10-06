@@ -25,7 +25,10 @@ use cp_mod_threads::types::{FocusState, ThreadStatus, ThreadsState};
 use cp_mod_threads::view_state::FleetExecMirror;
 
 /// Width of the thread list pane in columns.
-pub(crate) const THREAD_LIST_WIDTH: u16 = 28;
+///
+/// Matched to the panel-centric view's sidebar width ([`ViewMode::width`] for
+/// `Normal` = 36) so the two layouts line up pixel-for-pixel.
+pub(crate) const THREAD_LIST_WIDTH: u16 = 36;
 
 /// Render the threads view: thread list + message area.
 pub(crate) fn render_threads_view(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
@@ -209,12 +212,13 @@ fn push_thread_entry(
 /// Push the bottom help / confirm hint line for the current mode.
 fn push_help_hint(blocks: &mut Vec<IrBlock>, viewing_archived: bool, confirming: bool) {
     if confirming {
-        let (verb, key_sem) =
-            if viewing_archived { (" Restore? ", Semantic::KeyHint) } else { (" Archive? ", Semantic::KeyHint) };
+        let verb = if viewing_archived { " Restore? " } else { " Archive? " };
         blocks.push(IrBlock::Line(vec![
             S::warning(verb.to_owned()),
-            S::styled("y".to_owned(), key_sem),
-            S::muted("/any to cancel".to_owned()),
+            S::styled("Ctrl+X".to_owned(), Semantic::KeyHint),
+            S::muted(" again  ".to_owned()),
+            S::styled("any".to_owned(), Semantic::KeyHint),
+            S::muted(" to cancel".to_owned()),
         ]));
     } else if viewing_archived {
         blocks.push(IrBlock::Line(vec![
@@ -222,7 +226,7 @@ fn push_help_hint(blocks: &mut Vec<IrBlock>, viewing_archived: bool, confirming:
             S::muted(" select  ".to_owned()),
             S::styled("\u{2192}".to_owned(), Semantic::KeyHint),
             S::muted(" view  ".to_owned()),
-            S::styled("Ctrl+A".to_owned(), Semantic::KeyHint),
+            S::styled("Ctrl+X".to_owned(), Semantic::KeyHint),
             S::muted(" restore  ".to_owned()),
             S::styled("Ctrl+U".to_owned(), Semantic::KeyHint),
             S::muted(" active  ".to_owned()),
@@ -235,7 +239,7 @@ fn push_help_hint(blocks: &mut Vec<IrBlock>, viewing_archived: bool, confirming:
             S::muted(" select  ".to_owned()),
             S::styled("\u{2192}".to_owned(), Semantic::KeyHint),
             S::muted(" view  ".to_owned()),
-            S::styled("Ctrl+A".to_owned(), Semantic::KeyHint),
+            S::styled("Ctrl+X".to_owned(), Semantic::KeyHint),
             S::muted(" arch  ".to_owned()),
             S::styled("Ctrl+U".to_owned(), Semantic::KeyHint),
             S::muted(" arch'd  ".to_owned()),
@@ -276,15 +280,16 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let show_new = !viewing_archived; // virtual "+ New Thread" only in the active view
     let total_entries = visible.len().saturating_add(usize::from(show_new));
     let selected = focus.selected_thread_idx.min(total_entries.saturating_sub(1));
-    let confirming = focus.confirming_archive;
+    // The arm is only "live" within the 2-second confirm window; a lapsed arm
+    // reverts the hint to the normal state (a next Ctrl+X will re-arm).
+    let confirming =
+        focus.confirming_archive && cp_base::panels::now_ms().saturating_sub(focus.archive_armed_at_ms) <= 2_000;
 
-    // Layout chrome: border on right side
-    let border = RBlock::default()
-        .borders(Borders::RIGHT)
-        .border_style(ir::semantic_to_style(Semantic::Border))
-        .style(Style::default().bg(theme::bg_base()));
-    let inner = border.inner(area);
-    frame.render_widget(border, area);
+    // No border chrome: the pane bleeds into the message area with no divider
+    // line (matches the panel-centric sidebar, which has no right border).
+    let background = RBlock::default().style(Style::default().bg(theme::bg_base()));
+    let inner = background.inner(area);
+    frame.render_widget(background, area);
 
     // ── Build IR blocks ──────────────────────────────────────────────
     let mut ir_blocks: Vec<IrBlock> = Vec::new();
