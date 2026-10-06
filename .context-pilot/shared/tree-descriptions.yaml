@@ -2686,6 +2686,10 @@
   path: crates/cp-mod-github/src/panel.rs
   description: 'GithubResultPanel: static gh command output panel (no auto-refresh). Token redaction, tab-delimited PR/issue table rendering. Refreshes only when explicitly dirtied by mutating commands.'
   last_edited_ms: 0
+194dbe4944d236f5:
+  path: crates/cp-mod-threads/src/incoming.rs
+  description: 'Branch A/B incoming-message behavior for the focused thread: take_idle_autoread (ack+refresh panel) and take_streaming_push (mark has_been_pushed, non-interrupting).'
+  last_edited_ms: 1791281360581
 195b3a15fb448d34:
   path: crates/cp-mod-search/src/types.rs
   description: Core types + config constants. SearchPersistData (with recompute tracking + task_signals ring buffer), SearchState (with SharedRadarCache Arc<Mutex>), Chunk, SearchResult (no tags), SearchMetrics, SearchOverlayInfo (with meili_cpu_pct/meili_memory_bytes), MeiliLiveStats (with meili_cpu_ticks for delta), IndexerCmd, WatcherHandle. logs_index_settings without tags.
@@ -25093,6 +25097,10 @@ f0ef74fa355a3921:
 f10523eaf4fe91b8:
   path: crates/cp-mod-search/src/index/indexer.rs
   description: Background file indexer thread. A3 else_if fix at :388 (scan_directory). Debounced batch, dedup, tree-sitter chunking, mtime skip, Meilisearch upload.
+  last_edited_ms: 0
+f139a0ba992ffa37:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 f13efb695f77b0fe:
   path: web/src/lib/mock/index.ts
