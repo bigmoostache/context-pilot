@@ -64,6 +64,7 @@ impl App {
     pub(super) fn relocate_resident_on_focus_change(&mut self) {
         let want = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
         let have = self.state.resident_thread_id.clone();
+        let parking_resident = have.is_some();
         if want == have {
             // Keep the label in sync for the None/None and equal cases, then done.
             self.state.resident_thread_id = want;
@@ -113,19 +114,41 @@ impl App {
         // Swap the newly-focused thread's parked bundle into `state`. A cold or
         // unknown thread has no entry → state keeps the fresh empty runtime, which
         // is the correct blank view for a brand-new thread.
-        if let Some(want_id) = want.as_ref() {
-            if let Some(mut entry) = self.fleet.remove(want_id) {
-                entry.runtime.swap_with(&mut self.state); // state now holds `want`'s context
-                // `entry.runtime` now holds the empty leftover — dropped with `entry`.
-            }
-            // Load the newly-focused thread's parked per-stream runtime into App
-            // (a cold thread has none → App stays at the empty default).
-            if let Some(mut sr) = self.parked_stream_runtimes.remove(want_id) {
-                sr.swap_with_app(self); // App now holds `want`'s per-stream runtime; leftover dropped
-            }
+        let swapped_in = want.as_deref().is_some_and(|want_id| self.swap_in_parked(want_id));
+
+        // The park above emptied `state` to a bare `ThreadRuntime::new()` (no
+        // per-thread module states). If nothing was swapped back in — a cold
+        // thread, or focus cleared because the focused thread was just archived —
+        // the next render's `ext::<SpineState>()` would panic. Install an
+        // initialized blank runtime instead.
+        if parking_resident && !swapped_in {
+            self.install_blank_resident();
         }
 
         self.state.resident_thread_id = want;
+    }
+
+    /// Swap `want_id`'s parked bundle and per-stream runtime into `state`/App.
+    /// Returns whether a parked bundle existed (a cold thread has none).
+    fn swap_in_parked(&mut self, want_id: &str) -> bool {
+        let swapped_in = self.fleet.remove(want_id).is_some_and(|mut entry| {
+            entry.runtime.swap_with(&mut self.state); // state now holds `want`'s context; leftover dropped
+            true
+        });
+        // A cold thread has no parked per-stream runtime: App stays at the empty default.
+        if let Some(mut sr) = self.parked_stream_runtimes.remove(want_id) {
+            sr.swap_with_app(self); // App now holds `want`'s per-stream runtime; leftover dropped
+        }
+        swapped_in
+    }
+
+    /// Swap a freshly-initialized blank runtime (per-thread modules + fixed base
+    /// panels, via [`fresh_thread_runtime`](crate::state::persistence::fresh_thread_runtime))
+    /// into `state`, replacing the uninitialized leftover of a park.
+    fn install_blank_resident(&mut self) {
+        let active = self.state.active_modules.clone();
+        let mut fresh = crate::state::persistence::fresh_thread_runtime(&mut self.state.global_next_uid, &active);
+        fresh.swap_with(&mut self.state); // `fresh` now holds the empty leftover — dropped
     }
 
     /// Reconcile the fleet registry against [`ThreadsState`] — the roster-mirror

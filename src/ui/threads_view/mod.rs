@@ -188,14 +188,14 @@ fn push_thread_entry(lb: &mut ListBuild<'_>, thread: &cp_mod_threads::types::Thr
 /// Push the inline archive/restore confirm bubble, rendered on its own line
 /// directly below the selected thread's row.
 ///
-/// Leads with a down-left "return" arrow (`\u{21B5}`) pointing back up at the
-/// thread it concerns, and is fully red ([`Semantic::Error`]) so the pending
-/// destructive confirm reads as a bubble attached to that specific thread —
-/// not the easy-to-miss footer hint it replaces.
+/// Leads with a down-right arrow (`\u{21B3}`) hanging off the thread it
+/// concerns, and is fully red ([`Semantic::Error`]) so the pending confirm
+/// reads as a bubble attached to that specific thread — not the easy-to-miss
+/// footer hint it replaces.
 fn push_archive_confirm_bubble(blocks: &mut Vec<IrBlock>, viewing_archived: bool) {
-    let verb = if viewing_archived { "restore" } else { "delete" };
+    let verb = if viewing_archived { "restore" } else { "archive" };
     blocks.push(IrBlock::Line(vec![
-        S::styled("    \u{21B5} ".to_owned(), Semantic::Error),
+        S::styled("    \u{21B3} ".to_owned(), Semantic::Error),
         S::styled("Ctrl+X".to_owned(), Semantic::Error),
         S::styled(format!(" again to confirm {verb}"), Semantic::Error),
     ]));
