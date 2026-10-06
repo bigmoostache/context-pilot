@@ -16,7 +16,6 @@ use crate::state::persistence::{check_ownership, save_state};
 use crate::ui;
 
 use crate::app::App;
-use crate::app::context::{build_stream_params, get_active_agent_content, prepare_stream_context};
 
 /// Spinner-animation redraw cadence (extracted for the 500-line cap).
 mod animation;
@@ -391,8 +390,12 @@ impl App {
         self.state.flags.ui.dirty = true; // any action triggers a re-render
         // `if let` (not an exhaustive match) so ActionResult stays #[non_exhaustive].
         // SaveMessage is the only payload-bearing variant; the fieldless rest dispatch below.
-        let result = apply_action(&mut self.state, action);
+        let result = {
+            let _g = crate::profile!("apply_action");
+            apply_action(&mut self.state, action)
+        };
         if let ActionResult::SaveMessage(id) = result {
+            let _g = crate::profile!("save_message_by_id");
             self.save_message_by_id(&id);
         } else {
             self.handle_fieldless_result(&result);
@@ -407,6 +410,7 @@ impl App {
             self.on_stop_stream();
         } else if matches!(result, ActionResult::Save) {
             self.save_state_async();
+            let _g = crate::profile!("check_spine");
             self.check_spine(); // synchronous for responsive auto-continuation
         } else if matches!(result, ActionResult::StartApiCheck) {
             self.start_api_check_now();
@@ -480,10 +484,7 @@ impl App {
             if should_stream {
                 self.typewriter.reset();
                 self.pending_tools.clear();
-                let ctx = prepare_stream_context(&mut self.state, false, None);
-                let system_prompt = get_active_agent_content(&self.state);
-                let params = build_stream_params(&self.state, ctx, Some(system_prompt));
-                self.spawn_thread_stream(params);
+                crate::app::run::streaming::spawn_stream_with_context(self, false);
                 self.save_state_async();
                 self.state.flags.ui.dirty = true;
             }

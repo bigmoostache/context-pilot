@@ -201,11 +201,28 @@ pub(super) fn continue_streaming(app: &mut App) {
     // tool call can finally be injected without orphaning a tool_use.
     let _injected = cp_mod_spine::types::SpineState::flush_deferred_inject(&mut app.state);
     app.state.stream.phase.transition(StreamPhase::Receiving);
-    let ctx = prepare_stream_context(&mut app.state, true, None);
-    let system_prompt = get_active_agent_content(&app.state);
     app.typewriter.reset();
     app.pending_done = None;
-    let params = build_stream_params(&app.state, ctx, Some(system_prompt));
+    spawn_stream_with_context(app, true);
+}
+
+/// Build the full prompt (context, system prompt, params) and spawn the stream
+/// thread. Each phase gets its own perf row, so the per-turn request-building
+/// cost stays visible wherever a stream starts (tool cycle or spine).
+pub(in crate::app::run) fn spawn_stream_with_context(app: &mut App, include_last_message: bool) {
+    let ctx = {
+        let _g = crate::profile!("prepare_stream_context");
+        prepare_stream_context(&mut app.state, include_last_message, None)
+    };
+    let system_prompt = {
+        let _g = crate::profile!("active_agent_content");
+        get_active_agent_content(&app.state)
+    };
+    let params = {
+        let _g = crate::profile!("build_stream_params");
+        build_stream_params(&app.state, ctx, Some(system_prompt))
+    };
+    let _g = crate::profile!("spawn_thread_stream");
     app.spawn_thread_stream(params);
 }
 
