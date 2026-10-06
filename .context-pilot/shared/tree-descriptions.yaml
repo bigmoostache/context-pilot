@@ -1638,6 +1638,10 @@
   path: crates/cp-mod-git/src/lib.rs
   description: 'Git module. 1 tool: git_execute. refresh_git_status() split into current_branch/parse_numstat_line/collect_tracked/append_staged/append_untracked. overview_context_section renders changes table (push_changes_table + cap_overview_output, HARD-CAPPED 8KiB). git_line_semantic split status/diff/meta. Watches .git/ paths.'
   last_edited_ms: 0
+0fa7c87184522f5b:
+  path: src/ui/perf/overlay.rs
+  description: 'F12 perf overlay adapter: FPS/CPU/RAM/FDs, budget bars, sparkline, loop share-bars, op table, Ctrl+R footer hint.'
+  last_edited_ms: 1791288358103
 0fa7ca71c9c0e14f:
   path: crates/cp-orchestrator/tests/openapi/main.rs
   description: OpenAPI spec generator (integration test, --ignored). build_spec assembles schemas + paths. generate_openapi writes openapi.json. Acknowledges lib-only deps (incl reqwest, openssl).
@@ -3506,6 +3510,10 @@
   path: crates/cp-mod-github/src/watcher.rs
   description: Background polling watcher for GithubResult panels. ETag-based API polling + output-hash CLI polling. Per-panel GhWatch state with adaptive X-Poll-Interval. Branch PR watch for sidebar. Spawns background thread. DueWatch snapshot pattern avoids long mutex holds.
   last_edited_ms: 1780565754910
+216b0b183daf4ea7:
+  path: src/ui/perf/mod.rs
+  description: In-memory perf system (F12). Lifetime per-op count/total/sum_sq/max → exact mean/variance/max; 64-sample ring for legacy std. loop_count + CP_MEASURE_LOOPS (cp-env dev.measure_loops) drive --measure dump+exit.
+  last_edited_ms: 1791288357589
 217b64590c01723d:
   path: web/src/components/auth/UsersDialog.tsx
   description: 'Admin user management dialog (Phase 10). Lists all users with RoleBadge, create user form (collapsible), delete user with confirmation, force-logout (revoke all sessions). TanStack Query hooks. useQuery enabled:open — only fetches when dialog is visible (T402: prevents 501 when auth disabled). Accessible from UserMenu when admin.'
@@ -9594,6 +9602,10 @@
   path: tmp/v2/src/styles/shell.css
   description: 'Office chrome styling: Word-blue title bar (#2b579a), ribbon tab strip + groups with hairline separators, button/select/styles-gallery vocabulary, grey desk canvas, status bar. Chrome is system-sans (document is serif in page.css).'
   last_edited_ms: 1785764713727
+5b4dd1c460339416:
+  path: src/ui/perf/sys_stat.rs
+  description: Platform-specific process CPU ticks + RSS sampling (read_proc_stat), extracted from perf/mod.rs for the line cap.
+  last_edited_ms: 1791288356698
 5b546988fdff1adb:
   path: web/src/lib/providers/devMode.tsx
   description: Dev-mode context + useDevMode hook (T301 app-wide UI toggle, off by default, reveals developer surfaces). No component export; DevModeProvider lives in DevModeProvider.tsx.
@@ -11254,6 +11266,10 @@
   path: web/src/components/agents/AgentModal/manageBody.tsx
   description: 'AgentModal manage-mode body — T757/T760: ONE scrolling page, no category rail. ManageBody (was TabbedManageBody) renders LlmTab → inset hairline → VitalsTab inside a self-centering max-w-[820px] overflow-y-auto column (the ThreadsView shell) so the vitals board doesn''t stretch the form fields. LlmTab = AvatarField (label-wrapped file input + Dices sibling) + name/realm. VitalsTab = SessionVitals + AgentAclSection. IdentityTab removed (X525).'
   last_edited_ms: 1790580996579
+6b5a333fc8f8254e:
+  path: src/app/run/tools/watchdog.rs
+  description: 'Main-loop watchdog (observational wedge detector) + substep timing: mark(Step) records previous step''s µs into PERF as loop.* (perf_name) via thread-local LAST_STEP.'
+  last_edited_ms: 1791288358624
 6b5d7b046f3d6677:
   path: src/app/run/threads/commands.rs
   description: Bridge command APPLICATION (K7 mutation half). apply_command dispatches Send/Create/Archive/Restore/Pause/Resume/Delete thread + DeleteMessage (collect_delete_timestamps helper, A2) + Stop/Configure. Focused-thread instant spine notif.
@@ -12626,6 +12642,10 @@
   path: crates/cp-mod-console/src/tools.rs
   description: 'Console tools: create, send_keys, wait, watch, easy_bash. CONSOLE_WAIT_BLOCKING_SENTINEL const. Git/gh guardrails. console_wait max_wait default+cap = 60s (was 30).'
   last_edited_ms: 1785266957468
+7784e05241283442:
+  path: src/ui/perf/share_bars.rs
+  description: 'F12 overlay stacked share-bars: mean/variance/max, one colored segment per loop substep + legend. Renders IR PerfShareBar.'
+  last_edited_ms: 1791288356269
 7790d3d4a2e3ccf8:
   path: tmp/v2/src/table/sizing.ts
   description: Table sizing constants + pure arithmetic. CELL_MIN_WIDTH=40 (also handed to the extension's cellMinWidth so editor layout matches recorded widths), COLUMN_HANDLE_WIDTH=10 (prosemirror's 5px default is not a hittable target — a missed grab is indistinguishable from a broken feature), TABLE_WIDTH_PX=CONTENT_WIDTH_PX. distributeWidth spreads the remainder a pixel at a time so a table never stops short of the right margin.
@@ -14938,6 +14958,10 @@
   path: crates/cp-mod-search/src/meili/mod.rs
   description: 'Meilisearch sub-module hub: bootstrap, client, download, overlay, server, tasks.'
   last_edited_ms: 0
+8cb3786198fd2b91:
+  path: src/ui/perf/report.rs
+  description: 'One-shot `--measure N` HTML loop-profile report: inline-SVG pies (mean/variance/max per loop substep) + table, written to tmp/loop-profile.html (gitignored).'
+  last_edited_ms: 1791288355901
 8cbf00556bd55559:
   path: src/app/actions/threads.rs
   description: 'Thread action handlers. Archive cleanup: clears focused_thread_id + last_read_count + notified_my_turn_id for archived thread. Question form: YAML answers with escaped other_text -> ThreadMessage -> MY_TURN + spine notification.'
@@ -21978,6 +22002,10 @@ d0113e9c2175d3c2:
   path: crates/cp-mod-firecrawl/src/lib.rs
   description: 'Firecrawl module. 3 tools: scrape/search/map. Dynamic firecrawl_result panels. No state. Nested object params (location). Simple dispatch pattern.'
   last_edited_ms: 0
+d016ab6079834fd8:
+  path: src/ui/perf/text.rs
+  description: 'Plain-text dump of the perf snapshot (all ops: samples/mean/variance/std/max/total) copied by Ctrl+R while F12 is open.'
+  last_edited_ms: 1791288357102
 d016fa4d02cc0854:
   path: crates/cp-orchestrator/tests/openapi/schemas.rs
   description: 'OpenAPI core schemas — domain types (Agent, ThreadDetail, ThreadMsg, ToolCall, etc.). AgentIdentity schema removed (X525). core() carries registered #[expect(too_many_lines)].'

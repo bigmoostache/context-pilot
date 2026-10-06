@@ -779,6 +779,12 @@ M-tiny-44:
   contents: Repeating auto-nudges while panel shows my question unanswered = panel may be STALE, answer already posted. Fresh Read before concluding 'still blocked'. Burned ~45 nudges on an answered form.
   importance: high
   last_edited_ms: 1791196693475
+M-tiny-45:
+  tier: tiny
+  title: Adding a CP_* env var
+  contents: 'New CP_* var needs: cp-env specs/*.rs Spec + model field + docs/ENV.md regen (cargo test -p cp-env --test generate -- --ignored) + line in 3 deploy/env/*.example. Else boot fails ''unknown variable''.'
+  importance: high
+  last_edited_ms: 1791288480688
 M-tiny-5:
   tier: tiny
   title: 'CI web-install fix:'
