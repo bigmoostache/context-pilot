@@ -55,10 +55,18 @@ pub(super) fn handle_incoming_focused_messages(app: &mut App, was_streaming: boo
     // "was the agent mid-turn this tick?" semantics so Branch B fires.
     if was_streaming {
         // Branch B — inline push, non-interrupting.
-        if let Some((tid, name, count)) = cp_mod_threads::incoming::take_streaming_push(&mut app.state) {
+        if let Some(push) = cp_mod_threads::incoming::take_streaming_push(&mut app.state) {
+            let cp_mod_threads::incoming::StreamingPush { tid, name, messages, truncated } = push;
+            let quoted: Vec<String> = messages.iter().map(|m| format!("---\n{m}")).collect();
+            let tail = if truncated {
+                "Finish your current step, then respond. Some content was truncated: the full text \
+                 will be in the Threads panel once you are idle."
+            } else {
+                "Finish your current step, then respond (no need to call Read)."
+            };
             let content = format!(
-                "{count} new message(s) arrived in the focused thread \"{name}\" while you were working. \
-                 Finish your current step, then check the Threads panel to read and respond."
+                "New message(s) from the user in the focused thread \"{name}\" while you were working:\n{}\n---\n{tail}",
+                quoted.join("\n")
             );
             let nid = SpineState::create_notification(
                 &mut app.state,

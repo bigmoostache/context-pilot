@@ -76,24 +76,66 @@ pub fn take_idle_autoread(state: &mut State) -> Option<(String, String)> {
 /// `None` when there is nothing new to push, so a long stream never re-pushes
 /// the same message on every poll tick.
 ///
-/// It deliberately does **not** acknowledge the messages: the agent has only
-/// been *poked*, not shown the content. They stay unacknowledged so that once
-/// the stream ends, [`take_idle_autoread`] pulls them into context properly.
-pub fn take_streaming_push(state: &mut State) -> Option<(String, String, usize)> {
+/// The pushed messages' content is **inlined** into the notification body, so
+/// the agent can respond without a `Read` round-trip. A message whose content
+/// fits under [`PUSH_INLINE_MAX_BYTES`] is acknowledged (the agent has now seen
+/// it in full). A truncated one stays unacknowledged so that once the stream
+/// ends, [`take_idle_autoread`] pulls the full text into context.
+pub fn take_streaming_push(state: &mut State) -> Option<StreamingPush> {
     let tid = FocusState::get(state).focused_thread_id.clone()?;
     let name = ThreadsState::get(state).threads.iter().find(|t| t.id == tid).map(|t| t.name.clone())?;
 
     let ts_mut = ThreadsState::get_mut(state);
     let thread = ts_mut.threads.iter_mut().find(|t| t.id == tid)?;
-    let mut count = 0usize;
+    let mut messages = Vec::new();
+    let mut truncated = false;
     for msg in &mut thread.messages {
-        if !msg.acknowledged && !msg.has_been_pushed {
-            msg.has_been_pushed = true;
-            count = count.saturating_add(1);
+        if msg.acknowledged || msg.has_been_pushed {
+            continue;
         }
+        msg.has_been_pushed = true;
+        let (text, cut) = inline_text(msg.content.as_deref(), msg.file_path.as_deref());
+        msg.acknowledged = !cut;
+        truncated |= cut;
+        messages.push(text);
     }
-    if count == 0 {
+    if messages.is_empty() {
         return None;
     }
-    Some((tid, name, count))
+    Some(StreamingPush { tid, name, messages, truncated })
+}
+
+/// Per-message byte cap for content inlined into a push notification.
+pub const PUSH_INLINE_MAX_BYTES: usize = 4000;
+
+/// Result of [`take_streaming_push`]: what the caller needs to build the inline
+/// notification.
+#[derive(Debug)]
+pub struct StreamingPush {
+    /// Focused thread id the messages arrived on.
+    pub tid: String,
+    /// That thread's display name.
+    pub name: String,
+    /// Inlined text of each newly pushed message, in arrival order.
+    pub messages: Vec<String>,
+    /// True if at least one message was cut at [`PUSH_INLINE_MAX_BYTES`].
+    pub truncated: bool,
+}
+
+/// Inline text for one message (content + attached file path), capped on a
+/// char boundary. Returns `(text, was_truncated)`.
+fn inline_text(content: Option<&str>, file_path: Option<&str>) -> (String, bool) {
+    let body = content.unwrap_or("");
+    let cut = body.len() > PUSH_INLINE_MAX_BYTES;
+    let mut text = if cut {
+        format!("{}… [truncated]", body.get(..body.floor_char_boundary(PUSH_INLINE_MAX_BYTES)).unwrap_or(""))
+    } else {
+        body.to_owned()
+    };
+    if let Some(path) = file_path {
+        text.push_str("\n[attached file: ");
+        text.push_str(path);
+        text.push(']');
+    }
+    (text, cut)
 }
