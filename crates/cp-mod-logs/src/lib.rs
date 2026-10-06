@@ -5,8 +5,11 @@
 //! globally in chunked JSON files under `.context-pilot/logs/` and indexed
 //! by the search module for full-text retrieval.
 
+/// Change tracking for chunk files: only changed chunks are rewritten.
+mod dirty;
 /// Tool implementations: create, close conversation history.
 mod tools;
+use dirty::{chunk_fingerprint, clean_map, next_id_op};
 /// Log state types: `LogEntry`, `LogsState`.
 pub mod types;
 
@@ -93,43 +96,49 @@ fn migrate_if_needed() {
     log::info!("Logs: clean-slate migration to v2 schema complete");
 }
 
-/// Build write operations for chunked log persistence (CPU only — no I/O).
+/// Build write operations for the log chunks changed since their last write
+/// (CPU only — no I/O).
 ///
-/// Called from `save_module_data` to integrate with the `PersistenceWriter` batch system.
-/// Returns Vec<(path, content)> tuples that the binary converts to `WriteOps`.
+/// Logs are append-only, so a save normally re-serializes only the newest
+/// chunk; `next_id.json` is emitted only when the counter moved. Marks the
+/// returned files clean: callers must hand every op to a writer lane that
+/// never drops it (the persistence writer's durable lane). A fresh process
+/// starts with an empty memo, so its first save rewrites every chunk once.
 #[must_use]
 pub fn build_log_write_ops(logs: &[LogEntry], next_log_id: usize) -> Vec<(PathBuf, Vec<u8>)> {
     let dir = logs_dir();
     let mut ops = Vec::new();
+    let Ok(mut clean) = clean_map().lock() else { return ops };
+    let chunks = group_by_chunk(logs);
 
-    // Group logs by chunk
+    // Build write op for each changed chunk (sorted by index for deterministic output)
+    let mut sorted_chunk_keys: Vec<_> = chunks.keys().copied().collect();
+    sorted_chunk_keys.sort_unstable();
+    for idx in sorted_chunk_keys {
+        let Some(chunk_logs) = chunks.get(&idx) else { continue };
+        let fp = chunk_fingerprint(chunk_logs);
+        if clean.get(&idx) == Some(&fp) {
+            continue;
+        }
+        if let Ok(json) = serde_json::to_string_pretty(chunk_logs) {
+            let _prev = clean.insert(idx, fp);
+            ops.push((dir.join(format!("chunk_{idx}.json")), json.into_bytes()));
+        }
+    }
+
+    ops.extend(next_id_op(&mut clean, &dir, next_log_id));
+    ops
+}
+
+/// Group log entries by chunk index (entries with a malformed id are skipped).
+fn group_by_chunk(logs: &[LogEntry]) -> HashMap<usize, Vec<&LogEntry>> {
     let mut chunks: HashMap<usize, Vec<&LogEntry>> = HashMap::new();
     for log in logs {
         if let Some(num) = log.id.strip_prefix('L').and_then(|n| n.parse::<usize>().ok()) {
             chunks.entry(chunk_index(num)).or_default().push(log);
         }
     }
-
-    // Build write op for each chunk (sorted by index for deterministic output)
-    let mut sorted_chunk_keys: Vec<_> = chunks.keys().copied().collect();
-    sorted_chunk_keys.sort_unstable();
-    for idx in sorted_chunk_keys {
-        if let Some(chunk_logs) = chunks.get(&idx) {
-            let path = dir.join(format!("chunk_{idx}.json"));
-            if let Ok(json) = serde_json::to_string_pretty(chunk_logs) {
-                ops.push((path, json.into_bytes()));
-            }
-        }
-    }
-
-    // Build write op for next_id.json
-    let next_id_path = dir.join("next_id.json");
-    let json = serde_json::json!({ "next_log_id": next_log_id });
-    if let Ok(s) = serde_json::to_string_pretty(&json) {
-        ops.push((next_id_path, s.into_bytes()));
-    }
-
-    ops
+    chunks
 }
 
 /// Load all logs from chunked JSON files in .context-pilot/logs/

@@ -266,7 +266,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     ];
 
     // Per-thread message files, only for threads changed since last write.
-    let durable: Vec<WriteOp> = {
+    let mut durable: Vec<WriteOp> = {
         let _g = crate::profile!("thread_files");
         let threads = &cp_mod_threads::types::ThreadsState::get(state).threads;
         cp_mod_threads::types::persist::dirty_thread_file_ops(threads)
@@ -283,11 +283,12 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     writes.extend(shared_config_op(state, global_modules, &dir));
     writes.push(WriteOp { path: dir.join(OWNER_FILE), content: current_pid().to_string().into_bytes() });
 
-    // Chunked log files (global, shared across workers)
+    // Chunked log files (global, shared across workers): only changed chunks,
+    // on the durable lane because they are marked clean once built.
     {
         let _g = crate::profile!("logs");
         let logs_state = LogsState::get(state);
-        writes.extend(
+        durable.extend(
             cp_mod_logs::build_log_write_ops(&logs_state.logs, logs_state.next_log_id)
                 .into_iter()
                 .map(|(path, content)| WriteOp { path, content }),
