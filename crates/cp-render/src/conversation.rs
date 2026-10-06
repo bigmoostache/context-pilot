@@ -187,6 +187,8 @@ pub struct PerfOverlay {
     pub share_names: Vec<String>,
     /// Stacked share-bars (total / mean / std / max) of loop substep time.
     pub share_bars: Vec<PerfShareBar>,
+    /// Main-loop iterations recorded since F12 was enabled (`loop.idle` runs).
+    pub loop_iterations: u64,
 }
 
 /// One stacked share-bar: each substep's percentage of a lifetime metric.

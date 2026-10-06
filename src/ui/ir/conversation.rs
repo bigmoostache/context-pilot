@@ -12,6 +12,7 @@ use cp_render::conversation::{
 use cp_render::{Block, Semantic};
 
 use crate::state::{Kind, MsgKind, MsgStatus, State, ToolResultRecord, ToolUseRecord};
+use cp_base::cast::Safe as _;
 use cp_base::cast::float_math;
 
 /// Build the conversation region from application state.
@@ -349,6 +350,7 @@ fn build_perf_overlay(state: &State) -> PerfOverlay {
         budget_bars: build_perf_budget_bars(snapshot.frame_avg_ms),
         share_names: LOOP_SHARE_STEPS.iter().map(|name| name.trim_start_matches("loop.").to_owned()).collect(),
         share_bars: build_perf_share_bars(&snapshot),
+        loop_iterations: loop_iterations(&snapshot),
         sparkline: snapshot.frame_times_ms,
         operations,
     }
@@ -384,14 +386,23 @@ fn loop_substeps(snapshot: &crate::ui::perf::PerfSnapshot) -> Vec<Option<&crate:
 /// Extracts one lifetime metric (µs or µs²) from an op snapshot.
 type Metric = fn(&crate::ui::perf::OpSnapshot) -> f64;
 
+/// Main-loop iterations recorded since F12 was enabled: `loop.idle` is marked
+/// exactly once per iteration, and resets with the overlay (unlike
+/// `PERF.loop_count`, which only ticks under `--measure`).
+fn loop_iterations(snapshot: &crate::ui::perf::PerfSnapshot) -> u64 {
+    snapshot.ops.iter().find(|op| op.name == "loop.idle").map_or(0, |op| op.count)
+}
+
 /// Four stacked share-bars (total / mean / std / max) over the loop substeps:
 /// each segment is that substep's percentage of the metric's sum. `total`
-/// (mean × runs) shows where wall time goes; the others show per-run cost.
+/// (lifetime time ÷ loop iterations) is the average cost per iteration — where
+/// wall time goes; the others show per-run cost of each substep.
 /// Std (not variance) so the per-run bars share one unit (µs).
 fn build_perf_share_bars(snapshot: &crate::ui::perf::PerfSnapshot) -> Vec<PerfShareBar> {
     let steps = loop_substeps(snapshot);
+    let iterations = loop_iterations(snapshot).max(1).to_f64();
     let metrics: [(&str, &str, Metric); 4] = [
-        ("total", "ms", |op| op.total_ms),
+        ("total", "\u{b5}s/it", |op| op.total_ms),
         ("mean", "\u{b5}s", |op| op.mean_us),
         ("std", "\u{b5}s", |op| op.variance_us2.sqrt()),
         ("max", "\u{b5}s", |op| op.max_us),
@@ -403,7 +414,10 @@ fn build_perf_share_bars(snapshot: &crate::ui::perf::PerfSnapshot) -> Vec<PerfSh
             let total: f64 = values.iter().sum();
             let shares =
                 values.iter().map(|&v| if total > 0.0f64 { float_math::percent(v, total) } else { 0.0f64 }).collect();
-            PerfShareBar { label: label.to_owned(), shares, total_display: format!("{total:.0}{unit}") }
+            // Total is summed in ms over the whole run: ×1000 → µs, ÷ iterations.
+            let shown =
+                if label == "total" { float_math::div(float_math::mul(total, 1_000.0f64), iterations) } else { total };
+            PerfShareBar { label: label.to_owned(), shares, total_display: format!("{shown:.0}{unit}") }
         })
         .collect()
 }

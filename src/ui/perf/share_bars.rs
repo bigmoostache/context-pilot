@@ -4,7 +4,7 @@
 //! ([`PerfShareBar`]); this module only maps it to ratatui spans.
 
 use cp_render::Semantic;
-use cp_render::conversation::PerfShareBar;
+use cp_render::conversation::{PerfOverlay, PerfShareBar};
 use ratatui::prelude::{Color, Line, Span, Style};
 
 use crate::ui::chars;
@@ -35,14 +35,22 @@ const PALETTE: [Color; 12] = [
 
 /// Append the share-bars + legend to `lines`. No-op when no loop substep has
 /// been recorded yet.
-pub(super) fn render_share_bars(names: &[String], share_bars: &[PerfShareBar], lines: &mut Vec<Line<'static>>) {
+pub(super) fn render_share_bars(perf: &PerfOverlay, lines: &mut Vec<Line<'static>>) {
+    let names = &perf.share_names;
     if names.is_empty() {
         return;
     }
-    lines.push(Line::from(Span::styled(" Loop substep share", semantic_to_style(Semantic::Accent).bold())));
-    for share_bar in share_bars {
+    lines.push(Line::from(vec![
+        Span::styled(" Loop substep share", semantic_to_style(Semantic::Accent).bold()),
+        Span::styled(format!("  ({} iterations)", perf.loop_iterations), semantic_to_style(Semantic::Muted)),
+    ]));
+    for share_bar in &perf.share_bars {
         lines.push(render_one(share_bar));
     }
+    lines.push(Line::from(Span::styled(
+        " mean/std/max: less representative, substeps don't run every iteration",
+        semantic_to_style(Semantic::Muted),
+    )));
     let entries: Vec<(&String, Color)> = names.iter().zip(PALETTE.iter().copied().cycle()).collect();
     for chunk in entries.chunks(LEGEND_PER_LINE) {
         let mut spans = vec![Span::raw(" ")];
