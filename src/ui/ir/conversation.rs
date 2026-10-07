@@ -321,11 +321,32 @@ fn build_perf_budget_bars(frame_avg_ms: f64) -> Vec<PerfBudgetBar> {
     vec![build_bar("60fps", FRAME_BUDGET_60FPS), build_bar("30fps", FRAME_BUDGET_30FPS)]
 }
 
+/// Minimum age before the F12 overlay rebuilds its perf snapshot.
+const SNAPSHOT_TTL: std::time::Duration = std::time::Duration::from_millis(250);
+
+/// A perf snapshot plus the instant it was taken.
+type TimedSnapshot = (std::time::Instant, std::sync::Arc<crate::ui::perf::PerfSnapshot>);
+
+/// Last perf snapshot and when it was taken. `PERF.snapshot()` locks and sorts
+/// every op (~730); rebuilding it every frame made `ir_overlays` spike to 55 ms.
+static SNAPSHOT_CACHE: std::sync::Mutex<Option<TimedSnapshot>> = std::sync::Mutex::new(None);
+
+/// The perf snapshot, rebuilt at most every [`SNAPSHOT_TTL`] (4 per second).
+fn cached_snapshot() -> std::sync::Arc<crate::ui::perf::PerfSnapshot> {
+    let mut slot = SNAPSHOT_CACHE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some(entry) = slot.as_ref()
+        && entry.0.elapsed() < SNAPSHOT_TTL
+    {
+        return std::sync::Arc::clone(&entry.1);
+    }
+    let snap = std::sync::Arc::new(crate::ui::perf::PERF.snapshot());
+    *slot = Some((std::time::Instant::now(), std::sync::Arc::clone(&snap)));
+    snap
+}
+
 /// Build the perf overlay IR data from the perf metrics snapshot.
 fn build_perf_overlay(state: &State) -> PerfOverlay {
-    use crate::ui::perf::PERF;
-
-    let snapshot = PERF.snapshot();
+    let snapshot = cached_snapshot();
 
     let fps = if snapshot.frame_avg_ms > 0.0f64 { float_math::div(1_000.0f64, snapshot.frame_avg_ms) } else { 0.0f64 };
 
@@ -347,7 +368,7 @@ fn build_perf_overlay(state: &State) -> PerfOverlay {
         share_names: LOOP_SHARE_STEPS.iter().map(|name| name.trim_start_matches("loop.").to_owned()).collect(),
         share_bars: build_perf_share_bars(&snapshot),
         loop_iterations: loop_iterations(&snapshot),
-        sparkline: snapshot.frame_times_ms,
+        sparkline: snapshot.frame_times_ms.clone(),
         operations,
     }
 }
