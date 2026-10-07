@@ -7,7 +7,6 @@ use crossterm::event;
 use ratatui::prelude::{CrosstermBackend, Terminal};
 
 use crate::app::actions::{Action, ActionResult, apply_action};
-use crate::app::events::handle_event;
 use crate::app::panels::now_ms;
 use crate::infra::constants::{EVENT_POLL_MS, RENDER_THROTTLE_MS};
 use crate::state::Kind;
@@ -25,6 +24,9 @@ mod fleet;
 /// Fleet lifecycle I/O (Phase F): console orphan-prune, N-thread save, hard-delete
 /// teardown, Errored re-engage. Split from `fleet` for the 500-line cap.
 mod fleet_lifecycle;
+/// The `loop.input` phase: event poll/read/route, every step profile-guarded.
+mod input_phase;
+
 /// Per-thread stream runtime (typewriter/pending-tools/pending-done/…): the
 /// per-stream analogue of `ThreadRuntime`, swapped around each background step
 /// so one thread's in-flight stream never bleeds into another's (N>1 fix).
@@ -172,7 +174,10 @@ impl App {
         // thread, borrow its parked runtime into `state` just for this paint, then
         // restore. Execution (resident/focus/scheduling) is untouched — Model 2.
         // No-op at N=1 (drilled_thread_id is None) → byte-identical render.
-        let drilled = self.take_drilled_runtime_for_render();
+        let drilled = {
+            let _guard = crate::profile!("drill_swap");
+            self.take_drilled_runtime_for_render()
+        };
         // `terminal_draw` = widget build (`ui_render` child) + ratatui buffer
         // diff + stdout flush (the remainder not covered by children).
         let draw_result = {
@@ -183,7 +188,10 @@ impl App {
                 self.command_palette.render(frame, &self.state);
             })
         };
-        self.restore_drilled_runtime_after_render(drilled);
+        {
+            let _guard = crate::profile!("drill_restore");
+            self.restore_drilled_runtime_after_render(drilled);
+        }
         let _r = draw_result?;
         self.state.flags.ui.dirty = false;
         self.last_render_ms = current_ms;
@@ -200,85 +208,6 @@ impl App {
         } else {
             50 // 50ms when idle — still responsive for typing, much less CPU
         }
-    }
-
-    /// Non-blocking input phase: poll one event and route it (palette,
-    /// autocomplete, quit, or normal action), rendering immediately for
-    /// responsiveness. Returns how the main loop should proceed this tick.
-    fn handle_input_phase(
-        &mut self,
-        terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-        current_ms: u64,
-    ) -> io::Result<InputOutcome> {
-        if !event::poll(Duration::ZERO)? {
-            return Ok(InputOutcome::Continue);
-        }
-        let evt = {
-            let _guard = crate::profile!("event_read");
-            event::read()?
-        };
-
-        // Command palette takes precedence when open.
-        if self.command_palette.is_open {
-            if let Some(action) = self.handle_palette_event(&evt) {
-                self.handle_action(action);
-            }
-            self.state.flags.ui.dirty = true;
-            self.render_frame(terminal, current_ms)?;
-            return Ok(InputOutcome::Restart);
-        }
-
-        // Autocomplete popup handling.
-        if let Some(ac) = self.state.get_ext::<cp_base::state::autocomplete::Suggestions>()
-            && ac.active
-        {
-            self.handle_autocomplete_event(&evt);
-            self.state.flags.ui.dirty = true;
-            self.render_frame(terminal, current_ms)?;
-            return Ok(InputOutcome::Restart);
-        }
-
-        let mapped = {
-            let _guard = crate::profile!("handle_event");
-            handle_event(&evt, &self.state)
-        };
-        let Some(action) = mapped else {
-            // User quit — flush all pending writes and save final state synchronously
-            self.writer.flush();
-            self.save_all_threads();
-            return Ok(InputOutcome::Quit);
-        };
-
-        // Ctrl+P opens the palette; everything else dispatches normally.
-        if matches!(action, Action::None) {
-            // Ignored event (mouse click/move, unbound key): nothing changed,
-            // so don't mark dirty and don't redraw.
-            return Ok(InputOutcome::Continue);
-        }
-        if matches!(action, Action::OpenCommandPalette) {
-            self.command_palette.open(&self.state);
-            self.state.flags.ui.dirty = true;
-        } else {
-            let _guard = crate::profile!("handle_action");
-            self.handle_action(action);
-        }
-
-        // Make the resident follow a focus change the action may have just made
-        // (e.g. Right-arrow drill-in switching the focused thread) BEFORE the
-        // post-input render below — else this frame paints the previous resident
-        // ("one stale frame until I type" bug). No-op when focus did not change.
-        {
-            let _guard = crate::profile!("relocate_resident");
-            self.relocate_resident_on_focus_change();
-        }
-
-        // Render immediately after input for instant feedback, but never faster
-        // than the frame cap; otherwise the frame stays dirty and the throttled
-        // render step later in the loop paints it.
-        if self.state.flags.ui.dirty && current_ms.saturating_sub(self.last_render_ms) >= RENDER_THROTTLE_MS {
-            self.render_frame(terminal, current_ms)?;
-        }
-        Ok(InputOutcome::Continue)
     }
 
     /// Run all background processing for one tick: bridge, threads, stream,
