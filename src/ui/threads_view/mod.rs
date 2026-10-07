@@ -21,7 +21,7 @@ use crate::state::State;
 use crate::ui::{ir, theme};
 use cp_base::cast::Safe as _;
 use cp_fleet::ThreadExecState;
-use cp_mod_threads::types::{FocusState, ThreadStatus, ThreadsState};
+use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadStatus, ThreadsState};
 use cp_mod_threads::view_state::FleetExecMirror;
 
 /// Width of the thread list pane in columns.
@@ -102,6 +102,9 @@ struct ListBuild<'build> {
     /// Drives the leading working-spinner (reuses the fleet mirror; never read
     /// for scheduling).
     mirror: &'build FleetExecMirror,
+    /// Per-thread message count the *human* has seen in the TUI
+    /// ([`FocusState::last_read_count`]) — drives the unread marker.
+    last_read: &'build std::collections::BTreeMap<String, usize>,
 }
 
 /// Push the virtual "+ New Thread" entry (active view only, single-line),
@@ -158,6 +161,23 @@ const fn thread_is_working(exec: ThreadExecState) -> bool {
     )
 }
 
+/// Whether `thread` holds an LLM reply the human has not yet seen in the TUI:
+/// a non-auto assistant message at or past the thread's
+/// [`last_read_count`](FocusState::last_read_count). A thread with no entry
+/// was never tracked and counts as read, so old threads don't all light up.
+fn has_unread_reply(
+    thread: &cp_mod_threads::types::Thread,
+    last_read: &std::collections::BTreeMap<String, usize>,
+) -> bool {
+    let Some(&seen) = last_read.get(&thread.id) else {
+        return false;
+    };
+    thread
+        .messages
+        .get(seen..)
+        .is_some_and(|tail| tail.iter().any(|m| !m.auto && matches!(m.author, ThreadAuthor::Assistant)))
+}
+
 /// Push one thread's single-line entry (status-colored circle + name),
 /// recording its selected line range.
 fn push_thread_entry(lb: &mut ListBuild<'_>, thread: &cp_mod_threads::types::Thread, is_selected: bool) {
@@ -165,12 +185,16 @@ fn push_thread_entry(lb: &mut ListBuild<'_>, thread: &cp_mod_threads::types::Thr
     //   working            → the footer's square spinner,
     //   idle AND MyTurn     → a ⚠ warning (the LLM owes a turn but is doing
     //                         nothing — a stall the human should notice),
+    //   unread LLM reply    → a ◆ marker (never on the selected row: the
+    //                         human is looking at it),
     //   otherwise           → void.
     let working = thread_is_working(lb.mirror.exec_state_of(&thread.id));
     let leading = if working {
         S::styled(format!("{} ", crate::ui::helpers::spinner()), Semantic::Accent)
     } else if matches!(thread.status, ThreadStatus::MyTurn) {
         S::styled("\u{26a0} ".to_owned(), Semantic::Error)
+    } else if !is_selected && has_unread_reply(thread, lb.last_read) {
+        S::styled("\u{25c6} ".to_owned(), Semantic::Accent)
     } else {
         S::styled("  ".to_owned(), Semantic::Default)
     };
@@ -282,7 +306,13 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
     push_archived_header(&mut ir_blocks, viewing_archived);
 
     let on_virtual = show_new && selected >= visible.len();
-    let mut lb = ListBuild { blocks: &mut ir_blocks, sel: &mut sel, inner_width: inner.width, mirror };
+    let mut lb = ListBuild {
+        blocks: &mut ir_blocks,
+        sel: &mut sel,
+        inner_width: inner.width,
+        mirror,
+        last_read: &focus.last_read_count,
+    };
     if show_new {
         push_new_thread_entry(&mut lb, state, on_virtual);
     }
