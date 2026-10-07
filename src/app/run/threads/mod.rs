@@ -108,26 +108,76 @@ pub(super) fn handle_incoming_focused_messages(app: &mut App, was_streaming: boo
 /// emitter is a no-op when the bridge is OFF, so this whole barge is free at
 /// anchor. Order mirrors the historical inline sequence.
 pub(super) fn emit_bridge_deltas(app: &mut App) {
+    let (skip_roster, hash) = {
+        let _g = crate::profile!("roster_gate");
+        roster_gate(app)
+    };
     // Each emitter gets its own level-2 perf row (`loop.threads_emit.<name>`).
+    // `true` = roster emitter, skipped while the roster fingerprint is unchanged.
     let emitters: [Emitter; 9] = [
-        ("emit_vitals", emit_vitals),
-        ("emit_messages", emit_messages),
-        ("emit_task_lists", emit_task_lists),
-        ("emit_notes", emit_notes),
-        ("emit_thread_status", emit_thread_status),
-        ("emit_thread_focus", emit_thread_focus),
-        ("emit_behaviour", emit_behaviour),
-        ("emit_thread_archived", emit_thread_archived),
-        ("emit_thread_paused", emit_thread_paused),
+        ("emit_vitals", emit_vitals, false),
+        ("emit_messages", emit_messages, true),
+        ("emit_task_lists", emit_task_lists, false),
+        ("emit_notes", emit_notes, false),
+        ("emit_thread_status", emit_thread_status, true),
+        ("emit_thread_focus", emit_thread_focus, false),
+        ("emit_behaviour", emit_behaviour, false),
+        ("emit_thread_archived", emit_thread_archived, true),
+        ("emit_thread_paused", emit_thread_paused, true),
     ];
-    for (name, emit) in emitters {
+    for (name, emit, roster) in emitters {
+        if roster && skip_roster {
+            continue;
+        }
         let _guard = crate::profile!(name);
         emit(app);
     }
+    // Emitters never mutate threads, so `hash` still describes the live roster
+    // and every roster memo now matches it.
+    ROSTER_HASH.set(hash);
 }
 
-/// One bridge emitter paired with its level-2 perf row name.
-type Emitter = (&'static str, fn(&mut App));
+/// One bridge emitter, its level-2 perf row name, and whether it is a roster
+/// emitter (gated by [`roster_gate`]).
+type Emitter = (&'static str, fn(&mut App), bool);
+
+thread_local! {
+    /// Roster fingerprint after the last full roster pass (`None` = must run).
+    /// Main-loop only; a reload resets it, forcing one full pass.
+    static ROSTER_HASH: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
+}
+
+/// Decide whether the four roster emitters (messages, status, archived,
+/// paused) can be skipped this tick, and return the fingerprint to store.
+///
+/// They diff only `(id, message count, status, archived, paused)` per thread
+/// against memos that equal the live values after every pass. So once all four
+/// memos are seeded, an unchanged fingerprint guarantees an empty diff, saving
+/// four O(threads) walks with hash lookups on every loop tick.
+fn roster_gate(app: &App) -> (bool, Option<u64>) {
+    use std::hash::{Hash as _, Hasher as _};
+    if !bridge_active(&app.state) {
+        return (false, None);
+    }
+    let seeded = app.state.get_ext::<cp_mod_bridge::BridgeState>().is_some_and(|bs| {
+        bs.seeded.messages() && bs.seeded.statuses() && bs.seeded.archived() && bs.seeded.paused()
+    });
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    for t in &ThreadsState::get(&app.state).threads {
+        t.id.hash(&mut h);
+        t.messages.len().hash(&mut h);
+        (t.status == cp_mod_threads::types::ThreadStatus::MyTurn).hash(&mut h);
+        t.archived.hash(&mut h);
+        t.paused.hash(&mut h);
+    }
+    let hash = h.finish();
+    // Unseeded: run everything and store nothing, so the first pass after
+    // seeding still runs in full.
+    if !seeded {
+        return (false, None);
+    }
+    (ROSTER_HASH.get() == Some(hash), Some(hash))
+}
 
 /// Append an auto **tool-activity trace** to the owner (resident) thread, if any.
 ///
