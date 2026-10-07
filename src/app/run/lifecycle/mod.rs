@@ -269,6 +269,7 @@ impl App {
         // streaming, idle auto-read otherwise. Runs before the spine check so an
         // idle auto-read's continuation nudge is picked up this same tick.
         super::threads::handle_incoming_focused_messages(self, was_streaming);
+        cp_mod_threads::types::FocusState::tick_read_dwell(&mut self.state, current_ms);
         super::tools::watchdog::mark(super::tools::watchdog::Step::Spine);
         self.check_spine();
         super::streaming::process_api_check_results(self);

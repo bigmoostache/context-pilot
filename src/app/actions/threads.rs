@@ -166,9 +166,6 @@ fn focus_selected_thread(state: &mut State) {
 
 /// Navigate to the next thread (or wrap to first).
 fn select_next(state: &mut State) -> ActionResult {
-    // Replies that landed while the human sat on the row were seen: mark the
-    // thread being left read so it doesn't show the unread marker afterwards.
-    FocusState::mark_selected_read(state);
     let viewing_archived = FocusState::get(state).viewing_archived;
     let visible_count = ThreadsState::get(state).visible_indices(viewing_archived).len();
     // Active view has a trailing virtual "+ New Thread" entry; archived view does not.
@@ -179,9 +176,6 @@ fn select_next(state: &mut State) -> ActionResult {
     } else {
         focus.selected_thread_idx.saturating_add(1)
     };
-    if focus.selected_thread_idx < visible_count {
-        FocusState::mark_selected_read(state);
-    }
     focus_selected_thread(state);
     state.scroll_offset = 0.0;
     state.stream.user_scrolled = false;
@@ -191,7 +185,6 @@ fn select_next(state: &mut State) -> ActionResult {
 
 /// Navigate to the previous thread (or wrap to last).
 fn select_prev(state: &mut State) -> ActionResult {
-    FocusState::mark_selected_read(state); // see select_next
     let viewing_archived = FocusState::get(state).viewing_archived;
     let visible_count = ThreadsState::get(state).visible_indices(viewing_archived).len();
     let total = if viewing_archived { visible_count } else { visible_count.saturating_add(1) };
@@ -201,9 +194,6 @@ fn select_prev(state: &mut State) -> ActionResult {
     } else {
         focus.selected_thread_idx.saturating_sub(1)
     };
-    if focus.selected_thread_idx < visible_count {
-        FocusState::mark_selected_read(state);
-    }
     focus_selected_thread(state);
     state.scroll_offset = 0.0;
     state.stream.user_scrolled = false;

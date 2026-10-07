@@ -185,15 +185,15 @@ fn push_thread_entry(lb: &mut ListBuild<'_>, thread: &cp_mod_threads::types::Thr
     //   working            → the footer's square spinner,
     //   idle AND MyTurn     → a ⚠ warning (the LLM owes a turn but is doing
     //                         nothing — a stall the human should notice),
-    //   unread LLM reply    → a ◆ marker (never on the selected row: the
-    //                         human is looking at it),
+    //   unread LLM reply    → a ◆ marker (cleared once the row has stayed
+    //                         selected 2s, see FocusState::tick_read_dwell),
     //   otherwise           → void.
     let working = thread_is_working(lb.mirror.exec_state_of(&thread.id));
     let leading = if working {
         S::styled(format!("{} ", crate::ui::helpers::spinner()), Semantic::Accent)
     } else if matches!(thread.status, ThreadStatus::MyTurn) {
         S::styled("\u{26a0} ".to_owned(), Semantic::Error)
-    } else if !is_selected && has_unread_reply(thread, lb.last_read) {
+    } else if has_unread_reply(thread, lb.last_read) {
         S::styled("\u{25c6} ".to_owned(), Semantic::Accent)
     } else {
         S::styled("  ".to_owned(), Semantic::Default)

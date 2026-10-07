@@ -349,6 +349,11 @@ pub struct FocusState {
     /// `messages.len() > last_read_count[thread_id]`.
     #[serde(default)]
     pub last_read_count: std::collections::BTreeMap<String, usize>,
+    /// Thread currently under the list cursor and the ms it got there. A thread
+    /// is only marked read after [`READ_DWELL_MS`] of continuous selection, so
+    /// arrowing past rows leaves their unread marker intact. Transient.
+    #[serde(skip)]
+    pub read_dwell: Option<(String, u64)>,
     /// Draft name typed on the virtual "+ New Thread" row. Its own textarea
     /// (not a thread's composer) so it survives navigation and reloads.
     #[serde(default)]
@@ -374,6 +379,7 @@ impl FocusState {
             archive_armed_at_ms: 0,
             viewing_archived: false,
             last_read_count: std::collections::BTreeMap::new(),
+            read_dwell: None,
             new_thread_title: cp_base::state::runtime::textarea::TextArea::new(),
         }
     }
@@ -416,7 +422,38 @@ impl FocusState {
             let _prev = Self::get_mut(state).last_read_count.insert(tid, count);
         }
     }
+
+    /// Per-tick read tracking for the Threads view: restart the dwell clock
+    /// when the selected thread changes; once it has stayed selected for
+    /// [`READ_DWELL_MS`], mark it read (and keep doing so while it stays, so
+    /// replies arriving under the cursor count as seen).
+    pub fn tick_read_dwell(state: &mut State, now_ms: u64) {
+        let selected = (state.view_mode == cp_base::state::data::config::ViewMode::Threads)
+            .then(|| {
+                let focus = Self::get(state);
+                let threads = ThreadsState::get(state);
+                let visible = threads.visible_indices(focus.viewing_archived);
+                let real_idx = *visible.get(focus.selected_thread_idx)?;
+                threads.threads.get(real_idx).map(|t| t.id.clone())
+            })
+            .flatten();
+        let dwell = &mut Self::get_mut(state).read_dwell;
+        let since = dwell.as_ref().filter(|d| selected.as_deref() == Some(d.0.as_str())).map(|d| d.1);
+        let dwelled = since.map_or_else(
+            || {
+                *dwell = selected.map(|id| (id, now_ms));
+                false
+            },
+            |start| now_ms.saturating_sub(start) >= READ_DWELL_MS,
+        );
+        if dwelled {
+            Self::mark_selected_read(state);
+        }
+    }
 }
+
+/// Continuous selection time before a thread's messages count as user-read.
+pub const READ_DWELL_MS: u64 = 2_000;
 
 #[cfg(test)]
 mod tests;
