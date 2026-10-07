@@ -163,6 +163,10 @@ impl Default for PerfMetrics {
 /// Global performance metrics instance.
 pub(crate) static PERF: std::sync::LazyLock<PerfMetrics> = std::sync::LazyLock::new(PerfMetrics::default);
 
+/// Single-flight guard for the background CPU/RSS/FD sampler: at most one
+/// `perf-stats` thread alive, so a slow `ps` never stacks up workers.
+static STATS_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
+
 impl PerfMetrics {
     /// Record operation timing
     pub(crate) fn record_op(&self, name: &'static str, duration_us: u64) {
@@ -213,10 +217,20 @@ impl PerfMetrics {
         // Check if stats need refresh (time-based, not frame-based)
         let last_refresh =
             self.frame_state.read().unwrap_or_else(std::sync::PoisonError::into_inner).last_stats_refresh;
-        if last_refresh.elapsed().as_millis() >= u128::from(PERF_STATS_REFRESH_MS) {
-            self.refresh_system_stats();
+        if last_refresh.elapsed().as_millis() >= u128::from(PERF_STATS_REFRESH_MS)
+            && !STATS_IN_FLIGHT.swap(true, Ordering::AcqRel)
+        {
             self.frame_state.write().unwrap_or_else(std::sync::PoisonError::into_inner).last_stats_refresh =
                 Instant::now();
+            // macOS samples via a `ps` fork+exec (ms-scale, 100ms+ tail):
+            // never on the render path. Results land in atomics the overlay reads.
+            let spawned = std::thread::Builder::new().name("perf-stats".to_owned()).spawn(|| {
+                PERF.refresh_system_stats();
+                STATS_IN_FLIGHT.store(false, Ordering::Release);
+            });
+            if spawned.is_err() {
+                STATS_IN_FLIGHT.store(false, Ordering::Release);
+            }
         }
     }
 

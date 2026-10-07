@@ -16,6 +16,49 @@ use crate::ui::{ir, theme};
 use cp_base::cast::Safe as _;
 use cp_base::cast::float_math;
 use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadStatus, ThreadsState};
+use std::cell::RefCell;
+use std::hash::{Hash as _, Hasher as _};
+use std::rc::Rc;
+
+/// Rendered message lines for one thread, shared between frames.
+type CachedLines = Rc<Vec<ratatui::text::Line<'static>>>;
+
+thread_local! {
+    /// Last built message lines and the fingerprint they were built from.
+    /// Single slot: the threads view shows one thread at a time.
+    static LINE_CACHE: RefCell<Option<(u64, CachedLines)>> = const { RefCell::new(None) };
+}
+
+/// Fingerprint of everything [`build_thread_message_lines`] reads: thread id,
+/// width, active theme (colors are resolved at line build time) and each
+/// message's role/auto flag/content. Hashing is ~µs; rebuilding is ~ms.
+fn lines_fingerprint(thread: &cp_mod_threads::types::Thread, viewport_width: u16) -> u64 {
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    thread.id.hash(&mut h);
+    viewport_width.hash(&mut h);
+    std::ptr::from_ref(cp_base::config::accessors::active_theme()).addr().hash(&mut h);
+    for msg in &thread.messages {
+        msg.auto.hash(&mut h);
+        matches!(msg.author, ThreadAuthor::Assistant).hash(&mut h);
+        msg.content.hash(&mut h);
+    }
+    h.finish()
+}
+
+/// Message lines for `thread`, rebuilt only when its fingerprint changes.
+fn cached_thread_message_lines(thread: &cp_mod_threads::types::Thread, viewport_width: u16) -> CachedLines {
+    let key = lines_fingerprint(thread, viewport_width);
+    LINE_CACHE.with_borrow_mut(|slot| {
+        if let Some(entry) = slot.as_ref()
+            && entry.0 == key
+        {
+            return Rc::clone(&entry.1);
+        }
+        let lines = Rc::new(build_thread_message_lines(thread, viewport_width));
+        *slot = Some((key, Rc::clone(&lines)));
+        lines
+    })
+}
 
 /// Render the right-pane message area with input box for the selected thread.
 ///
@@ -27,7 +70,7 @@ pub(super) fn render_message_area_with_input(frame: &mut Frame<'_>, state: &mut 
     // build the message lines into an owned Vec (so no borrow of `state`
     // survives into the mutable scroll phase below). ───────────────────────
     let msg_area: Rect;
-    let lines: Vec<ratatui::text::Line<'static>>;
+    let lines: Rc<Vec<ratatui::text::Line<'static>>>;
     {
         let ts = ThreadsState::get(state);
         let Some(thread) = ts.threads.get(selected) else {
@@ -79,7 +122,7 @@ pub(super) fn render_message_area_with_input(frame: &mut Frame<'_>, state: &mut 
             return;
         };
 
-        lines = build_thread_message_lines(thread, m_area.width);
+        lines = cached_thread_message_lines(thread, m_area.width);
         msg_area = m_area;
         render_thread_input(frame, state, input_area);
     }
@@ -172,7 +215,11 @@ fn paint_thread_messages(frame: &mut Frame<'_>, state: &mut State, lines: &[rata
     state.scroll_offset = state.scroll_offset.clamp(0.0, max_scroll);
 
     let offset = state.scroll_offset;
-    let paragraph = Paragraph::new(lines.to_vec()).scroll((offset.round().to_u16(), 0));
+    // Clone only the visible window (no wrap on this Paragraph, so slicing is
+    // identical to `.scroll()` over the full vec, minus the O(total) copy).
+    let start = offset.round().to_usize().min(content_height);
+    let end = start.saturating_add(viewport_height).min(content_height);
+    let paragraph = Paragraph::new(lines.get(start..end).unwrap_or_default().to_vec());
     frame.render_widget(paragraph, area);
 
     // Scrollbar — colors via semantic mapping
