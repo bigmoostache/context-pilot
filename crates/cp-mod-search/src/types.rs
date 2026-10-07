@@ -384,7 +384,7 @@ pub(crate) struct SearchResult {
 // The indexability gates, extension allowlist, size cap and exclusion lists
 // live in the sibling `filters` module; re-exported here so existing
 // `types::is_indexable` / `types::MAX_FILE_SIZE` call-sites keep resolving.
-pub(crate) use crate::index::filters::{FALLBACK_CHUNK_SIZE, is_excluded_dir, is_indexable};
+pub(crate) use crate::index::filters::{FALLBACK_CHUNK_SIZE, is_indexable};
 
 /// Meilisearch settings for the **files** index.
 ///
