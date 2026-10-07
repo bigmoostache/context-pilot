@@ -82,8 +82,8 @@ pub const SIDEBAR_HELP_HEIGHT: u16 = 10;
 /// Poll interval for events in milliseconds
 pub const EVENT_POLL_MS: u64 = 8;
 
-/// Minimum time between renders (ms) - caps at ~28fps
-pub const RENDER_THROTTLE_MS: u64 = 36;
+/// Minimum time between renders (ms) - caps at 100fps
+pub const RENDER_THROTTLE_MS: u64 = 10;
 
 /// Interval for CPU/RAM stats refresh in perf overlay (ms)
 pub const PERF_STATS_REFRESH_MS: u64 = 500;

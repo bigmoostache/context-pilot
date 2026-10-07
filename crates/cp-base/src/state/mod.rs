@@ -9,7 +9,9 @@ pub mod data;
 /// Stream-phase state machine, boolean flag structs, and streaming-tool advisory state.
 pub mod flags;
 
-/// Runtime state: the in-memory `State` struct with all live fields.
+/// Runtime state: the in-memory `State` struct with all live fields. The shared
+/// text-editing engine lives at `runtime::textarea` (addressed as
+/// `state::runtime::textarea` by the editing/action layers).
 pub mod runtime;
 /// Watcher trait and registry for async condition monitoring.
 pub mod watchers;

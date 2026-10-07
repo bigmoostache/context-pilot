@@ -42,6 +42,10 @@ const CONFIG_FILE: &str = "config.json";
 /// Directory holding per-worker state files (`<worker_id>.json`).
 const STATES_DIR: &str = "states";
 
+/// Directory holding per-thread message files (`<thread_id>.json`). The agent
+/// keeps only slim thread metadata in `config.json`; messages live here.
+const THREADS_DIR: &str = "threads";
+
 // ── Cached value ───────────────────────────────────────────────────────
 
 /// A parsed JSON value paired with the file's `mtime` at the time of parsing,
@@ -64,6 +68,9 @@ struct AgentCache {
 
     /// Cached parses of `states/<worker>.json`, keyed by worker id.
     workers: HashMap<String, CachedJson>,
+
+    /// Cached parses of `threads/<id>.json`, keyed by thread id.
+    threads: HashMap<String, CachedJson>,
 }
 
 // ── StateReader ────────────────────────────────────────────────────────
@@ -94,12 +101,19 @@ impl StateReader {
     ///
     /// # Errors
     ///
+    /// Thread entries stored slim (no `messages` key) get their messages
+    /// spliced back from `threads/<id>.json`, so callers see the full shape.
+    ///
+    /// # Errors
+    ///
     /// Returns [`io::Error`] only when both the fresh read *and* the cache miss
     /// — i.e. the file has never been successfully read for this agent.
     pub fn read_config(&mut self, folder: &Path) -> io::Result<Value> {
         let path = folder.join(CP_DIR).join(CONFIG_FILE);
         let cache = self.agents.entry(folder.to_path_buf()).or_default();
-        read_cached_json(&path, &mut cache.config)
+        let mut config = read_cached_json(&path, &mut cache.config)?;
+        hydrate_thread_messages(&folder.join(CP_DIR).join(THREADS_DIR), &mut config, &mut cache.threads);
+        Ok(config)
     }
 
     /// Read and cache-parse a single worker's state file.
@@ -136,6 +150,28 @@ impl StateReader {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
+
+/// Splice `messages` from `<threads_dir>/<id>.json` into every thread entry of
+/// `config` lacking them. Legacy configs (inline messages) pass through as-is;
+/// a missing/unreadable file leaves the entry without messages.
+fn hydrate_thread_messages(threads_dir: &Path, config: &mut Value, cache: &mut HashMap<String, CachedJson>) {
+    let Some(entries) = config.pointer_mut("/modules/threads/threads").and_then(Value::as_array_mut) else {
+        return;
+    };
+    for entry in entries {
+        let Some(obj) = entry.as_object_mut() else { continue };
+        if obj.contains_key("messages") {
+            continue;
+        }
+        let Some(id) = obj.get("id").and_then(Value::as_str).map(str::to_owned) else { continue };
+        let path = threads_dir.join(format!("{id}.json"));
+        let slot = cache.entry(id).or_insert_with(|| CachedJson { mtime: SystemTime::UNIX_EPOCH, data: Value::Null });
+        let Ok(file) = read_cached_json_slot(&path, slot) else { continue };
+        if let Some(messages) = file.get("messages") {
+            let _prev = obj.insert("messages".to_owned(), messages.clone());
+        }
+    }
+}
 
 /// Read and parse a JSON file, returning the cached value on mtime-hit or
 /// torn-read fallback.
@@ -308,6 +344,29 @@ mod tests {
 
         let read = reader.read_worker(folder, "abc123").expect("read");
         assert_eq!(read, w1);
+    }
+
+    #[test]
+    fn read_config_hydrates_slim_threads_from_files() {
+        let dir = tempdir().expect("dir");
+        let folder = dir.path();
+        let cfg = serde_json::json!({"modules": {"threads": {"threads": [
+            {"id": "T1", "name": "slim"},
+            {"id": "T2", "name": "legacy", "messages": [{"content": "inline"}]},
+            {"id": "T3", "name": "no file"},
+        ]}}});
+        write_config(folder, &cfg);
+        let tdir = folder.join(CP_DIR).join(THREADS_DIR);
+        fs::create_dir_all(&tdir).expect("mkdir");
+        let t1 = serde_json::json!({"id": "T1", "messages": [{"content": "from file"}]});
+        fs::write(tdir.join("T1.json"), serde_json::to_vec(&t1).expect("ser")).expect("write");
+
+        let mut reader = StateReader::new();
+        let read = reader.read_config(folder).expect("read");
+        let at = |i: &str| read.pointer(i).and_then(Value::as_str);
+        assert_eq!(at("/modules/threads/threads/0/messages/0/content"), Some("from file"));
+        assert_eq!(at("/modules/threads/threads/1/messages/0/content"), Some("inline"));
+        assert!(read.pointer("/modules/threads/threads/2/messages").is_none());
     }
 
     #[test]

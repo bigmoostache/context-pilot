@@ -45,6 +45,11 @@ pub enum Action {
     CursorEndSelect,
     /// Select all text in input (Ctrl+A).
     SelectAll,
+    /// Revert the composer to its previous undo snapshot (Ctrl+Z).
+    Undo,
+    /// Copy the active composer selection to the system clipboard (Ctrl+C
+    /// while a selection is active — wins over `CopyPanelContent`).
+    CopySelection,
     /// Navigate to previous (older) prompt in history (Ctrl+U).
     HistoryPrev,
     /// Navigate to next (newer) prompt in history (Ctrl+D).
@@ -105,6 +110,8 @@ pub enum Action {
     ToggleIndexOverlay,
     /// Copy the index overlay content to the system clipboard (Ctrl+C while overlay is open).
     CopyIndexOverlay,
+    /// Copy the F12 perf overlay as plain text to the system clipboard (Ctrl+R while F12 is open).
+    CopyPerfOverlay,
 
     // === Config overlay — primary model ===
     /// Select primary LLM provider.
@@ -168,6 +175,14 @@ pub enum Action {
     /// Toggle between the active and archived thread lists in the
     /// thread-centered view (Ctrl+U). Resets selection to the top.
     ThreadToggleArchivedView,
+    /// Drill into the selected thread's full panel view (G3, read-only
+    /// inspection — Right arrow). Sets `FocusState::drilled_thread_id`; the
+    /// renderer swaps that thread's parked runtime in for the paint without
+    /// moving execution (Model 2).
+    ThreadDrillIn,
+    /// Exit the drilled panel view back to the thread list (G3 — Left/Esc).
+    /// Clears `FocusState::drilled_thread_id`.
+    ThreadDrillOut,
     /// Open the Ctrl+P command palette.
     OpenCommandPalette,
     /// Reset the session cost counters to zero.

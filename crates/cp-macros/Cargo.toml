@@ -1,0 +1,19 @@
+[package]
+name = "cp-macros"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Workspace-wide declarative macros (lint chokepoints) usable from every crate"
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+publish = false
+
+# Deliberately dependency-free: foundational crates (cp-wire, cp-vault,
+# cp-oplog) use these macros, so this crate must sit at the very bottom of the
+# graph.
+[dependencies]
+
+[lints]
+workspace = true

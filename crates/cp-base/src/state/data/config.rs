@@ -175,6 +175,15 @@ pub struct WorkerState {
     #[serde(default = "default_one")]
     pub next_result_id: usize,
 
+    // === Composer draft (per-thread, survives reload) ===
+    /// Unsent composer text of this thread. `None` in files saved before
+    /// per-thread drafts — boot then falls back to the legacy shared draft.
+    #[serde(default)]
+    pub draft_input: Option<String>,
+    /// Composer cursor byte-offset within `draft_input`.
+    #[serde(default)]
+    pub draft_cursor: usize,
+
     // === Module data (keyed by module ID) ===
     /// Per-module persistent worker data, keyed by module ID string.
     #[serde(default)]
@@ -190,6 +199,8 @@ impl Default for WorkerState {
             panel_uid_to_local_id: HashMap::new(),
             next_tool_id: 1,
             next_result_id: 1,
+            draft_input: None,
+            draft_cursor: 0,
             modules: HashMap::new(),
         }
     }
@@ -220,6 +231,14 @@ impl WorkerState {
     pub const fn with_id_counters(mut self, next_tool_id: usize, next_result_id: usize) -> Self {
         self.next_tool_id = next_tool_id;
         self.next_result_id = next_result_id;
+        self
+    }
+
+    /// Set this thread's composer draft text + cursor (builder).
+    #[must_use]
+    pub fn with_draft(mut self, text: String, cursor: usize) -> Self {
+        self.draft_input = Some(text);
+        self.draft_cursor = cursor;
         self
     }
 

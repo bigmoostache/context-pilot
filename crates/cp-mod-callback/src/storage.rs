@@ -78,6 +78,9 @@ pub(crate) struct YamlCallbackEntry {
     pub cwd: Option<String>,
     /// Global (true) or local/per-file (false).
     pub is_global: bool,
+    /// Multi-thread concurrency hint (§13/H2). Informational only.
+    #[serde(default)]
+    pub concurrency_friendly: bool,
     /// Inline script content (the body, without the auto-generated header).
     pub script_content: String,
     /// Timestamp for conflict resolution (ms since Unix epoch).
@@ -193,6 +196,7 @@ pub(crate) fn upsert_yaml_entry(def: &CallbackDefinition) {
         success_message: def.success_message.clone(),
         cwd: def.cwd.clone(),
         is_global: def.is_global,
+        concurrency_friendly: def.concurrency_friendly,
         script_content: script_body,
         last_edited_ms: 0, // set by YamlSync::upsert
     };
@@ -245,6 +249,7 @@ pub(crate) fn populate_from_yaml(state: &mut CallbackState) {
             is_global: entry.is_global,
             built_in: false,
             built_in_command: None,
+            concurrency_friendly: entry.concurrency_friendly,
         };
 
         state.definitions.push(def);
@@ -278,6 +283,7 @@ pub(crate) fn migrate_to_yaml(definitions: &[CallbackDefinition]) {
                 success_message: def.success_message.clone(),
                 cwd: def.cwd.clone(),
                 is_global: def.is_global,
+                concurrency_friendly: def.concurrency_friendly,
                 script_content: script_body,
                 last_edited_ms: 0,
             },

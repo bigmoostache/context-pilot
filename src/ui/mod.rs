@@ -27,6 +27,18 @@ use crate::infra::constants::STATUS_BAR_HEIGHT;
 use crate::state::{Kind, State};
 use crate::ui::perf::PERF;
 
+/// Whether the threads-list surface should be painted this frame: the Threads
+/// view mode is active **and** the human has not drilled into a specific thread.
+///
+/// When drilled (G3), the renderer paints the drilled thread's full panel body
+/// (sidebar + panels) instead of the list — `render_frame` has already swapped
+/// that thread's runtime into `state`, so the normal body renders it
+/// pixel-identically to its own main view.
+fn showing_threads_list(state: &State) -> bool {
+    state.view_mode == cp_base::state::data::config::ViewMode::Threads
+        && cp_mod_threads::types::FocusState::get(state).drilled_thread_id.is_none()
+}
+
 /// Top-level render entry point: draws the entire TUI frame.
 pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     PERF.frame_start();
@@ -36,10 +48,16 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
 
     // Build the IR frame snapshot (Phase 4 integration point).
     // Phase 5 progressively replaces direct-render code paths below.
-    let ir_frame = ir::build_frame(state);
+    let ir_frame = {
+        let _build = crate::profile!("ir_build_frame");
+        ir::build_frame(state, !showing_threads_list(state))
+    };
 
     // Fill base background
-    frame.render_widget(Block::default().style(Style::default().bg(theme::bg_base())), area);
+    {
+        let _g = crate::profile!("bg_fill");
+        frame.render_widget(Block::default().style(Style::default().bg(theme::bg_base())), area);
+    }
 
     // Main layout: body + footer (no header)
     let main_layout = Layout::default()
@@ -55,17 +73,18 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
         return;
     };
     render_body(frame, state, body_area, &ir_frame);
-    ir::render_status_bar::render_status_bar_from_ir(frame, &ir_frame.status_bar, status_area);
+    {
+        let _status = crate::profile!("status_bar");
+        ir::render_status_bar::render_status_bar_from_ir(frame, &ir_frame.status_bar, status_area);
+    }
 
     // Render autocomplete popup if active (via IR overlays).
     // In Threads mode the input lives inside the right pane (past the thread
     // list), so offset by THREAD_LIST_WIDTH instead of the sidebar width.
     {
-        let offset = if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
-            threads_view::THREAD_LIST_WIDTH
-        } else {
-            state.view_mode.width()
-        };
+        let _g = crate::profile!("autocomplete");
+        let offset =
+            if showing_threads_list(state) { threads_view::THREAD_LIST_WIDTH } else { state.view_mode.width() };
         let content_x = area.x.saturating_add(offset);
         let content_width = area.width.saturating_sub(offset);
         let content_height = area.height.saturating_sub(STATUS_BAR_HEIGHT);
@@ -73,7 +92,10 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
         ir::render_conversation::render_autocomplete_if_active(frame, content_area, &ir_frame.overlays);
     }
 
-    render_modal_overlays(frame, area, &ir_frame.overlays);
+    {
+        let _overlays = crate::profile!("modal_overlays");
+        render_modal_overlays(frame, area, &ir_frame.overlays);
+    }
 
     PERF.frame_end();
 }
@@ -84,7 +106,7 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
 fn render_modal_overlays(frame: &mut Frame<'_>, area: Rect, overlays: &[cp_render::conversation::Overlay]) {
     // Render performance overlay if active (from IR overlays)
     if let Some(perf_overlay) = overlays.iter().find_map(|o| {
-        cp_base::deref_match!(o, {
+        cp_macros::deref_match!(o, {
             cp_render::conversation::Overlay::Perf(ref p) => Some(p),
             cp_render::conversation::Overlay::QuestionForm(_)
             | cp_render::conversation::Overlay::Autocomplete(_)
@@ -98,7 +120,7 @@ fn render_modal_overlays(frame: &mut Frame<'_>, area: Rect, overlays: &[cp_rende
 
     // Render config overlay if active (from IR overlays)
     if let Some(config_overlay) = overlays.iter().find_map(|o| {
-        cp_base::deref_match!(o, {
+        cp_macros::deref_match!(o, {
             cp_render::conversation::Overlay::Config(ref c) => Some(c),
             cp_render::conversation::Overlay::QuestionForm(_)
             | cp_render::conversation::Overlay::Autocomplete(_)
@@ -112,7 +134,7 @@ fn render_modal_overlays(frame: &mut Frame<'_>, area: Rect, overlays: &[cp_rende
 
     // Render Meilisearch indexing status overlay if active (from IR overlays)
     if let Some(search_overlay) = overlays.iter().find_map(|o| {
-        cp_base::deref_match!(o, {
+        cp_macros::deref_match!(o, {
             cp_render::conversation::Overlay::SearchIndex(ref s) => Some(s.as_ref()),
             cp_render::conversation::Overlay::QuestionForm(_)
             | cp_render::conversation::Overlay::Autocomplete(_)
@@ -127,9 +149,12 @@ fn render_modal_overlays(frame: &mut Frame<'_>, area: Rect, overlays: &[cp_rende
 
 /// Render the body area: sidebar (if visible) and main content panel,
 /// or the threads view when `ViewMode::Threads` is active.
-fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &cp_render::frame::Frame) {
-    // Threads mode: completely different layout (no sidebar, no panels)
-    if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
+fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &ir::FrameChrome) {
+    // Threads mode: completely different layout (no sidebar, no panels) —
+    // unless the human has drilled into a thread (G3), in which case fall
+    // through to the normal body to paint that thread's full panel view.
+    if showing_threads_list(state) {
+        let _threads = crate::profile!("threads_view");
         threads_view::render_threads_view(frame, state, area);
         return;
     }
@@ -149,17 +174,25 @@ fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &
         debug_assert!(false, "body_layout must have at least 2 chunks");
         return;
     };
-    ir::render_sidebar::render_sidebar_from_ir(frame, &ir_frame.sidebar, sidebar_area);
-    render_main_content(frame, state, content_area, ir_frame);
+    {
+        let _g = crate::profile!("sidebar_draw");
+        if let Some(sidebar) = ir_frame.sidebar.as_ref() {
+            ir::render_sidebar::render_sidebar_from_ir(frame, sidebar, sidebar_area);
+        }
+    }
+    render_main_content(frame, state, content_area);
 }
 
 /// Render the main content area.
-fn render_main_content(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &cp_render::frame::Frame) {
-    render_content_panel(frame, state, area, ir_frame);
+fn render_main_content(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
+    render_content_panel(frame, state, area);
 }
 
 /// Render the active content panel (conversation or generic panel).
-fn render_content_panel(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &cp_render::frame::Frame) {
+///
+/// The IR for the painted kind is built here, lazily: building both the
+/// conversation and the active panel every frame wasted one of them always.
+fn render_content_panel(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
     let _guard = crate::profile!("ui::render_panel");
     let context_type = state
         .context
@@ -171,8 +204,15 @@ fn render_content_panel(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir
     // All other panels render from the IR snapshot, falling back to content()
     // for panels whose blocks() returns empty (not yet migrated).
     if context_type.as_str() == Kind::CONVERSATION {
-        ir::render_conversation::render_conversation_from_ir(frame, state, area, &ir_frame.conversation);
+        let conversation = ir::build_conversation_ir(state);
+        let _g = crate::profile!("conversation_draw");
+        ir::render_conversation::render_conversation_from_ir(frame, state, area, &conversation);
     } else {
-        ir::render_panel::render_panel_from_ir(frame, state, area, &ir_frame.active_panel);
+        let active_panel = {
+            let _g = crate::profile!("ir_active_panel");
+            ir::build_active_panel(state)
+        };
+        let _g = crate::infra::profiler::dyn_guard("panel_draw_", context_type.as_str());
+        ir::render_panel::render_panel_from_ir(frame, state, area, &active_panel);
     }
 }

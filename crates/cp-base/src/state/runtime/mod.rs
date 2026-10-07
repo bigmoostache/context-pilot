@@ -2,64 +2,58 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
 use super::context::{Entry, Kind};
-use super::data::TickTelemetry;
 use super::data::config::ViewMode;
 use super::data::message::Message;
-use super::flags::{HighlightIrFn, StatusBools, StreamPhase, StreamingTool};
+use super::flags::{HighlightIrFn, StatusBools, StreamPhase};
 use crate::config::llm::types::LlmProvider;
-use crate::panels::ContextItem;
 use crate::tools::ToolDefinition;
-use crate::ui::render_cache::{FullCache, InputCache, MessageCache};
 
 /// Ephemeral reverie sub-agent state (context optimizer, cartographer).
 pub mod reverie;
+/// Shared text-editing engine (buffer, cursor, selection, undo) for textareas.
+pub mod textarea;
 
 // Runtime State
 
-/// Runtime state (messages loaded in memory)
+/// Runtime application state.
+///
+/// `State` holds **only fleet-shared data** — things that are single-instance
+/// across every thread: the active model/provider, the theme, the tool set, the
+/// fleet-shared module `TypeMap`, the global UID counter, UI-global flags, and
+/// the ephemeral reverie sessions.
+///
+/// **No conversation, no panels, no per-thread anything lives here as a field.**
+/// Everything a thread owns (its messages, its panel/context set, its editor and
+/// scroll state, its token/cost telemetry, its cache/freeze engine snapshots,
+/// its per-thread module data, its stream phase) lives on a
+/// [`ThreadRuntime`](bundle::ThreadRuntime). The currently-loaded thread sits in
+/// [`resident`](Self::resident); every other thread is parked in the fleet
+/// registry. `State` [`Deref`](std::ops::Deref)s to `resident`, so existing code
+/// that reads `state.messages` / `state.context` / `state.stream` transparently
+/// reaches the resident thread's data — but those are the **thread's** fields,
+/// not `State`'s.
 pub struct State {
-    /// Active context panels (dynamic + fixed), ordered by recency for LLM injection.
-    pub context: Vec<Entry>,
-    /// Conversation messages (user, assistant, `tool_call`, `tool_result`).
-    pub messages: Vec<Message>,
-    /// Current user input text in the editor.
-    pub input: String,
-    /// Cursor position in input (byte index)
-    pub input_cursor: usize,
-    /// Selection anchor (byte index). When set, text between anchor and cursor is selected.
-    pub input_selection_anchor: Option<usize>,
-    /// Paste buffers: stored content for inline paste placeholders
-    pub paste_buffers: Vec<String>,
-    /// Labels for paste buffers: None = paste, Some(name) = command
-    pub paste_buffer_labels: Vec<Option<String>>,
-    /// Index of the currently selected context panel in the sidebar.
-    pub selected_context: usize,
-    /// Boolean status flags, organized by domain.
+    /// The per-thread context of the currently-resident thread (the focused
+    /// thread at rest, or a background thread while it is being stepped). Owns
+    /// the conversation, panels, editor/scroll, token/cost telemetry, the
+    /// cache/freeze engine snapshots, the per-thread stream phase, and the
+    /// per-thread module `TypeMap`. `State` derefs to this.
+    pub resident: bundle::ThreadRuntime,
+
+    /// Boolean status flags that are fleet-global (UI redraw, config overlay,
+    /// reload lifecycle, module overlays). Per-thread stream/scroll state is on
+    /// [`resident.stream`](bundle::ThreadRuntime::stream), reached via deref as
+    /// `state.stream`.
     pub flags: StatusBools,
-    /// Tool call currently being streamed (advisory, for UI rendering).
-    pub streaming_tool: Option<StreamingTool>,
     /// Selected bar in config view (0=budget, 1=threshold, 2=target)
     pub config_selected_bar: usize,
-    /// Stop reason from last completed stream (e.g., "`end_turn`", "`max_tokens`", "`tool_use`")
-    pub last_stop_reason: Option<String>,
-    /// Vertical scroll offset in the conversation view (fractional lines).
-    pub scroll_offset: f32,
-    /// Scroll acceleration (increases when holding scroll keys)
-    pub scroll_accel: f32,
-    /// Maximum scroll offset (set by UI based on content height)
-    pub max_scroll: f32,
-    /// Estimated tokens added during current streaming session (for correction when done)
-    pub streaming_estimated_tokens: usize,
-    /// Next user message ID (U1, U2, ...)
-    pub next_user_id: usize,
-    /// Next assistant message ID (A1, A2, ...)
-    pub next_assistant_id: usize,
-    /// Next tool message ID (T1, T2, ...)
-    pub next_tool_id: usize,
-    /// Next result message ID (R1, R2, ...)
-    pub next_result_id: usize,
     /// Global UID counter for all shared elements (messages, panels)
     pub global_next_uid: usize,
+    /// Cleaning threshold (0.0–1.0) of the context budget that triggers
+    /// auto-cleaning. Fleet-wide: the Ctrl+H setting applies to every thread.
+    pub cleaning_threshold: f32,
+    /// Context budget in tokens (`None` = model's full window). Fleet-wide.
+    pub context_budget: Option<usize>,
     /// Tool definitions with enabled state
     pub tools: Vec<ToolDefinition>,
     /// Active module IDs
@@ -87,131 +81,62 @@ pub struct State {
     /// Active reverie sessions keyed by `agent_id` (e.g., "cleaner", "cartographer").
     /// Ephemeral — not persisted, discarded after each run.
     pub reveries: HashMap<String, reverie::Session>,
-    /// Accumulated `prompt_cache_hit_tokens` across all API calls (persisted)
-    pub cache_hit_tokens: usize,
-    /// Accumulated `prompt_cache_miss_tokens` across all API calls (persisted)
-    pub cache_miss_tokens: usize,
-    /// Accumulated output tokens across all API calls (persisted)
-    pub total_output_tokens: usize,
-    /// Accumulated uncached input tokens (after last cache breakpoint, billed at base price).
-    /// Subset of `cache_miss_tokens` — tracked separately for sidebar display.
-    pub uncached_input_tokens: usize,
-    /// Current stream token accumulators (runtime-only, reset per user input)
-    pub stream_cache_hit_tokens: usize,
-    /// Cache misses in current stream.
-    pub stream_cache_miss_tokens: usize,
-    /// Output tokens in current stream.
-    pub stream_output_tokens: usize,
-    /// Uncached input tokens in current stream.
-    pub stream_uncached_input_tokens: usize,
-    /// Last tick token accumulators (runtime-only, set per `StreamDone`)
-    pub tick_cache_hit_tokens: usize,
-    /// Cache misses in last completed tick.
-    pub tick_cache_miss_tokens: usize,
-    /// Output tokens in last completed tick.
-    pub tick_output_tokens: usize,
-    /// Uncached input tokens in last completed tick.
-    pub tick_uncached_input_tokens: usize,
-    /// Cleaning threshold (0.0 - 1.0), triggers auto-cleaning when exceeded
-    pub cleaning_threshold: f32,
-    /// Context budget in tokens (None = use model's full context window)
-    pub context_budget: Option<usize>,
-
-    /// Accumulated cost in USD, frozen at consumption-time pricing.
-    ///
-    /// Unlike token counts (which are model-agnostic), cost is computed once per
-    /// stream using the price active at that moment, then accumulated. Switching
-    /// model afterwards does NOT retroactively rewrite these — past spend stays put.
-    /// Cache-hit / cache-miss / output legs are tracked separately for the sidebar.
-    pub cost_hit_usd: f64,
-    /// Accumulated cache-miss cost in USD (frozen at consumption-time pricing).
-    pub cost_miss_usd: f64,
-    /// Accumulated output cost in USD (frozen at consumption-time pricing).
-    pub cost_output_usd: f64,
-    /// Current-stream cache-hit cost in USD (reset per user input).
-    pub stream_cost_hit_usd: f64,
-    /// Current-stream cache-miss cost in USD (reset per user input).
-    pub stream_cost_miss_usd: f64,
-    /// Current-stream output cost in USD (reset per user input).
-    pub stream_cost_output_usd: f64,
-    /// Last-tick cache-hit cost in USD (set per `StreamDone`).
-    pub tick_cost_hit_usd: f64,
-    /// Last-tick cache-miss cost in USD (set per `StreamDone`).
-    pub tick_cost_miss_usd: f64,
-    /// Last-tick output cost in USD (set per `StreamDone`).
-    pub tick_cost_output_usd: f64,
-
     /// Result of the last API check
     pub api_check_result: Option<crate::config::llm::types::ApiCheckResult>,
-    /// Current API retry count (reset on success)
-    pub api_retry_count: u32,
-    /// Guard rail block reason (set when spine blocks, cleared when streaming starts)
-    pub guard_rail_blocked: Option<String>,
-    /// Previous panel hash list for cache cost tracking
-    pub previous_panel_hash_list: Vec<String>,
-    /// Saved panel ID order from last emitted tick (for queue freeze stability)
-    pub previous_panel_order: Vec<String>,
-    /// Panel ID → context type from last emitted tick (for disappearance detection).
-    pub previous_panel_id_types: Vec<(String, String)>,
-    /// Panel IDs that carried a cache breakpoint on the last emitted tick, in
-    /// prompt order (the BP→panel mapping recorded by the build path).
-    ///
-    /// Consumed by the freeze pass to widen the "free to update" region back to
-    /// the last alive breakpoint before the culprit: panels between that
-    /// breakpoint and the culprit are already billed fresh this turn, so
-    /// refreshing them costs nothing. Runtime-only (empty on cold start ⇒ the
-    /// freeze pass falls back to the culprit-anchored region).
-    pub previous_breakpoint_panel_ids: Vec<String>,
-    /// Full snapshot of panel `ContextItem`s from the last unfrozen tick.
-    ///
-    /// During tempo/queue freeze, this snapshot is replayed verbatim — guaranteeing
-    /// byte-identical panel content and eliminating cache breaks from panel
-    /// disappearance, appearance, or missing emitted snapshots.
-    /// Not persisted across reloads (runtime-only).
-    pub frozen_context_snapshot: Option<Vec<ContextItem>>,
-    /// Sleep timer: tool pipeline waits until this timestamp (ms) before proceeding
-    pub tool_sleep_until_ms: u64,
-    /// Cache optimization engine: tracks accumulated hashes and breakpoint timestamps
-    /// for intelligent Anthropic prompt cache breakpoint placement.
-    /// Serialized through `WorkerState` modules for reload survival.
-    pub cache_engine_json: Option<String>,
-    /// Tempo flag: `true` means "nothing meaningful changed — freeze everything next tick."
-    ///
-    /// Set to `true` at the start of each tick. Any tool execution breaks it (sets `false`)
-    /// unless the tool explicitly opts out via `ToolResult::preserves_tempo`. When the next
-    /// `prepare_stream_context()` runs with `tempo == true`, ALL panels freeze unconditionally.
-    pub tempo: bool,
-    /// Pre-tick telemetry for cost-tracking TSV (populated at stream start, consumed at stream end).
-    pub tick_telemetry: Option<TickTelemetry>,
-    /// Number of alive (non-pruned) breakpoints at last tick — for sidebar display only.
-    pub tick_alive_breakpoints: usize,
-    /// Per-mille positions (0–1000) of alive BPs within the prompt, sorted.
-    /// For the sidebar gauge showing WHERE breakpoints sit in the prompt.
-    pub tick_alive_bp_positions: Vec<u16>,
-
-    // === Render Cache (runtime-only) ===
-    /// Last viewport width used for render cache invalidation.
-    pub last_viewport_width: u16,
-    /// Cached rendered lines per message ID
-    pub message_cache: HashMap<String, MessageCache>,
-    /// Cached rendered lines for input area
-    pub input_cache: Option<InputCache>,
-    /// Full content cache (entire conversation output)
-    pub full_content_cache: Option<FullCache>,
 
     // === Callback hooks (set by binary, used by extracted module crates) ===
     /// IR-aware syntax highlighting (RGB colour spans for the IR pipeline).
     /// Takes `(file_path, content)` and returns `cp_render::Span` per line.
     pub highlight_ir_fn: Option<HighlightIrFn>,
 
-    // === Module extension data (TypeMap pattern) ===
-    /// Module-owned state stored by `TypeId`. Each module registers its own state struct
-    /// at startup via `Module::init_state()`. Accessed via `get_ext::<T>()` / `get_ext_mut::<T>()`.
-    pub module_data: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
+    // === Module extension data (fleet-shared half; per-thread half on resident) ===
+    /// Fleet-shared module-owned state stored by `TypeId` (one instance across
+    /// all threads — e.g. memory, logs, entities, the threads registry). The
+    /// per-thread half lives on [`resident.thread_module_data`](bundle::ThreadRuntime::thread_module_data).
+    ///
+    /// A given `TypeId` lives in exactly ONE of the two maps, so the `get_ext`
+    /// family searches both and `set_ext` updates whichever already holds the
+    /// type; first-inserts are routed by [`init_is_global`](Self::init_is_global).
+    pub shared_module_data: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
+    /// Ambient scope for the *next* first-insert via [`set_ext`](Self::set_ext),
+    /// set by the boot/init loops around `init_state` / `load_module_data`:
+    /// `Some(true)` → [`shared_module_data`](Self::shared_module_data),
+    /// `Some(false)` or `None` → the resident's per-thread map.
+    /// Updates to already-registered types ignore this (they stay in place).
+    pub init_is_global: Option<bool>,
+
+    /// Id of the thread whose per-thread context currently lives in
+    /// [`resident`](Self::resident): the focused thread normally, or the
+    /// background thread being advanced during its step. Residence metadata —
+    /// NOT part of [`resident`](Self::resident) so it tracks the current occupant
+    /// across a swap. Read by the stream tee to tag each frame's `thread_id`.
+    /// Runtime-only; `None` on cold boot.
+    pub resident_thread_id: Option<String>,
 }
 
+impl std::ops::Deref for State {
+    type Target = bundle::ThreadRuntime;
+
+    /// `State` derefs to its resident thread so existing `state.<per-thread>`
+    /// access keeps working after the fields moved onto [`ThreadRuntime`](bundle::ThreadRuntime).
+    /// The per-thread data is owned by the thread, not by `State`.
+    fn deref(&self) -> &Self::Target {
+        &self.resident
+    }
+}
+
+impl std::ops::DerefMut for State {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.resident
+    }
+}
+
+/// Per-thread runtime bundle + the resident-thread swap (`ThreadRuntime`).
+pub mod bundle;
 /// `Default` for `State` (extracted for the 500-line cap).
 mod default;
+/// Module extension-data accessors (`get_ext`/`ext`/`set_ext`/…), extracted for the cap.
+mod ext;
 
 impl State {
     // === Boot builder (cross-crate reconstruction from persisted state) ===
@@ -232,14 +157,14 @@ impl State {
 
     /// Set the selected-panel index (builder).
     #[must_use]
-    pub const fn with_selected_context(mut self, idx: usize) -> Self {
+    pub fn with_selected_context(mut self, idx: usize) -> Self {
         self.selected_context = idx;
         self
     }
 
     /// Set the four message-ID counters as `(user, assistant, tool, result)` (builder).
     #[must_use]
-    pub const fn with_id_counters(mut self, counters: (usize, usize, usize, usize)) -> Self {
+    pub fn with_id_counters(mut self, counters: (usize, usize, usize, usize)) -> Self {
         let (user, assistant, tool, result) = counters;
         self.next_user_id = user;
         self.next_assistant_id = assistant;
@@ -251,8 +176,8 @@ impl State {
     /// Set the draft input text and cursor byte-offset (builder).
     #[must_use]
     pub fn with_draft(mut self, input: String, cursor: usize) -> Self {
-        self.input = input;
-        self.input_cursor = cursor;
+        self.composer.text = input;
+        self.composer.cursor = cursor;
         self
     }
 
@@ -278,64 +203,7 @@ impl State {
     }
 
     // === Module extension data (TypeMap) ===
-
-    /// Get a reference to module-owned state by type.
-    #[must_use]
-    pub fn get_ext<T>(&self) -> Option<&T>
-    where
-        T: 'static + Send + Sync,
-    {
-        self.module_data.get(&TypeId::of::<T>()).and_then(|v| v.downcast_ref())
-    }
-
-    /// Get a mutable reference to module-owned state by type.
-    pub fn get_ext_mut<T>(&mut self) -> Option<&mut T>
-    where
-        T: 'static + Send + Sync,
-    {
-        self.module_data.get_mut(&TypeId::of::<T>()).and_then(|v| v.downcast_mut())
-    }
-
-    /// Get module state by type, panicking if not initialized.
-    ///
-    /// Prefer this over `get_ext().expect()` — the panic lives in
-    /// [`invariant_panic`](crate::config::invariant_panic) once,
-    /// so callers don't need `expect(clippy::expect_used)`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if module state `T` was never registered via [`set_ext`](Self::set_ext).
-    #[must_use]
-    pub fn ext<T>(&self) -> &T
-    where
-        T: 'static + Send + Sync,
-    {
-        self.get_ext::<T>().unwrap_or_else(|| {
-            crate::config::invariant_panic("module state not initialized \u{2014} was init_state() called?")
-        })
-    }
-
-    /// Get mutable module state by type, panicking if not initialized.
-    ///
-    /// # Panics
-    ///
-    /// Panics if module state `T` was never registered via [`set_ext`](Self::set_ext).
-    pub fn ext_mut<T>(&mut self) -> &mut T
-    where
-        T: 'static + Send + Sync,
-    {
-        self.get_ext_mut::<T>().unwrap_or_else(|| {
-            crate::config::invariant_panic("module state not initialized \u{2014} was init_state() called?")
-        })
-    }
-
-    /// Set module-owned state by type. Replaces any existing value of this type.
-    pub fn set_ext<T>(&mut self, val: T)
-    where
-        T: 'static + Send + Sync,
-    {
-        drop(self.module_data.insert(TypeId::of::<T>(), Box::new(val)));
-    }
+    // Accessors (get_ext/ext/set_ext/…) live in the `ext` sibling module.
 
     /// Update the `last_refresh_ms` timestamp for a panel by its context type.
     pub fn touch_panel(&mut self, context_type: &str) {
@@ -424,7 +292,7 @@ impl State {
     /// Prepare state for a new stream: transition to [`StreamPhase::Receiving`],
     /// clear stop reason, reset tick counters.
     pub fn begin_streaming(&mut self) {
-        self.flags.stream.phase.transition(StreamPhase::Receiving);
+        self.stream.phase.transition(StreamPhase::Receiving);
         self.last_stop_reason = None;
         self.streaming_estimated_tokens = 0;
         self.tick_cache_hit_tokens = 0;
@@ -440,10 +308,13 @@ impl State {
 impl std::fmt::Debug for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("State")
-            .field("context_len", &self.context.len())
-            .field("messages_len", &self.messages.len())
-            .field("stream_phase", &self.flags.stream.phase)
-            .field("module_data_keys", &self.module_data.len())
+            .field("context_len", &self.resident.context.len())
+            .field("messages_len", &self.resident.messages.len())
+            .field("stream_phase", &self.resident.stream.phase)
+            .field(
+                "module_data_keys",
+                &self.shared_module_data.len().saturating_add(self.resident.thread_module_data.len()),
+            )
             .finish_non_exhaustive()
     }
 }

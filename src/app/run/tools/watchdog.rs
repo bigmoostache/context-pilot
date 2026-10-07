@@ -40,9 +40,11 @@
 //! subprocesses are touched **only** when a wedge is detected (rare). There is
 //! no behavioural change whatsoever while the loop is healthy.
 
+use std::cell::Cell;
 use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
+use cp_base::cast::Safe as _;
 use cp_base::panels::now_ms;
 
 /// How often the monitor thread wakes to inspect the loop's liveness.
@@ -158,6 +160,27 @@ impl Step {
             _ => Self::Idle,
         }
     }
+
+    /// Stable perf-system key for this step's timing bucket. Distinct from
+    /// [`name`](Self::name) (human dump label); these feed the F12 overlay +
+    /// `--measure` report and must stay stable across versions.
+    const fn perf_name(self) -> &'static str {
+        match self {
+            Self::Idle => "loop.idle",
+            Self::Input => "loop.input",
+            Self::Bridge => "loop.bridge",
+            Self::ThreadsEmit => "loop.threads_emit",
+            Self::Stream => "loop.stream",
+            Self::Cache => "loop.cache",
+            Self::Watchers => "loop.watchers",
+            Self::Tools => "loop.tools",
+            Self::Spine => "loop.spine",
+            Self::Reverie => "loop.reverie",
+            Self::PanelRefresh => "loop.panel_refresh",
+            Self::Render => "loop.render",
+            Self::Save => "loop.save",
+        }
+    }
 }
 
 /// Record a fresh loop tick. Called at the top of every iteration. Two-`Relaxed`
@@ -166,10 +189,43 @@ pub(crate) fn beat() {
     LOOP_HEARTBEAT_MS.store(now_ms(), Ordering::Relaxed);
 }
 
+thread_local! {
+    /// The step currently in flight and the [`Instant`] it began, used to
+    /// attribute each substep's elapsed microseconds to the perf system. The
+    /// main loop is single-threaded, so a thread-local is sound and lock-free.
+    static LAST_STEP: Cell<Option<(Step, Instant)>> = const { Cell::new(None) };
+}
+
 /// Record the step the loop is about to execute, so a wedge dump can name it.
+/// Also closes out the previous step's microsecond timing into the perf system.
 pub(crate) fn mark(step: Step) {
     CURRENT_STEP.store(step.as_u8(), Ordering::Relaxed);
     STEP_SINCE_MS.store(now_ms(), Ordering::Relaxed);
+    record_step_timing(step);
+}
+
+/// Perf key (`loop.<step>`) of the main-loop step in flight on this thread.
+/// `None` off the main thread or before the first [`mark`]: nested profile
+/// guards then keep their bare leaf name.
+pub(crate) fn current_perf_step() -> Option<&'static str> {
+    LAST_STEP.with(Cell::get).map(|(step, _)| step.perf_name())
+}
+
+/// Attribute the just-finished step's elapsed time (µs) to the perf system,
+/// keyed by its [`perf_name`](Step::perf_name), then arm the next step. No-op
+/// on the perf side unless monitoring is enabled (F12 overlay or `--measure`),
+/// but the thread-local is always kept current so timing is accurate the
+/// instant monitoring turns on.
+fn record_step_timing(next: Step) {
+    let now = Instant::now();
+    let previous = LAST_STEP.replace(Some((next, now)));
+    if !crate::ui::perf::PERF.enabled.load(Ordering::Relaxed) {
+        return;
+    }
+    if let Some((prev, started)) = previous {
+        let elapsed_us = now.duration_since(started).as_micros().to_u64();
+        crate::ui::perf::PERF.record_op(prev.perf_name(), elapsed_us);
+    }
 }
 
 /// Spawn the monitor thread (idempotent — repeat calls are no-ops). Detached;

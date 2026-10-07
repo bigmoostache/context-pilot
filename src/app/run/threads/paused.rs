@@ -23,19 +23,7 @@ use crate::app::App;
 /// Returns an empty map when the bridge is OFF or replay fails (degraded:
 /// every live thread looks "new" and has its current paused flag emitted).
 fn oplog_roster_paused(state: &State) -> std::collections::HashMap<String, bool> {
-    let Some(bs) = state.get_ext::<BridgeState>() else {
-        return std::collections::HashMap::new();
-    };
-    let Some(boot) = bs.boot.as_ref() else {
-        return std::collections::HashMap::new();
-    };
-    match cp_oplog::replay::replay(&boot.entry().oplog_path) {
-        Ok(recovered) => recovered.roster.into_iter().map(|t| (t.thread_id, t.paused)).collect(),
-        Err(e) => {
-            log::warn!("bridge: oplog replay for paused seed failed: {e:?}");
-            std::collections::HashMap::new()
-        }
-    }
+    super::oplog_roster(state).map(|r| r.iter().map(|t| (t.thread_id.clone(), t.paused)).collect()).unwrap_or_default()
 }
 
 /// Emit [`ThreadPaused`] / [`ThreadResumed`] the instant any thread's

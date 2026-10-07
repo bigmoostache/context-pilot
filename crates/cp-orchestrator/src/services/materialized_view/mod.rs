@@ -148,7 +148,7 @@ impl AgentView {
     /// `Unknown` variants do not affect the projected state.
     pub fn apply(&mut self, entry: &OpEntry) {
         self.rev = self.rev.max(entry.rev);
-        cp_base::deref_match!(&entry.kind, {
+        cp_macros::deref_match!(&entry.kind, {
             OpEntryKind::Checkpoint { ref snapshot } => {
                 self.heads = snapshot.heads.clone();
                 self.roster.clone_from(&snapshot.roster);

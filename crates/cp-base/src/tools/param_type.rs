@@ -35,7 +35,7 @@ impl ParamType {
     /// set, so downstream pre-flight checks a value without matching `ParamType`.
     #[must_use]
     pub fn check_json(&self, value: &Value) -> bool {
-        crate::deref_match!(self, {
+        cp_macros::deref_match!(self, {
             Self::String => value.is_string(),
             Self::Integer => value.is_i64() || value.is_u64(),
             Self::Number => value.is_number(),
@@ -47,7 +47,7 @@ impl ParamType {
 
     /// Emit the JSON Schema representation (recursive for nested types).
     pub(super) fn to_json_schema(&self) -> Value {
-        crate::deref_match!(self, {
+        cp_macros::deref_match!(self, {
             Self::String => json!({"type": "string"}),
             Self::Integer => json!({"type": "integer"}),
             Self::Number => json!({"type": "number"}),

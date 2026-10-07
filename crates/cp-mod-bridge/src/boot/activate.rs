@@ -141,13 +141,20 @@ pub fn try_recover(state: &mut State) {
 /// chunk to `state.messages.last_mut()`). Carrying that id lets the frontend
 /// route live `Token` frames to the right conversation bubble and reconcile the
 /// streamed text against the durable `MessageCreated` entry (which references
-/// the same `Message::id`). `thread_id` stays empty: main-loop streaming is the
-/// agent's own conversation, not a thread reply (thread replies go through the
-/// `Send` tool, not the token stream).
+/// the same `Message::id`). `thread_id` is the **resident** thread (the one
+/// whose conversation is in `state` while these tokens stream), so a background
+/// thread's live frames route to its own UI pane rather than the focused one; it
+/// is empty only before any thread is resident (cold boot).
 pub(crate) fn publish_frame(state: &mut State, kind: StreamKind) {
-    // Read the active streaming message id BEFORE the mutable `ext_mut` borrow
-    // (a short clone, negligible against the LLM/network cost of a chunk).
+    // Read the active streaming message id + the resident thread id BEFORE the
+    // mutable `ext_mut` borrow (short clones, negligible against the LLM/network
+    // cost of a chunk). The resident is the thread whose conversation is in
+    // `state` right now — the focused thread in the main phase, or a background
+    // thread during its advancement step — so live frames route to the right UI
+    // pane. Empty when no thread is resident yet (cold boot), matching the
+    // pre-multi-thread single-conversation behaviour.
     let message_id = state.messages.last().map(|m| m.id.clone()).unwrap_or_default();
+    let thread_id = state.resident_thread_id.clone().unwrap_or_default();
 
     let bs = state.ext_mut::<BridgeState>();
 
@@ -161,15 +168,7 @@ pub(crate) fn publish_frame(state: &mut State, kind: StreamKind) {
 
     let agent_id = bs.boot.as_ref().map(|b| b.id().to_owned()).unwrap_or_default();
 
-    let frame = StreamFrame {
-        schema_version: 1,
-        agent_id,
-        worker_id: String::new(),
-        thread_id: String::new(),
-        message_id,
-        seq,
-        kind,
-    };
+    let frame = StreamFrame { schema_version: 1, agent_id, worker_id: String::new(), thread_id, message_id, seq, kind };
 
     if let Some(tee) = bs.tee.as_ref() {
         let _outcome = tee.publish(frame);

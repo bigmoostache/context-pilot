@@ -1,0 +1,19 @@
+[package]
+name = "cp-fleet"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Context Pilot fleet mechanism — thread execution registry, active-set concurrency cap, promoter (I/O-free)"
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+publish = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+
+[lints]
+workspace = true

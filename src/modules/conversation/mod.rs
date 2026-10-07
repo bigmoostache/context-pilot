@@ -38,8 +38,14 @@ impl Module for ConversationModule {
     fn is_core(&self) -> bool {
         true
     }
+    /// Per-thread (thread-centric model): a thread's conversation is its own.
+    /// This module holds no `TypeMap` data — the conversation lives in
+    /// `state.messages` + the `CONVERSATION` panel `Entry`, both carried by the
+    /// resident-thread swap (`ThreadRuntime`). The flag is per-thread for intent;
+    /// it is inert at N=1 (save/load are no-ops), so routing anything it ever
+    /// gains lands in the per-thread map.
     fn is_global(&self) -> bool {
-        true
+        false
     }
 
     fn context_type_metadata(&self) -> Vec<TypeMeta> {
@@ -96,11 +102,24 @@ impl Module for ConversationModule {
 
     fn load_module_data(&self, _data: &serde_json::Value, _state: &mut State) {}
 
-    fn save_worker_data(&self, _state: &State) -> serde_json::Value {
-        serde_json::Value::Null
+    /// Per-thread lifetime ("tot") token + cost accumulators. They live on the
+    /// thread bundle, so they must ride the thread's own worker file: the
+    /// global overview slot was shared by every thread and skipped when a
+    /// background thread was rehydrated, which reset tot to the stream value.
+    fn save_worker_data(&self, state: &State) -> serde_json::Value {
+        serde_json::json!({
+            "cache_hit_tokens": state.cache_hit_tokens,
+            "cache_miss_tokens": state.cache_miss_tokens,
+            "total_output_tokens": state.total_output_tokens,
+            "cost_hit_usd": state.cost_hit_usd,
+            "cost_miss_usd": state.cost_miss_usd,
+            "cost_output_usd": state.cost_output_usd,
+        })
     }
 
-    fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
+    fn load_worker_data(&self, data: &serde_json::Value, state: &mut State) {
+        super::overview::load_token_cost_accumulators(data, state);
+    }
 
     fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<crate::infra::tools::Verdict> {
         None

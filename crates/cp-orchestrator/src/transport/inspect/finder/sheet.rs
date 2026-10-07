@@ -222,7 +222,7 @@ fn build_row(
 /// empty string; everything else uses its natural textual form (numbers without
 /// a trailing `.0` where integral, via `Data`'s own `Display`).
 fn cell_to_string(cell: &Data) -> String {
-    cp_base::deref_match!(cell, {
+    cp_macros::deref_match!(cell, {
         Data::Empty => String::new(),
         Data::String(ref s) | Data::DateTimeIso(ref s) | Data::DurationIso(ref s) => s.clone(),
         // `f64`'s `Display` already omits a trailing `.0` for integral values

@@ -5,7 +5,19 @@
 
 /// Performance overlay adapter (F12 panel) — renders from IR snapshot.
 mod overlay;
+/// One-shot HTML loop-profile report (`--measure N` artifact).
+mod report;
+/// F12 overlay stacked share-bars (loop substep total/mean/std/max).
+mod share_bars;
+/// Per-operation snapshot math (lifetime + recent-ring stats).
+mod snapshot;
+/// Platform-specific process CPU/memory sampling.
+mod sys_stat;
+/// Plain-text dump of the perf snapshot (Ctrl+R clipboard copy).
+pub(crate) mod text;
 pub(crate) use overlay::render_perf_overlay_from_ir;
+use snapshot::compute_op_snapshot;
+use sys_stat::read_proc_stat;
 
 use crate::infra::constants::PERF_STATS_REFRESH_MS;
 use cp_base::cast::Safe as _;
@@ -73,6 +85,9 @@ pub(crate) struct OpStats {
     pub count: AtomicU64,
     /// Total time in microseconds
     pub total_us: AtomicU64,
+    /// Sum of squared sample times (µs²) — enables lifetime variance over ALL
+    /// samples (not just the 64-entry ring): `var = sumsq/n - mean²`.
+    pub sum_sq_us: AtomicU64,
     /// Maximum single execution time in microseconds
     pub max_us: AtomicU64,
     /// Recent samples ring buffer (microseconds)
@@ -84,6 +99,7 @@ impl Default for OpStats {
         Self {
             count: AtomicU64::new(0),
             total_us: AtomicU64::new(0),
+            sum_sq_us: AtomicU64::new(0),
             max_us: AtomicU64::new(0),
             samples: RwLock::new(RingBuffer::default()),
         }
@@ -120,6 +136,8 @@ pub(crate) struct PerfMetrics {
     pub open_fds: AtomicU32,
     /// Soft rlimit for NOFILE (set once at init, does not change)
     pub fd_limit_soft: AtomicU64,
+    /// Total main-loop iterations since boot (drives `--measure N` dump).
+    pub loop_count: AtomicU64,
 }
 
 impl Default for PerfMetrics {
@@ -140,96 +158,17 @@ impl Default for PerfMetrics {
             memory_bytes: AtomicU64::new(mem_bytes),
             open_fds: AtomicU32::new(0),
             fd_limit_soft: AtomicU64::new(rlimit::getrlimit(rlimit::Resource::NOFILE).map_or(0, |(soft, _)| soft)),
+            loop_count: AtomicU64::new(0),
         }
     }
 }
 
-/// Read CPU ticks and memory from /proc/self/stat and /proc/self/statm (Linux).
-#[cfg(target_os = "linux")]
-fn read_proc_stat() -> Option<(u64, u64)> {
-    // Read CPU ticks from /proc/self/stat
-    // Format: pid (comm) state ... utime stime ...
-    // Fields 14 and 15 (0-indexed: 13, 14) are utime and stime
-    let stat = std::fs::read_to_string("/proc/self/stat").ok()?;
-    let mut fields = stat.split_whitespace();
-    let utime: u64 = fields.nth(13)?.parse().ok()?;
-    let stime: u64 = fields.next()?.parse().ok()?;
-    let cpu_ticks = utime.saturating_add(stime);
-
-    // Read memory from /proc/self/statm (in pages)
-    // First field is total program size, second is RSS
-    let statm = std::fs::read_to_string("/proc/self/statm").ok()?;
-    let rss_pages: u64 = statm.split_whitespace().nth(1)?.parse().ok()?;
-    let page_size = 4096u64; // Standard page size
-    let mem_bytes = rss_pages.saturating_mul(page_size);
-
-    Some((cpu_ticks, mem_bytes))
-}
-
-/// Read CPU ticks (centiseconds) and memory (bytes) via `ps` (macOS).
-#[cfg(target_os = "macos")]
-fn read_proc_stat() -> Option<(u64, u64)> {
-    let pid = std::process::id();
-    let output =
-        std::process::Command::new("ps").args(["-o", "rss=,cputime=", "-p", &pid.to_string()]).output().ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    let text = String::from_utf8(output.stdout).ok()?;
-    let trimmed = text.trim();
-    let mut parts = trimmed.split_whitespace();
-    let rss_kb: u64 = parts.next()?.parse().ok()?;
-    let mem_bytes = rss_kb.saturating_mul(1024);
-    let cpu_centisecs = parse_ps_cputime(parts.next()?)?;
-    Some((cpu_centisecs, mem_bytes))
-}
-
-/// Parse `ps` cputime format (`H:MM:SS.cc` / `MM:SS.cc`) into centiseconds.
-#[cfg(target_os = "macos")]
-fn parse_ps_cputime(raw: &str) -> Option<u64> {
-    let (main_part, centis_str) = raw.rsplit_once('.')?;
-    let centis: u64 = centis_str.parse().ok()?;
-    let total_secs = parse_hms_secs(main_part)?;
-    Some(total_secs.saturating_mul(100).saturating_add(centis))
-}
-
-/// Parse a `SS` / `MM:SS` / `H:MM:SS` colon-separated duration into seconds.
-#[cfg(target_os = "macos")]
-fn parse_hms_secs(main_part: &str) -> Option<u64> {
-    let segments: Vec<&str> = main_part.split(':').collect();
-    match segments.len() {
-        1 => segments.first()?.parse().ok(),
-        2 => parse_ms_secs(&segments),
-        3 => parse_hms_triple(&segments),
-        _ => None,
-    }
-}
-
-/// Parse `[MM, SS]` colon segments into total seconds.
-#[cfg(target_os = "macos")]
-fn parse_ms_secs(segments: &[&str]) -> Option<u64> {
-    let mins: u64 = segments.first()?.parse().ok()?;
-    let secs: u64 = segments.get(1)?.parse().ok()?;
-    Some(mins.saturating_mul(60).saturating_add(secs))
-}
-
-/// Parse `[H, MM, SS]` colon segments into total seconds.
-#[cfg(target_os = "macos")]
-fn parse_hms_triple(segments: &[&str]) -> Option<u64> {
-    let hours: u64 = segments.first()?.parse().ok()?;
-    let mins: u64 = segments.get(1)?.parse().ok()?;
-    let secs: u64 = segments.get(2)?.parse().ok()?;
-    Some(hours.saturating_mul(3600).saturating_add(mins.saturating_mul(60)).saturating_add(secs))
-}
-
-/// Fallback for unsupported platforms — no CPU/memory data available.
-#[cfg(not(any(target_os = "linux", target_os = "macos")))]
-fn read_proc_stat() -> Option<(u64, u64)> {
-    None
-}
-
 /// Global performance metrics instance.
 pub(crate) static PERF: std::sync::LazyLock<PerfMetrics> = std::sync::LazyLock::new(PerfMetrics::default);
+
+/// Single-flight guard for the background CPU/RSS/FD sampler: at most one
+/// `perf-stats` thread alive, so a slow `ps` never stacks up workers.
+static STATS_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 
 impl PerfMetrics {
     /// Record operation timing
@@ -248,6 +187,9 @@ impl PerfMetrics {
         if let Some(stats) = ops.get(name) {
             let _r = stats.count.fetch_add(1, Ordering::Relaxed);
             let _r1 = stats.total_us.fetch_add(duration_us, Ordering::Relaxed);
+            // Saturating square keeps lifetime variance well-defined even on a
+            // pathological spike; realistic loop substeps never approach u64 range.
+            let _rsq = stats.sum_sq_us.fetch_add(duration_us.saturating_mul(duration_us), Ordering::Relaxed);
             let _r2 = stats.max_us.fetch_max(duration_us, Ordering::Relaxed);
             if let Ok(mut samples) = stats.samples.write() {
                 samples.push(duration_us);
@@ -278,10 +220,20 @@ impl PerfMetrics {
         // Check if stats need refresh (time-based, not frame-based)
         let last_refresh =
             self.frame_state.read().unwrap_or_else(std::sync::PoisonError::into_inner).last_stats_refresh;
-        if last_refresh.elapsed().as_millis() >= u128::from(PERF_STATS_REFRESH_MS) {
-            self.refresh_system_stats();
+        if last_refresh.elapsed().as_millis() >= u128::from(PERF_STATS_REFRESH_MS)
+            && !STATS_IN_FLIGHT.swap(true, Ordering::AcqRel)
+        {
             self.frame_state.write().unwrap_or_else(std::sync::PoisonError::into_inner).last_stats_refresh =
                 Instant::now();
+            // macOS samples via a `ps` fork+exec (ms-scale, 100ms+ tail):
+            // never on the render path. Results land in atomics the overlay reads.
+            let spawned = std::thread::Builder::new().name("perf-stats".to_owned()).spawn(|| {
+                PERF.refresh_system_stats();
+                STATS_IN_FLIGHT.store(false, Ordering::Release);
+            });
+            if spawned.is_err() {
+                STATS_IN_FLIGHT.store(false, Ordering::Release);
+            }
         }
     }
 
@@ -318,8 +270,9 @@ impl PerfMetrics {
 
     /// Get snapshot of metrics for display
     pub(crate) fn snapshot(&self) -> PerfSnapshot {
-        /// Type alias for raw operation data extracted under lock.
-        type RawOp = (&'static str, u64, Vec<u64>);
+        /// Type alias for raw operation data extracted under lock:
+        /// `(name, total_us, count, sum_sq_us, max_us, recent_samples)`.
+        type RawOp = (&'static str, u64, u64, u64, u64, Vec<u64>);
 
         // Extract frame data and release lock before processing ops
         let frame_samples: Vec<f64> = {
@@ -337,13 +290,31 @@ impl PerfMetrics {
                         .read()
                         .unwrap_or_else(std::sync::PoisonError::into_inner)
                         .recent(SAMPLE_RING_SIZE);
-                    (*name, stats.total_us.load(Ordering::Relaxed), recent)
+                    (
+                        *name,
+                        stats.total_us.load(Ordering::Relaxed),
+                        stats.count.load(Ordering::Relaxed),
+                        stats.sum_sq_us.load(Ordering::Relaxed),
+                        stats.max_us.load(Ordering::Relaxed),
+                        recent,
+                    )
                 })
                 .collect()
         };
 
-        let mut op_snapshots: Vec<OpSnapshot> =
-            raw_ops.iter().map(|entry| compute_op_snapshot(entry.0, entry.1, &entry.2)).collect();
+        let mut op_snapshots: Vec<OpSnapshot> = raw_ops
+            .iter()
+            .map(|entry| {
+                compute_op_snapshot(&OpRaw {
+                    name: entry.0,
+                    total_us: entry.1,
+                    count: entry.2,
+                    sum_sq_us: entry.3,
+                    max_us: entry.4,
+                    recent: &entry.5,
+                })
+            })
+            .collect();
 
         // Sort by total time descending (hotspots first)
         op_snapshots.sort_by(|a, b| b.total_ms.partial_cmp(&a.total_ms).unwrap_or(std::cmp::Ordering::Equal));
@@ -360,6 +331,7 @@ impl PerfMetrics {
             memory_mb: float_math::div_u64(self.memory_bytes.load(Ordering::Relaxed), 1_048_576.0f64),
             open_fds: self.open_fds.load(Ordering::Relaxed),
             fd_limit_soft: self.fd_limit_soft.load(Ordering::Relaxed),
+            loop_count: self.loop_count.load(Ordering::Relaxed),
         }
     }
 
@@ -381,35 +353,65 @@ impl PerfMetrics {
         }
         new_state
     }
+
+    /// `--measure` boot hook: force-enable monitoring when `CP_MEASURE_LOOPS`
+    /// is set, bypassing the F12 toggle so substep timings accumulate from the
+    /// first loop. No-op otherwise.
+    pub(crate) fn enable_if_measuring(&self) {
+        if Self::measure_target().is_none() {
+            return;
+        }
+        self.enabled.store(true, Ordering::Relaxed);
+        self.refresh_system_stats();
+    }
+
+    /// Increment the main-loop iteration counter and return the new count.
+    /// Called once per `App::run` loop iteration.
+    pub(crate) fn loop_tick(&self) -> u64 {
+        self.loop_count.fetch_add(1, Ordering::Relaxed).saturating_add(1)
+    }
+
+    /// `--measure N` target loop count, from `CP_MEASURE_LOOPS` (validated by
+    /// cp-env). `None` when zero/unset — measurement dump is disabled.
+    pub(crate) fn measure_target() -> Option<u64> {
+        let n = cp_env::env().dev.measure_loops;
+        (n > 0).then_some(n)
+    }
+
+    /// Per-iteration measurement hook for `--measure N`. Ticks the loop counter
+    /// and, exactly when it reaches the target, writes the HTML report. Returns
+    /// `true` once (at loop N) so the caller can exit the process cleanly;
+    /// otherwise `false`. A no-op when measurement is disabled.
+    pub(crate) fn tick_measure(&self) -> bool {
+        let Some(target) = Self::measure_target() else {
+            return false;
+        };
+        if self.loop_tick() != target {
+            return false;
+        }
+        match report::write_report(&self.snapshot()) {
+            Ok(path) => log::info!("[measure] wrote loop profile over {target} iterations -> {path}"),
+            Err(e) => log::error!("[measure] failed to write loop profile: {e}"),
+        }
+        true
+    }
 }
 
-/// Compute one operation's display snapshot (total/mean/std in ms) from its
-/// accumulated total and recent-sample ring. `recent` drives mean + std;
-/// std needs ≥2 samples (sample variance, `n-1` divisor).
-fn compute_op_snapshot(name: &'static str, total_us: u64, recent: &[u64]) -> OpSnapshot {
-    let count = recent.len();
-
-    let mean_us = if count > 0 { float_math::div(recent.iter().sum::<u64>().to_f64(), count.to_f64()) } else { 0.0f64 };
-
-    let std_us = if count > 1 {
-        let variance = float_math::div(
-            float_math::sum_iter(recent.iter().map(|&x| {
-                let diff = float_math::sub(x.to_f64(), mean_us);
-                float_math::mul(diff, diff)
-            })),
-            count.saturating_sub(1).to_f64(),
-        );
-        variance.sqrt()
-    } else {
-        0.0f64
-    };
-
-    OpSnapshot {
-        name,
-        total_ms: float_math::div_u64(total_us, 1000.0f64),
-        mean_ms: float_math::div(mean_us, 1000.0f64),
-        std_ms: float_math::div(std_us, 1000.0f64),
-    }
+/// One operation's raw lifetime counters plus its recent-sample ring, as
+/// extracted under lock (bundled to stay under the argument cap).
+struct OpRaw<'snap> {
+    /// Operation name.
+    name: &'static str,
+    /// Cumulative time (µs).
+    total_us: u64,
+    /// Lifetime sample count.
+    count: u64,
+    /// Sum of squared samples (µs²).
+    sum_sq_us: u64,
+    /// Lifetime maximum sample (µs).
+    max_us: u64,
+    /// Recent-sample ring contents (µs).
+    recent: &'snap [u64],
 }
 
 /// Snapshot of operation statistics for display.
@@ -421,8 +423,16 @@ pub(crate) struct OpSnapshot {
     pub total_ms: f64,
     /// Mean execution time in milliseconds.
     pub mean_ms: f64,
-    /// Standard deviation of execution time in milliseconds.
+    /// Standard deviation of execution time in milliseconds (recent ring).
     pub std_ms: f64,
+    /// Lifetime sample count.
+    pub count: u64,
+    /// Lifetime mean execution time in microseconds.
+    pub mean_us: f64,
+    /// Lifetime population variance in microseconds².
+    pub variance_us2: f64,
+    /// Lifetime maximum single execution time in microseconds.
+    pub max_us: f64,
 }
 
 /// Snapshot of all metrics for display.
@@ -444,4 +454,6 @@ pub(crate) struct PerfSnapshot {
     pub open_fds: u32,
     /// Soft rlimit for NOFILE.
     pub fd_limit_soft: u64,
+    /// Total main-loop iterations since boot.
+    pub loop_count: u64,
 }

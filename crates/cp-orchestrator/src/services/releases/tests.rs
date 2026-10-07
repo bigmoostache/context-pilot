@@ -1,3 +1,4 @@
+use super::channel::ChannelOps as _;
 use super::*;
 
 #[test]

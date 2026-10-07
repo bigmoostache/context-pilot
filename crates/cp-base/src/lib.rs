@@ -177,36 +177,38 @@ macro_rules! flame {
     };
 }
 
-/// Match a shared reference by dereferencing the place, funneling the one
-/// `ref`-binding suppression the workspace needs into a single audited site.
+/// Bridge from module crates to the binary's F12 perf profiler.
 ///
-/// `clippy::pattern_type_mismatch` (forbid) rejects matching a variant pattern
-/// against a `&Enum` via match ergonomics; its mandated fix is to dereference
-/// the scrutinee (`match *place`) and bind non-`Copy` fields with `ref`. But
-/// `clippy::ref_patterns` (also forbid) rejects `ref`. The two restriction
-/// lints are mutually exclusive for destructuring a non-`Copy` field out of a
-/// shared reference, so every such site routes through this macro — the single
-/// ref-pattern suppression inside it covers all expansions.
-///
-/// Enums whose matched fields are all `Copy` (or fieldless) need no `ref` and
-/// should use a plain `match *place` instead — this macro is only for the
-/// irreducible non-`Copy` case.
-///
-/// ```ignore
-/// deref_match!(self, {
-///     Self::Named(ref s) => write!(f, "{s}"),
-///     Self::Count(n)     => write!(f, "{n}"),
-/// })
-/// ```
+/// Module crates can't reach the binary's `profile!` guard, so the binary
+/// registers a span factory at startup ([`perf::set_hook`]); crates open spans
+/// with [`perf_span!`]. Before registration a span is a no-op.
+pub mod perf {
+    use std::sync::OnceLock;
+
+    /// Factory returning an RAII guard that records its lifetime on drop.
+    pub type Hook = fn(&'static str) -> Box<dyn core::any::Any>;
+
+    /// Registered span factory (set once by the binary).
+    static HOOK: OnceLock<Hook> = OnceLock::new();
+
+    /// Register the span factory. Later calls are ignored.
+    pub fn set_hook(hook: Hook) {
+        let _r = HOOK.set(hook);
+    }
+
+    /// Open a span named `leaf`; dropping the result closes it.
+    #[must_use]
+    pub fn span(leaf: &'static str) -> Option<Box<dyn core::any::Any>> {
+        HOOK.get().map(|hook| hook(leaf))
+    }
+}
+
+/// Open a perf span from a module crate (see [`perf`]). Bind it: `let _p = cp_base::perf_span!("x");`
 #[macro_export]
-macro_rules! deref_match {
-    ($place:expr, { $($arm:tt)* }) => {{
-        #[expect(
-            clippy::ref_patterns,
-            reason = "clippy::pattern_type_mismatch mandates ref bindings when destructuring non-Copy fields out of a shared reference; the two restriction lints are mutually exclusive, so the deref-plus-ref form is funneled through this one macro"
-        )]
-        match *$place { $($arm)* }
-    }};
+macro_rules! perf_span {
+    ($name:expr) => {
+        $crate::perf::span($name)
+    };
 }
 
 /// Module trait: tools, panels, lifecycle hooks for pluggable functionality.

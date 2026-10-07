@@ -4,12 +4,26 @@
 //! for the main binary's overlay renderer.  Stats are cached for
 //! 2 seconds to avoid hammering the local server from the render loop.
 
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use cp_base::state::runtime::State;
 
 use cp_base::cast::Safe as _;
 
 use super::api;
-use crate::types::{MeiliLiveStats, SearchOverlayInfo, SearchState};
+use crate::types::{MeiliLiveStats, SearchMetrics, SearchOverlayInfo, SearchState};
+
+/// Meilisearch process `(cpu %, rss bytes)` from the cached live stats.
+///
+/// Cheap per-frame accessor for the F12 overlay: unlike [`overlay_info`] it
+/// skips sorting the per-file maps. Kicks a background refresh when stale.
+#[must_use]
+pub(crate) fn process_stats(state: &State) -> Option<(f32, u64)> {
+    let ss = state.get_ext::<SearchState>()?;
+    refresh_live_stats(ss);
+    ss.metrics.lock().ok()?.live_stats.as_ref().map(|live| (live.meili_cpu_pct, live.meili_memory_bytes))
+}
 
 /// Read overlay information from the search module's state.
 ///
@@ -119,9 +133,9 @@ fn compute_cpu_pct(prev: Option<(u64, u64)>, cur_ticks: u64) -> f32 {
     float_math::percent(cpu_secs, wall_secs).to_f32()
 }
 
-/// Refresh cached live stats from Meilisearch if stale (>2s old).
+/// Kick a background refresh of the cached live stats if stale (>2s old).
 ///
-/// Makes HTTP calls (`/stats` + `/settings/embedders`) outside any lock.
+/// Never blocks: the HTTP calls run in [`fetch_live_stats`] on a worker thread.
 fn refresh_live_stats(ss: &SearchState) {
     if ss.persist.port == 0 {
         return;
@@ -136,20 +150,40 @@ fn refresh_live_stats(ss: &SearchState) {
         .ok()
         .is_none_or(|m| m.live_stats.as_ref().is_none_or(|s| now_ms.saturating_sub(s.fetched_at_ms) > 2000));
 
-    if !is_stale {
+    if !is_stale || REFRESH_IN_FLIGHT.swap(true, Ordering::AcqRel) {
         return;
     }
 
-    // Fetch live stats — no lock held during network I/O
-    let Ok(meili) = api::MeiliClient::new(ss.persist.port, &ss.persist.master_key) else {
+    let port = ss.persist.port;
+    let key = ss.persist.master_key.clone();
+    let hash = ss.persist.project_hash.clone();
+    let metrics = std::sync::Arc::clone(&ss.metrics);
+    let spawned = std::thread::Builder::new().name("meili-live-stats".into()).spawn(move || {
+        fetch_live_stats(port, &key, &hash, &metrics);
+        REFRESH_IN_FLIGHT.store(false, Ordering::Release);
+    });
+    if spawned.is_err() {
+        REFRESH_IN_FLIGHT.store(false, Ordering::Release);
+    }
+}
+
+/// Guards [`refresh_live_stats`] so at most one background fetch runs.
+static REFRESH_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
+
+/// Blocking fetch of Meilisearch stats + process stats into the shared cache.
+///
+/// Runs on a background thread: the 4 HTTP calls can take >1 s while Meili
+/// indexes, which froze the render loop when done inline (F12/Ctrl+I open).
+fn fetch_live_stats(port: u16, master_key: &str, project_hash: &str, metrics: &Mutex<SearchMetrics>) {
+    let Ok(meili) = api::MeiliClient::new(port, master_key) else {
         return;
     };
     let Ok(stats) = meili.global_stats() else {
         return;
     };
 
-    let files_uid = format!("cp_{}_files", ss.persist.project_hash);
-    let logs_uid = format!("cp_{}_logs", ss.persist.project_hash);
+    let files_uid = format!("cp_{project_hash}_files");
+    let logs_uid = format!("cp_{project_hash}_logs");
 
     // Read embedding model name from embedder settings (cached alongside stats)
     let model = meili
@@ -174,7 +208,7 @@ fn refresh_live_stats(ss: &SearchState) {
 
     // Compute CPU% from tick delta vs previous refresh
     let prev_ticks =
-        ss.metrics.lock().ok().and_then(|m| m.live_stats.as_ref().map(|s| (s.meili_cpu_ticks, s.fetched_at_ms)));
+        metrics.lock().ok().and_then(|m| m.live_stats.as_ref().map(|s| (s.meili_cpu_ticks, s.fetched_at_ms)));
     let meili_cpu_pct = compute_cpu_pct(prev_ticks, meili_cpu_ticks);
 
     let live = MeiliLiveStats {
@@ -198,7 +232,7 @@ fn refresh_live_stats(ss: &SearchState) {
     };
 
     // Write to cache (lock held briefly)
-    if let Ok(mut m) = ss.metrics.lock() {
+    if let Ok(mut m) = metrics.lock() {
         m.live_stats = Some(live);
     }
 }

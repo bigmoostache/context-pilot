@@ -7,7 +7,10 @@
 //! the content-addressed body store first (the I13 body-before-reference
 //! barrier).
 
+use std::cell::Cell;
 use std::collections::HashMap;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash as _, Hasher as _};
 
 use cp_base::state::runtime::State;
 use cp_mod_bridge::BridgeState;
@@ -173,9 +176,7 @@ const fn wire_task_status(status: TodoStatus) -> Option<WireTaskStatus> {
 /// aside renders: the thread's own items **sorted by sibling order** (YAML-diff
 /// rework — the backend's `order` int is the single source of truth for sibling
 /// order), cancelled excluded, nesting expressed via [`WireTask::parent_id`].
-fn project_thread_tasks(todos: &TodoState, thread_id: &str) -> Vec<WireTask> {
-    let mut items: Vec<&cp_mod_todo::types::TodoItem> =
-        todos.todos.iter().filter(|t| t.thread_id == thread_id).collect();
+fn project_thread_tasks(mut items: Vec<&cp_mod_todo::types::TodoItem>) -> Vec<WireTask> {
     // Sort by (order, id): within each parent group this yields ascending order,
     // which is all the frontend needs to render siblings correctly (it groups by
     // parent_id and preserves encounter order).
@@ -204,19 +205,9 @@ fn project_thread_tasks(todos: &TodoState, thread_id: &str) -> Vec<WireTask> {
 /// disk↔oplog divergence. Returns an empty map when the bridge is OFF or the
 /// replay fails.
 fn oplog_roster_tasks(state: &State) -> HashMap<String, Vec<WireTask>> {
-    let Some(bs) = state.get_ext::<BridgeState>() else {
-        return HashMap::new();
-    };
-    let Some(boot) = bs.boot.as_ref() else {
-        return HashMap::new();
-    };
-    match cp_oplog::replay::replay(&boot.entry().oplog_path) {
-        Ok(recovered) => recovered.roster.into_iter().map(|t| (t.thread_id, t.tasks)).collect(),
-        Err(e) => {
-            log::warn!("bridge: oplog replay for task seed failed: {e:?}");
-            HashMap::new()
-        }
-    }
+    super::oplog_roster(state)
+        .map(|r| r.iter().map(|t| (t.thread_id.clone(), t.tasks.clone())).collect())
+        .unwrap_or_default()
 }
 
 /// First pass after (re)boot: seed the task memo from the oplog roster (what the
@@ -242,10 +233,15 @@ fn collect_task_changes(app: &App) -> Vec<(String, Vec<WireTask>)> {
     let todos = TodoState::get(&app.state);
     let memo = &app.state.ext::<BridgeState>().thread_tasks;
     let empty: Vec<WireTask> = Vec::new();
+    // One pass over the todos instead of one per thread.
+    let mut by_thread: HashMap<&str, Vec<&cp_mod_todo::types::TodoItem>> = HashMap::new();
+    for t in &todos.todos {
+        by_thread.entry(t.thread_id.as_str()).or_default().push(t);
+    }
     ts.threads
         .iter()
         .filter_map(|t| {
-            let live = project_thread_tasks(todos, &t.id);
+            let live = project_thread_tasks(by_thread.remove(t.id.as_str()).unwrap_or_default());
             (memo.get(&t.id).unwrap_or(&empty) != &live).then(|| (t.id.clone(), live))
         })
         .collect()
@@ -272,12 +268,55 @@ pub(in crate::app::run) fn emit_task_lists(app: &mut App) {
 
     seed_tasks_memo_if_needed(app);
 
+    // Inputs unchanged since the last full diff ⇒ memo already equals every
+    // live projection: skip the O(threads × todos) rebuild entirely.
+    let hash = tasks_input_hash(app);
+    if TASKS_INPUT_HASH.get() == Some(hash) {
+        return;
+    }
+
     for (thread_id, tasks) in collect_task_changes(app) {
         emit_roster_delta(
             &app.state,
             OpEntryKind::TaskListChanged { thread_id: thread_id.clone(), tasks: tasks.clone() },
         );
         let _prev = app.state.ext_mut::<BridgeState>().thread_tasks.insert(thread_id, tasks);
+    }
+    TASKS_INPUT_HASH.set(Some(hash));
+}
+
+thread_local! {
+    /// Input hash at the last full task diff (`None` until the first one).
+    /// Main-loop only, so a thread-local is sound; a reload resets it, which
+    /// just forces one full diff.
+    static TASKS_INPUT_HASH: Cell<Option<u64>> = const { Cell::new(None) };
+    /// Input hash at the last full note diff (see [`TASKS_INPUT_HASH`]).
+    static NOTES_INPUT_HASH: Cell<Option<u64>> = const { Cell::new(None) };
+}
+
+/// Skip key for [`collect_task_changes`]: the todo change stamp plus the thread
+/// id set. Equal key ⇒ no thread's task list can differ. O(threads), never
+/// touches todo content.
+fn tasks_input_hash(app: &App) -> u64 {
+    let mut h = DefaultHasher::new();
+    TodoState::get(&app.state).revision.hash(&mut h);
+    hash_thread_ids(app, &mut h);
+    h.finish()
+}
+
+/// Skip key for [`collect_note_changes`]: the scratchpad change stamp plus the
+/// thread id set. Equal key ⇒ no thread's note list can differ.
+fn notes_input_hash(app: &App) -> u64 {
+    let mut h = DefaultHasher::new();
+    ScratchpadState::get(&app.state).revision.hash(&mut h);
+    hash_thread_ids(app, &mut h);
+    h.finish()
+}
+
+/// Feed every thread id into `h` (thread create/delete changes the diff set).
+fn hash_thread_ids(app: &App, h: &mut DefaultHasher) {
+    for t in &ThreadsState::get(&app.state).threads {
+        t.id.hash(h);
     }
 }
 
@@ -287,11 +326,9 @@ pub(in crate::app::run) fn emit_task_lists(app: &mut App) {
 /// web Notes aside renders: the thread's own cells in creation order (the
 /// `scratchpad_cells` Vec is already ordered by creation), each mapped to its
 /// `id`/`title`/`content`. The twin of [`project_thread_tasks`].
-fn project_thread_notes(scratchpad: &ScratchpadState, thread_id: &str) -> Vec<WireNote> {
-    scratchpad
-        .scratchpad_cells
-        .iter()
-        .filter(|c| c.thread_id == thread_id)
+fn project_thread_notes(cells: Vec<&cp_mod_scratchpad::types::ScratchpadCell>) -> Vec<WireNote> {
+    cells
+        .into_iter()
         .map(|c| WireNote { id: c.id.clone(), title: c.title.clone(), content: c.content.clone() })
         .collect()
 }
@@ -303,19 +340,9 @@ fn project_thread_notes(scratchpad: &ScratchpadState, thread_id: &str) -> Vec<Wi
 /// the bridge was down but was never journaled. Empty map when the bridge is OFF
 /// or the replay fails.
 fn oplog_roster_notes(state: &State) -> HashMap<String, Vec<WireNote>> {
-    let Some(bs) = state.get_ext::<BridgeState>() else {
-        return HashMap::new();
-    };
-    let Some(boot) = bs.boot.as_ref() else {
-        return HashMap::new();
-    };
-    match cp_oplog::replay::replay(&boot.entry().oplog_path) {
-        Ok(recovered) => recovered.roster.into_iter().map(|t| (t.thread_id, t.notes)).collect(),
-        Err(e) => {
-            log::warn!("bridge: oplog replay for note seed failed: {e:?}");
-            HashMap::new()
-        }
-    }
+    super::oplog_roster(state)
+        .map(|r| r.iter().map(|t| (t.thread_id.clone(), t.notes.clone())).collect())
+        .unwrap_or_default()
 }
 
 /// First pass after (re)boot: seed the note memo from the oplog roster (what the
@@ -342,10 +369,14 @@ fn collect_note_changes(app: &App) -> Vec<(String, Vec<WireNote>)> {
     let scratchpad = ScratchpadState::get(&app.state);
     let memo = &app.state.ext::<BridgeState>().thread_notes;
     let empty: Vec<WireNote> = Vec::new();
+    let mut by_thread: HashMap<&str, Vec<&cp_mod_scratchpad::types::ScratchpadCell>> = HashMap::new();
+    for c in &scratchpad.scratchpad_cells {
+        by_thread.entry(c.thread_id.as_str()).or_default().push(c);
+    }
     ts.threads
         .iter()
         .filter_map(|t| {
-            let live = project_thread_notes(scratchpad, &t.id);
+            let live = project_thread_notes(by_thread.remove(t.id.as_str()).unwrap_or_default());
             (memo.get(&t.id).unwrap_or(&empty) != &live).then(|| (t.id.clone(), live))
         })
         .collect()
@@ -368,8 +399,14 @@ pub(in crate::app::run) fn emit_notes(app: &mut App) {
 
     seed_notes_memo_if_needed(app);
 
+    let hash = notes_input_hash(app);
+    if NOTES_INPUT_HASH.get() == Some(hash) {
+        return;
+    }
+
     for (thread_id, notes) in collect_note_changes(app) {
         emit_roster_delta(&app.state, OpEntryKind::NotesChanged { thread_id: thread_id.clone(), notes: notes.clone() });
         let _prev = app.state.ext_mut::<BridgeState>().thread_notes.insert(thread_id, notes);
     }
+    NOTES_INPUT_HASH.set(Some(hash));
 }

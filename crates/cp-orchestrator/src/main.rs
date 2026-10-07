@@ -18,6 +18,7 @@ use calamine as _;
 use cp_base as _;
 use cp_env::model::features::Feature;
 use cp_env::spec::Target;
+use cp_macros as _;
 #[cfg(test)]
 use cp_mod_bridge as _;
 use cp_mod_utilities as _;

@@ -211,12 +211,11 @@ fn raise_fd_limit() {
 
 use crossterm::{
     ExecutableCommand as _,
-    event::{DisableBracketedPaste, EnableBracketedPaste},
+    event::{DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste},
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 
 use app::{App, ensure_default_agent, ensure_default_contexts};
-use infra::api::StreamEvent;
 use state::cache::CacheUpdate;
 use state::persistence::{
     boot_assemble_state, boot_extract_module_data, boot_init_modules, boot_load_config, boot_load_messages,
@@ -232,6 +231,8 @@ fn install_panic_hook() {
     std::panic::set_hook(Box::new(move |info| {
         let _r_raw = disable_raw_mode();
         let _r_paste = io::stdout().execute(DisableBracketedPaste);
+        let _r_mouse = io::stdout().execute(DisableMouseCapture);
+        let _r_altscroll = io::stdout().write_all(b"\x1b[?1007h");
         let _r_screen = io::stdout().execute(LeaveAlternateScreen);
 
         let error_dir = std::path::Path::new(".context-pilot").join("errors");
@@ -257,6 +258,8 @@ fn install_panic_hook() {
 fn teardown_and_maybe_reexec(reload_pending: bool) {
     let _r_raw_off = disable_raw_mode();
     let _r_paste_off = io::stdout().execute(DisableBracketedPaste);
+    let _r_mouse_off = io::stdout().execute(DisableMouseCapture);
+    let _r_altscroll_on = io::stdout().write_all(b"\x1b[?1007h");
     let _r_leave = io::stdout().execute(LeaveAlternateScreen);
     infra::flame::flush();
 
@@ -397,6 +400,7 @@ fn main() -> ExitCode {
     init_file_logger();
     raise_fd_limit();
     infra::flame::init();
+    cp_base::perf::set_hook(|leaf| Box::new(infra::profiler::ProfileGuard::new(leaf)));
 
     let resume_stream = args.iter().any(|a| a == "--resume-stream");
 
@@ -415,6 +419,23 @@ fn main() -> ExitCode {
     };
     let _r_enter = io::stdout().execute(EnterAlternateScreen);
     let _r_paste_on = io::stdout().execute(EnableBracketedPaste);
+    // Capture mouse so the wheel arrives as distinct `Event::Mouse(ScrollUp/Down)`
+    // rather than being folded into Up/Down arrow keys by the terminal's
+    // alternate-scroll mode — lets the threads list keep arrows for selection
+    // while the wheel scrolls the selected thread's conversation history.
+    // Button tracking (1000) + SGR encoding (1006) only — NOT crossterm's
+    // EnableMouseCapture, which also turns on any-motion tracking (1003) and
+    // floods the loop with an event per mouse move. The wheel still arrives
+    // as ScrollUp/Down; DisableMouseCapture on teardown resets all modes.
+    let _r_mouse_on = io::stdout().write_all(b"\x1b[?1000h\x1b[?1006h");
+    // Explicitly DISABLE alternate-scroll mode (DECSET 1007). Mouse capture
+    // alone does not reset it, and some terminals keep translating the wheel
+    // into Up/Down arrow keys even with tracking on — which leaked through as
+    // thread-list selection ("wheel-down at the bottom sometimes selects a
+    // thread"). With 1007 off, the wheel is ALWAYS an SGR mouse event, never an
+    // arrow key, so selection stays exclusively on the real arrow keys.
+    let _r_altscroll_off = io::stdout().write_all(b"\x1b[?1007l");
+    let _r_altscroll_flush = io::stdout().flush();
     let Ok(mut terminal) = Terminal::new(CrosstermBackend::new(io::stdout())) else {
         let _r_cleanup = disable_raw_mode();
         drop(writeln!(io::stderr(), "Fatal: failed to create terminal"));
@@ -437,12 +458,11 @@ fn main() -> ExitCode {
     let state = boot_app_state(&mut terminal, &mut steps);
 
     // Create channels
-    let (tx, rx) = mpsc::channel::<StreamEvent>();
     let (cache_tx, cache_rx) = mpsc::channel::<CacheUpdate>();
 
     // Create and run app
     let mut app = App::new(state, cache_tx, resume_stream);
-    let ch = app::run::lifecycle::EventChannels { tx: &tx, rx: &rx, cache_rx: &cache_rx };
+    let ch = app::run::lifecycle::EventChannels { cache_rx: &cache_rx };
     let run_result = app.run(&mut terminal, &ch);
 
     // Cleanup + self-restart on reload (see helper).

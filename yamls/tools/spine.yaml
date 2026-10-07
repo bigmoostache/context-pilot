@@ -7,11 +7,8 @@ tools:
 
   spine_configure:
     description: |
-      Configures the spine module's auto-continuation behavior and guard rail limits. All parameters are optional — only provided values are changed. Guard rail limits accept null to disable.
+      Configures the spine module's auto-continuation guard rail. The only limit is max_auto_retries (consecutive auto-continuations without human input). It is optional — only provided values are changed. Pass null to disable.
     parameters:
-      max_output_tokens: "Guard rail: max total output tokens before blocking. Null to disable."
-      max_duration_secs: "Guard rail: max autonomous duration in seconds. Null to disable."
-      max_messages: "Guard rail: max conversation messages before blocking. Null to disable."
       max_auto_retries: "Guard rail: max consecutive auto-continuations without human input. Null to disable."
       reset_counters: "Reset runtime counters (auto_continuation_count, autonomous_start_ms)"
 

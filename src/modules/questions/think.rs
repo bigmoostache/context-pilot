@@ -50,8 +50,8 @@ impl Default for ThinkState {
 /// tells the model how many thoughts it has chained, nudging it to
 /// keep going if it judges further deliberation useful.
 pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
-    if tool.input.get("thought_body").and_then(serde_json::Value::as_str).is_none_or(|s| s.trim().is_empty()) {
-        return ToolResult::new(tool.id.clone(), "Missing or empty 'thought_body' parameter".to_owned(), true);
+    if tool.input.get("plan").and_then(serde_json::Value::as_str).is_none_or(|s| s.trim().is_empty()) {
+        return ToolResult::new(tool.id.clone(), "Missing or empty 'plan' parameter".to_owned(), true);
     }
 
     if tool.input.get("task_context").and_then(serde_json::Value::as_str).is_none_or(|s| s.trim().is_empty()) {
@@ -65,20 +65,19 @@ pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Bring counter to at least 1, then increment from there
-    let count = {
+    {
         let ts = state.ext_mut::<ThinkState>();
         ts.consecutive_count = ts.consecutive_count.saturating_add(1).max(1i32);
         // Reset notification schedule since we're thinking again
         ts.next_notification_at = ts.reminder_threshold;
-        ts.consecutive_count
-    };
+    }
 
-    let status = format!(
-        "Thought {count} in a row — keep going if useful; thinking is cheap and sharpens your output.\n\n\
+    // Neutral wording: "think more / thinking is cheap" phrasing in this result
+    // triggered Opus 5.5 `stop_reason: refusal` (T772, 0/5 refusals once removed).
+    let status = "Plan recorded.\n\n\
          Now update your Todo roadmap before acting (mark done/in-progress, prune, add sub-items). \
-         It matters: planning sharpens you, it feeds the user's progress UI, and it lets you pass \
-         accurate 'task_id' values."
-    );
+         It matters: it feeds the user's progress UI and lets you pass accurate 'task_id' values."
+        .to_owned();
 
     let mut result = ToolResult::new(tool.id.clone(), status, false);
     result.preserves_tempo = true;
@@ -94,7 +93,11 @@ pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
 /// preserved** (FR8): `touch_panel` marks it stale so the fresh tree emits at
 /// tempo exhaustion, never forced immediately.
 fn apply_todo_upsert(items_val: &serde_json::Value, state: &mut State) -> Result<String, String> {
-    let Some(tid) = cp_mod_threads::types::FocusState::get(state).focused_thread_id.clone() else {
+    let Some(tid) = state
+        .resident_thread_id
+        .clone()
+        .or_else(|| cp_mod_threads::types::FocusState::get(state).focused_thread_id.clone())
+    else {
         return Err("no focused thread (tasks must live in a thread; Read a thread first).".to_owned());
     };
     let items = cp_mod_todo::upsert::parse_items(items_val)?;

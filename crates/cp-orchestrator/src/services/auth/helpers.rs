@@ -53,17 +53,3 @@ pub(super) fn format_uuid(bytes: &[u8; 16]) -> String {
 pub(super) fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |dur| u64::try_from(dur.as_millis()).unwrap_or(u64::MAX))
 }
-
-#[expect(
-    clippy::multiple_inherent_impl,
-    reason = "AuthStore's inherent methods are split across db.rs, helpers.rs, and acl.rs to respect the 500-line file cap; folding them into one impl block would push a file over the limit"
-)]
-impl super::db::AuthStore {
-    /// The auth database path — `CP_AUTH_DB`, else
-    /// `~/.context-pilot/orchestrator/auth.db`, as validated at boot
-    /// (`runtime::Config` and the transport both read it here).
-    #[must_use]
-    pub fn default_db_path() -> std::path::PathBuf {
-        cp_env::env().auth.db_path.clone()
-    }
-}

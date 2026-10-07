@@ -64,7 +64,18 @@ pub(crate) fn refresh_all_panels(state: &mut State) {
     let context_types: Vec<Kind> = state.context.iter().map(|c| c.context_type.clone()).collect();
 
     for context_type in &context_types {
-        let panel = get_panel(context_type);
+        // `get_panel` rebuilds every module (`all_modules()`) per lookup, so it
+        // gets its own sibling row to separate dispatch cost from refresh cost.
+        let panel = {
+            let _guard = crate::profile!("get_panel");
+            get_panel(context_type)
+        };
+        // One perf row per panel kind (`<parent>.refresh_<kind>`), so the cost
+        // of a full refresh can be attributed. Interning only when monitoring.
+        let _guard = crate::ui::perf::PERF
+            .enabled
+            .load(std::sync::atomic::Ordering::Relaxed)
+            .then(|| crate::profile!(crate::infra::profiler::intern(format!("refresh_{}", context_type.as_str()))));
         panel.refresh(state);
     }
 }

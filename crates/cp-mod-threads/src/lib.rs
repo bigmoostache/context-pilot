@@ -9,16 +9,21 @@
 
 /// Send-time validation of agent-authored ` ```form ` blocks.
 mod forms;
+/// Incoming-message behavior for the focused thread (idle auto-read + streaming push).
+pub mod incoming;
 /// Panel rendering for the thread list.
 mod panel;
 /// Tool execution handlers: `Send` and `Read`.
 pub mod tools;
 /// Thread state types: `Thread`, `ThreadMessage`, `ThreadsState`, `FocusState`.
 pub mod types;
+/// Display-only mirror of per-thread execution state (see the module docs).
+pub mod view_state;
 /// Persistent watcher: fires a notification when idle + `MY_TURN` thread exists.
 pub mod watcher;
 
 use types::{FocusState, ThreadsState};
+use view_state::FleetExecMirror;
 
 use serde_json::json;
 
@@ -68,29 +73,53 @@ impl Module for ThreadsModule {
 
     fn init_state(&self, state: &mut State) {
         state.set_ext(ThreadsState::new());
-        state.set_ext(FocusState::new());
+        // FocusState is UI-global: "which thread the human is looking at" is one
+        // singleton pointer, NOT per-thread state. set_ext_global pins it to the
+        // shared map so it never rides the resident-thread swap (`ThreadRuntime`).
+        state.set_ext_global(FocusState::new());
+        // FleetExecMirror describes EVERY thread, so it too must be shared — a
+        // per-thread copy would only ever hold that thread's own state. It is
+        // runtime-only (rebuilt from the fleet registry on the first tick after
+        // boot), hence no save/load arm.
+        state.set_ext_global(FleetExecMirror::new());
     }
 
     fn reset_state(&self, state: &mut State) {
         state.set_ext(ThreadsState::new());
-        state.set_ext(FocusState::new());
+        state.set_ext_global(FocusState::new());
+        state.set_ext_global(FleetExecMirror::new());
     }
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         let ts = ThreadsState::get(state);
+        // `focus_file` records which thread's `states/<id>.json` holds the
+        // focused context. It cannot live in that file (boot needs it to
+        // choose the file), so it is written here, in the shared config, in the
+        // same save as the keyed write — the two land together or the boot-side
+        // fallback covers the gap.
+        let focus_file = FocusState::get(state).focused_thread_id.clone().unwrap_or_default();
+        // Messages are NOT serialized here: they live in `threads/<id>.json`,
+        // written by the save batch only for threads that changed.
+        let threads: Vec<types::persist::ThreadMeta<'_>> = ts.threads.iter().map(Into::into).collect();
         json!({
-            "threads": ts.threads,
+            "threads": threads,
             "next_id": ts.next_id,
             "panel_content": ts.panel_content,
+            "focus_file": focus_file,
         })
     }
 
+    // Deliberately ignores `focus_file`: it is a boot-time *pointer* consumed
+    // by `persistence::boot_load_config` before this module is even initialised,
+    // never module state. Rehydrating it into a `FocusState` field would be
+    // circular — the focus it names is what that field holds.
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         let ts = ThreadsState::get_mut(state);
         if let Some(arr) = data.get("threads")
             && let Ok(v) = serde_json::from_value(arr.clone())
         {
             ts.threads = v;
+            types::persist::load_thread_messages(&mut ts.threads);
         }
         if let Some(v) = data.get("next_id").and_then(serde_json::Value::as_u64) {
             ts.next_id = v.to_u32();
@@ -113,7 +142,8 @@ impl Module for ThreadsModule {
 
     fn load_worker_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Ok(fs) = serde_json::from_value::<FocusState>(data.clone()) {
-            state.set_ext(fs);
+            // UI-global (see init_state): pin to the shared map, never swapped.
+            state.set_ext_global(fs);
         }
     }
 
@@ -139,32 +169,23 @@ impl Module for ThreadsModule {
                 .short_desc("Post message to thread")
                 .category("Threads")
                 .reverie_allowed(false)
-                .param("thread_id", ParamType::String, true)
                 .param("markdown", ParamType::String, false)
                 .param("file_path", ParamType::String, false)
                 .param("still_my_turn", ParamType::Boolean, false)
                 .build(),
             ToolDefinition::from_yaml("Read", t)
-                .short_desc("Read thread messages")
+                .short_desc("Refresh the Threads panel")
                 .category("Threads")
                 .reverie_allowed(false)
-                .param("thread_id", ParamType::String, true)
                 .build(),
         ]
     }
 
     fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
         let mut pf = Verdict::new();
-        let tool_name = tool.name.as_str();
-        let ts = ThreadsState::get(state);
-        let fs = FocusState::get(state);
 
-        check_focus_enforcement(tool_name, ts, fs, &mut pf);
-
-        match tool_name {
-            "Send" => preflight_send(tool, ts, &mut pf),
-            "Read" => preflight_read(tool, ts, fs, &mut pf),
-            _ => {}
+        if tool.name.as_str() == "Send" {
+            preflight_send(tool, state, &mut pf);
         }
 
         if pf.errors.is_empty() && pf.warnings.is_empty() { None } else { Some(pf) }
@@ -234,18 +255,7 @@ impl Module for ThreadsModule {
 
     fn on_stream_chunk(&self, _text: &str, _state: &mut State) {}
     fn on_tool_progress(&self, _tool_name: &str, _input_so_far: &str, _state: &mut State) {}
-    fn on_tool_complete(&self, _tool_name: &str, state: &mut State) {
-        let has_my_turn = ThreadsState::get(state).has_my_turn_threads();
-        let fs = FocusState::get_mut(state);
-
-        // Escalation: bump on every tool completion while unfocused with a
-        // MY_TURN thread pending. Only exempt tools (Think) get this far —
-        // everything else is blocked in pre-flight — so repeated stalling
-        // drives the escalation level up.
-        if fs.focused_thread_id.is_none() && has_my_turn {
-            fs.escalation_level = fs.escalation_level.saturating_add(1);
-        }
-    }
+    fn on_tool_complete(&self, _tool_name: &str, _state: &mut State) {}
     fn watch_paths(&self, _state: &State) -> Vec<cp_base::panels::WatchSpec> {
         vec![]
     }
@@ -262,31 +272,18 @@ impl Module for ThreadsModule {
     }
 }
 
-/// Focus enforcement shared by all tools: when `MY_TURN` threads exist and the
-/// AI is unfocused, block the tool with a message whose tone follows the
-/// escalation level. Exempt tools: Think (reasoning), Read (how you claim focus).
+/// Pre-flight for `Send`: the calling thread must exist, at least one content
+/// param, and any agent-authored ` ```form ` block must be well-formed (design
+/// doc §7).
 ///
-/// There is no grace period: `Send` keeps focus on the thread it replied to
-/// (T683), so the agent is only ever unfocused at boot or after its focused
-/// thread is archived/deleted — and then it must `Read` before acting.
-fn check_focus_enforcement(tool_name: &str, ts: &ThreadsState, fs: &FocusState, pf: &mut Verdict) {
-    let is_focus_exempt = matches!(tool_name, "Think" | "Read");
-    if is_focus_exempt || !ts.has_my_turn_threads() || fs.focused_thread_id.is_some() {
-        return;
-    }
-    pf.errors.push(escalation_message(fs.escalation_level));
-}
-
-/// Pre-flight for `Send`: thread must exist, at least one content param, and
-/// any agent-authored ` ```form ` block must be well-formed (design doc §7).
-///
+/// `Send` always targets the caller's own (resident) thread — there is no
+/// target parameter, so a thread can never post into another thread's voice.
 /// Sending to a `THEIR_TURN` thread is allowed — the AI may post follow-ups
 /// without waiting; status simply stays `THEIR_TURN`.
-fn preflight_send(tool: &ToolUse, ts: &ThreadsState, pf: &mut Verdict) {
-    if let Some(tid) = tool.input.get("thread_id").and_then(|v| v.as_str())
-        && !ts.threads.iter().any(|t| t.id == tid)
-    {
-        pf.errors.push(format!("Thread '{tid}' not found"));
+fn preflight_send(tool: &ToolUse, state: &State, pf: &mut Verdict) {
+    let tid = tools::resident_thread_id(state);
+    if !ThreadsState::get(state).threads.iter().any(|t| t.id == tid) {
+        pf.errors.push(format!("Send has no owning thread (resident thread '{tid}' not found)"));
     }
     let markdown = tool.input.get("markdown").and_then(|v| v.as_str());
     let has_markdown = markdown.is_some_and(|s| !s.is_empty());
@@ -298,41 +295,5 @@ fn preflight_send(tool: &ToolUse, ts: &ThreadsState, pf: &mut Verdict) {
         for err in forms::validate_form_blocks(md) {
             pf.errors.push(err);
         }
-    }
-}
-
-/// Pre-flight for `Read`: thread must exist; a paused thread cannot be read
-/// unless it is already focused.
-fn preflight_read(tool: &ToolUse, ts: &ThreadsState, fs: &FocusState, pf: &mut Verdict) {
-    let Some(tid) = tool.input.get("thread_id").and_then(|v| v.as_str()) else {
-        return;
-    };
-    let Some(thread) = ts.threads.iter().find(|t| t.id == tid) else {
-        pf.errors.push(format!("Thread '{tid}' not found"));
-        return;
-    };
-    if thread.paused && fs.focused_thread_id.as_deref() != Some(tid) {
-        pf.errors.push(format!(
-            "Thread '{tid}' is paused. Cannot read a paused thread \
-             unless it is already focused. Unpause it first."
-        ));
-    }
-}
-
-/// Returns the focus-enforcement message for the given escalation level.
-///
-/// - 0–5: polite reminder
-/// - 6–15: firm instruction
-/// - 16–29: aggressive demand
-/// - 30+: nuclear (with level number)
-fn escalation_message(level: u32) -> String {
-    match level {
-        0..=5 => "\u{1f9f5} Please focus on an available thread using Read.".to_owned(),
-        6..=15 => "\u{1f9f5} You MUST focus on a thread. Use Read(thread_id) now.".to_owned(),
-        16..=29 => "\u{1f9f5} STOP. Focus on a thread immediately. Use Read(thread_id).".to_owned(),
-        _ => format!(
-            "🧵 FOCUS. ON. A. THREAD. NOW. Read(thread_id). \
-             (escalation level {level})"
-        ),
     }
 }

@@ -8392,3 +8392,639 @@ index 4ba7d008..7774364b 100755
  # ── 1 + 2: web/src tree — ≤500 lines/file, ≤8 entries/dir ────────────────────
  # (former check-web-structure.sh). shadcn ui/ + generated OpenAPI client exempt.
 # --- End entry #99 ---
+100:24952dc89a72296a99ba76edb2456fb70d78ba4d57269e8c27344e0f74df3ff8:11da9f90d23bc59097d16691c33807bef6b8f0987fb1a0eb9a6566b4f5800c25:13fb07565a846f10796c2e101100a104eaf92e2b104a9f6b336efbf0fffea3a0
+# --- Diff for entry #100 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index 29c4ff47..8395be37 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,5 +1,5 @@
+ [workspace]
+-members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-threads", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities", "crates/cp-vault", "crates/cp-env"]
++members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-fleet", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-threads", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities", "crates/cp-vault", "crates/cp-env"]
+ 
+ [workspace.package]
+ version = "0.2.13"
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 759e4bbe..8c15a4d4 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -194,6 +194,19 @@ exceptions:
+       Could merge all impl blocks into a single file, but that would
+       create a 2500+ line file. The split is intentional for navigation.
+ 
++  - path: "crates/cp-base/src/state/runtime/ext.rs"
++    match: "State methods split across runtime/ submodules to respect the 500-line file cap"
++    reason: >
++      State's inherent methods are split across runtime/mod.rs (the aggregate
++      struct + boot builders + message creation) and the sibling ext.rs (the
++      module extension-data accessors: get_ext/ext/set_ext/set_ext_global/
++      set_ext_thread/set_init_scope). mod.rs sits near the 500-line file cap;
++      folding the accessors back in would push it over. clippy::multiple_inherent_impl
++      (deny) fires on the second block (ext.rs), so it carries the #[expect].
++    strategy: >
++      Irreducible under the 500-line file cap — the two impl blocks are the honest
++      shape once State's methods exceed one file's budget.
++
+   - path: "src/llms/mod.rs"
+     match: "type_id/cause/provide are unstable or deprecated"
+     reason: >
+# --- End entry #100 ---
+101:13fb07565a846f10796c2e101100a104eaf92e2b104a9f6b336efbf0fffea3a0:bc13df16a4fc7d4e94c52edd676105ebcff4c1b87fc267479504cf7cd7e11bad:bd61e56efb5af1937c66283114cdf1c67a33c7fc74f94ce6a59634719264b25a
+# --- Diff for entry #101 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 8c15a4d4..fc7e48af 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -207,6 +207,29 @@ exceptions:
+       Irreducible under the 500-line file cap — the two impl blocks are the honest
+       shape once State's methods exceed one file's budget.
+ 
++  - path: "crates/cp-base/src/state/runtime/bundle.rs"
++    match: "flat per-thread runtime initializer mirroring State::default; sub-grouping would diverge from the flat State layout the swap targets field-by-field"
++    reason: >
++      ThreadRuntime::default is a flat per-thread initializer — one `field: value`
++      line each, mirroring the per-thread subset of the flat State::default literal.
++      Grouping fields into sub-structs to shave lines would diverge from the flat
++      State layout that swap_with targets field-by-field, so it stays flat and carries
++      the length expect (threshold 60, unchanged). The twin of the State::default expect.
++    strategy: >
++      Irreducible — a flat per-thread initializer mirroring State's flat layout; the
++      honest shape, same as the accepted State::default flat-initializer expect.
++
++  - path: "crates/cp-base/src/state/runtime/bundle.rs"
++    match: "flat per-field mem::swap mirroring every per-thread State field; one swap per field, nothing to factor without a macro that re-expands to the same body"
++    reason: >
++      ThreadRuntime::swap_with is a flat sequence of std::mem::swap calls, one per
++      per-thread State field, exchanging each with the resident State. The targets are
++      non-uniform (state.context vs state.flags.stream vs state.flags.lifecycle.*), so a
++      macro would re-expand to the same body with no readability gain. The only residual
++      is length, intrinsic to the ~45-field per-thread subset, so it carries the expect.
++    strategy: >
++      Irreducible — one swap per per-thread field; a macro re-expands to the same body.
++
+   - path: "src/llms/mod.rs"
+     match: "type_id/cause/provide are unstable or deprecated"
+     reason: >
+# --- End entry #101 ---
+102:bd61e56efb5af1937c66283114cdf1c67a33c7fc74f94ce6a59634719264b25a:5d751f16a8b77c097c190ea77302022935603416d03c3fe5b58d8c7eabddb40e:92cf8335cc2641e75e833f6f7735cec69125e413d223998345ce451105b9ff29
+# --- Diff for entry #102 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index 8395be37..f28dd349 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1148,6 +1148,7 @@ cp-mod-github = { path = "crates/cp-mod-github" }
+ cp-mod-files = { path = "crates/cp-mod-files" }
+ cp-mod-spine = { path = "crates/cp-mod-spine" }
+ cp-mod-threads = { path = "crates/cp-mod-threads" }
++cp-fleet = { path = "crates/cp-fleet" }
+ cp-mod-bridge = { path = "crates/cp-mod-bridge" }
+ cp-wire = { path = "crates/cp-wire" }
+ cp-oplog = { path = "crates/cp-oplog" }
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index fc7e48af..0ac6cebd 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -194,6 +194,18 @@ exceptions:
+       Could merge all impl blocks into a single file, but that would
+       create a 2500+ line file. The split is intentional for navigation.
+ 
++  - path: "src/app/run/lifecycle/fleet.rs"
++    match: 'App methods split across run/ submodules for readability'
++    reason: >
++      The background-thread advancement step (advance_background_threads +
++      step_one_thread) is its own impl App block under run/lifecycle/. It is a
++      distinct concern (the Phase C multi-thread loop step) kept out of
++      lifecycle/mod.rs to respect the 500-line file cap. multiple_inherent_impl
++      (forbid) fires on this second block, so it carries the #[expect].
++    strategy: >
++      Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
++      would push that file over the limit. The split is the honest shape.
++
+   - path: "crates/cp-base/src/state/runtime/ext.rs"
+     match: "State methods split across runtime/ submodules to respect the 500-line file cap"
+     reason: >
+# --- End entry #102 ---
+103:92cf8335cc2641e75e833f6f7735cec69125e413d223998345ce451105b9ff29:1e5f1a5499a91d564a1f9c31053c09352f3938a6620e435b8087e3f0440989df:3f62fcfea3feb0e439a8b48b5223a06e1229ab1690000ae51deb44462ff5b8da
+# --- Diff for entry #103 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index 8395be37..f28dd349 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1148,6 +1148,7 @@ cp-mod-github = { path = "crates/cp-mod-github" }
+ cp-mod-files = { path = "crates/cp-mod-files" }
+ cp-mod-spine = { path = "crates/cp-mod-spine" }
+ cp-mod-threads = { path = "crates/cp-mod-threads" }
++cp-fleet = { path = "crates/cp-fleet" }
+ cp-mod-bridge = { path = "crates/cp-mod-bridge" }
+ cp-wire = { path = "crates/cp-wire" }
+ cp-oplog = { path = "crates/cp-oplog" }
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index fc7e48af..ea0ab7e0 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -183,7 +183,7 @@ exceptions:
+ 
+   # ── app/run/*: multiple_inherent_impl for App ────────────────────────
+ 
+-  - path: "src/app/run/lifecycle.rs"
++  - path: "src/app/run/lifecycle/mod.rs"
+     match: 'App methods split across run/ submodules for readability'
+     reason: >
+       App methods are split across 7 submodules in src/app/run/ for
+@@ -194,6 +194,18 @@ exceptions:
+       Could merge all impl blocks into a single file, but that would
+       create a 2500+ line file. The split is intentional for navigation.
+ 
++  - path: "src/app/run/lifecycle/fleet.rs"
++    match: 'App methods split across run/ submodules for readability'
++    reason: >
++      The background-thread advancement step (advance_background_threads +
++      step_one_thread) is its own impl App block under run/lifecycle/. It is a
++      distinct concern (the Phase C multi-thread loop step) kept out of
++      lifecycle/mod.rs to respect the 500-line file cap. multiple_inherent_impl
++      (forbid) fires on this second block, so it carries the #[expect].
++    strategy: >
++      Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
++      would push that file over the limit. The split is the honest shape.
++
+   - path: "crates/cp-base/src/state/runtime/ext.rs"
+     match: "State methods split across runtime/ submodules to respect the 500-line file cap"
+     reason: >
+# --- End entry #103 ---
+104:3f62fcfea3feb0e439a8b48b5223a06e1229ab1690000ae51deb44462ff5b8da:90920122b8b4ac80f9591845c8c80ae0a1324f1fcafee740b2fe58a70324355a:191ecb055470f89021c518f9fa3d36994cc2f6e5f8f62d5b7a3ca89dc6af64a0
+# --- Diff for entry #104 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index ea0ab7e0..2fb7b044 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -206,6 +206,19 @@ exceptions:
+       Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
+       would push that file over the limit. The split is the honest shape.
+ 
++  - path: "src/app/run/lifecycle/fleet_lifecycle.rs"
++    match: 'App methods split across run/ submodules for readability'
++    reason: >
++      The fleet lifecycle I/O methods (prune_orphaned_console_sessions,
++      save_all_threads, clear_errored_entry, teardown_thread — Phase F boot/
++      persist/teardown) are their own impl App block, split from the sibling
++      fleet.rs scheduling module to keep each file under the 500-line cap.
++      multiple_inherent_impl (forbid) fires on this additional block, so it
++      carries the #[expect].
++    strategy: >
++      Irreducible under the 500-line cap — folding these back into fleet.rs
++      would push that file over the limit. The split is the honest shape.
++
+   - path: "crates/cp-base/src/state/runtime/ext.rs"
+     match: "State methods split across runtime/ submodules to respect the 500-line file cap"
+     reason: >
+# --- End entry #104 ---
+105:191ecb055470f89021c518f9fa3d36994cc2f6e5f8f62d5b7a3ca89dc6af64a0:0b0b342715eee9670b0c27d8419a2cdce2d37c25cc25889db4802e835acb43b9:71949ae856baceac39a29781b307aaf5bf3c2c325acf74a48fdcb13048f777a9
+# --- Diff for entry #105 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 2fb7b044..11758b8b 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -74,21 +74,6 @@ exceptions:
+ 
+   # ── too_many_lines: flat aggregate root-state initializer ────────────
+ 
+-  - path: "crates/cp-base/src/state/runtime/default.rs"
+-    match: "flat aggregate root-state initializer; sub-grouping fields would churn 136 access sites for no gain"
+-    reason: >
+-      State is the flat aggregate root of the whole application (~80 leaf fields:
+-      UI cursors, id counters, model selections, cache/stream/tick token + USD
+-      telemetry, panel-diff snapshots, per-frame caches). Its Default impl is a
+-      single linear struct literal — one `field: value` line each — at 82 lines
+-      over the 60-line threshold. Grouping the telemetry counters into sub-structs
+-      to shave lines would ripple across 136 field-access sites for zero
+-      behavioural gain, so the initializer stays flat and carries the length
+-      expect. Threshold is unchanged (still 60).
+-    strategy: >
+-      Irreducible without a 136-site sub-struct refactor that trades a linear
+-      initializer for cross-cutting churn; the flat literal is the honest shape.
+-
+   # ── cast.rs: Safe numeric casting infrastructure ─────────────────
+ 
+   - path: "crates/cp-base/src/cast/mod.rs"
+@@ -244,17 +229,6 @@ exceptions:
+       Irreducible — a flat per-thread initializer mirroring State's flat layout; the
+       honest shape, same as the accepted State::default flat-initializer expect.
+ 
+-  - path: "crates/cp-base/src/state/runtime/bundle.rs"
+-    match: "flat per-field mem::swap mirroring every per-thread State field; one swap per field, nothing to factor without a macro that re-expands to the same body"
+-    reason: >
+-      ThreadRuntime::swap_with is a flat sequence of std::mem::swap calls, one per
+-      per-thread State field, exchanging each with the resident State. The targets are
+-      non-uniform (state.context vs state.flags.stream vs state.flags.lifecycle.*), so a
+-      macro would re-expand to the same body with no readability gain. The only residual
+-      is length, intrinsic to the ~45-field per-thread subset, so it carries the expect.
+-    strategy: >
+-      Irreducible — one swap per per-thread field; a macro re-expands to the same body.
+-
+   - path: "src/llms/mod.rs"
+     match: "type_id/cause/provide are unstable or deprecated"
+     reason: >
+# --- End entry #105 ---
+106:71949ae856baceac39a29781b307aaf5bf3c2c325acf74a48fdcb13048f777a9:5bc45d3ae8138b1a9ca212902c19c02b1a6ff48369c24b3fd05a5f9cbb2bd69a:2dbd8bec5c0a8d2986c229075b014b0f8dfed38468c37dd27bc14684eee96392
+# --- Diff for entry #106 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 11758b8b..5e744a2f 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -179,6 +179,18 @@ exceptions:
+       Could merge all impl blocks into a single file, but that would
+       create a 2500+ line file. The split is intentional for navigation.
+ 
++  - path: "src/app/run/lifecycle/animation.rs"
++    match: 'App methods split across run/ submodules for readability'
++    reason: >
++      The spinner-animation redraw cadence (tick_animation_dirty +
++      has_active_animation) is its own impl App block, extracted from
++      lifecycle/mod.rs to keep that file under the 500-line cap.
++      multiple_inherent_impl (forbid) fires on this additional block, so it
++      carries the #[expect].
++    strategy: >
++      Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
++      would push that file over the limit. The split is the honest shape.
++
+   - path: "src/app/run/lifecycle/fleet.rs"
+     match: 'App methods split across run/ submodules for readability'
+     reason: >
+diff --git a/run.sh b/run.sh
+index ccfa2a7a..e1b6cb36 100755
+--- a/run.sh
++++ b/run.sh
+@@ -13,12 +13,23 @@ if [ -f .env ]; then
+     export $(grep -v '^#' .env | xargs)
+ fi
+ 
+-# Parse --telemetry flag: enable flame graph instrumentation
++# Parse flags:
++#   --telemetry      enable flame graph instrumentation
++#   --measure N      profile the main loop for N iterations, dump an HTML
++#                    report to ./tmp/loop-profile.html, then exit. Read by the
++#                    binary via the CP_MEASURE_LOOPS env var (not a CLI flag).
+ ARGS=()
++expect_measure=0
+ for arg in "$@"; do
+-    if [ "$arg" = "--telemetry" ]; then
++    if [ "$expect_measure" = "1" ]; then
++        export CP_MEASURE_LOOPS="$arg"
++        echo "📊 Measure mode: profiling $arg main-loop iterations → tmp/loop-profile.html"
++        expect_measure=0
++    elif [ "$arg" = "--telemetry" ]; then
+         export CP_FLAMEGRAPH=1
+         echo "🔥 Telemetry mode: flame graph instrumentation enabled"
++    elif [ "$arg" = "--measure" ]; then
++        expect_measure=1
+     else
+         ARGS+=("$arg")
+     fi
+# --- End entry #106 ---
+107:2dbd8bec5c0a8d2986c229075b014b0f8dfed38468c37dd27bc14684eee96392:34804de9a7a8f850d7a2fdbfeb9f64a13142d372d519dccf2a4e77808ad61d4f:5d5fcdd84b1d02fecf66fbae4460f3a1da2217aac9bd0eb07bb5d10a3dbc459f
+# --- Diff for entry #107 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 5e744a2f..b47920df 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -253,24 +253,7 @@ exceptions:
+ 
+   # ── cp-mod-search/radar.rs: numeric casts ────────────────────────────
+ 
+-  - path: "crates/cp-mod-search/src/radar/mod.rs"
+-    match: "timestamp ms as f64 — decay math requires floating point"
+-    reason: >
+-      refresh_inner() casts u64 timestamps and log counts to f64 for
+-      exponential decay math and uses sequential write!() calls to build
+-      the YAML output string.
+-    strategy: >
+-      Irreducible — f64 arithmetic is required for exponential decay.
+ 
+-  - path: "crates/cp-mod-search/src/radar/mod.rs"
+-    match: "log number as f64 — decay math requires floating point"
+-    reason: >
+-      query_signal_results() casts the parsed log number and the current
+-      log count to f64 for the per-hit exponential decay factor. Extracted
+-      from refresh_inner during the cognitive_complexity split; the cast is
+-      the same irreducible decay math.
+-    strategy: >
+-      Irreducible — f64 arithmetic is required for exponential decay.
+ 
+   # ── cp-base test functions: panic for clear assertion messages ────
+ 
+@@ -310,23 +293,7 @@ exceptions:
+       Irreducible — clippy::little_endian_bytes forbids to_le_bytes and From
+       is not const-stable, so the masked const-fn narrowing is the only option.
+ 
+-  - path: "crates/cp-mod-utilities/src/time.rs"
+-    match: "const-fn widening (u8/i32 -> i64) is always exact"
+-    reason: >
+-      compose_epoch_secs() is a const fn that widens u8/i32 date-time
+-      components to i64 (always exact). From/i64::from are not callable in
+-      a const fn, so `as` is the only const-compatible widening.
+-    strategy: >
+-      Irreducible until From is const-callable in stable const fn.
+ 
+-  - path: "src/ui/ir/render_sidebar.rs"
+-    match: "const-fn widening (u16 -> usize) is always exact"
+-    reason: >
+-      content_width() is a const fn that widens the u16 area width to usize
+-      (always exact). usize::from is not const-callable on stable, so `as`
+-      is the only const-compatible widening.
+-    strategy: >
+-      Irreducible until From is const-callable in stable const fn.
+ 
+   # ── exhaustive_enums: closed wire / IR / registry contracts ──────────
+   # These public enums are LEGITIMATELY exhaustive. They are either wire /
+# --- End entry #107 ---
+108:5d5fcdd84b1d02fecf66fbae4460f3a1da2217aac9bd0eb07bb5d10a3dbc459f:fba22e0e67298f7bdf6803b917eef97c52f6bd7114b538a723309e38dda1cb64:97db165a7d3d36db84826a78dea25048ff4a7a6cfda61ce32add0e43fa185d48
+# --- Diff for entry #108 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index b47920df..fed39f49 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -229,18 +229,6 @@ exceptions:
+       Irreducible under the 500-line file cap — the two impl blocks are the honest
+       shape once State's methods exceed one file's budget.
+ 
+-  - path: "crates/cp-base/src/state/runtime/bundle.rs"
+-    match: "flat per-thread runtime initializer mirroring State::default; sub-grouping would diverge from the flat State layout the swap targets field-by-field"
+-    reason: >
+-      ThreadRuntime::default is a flat per-thread initializer — one `field: value`
+-      line each, mirroring the per-thread subset of the flat State::default literal.
+-      Grouping fields into sub-structs to shave lines would diverge from the flat
+-      State layout that swap_with targets field-by-field, so it stays flat and carries
+-      the length expect (threshold 60, unchanged). The twin of the State::default expect.
+-    strategy: >
+-      Irreducible — a flat per-thread initializer mirroring State's flat layout; the
+-      honest shape, same as the accepted State::default flat-initializer expect.
+-
+   - path: "src/llms/mod.rs"
+     match: "type_id/cause/provide are unstable or deprecated"
+     reason: >
+# --- End entry #108 ---
+109:97db165a7d3d36db84826a78dea25048ff4a7a6cfda61ce32add0e43fa185d48:9bd7c058825a28770702d9dc5f32990f96aa57f79d729e753ab9f8da8467af51:b9ff8ad4d272a65908b036341d247e41cbc20ed987d8c2098dc7b723ce2d8ef1
+# --- Diff for entry #109 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index f28dd349..e88097e8 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,5 +1,5 @@
+ [workspace]
+-members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-fleet", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-threads", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities", "crates/cp-vault", "crates/cp-env"]
++members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-fleet", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-threads", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities", "crates/cp-vault", "crates/cp-env", "crates/cp-macros"]
+ 
+ [workspace.package]
+ version = "0.2.13"
+@@ -13,6 +13,7 @@ readme = "README.md"
+ 
+ [workspace.dependencies]
+ cp-env = { path = "crates/cp-env" }
++cp-macros = { path = "crates/cp-macros" }
+ cp-base = { path = "crates/cp-base" }
+ cp-render = { path = "crates/cp-render" }
+ cp-mod-utilities = { path = "crates/cp-mod-utilities" }
+@@ -1131,6 +1132,7 @@ categories.workspace = true
+ publish = false
+ 
+ [dependencies]
++cp-macros.workspace = true
+ cp-base.workspace = true
+ cp-render = { path = "crates/cp-render" }
+ cp-mod-utilities.workspace = true
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index fed39f49..94ef72f2 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -17,7 +17,7 @@
+ exceptions:
+   # ── deref_match! macro: sole ref-pattern chokepoint ─────────────────
+ 
+-  - path: "crates/cp-base/src/lib.rs"
++  - path: "crates/cp-macros/src/lib.rs"
+     match: "clippy::pattern_type_mismatch mandates ref bindings when destructuring non-Copy fields out of a shared reference; the two restriction lints are mutually exclusive, so the deref-plus-ref form is funneled through this one macro"
+     reason: >
+       The deref_match! macro is the single audited site allowed to use `ref`
+@@ -28,50 +28,13 @@ exceptions:
+       exclusive for destructuring a non-Copy field out of a shared reference, so
+       every such site (Display/Debug/Error impls with String/Box/Vec fields)
+       routes through this macro — the single #[expect(clippy::ref_patterns)]
+-      covers all expansions workspace-wide.
++      covers all expansions workspace-wide. Lives in the dependency-free
++      cp-macros crate so even foundational crates (cp-wire, cp-vault, cp-oplog)
++      share it instead of carrying their own suppression.
+     strategy: >
+       Irreducible — the two forbid-level restriction lints are mutually exclusive
+       by design; a single chokepoint macro is the minimal honest resolution.
+ 
+-  - path: "crates/cp-vault/src/types.rs"
+-    match: "cp-vault is foundational (cannot depend on cp-base's deref_match! macro)"
+-    reason: >
+-      VaultError's Display impl matches *self and binds the non-Copy String
+-      payloads (MissingKey/Io/Network) with ref. clippy::pattern_type_mismatch
+-      (forbid) mandates the deref-plus-ref form; clippy::ref_patterns is mutually
+-      exclusive with it. cp-vault sits below cp-base in the crate graph and cannot
+-      use the deref_match! macro, so the fmt fn carries its own #[expect].
+-    strategy: >
+-      Irreducible — the two restriction lints are mutually exclusive and this
+-      foundational crate cannot reach the shared macro chokepoint.
+-
+-  - path: "crates/cp-wire/src/framing.rs"
+-    match: "cp-wire is foundational (cannot depend on cp-base's deref_match! macro)"
+-    reason: >
+-      FrameError's Display impl matches *self and binds the non-Copy String
+-      payloads (DeserializeError/SerializeError) with ref. clippy::pattern_type_mismatch
+-      (forbid) mandates the deref-plus-ref form; clippy::ref_patterns is mutually
+-      exclusive with it. cp-wire sits below cp-base in the crate graph and cannot
+-      use the deref_match! macro, so the fmt fn carries its own #[expect].
+-    strategy: >
+-      Irreducible — the two restriction lints are mutually exclusive and this
+-      foundational crate cannot reach the shared macro chokepoint.
+-
+-  - path: "crates/cp-oplog/src/lib.rs"
+-    match: "cp-oplog is foundational (only cp_wire + std); clippy::pattern_type_mismatch mandates explicit &-patterns with ref bindings for a read-only match over a borrowed enum and the two restriction lints are mutually exclusive, so every such site funnels through this one local macro"
+-    reason: >
+-      The ref_match! macro is cp-oplog's local ref-pattern chokepoint. Its sites
+-      (Error Display, replay fold_entry, replay_fast Checkpoint) all read non-Copy
+-      fields (io::Error/FrameError/Snapshot/thread_id) out of a borrowed enum;
+-      clippy::pattern_type_mismatch (forbid) mandates explicit &-patterns with ref
+-      bindings, and clippy::ref_patterns is mutually exclusive with it. cp-oplog
+-      depends only on cp_wire + std and cannot reach cp-base's deref_match!, so
+-      every such site routes through this one macro — the single
+-      #[expect(clippy::ref_patterns)] covers all expansions.
+-    strategy: >
+-      Irreducible — the two restriction lints are mutually exclusive and this
+-      foundational crate cannot reach the shared macro chokepoint.
+-
+   # ── too_many_lines: flat aggregate root-state initializer ────────────
+ 
+   # ── cast.rs: Safe numeric casting infrastructure ─────────────────
+# --- End entry #109 ---
+110:b9ff8ad4d272a65908b036341d247e41cbc20ed987d8c2098dc7b723ce2d8ef1:b5b3ce892166a2a8dcf25b8490acebb26527ea93453fe61d2148ace06028a03b:6dca93435c0e19c9c11d1e57db66271126e141ba9ff0b3e44b3c3f4943d6c18e
+# --- Diff for entry #110 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 94ef72f2..c5587f48 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -422,23 +422,8 @@ exceptions:
+     strategy: >
+       Irreducible — the exhaustive literal is the whole point; a ctor re-trips too_many_arguments.
+ 
+-  # ── multiple_inherent_impl: ReleaseStore split for the 500-line cap ──
++  # ── multiple_inherent_impl: AuthStore split across db/acl ────────────
+ 
+-  - path: "crates/cp-orchestrator/src/services/releases/mod.rs"
+-    match: "ReleaseStore inherent methods are split across mod.rs and the sibling channel.rs to respect the 500-line file cap"
+-    reason: >
+-      ReleaseStore's inherent methods are split across mod.rs (the primary impl:
+-      arch, local releases, GitHub API, download, select/delete, persistence) and
+-      the sibling channel.rs (the OTA-channel methods: channel, set_channel,
+-      pending_channel_switch, clear_pending_switch). mod.rs already sits at 477
+-      lines; folding channel.rs's ~45 lines back in would push it over the 500-line
+-      file cap. clippy::multiple_inherent_impl (forbid) fires on the second block,
+-      so the primary impl carries the #[expect].
+-    strategy: >
+-      Irreducible under the 500-line file cap — the two impl blocks are the honest
+-      shape once the type's methods exceed one file's budget.
+-
+-  # ── multiple_inherent_impl: AuthStore split across db/helpers/acl ────
+ 
+   - path: "crates/cp-orchestrator/src/services/auth/db.rs"
+     match: "AuthStore's inherent methods are split across db.rs, helpers.rs, and acl.rs to respect the 500-line file cap; folding them into one impl block would push a file over the limit"
+@@ -453,21 +438,9 @@ exceptions:
+       Irreducible under the 500-line file cap — the three impl blocks are the honest
+       shape once the type's methods exceed one file's budget.
+ 
+-  - path: "crates/cp-orchestrator/src/services/auth/helpers.rs"
+-    match: "AuthStore's inherent methods are split across db.rs, helpers.rs, and acl.rs to respect the 500-line file cap; folding them into one impl block would push a file over the limit"
+-    reason: >
+-      AuthStore's inherent methods are split across db.rs (the primary impl: open,
+-      schema, password hashing, user/session CRUD), helpers.rs (the default_db_path
+-      helper), and acl.rs (the per-agent ACL operations). db.rs already sits near
+-      the 500-line file cap; folding the sibling blocks back in would push it over
+-      the limit. clippy::multiple_inherent_impl fires on the db.rs and helpers.rs
+-      blocks (acl.rs is the canonical first), so each carries the #[expect].
+-    strategy: >
+-      Irreducible under the 500-line file cap — the three impl blocks are the honest
+-      shape once the type's methods exceed one file's budget.
+-
+   # ── flat path-segment router: too_many_lines + pattern_type_mismatch ──
+ 
++
+   - path: "crates/cp-orchestrator/src/transport/router.rs"
+     match: "flat path-segment router: a closed match over ~60 borrowed `(&Method, &[&str])` route shapes"
+     reason: >
+# --- End entry #110 ---
+111:6dca93435c0e19c9c11d1e57db66271126e141ba9ff0b3e44b3c3f4943d6c18e:92891d652d36e6245c81aa297e6e3aa119887603774fc336f73585a5eb211546:3762e939a65ffeefca066fdf594f944f9ccb0d82a2289fbbb72232a856f0bd37
+# --- Diff for entry #111 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index c5587f48..38e8b52e 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -179,6 +179,19 @@ exceptions:
+       Irreducible under the 500-line cap — folding these back into fleet.rs
+       would push that file over the limit. The split is the honest shape.
+ 
++  - path: "src/app/run/lifecycle/input_phase.rs"
++    match: 'App methods split across run/ submodules for readability'
++    reason: >
++      The main-loop input phase (handle_input_phase: event poll, palette,
++      autocomplete, quit flush, drill swap/restore, each under its own perf
++      guard) is its own impl App block, moved out of lifecycle/mod.rs when that
++      file hit the 500-line cap. multiple_inherent_impl (forbid) fires on this
++      additional block, so it carries the #[expect].
++    strategy: >
++      Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
++      would push that file over the limit. The split is the honest shape.
++
++
+   - path: "crates/cp-base/src/state/runtime/ext.rs"
+     match: "State methods split across runtime/ submodules to respect the 500-line file cap"
+     reason: >
+# --- End entry #111 ---
+112:3762e939a65ffeefca066fdf594f944f9ccb0d82a2289fbbb72232a856f0bd37:54eb5237c61cdc61eb86f0aab473ff0246a9faebdd8517eddef5ee0c6bf83136:0e4a31643b65d3151a7359a040d83eb01b049653b761b475f920f6afde28df4b
+# --- Diff for entry #112 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 38e8b52e..ed988f56 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -191,6 +191,18 @@ exceptions:
+       Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
+       would push that file over the limit. The split is the honest shape.
+ 
++  - path: "src/app/run/lifecycle/coucous.rs"
++    match: 'App methods split across run/ submodules for readability'
++    reason: >
++      Fleet-shared coucou delivery (check_coucous, once per tick) and the boot
++      migration of legacy per-thread coucous (migrate_legacy_coucous) are their
++      own impl App block: they need deliver_to_thread and the fleet registry,
++      so they live on App, not in the spine crate. multiple_inherent_impl
++      (forbid) fires on this additional block, so it carries the #[expect].
++    strategy: >
++      Irreducible under the 500-line cap — lifecycle/mod.rs is near the limit,
++      fleet.rs and fleet_lifecycle.rs too. The split is the honest shape.
++
+ 
+   - path: "crates/cp-base/src/state/runtime/ext.rs"
+     match: "State methods split across runtime/ submodules to respect the 500-line file cap"
+diff --git a/.context-pilot/shared/callbacks.yaml b/.context-pilot/shared/callbacks.yaml
+index 87a6b469..fecc0ddc 100644
+--- a/.context-pilot/shared/callbacks.yaml
++++ b/.context-pilot/shared/callbacks.yaml
+@@ -6,6 +6,7 @@ api-contract-rust:
+   timeout_secs: 180
+   success_message: API contract OK ✓
+   is_global: true
++  concurrency_friendly: false
+   script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-api-contract.sh" --callback
+   last_edited_ms: 1787907566116
+ api-contract-ts:
+@@ -16,6 +17,7 @@ api-contract-ts:
+   timeout_secs: 180
+   success_message: API contract OK ✓
+   is_global: true
++  concurrency_friendly: false
+   script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-api-contract.sh" --callback
+   last_edited_ms: 1783511056446
+ mobile-mirror:
+@@ -26,6 +28,7 @@ mobile-mirror:
+   timeout_secs: 30
+   success_message: Mobile mirror OK ✓
+   is_global: true
++  concurrency_friendly: false
+   script_content: exec .github/checks/check-mobile-mirror.sh $CP_CHANGED_FILES
+   last_edited_ms: 1784633228156
+ rust-lints:
+@@ -36,6 +39,7 @@ rust-lints:
+   timeout_secs: 120
+   success_message: Rust lints OK ✓
+   is_global: true
++  concurrency_friendly: false
+   script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-rust-lints.sh" --callback
+   last_edited_ms: 1783511056443
+ structure-rust:
+@@ -46,6 +50,7 @@ structure-rust:
+   timeout_secs: 30
+   success_message: Structure OK ✓
+   is_global: true
++  concurrency_friendly: false
+   script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-structure.sh" --callback
+   last_edited_ms: 1783511056442
+ structure-web:
+@@ -56,6 +61,7 @@ structure-web:
+   timeout_secs: 30
+   success_message: Structure OK ✓
+   is_global: true
++  concurrency_friendly: false
+   script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-structure.sh" --callback
+   last_edited_ms: 1783511056442
+ ts-tests:
+@@ -66,5 +72,6 @@ ts-tests:
+   timeout_secs: 30
+   success_message: TS tests OK ✓
+   is_global: true
++  concurrency_friendly: false
+   script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-ts-tests.sh" --callback
+   last_edited_ms: 1783511056445
+# --- End entry #112 ---

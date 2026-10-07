@@ -103,7 +103,15 @@ pub struct TodoState {
     /// every tool call; it clears when the condition clears or focus moves.
     /// **Transient** — never serialized.
     pub nudged_thread: Option<String>,
+    /// Change stamp, refreshed on every [`TodoState::get_mut`]. Lets per-tick
+    /// observers skip their diff while it is unchanged. Read-only by
+    /// convention — only `get_mut` writes it. **Transient**.
+    pub revision: u64,
 }
+
+/// Process-wide stamp source: unique across `set_ext` replacements, so a
+/// fresh state never reuses a stamp an observer already cached.
+static REVISION_SOURCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 impl Default for TodoState {
     fn default() -> Self {
@@ -115,7 +123,7 @@ impl TodoState {
     /// Create an empty todo state with ID counter at 1.
     #[must_use]
     pub const fn new() -> Self {
-        Self { todos: vec![], next_todo_id: 1, focus_filter: None, nudged_thread: None }
+        Self { todos: vec![], next_todo_id: 1, focus_filter: None, nudged_thread: None, revision: 0 }
     }
 
     /// Get shared ref from State's `TypeMap`.
@@ -128,12 +136,14 @@ impl TodoState {
         state.ext::<Self>()
     }
 
-    /// Get mutable ref from State's `TypeMap`.
+    /// Get mutable ref from State's `TypeMap`, refreshing the change stamp.
     ///
     /// # Panics
     ///
     /// Panics if an internal invariant is violated.
     pub fn get_mut(state: &mut State) -> &mut Self {
-        state.ext_mut::<Self>()
+        let ts = state.ext_mut::<Self>();
+        ts.revision = REVISION_SOURCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        ts
     }
 }

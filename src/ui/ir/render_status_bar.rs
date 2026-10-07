@@ -222,7 +222,7 @@ pub(crate) fn build_status_bar(state: &State) -> StatusBar {
             .filter(|c| c.cached_content.is_none() && c.context_type.needs_cache())
             .count()
             .to_u16(),
-        input_char_count: state.input.chars().count().to_u32(),
+        input_char_count: state.composer.text.chars().count().to_u32(),
     }
 }
 
@@ -235,6 +235,9 @@ fn build_badge(state: &State) -> Badge {
         state
             .get_ext::<WatcherRegistry>()
             .is_some_and(|reg| reg.active_watchers().iter().any(|w| w.fire_at_ms().is_some()))
+            || state
+                .get_ext::<cp_mod_spine::schedule::CoucouRegistry>()
+                .is_some_and(|reg| reg.has_pending_for(state.resident_thread_id.as_deref()))
     };
 
     if state.guard_rail_blocked.is_some() {
@@ -242,9 +245,9 @@ fn build_badge(state: &State) -> Badge {
             label: format!("BLOCKED: {}", state.guard_rail_blocked.as_deref().unwrap_or("?")),
             semantic: Semantic::Error,
         }
-    } else if state.flags.stream.phase.is_streaming() && !state.flags.stream.phase.is_tooling() {
+    } else if state.stream.phase.is_streaming() && !state.stream.phase.is_tooling() {
         Badge { label: "STREAMING".into(), semantic: Semantic::Success }
-    } else if state.flags.stream.phase.is_streaming() && state.flags.stream.phase.is_tooling() {
+    } else if state.stream.phase.is_streaming() && state.stream.phase.is_tooling() {
         Badge { label: "TOOLING".into(), semantic: Semantic::Info }
     } else if has_timed_watcher {
         Badge { label: "WAITING".into(), semantic: Semantic::AccentDim }
@@ -344,7 +347,7 @@ fn build_queue(state: &State) -> Option<QueueCard> {
 
 /// Build stop reason indicator from last completion.
 fn build_stop_reason(state: &State) -> Option<StopReason> {
-    if state.flags.stream.phase.is_streaming() {
+    if state.stream.phase.is_streaming() {
         return None;
     }
     let reason = state.last_stop_reason.as_ref()?;

@@ -57,7 +57,9 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     /// Maximum `file_path` length (bytes).
     const MAX_FILE_PATH_BYTES: usize = 1_024;
 
-    let tid = tool.input.get("thread_id").and_then(serde_json::Value::as_str).unwrap_or("");
+    // Always the caller's own thread: Send has no target parameter.
+    let owned_tid = resident_thread_id(state);
+    let tid = owned_tid.as_str();
 
     let markdown =
         tool.input.get("markdown").and_then(serde_json::Value::as_str).map(|s| clamp_bytes(s, MAX_CONTENT_BYTES));
@@ -77,6 +79,7 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
         timestamp: now,
         acknowledged: true,
         auto: false,
+        has_been_pushed: false,
     };
 
     // Build result message before mutating — need thread name.
@@ -103,18 +106,13 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
         rebuild_threads_panel(state, tid, now);
     }
 
-    // Handing the thread back (still_my_turn=false) flips it to THEIR_TURN
-    // (done in push_send_message) but KEEPS focus on it — the agent stays on the
-    // thread it just replied to instead of being left unfocused (T683). Focus is
-    // only ever moved by an explicit `Read` of another thread. We pin focus to
-    // the sent thread and hold the focused-state invariant `apply_read_focus`
-    // uses (no escalation).
-    if !still_my_turn {
-        let fs = FocusState::get_mut(state);
-        fs.focused_thread_id = Some(tid.to_owned());
-        fs.escalation_level = 0;
-    }
-
+    // NOTE: `Send` deliberately does NOT move `focused_thread_id`. That pointer
+    // is the HUMAN's on-screen view selection (UI-global, shared across the
+    // fleet, never swapped). A background thread finishing its turn with
+    // `still_my_turn=false` would otherwise yank the human's view onto itself —
+    // the "intempestive thread switch" bug. The focused thread is already the
+    // focus, so for the on-screen thread this is a no-op; for a background
+    // thread it must not steal focus. Focus changes only on explicit human nav.
     let suffix = if still_my_turn { " (still your turn)" } else { "" };
     let unarchived_note = if unarchived { " [thread was archived \u{2014} automatically unarchived]" } else { "" };
     let mut result = ToolResult::new(
@@ -146,15 +144,6 @@ fn collect_thread_summaries(ts: &ThreadsState, focused_tid: &str) -> Vec<String>
     summaries
 }
 
-/// Focus the target thread when it is `MY_TURN`, resetting escalation.
-fn apply_read_focus(state: &mut State, tid: &str, thread_status: ThreadStatus) {
-    if thread_status == ThreadStatus::MyTurn {
-        let fs = FocusState::get_mut(state);
-        fs.focused_thread_id = Some(tid.to_owned());
-        fs.escalation_level = 0;
-    }
-}
-
 /// Force the Threads panel to emit fresh THIS tick after a Read.
 ///
 /// Deprecating the cache alone is insufficient: the freeze pass would restore
@@ -182,19 +171,24 @@ fn force_refresh_threads_panel(state: &mut State) {
 /// `state.tempo` — a caller that preserves tempo (Send) keeps a full cache
 /// refresh from firing; the new content then emits on the next tick the freeze
 /// pass runs fresh (never lost, since `panel_content` is durable).
-fn rebuild_threads_panel(state: &mut State, focused_tid: &str, now_ms: u64) {
+pub(crate) fn rebuild_threads_panel(state: &mut State, focused_tid: &str, now_ms: u64) {
     let panel_content = build_panel_content(state, focused_tid, now_ms);
     ThreadsState::get_mut(state).panel_content = panel_content;
     force_refresh_threads_panel(state);
 }
 
-/// Read messages from a thread. Sets focus and updates the Threads panel.
+/// Refresh the Threads panel for the CALLER's own thread.
 ///
-/// Marks all messages in the target thread as acknowledged, builds the
-/// panel content (thread list + focused conversation), and returns a
-/// lightweight summary pointing to the panel.
+/// Read takes no `thread_id`: it always targets the **resident** thread (the
+/// thread whose context is executing this tool), exactly like `Send`. It must
+/// NOT use `FocusState::focused_thread_id` — that is the human's UI-global view
+/// pointer, so at N>1 a background thread would read, acknowledge, and clear
+/// notifications of whatever thread is on screen (T828). For the same reason
+/// Read never writes focus. Marks the thread's messages acknowledged, rebuilds
+/// the panel (thread list + own conversation), and returns a summary.
 pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let tid = tool.input.get("thread_id").and_then(serde_json::Value::as_str).unwrap_or("");
+    let owned_tid = resident_thread_id(state);
+    let tid = owned_tid.as_str();
 
     let now_ms = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis().to_u64());
 
@@ -206,19 +200,6 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let thread_name = target_thread.name.clone();
     let thread_status = target_thread.status;
-
-    // Refuse to read a paused thread unless it's already focused.
-    // Checked at both pre-flight and execution because state can change between the two.
-    if target_thread.paused && FocusState::get(state).focused_thread_id.as_deref() != Some(tid) {
-        return ToolResult::new(
-            tool.id.clone(),
-            format!(
-                "Thread '{tid}' (\"{thread_name}\") is paused. Cannot read a paused \
-                 thread unless it is already focused. Unpause it first."
-            ),
-            true,
-        );
-    }
 
     let thread_summaries = collect_thread_summaries(ts, tid);
 
@@ -240,11 +221,8 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     }
 
-    // --- Phase 3: Set focus ---
-    apply_read_focus(state, tid, thread_status);
-
     // Reading a thread clears any spine notifications bound to it — the agent
-    // has now focused the thread, so its pending nudges are moot.
+    // has now read its own thread, so its pending nudges are moot.
     let _cleared = cp_mod_spine::types::SpineState::delete_notifications_by_thread(state, tid);
 
     // --- Phase 4: Build panel content (thread list + focused conversation) ---
@@ -307,7 +285,7 @@ fn build_read_result(state: &State, r: &ReadResult<'_>) -> String {
         .map_or_else(|| "[no messages]".to_owned(), |c| preview_ellipsis(c, 80));
 
     let (tid, thread_name, thread_status) = (r.tid, r.thread_name, r.thread_status);
-    let mut lines = vec![format!("Thread {tid} \"{thread_name}\" [{thread_status}] — now focused.\n")];
+    let mut lines = vec![format!("Thread {tid} \"{thread_name}\" [{thread_status}] — your thread, refreshed.\n")];
     if r.thread_summaries.is_empty() {
         lines.push("No unacknowledged messages across active threads.".to_owned());
     } else {
@@ -398,15 +376,39 @@ fn write_message(output: &mut String, msg: &ThreadMessage, now_ms: u64) {
     }
 }
 
-/// Build the full panel content: thread overview + focused thread conversation.
+/// The id of the thread whose context currently lives in `state` — the
+/// **resident** thread (the focused thread at rest, or a background thread while
+/// it is being stepped). Falls back to the focused pointer, then empty.
 ///
-/// Called by `execute_read` to generate the static panel text that the LLM sees.
-/// Limits the focused thread to the last [`MAX_PANEL_MESSAGES`] messages to keep
-/// token usage bounded for long-lived threads.
+/// This is the identity the Threads panel must render for: the panel instance is
+/// per-thread (its `Entry` rides the resident-thread swap), so each thread's
+/// panel shows the roster + *its own* conversation — a per-thread **view** over
+/// the shared roster (design doc §3). Without this, every thread rendered the
+/// single shared `panel_content` baked for the focused thread, so a background
+/// thread's Threads panel showed the focused thread's conversation.
+pub(crate) fn resident_thread_id(state: &State) -> String {
+    state.resident_thread_id.clone().or_else(|| FocusState::get(state).focused_thread_id.clone()).unwrap_or_default()
+}
+
+/// Build the Threads panel content for the **resident** thread (roster list +
+/// that thread's own conversation). This is the per-thread render source used by
+/// [`ThreadsPanel`](crate::panel::ThreadsPanel) in place of the shared, focused-
+/// thread-baked `ThreadsState::panel_content`.
+pub(crate) fn resident_panel_content(state: &State) -> String {
+    let tid = resident_thread_id(state);
+    let now_ms = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis().to_u64());
+    build_panel_content(state, &tid, now_ms)
+}
+
+/// Build the full panel content: thread overview + the given thread's conversation.
+///
+/// Renders the roster list plus `focused_tid`'s own conversation, capped to the
+/// last [`MAX_PANEL_MESSAGES`] messages to keep token usage bounded for
+/// long-lived threads.
 ///
 /// Emits **YAML-structured** output (T372) so the LLM can parse thread state
 /// cleanly — matching the style of the Search result panels.
-fn build_panel_content(state: &State, focused_tid: &str, now_ms: u64) -> String {
+pub(crate) fn build_panel_content(state: &State, focused_tid: &str, now_ms: u64) -> String {
     /// Maximum messages shown in the panel for a single focused thread.
     const MAX_PANEL_MESSAGES: usize = 50;
 

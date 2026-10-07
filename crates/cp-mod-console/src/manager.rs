@@ -12,7 +12,9 @@ use cp_base::config::constants;
 use cp_base::panels::now_ms;
 
 use crate::CONSOLE_DIR;
-use crate::pollers::{FilePoller, StatusPoller};
+use crate::pollers::{
+    DetachedLaunch, FilePoller, StatusPoller, create_request, pid_of, send_create, start_file_poller,
+};
 use crate::ring_buffer::RingBuffer;
 use crate::types::ProcessStatus;
 use cp_base::cast::Safe as _;
@@ -78,24 +80,36 @@ pub fn log_file_path(key: &str) -> PathBuf {
 /// or if the server response indicates an error.
 pub(crate) fn server_request(req: &serde_json::Value) -> Result<serde_json::Value, String> {
     let sock_path = server_socket_path();
-    let stream = UnixStream::connect(&sock_path).map_err(|e| format!("Failed to connect to console server: {e}"))?;
+    let stream = {
+        let _p = cp_base::perf_span!("console_connect");
+        UnixStream::connect(&sock_path).map_err(|e| format!("Failed to connect to console server: {e}"))?
+    };
     let _: Option<()> = stream.set_read_timeout(Some(std::time::Duration::from_secs(5))).ok();
     let _: Option<()> = stream.set_write_timeout(Some(std::time::Duration::from_secs(5))).ok();
 
     let mut writer = stream.try_clone().map_err(|e| format!("Clone failed: {e}"))?;
     let reader = BufReader::new(stream);
 
-    let mut line = serde_json::to_string(req).map_err(|e| format!("Serialize failed: {e}"))?;
-    line.push('\n');
-    writer.write_all(line.as_bytes()).map_err(|e| format!("Write failed: {e}"))?;
-    writer.flush().map_err(|e| format!("Flush failed: {e}"))?;
+    {
+        let _p = cp_base::perf_span!("console_send");
+        let mut line = serde_json::to_string(req).map_err(|e| format!("Serialize failed: {e}"))?;
+        line.push('\n');
+        writer.write_all(line.as_bytes()).map_err(|e| format!("Write failed: {e}"))?;
+        writer.flush().map_err(|e| format!("Flush failed: {e}"))?;
+    }
 
     let mut resp_line = String::new();
     let mut buf_reader = reader;
-    let _: usize = buf_reader.read_line(&mut resp_line).map_err(|e| format!("Read failed: {e}"))?;
+    {
+        // Blocks until the server has done the work (spawn, write stdin, …).
+        let _p = cp_base::perf_span!("console_reply");
+        let _: usize = buf_reader.read_line(&mut resp_line).map_err(|e| format!("Read failed: {e}"))?;
+    }
 
-    let resp: serde_json::Value =
-        serde_json::from_str(resp_line.trim()).map_err(|e| format!("Parse response failed: {e}"))?;
+    let resp: serde_json::Value = {
+        let _p = cp_base::perf_span!("console_parse");
+        serde_json::from_str(resp_line.trim()).map_err(|e| format!("Parse response failed: {e}"))?
+    };
 
     if resp.get("ok").and_then(serde_json::Value::as_bool) == Some(true) {
         Ok(resp)
@@ -281,70 +295,62 @@ impl SessionHandle {
     /// Returns `Err` if the server is unreachable and cannot be restarted,
     /// or if the spawn request fails.
     pub fn spawn(name: String, command: String, cwd: Option<String>) -> Result<Self, String> {
-        let log_path = log_file_path(&name);
-        let log_path_str = log_path.to_string_lossy().to_string();
-
-        // Ask server to create the process
-        let mut req = serde_json::json!({
-            "cmd": "create",
-            "key": name,
-            "command": command,
-            "log_path": log_path_str,
-        });
-        if let Some(dir) = cwd.as_ref()
-            && let Some(obj) = req.as_object_mut()
-        {
-            let _prev = obj.insert("cwd".to_owned(), serde_json::Value::String(dir.clone()));
-        }
-
-        let resp = if let Ok(r) = server_request(&req) {
-            r
-        } else {
-            // Server may have died — try to respawn
-            find_or_create_server()?;
-            server_request(&req)?
+        let handle = Self::unstarted(name, command, cwd);
+        let req = create_request(&handle.name, &handle.command, &handle.log_path, handle.cwd.as_deref());
+        let pid = {
+            let _p = cp_base::perf_span!("console_create_req");
+            pid_of(&send_create(&req)?)
         };
-        let pid = resp.get("pid").and_then(serde_json::Value::as_u64).unwrap_or(0).to_u32();
+        *handle.child_id.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(pid);
+        let _p = cp_base::perf_span!("console_start_pollers");
+        start_file_poller(PathBuf::from(&handle.log_path), handle.buffer.clone(), Arc::clone(&handle.stop_polling));
+        let poller = handle.status_poller();
+        drop(std::thread::spawn(move || poller.run()));
+        Ok(handle)
+    }
 
-        let status = Arc::new(Mutex::new(ProcessStatus::Running));
-        let buffer = RingBuffer::new();
-        let child_id = Arc::new(Mutex::new(Some(pid)));
-        let finished_at = Arc::new(Mutex::new(None));
-        let stop_polling = Arc::new(AtomicBool::new(false));
+    /// Non-blocking [`Self::spawn`] for edit callbacks: returns a `Running`
+    /// handle at once and sends `create` from a worker thread. A spawn error
+    /// lands in the output buffer and flips the status to `Failed(-1)`.
+    #[must_use]
+    pub fn spawn_detached(name: String, command: String, cwd: Option<String>) -> Self {
+        let handle = Self::unstarted(name, command, cwd);
+        start_file_poller(PathBuf::from(&handle.log_path), handle.buffer.clone(), Arc::clone(&handle.stop_polling));
+        let launch = DetachedLaunch {
+            req: create_request(&handle.name, &handle.command, &handle.log_path, handle.cwd.as_deref()),
+            child_id: Arc::clone(&handle.child_id),
+            buffer: handle.buffer.clone(),
+            poller: handle.status_poller(),
+        };
+        drop(std::thread::spawn(move || launch.run()));
+        handle
+    }
 
-        // File poller thread
-        {
-            let buf = buffer.clone();
-            let stop = Arc::clone(&stop_polling);
-            let path = log_path;
-            drop(std::thread::spawn(move || {
-                FilePoller { path, buffer: buf, stop, offset: 0 }.run();
-            }));
-        }
-
-        // Status poller thread — periodically ask server for status
-        {
-            let status_clone = Arc::clone(&status);
-            let finished_clone = Arc::clone(&finished_at);
-            let stop_clone = Arc::clone(&stop_polling);
-            let key = name.clone();
-            drop(std::thread::spawn(move || {
-                StatusPoller { key, status: status_clone, finished_at: finished_clone, stop: stop_clone }.run();
-            }));
-        }
-
-        Ok(Self {
+    /// `Running` handle with no pid yet and no poller threads started.
+    fn unstarted(name: String, command: String, cwd: Option<String>) -> Self {
+        let log_path = log_file_path(&name).to_string_lossy().to_string();
+        Self {
             name,
             command,
             cwd,
-            status,
-            buffer,
-            log_path: log_path_str,
-            child_id,
+            status: Arc::new(Mutex::new(ProcessStatus::Running)),
+            buffer: RingBuffer::new(),
+            log_path,
+            child_id: Arc::new(Mutex::new(None)),
             started_at: now_ms(),
-            finished_at,
-            stop_polling,
-        })
+            finished_at: Arc::new(Mutex::new(None)),
+            stop_polling: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    /// Status poller bound to this handle's shared status/finish/stop state.
+    fn status_poller(&self) -> StatusPoller {
+        StatusPoller {
+            key: self.name.clone(),
+            status: Arc::clone(&self.status),
+            finished_at: Arc::clone(&self.finished_at),
+            stop: Arc::clone(&self.stop_polling),
+        }
     }
 
     /// Reconnect to a server-managed session after TUI reload.
@@ -419,18 +425,39 @@ impl SessionHandle {
         });
         if server_request(&req).is_err() {
             // Server may have died — try to respawn and retry
+            let _p = cp_base::perf_span!("console_respawn_server");
             find_or_create_server()?;
             drop(server_request(&req)?);
         }
         Ok(())
     }
 
-    /// Kill the process via the server.
+    /// Kill the process without blocking the caller.
+    ///
+    /// The server reaps with a SIGTERM grace period (100+ ms), which froze the
+    /// main loop on `Close_panel` and callback dedup. The request runs on a
+    /// detached thread; local status flips to `Killed` immediately.
     pub fn kill(&self) {
-        self.stop_polling.store(true, Ordering::Relaxed);
+        self.mark_killed();
+        let req = serde_json::json!({"cmd": "kill", "key": self.name});
+        let bg_req = req.clone();
+        let spawned =
+            std::thread::Builder::new().name("console-kill".into()).spawn(move || drop(server_request(&bg_req).ok()));
+        if spawned.is_err() {
+            drop(server_request(&req).ok());
+        }
+    }
 
+    /// Kill the process and wait for the server to confirm (shutdown paths).
+    pub fn kill_blocking(&self) {
+        self.mark_killed();
         let req = serde_json::json!({"cmd": "kill", "key": self.name});
         drop(server_request(&req).ok());
+    }
+
+    /// Stop polling and record a terminal `Killed` status + finish time.
+    fn mark_killed(&self) {
+        self.stop_polling.store(true, Ordering::Relaxed);
         {
             let mut status = self.status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             if !status.is_terminal() {

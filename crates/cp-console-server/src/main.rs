@@ -230,11 +230,7 @@ fn handle_kill(sessions: &Sessions, key: &str) -> Response {
 
     // If still running, kill the process.
     if !session.is_terminal() {
-        drop(Command::new("kill").args([&session.pid.to_string()]).output());
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        if is_pid_alive(session.pid) {
-            drop(Command::new("kill").args(["-9", &session.pid.to_string()]).output());
-        }
+        cleanup::terminate(session.pid, 100);
     }
 
     Response::ok()
@@ -245,11 +241,7 @@ fn handle_remove(sessions: &Sessions, key: &str) -> Response {
     let removed = sessions.lock().unwrap_or_else(PoisonError::into_inner).remove(key);
     if let Some(mut session) = removed {
         if !session.is_terminal() {
-            drop(Command::new("kill").args([&session.pid.to_string()]).output());
-            std::thread::sleep(std::time::Duration::from_millis(100));
-            if is_pid_alive(session.pid) {
-                drop(Command::new("kill").args(["-9", &session.pid.to_string()]).output());
-            }
+            cleanup::terminate(session.pid, 100);
         }
         drop(session.stdin.take());
     }
@@ -440,8 +432,11 @@ fn main() {
         return;
     };
 
-    // Set socket to non-blocking so we can check SHUTDOWN_REQUESTED between accepts
-    let _: Option<()> = listener.set_nonblocking(true).ok();
+    // Blocking accept: a non-blocking poll with a 50 ms idle sleep added 0–50 ms
+    // (measured mean ~22 ms) to EVERY client request. Shutdown wakes the accept
+    // via a self-connect from `shutdown_waker`.
+    let waker_path = socket_path.clone();
+    drop(std::thread::spawn(move || cleanup::shutdown_waker(&waker_path)));
 
     let sessions: Sessions = Arc::new(Mutex::new(BTreeMap::new()));
 
@@ -460,20 +455,19 @@ fn main() {
     loop {
         match listener.accept() {
             Ok((stream, _)) => {
+                if SHUTDOWN_REQUESTED.load(Ordering::Relaxed) {
+                    break; // the waker's self-connect, or a client racing shutdown
+                }
                 let conn_sessions = Arc::clone(&sessions);
                 drop(std::thread::spawn(move || {
                     ConnectionHandler { stream, sessions: conn_sessions }.run();
                 }));
             }
-            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                // No pending connection — sleep briefly and retry
-                std::thread::sleep(std::time::Duration::from_millis(50));
+            Err(_) => {
+                if SHUTDOWN_REQUESTED.load(Ordering::Relaxed) {
+                    break;
+                }
             }
-            Err(_) => continue,
-        }
-
-        if SHUTDOWN_REQUESTED.load(Ordering::Relaxed) {
-            break;
         }
     }
 

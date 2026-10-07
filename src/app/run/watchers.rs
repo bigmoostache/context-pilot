@@ -93,10 +93,26 @@ fn process_cache_updates_static(state: &mut State, cache_rx: &Receiver<CacheUpda
         if apply_unchanged_update(state, &update) {
             continue;
         }
+        // One perf row per panel kind (`<parent>.apply_<kind>`): attributes the
+        // main-thread cost of each `apply_cache_update`. Interning only when monitoring.
+        let _kind_guard = apply_kind_guard(state, &update);
         if let Err(leftover) = apply_module_specific_update(state, update) {
             apply_content_update(state, leftover);
         }
     }
+}
+
+/// Perf guard named `apply_<kind>` for the panel an update targets; `None` when
+/// the F12 profiler is off or the target panel is gone.
+fn apply_kind_guard(state: &State, update: &CacheUpdate) -> Option<crate::infra::profiler::ProfileGuard> {
+    if !crate::ui::perf::PERF.enabled.load(std::sync::atomic::Ordering::Relaxed) {
+        return None;
+    }
+    let kind = update.module_specific_type().cloned().or_else(|| {
+        let id = update.content_context_id()?;
+        state.context.iter().find(|c| c.id == id).map(|c| c.context_type.clone())
+    })?;
+    Some(crate::profile!(crate::infra::profiler::intern(format!("apply_{}", kind.as_str()))))
 }
 
 /// Mark every panel a module claims for `path` as `cache_deprecated`, returning
@@ -104,7 +120,7 @@ fn process_cache_updates_static(state: &mut State, cache_rx: &Receiver<CacheUpda
 fn invalidate_matching_panels(app: &mut App, path: &str, is_dir_event: bool) -> Vec<usize> {
     let modules = crate::modules::all_modules();
     let mut refresh_indices = Vec::new();
-    for (i, ctx) in app.state.context.iter_mut().enumerate() {
+    for (i, ctx) in app.state.resident.context.iter_mut().enumerate() {
         for module in &modules {
             if module.should_invalidate_on_fs_change(ctx, path, is_dir_event) {
                 ctx.cache_deprecated = true;
@@ -126,7 +142,7 @@ fn collect_invalidations(app: &mut App, events: &[WatchEvent]) -> (Vec<usize>, V
     let mut refresh_indices = Vec::new();
     let mut rewatch_paths: Vec<String> = Vec::new();
     for event in events {
-        let (path, is_dir_event) = cp_base::deref_match!(event, {
+        let (path, is_dir_event) = cp_macros::deref_match!(event, {
             WatchEvent::FileChanged(ref p) => (p, false),
             WatchEvent::DirChanged(ref p) => (p, true),
         });
@@ -175,6 +191,7 @@ pub(super) fn process_watcher_events(app: &mut App) {
     let _fg = cp_base::flame!("watcher_events");
     // Collect events (immutable borrow on file_watcher released after this block)
     let events = {
+        let _g = crate::profile!("poll_events");
         let Some(watcher) = app.file_watcher.as_ref() else { return };
         watcher.poll_events()
     };
@@ -182,8 +199,15 @@ pub(super) fn process_watcher_events(app: &mut App) {
         return;
     }
 
-    let (refresh_indices, rewatch_paths) = collect_invalidations(app, &events);
-    dispatch_refresh_requests(app, refresh_indices);
+    let (refresh_indices, rewatch_paths) = {
+        let _g = crate::profile!("invalidate");
+        collect_invalidations(app, &events)
+    };
+    {
+        let _g = crate::profile!("dispatch_refresh");
+        dispatch_refresh_requests(app, refresh_indices);
+    }
+    let _g = crate::profile!("rewatch");
     rewatch_changed_files(app, rewatch_paths);
 }
 
@@ -243,9 +267,9 @@ fn remove_suicided_panels(app: &mut App, suicide_indices: &[usize]) {
         return;
     }
     // Save current scroll state before removals (entry might shift or disappear)
-    if let Some(current) = app.state.context.get_mut(app.state.selected_context) {
-        current.scroll_state.offset = app.state.scroll_offset;
-        current.scroll_state.user_scrolled = app.state.flags.stream.user_scrolled;
+    if let Some(current) = app.state.resident.context.get_mut(app.state.resident.selected_context) {
+        current.scroll_state.offset = app.state.resident.scroll_offset;
+        current.scroll_state.user_scrolled = app.state.resident.stream.user_scrolled;
     }
     for &i in suicide_indices.iter().rev() {
         // Fix selected_context if it pointed at or past the removed panel
@@ -259,9 +283,9 @@ fn remove_suicided_panels(app: &mut App, suicide_indices: &[usize]) {
         drop(app.state.context.remove(i));
     }
     // Restore scroll from the (possibly new) selected panel
-    if let Some(incoming) = app.state.context.get(app.state.selected_context) {
-        app.state.scroll_offset = incoming.scroll_state.offset;
-        app.state.flags.stream.user_scrolled = incoming.scroll_state.user_scrolled;
+    if let Some(incoming) = app.state.resident.context.get(app.state.resident.selected_context) {
+        app.state.resident.scroll_offset = incoming.scroll_state.offset;
+        app.state.resident.stream.user_scrolled = incoming.scroll_state.user_scrolled;
     }
     app.state.flags.ui.dirty = true;
 }
@@ -287,9 +311,15 @@ pub(super) fn check_timer_based_deprecation(app: &mut App) {
     app.last_timer_check_ms = current_ms;
 
     // Ensure all module-requested paths have active watchers
-    sync_file_watchers(app);
+    {
+        let _g = crate::profile!("sync_file_watchers");
+        sync_file_watchers(app);
+    }
 
-    let (requests, suicide_indices) = collect_timer_requests(app, current_ms);
+    let (requests, suicide_indices) = {
+        let _g = crate::profile!("collect_timer_requests");
+        collect_timer_requests(app, current_ms)
+    };
 
     // Mutable pass: send requests, mark in-flight, update poll timestamps
     for (i, request) in requests {

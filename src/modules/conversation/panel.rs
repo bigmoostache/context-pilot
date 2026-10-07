@@ -58,7 +58,7 @@ impl ConversationPanel {
         // Hash viewport width
         std::hash::Hash::hash(&viewport_width, &mut hasher);
         std::hash::Hash::hash(&state.flags.ui.dev_mode, &mut hasher);
-        std::hash::Hash::hash(&state.flags.stream.phase.is_streaming(), &mut hasher);
+        std::hash::Hash::hash(&state.stream.phase.is_streaming(), &mut hasher);
 
         // Hash conversation history panel count (invalidate when panels added/removed)
         let history_count =
@@ -83,9 +83,9 @@ impl ConversationPanel {
         }
 
         // Hash input
-        std::hash::Hash::hash(&state.input, &mut hasher);
-        std::hash::Hash::hash(&state.input_cursor, &mut hasher);
-        std::hash::Hash::hash(&state.input_selection_anchor, &mut hasher);
+        std::hash::Hash::hash(&state.composer.text, &mut hasher);
+        std::hash::Hash::hash(&state.composer.cursor, &mut hasher);
+        std::hash::Hash::hash(&state.composer.anchor, &mut hasher);
 
         std::hash::Hasher::finish(&hasher)
     }
@@ -123,12 +123,12 @@ impl ConversationPanel {
     /// deleted + empty-non-streaming messages.
     fn push_message_blocks(state: &mut State, blocks: &mut Vec<Block>, viewport_width: u16) {
         let last_msg_id = state.messages.last().map(|m| m.id.clone());
-        for msg in &state.messages {
+        for msg in &state.resident.messages {
             if msg.status == MsgStatus::Deleted {
                 continue;
             }
             let is_last = last_msg_id.as_ref() == Some(&msg.id);
-            let is_streaming_this = state.flags.stream.phase.is_streaming() && is_last && msg.role == "assistant";
+            let is_streaming_this = state.stream.phase.is_streaming() && is_last && msg.role == "assistant";
 
             // Skip empty text messages (unless streaming)
             if msg.msg_type == MsgKind::TextMessage && msg.content.trim().is_empty() && !is_streaming_this {
@@ -136,7 +136,7 @@ impl ConversationPanel {
             }
 
             let hash = Self::compute_message_hash(msg, viewport_width, state.flags.ui.dev_mode);
-            if let Some(cached) = state.message_cache.get(&msg.id)
+            if let Some(cached) = state.resident.message_cache.get(&msg.id)
                 && cached.content_hash == hash
                 && cached.viewport_width == viewport_width
             {
@@ -154,6 +154,7 @@ impl ConversationPanel {
             );
             if !is_streaming_this {
                 let _r = state
+                    .resident
                     .message_cache
                     .insert(msg.id.clone(), MessageCache::new(Rc::from(rendered.as_slice()), hash, viewport_width));
             }
@@ -169,9 +170,9 @@ impl ConversationPanel {
                 .map(|c| c.id.clone())
                 .collect();
         let input_blocks = render_input_blocks::render_input_blocks(
-            &state.input,
-            state.input_cursor,
-            state.input_selection_anchor,
+            &state.composer.text,
+            state.composer.cursor,
+            state.composer.anchor,
             &InputBlockCtx {
                 command_ids: &command_ids,
                 paste_buffers: &state.paste_buffers,
@@ -186,8 +187,12 @@ impl ConversationPanel {
     /// Render the input area (cached by input hash), updating the autocomplete
     /// popup's visual-line count. Renders fresh + stores on cache miss.
     fn push_input_area(state: &mut State, blocks: &mut Vec<Block>, viewport_width: u16) {
-        let input_hash =
-            Self::compute_input_hash(&state.input, state.input_cursor, state.input_selection_anchor, viewport_width);
+        let input_hash = Self::compute_input_hash(
+            &state.composer.text,
+            state.composer.cursor,
+            state.composer.anchor,
+            viewport_width,
+        );
 
         let cache_hit = state
             .input_cache
@@ -289,7 +294,7 @@ impl Panel for ConversationPanel {
         Vec::new()
     }
     fn title(&self, state: &State) -> String {
-        if state.flags.stream.phase.is_streaming() { "Conversation *".to_owned() } else { "Conversation".to_owned() }
+        if state.stream.phase.is_streaming() { "Conversation *".to_owned() } else { "Conversation".to_owned() }
     }
 
     fn handle_key(&self, key: &KeyEvent, state: &State) -> Option<Action> {
@@ -302,38 +307,7 @@ impl Panel for ConversationPanel {
             return Some(action);
         }
 
-        // Regular typing and editing
-        match key.code {
-            KeyCode::Char(c) => Some(Action::InputChar(c)),
-            KeyCode::Backspace => Some(Action::InputBackspace),
-            KeyCode::Delete => Some(Action::InputDelete),
-            KeyCode::Left if shift => Some(Action::CursorLeftSelect),
-            KeyCode::Left => Some(Action::CursorLeft),
-            KeyCode::Right if shift => Some(Action::CursorRightSelect),
-            KeyCode::Right => Some(Action::CursorRight),
-            KeyCode::Enter => Some(handle_enter_key(state)),
-            KeyCode::Home if shift => Some(Action::CursorHomeSelect),
-            KeyCode::Home => Some(Action::CursorHome),
-            KeyCode::End if shift => Some(Action::CursorEndSelect),
-            KeyCode::End => Some(Action::CursorEnd),
-            // Remaining variants: delegate scroll keys, ignore everything else
-            KeyCode::Up | KeyCode::Down | KeyCode::PageUp | KeyCode::PageDown => scroll_key_action(key),
-            KeyCode::Tab
-            | KeyCode::BackTab
-            | KeyCode::Insert
-            | KeyCode::F(_)
-            | KeyCode::Null
-            | KeyCode::Esc
-            | KeyCode::CapsLock
-            | KeyCode::ScrollLock
-            | KeyCode::NumLock
-            | KeyCode::PrintScreen
-            | KeyCode::Pause
-            | KeyCode::Menu
-            | KeyCode::KeypadBegin
-            | KeyCode::Media(_)
-            | KeyCode::Modifier(_) => None,
-        }
+        handle_plain_key(key, state, shift)
     }
 
     fn refresh(&self, _state: &mut State) {}
@@ -428,18 +402,69 @@ const fn handle_modifier_combo(code: KeyCode, mods: &Mods) -> Option<Action> {
     }
 }
 
+/// Resolve a bare `Left` press in the composer. With `Shift`, extends the
+/// selection. With an empty composer and no active selection, Left navigates
+/// OUT to the threads list (the panel→list entry gesture G1 left unwired after
+/// dropping Ctrl+V). Otherwise it moves the cursor, so editing is never
+/// hijacked.
+fn left_action(state: &State, shift: bool) -> Action {
+    if shift {
+        Action::CursorLeftSelect
+    } else if state.composer.text.is_empty() && state.composer.anchor.is_none() {
+        Action::CycleViewMode
+    } else {
+        Action::CursorLeft
+    }
+}
+
+/// Resolve a plain (non-modifier-combo) key into an editing/navigation action.
+/// Split out of [`ConversationPanel::handle_key`] to keep its cognitive
+/// complexity under the lint budget.
+fn handle_plain_key(key: &KeyEvent, state: &State, shift: bool) -> Option<Action> {
+    match key.code {
+        KeyCode::Char(c) => Some(Action::InputChar(c)),
+        KeyCode::Backspace => Some(Action::InputBackspace),
+        KeyCode::Delete => Some(Action::InputDelete),
+        KeyCode::Left => Some(left_action(state, shift)),
+        KeyCode::Right if shift => Some(Action::CursorRightSelect),
+        KeyCode::Right => Some(Action::CursorRight),
+        KeyCode::Enter => Some(handle_enter_key(state)),
+        KeyCode::Home if shift => Some(Action::CursorHomeSelect),
+        KeyCode::Home => Some(Action::CursorHome),
+        KeyCode::End if shift => Some(Action::CursorEndSelect),
+        KeyCode::End => Some(Action::CursorEnd),
+        // Remaining variants: delegate scroll keys, ignore everything else
+        KeyCode::Up | KeyCode::Down | KeyCode::PageUp | KeyCode::PageDown => scroll_key_action(key),
+        KeyCode::Tab
+        | KeyCode::BackTab
+        | KeyCode::Insert
+        | KeyCode::F(_)
+        | KeyCode::Null
+        | KeyCode::Esc
+        | KeyCode::CapsLock
+        | KeyCode::ScrollLock
+        | KeyCode::NumLock
+        | KeyCode::PrintScreen
+        | KeyCode::Pause
+        | KeyCode::Menu
+        | KeyCode::KeypadBegin
+        | KeyCode::Media(_)
+        | KeyCode::Modifier(_) => None,
+    }
+}
+
 /// Resolve the `Enter` key: send on an empty trailing line at end-of-input,
 /// else continue/close a markdown list, else insert a newline.
 fn handle_enter_key(state: &State) -> Action {
     // Send if: cursor at end AND (input empty OR ends with empty line)
-    let at_end = state.input_cursor >= state.input.len();
+    let at_end = state.composer.cursor >= state.composer.text.len();
     let ends_with_empty_line =
-        state.input.ends_with('\n') || state.input.lines().last().is_none_or(|l| l.trim().is_empty());
+        state.composer.text.ends_with('\n') || state.composer.text.lines().last().is_none_or(|l| l.trim().is_empty());
 
     if at_end && ends_with_empty_line {
         return Action::InputSubmit;
     }
-    match list::detect_list_action(&state.input) {
+    match list::detect_list_action(&state.composer.text) {
         Some(ListAction::Continue(text)) => Action::InsertText(text),
         Some(ListAction::RemoveItem) => Action::RemoveListItem,
         None => Action::InputChar('\n'),

@@ -32,6 +32,7 @@ pub(crate) use cp_mod_queue::QueueModule;
 pub(crate) use cp_mod_scratchpad::ScratchpadModule;
 pub(crate) use cp_mod_search::SearchModule;
 pub(crate) use cp_mod_spine::SpineModule;
+pub(crate) use cp_mod_spine::persist::CoucouModule;
 pub(crate) use cp_mod_threads::ThreadsModule;
 pub(crate) use cp_mod_todo::TodoModule;
 pub(crate) use cp_mod_tree::TreeModule;
@@ -121,6 +122,7 @@ pub(crate) fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(ScratchpadModule::new()),
         Box::new(ThreadsModule::new()),
         Box::new(SpineModule::new()),
+        Box::new(CoucouModule::new()),
         Box::new(LogsModule::new()),
         Box::new(BraveModule::new()),
         Box::new(FirecrawlModule::new()),
@@ -157,6 +159,12 @@ pub(crate) fn active_tool_definitions(active_modules: &HashSet<String>) -> Vec<T
 /// Dispatch a tool call to the appropriate active module.
 pub(crate) fn dispatch_tool(tool: &ToolUse, state: &mut State, active_modules: &HashSet<String>) -> ToolResult {
     let _fg = cp_base::flame!(&format!("tool_{}", tool.name));
+    // One perf row per tool (`<parent>.tool_<name>`): bounded name set, interned
+    // once. Skipped when F12/--measure is off.
+    let _guard = crate::ui::perf::PERF
+        .enabled
+        .load(std::sync::atomic::Ordering::Relaxed)
+        .then(|| crate::profile!(crate::infra::profiler::intern(format!("tool_{}", tool.name))));
     // Handle reverie tools — optimize_context for main AI, report + allowed tools for reverie
     if tool.name == "optimize_context" {
         return crate::app::reverie::tools::execute_optimize_context(tool, state);
@@ -184,8 +192,13 @@ pub(crate) fn dispatch_tool(tool: &ToolUse, state: &mut State, active_modules: &
 }
 
 /// Create a panel for the given context type by asking all modules.
+///
+/// Modules are stateless, so the registry is built once and reused: this runs
+/// per context entry on every panel refresh, and rebuilding ~24 boxed modules
+/// each time showed up in the main-loop profile.
 pub(crate) fn create_panel(context_type: &Kind) -> Option<Box<dyn Panel>> {
-    for module in all_modules() {
+    static MODULES: std::sync::OnceLock<Vec<Box<dyn Module>>> = std::sync::OnceLock::new();
+    for module in MODULES.get_or_init(all_modules) {
         if let Some(panel) = module.create_panel(context_type) {
             return Some(panel);
         }

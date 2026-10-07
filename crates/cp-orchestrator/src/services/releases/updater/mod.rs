@@ -96,7 +96,7 @@ pub(crate) fn check_channel(
         };
         evaluate_manifest(&bytes, &sig, &ctx).map_err(|e| e.to_string())
     });
-    cp_base::deref_match!(&outcome, {
+    cp_macros::deref_match!(&outcome, {
         Ok(UpdateEvaluation::Available(ref manifest)) => {
             st.available = Some(manifest.version.clone());
             st.available_notes_url = Some(manifest.notes_url.clone());

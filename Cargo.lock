@@ -313,6 +313,7 @@ name = "cp-base"
 version = "0.2.13"
 dependencies = [
  "cp-env",
+ "cp-macros",
  "cp-mod-utilities",
  "cp-render",
  "crossterm",
@@ -343,6 +344,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cp-fleet"
+version = "0.2.13"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "cp-macros"
+version = "0.2.13"
+
+[[package]]
 name = "cp-mod-brave"
 version = "0.2.13"
 dependencies = [
@@ -362,6 +374,7 @@ version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-env",
+ "cp-macros",
  "cp-oplog",
  "cp-render",
  "cp-wire",
@@ -537,6 +550,7 @@ version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-env",
+ "cp-macros",
  "cp-mod-logs",
  "cp-mod-threads",
  "cp-mod-utilities",
@@ -577,6 +591,7 @@ name = "cp-mod-threads"
 version = "0.2.13"
 dependencies = [
  "cp-base",
+ "cp-fleet",
  "cp-mod-spine",
  "cp-render",
  "crossterm",
@@ -620,6 +635,7 @@ dependencies = [
 name = "cp-oplog"
 version = "0.2.13"
 dependencies = [
+ "cp-macros",
  "cp-wire",
  "tempfile",
 ]
@@ -633,6 +649,7 @@ dependencies = [
  "calamine",
  "cp-base",
  "cp-env",
+ "cp-macros",
  "cp-mod-bridge",
  "cp-mod-utilities",
  "cp-oplog",
@@ -668,6 +685,7 @@ name = "cp-vault"
 version = "0.2.13"
 dependencies = [
  "cp-env",
+ "cp-macros",
  "fs2",
  "log",
  "reqwest",
@@ -680,6 +698,7 @@ dependencies = [
 name = "cp-wire"
 version = "0.2.13"
 dependencies = [
+ "cp-macros",
  "crc32c",
  "serde",
  "serde_json",
@@ -3384,6 +3403,8 @@ version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-env",
+ "cp-fleet",
+ "cp-macros",
  "cp-mod-brave",
  "cp-mod-bridge",
  "cp-mod-callback",

@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use cp_base::cast::Safe as _;
 use cp_base::panels::now_ms;
 
-use super::manager::server_request;
+use super::manager::{find_or_create_server, server_request};
 use crate::ring_buffer::RingBuffer;
 use crate::types::ProcessStatus;
 
@@ -120,6 +120,74 @@ impl StatusPoller {
                 break;
             }
             std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+    }
+}
+
+/// Build the console-server `create` request for a session.
+pub(crate) fn create_request(key: &str, command: &str, log_path: &str, cwd: Option<&str>) -> serde_json::Value {
+    let mut req = serde_json::json!({"cmd": "create", "key": key, "command": command, "log_path": log_path});
+    if let Some(dir) = cwd
+        && let Some(obj) = req.as_object_mut()
+    {
+        let _prev = obj.insert("cwd".to_owned(), serde_json::Value::String(dir.to_owned()));
+    }
+    req
+}
+
+/// Send a `create` request, respawning the console server once if it is unreachable.
+pub(crate) fn send_create(req: &serde_json::Value) -> Result<serde_json::Value, String> {
+    if let Ok(resp) = server_request(req) {
+        return Ok(resp);
+    }
+    let _p = cp_base::perf_span!("console_respawn_server");
+    find_or_create_server()?;
+    server_request(req)
+}
+
+/// Server-reported pid from a `create` response (0 when absent).
+pub(crate) fn pid_of(resp: &serde_json::Value) -> u32 {
+    resp.get("pid").and_then(serde_json::Value::as_u64).unwrap_or(0).to_u32()
+}
+
+/// Spawn the log-tailing thread for a session.
+pub(crate) fn start_file_poller(path: PathBuf, buffer: RingBuffer, stop: Arc<AtomicBool>) {
+    drop(std::thread::spawn(move || FilePoller { path, buffer, stop, offset: 0 }.run()));
+}
+
+/// Background half of `SessionHandle::spawn_detached`: sends `create`, then
+/// becomes the status poller. Runs off the main loop because `create` is a
+/// console-server round-trip (~60 ms per callback on every edit).
+pub(crate) struct DetachedLaunch {
+    /// Prebuilt `create` request.
+    pub req: serde_json::Value,
+    /// Handle's pid slot, filled once the server answers.
+    pub child_id: Arc<Mutex<Option<u32>>>,
+    /// Handle's output buffer; receives the spawn error on failure.
+    pub buffer: RingBuffer,
+    /// Status poller bound to the handle's shared state.
+    pub poller: StatusPoller,
+}
+
+impl DetachedLaunch {
+    /// Consume self: create the process, then poll its status until exit.
+    pub(crate) fn run(self) {
+        match send_create(&self.req) {
+            Err(e) => {
+                self.buffer.write(format!("console server: failed to spawn: {e}\n").as_bytes());
+                self.poller.mark_terminal(ProcessStatus::Failed(-1));
+            }
+            Ok(resp) => {
+                *self.child_id.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(pid_of(&resp));
+                if self.poller.stop.load(Ordering::Relaxed) {
+                    // Killed before `create` landed: the async kill may have
+                    // reached the server first, so re-send it to avoid an orphan.
+                    let kill = serde_json::json!({"cmd": "kill", "key": self.poller.key});
+                    drop(server_request(&kill).ok());
+                    return;
+                }
+                self.poller.run();
+            }
         }
     }
 }

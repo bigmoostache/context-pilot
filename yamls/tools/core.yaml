@@ -12,26 +12,26 @@ tools:
 
   Think:
     description: |
-      Records a reasoning step or deliberation as a structured tool call. Use this when you need to think through a tricky problem before acting — weighing trade-offs, planning a multi-step approach, or working through a chain of logic that benefits from being made explicit.
+      Records a planning step as a structured tool call so the plan is visible in the UI and tracked across the session. Use it before a non-trivial, multi-step action to lay out the approach, compare options, or sequence the work.
 
-      The full thought stays in your active context for the current turn. Once the conversation gets compacted into history (long-running sessions detach old turns into frozen panels), the thought body drops away. This lets you reason at length without permanently bloating the conversation log.
+      The note stays in the active context for the current turn. In long sessions, when older turns are compacted into history, the note body drops away — so this is a lightweight place to plan without permanently growing the log.
 
       WHEN TO USE:
-      - Before committing to a non-trivial implementation plan, sketch the design out loud.
-      - When facing ambiguity in user intent, lay out the interpretations and pick one.
-      - When debugging, walk through your hypothesis chain explicitly.
-      - When code paths fork on subtle conditions, reason through which branch fits.
+      - Before committing to a non-trivial implementation plan, lay out the approach.
+      - When the request is ambiguous, list the possible interpretations and pick one.
+      - When debugging, record the hypotheses you are checking.
+      - When a code path forks on a subtle condition, note which branch fits and why.
 
       WHEN NOT TO USE:
       - Trivial decisions or single-step actions — just do them.
-      - Reasoning that's already captured implicitly by the next tool call (e.g., opening a file you obviously need to read).
-      - As filler. Every think call should earn its place.
+      - A note already implied by the next tool call (e.g., opening a file you obviously need to read).
+      - As filler. Every note should earn its place.
 
-      The thought body should be your real reasoning — uncensored, rigorous, structured.
+      The note body should be a clear, structured plan.
 
       CONTEXT RADAR: Use the task_context parameter to describe what you're currently working on (1-2 sentences). This feeds the Context Radar panel, which automatically recalls related past decisions and context from logs. Describe *what* you're working on, not *how*. The panel refreshes whenever you provide a new task_context.
     parameters:
-      thought_body: "The full reasoning. Be thorough — this is your scratch space to think clearly. Markdown is supported. Stays in active context until the turn is detached into history."
+      plan: "The plan: the approach, the options considered, and the steps you will take. Markdown is supported. Stays in the active context for the current turn."
       task_context: "Short (1-2 sentences) description of what you're currently working on. Feeds the Context Radar panel — automatically recalls related past decisions and context from logs. Describe *what* you're working on, not *how*. Example: 'Investigating port reconnection failure on TUI reload'"
 
   Todo:

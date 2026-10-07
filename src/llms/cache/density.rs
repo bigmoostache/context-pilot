@@ -265,7 +265,7 @@ pub(crate) enum DensityKind {
 impl DensityKind {
     /// Build a concrete density from the selected kind.
     pub(crate) fn build(&self) -> Box<dyn DivergenceDensity> {
-        cp_base::deref_match!(self, {
+        cp_macros::deref_match!(self, {
             Self::Uniform => Box::new(UniformDensity),
             Self::Quadratic => Box::new(QuadraticDensity),
             Self::PowerLaw { alpha } => Box::new(PowerLawDensity { alpha }),

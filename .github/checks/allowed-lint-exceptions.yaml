@@ -17,7 +17,7 @@
 exceptions:
   # ── deref_match! macro: sole ref-pattern chokepoint ─────────────────
 
-  - path: "crates/cp-base/src/lib.rs"
+  - path: "crates/cp-macros/src/lib.rs"
     match: "clippy::pattern_type_mismatch mandates ref bindings when destructuring non-Copy fields out of a shared reference; the two restriction lints are mutually exclusive, so the deref-plus-ref form is funneled through this one macro"
     reason: >
       The deref_match! macro is the single audited site allowed to use `ref`
@@ -28,66 +28,14 @@ exceptions:
       exclusive for destructuring a non-Copy field out of a shared reference, so
       every such site (Display/Debug/Error impls with String/Box/Vec fields)
       routes through this macro — the single #[expect(clippy::ref_patterns)]
-      covers all expansions workspace-wide.
+      covers all expansions workspace-wide. Lives in the dependency-free
+      cp-macros crate so even foundational crates (cp-wire, cp-vault, cp-oplog)
+      share it instead of carrying their own suppression.
     strategy: >
       Irreducible — the two forbid-level restriction lints are mutually exclusive
       by design; a single chokepoint macro is the minimal honest resolution.
 
-  - path: "crates/cp-vault/src/types.rs"
-    match: "cp-vault is foundational (cannot depend on cp-base's deref_match! macro)"
-    reason: >
-      VaultError's Display impl matches *self and binds the non-Copy String
-      payloads (MissingKey/Io/Network) with ref. clippy::pattern_type_mismatch
-      (forbid) mandates the deref-plus-ref form; clippy::ref_patterns is mutually
-      exclusive with it. cp-vault sits below cp-base in the crate graph and cannot
-      use the deref_match! macro, so the fmt fn carries its own #[expect].
-    strategy: >
-      Irreducible — the two restriction lints are mutually exclusive and this
-      foundational crate cannot reach the shared macro chokepoint.
-
-  - path: "crates/cp-wire/src/framing.rs"
-    match: "cp-wire is foundational (cannot depend on cp-base's deref_match! macro)"
-    reason: >
-      FrameError's Display impl matches *self and binds the non-Copy String
-      payloads (DeserializeError/SerializeError) with ref. clippy::pattern_type_mismatch
-      (forbid) mandates the deref-plus-ref form; clippy::ref_patterns is mutually
-      exclusive with it. cp-wire sits below cp-base in the crate graph and cannot
-      use the deref_match! macro, so the fmt fn carries its own #[expect].
-    strategy: >
-      Irreducible — the two restriction lints are mutually exclusive and this
-      foundational crate cannot reach the shared macro chokepoint.
-
-  - path: "crates/cp-oplog/src/lib.rs"
-    match: "cp-oplog is foundational (only cp_wire + std); clippy::pattern_type_mismatch mandates explicit &-patterns with ref bindings for a read-only match over a borrowed enum and the two restriction lints are mutually exclusive, so every such site funnels through this one local macro"
-    reason: >
-      The ref_match! macro is cp-oplog's local ref-pattern chokepoint. Its sites
-      (Error Display, replay fold_entry, replay_fast Checkpoint) all read non-Copy
-      fields (io::Error/FrameError/Snapshot/thread_id) out of a borrowed enum;
-      clippy::pattern_type_mismatch (forbid) mandates explicit &-patterns with ref
-      bindings, and clippy::ref_patterns is mutually exclusive with it. cp-oplog
-      depends only on cp_wire + std and cannot reach cp-base's deref_match!, so
-      every such site routes through this one macro — the single
-      #[expect(clippy::ref_patterns)] covers all expansions.
-    strategy: >
-      Irreducible — the two restriction lints are mutually exclusive and this
-      foundational crate cannot reach the shared macro chokepoint.
-
   # ── too_many_lines: flat aggregate root-state initializer ────────────
-
-  - path: "crates/cp-base/src/state/runtime/default.rs"
-    match: "flat aggregate root-state initializer; sub-grouping fields would churn 136 access sites for no gain"
-    reason: >
-      State is the flat aggregate root of the whole application (~80 leaf fields:
-      UI cursors, id counters, model selections, cache/stream/tick token + USD
-      telemetry, panel-diff snapshots, per-frame caches). Its Default impl is a
-      single linear struct literal — one `field: value` line each — at 82 lines
-      over the 60-line threshold. Grouping the telemetry counters into sub-structs
-      to shave lines would ripple across 136 field-access sites for zero
-      behavioural gain, so the initializer stays flat and carries the length
-      expect. Threshold is unchanged (still 60).
-    strategy: >
-      Irreducible without a 136-site sub-struct refactor that trades a linear
-      initializer for cross-cutting churn; the flat literal is the honest shape.
 
   # ── cast.rs: Safe numeric casting infrastructure ─────────────────
 
@@ -183,7 +131,7 @@ exceptions:
 
   # ── app/run/*: multiple_inherent_impl for App ────────────────────────
 
-  - path: "src/app/run/lifecycle.rs"
+  - path: "src/app/run/lifecycle/mod.rs"
     match: 'App methods split across run/ submodules for readability'
     reason: >
       App methods are split across 7 submodules in src/app/run/ for
@@ -193,6 +141,81 @@ exceptions:
     strategy: >
       Could merge all impl blocks into a single file, but that would
       create a 2500+ line file. The split is intentional for navigation.
+
+  - path: "src/app/run/lifecycle/animation.rs"
+    match: 'App methods split across run/ submodules for readability'
+    reason: >
+      The spinner-animation redraw cadence (tick_animation_dirty +
+      has_active_animation) is its own impl App block, extracted from
+      lifecycle/mod.rs to keep that file under the 500-line cap.
+      multiple_inherent_impl (forbid) fires on this additional block, so it
+      carries the #[expect].
+    strategy: >
+      Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
+      would push that file over the limit. The split is the honest shape.
+
+  - path: "src/app/run/lifecycle/fleet.rs"
+    match: 'App methods split across run/ submodules for readability'
+    reason: >
+      The background-thread advancement step (advance_background_threads +
+      step_one_thread) is its own impl App block under run/lifecycle/. It is a
+      distinct concern (the Phase C multi-thread loop step) kept out of
+      lifecycle/mod.rs to respect the 500-line file cap. multiple_inherent_impl
+      (forbid) fires on this second block, so it carries the #[expect].
+    strategy: >
+      Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
+      would push that file over the limit. The split is the honest shape.
+
+  - path: "src/app/run/lifecycle/fleet_lifecycle.rs"
+    match: 'App methods split across run/ submodules for readability'
+    reason: >
+      The fleet lifecycle I/O methods (prune_orphaned_console_sessions,
+      save_all_threads, clear_errored_entry, teardown_thread — Phase F boot/
+      persist/teardown) are their own impl App block, split from the sibling
+      fleet.rs scheduling module to keep each file under the 500-line cap.
+      multiple_inherent_impl (forbid) fires on this additional block, so it
+      carries the #[expect].
+    strategy: >
+      Irreducible under the 500-line cap — folding these back into fleet.rs
+      would push that file over the limit. The split is the honest shape.
+
+  - path: "src/app/run/lifecycle/input_phase.rs"
+    match: 'App methods split across run/ submodules for readability'
+    reason: >
+      The main-loop input phase (handle_input_phase: event poll, palette,
+      autocomplete, quit flush, drill swap/restore, each under its own perf
+      guard) is its own impl App block, moved out of lifecycle/mod.rs when that
+      file hit the 500-line cap. multiple_inherent_impl (forbid) fires on this
+      additional block, so it carries the #[expect].
+    strategy: >
+      Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
+      would push that file over the limit. The split is the honest shape.
+
+  - path: "src/app/run/lifecycle/coucous.rs"
+    match: 'App methods split across run/ submodules for readability'
+    reason: >
+      Fleet-shared coucou delivery (check_coucous, once per tick) and the boot
+      migration of legacy per-thread coucous (migrate_legacy_coucous) are their
+      own impl App block: they need deliver_to_thread and the fleet registry,
+      so they live on App, not in the spine crate. multiple_inherent_impl
+      (forbid) fires on this additional block, so it carries the #[expect].
+    strategy: >
+      Irreducible under the 500-line cap — lifecycle/mod.rs is near the limit,
+      fleet.rs and fleet_lifecycle.rs too. The split is the honest shape.
+
+
+  - path: "crates/cp-base/src/state/runtime/ext.rs"
+    match: "State methods split across runtime/ submodules to respect the 500-line file cap"
+    reason: >
+      State's inherent methods are split across runtime/mod.rs (the aggregate
+      struct + boot builders + message creation) and the sibling ext.rs (the
+      module extension-data accessors: get_ext/ext/set_ext/set_ext_global/
+      set_ext_thread/set_init_scope). mod.rs sits near the 500-line file cap;
+      folding the accessors back in would push it over. clippy::multiple_inherent_impl
+      (deny) fires on the second block (ext.rs), so it carries the #[expect].
+    strategy: >
+      Irreducible under the 500-line file cap — the two impl blocks are the honest
+      shape once State's methods exceed one file's budget.
 
   - path: "src/llms/mod.rs"
     match: "type_id/cause/provide are unstable or deprecated"
@@ -206,24 +229,7 @@ exceptions:
 
   # ── cp-mod-search/radar.rs: numeric casts ────────────────────────────
 
-  - path: "crates/cp-mod-search/src/radar/mod.rs"
-    match: "timestamp ms as f64 — decay math requires floating point"
-    reason: >
-      refresh_inner() casts u64 timestamps and log counts to f64 for
-      exponential decay math and uses sequential write!() calls to build
-      the YAML output string.
-    strategy: >
-      Irreducible — f64 arithmetic is required for exponential decay.
 
-  - path: "crates/cp-mod-search/src/radar/mod.rs"
-    match: "log number as f64 — decay math requires floating point"
-    reason: >
-      query_signal_results() casts the parsed log number and the current
-      log count to f64 for the per-hit exponential decay factor. Extracted
-      from refresh_inner during the cognitive_complexity split; the cast is
-      the same irreducible decay math.
-    strategy: >
-      Irreducible — f64 arithmetic is required for exponential decay.
 
   # ── cp-base test functions: panic for clear assertion messages ────
 
@@ -263,23 +269,7 @@ exceptions:
       Irreducible — clippy::little_endian_bytes forbids to_le_bytes and From
       is not const-stable, so the masked const-fn narrowing is the only option.
 
-  - path: "crates/cp-mod-utilities/src/time.rs"
-    match: "const-fn widening (u8/i32 -> i64) is always exact"
-    reason: >
-      compose_epoch_secs() is a const fn that widens u8/i32 date-time
-      components to i64 (always exact). From/i64::from are not callable in
-      a const fn, so `as` is the only const-compatible widening.
-    strategy: >
-      Irreducible until From is const-callable in stable const fn.
 
-  - path: "src/ui/ir/render_sidebar.rs"
-    match: "const-fn widening (u16 -> usize) is always exact"
-    reason: >
-      content_width() is a const fn that widens the u16 area width to usize
-      (always exact). usize::from is not const-callable on stable, so `as`
-      is the only const-compatible widening.
-    strategy: >
-      Irreducible until From is const-callable in stable const fn.
 
   # ── exhaustive_enums: closed wire / IR / registry contracts ──────────
   # These public enums are LEGITIMATELY exhaustive. They are either wire /
@@ -457,23 +447,8 @@ exceptions:
     strategy: >
       Irreducible — the exhaustive literal is the whole point; a ctor re-trips too_many_arguments.
 
-  # ── multiple_inherent_impl: ReleaseStore split for the 500-line cap ──
+  # ── multiple_inherent_impl: AuthStore split across db/acl ────────────
 
-  - path: "crates/cp-orchestrator/src/services/releases/mod.rs"
-    match: "ReleaseStore inherent methods are split across mod.rs and the sibling channel.rs to respect the 500-line file cap"
-    reason: >
-      ReleaseStore's inherent methods are split across mod.rs (the primary impl:
-      arch, local releases, GitHub API, download, select/delete, persistence) and
-      the sibling channel.rs (the OTA-channel methods: channel, set_channel,
-      pending_channel_switch, clear_pending_switch). mod.rs already sits at 477
-      lines; folding channel.rs's ~45 lines back in would push it over the 500-line
-      file cap. clippy::multiple_inherent_impl (forbid) fires on the second block,
-      so the primary impl carries the #[expect].
-    strategy: >
-      Irreducible under the 500-line file cap — the two impl blocks are the honest
-      shape once the type's methods exceed one file's budget.
-
-  # ── multiple_inherent_impl: AuthStore split across db/helpers/acl ────
 
   - path: "crates/cp-orchestrator/src/services/auth/db.rs"
     match: "AuthStore's inherent methods are split across db.rs, helpers.rs, and acl.rs to respect the 500-line file cap; folding them into one impl block would push a file over the limit"
@@ -488,20 +463,8 @@ exceptions:
       Irreducible under the 500-line file cap — the three impl blocks are the honest
       shape once the type's methods exceed one file's budget.
 
-  - path: "crates/cp-orchestrator/src/services/auth/helpers.rs"
-    match: "AuthStore's inherent methods are split across db.rs, helpers.rs, and acl.rs to respect the 500-line file cap; folding them into one impl block would push a file over the limit"
-    reason: >
-      AuthStore's inherent methods are split across db.rs (the primary impl: open,
-      schema, password hashing, user/session CRUD), helpers.rs (the default_db_path
-      helper), and acl.rs (the per-agent ACL operations). db.rs already sits near
-      the 500-line file cap; folding the sibling blocks back in would push it over
-      the limit. clippy::multiple_inherent_impl fires on the db.rs and helpers.rs
-      blocks (acl.rs is the canonical first), so each carries the #[expect].
-    strategy: >
-      Irreducible under the 500-line file cap — the three impl blocks are the honest
-      shape once the type's methods exceed one file's budget.
-
   # ── flat path-segment router: too_many_lines + pattern_type_mismatch ──
+
 
   - path: "crates/cp-orchestrator/src/transport/router.rs"
     match: "flat path-segment router: a closed match over ~60 borrowed `(&Method, &[&str])` route shapes"

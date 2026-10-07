@@ -44,7 +44,7 @@ pub(crate) enum TickOutcome {
 impl TickOutcome {
     /// The log line for this decision.
     pub(crate) fn describe(&self) -> String {
-        cp_base::deref_match!(self, {
+        cp_macros::deref_match!(self, {
             Self::CheckFailed(ref e) => format!("check failed: {e}"),
             Self::UpToDate => "up to date".to_owned(),
             Self::SkipMode(ref mode) => format!("skip: mode is {}", mode.as_str()),

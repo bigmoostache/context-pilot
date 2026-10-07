@@ -38,6 +38,9 @@ pub(crate) struct WriteBatch {
     pub deletes: Vec<DeleteOp>,
     /// Directories to ensure exist before writing
     pub ensure_dirs: Vec<PathBuf>,
+    /// Writes that must never be coalesced away (per-thread message files are
+    /// only emitted when dirty, so a superseded batch would lose them).
+    pub durable: Vec<WriteOp>,
 }
 
 /// Messages sent to the writer thread
@@ -140,7 +143,9 @@ impl WriterThread {
             };
 
             match msg {
-                Some(WriterMsg::Batch(batch)) => {
+                Some(WriterMsg::Batch(mut batch)) => {
+                    // Durable ops survive coalescing: queue them with messages.
+                    pending_messages.append(&mut batch.durable);
                     // Replace the pending batch (coalesce — only the latest state matters)
                     pending_batch = Some(batch);
                     // Don't write yet — wait for debounce timeout

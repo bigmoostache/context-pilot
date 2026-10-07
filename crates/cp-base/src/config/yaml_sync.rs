@@ -33,7 +33,7 @@ use crate::cast::Safe as _;
 ///
 /// Every entry carries a `last_edited_ms` timestamp for conflict resolution.
 /// Legacy entries without a timestamp default to `0` (any real timestamp wins).
-pub trait SyncEntry: Serialize + DeserializeOwned + Clone {
+pub trait SyncEntry: Serialize + DeserializeOwned + Clone + 'static {
     /// Milliseconds since Unix epoch when this entry was last modified.
     /// Returns `0` for legacy/unknown entries.
     fn last_edited_ms(&self) -> u64;
@@ -201,10 +201,58 @@ impl YamlSync {
         E: SyncEntry,
     {
         entry.set_last_edited_ms(now_ms());
-        let mut map = self.load::<E>();
-        let _prev = map.insert(key.to_owned(), entry.clone());
-        self.write_yaml(&map);
-        self.write_backup(&map);
+        self.upsert_many(vec![(key.to_owned(), entry.clone())]);
+    }
+
+    /// Insert or update several entries with a single load and a single write.
+    ///
+    /// Each entry's `last_edited_ms` is set to the current time. A per-entry
+    /// [`upsert`](Self::upsert) loop would re-parse and re-serialize the whole
+    /// file N times — ~100 ms on the main loop for a large tree-descriptions YAML.
+    pub fn upsert_many<E>(&self, entries: Vec<(String, E)>)
+    where
+        E: SyncEntry,
+    {
+        if entries.is_empty() {
+            return;
+        }
+        let now = now_ms();
+        let mut map = self.load_for_edit::<E>();
+        for (key, mut entry) in entries {
+            entry.set_last_edited_ms(now);
+            let _prev = map.insert(key, entry);
+        }
+        self.write_both(&map);
+    }
+
+    /// Load for a mutation that rewrites both files anyway: skips the
+    /// success-path backup write that [`load`](Self::load) performs.
+    fn load_for_edit<E>(&self) -> BTreeMap<String, E>
+    where
+        E: SyncEntry,
+    {
+        try_parse::<E>(&self.shared_path).unwrap_or_else(|| self.load::<E>())
+    }
+
+    /// Serialize once and write the result to both the shared YAML and the backup.
+    fn write_both<E>(&self, map: &BTreeMap<String, E>)
+    where
+        E: SyncEntry,
+    {
+        let serialized = {
+            let _p = crate::perf_span!("yaml_serialize");
+            serde_yaml::to_string(map)
+        };
+        let Ok(yaml_str) = serialized else { return };
+        let _p = crate::perf_span!("yaml_write");
+        for path in [&self.shared_path, &self.backup_path] {
+            if let Some(parent) = path.parent() {
+                let _mkdir = fs::create_dir_all(parent);
+            }
+            if fs::write(path, &yaml_str).is_ok() {
+                cache_store(path, map);
+            }
+        }
     }
 
     /// Remove an entry by key.
@@ -212,10 +260,9 @@ impl YamlSync {
     where
         E: SyncEntry,
     {
-        let mut map = self.load::<E>();
+        let mut map = self.load_for_edit::<E>();
         if map.remove(key).is_some() {
-            self.write_yaml(&map);
-            self.write_backup(&map);
+            self.write_both(&map);
         }
     }
 
@@ -227,13 +274,12 @@ impl YamlSync {
         E: SyncEntry,
         F: Fn(&str, &E) -> bool,
     {
-        let mut map = self.load::<E>();
+        let mut map = self.load_for_edit::<E>();
         let before = map.len();
         map.retain(|k, v| !predicate(k, v));
         let removed = before.saturating_sub(map.len());
         if removed > 0 {
-            self.write_yaml(&map);
-            self.write_backup(&map);
+            self.write_both(&map);
         }
         removed
     }
@@ -270,13 +316,73 @@ impl YamlSync {
 // Helpers
 // ---------------------------------------------------------------------------
 
+/// Size + modification time: a cached parse is reused only while both match.
+type Stamp = (u64, SystemTime);
+
+/// Per-file parse cache: stamp at parse/write time + the type-erased map.
+type ParseCache = std::collections::HashMap<PathBuf, (Stamp, Box<dyn std::any::Any>)>;
+
+thread_local! {
+    /// Last parsed map per file, with the stamp it was parsed/written at.
+    /// Parsing the 28k-line tree-descriptions YAML costs ~23 ms per call.
+    static PARSED: std::cell::RefCell<ParseCache> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+/// Current size + mtime of `path`, or `None` if unavailable.
+fn file_stamp(path: &Path) -> Option<Stamp> {
+    let meta = fs::metadata(path).ok()?;
+    Some((meta.len(), meta.modified().ok()?))
+}
+
+/// Remember `map` as the parsed content of `path` at its current stamp.
+fn cache_store<E>(path: &Path, map: &BTreeMap<String, E>)
+where
+    E: SyncEntry,
+{
+    let Some(stamp) = file_stamp(path) else { return };
+    PARSED.with(|c| {
+        let _prev = c.borrow_mut().insert(path.to_path_buf(), (stamp, Box::new(map.clone())));
+    });
+}
+
+/// Cached map for `path` if the file is unchanged since it was cached.
+fn cache_get<E>(path: &Path) -> Option<BTreeMap<String, E>>
+where
+    E: SyncEntry,
+{
+    let stamp = file_stamp(path)?;
+    PARSED.with(|c| {
+        let cache = c.borrow();
+        let entry = cache.get(path)?;
+        (entry.0 == stamp).then(|| entry.1.downcast_ref::<BTreeMap<String, E>>().cloned()).flatten()
+    })
+}
+
 /// Attempt to parse a YAML file. Returns `None` on any failure.
+///
+/// Served from the per-thread cache while the file's size and mtime are
+/// unchanged; any external edit changes the stamp and forces a re-parse.
 fn try_parse<E>(path: &Path) -> Option<BTreeMap<String, E>>
 where
-    E: DeserializeOwned,
+    E: SyncEntry,
 {
-    let contents = fs::read_to_string(path).ok()?;
-    serde_yaml::from_str(&contents).ok()
+    if let Some(map) = {
+        let _p = crate::perf_span!("yaml_cache_hit");
+        cache_get::<E>(path)
+    } {
+        return Some(map);
+    }
+    let contents = {
+        let _p = crate::perf_span!("yaml_read");
+        fs::read_to_string(path).ok()?
+    };
+    let map: BTreeMap<String, E> = {
+        let _p = crate::perf_span!("yaml_parse");
+        serde_yaml::from_str(&contents).ok()?
+    };
+    cache_store(path, &map);
+    Some(map)
 }
 
 /// Current time in milliseconds since Unix epoch.

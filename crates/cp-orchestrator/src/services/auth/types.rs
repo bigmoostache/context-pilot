@@ -13,7 +13,7 @@ pub(crate) enum AuthError {
 
 impl std::fmt::Display for AuthError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        cp_base::deref_match!(self, {
+        cp_macros::deref_match!(self, {
             Self::Database(ref err) => write!(f, "auth database error: {err}"),
             Self::Hash(ref msg) => write!(f, "password hash error: {msg}"),
         })

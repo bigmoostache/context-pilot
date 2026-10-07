@@ -41,7 +41,10 @@ pub(super) fn fire_edit_callbacks(
         return;
     }
     let _fg_cb = cp_base::flame!("callbacks");
-    let (matched, skip_warnings) = callback_trigger::match_callbacks(&app.state, &changed_files);
+    let (matched, skip_warnings) = {
+        let _g = crate::profile!("match_callbacks");
+        callback_trigger::match_callbacks(&app.state, &changed_files)
+    };
 
     // Inject skip_callbacks warnings into tool results so the AI sees them
     if !skip_warnings.is_empty() {
@@ -56,6 +59,7 @@ pub(super) fn fire_edit_callbacks(
 
     // Fire non-blocking callbacks immediately (they run async via watchers)
     if !async_cbs.is_empty() {
+        let _g = crate::profile!("fire_async");
         let summaries = callback_firing::fire_async_callbacks(&mut app.state, &async_cbs);
         if !summaries.is_empty() {
             append_to_last_edit_result(tool_results, &format!("\nCallbacks:\n{}", summaries.join("\n")));
@@ -63,6 +67,7 @@ pub(super) fn fire_edit_callbacks(
     }
 
     if !blocking_cbs.is_empty() {
+        let _g = crate::profile!("fire_blocking");
         fire_blocking_edit_callbacks(app, &blocking_cbs, tool_results);
     }
 }

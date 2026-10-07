@@ -42,7 +42,10 @@ pub(super) struct BranchPoint<'point> {
 /// frontend id round-trip and no window where the message exists un-paused.
 /// The message content rides the durable command payload, closing the
 /// data-loss race a frontend create -> wait-id -> send orchestration had.
-pub(super) fn apply_create_thread(state: &mut State, name: &str, seed: &Seed<'_>) {
+///
+/// Returns the new thread's id so the caller can route the per-thread
+/// `on_user_message` hook (D4) when a first message was seeded.
+pub(super) fn apply_create_thread(state: &mut State, name: &str, seed: &Seed<'_>) -> String {
     let ts = ThreadsState::get_mut(state);
     let id = format!("T{}", ts.next_id);
     ts.next_id = ts.next_id.saturating_add(1);
@@ -51,6 +54,7 @@ pub(super) fn apply_create_thread(state: &mut State, name: &str, seed: &Seed<'_>
     announce_thread(state, &id, name, None);
     log::info!("bridge: created thread {id} \"{name}\"");
     apply_seed(state, &id, seed);
+    id
 }
 
 /// Branch a new thread out of an existing one: copy the parent's messages up
@@ -60,18 +64,28 @@ pub(super) fn apply_create_thread(state: &mut State, name: &str, seed: &Seed<'_>
 /// The branch starts as `TheirTurn`; a first message flips it to `MyTurn`
 /// through [`apply_send_message`]. An unknown parent or branch point is
 /// logged and ignored — nothing is created.
-pub(super) fn apply_branch_thread(state: &mut State, point: &BranchPoint<'_>, name: &str, seed: &Seed<'_>) {
+///
+/// Returns the new thread's id on success (so the caller can route the
+/// per-thread `on_user_message` hook when a first message was seeded), or
+/// `None` when the branch was rejected.
+pub(super) fn apply_branch_thread(
+    state: &mut State,
+    point: &BranchPoint<'_>,
+    name: &str,
+    seed: &Seed<'_>,
+) -> Option<String> {
     let source = point.source_thread_id;
     let id = match ThreadsState::get_mut(state).branch(source, point.message_ts, name) {
         Ok(id) => id,
         Err(e) => {
             log::warn!("bridge: BranchThread rejected: {e}");
-            return;
+            return None;
         }
     };
     announce_thread(state, &id, name, Some(source));
     log::info!("bridge: branched thread {id} \"{name}\" out of {source} at ts={}", point.message_ts);
     apply_seed(state, &id, seed);
+    Some(id)
 }
 
 /// Emit the durable `ThreadCreated` roster delta for a thread just pushed onto
@@ -107,6 +121,9 @@ fn apply_seed(state: &mut State, id: &str, seed: &Seed<'_>) {
         apply_pause_thread(state, id);
     }
     if let Some(content) = seed.initial_message.filter(|c| !c.trim().is_empty()) {
-        apply_send_message(state, id, content);
+        // Ignore the applied-flag: the thread was just created, so it always
+        // exists. The create path's `on_user_message` reset is routed by the
+        // caller (`apply_command`) once it has the new thread id.
+        let _applied = apply_send_message(state, id, content);
     }
 }

@@ -69,7 +69,7 @@ pub(crate) struct StreamDoneEvent<'ev> {
 
 /// Handle `StreamDone` action — finalize streaming, correct token counts.
 pub(crate) fn handle_stream_done(state: &mut State, event: &StreamDoneEvent<'_>) -> ActionResult {
-    state.flags.stream.phase.transition(StreamPhase::Idle);
+    state.stream.phase.transition(StreamPhase::Idle);
     state.last_stop_reason = event.stop_reason.map(str::to_owned);
 
     let usage = TokenUsage {
@@ -98,10 +98,12 @@ pub(crate) fn handle_stream_done(state: &mut State, event: &StreamDoneEvent<'_>)
     crate::app::run::tools::cost_log::append_cost_tsv(state);
 
     // Correct the estimated tokens with actual output tokens on Conversation context and update timestamp
-    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
+    if let Some(ctx) = state.resident.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
         // Remove our estimate, add actual
-        ctx.token_count =
-            ctx.token_count.saturating_sub(state.streaming_estimated_tokens).saturating_add(event.output_tokens);
+        ctx.token_count = ctx
+            .token_count
+            .saturating_sub(state.resident.streaming_estimated_tokens)
+            .saturating_add(event.output_tokens);
         ctx.last_refresh_ms = crate::app::panels::now_ms();
     }
     state.streaming_estimated_tokens = 0;
@@ -121,7 +123,7 @@ pub(crate) fn handle_stream_done(state: &mut State, event: &StreamDoneEvent<'_>)
 }
 
 /// Apply token usage and frozen per-stream cost to state counters.
-const fn apply_token_usage(app_state: &mut State, usage: &TokenUsage, cost: &StreamCost) {
+fn apply_token_usage(app_state: &mut State, usage: &TokenUsage, cost: &StreamCost) {
     // Set tick usage (this tick only)
     app_state.tick_cache_hit_tokens = usage.cache_hit;
     app_state.tick_cache_miss_tokens = usage.cache_miss;
@@ -155,11 +157,11 @@ const fn apply_token_usage(app_state: &mut State, usage: &TokenUsage, cost: &Str
 pub(crate) fn handle_stream_error(state: &mut State, error: &str) -> ActionResult {
     const INLINE_LIMIT: usize = 1000;
 
-    state.flags.stream.phase.transition(StreamPhase::Idle);
+    state.stream.phase.transition(StreamPhase::Idle);
 
     // Remove estimated tokens on error from Conversation context
-    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
-        ctx.token_count = ctx.token_count.saturating_sub(state.streaming_estimated_tokens);
+    if let Some(ctx) = state.resident.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
+        ctx.token_count = ctx.token_count.saturating_sub(state.resident.streaming_estimated_tokens);
     }
     state.streaming_estimated_tokens = 0;
 

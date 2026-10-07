@@ -150,16 +150,16 @@ impl Module for ConsoleModule {
         };
 
         if sessions_map.is_empty() {
-            // No known sessions — kill any orphans on the server
-            manager::kill_orphaned_processes(&std::collections::HashSet::new());
-            return;
+            return; // nothing to reconnect; orphan cleanup is a fleet-wide pass (see below)
         }
 
-        // Collect known session keys for orphan cleanup
-        let known_keys: std::collections::HashSet<String> = sessions_map.keys().cloned().collect();
-
-        // Kill any server-managed sessions that aren't in our saved state
-        manager::kill_orphaned_processes(&known_keys);
+        // NOTE: orphan cleanup is deliberately NOT done here. `load_module_data`
+        // runs once PER THREAD at boot, but the console server's session map is
+        // fleet-wide; killing "orphans" relative to a single thread's keys would
+        // kill every OTHER thread's live sessions (same class as the F1c
+        // per-thread panel prune). The orphan-kill runs exactly once over the
+        // UNION of all threads' session keys in
+        // `App::prune_orphaned_console_sessions` after every thread is loaded.
 
         // Phase 1: Reconnect sessions (no &mut State needed)
         let mut reconnected: Vec<(String, SessionHandle)> = Vec::new();

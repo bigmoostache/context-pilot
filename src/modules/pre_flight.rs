@@ -117,7 +117,11 @@ fn check_duplicate_close(tool: &ToolUse, state: &State) -> Option<String> {
 /// - `task_id` matches a todo owned by a DIFFERENT thread — a cross-thread
 ///   reference (the precise "wrong thread" warning the all-todos scope enables).
 fn validate_task_declaration(tool: &ToolUse, state: &State, result: &mut Verdict) {
-    let Some(focused) = cp_mod_threads::types::FocusState::get(state).focused_thread_id.clone() else {
+    let Some(focused) = state
+        .resident_thread_id
+        .clone()
+        .or_else(|| cp_mod_threads::types::FocusState::get(state).focused_thread_id.clone())
+    else {
         return; // No focused thread → task_id not enforced.
     };
 

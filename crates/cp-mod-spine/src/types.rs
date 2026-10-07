@@ -102,15 +102,11 @@ pub enum ContinuationAction {
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct SpineConfig {
     // === Guard Rail Limits (all nullable = disabled by default) ===
-    /// Max total output tokens before blocking auto-continuation
-    #[serde(default)]
-    pub max_output_tokens: Option<usize>,
-    /// Max duration in seconds of autonomous operation before blocking
-    #[serde(default)]
-    pub max_duration_secs: Option<u64>,
-    /// Max conversation messages before blocking auto-continuation
-    #[serde(default)]
-    pub max_messages: Option<usize>,
+    // Phase H removed max_output_tokens / max_duration_secs / max_messages:
+    // a global ceiling on cumulative output / wall-clock / message count is a
+    // single-worker fossil in a thread-centric fleet that runs indefinitely.
+    // Only the anti-runaway retry cap survives. (serde skips the removed keys in
+    // older persisted configs — no deny_unknown_fields — so load stays safe.)
     /// Max consecutive auto-continuations without human input
     #[serde(default)]
     pub max_auto_retries: Option<usize>,
@@ -147,6 +143,17 @@ pub struct SpineState {
     pub next_notification_id: usize,
     /// Per-worker spine configuration (guard rails, auto-continuation settings).
     pub config: SpineConfig,
+    /// Mid-stream notification whose injection was deferred because the last
+    /// message was an assistant `tool_use` still awaiting its `tool_result`
+    /// (injecting there breaks the API contract). `(notification id, message)`.
+    /// Flushed by [`Self::flush_deferred_inject`] once the tool result lands;
+    /// latest wins (T736: at most one live notification message).
+    pub deferred_inject: Option<(String, String)>,
+    /// Coucous read from this thread's legacy `pending_coucous` save slot (they
+    /// lived per-thread before the fleet-shared registry). Drained once at boot
+    /// by the app into [`CoucouRegistry`](crate::schedule::CoucouRegistry),
+    /// stamped with this thread as owner. Never re-saved.
+    pub legacy_coucous: Vec<crate::coucou::Record>,
 }
 
 impl Default for SpineState {
@@ -159,7 +166,30 @@ impl SpineState {
     /// Create an empty spine state with default configuration.
     #[must_use]
     pub fn new() -> Self {
-        Self { notifications: vec![], next_notification_id: 1, config: SpineConfig::default() }
+        Self {
+            notifications: vec![],
+            next_notification_id: 1,
+            config: SpineConfig::default(),
+            deferred_inject: None,
+            legacy_coucous: vec![],
+        }
+    }
+
+    /// Inject the deferred mid-stream notification, if any and still unprocessed.
+    ///
+    /// Call right before re-streaming after tool results are appended — the
+    /// first point where a user message can legally follow. Returns whether a
+    /// message was injected.
+    pub fn flush_deferred_inject(state: &mut State) -> bool {
+        let Some((id, msg)) = Self::get_mut(state).deferred_inject.take() else {
+            return false;
+        };
+        if !Self::get(state).notifications.iter().any(|n| n.id == id && n.is_unprocessed()) {
+            return false;
+        }
+        let _stripped = state.strip_notification_messages();
+        let _idx = state.push_user_message(msg);
+        true
     }
 
     /// Get shared ref from State's `TypeMap`.
@@ -205,25 +235,29 @@ impl SpineState {
         // Only inject mid-stream: when idle, auto-continuation delivers the
         // content itself — injecting here too would create a doublon.
         let should_inject = !matches!(kind, NotificationType::UserMessage | NotificationType::ReloadResume)
-            && state.flags.stream.phase.is_streaming();
+            && state.stream.phase.is_streaming();
+        let id = format!("N{}", Self::get(state).next_notification_id);
         if should_inject {
             let safe_to_inject = state.messages.last().is_none_or(|last| {
                 // Unsafe if the last message is an assistant with pending tool calls
                 // (tool_result hasn't been appended yet).
                 last.role != "assistant" || last.tool_uses.is_empty()
             });
+            let msg = format!("/* Notification [{source}]: {content} */");
             if safe_to_inject {
                 // Aggregate (T736): keep at most one notification message live —
                 // drop any prior injected notification messages before adding this.
                 let _stripped = state.strip_notification_messages();
-                let msg = format!("/* Notification [{source}]: {content} */");
-                let _id = state.push_user_message(msg);
+                let _idx = state.push_user_message(msg);
+            } else {
+                // Mid tool call: defer until the tool_result lands, instead of
+                // silently dropping it (the LLM would never see it mid-stream).
+                Self::get_mut(state).deferred_inject = Some((id.clone(), msg));
             }
         }
 
-        let id = {
+        {
             let ss = Self::get_mut(state);
-            let id = format!("N{}", ss.next_notification_id);
             ss.next_notification_id = ss.next_notification_id.saturating_add(1);
             let mut notification = Notification::new(id.clone(), kind, source, content);
             notification.thread_id = None;
@@ -243,8 +277,7 @@ impl SpineState {
                     true
                 });
             }
-            id
-        };
+        }
         state.touch_panel(Kind::SPINE);
         id
     }

@@ -158,7 +158,7 @@ impl Backend {
             releases,
             provision_flag_path,
             pkce_session: None,
-            auth_db_path: AuthStore::default_db_path(),
+            auth_db_path: crate::services::auth::default_db_path(),
             agents_dir,
             dirty_agents: HashSet::new(),
             liveness: HashMap::new(),

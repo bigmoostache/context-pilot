@@ -11,17 +11,16 @@ use crate::modules::all_modules;
 
 /// Handle `InputSubmit` action — context switching, message creation, stream start.
 pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
-    if state.input.is_empty() {
+    if state.composer.text.is_empty() {
         return ActionResult::Nothing;
     }
 
     // Context switching is always allowed, even during streaming
-    if let Some(id) = parse_context_pattern(&state.input)
+    if let Some(id) = parse_context_pattern(&state.composer.text)
         && let Some(index) = find_context_by_id(state, &id)
     {
         super::switch_to_panel(state, index);
-        state.input.clear();
-        state.input_cursor = 0;
+        state.composer.reset();
         return ActionResult::Nothing;
     }
 
@@ -31,12 +30,10 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
     }
 
     let commands = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Command);
-    let commanded = replace_commands(&state.input, &commands);
+    let commanded = replace_commands(&state.composer.text, &commands);
     // Expand paste sentinels: replace \x00{idx}\x00 with actual paste buffer content
     let content = expand_paste_sentinels(&commanded, &state.paste_buffers);
-    state.input.clear();
-    state.input_cursor = 0;
-    state.input_selection_anchor = None;
+    state.composer.reset();
     state.paste_buffers.clear();
     state.paste_buffer_labels.clear();
     let user_token_estimate = estimate_tokens(&content);
@@ -78,7 +75,7 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
 
     // During streaming: insert BEFORE the streaming assistant message
     // The notification will be picked up when the current stream ends
-    if state.flags.stream.phase.is_streaming() {
+    if state.stream.phase.is_streaming() {
         let insert_pos = state.messages.len().saturating_sub(1);
         state.messages.insert(insert_pos, user_msg);
         return ActionResult::Save;
@@ -95,7 +92,7 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
 
 /// Zero the per-stream and per-tick token + USD telemetry counters ahead of a
 /// new user-initiated stream, so the next stream's stats start from a clean base.
-const fn reset_stream_and_tick_counters(state: &mut State) {
+fn reset_stream_and_tick_counters(state: &mut State) {
     state.stream_cache_hit_tokens = 0;
     state.stream_cache_miss_tokens = 0;
     state.stream_output_tokens = 0;
@@ -120,8 +117,7 @@ pub(crate) fn handle_clear_conversation(state: &mut State) -> ActionResult {
         delete_message(file_id);
     }
     state.messages.clear();
-    state.input.clear();
-    state.input_selection_anchor = None;
+    state.composer.reset();
     // Reset token count for Conversation context and update timestamp
     if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
         ctx.token_count = 0;
@@ -172,13 +168,11 @@ fn handle_thread_input_submit(state: &mut State) -> ActionResult {
     };
 
     let commands = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Command);
-    let commanded = replace_commands(&state.input, &commands);
+    let commanded = replace_commands(&state.composer.text, &commands);
     let content = expand_paste_sentinels(&commanded, &state.paste_buffers);
 
     // Clear input state
-    state.input.clear();
-    state.input_cursor = 0;
-    state.input_selection_anchor = None;
+    state.composer.reset();
     state.paste_buffers.clear();
     state.paste_buffer_labels.clear();
 
@@ -218,12 +212,10 @@ fn handle_thread_create(state: &mut State) -> ActionResult {
     /// Maximum thread name length to prevent state bloat.
     const MAX_THREAD_NAME_LEN: usize = 200;
 
-    let raw_name = state.input.trim().to_owned();
+    let raw_name = state.composer.text.trim().to_owned();
 
     // Clear input regardless of outcome
-    state.input.clear();
-    state.input_cursor = 0;
-    state.input_selection_anchor = None;
+    state.composer.reset();
 
     if raw_name.is_empty() {
         return ActionResult::Nothing;

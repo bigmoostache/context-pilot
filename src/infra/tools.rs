@@ -16,6 +16,21 @@ pub(crate) fn execute_tool(tool: &ToolUse, state: &mut State) -> ToolResult {
 
 /// Execute `reload_tui` tool (public for module access)
 pub(crate) fn execute_reload_tui(tool: &ToolUse, state: &mut State) -> ToolResult {
+    // Pin focus to the thread that invoked the reload. On boot the persisted
+    // focused thread is what `boot_load_config` uses to pick the resident
+    // `states/<id>.json`, so the post-reload `ReloadResume` continuation (the
+    // "reload complete" message + stream relaunch) applies to that thread's
+    // state. Without this, a background thread that calls `system_reload` would
+    // have the resume land on whatever thread was focused at boot — the wrong
+    // one. At N=1 `resident_thread_id` is None or already equals the focused
+    // pointer, so this is a no-op and behaviour is byte-identical.
+    if let Some(caller) = state.resident_thread_id.clone() {
+        let fs = cp_mod_threads::types::FocusState::get_mut(state);
+        if fs.focused_thread_id.as_deref() != Some(caller.as_str()) {
+            fs.focused_thread_id = Some(caller);
+        }
+    }
+
     // Set flag - actual reload happens in app.rs after tool result is saved
     state.flags.lifecycle.reload_pending = true;
 

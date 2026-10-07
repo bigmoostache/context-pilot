@@ -86,50 +86,14 @@ fn zero_limit_error(tool: &ToolUse, key: &str) -> ToolResult {
     )
 }
 
-/// Apply all four guard-rail limit fields. Returns `Some(error)` on a zero value,
-/// else `None` after recording any changes into `changes`.
+/// Apply the `max_auto_retries` guard-rail limit field. Returns `Some(error)` on
+/// a zero value, else `None` after recording any change into `changes`.
+///
+/// Phase H removed the output-token / duration / message-count limits, so this
+/// is the only configurable guard rail left (the anti-runaway retry cap).
 fn apply_limits(tool: &ToolUse, state: &mut State, changes: &mut Vec<String>) -> Option<ToolResult> {
     use cp_base::cast::Safe as _;
     let input = &tool.input;
-
-    match read_limit(input, "max_output_tokens") {
-        LimitAction::Disable => {
-            SpineState::get_mut(state).config.max_output_tokens = None;
-            changes.push("max_output_tokens = disabled".to_owned());
-        }
-        LimitAction::Set(n) => {
-            SpineState::get_mut(state).config.max_output_tokens = Some(n.to_usize());
-            changes.push(format!("max_output_tokens = {n}"));
-        }
-        LimitAction::Zero => return Some(zero_limit_error(tool, "max_output_tokens")),
-        LimitAction::Absent => {}
-    }
-
-    match read_limit(input, "max_duration_secs") {
-        LimitAction::Disable => {
-            SpineState::get_mut(state).config.max_duration_secs = None;
-            changes.push("max_duration_secs = disabled".to_owned());
-        }
-        LimitAction::Set(n) => {
-            SpineState::get_mut(state).config.max_duration_secs = Some(n);
-            changes.push(format!("max_duration_secs = {n}s"));
-        }
-        LimitAction::Zero => return Some(zero_limit_error(tool, "max_duration_secs")),
-        LimitAction::Absent => {}
-    }
-
-    match read_limit(input, "max_messages") {
-        LimitAction::Disable => {
-            SpineState::get_mut(state).config.max_messages = None;
-            changes.push("max_messages = disabled".to_owned());
-        }
-        LimitAction::Set(n) => {
-            SpineState::get_mut(state).config.max_messages = Some(n.to_usize());
-            changes.push(format!("max_messages = {n}"));
-        }
-        LimitAction::Zero => return Some(zero_limit_error(tool, "max_messages")),
-        LimitAction::Absent => {}
-    }
 
     match read_limit(input, "max_auto_retries") {
         LimitAction::Disable => {

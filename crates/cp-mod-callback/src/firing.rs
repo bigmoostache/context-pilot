@@ -25,14 +25,57 @@ pub struct FireResult {
     pub replaced: bool,
 }
 
+/// Dedup key for a callback's active session: `"<thread>\u{1f}<callback_id>"`.
+///
+/// The thread component is the resident (executing) thread at fire time, so two
+/// threads firing the same callback get distinct keys and never kill each
+/// other's in-flight run (§13/H2, S6). The `\u{1f}` (ASCII unit separator) can't
+/// appear in a thread id or callback id, so the join is collision-free. At N=1
+/// `resident_thread_id` is `None` → the key degrades to the old callback-id-only
+/// behaviour with a constant prefix.
+fn dedup_key(state: &State, callback_id: &str) -> String {
+    let tid = state.resident_thread_id.as_deref().unwrap_or(constants::DEFAULT_WORKER_ID);
+    format!("{tid}\u{1f}{callback_id}")
+}
+
+/// Informational note (§13/H2) appended to a callback *failure* when another
+/// thread is concurrently running the same callback.
+///
+/// Scans `active_sessions` (keyed `"<thread>\u{1f}<callback_id>"`) for an entry
+/// with the *same* callback id but a *different* thread whose console session is
+/// still running. Returns `None` at N=1 (no other thread), when the callback is
+/// not `concurrency_friendly`, or when no concurrent run is live — so the note
+/// never appears in the single-thread case.
+fn concurrent_run_note(state: &State, callback_id: &str, fired_by: Option<&str>) -> Option<String> {
+    let cs = CallbackState::get(state);
+    let console = ConsoleState::get(state);
+    let suffix = format!("\u{1f}{callback_id}");
+    let other_live = cs.active_sessions.iter().any(|(key, session)| {
+        // Same callback id, different executing thread.
+        let Some(other_tid) = key.strip_suffix(&suffix) else { return false };
+        if Some(other_tid) == fired_by {
+            return false;
+        }
+        // That thread's session must still be running to count as concurrent.
+        console.sessions.get(session).is_some_and(|h| !h.get_status().is_terminal())
+    });
+    other_live.then(|| {
+        "\n  (note: another thread is running this callback concurrently \u{2014} \
+         this failure may be caused by that concurrent run)"
+            .to_owned()
+    })
+}
+
 /// Kill an existing session for the same callback definition (dedup).
 ///
-/// If the same callback already has an active session, kills its process,
-/// removes its watcher, and cleans up the console entry. Returns `true`
-/// if a running session was replaced.
+/// If the same callback already has an active session **for this thread**, kills
+/// its process, removes its watcher, and cleans up the console entry. Returns
+/// `true` if a running session was replaced.
 fn kill_existing_callback(state: &mut State, callback_id: &str) -> bool {
+    let _p = cp_base::perf_span!("cb_kill_existing");
+    let key = dedup_key(state, callback_id);
     let cs = CallbackState::get_mut(state);
-    let Some(old_key) = cs.active_sessions.remove(callback_id) else {
+    let Some(old_key) = cs.active_sessions.remove(&key) else {
         return false;
     };
 
@@ -142,8 +185,11 @@ pub fn fire_callback(
         key
     };
 
-    // Spawn the process
-    let handle = SessionHandle::spawn(session_key.clone(), command.clone(), cwd)?;
+    // Spawn the process off the main loop; a spawn error surfaces as a failed run.
+    let handle = {
+        let _p = cp_base::perf_span!("cb_spawn");
+        SessionHandle::spawn_detached(session_key.clone(), command.clone(), cwd)
+    };
 
     // Store handle in console state (NO panel created — deferred until failure/timeout)
     let cs = ConsoleState::get_mut(state);
@@ -172,6 +218,8 @@ pub fn fire_callback(
         deadline_ms,
         desc: watcher_desc,
         matched_files: matched.matched_files.clone(),
+        fired_by_thread: state.resident_thread_id.clone(),
+        concurrency_friendly: def.concurrency_friendly,
         deferred_panel: DeferredPanel::new(
             session_key.clone(),
             format!("CB: {}", def.name),
@@ -185,8 +233,9 @@ pub fn fire_callback(
     let registry = WatcherRegistry::get_mut(state);
     registry.register(Box::new(watcher));
 
-    // Track this session for dedup
-    drop(CallbackState::get_mut(state).active_sessions.insert(def.id.clone(), session_key.clone()));
+    // Track this session for dedup, keyed per (executing thread, callback).
+    let key = dedup_key(state, &def.id);
+    drop(CallbackState::get_mut(state).active_sessions.insert(key, session_key.clone()));
 
     Ok(FireResult { session_key, replaced })
 }
@@ -289,6 +338,15 @@ pub struct CallbackWatcher {
     pub desc: String,
     /// Files that triggered this callback (for env var injection).
     pub matched_files: Vec<String>,
+    /// Resident (executing) thread id at fire time, or `None` at N=1.
+    ///
+    /// Used only to decide whether *another* thread is concurrently running the
+    /// same callback when this one fails, so a cross-thread note can be appended
+    /// to the failure result (§13/H2, informational).
+    pub fired_by_thread: Option<String>,
+    /// Whether this callback is marked safe to run concurrently (§13/H2). Gates
+    /// the informational cross-thread failure note; `false` suppresses it.
+    pub concurrency_friendly: bool,
     /// Panel creation info (deferred until failure/timeout).
     pub deferred_panel: DeferredPanel,
 }
@@ -345,7 +403,13 @@ impl Watcher for CallbackWatcher {
             )
         } else {
             // Panel content is already final — the pipeline waited for process exit before resuming
-            let msg = format!("· {} FAILED (exit {})", self.callback_name, exit_code);
+            let mut msg = format!("· {} FAILED (exit {})", self.callback_name, exit_code);
+            if self.concurrency_friendly
+                && let Some(cbid) = self.callback_tag.strip_prefix("callback_")
+                && let Some(note) = concurrent_run_note(state, cbid, self.fired_by_thread.as_deref())
+            {
+                msg.push_str(&note);
+            }
             Some(
                 WatcherResult::new(msg).tool_use_id_opt(self.tool_use_id.clone()).create_panel(
                     DeferredPanel::new(

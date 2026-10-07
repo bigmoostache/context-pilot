@@ -27,6 +27,8 @@
 //!
 //! [`Recovered`]: cp_oplog::replay::replay
 
+use cp_macros as _;
+
 use std::time::Duration;
 
 use cp_oplog::append::OplogWriter;

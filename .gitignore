@@ -124,4 +124,6 @@ deploy/ansible/*.local.yml
 
 # local working notes
 /todo.md
-tmp/**
+tmp/**orchestrator.log
+orchestrator.log
+tmp

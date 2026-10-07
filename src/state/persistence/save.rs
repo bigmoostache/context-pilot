@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use cp_mod_logs::types::LogsState;
 
-use crate::infra::constants::{CONFIG_FILE, DEFAULT_WORKER_ID, STORE_DIR};
+use crate::infra::constants::{CONFIG_FILE, DEFAULT_WORKER_ID, OWNER_FILE, STORE_DIR};
 use crate::state::{Kind, Message, PanelData, SharedConfig, State, WorkerState};
 
 use super::config::current_pid;
@@ -22,11 +22,56 @@ type ModuleDataMaps = (HashMap<String, serde_json::Value>, HashMap<String, serde
 /// (`important_panel_uids` by kind, `panel_uid` → local id) worker maps.
 type PanelUidMaps = (HashMap<Kind, String>, HashMap<String, String>);
 
+/// The `states/<id>.json` file id for whichever thread is currently resident
+/// in `state` — the file this save writes.
+///
+/// Both thread kinds write a file named after their own thread id:
+/// - a **background** thread (resident only during its advancement step, so
+///   `resident_thread_id != focused_thread_id`) writes `states/<tid>.json`,
+///   which is why a background thread's mid-step `save_state_async` cannot
+///   clobber the focused thread's file;
+/// - the **focused** thread writes `states/<tid>.json` too. Keying it by id
+///   rather than by position is what makes focus-switching safe across a
+///   reload: under a fixed `main_worker` name, switching focus and then
+///   reloading loads the *previously* focused thread's context into the newly
+///   focused one.
+///
+/// An **unfocused** agent (boot before any `Read`; focus cleared by
+/// archive/delete) has no thread to name, so it keeps the legacy
+/// [`DEFAULT_WORKER_ID`] file. Boot selects the matching id through
+/// [`worker::focused_worker_id`], which mirrors this rule and adds a one-shot
+/// fallback to the legacy name for installs saved before pointers existed.
+fn resident_worker_id(state: &State) -> String {
+    let focused = cp_mod_threads::types::FocusState::get(state).focused_thread_id.clone();
+    match state.resident_thread_id.as_ref() {
+        Some(tid) if Some(tid) != focused.as_ref() => tid.clone(),
+        _ => focused.unwrap_or_else(|| DEFAULT_WORKER_ID.to_owned()),
+    }
+}
+
+/// The set of panel UIDs this `state` persists (same filter as
+/// [`build_panel_write_ops`]): every panel with a UID except the compiled-in
+/// SYSTEM / LIBRARY panels.
+///
+/// [`save_all_threads`](crate::app::App::save_all_threads) unions this across
+/// every thread to prune orphaned `panels/<uid>.json` exactly once — pruning
+/// per-thread would delete other threads' panels (all threads share the
+/// `panels/` dir, keyed by the fleet-global UID counter).
+pub(crate) fn panel_uids_of(state: &State) -> std::collections::HashSet<String> {
+    state
+        .context
+        .iter()
+        .filter(|c| c.context_type.as_str() != Kind::SYSTEM && c.context_type.as_str() != Kind::LIBRARY)
+        .filter_map(|c| c.uid.clone())
+        .collect()
+}
+
 /// Build global + per-worker module-data maps by polling every registered module.
 fn build_module_data_maps(state: &State) -> ModuleDataMaps {
     let mut global_modules = HashMap::new();
     let mut worker_modules = HashMap::new();
     for module in crate::modules::all_modules() {
+        let _g = crate::infra::profiler::dyn_guard("save_mod_", module.id());
         let data = module.save_module_data(state);
         if !data.is_null() {
             if module.is_global() {
@@ -117,7 +162,10 @@ fn build_history_message_ops(state: &State, messages_dir: &std::path::Path) -> V
 
 /// Scan the panels dir and emit a delete op for every `{uid}.json` whose UID is
 /// no longer live in `known_uids`.
-fn collect_orphan_deletes(
+///
+/// `pub(crate)` so [`save_all_threads`](crate::app::App::save_all_threads) can
+/// run it once over the union of every thread's UIDs (see [`panel_uids_of`]).
+pub(crate) fn collect_orphan_deletes(
     panels_dir: &std::path::Path,
     known_uids: &std::collections::HashSet<String>,
 ) -> Vec<DeleteOp> {
@@ -158,6 +206,49 @@ fn build_panel_uid_maps(state: &State) -> PanelUidMaps {
     (important_uids, panel_uid_to_local_id)
 }
 
+/// Serialize `config.json` (shared config + global module data). Timed as
+/// `….shared_config`.
+fn shared_config_op(
+    state: &State,
+    global_modules: HashMap<String, serde_json::Value>,
+    dir: &std::path::Path,
+) -> Option<WriteOp> {
+    let _g = crate::profile!("shared_config");
+    let shared_config = SharedConfig::default()
+        .with_active_theme(state.active_theme.clone())
+        .with_owner_pid(Some(current_pid()))
+        // Draft lives per-thread in `states/<id>.json`; the shared slot is
+        // emptied so a background-thread save can't clobber the focused draft.
+        .with_ui(state.selected_context, String::new(), 0)
+        .with_view_mode(state.view_mode)
+        .with_modules(global_modules);
+    let json = serde_json::to_string_pretty(&shared_config).ok()?;
+    Some(WriteOp { path: dir.join(CONFIG_FILE), content: json.into_bytes() })
+}
+
+/// Serialize the resident thread's `states/<id>.json` (see
+/// [`resident_worker_id`]). Timed as `….worker_state`.
+fn worker_state_op(
+    state: &State,
+    worker_modules: HashMap<String, serde_json::Value>,
+    dir: &std::path::Path,
+) -> Option<WriteOp> {
+    let _g = crate::profile!("worker_state");
+    let (important_uids, panel_uid_to_local_id) = build_panel_uid_maps(state);
+    let worker_id = resident_worker_id(state);
+    let worker_state = WorkerState::default()
+        .with_worker_id(worker_id.clone())
+        .with_panel_uids(important_uids, panel_uid_to_local_id)
+        .with_id_counters(state.next_tool_id, state.next_result_id)
+        .with_draft(state.composer.text.clone(), state.composer.cursor)
+        .with_modules(worker_modules);
+    let json = serde_json::to_string_pretty(&worker_state).ok()?;
+    Some(WriteOp {
+        path: dir.join(crate::infra::constants::STATES_DIR).join(format!("{worker_id}.json")),
+        content: json.into_bytes(),
+    })
+}
+
 /// Serialize all config, worker state, panels, and history messages
 /// into a batch of file write/delete operations.
 pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
@@ -172,53 +263,59 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
         dir.join(crate::infra::constants::MESSAGES_DIR),
         dir.join(cp_mod_logs::LOGS_DIR),
         dir.join(cp_mod_console::CONSOLE_DIR),
+        dir.join(cp_mod_threads::types::persist::THREADS_DIR),
     ];
 
-    let (global_modules, worker_modules) = build_module_data_maps(state);
-
-    // Shared config
-    let shared_config = SharedConfig::default()
-        .with_active_theme(state.active_theme.clone())
-        .with_owner_pid(Some(current_pid()))
-        .with_ui(state.selected_context, state.input.clone(), state.input_cursor)
-        .with_view_mode(state.view_mode)
-        .with_modules(global_modules);
-    if let Ok(json) = serde_json::to_string_pretty(&shared_config) {
-        writes.push(WriteOp { path: dir.join(CONFIG_FILE), content: json.into_bytes() });
-    }
-
-    // Chunked log files (global, shared across workers)
-    let logs_state = LogsState::get(state);
-    writes.extend(
-        cp_mod_logs::build_log_write_ops(&logs_state.logs, logs_state.next_log_id)
+    // Per-thread message files, only for threads changed since last write.
+    let mut durable: Vec<WriteOp> = {
+        let _g = crate::profile!("thread_files");
+        let threads = &cp_mod_threads::types::ThreadsState::get(state).threads;
+        cp_mod_threads::types::persist::dirty_thread_file_ops(threads)
             .into_iter()
-            .map(|(path, content)| WriteOp { path, content }),
-    );
+            .map(|(path, content)| WriteOp { path, content })
+            .collect()
+    };
 
-    let (important_uids, panel_uid_to_local_id) = build_panel_uid_maps(state);
+    let (global_modules, worker_modules) = {
+        let _g = crate::profile!("modules");
+        build_module_data_maps(state)
+    };
 
-    // WorkerState
-    let worker_state = WorkerState::default()
-        .with_worker_id(DEFAULT_WORKER_ID.to_owned())
-        .with_panel_uids(important_uids, panel_uid_to_local_id)
-        .with_id_counters(state.next_tool_id, state.next_result_id)
-        .with_modules(worker_modules);
-    if let Ok(json) = serde_json::to_string_pretty(&worker_state) {
-        writes.push(WriteOp {
-            path: dir.join(crate::infra::constants::STATES_DIR).join(format!("{DEFAULT_WORKER_ID}.json")),
-            content: json.into_bytes(),
-        });
+    writes.extend(shared_config_op(state, global_modules, &dir));
+    writes.push(WriteOp { path: dir.join(OWNER_FILE), content: current_pid().to_string().into_bytes() });
+
+    // Chunked log files (global, shared across workers): only changed chunks,
+    // on the durable lane because they are marked clean once built.
+    {
+        let _g = crate::profile!("logs");
+        let logs_state = LogsState::get(state);
+        durable.extend(
+            cp_mod_logs::build_log_write_ops(&logs_state.logs, logs_state.next_log_id)
+                .into_iter()
+                .map(|(path, content)| WriteOp { path, content }),
+        );
     }
 
-    // Panels + history messages + orphan pruning
+    writes.extend(worker_state_op(state, worker_modules, &dir));
+
+    // Panels + history messages. NOTE: orphan pruning is deliberately NOT done
+    // here — a single-thread save only knows the RESIDENT's UIDs, so pruning
+    // would delete every OTHER thread's `panels/<uid>.json` (the dir is shared,
+    // keyed by the fleet-global UID counter). Pruning runs once over the union
+    // of all threads' UIDs in `App::save_all_threads` (reload/quit).
     let panels_dir = dir.join(crate::infra::constants::PANELS_DIR);
     let messages_dir = dir.join(crate::infra::constants::MESSAGES_DIR);
     let mut known_uids: std::collections::HashSet<String> = std::collections::HashSet::new();
-    writes.extend(build_panel_write_ops(state, &panels_dir, &mut known_uids));
-    writes.extend(build_history_message_ops(state, &messages_dir));
-    let deletes = collect_orphan_deletes(&panels_dir, &known_uids);
+    {
+        let _g = crate::profile!("panels");
+        writes.extend(build_panel_write_ops(state, &panels_dir, &mut known_uids));
+    }
+    {
+        let _g = crate::profile!("history_msgs");
+        writes.extend(build_history_message_ops(state, &messages_dir));
+    }
 
-    WriteBatch { writes, deletes, ensure_dirs }
+    WriteBatch { writes, deletes: Vec::new(), ensure_dirs, durable }
 }
 
 /// Build a `WriteOp` for a single message (CPU work only — no I/O).
@@ -230,7 +327,7 @@ pub(crate) fn build_message_op(msg: &Message) -> WriteOp {
 }
 
 /// Execute one write op synchronously (create parent dir, then write).
-fn exec_write_op(op: &WriteOp) {
+pub(crate) fn exec_write_op(op: &WriteOp) {
     if let Some(parent) = op.path.parent()
         && let Err(e) = fs::create_dir_all(parent)
     {
@@ -242,8 +339,15 @@ fn exec_write_op(op: &WriteOp) {
     }
 }
 
+/// Absolute path to the shared `panels/` directory — the dir
+/// [`save_all_threads`](crate::app::App::save_all_threads) scans for the union
+/// orphan-prune.
+pub(crate) fn panels_dir() -> PathBuf {
+    PathBuf::from(STORE_DIR).join(crate::infra::constants::PANELS_DIR)
+}
+
 /// Execute one delete op synchronously (ignoring not-found).
-fn exec_delete_op(op: &DeleteOp) {
+pub(crate) fn exec_delete_op(op: &DeleteOp) {
     if let Err(e) = fs::remove_file(&op.path)
         && e.kind() != std::io::ErrorKind::NotFound
     {
@@ -262,7 +366,7 @@ pub(crate) fn save_state(state: &State) {
             drop(writeln!(std::io::stderr(), "[persistence] failed to create dir {}: {}", dir.display(), e));
         }
     }
-    for op in &batch.writes {
+    for op in batch.durable.iter().chain(&batch.writes) {
         exec_write_op(op);
     }
     for op in &batch.deletes {
@@ -272,7 +376,13 @@ pub(crate) fn save_state(state: &State) {
 
 /// Check if we still own the state file (another instance may have taken over).
 /// Returns false if another process has claimed ownership.
+///
+/// Reads the tiny `owner.pid` file. Falls back to parsing `config.json` only
+/// when `owner.pid` is absent (state written by a build predating it).
 pub(crate) fn check_ownership() -> bool {
+    if let Ok(raw) = fs::read_to_string(PathBuf::from(STORE_DIR).join(OWNER_FILE)) {
+        return raw.trim().parse::<u32>().ok().is_none_or(|owner| owner == current_pid());
+    }
     if let Some(cfg) = super::config::load_config()
         && let Some(owner) = cfg.owner_pid
     {

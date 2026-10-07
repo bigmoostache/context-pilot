@@ -32,6 +32,15 @@ pub(crate) fn install_signal_handlers() {
     }
 }
 
+/// Wait for a shutdown signal, then connect to our own socket once so the
+/// main thread's blocking `accept` returns and sees the flag.
+pub(crate) fn shutdown_waker(socket_path: &str) {
+    while !SHUTDOWN_REQUESTED.load(Ordering::Relaxed) {
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    drop(std::os::unix::net::UnixStream::connect(socket_path));
+}
+
 /// Grace period (seconds) after a session exits before the reaper removes it.
 /// Gives the TUI time to read the final status and log output.
 const REAPER_GRACE_SECS: u64 = 30;
@@ -97,13 +106,27 @@ pub(crate) fn kill_all_sessions(sessions: &Sessions) {
     let mut map = sessions.lock().unwrap_or_else(PoisonError::into_inner);
     for session in map.values_mut() {
         if !session.is_terminal() {
-            drop(Command::new("kill").args([&session.pid.to_string()]).output());
-            std::thread::sleep(std::time::Duration::from_millis(50));
-            if is_pid_alive(session.pid) {
-                drop(Command::new("kill").args(["-9", &session.pid.to_string()]).output());
-            }
+            terminate(session.pid, 50);
         }
         drop(session.stdin.take());
     }
     map.clear();
+}
+
+/// SIGTERM `pid`, then SIGKILL it if still alive after `grace_ms`.
+///
+/// Polls liveness every 5 ms instead of sleeping the full grace period, so a
+/// process that exits promptly (the common case) returns in a few ms. The
+/// caller (and the agent blocked on the socket reply) no longer pays a fixed
+/// delay. Worst case is unchanged: `grace_ms` then SIGKILL.
+pub(crate) fn terminate(pid: u32, grace_ms: u64) {
+    drop(Command::new("kill").args([&pid.to_string()]).output());
+    let deadline = std::time::Instant::now().checked_add(std::time::Duration::from_millis(grace_ms));
+    while is_pid_alive(pid) {
+        if deadline.is_none_or(|d| std::time::Instant::now() >= d) {
+            drop(Command::new("kill").args(["-9", &pid.to_string()]).output());
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
 }

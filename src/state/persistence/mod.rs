@@ -7,7 +7,10 @@
 //! - Messages (messages/{uid}.yaml) - Conversation messages
 mod boot;
 
-pub(crate) use boot::{boot_extract_module_data, boot_init_modules, check_env, preflight_env};
+pub(crate) use boot::{
+    boot_extract_module_data, boot_init_modules, boot_load_thread_runtime, check_env, fresh_thread_runtime,
+    preflight_env,
+};
 pub(crate) mod config;
 pub(crate) mod message;
 pub(crate) mod panel;
@@ -23,7 +26,7 @@ pub(crate) use writer::PersistenceWriter;
 use std::path::PathBuf;
 
 use crate::infra::config::set_active_theme;
-use crate::infra::constants::{CONFIG_FILE, DEFAULT_WORKER_ID, STORE_DIR};
+use crate::infra::constants::{CONFIG_FILE, STORE_DIR};
 use crate::state::{Entry, Kind, Message, PanelData, SharedConfig, State, WorkerState};
 
 /// Check if new multi-file format exists
@@ -52,10 +55,21 @@ pub(crate) struct BootPanels {
     pub panel_count: usize,
 }
 
+/// The focused thread id recorded by the last save, from the threads module's
+/// shared blob in `config.json`.
+///
+/// This is a raw peek rather than a `FocusState` read because boot has not
+/// initialised modules yet — the focus normally lives in the worker file this
+/// pointer selects, so reading it the usual way would be circular.
+fn saved_focus_pointer(shared: &SharedConfig) -> Option<&str> {
+    shared.modules.get("threads")?.get("focus_file")?.as_str()
+}
+
 /// Phase 1: Load config.json and worker state from disk.
 pub(crate) fn boot_load_config() -> BootConfig {
     let shared = config::load_config().unwrap_or_default();
-    let worker = worker::load_worker(DEFAULT_WORKER_ID).unwrap_or_default();
+    let worker_id = worker::focused_worker_id(saved_focus_pointer(&shared), worker::exists);
+    let worker = worker::load_worker(&worker_id).unwrap_or_default();
     BootConfig { shared, worker }
 }
 
@@ -178,12 +192,19 @@ pub(crate) fn boot_assemble_state(cfg: BootConfig, panels: BootPanels, messages:
     // Restore cache engine state from worker modules
     let cache_engine_json = cfg.worker.modules.get("cache_engine").and_then(|v| serde_json::to_string(v).ok());
 
+    // Per-thread draft (states/<id>.json); legacy installs fall back to the
+    // shared `config.json` slot once, until the next save migrates it.
+    let (draft_text, draft_cursor) = match cfg.worker.draft_input {
+        Some(text) => (text, cfg.worker.draft_cursor),
+        None => (cfg.shared.draft_input, cfg.shared.draft_cursor),
+    };
+
     State::default()
         .with_context(panels.context)
         .with_messages(messages)
         .with_selected_context(cfg.shared.selected_context)
         .with_id_counters((next_user_id, next_assistant_id, cfg.worker.next_tool_id, cfg.worker.next_result_id))
-        .with_draft(cfg.shared.draft_input, cfg.shared.draft_cursor)
+        .with_draft(draft_text, draft_cursor)
         .with_view_mode(cfg.shared.view_mode)
         .with_active_theme(cfg.shared.active_theme)
         .with_cache_engine_json(cache_engine_json)
@@ -209,8 +230,10 @@ pub(crate) fn load_state() -> State {
         state.tools = crate::modules::active_tool_definitions(&state.active_modules);
         state.tools.push(crate::app::reverie::tools::optimize_context_tool_definition());
         for module in crate::modules::all_modules() {
+            state.set_init_scope(Some(module.is_global()));
             module.init_state(&mut state);
         }
+        state.set_init_scope(None);
         set_active_theme(&state.active_theme);
         state
     }

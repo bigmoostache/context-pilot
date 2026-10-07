@@ -163,6 +163,7 @@ impl Intake {
                     }
                     Inbound::Query(frame) => reply::encode(&reply::answer(&frame, &self.cap_token, responder)),
                 };
+                let _p = cp_base::perf_span!("bridge_write_reply");
                 stream.write_all(&out).map_err(|e| Error::io("write command reply", e))?;
                 let _drained: Vec<u8> = buf.drain(..consumed).collect();
             }
@@ -174,7 +175,10 @@ impl Intake {
                 ));
             }
 
-            let read = stream.read(&mut chunk).map_err(|e| Error::io("read command", e))?;
+            let read = {
+                let _p = cp_base::perf_span!("bridge_read");
+                stream.read(&mut chunk).map_err(|e| Error::io("read command", e))?
+            };
             if read == 0 {
                 return Ok(applied); // EOF: commander closed the connection.
             }
@@ -202,10 +206,14 @@ impl Intake {
         // 3. Journal-then-ack: durable before accepted. A journal failure is a
         //    rejection (fail-closed) — the commander retries rather than
         //    believing a lost command was applied.
-        match oplog.append_durable(OpEntryKind::CommandEffect {
-            cmd_id: command.id.clone(),
-            dedup_token: command.dedup_token.clone(),
-        }) {
+        let journaled = {
+            let _p = cp_base::perf_span!("bridge_journal");
+            oplog.append_durable(OpEntryKind::CommandEffect {
+                cmd_id: command.id.clone(),
+                dedup_token: command.dedup_token.clone(),
+            })
+        };
+        match journaled {
             Ok(rev) => {
                 self.seen.mark(&command.dedup_token, rev);
                 (accept(&command.id, Some(rev)), Some(command))

@@ -399,26 +399,52 @@ fn render_tree_node(node: &TreeNode, depth: usize, lines: &mut Vec<Line<'static>
 
 // ── Frame builder ────────────────────────────────────────────────────
 
-use cp_render::frame::{Frame as IrFrame, PanelContent};
+use cp_render::conversation::Overlay;
+use cp_render::frame::{PanelContent, Sidebar, StatusBar};
 
 use crate::app::panels;
 use crate::state::State;
 use cp_base::panels::now_ms;
 
-/// Build a complete frame snapshot from application state.
+/// Frame regions every render paints (or may paint): sidebar, status bar,
+/// overlays. The body content (conversation OR active panel) is built lazily
+/// by the body renderer, so a frame never builds a region it does not draw.
+pub(crate) struct FrameChrome {
+    /// Sidebar IR; `None` when the threads list replaces the body (no sidebar).
+    pub sidebar: Option<Sidebar>,
+    /// Bottom status bar IR.
+    pub status_bar: StatusBar,
+    /// Overlay stack (autocomplete, perf, config, search-index).
+    pub overlays: Vec<Overlay>,
+}
+
+/// Build the always-painted frame regions from application state.
 ///
-/// Called once per render tick. Returns a pure-data `Frame` with no
-/// ratatui dependencies — the adapter converts it to terminal widgets.
+/// Called once per render tick. `with_sidebar` is false when the threads list
+/// owns the body, where the sidebar is never drawn.
 #[must_use]
-pub(crate) fn build_frame(state: &State) -> IrFrame {
-    let sidebar = sidebar::build_sidebar(state);
-    let status_bar = render_status_bar::build_status_bar(state);
-    let active_panel = build_active_panel(state);
+pub(crate) fn build_frame(state: &State, with_sidebar: bool) -> FrameChrome {
+    let sidebar = with_sidebar.then(|| {
+        let _g = crate::profile!("ir_sidebar");
+        sidebar::build_sidebar(state)
+    });
+    let status_bar = {
+        let _g = crate::profile!("ir_status_bar");
+        render_status_bar::build_status_bar(state)
+    };
+    let overlays = {
+        let _g = crate::profile!("ir_overlays");
+        conversation::build_overlays(state)
+    };
 
-    let conversation = conversation::build_conversation(state);
-    let overlays = conversation::build_overlays(state);
+    FrameChrome { sidebar, status_bar, overlays }
+}
 
-    IrFrame { sidebar, active_panel, status_bar, conversation, overlays }
+/// Build the conversation IR — only when the conversation panel is painted.
+#[must_use]
+pub(crate) fn build_conversation_ir(state: &State) -> cp_render::conversation::Conversation {
+    let _g = crate::profile!("ir_conversation");
+    conversation::build_conversation(state)
 }
 
 /// Build the active panel content from application state.
@@ -426,7 +452,7 @@ pub(crate) fn build_frame(state: &State) -> IrFrame {
 /// Calls `blocks()` on the panel for the currently selected context element.
 /// Returns a [`PanelContent`] with title, blocks, and optional refresh timestamp.
 #[must_use]
-fn build_active_panel(state: &State) -> PanelContent {
+pub(crate) fn build_active_panel(state: &State) -> PanelContent {
     let context_type = state.context.get(state.selected_context).map_or_else(
         || cp_base::state::context::Kind::new(cp_base::state::context::Kind::CONVERSATION),
         |c| c.context_type.clone(),

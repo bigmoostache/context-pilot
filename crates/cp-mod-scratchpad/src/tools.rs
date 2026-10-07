@@ -9,13 +9,12 @@ use std::fmt::Write as _;
 /// whether it changed (which drives the caller's forced panel refresh).
 /// Mirrors `cp_mod_todo::tools::set_focus_filter`.
 pub fn set_focus_filter(state: &mut State, thread_id: Option<String>) -> bool {
-    let ss = ScratchpadState::get_mut(state);
-    if ss.focus_filter == thread_id {
-        false
-    } else {
-        ss.focus_filter = thread_id;
-        true
+    // Read first: `get_mut` refreshes the change stamp, and this runs every tick.
+    if ScratchpadState::get(state).focus_filter == thread_id {
+        return false;
     }
+    ScratchpadState::get_mut(state).focus_filter = thread_id;
+    true
 }
 
 /// Drop every cell lacking a `thread_id` (the legacy, pre-rework backlog).
@@ -51,7 +50,8 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Thread-owned: a cell must live in the focused thread (mirrors Think.todo).
-    let Some(thread_id) = ScratchpadState::get(state).focus_filter.clone() else {
+    let Some(thread_id) = state.resident_thread_id.clone().or_else(|| ScratchpadState::get(state).focus_filter.clone())
+    else {
         return ToolResult::new(
             tool.id.clone(),
             "No focused thread \u{2014} scratchpad cells live in a thread; Read a thread first.".to_owned(),
@@ -89,7 +89,8 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Thread-owned: only cells of the focused thread are editable.
-    let Some(thread_id) = ScratchpadState::get(state).focus_filter.clone() else {
+    let Some(thread_id) = state.resident_thread_id.clone().or_else(|| ScratchpadState::get(state).focus_filter.clone())
+    else {
         return ToolResult::new(
             tool.id.clone(),
             "No focused thread \u{2014} scratchpad cells live in a thread; Read a thread first.".to_owned(),
@@ -134,7 +135,8 @@ pub(crate) fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Thread-owned: wiping only ever touches the focused thread's cells.
-    let Some(thread_id) = ScratchpadState::get(state).focus_filter.clone() else {
+    let Some(thread_id) = state.resident_thread_id.clone().or_else(|| ScratchpadState::get(state).focus_filter.clone())
+    else {
         return ToolResult::new(
             tool.id.clone(),
             "No focused thread \u{2014} scratchpad cells live in a thread; Read a thread first.".to_owned(),

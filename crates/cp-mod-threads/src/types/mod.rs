@@ -2,6 +2,9 @@ use serde::{Deserialize, Serialize};
 
 use cp_base::state::runtime::State;
 
+/// Per-thread message files (`threads/<id>.json`), written only when dirty.
+pub mod persist;
+
 // =============================================================================
 // Enums
 // =============================================================================
@@ -81,6 +84,17 @@ pub struct ThreadMessage {
     /// turn/focus. Defaults to `false` (back-compat with pre-feature data).
     #[serde(default)]
     pub auto: bool,
+    /// True once an **inline push notification** has been emitted for this
+    /// message while the agent was mid-stream (Branch B of the incoming-message
+    /// behavior). The push path sets this the first time it nudges the agent
+    /// about the message, so a long-running stream never re-pushes the same
+    /// message on every poll tick. It is message-level and serialized so the
+    /// guard survives reloads. Independent of [`acknowledged`](Self::acknowledged):
+    /// a message can be pushed (agent nudged mid-stream) yet still unacknowledged
+    /// (not pulled into context via `Read`) until the agent actually reads it.
+    /// Defaults to `false` (back-compat with pre-feature data).
+    #[serde(default)]
+    pub has_been_pushed: bool,
 }
 
 impl ThreadMessage {
@@ -94,6 +108,7 @@ impl ThreadMessage {
             timestamp: cp_base::panels::now_ms(),
             acknowledged: false,
             auto: false,
+            has_been_pushed: false,
         }
     }
 
@@ -109,6 +124,7 @@ impl ThreadMessage {
             timestamp: cp_base::panels::now_ms(),
             acknowledged: true,
             auto: true,
+            has_been_pushed: false,
         }
     }
 }
@@ -132,7 +148,9 @@ pub struct Thread {
     pub name: String,
     /// Whose turn it is.
     pub status: ThreadStatus,
-    /// Ordered list of messages.
+    /// Ordered list of messages. Persisted in `threads/<id>.json`, not in
+    /// `config.json` (see [`persist`]); empty after a slim deserialize.
+    #[serde(default)]
     pub messages: Vec<ThreadMessage>,
     /// Creation timestamp (epoch ms).
     pub created_at: u64,
@@ -293,9 +311,14 @@ impl ThreadsState {
 pub struct FocusState {
     /// Which thread the AI is currently focused on (None = unfocused).
     pub focused_thread_id: Option<String>,
-    /// Escalation severity counter. Increments on each tool completion while
-    /// the AI is unfocused with a `MY_TURN` thread pending; reset on focus.
-    pub escalation_level: u32,
+    /// Which thread the human has *drilled into* in the TUI (`None` = showing the
+    /// thread list). Pure view state (G3): it selects whose full panel view is
+    /// painted, and never moves execution — the renderer swaps the drilled
+    /// thread's parked runtime in only for the duration of one paint, then
+    /// restores the resident (Model 2: a human glance must not disturb the
+    /// agent's work). Defaults to `None` (back-compat; byte-identical until set).
+    #[serde(default)]
+    pub drilled_thread_id: Option<String>,
     /// Index of the currently selected thread in the TUI threads view.
     /// Used for navigation (Tab/Shift+Tab) and message area display.
     #[serde(default)]
@@ -304,10 +327,16 @@ pub struct FocusState {
     /// Set by pressing 'n' in Threads view, cleared on Enter or Esc.
     #[serde(default)]
     pub creating_thread: bool,
-    /// When true, the user is confirming thread archive/deletion.
-    /// Set by pressing 'a' in Threads view, cleared on 'y' (confirm) or any other key.
+    /// When true, an archive/restore is *armed*: a first Ctrl+X was pressed and
+    /// the TUI is waiting for a confirming second Ctrl+X. Cleared on confirm, on
+    /// any other (non-Ctrl) key, or implicitly once the 2-second window lapses.
     #[serde(default)]
     pub confirming_archive: bool,
+    /// Wall-clock ms ([`now_ms`](cp_base::panels::now_ms)) of the first Ctrl+X
+    /// that armed the pending archive. The confirming second Ctrl+X only counts
+    /// while `now - archive_armed_at_ms <= 2000`; a later press re-arms instead.
+    #[serde(default)]
+    pub archive_armed_at_ms: u64,
     /// When true, the TUI thread-centered view shows the *archived* threads
     /// instead of the active ones (toggled by Ctrl+U). Selection indexes into
     /// the matching filtered slice ([`ThreadsState::visible_indices`]); the
@@ -320,6 +349,15 @@ pub struct FocusState {
     /// `messages.len() > last_read_count[thread_id]`.
     #[serde(default)]
     pub last_read_count: std::collections::BTreeMap<String, usize>,
+    /// Thread currently under the list cursor and the ms it got there. A thread
+    /// is only marked read after [`READ_DWELL_MS`] of continuous selection, so
+    /// arrowing past rows leaves their unread marker intact. Transient.
+    #[serde(skip)]
+    pub read_dwell: Option<(String, u64)>,
+    /// Draft name typed on the virtual "+ New Thread" row. Its own textarea
+    /// (not a thread's composer) so it survives navigation and reloads.
+    #[serde(default)]
+    pub new_thread_title: cp_base::state::runtime::textarea::TextArea,
 }
 
 impl Default for FocusState {
@@ -334,12 +372,15 @@ impl FocusState {
     pub const fn new() -> Self {
         Self {
             focused_thread_id: None,
-            escalation_level: 0,
+            drilled_thread_id: None,
             selected_thread_idx: 0,
             creating_thread: false,
             confirming_archive: false,
+            archive_armed_at_ms: 0,
             viewing_archived: false,
             last_read_count: std::collections::BTreeMap::new(),
+            read_dwell: None,
+            new_thread_title: cp_base::state::runtime::textarea::TextArea::new(),
         }
     }
 
@@ -378,108 +419,47 @@ impl FocusState {
         if let Some(thread) = threads.threads.get(real_idx) {
             let tid = thread.id.clone();
             let count = thread.messages.len();
-            let _prev = Self::get_mut(state).last_read_count.insert(tid, count);
+            let prev = Self::get_mut(state).last_read_count.insert(tid, count);
+            // Surgical repaint: the unread marker may have just cleared with no
+            // input event to trigger a draw. Only on an actual change, so the
+            // per-tick dwell re-mark never forces a redraw on its own.
+            if prev != Some(count) {
+                state.flags.ui.dirty = true;
+            }
+        }
+    }
+
+    /// Per-tick read tracking for the Threads view: restart the dwell clock
+    /// when the selected thread changes; once it has stayed selected for
+    /// [`READ_DWELL_MS`], mark it read (and keep doing so while it stays, so
+    /// replies arriving under the cursor count as seen).
+    pub fn tick_read_dwell(state: &mut State, now_ms: u64) {
+        let selected = (state.view_mode == cp_base::state::data::config::ViewMode::Threads)
+            .then(|| {
+                let focus = Self::get(state);
+                let threads = ThreadsState::get(state);
+                let visible = threads.visible_indices(focus.viewing_archived);
+                let real_idx = *visible.get(focus.selected_thread_idx)?;
+                threads.threads.get(real_idx).map(|t| t.id.clone())
+            })
+            .flatten();
+        let dwell = &mut Self::get_mut(state).read_dwell;
+        let since = dwell.as_ref().filter(|d| selected.as_deref() == Some(d.0.as_str())).map(|d| d.1);
+        let dwelled = since.map_or_else(
+            || {
+                *dwell = selected.map(|id| (id, now_ms));
+                false
+            },
+            |start| now_ms.saturating_sub(start) >= READ_DWELL_MS,
+        );
+        if dwelled {
+            Self::mark_selected_read(state);
         }
     }
 }
+
+/// Continuous selection time before a thread's messages count as user-read.
+pub const READ_DWELL_MS: u64 = 2_000;
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// A message by `author` stamped `ts`, unacknowledged.
-    fn msg(author: ThreadAuthor, text: &str, ts: u64) -> ThreadMessage {
-        ThreadMessage {
-            author,
-            content: Some(text.to_owned()),
-            file_path: None,
-            timestamp: ts,
-            acknowledged: false,
-            auto: false,
-        }
-    }
-
-    /// State holding one parent thread `T1` with four messages (ts 10..=40),
-    /// archived + paused + `MyTurn` so the test can check none of it carries over.
-    fn parent_state() -> ThreadsState {
-        let mut ts = ThreadsState::new();
-        let mut parent = Thread::new("T1".to_owned(), "Parent".to_owned());
-        parent.messages = vec![
-            msg(ThreadAuthor::User, "q1", 10),
-            msg(ThreadAuthor::Assistant, "a1", 20),
-            msg(ThreadAuthor::User, "q2", 30),
-            msg(ThreadAuthor::Assistant, "a2", 40),
-        ];
-        parent.status = ThreadStatus::MyTurn;
-        parent.archived = true;
-        parent.paused = true;
-        ts.threads.push(parent);
-        ts.next_id = 2;
-        ts
-    }
-
-    #[test]
-    fn branch_copies_history_up_to_and_including_the_branch_point() {
-        let mut ts = parent_state();
-        let id = ts.branch("T1", 20, "Alt").unwrap();
-        assert_eq!(id, "T2");
-        assert_eq!(ts.next_id, 3);
-
-        let branch = ts.threads.iter().find(|t| t.id == "T2").unwrap();
-        let texts: Vec<_> = branch.messages.iter().map(|m| m.content.as_deref().unwrap_or("")).collect();
-        assert_eq!(texts, ["q1", "a1"]);
-        assert_eq!(branch.messages.iter().map(|m| m.timestamp).collect::<Vec<_>>(), [10, 20]);
-        assert!(branch.messages.iter().all(|m| m.acknowledged));
-        assert_eq!(branch.origin, Some(ThreadOrigin { thread_id: "T1".to_owned(), message_ts: 20 }));
-    }
-
-    #[test]
-    fn branch_is_a_fresh_active_thread_and_leaves_the_parent_untouched() {
-        let mut ts = parent_state();
-        let id = ts.branch("T1", 20, "Alt").unwrap();
-
-        let branch = ts.threads.iter().find(|t| t.id == id).unwrap();
-        assert_eq!(branch.name, "Alt");
-        assert_eq!(branch.status, ThreadStatus::TheirTurn);
-        assert!(!branch.archived);
-        assert!(!branch.paused);
-
-        let parent = ts.threads.iter().find(|t| t.id == "T1").unwrap();
-        assert_eq!(parent.messages.len(), 4);
-        assert!(parent.messages.iter().all(|m| !m.acknowledged));
-    }
-
-    #[test]
-    fn branch_at_last_message_copies_everything() {
-        let mut ts = parent_state();
-        let id = ts.branch("T1", 40, "Copy").unwrap();
-        let branch = ts.threads.iter().find(|t| t.id == id).unwrap();
-        assert_eq!(branch.messages.len(), 4);
-    }
-
-    #[test]
-    fn branch_rejects_unknown_thread_or_message() {
-        let mut ts = parent_state();
-        let unknown_thread = ts.branch("T9", 20, "x").unwrap_err();
-        assert!(unknown_thread.contains("T9"));
-        let unknown_message = ts.branch("T1", 25, "x").unwrap_err();
-        assert!(unknown_message.contains("ts=25"));
-        assert_eq!(ts.threads.len(), 1);
-        assert_eq!(ts.next_id, 2);
-    }
-
-    #[test]
-    fn origin_round_trips_and_defaults_to_none() {
-        let legacy: Thread =
-            serde_json::from_str(r#"{"id":"T1","name":"n","status":"TheirTurn","messages":[],"created_at":1}"#)
-                .unwrap();
-        assert_eq!(legacy.origin, None);
-        assert!(!serde_json::to_string(&legacy).unwrap().contains("origin"));
-
-        let mut ts = parent_state();
-        let id = ts.branch("T1", 30, "b").unwrap();
-        let branch = ts.threads.iter().find(|t| t.id == id).unwrap();
-        let back: Thread = serde_json::from_str(&serde_json::to_string(branch).unwrap()).unwrap();
-        assert_eq!(back.origin, branch.origin);
-    }
-}
+mod tests;

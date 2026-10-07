@@ -49,8 +49,14 @@ impl Module for QuestionsModule {
     fn is_core(&self) -> bool {
         true
     }
+    /// Per-thread (thread-centric model): the `Think`-reminder cadence is each
+    /// thread's own. `ThinkState` (consecutive-count + next-notification point)
+    /// lives in the per-thread `TypeMap` and rides the resident-thread swap; it
+    /// is already persisted per-thread via `save_worker_data`/`load_worker_data`,
+    /// so the flip aligns the in-memory map with the on-disk location (no data
+    /// loss) and is inert at N=1.
     fn is_global(&self) -> bool {
-        true
+        false
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
@@ -66,7 +72,7 @@ impl Module for QuestionsModule {
             ToolDefinition::from_yaml("Think", core_t)
                 .short_desc("Record a structured reasoning step")
                 .category("Context")
-                .param("thought_body", ParamType::String, true)
+                .param("plan", ParamType::String, true)
                 .param("task_context", ParamType::String, false)
                 .build(),
             ToolDefinition::from_yaml("Todo", core_t)
@@ -191,10 +197,8 @@ impl Module for QuestionsModule {
             let id = cp_mod_spine::types::SpineState::create_notification(
                 state,
                 cp_mod_spine::types::NotificationType::Custom,
-                "Think Reminder".into(),
-                "Please think more. Thinking is both cheap in tokens, and drastically \
-                 augments your performances. Make a habit out of it."
-                    .into(),
+                "Plan Reminder".into(),
+                "For multi-step work, record your plan with the Think tool before acting.".into(),
             );
             // Auto-mark as processed — the nudge is injected into the chat
             // stream but should not accumulate in the Spine panel or trigger

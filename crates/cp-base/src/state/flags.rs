@@ -93,8 +93,6 @@ pub struct Lifecycle {
     pub api_check_in_progress: bool,
     /// Reload pending (set by `system_reload`, triggers reload after tool result saved).
     pub reload_pending: bool,
-    /// Waiting for file panels to load before continuing stream.
-    pub waiting_for_panels: bool,
 }
 
 /// Module-specific overlay flags — kept separate from core UI flags
@@ -110,12 +108,14 @@ pub struct ModuleOverlays {
 
 /// Composite of all boolean status flags, organized by domain.
 ///
-/// Access individual flags via domain sub-structs: `flags.stream.is_streaming`,
-/// `flags.ui.dirty`, `flags.config.reverie_enabled`, `flags.lifecycle.reload_pending`.
+/// Access individual flags via domain sub-structs: `flags.ui.dirty`,
+/// `flags.config.reverie_enabled`, `flags.lifecycle.reload_pending`.
+///
+/// Per-thread stream/scroll state is NOT here — it lives on the thread's own
+/// [`StreamState`](crate::state::runtime::bundle::ThreadRuntime) and is reached
+/// via `state.stream` (the resident thread), never on the fleet-global flags.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct StatusBools {
-    /// Streaming and scrolling state.
-    pub stream: StreamState,
     /// UI rendering and debug toggles.
     pub ui: UiState,
     /// Configuration overlay state.

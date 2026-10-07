@@ -30,6 +30,10 @@ pub(super) struct StreamContext {
 pub(super) struct ReverieContext {
     /// Agent ID driving this reverie (e.g., "cleaner", "cartographer")
     pub agent_id: String,
+    /// Optional directive (from `optimize_context`) injected into the preamble.
+    /// Carried here so prompt building never looks the reverie up in the
+    /// `state.reveries` map — that map is keyed by an opaque per-thread slot.
+    pub directive: Option<String>,
     /// The reverie's own conversation messages (may be empty on first run)
     pub messages: Vec<Message>,
     /// Tool restrictions preamble injected at the top of the reverie conversation
@@ -63,17 +67,24 @@ pub(super) fn prepare_stream_context(
     // preserving the prompt prefix. Detaching creates new panels and drains
     // messages, which would break the exact cache prefix that freezing protects.
     if !cond.freeze_order() {
+        let _g = crate::profile!("ctx_detach");
         detach::detach_conversation_chunks(state);
     }
 
     // Refresh conversation token counts (not panel-based yet)
-    refresh_conversation_context(state);
+    {
+        let _g = crate::profile!("ctx_refresh_conversation");
+        refresh_conversation_context(state);
+    }
 
     // Refresh all panel token counts
     refresh_all_panels(state);
 
     // Collect all context items from panels
-    let mut context_items = collect_all_context(state);
+    let mut context_items = {
+        let _g = crate::profile!("ctx_collect_all");
+        collect_all_context(state)
+    };
 
     // === Panel ordering ===
     // When frozen, panels keep their previous sorted positions — no reordering
@@ -101,11 +112,14 @@ pub(super) fn prepare_stream_context(
     if state.previous_panel_order.is_empty() {
         context_items.sort_by_key(|item| item.last_refresh_ms);
     } else {
-        let order = &state.previous_panel_order;
+        // Index once instead of a linear scan per comparison; `rev` keeps the
+        // first occurrence on duplicate ids, matching `position`.
+        let order: std::collections::HashMap<&str, usize> =
+            state.previous_panel_order.iter().enumerate().rev().map(|(pos, id)| (id.as_str(), pos)).collect();
         context_items.sort_by_key(|item| {
             if item.id == "chat" {
                 (2usize, 0usize) // conversation tail — always last
-            } else if let Some(pos) = order.iter().position(|id| *id == item.id) {
+            } else if let Some(&pos) = order.get(item.id.as_str()) {
                 (0usize, pos) // known panel — keep saved position
             } else {
                 (1usize, 0usize) // new panel — after known, before chat
@@ -126,13 +140,17 @@ pub(super) fn prepare_stream_context(
     // freeze policy, apply decision, snapshot what was emitted, track cost.
 
     // Pre-compute system + tools token prefix for tick telemetry
-    let system_tokens = crate::state::estimate_tokens(&get_active_agent_content(state));
-    let tools_tokens = modules::overview::context::estimate_tool_definitions_tokens(state);
-    let prompt_prefix_tokens = system_tokens.saturating_add(tools_tokens);
+    let prompt_prefix_tokens = {
+        let _g = crate::profile!("ctx_prefix_tokens");
+        let system_tokens = crate::state::estimate_tokens(&get_active_agent_content(state));
+        let tools_tokens = modules::overview::context::estimate_tool_definitions_tokens(state);
+        system_tokens.saturating_add(tools_tokens)
+    };
 
     let full_freeze = cond.freeze_order() && state.frozen_context_snapshot.is_some();
     let meta = FreezeMeta { cond, prompt_prefix_tokens };
 
+    let freeze_guard = crate::profile!("ctx_freeze_pass");
     if let (true, Some(snapshot)) = (full_freeze, state.frozen_context_snapshot.as_ref()) {
         // ═══ FULL FREEZE: replay exact previous prompt ═══════════════════════
         let snap = snapshot.clone();
@@ -145,10 +163,13 @@ pub(super) fn prepare_stream_context(
         state.frozen_context_snapshot = Some(context_items.iter().filter(|i| i.id != "chat").cloned().collect());
     }
 
+    drop(freeze_guard);
+
     // Check if context has breached the threshold — may activate the reverie optimizer
     let _r = crate::app::reverie::trigger::check_threshold_trigger(state);
 
     // Prepare messages — branch based on whether this is a reverie or main worker
+    let _g = crate::profile!("ctx_build_messages");
     if let Some(rev) = reverie {
         build_reverie_stream_context(state, context_items, rev)
     } else {
@@ -184,7 +205,7 @@ fn build_reverie_stream_context(
     context_items.push(ContextItem::new(
         "P-reverie",
         "Reverie Context (tool restrictions + conversation)",
-        build_reverie_panel_content(state, &rev),
+        build_reverie_panel_content(&rev),
         crate::app::panels::now_ms(),
     ));
 
@@ -197,7 +218,7 @@ fn build_reverie_stream_context(
 /// Build the `P-reverie` panel body: agent instructions (injected here, NOT as
 /// system prompt, to preserve cache hits) + additional context + tool
 /// restrictions + a conversation-follows marker.
-fn build_reverie_panel_content(state: &State, rev: &ReverieContext) -> String {
+fn build_reverie_panel_content(rev: &ReverieContext) -> String {
     let mut content = String::new();
     let agents = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Agent);
     if let Some(agent) = agents.iter().find(|a| a.id == rev.agent_id) {
@@ -205,9 +226,7 @@ fn build_reverie_panel_content(state: &State, rev: &ReverieContext) -> String {
         content.push_str(&agent.content);
         content.push('\n');
     }
-    if let Some(rev_state) = state.reveries.get(&rev.agent_id)
-        && let Some(ctx) = rev_state.context.as_ref()
-    {
+    if let Some(ctx) = rev.directive.as_ref() {
         content.push_str("\n## Additional Context\n");
         content.push_str(ctx);
         content.push('\n');

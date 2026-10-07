@@ -102,12 +102,16 @@ fn append_reverie_chunk(app: &mut App, agent_id: &str, text: &str) {
 /// A reverie stream errored: notify, discard its queued actions, destroy the
 /// agent's session (non-critical — reveries are best-effort).
 fn destroy_reverie_on_error(app: &mut App, agent_id: &str, err: &str) {
-    let _notif = cp_mod_spine::types::SpineState::create_notification(
+    let session = app.state.reveries.get(agent_id);
+    let tid = session.and_then(|r| r.thread_id.clone());
+    let label = session.map_or_else(|| agent_id.to_owned(), |r| r.agent_id.clone());
+    let nid = cp_mod_spine::types::SpineState::create_notification(
         &mut app.state,
         cp_mod_spine::types::NotificationType::Custom,
         "Reverie".to_owned(),
-        format!("Reverie '{agent_id}' error: {err}. Destroying session."),
+        format!("Reverie '{label}' error: {err}. Destroying session."),
     );
+    cp_mod_spine::types::SpineState::set_notification_thread(&mut app.state, &nid, tid);
     QueueState::get_mut(&mut app.state).clear();
     drop(app.state.reveries.remove(agent_id));
     drop(app.reverie_streams.remove(agent_id));
@@ -163,12 +167,16 @@ fn reverie_over_tool_cap(app: &mut App, agent_id: &str) -> bool {
     if app.state.reveries.get(agent_id).is_none_or(|r| r.tool_call_count <= cap) {
         return false;
     }
-    let _notif_cap = cp_mod_spine::types::SpineState::create_notification(
+    let session = app.state.reveries.get(agent_id);
+    let tid = session.and_then(|r| r.thread_id.clone());
+    let label = session.map_or_else(|| agent_id.to_owned(), |r| r.agent_id.clone());
+    let nid = cp_mod_spine::types::SpineState::create_notification(
         &mut app.state,
         cp_mod_spine::types::NotificationType::Custom,
         "Reverie".to_owned(),
-        format!("Tool cap ({cap}) reached for '{agent_id}'. Force-stopping."),
+        format!("Tool cap ({cap}) reached for '{label}'. Force-stopping."),
     );
+    cp_mod_spine::types::SpineState::set_notification_thread(&mut app.state, &nid, tid);
     QueueState::get_mut(&mut app.state).clear();
     drop(app.state.reveries.remove(agent_id));
     drop(app.reverie_streams.remove(agent_id));
@@ -225,12 +233,14 @@ fn dispatch_one_reverie_tool(
 /// stream reported, clear its queued actions, and destroy the session.
 fn destroy_reverie_on_report(app: &mut App, agent_id: &str, content: &str) {
     let summary = content.strip_prefix("REVERIE_REPORT:").unwrap_or("Completed");
-    let _notif_report = cp_mod_spine::types::SpineState::create_notification(
+    let tid = app.state.reveries.get(agent_id).and_then(|r| r.thread_id.clone());
+    let nid = cp_mod_spine::types::SpineState::create_notification(
         &mut app.state,
         cp_mod_spine::types::NotificationType::Custom,
         "Reverie".to_owned(),
         summary.to_owned(),
     );
+    cp_mod_spine::types::SpineState::set_notification_thread(&mut app.state, &nid, tid);
     if let Some(stream) = app.reverie_streams.get_mut(agent_id) {
         stream.report_called = true;
     }
@@ -307,12 +317,16 @@ pub(super) fn check_reverie_end_turn(app: &mut App) {
         let retries = app.state.reveries.get(&agent_id).map_or(0, |r| r.report_retries);
         if retries >= 1 {
             // Max retries reached — force destroy
-            let _notif_end = cp_mod_spine::types::SpineState::create_notification(
+            let session = app.state.reveries.get(&agent_id);
+            let tid = session.and_then(|r| r.thread_id.clone());
+            let label = session.map_or_else(|| agent_id.clone(), |r| r.agent_id.clone());
+            let nid = cp_mod_spine::types::SpineState::create_notification(
                 &mut app.state,
                 cp_mod_spine::types::NotificationType::Custom,
                 "Reverie".to_owned(),
-                format!("Reverie '{agent_id}' ended without Report after retry. Force-destroying."),
+                format!("Reverie '{label}' ended without Report after retry. Force-destroying."),
             );
+            cp_mod_spine::types::SpineState::set_notification_thread(&mut app.state, &nid, tid);
             QueueState::get_mut(&mut app.state).clear();
             drop(app.state.reveries.remove(&agent_id));
             drop(app.reverie_streams.remove(&agent_id));

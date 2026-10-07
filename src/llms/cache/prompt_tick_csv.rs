@@ -25,7 +25,7 @@ fn rolling_cleanup_csvs(dir: &std::path::Path) {
 
 /// Classify one content block into `(block_type, context, raw_text)` for the CSV.
 fn block_to_row<'blk>(block: &'blk ContentBlock, role: &str) -> (&'static str, String, &'blk str) {
-    cp_base::deref_match!(block, {
+    cp_macros::deref_match!(block, {
         ContentBlock::Text { ref text } => ("text", classify_text_context(text, role), text.as_str()),
         ContentBlock::ToolUse { ref id, ref name, .. } => {
             let ctx = if name == "dynamic_panel" { format!("panel_call:{id}") } else { format!("tool_use:{name}") };

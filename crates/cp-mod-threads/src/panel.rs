@@ -5,8 +5,6 @@ use cp_base::state::actions::Action;
 use cp_base::state::context::{Kind, estimate_tokens};
 use cp_base::state::runtime::State;
 
-use crate::types::ThreadsState;
-
 /// Panel that renders the thread list and provides thread context to the LLM.
 ///
 /// **Static panel**: the LLM-facing content (`panel_content`) is only updated
@@ -22,14 +20,16 @@ impl Panel for ThreadsPanel {
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
         use cp_render::{Block, Span as S};
 
-        let ts = ThreadsState::get(state);
+        // Per-thread view: render THIS thread's roster + own conversation, not the
+        // shared `panel_content` baked for the focused thread.
+        let content = crate::tools::resident_panel_content(state);
 
-        if ts.panel_content.is_empty() {
+        if content.is_empty() {
             return vec![Block::Line(vec![S::muted("  (empty \u{2014} AI must call Read to populate)".into())])];
         }
 
-        // Render the same panel_content the LLM sees, line by line
-        ts.panel_content
+        // Render the per-thread content line by line.
+        content
             .lines()
             .map(|line| if line.is_empty() { Block::Empty } else { Block::Line(vec![S::new(format!("  {line}"))]) })
             .collect()
@@ -40,8 +40,9 @@ impl Panel for ThreadsPanel {
     }
 
     fn refresh(&self, state: &mut State) {
-        // Static panel: content is the pre-rendered panel_content set by Read.
-        let content = ThreadsState::get(state).panel_content.clone();
+        // Per-thread view: content is rebuilt for the resident thread (roster +
+        // its own conversation), not copied from the shared `panel_content`.
+        let content = crate::tools::resident_panel_content(state);
         let token_count = estimate_tokens(&content);
 
         for ctx in &mut state.context {
@@ -58,8 +59,8 @@ impl Panel for ThreadsPanel {
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
-        // Return the static panel_content — only updated by Read tool.
-        let content = ThreadsState::get(state).panel_content.clone();
+        // Per-thread view: return THIS thread's content, not the shared string.
+        let content = crate::tools::resident_panel_content(state);
         let (id, last_refresh_ms) = state
             .context
             .iter()

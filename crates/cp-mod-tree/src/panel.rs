@@ -12,14 +12,23 @@ use cp_base::panels::scroll_key_action;
 
 /// Data payload sent to the background cache worker for tree generation.
 pub(crate) struct TreeCacheRequest {
-    /// Context element identifier.
-    pub context_id: String,
     /// Gitignore-style filter applied to the tree.
-    pub tree_filter: String,
+    pub filter: String,
     /// Paths of currently expanded folders.
-    pub tree_open_folders: Vec<String>,
+    pub open_folders: Vec<String>,
     /// File/folder description annotations.
-    pub tree_descriptions: Vec<crate::types::TreeFileDescription>,
+    pub descriptions: Vec<crate::types::TreeFileDescription>,
+}
+
+/// Worker output: rendered tree plus the stale-description swaps the main
+/// thread must replay onto `TreeState`.
+struct TreeCacheResult {
+    /// Rendered tree text.
+    content: String,
+    /// Token estimate of `content`.
+    token_count: usize,
+    /// Description refreshes computed from the YAML store.
+    patches: Vec<crate::storage::DescPatch>,
 }
 
 /// Panel that renders the directory tree in the sidebar.
@@ -83,37 +92,35 @@ impl Panel for TreePanel {
         "Directory Tree".to_owned()
     }
 
-    fn build_cache_request(&self, ctx: &Entry, state: &State) -> Option<CacheRequest> {
+    fn build_cache_request(&self, _ctx: &Entry, state: &State) -> Option<CacheRequest> {
         let ts = TreeState::get(state);
         Some(CacheRequest::new(
             Kind::new(Kind::TREE),
             Box::new(TreeCacheRequest {
-                context_id: ctx.id.clone(),
-                tree_filter: ts.filter.clone(),
-                tree_open_folders: ts.open_folders.clone(),
-                tree_descriptions: ts.descriptions.clone(),
+                filter: ts.filter.clone(),
+                open_folders: ts.open_folders.clone(),
+                descriptions: ts.descriptions.clone(),
             }),
         ))
     }
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut Entry, state: &mut State) -> bool {
-        let CacheUpdate::Content { content, token_count, .. } = update else {
+        let CacheUpdate::ModuleSpecific { data, .. } = update else {
             return false;
         };
+        let Ok(result) = data.downcast::<TreeCacheResult>() else {
+            return false;
+        };
+        let TreeCacheResult { content, token_count, patches } = *result;
         ctx.cache_deprecated = false;
 
-        // After rebuilding tree content, check for stale descriptions that can
-        // be refreshed from the YAML backing store (e.g. after a branch switch).
-        let refreshed = crate::storage::refresh_stale_from_yaml(&mut TreeState::get_mut(state).descriptions);
+        // Stale descriptions were refreshed from the YAML on the worker thread
+        // (and already rendered into `content`); only replay the swaps here.
+        let refreshed = crate::storage::apply_patches(&mut TreeState::get_mut(state).descriptions, patches);
 
         // Check if content actually changed before updating
         if !refreshed && !cp_base::panels::update_if_changed(ctx, &content) && ctx.cached_content.is_some() {
             return false;
-        }
-
-        if refreshed {
-            // Descriptions changed — re-invalidate so the tree rebuilds with fresh text.
-            ctx.cache_deprecated = true;
         }
 
         ctx.cached_content = Some(content);
@@ -129,10 +136,15 @@ impl Panel for TreePanel {
 
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
         let req = request.data.downcast::<TreeCacheRequest>().ok()?;
-        let TreeCacheRequest { context_id, tree_filter, tree_open_folders, tree_descriptions } = *req;
-        let content = crate::render::generate_tree_string(&tree_filter, &tree_open_folders, &tree_descriptions);
+        let TreeCacheRequest { filter, open_folders, mut descriptions } = *req;
+        // YAML parse + per-file hashing happen here, off the main thread.
+        let patches = crate::storage::refresh_stale_from_yaml(&mut descriptions);
+        let content = crate::render::generate_tree_string(&filter, &open_folders, &descriptions);
         let token_count = estimate_tokens(&content);
-        Some(CacheUpdate::Content { context_id, content, token_count })
+        Some(CacheUpdate::ModuleSpecific {
+            context_type: Kind::new(Kind::TREE),
+            data: Box::new(TreeCacheResult { content, token_count, patches }),
+        })
     }
 
     fn max_freezes(&self) -> u8 {

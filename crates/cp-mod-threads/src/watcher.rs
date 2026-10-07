@@ -72,7 +72,7 @@ impl Watcher for IdleMyTurnDetector {
 
     fn check(&self, state: &State) -> Option<WatcherResult> {
         // Only fire when the agent is NOT streaming (i.e. idle).
-        if state.flags.stream.phase.is_streaming() {
+        if state.stream.phase.is_streaming() {
             return None;
         }
 
@@ -86,14 +86,28 @@ impl Watcher for IdleMyTurnDetector {
         let ts = ThreadsState::get(state);
         let fs = FocusState::get(state);
 
-        // Prefer the focused thread (it's the one the agent was working on when
-        // it stopped). Fall back to any MY_TURN thread.
+        // FOCUSED-ONLY: nudge the focused thread when it is still MY_TURN (the
+        // one the agent was working on when it stopped). Background MY_TURN
+        // threads are the per-thread *dispatcher*'s job
+        // (`App::dispatch_background_my_turn`), so this watcher no longer falls
+        // back to "the first MY_TURN thread" — that would double-nudge a
+        // background thread the dispatcher already handles (hardening S5). At
+        // N=1 the focused thread is the only MY_TURN thread, so this is
+        // behaviourally identical to the former fallback.
         let focused_tid = fs.focused_thread_id.as_deref();
-        let thread = focused_tid
-            .and_then(|fid| {
-                ts.threads.iter().find(|t| t.id == fid && !t.archived && !t.paused && t.status == ThreadStatus::MyTurn)
-            })
-            .or_else(|| ts.threads.iter().find(|t| !t.archived && !t.paused && t.status == ThreadStatus::MyTurn))?;
+        let thread = focused_tid.and_then(|fid| {
+            ts.threads.iter().find(|t| t.id == fid && !t.archived && !t.paused && t.status == ThreadStatus::MyTurn)
+        })?;
+
+        // Unacknowledged (unseen) messages are the idle **auto-read** hook's job
+        // (`cp_mod_threads::tools::take_idle_autoread` acknowledges them,
+        // force-refreshes the panel, and nudges). This watcher only fires the
+        // plain "please respond" notification once the agent has ALREADY SEEN
+        // everything in the thread and simply went idle without replying — so
+        // the two mechanisms never double-nudge the same incoming message.
+        if thread.messages.iter().any(|m| !m.acknowledged) {
+            return None;
+        }
 
         // Record the fire time for cooldown.
         self.last_fired_ms.store(now, Ordering::Relaxed);

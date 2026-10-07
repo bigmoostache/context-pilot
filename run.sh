@@ -13,12 +13,23 @@ if [ -f .env ]; then
     export $(grep -v '^#' .env | xargs)
 fi
 
-# Parse --telemetry flag: enable flame graph instrumentation
+# Parse flags:
+#   --telemetry      enable flame graph instrumentation
+#   --measure N      profile the main loop for N iterations, dump an HTML
+#                    report to ./tmp/loop-profile.html, then exit. Read by the
+#                    binary via the CP_MEASURE_LOOPS env var (not a CLI flag).
 ARGS=()
+expect_measure=0
 for arg in "$@"; do
-    if [ "$arg" = "--telemetry" ]; then
+    if [ "$expect_measure" = "1" ]; then
+        export CP_MEASURE_LOOPS="$arg"
+        echo "📊 Measure mode: profiling $arg main-loop iterations → tmp/loop-profile.html"
+        expect_measure=0
+    elif [ "$arg" = "--telemetry" ]; then
         export CP_FLAMEGRAPH=1
         echo "🔥 Telemetry mode: flame graph instrumentation enabled"
+    elif [ "$arg" = "--measure" ]; then
+        expect_measure=1
     else
         ARGS+=("$arg")
     fi

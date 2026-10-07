@@ -13,6 +13,7 @@ use std::collections::HashMap;
 
 use crossterm::event::KeyEvent;
 
+use cp_base::cast::Safe as _;
 use cp_base::panels::{CacheRequest, CacheUpdate, ContextItem, Panel, scroll_key_action};
 use cp_base::state::actions::Action;
 use cp_base::state::context::Entry;
@@ -93,12 +94,12 @@ fn get_radar_yaml(state: &State) -> String {
 /// Maximum character length for a task context signal.
 ///
 /// Signals should be 1–2 sentences (the `task_context` param).  Anything
-/// longer almost certainly contains a leaked `thought_body`.
+/// longer almost certainly contains a leaked Think `plan`.
 const MAX_SIGNAL_LEN: usize = 300;
 
 /// Truncate and sanitize a signal string (cap at [`MAX_SIGNAL_LEN`], strip XML artifacts).
 pub(crate) fn sanitize_signal(raw: &str) -> String {
-    // If the signal contains tool XML, it's a leaked thought_body — take only
+    // If the signal contains tool XML, it's a leaked Think plan — take only
     // the text before the XML starts.
     let content = raw
         .find("<parameter")
@@ -253,11 +254,6 @@ struct RefreshJob {
 /// `q_decay` is the signal's own log-distance decay; each hit is additionally
 /// decayed by its own log-number distance. Returns an empty vec on query
 /// failure or a malformed response (never errors — a bad signal is skipped).
-#[expect(
-    clippy::cast_precision_loss,
-    clippy::as_conversions,
-    reason = "log number as f64 — decay math requires floating point"
-)]
 fn query_signal_results(
     client: &MeiliClient,
     logs_uid: &str,
@@ -265,7 +261,7 @@ fn query_signal_results(
     current_log_count_f: f64,
 ) -> Vec<ScoredResult> {
     use cp_base::cast::float_math;
-    let q_distance = float_math::sub(current_log_count_f, signal.log_count as f64);
+    let q_distance = float_math::sub(current_log_count_f, signal.log_count.to_f64());
     let q_decay = decay(q_distance, HALF_LIFE_LOGS);
 
     let Ok(json) = client.search(&SearchParams {
@@ -294,7 +290,7 @@ fn query_signal_results(
                 .and_then(|id| id.strip_prefix('L'))
                 .and_then(|n| n.parse::<u64>().ok())
                 .unwrap_or(0);
-            let r_distance = float_math::sub(current_log_count_f, log_number as f64);
+            let r_distance = float_math::sub(current_log_count_f, log_number.to_f64());
             let r_decay = decay(r_distance, HALF_LIFE_LOGS);
 
             ScoredResult {
@@ -331,13 +327,8 @@ fn dedup_best_by_id(all_results: Vec<ScoredResult>) -> HashMap<String, ScoredRes
 /// Queries the Meilisearch logs index for each task signal, scores results
 /// with adaptive decay, deduplicates, and writes the YAML to the shared
 /// [`RadarCache`].
-#[expect(
-    clippy::cast_precision_loss,
-    clippy::as_conversions,
-    reason = "timestamp ms as f64 — decay math requires floating point"
-)]
 fn refresh_inner(job: &RefreshJob) {
-    let current_log_count_f = job.current_log_count as f64;
+    let current_log_count_f = job.current_log_count.to_f64();
     let logs_uid = format!("cp_{}_logs", job.project_hash);
 
     let Ok(client) = MeiliClient::new(job.port, &job.master_key) else {

@@ -11,6 +11,7 @@ readme.workspace = true
 publish = false
 
 [dependencies]
+cp-macros.workspace = true
 cp-wire = { path = "../cp-wire" }
 
 [dev-dependencies]

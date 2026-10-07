@@ -47,6 +47,14 @@ impl Panel for EntitiesPanel {
             return;
         }
 
+        // Skip the reopen + introspect + sample queries when neither the DB nor
+        // its WAL changed since the last refresh (writes land in `-wal` first).
+        let fingerprint = db_fingerprint(&db_path);
+        let entry = state.context.iter().find(|e| e.context_type.as_str() == Kind::ENTITIES);
+        if entry.is_some_and(|e| e.cached_content.is_some() && e.source_hash.as_deref() == Some(fingerprint.as_str())) {
+            return;
+        }
+
         if let Ok(conn) = db::open(&db_path) {
             let fresh = db::introspect(&conn, &db_path);
             EntitiesState::get_mut(state).schema_cache = Some(fresh);
@@ -60,6 +68,9 @@ impl Panel for EntitiesPanel {
             ctx.cached_content = Some(content);
             ctx.token_count = tokens;
             ctx.full_token_count = tokens;
+            // Fingerprint taken before the reopen: our own PRAGMAs may touch the
+            // WAL, which only costs one extra refresh, never a missed change.
+            ctx.source_hash = Some(fingerprint);
         }
     }
 
@@ -110,6 +121,15 @@ impl Panel for EntitiesPanel {
 // =============================================================================
 // Context text (sent to LLM)
 // =============================================================================
+
+/// Size + mtime of the DB file and its `-wal` sidecar: changes on any write,
+/// read with two `stat` calls instead of opening `SQLite`.
+fn db_fingerprint(db_path: &std::path::Path) -> String {
+    let stat = |p: &std::path::Path| std::fs::metadata(p).ok().map(|m| (m.len(), m.modified().ok()));
+    let mut wal = db_path.as_os_str().to_owned();
+    wal.push("-wal");
+    format!("{:?}|{:?}", stat(db_path), stat(std::path::Path::new(&wal)))
+}
 
 /// Build the text sent to the LLM as context for the Entities panel.
 fn build_context_text(es: &EntitiesState) -> String {

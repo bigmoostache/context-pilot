@@ -1,5 +1,6 @@
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEventKind};
 
+use cp_base::config::constants::SCROLL_ARROW_AMOUNT;
 use cp_base::panels::scroll_key_action;
 
 use crate::app::actions::{Action, find_context_by_id, parse_context_pattern};
@@ -22,12 +23,32 @@ enum Dispatch {
     Fallthrough,
 }
 
+/// How long (ms) after the first Ctrl+X a confirming second Ctrl+X still
+/// archives/restores the selected thread. A later press re-arms instead.
+const ARCHIVE_CONFIRM_WINDOW_MS: u64 = 2_000;
+
 /// Map a terminal event to an application action.
 ///
 /// Returns `None` for Ctrl+Q (quit signal), `Some(Action)` for everything else.
 pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
     if let &Event::Key(key) = event {
         return handle_key_event(&key, state);
+    }
+    // Mouse wheel → scroll the shown conversation/history pane. In the threads
+    // list this scrolls the SELECTED thread's conversation (arrows stay bound to
+    // selection via `handle_threads_nav`); in a panel view it scrolls the active
+    // pane exactly as before. Non-scroll mouse events (clicks/drag/move) are
+    // ignored. Written as `matches!`/`else` rather than a `match` with a `_` arm
+    // to avoid the forbidden `wildcard_enum_match_arm` on crossterm's enum.
+    if let &Event::Mouse(me) = event {
+        let action = if matches!(me.kind, MouseEventKind::ScrollUp) {
+            Action::ScrollUp(SCROLL_ARROW_AMOUNT)
+        } else if matches!(me.kind, MouseEventKind::ScrollDown) {
+            Action::ScrollDown(SCROLL_ARROW_AMOUNT)
+        } else {
+            Action::None
+        };
+        return Some(action);
     }
     // Bracketed paste: store in buffer, insert placeholder sentinel.
     // Normalize line endings: terminals may send \r\n or \r instead of \n.
@@ -59,7 +80,7 @@ fn handle_key_event(key: &KeyEvent, state: &State) -> Option<Action> {
     }
 
     // Escape stops streaming.
-    if key.code == KeyCode::Esc && state.flags.stream.phase.is_streaming() {
+    if key.code == KeyCode::Esc && state.stream.phase.is_streaming() {
         return Some(Action::StopStreaming);
     }
 
@@ -100,16 +121,32 @@ fn handle_ctrl_shortcuts(key: &KeyEvent, state: &State) -> Dispatch {
         KeyCode::Char('n') => Dispatch::Act(Action::NewContext),
         KeyCode::Char('h') => Dispatch::Act(Action::ToggleConfigView),
         KeyCode::Char('i') => Dispatch::Act(Action::ToggleIndexOverlay),
-        KeyCode::Char('v') => Dispatch::Act(Action::CycleViewMode),
+        // Ctrl+R copies the F12 perf overlay as text (only while it is open).
+        KeyCode::Char('r') if state.flags.ui.perf_enabled => Dispatch::Act(Action::CopyPerfOverlay),
+        // Ctrl+V pastes the system clipboard into the composer, replacing any
+        // active selection (paste handler deletes the selection first). Was an
+        // explicit no-op (design 9.1); now a real paste per T797.
+        KeyCode::Char('v') => {
+            let clip = cp_base::state::runtime::textarea::read_clipboard();
+            if clip.is_empty() { Dispatch::Fallthrough } else { Dispatch::Act(Action::PasteText(clip)) }
+        }
         KeyCode::Char('o') => Dispatch::Act(Action::ResetSessionCosts),
         KeyCode::Char('p') => Dispatch::Act(Action::OpenCommandPalette),
         KeyCode::Char('u') => Dispatch::Act(Action::HistoryPrev),
         KeyCode::Char('d') => Dispatch::Act(Action::HistoryNext),
-        KeyCode::Char('c') => Dispatch::Act(if state.flags.overlays.index_status {
-            Action::CopyIndexOverlay
-        } else {
-            Action::CopyPanelContent
-        }),
+        // Ctrl+Z reverts the composer to its previous undo snapshot (T797).
+        KeyCode::Char('z') => Dispatch::Act(Action::Undo),
+        // Selection-priority (T797): when the composer has an active selection,
+        // Ctrl+C copies that selection and wins over panel/overlay copy.
+        KeyCode::Char('c') => {
+            Dispatch::Act(if crate::app::actions::threads::active_textarea(state).selection_range().is_some() {
+                Action::CopySelection
+            } else if state.flags.overlays.index_status {
+                Action::CopyIndexOverlay
+            } else {
+                Action::CopyPanelContent
+            })
+        }
         KeyCode::Backspace
         | KeyCode::Enter
         | KeyCode::Left
@@ -140,13 +177,19 @@ fn handle_ctrl_shortcuts(key: &KeyEvent, state: &State) -> Dispatch {
     }
 }
 
-/// Threads-view Ctrl overrides: Ctrl+A archive/restore, Ctrl+U toggle archived
-/// view. `None` = not one of these (fall through to global Ctrl bindings).
+/// Threads-view Ctrl overrides: Ctrl+X arms then (within 2s) confirms
+/// archive/restore, Ctrl+U toggles the archived view. `None` = not one of these
+/// (fall through to global Ctrl bindings).
 fn handle_threads_ctrl(key: &KeyEvent, state: &State) -> Option<Action> {
-    let viewing_archived = cp_mod_threads::types::FocusState::get(state).viewing_archived;
     match key.code {
-        KeyCode::Char('a') => {
-            Some(if viewing_archived { Action::ThreadArchiveConfirm } else { Action::ThreadArchiveStart })
+        // Ctrl+X: first press arms (ThreadArchiveStart), a second press within
+        // the 2-second window confirms (ThreadArchiveConfirm). A press after the
+        // window lapsed simply re-arms — `archive_start` re-stamps the time.
+        KeyCode::Char('x') => {
+            let focus = cp_mod_threads::types::FocusState::get(state);
+            let within_window = focus.confirming_archive
+                && cp_base::panels::now_ms().saturating_sub(focus.archive_armed_at_ms) <= ARCHIVE_CONFIRM_WINDOW_MS;
+            Some(if within_window { Action::ThreadArchiveConfirm } else { Action::ThreadArchiveStart })
         }
         KeyCode::Char('u') => Some(Action::ThreadToggleArchivedView),
         KeyCode::Backspace
@@ -188,23 +231,69 @@ fn handle_index_overlay_key(key: &KeyEvent, state: &State) -> Option<Action> {
     Some(if key.code == KeyCode::Esc { Action::ToggleIndexOverlay } else { Action::None })
 }
 
+/// Threads-nav while the human has drilled into a thread's panel view (G3):
+/// only Left/Esc exits back to the list; every other key is swallowed
+/// (`Action::None`) so a glance stays read-only. Events run against the focused
+/// resident (the drill-in swap is render-scoped only), so letting keys through
+/// would scroll/mutate the *focused* thread while the screen shows the drilled
+/// one — Model 2 forbids a glance disturbing the agent's thread. Written as an
+/// `if`/`else` on `matches!` rather than a `match` with a `_` arm to avoid the
+/// forbidden `wildcard_enum_match_arm`.
+const fn drilled_threads_nav(key: &KeyEvent) -> Dispatch {
+    if matches!(key.code, KeyCode::Left | KeyCode::Esc) {
+        Dispatch::Act(Action::ThreadDrillOut)
+    } else {
+        Dispatch::Act(Action::None)
+    }
+}
+
+/// True when the list cursor sits on a real thread row (not the virtual
+/// "+ New Thread" entry, not an empty list) — i.e. drill-in has a target.
+fn selection_is_real_thread(focus: &cp_mod_threads::types::FocusState, state: &State) -> bool {
+    let visible = cp_mod_threads::types::ThreadsState::get(state).visible_indices(focus.viewing_archived);
+    focus.selected_thread_idx < visible.len()
+}
+
 /// Threads-view navigation (non-Ctrl): archive-confirm y/n, Tab/BackTab select,
 /// Esc exit. `Fallthrough` when the key isn't a threads-nav key.
 fn handle_threads_nav(key: &KeyEvent, state: &State) -> Dispatch {
     let shift = key.modifiers.contains(KeyModifiers::SHIFT);
-    let confirming = cp_mod_threads::types::FocusState::get(state).confirming_archive;
+    let focus = cp_mod_threads::types::FocusState::get(state);
+    let confirming = focus.confirming_archive;
+
+    if focus.drilled_thread_id.is_some() {
+        return drilled_threads_nav(key);
+    }
+
     match key.code {
-        KeyCode::Char('y') if confirming => Dispatch::Act(Action::ThreadArchiveConfirm),
+        // While armed, the confirming gesture is a second Ctrl+X (handled in
+        // `handle_threads_ctrl`, which runs first). Any other non-Ctrl key here
+        // cancels the pending arm.
         _ if confirming => Dispatch::Act(Action::ThreadArchiveCancel),
         KeyCode::Tab if !shift => Dispatch::Act(Action::ThreadSelectNext),
-        KeyCode::BackTab => Dispatch::Act(Action::ThreadSelectPrev),
-        KeyCode::Esc => Dispatch::Act(Action::CycleViewMode),
+        // Design 9.1: Up/Down move the selection within the list. The threads
+        // view IS the list surface, so selection wins over the message pane's
+        // scroll; Shift+Up/Down and PageUp/PageDown still scroll that pane.
+        KeyCode::Up | KeyCode::Down if shift => Dispatch::Act(scroll_key_action(key).unwrap_or(Action::None)),
+        KeyCode::BackTab | KeyCode::Up => Dispatch::Act(Action::ThreadSelectPrev),
+        KeyCode::Down => Dispatch::Act(Action::ThreadSelectNext),
+        // Design 9.1: Esc navigates *out* to the panel view. On a real row it
+        // opens the SELECTED thread (drill-in commits the list cursor as
+        // focus), never whatever `focused_thread_id` last held — an agent's
+        // Read/Send can move focus after the cursor was placed. On the virtual
+        // "+ New Thread" row (or an empty list) it just leaves the list.
+        KeyCode::Esc => Dispatch::Act(if selection_is_real_thread(focus, state) {
+            Action::ThreadDrillIn
+        } else {
+            Action::CycleViewMode
+        }),
+        // Left is deliberately inert in the list: only Right opens a thread.
+        KeyCode::Left => Dispatch::Act(Action::None),
+        // Right drills into the selected thread's full panel view (G3). The
+        // handler no-ops on the virtual "+ New Thread" entry / empty selection.
+        KeyCode::Right => Dispatch::Act(Action::ThreadDrillIn),
         KeyCode::Backspace
         | KeyCode::Enter
-        | KeyCode::Left
-        | KeyCode::Right
-        | KeyCode::Up
-        | KeyCode::Down
         | KeyCode::Home
         | KeyCode::End
         | KeyCode::PageUp
@@ -235,7 +324,7 @@ fn handle_context_pattern_submit(key: &KeyEvent, state: &State) -> Option<Action
         || key.modifiers.contains(KeyModifiers::ALT);
     let is_submit = (key.code == KeyCode::Enter && !has_modifier) || key.code == KeyCode::Char(' ');
     if is_submit
-        && let Some(id) = parse_context_pattern(&state.input)
+        && let Some(id) = parse_context_pattern(&state.composer.text)
         && find_context_by_id(state, &id).is_some()
     {
         return Some(Action::InputSubmit);
@@ -265,9 +354,11 @@ fn handle_global_fallback(key: &KeyEvent) -> Action {
         KeyCode::Up | KeyCode::Down | KeyCode::PageUp | KeyCode::PageDown => {
             scroll_key_action(key).unwrap_or(Action::None)
         }
+        // Left on a non-composer panel navigates to the threads list (the
+        // conversation panel handles its own composer-aware Left separately).
+        KeyCode::Left => Action::CycleViewMode,
         KeyCode::Backspace
         | KeyCode::Enter
-        | KeyCode::Left
         | KeyCode::Right
         | KeyCode::Home
         | KeyCode::End

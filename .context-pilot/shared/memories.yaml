@@ -1,33 +1,26 @@
 M-long-1:
   tier: long
   title: X525 Agora DONE
-  contents: 'X525 Agora deletion COMPLETE (02ccc32f on t753-openrouter). All code removed: cp-agora crate, cp-wire SelfIdentity/SetIdentity/IdentityChanged, cp-mod-bridge last_identity+seed bitfield, tui AgoraModule+commands+observers+freeze_pass, orchestrator identity endpoint+route+materialized_view, cp-oplog refs, frontend IdentityTab+useIdentity+fetchIdentity+identity_changed SSE+qk.identity. openapi.json+TS client regenerated. Hash chain #98. cargo check+clippy+fmt clean. IT identity subsystem (transport/it/*) KEPT intact. cp-env profiles patched for OPENROUTER_API_KEY. Ready for X526 (settings merge).'
   importance: high
-  last_edited_ms: 1790351900117
+  last_edited_ms: 1791290207493
 M-long-10:
   tier: long
   title: 'CI Frontend red: exit-1'
   contents: |-
-    CI Frontend red: exit-1 always prints after the LAST header (knip) because check-ts-lints.sh aggregates 8 sub-checks. Never infer the culprit from the error's position — grep the whole log. knip falsely blamed twice; prettier was the real cause.
+    CI Frontend red: `exit code 1` always prints after the LAST header (knip) because check-ts-lints.sh runs 8 sub-checks (eslint, prettier --check, stylelint, tsc -b, type-coverage, suppressions, rule-census, knip) with `|| fail=1` and exits at the end. The error's position says nothing about the culprit. Hit twice (T648, T672): knip blamed, prettier guilty, ~200 wasted calls.
 
-    THE TRAP (hit twice: T648 2026-07-22, T672 2026-07-27 — user furious the 2nd time, ~200 wasted tool calls).
-
-    MECHANISM: .github/checks/check-ts-lints.sh uses `set -uo pipefail` (NO -e) and runs all 8 sub-checks unconditionally:
-      eslint · prettier --check · stylelint · tsc -b · type-coverage · suppressions · rule-census · knip
-    Each failure does `|| fail=1`; the script then `exit "$fail"` at the very end. GitHub prints `##[error]Process completed with exit code 1` at the moment the STEP ends — i.e. always after the last section header, `=== dead code (knip) ===`. This makes knip look guilty every single time regardless of the true culprit.
-
-    CORRECT PROTOCOL when the Frontend job is red:
-    1. Fetch the full job log (GitHub REST: /actions/jobs/<id>/logs — gh CLI is NOT installed, M156).
-    2. `grep -n "^2.*=== "` to list every section header with line numbers.
-    3. Read the BODY between each pair of headers. A failing sub-check prints its own diagnostics there (`[warn] <file>` for prettier, rule violations for eslint, `error TS####` for tsc).
-    4. Do NOT
+    PROTOCOL:
+    1. Fetch the full job log (REST /actions/jobs/<id>/logs if gh is unavailable).
+    2. grep -n '=== ' to list every section header.
+    3. Read the body between each pair of headers: prettier prints `[warn] <file>`, eslint rule violations, tsc `error TS####`.
+    4. Fix the section that printed diagnostics, never the last one by default.
   importance: critical
-  last_edited_ms: 0
+  last_edited_ms: 1791290207511
 M-long-2:
   tier: long
   title: ACTIVE WORKING BRANCH =
   importance: critical
-  last_edited_ms: 1787840930953
+  last_edited_ms: 1791290207481
 M-long-3:
   tier: long
   title: Reverie supports multiple
@@ -41,47 +34,43 @@ M-long-4:
   tier: long
   title: NEVER touch Tailscale or
   importance: critical
-  last_edited_ms: 1787840930955
+  last_edited_ms: 1791290207483
 M-long-5:
   tier: long
   title: 'DEPLOY TRAP (T687):'
   contents: |-
-    DEPLOY TRAP (T687): source fix correct but fleet stale. system_reload re-execs agent from RELEASE binary, never restarts orchestrator; stale orch serde-drops unknown command fields. Deploy fresh binaries + restart orch, then VERIFY.
-
-    Cost 4 false 'fixed' claims + a furious user.
+    DEPLOY TRAP (T687): source fix correct but fleet stale → 4 false 'fixed' claims + furious user.
 
     MECHANISM:
     - system_reload re-execs the AGENT from the active_tag RELEASE binary (~/.context-pilot/releases/<tag>/cpilot), NOT target/release/tui.
-    - system_reload NEVER touches the orchestrator (M99: orchestrator = rebuild+RESTART).
-    - Orchestrator typed-decodes POST /command via serde_json::from_slice::<Command>. serde SILENTLY DROPS unknown fields, so a stale orchestrator strips new command fields (e.g. initial_message) before the agent sees them. Symptom: 'thread created but message lost'.
+    - system_reload never touches the orchestrator (orchestrator = rebuild + restart, M-mid-10).
+    - Orchestrator decodes POST /command with serde, which SILENTLY DROPS unknown fields: a stale orch strips new command fields (e.g. initial_message). Symptom: 'thread created but message lost'.
 
-    DEPLOY CHECKLIST after Rust source edit:
+    CHECKLIST after a Rust edit:
     1. cargo build --release.
-    2. cp target/release/tui -> ~/.context-pilot/releases/<active_tag>/cpilot (active_tag in releases/config.json).
-    3. cp target/release/cp-orchestrator -> ~/cp-server/bin/cp-orchestrator.
-    4. Restart orchestrator: kill pid on :7878, relaunch from cwd ~/cp-server, env CP_WEB_ROOT=~/cp-server/web CP_BRIDGE=1 + BRAVE/VOYAGE/ANTHROPIC keys + PATH=/opt/homebrew/bin:... (M160 reap orphan meili).
-    5. system_reload self to pick up fresh release binary.
+    2. cp target/release/tui → ~/.context-pilot/releases/<active_tag>/cpilot (active_tag in releases/config.json). Back up the old one first.
+    3. If orch changed: cp target/release/cp-orchestrator → ~/cp-server/bin/, kill pid on :7878, relaunch from ~/cp-server (env per M-mid-9), reap orphan meili (M-short-16).
+    4. system_reload.
 
-    VERIFY:
-    - strings <running-bi
+    VERIFY: `strings` the running binary for a marker from the new code before claiming it's shipped.
   importance: critical
-  last_edited_ms: 0
+  last_edited_ms: 1791290207510
 M-long-6:
   tier: long
   title: ALWAYS communicate with
   importance: critical
-  last_edited_ms: 1787840930957
+  last_edited_ms: 1791290207484
 M-long-7:
   tier: long
   title: NEVER touch temp_1.md or
   importance: critical
-  last_edited_ms: 1787840930958
+  last_edited_ms: 1791290207486
 M-long-8:
   tier: long
   title: T713 sync-dir SHIPPED
-  contents: 'T713 SHIPPED — PR #192 (branch t713-sync-dir, base master, commit 24eda477). Runtime artifacts (bridge.lock/oplog/stream.sock/tee.sock/heartbeat) moved to GLOBAL ~/.context-pilot/sync/<id>/ (id=folder_id FNV-1a). cp-wire Entry+tee_socket_path #[serde(default)] (14->15). Orch: resolve_tee_path (field else folder+tee.sock), TeeReader::spawn full path, reap_orphan_sync_dirs 7d. Bridge: BootDirs param struct, create_dir_all sync_dir before lock, migrate::migrate_oplog (rename+EXDEV copy/fsync/remove), boot tests -> boot/tests.rs. All green (build/tests/workspace-clippy/api-contract). DEPLOY orch-FIRST (M177): new orch serves migrated + un-migrated agents.'
+  contents: 'T713 SHIPPED — PR #192 (branch t713-sync-dir, commit 24eda477). Runtime artifacts (bridge.lock/oplog/stream.sock/tee.sock/heartbeat) live in GLOBAL ~/.context-pilot/sync/<id>/ (id=folder_id FNV-1a). cp-wire Entry.tee_socket_path #[serde(default)]. Orch: resolve_tee_path (field else folder+tee.sock), reap_orphan_sync_dirs 7d. Bridge: BootDirs, create sync_dir before lock, migrate::migrate_oplog (rename, EXDEV fallback copy/fsync/remove). Deploy the orchestrator FIRST: new orch serves both migrated and un-migrated agents.'
   importance: critical
-  last_edited_ms: 1788350028141
+  last_edited_ms: 1791290207508
 M-long-9:
   tier: long
   title: T724 spine↔thread map
@@ -94,27 +83,28 @@ M-long-9:
   last_edited_ms: 1788362763224
 M-mid-1:
   tier: mid
-  title: 'DOCUMENTATION QUALITY:'
-  contents: 'DOCUMENTATION QUALITY: Documentation is ABSOLUTELY CRITICAL. Do NOT half-ass it. If understanding a function requires opening extra files to see context, DO IT. Don''t document to document — document to HELP future readers. Take the extra step.'
+  title: Documentation rules
+  contents: 'Docs are critical, never half-done: open the extra files needed to understand a function before documenting it; document to help future readers. Keep it synthetic: every word earns its place, no obvious statements. Bad: ''/// Returns the result of the operation''. Good: ''/// Saturating cast — clamps to target range on overflow''.'
   importance: critical
-  last_edited_ms: 0
+  last_edited_ms: 1791290207501
 M-mid-10:
   tier: mid
   title: OPS & BUILD GOTCHAS
   contents: |-
-    OPS & BUILD GOTCHAS (consolidated): orchestrator restart vs system_reload, port-freeing, git/pnpm/lint quirks, never-commit list. Full list in contents.
-
-    Key gotchas: TUI change = cargo build+reload; orchestrator change = rebuild+restart (not reload); frontend = vite hot-reloads. Kill orchestrator: lsof -ti:7878 + parent sh. git via git_execute only. web/ uses pnpm. CB3 is lib-only. oplog/bodies folder-sizes failure = benign.
-
-    Orchestrator launch: separate binary `cp-orchestrator` (crate cp-orchestrator), NOT the TUI binary. Build: `cargo build --release -p cp-orchestrator`. Run: `./target/release/cp-orchestrator`. Serves on :7878. Kill stale: `kill -9
+    OPS & BUILD GOTCHAS:
+    - TUI change = cargo build + deploy to release slot + system_reload (M-long-5). Orchestrator change = rebuild + RESTART, never reload. Frontend = vite hot-reload.
+    - Orchestrator = separate binary: `cargo build --release -p cp-orchestrator`, serves :7878. Kill: lsof -ti:7878 plus its parent sh.
+    - git only via git_execute (no pipes). web/ uses pnpm.
+    - oplog/bodies folder-size failure in structure check = benign.
+    - Never commit entities/ (M-mid-6), temp_1/2.md (M-tiny-20).
   importance: critical
-  last_edited_ms: 0
+  last_edited_ms: 1791290207513
 M-mid-11:
   tier: mid
-  title: EVEN IF A RED CALLBACK IS
-  contents: 'EVEN IF A RED CALLBACK IS PRE-EXISTING: ALWAYS TAKE OWNERSHIP OF IT AND SOLVE IT. PERIOD. EVERYONE IS RESPONSIBLE, ESPECIALLY YOU. No dismissing failures as ''pre-existing'' — fix them.'
-  importance: critical
-  last_edited_ms: 0
+  title: MT branch status
+  contents: 'Multi-thread (T774), branch multi-thread-core-loop, PR #208. Shipped: phases A-H, TC, TC-REAL (State = shared + resident ThreadRuntime via Deref), per-thread fixed panels (3a0451fb, b98a370d), BUG-SWITCH (focus no longer hijacked by bg Send), BUG-PANELS (ensure_default_contexts on fresh/boot runtime), X805 exec_state on relocation. OPEN: X808 scratchpad/todo write-path keyed on focus_filter (wrong owner at N>1), X786, X798 always-typable composer, X799 streaming shown green.'
+  importance: high
+  last_edited_ms: 1791290207526
 M-mid-12:
   tier: mid
   title: 'T604 + FIGHT:'
@@ -137,10 +127,10 @@ M-mid-13:
   last_edited_ms: 1790581108794
 M-mid-14:
   tier: mid
-  title: FEATURE COMPLETION
-  contents: 'FEATURE COMPLETION SEQUENCE: build → reload → commit+push (with memories/tree-descs) → clean context. Always, every time.'
+  title: Feature completion
+  contents: 'Feature completion, every time: build → reload (or deploy, see M-long-5) → commit → push → clean context. Always ship memories.yaml + tree-descriptions.yaml with the code (separate ''chore: sync memories and tree descriptions'' commit, pushed together). Never commit .context-pilot/shared/entities/ (M-mid-6).'
   importance: critical
-  last_edited_ms: 0
+  last_edited_ms: 1791290207504
 M-mid-15:
   tier: mid
   title: Context Pilot is a SIDE
@@ -204,10 +194,10 @@ M-mid-2:
   last_edited_ms: 0
 M-mid-20:
   tier: mid
-  title: 'WORKFLOW RULE (T581):'
-  contents: 'WORKFLOW RULE (T581): NEVER push to master. Always new branch + new PR. Commit locally, branch off master, push the branch, open PR to master via gh. Augments M151 (don''t push unless asked) with the delivery mechanism when push IS asked.'
+  title: Always commit+push
+  contents: ALWAYS commit AND push after finishing a change, without waiting to be asked (user mandate T789). Push the CURRENT branch. Never push to master.
   importance: critical
-  last_edited_ms: 0
+  last_edited_ms: 1791291678442
 M-mid-3:
   tier: mid
   title: 'Hardcoded prompt audit:'
@@ -217,14 +207,14 @@ M-mid-3:
 M-mid-4:
   tier: mid
   title: 'DOCUMENTATION PHASE: Use'
-  contents: 'DOCUMENTATION PHASE: Use tool queuing (Queue_activate/Queue_execute) for all file edits during doc work — otherwise cost explodes from cache breaks on every single edit.'
   importance: critical
-  last_edited_ms: 0
+  last_edited_ms: 1791290207496
 M-mid-5:
   tier: mid
-  title: Cryptographic hash chain
-  importance: critical
-  last_edited_ms: 1787840930923
+  title: Opus5.5 refusal triggers
+  contents: 'T772 Opus 5.5 stop_reason:refusal triggers found (all fixed): (1) Think tool desc CoT wording (2b43619b); (2) Think result ''thinking is cheap...'' (fe5c6178); (3) param NAME thought_body: any long text under it refused, renamed to `plan` (211147ff, 0/12). Dumps: ~/.context-pilot/refusals/. Harness /tmp/cc-capture/{replay_refusal,body_bisect}.py, MAXTOK=512 for speed. Suspect tool/param wording first.'
+  importance: high
+  last_edited_ms: 1791362080622
 M-mid-6:
   tier: mid
   title: NEVER commit or push
@@ -234,15 +224,13 @@ M-mid-6:
 M-mid-7:
   tier: mid
   title: ALWAYS push memories
-  contents: 'ALWAYS push memories (memories.yaml) and tree descriptions (tree-descriptions.yaml) alongside code commits. When committing work, include a ''chore: sync memories and tree descriptions'' commit and push everything together. Never leave these unsync''d.'
   importance: critical
-  last_edited_ms: 0
+  last_edited_ms: 1791290207502
 M-mid-8:
   tier: mid
   title: 'DOCUMENTATION STYLE: Keep'
-  contents: 'DOCUMENTATION STYLE: Keep docs SYNTHETIC. No useless verbosity, no trivial obvious statements. Every word must earn its place. Bad: ''/// Returns the result of the operation''. Good: ''/// Saturating cast — clamps to target range on overflow''.'
   importance: critical
-  last_edited_ms: 0
+  last_edited_ms: 1791290207499
 M-mid-9:
   tier: mid
   title: Gilbert launch recipe
@@ -295,7 +283,7 @@ M-short-11:
   title: 'Cache optimizer: K=3 +'
   contents: 'Cache optimizer: K=3 + beacon (4th). ConversationTailDensity uses UNIFORM weight (1.0) for hot blocks, zero for cold. Previous i² was catastrophic. Fix: ed83c9df.'
   importance: high
-  last_edited_ms: 0
+  last_edited_ms: 1790859348667
 M-short-12:
   tier: short
   title: T506 web-lint P0-P12
@@ -312,12 +300,12 @@ M-short-14:
   tier: short
   title: T581 agent-editor SHIPPED
   importance: high
-  last_edited_ms: 1787840930963
+  last_edited_ms: 1791290207473
 M-short-15:
   tier: short
   title: T593 tmp/v2 document
   importance: high
-  last_edited_ms: 1787840930964
+  last_edited_ms: 1791290207475
 M-short-16:
   tier: short
   title: Agents restarted via
@@ -333,7 +321,7 @@ M-short-17:
   tier: short
   title: MiniMax Token Plan API
   importance: high
-  last_edited_ms: 1787840930926
+  last_edited_ms: 1791290207476
 M-short-18:
   tier: short
   title: Thinking between ticks
@@ -360,16 +348,10 @@ M-short-20:
   last_edited_ms: 0
 M-short-21:
   tier: short
-  title: SSH to gilbert works
-  contents: |-
-    SSH to gilbert works non-interactively: `ssh gilbert@gilberts-mac-mini-1.barking-hue.ts.net`. Auth = Tailscale SSH (method "none"), no key, no password, BatchMode-safe. M149 still applies: never change network config there.
-
-    Verified T665 from the guillaume Mac Mini.
-
-    COMMAND: ssh -o BatchMode=yes -o ConnectTimeout=5 gilbert@gilberts-mac-mini-1.barking-hue.ts.net '<cmd>'
-    Works with BatchMode=y
+  title: SSH to gilbert
+  contents: 'SSH to gilbert non-interactive, verified T665: `ssh -o BatchMode=yes -o ConnectTimeout=5 gilbert@gilberts-mac-mini-1.barking-hue.ts.net ''<cmd>''`. Auth = Tailscale SSH (no key, no password). Never change network config there (M-tiny-18).'
   importance: high
-  last_edited_ms: 0
+  last_edited_ms: 1791290207507
 M-short-22:
   tier: short
   title: T605 web frontend "no
@@ -433,10 +415,10 @@ M-short-29:
   last_edited_ms: 0
 M-short-3:
   tier: short
-  title: 'Think tool v4: single'
-  contents: 'Think tool v4: single param (thought_body). ThinkState{consecutive_count, reminder_threshold, next_notification_at}. Fires reminder at threshold. Queue bypass. TUI card shows negative balance.'
+  title: Think tool v4
+  contents: 'Think tool v4: params plan (was thought_body, renamed 211147ff for Opus 5.5 refusals) + task_context. ThinkState{consecutive_count, reminder_threshold, next_notification_at}. Fires reminder at threshold. Queue bypass.'
   importance: high
-  last_edited_ms: 0
+  last_edited_ms: 1791362080625
 M-short-30:
   tier: short
   title: OAuth architecture (T504
@@ -450,23 +432,17 @@ M-short-31:
   tier: short
   title: 'Dream layer decided: Groq'
   importance: high
-  last_edited_ms: 1787840964644
+  last_edited_ms: 1791290207478
 M-short-32:
   tier: short
   title: Rust 1.97.1 upgrade DONE
   importance: high
-  last_edited_ms: 1787840930967
+  last_edited_ms: 1791290207480
 M-short-33:
   tier: short
-  title: 'web-lint: generated/'
-  contents: |-
-    web-lint: generated/ @ts-nocheck header now emitted NATIVELY by web/openapi-ts.config.ts output.header; the old post-codegen stamp loop is REMOVED. NEVER reintroduce hand-stamping. Commit 2dd641c4.
-
-    web/openapi-ts.config.ts output.header (fn → 2 lines: @ts-nocheck generated-bindings line + '// This file is auto-generated by @hey-api/openapi-ts').
-
-    Both check-typescript-contract.sh AND CB5 ts
+  title: MT phase progress
   importance: high
-  last_edited_ms: 0
+  last_edited_ms: 1791290207524
 M-short-34:
   tier: short
   title: check-rust-tests.sh now
@@ -484,10 +460,10 @@ M-short-36:
   last_edited_ms: 1787840964656
 M-short-37:
   tier: short
-  title: HISTORICAL (macbook node,
-  contents: 'X525 Agora del FE: manageBody IdentityTab+IDENTITY_FIELDS; settingsView tab===''identity''; tabs.ts ''identity''; lib/live useIdentity+identity_changed SSE; lib/api AgentIdentity+fetchIdentity; openapi-regen types; mobile twins. KEEP (IT box-provisioning, no cp_agora): transport/it/*, it_get/set_identity, rest/config/it.rs, auth next_action, router api/it/identity.'
-  importance: medium
-  last_edited_ms: 1790349217890
+  title: X525 Agora deleted
+  contents: 'X525 (02ccc32f): cp-agora crate + all self-identity code deleted (cp-wire SelfIdentity/SetIdentity/IdentityChanged, bridge, orch endpoint, FE IdentityTab/useIdentity/SSE). KEPT: IT box-provisioning identity (transport/it/*, it_get/set_identity, rest/config/it.rs, api/it/identity) — no cp_agora dependency.'
+  importance: low
+  last_edited_ms: 1791290207495
 M-short-38:
   tier: short
   title: 'T759 boot stall: fetch'
@@ -528,10 +504,10 @@ M-short-6:
   last_edited_ms: 0
 M-short-7:
   tier: short
-  title: T697 focused auto-read
-  contents: 'check_my_turn_threads @ src/app/run/threads/mod.rs. T697 SHIPPED (a9b19094, todo-v3-yaml-diffs): focused+idle+MY_TURN thread now auto-reads ITSELF (waiting prefers focused), DEBOUNCED on notified_my_turn_id vs self-loop. apply_send_message clears notified_my_turn_id (re-arm) instead of focused_thread_input notif. Old T692 free-only rule + passive notif branch removed.'
+  title: T799 loop profile
+  contents: 'T799 git worker SHIPPED b3e21c49: panel_refresh git_status (was 97% of 66ms/2s stall) moved off main loop to cp-mod-git/worker.rs bg thread (Box::leak''d &''static Mutex slot + in_flight guard, mpsc coalesce). refresh_git_status non-blocking: take_latest+request. Dropped diff --cached + rev-parse probe. Remaining idle: threads_emit ~1ms/tick, check_ownership ~15ms/s. NOT yet deployed/reloaded.'
   importance: high
-  last_edited_ms: 1787996890804
+  last_edited_ms: 1791291051289
 M-short-8:
   tier: short
   title: 'OPERATING MODEL: harbor'
@@ -550,12 +526,9 @@ M-short-9:
 M-tiny-1:
   tier: tiny
   title: 'T568: ''Use'' release'
-  contents: |-
-    T568: 'Use' release selection now survives orchestrator reload. Backend::new reconciles persisted active_tag onto agent_binary at boot. Fix in transport/rest/backend.rs.
-
-    select_release persists act
-  importance: medium
-  last_edited_ms: 0
+  contents: 'T568: ''Use'' release selection survives orchestrator reload. Backend::new reconciles persisted active_tag onto agent_binary at boot (transport/rest/backend.rs).'
+  importance: low
+  last_edited_ms: 1791290207514
 M-tiny-10:
   tier: tiny
   title: IR Architecture Phases
@@ -595,9 +568,8 @@ M-tiny-15:
 M-tiny-16:
   tier: tiny
   title: Freeze RESOLVED at infra
-  contents: Freeze RESOLVED at infra level (v0.2.8 deadman + v0.2.9 stream timeout + v0.2.10 deadman-aware-of-retry). gpt2 dribble = throttle-induced, not fundamental. Normal tasks pass.
   importance: low
-  last_edited_ms: 0
+  last_edited_ms: 1791290207489
 M-tiny-17:
   tier: tiny
   title: Datalab documentation
@@ -631,9 +603,8 @@ M-tiny-20:
 M-tiny-21:
   tier: tiny
   title: tmp/v2 editor
-  contents: 'tmp/v2 Word-clone editor (side project): Tiptap+Vite+React on :5199. Pretty-printed disk storage, diff3 word-merge, PDF via Paged.js+print.'
   importance: low
-  last_edited_ms: 1787840930965
+  last_edited_ms: 1791290207487
 M-tiny-22:
   tier: tiny
   title: Rust 1.97.1 pin
@@ -649,15 +620,14 @@ M-tiny-23:
 M-tiny-24:
   tier: tiny
   title: Queue is mandatory
-  contents: 'Edits ALWAYS queue; cannot bypass. Inherent to context-pilot, forces batching = big token savings. Don''t fight it: batch edits, Queue_execute once.'
+  contents: Edits always queue, no bypass. Batch edits, one Queue_execute — one cache break instead of N. Matters most in doc/sweep work.
   importance: high
-  last_edited_ms: 1787910296001
+  last_edited_ms: 1791290207498
 M-tiny-25:
   tier: tiny
   title: 'todo-v2 PR #188 open'
-  contents: 'todo-v2 rebased onto post-#187 master, PR #188 OPEN (base master). 6 commits on 50fae45c. Clippy-clean under --workspace gate, chain #94. Frontend back on vite dev/HMR :5174. CB1 already active.'
   importance: high
-  last_edited_ms: 1787910650137
+  last_edited_ms: 1791290207492
 M-tiny-26:
   tier: tiny
   title: Notes-tab SHIPPED
@@ -696,16 +666,21 @@ M-tiny-30:
   last_edited_ms: 1790256805028
 M-tiny-31:
   tier: tiny
-  title: Close_panel kills servers
-  contents: Close_panel KILLS its console's backing process (143). Never close the panel hosting the :5174 vite dev server — tailscale serve proxies it.
+  title: Close_panel kills procs
+  contents: Close_panel KILLS the console's backing process (exit 143). Never close the console panel hosting the :5174 vite server (tailscale serve proxies it) or the orchestrator.
   importance: high
-  last_edited_ms: 1790352833364
+  last_edited_ms: 1791290207521
 M-tiny-32:
   tier: tiny
   title: 'find -prune: 3 shapes'
   contents: 'find -prune shapes: bare X => descend; X + X/* => -prune; X/* only => -print -prune. Group''s first entry must not be -o.'
   importance: medium
   last_edited_ms: 1790582340866
+M-tiny-33:
+  tier: tiny
+  title: Multi-thread A-H done
+  importance: high
+  last_edited_ms: 1791290207471
 M-tiny-34:
   tier: tiny
   title: Never trust gate markers
@@ -724,21 +699,113 @@ M-tiny-36:
   contents: Let `cargo fmt` author line breaks. Hand-rolling rustfmt's shape re-creates the very fmt diff just shown.
   importance: medium
   last_edited_ms: 1790587533541
+M-tiny-37:
+  tier: tiny
+  title: 'Stash-pop: silent loss'
+  contents: 'Stash-pop of memories.yaml: auto-merge drops memories with NO conflict marker. Diff against the stash after. Slot ids are per-branch: content is identity, not id.'
+  importance: critical
+  last_edited_ms: 1790603981046
+M-tiny-38:
+  tier: tiny
+  title: Meili fetch page ceiling
+  contents: 'Meili /documents/fetch ceiling: 1k=0.09s, 5k=0.15s, 20k=0.43s, 100k=2.33s. `distinct` unsupported there, so the sweep can''t collapse server-side.'
+  importance: high
+  last_edited_ms: 1790603924587
+M-tiny-39:
+  tier: tiny
+  title: Multi-thread design v8
+  contents: 'Multi-thread migration (T774): docs/design-multi-worker.md is v8 THREAD-CENTRIC (no worker entity; thread=unit of execution; concurrency cap K=2; lease deleted; dispatch→promotion). Branch multi-thread-core-loop. Implementing per 2.1-2.6 roadmap.'
+  importance: high
+  last_edited_ms: 1790782760182
 M-tiny-4:
   tier: tiny
   title: 'T646 SHIPPED + FIXED:'
   contents: 'T646 SHIPPED + FIXED: ⌘/Ctrl+A opens the workspace AgentSwitcher from any view, shows an ''A'' HintBadge on ⌘-hold, and respects empty-vs-filled text fields. Branch t646-agent-selector-shortcut, P'
   importance: medium
   last_edited_ms: 0
+M-tiny-40:
+  tier: tiny
+  title: Scroll amounts via helper
+  contents: Never hardcode scroll amounts in key handlers — route via cp_base::panels::scroll_key_action so the amount stays SCROLL_ARROW_AMOUNT (3.0). Shipped a hardcoded 1.0 once as a silent 3× regression.
+  importance: medium
+  last_edited_ms: 1791190679612
+M-tiny-41:
+  tier: tiny
+  title: Update all hint branches
+  contents: 'Key-binding helpers like handle_threads_nav are view-agnostic: when adding a binding, update the help hint in EVERY view branch (active AND archived) or the UI advertises stale keys.'
+  importance: medium
+  last_edited_ms: 1791190685012
+M-tiny-42:
+  tier: tiny
+  title: No-op arm vs delete
+  contents: 'Ctrl+V was dropped as an explicit no-op arm, NOT deleted: the conversation panel maps EVERY Char to InputChar, so fallthrough types a literal ''v''. Right (drill-in) deferred to G3.'
+  importance: medium
+  last_edited_ms: 1791190679614
+M-tiny-43:
+  tier: tiny
+  title: cp-server relaunch state
+  contents: '2026-10-05: ~/cp-server gone after reboot. Orch run from releases/v0.2.13-537a0e3, FE via vite preview :5174 (proxied by Tailscale).'
+  importance: high
+  last_edited_ms: 1791290207523
+M-tiny-44:
+  tier: tiny
+  title: Read stale-context loop
+  contents: Repeating auto-nudges while panel shows my question unanswered = panel may be STALE, answer already posted. Fresh Read before concluding 'still blocked'. Burned ~45 nudges on an answered form.
+  importance: high
+  last_edited_ms: 1791196693475
+M-tiny-45:
+  tier: tiny
+  title: Adding a CP_* env var
+  contents: 'New CP_* var needs: cp-env specs/*.rs Spec + model field + docs/ENV.md regen (cargo test -p cp-env --test generate -- --ignored) + line in 3 deploy/env/*.example. Else boot fails ''unknown variable''.'
+  importance: high
+  last_edited_ms: 1791288480688
+M-tiny-46:
+  tier: tiny
+  title: Never switch branches
+  contents: NEVER switch git branches unless the user explicitly asks. Commit/push on the current branch (T789 mandate).
+  importance: critical
+  last_edited_ms: 1791291678445
+M-tiny-47:
+  tier: tiny
+  title: Perf names hierarchical
+  contents: Perf ops nest as loop.<step>.<child> (runtime path, profiler.rs). Only siblings sum; a child is included in its parent. ./run.sh --measure N → tmp/loop-profile.html; F12 Ctrl+R copies dump.
+  importance: medium
+  last_edited_ms: 1791290207528
+M-tiny-48:
+  tier: tiny
+  title: Commit refs + no new br
+  contents: In Send, cite commits as <hash>(local|pushed) + the branch/PR it's on. Never create/push a new branch or PR unless user asks; stay on current branch+PR. Unless unsure, always commit.
+  importance: critical
+  last_edited_ms: 1791294532112
+M-tiny-49:
+  tier: tiny
+  title: Agent runs /usr/local/bin
+  contents: 'Agent runs root-owned /usr/local/bin/cpilot, not releases/<tag>/cpilot. Deploy: sudo cp target/release/tui there (user pw). Check ps+strings.'
+  importance: high
+  last_edited_ms: 1791297095116
 M-tiny-5:
   tier: tiny
   title: 'CI web-install fix:'
-  contents: |-
-    CI web-install fix: web/pnpm-workspace.yaml needs `packages: [.]` + `allowBuilds: {unrs-resolver: true}`; pin CI+release pnpm to 11.6.0.
-
-    pnpm 11 needs `packages: [.]` in pnpm-workspace.yaml + `allo
+  contents: 'CI web install: web/pnpm-workspace.yaml needs `packages: [.]` + `allowBuilds: {unrs-resolver: true}`; CI + release pin pnpm 11.6.0.'
   importance: medium
-  last_edited_ms: 0
+  last_edited_ms: 1791290207516
+M-tiny-50:
+  tier: tiny
+  title: 'Perf: profiler self-cost'
+  contents: 'T824 a473d279: PERF.frame_end ran macOS `ps` every 500ms inside ui_render, so the profiler polluted itself. Now on a bg thread. threads_view lines are cached in messages.rs LINE_CACHE (fingerprint).'
+  importance: medium
+  last_edited_ms: 1791368656912
+M-tiny-51:
+  tier: tiny
+  title: sweep
+  importance: low
+  last_edited_ms: 1791369691329
+M-tiny-52:
+  tier: tiny
+  title: 'Perf: optimize, not async'
+  contents: 'CRITICAL perf rule: instrument before optimizing, never blind. No async frenzy: optimizing the work beats moving it off the main loop (loses control).'
+  importance: critical
+  last_edited_ms: 1791375401749
 M-tiny-6:
   tier: tiny
   title: 'User preference: factor'
@@ -747,10 +814,10 @@ M-tiny-6:
   last_edited_ms: 0
 M-tiny-7:
   tier: tiny
-  title: 'SSE freeze v0.2.4-v0.2.7:'
-  contents: 'SSE freeze v0.2.4-v0.2.7: 4 watchdogs layered (idle-body 120s, send-header 60s, first-content 90s, catch-all TTFB 100s) in streaming.rs + mod.rs. All still in binary.'
-  importance: medium
-  last_edited_ms: 0
+  title: 'SSE freeze: resolved'
+  contents: 'SSE freeze v0.2.4-0.2.7 fixed: 4 stream watchdogs (streaming.rs, mod.rs) + v0.2.8-0.2.10 deadman and stream timeout.'
+  importance: low
+  last_edited_ms: 1791290215777
 M-tiny-8:
   tier: tiny
   title: entity_sql SQL splitter

@@ -20,13 +20,18 @@ use cp_render::{Block as IrBlock, Semantic, Span as S};
 use crate::state::State;
 use crate::ui::{ir, theme};
 use cp_base::cast::Safe as _;
-use cp_mod_threads::types::{FocusState, ThreadStatus, ThreadsState};
+use cp_fleet::ThreadExecState;
+use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadStatus, ThreadsState};
+use cp_mod_threads::view_state::FleetExecMirror;
 
 /// Width of the thread list pane in columns.
-pub(crate) const THREAD_LIST_WIDTH: u16 = 28;
+///
+/// Matched to the panel-centric view's sidebar width ([`ViewMode::width`] for
+/// `Normal` = 36) so the two layouts line up pixel-for-pixel.
+pub(crate) const THREAD_LIST_WIDTH: u16 = 36;
 
 /// Render the threads view: thread list + message area.
-pub(crate) fn render_threads_view(frame: &mut Frame<'_>, state: &State, area: Rect) {
+pub(crate) fn render_threads_view(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
     let threads_state = ThreadsState::get(state);
     let focus_state = FocusState::get(state);
     let viewing_archived = focus_state.viewing_archived;
@@ -93,101 +98,160 @@ struct ListBuild<'build> {
     sel: &'build mut SelRange,
     /// Inner pane width (columns) for name truncation.
     inner_width: u16,
+    /// Display-only per-thread exec state, rebuilt each tick by the run loop.
+    /// Drives the leading working-spinner (reuses the fleet mirror; never read
+    /// for scheduling).
+    mirror: &'build FleetExecMirror,
+    /// Per-thread message count the *human* has seen in the TUI
+    /// ([`FocusState::last_read_count`]) — drives the unread marker.
+    last_read: &'build std::collections::BTreeMap<String, usize>,
 }
 
-/// Push the virtual "+ New Thread" entry (active view only, 2-line format),
+/// Push the virtual "+ New Thread" entry (active view only, single-line),
 /// recording its line range into `sel` when it is the selected entry.
 fn push_new_thread_entry(lb: &mut ListBuild<'_>, state: &State, on_virtual: bool) {
     let new_sem = if on_virtual { Semantic::Accent } else { Semantic::Muted };
     if on_virtual {
         lb.sel.start = Some(lb.blocks.len());
     }
-    let new_name = if on_virtual && !state.input.is_empty() {
-        truncate_str(&state.input, lb.inner_width.saturating_sub(6).into())
-    } else {
+    let title = &FocusState::get(state).new_thread_title.text;
+    let new_name = if title.is_empty() {
         "New Thread".to_owned()
+    } else {
+        truncate_str(title, lb.inner_width.saturating_sub(6).into())
     };
     lb.blocks.push(IrBlock::Line(vec![
         S::styled("  ".to_owned(), new_sem),
         S::styled("\u{25cf} ".to_owned(), new_sem),
         S::styled(new_name, new_sem),
     ]));
-    lb.blocks.push(IrBlock::Line(vec![S::new("  ".to_owned()), S::styled("[NEW THREAD]".to_owned(), new_sem)]));
     if on_virtual {
         lb.sel.end = Some(lb.blocks.len());
     }
 }
 
-/// Semantic + badge for one thread's status (focused wins over turn state).
-const fn thread_status_style(thread: &cp_mod_threads::types::Thread, is_focused: bool) -> (Semantic, &'static str) {
-    if is_focused {
-        return (Semantic::Accent, "[FOCUSED]");
-    }
-    if matches!(thread.status, ThreadStatus::MyTurn) {
-        (Semantic::Warning, "[MY_TURN]")
+/// Raw RGB for one thread's status circle — a function of thread *state* only,
+/// never of which thread the human happens to be viewing:
+/// orange = `MyTurn` (the LLM owes a turn), green = `TheirTurn` (the human owes
+/// a turn), yellow/amber = paused. Returned as a raw triple (via
+/// [`Span::rgb`](cp_render::Span::rgb)) because the IR `Semantic` palette has no
+/// distinct orange-vs-amber pair.
+fn thread_circle_rgb(thread: &cp_mod_threads::types::Thread) -> (u8, u8, u8) {
+    let color = if thread.paused {
+        theme::warning()
+    } else if matches!(thread.status, ThreadStatus::MyTurn) {
+        theme::orange()
     } else {
-        (Semantic::Success, "[THEIR_TURN]")
-    }
+        theme::success()
+    };
+    if let ratatui::style::Color::Rgb(r, g, b) = color { (r, g, b) } else { (200, 200, 200) }
 }
 
-/// Push one thread's 2-line entry, recording its selected line range.
-fn push_thread_entry(
-    lb: &mut ListBuild<'_>,
-    thread: &cp_mod_threads::types::Thread,
-    focus: &FocusState,
-    is_selected: bool,
-) {
-    let last_read = focus.last_read_count.get(&thread.id).copied().unwrap_or(0);
-    let has_unread = thread.messages.len() > last_read;
-    let is_focused = focus.focused_thread_id.as_deref() == Some(thread.id.as_str());
-    let (status_sem, badge) = thread_status_style(thread, is_focused);
+/// Whether a thread's exec state should show the "working" spinner — the
+/// per-thread analog of the footer badge needing a spinner (STREAMING /
+/// TOOLING / WAITING). `Idle` is READY (void) and `Errored` is parked (void),
+/// exactly like the footer's READY / BLOCKED badges carry no spinner.
+const fn thread_is_working(exec: ThreadExecState) -> bool {
+    matches!(
+        exec,
+        ThreadExecState::Runnable
+            | ThreadExecState::Streaming
+            | ThreadExecState::AwaitingLlm
+            | ThreadExecState::AwaitingTool
+    )
+}
 
-    let indicator = if has_unread && !is_selected { "\u{25cf} " } else { "  " };
-    let indicator_sem = if has_unread { Semantic::Warning } else { Semantic::Default };
+/// Whether `thread` holds an LLM reply the human has not yet seen in the TUI:
+/// a non-auto assistant message at or past the thread's
+/// [`last_read_count`](FocusState::last_read_count). A thread with no entry
+/// was never tracked and counts as read, so old threads don't all light up.
+fn has_unread_reply(
+    thread: &cp_mod_threads::types::Thread,
+    last_read: &std::collections::BTreeMap<String, usize>,
+) -> bool {
+    let Some(&seen) = last_read.get(&thread.id) else {
+        return false;
+    };
+    thread
+        .messages
+        .get(seen..)
+        .is_some_and(|tail| tail.iter().any(|m| !m.auto && matches!(m.author, ThreadAuthor::Assistant)))
+}
+
+/// Push one thread's single-line entry (status-colored circle + name),
+/// recording its selected line range.
+fn push_thread_entry(lb: &mut ListBuild<'_>, thread: &cp_mod_threads::types::Thread, is_selected: bool) {
+    // Leading slot (2 cols), mirroring the footer:
+    //   working            → the footer's square spinner,
+    //   idle AND MyTurn     → a ⚠ warning (the LLM owes a turn but is doing
+    //                         nothing — a stall the human should notice),
+    //   unread LLM reply    → a ◆ marker (cleared once the row has stayed
+    //                         selected 2s, see FocusState::tick_read_dwell),
+    //   otherwise           → void.
+    let working = thread_is_working(lb.mirror.exec_state_of(&thread.id));
+    let leading = if working {
+        S::styled(format!("{} ", crate::ui::helpers::spinner()), Semantic::Accent)
+    } else if matches!(thread.status, ThreadStatus::MyTurn) {
+        S::styled("\u{26a0} ".to_owned(), Semantic::Error)
+    } else if has_unread_reply(thread, lb.last_read) {
+        S::styled("\u{25c6} ".to_owned(), Semantic::Accent)
+    } else {
+        S::styled("  ".to_owned(), Semantic::Default)
+    };
+    let (cr, cg, cb) = thread_circle_rgb(thread);
     let name = truncate_str(&thread.name, lb.inner_width.saturating_sub(6).into());
 
     if is_selected {
         lb.sel.start = Some(lb.blocks.len());
     }
-    lb.blocks.push(IrBlock::Line(vec![
-        S::styled(indicator.to_owned(), indicator_sem),
-        S::styled("\u{25cf} ".to_owned(), status_sem),
-        S::new(name),
-    ]));
-    lb.blocks.push(IrBlock::Line(vec![
-        S::new("  ".to_owned()),
-        S::styled(badge.to_owned(), status_sem),
-        S::muted(format!("  {} msg", thread.messages.len())),
-    ]));
+    lb.blocks.push(IrBlock::Line(vec![leading, S::rgb("\u{25cf} ".to_owned(), cr, cg, cb), S::new(name)]));
     if is_selected {
         lb.sel.end = Some(lb.blocks.len());
     }
 }
 
-/// Push the bottom help / confirm hint line for the current mode.
-fn push_help_hint(blocks: &mut Vec<IrBlock>, viewing_archived: bool, confirming: bool) {
-    if confirming {
-        let (verb, key_sem) =
-            if viewing_archived { (" Restore? ", Semantic::KeyHint) } else { (" Archive? ", Semantic::KeyHint) };
+/// Push the inline archive/restore confirm bubble, rendered on its own line
+/// directly below the selected thread's row.
+///
+/// Leads with a down-right arrow (`\u{21B3}`) hanging off the thread it
+/// concerns, and is fully red ([`Semantic::Error`]) so the pending confirm
+/// reads as a bubble attached to that specific thread — not the easy-to-miss
+/// footer hint it replaces.
+fn push_archive_confirm_bubble(blocks: &mut Vec<IrBlock>, viewing_archived: bool) {
+    let verb = if viewing_archived { "restore" } else { "archive" };
+    blocks.push(IrBlock::Line(vec![
+        S::styled("    \u{21B3} ".to_owned(), Semantic::Error),
+        S::styled("Ctrl+X".to_owned(), Semantic::Error),
+        S::styled(format!(" again to confirm {verb}"), Semantic::Error),
+    ]));
+}
+
+/// Push the bottom help hint line for the current mode.
+fn push_help_hint(blocks: &mut Vec<IrBlock>, viewing_archived: bool) {
+    if viewing_archived {
         blocks.push(IrBlock::Line(vec![
-            S::warning(verb.to_owned()),
-            S::styled("y".to_owned(), key_sem),
-            S::muted("/any to cancel".to_owned()),
-        ]));
-    } else if viewing_archived {
-        blocks.push(IrBlock::Line(vec![
-            S::styled(" Ctrl+A".to_owned(), Semantic::KeyHint),
+            S::styled("Up/Dn".to_owned(), Semantic::KeyHint),
+            S::muted(" select  ".to_owned()),
+            S::styled("\u{2192}".to_owned(), Semantic::KeyHint),
+            S::muted(" view  ".to_owned()),
+            S::styled("Ctrl+X".to_owned(), Semantic::KeyHint),
             S::muted(" restore  ".to_owned()),
             S::styled("Ctrl+U".to_owned(), Semantic::KeyHint),
-            S::muted(" active".to_owned()),
+            S::muted(" active  ".to_owned()),
+            S::styled("Esc".to_owned(), Semantic::KeyHint),
+            S::muted(" back".to_owned()),
         ]));
     } else {
         blocks.push(IrBlock::Line(vec![
-            S::styled(" Ctrl+A".to_owned(), Semantic::KeyHint),
+            S::styled("Up/Dn".to_owned(), Semantic::KeyHint),
+            S::muted(" select  ".to_owned()),
+            S::styled("\u{2192}".to_owned(), Semantic::KeyHint),
+            S::muted(" view  ".to_owned()),
+            S::styled("Ctrl+X".to_owned(), Semantic::KeyHint),
             S::muted(" arch  ".to_owned()),
             S::styled("Ctrl+U".to_owned(), Semantic::KeyHint),
             S::muted(" arch'd  ".to_owned()),
-            S::styled("Ctrl+V".to_owned(), Semantic::KeyHint),
+            S::styled("Esc".to_owned(), Semantic::KeyHint),
             S::muted(" back".to_owned()),
         ]));
     }
@@ -218,20 +282,22 @@ fn apply_selection_highlight(lines: &mut [ratatui::text::Line<'static>], sel: &S
 fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let ts = ThreadsState::get(state);
     let focus = FocusState::get(state);
+    let mirror = FleetExecMirror::get(state);
     let viewing_archived = focus.viewing_archived;
     let visible = ts.visible_indices(viewing_archived);
     let show_new = !viewing_archived; // virtual "+ New Thread" only in the active view
     let total_entries = visible.len().saturating_add(usize::from(show_new));
     let selected = focus.selected_thread_idx.min(total_entries.saturating_sub(1));
-    let confirming = focus.confirming_archive;
+    // The arm is only "live" within the 2-second confirm window; a lapsed arm
+    // reverts the hint to the normal state (a next Ctrl+X will re-arm).
+    let confirming =
+        focus.confirming_archive && cp_base::panels::now_ms().saturating_sub(focus.archive_armed_at_ms) <= 2_000;
 
-    // Layout chrome: border on right side
-    let border = RBlock::default()
-        .borders(Borders::RIGHT)
-        .border_style(ir::semantic_to_style(Semantic::Border))
-        .style(Style::default().bg(theme::bg_base()));
-    let inner = border.inner(area);
-    frame.render_widget(border, area);
+    // No border chrome: the pane bleeds into the message area with no divider
+    // line (matches the panel-centric sidebar, which has no right border).
+    let background = RBlock::default().style(Style::default().bg(theme::bg_base()));
+    let inner = background.inner(area);
+    frame.render_widget(background, area);
 
     // ── Build IR blocks ──────────────────────────────────────────────
     let mut ir_blocks: Vec<IrBlock> = Vec::new();
@@ -240,7 +306,13 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
     push_archived_header(&mut ir_blocks, viewing_archived);
 
     let on_virtual = show_new && selected >= visible.len();
-    let mut lb = ListBuild { blocks: &mut ir_blocks, sel: &mut sel, inner_width: inner.width };
+    let mut lb = ListBuild {
+        blocks: &mut ir_blocks,
+        sel: &mut sel,
+        inner_width: inner.width,
+        mirror,
+        last_read: &focus.last_read_count,
+    };
     if show_new {
         push_new_thread_entry(&mut lb, state, on_virtual);
     }
@@ -250,7 +322,10 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
         let Some(thread) = ts.threads.get(real) else {
             continue;
         };
-        push_thread_entry(&mut lb, thread, focus, i == selected);
+        push_thread_entry(&mut lb, thread, i == selected);
+        if confirming && i == selected {
+            push_archive_confirm_bubble(lb.blocks, viewing_archived);
+        }
     }
 
     // Empty-state hint when the archived list has nothing in it.
@@ -267,7 +342,7 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
         }
     }
 
-    push_help_hint(&mut ir_blocks, viewing_archived, confirming);
+    push_help_hint(&mut ir_blocks, viewing_archived);
 
     // Convert IR → ratatui and render
     let mut lines = ir::blocks_to_lines(&ir_blocks);
@@ -291,7 +366,8 @@ fn render_new_thread_prompt(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let inner = border.inner(area);
     frame.render_widget(border, area);
 
-    let input_preview = if state.input.is_empty() { "\u{2026}".to_owned() } else { state.input.clone() };
+    let title = &FocusState::get(state).new_thread_title.text;
+    let input_preview = if title.is_empty() { "\u{2026}".to_owned() } else { title.clone() };
 
     let ir_blocks = vec![
         IrBlock::Empty,

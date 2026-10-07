@@ -19,3 +19,10 @@ mod capabilities;
 pub mod db;
 mod helpers;
 pub mod types;
+
+/// The auth database path — `CP_AUTH_DB`, else
+/// `~/.context-pilot/orchestrator/auth.db`, as validated at boot.
+#[must_use]
+pub fn default_db_path() -> std::path::PathBuf {
+    cp_env::env().auth.db_path.clone()
+}

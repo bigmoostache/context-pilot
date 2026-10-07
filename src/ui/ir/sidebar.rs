@@ -189,7 +189,7 @@ fn build_token_bar(state: &State) -> TokenBar {
         used: total.to_u32(),
         budget: budget.to_u32(),
         threshold: threshold.to_u32(),
-        streaming: state.flags.stream.phase.is_streaming(),
+        streaming: state.stream.phase.is_streaming(),
     }
 }
 

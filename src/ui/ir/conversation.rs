@@ -4,6 +4,7 @@
 //! function returning IR types. No ratatui, no Frame, no caching — just
 //! state → data transformation. Caching lives in the adapter layer (Phase 5).
 
+use cp_render::conversation::PerfShareBar;
 use cp_render::conversation::{
     Autocomplete, AutocompleteEntry, Conversation, HistorySection, InputArea, Message as IrMessage, Overlay,
     PerfBudgetBar, PerfMeiliStats, PerfOp, PerfOverlay, StreamingTool, ToolResultPreview, ToolUsePreview,
@@ -11,6 +12,7 @@ use cp_render::conversation::{
 use cp_render::{Block, Semantic};
 
 use crate::state::{Kind, MsgKind, MsgStatus, State, ToolResultRecord, ToolUseRecord};
+use cp_base::cast::Safe as _;
 use cp_base::cast::float_math;
 
 /// Build the conversation region from application state.
@@ -61,7 +63,7 @@ fn build_messages(state: &State) -> Vec<IrMessage> {
             }
             // Skip empty text messages (unless currently streaming)
             let is_last = last_msg_id.as_ref() == Some(&msg.id);
-            let is_streaming = state.flags.stream.phase.is_streaming() && is_last && msg.role == "assistant";
+            let is_streaming = state.stream.phase.is_streaming() && is_last && msg.role == "assistant";
             if msg.msg_type == MsgKind::TextMessage && msg.content.trim().is_empty() && !is_streaming {
                 return false;
             }
@@ -140,10 +142,10 @@ fn build_streaming_tools(state: &State) -> Vec<StreamingTool> {
 /// Build the input area from state.
 fn build_input(state: &State) -> InputArea {
     InputArea {
-        text: state.input.clone(),
-        cursor: state.input_cursor,
+        text: state.composer.text.clone(),
+        cursor: state.composer.cursor,
         placeholder: "Type a message\u{2026}".into(),
-        focused: !state.flags.stream.phase.is_streaming(),
+        focused: !state.stream.phase.is_streaming(),
     }
 }
 
@@ -295,16 +297,12 @@ fn build_perf_ops(snapshot: &crate::ui::perf::PerfSnapshot) -> Vec<PerfOp> {
 /// Build the optional Meilisearch stats row for the perf overlay (None when no
 /// meili process is running or it reports no CPU/memory).
 fn build_perf_meili(state: &State) -> Option<PerfMeiliStats> {
-    let info = cp_mod_search::overlay_info(state)?;
-    if info.meili_memory_bytes == 0 && info.meili_cpu_pct <= 0.0 {
+    let (cpu_pct, memory_bytes) = cp_mod_search::meili_process_stats(state)?;
+    if memory_bytes == 0 && cpu_pct <= 0.0 {
         return None;
     }
-    let mb = float_math::div_u64(info.meili_memory_bytes, 1_048_576.0f64);
-    Some(PerfMeiliStats {
-        cpu_pct: f64::from(info.meili_cpu_pct),
-        cpu_semantic: cpu_semantic(f64::from(info.meili_cpu_pct)),
-        memory_mb: mb,
-    })
+    let mb = float_math::div_u64(memory_bytes, 1_048_576.0f64);
+    Some(PerfMeiliStats { cpu_pct: f64::from(cpu_pct), cpu_semantic: cpu_semantic(f64::from(cpu_pct)), memory_mb: mb })
 }
 
 /// Build the two frame-budget bars (60fps / 30fps) from the average frame time.
@@ -346,7 +344,76 @@ fn build_perf_overlay(state: &State) -> PerfOverlay {
         fd_semantic: fd_semantic(snapshot.open_fds, snapshot.fd_limit_soft),
         meili: build_perf_meili(state),
         budget_bars: build_perf_budget_bars(snapshot.frame_avg_ms),
+        share_names: LOOP_SHARE_STEPS.iter().map(|name| name.trim_start_matches("loop.").to_owned()).collect(),
+        share_bars: build_perf_share_bars(&snapshot),
+        loop_iterations: loop_iterations(&snapshot),
         sparkline: snapshot.frame_times_ms,
         operations,
     }
+}
+
+/// Level-1 main-loop steps shown in the share-bars, in loop execution order.
+///
+/// Fixed on purpose: segment colour = position in this list, so colours never
+/// move between frames (sorting by the live snapshot reshuffled them on every
+/// refresh). `loop.idle` is excluded: the input-poll park would dwarf every
+/// real step. Keep in sync with `watchdog::Step::perf_name`.
+const LOOP_SHARE_STEPS: [&str; 12] = [
+    "loop.input",
+    "loop.bridge",
+    "loop.threads_emit",
+    "loop.stream",
+    "loop.cache",
+    "loop.watchers",
+    "loop.tools",
+    "loop.spine",
+    "loop.reverie",
+    "loop.panel_refresh",
+    "loop.render",
+    "loop.save",
+];
+
+/// One snapshot op per [`LOOP_SHARE_STEPS`] entry (`None` = not recorded yet),
+/// aligned index-for-index with the step list.
+fn loop_substeps(snapshot: &crate::ui::perf::PerfSnapshot) -> Vec<Option<&crate::ui::perf::OpSnapshot>> {
+    LOOP_SHARE_STEPS.iter().map(|&name| snapshot.ops.iter().find(|op| op.name == name)).collect()
+}
+
+/// Extracts one lifetime metric (µs or µs²) from an op snapshot.
+type Metric = fn(&crate::ui::perf::OpSnapshot) -> f64;
+
+/// Main-loop iterations recorded since F12 was enabled: `loop.idle` is marked
+/// exactly once per iteration, and resets with the overlay (unlike
+/// `PERF.loop_count`, which only ticks under `--measure`).
+fn loop_iterations(snapshot: &crate::ui::perf::PerfSnapshot) -> u64 {
+    snapshot.ops.iter().find(|op| op.name == "loop.idle").map_or(0, |op| op.count)
+}
+
+/// Four stacked share-bars (total / mean / std / max) over the loop substeps:
+/// each segment is that substep's percentage of the metric's sum. `total`
+/// (lifetime time ÷ loop iterations) is the average cost per iteration — where
+/// wall time goes; the others show per-run cost of each substep.
+/// Std (not variance) so the per-run bars share one unit (µs).
+fn build_perf_share_bars(snapshot: &crate::ui::perf::PerfSnapshot) -> Vec<PerfShareBar> {
+    let steps = loop_substeps(snapshot);
+    let iterations = loop_iterations(snapshot).max(1).to_f64();
+    let metrics: [(&str, &str, Metric); 4] = [
+        ("total", "\u{b5}s/it", |op| op.total_ms),
+        ("mean", "\u{b5}s", |op| op.mean_us),
+        ("std", "\u{b5}s", |op| op.variance_us2.sqrt()),
+        ("max", "\u{b5}s", |op| op.max_us),
+    ];
+    metrics
+        .iter()
+        .map(|&(label, unit, metric)| {
+            let values: Vec<f64> = steps.iter().map(|op| op.map_or(0.0f64, metric)).collect();
+            let total: f64 = values.iter().sum();
+            let shares =
+                values.iter().map(|&v| if total > 0.0f64 { float_math::percent(v, total) } else { 0.0f64 }).collect();
+            // Total is summed in ms over the whole run: ×1000 → µs, ÷ iterations.
+            let shown =
+                if label == "total" { float_math::div(float_math::mul(total, 1_000.0f64), iterations) } else { total };
+            PerfShareBar { label: label.to_owned(), shares, total_display: format!("{shown:.0}{unit}") }
+        })
+        .collect()
 }
