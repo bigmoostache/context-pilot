@@ -179,6 +179,19 @@ exceptions:
       Irreducible under the 500-line cap — folding these back into fleet.rs
       would push that file over the limit. The split is the honest shape.
 
+  - path: "src/app/run/lifecycle/input_phase.rs"
+    match: 'App methods split across run/ submodules for readability'
+    reason: >
+      The main-loop input phase (handle_input_phase: event poll, palette,
+      autocomplete, quit flush, drill swap/restore, each under its own perf
+      guard) is its own impl App block, moved out of lifecycle/mod.rs when that
+      file hit the 500-line cap. multiple_inherent_impl (forbid) fires on this
+      additional block, so it carries the #[expect].
+    strategy: >
+      Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
+      would push that file over the limit. The split is the honest shape.
+
+
   - path: "crates/cp-base/src/state/runtime/ext.rs"
     match: "State methods split across runtime/ submodules to respect the 500-line file cap"
     reason: >

@@ -8916,3 +8916,30 @@ index 94ef72f2..c5587f48 100644
      match: "flat path-segment router: a closed match over ~60 borrowed `(&Method, &[&str])` route shapes"
      reason: >
 # --- End entry #110 ---
+111:6dca93435c0e19c9c11d1e57db66271126e141ba9ff0b3e44b3c3f4943d6c18e:92891d652d36e6245c81aa297e6e3aa119887603774fc336f73585a5eb211546:3762e939a65ffeefca066fdf594f944f9ccb0d82a2289fbbb72232a856f0bd37
+# --- Diff for entry #111 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index c5587f48..38e8b52e 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -179,6 +179,19 @@ exceptions:
+       Irreducible under the 500-line cap — folding these back into fleet.rs
+       would push that file over the limit. The split is the honest shape.
+ 
++  - path: "src/app/run/lifecycle/input_phase.rs"
++    match: 'App methods split across run/ submodules for readability'
++    reason: >
++      The main-loop input phase (handle_input_phase: event poll, palette,
++      autocomplete, quit flush, drill swap/restore, each under its own perf
++      guard) is its own impl App block, moved out of lifecycle/mod.rs when that
++      file hit the 500-line cap. multiple_inherent_impl (forbid) fires on this
++      additional block, so it carries the #[expect].
++    strategy: >
++      Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
++      would push that file over the limit. The split is the honest shape.
++
++
+   - path: "crates/cp-base/src/state/runtime/ext.rs"
+     match: "State methods split across runtime/ submodules to respect the 500-line file cap"
+     reason: >
+# --- End entry #111 ---
