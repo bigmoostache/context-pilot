@@ -144,14 +144,6 @@ fn collect_thread_summaries(ts: &ThreadsState, focused_tid: &str) -> Vec<String>
     summaries
 }
 
-/// Focus the target thread when it is `MY_TURN`, resetting escalation.
-fn apply_read_focus(state: &mut State, tid: &str, thread_status: ThreadStatus) {
-    if thread_status == ThreadStatus::MyTurn {
-        let fs = FocusState::get_mut(state);
-        fs.focused_thread_id = Some(tid.to_owned());
-    }
-}
-
 /// Force the Threads panel to emit fresh THIS tick after a Read.
 ///
 /// Deprecating the cache alone is insufficient: the freeze pass would restore
@@ -185,17 +177,18 @@ pub(crate) fn rebuild_threads_panel(state: &mut State, focused_tid: &str, now_ms
     force_refresh_threads_panel(state);
 }
 
-/// Refresh the Threads panel for the focused thread.
+/// Refresh the Threads panel for the CALLER's own thread.
 ///
-/// Read no longer takes a `thread_id`: the LLM does not choose which thread is
-/// displayed — the panel always reflects the focused (resident) thread. This
-/// marks that thread's messages as acknowledged, rebuilds the panel content
-/// (thread list + focused conversation), and returns a lightweight summary
-/// pointing to the panel. The focus itself is set elsewhere (the focused thread
-/// is already the resident), so re-affirming it here is a no-op.
+/// Read takes no `thread_id`: it always targets the **resident** thread (the
+/// thread whose context is executing this tool), exactly like `Send`. It must
+/// NOT use `FocusState::focused_thread_id` — that is the human's UI-global view
+/// pointer, so at N>1 a background thread would read, acknowledge, and clear
+/// notifications of whatever thread is on screen (T828). For the same reason
+/// Read never writes focus. Marks the thread's messages acknowledged, rebuilds
+/// the panel (thread list + own conversation), and returns a summary.
 pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let focused_tid = FocusState::get(state).focused_thread_id.clone().unwrap_or_default();
-    let tid = focused_tid.as_str();
+    let owned_tid = resident_thread_id(state);
+    let tid = owned_tid.as_str();
 
     let now_ms = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis().to_u64());
 
@@ -207,19 +200,6 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let thread_name = target_thread.name.clone();
     let thread_status = target_thread.status;
-
-    // Refuse to read a paused thread unless it's already focused.
-    // Checked at both pre-flight and execution because state can change between the two.
-    if target_thread.paused && FocusState::get(state).focused_thread_id.as_deref() != Some(tid) {
-        return ToolResult::new(
-            tool.id.clone(),
-            format!(
-                "Thread '{tid}' (\"{thread_name}\") is paused. Cannot read a paused \
-                 thread unless it is already focused. Unpause it first."
-            ),
-            true,
-        );
-    }
 
     let thread_summaries = collect_thread_summaries(ts, tid);
 
@@ -241,11 +221,8 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     }
 
-    // --- Phase 3: Set focus ---
-    apply_read_focus(state, tid, thread_status);
-
     // Reading a thread clears any spine notifications bound to it — the agent
-    // has now focused the thread, so its pending nudges are moot.
+    // has now read its own thread, so its pending nudges are moot.
     let _cleared = cp_mod_spine::types::SpineState::delete_notifications_by_thread(state, tid);
 
     // --- Phase 4: Build panel content (thread list + focused conversation) ---
@@ -308,7 +285,7 @@ fn build_read_result(state: &State, r: &ReadResult<'_>) -> String {
         .map_or_else(|| "[no messages]".to_owned(), |c| preview_ellipsis(c, 80));
 
     let (tid, thread_name, thread_status) = (r.tid, r.thread_name, r.thread_status);
-    let mut lines = vec![format!("Thread {tid} \"{thread_name}\" [{thread_status}] — now focused.\n")];
+    let mut lines = vec![format!("Thread {tid} \"{thread_name}\" [{thread_status}] — your thread, refreshed.\n")];
     if r.thread_summaries.is_empty() {
         lines.push("No unacknowledged messages across active threads.".to_owned());
     } else {
