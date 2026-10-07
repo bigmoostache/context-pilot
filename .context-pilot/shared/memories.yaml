@@ -211,10 +211,10 @@ M-mid-4:
   last_edited_ms: 1791290207496
 M-mid-5:
   tier: mid
-  title: Opus5.5 Think fix SHIPPED
-  contents: 'T772: Opus 5.5 stop_reason:refusal was caused by the Think tool description + param descriptions (yamls/tools/core.yaml): CoT-eliciting wording tripped the refusal classifier. Rewritten neutral → 0/8 refusals vs 8/8 (/tmp/cc-capture/test_ship.py). core.yaml is include_str!''d: needs rebuild + deploy to go live. If refusals reappear, suspect tool/param wording first.'
+  title: Opus5.5 refusal triggers
+  contents: 'T772 Opus 5.5 stop_reason:refusal triggers found (all fixed): (1) Think tool desc CoT wording (2b43619b); (2) Think result ''thinking is cheap...'' (fe5c6178); (3) param NAME thought_body: any long text under it refused, renamed to `plan` (211147ff, 0/12). Dumps: ~/.context-pilot/refusals/. Harness /tmp/cc-capture/{replay_refusal,body_bisect}.py, MAXTOK=512 for speed. Suspect tool/param wording first.'
   importance: high
-  last_edited_ms: 1791290207527
+  last_edited_ms: 1791362080622
 M-mid-6:
   tier: mid
   title: NEVER commit or push
@@ -415,10 +415,10 @@ M-short-29:
   last_edited_ms: 0
 M-short-3:
   tier: short
-  title: 'Think tool v4: single'
-  contents: 'Think tool v4: single param (thought_body). ThinkState{consecutive_count, reminder_threshold, next_notification_at}. Fires reminder at threshold. Queue bypass. TUI card shows negative balance.'
+  title: Think tool v4
+  contents: 'Think tool v4: params plan (was thought_body, renamed 211147ff for Opus 5.5 refusals) + task_context. ThinkState{consecutive_count, reminder_threshold, next_notification_at}. Fires reminder at threshold. Queue bypass.'
   importance: high
-  last_edited_ms: 0
+  last_edited_ms: 1791362080625
 M-short-30:
   tier: short
   title: OAuth architecture (T504
