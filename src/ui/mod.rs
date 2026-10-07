@@ -50,7 +50,7 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     // Phase 5 progressively replaces direct-render code paths below.
     let ir_frame = {
         let _build = crate::profile!("ir_build_frame");
-        ir::build_frame(state)
+        ir::build_frame(state, !showing_threads_list(state))
     };
 
     // Fill base background
@@ -149,7 +149,7 @@ fn render_modal_overlays(frame: &mut Frame<'_>, area: Rect, overlays: &[cp_rende
 
 /// Render the body area: sidebar (if visible) and main content panel,
 /// or the threads view when `ViewMode::Threads` is active.
-fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &cp_render::frame::Frame) {
+fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &ir::FrameChrome) {
     // Threads mode: completely different layout (no sidebar, no panels) —
     // unless the human has drilled into a thread (G3), in which case fall
     // through to the normal body to paint that thread's full panel view.
@@ -176,18 +176,23 @@ fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &
     };
     {
         let _g = crate::profile!("sidebar_draw");
-        ir::render_sidebar::render_sidebar_from_ir(frame, &ir_frame.sidebar, sidebar_area);
+        if let Some(sidebar) = ir_frame.sidebar.as_ref() {
+            ir::render_sidebar::render_sidebar_from_ir(frame, sidebar, sidebar_area);
+        }
     }
-    render_main_content(frame, state, content_area, ir_frame);
+    render_main_content(frame, state, content_area);
 }
 
 /// Render the main content area.
-fn render_main_content(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &cp_render::frame::Frame) {
-    render_content_panel(frame, state, area, ir_frame);
+fn render_main_content(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
+    render_content_panel(frame, state, area);
 }
 
 /// Render the active content panel (conversation or generic panel).
-fn render_content_panel(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &cp_render::frame::Frame) {
+///
+/// The IR for the painted kind is built here, lazily: building both the
+/// conversation and the active panel every frame wasted one of them always.
+fn render_content_panel(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
     let _guard = crate::profile!("ui::render_panel");
     let context_type = state
         .context
@@ -199,10 +204,15 @@ fn render_content_panel(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir
     // All other panels render from the IR snapshot, falling back to content()
     // for panels whose blocks() returns empty (not yet migrated).
     if context_type.as_str() == Kind::CONVERSATION {
+        let conversation = ir::build_conversation_ir(state);
         let _g = crate::profile!("conversation_draw");
-        ir::render_conversation::render_conversation_from_ir(frame, state, area, &ir_frame.conversation);
+        ir::render_conversation::render_conversation_from_ir(frame, state, area, &conversation);
     } else {
+        let active_panel = {
+            let _g = crate::profile!("ir_active_panel");
+            ir::build_active_panel(state)
+        };
         let _g = crate::infra::profiler::dyn_guard("panel_draw_", context_type.as_str());
-        ir::render_panel::render_panel_from_ir(frame, state, area, &ir_frame.active_panel);
+        ir::render_panel::render_panel_from_ir(frame, state, area, &active_panel);
     }
 }
