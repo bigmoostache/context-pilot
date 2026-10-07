@@ -214,7 +214,7 @@ fn push_help_hint(blocks: &mut Vec<IrBlock>, viewing_archived: bool) {
             S::muted(" restore  ".to_owned()),
             S::styled("Ctrl+U".to_owned(), Semantic::KeyHint),
             S::muted(" active  ".to_owned()),
-            S::styled("Left".to_owned(), Semantic::KeyHint),
+            S::styled("Esc".to_owned(), Semantic::KeyHint),
             S::muted(" back".to_owned()),
         ]));
     } else {
@@ -227,7 +227,7 @@ fn push_help_hint(blocks: &mut Vec<IrBlock>, viewing_archived: bool) {
             S::muted(" arch  ".to_owned()),
             S::styled("Ctrl+U".to_owned(), Semantic::KeyHint),
             S::muted(" arch'd  ".to_owned()),
-            S::styled("Left".to_owned(), Semantic::KeyHint),
+            S::styled("Esc".to_owned(), Semantic::KeyHint),
             S::muted(" back".to_owned()),
         ]));
     }

@@ -277,16 +277,18 @@ fn handle_threads_nav(key: &KeyEvent, state: &State) -> Dispatch {
         KeyCode::Up | KeyCode::Down if shift => Dispatch::Act(scroll_key_action(key).unwrap_or(Action::None)),
         KeyCode::BackTab | KeyCode::Up => Dispatch::Act(Action::ThreadSelectPrev),
         KeyCode::Down => Dispatch::Act(Action::ThreadSelectNext),
-        // Design 9.1: Left/Esc navigate *out* to the panel view. On a real row
-        // they open the SELECTED thread (drill-in commits the list cursor as
+        // Design 9.1: Esc navigates *out* to the panel view. On a real row it
+        // opens the SELECTED thread (drill-in commits the list cursor as
         // focus), never whatever `focused_thread_id` last held — an agent's
         // Read/Send can move focus after the cursor was placed. On the virtual
-        // "+ New Thread" row (or an empty list) they just leave the list.
-        KeyCode::Left | KeyCode::Esc => Dispatch::Act(if selection_is_real_thread(focus, state) {
+        // "+ New Thread" row (or an empty list) it just leaves the list.
+        KeyCode::Esc => Dispatch::Act(if selection_is_real_thread(focus, state) {
             Action::ThreadDrillIn
         } else {
             Action::CycleViewMode
         }),
+        // Left is deliberately inert in the list: only Right opens a thread.
+        KeyCode::Left => Dispatch::Act(Action::None),
         // Right drills into the selected thread's full panel view (G3). The
         // handler no-ops on the virtual "+ New Thread" entry / empty selection.
         KeyCode::Right => Dispatch::Act(Action::ThreadDrillIn),
