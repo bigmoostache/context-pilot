@@ -185,10 +185,10 @@ pub fn fire_callback(
         key
     };
 
-    // Spawn the process
+    // Spawn the process off the main loop; a spawn error surfaces as a failed run.
     let handle = {
         let _p = cp_base::perf_span!("cb_spawn");
-        SessionHandle::spawn(session_key.clone(), command.clone(), cwd)?
+        SessionHandle::spawn_detached(session_key.clone(), command.clone(), cwd)
     };
 
     // Store handle in console state (NO panel created — deferred until failure/timeout)

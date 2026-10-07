@@ -12,7 +12,9 @@ use cp_base::config::constants;
 use cp_base::panels::now_ms;
 
 use crate::CONSOLE_DIR;
-use crate::pollers::{FilePoller, StatusPoller};
+use crate::pollers::{
+    DetachedLaunch, FilePoller, StatusPoller, create_request, pid_of, send_create, start_file_poller,
+};
 use crate::ring_buffer::RingBuffer;
 use crate::types::ProcessStatus;
 use cp_base::cast::Safe as _;
@@ -281,70 +283,58 @@ impl SessionHandle {
     /// Returns `Err` if the server is unreachable and cannot be restarted,
     /// or if the spawn request fails.
     pub fn spawn(name: String, command: String, cwd: Option<String>) -> Result<Self, String> {
-        let log_path = log_file_path(&name);
-        let log_path_str = log_path.to_string_lossy().to_string();
+        let handle = Self::unstarted(name, command, cwd);
+        let req = create_request(&handle.name, &handle.command, &handle.log_path, handle.cwd.as_deref());
+        let pid = pid_of(&send_create(&req)?);
+        *handle.child_id.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(pid);
+        start_file_poller(PathBuf::from(&handle.log_path), handle.buffer.clone(), Arc::clone(&handle.stop_polling));
+        let poller = handle.status_poller();
+        drop(std::thread::spawn(move || poller.run()));
+        Ok(handle)
+    }
 
-        // Ask server to create the process
-        let mut req = serde_json::json!({
-            "cmd": "create",
-            "key": name,
-            "command": command,
-            "log_path": log_path_str,
-        });
-        if let Some(dir) = cwd.as_ref()
-            && let Some(obj) = req.as_object_mut()
-        {
-            let _prev = obj.insert("cwd".to_owned(), serde_json::Value::String(dir.clone()));
-        }
-
-        let resp = if let Ok(r) = server_request(&req) {
-            r
-        } else {
-            // Server may have died — try to respawn
-            find_or_create_server()?;
-            server_request(&req)?
+    /// Non-blocking [`Self::spawn`] for edit callbacks: returns a `Running`
+    /// handle at once and sends `create` from a worker thread. A spawn error
+    /// lands in the output buffer and flips the status to `Failed(-1)`.
+    #[must_use]
+    pub fn spawn_detached(name: String, command: String, cwd: Option<String>) -> Self {
+        let handle = Self::unstarted(name, command, cwd);
+        start_file_poller(PathBuf::from(&handle.log_path), handle.buffer.clone(), Arc::clone(&handle.stop_polling));
+        let launch = DetachedLaunch {
+            req: create_request(&handle.name, &handle.command, &handle.log_path, handle.cwd.as_deref()),
+            child_id: Arc::clone(&handle.child_id),
+            buffer: handle.buffer.clone(),
+            poller: handle.status_poller(),
         };
-        let pid = resp.get("pid").and_then(serde_json::Value::as_u64).unwrap_or(0).to_u32();
+        drop(std::thread::spawn(move || launch.run()));
+        handle
+    }
 
-        let status = Arc::new(Mutex::new(ProcessStatus::Running));
-        let buffer = RingBuffer::new();
-        let child_id = Arc::new(Mutex::new(Some(pid)));
-        let finished_at = Arc::new(Mutex::new(None));
-        let stop_polling = Arc::new(AtomicBool::new(false));
-
-        // File poller thread
-        {
-            let buf = buffer.clone();
-            let stop = Arc::clone(&stop_polling);
-            let path = log_path;
-            drop(std::thread::spawn(move || {
-                FilePoller { path, buffer: buf, stop, offset: 0 }.run();
-            }));
-        }
-
-        // Status poller thread — periodically ask server for status
-        {
-            let status_clone = Arc::clone(&status);
-            let finished_clone = Arc::clone(&finished_at);
-            let stop_clone = Arc::clone(&stop_polling);
-            let key = name.clone();
-            drop(std::thread::spawn(move || {
-                StatusPoller { key, status: status_clone, finished_at: finished_clone, stop: stop_clone }.run();
-            }));
-        }
-
-        Ok(Self {
+    /// `Running` handle with no pid yet and no poller threads started.
+    fn unstarted(name: String, command: String, cwd: Option<String>) -> Self {
+        let log_path = log_file_path(&name).to_string_lossy().to_string();
+        Self {
             name,
             command,
             cwd,
-            status,
-            buffer,
-            log_path: log_path_str,
-            child_id,
+            status: Arc::new(Mutex::new(ProcessStatus::Running)),
+            buffer: RingBuffer::new(),
+            log_path,
+            child_id: Arc::new(Mutex::new(None)),
             started_at: now_ms(),
-            finished_at,
-            stop_polling,
-        })
+            finished_at: Arc::new(Mutex::new(None)),
+            stop_polling: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    /// Status poller bound to this handle's shared status/finish/stop state.
+    fn status_poller(&self) -> StatusPoller {
+        StatusPoller {
+            key: self.name.clone(),
+            status: Arc::clone(&self.status),
+            finished_at: Arc::clone(&self.finished_at),
+            stop: Arc::clone(&self.stop_polling),
+        }
     }
 
     /// Reconnect to a server-managed session after TUI reload.
