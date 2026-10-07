@@ -72,15 +72,21 @@ pub(in crate::app::run) fn poll_bridge_commands(app: &mut App) {
     let mut applied_any = false;
     while budget > 0 {
         budget = budget.saturating_sub(1);
-        let Some(commands) = accept_commands(&mut app.state) else {
+        let accepted = {
+            let _g = crate::profile!("bridge_accept");
+            accept_commands(&mut app.state)
+        };
+        let Some(commands) = accepted else {
             break; // no pending connection — done draining this tick.
         };
         for cmd in commands {
+            let _g = crate::profile!("apply_command");
             super::commands::apply_command(app, cmd);
             applied_any = true;
         }
     }
     if applied_any {
+        let _g = crate::profile!("bridge_save");
         app.save_state_async();
     }
 }
@@ -136,7 +142,10 @@ fn accept_commands(state: &mut State) -> Option<Vec<Command>> {
     // Bound how long we wait for the commander to finish writing.
     let _ignored = stream.set_read_timeout(Some(READ_TIMEOUT));
 
-    let responder = |query: &Query| super::query::answer(search_creds.as_ref(), query);
+    let responder = |query: &Query| {
+        let _g = crate::profile!("bridge_query");
+        super::query::answer(search_creds.as_ref(), query)
+    };
 
     match intake.handle_connection(boot.oplog(), &mut stream, &responder) {
         Ok(cmds) => Some(cmds),
