@@ -222,7 +222,8 @@ fn shared_config_op(
         .with_ui(state.selected_context, String::new(), 0)
         .with_view_mode(state.view_mode)
         .with_modules(global_modules);
-    let json = serde_json::to_string_pretty(&shared_config).ok()?;
+    // Compact, not pretty: config.json is ~1.2 MB and rewritten on every save.
+    let json = serde_json::to_string(&shared_config).ok()?;
     Some(WriteOp { path: dir.join(CONFIG_FILE), content: json.into_bytes() })
 }
 
@@ -242,7 +243,7 @@ fn worker_state_op(
         .with_id_counters(state.next_tool_id, state.next_result_id)
         .with_draft(state.composer.text.clone(), state.composer.cursor)
         .with_modules(worker_modules);
-    let json = serde_json::to_string_pretty(&worker_state).ok()?;
+    let json = serde_json::to_string(&worker_state).ok()?;
     Some(WriteOp {
         path: dir.join(crate::infra::constants::STATES_DIR).join(format!("{worker_id}.json")),
         content: json.into_bytes(),

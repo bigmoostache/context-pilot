@@ -239,13 +239,10 @@ impl Module for SearchModule {
         let Some(ss) = state.get_ext::<SearchState>() else {
             return serde_json::Value::Null;
         };
-        // Snapshot metrics into persist so they survive TUI reload
-        let mut persist = ss.persist.clone();
-        if let Ok(m) = ss.metrics.lock() {
-            persist.recompute_counts.clone_from(&m.recompute_counts);
-            persist.last_sent_ms.clone_from(&m.last_sent_ms);
-        }
-        serde_json::to_value(&persist).unwrap_or(serde_json::Value::Null)
+        // Diagnostic maps (recompute_counts / last_sent_ms) stay live-only in
+        // `metrics`: persisting them cost a 28 KB clone under the indexer's
+        // mutex on every save, for data the Ctrl+I overlay can rebuild.
+        serde_json::to_value(&ss.persist).unwrap_or(serde_json::Value::Null)
     }
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
