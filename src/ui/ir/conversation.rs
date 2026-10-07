@@ -297,16 +297,12 @@ fn build_perf_ops(snapshot: &crate::ui::perf::PerfSnapshot) -> Vec<PerfOp> {
 /// Build the optional Meilisearch stats row for the perf overlay (None when no
 /// meili process is running or it reports no CPU/memory).
 fn build_perf_meili(state: &State) -> Option<PerfMeiliStats> {
-    let info = cp_mod_search::overlay_info(state)?;
-    if info.meili_memory_bytes == 0 && info.meili_cpu_pct <= 0.0 {
+    let (cpu_pct, memory_bytes) = cp_mod_search::meili_process_stats(state)?;
+    if memory_bytes == 0 && cpu_pct <= 0.0 {
         return None;
     }
-    let mb = float_math::div_u64(info.meili_memory_bytes, 1_048_576.0f64);
-    Some(PerfMeiliStats {
-        cpu_pct: f64::from(info.meili_cpu_pct),
-        cpu_semantic: cpu_semantic(f64::from(info.meili_cpu_pct)),
-        memory_mb: mb,
-    })
+    let mb = float_math::div_u64(memory_bytes, 1_048_576.0f64);
+    Some(PerfMeiliStats { cpu_pct: f64::from(cpu_pct), cpu_semantic: cpu_semantic(f64::from(cpu_pct)), memory_mb: mb })
 }
 
 /// Build the two frame-budget bars (60fps / 30fps) from the average frame time.

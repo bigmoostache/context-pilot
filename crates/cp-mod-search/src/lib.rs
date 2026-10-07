@@ -56,6 +56,12 @@ pub fn overlay_info(state: &State) -> Option<types::SearchOverlayInfo> {
     meili::overlay::overlay_info(state)
 }
 
+/// Meilisearch process `(cpu %, rss bytes)` for the F12 overlay (cached, non-blocking).
+#[must_use]
+pub fn meili_process_stats(state: &State) -> Option<(f32, u64)> {
+    meili::overlay::process_stats(state)
+}
+
 /// Get the Meilisearch server credentials (port, master key).
 ///
 /// Returns `None` if the search module isn't initialized or the server
