@@ -32,23 +32,30 @@ pub fn sync_logs_to_meilisearch(state: &State) {
         return;
     }
 
-    let docs: Vec<serde_json::Value> = ls
-        .logs
-        .iter()
-        .map(|l| {
-            serde_json::json!({
-                "id": l.id,
-                "content": l.content,
-                "importance": l.importance,
-                "timestamp_ms": l.timestamp_ms,
-                "datetime": l.datetime,
+    let docs: Vec<serde_json::Value> = {
+        let _p = cp_base::perf_span!("logsync_build_docs");
+        ls.logs
+            .iter()
+            .map(|l| {
+                serde_json::json!({
+                    "id": l.id,
+                    "content": l.content,
+                    "importance": l.importance,
+                    "timestamp_ms": l.timestamp_ms,
+                    "datetime": l.datetime,
+                })
             })
-        })
-        .collect();
+            .collect()
+    };
 
-    let Ok(client) = MeiliClient::new(port, &master_key) else { return };
+    let client_res = {
+        let _p = cp_base::perf_span!("logsync_client");
+        MeiliClient::new(port, &master_key)
+    };
+    let Ok(client) = client_res else { return };
     // Fire-and-forget: Meilisearch processes the task asynchronously (including
     // remote Voyage AI embedding calls). No need to wait — the documents will
     // appear in search results within seconds, and blocking here freezes the UI.
+    let _p = cp_base::perf_span!("logsync_http");
     let _r = client.add_documents(&logs_uid, &serde_json::Value::Array(docs));
 }

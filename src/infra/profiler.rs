@@ -184,3 +184,32 @@ macro_rules! profile {
         $crate::infra::profiler::ProfileGuard::new($name)
     };
 }
+
+thread_local! {
+    /// Interned `act_<Variant>` span names (one leak per distinct variant).
+    static VARIANT_NAMES: RefCell<HashMap<String, &'static str>> = RefCell::new(HashMap::new());
+}
+
+/// Span named `act_<Variant>` for an enum value, from its `Debug` output up to
+/// the first `(`/`{`/space. `None` (no cost beyond one atomic load) unless
+/// monitoring is on.
+pub(crate) fn variant_span<T>(value: &T) -> Option<ProfileGuard>
+where
+    T: std::fmt::Debug,
+{
+    if !crate::ui::perf::PERF.enabled.load(std::sync::atomic::Ordering::Relaxed) {
+        return None;
+    }
+    let dbg = format!("{value:?}");
+    let variant = dbg.split(['(', '{', ' ']).next().unwrap_or("unknown");
+    let name = VARIANT_NAMES.with(|cell| {
+        let mut names = cell.borrow_mut();
+        if let Some(&known) = names.get(variant) {
+            return known;
+        }
+        let leaked: &'static str = Box::leak(format!("act_{variant}").into_boxed_str());
+        let _prev = names.insert(variant.to_owned(), leaked);
+        leaked
+    });
+    Some(ProfileGuard::new(name))
+}

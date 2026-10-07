@@ -75,6 +75,7 @@ impl App {
         // context is preserved rather than being overwritten by the swap-in below
         // (and not mislabelled as the new focus by reconcile).
         if let Some(have_id) = have {
+            let _g = crate::profile!("rr_park");
             let mut parked = cp_base::state::runtime::bundle::ThreadRuntime::new();
             parked.swap_with(&mut self.state); // `parked` now holds `have`'s context; state emptied
             // Park the resident's per-stream runtime alongside its bundle, so its
@@ -114,7 +115,10 @@ impl App {
         // Swap the newly-focused thread's parked bundle into `state`. A cold or
         // unknown thread has no entry → state keeps the fresh empty runtime, which
         // is the correct blank view for a brand-new thread.
-        let swapped_in = want.as_deref().is_some_and(|want_id| self.swap_in_parked(want_id));
+        let swapped_in = {
+            let _g = crate::profile!("rr_swap_in");
+            want.as_deref().is_some_and(|want_id| self.swap_in_parked(want_id))
+        };
 
         // The park above emptied `state` to a bare `ThreadRuntime::new()` (no
         // per-thread module states). If nothing was swapped back in — a cold
@@ -122,6 +126,7 @@ impl App {
         // the next render's `ext::<SpineState>()` would panic. Install an
         // initialized blank runtime instead.
         if parking_resident && !swapped_in {
+            let _g = crate::profile!("rr_install_blank");
             self.install_blank_resident();
         }
 

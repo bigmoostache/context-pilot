@@ -32,6 +32,15 @@ pub(crate) fn install_signal_handlers() {
     }
 }
 
+/// Wait for a shutdown signal, then connect to our own socket once so the
+/// main thread's blocking `accept` returns and sees the flag.
+pub(crate) fn shutdown_waker(socket_path: &str) {
+    while !SHUTDOWN_REQUESTED.load(Ordering::Relaxed) {
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    drop(std::os::unix::net::UnixStream::connect(socket_path));
+}
+
 /// Grace period (seconds) after a session exits before the reaper removes it.
 /// Gives the TUI time to read the final status and log output.
 const REAPER_GRACE_SECS: u64 = 30;

@@ -321,6 +321,7 @@ impl App {
         // SaveMessage is the only payload-bearing variant; the fieldless rest dispatch below.
         let result = {
             let _g = crate::profile!("apply_action");
+            let _v = crate::infra::profiler::variant_span(&action);
             apply_action(&mut self.state, action)
         };
         if let ActionResult::SaveMessage(id) = result {
