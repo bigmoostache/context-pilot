@@ -94,12 +94,12 @@ fn get_radar_yaml(state: &State) -> String {
 /// Maximum character length for a task context signal.
 ///
 /// Signals should be 1–2 sentences (the `task_context` param).  Anything
-/// longer almost certainly contains a leaked `thought_body`.
+/// longer almost certainly contains a leaked Think `plan`.
 const MAX_SIGNAL_LEN: usize = 300;
 
 /// Truncate and sanitize a signal string (cap at [`MAX_SIGNAL_LEN`], strip XML artifacts).
 pub(crate) fn sanitize_signal(raw: &str) -> String {
-    // If the signal contains tool XML, it's a leaked thought_body — take only
+    // If the signal contains tool XML, it's a leaked Think plan — take only
     // the text before the XML starts.
     let content = raw
         .find("<parameter")

@@ -248,7 +248,7 @@ impl Module for SearchModule {
         let mut persist = serde_json::from_value::<SearchPersistData>(data.clone()).unwrap_or_default();
 
         // Sanitize persisted signals — earlier versions could store leaked
-        // thought_body content.  Truncate + strip XML artifacts.
+        // Think `plan` content.  Truncate + strip XML artifacts.
         for sig in &mut persist.task_signals {
             sig.content = radar::sanitize_signal(&sig.content);
         }

@@ -72,7 +72,7 @@ impl Module for QuestionsModule {
             ToolDefinition::from_yaml("Think", core_t)
                 .short_desc("Record a structured reasoning step")
                 .category("Context")
-                .param("thought_body", ParamType::String, true)
+                .param("plan", ParamType::String, true)
                 .param("task_context", ParamType::String, false)
                 .build(),
             ToolDefinition::from_yaml("Todo", core_t)

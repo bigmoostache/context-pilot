@@ -31,7 +31,7 @@ tools:
 
       CONTEXT RADAR: Use the task_context parameter to describe what you're currently working on (1-2 sentences). This feeds the Context Radar panel, which automatically recalls related past decisions and context from logs. Describe *what* you're working on, not *how*. The panel refreshes whenever you provide a new task_context.
     parameters:
-      thought_body: "The plan: the approach, the options considered, and the steps you will take. Markdown is supported. Stays in the active context for the current turn."
+      plan: "The plan: the approach, the options considered, and the steps you will take. Markdown is supported. Stays in the active context for the current turn."
       task_context: "Short (1-2 sentences) description of what you're currently working on. Feeds the Context Radar panel — automatically recalls related past decisions and context from logs. Describe *what* you're working on, not *how*. Example: 'Investigating port reconnection failure on TUI reload'"
 
   Todo:

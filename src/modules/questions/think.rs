@@ -50,8 +50,8 @@ impl Default for ThinkState {
 /// tells the model how many thoughts it has chained, nudging it to
 /// keep going if it judges further deliberation useful.
 pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
-    if tool.input.get("thought_body").and_then(serde_json::Value::as_str).is_none_or(|s| s.trim().is_empty()) {
-        return ToolResult::new(tool.id.clone(), "Missing or empty 'thought_body' parameter".to_owned(), true);
+    if tool.input.get("plan").and_then(serde_json::Value::as_str).is_none_or(|s| s.trim().is_empty()) {
+        return ToolResult::new(tool.id.clone(), "Missing or empty 'plan' parameter".to_owned(), true);
     }
 
     if tool.input.get("task_context").and_then(serde_json::Value::as_str).is_none_or(|s| s.trim().is_empty()) {
