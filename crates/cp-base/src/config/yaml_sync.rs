@@ -201,10 +201,51 @@ impl YamlSync {
         E: SyncEntry,
     {
         entry.set_last_edited_ms(now_ms());
-        let mut map = self.load::<E>();
-        let _prev = map.insert(key.to_owned(), entry.clone());
-        self.write_yaml(&map);
-        self.write_backup(&map);
+        self.upsert_many(vec![(key.to_owned(), entry.clone())]);
+    }
+
+    /// Insert or update several entries with a single load and a single write.
+    ///
+    /// Each entry's `last_edited_ms` is set to the current time. A per-entry
+    /// [`upsert`](Self::upsert) loop would re-parse and re-serialize the whole
+    /// file N times — ~100 ms on the main loop for a large tree-descriptions YAML.
+    pub fn upsert_many<E>(&self, entries: Vec<(String, E)>)
+    where
+        E: SyncEntry,
+    {
+        if entries.is_empty() {
+            return;
+        }
+        let now = now_ms();
+        let mut map = self.load_for_edit::<E>();
+        for (key, mut entry) in entries {
+            entry.set_last_edited_ms(now);
+            let _prev = map.insert(key, entry);
+        }
+        self.write_both(&map);
+    }
+
+    /// Load for a mutation that rewrites both files anyway: skips the
+    /// success-path backup write that [`load`](Self::load) performs.
+    fn load_for_edit<E>(&self) -> BTreeMap<String, E>
+    where
+        E: SyncEntry,
+    {
+        try_parse::<E>(&self.shared_path).unwrap_or_else(|| self.load::<E>())
+    }
+
+    /// Serialize once and write the result to both the shared YAML and the backup.
+    fn write_both<E>(&self, map: &BTreeMap<String, E>)
+    where
+        E: SyncEntry,
+    {
+        let Ok(yaml_str) = serde_yaml::to_string(map) else { return };
+        for path in [&self.shared_path, &self.backup_path] {
+            if let Some(parent) = path.parent() {
+                let _mkdir = fs::create_dir_all(parent);
+            }
+            let _write = fs::write(path, &yaml_str);
+        }
     }
 
     /// Remove an entry by key.
@@ -212,10 +253,9 @@ impl YamlSync {
     where
         E: SyncEntry,
     {
-        let mut map = self.load::<E>();
+        let mut map = self.load_for_edit::<E>();
         if map.remove(key).is_some() {
-            self.write_yaml(&map);
-            self.write_backup(&map);
+            self.write_both(&map);
         }
     }
 
@@ -227,13 +267,12 @@ impl YamlSync {
         E: SyncEntry,
         F: Fn(&str, &E) -> bool,
     {
-        let mut map = self.load::<E>();
+        let mut map = self.load_for_edit::<E>();
         let before = map.len();
         map.retain(|k, v| !predicate(k, v));
         let removed = before.saturating_sub(map.len());
         if removed > 0 {
-            self.write_yaml(&map);
-            self.write_backup(&map);
+            self.write_both(&map);
         }
         removed
     }

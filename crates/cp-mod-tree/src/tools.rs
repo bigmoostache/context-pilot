@@ -267,14 +267,15 @@ fn describe_one(state: &mut State, desc_obj: &serde_json::Value, cwd: Option<&Pa
 
 /// Persist added/updated descriptions and drop removed ones from the YAML store.
 fn sync_descriptions_to_yaml(state: &State, added: &[String], updated: &[String], removed: &[String]) {
-    for path in added.iter().chain(updated.iter()) {
-        if let Some(desc) = TreeState::get(state).descriptions.iter().find(|d| d.path == *path) {
-            storage::upsert_yaml_entry(&desc.path, &desc.description);
-        }
-    }
-    for path in removed {
-        storage::remove_yaml_entry(path);
-    }
+    let descriptions = &TreeState::get(state).descriptions;
+    let upserts: Vec<(&str, &str)> = added
+        .iter()
+        .chain(updated.iter())
+        .filter_map(|path| descriptions.iter().find(|d| d.path == *path))
+        .map(|d| (d.path.as_str(), d.description.as_str()))
+        .collect();
+    storage::upsert_yaml_entries(&upserts);
+    storage::remove_yaml_entries(removed);
 }
 
 /// Execute `tree_describe_files` tool - add/update/remove file descriptions

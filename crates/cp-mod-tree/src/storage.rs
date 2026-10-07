@@ -97,19 +97,24 @@ fn compute_description_key(path: &str, content: &[u8]) -> String {
 ///
 /// Reads the file from disk to compute a content-hash key, then delegates
 /// to [`YamlSync::upsert`] which auto-sets the `last_edited_ms` timestamp.
-pub(crate) fn upsert_yaml_entry(path: &str, description: &str) {
-    let file_path = Path::new(path);
-    let Ok(content) = std::fs::read(file_path) else { return };
-    let key = compute_description_key(path, &content);
-
-    let mut entry = YamlEntry { path: path.to_owned(), description: description.to_owned(), last_edited_ms: 0 };
-    sync().upsert(&key, &mut entry);
+pub(crate) fn upsert_yaml_entries(items: &[(&str, &str)]) {
+    let entries: Vec<(String, YamlEntry)> = items
+        .iter()
+        .filter_map(|&(path, description)| {
+            let content = std::fs::read(Path::new(path)).ok()?;
+            let key = compute_description_key(path, &content);
+            Some((key, YamlEntry { path: path.to_owned(), description: description.to_owned(), last_edited_ms: 0 }))
+        })
+        .collect();
+    sync().upsert_many(entries);
 }
 
-/// Remove all YAML entries for a given path.
-pub(crate) fn remove_yaml_entry(path: &str) {
-    let owned_path = path.to_owned();
-    let _removed = sync().remove_where::<YamlEntry, _>(|_key, entry| entry.path == owned_path);
+/// Remove all YAML entries for the given paths (one load, at most one write).
+pub(crate) fn remove_yaml_entries(paths: &[String]) {
+    if paths.is_empty() {
+        return;
+    }
+    let _removed = sync().remove_where::<YamlEntry, _>(|_key, entry| paths.contains(&entry.path));
 }
 
 // ---------------------------------------------------------------------------
