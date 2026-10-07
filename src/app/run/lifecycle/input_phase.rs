@@ -27,12 +27,16 @@ impl App {
         terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
         current_ms: u64,
     ) -> io::Result<InputOutcome> {
-        // Runs on EVERY iteration (crossterm reader lock + a zero-timeout
-        // syscall), so it is most of `loop.input` on an idle tick.
-        let ready = {
-            let _guard = crate::profile!("event_poll");
-            event::poll(Duration::ZERO)?
-        };
+        // Reuse the idle poll that ended the previous iteration; only poll
+        // (crossterm reader lock + kevent syscall) when there is none — first
+        // iteration, or after a `Restart` skipped the idle poll.
+        let ready = self.input_ready.take().map_or_else(
+            || {
+                let _guard = crate::profile!("event_poll");
+                event::poll(Duration::ZERO)
+            },
+            Ok,
+        )?;
         if !ready {
             return Ok(InputOutcome::Continue);
         }

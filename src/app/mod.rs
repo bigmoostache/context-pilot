@@ -142,6 +142,10 @@ pub(crate) struct App {
     /// so one thread's in-flight stream can never bleed into another's. Empty
     /// at N=1.
     pub parked_stream_runtimes: std::collections::HashMap<String, run::lifecycle::stream_runtime::StreamRuntime>,
+    /// Result of the previous iteration's idle `event::poll(timeout)`, consumed
+    /// by the next input phase so it can skip its own `poll(ZERO)`. `None` on
+    /// the first iteration and after a `Restart` (which skips the idle poll).
+    pub input_ready: Option<bool>,
 }
 
 // App impl block is in run/input.rs (primary), with additional methods spread

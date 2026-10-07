@@ -48,6 +48,7 @@ impl App {
             fleet: cp_fleet::FleetRegistry::new(),
             stepping_thread: None,
             parked_stream_runtimes: std::collections::HashMap::new(),
+            input_ready: None,
         }
     }
 

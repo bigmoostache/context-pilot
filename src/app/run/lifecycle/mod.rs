@@ -143,7 +143,9 @@ impl App {
                 break;
             }
 
-            let _r = event::poll(Duration::from_millis(self.compute_poll_ms()))?;
+            // Handed to the next input phase, which then skips its own
+            // `poll(ZERO)` — the same question asked microseconds later.
+            self.input_ready = Some(event::poll(Duration::from_millis(self.compute_poll_ms()))?);
         }
 
         Ok(())
