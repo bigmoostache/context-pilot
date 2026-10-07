@@ -140,6 +140,7 @@ pub(crate) fn send_create(req: &serde_json::Value) -> Result<serde_json::Value, 
     if let Ok(resp) = server_request(req) {
         return Ok(resp);
     }
+    let _p = cp_base::perf_span!("console_respawn_server");
     find_or_create_server()?;
     server_request(req)
 }

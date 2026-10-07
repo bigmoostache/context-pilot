@@ -147,6 +147,7 @@ fn accept_commands(state: &mut State) -> Option<Vec<Command>> {
         super::query::answer(search_creds.as_ref(), query)
     };
 
+    let _g = crate::profile!("bridge_handle_conn");
     match intake.handle_connection(boot.oplog(), &mut stream, &responder) {
         Ok(cmds) => Some(cmds),
         Err(e) => {

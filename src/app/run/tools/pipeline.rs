@@ -172,6 +172,7 @@ fn sync_logs_and_radar(
         (t.name == "log_create" || t.name == "Close_conversation_history") && !r.content.starts_with("Queued as #")
     });
     if logs_changed {
+        let _g = crate::profile!("logsync_meili");
         cp_mod_search::index::logsync::sync_logs_to_meilisearch(&app.state);
     }
 
@@ -185,12 +186,14 @@ fn sync_logs_and_radar(
         };
         let trimmed = ctx.trim();
         if !trimmed.is_empty() {
+            let _g = crate::profile!("push_task_signal");
             cp_mod_search::push_task_signal(&mut app.state, trimmed);
             radar_needs_refresh = true;
         }
     }
 
     if radar_needs_refresh {
+        let _g = crate::profile!("refresh_radar");
         cp_mod_search::refresh_radar(&app.state);
     }
 }

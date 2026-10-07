@@ -239,7 +239,12 @@ impl YamlSync {
     where
         E: SyncEntry,
     {
-        let Ok(yaml_str) = serde_yaml::to_string(map) else { return };
+        let serialized = {
+            let _p = crate::perf_span!("yaml_serialize");
+            serde_yaml::to_string(map)
+        };
+        let Ok(yaml_str) = serialized else { return };
+        let _p = crate::perf_span!("yaml_write");
         for path in [&self.shared_path, &self.backup_path] {
             if let Some(parent) = path.parent() {
                 let _mkdir = fs::create_dir_all(parent);
@@ -314,7 +319,11 @@ fn try_parse<E>(path: &Path) -> Option<BTreeMap<String, E>>
 where
     E: DeserializeOwned,
 {
-    let contents = fs::read_to_string(path).ok()?;
+    let contents = {
+        let _p = crate::perf_span!("yaml_read");
+        fs::read_to_string(path).ok()?
+    };
+    let _p = crate::perf_span!("yaml_parse");
     serde_yaml::from_str(&contents).ok()
 }
 

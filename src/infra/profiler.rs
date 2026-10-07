@@ -96,6 +96,8 @@ pub(crate) struct ProfileGuard {
     name: &'static str,
     /// Whether `name` was pushed on [`PATH`] (popped on drop).
     pushed: bool,
+    /// Whether the drop records into PERF (false for rootless off-main spans).
+    record: bool,
     /// Instant when the guard was created.
     start: Instant,
 }
@@ -103,14 +105,22 @@ pub(crate) struct ProfileGuard {
 impl ProfileGuard {
     /// Create a new profile guard for the given operation name.
     pub(crate) fn new(leaf: &'static str) -> Self {
-        let mut guard = Self { leaf, name: leaf, pushed: false, start: Instant::now() };
+        let mut guard = Self { leaf, name: leaf, pushed: false, record: true, start: Instant::now() };
         if !crate::ui::perf::PERF.enabled.load(std::sync::atomic::Ordering::Relaxed) {
             return guard;
         }
         let parent_key =
             PATH.with(|p| p.borrow().last().copied()).or_else(crate::app::run::tools::watchdog::current_perf_step);
-        if let Some(parent) = parent_key {
-            guard.name = nested_name(parent, leaf);
+        match parent_key {
+            Some(parent) => guard.name = nested_name(parent, leaf),
+            // Spans in shared code (e.g. the console client) also run on
+            // pollers/workers; a rootless off-main span would pollute the
+            // main-loop profile, so it records nothing.
+            None if std::thread::current().name() != Some("main") => {
+                guard.record = false;
+                return guard;
+            }
+            None => {}
         }
         PATH.with(|p| p.borrow_mut().push(guard.name));
         guard.pushed = true;
@@ -121,6 +131,9 @@ impl ProfileGuard {
 
 impl Drop for ProfileGuard {
     fn drop(&mut self) {
+        if !self.record {
+            return;
+        }
         let elapsed = self.start.elapsed();
         let us = elapsed.as_micros().to_u64();
         let ms = time_arith::us_to_ms(us);

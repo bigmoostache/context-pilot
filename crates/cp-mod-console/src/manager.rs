@@ -80,24 +80,36 @@ pub fn log_file_path(key: &str) -> PathBuf {
 /// or if the server response indicates an error.
 pub(crate) fn server_request(req: &serde_json::Value) -> Result<serde_json::Value, String> {
     let sock_path = server_socket_path();
-    let stream = UnixStream::connect(&sock_path).map_err(|e| format!("Failed to connect to console server: {e}"))?;
+    let stream = {
+        let _p = cp_base::perf_span!("console_connect");
+        UnixStream::connect(&sock_path).map_err(|e| format!("Failed to connect to console server: {e}"))?
+    };
     let _: Option<()> = stream.set_read_timeout(Some(std::time::Duration::from_secs(5))).ok();
     let _: Option<()> = stream.set_write_timeout(Some(std::time::Duration::from_secs(5))).ok();
 
     let mut writer = stream.try_clone().map_err(|e| format!("Clone failed: {e}"))?;
     let reader = BufReader::new(stream);
 
-    let mut line = serde_json::to_string(req).map_err(|e| format!("Serialize failed: {e}"))?;
-    line.push('\n');
-    writer.write_all(line.as_bytes()).map_err(|e| format!("Write failed: {e}"))?;
-    writer.flush().map_err(|e| format!("Flush failed: {e}"))?;
+    {
+        let _p = cp_base::perf_span!("console_send");
+        let mut line = serde_json::to_string(req).map_err(|e| format!("Serialize failed: {e}"))?;
+        line.push('\n');
+        writer.write_all(line.as_bytes()).map_err(|e| format!("Write failed: {e}"))?;
+        writer.flush().map_err(|e| format!("Flush failed: {e}"))?;
+    }
 
     let mut resp_line = String::new();
     let mut buf_reader = reader;
-    let _: usize = buf_reader.read_line(&mut resp_line).map_err(|e| format!("Read failed: {e}"))?;
+    {
+        // Blocks until the server has done the work (spawn, write stdin, …).
+        let _p = cp_base::perf_span!("console_reply");
+        let _: usize = buf_reader.read_line(&mut resp_line).map_err(|e| format!("Read failed: {e}"))?;
+    }
 
-    let resp: serde_json::Value =
-        serde_json::from_str(resp_line.trim()).map_err(|e| format!("Parse response failed: {e}"))?;
+    let resp: serde_json::Value = {
+        let _p = cp_base::perf_span!("console_parse");
+        serde_json::from_str(resp_line.trim()).map_err(|e| format!("Parse response failed: {e}"))?
+    };
 
     if resp.get("ok").and_then(serde_json::Value::as_bool) == Some(true) {
         Ok(resp)
@@ -285,8 +297,12 @@ impl SessionHandle {
     pub fn spawn(name: String, command: String, cwd: Option<String>) -> Result<Self, String> {
         let handle = Self::unstarted(name, command, cwd);
         let req = create_request(&handle.name, &handle.command, &handle.log_path, handle.cwd.as_deref());
-        let pid = pid_of(&send_create(&req)?);
+        let pid = {
+            let _p = cp_base::perf_span!("console_create_req");
+            pid_of(&send_create(&req)?)
+        };
         *handle.child_id.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(pid);
+        let _p = cp_base::perf_span!("console_start_pollers");
         start_file_poller(PathBuf::from(&handle.log_path), handle.buffer.clone(), Arc::clone(&handle.stop_polling));
         let poller = handle.status_poller();
         drop(std::thread::spawn(move || poller.run()));
@@ -409,6 +425,7 @@ impl SessionHandle {
         });
         if server_request(&req).is_err() {
             // Server may have died — try to respawn and retry
+            let _p = cp_base::perf_span!("console_respawn_server");
             find_or_create_server()?;
             drop(server_request(&req)?);
         }
