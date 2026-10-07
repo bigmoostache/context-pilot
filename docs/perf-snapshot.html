@@ -1,0 +1,1496 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}body.empty main > section:not(.source), body.empty #note, body.empty #rawHead, body.empty #lede { display: none; }
+</style></head><body>
+<title>Main Loop Perf Snapshot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one instrument-report column. Vitals strip, findings, phase split, call-tree icicle with a readout,
+   stalls and saves side by side, then every op in a tree table. Color only carries phase identity and over-budget status. */
+:root{
+  --page:#eef1f4; --surface:#fbfcfd; --ink:#121820; --ink-2:#47525e; --muted:#76818d;
+  --grid:#e3e7eb; --axis:#bcc4cd; --line:rgba(18,24,32,.11); --hi:#1e2935; --seg:#b4bec9; --node:#d6dce2;
+  --p1:#2a78d6; --p2:#eb6834; --p3:#1baf7a; --p4:#eda100; --p5:#e87ba4; --p6:#008300; --p7:#4a3aa7; --p8:#e34948; --p0:#a2abb5;
+  --serious:#ec835a; --serious-wash:rgba(236,131,90,.16); --warning:#fab219; --critical:#d03b3b;
+  --m0:74%; --m1:58%; --m2:46%; --m3:37%; --m4:30%; --m5:24%;
+  --sans:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --row:28px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --page:#0c1014; --surface:#151a20; --ink:#eef2f6; --ink-2:#b3bdc8; --muted:#838e9a;
+    --grid:#232a32; --axis:#3a444e; --line:rgba(238,242,246,.11); --hi:#e2e8ee; --seg:#4b5560; --node:#2a323b;
+    --p1:#3987e5; --p2:#d95926; --p3:#199e70; --p4:#c98500; --p5:#d55181; --p6:#008300; --p7:#9085e9; --p8:#e66767; --p0:#5d6772;
+    --serious-wash:rgba(236,131,90,.20);
+    --m0:60%; --m1:48%; --m2:39%; --m3:32%; --m4:27%; --m5:23%;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --page:#0c1014; --surface:#151a20; --ink:#eef2f6; --ink-2:#b3bdc8; --muted:#838e9a;
+  --grid:#232a32; --axis:#3a444e; --line:rgba(238,242,246,.11); --hi:#e2e8ee; --seg:#4b5560; --node:#2a323b;
+  --p1:#3987e5; --p2:#d95926; --p3:#199e70; --p4:#c98500; --p5:#d55181; --p6:#008300; --p7:#9085e9; --p8:#e66767; --p0:#5d6772;
+  --serious-wash:rgba(236,131,90,.20);
+  --m0:60%; --m1:48%; --m2:39%; --m3:32%; --m4:27%; --m5:23%;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--page);color:var(--ink);font:400 14.5px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1160px;margin:0 auto;padding:0 20px;padding-block:36px 64px;display:flex;flex-direction:column;gap:36px}
+h1,h2,h3{margin:0;text-wrap:balance;font-weight:600;letter-spacing:-.01em}
+h1{font-size:clamp(1.6rem,1.2rem + 1.6vw,2.15rem);line-height:1.15}
+h2{font-size:1.08rem;line-height:1.3}
+p{margin:0}
+code,.mono{font-family:var(--mono)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+.mast{display:flex;flex-direction:column;gap:10px;max-width:760px}
+.eyebrow{font:500 11.5px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lede{color:var(--ink-2);font-size:1.02rem;max-width:66ch}
+.raw-head{font-size:12px;color:var(--muted);background:transparent;overflow-wrap:anywhere}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px}
+.block{display:flex;flex-direction:column;gap:12px;min-width:0}
+.block-head{display:flex;flex-direction:column;gap:3px}
+.cap{color:var(--ink-2);font-size:13.5px;max-width:72ch}
+
+/* data source */
+.source{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px 10px 16px;display:flex;flex-direction:column;gap:12px;margin-top:-16px}
+.src-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px}
+.src-state{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);min-width:0;flex-wrap:wrap}
+.src-state b{color:var(--ink);font-weight:600}
+.src-dot{width:8px;height:8px;border-radius:50%;background:var(--axis);flex:none}
+.src-dot.pasted{background:var(--p1)}
+.src-flash{font:500 11.5px/1 var(--mono);color:var(--ink);background:var(--grid);padding:4px 8px;border-radius:10px}
+.src-actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn.primary{background:var(--hi);color:var(--surface);border-color:transparent;font-weight:500}
+.btn.primary:hover{background:var(--hi);opacity:.88}
+.paste{display:flex;flex-direction:column;gap:8px;padding-bottom:4px}
+.paste textarea{width:100%;min-height:200px;resize:vertical;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--page);color:var(--ink);font:400 12px/1.5 var(--mono);white-space:pre;overflow:auto;tab-size:8}
+.paste textarea::placeholder{color:var(--muted)}
+.paste-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px}
+.hint{font-size:12.5px;color:var(--muted);max-width:60ch}
+.paste-err{display:flex;align-items:flex-start;gap:8px;padding:8px 12px;border-radius:8px;background:var(--serious-wash);color:var(--ink);font-size:13px}
+.paste-err .tri{margin-top:4px}
+
+/* vitals */
+.vitals{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.tile.wide{grid-column:span 2}
+.t-lab{font:500 11px/1.2 var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.t-val{font-size:1.65rem;font-weight:600;line-height:1.1;letter-spacing:-.015em}
+.t-val small{font-size:.9rem;font-weight:500;color:var(--ink-2);letter-spacing:0;margin-left:3px}
+.t-sub{font-size:12.5px;color:var(--ink-2)}
+.meter{position:relative;height:8px;border-radius:4px;background:var(--grid);margin-top:20px;margin-bottom:18px}
+.meter .fill{position:absolute;left:0;top:0;bottom:0;border-radius:0 4px 4px 0;background:var(--hi)}
+.meter .mark{position:absolute;top:-5px;bottom:-5px;width:2px;border-radius:1px}
+.meter .mark.budget{background:var(--serious)}
+.meter .mark.max{background:var(--ink-2)}
+.meter .ml{position:absolute;font:500 11px/1 var(--mono);color:var(--ink-2);white-space:nowrap}
+.meter .ml.top{bottom:calc(100% + 8px)}
+.meter .ml.bot{top:calc(100% + 8px)}
+.vitals.solo{grid-template-columns:minmax(0,340px)}
+@media (max-width:900px){.vitals:not(.solo){grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:560px){.vitals:not(.solo){grid-template-columns:repeat(2,minmax(0,1fr))}.t-val{font-size:1.4rem}}
+
+/* findings */
+.findings{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 28px}
+.findings li{align-content:start;display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;padding:14px 0;border-top:1px solid var(--line)}
+.findings li:last-child:nth-child(odd){grid-column:1 / -1}
+.findings .tag{grid-row:span 2;display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:11px;border:1px solid var(--line);font:500 11px/1 var(--mono);color:var(--ink-2);white-space:nowrap;margin-top:1px}
+.findings b{font-weight:600}
+.findings p{color:var(--ink-2);font-size:13.8px;max-width:64ch}
+.dot{width:8px;height:8px;border-radius:2px;background:var(--c);flex:none}
+.tri{width:10px;height:9px;flex:none;fill:var(--serious)}
+@media (max-width:760px){.findings{grid-template-columns:1fr}}
+
+/* phase bars */
+.phases{display:flex;flex-direction:column;gap:2px}
+.ph{display:grid;grid-template-columns:minmax(0,12rem) minmax(0,1fr) 4.6rem 3.6rem;align-items:center;gap:12px;padding:7px 8px;border-radius:6px;border:0;background:transparent;text-align:left;width:100%;cursor:pointer}
+.ph:hover{background:var(--grid)}
+.ph.static{cursor:default}
+.ph.static:hover{background:transparent}
+.ph-name{display:flex;align-items:center;gap:8px;font:500 13px/1.3 var(--mono);min-width:0}
+.ph-name span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ph-name em{font-style:normal;color:var(--muted);font-weight:400}
+.ph-track{height:10px;position:relative}
+.ph-bar{position:absolute;left:0;top:0;bottom:0;border-radius:0 4px 4px 0;background:var(--c);min-width:2px}
+.ph-val,.ph-pct{font:500 12.5px/1 var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.ph-pct{color:var(--ink-2)}
+@media (max-width:620px){
+  .ph{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"n v p" "t t t";row-gap:6px}
+  .ph-name{grid-area:n}.ph-track{grid-area:t}.ph-val{grid-area:v}.ph-pct{grid-area:p}
+}
+
+/* icicle */
+.crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;font:500 12.5px/1.4 var(--mono);margin-bottom:12px;min-height:26px}
+.crumbs button{border:0;background:transparent;padding:2px 4px;border-radius:4px;cursor:pointer;color:var(--ink-2)}
+.crumbs button:hover{background:var(--grid);color:var(--ink)}
+.crumbs .cur{color:var(--ink);font-weight:600;padding:2px 4px}
+.crumbs .sep{color:var(--muted)}
+.crumbs .reset{margin-left:auto;border:1px solid var(--line);padding:3px 10px;border-radius:6px;font-family:var(--sans);color:var(--ink)}
+.icicle{position:relative;width:100%}
+.cell{position:absolute;height:calc(var(--row) - 2px);border:0;margin:0;padding:0 6px;border-radius:3px;
+  background:var(--c);background:color-mix(in oklab,var(--c) var(--m),var(--surface));
+  color:var(--ink);font:500 11.5px/calc(var(--row) - 2px) var(--mono);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.cell.thin{padding:0}
+.cell .v{color:var(--ink-2);font-weight:400;margin-left:8px}
+.cell.l0{--m:var(--m0)}.cell.l1{--m:var(--m1)}.cell.l2{--m:var(--m2)}.cell.l3{--m:var(--m3)}.cell.l4{--m:var(--m4)}.cell.l5{--m:var(--m5)}
+.cell.neutral{background:var(--node)}
+.cell:hover{box-shadow:inset 0 0 0 1.5px var(--ink)}
+.cell.sel{box-shadow:inset 0 0 0 2px var(--ink)}
+.cell:focus-visible{outline-offset:0}
+.ic-axis{display:flex;justify-content:space-between;font:400 11px/1 var(--mono);color:var(--muted);margin-top:8px;font-variant-numeric:tabular-nums}
+
+.detail{margin-top:18px;padding-top:16px;border-top:1px solid var(--line);display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px 32px}
+.detail h3{font:600 14px/1.35 var(--mono);overflow-wrap:anywhere}
+.detail .path{font:400 12px/1.4 var(--mono);color:var(--muted);overflow-wrap:anywhere;margin-top:2px}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 16px;margin-top:14px}
+.stat .k{font:500 10.5px/1.2 var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.stat .v{font-size:15px;font-weight:600;margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.kids{display:flex;flex-direction:column;gap:6px}
+.kids .k{font:500 10.5px/1.2 var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.kid{display:grid;grid-template-columns:minmax(0,1fr) 4.4rem 3.4rem;gap:10px;align-items:center;font:400 12.5px/1.3 var(--mono);border:0;background:transparent;text-align:left;padding:3px 4px;border-radius:4px;cursor:pointer;width:100%}
+.kid:hover{background:var(--grid)}
+.kid .nm{display:flex;flex-direction:column;gap:4px;min-width:0}
+.kid .kn{display:flex;align-items:center;gap:6px;min-width:0}
+.kid .kn > span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kid .bar{height:4px;border-radius:0 2px 2px 0;background:var(--c);background:color-mix(in oklab,var(--c) var(--m0),var(--surface));min-width:2px}
+.kid .r{text-align:right;font-variant-numeric:tabular-nums}
+.kid .r.p{color:var(--ink-2)}
+.none{color:var(--muted);font-size:13px}
+@media (max-width:760px){.detail{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.over{display:inline-flex;align-items:center;gap:5px;padding:1px 7px 1px 6px;border-radius:9px;background:var(--serious-wash);font:500 11px/1.5 var(--mono);color:var(--ink);white-space:nowrap}
+
+/* paired charts */
+.pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px}
+@media (max-width:980px){.pair{grid-template-columns:1fr}}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font:400 12px/1.3 var(--sans);color:var(--ink-2);margin-bottom:10px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.lg-sw{width:10px;height:10px;border-radius:2px;background:var(--c)}
+.lg-line{width:2px;height:12px;background:var(--serious);border-radius:1px}
+.chart{width:100%;position:relative}
+.chart svg{display:block;overflow:visible}
+svg text{font-family:var(--mono)}
+.s-grid{stroke:var(--grid);stroke-width:1}
+.s-axis{stroke:var(--axis);stroke-width:1}
+.s-budget{stroke:var(--serious);stroke-width:1.5}
+.s-range{stroke:var(--axis);stroke-width:2;stroke-linecap:round}
+.s-mean{fill:var(--surface);stroke:var(--ink-2);stroke-width:1.5}
+.s-max{fill:var(--ink);stroke:var(--surface);stroke-width:2}
+.f-hi{fill:var(--hi)}
+.f-seg{fill:var(--seg)}
+.f-hit{fill:transparent;cursor:default}
+.chart svg text,.chart svg circle,.chart svg line{pointer-events:none}
+.f-hit:hover,.f-hit:focus{fill:var(--grid);fill-opacity:.55;outline:none}
+.t-tick{fill:var(--muted);font-size:10.5px}
+.t-budget{fill:var(--ink-2);font-size:10.5px;font-family:var(--sans)}
+.t-leaf{fill:var(--ink);font-size:12px;font-weight:600}
+.t-path{fill:var(--muted);font-size:11.5px}
+.t-n{fill:var(--ink-2);font-size:11.5px}
+.t-num{fill:var(--ink-2);font-size:11px}
+.parts{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.parts .k{font:500 10.5px/1.2 var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.part{display:grid;grid-template-columns:minmax(0,15rem) minmax(0,1fr) 4.4rem 3.2rem;gap:10px;align-items:center;font:400 12.5px/1.3 var(--mono);min-height:22px}
+.p-name{display:flex;align-items:center;gap:4px;min-width:0;padding-left:calc(var(--d,0) * 16px)}
+.p-name .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.p-zero{font:400 11.5px/1.45 var(--mono);color:var(--muted);padding-left:calc(var(--d,0) * 16px + 22px);overflow-wrap:anywhere}
+.part .tr{height:6px;position:relative}
+.part .b{position:absolute;left:0;top:0;bottom:0;border-radius:0 3px 3px 0;min-width:2px}
+.part .r{text-align:right;font-variant-numeric:tabular-nums}
+.part .r.p{color:var(--ink-2)}
+@media (max-width:520px){.part{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"n v p" "t t t";row-gap:4px}.part .p-name{grid-area:n}.part .tr{grid-area:t;margin-left:calc(var(--d,0) * 16px + 22px)}.part .r{grid-area:v}.part .r.p{grid-area:p}}
+
+/* new-op chip, more cells, self time */
+.chip-new{display:inline-flex;align-items:center;height:16px;padding:0 6px;border-radius:8px;background:var(--hi);color:var(--surface);font:600 9.5px/1 var(--mono);letter-spacing:.07em;text-transform:uppercase;flex:none;white-space:nowrap}
+.findings .tag .chip-new{margin:0 -4px}
+.t-new{fill:var(--ink);font-size:9.5px;font-weight:600;letter-spacing:.07em}
+.cell.more{background:transparent;box-shadow:inset 0 0 0 1px var(--axis);color:var(--muted);font-weight:400;text-align:center;padding:0}
+.cell.more:hover{box-shadow:inset 0 0 0 1.5px var(--ink);color:var(--ink)}
+.cell.is-new::after{content:"";position:absolute;top:3px;right:3px;width:5px;height:5px;border-radius:50%;background:var(--ink)}
+.linkbtn{border:0;background:transparent;color:var(--ink);cursor:pointer;padding:3px 4px;border-radius:4px;font:500 12.5px/1.3 var(--sans);text-decoration:underline;text-decoration-color:var(--axis);text-underline-offset:3px;display:inline-flex;align-items:center;gap:6px;align-self:flex-start}
+.linkbtn:hover{text-decoration-color:currentColor;background:var(--grid)}
+.hot-tools{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin-bottom:12px}
+.hot-tools .legend{margin:0}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;padding:2px;gap:2px}
+.seg button{border:0;background:transparent;height:28px;padding:0 10px;border-radius:6px;font-size:12.5px;cursor:pointer;color:var(--ink-2)}
+.seg button[aria-pressed="true"]{background:var(--grid);color:var(--ink);font-weight:500}
+.hot{display:flex;flex-direction:column;gap:2px}
+.hrow{display:grid;grid-template-columns:minmax(0,19rem) minmax(0,1fr) 4.6rem 3.6rem;align-items:center;gap:12px;padding:6px 8px;border:0;border-radius:6px;background:transparent;text-align:left;width:100%;cursor:pointer}
+.hrow:hover{background:var(--grid)}
+.h-name{display:flex;flex-direction:column;gap:3px;min-width:0}
+.h-name .l1{display:flex;align-items:center;gap:7px;font:500 13px/1.3 var(--mono);min-width:0}
+.h-name .l1 .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.h-name .l2{font:400 11px/1.3 var(--mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:15px}
+.own-tag{font:400 11.5px/1 var(--sans);color:var(--ink-2);white-space:nowrap}
+.h-track{height:10px;position:relative}
+.h-bar{position:absolute;left:0;top:0;bottom:0;border-radius:0 4px 4px 0;min-width:2px;background:var(--hi)}
+.h-bar.own{background:var(--seg)}
+.h-val,.h-pct{font:500 12.5px/1 var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.h-pct{color:var(--ink-2)}
+.hot-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-top:10px}
+.hot-foot .count{margin-left:0}
+@media (max-width:620px){
+  .hrow{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"n v p" "t t t";row-gap:6px}
+  .h-name{grid-area:n}.h-track{grid-area:t}.h-val{grid-area:v}.h-pct{grid-area:p}
+}
+.btn[aria-pressed="true"]{background:var(--grid);font-weight:500;box-shadow:inset 0 0 0 1px var(--axis)}
+tr.ctx td{color:var(--muted)}
+tr.ctx td .nm{font-weight:400}
+
+/* worst cases */
+.fz-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:900px){.fz-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.fz-tiles .t-sub{display:flex;flex-wrap:wrap;gap:4px 12px}
+.muted-sub{color:var(--muted)}
+.sev{display:inline-flex;align-items:center;gap:6px;font:500 12.5px/1.3 var(--sans);color:var(--ink);white-space:nowrap}
+.sev .tri{width:11px;height:10px}
+.sev.warn .tri{fill:var(--warning)}
+.sev.ser .tri{fill:var(--serious)}
+.sev.crit .tri{fill:var(--critical)}
+.fz-tools{display:flex;flex-wrap:wrap;gap:10px 12px;align-items:center;margin-bottom:4px}
+.fz-legend{margin:0 0 0 auto}
+.lg-mean{width:9px;height:9px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--ink-2)}
+.lg-max{width:10px;height:10px;border-radius:50%;background:var(--critical)}
+.fz-head,.fz-row{display:grid;grid-template-columns:6.8rem minmax(0,1.1fr) minmax(0,1fr) 5.8rem 8.8rem;gap:6px 18px;align-items:center}
+.fz-head{padding:12px 8px 8px;font:500 10.5px/1.2 var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.fz-h-worst,.fz-h-freq{text-align:right}
+.fz-h-track{position:relative;height:14px;text-transform:none;letter-spacing:0}
+.fz-tick{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap;font:400 10.5px/14px var(--mono);color:var(--muted)}
+.fz-row{padding:12px 8px;border:0;border-top:1px solid var(--line);background:transparent;text-align:left;width:100%;cursor:pointer;font:inherit;color:inherit}
+.fz-row:hover{background:var(--grid)}
+.fz-op{display:flex;flex-direction:column;gap:3px;min-width:0}
+.fz-name{display:flex;align-items:center;gap:7px;font:600 13px/1.3 var(--mono);min-width:0}
+.fz-name .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fz-chain{font:400 11.5px/1.45 var(--mono);color:var(--muted);overflow-wrap:anywhere;padding-left:15px}
+.fz-chain i{font-style:normal;color:var(--ink-2)}
+.fz-diag{font-size:12.5px;line-height:1.45;color:var(--ink-2);padding-left:15px}
+.fz-diag b{font-weight:600;color:var(--ink)}
+.fz-track{position:relative;height:24px;min-width:0}
+.fz-grid{position:absolute;top:3px;bottom:3px;width:1px;background:var(--grid)}
+.fz-row:hover .fz-grid{background:var(--axis);opacity:.5}
+.fz-thr{position:absolute;top:0;bottom:0;width:1.5px;margin-left:-.75px;background:var(--serious)}
+.fz-range{position:absolute;top:50%;height:2px;margin-top:-1px;background:var(--axis);border-radius:1px}
+.fz-mean{position:absolute;top:50%;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;background:var(--surface);box-shadow:inset 0 0 0 1.5px var(--ink-2)}
+.fz-max{position:absolute;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:var(--ink-2);box-shadow:0 0 0 2px var(--surface),inset 0 0 0 1px rgba(0,0,0,.22)}
+.fz-max.warn{background:var(--warning)}
+.fz-max.ser{background:var(--serious)}
+.fz-max.crit{background:var(--critical)}
+.fz-worst{display:flex;flex-direction:column;align-items:flex-end;font:600 14px/1.25 var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.fz-worst small,.fz-freq small{font:400 11.5px/1.4 var(--mono);color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.fz-freq{display:flex;flex-direction:column;align-items:flex-end;text-align:right;font-size:13px;line-height:1.3}
+.fz-freq b{font-weight:600}
+.fz-note{font-size:12.5px;color:var(--muted);max-width:92ch;margin-top:12px;line-height:1.55}
+@media (max-width:820px){
+  .fz-head{grid-template-columns:1fr}
+  .fz-head > :not(.fz-h-track){display:none}
+  .fz-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"sev worst" "op op" "track track" "freq freq";row-gap:8px}
+  .fz-sev{grid-area:sev}.fz-op{grid-area:op}.fz-track{grid-area:track}.fz-worst{grid-area:worst}
+  .fz-freq{grid-area:freq;flex-direction:row;align-items:baseline;gap:8px;text-align:left}
+  .fz-legend{margin-left:0}
+  .fz-tick.minor{display:none}
+}
+.save-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px 36px;align-items:start}
+.save-grid .parts{margin-top:0;padding-top:0;border-top:0}
+@media (max-width:900px){.save-grid{grid-template-columns:1fr}.save-grid .parts{margin-top:4px;padding-top:14px;border-top:1px solid var(--line)}}
+
+/* table */
+.tbl-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.tbl-tools input{flex:1 1 240px;min-width:0;height:34px;padding:0 12px;border-radius:8px;border:1px solid var(--line);background:var(--page);color:var(--ink);font:400 13.5px var(--sans)}
+.tbl-tools input::placeholder{color:var(--muted)}
+.btn{height:34px;padding:0 12px;border-radius:8px;border:1px solid var(--line);background:transparent;cursor:pointer;font-size:13px}
+.btn:hover{background:var(--grid)}
+.count{font:400 12px var(--mono);color:var(--muted);margin-left:auto}
+.tbl-scroll{overflow-x:auto;margin:0 -18px;padding:0 18px}
+table{border-collapse:collapse;width:100%;min-width:820px;font-size:13px}
+th{font:500 11px/1.2 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:right;padding:0;border-bottom:1px solid var(--axis);white-space:nowrap}
+th:first-child{text-align:left}
+th button{border:0;background:transparent;font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit;padding:8px 8px;cursor:pointer;width:100%;text-align:inherit;display:inline-flex;gap:4px;align-items:center;justify-content:flex-end}
+th:first-child button{justify-content:flex-start}
+th[aria-sort] button{color:var(--ink)}
+td{padding:5px 8px;border-bottom:1px solid var(--grid);text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap;vertical-align:middle}
+td.op{text-align:left;max-width:420px}
+.opc{display:flex;align-items:center;gap:6px;min-width:0}
+.opc .nm{overflow:hidden;text-overflow:ellipsis}
+.tw{width:18px;height:18px;flex:none;border:0;background:transparent;border-radius:4px;cursor:pointer;color:var(--muted);display:inline-grid;place-items:center;padding:0}
+.tw:hover{background:var(--grid);color:var(--ink)}
+.tw svg{width:10px;height:10px;transition:transform .12s}
+.tw[aria-expanded="true"] svg{transform:rotate(90deg)}
+.tw.ph0{visibility:hidden}
+tr.top td{font-weight:500}
+tr.top td.op .nm{font-weight:600}
+tr:hover td{background:color-mix(in oklab,var(--grid) 50%,transparent)}
+td.muted{color:var(--muted)}
+.sh{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.sh .tr{width:84px;height:6px;background:var(--grid);border-radius:3px;position:relative;overflow:hidden}
+.sh .b{position:absolute;left:0;top:0;bottom:0;background:var(--c);border-radius:0 3px 3px 0}
+.sh .p{width:3.6rem;text-align:right}
+.note{color:var(--muted);font-size:12.5px;max-width:84ch;line-height:1.55}
+
+.tip{position:fixed;z-index:20;pointer-events:none;max-width:320px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px 12px;box-shadow:0 6px 24px rgba(0,0,0,.14);font-size:12.5px;line-height:1.45}
+.tip .tt{font:600 12.5px/1.35 var(--mono);overflow-wrap:anywhere}
+.tip .tp{font:400 11px/1.35 var(--mono);color:var(--muted);overflow-wrap:anywhere;margin-bottom:6px}
+.tip dl{display:grid;grid-template-columns:auto auto;gap:2px 14px;margin:0}
+.tip dt{color:var(--ink-2)}
+.tip dd{margin:0;text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<main class="wrap">
+  <header class="mast">
+    <p class="eyebrow">Perf snapshot · main loop</p>
+    <h1>Where the main loop spends its time</h1>
+    <p class="lede" id="lede"></p>
+    <code class="raw-head" id="rawHead"></code>
+  </header>
+
+  <section class="source" aria-label="Snapshot data">
+    <div class="src-bar">
+      <span class="src-state" id="srcState" aria-live="polite"></span>
+      <div class="src-actions">
+        <button class="btn" id="restoreBtn" type="button" hidden>Clear snapshot</button>
+        <button class="btn" id="pasteBtn" type="button" aria-expanded="false" aria-controls="pasteBox">Paste new snapshot</button>
+      </div>
+    </div>
+    <div class="paste" id="pasteBox" hidden>
+      <label for="pasteArea" class="t-lab">Snapshot text</label>
+      <textarea id="pasteArea" spellcheck="false" autocomplete="off" placeholder="Perf snapshot: frame …ms avg / …ms max, CPU …%, RAM … MB, FDs …/…, loops …&#10;op                 samples     mean_us   variance_us2     std_us     max_us    total_ms&#10;loop.render            …           …              …          …          …            …&#10;…"></textarea>
+      <p class="paste-err" id="pasteErr" role="alert" hidden></p>
+      <div class="paste-foot">
+        <p class="hint">Paste the whole output, from the “Perf snapshot:” line to the last row. Ctrl or ⌘ + Enter applies it.</p>
+        <div class="src-actions">
+          <button class="btn" id="cancelBtn" type="button">Cancel</button>
+          <button class="btn primary" id="applyBtn" type="button">Apply snapshot</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="vitals" id="vitals" aria-label="Snapshot vitals"></section>
+
+  <section class="block" aria-labelledby="h-find">
+    <div class="block-head"><h2 id="h-find">What stands out</h2></div>
+    <ul class="findings" id="findings"></ul>
+  </section>
+
+  <section class="block" id="worst" aria-labelledby="h-fz">
+    <div class="block-head">
+      <h2 id="h-fz">Worst cases</h2>
+      <p class="cap">The rest of this page is about averages. This section ranks operations by their slowest single call, because one rare 200 ms call freezes the interface even when the average is a few microseconds. Each operation appears at the deepest level that still explains its spike, with the chain of parents above it. Select a row to open it in the call tree.</p>
+    </div>
+    <div class="fz-tiles" id="fzTiles"></div>
+    <div class="panel">
+      <div class="fz-tools">
+        <div class="seg" id="fzThr" role="group" aria-label="Threshold">
+          <button type="button" data-t="16667" aria-pressed="true">Over 16.7 ms</button>
+          <button type="button" data-t="50000" aria-pressed="false">Over 50 ms</button>
+          <button type="button" data-t="100000" aria-pressed="false">Over 100 ms</button>
+        </div>
+        <div class="seg" id="fzSort" role="group" aria-label="Sort">
+          <button type="button" data-s="worst" aria-pressed="true">Slowest first</button>
+          <button type="button" data-s="often" aria-pressed="false">Most frequent first</button>
+        </div>
+        <div class="legend fz-legend">
+          <span><span class="lg-mean"></span>mean</span>
+          <span><span class="lg-max"></span>worst call, colored by severity</span>
+          <span><span class="lg-line"></span>threshold</span>
+        </div>
+      </div>
+      <div class="fz-list" id="fzList"></div>
+      <div class="hot-foot"><span class="count" id="fzCount"></span><button class="btn" id="fzMore" type="button">Show all</button></div>
+      <p class="fz-note">A snapshot keeps no per-call timings, so “calls over” is a range: the fewest and the most calls that could have crossed the threshold while still matching the reported count, mean, variance and worst call. Severity follows the worst call: a frame drop from 16.7 ms, a stutter from 50 ms, a freeze from 100 ms. “No timers inside” means the op has no child timers, so adding some is the way to see which part blocks.</p>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="h-ph">
+    <div class="block-head">
+      <h2 id="h-ph">Busy time by phase</h2>
+      <p class="cap">Total time of every top-level loop phase, idle excluded. The eight largest known phases keep a fixed color in every chart below, and any others are grey. Select a phase to open it in the call tree.</p>
+    </div>
+    <div class="panel"><div class="phases" id="phases"></div></div>
+  </section>
+
+  <section class="block" id="tree" aria-labelledby="h-tree">
+    <div class="block-head">
+      <h2 id="h-tree">Call tree</h2>
+      <p class="cap">Each block's width is its total time, nested under its parent. Children too narrow to draw are gathered into an outlined <b>+N</b> block. Select a block to zoom in and read its numbers below. A dot marks an op that is new since the previous snapshot.</p>
+    </div>
+    <div class="panel">
+      <div class="crumbs" id="crumbs"></div>
+      <div class="icicle" id="icicle" role="group" aria-label="Call tree of loop busy time"></div>
+      <div class="ic-axis" id="icAxis"></div>
+      <div class="detail" id="detail"></div>
+    </div>
+  </section>
+
+  <section class="block" id="hot" aria-labelledby="h-hot">
+    <div class="block-head">
+      <h2 id="h-hot">Self time</h2>
+      <p class="cap">Where busy time actually ends up: each op's time minus its timed children, at any depth, so a new timer appears here wherever it sits in the tree. When a parent spends time that none of its children cover, that remainder gets its own row, which shows where to add timers next. Select a row to open it in the call tree.</p>
+    </div>
+    <div class="panel">
+      <div class="hot-tools">
+        <div class="seg" id="hotMode" role="group" aria-label="Group rows">
+          <button type="button" data-mode="name" aria-pressed="true">Merged by name</button>
+          <button type="button" data-mode="path" aria-pressed="false">Per call path</button>
+        </div>
+        <div class="legend">
+          <span><span class="lg-sw" style="--c:var(--hi)"></span>timed operation</span>
+          <span><span class="lg-sw" style="--c:var(--seg)"></span>parent time not covered by children</span>
+        </div>
+      </div>
+      <div class="hot" id="hotList"></div>
+      <div class="hot-foot">
+        <span class="count" id="hotCount"></span>
+        <button class="btn" id="hotMore" type="button">Show all</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="savesec" aria-labelledby="h-sv">
+    <div class="block-head">
+      <h2 id="h-sv">Save batches on the loop</h2>
+      <p class="cap" id="saveCap"></p>
+    </div>
+    <div class="panel save-grid">
+      <div class="save-chart">
+        <div class="legend">
+          <span><span class="lg-sw" style="--c:var(--hi)"></span><span id="lgHi">modules</span></span>
+          <span><span class="lg-sw" style="--c:var(--seg)"></span>other save steps</span>
+          <span><span class="lg-line"></span>16.7 ms frame budget</span>
+        </div>
+        <div class="chart" id="saves"></div>
+      </div>
+      <div class="parts" id="parts"></div>
+    </div>
+  </section>
+
+  <section class="block" id="ops" aria-labelledby="h-tbl">
+    <div class="block-head">
+      <h2 id="h-tbl">All operations</h2>
+      <p class="cap">Every row of the snapshot as a tree. Sorting applies within each level. A <span class="over" style="vertical-align:1px"><svg class="tri" viewBox="0 0 10 9" aria-hidden="true"><path d="M5 0 10 9H0z"/></svg>max</span> marks a worst case over the frame budget, and <span class="chip-new" style="vertical-align:1px">new</span> marks an op the previous snapshot didn't have. The snapshot rounds total_ms to 0.1 ms, so very small totals show as &lt;0.1.</p>
+    </div>
+    <div class="panel">
+      <div class="tbl-tools">
+        <label for="q" class="t-lab" style="position:absolute;left:-9999px">Filter operations</label>
+        <input id="q" type="search" placeholder="Filter by name, e.g. spawn or persist" autocomplete="off">
+        <button class="btn" id="expAll" type="button">Expand all</button>
+        <button class="btn" id="colAll" type="button">Collapse all</button>
+        <button class="btn" id="newOnly" type="button" aria-pressed="false" hidden>New only</button>
+        <span class="count" id="count"></span>
+      </div>
+      <div class="tbl-scroll">
+        <table id="tbl">
+          <thead><tr>
+            <th data-k="name"><button type="button">Operation</button></th>
+            <th data-k="samples"><button type="button">Samples</button></th>
+            <th data-k="mean"><button type="button">Mean µs</button></th>
+            <th data-k="std"><button type="button">Std dev µs</button></th>
+            <th data-k="max"><button type="button">Max µs</button></th>
+            <th data-k="total"><button type="button">Total ms</button></th>
+            <th data-k="share"><button type="button">Share of busy</button></th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <p class="note" id="note"></p>
+</main>
+
+<div class="tip" id="tip" hidden role="tooltip"></div>
+
+<script>
+(() => {
+"use strict";
+const $ = s => document.querySelector(s);
+const BUDGET = 16667; // µs: one frame at 60 Hz
+const STORE_KEY = "perf-snapshot:pasted";
+const PREV_KEY = "perf-snapshot:previous";
+const DEF_KEY = "perf-snapshot:default-id";
+const ORIG = "__default__";
+const NS = "http://www.w3.org/2000/svg";
+const DEFAULT_RAW = ""; // no snapshot ships with the page: paste one
+const DEFAULT_PREV = null;
+/* A phase keeps its color slot across snapshots. Phases not listed take a free slot, largest first, else grey. */
+const COLOR = { "loop.render": 1, "loop.input": 2, "loop.threads_emit": 3, "loop.watchers": 4, "loop.tools": 5, "loop.spine": 6, "loop.panel_refresh": 7, "loop.bridge": 8 };
+const SLOTS = 8;
+/* total_ms is rounded to 0.1 ms. Below this many samples, samples × mean is the more precise total. */
+const PRECISE_BELOW = 1000;
+const HOT_TOP = 12, FZ_TOP = 15;
+const TIERS = [
+  { min: 100000, label: "Freeze", cls: "crit", range: "100 ms or more" },
+  { min: 50000, label: "Stutter", cls: "ser", range: "50 to 100 ms" },
+  { min: BUDGET, label: "Frame drop", cls: "warn", range: "16.7 to 50 ms" }
+];
+const tierOf = us => TIERS.find(t => us >= t.min) || null;
+
+/* ---------- format ---------- */
+const nf1 = new Intl.NumberFormat("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+function dur(us) {
+  if (us == null || isNaN(us)) return "–";
+  if (us === 0) return "0 µs";
+  if (us < 10) return us.toFixed(1) + " µs";
+  if (us < 1000) return Math.round(us) + " µs";
+  if (us < 10000) return (us / 1000).toFixed(2) + " ms";
+  if (us < 1e6) return (us / 1000).toFixed(1) + " ms";
+  if (us < 60e6) return (us / 1e6).toFixed(us < 10e6 ? 2 : 1) + " s";
+  return (us / 60e6).toFixed(1) + " min";
+}
+const durMs = ms => dur(ms * 1000);
+function pct(a, b) { if (!b) return "–"; const v = a / b * 100; if (v > 0 && v < 0.05) return "<0.1%"; return v.toFixed(1) + "%"; }
+const sum = a => a.reduce((x, y) => x + y, 0);
+const plural = (n, w) => `${w}${n === 1 ? "" : "s"}`;
+const WORDS = ["No", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve"];
+const word = n => n < WORDS.length ? WORDS[n] : nf0.format(n);
+const andList = a => a.length < 2 ? a.join("") : a.slice(0, -1).join(", ") + " and " + a[a.length - 1];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const leaf = n => n.synthetic ? "loop (busy)" : n.name.split(".").pop();
+const short = n => n.synthetic ? "loop busy time" : n.name.replace(/^loop\./, "").split(".").join(" › ");
+const pathOf = n => n.name.replace(/^loop\./, "").split(".").slice(0, -1);
+const totalCell = n => n.total === 0 && n.t > 0 ? "<0.1" : nf1.format(n.total);
+const thrLabel = T => T === BUDGET ? "16.7 ms" : `${T / 1000} ms`;
+const triSvg = '<svg class="tri" viewBox="0 0 10 9" aria-hidden="true"><path d="M5 0 10 9H0z"/></svg>';
+const newChip = '<span class="chip-new">new</span>';
+const caret = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M3 1.5 7 5 3 8.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const smooth = () => matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+function hashStr(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = (h * 33 ^ s.charCodeAt(i)) >>> 0; return h.toString(36) + ":" + s.length; }
+
+/* ---------- parse + model ---------- */
+let M = null, focus = null, selected = null, kidsAll = false;
+
+function parse(text) {
+  const lines = String(text).replace(/\r/g, "").split("\n");
+  const headerLine = (lines.find(l => /frame\s+[\d.]+\s*ms avg/i.test(l)) || "").trim();
+  const rows = [], byName = new Map();
+  for (const l of lines) {
+    const p = l.trim().split(/\s+/);
+    if (p.length !== 7 || p[0] === "op" || p.slice(1).some(v => isNaN(+v))) continue;
+    if (byName.has(p[0])) continue;
+    const r = { name: p[0], samples: +p[1], mean: +p[2], variance: +p[3], std: +p[4], max: +p[5], total: +p[6], children: [], parent: null, isNew: false, _ob: {} };
+    r.t = r.samples < PRECISE_BELOW ? r.samples * r.mean / 1000 : r.total;
+    rows.push(r); byName.set(r.name, r);
+  }
+  if (!rows.length) throw new Error("No operation rows were found. Paste the whole snapshot, from the “Perf snapshot:” line through the last op row.");
+  // Attach each row to its nearest listed ancestor, so a timer still lands in the tree when an intermediate level isn't timed.
+  for (const r of rows) {
+    for (let i = r.name.lastIndexOf("."); i > 0; i = r.name.lastIndexOf(".", i - 1)) {
+      const p = byName.get(r.name.slice(0, i));
+      if (p) { r.parent = p; p.children.push(r); break; }
+    }
+  }
+  const loopRow = byName.get("loop"); // a whole-loop timer, if one is ever added, should not swallow the phases
+  if (loopRow) { for (const c of loopRow.children) c.parent = null; loopRow.children = []; }
+  const tops = rows.filter(r => !r.parent);
+  const idle = byName.get("loop.idle") || null;
+  const phases = tops.filter(r => r.name.startsWith("loop.") && r !== idle);
+  if (!phases.length) throw new Error("The rows were read, but none of them is a top-level loop phase (loop.render, loop.input, …). Check that the op column was pasted intact.");
+  const outside = tops.filter(r => !r.name.startsWith("loop."));
+  const busy = sum(phases.map(r => r.t));
+  const wall = busy + (idle ? idle.t : 0);
+  const iterations = idle ? idle.samples : Math.max(...phases.map(p => p.samples));
+
+  const colorOf = new Map(), used = new Set();
+  for (const p of phases) if (COLOR[p.name]) { colorOf.set(p, COLOR[p.name]); used.add(COLOR[p.name]); }
+  const free = []; for (let i = 1; i <= SLOTS; i++) if (!used.has(i)) free.push(i);
+  for (const p of phases.filter(p => !COLOR[p.name]).sort((a, b) => b.t - a.t)) colorOf.set(p, free.length ? free.shift() : 0);
+
+  const root = { name: "loop", synthetic: true, samples: iterations, mean: busy * 1000 / iterations, std: null, max: null, total: busy, t: busy, children: phases, parent: null, color: 0, level: -1, ip: null, inLoop: true, _ob: {} };
+  const prep = (n, phase, level, ip) => {
+    n.color = phase ? (colorOf.get(phase) || 0) : 0;
+    n.level = level; n.ip = ip; n.phase = phase;
+    n.inLoop = !!phase && phase !== idle;
+    n.kids = [...n.children].sort((a, b) => b.t - a.t);
+    for (const c of n.children) prep(c, phase, level + 1, n);
+  };
+  for (const t of tops) prep(t, phases.includes(t) || t === idle ? t : null, 0, phases.includes(t) ? root : null);
+  root.kids = [...phases].sort((a, b) => b.t - a.t);
+
+  const isSave = r => /(^|\.)persist_build_save_batch$/.test(r.name);
+  const saveSites = rows.filter(r => r.inLoop && isSave(r) && !(function up(a) { return a && (isSave(a) || up(a.parent)); })(r.parent))
+    .sort((a, b) => b.mean - a.mean);
+  // Merge every save batch's subtree by its path below the batch, at any depth.
+  const saveTree = { key: "", name: "all saves", t: 0, samples: 0, max: 0, kids: new Map() };
+  for (const s of saveSites) {
+    saveTree.t += s.t; saveTree.samples += s.samples; saveTree.max = Math.max(saveTree.max, s.max);
+    (function walk(n, agg) {
+      for (const c of n.children) {
+        const k = leaf(c);
+        let a = agg.kids.get(k);
+        if (!a) { a = { key: (agg.key ? agg.key + "." : "") + k, name: k, t: 0, samples: 0, max: 0, kids: new Map(), nodes: [] }; agg.kids.set(k, a); }
+        a.t += c.t; a.samples += c.samples; a.max = Math.max(a.max, c.max); a.nodes.push(c);
+        walk(c, a);
+      }
+    })(s, saveTree);
+  }
+  const sortedKids = a => [...a.kids.values()].sort((x, y) => y.t - x.t);
+  const hiPart = saveTree.kids.size ? sortedKids(saveTree)[0].name : null;
+
+  return { headerLine, rows, byName, tops, idle, phases, outside, busy, wall, iterations, root, saveSites, saveTree, sortedKids, hiPart, hasBase: false, newCount: 0, goneCount: 0 };
+}
+
+function markNew(model, baseRaw) {
+  if (!baseRaw) return;
+  let base; try { base = parse(baseRaw); } catch (e) { return; }
+  const old = new Set(base.rows.map(r => r.name));
+  const cur = new Set(model.rows.map(r => r.name));
+  model.hasBase = true;
+  for (const r of model.rows) if (!old.has(r.name)) { r.isNew = true; model.newCount++; }
+  model.goneCount = base.rows.filter(r => !cur.has(r.name)).length;
+}
+
+/* ---------- worst cases ---------- */
+function groupByLeaf(nodes) {
+  const m = new Map();
+  for (const r of nodes) { const k = leaf(r); if (!m.has(k)) m.set(k, []); m.get(k).push(r); }
+  return [...m.entries()].map(([name, rs]) => ({ name, rs }));
+}
+const groupNames = (nodes, k) => {
+  const g = groupByLeaf(nodes);
+  const head = g.slice(0, k).map(x => x.rs.length > 1 ? `${x.name} ×${x.rs.length}` : x.name);
+  const rest = sum(g.slice(k).map(x => x.rs.length));
+  return andList(rest ? head.concat(`${rest} more`) : head);
+};
+/* How many calls could have reached T µs, given only n, mean, variance and max (all calls ≥ 0)?
+   For each k, the calls other than the max are placed as close to the mean as the constraints allow;
+   if even that spread exceeds the reported variance, k is impossible. Returns [fewest, most]. */
+function overBounds(r, T) {
+  if (r._ob[T]) return r._ob[T];
+  const n = r.samples, mu = r.mean, V = Math.max(0, r.variance), Mx = r.max;
+  let res;
+  if (!(Mx >= T) || !n) res = [0, 0];
+  else if (n === 1) res = [1, 1];
+  else {
+    const slack = n * 0.05 + 1; // the mean is rounded to 0.1 µs
+    const S = Math.max(0, n * mu - Mx);
+    const Q = n * V - (Mx - mu) ** 2, tolQ = Math.max(1, n * V * 0.01);
+    const feasible = k => {
+      const nO = k - 1, nU = n - k;
+      let o = null, u = null;
+      if (nO === 0) { u = S / nU; if (u > T + slack / nU || u < -slack / nU) return false; }
+      else if (nU === 0) { o = S / nO; if (o < T - slack / nO) return false; }
+      else if (S / (n - 1) >= T) { u = T; o = (S - nU * T) / nO; }
+      else { o = T; u = (S - nO * T) / nU; if (u < -slack / nU) return false; }
+      let dev = 0;
+      if (o != null) dev += nO * (o - mu) ** 2;
+      if (u != null) dev += nU * (Math.max(0, u) - mu) ** 2;
+      return dev <= Q + tolQ;
+    };
+    const cap = Math.min(n, 1 + Math.floor((S + slack) / T));
+    let lo = null, hi = null;
+    for (let k = 1; k <= cap; k++) if (feasible(k)) { if (lo == null) lo = k; hi = k; }
+    res = lo == null ? [1, 1] : [lo, hi];
+  }
+  r._ob[T] = res;
+  return res;
+}
+const rangeText = ([lo, hi]) => lo === hi ? nf0.format(lo) : `${nf0.format(lo)}–${nf0.format(hi)}`;
+function patternOf(n, [lo, hi]) {
+  if (lo >= n) return { key: "every", label: n === 1 ? "Single call" : "Every call" };
+  if (lo >= 0.5 * n) return { key: "most", label: "Most calls" };
+  if (hi <= Math.max(3, 0.01 * n)) return { key: "rare", label: lo === hi && hi === 1 ? "Once" : "Rare" };
+  return { key: "some", label: "Sometimes" };
+}
+/* An op is shown at the deepest level that still explains its spike: no child reached 80% of its max. */
+const culpritsAt = T => M.rows.filter(r => r.inLoop && r.max >= T && !r.children.some(c => c.max >= 0.8 * r.max));
+function explainEnd(n) { let a = n; for (;;) { const c = a.children.find(x => x.max >= 0.8 * a.max); if (!c) return a; a = c; } }
+function diagnose(r) {
+  if (!r.children.length) return { kind: "leaf", html: "<b>No timers inside.</b>" };
+  const byMax = [...r.children].sort((a, b) => b.max - a.max);
+  const sumMax = sum(byMax.map(c => c.max));
+  const oncePerCall = r.children.every(c => c.samples <= r.samples);
+  if (sumMax < 0.8 * r.max && oncePerCall) return { kind: "gap", gap: r.max - sumMax, html: `<b>${esc(dur(r.max - sumMax))} or more likely ran outside its timers.</b> Even all its children's worst calls together reach only ${esc(dur(sumMax))}.` };
+  if (sumMax < 0.8 * r.max) return { kind: "gap", gap: r.max - sumMax, html: `<b>Its timers don't account for the spike.</b> Their worst calls add up to ${esc(dur(sumMax))}, though some children run more than once per call.` };
+  const top = byMax.filter(c => c.max >= 0.1 * r.max).slice(0, 3);
+  return { kind: "spread", html: `<b>Spread over several children.</b> Worst calls: ${top.map(c => `${esc(leaf(c))} ${esc(dur(c.max))}`).join(", ")}.` };
+}
+
+/* Self time: an op's time minus its timed children. A parent's uncovered remainder is listed as its own entry. */
+function selfTimes(model) {
+  const out = [];
+  for (const r of model.rows) {
+    if (!r.inLoop) continue;
+    if (!r.children.length) { if (r.t > 0) out.push({ node: r, own: false, self: r.t }); continue; }
+    const self = r.t - sum(r.children.map(c => c.t));
+    if (self >= 0.05 * (r.children.length + 1)) out.push({ node: r, own: true, self }); // skip rounding noise
+  }
+  const merged = new Map();
+  for (const e of out) {
+    const k = (e.own ? "own:" : "op:") + leaf(e.node);
+    let g = merged.get(k);
+    if (!g) { g = { name: leaf(e.node), own: e.own, self: 0, entries: [], isNew: true }; merged.set(k, g); }
+    g.self += e.self; g.entries.push(e); if (!e.node.isNew) g.isNew = false;
+  }
+  for (const g of merged.values()) g.entries.sort((a, b) => b.self - a.self);
+  return {
+    path: out.sort((a, b) => b.self - a.self).map(e => ({ name: leaf(e.node), own: e.own, self: e.self, entries: [e], isNew: e.node.isNew })),
+    name: [...merged.values()].sort((a, b) => b.self - a.self)
+  };
+}
+const overBudget = n => n.max != null && n.max >= BUDGET && n !== M.idle;
+const shareText = n => n.inLoop || n.synthetic ? pct(n.t, M.busy) : (n === M.idle ? "idle" : "outside loop");
+const baseLabel = () => "the previous snapshot";
+const worstPhase = () => [...M.phases].sort((a, b) => b.max - a.max)[0];
+const frameMax = () => { const m = M.headerLine.match(/frame\s+[\d.]+\s*ms avg\s*\/\s*([\d.]+)\s*ms max/i); return m ? +m[1] : null; };
+
+/* ---------- tooltip ---------- */
+const tip = $("#tip");
+function tipHtml(n, extra) {
+  const rowsHtml = [
+    ["Samples", nf0.format(n.samples)],
+    ["Mean", dur(n.mean)],
+    ["Std dev", dur(n.std)],
+    ["Worst", dur(n.max) + (overBudget(n) ? " ▲" : "")]
+  ];
+  if (overBudget(n)) rowsHtml.push(["Calls over 16.7 ms", `${rangeText(overBounds(n, BUDGET))} of ${nf0.format(n.samples)}`]);
+  rowsHtml.push(["Total", durMs(n.t)], ["Share of busy", shareText(n)]);
+  return `<div class="tt">${esc(leaf(n))}${n.isNew ? " " + newChip : ""}</div><div class="tp">${esc(n.synthetic ? "sum of non-idle phases" : n.name)}</div><dl>${rowsHtml.concat(extra || []).map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>`;
+}
+function showTip(html, x, y) {
+  tip.innerHTML = html; tip.hidden = false;
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let left = x + 14, top = y + 16;
+  if (left + w > innerWidth - 8) left = Math.max(8, x - w - 14);
+  if (top + h > innerHeight - 8) top = Math.max(8, y - h - 12);
+  tip.style.left = left + "px"; tip.style.top = top + "px";
+}
+function tipAt(el, html) { const r = el.getBoundingClientRect(); showTip(html, r.left + Math.min(r.width, 60), r.top + r.height - 10); }
+const hideTip = () => { tip.hidden = true; };
+function bindTip(el, htmlFn) {
+  el.addEventListener("pointermove", e => { if (e.pointerType === "touch") return; showTip(htmlFn(), e.clientX, e.clientY); });
+  el.addEventListener("pointerleave", hideTip);
+  el.addEventListener("focus", () => tipAt(el, htmlFn()));
+  el.addEventListener("blur", hideTip);
+}
+addEventListener("scroll", hideTip, { passive: true });
+
+/* ---------- header, lede, vitals ---------- */
+function renderHeader() {
+  const { idle, wall, busy, iterations, root } = M;
+  $("#rawHead").textContent = M.headerLine;
+  $("#rawHead").hidden = !M.headerLine;
+  const top = root.kids[0], wp = worstPhase();
+  let s = `${nf0.format(iterations)} loop iterations, about ${durMs(wall)} of wall time.`;
+  if (idle) s += ` The loop sits idle ${pct(idle.t, wall)} of it.`;
+  s += ` When it works, ${leaf(top)} takes ${pct(top.t, busy)} of the effort.`;
+  s += wp && wp.max >= BUDGET ? ` The longest single stall was ${dur(wp.max)}, in ${leaf(wp)}.` : " No single call went past one 16.7 ms frame.";
+  $("#lede").textContent = s;
+}
+
+function renderVitals() {
+  const v = $("#vitals");
+  const hm = M.headerLine.match(/frame\s+([\d.]+)\s*ms avg\s*\/\s*([\d.]+)\s*ms max,\s*CPU\s+([\d.]+)%,\s*RAM\s+([\d.]+)\s*MB,\s*FDs\s+(\d+)\/(\d+)/i);
+  const { busy, wall, iterations } = M;
+  const busyTile = `<div class="tile">
+      <div class="t-lab">Loop busy</div>
+      <div class="t-val">${pct(busy, wall)}</div>
+      <div class="t-sub">${durMs(busy)} of ${durMs(wall)} over ${nf0.format(iterations)} iterations</div>
+    </div>`;
+  if (!hm) { v.innerHTML = busyTile; v.classList.add("solo"); return; }
+  v.classList.remove("solo");
+  const [, favg, fmax, cpu, ram, fd, fdMax] = hm.map(Number);
+  const scale = Math.max(25, Math.ceil(fmax / 5) * 5 + 5);
+  const at = ms => (ms / scale * 100).toFixed(2) + "%";
+  const b = BUDGET / 1000;
+  v.innerHTML = `
+    <div class="tile wide">
+      <div class="t-lab">Frame time</div>
+      <div class="t-val">${favg} ms<small>avg</small> <span style="color:var(--muted);font-weight:400">/</span> ${fmax} ms<small>max</small></div>
+      <div class="meter" role="img" aria-label="Average frame ${favg} ms, worst ${fmax} ms, budget ${b.toFixed(1)} ms">
+        <div class="fill" style="width:${at(favg)}"></div>
+        <div class="mark budget" style="left:${at(b)}"></div>
+        <div class="mark max" style="left:${at(fmax)}"></div>
+        <span class="ml top" style="left:${at(b)};transform:translateX(-50%)">budget ${b.toFixed(1)}</span>
+        <span class="ml bot" style="left:0">avg ${favg}</span>
+        ${fmax - favg > scale * 0.18 ? `<span class="ml bot" style="left:${at(fmax)};transform:translateX(-50%)">max ${fmax}</span>` : ""}
+      </div>
+      <div class="t-sub">${fmax >= b ? `<span class="over">${triSvg}worst frame over budget</span>` : "Worst frame within budget"}</div>
+    </div>
+    ${busyTile}
+    <div class="tile"><div class="t-lab">CPU</div><div class="t-val">${cpu}%</div><div class="t-sub">process share</div></div>
+    <div class="tile"><div class="t-lab">RAM</div><div class="t-val">${ram}<small>MB</small></div><div class="t-sub">resident</div></div>
+    <div class="tile"><div class="t-lab">File descriptors</div><div class="t-val">${fd}<small>/ ${nf0.format(fdMax)}</small></div><div class="t-sub">${(fd / fdMax * 100).toFixed(1)}% of limit</div></div>`;
+}
+
+/* ---------- findings: chosen from the data, not from op names ---------- */
+function hotName(g) { return g.own ? `${g.name} outside its timed children` : g.name; }
+function freqPhrase(r, T) {
+  const b = overBounds(r, T), p = patternOf(r.samples, b);
+  if (r.samples === 1) return "it ran only once";
+  if (p.key === "every") return `all ${nf0.format(r.samples)} of its calls went over ${thrLabel(T)}`;
+  if (b[0] === b[1]) return `exactly ${nf0.format(b[0])} of its ${nf0.format(r.samples)} calls went over ${thrLabel(T)}`;
+  return `${rangeText(b)} of its ${nf0.format(r.samples)} calls went over ${thrLabel(T)}`;
+}
+function renderFindings() {
+  const { busy, saveSites, saveTree, root } = M;
+  const items = [];
+  const tag = (label, color) => color === "tri" ? `<span class="tag">${triSvg}${esc(label)}</span>` : `<span class="tag"><span class="dot" style="--c:var(--p${color || 0})"></span>${esc(label)}</span>`;
+  const hot = selfTimes(M);
+  const culprits = culpritsAt(BUDGET);
+
+  if (M.hasBase && M.newCount) {
+    const fresh = hot.name.filter(g => g.isNew);
+    const freshT = sum(fresh.map(g => g.self));
+    let body = `They add ${durMs(freshT)} of self time, ${pct(freshT, busy)} of busy time.`;
+    const topNew = fresh.slice(0, 3).map(g => `${hotName(g)} (${durMs(g.self)})`);
+    if (topNew.length) body += ` The largest ${topNew.length === 1 ? "is" : "are"} ${andList(topNew)}.`;
+    if (M.goneCount) body += ` ${nf0.format(M.goneCount)} ${plural(M.goneCount, "op")} from ${baseLabel()} ${M.goneCount === 1 ? "is" : "are"} gone.`;
+    items.push([`<span class="tag">${newChip}</span>`, `${nf0.format(M.newCount)} ${plural(M.newCount, "op")} ${M.newCount === 1 ? "is" : "are"} new since ${baseLabel()}.`, body]);
+  }
+
+  const wp = worstPhase();
+  if (wp && wp.max >= BUDGET) {
+    const end = explainEnd(wp);
+    let body = end === wp
+      ? `No timer inside ${leaf(wp)} explains it: ${diagnose(wp).html.replace(/<[^>]+>/g, "")}`
+      : `It traces to ${pathOf(end).join(" › ")} › ${leaf(end)}, whose worst call took ${dur(end.max)} against a ${dur(end.mean)} mean; ${freqPhrase(end, BUDGET)}.`;
+    body += ` ${culprits.length} ${plural(culprits.length, "operation")} crossed the 16.7 ms frame budget at least once.`;
+    const fm = frameMax();
+    if (fm != null && fm * 1000 < wp.max) body += ` The header's ${fm} ms frame max doesn't show this stall.`;
+    items.push([tag("worst case", "tri"), `The longest stall was ${dur(wp.max)}, in ${leaf(wp)}.`, body]);
+  } else {
+    const w = M.rows.filter(r => r.inLoop).sort((a, b) => b.max - a.max)[0];
+    items.push([tag("worst case", "tri"), "No call went past the 16.7 ms frame budget.", w ? `The slowest single call was ${leaf(w)} at ${dur(w.max)}.` : ""]);
+  }
+
+  const steady = culprits.map(r => ({ r, p: patternOf(r.samples, overBounds(r, BUDGET)) }))
+    .filter(x => (x.p.key === "every" || x.p.key === "most") && x.r.samples > 1)
+    .sort((a, b) => b.r.max - a.r.max);
+  if (steady.length) {
+    const every = steady.every(x => x.p.key === "every");
+    const groups = groupByLeaf(steady.map(x => x.r));
+    const list = groups.slice(0, 3).map(g => {
+      if (g.rs.length === 1) return `${g.name} (${dur(g.rs[0].mean)} mean over ${nf0.format(g.rs[0].samples)} calls)`;
+      const ms = g.rs.map(r => r.mean);
+      return `${g.name} on ${g.rs.length} call paths (${dur(Math.min(...ms))} to ${dur(Math.max(...ms))} mean)`;
+    });
+    const restG = groups.length - 3;
+    items.push([tag("every call", "tri"), `${word(steady.length)} ${plural(steady.length, "operation")} ${steady.length === 1 ? "is" : "are"} slow on ${every ? "every call" : "most or all of their calls"}.`,
+      `Unlike rare spikes, these stall the loop each time they run: ${andList(list)}${restG > 0 ? `, plus ${restG} more` : ""}.`]);
+  }
+
+  const top = root.kids[0];
+  if (top) {
+    const chain = [];
+    for (let a = top; a.kids.length && a.kids[0].t >= 0.5 * a.t;) { a = a.kids[0]; chain.push(a); }
+    const last = chain.length ? chain[chain.length - 1] : top;
+    let body = chain.length ? `Most of it runs in ${chain.map(leaf).join(" › ")}, ${pct(last.t, top.t)} of ${leaf(top)}.` : "";
+    if (last.kids.length) body += ` The largest part of ${leaf(last)} is ${leaf(last.kids[0])} at ${durMs(last.kids[0].t)} (${pct(last.kids[0].t, last.t)}).`;
+    items.push([tag("largest phase", top.color), `${leaf(top)} is ${pct(top.t, busy)} of busy time.`, body.trim()]);
+  }
+
+  if (hot.name.length) {
+    const [g, ...rest] = hot.name;
+    const paths = g.entries.length;
+    const title = g.own ? `${g.name} spends the most time outside its timed children.` : `${g.name} has the largest self time.`;
+    let body = `${g.own ? "That uncovered time" : "It"} adds up to ${durMs(g.self)}, ${pct(g.self, busy)} of busy time${paths > 1 ? `, across ${paths} call paths` : ""}.`;
+    const next = rest.slice(0, 2).map(x => `${hotName(x)} (${durMs(x.self)})`);
+    if (next.length) body += ` Next come ${andList(next)}.`;
+    items.push([tag("self time", g.entries[0].node.color), title, body]);
+  }
+
+  if (saveSites.length) {
+    const calls = sum(saveSites.map(s => s.samples));
+    let body = `persist_build_save_batch ran ${nf0.format(calls)} ${plural(calls, "time")} from ${saveSites.length} ${plural(saveSites.length, "call site")}, for ${durMs(saveTree.t)} in total.`;
+    const chain = [];
+    for (let a = saveTree; a.kids.size;) {
+      const t = M.sortedKids(a)[0];
+      if (chain.length && t.t < 0.5 * a.t) break;
+      chain.push({ node: t, parent: a }); a = t;
+    }
+    if (chain.length) {
+      const [first, ...deeper] = chain;
+      const last = chain[chain.length - 1].node;
+      body += ` The ${first.node.name} step is ${pct(first.node.t, saveTree.t)} of that`;
+      body += deeper.length
+        ? `, and ${andList(deeper.map(c => `${c.node.name} makes up ${pct(c.node.t, c.parent.t)} of ${c.parent.name}`))}. ${last.name} peaked at ${dur(last.max)}.`
+        : ` and peaked at ${dur(last.max)}.`;
+    }
+    const worstSave = [...saveSites].sort((a, b) => b.max - a.max)[0];
+    if (worstSave.max >= BUDGET) body += ` The slowest single save took ${dur(worstSave.max)}, from ${pathOf(worstSave).join(" › ")}.`;
+    items.push([tag("saves", 0), "Saves run on the loop thread.", body]);
+  }
+
+  $("#findings").innerHTML = items.map(([t, b, p]) => `<li>${t}<b>${esc(b)}</b><p>${esc(p)}</p></li>`).join("");
+}
+
+/* ---------- worst-case section ---------- */
+let fzT = BUDGET, fzSort = "worst", fzAll = false;
+function renderFreeze() {
+  const T = fzT;
+  const list = culpritsAt(T).map(r => {
+    const b = overBounds(r, T);
+    return { r, b, p: patternOf(r.samples, b), tier: tierOf(r.max), d: diagnose(r) };
+  });
+  if (fzSort === "often") list.sort((a, b) => (b.b[0] - a.b[0]) || (b.b[1] - a.b[1]) || (b.r.max - a.r.max));
+  else list.sort((a, b) => b.r.max - a.r.max);
+
+  /* tiles */
+  const wp = worstPhase(), fm = frameMax();
+  const tierCounts = TIERS.filter(t => t.min >= T || t.min === BUDGET && T === BUDGET)
+    .map(t => ({ t, n: list.filter(x => x.tier === t).length })).filter(x => x.n);
+  const steady = list.filter(x => (x.p.key === "every" || x.p.key === "most") && x.r.samples > 1).sort((a, b) => b.r.max - a.r.max);
+  const gaps = list.filter(x => x.d.kind === "gap").sort((a, b) => b.d.gap - a.d.gap);
+  const wEnd = wp ? explainEnd(wp) : null;
+  $("#fzTiles").innerHTML = `
+    <div class="tile">
+      <div class="t-lab">Longest stall</div>
+      <div class="t-val">${wp ? esc(dur(wp.max)) : "–"}</div>
+      <div class="t-sub">${wp ? `in ${esc(leaf(wp))}${wEnd && wEnd !== wp ? `, traced to ${esc(leaf(wEnd))}` : ""}` : ""}</div>
+      ${wp && fm != null && fm * 1000 < wp.max ? `<div class="t-sub muted-sub">The header's ${fm} ms frame max doesn't show it.</div>` : ""}
+    </div>
+    <div class="tile">
+      <div class="t-lab">Ops over ${esc(thrLabel(T))}</div>
+      <div class="t-val">${list.length}</div>
+      <div class="t-sub">${tierCounts.length ? tierCounts.map(x => `<span class="sev ${x.t.cls}">${triSvg}${x.n} ${esc(x.t.label.toLowerCase())}${x.n === 1 ? "" : "s"}</span>`).join(" ") : "none"}</div>
+    </div>
+    <div class="tile">
+      <div class="t-lab">Slow on every call</div>
+      <div class="t-val">${steady.length}</div>
+      <div class="t-sub">${steady.length ? esc(groupNames(steady.map(x => x.r), 2)) : "Every spike here is occasional."}</div>
+    </div>
+    <div class="tile">
+      <div class="t-lab">Spikes outside timers</div>
+      <div class="t-val">${gaps.length}</div>
+      <div class="t-sub">${gaps.length ? `Add timers in ${esc(groupNames(gaps.map(x => x.r), 2))}` : "Timers cover every spike."}</div>
+    </div>`;
+
+  /* scale: log, shared by all rows */
+  const LO = 1, HI = Math.max(300000, ...list.map(x => x.r.max * 1.5));
+  const at = v => ((Math.log10(Math.max(v, LO)) - Math.log10(LO)) / (Math.log10(HI) - Math.log10(LO)) * 100).toFixed(2) + "%";
+  const ticks = [1, 10, 100, 1000, 10000, 100000, 1000000].filter(t => t <= HI);
+  const grid = ticks.map(t => `<span class="fz-grid" style="left:${at(t)}"></span>`).join("") + `<span class="fz-thr" style="left:${at(T)}"></span>`;
+
+  const box = $("#fzList");
+  if (!list.length) {
+    box.innerHTML = `<p class="none" style="padding:12px 4px">No operation's worst call reached ${esc(thrLabel(T))}.</p>`;
+  } else {
+    const shown = fzAll ? list : list.slice(0, FZ_TOP);
+    const head = `<div class="fz-head" aria-hidden="true">
+      <span class="fz-h-sev">Severity</span><span class="fz-h-op">Operation</span>
+      <span class="fz-h-track">${ticks.map((t, i) => `<span class="fz-tick${t === 10 || t === 100 ? " minor" : ""}" style="left:${at(t)};${i === 0 ? "transform:none" : i === ticks.length - 1 && t * 3 > HI ? "transform:translateX(-100%)" : ""}">${t >= 1e6 ? "1 s" : t >= 1000 ? t / 1000 + " ms" : t + " µs"}</span>`).join("")}</span>
+      <span class="fz-h-worst">Worst call</span><span class="fz-h-freq">Calls over ${esc(thrLabel(T))}</span></div>`;
+    box.innerHTML = head + shown.map(x => {
+      const r = x.r;
+      const chain = [];
+      for (let a = r.parent; a; a = a.parent) chain.unshift(a);
+      return `<button type="button" class="fz-row" data-n="${esc(r.name)}" aria-label="${esc(`${x.tier ? x.tier.label : ""}: ${short(r)}, worst ${dur(r.max)}, mean ${dur(r.mean)}, ${rangeText(x.b)} of ${r.samples} calls over ${thrLabel(T)}. Open in call tree`)}">
+        <span class="fz-sev"><span class="sev ${x.tier ? x.tier.cls : ""}">${triSvg}${esc(x.tier ? x.tier.label : "")}</span></span>
+        <span class="fz-op">
+          <span class="fz-name"><span class="dot" style="--c:var(--p${r.color || 0})"></span><span class="nm">${esc(leaf(r))}</span>${r.isNew ? newChip : ""}</span>
+          <span class="fz-chain">${chain.length ? chain.map(a => `${esc(leaf(a))} <i>${esc(dur(a.max))}</i>`).join(" › ") + " ›" : "top-level phase"}</span>
+          <span class="fz-diag">${x.d.html}</span>
+        </span>
+        <span class="fz-track">${grid}<span class="fz-range" style="left:${at(r.mean)};width:calc(${at(r.max)} - ${at(r.mean)})"></span><span class="fz-mean" style="left:${at(r.mean)}"></span><span class="fz-max ${x.tier ? x.tier.cls : ""}" style="left:${at(r.max)}"></span></span>
+        <span class="fz-worst">${esc(dur(r.max))}<small>mean ${esc(dur(r.mean))}</small></span>
+        <span class="fz-freq"><b>${esc(x.p.label)}</b><small>${rangeText(x.b)} of ${nf0.format(r.samples)} ${plural(r.samples, "call")}</small></span>
+      </button>`;
+    }).join("");
+    box.querySelectorAll(".fz-row").forEach(el => el.addEventListener("click", () => openInTree(M.byName.get(el.dataset.n))));
+  }
+  const more = $("#fzMore");
+  more.hidden = list.length <= FZ_TOP;
+  more.textContent = fzAll ? `Show top ${FZ_TOP}` : `Show all ${list.length}`;
+  $("#fzCount").textContent = list.length ? `${Math.min(list.length, fzAll ? list.length : FZ_TOP)} of ${list.length} ${plural(list.length, "op")}` : "";
+}
+document.querySelectorAll("#fzThr button").forEach(b => b.addEventListener("click", () => {
+  fzT = +b.dataset.t; fzAll = false;
+  document.querySelectorAll("#fzThr button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  renderFreeze();
+}));
+document.querySelectorAll("#fzSort button").forEach(b => b.addEventListener("click", () => {
+  fzSort = b.dataset.s;
+  document.querySelectorAll("#fzSort button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  renderFreeze();
+}));
+$("#fzMore").addEventListener("click", () => { fzAll = !fzAll; renderFreeze(); });
+
+/* ---------- phase bars: every phase gets its own row ---------- */
+function renderPhases() {
+  const box = $("#phases"); box.innerHTML = "";
+  const { root, busy } = M;
+  const maxT = root.kids[0].t || 1;
+  for (const p of root.kids) {
+    const colorVar = `var(--p${p.color || 0})`;
+    const el = document.createElement("button");
+    el.type = "button"; el.className = "ph";
+    el.innerHTML = `<span class="ph-name"><span class="dot" style="--c:${colorVar}"></span><span>${esc(leaf(p))}</span>${p.isNew ? newChip : ""}</span>
+      <span class="ph-track"><span class="ph-bar" style="--c:${colorVar};width:${(p.t / maxT * 100).toFixed(2)}%"></span></span>
+      <span class="ph-val">${durMs(p.t)}</span><span class="ph-pct">${pct(p.t, busy)}</span>`;
+    el.setAttribute("aria-label", `${leaf(p)}: ${durMs(p.t)}, ${pct(p.t, busy)} of busy time. Open in call tree`);
+    bindTip(el, () => tipHtml(p, [["Children", String(p.children.length)]]));
+    el.addEventListener("click", () => { hideTip(); setFocus(p, p); $("#tree").scrollIntoView({ behavior: smooth(), block: "start" }); });
+    box.append(el);
+  }
+}
+
+/* ---------- icicle ---------- */
+const ic = $("#icicle");
+function chainOf(n) { const c = []; for (let a = n; a; a = a.ip) c.unshift(a); return c; }
+function setFocus(f, sel) { focus = f; selected = sel || f; kidsAll = false; renderIcicle(); renderDetail(); }
+function openInTree(n) {
+  if (!n) return;
+  hideTip();
+  setFocus(n.kids.length || !n.ip ? n : n.ip, n);
+  $("#tree").scrollIntoView({ behavior: smooth(), block: "start" });
+}
+
+function renderCrumbs() {
+  const cr = $("#crumbs"); cr.innerHTML = "";
+  const chain = chainOf(focus);
+  chain.forEach((n, i) => {
+    if (i) { const s = document.createElement("span"); s.className = "sep"; s.textContent = "›"; cr.append(s); }
+    if (i === chain.length - 1) { const s = document.createElement("span"); s.className = "cur"; s.textContent = leaf(n); cr.append(s); }
+    else { const b = document.createElement("button"); b.type = "button"; b.textContent = leaf(n); b.addEventListener("click", () => setFocus(n)); cr.append(b); }
+  });
+  if (focus !== M.root) { const r = document.createElement("button"); r.type = "button"; r.className = "reset"; r.textContent = "Show all"; r.addEventListener("click", () => setFocus(M.root)); cr.append(r); }
+}
+
+function renderIcicle() {
+  renderCrumbs();
+  const W = ic.clientWidth; if (!W) return;
+  const MIN = 3; // px: narrower children are gathered into one "+N" block so they still show
+  const cells = [];
+  const anc = chainOf(focus).slice(0, -1);
+  anc.forEach((n, i) => cells.push({ n, x0: 0, x1: 1, d: i, anc: true }));
+  (function rec(n, x0, x1, d) {
+    cells.push({ n, x0, x1, d });
+    if (!n.kids.length) return;
+    const s = (x1 - x0) / Math.max(n.t, sum(n.kids.map(c => c.t)), 1e-9);
+    let x = x0, xs = null; const small = [];
+    for (const c of n.kids) {
+      const w = c.t * s;
+      if (w * W >= MIN && xs == null) rec(c, x, x + w, d + 1);
+      else { if (xs == null) xs = x; small.push(c); }
+      x += w;
+    }
+    if (small.length) cells.push({ more: small, parent: n, x0: xs, x1: Math.max(x, xs), d: d + 1 });
+  })(focus, 0, 1, anc.length);
+  const maxD = Math.max(...cells.map(c => c.d));
+  const ROW = parseFloat(getComputedStyle(ic).getPropertyValue("--row")) || 28;
+  ic.style.height = (maxD + 1) * ROW + "px";
+  ic.innerHTML = "";
+  const frag = document.createDocumentFragment();
+  for (const c of cells) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "cell";
+    const raw = (c.x1 - c.x0) * W;
+    const width = Math.max(c.more ? 2 : 1, raw - 2);
+    b.style.left = c.x0 * W + "px"; b.style.top = c.d * ROW + "px"; b.style.width = width + "px";
+    if (c.more) {
+      const items = c.more, tot = sum(items.map(i => i.t)), p = c.parent;
+      b.classList.add("more");
+      if (width >= 26) b.textContent = `+${items.length}`;
+      b.setAttribute("aria-label", `${items.length} smaller ${plural(items.length, "operation")} under ${leaf(p)}, ${durMs(tot)} together. Open ${leaf(p)}`);
+      b.tabIndex = width < 4 ? -1 : 0;
+      bindTip(b, () => `<div class="tt">${items.length} smaller ${plural(items.length, "operation")}</div><div class="tp">under ${esc(p.name)} · ${durMs(tot)} together</div><dl>${items.slice(0, 8).map(i => `<dt>${esc(leaf(i))}${i.isNew ? " " + newChip : ""}</dt><dd>${durMs(i.t)}</dd>`).join("")}${items.length > 8 ? `<dt>and ${items.length - 8} more</dt><dd></dd>` : ""}</dl>`);
+      b.addEventListener("click", () => { hideTip(); if (p !== focus) setFocus(p); else { selected = p; kidsAll = true; renderIcicle(); renderDetail(); } });
+      frag.append(b);
+      continue;
+    }
+    const n = c.n;
+    if (n.synthetic || c.anc) b.classList.add("neutral");
+    else { b.style.setProperty("--c", `var(--p${n.color || 0})`); b.classList.add("l" + Math.min(n.level, 5)); }
+    if (width < 16) b.classList.add("thin");
+    if (n === selected) b.classList.add("sel");
+    if (n.isNew && width >= 12) b.classList.add("is-new");
+    if (width >= 40) b.innerHTML = `${esc(n.synthetic ? "loop busy time" : leaf(n))}${width >= 150 ? `<span class="v">${durMs(n.t)}</span>` : ""}`;
+    b.setAttribute("aria-label", `${short(n)}: ${durMs(n.t)} total, ${pct(n.t, M.busy)} of busy time${n.isNew ? ", new" : ""}`);
+    if (width < 4) b.tabIndex = -1;
+    bindTip(b, () => tipHtml(n, n.ip ? [["Share of parent", pct(n.t, n.ip.t)]] : []));
+    b.addEventListener("click", () => { hideTip(); if (c.anc) setFocus(n); else if (n.kids.length && n !== focus) setFocus(n); else { selected = n; kidsAll = false; renderIcicle(); renderDetail(); } });
+    frag.append(b);
+  }
+  ic.append(frag);
+  $("#icAxis").innerHTML = `<span>0</span><span>${esc(leaf(focus))} total ${durMs(focus.t)}</span>`;
+}
+
+function renderDetail() {
+  const n = selected, d = $("#detail");
+  const self = n.kids.length ? Math.max(0, n.t - sum(n.kids.map(c => c.t))) : null;
+  const worstV = n.synthetic ? "" : dur(n.max) + (overBudget(n) ? ` <span class="over">${triSvg}${rangeText(overBounds(n, BUDGET))} of ${nf0.format(n.samples)} over 16.7 ms</span>` : "");
+  const stats = n.synthetic ? [
+    ["Iterations", nf0.format(M.iterations)],
+    ["Busy per iteration", dur(n.mean)],
+    ["Busy total", durMs(n.t)],
+    ["Share of wall time", pct(n.t, M.wall)]
+  ] : [
+    ["Samples", nf0.format(n.samples)],
+    ["Mean", dur(n.mean)],
+    ["Std dev", dur(n.std)],
+    ["Worst", worstV],
+    ["Total", durMs(n.t)],
+    ["Share of busy", pct(n.t, M.busy)],
+    ["Share of parent", n.ip ? pct(n.t, n.ip.t) : "–"],
+    ["Not in children", self == null ? "no children" : durMs(self)]
+  ];
+  const LIMIT = 7;
+  const kids = kidsAll ? n.kids : n.kids.slice(0, LIMIT);
+  const top = n.kids.length ? (n.kids[0].t || 1) : 1;
+  d.innerHTML = `
+    <div>
+      <h3>${esc(n.synthetic ? "loop busy time" : leaf(n))}${n.isNew ? " " + newChip : ""}</h3>
+      <div class="path">${esc(n.synthetic ? `Sum of the ${word(M.phases.length).toLowerCase()} non-idle loop ${plural(M.phases.length, "phase")}` : n.name)}</div>
+      <div class="stats">${stats.map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v.includes("<span") ? v : esc(v)}</div></div>`).join("")}</div>
+    </div>
+    <div class="kids">
+      <div class="k">${n.kids.length ? `${kidsAll || n.kids.length <= LIMIT ? "Children" : "Largest children"} · ${n.kids.length} total` : "Children"}</div>
+      ${n.kids.length ? "" : `<p class="none">This operation has no timed children.</p>`}
+    </div>`;
+  const kb = d.querySelector(".kids");
+  for (const c of kids) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "kid";
+    b.style.setProperty("--c", `var(--p${c.color || 0})`);
+    b.innerHTML = `<span class="nm"><span class="kn"><span>${esc(leaf(c))}</span>${c.isNew ? newChip : ""}</span><span class="bar" style="width:${Math.max(0.5, c.t / top * 100).toFixed(1)}%"></span></span><span class="r">${durMs(c.t)}</span><span class="r p">${pct(c.t, n.t)}</span>`;
+    b.setAttribute("aria-label", `${leaf(c)}: ${durMs(c.t)}, ${pct(c.t, n.t)} of ${leaf(n)}. Open`);
+    b.addEventListener("click", () => { kidsAll = false; setFocus(c.kids.length ? c : n, c); });
+    kb.append(b);
+  }
+  if (n.kids.length > LIMIT) {
+    const t = document.createElement("button");
+    t.type = "button"; t.className = "linkbtn";
+    t.textContent = kidsAll ? "Show fewer" : `Show all ${n.kids.length}`;
+    t.addEventListener("click", () => { kidsAll = !kidsAll; renderDetail(); });
+    kb.append(t);
+  }
+}
+
+/* ---------- self time ---------- */
+let hotMode = "name", hotAll = false;
+function renderHot() {
+  const box = $("#hotList"); box.innerHTML = "";
+  const list = selfTimes(M)[hotMode];
+  const shown = hotAll ? list : list.slice(0, HOT_TOP);
+  const maxS = list.length ? list[0].self : 1;
+  for (const g of shown) {
+    const lead = g.entries[0].node;
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "hrow";
+    let sub;
+    if (hotMode === "name") {
+      const ph = [...new Set(g.entries.map(e => leaf(e.node.phase)))];
+      sub = g.entries.length > 1 ? `${g.entries.length} call paths · ${ph.join(", ")}` : pathOf(lead).join(" › ");
+    } else sub = pathOf(lead).join(" › ");
+    b.innerHTML = `<span class="h-name"><span class="l1"><span class="dot" style="--c:var(--p${lead.color || 0})"></span><span class="nm">${esc(g.name)}</span>${g.own ? `<span class="own-tag">not in children</span>` : ""}${g.isNew ? newChip : ""}</span><span class="l2">${esc(sub || "loop")}</span></span>
+      <span class="h-track"><span class="h-bar${g.own ? " own" : ""}" style="width:${(g.self / maxS * 100).toFixed(2)}%"></span></span>
+      <span class="h-val">${durMs(g.self)}</span><span class="h-pct">${pct(g.self, M.busy)}</span>`;
+    b.setAttribute("aria-label", `${g.name}${g.own ? ", time not covered by its children" : ""}: ${durMs(g.self)}, ${pct(g.self, M.busy)} of busy time. Open in call tree`);
+    bindTip(b, () => `<div class="tt">${esc(g.name)}${g.isNew ? " " + newChip : ""}</div><div class="tp">${g.own ? "time not covered by its timed children" : "self time"}</div><dl>${g.entries.slice(0, 6).map(e => `<dt>${esc(pathOf(e.node).join(" › ") || "loop")}</dt><dd>${durMs(e.self)}</dd>`).join("")}${g.entries.length > 6 ? `<dt>and ${g.entries.length - 6} more paths</dt><dd></dd>` : ""}</dl>`);
+    b.addEventListener("click", () => openInTree(lead));
+    box.append(b);
+  }
+  const more = $("#hotMore");
+  more.hidden = list.length <= HOT_TOP;
+  more.textContent = hotAll ? `Show top ${HOT_TOP}` : `Show all ${list.length}`;
+  $("#hotCount").textContent = `${shown.length} of ${list.length} ${hotMode === "name" ? "names" : "call paths"}`;
+}
+document.querySelectorAll("#hotMode button").forEach(b => b.addEventListener("click", () => {
+  hotMode = b.dataset.mode;
+  document.querySelectorAll("#hotMode button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  renderHot();
+}));
+$("#hotMore").addEventListener("click", () => { hotAll = !hotAll; renderHot(); });
+
+/* ---------- svg helpers ---------- */
+function mk(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.append(e); return e; }
+function rightRounded(x, y, w, h, r) { r = Math.min(r, w, h / 2); return `M${x},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h - r}Q${x + w},${y + h} ${x + w - r},${y + h}H${x}Z`; }
+const emptyChart = (box, msg) => { box.innerHTML = `<p class="none" style="padding:6px 0">${esc(msg)}</p>`; };
+
+/* ---------- saves ---------- */
+const siteLabel = r => r.name.replace(/^loop\./, "").replace(/\.persist_build_save_batch$/, "").replace(/^persist_build_save_batch$/, "loop").replace(/\.app_tool_exec\.save_state_async$/, ".save_state_async").split(".").join(" › ");
+let saveOpen = new Set();
+
+function renderSaveText() {
+  const { saveSites, hiPart, byName } = M;
+  $("#lgHi").textContent = hiPart || "largest step";
+  let cap = "Mean time per persist_build_save_batch call, by call site, split into its steps.";
+  if (hiPart && saveSites.length) {
+    const everywhere = saveSites.every(s => {
+      const h = byName.get(s.name + "." + hiPart);
+      return h && s.children.every(c => c.mean <= h.mean);
+    });
+    cap += everywhere ? ` The ${hiPart} step is the largest at every site.` : ` The ${hiPart} step is the largest overall.`;
+  }
+  cap += " The breakdown merges every site, at every depth.";
+  $("#saveCap").textContent = cap;
+  $("#savesec").hidden = !saveSites.length;
+}
+
+function renderSaves() {
+  const box = $("#saves"); const W = box.clientWidth; if (!W) return;
+  const { saveSites, hiPart, saveTree } = M;
+  if (!saveSites.length) { emptyChart(box, "This snapshot has no persist_build_save_batch rows."); return; }
+  const rowH = 48, top = 26, bottom = 26;
+  const H = top + saveSites.length * rowH + bottom;
+  const L = 6, R = W - 66;
+  const hiV = Math.max(18000, Math.ceil(Math.max(...saveSites.map(s => s.mean)) / 5000) * 5000 + 2000);
+  const step = hiV > 60000 ? 20000 : hiV > 30000 ? 10000 : 5000;
+  const x = v => L + v / hiV * (R - L);
+  box.innerHTML = "";
+  const svg = mk("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Mean save batch time by call site, split by step" }, box);
+  for (let t = 0; t <= hiV; t += step) {
+    mk("line", { x1: x(t), x2: x(t), y1: top - 4, y2: H - bottom, class: "s-grid" }, svg);
+    const tx = mk("text", { x: x(t), y: H - bottom + 16, class: "t-tick", "text-anchor": t === 0 ? "start" : "middle" }, svg); tx.textContent = t === 0 ? "0" : t / 1000 + " ms";
+  }
+  mk("line", { x1: L, x2: L, y1: top - 4, y2: H - bottom, class: "s-axis" }, svg);
+  const bx = x(BUDGET);
+  mk("line", { x1: bx, x2: bx, y1: top - 10, y2: H - bottom, class: "s-budget" }, svg);
+  const bl = mk("text", { x: bx - 6, y: top - 12, class: "t-budget", "text-anchor": "end" }, svg); bl.textContent = "16.7 ms budget";
+  const order = M.sortedKids(saveTree).map(a => a.name);
+  saveSites.forEach((s, i) => {
+    const y0 = top + i * rowH;
+    const hit = mk("rect", { x: 0, y: y0 + 1, width: W, height: rowH - 2, rx: 4, class: "f-hit", tabindex: 0,
+      "aria-label": `${siteLabel(s)}: ${s.samples} saves, mean ${dur(s.mean)}, worst ${dur(s.max)}` }, svg);
+    bindTip(hit, () => tipHtml(s));
+    hit.addEventListener("click", () => openInTree(s));
+    hit.style.cursor = "pointer";
+    const t = mk("text", { x: L, y: y0 + 16 }, svg);
+    const a = mk("tspan", { class: "t-leaf" }, t); a.textContent = siteLabel(s);
+    if (s.isNew) { const nw = mk("tspan", { class: "t-new", dx: 6 }, t); nw.textContent = "NEW"; }
+    const nsp = mk("tspan", { class: "t-n", dx: 8 }, t); nsp.textContent = `${nf0.format(s.samples)} ${plural(s.samples, "save")}`;
+    if (t.getComputedTextLength() > W - L - 4) nsp.textContent = "";
+    const by = y0 + 24, bh = 14;
+    const known = new Set(order);
+    const segs = order.map(p => M.byName.get(s.name + "." + p)).filter(Boolean)
+      .concat(s.children.filter(c => !known.has(leaf(c))));
+    const visible = segs.filter(p => p.mean / hiV * (R - L) >= 0.5);
+    let cx = L;
+    visible.forEach((p, j) => {
+      const w = p.mean / hiV * (R - L);
+      const last = j === visible.length - 1;
+      const gw = last ? w : Math.max(0.5, w - 2);
+      const cls = leaf(p) === hiPart ? "f-hi" : "f-seg";
+      const el = last ? mk("path", { d: rightRounded(cx, by, gw, bh, 4), class: cls }, svg) : mk("rect", { x: cx, y: by, width: gw, height: bh, class: cls }, svg);
+      el.style.pointerEvents = "auto";
+      bindTip(el, () => `<div class="tt">${esc(leaf(p))}</div><div class="tp">${esc(siteLabel(s))}</div><dl><dt>Mean per save</dt><dd>${dur(p.mean)}</dd><dt>Share of this save</dt><dd>${pct(p.mean, s.mean)}</dd><dt>Worst</dt><dd>${dur(p.max)}</dd><dt>Total</dt><dd>${durMs(p.t)}</dd></dl>`);
+      cx += w;
+    });
+    const v = mk("text", { x: Math.max(cx, x(s.mean)) + 8, y: by + 11, class: "t-num" }, svg); v.textContent = dur(s.mean);
+  });
+}
+
+/* Breakdown of all save batches, merged by step, at every depth. */
+function renderParts() {
+  const box = $("#parts");
+  const { saveSites, saveTree, hiPart } = M;
+  if (!saveSites.length || !saveTree.kids.size) { box.hidden = true; return; }
+  box.hidden = false;
+  const all = saveTree.t || 1;
+  const calls = sum(saveSites.map(s => s.samples));
+  const html = [`<div class="k">All ${nf0.format(calls)} saves · ${durMs(saveTree.t)} total, by step</div>`];
+  (function walk(agg, depth) {
+    const kids = M.sortedKids(agg);
+    const live = kids.filter(k => k.t > 0), zero = kids.filter(k => k.t <= 0);
+    for (const k of live) {
+      const has = k.kids.size > 0, open = saveOpen.has(k.key);
+      const isNew = k.nodes.every(n => n.isNew);
+      html.push(`<div class="part" style="--d:${depth}">
+        <span class="p-name">${has ? `<button type="button" class="tw" data-key="${esc(k.key)}" aria-expanded="${open}" aria-label="${open ? "Collapse" : "Expand"} ${esc(k.name)}">${caret}</button>` : `<span class="tw ph0" aria-hidden="true"></span>`}<span class="nm" title="${esc(k.key)}">${esc(k.name)}</span>${isNew ? newChip : ""}</span>
+        <span class="tr"><span class="b" style="width:${Math.max(0.3, k.t / all * 100).toFixed(2)}%;background:var(${depth === 0 && k.name === hiPart ? "--hi" : "--seg"})"></span></span>
+        <span class="r">${durMs(k.t)}</span><span class="r p">${pct(k.t, all)}</span></div>`);
+      if (has && open) walk(k, depth + 1);
+    }
+    if (zero.length) html.push(`<div class="p-zero" style="--d:${depth}">${zero.length} at 0 µs: ${esc(zero.map(z => z.name).join(", "))}</div>`);
+  })(saveTree, 0);
+  box.innerHTML = html.join("");
+}
+$("#parts").addEventListener("click", e => {
+  const b = e.target.closest(".tw[data-key]"); if (!b) return;
+  const k = b.dataset.key;
+  saveOpen.has(k) ? saveOpen.delete(k) : saveOpen.add(k);
+  renderParts();
+  const again = $("#parts").querySelector(`.tw[data-key="${CSS.escape(k)}"]`); if (again) again.focus();
+});
+
+/* ---------- table ---------- */
+const expanded = new Set(["loop.render", "loop.render.terminal_draw", "loop.render.terminal_draw.ui_render"]);
+let sortK = "total", sortDir = -1, query = "", newOnly = false;
+const tbody = $("#tbody");
+const shareVal = n => n.inLoop ? n.t / M.busy : -1;
+const keyVal = (n, k) => k === "name" ? leaf(n) : k === "share" ? shareVal(n) : k === "total" ? n.t : n[k];
+function sorted(list) {
+  return [...list].sort((a, b) => {
+    const va = keyVal(a, sortK), vb = keyVal(b, sortK);
+    if (sortK === "name") return va.localeCompare(vb) * sortDir;
+    return (va - vb) * sortDir;
+  });
+}
+const filtering = () => !!query || newOnly;
+const keep = n => (!query || n.name.toLowerCase().includes(query)) && (!newOnly || n.isNew);
+const visible = n => keep(n) || n.children.some(visible);
+function renderTable() {
+  const out = [];
+  let shown = 0;
+  const { tops, busy, rows } = M;
+  const topOrder = sorted(tops.filter(t => t.name.startsWith("loop."))).concat(sorted(tops.filter(t => !t.name.startsWith("loop."))));
+  (function walk(list, depth) {
+    for (const n of list) {
+      if (filtering() && !visible(n)) continue;
+      const ctx = filtering() && !keep(n);
+      if (!ctx) shown++;
+      const has = n.children.length > 0;
+      const open = filtering() ? true : expanded.has(n.name);
+      const share = n.inLoop
+        ? `<span class="sh"><span class="tr"><span class="b" style="--c:var(--p${n.color || 0});width:${Math.min(100, n.t / busy * 100).toFixed(2)}%"></span></span><span class="p">${pct(n.t, busy)}</span></span>`
+        : `<span class="sh"><span class="p" style="width:auto;color:var(--muted)">${n === M.idle ? "idle" : "outside loop"}</span></span>`;
+      const maxCell = overBudget(n) ? `<span class="over" title="Over the 16.7 ms frame budget">${triSvg}${nf0.format(n.max)}</span>` : nf0.format(n.max);
+      out.push(`<tr class="${depth === 0 ? "top" : ""}${ctx ? " ctx" : ""}" data-n="${esc(n.name)}">
+        <td class="op"><span class="opc" style="padding-left:${depth * 16}px">
+          <button type="button" class="tw ${has ? "" : "ph0"}" ${has ? `aria-expanded="${open}" aria-label="${open ? "Collapse" : "Expand"} ${esc(leaf(n))}"` : 'tabindex="-1" aria-hidden="true"'}>${caret}</button>
+          ${depth === 0 ? `<span class="dot" style="--c:var(--p${n.color || 0})"></span>` : ""}
+          <span class="nm" title="${esc(n.name)}">${esc(depth === 0 ? n.name : leaf(n))}</span>${n.isNew ? newChip : ""}</span></td>
+        <td>${nf0.format(n.samples)}</td>
+        <td>${nf1.format(n.mean)}</td>
+        <td class="${n.std === 0 ? "muted" : ""}">${nf1.format(n.std)}</td>
+        <td>${maxCell}</td>
+        <td class="${n.total === 0 ? "muted" : ""}">${totalCell(n)}</td>
+        <td>${share}</td></tr>`);
+      if (has && open) walk(sorted(n.children), depth + 1);
+    }
+  })(topOrder, 0);
+  const why = newOnly && query ? `No new operation matches “${esc(query)}”.` : newOnly ? "No operation is new." : `No operation matches “${esc(query)}”.`;
+  tbody.innerHTML = out.join("") || `<tr><td colspan="7" style="text-align:left" class="muted">${why}</td></tr>`;
+  $("#count").textContent = filtering() ? `${shown} of ${rows.length} ops match` : `${rows.length} ops`;
+  document.querySelectorAll("#tbl th").forEach(th => {
+    if (th.dataset.k === sortK) th.setAttribute("aria-sort", sortDir < 0 ? "descending" : "ascending"); else th.removeAttribute("aria-sort");
+    const b = th.querySelector("button"); const base = b.textContent.replace(/[▾▴]\s*$/, "").trim();
+    b.textContent = base + (th.dataset.k === sortK ? (sortDir < 0 ? " ▾" : " ▴") : "");
+  });
+  const nb = $("#newOnly");
+  nb.hidden = !(M.hasBase && M.newCount);
+  nb.setAttribute("aria-pressed", String(newOnly));
+  nb.textContent = `New only (${nf0.format(M.newCount)})`;
+}
+tbody.addEventListener("click", e => {
+  const b = e.target.closest(".tw"); if (!b || b.classList.contains("ph0") || filtering()) return;
+  const name = b.closest("tr").dataset.n;
+  expanded.has(name) ? expanded.delete(name) : expanded.add(name);
+  renderTable();
+  const again = tbody.querySelector(`tr[data-n="${CSS.escape(name)}"] .tw`); if (again) again.focus();
+});
+document.querySelectorAll("#tbl th button").forEach(b => b.addEventListener("click", () => {
+  const k = b.parentElement.dataset.k;
+  if (sortK === k) sortDir = -sortDir; else { sortK = k; sortDir = k === "name" ? 1 : -1; }
+  renderTable();
+}));
+$("#q").addEventListener("input", e => { query = e.target.value.trim().toLowerCase(); renderTable(); });
+$("#expAll").addEventListener("click", () => { M.rows.forEach(r => r.children.length && expanded.add(r.name)); renderTable(); });
+$("#colAll").addEventListener("click", () => { expanded.clear(); renderTable(); });
+$("#newOnly").addEventListener("click", () => { newOnly = !newOnly; renderTable(); });
+
+/* ---------- note ---------- */
+function renderNote() {
+  const { phases, busy, idle, wall, outside, rows } = M;
+  let s = `Busy time is the sum of the ${word(phases.length).toLowerCase()} non-idle top-level loop ${plural(phases.length, "phase")} (${durMs(busy)})`;
+  s += idle ? `; adding loop.idle gives the ${durMs(wall)} of wall time.` : ". This snapshot has no loop.idle row.";
+  s += " The frame budget is 16.7 ms, one frame at 60 Hz.";
+  if (outside.length) s += ` ${andList(outside.map(o => o.name))} ${outside.length === 1 ? "is" : "are"} recorded outside the loop tree and left out of the busy-time charts.`;
+  const rounded = rows.filter(r => r.samples < PRECISE_BELOW && Math.abs(r.t - r.total) > 0.001).length;
+  if (rounded) s += ` The snapshot rounds total_ms to 0.1 ms, so for ops with fewer than ${nf0.format(PRECISE_BELOW)} samples the charts use samples × mean instead; the table keeps the reported value.`;
+  s += " Variance is shown as standard deviation.";
+  $("#note").textContent = s;
+}
+
+/* ---------- data source: paste, keep, restore ---------- */
+const srcState = $("#srcState"), pasteBox = $("#pasteBox"), pasteArea = $("#pasteArea"), pasteErr = $("#pasteErr");
+const pasteBtn = $("#pasteBtn"), restoreBtn = $("#restoreBtn");
+const DEFAULT_ID = hashStr(DEFAULT_RAW);
+let curRaw = DEFAULT_RAW, baseRaw = DEFAULT_PREV, source = "default", kept = false;
+function storeGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function storeSet(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+function storeDel(k) { try { localStorage.removeItem(k); } catch (e) { /* storage unavailable */ } }
+function clearStore() { storeDel(STORE_KEY); storeDel(PREV_KEY); storeDel(DEF_KEY); }
+function renderSource(flash) {
+  const custom = source === "pasted";
+  let html = custom
+    ? `<span class="src-dot pasted"></span><span><b>Pasted snapshot</b> · ${M.rows.length} ops${kept ? " · kept in this browser" : " · not saved, lost on reload"}</span>`
+    : `<span class="src-dot"></span><span><b>No snapshot loaded</b> · paste one to start</span>`;
+  if (M && M.hasBase && M.newCount) html += `<button type="button" class="linkbtn" id="showNew">${newChip} ${nf0.format(M.newCount)} new since ${baseLabel()}</button>`;
+  srcState.innerHTML = html;
+  const sn = $("#showNew");
+  if (sn) sn.addEventListener("click", () => { newOnly = true; renderTable(); $("#ops").scrollIntoView({ behavior: smooth(), block: "start" }); });
+  if (flash) { const f = document.createElement("span"); f.className = "src-flash"; f.textContent = flash; srcState.append(f); setTimeout(() => f.remove(), 2600); }
+  restoreBtn.hidden = !custom;
+}
+function openPaste(open) {
+  pasteBox.hidden = !open;
+  pasteBtn.setAttribute("aria-expanded", String(open));
+  pasteBtn.textContent = open ? "Close" : "Paste new snapshot";
+  if (open) { pasteErr.hidden = true; pasteArea.focus(); }
+}
+function showError(msg) { pasteErr.innerHTML = `${triSvg}<span>${esc(msg)}</span>`; pasteErr.hidden = false; }
+
+function load() {
+  document.body.classList.toggle("empty", !curRaw);
+  if (!curRaw) { M = null; openPaste(true); return; }
+  M = parse(curRaw);
+  markNew(M, baseRaw);
+  focus = selected = M.root; kidsAll = false; hotAll = false; fzAll = false;
+  saveOpen = new Set(M.hiPart ? [M.hiPart] : []);
+  if (!(M.hasBase && M.newCount)) newOnly = false;
+  renderAll();
+}
+function renderAll() {
+  renderHeader(); renderVitals(); renderFindings(); renderFreeze(); renderPhases(); renderSaveText(); renderParts();
+  renderDetail(); renderHot(); renderTable(); renderNote(); renderCharts();
+}
+function applyPaste() {
+  const text = pasteArea.value.trim();
+  if (!text) { showError("The box is empty. Paste the snapshot text first."); return; }
+  try { parse(text); } catch (e) { showError(e.message); return; }
+  if (text !== curRaw) { baseRaw = curRaw; curRaw = text; }
+  newOnly = false;
+  if (curRaw === DEFAULT_RAW) { source = "default"; kept = false; baseRaw = DEFAULT_PREV; clearStore(); }
+  else {
+    source = "pasted";
+    kept = storeSet(STORE_KEY, curRaw) && storeSet(DEF_KEY, DEFAULT_ID) &&
+      (baseRaw ? storeSet(PREV_KEY, baseRaw === DEFAULT_RAW ? ORIG : baseRaw) : (storeDel(PREV_KEY), true));
+  }
+  load();
+  openPaste(false);
+  renderSource("Snapshot applied");
+}
+pasteBtn.addEventListener("click", () => openPaste(pasteBox.hidden));
+$("#cancelBtn").addEventListener("click", () => openPaste(false));
+$("#applyBtn").addEventListener("click", applyPaste);
+pasteArea.addEventListener("keydown", e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); applyPaste(); } });
+pasteArea.addEventListener("input", () => { pasteErr.hidden = true; });
+restoreBtn.addEventListener("click", () => {
+  clearStore();
+  source = "default"; kept = false; curRaw = DEFAULT_RAW; baseRaw = DEFAULT_PREV; newOnly = false;
+  load();
+  pasteArea.value = "";
+  renderSource("Snapshot cleared");
+});
+
+/* ---------- boot ---------- */
+function renderCharts() { if (!M) return; renderIcicle(); renderSaves(); }
+(function restore() {
+  const stored = storeGet(STORE_KEY);
+  if (!stored) return;
+  // A paste made against an older default is dropped: a newer default ships with the page.
+  if (storeGet(DEF_KEY) !== DEFAULT_ID || stored === DEFAULT_RAW) { clearStore(); return; }
+  try {
+    parse(stored);
+    const prev = storeGet(PREV_KEY);
+    curRaw = stored; baseRaw = !prev ? null : prev === ORIG ? DEFAULT_RAW : prev;
+    if (baseRaw === curRaw) baseRaw = null;
+    source = "pasted"; kept = true;
+  } catch (e) { clearStore(); }
+})();
+load();
+renderSource();
+let raf = 0;
+const ro = new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(renderCharts); });
+[ic, $("#saves")].forEach(el => ro.observe(el));
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(renderCharts);
+})();
+</script>
+
+</body></html>
