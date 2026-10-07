@@ -419,7 +419,13 @@ impl FocusState {
         if let Some(thread) = threads.threads.get(real_idx) {
             let tid = thread.id.clone();
             let count = thread.messages.len();
-            let _prev = Self::get_mut(state).last_read_count.insert(tid, count);
+            let prev = Self::get_mut(state).last_read_count.insert(tid, count);
+            // Surgical repaint: the unread marker may have just cleared with no
+            // input event to trigger a draw. Only on an actual change, so the
+            // per-tick dwell re-mark never forces a redraw on its own.
+            if prev != Some(count) {
+                state.flags.ui.dirty = true;
+            }
         }
     }
 
