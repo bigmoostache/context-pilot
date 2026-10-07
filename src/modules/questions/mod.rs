@@ -197,10 +197,8 @@ impl Module for QuestionsModule {
             let id = cp_mod_spine::types::SpineState::create_notification(
                 state,
                 cp_mod_spine::types::NotificationType::Custom,
-                "Think Reminder".into(),
-                "Please think more. Thinking is both cheap in tokens, and drastically \
-                 augments your performances. Make a habit out of it."
-                    .into(),
+                "Plan Reminder".into(),
+                "For multi-step work, record your plan with the Think tool before acting.".into(),
             );
             // Auto-mark as processed — the nudge is injected into the chat
             // stream but should not accumulate in the Spine panel or trigger
