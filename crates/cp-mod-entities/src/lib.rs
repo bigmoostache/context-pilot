@@ -35,6 +35,62 @@ use cp_base::tools::{ToolResult, ToolUse};
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/entities.yaml")));
 
+/// `(len, mtime ns)` of the DB file, its WAL, and the dump file.
+type DbFingerprint = [(u64, u128); 3];
+
+/// Fingerprint right after the last dump: an equal one at save time means the
+/// dump is current, so `save_module_data` skips its ~17 ms dump on the loop.
+static LAST_DUMP: std::sync::Mutex<Option<DbFingerprint>> = std::sync::Mutex::new(None);
+
+/// Size + mtime of the DB, its `-wal` sidecar and the dump (absent = zeros).
+/// Any `entity_sql` write moves the DB or WAL; a deleted dump moves the third.
+fn db_fingerprint(db_path: &std::path::Path, dump_path: &std::path::Path) -> DbFingerprint {
+    let stat = |p: &std::path::Path| {
+        std::fs::metadata(p).map_or((0, 0), |m| {
+            let mtime = m
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map_or(0, |d| d.as_nanos());
+            (m.len(), mtime)
+        })
+    };
+    let mut wal = db_path.as_os_str().to_owned();
+    wal.push("-wal");
+    [stat(db_path), stat(std::path::Path::new(&wal)), stat(dump_path)]
+}
+
+/// Regenerate the dump + checkpoint the WAL, unless nothing changed since the
+/// last dump.
+///
+/// Guards: a missing DB file is never recreated (that would overwrite the good
+/// dump, the recovery source), and an empty-data DB never overwrites the dump.
+fn dump_if_changed(db_path: &std::path::Path, dump_path: &std::path::Path) {
+    if !db_path.exists() {
+        log::info!("save_module_data: DB missing, skipping dump");
+        return;
+    }
+    // Checked before `open`, which itself touches the -wal/-shm files.
+    let before = db_fingerprint(db_path, dump_path);
+    if LAST_DUMP.lock().ok().is_some_and(|last| *last == Some(before)) {
+        return;
+    }
+    let Ok(conn) = db::open(db_path) else { return };
+    if !db::has_user_tables(&conn) {
+        log::info!("save_module_data: DB has no user tables, skipping dump");
+        db::checkpoint(&conn);
+        return;
+    }
+    log::info!("save_module_data: dumping DB");
+    let _r = db::dump_to_file(&conn, dump_path);
+    db::checkpoint(&conn);
+    drop(conn);
+    // Taken after close: closing may checkpoint and remove the WAL.
+    if let Ok(mut last) = LAST_DUMP.lock() {
+        *last = Some(db_fingerprint(db_path, dump_path));
+    }
+}
+
 /// Entities module: persistent relational entity database.
 #[derive(Debug, Clone, Copy)]
 pub struct EntitiesModule;
@@ -100,30 +156,8 @@ impl Module for EntitiesModule {
     }
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {
-        // Regenerate dump + WAL checkpoint.
-        // Guard: if the DB file doesn't exist (deleted for recovery testing, etc.),
-        // don't create a new empty one — that would overwrite the good dump file
-        // and destroy the recovery source.
         let es = EntitiesState::get(state);
-        if !es.db_path.exists() {
-            log::info!("save_module_data: DB missing, skipping dump");
-            return serde_json::Value::Null;
-        }
-        if let Ok(conn) = db::open(&es.db_path) {
-            // Guard: don't overwrite a good dump with an empty-data DB
-            if !db::has_user_tables(&conn) {
-                log::info!("save_module_data: DB has no user tables, skipping dump");
-                db::checkpoint(&conn);
-                return serde_json::Value::Null;
-            }
-            let total_rows: u64 = {
-                let cache = db::introspect(&conn, &es.db_path);
-                cache.tables.iter().map(|t| t.row_count).sum()
-            };
-            log::info!("save_module_data: dumping DB ({total_rows} rows)");
-            let _r = db::dump_to_file(&conn, &es.dump_path);
-            db::checkpoint(&conn);
-        }
+        dump_if_changed(&es.db_path, &es.dump_path);
         serde_json::Value::Null
     }
 
