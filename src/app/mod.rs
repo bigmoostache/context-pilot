@@ -71,6 +71,9 @@ pub(crate) struct App {
     pub watched_file_paths: std::collections::HashSet<String>,
     /// Tracks which directory paths are being watched
     pub watched_dir_paths: std::collections::HashSet<String>,
+    /// Fingerprint of every module's `watch_paths()` at the last watcher sync;
+    /// an unchanged fingerprint skips the sync (no watch/unwatch syscalls).
+    pub watch_specs_hash: u64,
     /// Last time we checked timer-based caches
     pub last_timer_check_ms: u64,
     /// Last time we checked ownership

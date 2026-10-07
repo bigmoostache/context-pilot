@@ -26,6 +26,7 @@ impl App {
             file_watcher,
             watched_file_paths: std::collections::HashSet::new(),
             watched_dir_paths: std::collections::HashSet::new(),
+            watch_specs_hash: 0,
             last_timer_check_ms: now_ms(),
             last_ownership_check_ms: now_ms(),
             pending_retry_error: None,

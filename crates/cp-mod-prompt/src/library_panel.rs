@@ -77,23 +77,15 @@ fn push_crud_cheatsheet(content: &mut String) {
 pub(crate) struct LibraryPanel;
 
 /// Everything the Library text depends on, without reading file contents:
-/// name + size + mtime of each behaviour `.md` (built-ins are compiled in),
-/// plus the active agent and loaded skills. Equal fingerprint ⇒ same text.
+/// the behaviour-dir stat fingerprint (built-ins are compiled in), plus the
+/// active agent and loaded skills. Equal fingerprint ⇒ same text.
+///
+/// Also the sole periodic revalidation point of the in-memory prompt index:
+/// a changed dir fingerprint drops the index, so external edits surface here.
 fn library_fingerprint(state: &State) -> String {
     use std::hash::{Hash as _, Hasher as _};
     let mut h = std::collections::hash_map::DefaultHasher::new();
-    for pt in [PromptType::Agent, PromptType::Skill, PromptType::Command] {
-        // Order-independent sum of per-file hashes: `read_dir` order is unspecified.
-        let files = std::fs::read_dir(crate::storage::dir_for(pt)).map_or(0u64, |rd| {
-            rd.flatten().fold(0u64, |acc, e| {
-                let mut fh = std::collections::hash_map::DefaultHasher::new();
-                e.file_name().hash(&mut fh);
-                e.metadata().ok().map(|m| (m.len(), m.modified().ok())).hash(&mut fh);
-                acc.wrapping_add(fh.finish())
-            })
-        });
-        files.hash(&mut h);
-    }
+    crate::storage::revalidate_index().hash(&mut h);
     let ps = PromptState::get(state);
     ps.active_agent_id.hash(&mut h);
     ps.loaded_skill_ids.hash(&mut h);

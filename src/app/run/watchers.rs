@@ -419,8 +419,36 @@ fn sync_file_watchers(app: &mut App) {
     if app.file_watcher.is_none() {
         return;
     }
+    let specs_hash = watch_specs_fingerprint(app);
+    if specs_hash == app.watch_specs_hash {
+        return;
+    }
+    app.watch_specs_hash = specs_hash;
     let (wanted_files, wanted_dirs) = collect_wanted_paths(app);
     remove_stale_watches(app, &wanted_files, &wanted_dirs);
     add_file_watches(app, wanted_files);
     add_dir_watches(app);
+}
+
+/// Order-sensitive hash of every module's `watch_paths()` (variant + path).
+/// In-memory only: no filesystem access.
+fn watch_specs_fingerprint(app: &App) -> u64 {
+    use cp_base::panels::WatchSpec;
+    use std::hash::{Hash as _, Hasher as _};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    for module in &crate::modules::all_modules() {
+        for spec in module.watch_paths(&app.state) {
+            // `if let` (not exhaustive match) so WatchSpec stays #[non_exhaustive].
+            if let WatchSpec::File(path) = spec {
+                (0u8, path).hash(&mut h);
+            } else if let WatchSpec::Dir(path) = spec {
+                (1u8, path).hash(&mut h);
+            } else if let WatchSpec::DirRecursive(path) = spec {
+                (2u8, path).hash(&mut h);
+            } else {
+                // Future non_exhaustive variants: ignored by the watcher sync.
+            }
+        }
+    }
+    h.finish()
 }

@@ -258,7 +258,13 @@ impl Module for PromptModule {
 
     fn on_tool_progress(&self, _tool_name: &str, _input_so_far: &str, _state: &mut State) {}
 
-    fn on_tool_complete(&self, _tool_name: &str, _state: &mut State) {}
+    fn on_tool_complete(&self, tool_name: &str, _state: &mut State) {
+        // Edit/Write may have touched a behaviour `.md`: drop the prompt index so
+        // the next read reflects it without waiting for the stat revalidation.
+        if matches!(tool_name, "Edit" | "Write") {
+            storage::invalidate_index();
+        }
+    }
 
     fn watch_paths(&self, _state: &State) -> Vec<cp_base::panels::WatchSpec> {
         vec![]

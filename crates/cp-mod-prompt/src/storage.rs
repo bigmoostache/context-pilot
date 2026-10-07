@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use cp_base::config::constants;
 
@@ -184,10 +185,88 @@ pub(crate) fn slugify(name: &str) -> String {
         .join("-")
 }
 
-/// Load all prompts for a single type (from disk + built-ins merged).
-/// Re-reads from disk every call — no caching.
+/// Per-type prompt lists shared by every reader, plus the stat fingerprint of
+/// the behaviour dirs they were built from.
+struct PromptIndex {
+    /// Fingerprint of the three behaviour dirs at build time (see [`dirs_fingerprint`]).
+    fingerprint: u64,
+    /// Agent, skill, command lists, indexed by [`type_slot`]; `None` = not built yet.
+    lists: [Option<Arc<[PromptItem]>>; 3],
+}
+
+/// In-memory prompt index. Frame code (status bar, sidebar, threads view) reads
+/// it on every render, so it must never touch the disk: it is invalidated by
+/// [`revalidate_index`] (stat-only, on panel refresh) and [`invalidate_index`]
+/// (after our own writes).
+static INDEX: Mutex<PromptIndex> = Mutex::new(PromptIndex { fingerprint: 0, lists: [None, None, None] });
+
+/// Slot of a prompt type in [`PromptIndex::lists`].
+const fn type_slot(pt: PromptType) -> usize {
+    match pt {
+        PromptType::Agent => 0,
+        PromptType::Skill => 1,
+        PromptType::Command => 2,
+    }
+}
+
+/// Order-independent stat fingerprint (name, size, mtime) of every file in the
+/// three behaviour dirs. No file contents are read.
 #[must_use]
-pub fn load_prompts_for(pt: PromptType) -> Vec<PromptItem> {
+pub fn dirs_fingerprint() -> u64 {
+    use std::hash::{Hash as _, Hasher as _};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    for pt in [PromptType::Agent, PromptType::Skill, PromptType::Command] {
+        // Sum of per-file hashes: `read_dir` order is unspecified.
+        let files = fs::read_dir(dir_for(pt)).map_or(0u64, |rd| {
+            rd.flatten().fold(0u64, |acc, e| {
+                let mut fh = std::collections::hash_map::DefaultHasher::new();
+                e.file_name().hash(&mut fh);
+                e.metadata().ok().map(|m| (m.len(), m.modified().ok())).hash(&mut fh);
+                acc.wrapping_add(fh.finish())
+            })
+        });
+        files.hash(&mut h);
+    }
+    h.finish()
+}
+
+/// Drop the cached lists when the behaviour dirs changed on disk since they were
+/// built (external edit, another agent of the fleet). Returns the fingerprint.
+pub fn revalidate_index() -> u64 {
+    let fp = dirs_fingerprint();
+    let mut idx = INDEX.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    if idx.fingerprint != fp {
+        idx.fingerprint = fp;
+        idx.lists = [None, None, None];
+    }
+    fp
+}
+
+/// Drop the cached lists after we wrote a behaviour file ourselves.
+pub fn invalidate_index() {
+    let mut idx = INDEX.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    idx.lists = [None, None, None];
+}
+
+/// All prompts of a type (disk + built-ins merged), served from the in-memory
+/// index. Disk is read only on the first call after an invalidation.
+#[must_use]
+pub fn load_prompts_for(pt: PromptType) -> Arc<[PromptItem]> {
+    let slot = type_slot(pt);
+    let cached = INDEX.lock().unwrap_or_else(std::sync::PoisonError::into_inner).lists.get(slot).cloned();
+    if let Some(list) = cached.flatten() {
+        return list;
+    }
+    let list: Arc<[PromptItem]> = Arc::from(read_prompts_for(pt));
+    if let Some(entry) = INDEX.lock().unwrap_or_else(std::sync::PoisonError::into_inner).lists.get_mut(slot) {
+        *entry = Some(Arc::clone(&list));
+    }
+    list
+}
+
+/// Load all prompts for a single type from disk, merged with built-ins
+/// (disk wins on id).
+fn read_prompts_for(pt: PromptType) -> Vec<PromptItem> {
     use cp_base::config::accessors::library;
 
     let mut items = load_prompts_from_dir(&dir_for(pt), pt);

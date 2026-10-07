@@ -71,6 +71,7 @@ fn behaviour_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     if let Err(e) = fs::write(&path, &file_content) {
         return ToolResult::new(tool.id.clone(), format!("Failed to write file: {e}"), true);
     }
+    storage::invalidate_index();
 
     state.touch_panel(Kind::LIBRARY);
     if prompt_type == PromptType::Agent {
