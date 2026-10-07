@@ -191,6 +191,7 @@ pub(super) fn process_watcher_events(app: &mut App) {
     let _fg = cp_base::flame!("watcher_events");
     // Collect events (immutable borrow on file_watcher released after this block)
     let events = {
+        let _g = crate::profile!("poll_events");
         let Some(watcher) = app.file_watcher.as_ref() else { return };
         watcher.poll_events()
     };
@@ -198,8 +199,15 @@ pub(super) fn process_watcher_events(app: &mut App) {
         return;
     }
 
-    let (refresh_indices, rewatch_paths) = collect_invalidations(app, &events);
-    dispatch_refresh_requests(app, refresh_indices);
+    let (refresh_indices, rewatch_paths) = {
+        let _g = crate::profile!("invalidate");
+        collect_invalidations(app, &events)
+    };
+    {
+        let _g = crate::profile!("dispatch_refresh");
+        dispatch_refresh_requests(app, refresh_indices);
+    }
+    let _g = crate::profile!("rewatch");
     rewatch_changed_files(app, rewatch_paths);
 }
 
@@ -303,9 +311,15 @@ pub(super) fn check_timer_based_deprecation(app: &mut App) {
     app.last_timer_check_ms = current_ms;
 
     // Ensure all module-requested paths have active watchers
-    sync_file_watchers(app);
+    {
+        let _g = crate::profile!("sync_file_watchers");
+        sync_file_watchers(app);
+    }
 
-    let (requests, suicide_indices) = collect_timer_requests(app, current_ms);
+    let (requests, suicide_indices) = {
+        let _g = crate::profile!("collect_timer_requests");
+        collect_timer_requests(app, current_ms)
+    };
 
     // Mutable pass: send requests, mark in-flight, update poll timestamps
     for (i, request) in requests {

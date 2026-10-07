@@ -52,6 +52,19 @@ pub(crate) fn intern(full: String) -> &'static str {
     leaked
 }
 
+/// Guard for a runtime-built leaf `<prefix><id>` (e.g. `save_mod_tree`).
+///
+/// Formats and interns the name only while perf monitoring is on; otherwise
+/// falls back to the bare `prefix`, so the hot path stays allocation-free.
+pub(crate) fn dyn_guard(prefix: &'static str, id: &str) -> ProfileGuard {
+    let leaf = if crate::ui::perf::PERF.enabled.load(std::sync::atomic::Ordering::Relaxed) {
+        intern(format!("{prefix}{id}"))
+    } else {
+        prefix
+    };
+    ProfileGuard::new(leaf)
+}
+
 /// RAII guard that records elapsed time on drop.
 pub(crate) struct ProfileGuard {
     /// Leaf name, as written at the call site (used for the slow-op file log).

@@ -54,7 +54,10 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     };
 
     // Fill base background
-    frame.render_widget(Block::default().style(Style::default().bg(theme::bg_base())), area);
+    {
+        let _g = crate::profile!("bg_fill");
+        frame.render_widget(Block::default().style(Style::default().bg(theme::bg_base())), area);
+    }
 
     // Main layout: body + footer (no header)
     let main_layout = Layout::default()
@@ -79,6 +82,7 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     // In Threads mode the input lives inside the right pane (past the thread
     // list), so offset by THREAD_LIST_WIDTH instead of the sidebar width.
     {
+        let _g = crate::profile!("autocomplete");
         let offset =
             if showing_threads_list(state) { threads_view::THREAD_LIST_WIDTH } else { state.view_mode.width() };
         let content_x = area.x.saturating_add(offset);
@@ -170,7 +174,10 @@ fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &
         debug_assert!(false, "body_layout must have at least 2 chunks");
         return;
     };
-    ir::render_sidebar::render_sidebar_from_ir(frame, &ir_frame.sidebar, sidebar_area);
+    {
+        let _g = crate::profile!("sidebar_draw");
+        ir::render_sidebar::render_sidebar_from_ir(frame, &ir_frame.sidebar, sidebar_area);
+    }
     render_main_content(frame, state, content_area, ir_frame);
 }
 
@@ -192,8 +199,10 @@ fn render_content_panel(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir
     // All other panels render from the IR snapshot, falling back to content()
     // for panels whose blocks() returns empty (not yet migrated).
     if context_type.as_str() == Kind::CONVERSATION {
+        let _g = crate::profile!("conversation_draw");
         ir::render_conversation::render_conversation_from_ir(frame, state, area, &ir_frame.conversation);
     } else {
+        let _g = crate::infra::profiler::dyn_guard("panel_draw_", context_type.as_str());
         ir::render_panel::render_panel_from_ir(frame, state, area, &ir_frame.active_panel);
     }
 }

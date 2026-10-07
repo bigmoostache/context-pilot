@@ -71,6 +71,7 @@ fn build_module_data_maps(state: &State) -> ModuleDataMaps {
     let mut global_modules = HashMap::new();
     let mut worker_modules = HashMap::new();
     for module in crate::modules::all_modules() {
+        let _g = crate::infra::profiler::dyn_guard("save_mod_", module.id());
         let data = module.save_module_data(state);
         if !data.is_null() {
             if module.is_global() {
