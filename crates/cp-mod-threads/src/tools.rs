@@ -57,7 +57,9 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     /// Maximum `file_path` length (bytes).
     const MAX_FILE_PATH_BYTES: usize = 1_024;
 
-    let tid = tool.input.get("thread_id").and_then(serde_json::Value::as_str).unwrap_or("");
+    // Always the caller's own thread: Send has no target parameter.
+    let owned_tid = resident_thread_id(state);
+    let tid = owned_tid.as_str();
 
     let markdown =
         tool.input.get("markdown").and_then(serde_json::Value::as_str).map(|s| clamp_bytes(s, MAX_CONTENT_BYTES));
@@ -407,7 +409,7 @@ fn write_message(output: &mut String, msg: &ThreadMessage, now_ms: u64) {
 /// the shared roster (design doc §3). Without this, every thread rendered the
 /// single shared `panel_content` baked for the focused thread, so a background
 /// thread's Threads panel showed the focused thread's conversation.
-fn resident_thread_id(state: &State) -> String {
+pub(crate) fn resident_thread_id(state: &State) -> String {
     state.resident_thread_id.clone().or_else(|| FocusState::get(state).focused_thread_id.clone()).unwrap_or_default()
 }
 

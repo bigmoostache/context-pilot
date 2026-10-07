@@ -169,7 +169,6 @@ impl Module for ThreadsModule {
                 .short_desc("Post message to thread")
                 .category("Threads")
                 .reverie_allowed(false)
-                .param("thread_id", ParamType::String, true)
                 .param("markdown", ParamType::String, false)
                 .param("file_path", ParamType::String, false)
                 .param("still_my_turn", ParamType::Boolean, false)
@@ -186,7 +185,7 @@ impl Module for ThreadsModule {
         let mut pf = Verdict::new();
 
         if tool.name.as_str() == "Send" {
-            preflight_send(tool, ThreadsState::get(state), &mut pf);
+            preflight_send(tool, state, &mut pf);
         }
 
         if pf.errors.is_empty() && pf.warnings.is_empty() { None } else { Some(pf) }
@@ -273,16 +272,18 @@ impl Module for ThreadsModule {
     }
 }
 
-/// Pre-flight for `Send`: thread must exist, at least one content param, and
-/// any agent-authored ` ```form ` block must be well-formed (design doc §7).
+/// Pre-flight for `Send`: the calling thread must exist, at least one content
+/// param, and any agent-authored ` ```form ` block must be well-formed (design
+/// doc §7).
 ///
+/// `Send` always targets the caller's own (resident) thread — there is no
+/// target parameter, so a thread can never post into another thread's voice.
 /// Sending to a `THEIR_TURN` thread is allowed — the AI may post follow-ups
 /// without waiting; status simply stays `THEIR_TURN`.
-fn preflight_send(tool: &ToolUse, ts: &ThreadsState, pf: &mut Verdict) {
-    if let Some(tid) = tool.input.get("thread_id").and_then(|v| v.as_str())
-        && !ts.threads.iter().any(|t| t.id == tid)
-    {
-        pf.errors.push(format!("Thread '{tid}' not found"));
+fn preflight_send(tool: &ToolUse, state: &State, pf: &mut Verdict) {
+    let tid = tools::resident_thread_id(state);
+    if !ThreadsState::get(state).threads.iter().any(|t| t.id == tid) {
+        pf.errors.push(format!("Send has no owning thread (resident thread '{tid}' not found)"));
     }
     let markdown = tool.input.get("markdown").and_then(|v| v.as_str());
     let has_markdown = markdown.is_some_and(|s| !s.is_empty());

@@ -1,7 +1,8 @@
 tools:
   Send:
     description: |
-      Posts a message to a thread. The AI uses this to respond to thread messages.
+      Posts a message to the thread you own (your current thread). The AI uses
+      this to respond to thread messages.
       At least one of markdown or file_path must be provided.
       By default the thread stays MY_TURN (progress update); pass
       still_my_turn=false to hand it back to the user (THEIR_TURN). Focus stays
@@ -178,7 +179,6 @@ tools:
       Single `$` is treated as a literal dollar sign (NOT inline math).
       For LaTeX math, use `$$...$$` (display block) or `\(...\)` (inline).
     parameters:
-      thread_id: "Thread ID to post to (e.g., 'T1')"
       markdown: "Markdown text content for the message (may embed ```file-upload``` and ```form``` blocks)"
       file_path: "File path to attach as a reference"
       still_my_turn: "If true (default), the thread stays yours after sending — use for progress updates. Set false when you're done and want to hand the thread back to the user (flips to THEIR_TURN)."
