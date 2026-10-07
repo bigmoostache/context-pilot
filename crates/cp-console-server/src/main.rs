@@ -406,6 +406,9 @@ impl ConnectionHandler {
 // ---------------------------------------------------------------------------
 
 /// Entry point: parse arguments, bind the Unix socket, and start the accept loop.
+/// Session logs older than this (by mtime) are deleted at server boot.
+const LOG_MAX_AGE: std::time::Duration = std::time::Duration::from_hours(168);
+
 fn main() {
     cleanup::raise_fd_limit();
     let Some(socket_path) = std::env::args().nth(1) else {
@@ -439,6 +442,17 @@ fn main() {
     drop(std::thread::spawn(move || cleanup::shutdown_waker(&waker_path)));
 
     let sessions: Sessions = Arc::new(Mutex::new(BTreeMap::new()));
+
+    // Drop session logs untouched for a week (35k files had piled up, making
+    // every directory operation in the console dir slow). Off the accept path.
+    {
+        let log_dir = std::path::Path::new(&socket_path).parent().map(std::path::Path::to_path_buf);
+        drop(std::thread::spawn(move || {
+            if let Some(dir) = log_dir {
+                cleanup::prune_old_logs(&dir, LOG_MAX_AGE);
+            }
+        }));
+    }
 
     // Install SIGTERM/SIGINT handlers — set flag, main loop polls it
     cleanup::install_signal_handlers();
