@@ -789,6 +789,23 @@ M-tiny-5:
   contents: 'CI web install: web/pnpm-workspace.yaml needs `packages: [.]` + `allowBuilds: {unrs-resolver: true}`; CI + release pin pnpm 11.6.0.'
   importance: medium
   last_edited_ms: 1791290207516
+M-tiny-50:
+  tier: tiny
+  title: 'Perf: profiler self-cost'
+  contents: 'T824 a473d279: PERF.frame_end ran macOS `ps` every 500ms inside ui_render, so the profiler polluted itself. Now on a bg thread. threads_view lines are cached in messages.rs LINE_CACHE (fingerprint).'
+  importance: medium
+  last_edited_ms: 1791368656912
+M-tiny-51:
+  tier: tiny
+  title: sweep
+  importance: low
+  last_edited_ms: 1791369691329
+M-tiny-52:
+  tier: tiny
+  title: 'Perf: optimize, not async'
+  contents: 'CRITICAL perf rule: instrument before optimizing, never blind. No async frenzy: optimizing the work beats moving it off the main loop (loses control).'
+  importance: critical
+  last_edited_ms: 1791375401749
 M-tiny-6:
   tier: tiny
   title: 'User preference: factor'
