@@ -123,7 +123,7 @@ impl ConsoleState {
         keys.sort();
         for key in keys {
             if let Some(handle) = cs.sessions.remove(&key) {
-                handle.kill();
+                handle.kill_blocking();
             }
         }
     }

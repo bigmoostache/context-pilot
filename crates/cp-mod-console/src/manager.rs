@@ -425,12 +425,32 @@ impl SessionHandle {
         Ok(())
     }
 
-    /// Kill the process via the server.
+    /// Kill the process without blocking the caller.
+    ///
+    /// The server reaps with a SIGTERM grace period (100+ ms), which froze the
+    /// main loop on `Close_panel` and callback dedup. The request runs on a
+    /// detached thread; local status flips to `Killed` immediately.
     pub fn kill(&self) {
-        self.stop_polling.store(true, Ordering::Relaxed);
+        self.mark_killed();
+        let req = serde_json::json!({"cmd": "kill", "key": self.name});
+        let bg_req = req.clone();
+        let spawned =
+            std::thread::Builder::new().name("console-kill".into()).spawn(move || drop(server_request(&bg_req).ok()));
+        if spawned.is_err() {
+            drop(server_request(&req).ok());
+        }
+    }
 
+    /// Kill the process and wait for the server to confirm (shutdown paths).
+    pub fn kill_blocking(&self) {
+        self.mark_killed();
         let req = serde_json::json!({"cmd": "kill", "key": self.name});
         drop(server_request(&req).ok());
+    }
+
+    /// Stop polling and record a terminal `Killed` status + finish time.
+    fn mark_killed(&self) {
+        self.stop_polling.store(true, Ordering::Relaxed);
         {
             let mut status = self.status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             if !status.is_terminal() {
