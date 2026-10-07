@@ -149,6 +149,11 @@ pub struct SpineState {
     /// Flushed by [`Self::flush_deferred_inject`] once the tool result lands;
     /// latest wins (T736: at most one live notification message).
     pub deferred_inject: Option<(String, String)>,
+    /// Coucous read from this thread's legacy `pending_coucous` save slot (they
+    /// lived per-thread before the fleet-shared registry). Drained once at boot
+    /// by the app into [`CoucouRegistry`](crate::schedule::CoucouRegistry),
+    /// stamped with this thread as owner. Never re-saved.
+    pub legacy_coucous: Vec<crate::coucou::Record>,
 }
 
 impl Default for SpineState {
@@ -161,7 +166,13 @@ impl SpineState {
     /// Create an empty spine state with default configuration.
     #[must_use]
     pub fn new() -> Self {
-        Self { notifications: vec![], next_notification_id: 1, config: SpineConfig::default(), deferred_inject: None }
+        Self {
+            notifications: vec![],
+            next_notification_id: 1,
+            config: SpineConfig::default(),
+            deferred_inject: None,
+            legacy_coucous: vec![],
+        }
     }
 
     /// Inject the deferred mid-stream notification, if any and still unprocessed.

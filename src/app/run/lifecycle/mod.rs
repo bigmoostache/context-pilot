@@ -18,6 +18,8 @@ use crate::app::App;
 
 /// Spinner-animation redraw cadence (extracted for the 500-line cap).
 mod animation;
+/// Fleet-shared coucou delivery (once per tick) + legacy per-thread migration.
+mod coucous;
 /// Background-thread advancement: swap-in/step/swap-out each non-resident active
 /// thread around the shared pipeline (Phase C). No-op at N=1.
 mod fleet;
@@ -75,6 +77,10 @@ impl App {
         // kill was removed from the console module: it would cross-kill other
         // threads' live sessions, F6/S2). N=1-identical: union = focused keys.
         self.prune_orphaned_console_sessions();
+
+        // Coucous moved from per-thread watcher registries to one fleet-shared
+        // registry: fold any legacy per-thread records in, once.
+        self.migrate_legacy_coucous();
 
         // Start the interactive main-loop watchdog (purely observational — dumps
         // a diagnostic to .context-pilot/errors/ if the single-threaded loop
@@ -244,6 +250,9 @@ impl App {
         super::tools::checks::check_deferred_sleep(self);
         // Check watchers (blocking sentinel replacement + async → spine notifications)
         super::tools::cleanup::check_watchers(self);
+        // Fleet-shared coucous: polled once per tick for every thread, with the
+        // focused thread resident (background steps never see them).
+        self.check_coucous();
         self.recover_bridge_if_pending(current_ms);
         self.drain_chat_sync_if_due(current_ms);
         super::watchers::check_timer_based_deprecation(self);

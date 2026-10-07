@@ -1,4 +1,5 @@
-//! Coucou tool — scheduled notifications via the Watcher system.
+//! Coucou tool — scheduled notifications held in the fleet-shared
+//! [`CoucouRegistry`](crate::schedule::CoucouRegistry).
 //!
 //! Two modes:
 //! - `timer`: fire after a delay (e.g. "5m", "1h30m", "90s")
@@ -8,19 +9,20 @@ use serde::{Deserialize, Serialize};
 
 use cp_base::panels::now_ms;
 use cp_base::state::runtime::State;
-use cp_base::state::watchers::carriers::WatcherResult;
-use cp_base::state::watchers::{Watcher, WatcherRegistry};
+
+use crate::schedule::CoucouRegistry;
 use cp_base::tools::{ToolResult, ToolUse};
 
 // ============================================================
 // Persistable coucou data — saved in worker JSON via SpineState
 // ============================================================
 
-/// Serializable coucou record. Stored in `SpineState.pending_coucous`
-/// and re-registered into `WatcherRegistry` on load.
+/// Serializable coucou record, held in the fleet-shared [`CoucouRegistry`].
+/// Also the shape of the legacy per-thread `pending_coucous` array, migrated
+/// into the registry on boot.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct CoucouData {
-    /// Unique watcher ID for registry lookup.
+pub struct Record {
+    /// Unique coucou id (`coucou_<n>`); field name kept for legacy compat.
     pub watcher_id: String,
     /// The user's reminder message.
     pub message: String,
@@ -28,7 +30,8 @@ pub(crate) struct CoucouData {
     pub registered_at_ms: u64,
     /// When the notification should fire (ms since epoch).
     pub fire_at_ms: u64,
-    /// Optional thread ID — scopes the notification to a thread.
+    /// Target thread. Stamped with the scheduling thread when the tool call
+    /// omits `thread_id`; `None` only for coucous scheduled outside any thread.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thread_id: Option<String>,
     /// Repeat interval in milliseconds. 0 = one-shot (no recurrence).
@@ -37,50 +40,6 @@ pub(crate) struct CoucouData {
     /// Human-readable recurrence label (e.g. "hourly", "daily", "every 30m").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recurrence_label: Option<String>,
-}
-
-impl CoucouData {
-    /// Convert into a live `CoucouWatcher` and register in `WatcherRegistry`.
-    pub(crate) fn into_watcher(self) -> CoucouWatcher {
-        let recurrence_suffix = self.recurrence_label.as_deref().map_or(String::new(), |r| format!(" [{r}]"));
-        let desc = if let Some(tid) = self.thread_id.as_ref() {
-            format!("🔔 Coucou (thread {tid}): \"{}\"{recurrence_suffix}", self.message)
-        } else {
-            format!("🔔 Coucou: \"{}\"{recurrence_suffix}", self.message)
-        };
-        CoucouWatcher {
-            watcher_id: self.watcher_id,
-            message: self.message,
-            registered_at_ms: self.registered_at_ms,
-            fire_at_ms: std::sync::atomic::AtomicU64::new(self.fire_at_ms),
-            thread_id: self.thread_id,
-            interval_ms: self.interval_ms,
-            recurrence_label: self.recurrence_label,
-            desc,
-        }
-    }
-}
-
-/// Collect all active `CoucouWatcher` data from the `WatcherRegistry`
-/// for persistence. Filters by `source_tag` == "coucou".
-pub(crate) fn collect_pending_coucous(state: &State) -> Vec<CoucouData> {
-    let registry = WatcherRegistry::get(state);
-    registry
-        .active_watchers()
-        .iter()
-        .filter(|w| w.source_tag() == "coucou")
-        .filter_map(|w| {
-            Some(CoucouData {
-                watcher_id: w.id().to_owned(),
-                message: w.message()?.to_owned(),
-                registered_at_ms: w.registered_ms(),
-                fire_at_ms: w.fire_at_ms()?,
-                thread_id: w.thread_id().map(str::to_owned),
-                interval_ms: w.interval_ms(),
-                recurrence_label: w.recurrence_label().map(str::to_owned),
-            })
-        })
-        .collect()
 }
 
 /// Parse a human-friendly duration string into milliseconds.
@@ -166,123 +125,8 @@ fn format_duration(ms: u64) -> String {
 }
 
 // ============================================================
-// CoucouWatcher — implements cp_base::state::watchers::Watcher trait
-// ============================================================
-
-/// A watcher that fires a notification at a specific time.
-/// Recurrent coucous use `AtomicU64` for `fire_at_ms` so the poll
-/// method can bump the next occurrence via interior mutability.
-pub(crate) struct CoucouWatcher {
-    /// Unique watcher ID.
-    pub watcher_id: String,
-    /// The user's message to deliver.
-    pub message: String,
-    /// When this watcher was registered (ms since epoch).
-    pub registered_at_ms: u64,
-    /// When the notification should next fire (ms since epoch).
-    /// Atomic for interior mutability — recurrent watchers bump this on fire.
-    pub fire_at_ms: std::sync::atomic::AtomicU64,
-    /// Optional thread ID — scopes the notification to a thread.
-    pub thread_id: Option<String>,
-    /// Repeat interval in ms. 0 = one-shot, >0 = recurrent.
-    pub interval_ms: u64,
-    /// Human-readable recurrence label for display.
-    pub recurrence_label: Option<String>,
-    /// Human-readable description.
-    pub desc: String,
-}
-
-impl Watcher for CoucouWatcher {
-    fn is_easy_bash(&self) -> bool {
-        false
-    }
-
-    fn is_persistent(&self) -> bool {
-        self.interval_ms > 0
-    }
-
-    fn suicide(&self, _state: &State) -> bool {
-        false
-    }
-
-    fn id(&self) -> &str {
-        &self.watcher_id
-    }
-
-    fn description(&self) -> &str {
-        &self.desc
-    }
-
-    fn is_blocking(&self) -> bool {
-        false // Coucou is always async — fires a spine notification
-    }
-
-    fn tool_use_id(&self) -> Option<&str> {
-        None
-    }
-
-    fn check(&self, _state: &State) -> Option<WatcherResult> {
-        let current_fire = self.fire_at_ms.load(std::sync::atomic::Ordering::Relaxed);
-        let now = now_ms();
-        (now >= current_fire).then(|| {
-            // Recurrent: bump fire_at_ms to next occurrence
-            if self.interval_ms > 0 {
-                self.fire_at_ms.store(now.saturating_add(self.interval_ms), std::sync::atomic::Ordering::Relaxed);
-            }
-
-            let desc = self.thread_id.as_ref().map_or_else(
-                || format!("⏰ Coucou! {}", self.message),
-                |tid| format!("⏰ Coucou (thread {tid})! {}", self.message),
-            );
-            // Stamp the owner thread (D2) so the resulting spine notification
-            // routes into THAT thread's inbox via `deliver_to_thread`, not the
-            // resident's. `None` (unscoped coucou) delivers to the resident.
-            let mut result = WatcherResult::new(desc);
-            result.thread_id.clone_from(&self.thread_id);
-            result
-        })
-    }
-
-    fn check_timeout(&self) -> Option<WatcherResult> {
-        // No timeout — the check itself handles the time condition
-        None
-    }
-
-    fn registered_ms(&self) -> u64 {
-        self.registered_at_ms
-    }
-
-    fn source_tag(&self) -> &'static str {
-        "coucou"
-    }
-
-    fn fire_at_ms(&self) -> Option<u64> {
-        Some(self.fire_at_ms.load(std::sync::atomic::Ordering::Relaxed))
-    }
-
-    fn message(&self) -> Option<&str> {
-        Some(&self.message)
-    }
-
-    fn thread_id(&self) -> Option<&str> {
-        self.thread_id.as_deref()
-    }
-
-    fn interval_ms(&self) -> u64 {
-        self.interval_ms
-    }
-
-    fn recurrence_label(&self) -> Option<&str> {
-        self.recurrence_label.as_deref()
-    }
-}
-
-// ============================================================
 // Tool execution
 // ============================================================
-
-/// Monotonic counter for generating unique coucou watcher IDs.
-static COUCOU_COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 /// Minimum recurrence interval to prevent notification spam (60 seconds).
 const MIN_RECURRENCE_MS: u64 = 60_000;
@@ -394,7 +238,7 @@ fn resolve_fire_time(tool: &ToolUse, mode: &str, now: u64) -> Result<FireTime, C
 pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
     // === Cancel path ===
     if let Some(cancel_id) = tool.input.get("cancel_id").and_then(|v| v.as_str()) {
-        let removed = WatcherRegistry::get_mut(state).remove_by_id(cancel_id);
+        let removed = CoucouRegistry::get_mut(state).cancel(cancel_id);
         return if removed {
             ToolResult::new(tool.id.clone(), format!("Cancelled coucou '{cancel_id}'"), false)
         } else {
@@ -418,7 +262,14 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    let thread_id = tool.input.get("thread_id").and_then(|v| v.as_str()).map(String::from);
+    // Unscoped calls target the calling thread, so a background thread's
+    // reminder lands back in its own inbox, not whichever thread is focused.
+    let thread_id = tool
+        .input
+        .get("thread_id")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .or_else(|| state.resident_thread_id.clone());
 
     let (interval_ms, recurrence_label) = match parse_recurrence(tool) {
         Ok(r) => r,
@@ -431,26 +282,18 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
         Err(e) => return *e,
     };
 
-    let counter = COUCOU_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let watcher_id = format!("coucou_{counter}");
+    let registry = CoucouRegistry::get_mut(state);
+    let watcher_id = registry.alloc_id();
     let recurrence_suffix = recurrence_label.as_deref().map_or(String::new(), |r| format!(" [{r}]"));
-    let desc = thread_id.as_ref().map_or_else(
-        || format!("🔔 Coucou {delay_desc}: \"{message}\"{recurrence_suffix}"),
-        |tid| format!("🔔 Coucou {delay_desc} (thread {tid}): \"{message}\"{recurrence_suffix}"),
-    );
-
-    let watcher = CoucouWatcher {
+    registry.pending.push(Record {
         watcher_id: watcher_id.clone(),
         message: message.clone(),
         registered_at_ms: now,
-        fire_at_ms: std::sync::atomic::AtomicU64::new(fire_at_ms),
+        fire_at_ms,
         thread_id,
         interval_ms,
         recurrence_label,
-        desc,
-    };
-
-    WatcherRegistry::get_mut(state).register(Box::new(watcher));
+    });
 
     let recurrence_info =
         if interval_ms > 0 { format!("\nRecurrence: {}", recurrence_suffix.trim()) } else { String::new() };

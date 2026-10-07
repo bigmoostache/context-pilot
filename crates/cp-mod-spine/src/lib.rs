@@ -6,11 +6,16 @@
 //! duration, and message-count ceilings were removed in Phase H as single-worker
 //! fossils that no longer map to any one unit of work in a thread-centric fleet.
 
-pub(crate) mod coucou;
+/// Coucou tool: scheduling and cancelling reminders.
+pub mod coucou;
 /// Auto-continuation engine: `should_auto_continue()`, message injection, guard rail checks.
 pub mod engine;
 /// Guard rail implementations: safety limits for auto-continuation.
 pub(crate) mod guard_rail;
+/// Global module persisting the fleet-shared coucou registry.
+pub mod persist;
+/// Fleet-shared coucou registry, polled once per tick by the app loop.
+pub mod schedule;
 /// Tool execution: `notification_mark_processed`, `spine_configure`.
 pub(crate) mod tools;
 /// Notification, spine config, and state types.
@@ -152,14 +157,10 @@ impl Module for SpineModule {
         // Sort by ID number to maintain order
         to_save.sort_by_key(|n| n.id.trim_start_matches('N').parse::<usize>().unwrap_or(0));
 
-        // Collect pending coucou watchers for persistence
-        let pending_coucous = coucou::collect_pending_coucous(state);
-
         json!({
             "notifications": to_save,
             "next_notification_id": ss.next_notification_id,
             "spine_config": ss.config,
-            "pending_coucous": pending_coucous,
         })
     }
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
@@ -179,16 +180,12 @@ impl Module for SpineModule {
         // Prune stale processed notifications on load too
         prune_notifications(&mut SpineState::get_mut(state).notifications);
 
-        // Restore pending coucou watchers into the WatcherRegistry
+        // Legacy per-thread coucous: stash for the boot migration into the
+        // fleet-shared registry (`App::migrate_legacy_coucous`).
         if let Some(coucous) = data.get("pending_coucous")
-            && let Ok(coucou_list) = serde_json::from_value::<Vec<coucou::CoucouData>>(coucous.clone())
+            && let Ok(list) = serde_json::from_value::<Vec<coucou::Record>>(coucous.clone())
         {
-            let registry = cp_base::state::watchers::WatcherRegistry::get_mut(state);
-            for cd in coucou_list {
-                // Register all coucous — expired ones will fire on next poll_all
-                // and create a notification, which is the desired behavior
-                registry.register(Box::new(cd.into_watcher()));
-            }
+            SpineState::get_mut(state).legacy_coucous = list;
         }
 
         // The spine panel was removed (notifications are backend-only now).

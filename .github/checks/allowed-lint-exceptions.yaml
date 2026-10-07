@@ -191,6 +191,18 @@ exceptions:
       Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
       would push that file over the limit. The split is the honest shape.
 
+  - path: "src/app/run/lifecycle/coucous.rs"
+    match: 'App methods split across run/ submodules for readability'
+    reason: >
+      Fleet-shared coucou delivery (check_coucous, once per tick) and the boot
+      migration of legacy per-thread coucous (migrate_legacy_coucous) are their
+      own impl App block: they need deliver_to_thread and the fleet registry,
+      so they live on App, not in the spine crate. multiple_inherent_impl
+      (forbid) fires on this additional block, so it carries the #[expect].
+    strategy: >
+      Irreducible under the 500-line cap — lifecycle/mod.rs is near the limit,
+      fleet.rs and fleet_lifecycle.rs too. The split is the honest shape.
+
 
   - path: "crates/cp-base/src/state/runtime/ext.rs"
     match: "State methods split across runtime/ submodules to respect the 500-line file cap"
