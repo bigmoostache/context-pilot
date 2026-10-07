@@ -19,8 +19,10 @@ pub(super) use observers::{emit_behaviour, emit_thread_focus};
 pub(super) use paused::emit_thread_paused;
 
 use crate::app::App;
+use cp_base::state::runtime::State;
 use cp_base::tools::ToolUse;
 use cp_mod_threads::types::{FocusState, ThreadMessage, ThreadsState};
+use cp_wire::types::snapshot::RosterThread;
 
 /// Branch A + B of the incoming-message behavior, run once per main-loop tick on
 /// the **focused** thread (the resident at rest, per the resident=focused
@@ -135,6 +137,38 @@ pub(super) fn emit_bridge_deltas(app: &mut App) {
     // Emitters never mutate threads, so `hash` still describes the live roster
     // and every roster memo now matches it.
     ROSTER_HASH.set(hash);
+    // Drop the tick's replay so a later reseed (bridge recovery) reads fresh.
+    drop(OPLOG_ROSTER.with(|c| c.borrow_mut().take()));
+}
+
+/// Shared, cheaply clonable oplog roster snapshot.
+type RosterRc = std::rc::Rc<[RosterThread]>;
+
+thread_local! {
+    /// Oplog roster replayed at most once per `emit_bridge_deltas` tick.
+    static OPLOG_ROSTER: std::cell::RefCell<Option<RosterRc>> = const { std::cell::RefCell::new(None) };
+}
+
+/// The roster the oplog last recorded (what the backend view has folded),
+/// shared by the five seeders (status, archived, paused, tasks, notes).
+///
+/// They all seed on the same first post-boot tick; each used to replay the
+/// whole oplog itself (up to ~30 ms each). Cached for the current tick only.
+/// `None` when the bridge is OFF or the replay fails (callers seed nothing).
+pub(super) fn oplog_roster(state: &State) -> Option<RosterRc> {
+    if let Some(hit) = OPLOG_ROSTER.with(|c| c.borrow().clone()) {
+        return Some(hit);
+    }
+    let boot = state.get_ext::<cp_mod_bridge::BridgeState>()?.boot.as_ref()?;
+    let roster: RosterRc = match cp_oplog::replay::replay(&boot.entry().oplog_path) {
+        Ok(recovered) => recovered.roster.into(),
+        Err(e) => {
+            log::warn!("bridge: oplog replay for roster seed failed: {e:?}");
+            return None;
+        }
+    };
+    OPLOG_ROSTER.with(|c| *c.borrow_mut() = Some(std::rc::Rc::clone(&roster)));
+    Some(roster)
 }
 
 /// One bridge emitter, its level-2 perf row name, and whether it is a roster
@@ -159,9 +193,10 @@ fn roster_gate(app: &App) -> (bool, Option<u64>) {
     if !bridge_active(&app.state) {
         return (false, None);
     }
-    let seeded = app.state.get_ext::<cp_mod_bridge::BridgeState>().is_some_and(|bs| {
-        bs.seeded.messages() && bs.seeded.statuses() && bs.seeded.archived() && bs.seeded.paused()
-    });
+    let seeded = app
+        .state
+        .get_ext::<cp_mod_bridge::BridgeState>()
+        .is_some_and(|bs| bs.seeded.messages() && bs.seeded.statuses() && bs.seeded.archived() && bs.seeded.paused());
     let mut h = std::collections::hash_map::DefaultHasher::new();
     for t in &ThreadsState::get(&app.state).threads {
         t.id.hash(&mut h);
@@ -206,7 +241,7 @@ fn roster_gate(app: &App) -> (bool, Option<u64>) {
 /// next loop tick and pushes it to the backend view (and the web UI) for free,
 /// since an auto message is an ordinary thread message on the wire (carrying its
 /// `auto` flag).
-pub(in crate::app::run) fn maybe_append_tool_activity(state: &mut cp_base::state::runtime::State, tool: &ToolUse) {
+pub(in crate::app::run) fn maybe_append_tool_activity(state: &mut State, tool: &ToolUse) {
     // Attribute the trace to the OWNER thread — the one whose runtime is
     // currently resident in `state` (the thread actually executing this tool),
     // NOT the human's on-screen focus. With N>1 these differ: a background

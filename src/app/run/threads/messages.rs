@@ -205,19 +205,9 @@ fn project_thread_tasks(mut items: Vec<&cp_mod_todo::types::TodoItem>) -> Vec<Wi
 /// disk↔oplog divergence. Returns an empty map when the bridge is OFF or the
 /// replay fails.
 fn oplog_roster_tasks(state: &State) -> HashMap<String, Vec<WireTask>> {
-    let Some(bs) = state.get_ext::<BridgeState>() else {
-        return HashMap::new();
-    };
-    let Some(boot) = bs.boot.as_ref() else {
-        return HashMap::new();
-    };
-    match cp_oplog::replay::replay(&boot.entry().oplog_path) {
-        Ok(recovered) => recovered.roster.into_iter().map(|t| (t.thread_id, t.tasks)).collect(),
-        Err(e) => {
-            log::warn!("bridge: oplog replay for task seed failed: {e:?}");
-            HashMap::new()
-        }
-    }
+    super::oplog_roster(state)
+        .map(|r| r.iter().map(|t| (t.thread_id.clone(), t.tasks.clone())).collect())
+        .unwrap_or_default()
 }
 
 /// First pass after (re)boot: seed the task memo from the oplog roster (what the
@@ -350,19 +340,9 @@ fn project_thread_notes(cells: Vec<&cp_mod_scratchpad::types::ScratchpadCell>) -
 /// the bridge was down but was never journaled. Empty map when the bridge is OFF
 /// or the replay fails.
 fn oplog_roster_notes(state: &State) -> HashMap<String, Vec<WireNote>> {
-    let Some(bs) = state.get_ext::<BridgeState>() else {
-        return HashMap::new();
-    };
-    let Some(boot) = bs.boot.as_ref() else {
-        return HashMap::new();
-    };
-    match cp_oplog::replay::replay(&boot.entry().oplog_path) {
-        Ok(recovered) => recovered.roster.into_iter().map(|t| (t.thread_id, t.notes)).collect(),
-        Err(e) => {
-            log::warn!("bridge: oplog replay for note seed failed: {e:?}");
-            HashMap::new()
-        }
-    }
+    super::oplog_roster(state)
+        .map(|r| r.iter().map(|t| (t.thread_id.clone(), t.notes.clone())).collect())
+        .unwrap_or_default()
 }
 
 /// First pass after (re)boot: seed the note memo from the oplog roster (what the

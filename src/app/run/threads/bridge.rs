@@ -358,19 +358,7 @@ pub(super) const fn wire_turn(status: ThreadStatus) -> ThreadTurn {
 /// current status emitted — a safe, if chattier, degradation that still
 /// converges the view (it never leaves a thread stale).
 fn oplog_roster_statuses(state: &State) -> std::collections::HashMap<String, ThreadTurn> {
-    let Some(bs) = state.get_ext::<BridgeState>() else {
-        return std::collections::HashMap::new();
-    };
-    let Some(boot) = bs.boot.as_ref() else {
-        return std::collections::HashMap::new();
-    };
-    match cp_oplog::replay::replay(&boot.entry().oplog_path) {
-        Ok(recovered) => recovered.roster.into_iter().map(|t| (t.thread_id, t.status)).collect(),
-        Err(e) => {
-            log::warn!("bridge: oplog replay for status seed failed: {e:?}");
-            std::collections::HashMap::new()
-        }
-    }
+    super::oplog_roster(state).map(|r| r.iter().map(|t| (t.thread_id.clone(), t.status)).collect()).unwrap_or_default()
 }
 
 /// Emit a [`ThreadStatusChanged`](OpEntryKind::ThreadStatusChanged) the instant
