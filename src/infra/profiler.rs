@@ -65,6 +65,29 @@ pub(crate) fn dyn_guard(prefix: &'static str, id: &str) -> ProfileGuard {
     ProfileGuard::new(leaf)
 }
 
+/// Memo for [`nested_name`]: `(parent addr, leaf addr, leaf len)` → full key.
+type NestedMemo = RefCell<HashMap<(usize, usize, usize), &'static str>>;
+
+/// `<parent>.<leaf>` as an interned key, memoised per thread by the two
+/// `&'static str` addresses.
+///
+/// Every guard used to `format!` + lock the global [`intern`] map on creation,
+/// costing several µs per guard and showing up as phantom "uncovered" parent
+/// time (e.g. `threads_emit`, 9 guards per tick). A hit is now one
+/// thread-local hash lookup with no allocation.
+fn nested_name(parent: &'static str, leaf: &'static str) -> &'static str {
+    thread_local! {
+        static NESTED: NestedMemo = RefCell::new(HashMap::new());
+    }
+    let key = (parent.as_ptr().addr(), leaf.as_ptr().addr(), leaf.len());
+    if let Some(name) = NESTED.with(|m| m.borrow().get(&key).copied()) {
+        return name;
+    }
+    let name = intern(format!("{parent}.{}", leaf.replace("::", "_")));
+    let _prev = NESTED.with(|m| m.borrow_mut().insert(key, name));
+    name
+}
+
 /// RAII guard that records elapsed time on drop.
 pub(crate) struct ProfileGuard {
     /// Leaf name, as written at the call site (used for the slow-op file log).
@@ -87,7 +110,7 @@ impl ProfileGuard {
         let parent_key =
             PATH.with(|p| p.borrow().last().copied()).or_else(crate::app::run::tools::watchdog::current_perf_step);
         if let Some(parent) = parent_key {
-            guard.name = intern(format!("{parent}.{}", leaf.replace("::", "_")));
+            guard.name = nested_name(parent, leaf);
         }
         PATH.with(|p| p.borrow_mut().push(guard.name));
         guard.pushed = true;
