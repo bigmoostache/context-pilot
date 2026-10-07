@@ -142,7 +142,7 @@ impl Module for ScratchpadModule {
         // Thread-owned: existence checks are scoped to the focused thread's
         // cells. With no focused thread, execute returns the canonical
         // no-focus error, so pre_flight stays silent here.
-        let focus = ss.focus_filter.as_deref();
+        let focus = state.resident_thread_id.as_deref().or(ss.focus_filter.as_deref());
         match tool.name.as_str() {
             "scratchpad_edit_cell" => {
                 let mut pf = Verdict::new();
