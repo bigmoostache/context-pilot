@@ -169,8 +169,13 @@ impl App {
     }
 
     /// Loop-tail render: a forced full repaint once per [`FULL_REDRAW_MS`]
-    /// (clears terminal + ratatui back buffer so resize leftovers and stray
-    /// escape output get overwritten), else a throttled diff render when dirty.
+    /// (every cell rewritten in place so resize leftovers and stray escape
+    /// output get overwritten), else a throttled diff render when dirty.
+    ///
+    /// The full repaint never clears the screen: a clear shows a blank frame
+    /// before the redraw lands, which flickers. Instead the back buffer is
+    /// poisoned so ratatui's diff emits every cell, and the write is wrapped in
+    /// a synchronized update so the terminal presents it atomically.
     fn render_if_due(
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
@@ -183,12 +188,18 @@ impl App {
             return Ok(());
         }
         super::tools::watchdog::mark(super::tools::watchdog::Step::Render);
-        if full {
-            self.last_full_redraw_ms = current_ms;
-            let _guard = crate::profile!("full_redraw_clear");
-            terminal.clear()?;
+        if !full {
+            return self.render_frame(terminal, current_ms);
         }
-        self.render_frame(terminal, current_ms)
+        self.last_full_redraw_ms = current_ms;
+        {
+            let _guard = crate::profile!("full_redraw_poison");
+            poison_back_buffer(terminal);
+        }
+        crossterm::execute!(terminal.backend_mut(), crossterm::terminal::BeginSynchronizedUpdate)?;
+        let result = self.render_frame(terminal, current_ms);
+        crossterm::execute!(terminal.backend_mut(), crossterm::terminal::EndSynchronizedUpdate)?;
+        result
     }
 
     /// Draw one frame: render the UI + command palette, clear dirty, stamp render time.
@@ -453,4 +464,17 @@ impl App {
             // SpineDecision::Idle — no auto-continuation, nothing to do.
         }
     }
+}
+
+/// Make ratatui's next diff rewrite every cell without clearing the screen.
+///
+/// Fills the current (about to become previous) buffer with a background no
+/// real frame uses, then swaps: the fresh frame differs from it everywhere.
+fn poison_back_buffer(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) {
+    /// Sentinel background — any value the UI never paints works.
+    const POISON: ratatui::style::Color = ratatui::style::Color::Rgb(1, 2, 3);
+    for cell in &mut terminal.current_buffer_mut().content {
+        let _cell = cell.set_bg(POISON);
+    }
+    terminal.swap_buffers();
 }
