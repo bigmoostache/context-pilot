@@ -131,7 +131,7 @@ pub(crate) struct App {
     /// single resident thread is the only one that exists — so the background
     /// advancement pass is a no-op and behaviour is identical to single-thread.
     /// Population (reconcile from `ThreadsState`) is wired in C4.
-    pub fleet: cp_fleet::FleetRegistry<cp_base::state::runtime::bundle::ThreadRuntime>,
+    pub fleet: cp_fleet::FleetRegistry,
     /// Id of the background thread currently swapped into [`state`](Self::state)
     /// for an advancement step, or `None` when the resident is the focused
     /// thread (the normal case). It is the override half of

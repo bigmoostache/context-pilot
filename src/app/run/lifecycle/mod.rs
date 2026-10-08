@@ -208,10 +208,9 @@ impl App {
         terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
         current_ms: u64,
     ) -> io::Result<()> {
-        // G3 render-scoped drill-in: if the human has drilled into a non-resident
-        // thread, borrow its parked runtime into `state` just for this paint, then
-        // restore. Execution (resident/focus/scheduling) is untouched — Model 2.
-        // No-op at N=1 (drilled_thread_id is None) → byte-identical render.
+        // G3 render-scoped drill-in: if the human has drilled into another
+        // thread, make it the executing one just for this paint, then restore.
+        // Focus and scheduling are untouched (Model 2).
         let drilled = {
             let _guard = crate::profile!("drill_swap");
             self.take_drilled_runtime_for_render()

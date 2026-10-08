@@ -14,6 +14,12 @@ use cp_mod_threads::types::{ThreadStatus, ThreadsState};
 
 use crate::app::App;
 
+/// Executing thread to restore after a drill-in paint (`None` = unbound).
+pub(super) struct DrillRestore {
+    /// Thread that was executing before the drilled thread was made current.
+    prev: Option<String>,
+}
+
 #[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
     /// Kill console-server sessions that belong to **no** loaded thread, in a
@@ -42,16 +48,12 @@ impl App {
         let mut known: std::collections::HashSet<String> =
             ConsoleState::get(&self.state).sessions.keys().cloned().collect();
 
-        // Union in each background thread's keys via a transient swap (pure read;
-        // no stream is spawned, so no `stepping_thread`/`resident_thread_id`
-        // bookkeeping is needed — those only matter for stream spawn/drain).
+        // Union in each background thread's keys (pure read, no stream spawned).
         let bg_ids: Vec<String> = self.fleet.iter().map(|entry| entry.0.clone()).collect();
         for id in bg_ids {
-            let Some(mut entry) = self.fleet.remove(&id) else { continue };
-            entry.runtime.swap_with(&mut self.state); // thread `id` resident
-            known.extend(ConsoleState::get(&self.state).sessions.keys().cloned());
-            entry.runtime.swap_with(&mut self.state); // restore focused
-            self.fleet.insert(id, entry);
+            self.deliver_to_thread(Some(&id), |state| {
+                known.extend(ConsoleState::get(state).sessions.keys().cloned());
+            });
         }
 
         cp_mod_console::manager::kill_orphaned_processes(&known);
@@ -90,18 +92,15 @@ impl App {
         known.extend(save::panel_uids_of(&self.state));
         save::save_state(&self.state);
 
-        // Each background thread: swap in, snapshot to its own file, swap back.
+        // Each background thread: execute it, snapshot to its own file.
         let bg_ids: Vec<String> = self.fleet.iter().map(|entry| entry.0.clone()).collect();
         for id in bg_ids {
-            let Some(mut entry) = self.fleet.remove(&id) else { continue };
-            self.stepping_thread = Some(id.clone());
-            entry.runtime.swap_with(&mut self.state); // thread `id` resident; focused parks into entry
-            self.state.thread_store.set_executing(Some(id.clone()));
+            if !self.state.thread_store.contains(&id) {
+                continue;
+            }
+            self.state.thread_store.set_executing(Some(id));
             known.extend(save::panel_uids_of(&self.state));
-            save::save_state(&self.state); // → states/<id>.json (resident != focused), no deletes
-            entry.runtime.swap_with(&mut self.state); // restore focused; thread `id` parks back
-            self.stepping_thread = None;
-            self.fleet.insert(id, entry);
+            save::save_state(&self.state); // → states/<id>.json (executing != focused), no deletes
         }
         self.state.thread_store.set_executing(focused);
 
@@ -161,50 +160,45 @@ impl App {
             cp_mod_console::types::ConsoleState::shutdown_all(state);
         });
         let _removed = self.fleet.remove(thread_id);
+        drop(self.state.thread_store.remove(thread_id));
+        let _parked = self.parked_stream_runtimes.remove(thread_id);
+        // Deleting the executing thread: fall back to an initialized unbound
+        // runtime so the next render's per-thread `ext` lookups still resolve.
+        if self.state.executing_thread_id() == Some(thread_id) {
+            let fresh = self.fresh_runtime();
+            drop(self.state.thread_store.take_unbound(fresh));
+            self.state.thread_store.set_executing(None);
+        }
     }
 
-    /// Render-scoped drill-in: temporarily make the human-drilled thread
-    /// ([`FocusState::drilled_thread_id`](cp_mod_threads::types::FocusState)) resident
-    /// in `state` **only for the duration of one paint**, returning the removed
-    /// registry entry the caller must pass to
+    /// Render-scoped drill-in: make the human-drilled thread
+    /// ([`FocusState::drilled_thread_id`](cp_mod_threads::types::FocusState)) the
+    /// executing one **for one paint only**. Returns the previous executing id,
+    /// which the caller passes to
     /// [`restore_drilled_runtime_after_render`](Self::restore_drilled_runtime_after_render)
-    /// right after `terminal.draw` to swap it back.
+    /// right after `terminal.draw`.
     ///
-    /// This is the G3 "pixel-identical panel view" mechanism and the one place
-    /// focus-as-view and execution are deliberately decoupled (Model 2): the
-    /// drilled thread's panels are painted by swapping its parked
-    /// [`ThreadRuntime`](cp_base::state::runtime::bundle::ThreadRuntime) into
-    /// `state`, then restored before the next tick — so `resident_thread_id`,
-    /// `focused_thread_id`, and all scheduling are untouched and a human glance
-    /// never parks a mid-stream thread.
+    /// Focus-as-view and execution stay decoupled (Model 2): no data moves,
+    /// `focused_thread_id` and scheduling are untouched, and a human glance never
+    /// parks a mid-stream thread.
     ///
-    /// Returns `None` (no swap) when there is no drill-in, when the drilled
-    /// thread **is** the resident (already flat in `state` — painted directly),
-    /// or when it has no registry entry (cold/unknown). At N=1 the field is
-    /// always `None`, so this is a no-op and rendering is byte-identical.
-    pub(super) fn take_drilled_runtime_for_render(
-        &mut self,
-    ) -> Option<(String, cp_fleet::Entry<cp_base::state::runtime::bundle::ThreadRuntime>)> {
+    /// `None` when there is no drill-in, the drilled thread is already executing,
+    /// or it has no stored runtime (cold/unknown).
+    pub(super) fn take_drilled_runtime_for_render(&mut self) -> Option<DrillRestore> {
         let drilled = cp_mod_threads::types::FocusState::get(&self.state).drilled_thread_id.clone()?;
-        // Resident (== focused) thread is already flat in `state`; nothing to swap.
-        if self.state.executing_thread_id() == Some(drilled.as_str()) {
+        if self.state.executing_thread_id() == Some(drilled.as_str()) || !self.state.thread_store.contains(&drilled) {
             return None;
         }
-        let mut entry = self.fleet.remove(&drilled)?;
-        entry.runtime.swap_with(&mut self.state); // drilled thread resident for the paint; focused parks into entry
-        Some((drilled, entry))
+        let prev = self.state.executing_thread_id().map(str::to_owned);
+        self.state.thread_store.set_executing(Some(drilled));
+        Some(DrillRestore { prev })
     }
 
     /// Undo [`take_drilled_runtime_for_render`](Self::take_drilled_runtime_for_render):
-    /// swap the focused thread back into `state` and re-park the drilled thread's
-    /// runtime in the registry, leaving `state` + fleet exactly as before the paint.
-    pub(super) fn restore_drilled_runtime_after_render(
-        &mut self,
-        drilled: Option<(String, cp_fleet::Entry<cp_base::state::runtime::bundle::ThreadRuntime>)>,
-    ) {
-        if let Some((id, mut entry)) = drilled {
-            entry.runtime.swap_with(&mut self.state); // restore focused resident; drilled parks back
-            self.fleet.insert(id, entry);
+    /// restore the executing thread that was current before the paint.
+    pub(super) fn restore_drilled_runtime_after_render(&mut self, restore: Option<DrillRestore>) {
+        if let Some(r) = restore {
+            self.state.thread_store.set_executing(r.prev);
         }
     }
 
@@ -303,15 +297,15 @@ impl App {
             f(&mut self.state);
             return;
         };
-        // Background owner: swap its parked runtime in, deliver, swap back.
-        let Some(mut entry) = self.fleet.remove(tid) else {
-            log::warn!("deliver_to_thread: unknown/unparked thread {tid}; delivering to resident");
+        if !self.state.thread_store.contains(tid) {
+            log::warn!("deliver_to_thread: unknown thread {tid}; delivering to the executing thread");
             f(&mut self.state);
             return;
-        };
-        entry.runtime.swap_with(&mut self.state); // thread `tid` resident; focused parks into entry
+        }
+        // Background owner: execute it for the duration of `f`, then restore.
+        let prev = self.state.executing_thread_id().map(str::to_owned);
+        self.state.thread_store.set_executing(Some(tid.to_owned()));
         f(&mut self.state);
-        entry.runtime.swap_with(&mut self.state); // restore focused; thread `tid` parks back
-        self.fleet.insert(tid.to_owned(), entry);
+        self.state.thread_store.set_executing(prev);
     }
 }

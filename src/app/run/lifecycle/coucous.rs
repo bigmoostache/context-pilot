@@ -59,11 +59,7 @@ impl App {
 
         let bg_ids: Vec<String> = self.fleet.iter().map(|entry| entry.0.clone()).collect();
         for id in bg_ids {
-            let Some(mut entry) = self.fleet.remove(&id) else { continue };
-            entry.runtime.swap_with(&mut self.state); // thread `id` resident
-            moved.extend(drain_legacy(&mut self.state, Some(&id)));
-            entry.runtime.swap_with(&mut self.state); // restore focused
-            self.fleet.insert(id, entry);
+            self.deliver_to_thread(Some(&id), |state| moved.extend(drain_legacy(state, Some(&id))));
         }
         if moved.is_empty() {
             return;

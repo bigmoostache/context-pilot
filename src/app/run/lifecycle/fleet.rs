@@ -10,6 +10,8 @@
 use cp_fleet::{Entry, Role, ThreadExecState, promote};
 use cp_mod_threads::types::{ThreadStatus, ThreadsState};
 
+use cp_base::state::runtime::bundle::ThreadRuntime;
+
 use crate::app::App;
 
 /// Consecutive terminal stream failures (each after its own API retries are
@@ -26,139 +28,94 @@ const STUCK_ERROR_THRESHOLD: usize = 3;
 
 #[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
-    /// Relocate the resident bundle so the flat per-thread fields in
-    /// [`state`](crate::app::App::state) always hold the **focused** thread —
-    /// the thread-centric invariant "resident = focused" (design doc §4), made
-    /// true on every focus change rather than only at boot.
+    /// Make the **focused** thread the executing one when focus changes.
     ///
-    /// Focus changes (today: the agent's `Read`; later: a human drill-in) only
-    /// set [`FocusState::focused_thread_id`](cp_mod_threads::types::FocusState);
-    /// they do **not** move the bundle. Without this step the next
-    /// [`reconcile_fleet_registry`](Self::reconcile_fleet_registry) would mislabel
-    /// the old focused thread's live context (still flat in `state`) as the new
-    /// focus and insert a *fresh empty* entry for the old one — losing its
-    /// conversation. This primitive closes that gap: when the focus (`want`)
-    /// differs from the resident (`have`), it parks `have`'s bundle into the
-    /// registry and swaps `want`'s bundle out of the registry into `state`.
+    /// Every thread's runtime lives permanently in
+    /// [`ThreadStore`](cp_base::state::runtime::threads::ThreadStore); switching
+    /// is an id change, no context moves. What still travels is the per-stream
+    /// [`StreamRuntime`](super::stream_runtime::StreamRuntime) on `App`
+    /// (removed in step 5).
     ///
-    /// Ordering: this MUST run before `reconcile_fleet_registry` (which assumes
-    /// the invariant already holds) and before the focused pipeline steps, so the
-    /// pipeline operates on the correct resident. It replaces the unconditional
-    /// `resident_thread_id = focused` assignment at the top of
-    /// [`run_background_phase`](super::App::run_background_phase).
+    /// MUST run before `reconcile_fleet_registry` and before the focused
+    /// pipeline steps, so both see the new focus as executing.
     ///
-    /// Cases:
-    /// - `want == have` (including both `None`): no-op. This is the **only** path
-    ///   at N=1 — a single-thread agent never switches focus, so the resident is
-    ///   always already the focus and behaviour is byte-identical.
-    /// - `want` is a background thread in the registry: park `have` (if any), then
-    ///   swap `want`'s parked runtime into `state`.
-    /// - `want` is cold/unknown (just created, never persisted): park `have`, leave
-    ///   `state` with a fresh empty runtime — the correct blank view for a new
-    ///   thread; `reconcile_fleet_registry` will not re-add it (it is the focus).
-    ///
-    /// Caveat (handled in later TC steps): if `have` was mid-stream when focus
-    /// switched, its per-thread stream channel (keyed by its id) stops being
-    /// drained until it is next stepped as a background thread. Focus is switched
-    /// between turns in practice, so the common path parks an idle thread.
+    /// - `want == have`: no-op.
+    /// - outgoing `have`: its runtime stays in its slot. If it is mid-execution
+    ///   (live stream, pending console-wait, pending tools, deferred
+    ///   `StreamDone`) its fleet entry is marked `Streaming`, so the step loop
+    ///   keeps advancing it after it loses focus (X805).
+    /// - incoming `want` with no slot: on first placement (`have` is `None`) it
+    ///   adopts the boot-assembled unbound runtime; otherwise (cold thread) it
+    ///   gets a freshly initialized one.
+    /// - `want` is `None` (focus cleared): the unbound runtime becomes current,
+    ///   re-initialized so per-thread module states exist for the next render.
     pub(super) fn relocate_resident_on_focus_change(&mut self) {
         let want = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
         let have = self.state.executing_thread_id().map(str::to_owned);
-        let parking_resident = have.is_some();
         if want == have {
-            // Keep the label in sync for the None/None and equal cases, then done.
-            self.state.thread_store.set_executing(want);
             return;
         }
 
-        // Park the current resident's live bundle back into the registry, so its
-        // context is preserved rather than being overwritten by the swap-in below
-        // (and not mislabelled as the new focus by reconcile).
-        if let Some(have_id) = have {
-            let _g = crate::profile!("rr_park");
-            let mut parked = cp_base::state::runtime::bundle::ThreadRuntime::new();
-            {
-                let _bundle = crate::profile!("rr_park_bundle");
-                parked.swap_with(&mut self.state); // `parked` now holds `have`'s context; state emptied
-            }
-            // Park the resident's per-stream runtime alongside its bundle, so its
-            // in-flight typewriter/pending-tools travel with it rather than
-            // leaking into the newly-focused thread.
-            let mut sr = super::stream_runtime::StreamRuntime::new();
-            sr.swap_with_app(self); // `sr` now holds `have`'s per-stream runtime; App reset to empty
-            // Is the outgoing resident mid-execution? A live stream, a pending
-            // blocking console-wait, un-executed tool calls, or a deferred
-            // `StreamDone` all mean "this thread is doing work right now" —
-            // independent of its MyTurn/TheirTurn conversation status.
-            let mid_exec = parked.stream.phase.is_streaming()
-                || sr.pending_console_wait_tool_results.is_some()
-                || !sr.pending_tools.is_empty()
-                || sr.pending_done.is_some();
-            let _prev = self.parked_stream_runtimes.insert(have_id.clone(), sr);
-            // Preserve an existing entry's role if one somehow exists; otherwise a
-            // plain Thread entry.
-            let role = self.fleet.get(&have_id).map_or(Role::Thread, |e| e.role);
-            let mut entry = Entry::new(role, parked);
-            // Park a mid-execution thread as `Streaming` (active) so the step loop
-            // keeps advancing it and `reconcile`'s status-only `derive_exec_state`
-            // (which early-returns for active entries) does NOT clobber it to Idle.
-            // Without this, a thread counting via one blocking tool per step —
-            // whose `ThreadStatus` is `TheirTurn` between turns — would be parked
-            // Idle on focus-switch, dropped from scheduling, and stall the instant
-            // it stops being focused (the focused resident is stepped
-            // unconditionally; a background thread is gated by exec_state). The
-            // first background step re-derives the true state from its stream phase
-            // via `post_step_exec_state`.
-            if mid_exec {
-                entry.exec_state = ThreadExecState::Streaming;
-            }
-            self.fleet.insert(have_id, entry);
+        // A deleted outgoing thread (slot gone) has nothing to park.
+        if let Some(have_id) = have.as_deref().filter(|id| self.state.thread_store.contains(id)) {
+            self.park_outgoing(have_id.to_owned());
         }
-
-        // Swap the newly-focused thread's parked bundle into `state`. A cold or
-        // unknown thread has no entry → state keeps the fresh empty runtime, which
-        // is the correct blank view for a brand-new thread.
-        let swapped_in = {
-            let _g = crate::profile!("rr_swap_in");
-            want.as_deref().is_some_and(|want_id| self.swap_in_parked(want_id))
-        };
-
-        // The park above emptied `state` to a bare `ThreadRuntime::new()` (no
-        // per-thread module states). If nothing was swapped back in — a cold
-        // thread, or focus cleared because the focused thread was just archived —
-        // the next render's `ext::<SpineState>()` would panic. Install an
-        // initialized blank runtime instead.
-        if parking_resident && !swapped_in {
-            let _g = crate::profile!("rr_install_blank");
-            self.install_blank_resident();
-        }
-
+        self.place_incoming(want.as_deref(), have.is_none());
         self.state.thread_store.set_executing(want);
     }
 
-    /// Swap `want_id`'s parked bundle and per-stream runtime into `state`/App.
-    /// Returns whether a parked bundle existed (a cold thread has none).
-    fn swap_in_parked(&mut self, want_id: &str) -> bool {
-        let swapped_in = self.fleet.remove(want_id).is_some_and(|mut entry| {
-            let _g = crate::profile!("rr_swap_bundle");
-            entry.runtime.swap_with(&mut self.state); // state now holds `want`'s context; leftover dropped
-            true
-        });
-        // A cold thread has no parked per-stream runtime: App stays at the empty default.
-        if let Some(mut sr) = self.parked_stream_runtimes.remove(want_id) {
-            let _g = crate::profile!("rr_swap_stream");
-            sr.swap_with_app(self); // App now holds `want`'s per-stream runtime; leftover dropped
+    /// Park the outgoing thread's per-stream runtime (so its typewriter and
+    /// pending tools travel with it) and register it for background stepping.
+    /// A mid-exec thread is marked `Streaming`, not `Idle`: its `ThreadStatus`
+    /// is `TheirTurn` between turns, so `Idle` would drop it from scheduling.
+    /// `post_step_exec_state` re-derives the real state on its first step.
+    fn park_outgoing(&mut self, have_id: String) {
+        let _g = crate::profile!("rr_park");
+        let mut sr = super::stream_runtime::StreamRuntime::new();
+        sr.swap_with_app(self);
+        let mid_exec = self.state.stream.phase.is_streaming()
+            || sr.pending_console_wait_tool_results.is_some()
+            || !sr.pending_tools.is_empty()
+            || sr.pending_done.is_some();
+        let _prev = self.parked_stream_runtimes.insert(have_id.clone(), sr);
+        let role = self.fleet.get(&have_id).map_or(Role::Thread, |e| e.role);
+        let mut entry = Entry::new(role);
+        if mid_exec {
+            entry.exec_state = ThreadExecState::Streaming;
         }
-        swapped_in
+        self.fleet.insert(have_id, entry);
     }
 
-    /// Swap a freshly-initialized blank runtime (per-thread modules + fixed base
-    /// panels, via [`fresh_thread_runtime`](crate::state::persistence::fresh_thread_runtime))
-    /// into `state`, replacing the uninitialized leftover of a park.
-    fn install_blank_resident(&mut self) {
+    /// Give the incoming thread a stored runtime if it has none (the boot
+    /// unbound runtime on `first_placement`, else a fresh one), take it out of
+    /// the background registry and restore its per-stream runtime. `None`
+    /// (focus cleared) re-initializes the unbound runtime instead.
+    fn place_incoming(&mut self, want: Option<&str>, first_placement: bool) {
+        let Some(want_id) = want else {
+            let fresh = self.fresh_runtime();
+            drop(self.state.thread_store.take_unbound(fresh));
+            return;
+        };
+        if !self.state.thread_store.contains(want_id) {
+            let runtime = if first_placement {
+                self.state.thread_store.take_unbound(ThreadRuntime::new())
+            } else {
+                self.fresh_runtime()
+            };
+            self.state.thread_store.insert(want_id.to_owned(), runtime);
+        }
+        let _removed = self.fleet.remove(want_id);
+        if let Some(mut sr) = self.parked_stream_runtimes.remove(want_id) {
+            let _g = crate::profile!("rr_swap_stream");
+            sr.swap_with_app(self);
+        }
+    }
+
+    /// A freshly initialized runtime (per-thread module states + fixed base
+    /// panels), minting panel UIDs from the shared counter.
+    pub(super) fn fresh_runtime(&mut self) -> ThreadRuntime {
         let active = self.state.active_modules.clone();
-        let mut fresh = crate::state::persistence::fresh_thread_runtime(&mut self.state.global_next_uid, &active);
-        fresh.swap_with(&mut self.state); // `fresh` now holds the empty leftover — dropped
+        crate::state::persistence::fresh_thread_runtime(&mut self.state.global_next_uid, &active)
     }
 
     /// Reconcile the fleet registry against [`ThreadsState`] — the roster-mirror
@@ -190,28 +147,31 @@ impl App {
             .map(|t| (t.id.clone(), t.status))
             .collect();
 
-        // Drop entries whose thread is gone / archived / now the focused resident.
+        // Drop entries whose thread is gone / archived / now focused. A gone or
+        // archived thread also loses its stored runtime; the focused one keeps it.
         let live: std::collections::HashSet<&str> = roster.iter().map(|entry| entry.0.as_str()).collect();
         let stale: Vec<String> =
             self.fleet.iter().map(|entry| entry.0.clone()).filter(|id| !live.contains(id.as_str())).collect();
         for id in stale {
             let _removed = self.fleet.remove(&id);
+            if focused.as_deref() != Some(id.as_str()) {
+                drop(self.state.thread_store.remove(&id));
+            }
         }
 
         // Add missing entries, then derive exec_state for each roster thread.
         for entry in &roster {
             let (id, status) = (&entry.0, entry.1);
+            if !self.state.thread_store.contains(id) {
+                // A cold thread (in the roster, no persisted file) still needs a
+                // runtime whose per-thread module states are INITIALIZED: a bare
+                // `ThreadRuntime::new()` has an empty module map, so its first
+                // step's `ext::<SpineState>()` would panic.
+                let runtime = self.fresh_runtime();
+                self.state.thread_store.insert(id.clone(), runtime);
+            }
             if !self.fleet.contains(id) {
-                // A cold thread (in the roster, no persisted file) must still get
-                // a runtime whose per-thread module states are INITIALIZED — a
-                // bare `ThreadRuntime::new()` has an empty module map, so once the
-                // step loop promotes and swaps it in, `check_spine`'s first
-                // `ext::<SpineState>()` would panic. `fresh_thread_runtime` inits
-                // the per-thread modules + fixed base panels exactly like a disk
-                // load would, minting panel UIDs from the shared counter.
-                let active = self.state.active_modules.clone();
-                let runtime = crate::state::persistence::fresh_thread_runtime(&mut self.state.global_next_uid, &active);
-                self.fleet.insert(id.clone(), Entry::new(Role::Thread, runtime));
+                self.fleet.insert(id.clone(), Entry::new(Role::Thread));
             }
             if let Some(reg_entry) = self.fleet.get_mut(id) {
                 Self::derive_exec_state(reg_entry, status, now_ms);
@@ -256,7 +216,8 @@ impl App {
             else {
                 continue; // cold thread: no persisted file; reconcile gives it a fresh runtime
             };
-            let mut entry = Entry::new(Role::Thread, runtime);
+            self.state.thread_store.insert(id.clone(), runtime);
+            let mut entry = Entry::new(Role::Thread);
             Self::derive_exec_state(&mut entry, status, now);
             self.fleet.insert(id, entry);
         }
@@ -275,11 +236,7 @@ impl App {
     /// `Runnable` (stamping `waiting_since_ms` once, on the Idle→Runnable edge,
     /// for oldest-waiting-first promotion); `TheirTurn` → `Idle` (waiting on the
     /// human), clearing any stale wait stamp.
-    fn derive_exec_state(
-        entry: &mut Entry<cp_base::state::runtime::bundle::ThreadRuntime>,
-        status: ThreadStatus,
-        now_ms: u64,
-    ) {
+    fn derive_exec_state(entry: &mut Entry, status: ThreadStatus, now_ms: u64) {
         if entry.exec_state.is_active() || entry.exec_state == ThreadExecState::Errored {
             // Active: owned by the advancement step loop (re-derived post-step).
             // Errored: parked as stuck — never auto-revived here; only a fresh
@@ -328,16 +285,14 @@ impl App {
             .map(|entry| entry.0.clone())
             .collect();
 
+        let prev = self.state.executing_thread_id().map(str::to_owned);
         for id in ids {
-            // Remove the entry so the registry borrow ends before touching
-            // `state` — the fleet and state `&mut self` sub-borrows must not
-            // overlap. Re-inserted after the step.
-            let Some(mut entry) = self.fleet.remove(&id) else { continue };
-            // Mark this thread resident so `resident_key` (stream spawn + drain)
-            // targets ITS channel during the step, not the focused thread's, and
-            // so the stream tee tags this thread's live frames with ITS id.
+            if !self.fleet.contains(&id) || !self.state.thread_store.contains(&id) {
+                continue;
+            }
+            // Execute this thread: its stream spawn/drain, tee tag and every
+            // per-thread write now target ITS runtime. No data moves.
             self.stepping_thread = Some(id.clone());
-            entry.runtime.swap_with(&mut self.state); // thread `id` resident; focused parks into entry
             self.state.thread_store.set_executing(Some(id.clone()));
             // Swap this thread's per-stream runtime (typewriter, pending tools/
             // done, console-wait + blocking accumulators, deferred-sleep flags)
@@ -347,13 +302,14 @@ impl App {
             let mut sr = self.parked_stream_runtimes.remove(&id).unwrap_or_default();
             sr.swap_with_app(self);
             self.step_one_thread();
-            entry.exec_state = self.post_step_exec_state(&id); // from this thread's new stream phase
+            let exec_state = self.post_step_exec_state(&id); // from this thread's new stream phase
             sr.swap_with_app(self); // restore focused thread's per-stream runtime
             let _prev = self.parked_stream_runtimes.insert(id.clone(), sr);
-            entry.runtime.swap_with(&mut self.state); // restore focused; thread `id` parks back
             self.stepping_thread = None;
-            self.state.thread_store.set_executing(focused.clone());
-            self.fleet.insert(id, entry);
+            self.state.thread_store.set_executing(prev.clone());
+            if let Some(entry) = self.fleet.get_mut(&id) {
+                entry.exec_state = exec_state;
+            }
         }
     }
 
