@@ -86,7 +86,7 @@ impl App {
         let mut known: std::collections::HashSet<String> = std::collections::HashSet::new();
 
         // Resident (focused) first → states/main_worker.json (focused == resident).
-        self.state.resident_thread_id.clone_from(&focused);
+        self.state.thread_store.set_executing(focused.clone());
         known.extend(save::panel_uids_of(&self.state));
         save::save_state(&self.state);
 
@@ -96,14 +96,14 @@ impl App {
             let Some(mut entry) = self.fleet.remove(&id) else { continue };
             self.stepping_thread = Some(id.clone());
             entry.runtime.swap_with(&mut self.state); // thread `id` resident; focused parks into entry
-            self.state.resident_thread_id = Some(id.clone());
+            self.state.thread_store.set_executing(Some(id.clone()));
             known.extend(save::panel_uids_of(&self.state));
             save::save_state(&self.state); // → states/<id>.json (resident != focused), no deletes
             entry.runtime.swap_with(&mut self.state); // restore focused; thread `id` parks back
             self.stepping_thread = None;
             self.fleet.insert(id, entry);
         }
-        self.state.resident_thread_id = focused;
+        self.state.thread_store.set_executing(focused);
 
         // Union orphan-prune, exactly once over every thread's live UIDs.
         for del in save::collect_orphan_deletes(&save::panels_dir(), &known) {
@@ -187,7 +187,7 @@ impl App {
     ) -> Option<(String, cp_fleet::Entry<cp_base::state::runtime::bundle::ThreadRuntime>)> {
         let drilled = cp_mod_threads::types::FocusState::get(&self.state).drilled_thread_id.clone()?;
         // Resident (== focused) thread is already flat in `state`; nothing to swap.
-        if self.state.resident_thread_id.as_deref() == Some(drilled.as_str()) {
+        if self.state.executing_thread_id() == Some(drilled.as_str()) {
             return None;
         }
         let mut entry = self.fleet.remove(&drilled)?;

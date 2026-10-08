@@ -24,7 +24,7 @@ pub(crate) fn execute_reload_tui(tool: &ToolUse, state: &mut State) -> ToolResul
     // have the resume land on whatever thread was focused at boot — the wrong
     // one. At N=1 `resident_thread_id` is None or already equals the focused
     // pointer, so this is a no-op and behaviour is byte-identical.
-    if let Some(caller) = state.resident_thread_id.clone() {
+    if let Some(caller) = state.executing_thread_id().map(str::to_owned) {
         let fs = cp_mod_threads::types::FocusState::get_mut(state);
         if fs.focused_thread_id.as_deref() != Some(caller.as_str()) {
             fs.focused_thread_id = Some(caller);

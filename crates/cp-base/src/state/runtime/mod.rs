@@ -33,12 +33,12 @@ pub mod textarea;
 /// reaches the resident thread's data — but those are the **thread's** fields,
 /// not `State`'s.
 pub struct State {
-    /// The per-thread context of the currently-resident thread (the focused
-    /// thread at rest, or a background thread while it is being stepped). Owns
-    /// the conversation, panels, editor/scroll, token/cost telemetry, the
-    /// cache/freeze engine snapshots, the per-thread stream phase, and the
-    /// per-thread module `TypeMap`. `State` derefs to this.
-    pub resident: bundle::ThreadRuntime,
+    /// Every thread's per-thread context (conversation, panels, editor/scroll,
+    /// token/cost telemetry, cache/freeze snapshots, stream phase, per-thread
+    /// module `TypeMap`), stored permanently by thread id, plus the id of the
+    /// thread executing right now. `State` derefs to the executing thread's
+    /// runtime; changing it moves no data.
+    pub thread_store: threads::ThreadStore,
 
     /// Boolean status flags that are fleet-global (UI redraw, config overlay,
     /// reload lifecycle, module overlays). Per-thread stream/scroll state is on
@@ -104,52 +104,45 @@ pub struct State {
     /// `Some(false)` or `None` → the resident's per-thread map.
     /// Updates to already-registered types ignore this (they stay in place).
     pub init_is_global: Option<bool>,
-
-    /// Id of the thread whose per-thread context currently lives in
-    /// [`resident`](Self::resident): the focused thread normally, or the
-    /// background thread being advanced during its step. Residence metadata —
-    /// NOT part of [`resident`](Self::resident) so it tracks the current occupant
-    /// across a swap. Read by the stream tee to tag each frame's `thread_id`.
-    /// Runtime-only; `None` on cold boot.
-    pub resident_thread_id: Option<String>,
 }
 
 impl std::ops::Deref for State {
     type Target = bundle::ThreadRuntime;
 
-    /// `State` derefs to its resident thread so existing `state.<per-thread>`
+    /// `State` derefs to the executing thread's runtime so existing `state.<per-thread>`
     /// access keeps working after the fields moved onto [`ThreadRuntime`](bundle::ThreadRuntime).
     /// The per-thread data is owned by the thread, not by `State`.
     fn deref(&self) -> &Self::Target {
-        &self.resident
+        self.thread_store.current()
     }
 }
 
 impl std::ops::DerefMut for State {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.resident
+        self.thread_store.current_mut()
     }
 }
 
-/// Per-thread runtime bundle + the resident-thread swap (`ThreadRuntime`).
+/// Per-thread runtime bundle (`ThreadRuntime`).
 pub mod bundle;
 /// `Default` for `State` (extracted for the 500-line cap).
 mod default;
 /// Module extension-data accessors (`get_ext`/`ext`/`set_ext`/…), extracted for the cap.
 mod ext;
+/// Thread-runtime storage keyed by id + the executing-thread id (`ThreadStore`).
+pub mod threads;
 
 impl State {
     /// The thread executing right now: owner of every per-thread write (todos,
     /// scratchpad, tool traces, notifications). Never the human's focus — that
     /// is UI-only and can point at another thread while this one runs.
-    /// `None` only before the first tick has placed a thread.
+    /// `None` when no thread is placed (cold boot, focus cleared).
     #[must_use]
     pub fn executing_thread_id(&self) -> Option<&str> {
-        self.resident_thread_id.as_deref()
+        self.thread_store.executing()
     }
 
     // === Boot builder (cross-crate reconstruction from persisted state) ===
-
 
     /// Set the loaded context panels (builder).
     #[must_use]
@@ -318,13 +311,10 @@ impl State {
 impl std::fmt::Debug for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("State")
-            .field("context_len", &self.resident.context.len())
-            .field("messages_len", &self.resident.messages.len())
-            .field("stream_phase", &self.resident.stream.phase)
-            .field(
-                "module_data_keys",
-                &self.shared_module_data.len().saturating_add(self.resident.thread_module_data.len()),
-            )
+            .field("context_len", &self.context.len())
+            .field("messages_len", &self.messages.len())
+            .field("stream_phase", &self.stream.phase)
+            .field("module_data_keys", &self.shared_module_data.len().saturating_add(self.thread_module_data.len()))
             .finish_non_exhaustive()
     }
 }

@@ -122,21 +122,23 @@ impl ConversationPanel {
     /// Render the live conversation messages (with per-message caching), skipping
     /// deleted + empty-non-streaming messages.
     fn push_message_blocks(state: &mut State, blocks: &mut Vec<Block>, viewport_width: u16) {
-        let last_msg_id = state.messages.last().map(|m| m.id.clone());
-        for msg in &state.resident.messages {
+        let dev_mode = state.flags.ui.dev_mode;
+        let rt = state.thread_store.current_mut();
+        let last_msg_id = rt.messages.last().map(|m| m.id.clone());
+        for msg in &rt.messages {
             if msg.status == MsgStatus::Deleted {
                 continue;
             }
             let is_last = last_msg_id.as_ref() == Some(&msg.id);
-            let is_streaming_this = state.stream.phase.is_streaming() && is_last && msg.role == "assistant";
+            let is_streaming_this = rt.stream.phase.is_streaming() && is_last && msg.role == "assistant";
 
             // Skip empty text messages (unless streaming)
             if msg.msg_type == MsgKind::TextMessage && msg.content.trim().is_empty() && !is_streaming_this {
                 continue;
             }
 
-            let hash = Self::compute_message_hash(msg, viewport_width, state.flags.ui.dev_mode);
-            if let Some(cached) = state.resident.message_cache.get(&msg.id)
+            let hash = Self::compute_message_hash(msg, viewport_width, dev_mode);
+            if let Some(cached) = rt.message_cache.get(&msg.id)
                 && cached.content_hash == hash
                 && cached.viewport_width == viewport_width
             {
@@ -146,15 +148,10 @@ impl ConversationPanel {
 
             let rendered = render_blocks::render_message_blocks(
                 msg,
-                &MessageBlockOpts {
-                    viewport_width,
-                    is_streaming: is_streaming_this,
-                    dev_mode: state.flags.ui.dev_mode,
-                },
+                &MessageBlockOpts { viewport_width, is_streaming: is_streaming_this, dev_mode },
             );
             if !is_streaming_this {
-                let _r = state
-                    .resident
+                let _r = rt
                     .message_cache
                     .insert(msg.id.clone(), MessageCache::new(Rc::from(rendered.as_slice()), hash, viewport_width));
             }

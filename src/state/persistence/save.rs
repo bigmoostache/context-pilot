@@ -71,8 +71,8 @@ type PanelUidMaps = (HashMap<Kind, String>, HashMap<String, String>);
 /// fallback to the legacy name for installs saved before pointers existed.
 fn resident_worker_id(state: &State) -> String {
     let focused = cp_mod_threads::types::FocusState::get(state).focused_thread_id.clone();
-    match state.resident_thread_id.as_ref() {
-        Some(tid) if Some(tid) != focused.as_ref() => tid.clone(),
+    match state.executing_thread_id() {
+        Some(tid) if Some(tid) != focused.as_deref() => tid.to_owned(),
         _ => focused.unwrap_or_else(|| DEFAULT_WORKER_ID.to_owned()),
     }
 }

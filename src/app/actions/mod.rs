@@ -58,8 +58,9 @@ fn handle_stop_streaming(state: &mut State) -> ActionResult {
         return ActionResult::Nothing;
     }
     state.stream.phase.transition(StreamPhase::Idle);
-    if let Some(ctx) = state.resident.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
-        ctx.token_count = ctx.token_count.saturating_sub(state.resident.streaming_estimated_tokens);
+    let est = state.streaming_estimated_tokens;
+    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
+        ctx.token_count = ctx.token_count.saturating_sub(est);
     }
     state.streaming_estimated_tokens = 0;
     if let Some(msg) = state.messages.last_mut()

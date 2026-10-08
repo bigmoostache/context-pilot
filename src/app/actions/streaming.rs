@@ -98,12 +98,10 @@ pub(crate) fn handle_stream_done(state: &mut State, event: &StreamDoneEvent<'_>)
     crate::app::run::tools::cost_log::append_cost_tsv(state);
 
     // Correct the estimated tokens with actual output tokens on Conversation context and update timestamp
-    if let Some(ctx) = state.resident.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
+    let est = state.streaming_estimated_tokens;
+    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
         // Remove our estimate, add actual
-        ctx.token_count = ctx
-            .token_count
-            .saturating_sub(state.resident.streaming_estimated_tokens)
-            .saturating_add(event.output_tokens);
+        ctx.token_count = ctx.token_count.saturating_sub(est).saturating_add(event.output_tokens);
         ctx.last_refresh_ms = crate::app::panels::now_ms();
     }
     state.streaming_estimated_tokens = 0;
@@ -160,8 +158,9 @@ pub(crate) fn handle_stream_error(state: &mut State, error: &str) -> ActionResul
     state.stream.phase.transition(StreamPhase::Idle);
 
     // Remove estimated tokens on error from Conversation context
-    if let Some(ctx) = state.resident.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
-        ctx.token_count = ctx.token_count.saturating_sub(state.resident.streaming_estimated_tokens);
+    let est = state.streaming_estimated_tokens;
+    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
+        ctx.token_count = ctx.token_count.saturating_sub(est);
     }
     state.streaming_estimated_tokens = 0;
 

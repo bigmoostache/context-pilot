@@ -63,11 +63,11 @@ impl App {
     /// between turns in practice, so the common path parks an idle thread.
     pub(super) fn relocate_resident_on_focus_change(&mut self) {
         let want = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
-        let have = self.state.resident_thread_id.clone();
+        let have = self.state.executing_thread_id().map(str::to_owned);
         let parking_resident = have.is_some();
         if want == have {
             // Keep the label in sync for the None/None and equal cases, then done.
-            self.state.resident_thread_id = want;
+            self.state.thread_store.set_executing(want);
             return;
         }
 
@@ -133,7 +133,7 @@ impl App {
             self.install_blank_resident();
         }
 
-        self.state.resident_thread_id = want;
+        self.state.thread_store.set_executing(want);
     }
 
     /// Swap `want_id`'s parked bundle and per-stream runtime into `state`/App.
@@ -338,7 +338,7 @@ impl App {
             // so the stream tee tags this thread's live frames with ITS id.
             self.stepping_thread = Some(id.clone());
             entry.runtime.swap_with(&mut self.state); // thread `id` resident; focused parks into entry
-            self.state.resident_thread_id = Some(id.clone());
+            self.state.thread_store.set_executing(Some(id.clone()));
             // Swap this thread's per-stream runtime (typewriter, pending tools/
             // done, console-wait + blocking accumulators, deferred-sleep flags)
             // into `App` so the shared advancement core drains ITS buffers, not
@@ -352,7 +352,7 @@ impl App {
             let _prev = self.parked_stream_runtimes.insert(id.clone(), sr);
             entry.runtime.swap_with(&mut self.state); // restore focused; thread `id` parks back
             self.stepping_thread = None;
-            self.state.resident_thread_id.clone_from(&focused);
+            self.state.thread_store.set_executing(focused.clone());
             self.fleet.insert(id, entry);
         }
     }

@@ -120,7 +120,7 @@ fn apply_kind_guard(state: &State, update: &CacheUpdate) -> Option<crate::infra:
 fn invalidate_matching_panels(app: &mut App, path: &str, is_dir_event: bool) -> Vec<usize> {
     let modules = crate::modules::all_modules();
     let mut refresh_indices = Vec::new();
-    for (i, ctx) in app.state.resident.context.iter_mut().enumerate() {
+    for (i, ctx) in app.state.thread_store.current_mut().context.iter_mut().enumerate() {
         for module in &modules {
             if module.should_invalidate_on_fs_change(ctx, path, is_dir_event) {
                 ctx.cache_deprecated = true;
@@ -272,9 +272,10 @@ fn remove_suicided_panels(app: &mut App, suicide_indices: &[usize]) {
         return;
     }
     // Save current scroll state before removals (entry might shift or disappear)
-    if let Some(current) = app.state.resident.context.get_mut(app.state.resident.selected_context) {
-        current.scroll_state.offset = app.state.resident.scroll_offset;
-        current.scroll_state.user_scrolled = app.state.resident.stream.user_scrolled;
+    let rt = app.state.thread_store.current_mut();
+    if let Some(current) = rt.context.get_mut(rt.selected_context) {
+        current.scroll_state.offset = rt.scroll_offset;
+        current.scroll_state.user_scrolled = rt.stream.user_scrolled;
     }
     for &i in suicide_indices.iter().rev() {
         // Fix selected_context if it pointed at or past the removed panel
@@ -288,9 +289,10 @@ fn remove_suicided_panels(app: &mut App, suicide_indices: &[usize]) {
         drop(app.state.context.remove(i));
     }
     // Restore scroll from the (possibly new) selected panel
-    if let Some(incoming) = app.state.resident.context.get(app.state.resident.selected_context) {
-        app.state.resident.scroll_offset = incoming.scroll_state.offset;
-        app.state.resident.stream.user_scrolled = incoming.scroll_state.user_scrolled;
+    let after = app.state.thread_store.current_mut();
+    if let Some(incoming) = after.context.get(after.selected_context) {
+        after.scroll_offset = incoming.scroll_state.offset;
+        after.stream.user_scrolled = incoming.scroll_state.user_scrolled;
     }
     app.state.flags.ui.dirty = true;
 }

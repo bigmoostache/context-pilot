@@ -260,21 +260,14 @@ impl ThreadRuntime {
         Self::default()
     }
 
-    /// Exchange this bundle with the resident thread currently loaded in `state`
-    /// in O(1).
+    /// Exchange this bundle with the runtime `state` currently derefs to, in
+    /// O(1). Symmetric: a second call restores the original arrangement.
     ///
-    /// Since every per-thread field now lives on [`ThreadRuntime`] (and `State`
-    /// holds the resident as a single [`resident`](State::resident) field), the
-    /// swap is one whole-struct [`mem::swap`](std::mem::swap) rather than a
-    /// field-by-field exchange. Symmetric: calling it once makes `self` resident
-    /// (parking the previous resident back into `self`); calling it again with
-    /// the same pair restores the original arrangement.
-    ///
-    /// Fleet-shared fields on `State` (tools, model, theme, `shared_module_data`,
-    /// `global_next_uid`, the highlight fn, reveries, `resident_thread_id`) are
-    /// untouched — they are not part of `ThreadRuntime`.
-    pub const fn swap_with(&mut self, state: &mut State) {
-        std::mem::swap(self, &mut state.resident);
+    /// Transitional (T840 step 2): callers are being moved to
+    /// [`ThreadStore`](super::threads::ThreadStore), where switching the
+    /// executing thread is an id change and nothing is swapped.
+    pub fn swap_with(&mut self, state: &mut State) {
+        std::mem::swap(self, state.thread_store.current_mut());
     }
 }
 
