@@ -77,7 +77,10 @@ impl App {
         if let Some(have_id) = have {
             let _g = crate::profile!("rr_park");
             let mut parked = cp_base::state::runtime::bundle::ThreadRuntime::new();
-            parked.swap_with(&mut self.state); // `parked` now holds `have`'s context; state emptied
+            {
+                let _bundle = crate::profile!("rr_park_bundle");
+                parked.swap_with(&mut self.state); // `parked` now holds `have`'s context; state emptied
+            }
             // Park the resident's per-stream runtime alongside its bundle, so its
             // in-flight typewriter/pending-tools travel with it rather than
             // leaking into the newly-focused thread.
@@ -137,11 +140,13 @@ impl App {
     /// Returns whether a parked bundle existed (a cold thread has none).
     fn swap_in_parked(&mut self, want_id: &str) -> bool {
         let swapped_in = self.fleet.remove(want_id).is_some_and(|mut entry| {
+            let _g = crate::profile!("rr_swap_bundle");
             entry.runtime.swap_with(&mut self.state); // state now holds `want`'s context; leftover dropped
             true
         });
         // A cold thread has no parked per-stream runtime: App stays at the empty default.
         if let Some(mut sr) = self.parked_stream_runtimes.remove(want_id) {
+            let _g = crate::profile!("rr_swap_stream");
             sr.swap_with_app(self); // App now holds `want`'s per-stream runtime; leftover dropped
         }
         swapped_in

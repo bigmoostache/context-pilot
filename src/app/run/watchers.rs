@@ -223,12 +223,17 @@ enum TimerOutcome {
 /// interval), or nothing. Pure read of `app` — no mutation.
 fn classify_timer_panel(app: &App, ctx: &crate::state::Entry, current_ms: u64) -> Option<TimerOutcome> {
     let panel = crate::app::panels::get_panel(&ctx.context_type);
-    if panel.suicide(ctx, &app.state) {
+    let suicide = {
+        let _g = crate::infra::profiler::dyn_guard("tr_suicide_", ctx.context_type.as_str());
+        panel.suicide(ctx, &app.state)
+    };
+    if suicide {
         return Some(TimerOutcome::Suicide);
     }
     if ctx.cache_in_flight {
         return None;
     }
+    let _g = crate::infra::profiler::dyn_guard("tr_req_", ctx.context_type.as_str());
     // Case 1: Initial load — panel has no content yet.
     // Case 2: Explicitly dirty (watcher event, tool, self-invalidation).
     let needs_initial = ctx.cached_content.is_none() && ctx.context_type.needs_cache();

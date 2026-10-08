@@ -91,6 +91,8 @@ pub(crate) fn collect_all_context(state: &State) -> Vec<ContextItem> {
 
     for context_type in &context_types {
         let panel = get_panel(context_type);
+        // One row per panel kind (`ctx_collect_all.ctx_<kind>`) to find the slow panel.
+        let _guard = crate::infra::profiler::dyn_guard("ctx_", context_type.as_str());
         items.extend(panel.context(state));
     }
 
