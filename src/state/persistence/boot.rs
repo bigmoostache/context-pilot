@@ -24,7 +24,25 @@ pub(crate) struct BootModuleData {
 /// Extract module data maps from `BootConfig` before it is consumed by `boot_assemble_state`.
 /// Returns the maps needed by `boot_init_modules`.
 pub(crate) fn boot_extract_module_data(cfg: &BootConfig) -> BootModuleData {
-    BootModuleData { global: cfg.shared.modules.clone(), worker: cfg.worker.modules.clone() }
+    let mut global = cfg.shared.modules.clone();
+    overlay_module_files(&mut global);
+    BootModuleData { global, worker: cfg.worker.modules.clone() }
+}
+
+/// Replace inline `config.json` entries with `modules/<id>.json` where present.
+/// An install saved before own-file modules keeps its inline copy (migration:
+/// the next save writes the file and drops the inline entry).
+fn overlay_module_files(global: &mut HashMap<String, serde_json::Value>) {
+    let dir = std::path::Path::new(crate::infra::constants::STORE_DIR).join(super::save::MODULES_DIR);
+    let Ok(entries) = std::fs::read_dir(&dir) else { return };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Some(id) = path.file_stem().and_then(|s| s.to_str()).map(str::to_owned) else { continue };
+        let Ok(bytes) = std::fs::read(&path) else { continue };
+        if let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+            let _prev = global.insert(id, value);
+        }
+    }
 }
 
 /// Merge the `.env` files into the process environment - project-local first,

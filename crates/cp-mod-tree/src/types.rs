@@ -37,7 +37,14 @@ pub struct TreeState {
     pub open_folders: Vec<String>,
     /// User-written descriptions attached to files/folders.
     pub descriptions: Vec<TreeFileDescription>,
+    /// Change stamp, refreshed on every [`TreeState::get_mut`]. The save path
+    /// rewrites `modules/tree.json` only when it moved. **Transient**.
+    pub revision: u64,
 }
+
+/// Process-wide stamp source: unique across `set_ext` replacements, so a
+/// fresh state never reuses a stamp the save path already recorded.
+static REVISION_SOURCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 impl Default for TreeState {
     fn default() -> Self {
@@ -49,7 +56,12 @@ impl TreeState {
     /// Create a default tree state (root folder open, standard filter).
     #[must_use]
     pub fn new() -> Self {
-        Self { filter: DEFAULT_TREE_FILTER.to_owned(), open_folders: vec![".".to_owned()], descriptions: vec![] }
+        Self {
+            filter: DEFAULT_TREE_FILTER.to_owned(),
+            open_folders: vec![".".to_owned()],
+            descriptions: vec![],
+            revision: REVISION_SOURCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+        }
     }
 
     /// Get shared ref from State's `TypeMap`.
@@ -62,12 +74,14 @@ impl TreeState {
         state.ext::<Self>()
     }
 
-    /// Get mutable ref from State's `TypeMap`.
+    /// Get mutable ref from State's `TypeMap`, refreshing the change stamp.
     ///
     /// # Panics
     ///
     /// Panics if an internal invariant is violated.
     pub fn get_mut(state: &mut State) -> &mut Self {
-        state.ext_mut::<Self>()
+        let ts = state.ext_mut::<Self>();
+        ts.revision = REVISION_SOURCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        ts
     }
 }

@@ -16,6 +16,34 @@ use super::writer::{DeleteOp, WriteBatch, WriteOp};
 /// Errors directory name
 const ERRORS_DIR: &str = "errors";
 
+/// Subdirectory holding `<id>.json` for modules that opt into
+/// [`save_revision`](cp_base::modules::Module::save_revision).
+pub(super) const MODULES_DIR: &str = "modules";
+
+thread_local! {
+    /// Last stamp written per own-file module. Starts empty, so the first save
+    /// after boot/reload writes every own-file module once.
+    static SAVED_REVISIONS: std::cell::RefCell<HashMap<String, u64>> = std::cell::RefCell::new(HashMap::new());
+}
+
+/// `modules/<id>.json` writes for own-file modules whose stamp moved since the
+/// last save. Unchanged modules cost one stamp read: no JSON, no write.
+fn module_file_ops(state: &State, dir: &std::path::Path) -> Vec<WriteOp> {
+    let mut ops = Vec::new();
+    for module in crate::modules::all_modules() {
+        let Some(rev) = module.save_revision(state) else { continue };
+        let id = module.id();
+        if SAVED_REVISIONS.with_borrow(|m| m.get(id) == Some(&rev)) {
+            continue;
+        }
+        let _g = crate::infra::profiler::dyn_guard("module_file_", id);
+        let Ok(json) = serde_json::to_vec(&module.save_module_data(state)) else { continue };
+        ops.push(WriteOp { path: dir.join(MODULES_DIR).join(format!("{id}.json")), content: json });
+        let _prev = SAVED_REVISIONS.with_borrow_mut(|m| m.insert(id.to_owned(), rev));
+    }
+    ops
+}
+
 /// (global, worker) module-data maps keyed by module id.
 type ModuleDataMaps = (HashMap<String, serde_json::Value>, HashMap<String, serde_json::Value>);
 
@@ -72,7 +100,12 @@ fn build_module_data_maps(state: &State) -> ModuleDataMaps {
     let mut worker_modules = HashMap::new();
     for module in crate::modules::all_modules() {
         let _g = crate::infra::profiler::dyn_guard("save_mod_", module.id());
-        let data = module.save_module_data(state);
+        // Own-file modules are written by `module_file_ops`, not inlined.
+        let data = if module.save_revision(state).is_some() {
+            serde_json::Value::Null
+        } else {
+            module.save_module_data(state)
+        };
         if !data.is_null() {
             if module.is_global() {
                 let _r = global_modules.insert(module.id().to_owned(), data);
@@ -265,6 +298,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
         dir.join(cp_mod_logs::LOGS_DIR),
         dir.join(cp_mod_console::CONSOLE_DIR),
         dir.join(cp_mod_threads::types::persist::THREADS_DIR),
+        dir.join(MODULES_DIR),
     ];
 
     // Per-thread message files, only for threads changed since last write.
@@ -281,6 +315,8 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
         let _g = crate::profile!("modules");
         build_module_data_maps(state)
     };
+    // Durable lane: the stamp is recorded as soon as the op is built.
+    durable.extend(module_file_ops(state, &dir));
 
     writes.extend(shared_config_op(state, global_modules, &dir));
     writes.push(WriteOp { path: dir.join(OWNER_FILE), content: current_pid().to_string().into_bytes() });

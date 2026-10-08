@@ -46,6 +46,10 @@ const STATES_DIR: &str = "states";
 /// keeps only slim thread metadata in `config.json`; messages live here.
 const THREADS_DIR: &str = "threads";
 
+/// Directory holding large global modules saved outside `config.json`
+/// (`<module_id>.json`, e.g. `tree`, `todo`), rewritten only when they change.
+const MODULES_DIR: &str = "modules";
+
 // ── Cached value ───────────────────────────────────────────────────────
 
 /// A parsed JSON value paired with the file's `mtime` at the time of parsing,
@@ -71,6 +75,9 @@ struct AgentCache {
 
     /// Cached parses of `threads/<id>.json`, keyed by thread id.
     threads: HashMap<String, CachedJson>,
+
+    /// Cached parses of `modules/<id>.json`, keyed by module id.
+    modules: HashMap<String, CachedJson>,
 }
 
 // ── StateReader ────────────────────────────────────────────────────────
@@ -113,6 +120,7 @@ impl StateReader {
         let cache = self.agents.entry(folder.to_path_buf()).or_default();
         let mut config = read_cached_json(&path, &mut cache.config)?;
         hydrate_thread_messages(&folder.join(CP_DIR).join(THREADS_DIR), &mut config, &mut cache.threads);
+        overlay_module_files(&folder.join(CP_DIR).join(MODULES_DIR), &mut config, &mut cache.modules);
         Ok(config)
     }
 
@@ -150,6 +158,26 @@ impl StateReader {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
+
+/// Splice each `modules/<id>.json` into `config.modules.<id>`, replacing any
+/// inline copy, so callers keep reading one merged `config` shape. Unreadable
+/// files are skipped (the inline copy, if any, stays).
+fn overlay_module_files(modules_dir: &Path, config: &mut Value, cache: &mut HashMap<String, CachedJson>) {
+    let Ok(entries) = fs::read_dir(modules_dir) else { return };
+    let Some(modules) = config.get_mut("modules").and_then(Value::as_object_mut) else { return };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+        let Some(id) = path.file_stem().and_then(|s| s.to_str()).map(str::to_owned) else { continue };
+        let slot =
+            cache.entry(id.clone()).or_insert_with(|| CachedJson { mtime: SystemTime::UNIX_EPOCH, data: Value::Null });
+        if let Ok(value) = read_cached_json_slot(&path, slot) {
+            let _prev = modules.insert(id, value);
+        }
+    }
+}
 
 /// Splice `messages` from `<threads_dir>/<id>.json` into every thread entry of
 /// `config` lacking them. Legacy configs (inline messages) pass through as-is;
@@ -367,6 +395,25 @@ mod tests {
         assert_eq!(at("/modules/threads/threads/0/messages/0/content"), Some("from file"));
         assert_eq!(at("/modules/threads/threads/1/messages/0/content"), Some("inline"));
         assert!(read.pointer("/modules/threads/threads/2/messages").is_none());
+    }
+
+    #[test]
+    fn read_config_overlays_module_files() {
+        let dir = tempdir().expect("dir");
+        let folder = dir.path();
+        let cfg = serde_json::json!({"modules": {"todo": {"todos": ["inline"]}, "memory": {"m": 1u64}}});
+        write_config(folder, &cfg);
+        let mdir = folder.join(CP_DIR).join(MODULES_DIR);
+        fs::create_dir_all(&mdir).expect("mkdir");
+        fs::write(mdir.join("todo.json"), br#"{"todos":["file"]}"#).expect("write");
+        fs::write(mdir.join("tree.json"), br#"{"filter":"x"}"#).expect("write");
+
+        let mut reader = StateReader::new();
+        let read = reader.read_config(folder).expect("read");
+        let at = |i: &str| read.pointer(i).and_then(Value::as_str);
+        assert_eq!(at("/modules/todo/todos/0"), Some("file"));
+        assert_eq!(at("/modules/tree/filter"), Some("x"));
+        assert_eq!(read.pointer("/modules/memory/m").and_then(Value::as_u64), Some(1));
     }
 
     #[test]

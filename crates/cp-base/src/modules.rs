@@ -84,6 +84,16 @@ pub trait Module: Send + Sync {
         serde_json::Value::Null
     }
 
+    /// Change stamp of this module's persisted data, for global modules large
+    /// enough to deserve their own file.
+    ///
+    /// `Some` moves the data out of `config.json` into `modules/<id>.json`,
+    /// serialized and written only when the stamp differs from the last save.
+    /// `None` (default) keeps it inline in `config.json`, rebuilt every save.
+    fn save_revision(&self, _state: &State) -> Option<u64> {
+        None
+    }
+
     /// Deserialize this module's data from a JSON value and apply it to State.
     /// Data comes from `config::Shared` (if `is_global`) or `WorkerState` (if !`is_global`).
     fn load_module_data(&self, _data: &serde_json::Value, _state: &mut State) {}
