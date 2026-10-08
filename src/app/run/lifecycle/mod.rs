@@ -415,9 +415,9 @@ impl App {
     /// flag — without it the spine would instantly relaunch a stream, making Esc
     /// uncancellable (#44).
     fn on_stop_stream(&mut self) {
-        self.typewriter.reset();
-        self.pending_done = None;
-        self.pending_tools.clear();
+        self.stream_rt_mut().typewriter.reset();
+        self.stream_rt_mut().pending_done = None;
+        self.stream_rt_mut().pending_tools.clear();
         super::tools::cleanup::flush_pending_tool_results_as_interrupted(self);
         for module in crate::modules::all_modules() {
             module.on_stream_stop(&mut self.state);
@@ -453,8 +453,8 @@ impl App {
             self.state.thread_mut().guard_rail_blocked = None;
             let should_stream = apply_continuation(&mut self.state, action);
             if should_stream {
-                self.typewriter.reset();
-                self.pending_tools.clear();
+                self.stream_rt_mut().typewriter.reset();
+                self.stream_rt_mut().pending_tools.clear();
                 crate::app::run::streaming::spawn_stream_with_context(self, false);
                 self.save_state_async();
                 self.state.flags.ui.dirty = true;

@@ -62,9 +62,9 @@ fn apply_stream_event(app: &mut App, evt: StreamEvent) {
         alive_positions_permille,
     } = evt
     {
-        app.typewriter.mark_done();
+        app.stream_rt_mut().typewriter.mark_done();
         app.state.thread_mut().streaming_tool = None;
-        app.pending_done = Some((
+        app.stream_rt_mut().pending_done = Some((
             input_tokens,
             output_tokens,
             cache_hit_tokens,
@@ -89,7 +89,7 @@ fn broadcast_chunk(app: &mut App, text: &str) {
     for module in crate::modules::all_modules() {
         module.on_stream_chunk(text, &mut app.state);
     }
-    app.typewriter.add_chunk(text);
+    app.stream_rt_mut().typewriter.add_chunk(text);
 }
 
 /// Notify modules of streaming tool progress (e.g. typing indicators) and stash
@@ -108,13 +108,13 @@ fn broadcast_tool_use(app: &mut App, tool: cp_base::tools::ToolUse) {
         module.on_tool_complete(&tool.name, &mut app.state);
     }
     app.state.thread_mut().streaming_tool = None;
-    app.pending_tools.push(tool);
+    app.stream_rt_mut().pending_tools.push(tool);
 }
 
 /// Handle a `StreamEvent::Error`: log to disk, then either flag a retry (under
 /// the retry cap) or surface the error + record a continuation-error backoff.
 fn handle_stream_error_event(app: &mut App, e: String) {
-    app.typewriter.reset();
+    app.stream_rt_mut().typewriter.reset();
     // Log every error to disk for debugging
     let attempt = app.state.thread().api_retry_count.saturating_add(1);
     let will_retry = attempt <= MAX_API_RETRIES;
@@ -137,7 +137,7 @@ fn handle_stream_error_event(app: &mut App, e: String) {
     // Check if we should retry
     if will_retry {
         app.state.thread_mut().api_retry_count = app.state.thread_mut().api_retry_count.saturating_add(1);
-        app.pending_retry_error = Some(e);
+        app.stream_rt_mut().pending_retry_error = Some(e);
     } else {
         // Max retries reached, show error
         app.state.thread_mut().api_retry_count = 0;
@@ -151,7 +151,7 @@ fn handle_stream_error_event(app: &mut App, e: String) {
 
 /// If a retryable error is pending, clear partial state and re-launch the stream.
 pub(super) fn handle_retry(app: &mut App) {
-    if let Some(_error) = app.pending_retry_error.take() {
+    if let Some(_error) = app.stream_rt_mut().pending_retry_error.take() {
         // Still streaming, retry the request
         if app.state.thread().stream.phase.is_streaming() {
             // Clear any partial assistant message content before retrying
@@ -162,8 +162,8 @@ pub(super) fn handle_retry(app: &mut App) {
             }
             let ctx = prepare_stream_context(&mut app.state, true, None);
             let system_prompt = get_active_agent_content(&app.state);
-            app.typewriter.reset();
-            app.pending_done = None;
+            app.stream_rt_mut().typewriter.reset();
+            app.stream_rt_mut().pending_done = None;
             let params = build_stream_params(&app.state, ctx, Some(system_prompt));
             app.spawn_thread_stream(params);
             app.state.flags.ui.dirty = true;
@@ -175,7 +175,7 @@ pub(super) fn handle_retry(app: &mut App) {
 pub(super) fn process_typewriter(app: &mut App) {
     let _guard = crate::profile!("app::typewriter");
     if app.state.thread().stream.phase.is_streaming()
-        && let Some(chars) = app.typewriter.take_chars()
+        && let Some(chars) = app.stream_rt_mut().typewriter.take_chars()
     {
         let _r = apply_action(&mut app.state, Action::AppendChars(chars));
         app.state.flags.ui.dirty = true;
@@ -201,8 +201,8 @@ pub(super) fn continue_streaming(app: &mut App) {
     // tool call can finally be injected without orphaning a tool_use.
     let _injected = cp_mod_spine::types::SpineState::flush_deferred_inject(&mut app.state);
     app.state.thread_mut().stream.phase.transition(StreamPhase::Receiving);
-    app.typewriter.reset();
-    app.pending_done = None;
+    app.stream_rt_mut().typewriter.reset();
+    app.stream_rt_mut().pending_done = None;
     spawn_stream_with_context(app, true);
 }
 
@@ -235,19 +235,19 @@ pub(super) fn finalize_stream(app: &mut App) {
     // Don't finalize while waiting for panels or deferred sleep —
     // pending_done is still Some from the intermediate stream, and
     // continue_streaming will clear it when the deferred state resolves.
-    if app.state.thread().waiting_for_panels || app.deferred_tool_sleeping {
+    if app.state.thread().waiting_for_panels || app.stream_rt_mut().deferred_tool_sleeping {
         return;
     }
     // Don't finalize while a console blocking wait is pending
-    if app.pending_console_wait_tool_results.is_some() {
+    if app.stream_rt_mut().pending_console_wait_tool_results.is_some() {
         return;
     }
 
-    let ready = app.typewriter.pending_chars.is_empty() && app.pending_tools.is_empty();
-    if ready && let Some(done) = app.pending_done.take() {
+    let ready = app.stream_rt_mut().typewriter.pending_chars.is_empty() && app.stream_rt_mut().pending_tools.is_empty();
+    if ready && let Some(done) = app.stream_rt_mut().pending_done.take() {
         apply_stream_done(app, done);
-        app.typewriter.reset();
-        app.pending_done = None;
+        app.stream_rt_mut().typewriter.reset();
+        app.stream_rt_mut().pending_done = None;
     }
 }
 

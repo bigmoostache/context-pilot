@@ -236,7 +236,7 @@ fn replace_blocking_sentinels(
         // A stale tool_use_id left a sentinel unmatched. If real watchers remain,
         // stash and wait; otherwise force-resolve to avoid an infinite stall.
         if WatcherRegistry::get(&app.state).has_blocking_watchers() {
-            app.pending_console_wait_tool_results = Some(std::mem::take(tool_results));
+            app.stream_rt_mut().pending_console_wait_tool_results = Some(std::mem::take(tool_results));
             return true;
         }
         force_resolve_stragglers(tool_results);
@@ -285,7 +285,7 @@ pub(crate) fn check_watchers(app: &mut App) {
     }
 
     // --- Blocking sentinel replacement ---
-    if app.pending_console_wait_tool_results.is_none() {
+    if app.stream_rt_mut().pending_console_wait_tool_results.is_none() {
         return;
     }
 
@@ -306,7 +306,7 @@ pub(crate) fn check_watchers(app: &mut App) {
     // Accumulate partial blocking results into App-level storage.
     // Multiple blocking callbacks share one sentinel_id but complete at different times.
     // We must wait for ALL of them before resuming the pipeline.
-    app.accumulated_blocking_results.extend(blocking_results);
+    app.stream_rt_mut().accumulated_blocking_results.extend(blocking_results);
 
     // Check if there are STILL blocking watchers pending in the registry.
     // If so, don't resume yet — more results are coming.
@@ -316,9 +316,9 @@ pub(crate) fn check_watchers(app: &mut App) {
     }
 
     // All blocking watchers done — merge accumulated results and resume pipeline.
-    let mut merged_blocking = std::mem::take(&mut app.accumulated_blocking_results);
+    let mut merged_blocking = std::mem::take(&mut app.stream_rt_mut().accumulated_blocking_results);
 
-    let Some(mut tool_results) = app.pending_console_wait_tool_results.take() else {
+    let Some(mut tool_results) = app.stream_rt_mut().pending_console_wait_tool_results.take() else {
         return;
     };
 
@@ -402,7 +402,7 @@ fn resume_pipeline_after_blocking(
     let _r = crate::app::run::streaming::trigger_dirty_panel_refresh(&app.state, &app.cache_tx);
     if crate::app::run::streaming::has_dirty_file_panels(&app.state) {
         app.state.thread_mut().waiting_for_panels = true;
-        app.wait_started_ms = now_ms();
+        app.stream_rt_mut().wait_started_ms = now_ms();
     } else {
         crate::app::run::streaming::continue_streaming(app);
     }
@@ -421,12 +421,12 @@ pub(crate) fn flush_pending_tool_results_as_interrupted(app: &mut App) {
     // Collect all pending tool results from both blocking paths
     let mut all_pending: Vec<crate::infra::tools::ToolResult> = Vec::new();
 
-    if let Some(results) = app.pending_console_wait_tool_results.take() {
+    if let Some(results) = app.stream_rt_mut().pending_console_wait_tool_results.take() {
         all_pending.extend(results);
     }
 
     // Clear any accumulated blocking results from partial callback completions
-    app.accumulated_blocking_results.clear();
+    app.stream_rt_mut().accumulated_blocking_results.clear();
 
     // Scuttle stale blocking watchers whose tool_use_ids match the interrupted results.
     // Without this, interrupted watchers linger in the registry and fire later with

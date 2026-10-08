@@ -8,7 +8,6 @@ use crate::infra::watcher::FileWatcher;
 use crate::state::cache::CacheUpdate;
 use crate::state::persistence::{build_message_op, build_save_batch};
 use crate::state::{Message, State};
-use crate::ui::TypewriterBuffer;
 use crate::ui::help::CommandPalette;
 use cp_base::panels::now_ms;
 
@@ -19,9 +18,6 @@ impl App {
 
         Self {
             state,
-            typewriter: TypewriterBuffer::new(),
-            pending_done: None,
-            pending_tools: Vec::new(),
             cache_tx,
             file_watcher,
             watched_file_paths: std::collections::HashSet::new(),
@@ -29,7 +25,6 @@ impl App {
             watch_specs_hash: 0,
             last_timer_check_ms: now_ms(),
             last_ownership_check_ms: now_ms(),
-            pending_retry_error: None,
             last_render_ms: 0,
             last_full_redraw_ms: now_ms(),
 
@@ -39,18 +34,12 @@ impl App {
             api_check_rx: None,
             resume_stream,
             command_palette: CommandPalette::new(),
-            wait_started_ms: 0,
-            deferred_tool_sleep_until_ms: 0,
-            deferred_tool_sleeping: false,
             writer: crate::state::persistence::PersistenceWriter::new(),
             last_poll_ms: std::collections::HashMap::new(),
-            pending_console_wait_tool_results: None,
-            accumulated_blocking_results: Vec::new(),
             reverie_streams: std::collections::HashMap::new(),
             thread_streams: std::collections::HashMap::new(),
             fleet: cp_fleet::FleetRegistry::new(),
             stepping_thread: None,
-            parked_stream_runtimes: std::collections::HashMap::new(),
             input_ready: None,
         }
     }

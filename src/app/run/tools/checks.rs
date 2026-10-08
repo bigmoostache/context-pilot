@@ -18,7 +18,7 @@ pub(crate) fn check_waiting_for_panels(app: &mut App) {
     }
 
     let panels_ready = !has_dirty_panels(&app.state);
-    let timed_out = now_ms().saturating_sub(app.wait_started_ms) >= 5_000;
+    let timed_out = now_ms().saturating_sub(app.stream_rt_mut().wait_started_ms) >= 5_000;
 
     if panels_ready || timed_out {
         app.state.thread_mut().waiting_for_panels = false;
@@ -31,16 +31,16 @@ pub(crate) fn check_waiting_for_panels(app: &mut App) {
 /// wait for the timer to expire, then deprecate tmux panels and continue
 /// through the normal `wait_for_panels` → `continue_streaming` pipeline.
 pub(crate) fn check_deferred_sleep(app: &mut App) {
-    if !app.deferred_tool_sleeping {
+    if !app.stream_rt_mut().deferred_tool_sleeping {
         return;
     }
 
-    if now_ms() < app.deferred_tool_sleep_until_ms {
+    if now_ms() < app.stream_rt_mut().deferred_tool_sleep_until_ms {
         return; // Still sleeping — keep processing input normally
     }
 
-    app.deferred_tool_sleeping = false;
-    app.deferred_tool_sleep_until_ms = 0;
+    app.stream_rt_mut().deferred_tool_sleeping = false;
+    app.stream_rt_mut().deferred_tool_sleep_until_ms = 0;
     app.state.flags.ui.dirty = true;
 
     // Deferred sleep expired — continue streaming

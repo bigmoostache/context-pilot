@@ -86,7 +86,9 @@ fn append_line(line: &str) -> std::io::Result<()> {
 /// `pending_done` would otherwise be lost (only the final tick goes through
 /// `finalize_stream → handle_stream_done → apply_token_usage`).
 pub(crate) fn accumulate_pending_token_stats(app: &mut App) {
-    if let Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, _, _, _, _, _)) = app.pending_done {
+    if let Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, _, _, _, _, _)) =
+        app.stream_rt_mut().pending_done
+    {
         // Fold uncached input into cache_miss for correct cost accounting
         let effective_miss = cache_miss_tokens.saturating_add(input_tokens);
 

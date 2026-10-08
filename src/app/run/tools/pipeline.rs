@@ -246,20 +246,20 @@ struct ToolBatch {
 /// this tick (not streaming, nothing pending, waiting on panels/sleep).
 fn collect_tool_results(app: &mut App) -> Option<ToolBatch> {
     if !app.state.thread().stream.phase.is_streaming()
-        || app.pending_done.is_none()
-        || !app.typewriter.pending_chars.is_empty()
-        || app.pending_tools.is_empty()
+        || app.stream_rt_mut().pending_done.is_none()
+        || !app.stream_rt_mut().typewriter.pending_chars.is_empty()
+        || app.stream_rt_mut().pending_tools.is_empty()
     {
         return None;
     }
     // Don't process new tools while waiting for panels or deferred sleep
-    if app.state.thread().waiting_for_panels || app.deferred_tool_sleeping {
+    if app.state.thread().waiting_for_panels || app.stream_rt_mut().deferred_tool_sleeping {
         return None;
     }
 
     app.state.flags.ui.dirty = true;
     app.state.thread_mut().stream.phase.transition(StreamPhase::ExecutingTools);
-    let mut tools = std::mem::take(&mut app.pending_tools);
+    let mut tools = std::mem::take(&mut app.stream_rt_mut().pending_tools);
     let mut tool_results: Vec<crate::infra::tools::ToolResult> = Vec::new();
     let mut flushed_tools: Vec<super::queue_flush::FlushedTool> = Vec::new();
 
@@ -358,7 +358,7 @@ pub(crate) fn handle_tool_execution(app: &mut App) {
     // Check if any tool triggered a console blocking wait
     let has_console_wait = tool_results.iter().any(|r| r.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL));
     if has_console_wait {
-        app.pending_console_wait_tool_results = Some(tool_results);
+        app.stream_rt_mut().pending_console_wait_tool_results = Some(tool_results);
         app.save_state_async();
         crate::infra::profiler::log_tool_time(&tool_names, pipeline_start.elapsed());
         return;
@@ -437,8 +437,8 @@ fn finalize_tool_cycle(app: &mut App, cycle: &ToolCycle<'_>) {
     // Check if any tool requested a sleep (e.g., console send_keys delay)
     if app.state.thread().tool_sleep_until_ms > 0 {
         // Defer everything — main loop will check timer and continue
-        app.deferred_tool_sleeping = true;
-        app.deferred_tool_sleep_until_ms = app.state.thread().tool_sleep_until_ms;
+        app.stream_rt_mut().deferred_tool_sleeping = true;
+        app.stream_rt_mut().deferred_tool_sleep_until_ms = app.state.thread().tool_sleep_until_ms;
         app.state.thread_mut().tool_sleep_until_ms = 0; // Clear from state (App owns it now)
         crate::infra::profiler::log_tool_time(tool_names, pipeline_start.elapsed());
         return;
@@ -454,7 +454,7 @@ fn finalize_tool_cycle(app: &mut App, cycle: &ToolCycle<'_>) {
     if has_dirty_file_panels(&app.state) {
         // Set waiting flag — main loop will check and continue streaming when ready
         app.state.thread_mut().waiting_for_panels = true;
-        app.wait_started_ms = now_ms();
+        app.stream_rt_mut().wait_started_ms = now_ms();
     } else {
         let _g = crate::profile!("continue_streaming");
         // No dirty panels — continue streaming immediately

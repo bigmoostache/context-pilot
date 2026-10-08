@@ -64,20 +64,19 @@ impl App {
         self.state.thread_store.set_executing(want);
     }
 
-    /// Park the outgoing thread's per-stream runtime (so its typewriter and
-    /// pending tools travel with it) and register it for background stepping.
+    /// Register the outgoing thread for background stepping. Its runtime,
+    /// stream runtime included, stays in its own slot.
     /// A mid-exec thread is marked `Streaming`, not `Idle`: its `ThreadStatus`
     /// is `TheirTurn` between turns, so `Idle` would drop it from scheduling.
     /// `post_step_exec_state` re-derives the real state on its first step.
+    /// Runs while the outgoing thread is still the executing one.
     fn park_outgoing(&mut self, have_id: String) {
-        let _g = crate::profile!("rr_park");
-        let mut sr = super::stream_runtime::StreamRuntime::new();
-        sr.swap_with_app(self);
         let mid_exec = self.state.thread().stream.phase.is_streaming()
-            || sr.pending_console_wait_tool_results.is_some()
-            || !sr.pending_tools.is_empty()
-            || sr.pending_done.is_some();
-        let _prev = self.parked_stream_runtimes.insert(have_id.clone(), sr);
+            || self.stream_rt().is_some_and(|sr| {
+                sr.pending_console_wait_tool_results.is_some()
+                    || !sr.pending_tools.is_empty()
+                    || sr.pending_done.is_some()
+            });
         let role = self.fleet.get(&have_id).map_or(Role::Thread, |e| e.role);
         let mut entry = Entry::new(role);
         if mid_exec {
@@ -88,7 +87,7 @@ impl App {
 
     /// Give the incoming thread a stored runtime if it has none (the boot
     /// unbound runtime on `first_placement`, else a fresh one), take it out of
-    /// the background registry and restore its per-stream runtime. `None`
+    /// the background registry. `None`
     /// (focus cleared) re-initializes the unbound runtime instead.
     fn place_incoming(&mut self, want: Option<&str>, first_placement: bool) {
         let Some(want_id) = want else {
@@ -105,10 +104,6 @@ impl App {
             self.state.thread_store.insert(want_id.to_owned(), runtime);
         }
         let _removed = self.fleet.remove(want_id);
-        if let Some(mut sr) = self.parked_stream_runtimes.remove(want_id) {
-            let _g = crate::profile!("rr_swap_stream");
-            sr.swap_with_app(self);
-        }
     }
 
     /// A freshly initialized runtime (per-thread module states + fixed base
@@ -294,17 +289,8 @@ impl App {
             // per-thread write now target ITS runtime. No data moves.
             self.stepping_thread = Some(id.clone());
             self.state.thread_store.set_executing(Some(id.clone()));
-            // Swap this thread's per-stream runtime (typewriter, pending tools/
-            // done, console-wait + blocking accumulators, deferred-sleep flags)
-            // into `App` so the shared advancement core drains ITS buffers, not
-            // the focused thread's — without this, the focused thread's residual
-            // typewriter chars / pending tools bleed into this thread (N>1 bug).
-            let mut sr = self.parked_stream_runtimes.remove(&id).unwrap_or_default();
-            sr.swap_with_app(self);
             self.step_one_thread();
             let exec_state = self.post_step_exec_state(&id); // from this thread's new stream phase
-            sr.swap_with_app(self); // restore focused thread's per-stream runtime
-            let _prev = self.parked_stream_runtimes.insert(id.clone(), sr);
             self.stepping_thread = None;
             self.state.thread_store.set_executing(prev.clone());
             if let Some(entry) = self.fleet.get_mut(&id) {

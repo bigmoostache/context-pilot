@@ -161,7 +161,6 @@ impl App {
         });
         let _removed = self.fleet.remove(thread_id);
         drop(self.state.thread_store.remove(thread_id));
-        let _parked = self.parked_stream_runtimes.remove(thread_id);
         // Deleting the executing thread: fall back to an initialized unbound
         // runtime so the next render's per-thread `ext` lookups still resolve.
         if self.state.executing_thread_id() == Some(thread_id) {
