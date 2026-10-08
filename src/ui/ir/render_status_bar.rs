@@ -5,12 +5,11 @@
 
 use cp_render::Semantic;
 use cp_render::frame::{
-    AgentCard, AutoContinue, Badge, GitChanges, QueueCard, ReverieCard, SkillCard, StatusBar, StopReason, ThinkCard,
+    AgentCard, Badge, GitChanges, QueueCard, ReverieCard, SkillCard, StatusBar, StopReason, ThinkCard,
 };
 use ratatui::prelude::{Frame, Line, Rect, Span, Style};
 use ratatui::widgets::Paragraph;
 
-use crate::infra::config::normalize_icon;
 use crate::state::State;
 use crate::ui::{helpers::spinner, theme};
 use cp_base::cast::Safe as _;
@@ -92,18 +91,8 @@ fn push_git(spans: &mut Vec<Span<'static>>, status: &StatusBar, base: Style) {
     }
 }
 
-/// Auto-continue + reverie + queue + think cards.
+/// Reverie + queue + think cards.
 fn push_activity_cards(spans: &mut Vec<Span<'static>>, status: &StatusBar, spin: &str, base: Style) {
-    if let Some(ac) = status.auto_continue.as_ref() {
-        let (icon, bg_color) = if ac.max.is_some() {
-            (normalize_icon("\u{1f501}"), theme::warning())
-        } else {
-            (normalize_icon("\u{1f504}"), theme::text_muted())
-        };
-        let label = if ac.max.is_some() { "Auto-continue" } else { "No Auto-continue" };
-        push_card(spans, format!(" {icon}{label} "), Style::default().fg(theme::bg_base()).bg(bg_color).bold(), base);
-    }
-
     for rev in &status.reveries {
         push_card(
             spans,
@@ -209,7 +198,7 @@ pub(crate) fn build_status_bar(state: &State) -> StatusBar {
         agent: build_agent(state),
         skills: build_skills(state),
         git: build_git(state),
-        auto_continue: Some(build_auto_continue(state)),
+
         reveries: build_reveries(state),
         queue: build_queue(state),
         think: build_think(state),
@@ -300,17 +289,6 @@ fn build_git(state: &State) -> Option<GitChanges> {
         additions: additions.unsigned_abs(),
         deletions: deletions.unsigned_abs(),
     })
-}
-
-// ── Auto-continue ────────────────────────────────────────────────────
-
-/// Build auto-continuation indicator.
-fn build_auto_continue(state: &State) -> AutoContinue {
-    let cfg = &cp_mod_spine::types::SpineState::get(state).config;
-    AutoContinue {
-        count: cfg.auto_continuation_count.to_u32(),
-        max: cfg.max_auto_retries.map(cp_base::cast::Safe::to_u32),
-    }
 }
 
 // ── Reverie ──────────────────────────────────────────────────────────
