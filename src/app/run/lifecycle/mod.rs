@@ -8,7 +8,7 @@ use ratatui::prelude::{CrosstermBackend, Terminal};
 
 use crate::app::actions::{Action, ActionResult, apply_action};
 use crate::app::panels::now_ms;
-use crate::infra::constants::{EVENT_POLL_MS, RENDER_THROTTLE_MS};
+use crate::infra::constants::{EVENT_POLL_MS, FULL_REDRAW_MS, RENDER_THROTTLE_MS};
 use crate::state::Kind;
 use crate::state::cache::CacheUpdate;
 use crate::state::persistence::{check_ownership, save_state};
@@ -134,11 +134,7 @@ impl App {
             // Update spinner animation if there's active loading/streaming
             self.update_spinner_animation();
 
-            // Render if dirty and enough time has passed (capped at ~28fps)
-            if self.state.flags.ui.dirty && current_ms.saturating_sub(self.last_render_ms) >= RENDER_THROTTLE_MS {
-                super::tools::watchdog::mark(super::tools::watchdog::Step::Render);
-                self.render_frame(terminal, current_ms)?;
-            }
+            self.render_if_due(terminal, current_ms)?;
 
             super::tools::watchdog::mark(super::tools::watchdog::Step::Idle);
 
@@ -170,6 +166,29 @@ impl App {
             "Resuming after TUI reload".to_owned(),
         );
         save_state(&self.state);
+    }
+
+    /// Loop-tail render: a forced full repaint once per [`FULL_REDRAW_MS`]
+    /// (clears terminal + ratatui back buffer so resize leftovers and stray
+    /// escape output get overwritten), else a throttled diff render when dirty.
+    fn render_if_due(
+        &mut self,
+        terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+        current_ms: u64,
+    ) -> io::Result<()> {
+        let full = current_ms.saturating_sub(self.last_full_redraw_ms) >= FULL_REDRAW_MS;
+        let throttled_dirty =
+            self.state.flags.ui.dirty && current_ms.saturating_sub(self.last_render_ms) >= RENDER_THROTTLE_MS;
+        if !full && !throttled_dirty {
+            return Ok(());
+        }
+        super::tools::watchdog::mark(super::tools::watchdog::Step::Render);
+        if full {
+            self.last_full_redraw_ms = current_ms;
+            let _guard = crate::profile!("full_redraw_clear");
+            terminal.clear()?;
+        }
+        self.render_frame(terminal, current_ms)
     }
 
     /// Draw one frame: render the UI + command palette, clear dirty, stamp render time.

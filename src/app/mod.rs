@@ -82,6 +82,9 @@ pub(crate) struct App {
     pub pending_retry_error: Option<String>,
     /// Last render time for throttling
     pub last_render_ms: u64,
+    /// Last forced full repaint (terminal clear + redraw of every cell)
+    pub last_full_redraw_ms: u64,
+
     /// Last spinner animation update time
     pub last_spinner_ms: u64,
     /// Last bridge-recovery retry time — throttles the periodic

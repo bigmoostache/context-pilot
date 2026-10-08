@@ -31,6 +31,8 @@ impl App {
             last_ownership_check_ms: now_ms(),
             pending_retry_error: None,
             last_render_ms: 0,
+            last_full_redraw_ms: now_ms(),
+
             last_spinner_ms: 0,
             last_bridge_recover_ms: 0,
             last_chat_drain_ms: 0,
