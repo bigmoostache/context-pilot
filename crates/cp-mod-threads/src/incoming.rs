@@ -46,7 +46,8 @@ pub fn take_idle_autoread(state: &mut State) -> Option<StreamingPush> {
     let tid = FocusState::get(state).focused_thread_id.clone()?;
     let ts = ThreadsState::get(state);
     let thread = ts.threads.iter().find(|t| t.id == tid)?;
-    if thread.status != ThreadStatus::MyTurn || thread.archived {
+    // Paused = parked: leave messages unseen so resuming picks them up.
+    if thread.status != ThreadStatus::MyTurn || thread.archived || thread.paused {
         return None;
     }
     if !thread.messages.iter().any(|m| !m.acknowledged) {
@@ -95,6 +96,10 @@ pub fn take_streaming_push(state: &mut State) -> Option<StreamingPush> {
 
     let ts_mut = ThreadsState::get_mut(state);
     let thread = ts_mut.threads.iter_mut().find(|t| t.id == tid)?;
+    // Paused = parked: no push; messages stay unseen for the resume auto-read.
+    if thread.paused || thread.archived {
+        return None;
+    }
     let mut messages = Vec::new();
     let mut truncated = false;
     for msg in &mut thread.messages {
