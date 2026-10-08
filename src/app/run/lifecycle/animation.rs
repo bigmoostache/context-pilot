@@ -20,13 +20,17 @@ impl App {
     /// mutations) set `dirty` at their source, so real changes still render instantly.
     /// This gating fixed the "idle yet pinning CPU" pathology (T309). The 100ms throttle
     /// caps the (cheap) animation scan itself to 10Hz.
+    /// While the F12 perf overlay is open the tick runs at 30fps unconditionally,
+    /// so its live numbers refresh even when nothing else animates.
     pub(super) fn update_spinner_animation(&mut self) {
         let now = now_ms();
-        if now.saturating_sub(self.last_spinner_ms) < 100 {
+        let perf_open = self.state.flags.ui.perf_enabled;
+        let interval = if perf_open { crate::infra::constants::PERF_OVERLAY_FRAME_MS } else { 100 };
+        if now.saturating_sub(self.last_spinner_ms) < interval {
             return;
         }
         self.last_spinner_ms = now;
-        if Self::has_active_animation(&self.state) {
+        if perf_open || Self::has_active_animation(&self.state) {
             self.state.flags.ui.dirty = true;
         }
     }

@@ -322,7 +322,8 @@ fn build_perf_budget_bars(frame_avg_ms: f64) -> Vec<PerfBudgetBar> {
 }
 
 /// Minimum age before the F12 overlay rebuilds its perf snapshot.
-const SNAPSHOT_TTL: std::time::Duration = std::time::Duration::from_millis(250);
+const SNAPSHOT_TTL: std::time::Duration =
+    std::time::Duration::from_millis(crate::infra::constants::PERF_OVERLAY_FRAME_MS);
 
 /// A perf snapshot plus the instant it was taken.
 type TimedSnapshot = (std::time::Instant, std::sync::Arc<crate::ui::perf::PerfSnapshot>);
@@ -331,7 +332,7 @@ type TimedSnapshot = (std::time::Instant, std::sync::Arc<crate::ui::perf::PerfSn
 /// every op (~730); rebuilding it every frame made `ir_overlays` spike to 55 ms.
 static SNAPSHOT_CACHE: std::sync::Mutex<Option<TimedSnapshot>> = std::sync::Mutex::new(None);
 
-/// The perf snapshot, rebuilt at most every [`SNAPSHOT_TTL`] (4 per second).
+/// The perf snapshot, rebuilt at most every [`SNAPSHOT_TTL`] (30 per second).
 fn cached_snapshot() -> std::sync::Arc<crate::ui::perf::PerfSnapshot> {
     let mut slot = SNAPSHOT_CACHE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     if let Some(entry) = slot.as_ref()
