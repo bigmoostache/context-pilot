@@ -17,6 +17,7 @@ use cp_base::cast::Safe as _;
 use cp_base::cast::float_math;
 use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadStatus, ThreadsState};
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::hash::{Hash as _, Hasher as _};
 use std::rc::Rc;
 
@@ -27,6 +28,26 @@ thread_local! {
     /// Last built message lines and the fingerprint they were built from.
     /// Single slot: the threads view shows one thread at a time.
     static LINE_CACHE: RefCell<Option<(u64, CachedLines)>> = const { RefCell::new(None) };
+    /// Rendered lines per message, keyed by [`message_key`]. When the thread
+    /// changes (new message, switch back to a thread), only messages missing
+    /// here are rendered again; the rest are copied.
+    static MSG_CACHE: RefCell<HashMap<u64, CachedLines>> = RefCell::new(HashMap::new());
+}
+
+/// Extra entries kept in [`MSG_CACHE`] beyond the current build before pruning
+/// to the current build's messages.
+const MSG_CACHE_SLACK: usize = 4096;
+
+/// Key of one message's rendered lines: everything `render_message_blocks`
+/// reads from it, plus width and active theme.
+fn message_key(msg: &cp_mod_threads::types::ThreadMessage, viewport_width: u16) -> u64 {
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    viewport_width.hash(&mut h);
+    std::ptr::from_ref(cp_base::config::accessors::active_theme()).addr().hash(&mut h);
+    matches!(msg.author, ThreadAuthor::Assistant).hash(&mut h);
+    msg.timestamp.hash(&mut h);
+    msg.content.hash(&mut h);
+    h.finish()
 }
 
 /// Fingerprint of everything [`build_thread_message_lines`] reads: thread id,
@@ -54,7 +75,10 @@ fn cached_thread_message_lines(thread: &cp_mod_threads::types::Thread, viewport_
         {
             return Rc::clone(&entry.1);
         }
-        let lines = Rc::new(build_thread_message_lines(thread, viewport_width));
+        let lines = {
+            let _g = crate::profile!("tv_lines_build");
+            Rc::new(build_thread_message_lines(thread, viewport_width))
+        };
         *slot = Some((key, Rc::clone(&lines)));
         lines
     })
@@ -150,7 +174,8 @@ fn build_thread_message_lines(
 
     let opts = MessageBlockOpts { viewport_width, is_streaming: false, dev_mode: false };
 
-    // Convert ThreadMessages → Messages → IR blocks → ratatui Lines.
+    // Real messages come from MSG_CACHE (rendered once per content/width/theme);
+    // only messages not seen before go through the IR renderer.
     //
     // Auto tool-activity traces (`msg.auto`) are NOT rendered as full message
     // bubbles — that would drown the real conversation in a wall of one-line
@@ -160,29 +185,39 @@ fn build_thread_message_lines(
     // traces (mirroring the one real messages leave after their bubble), so a
     // block of tool calls is visually separated from the next message but its
     // internal rows stay tight.
-    let mut all_blocks: Vec<cp_render::Block> = Vec::new();
+    let mut out: Vec<ratatui::text::Line<'static>> = Vec::new();
+    let mut used: Vec<u64> = Vec::new();
     let mut in_auto_run = false;
-    for msg in &thread.messages {
-        if msg.auto {
-            all_blocks.push(IrBlock::Line(auto_trace_spans(msg)));
-            in_auto_run = true;
-            continue;
+    MSG_CACHE.with_borrow_mut(|cache| {
+        for msg in &thread.messages {
+            if msg.auto {
+                out.extend(ir::blocks_to_lines(&[IrBlock::Line(auto_trace_spans(msg))]));
+                in_auto_run = true;
+                continue;
+            }
+            if in_auto_run {
+                out.extend(ir::blocks_to_lines(&[IrBlock::Empty]));
+                in_auto_run = false;
+            }
+            let key = message_key(msg, viewport_width);
+            used.push(key);
+            let lines = cache.entry(key).or_insert_with(|| {
+                let _g = crate::profile!("tv_msg_render");
+                Rc::new(ir::blocks_to_lines(&render_message_blocks(&thread_message_to_message(msg), &opts)))
+            });
+            out.extend(lines.iter().cloned());
         }
-        if in_auto_run {
-            all_blocks.push(IrBlock::Empty);
-            in_auto_run = false;
+        if cache.len() > used.len().saturating_add(MSG_CACHE_SLACK) {
+            let keep: std::collections::HashSet<u64> = used.iter().copied().collect();
+            cache.retain(|k, _| keep.contains(k));
         }
-        let conv_msg = thread_message_to_message(msg);
-        let msg_blocks = render_message_blocks(&conv_msg, &opts);
-        all_blocks.extend(msg_blocks);
-    }
+    });
     // Trailing run of traces (conversation ends on tool calls) still gets its
     // separating blank line.
     if in_auto_run {
-        all_blocks.push(IrBlock::Empty);
+        out.extend(ir::blocks_to_lines(&[IrBlock::Empty]));
     }
-
-    ir::blocks_to_lines(&all_blocks)
+    out
 }
 
 /// Paint the pre-built message `lines` with scroll management that mirrors the
