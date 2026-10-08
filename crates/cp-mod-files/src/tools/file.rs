@@ -47,7 +47,7 @@ fn open_single_file(path: &str, state: &mut State) -> String {
     let canonical = path_obj.canonicalize().map_or_else(|_| path.to_owned(), |p| p.to_string_lossy().to_string());
 
     // Check if file is already open (using canonical path)
-    if state.context.iter().any(|c| c.get_meta_str("file_path") == Some(&canonical)) {
+    if state.thread().context.iter().any(|c| c.get_meta_str("file_path") == Some(&canonical)) {
         return format!("File '{path}' is already open in context");
     }
 
@@ -63,7 +63,7 @@ fn open_single_file(path: &str, state: &mut State) -> String {
     let mut elem = cp_base::state::context::make_default_entry(&context_id, Kind::new(Kind::FILE), &file_name, true);
     elem.uid = Some(uid);
     elem.set_meta("file_path", &canonical);
-    state.context.push(elem);
+    state.thread_mut().context.push(elem);
 
     // Auto-expand parent folders in the tree so the opened file is visible
     if state.active_modules.contains("tree")

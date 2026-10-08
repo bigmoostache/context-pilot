@@ -32,7 +32,7 @@ pub(crate) fn check_threshold_trigger(state: &mut State) -> bool {
     }
 
     // Sum all context element token counts
-    let total_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
+    let total_tokens: usize = state.thread().context.iter().map(|c| c.token_count).sum();
     let threshold = state.cleaning_threshold_tokens();
 
     if total_tokens <= threshold {

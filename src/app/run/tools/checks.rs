@@ -13,7 +13,7 @@ use crate::app::App;
 /// Non-blocking check: if we're waiting for file panels to load,
 /// check if they're ready (or timed out) and continue streaming.
 pub(crate) fn check_waiting_for_panels(app: &mut App) {
-    if !app.state.waiting_for_panels {
+    if !app.state.thread().waiting_for_panels {
         return;
     }
 
@@ -21,7 +21,7 @@ pub(crate) fn check_waiting_for_panels(app: &mut App) {
     let timed_out = now_ms().saturating_sub(app.wait_started_ms) >= 5_000;
 
     if panels_ready || timed_out {
-        app.state.waiting_for_panels = false;
+        app.state.thread_mut().waiting_for_panels = false;
         app.state.flags.ui.dirty = true;
         crate::app::run::streaming::continue_streaming(app);
     }
@@ -74,7 +74,7 @@ pub(crate) fn check_deferred_sleep(app: &mut App) {
 /// in-memory copy and a full-recap on-disk one, and every reload would redo the
 /// same work. Persisting makes the collapse happen exactly once per recap.
 pub(crate) fn strip_superseded_recaps(app: &mut App) {
-    if cp_mod_queue::types::QueueState::get(&app.state).active || app.state.tempo {
+    if cp_mod_queue::types::QueueState::get(&app.state).active || app.state.thread().tempo {
         return;
     }
     let touched = cp_mod_todo::recap::strip_superseded(&mut app.state);
@@ -84,7 +84,7 @@ pub(crate) fn strip_superseded_recaps(app: &mut App) {
     // Clone first so the immutable borrow of `messages` ends before the save
     // (which needs `&App`). Indices are valid — nothing mutated the vec since.
     let saved: Vec<crate::state::Message> =
-        touched.iter().filter_map(|&idx| app.state.messages.get(idx).cloned()).collect();
+        touched.iter().filter_map(|&idx| app.state.thread().messages.get(idx).cloned()).collect();
     for msg in &saved {
         app.save_message_async(msg);
     }
@@ -101,14 +101,14 @@ pub(crate) fn strip_superseded_recaps(app: &mut App) {
 pub(crate) fn sync_todo_focus(app: &mut App) {
     let focused = cp_mod_threads::types::FocusState::get(&app.state).focused_thread_id.clone();
     if cp_mod_todo::tools::set_focus_filter(&mut app.state, focused) {
-        for ctx in &mut app.state.context {
+        for ctx in &mut app.state.thread_mut().context {
             if ctx.context_type.as_str() == crate::state::Kind::TODO {
                 ctx.cache_deprecated = true;
                 ctx.freeze_count = u8::MAX;
                 break;
             }
         }
-        app.state.tempo = false;
+        app.state.thread_mut().tempo = false;
     }
 }
 
@@ -123,14 +123,14 @@ pub(crate) fn sync_todo_focus(app: &mut App) {
 pub(crate) fn sync_scratchpad_focus(app: &mut App) {
     let focused = cp_mod_threads::types::FocusState::get(&app.state).focused_thread_id.clone();
     if cp_mod_scratchpad::tools::set_focus_filter(&mut app.state, focused) {
-        for ctx in &mut app.state.context {
+        for ctx in &mut app.state.thread_mut().context {
             if ctx.context_type.as_str() == crate::state::Kind::SCRATCHPAD {
                 ctx.cache_deprecated = true;
                 ctx.freeze_count = u8::MAX;
                 break;
             }
         }
-        app.state.tempo = false;
+        app.state.thread_mut().tempo = false;
     }
 }
 

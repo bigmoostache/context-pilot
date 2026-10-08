@@ -37,7 +37,7 @@ pub(super) struct FreezeConditions {
 pub(super) fn freeze_conditions(state: &State) -> FreezeConditions {
     FreezeConditions {
         queue_active: cp_mod_queue::types::QueueState::get(state).active,
-        tempo: state.tempo && state.frozen_context_snapshot.is_some(),
+        tempo: state.thread().tempo && state.thread().frozen_context_snapshot.is_some(),
     }
 }
 
@@ -94,7 +94,7 @@ pub(super) fn free_region_anchor(bp_indices: &[usize], culprit_idx: usize) -> us
 fn item_is_culprit(item: &crate::app::panels::ContextItem, state: &State, cond: FreezeConditions) -> bool {
     use crate::state::cache::hash_content;
     let fresh_hash = hash_content(&item.content);
-    match state.context.iter().find(|c| c.id == item.id) {
+    match state.thread().context.iter().find(|c| c.id == item.id) {
         None => true,
         Some(entry) => {
             let changed = entry.emitted.hash.as_deref().is_none_or(|lh| lh != fresh_hash);
@@ -120,7 +120,7 @@ fn scan_culprit_and_bps(
     cond: FreezeConditions,
 ) -> (Option<usize>, Vec<usize>) {
     let bp_ids: std::collections::HashSet<&str> =
-        state.previous_breakpoint_panel_ids.iter().map(String::as_str).collect();
+        state.thread().previous_breakpoint_panel_ids.iter().map(String::as_str).collect();
     let mut culprit_idx: Option<usize> = None;
     let mut bp_indices: Vec<usize> = Vec::new();
     let mut idx = 0usize;

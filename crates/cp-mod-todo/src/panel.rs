@@ -58,7 +58,7 @@ impl Panel for TodoPanel {
         let todo_content = Self::format_todos_for_context(state);
         let token_count = estimate_tokens(&todo_content);
 
-        for ctx in &mut state.context {
+        for ctx in &mut state.thread_mut().context {
             if ctx.context_type.as_str() == Kind::TODO {
                 ctx.token_count = token_count;
                 let _changed = cp_base::panels::update_if_changed(ctx, &todo_content);
@@ -75,6 +75,7 @@ impl Panel for TodoPanel {
         let content = Self::format_todos_for_context(state);
         // Find the Todo context element to get its ID and timestamp
         let (id, last_refresh_ms) = state
+            .thread()
             .context
             .iter()
             .find(|c| c.context_type.as_str() == Kind::TODO)

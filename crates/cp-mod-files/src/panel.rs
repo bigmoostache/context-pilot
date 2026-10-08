@@ -55,7 +55,7 @@ impl Panel for FilePanel {
     }
 
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
-        let selected = state.context.get(state.selected_context);
+        let selected = state.thread().context.get(state.thread().selected_context);
 
         let (content, file_path) = selected.map_or_else(
             || (String::new(), String::new()),
@@ -100,7 +100,11 @@ impl Panel for FilePanel {
         blocks
     }
     fn title(&self, state: &State) -> String {
-        state.context.get(state.selected_context).map_or_else(|| "File".to_owned(), |ctx| ctx.name.clone())
+        state
+            .thread()
+            .context
+            .get(state.thread().selected_context)
+            .map_or_else(|| "File".to_owned(), |ctx| ctx.name.clone())
     }
 
     fn build_cache_request(&self, ctx: &Entry, _state: &State) -> Option<CacheRequest> {
@@ -175,6 +179,7 @@ impl Panel for FilePanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         state
+            .thread()
             .context
             .iter()
             .filter(|c| c.context_type.as_str() == Kind::FILE)

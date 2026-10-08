@@ -51,7 +51,7 @@ impl App {
     ///
     /// When none hold, the screen is static and no periodic redraw is needed.
     fn has_active_animation(state: &crate::state::State) -> bool {
-        if state.stream.phase.is_streaming() {
+        if state.thread().stream.phase.is_streaming() {
             return true; // STREAMING / TOOLING badge spinner
         }
         // A pending timed watcher renders the animated WAITING badge.
@@ -66,7 +66,7 @@ impl App {
         }
         // A panel still loading its first content (LOADING badge + sidebar
         // spinner) or a running console (animated sidebar glyph).
-        state.context.iter().any(|c| {
+        state.thread().context.iter().any(|c| {
             (c.cached_content.is_none() && c.context_type.needs_cache())
                 || (c.context_type.as_str() == "console"
                     && c.get_meta_str("console_status").is_some_and(|s| s.starts_with("running")))

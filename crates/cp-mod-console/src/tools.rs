@@ -63,6 +63,7 @@ fn check_git_gh_guardrail(input: &str) -> Option<String> {
 /// Returns (`session_key`, `panel_id`) or an error.
 fn resolve_session_key(state: &State, panel_id: &str) -> Result<String, String> {
     state
+        .thread()
         .context
         .iter()
         .find(|c| c.id == panel_id && c.context_type.as_str() == Kind::CONSOLE)
@@ -118,7 +119,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     if let Some(dir) = cwd.as_ref() {
         ctx.set_meta("console_cwd", dir);
     }
-    state.context.push(ctx);
+    state.thread_mut().context.push(ctx);
 
     // Store handle
     let cs = ConsoleState::get_mut(state);
@@ -167,7 +168,7 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Short delay for output to arrive
-    state.tool_sleep_until_ms = now_ms().saturating_add(500);
+    state.thread_mut().tool_sleep_until_ms = now_ms().saturating_add(500);
 
     ToolResult::new(tool.id.clone(), format!("Sent input to console '{panel_id}'"), false)
 }

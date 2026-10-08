@@ -49,7 +49,7 @@ fn file_panel_needs_describe(state: &State, ctx: &Entry) -> Option<String> {
 /// `(index, id)` in `state.context`.
 fn close_one_panel(state: &mut State, at: (usize, &str), modules: &[Box<dyn Module>], tally: &mut CloseTally) {
     let (idx, id) = at;
-    let ctx = state.context.remove(idx);
+    let ctx = state.thread_mut().context.remove(idx);
     let mut close_result: Option<Result<String, String>> = None;
     for module in modules {
         if let Some(result) = module.on_close_context(&ctx, state) {
@@ -60,7 +60,7 @@ fn close_one_panel(state: &mut State, at: (usize, &str), modules: &[Box<dyn Modu
     match close_result {
         Some(Ok(desc)) => tally.closed.push(format!("{id} ({desc})")),
         Some(Err(msg)) => {
-            state.context.insert(idx, ctx);
+            state.thread_mut().context.insert(idx, ctx);
             tally.skipped.push(msg);
         }
         None => {
@@ -73,11 +73,11 @@ fn close_one_panel(state: &mut State, at: (usize, &str), modules: &[Box<dyn Modu
 /// Route one requested id to its outcome: not-found, protected, describe-skip,
 /// or an actual close.
 fn process_close_id(state: &mut State, id: &str, modules: &[Box<dyn Module>], tally: &mut CloseTally) {
-    let Some(idx) = state.context.iter().position(|c| c.id == id) else {
+    let Some(idx) = state.thread().context.iter().position(|c| c.id == id) else {
         tally.not_found.push(id.to_owned());
         return;
     };
-    let Some(ctx_elem) = state.context.get(idx) else {
+    let Some(ctx_elem) = state.thread().context.get(idx) else {
         tally.not_found.push(id.to_owned());
         return;
     };

@@ -22,7 +22,7 @@ impl Panel for EntitiesPanel {
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let es = EntitiesState::get(state);
         let content = build_context_text(es);
-        let entry = state.context.iter().find(|e| e.context_type.as_str() == Kind::ENTITIES);
+        let entry = state.thread().context.iter().find(|e| e.context_type.as_str() == Kind::ENTITIES);
         let (id, last_refresh_ms) = entry.map_or_else(|| (String::new(), 0), |e| (e.id.clone(), e.last_refresh_ms));
         vec![ContextItem::new(id, "Entities", content, last_refresh_ms)]
     }
@@ -53,7 +53,7 @@ impl Panel for EntitiesPanel {
             let _p = cp_base::perf_span!("ent_fingerprint");
             db_fingerprint(&db_path)
         };
-        let entry = state.context.iter().find(|e| e.context_type.as_str() == Kind::ENTITIES);
+        let entry = state.thread().context.iter().find(|e| e.context_type.as_str() == Kind::ENTITIES);
         if entry.is_some_and(|e| e.cached_content.is_some() && e.source_hash.as_deref() == Some(fingerprint.as_str())) {
             return;
         }
@@ -73,7 +73,7 @@ impl Panel for EntitiesPanel {
         let content = build_context_text(EntitiesState::get(state));
         let tokens = cp_base::state::context::estimate_tokens(&content);
 
-        if let Some(ctx) = state.context.iter_mut().find(|e| e.context_type.as_str() == Kind::ENTITIES) {
+        if let Some(ctx) = state.thread_mut().context.iter_mut().find(|e| e.context_type.as_str() == Kind::ENTITIES) {
             ctx.cached_content = Some(content);
             ctx.token_count = tokens;
             ctx.full_token_count = tokens;

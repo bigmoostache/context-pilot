@@ -73,7 +73,7 @@ impl App {
         let _g = crate::profile!("rr_park");
         let mut sr = super::stream_runtime::StreamRuntime::new();
         sr.swap_with_app(self);
-        let mid_exec = self.state.stream.phase.is_streaming()
+        let mid_exec = self.state.thread().stream.phase.is_streaming()
             || sr.pending_console_wait_tool_results.is_some()
             || !sr.pending_tools.is_empty()
             || sr.pending_done.is_some();
@@ -321,7 +321,7 @@ impl App {
     fn post_step_exec_state(&self, id: &str) -> ThreadExecState {
         let errs = cp_mod_spine::types::SpineState::get(&self.state).config.consecutive_continuation_errors;
         let status = ThreadsState::get(&self.state).threads.iter().find(|t| t.id == id).map(|t| t.status);
-        Self::exec_state_from_residency(self.state.stream.phase.is_streaming(), errs, status)
+        Self::exec_state_from_residency(self.state.thread().stream.phase.is_streaming(), errs, status)
     }
 
     /// The single definition of "what exec state do these residency facts imply".
@@ -378,7 +378,8 @@ impl App {
         if let Some(id) = focused {
             let errs = cp_mod_spine::types::SpineState::get(&self.state).config.consecutive_continuation_errors;
             let status = ThreadsState::get(&self.state).threads.iter().find(|t| t.id == id).map(|t| t.status);
-            let resident = Self::exec_state_from_residency(self.state.stream.phase.is_streaming(), errs, status);
+            let resident =
+                Self::exec_state_from_residency(self.state.thread().stream.phase.is_streaming(), errs, status);
             let _inserted = exec_states.insert(id, resident);
         }
 

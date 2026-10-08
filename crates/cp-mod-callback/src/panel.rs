@@ -248,7 +248,7 @@ impl Panel for CallbackPanel {
         let content = Self::format_for_context(state);
         let token_count = estimate_tokens(&content);
 
-        for ctx in &mut state.context {
+        for ctx in &mut state.thread_mut().context {
             if ctx.context_type.as_str() == Kind::CALLBACK {
                 ctx.token_count = token_count;
                 let _changed = cp_base::panels::update_if_changed(ctx, &content);
@@ -264,6 +264,7 @@ impl Panel for CallbackPanel {
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let content = Self::format_for_context(state);
         let (id, last_refresh_ms) = state
+            .thread()
             .context
             .iter()
             .find(|c| c.context_type.as_str() == Kind::CALLBACK)

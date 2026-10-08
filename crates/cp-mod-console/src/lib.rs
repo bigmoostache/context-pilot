@@ -185,7 +185,9 @@ impl Module for ConsoleModule {
             drop(cs.sessions.insert(name.clone(), handle));
 
             // Update panel metadata if panel was persisted
-            if let Some(ctx) = state.context.iter_mut().find(|c| c.get_meta_str("console_name") == Some(&name)) {
+            if let Some(ctx) =
+                state.thread_mut().context.iter_mut().find(|c| c.get_meta_str("console_name") == Some(&name))
+            {
                 ctx.set_meta("console_status", &status_label);
                 ctx.cache_deprecated = true;
             }
@@ -197,7 +199,7 @@ impl Module for ConsoleModule {
             let cs = ConsoleState::get(state);
             cs.sessions.keys().cloned().collect()
         };
-        state.context.retain(|c| {
+        state.thread_mut().context.retain(|c| {
             if c.context_type.as_str() != Kind::CONSOLE {
                 return true; // keep non-console panels
             }
@@ -279,7 +281,7 @@ impl Module for ConsoleModule {
             "console_send_keys" | "console_wait" | "console_watch" => {
                 let mut pf = Verdict::new();
                 if let Some(panel_id) = tool.input.get("id").and_then(|v| v.as_str()) {
-                    match state.context.iter().find(|c| c.id == panel_id) {
+                    match state.thread().context.iter().find(|c| c.id == panel_id) {
                         None => pf.errors.push(format!("Panel '{panel_id}' not found")),
                         Some(ctx) if ctx.context_type.as_str() != Kind::CONSOLE => {
                             pf.errors.push(format!("Panel '{panel_id}' is not a console panel"));

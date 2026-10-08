@@ -31,7 +31,7 @@ pub(crate) fn build_conversation(state: &State) -> Conversation {
 /// Build history sections from `ConversationHistory` context elements.
 fn build_history_sections(state: &State) -> Vec<HistorySection> {
     let mut history_panels: Vec<_> =
-        state.context.iter().filter(|c| c.context_type.as_str() == Kind::CONVERSATION_HISTORY).collect();
+        state.thread().context.iter().filter(|c| c.context_type.as_str() == Kind::CONVERSATION_HISTORY).collect();
     history_panels.sort_by_key(|c| c.last_refresh_ms);
 
     history_panels
@@ -52,9 +52,10 @@ fn build_history_sections(state: &State) -> Vec<HistorySection> {
 
 /// Build the visible message list from current conversation.
 fn build_messages(state: &State) -> Vec<IrMessage> {
-    let last_msg_id = state.messages.last().map(|m| m.id.clone());
+    let last_msg_id = state.thread().messages.last().map(|m| m.id.clone());
 
     state
+        .thread()
         .messages
         .iter()
         .filter(|msg| {
@@ -63,7 +64,7 @@ fn build_messages(state: &State) -> Vec<IrMessage> {
             }
             // Skip empty text messages (unless currently streaming)
             let is_last = last_msg_id.as_ref() == Some(&msg.id);
-            let is_streaming = state.stream.phase.is_streaming() && is_last && msg.role == "assistant";
+            let is_streaming = state.thread().stream.phase.is_streaming() && is_last && msg.role == "assistant";
             if msg.msg_type == MsgKind::TextMessage && msg.content.trim().is_empty() && !is_streaming {
                 return false;
             }
@@ -131,6 +132,7 @@ fn tool_result_to_ir(tr: &ToolResultRecord) -> ToolResultPreview {
 /// Build streaming tool previews from state.
 fn build_streaming_tools(state: &State) -> Vec<StreamingTool> {
     state
+        .thread()
         .streaming_tool
         .as_ref()
         .map(|st| vec![StreamingTool { tool_name: st.name.clone(), partial_input: st.input_so_far.clone() }])
@@ -142,10 +144,10 @@ fn build_streaming_tools(state: &State) -> Vec<StreamingTool> {
 /// Build the input area from state.
 fn build_input(state: &State) -> InputArea {
     InputArea {
-        text: state.composer.text.clone(),
-        cursor: state.composer.cursor,
+        text: state.thread().composer.text.clone(),
+        cursor: state.thread().composer.cursor,
         placeholder: "Type a message\u{2026}".into(),
-        focused: !state.stream.phase.is_streaming(),
+        focused: !state.thread().stream.phase.is_streaming(),
     }
 }
 

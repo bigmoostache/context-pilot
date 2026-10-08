@@ -159,7 +159,7 @@ fn skill_load(tool: &ToolUse, state: &mut State) -> ToolResult {
     elem.cached_content = Some(content);
     elem.last_refresh_ms = cp_base::panels::now_ms();
 
-    state.context.push(elem);
+    state.thread_mut().context.push(elem);
     PromptState::get_mut(state).loaded_skill_ids.push(id.to_owned());
 
     state.touch_panel(Kind::LIBRARY);

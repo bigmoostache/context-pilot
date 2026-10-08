@@ -87,6 +87,7 @@ fn resident_worker_id(state: &State) -> String {
 /// `panels/` dir, keyed by the fleet-global UID counter).
 pub(crate) fn panel_uids_of(state: &State) -> std::collections::HashSet<String> {
     state
+        .thread()
         .context
         .iter()
         .filter(|c| c.context_type.as_str() != Kind::SYSTEM && c.context_type.as_str() != Kind::LIBRARY)
@@ -119,7 +120,7 @@ fn build_module_data_maps(state: &State) -> ModuleDataMaps {
         }
     }
     // Cache optimization engine (survives reloads via worker state)
-    if let Some(json) = state.cache_engine_json.as_ref()
+    if let Some(json) = state.thread().cache_engine_json.as_ref()
         && let Ok(val) = serde_json::from_str::<serde_json::Value>(json)
     {
         let _r = worker_modules.insert("cache_engine".to_owned(), val);
@@ -131,7 +132,7 @@ fn build_module_data_maps(state: &State) -> ModuleDataMaps {
 /// live conversation messages, or a history panel's frozen chunk, else empty.
 fn panel_message_uids(ctx: &crate::state::Entry, state: &State) -> Vec<String> {
     if ctx.context_type.as_str() == Kind::CONVERSATION {
-        state.messages.iter().map(|m| m.uid.clone().unwrap_or_else(|| m.id.clone())).collect()
+        state.thread().messages.iter().map(|m| m.uid.clone().unwrap_or_else(|| m.id.clone())).collect()
     } else if ctx.context_type.as_str() == Kind::CONVERSATION_HISTORY {
         ctx.history_messages
             .as_ref()
@@ -150,7 +151,7 @@ fn build_panel_write_ops(
     known_uids: &mut std::collections::HashSet<String>,
 ) -> Vec<WriteOp> {
     let mut writes = Vec::new();
-    for ctx in &state.context {
+    for ctx in &state.thread().context {
         if ctx.context_type.as_str() == Kind::SYSTEM || ctx.context_type.as_str() == Kind::LIBRARY {
             continue;
         }
@@ -175,7 +176,7 @@ fn build_panel_write_ops(
 /// Emit one `{uid}.yaml` write op per message held in a `ConversationHistory` panel.
 fn build_history_message_ops(state: &State, messages_dir: &std::path::Path) -> Vec<WriteOp> {
     let mut writes = Vec::new();
-    for ctx in &state.context {
+    for ctx in &state.thread().context {
         if ctx.context_type.as_str() == Kind::CONVERSATION_HISTORY
             && let Some(msgs) = ctx.history_messages.as_ref()
         {
@@ -222,7 +223,7 @@ pub(crate) fn collect_orphan_deletes(
 /// Build `important_panel_uids` + `panel_uid_to_local_id` maps for the worker state.
 fn build_panel_uid_maps(state: &State) -> PanelUidMaps {
     let mut important_uids: HashMap<Kind, String> = HashMap::new();
-    for ctx in &state.context {
+    for ctx in &state.thread().context {
         let dominated = (ctx.context_type.is_fixed() || ctx.context_type.as_str() == Kind::CONVERSATION)
             && ctx.context_type.as_str() != Kind::SYSTEM
             && ctx.context_type.as_str() != Kind::LIBRARY;
@@ -231,6 +232,7 @@ fn build_panel_uid_maps(state: &State) -> PanelUidMaps {
         }
     }
     let panel_uid_to_local_id: HashMap<String, String> = state
+        .thread()
         .context
         .iter()
         .filter(|c| c.uid.is_some() && !c.context_type.is_fixed() && c.context_type.as_str() != Kind::CONVERSATION)
@@ -252,7 +254,7 @@ fn shared_config_op(
         .with_owner_pid(Some(current_pid()))
         // Draft lives per-thread in `states/<id>.json`; the shared slot is
         // emptied so a background-thread save can't clobber the focused draft.
-        .with_ui(state.selected_context, String::new(), 0)
+        .with_ui(state.thread().selected_context, String::new(), 0)
         .with_view_mode(state.view_mode)
         .with_modules(global_modules);
     // Compact, not pretty: config.json is ~1.2 MB and rewritten on every save.
@@ -273,8 +275,8 @@ fn worker_state_op(
     let worker_state = WorkerState::default()
         .with_worker_id(worker_id.clone())
         .with_panel_uids(important_uids, panel_uid_to_local_id)
-        .with_id_counters(state.next_tool_id, state.next_result_id)
-        .with_draft(state.composer.text.clone(), state.composer.cursor)
+        .with_id_counters(state.thread().next_tool_id, state.thread().next_result_id)
+        .with_draft(state.thread().composer.text.clone(), state.thread().composer.cursor)
         .with_modules(worker_modules);
     let json = serde_json::to_string(&worker_state).ok()?;
     Some(WriteOp {

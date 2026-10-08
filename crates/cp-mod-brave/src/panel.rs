@@ -29,7 +29,7 @@ pub fn create(state: &mut State, title: &str, content: &str) -> String {
     // Store content in metadata so it persists across reloads
     drop(elem.metadata.insert(META_CONTENT.to_owned(), serde_json::Value::String(content.to_owned())));
 
-    state.context.push(elem);
+    state.thread_mut().context.push(elem);
     panel_id
 }
 
@@ -96,8 +96,11 @@ impl Panel for Results {
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
         use cp_render::{Block, Semantic, Span as S};
 
-        let ctx_opt =
-            state.context.get(state.selected_context).filter(|c| c.context_type == Kind::new(BRAVE_PANEL_TYPE));
+        let ctx_opt = state
+            .thread()
+            .context
+            .get(state.thread().selected_context)
+            .filter(|c| c.context_type == Kind::new(BRAVE_PANEL_TYPE));
 
         let Some(ctx) = ctx_opt else {
             return vec![Block::styled_text(" No brave result panel".into(), Semantic::Muted)];
@@ -110,7 +113,11 @@ impl Panel for Results {
         content.lines().map(|line| Block::text(format!(" {line}"))).collect()
     }
     fn title(&self, state: &State) -> String {
-        state.context.get(state.selected_context).map_or_else(|| "Brave Result".to_owned(), |ctx| ctx.name.clone())
+        state
+            .thread()
+            .context
+            .get(state.thread().selected_context)
+            .map_or_else(|| "Brave Result".to_owned(), |ctx| ctx.name.clone())
     }
 
     fn max_freezes(&self) -> u8 {
@@ -119,6 +126,7 @@ impl Panel for Results {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         state
+            .thread()
             .context
             .iter()
             .filter(|c| c.context_type == Kind::new(BRAVE_PANEL_TYPE))

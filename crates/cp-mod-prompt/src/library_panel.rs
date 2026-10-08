@@ -134,12 +134,12 @@ impl Panel for LibraryPanel {
         // fingerprint) and the active agent / loaded skills are the same.
         let fingerprint = library_fingerprint(state);
         let lib = Kind::new(Kind::LIBRARY);
-        let entry = state.context.iter().find(|c| c.context_type == lib);
+        let entry = state.thread().context.iter().find(|c| c.context_type == lib);
         if entry.is_some_and(|c| c.cached_content.is_some() && c.source_hash.as_deref() == Some(fingerprint.as_str())) {
             return;
         }
         let items = self.context(state);
-        if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == lib) {
+        if let Some(ctx) = state.thread_mut().context.iter_mut().find(|c| c.context_type == lib) {
             let total: usize = items.iter().map(|i| cp_base::state::context::estimate_tokens(&i.content)).sum();
             ctx.token_count = total;
             let combined: String = items.iter().map(|i| i.content.as_str()).collect::<Vec<_>>().join("\n");
@@ -153,7 +153,7 @@ impl Panel for LibraryPanel {
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
-        let Some(ctx) = state.context.iter().find(|c| c.context_type == Kind::new(Kind::LIBRARY)) else {
+        let Some(ctx) = state.thread().context.iter().find(|c| c.context_type == Kind::new(Kind::LIBRARY)) else {
             return Vec::new();
         };
 

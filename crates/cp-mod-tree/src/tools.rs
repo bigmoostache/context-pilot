@@ -221,11 +221,12 @@ fn auto_close_file_panel(state: &mut State, normalized: &str, cwd: Option<&PathB
     let cwd_path = cwd?;
     let abs_path = cwd_path.join(normalized).to_string_lossy().to_string();
     let pos = state
+        .thread()
         .context
         .iter()
         .position(|c| c.context_type.as_str() == Kind::FILE && c.get_meta_str("file_path") == Some(&abs_path))?;
-    let panel_id = state.context.get(pos).map(|c| c.id.clone()).unwrap_or_default();
-    let _removed = state.context.remove(pos);
+    let panel_id = state.thread().context.get(pos).map(|c| c.id.clone()).unwrap_or_default();
+    let _removed = state.thread_mut().context.remove(pos);
     Some(format!("{panel_id} ({normalized})"))
 }
 

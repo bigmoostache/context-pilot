@@ -195,8 +195,9 @@ fn render_main_content(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
 fn render_content_panel(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
     let _guard = crate::profile!("ui::render_panel");
     let context_type = state
+        .thread()
         .context
-        .get(state.selected_context)
+        .get(state.thread().selected_context)
         .map_or_else(|| Kind::new(Kind::CONVERSATION), |c| c.context_type.clone());
 
     // ConversationPanel renders from its multi-level cached content builder,

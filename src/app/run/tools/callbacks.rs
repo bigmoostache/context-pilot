@@ -82,8 +82,8 @@ fn fire_blocking_edit_callbacks(
     blocking_cbs: &[callback_trigger::MatchedCallback],
     tool_results: &mut [crate::infra::tools::ToolResult],
 ) {
-    let sentinel_id = format!("cb_block_{}", app.state.next_tool_id);
-    app.state.next_tool_id = app.state.next_tool_id.saturating_add(1);
+    let sentinel_id = format!("cb_block_{}", app.state.thread().next_tool_id);
+    app.state.thread_mut().next_tool_id = app.state.thread_mut().next_tool_id.saturating_add(1);
 
     let summaries = callback_firing::fire_blocking_callbacks(&mut app.state, blocking_cbs, &sentinel_id);
 

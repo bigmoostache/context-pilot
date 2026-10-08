@@ -67,7 +67,7 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
     // Pre-invalidate cached panels for mutating commands (needs &mut State).
     if class == CommandClass::Mutating {
         let invalidations = super::cache_invalidation::find_invalidations(command);
-        for ctx in &mut state.context {
+        for ctx in &mut state.thread_mut().context {
             if ctx.context_type.as_str() == Kind::GITHUB_RESULT {
                 let matches = ctx
                     .get_meta_str("result_command")

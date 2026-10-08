@@ -108,12 +108,12 @@ impl Module for ConversationModule {
     /// background thread was rehydrated, which reset tot to the stream value.
     fn save_worker_data(&self, state: &State) -> serde_json::Value {
         serde_json::json!({
-            "cache_hit_tokens": state.cache_hit_tokens,
-            "cache_miss_tokens": state.cache_miss_tokens,
-            "total_output_tokens": state.total_output_tokens,
-            "cost_hit_usd": state.cost_hit_usd,
-            "cost_miss_usd": state.cost_miss_usd,
-            "cost_output_usd": state.cost_output_usd,
+            "cache_hit_tokens": state.thread().cache_hit_tokens,
+            "cache_miss_tokens": state.thread().cache_miss_tokens,
+            "total_output_tokens": state.thread().total_output_tokens,
+            "cost_hit_usd": state.thread().cost_hit_usd,
+            "cost_miss_usd": state.thread().cost_miss_usd,
+            "cost_output_usd": state.thread().cost_output_usd,
         })
     }
 

@@ -74,7 +74,7 @@ pub(crate) fn parse_context_pattern(raw: &str) -> Option<String> {
 
 /// Find context index by ID.
 pub(crate) fn find_context_by_id(state: &State, id: &str) -> Option<usize> {
-    state.context.iter().position(|c| c.id == id)
+    state.thread().context.iter().position(|c| c.id == id)
 }
 
 /// If cursor is inside a paste sentinel (\x00{idx}\x00), eject it to after the sentinel.
@@ -114,8 +114,8 @@ pub(crate) fn eject_cursor_from_sentinel(input: &str, cursor: usize) -> usize {
 /// Create a new conversation context panel.
 pub(super) fn create_new_context(state: &mut State) -> ActionResult {
     let context_id = state.next_available_context_id();
-    let name = format!("Conv {}", state.context.len());
-    state.context.push(cp_base::state::context::make_default_entry(
+    let name = format!("Conv {}", state.thread().context.len());
+    state.thread_mut().context.push(cp_base::state::context::make_default_entry(
         &context_id,
         Kind::new(Kind::CONVERSATION),
         &name,
@@ -134,6 +134,7 @@ const DYNAMIC_PAGE_SIZE: usize = 10;
 /// Numeric panel-ID sort key (`P12` → 12), `usize::MAX` when unparsable.
 fn panel_id_key(state: &State, idx: usize) -> usize {
     state
+        .thread()
         .context
         .get(idx)
         .and_then(|el| el.id.strip_prefix('P'))
@@ -143,7 +144,7 @@ fn panel_id_key(state: &State, idx: usize) -> usize {
 
 /// Context indices sorted by numeric panel ID (shared ordering).
 fn sorted_by_panel_id(state: &State) -> Vec<usize> {
-    let mut sorted: Vec<usize> = (0..state.context.len()).collect();
+    let mut sorted: Vec<usize> = (0..state.thread().context.len()).collect();
     sorted.sort_by_key(|&a| panel_id_key(state, a));
     sorted
 }
@@ -162,11 +163,11 @@ const fn next_dynamic_page(current_page: usize, total_pages: usize, forward: boo
 /// Navigate to the next (`forward=true`) or previous (`forward=false`) context panel,
 /// sorted by numeric panel ID.
 pub(super) fn select_context(state: &mut State, forward: bool) {
-    if state.context.is_empty() {
+    if state.thread().context.is_empty() {
         return;
     }
     let sorted = sorted_by_panel_id(state);
-    let cur = sorted.iter().position(|&i| i == state.selected_context).unwrap_or(0);
+    let cur = sorted.iter().position(|&i| i == state.thread().selected_context).unwrap_or(0);
     let next = if forward {
         config::wrap_next(cur, sorted.len())
     } else if cur == 0 {
@@ -183,14 +184,17 @@ pub(super) fn select_context(state: &mut State, forward: bool) {
 /// - From a **fixed** panel: forward → last page start, backward → first page start.
 /// - From a **dynamic** panel: forward/backward wraps circularly through pages.
 pub(super) fn page_dynamic(state: &mut State, forward: bool) {
-    if state.context.is_empty() {
+    if state.thread().context.is_empty() {
         return;
     }
     let sorted = sorted_by_panel_id(state);
 
     // Collect dynamic panel indices only (preserving sorted order).
-    let dynamic_indices: Vec<usize> =
-        sorted.iter().filter(|&&i| state.context.get(i).is_some_and(|c| !c.context_type.is_fixed())).copied().collect();
+    let dynamic_indices: Vec<usize> = sorted
+        .iter()
+        .filter(|&&i| state.thread().context.get(i).is_some_and(|c| !c.context_type.is_fixed()))
+        .copied()
+        .collect();
 
     if dynamic_indices.is_empty() {
         return;
@@ -199,10 +203,11 @@ pub(super) fn page_dynamic(state: &mut State, forward: bool) {
     let total_pages = dynamic_indices.len().div_ceil(DYNAMIC_PAGE_SIZE);
 
     // Is the currently selected panel dynamic?
-    let current_is_dynamic = state.context.get(state.selected_context).is_some_and(|c| !c.context_type.is_fixed());
+    let current_is_dynamic =
+        state.thread().context.get(state.thread().selected_context).is_some_and(|c| !c.context_type.is_fixed());
 
     let target_page = if current_is_dynamic {
-        let pos = dynamic_indices.iter().position(|&i| i == state.selected_context).unwrap_or(0);
+        let pos = dynamic_indices.iter().position(|&i| i == state.thread().selected_context).unwrap_or(0);
         let current_page = pos.checked_div(DYNAMIC_PAGE_SIZE).unwrap_or(0);
         next_dynamic_page(current_page, total_pages, forward)
     } else {

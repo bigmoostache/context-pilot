@@ -89,8 +89,11 @@ impl Panel for SearchResultPanel {
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
         use cp_render::{Block, Semantic, Span};
 
-        let ctx_opt =
-            state.context.get(state.selected_context).filter(|c| c.context_type == Kind::new(SEARCH_PANEL_TYPE));
+        let ctx_opt = state
+            .thread()
+            .context
+            .get(state.thread().selected_context)
+            .filter(|c| c.context_type == Kind::new(SEARCH_PANEL_TYPE));
 
         let Some(ctx) = ctx_opt else {
             return vec![Block::styled_text(" No search result panel".into(), Semantic::Muted)];
@@ -104,7 +107,11 @@ impl Panel for SearchResultPanel {
     }
 
     fn title(&self, state: &State) -> String {
-        state.context.get(state.selected_context).map_or_else(|| "Search Results".to_owned(), |ctx| ctx.name.clone())
+        state
+            .thread()
+            .context
+            .get(state.thread().selected_context)
+            .map_or_else(|| "Search Results".to_owned(), |ctx| ctx.name.clone())
     }
 
     fn max_freezes(&self) -> u8 {
@@ -113,6 +120,7 @@ impl Panel for SearchResultPanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         state
+            .thread()
             .context
             .iter()
             .filter(|c| c.context_type == Kind::new(SEARCH_PANEL_TYPE))

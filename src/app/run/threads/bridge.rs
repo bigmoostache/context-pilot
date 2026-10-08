@@ -234,7 +234,7 @@ pub(in crate::app::run) fn emit_vitals(app: &mut App) {
     }
 
     // Phase — emit on transition only.
-    let phase = wire_phase(app.state.stream.phase);
+    let phase = wire_phase(app.state.thread().stream.phase);
     let phase_changed = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.last_phase != Some(phase));
     if phase_changed {
         emit_best_effort(&app.state, OpEntryKind::PhaseTransition { phase });
@@ -242,15 +242,19 @@ pub(in crate::app::run) fn emit_vitals(app: &mut App) {
     }
 
     // Cost — cumulative-since-boot; emit when the dollar total moves.
-    let cost_usd =
-        cp_base::cast::float_math::sum3(app.state.cost_hit_usd, app.state.cost_miss_usd, app.state.cost_output_usd);
+    let cost_usd = cp_base::cast::float_math::sum3(
+        app.state.thread().cost_hit_usd,
+        app.state.thread().cost_miss_usd,
+        app.state.thread().cost_output_usd,
+    );
     let cost_changed = app
         .state
         .get_ext::<BridgeState>()
         .is_some_and(|bs| cp_base::cast::float_math::abs_diff(bs.last_cost_usd, cost_usd) > f64::EPSILON);
     if cost_changed {
-        let input_tokens = app.state.cache_hit_tokens.to_u64().saturating_add(app.state.cache_miss_tokens.to_u64());
-        let output_tokens = app.state.total_output_tokens.to_u64();
+        let input_tokens =
+            app.state.thread().cache_hit_tokens.to_u64().saturating_add(app.state.thread().cache_miss_tokens.to_u64());
+        let output_tokens = app.state.thread().total_output_tokens.to_u64();
         emit_best_effort(&app.state, OpEntryKind::CostAggregate { input_tokens, output_tokens, cost_usd });
         app.state.ext_mut::<BridgeState>().last_cost_usd = cost_usd;
     }
@@ -305,7 +309,7 @@ fn context_inputs_changed(state: &State) -> bool {
     for tool in &state.tools {
         (&tool.name, tool.enabled).hash(&mut h);
     }
-    for ctx in &state.context {
+    for ctx in &state.thread().context {
         (ctx.token_count, ctx.panel_cache_hit).hash(&mut h);
     }
     (state.cleaning_threshold_tokens(), state.effective_context_budget()).hash(&mut h);

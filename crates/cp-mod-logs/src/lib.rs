@@ -319,7 +319,7 @@ impl Module for LogsModule {
                         continue;
                     };
 
-                    match state.context.iter().find(|c| c.id == id) {
+                    match state.thread().context.iter().find(|c| c.id == id) {
                         None => pf.errors.push(format!("Panel #{idx}: '{id}' not found")),
                         Some(ctx) if ctx.context_type.as_str() != Kind::CONVERSATION_HISTORY => {
                             pf.errors.push(format!(

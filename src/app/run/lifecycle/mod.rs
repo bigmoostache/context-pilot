@@ -238,7 +238,7 @@ impl App {
     /// Adaptive poll interval: short while streaming/active or bridge-driven,
     /// long when idle — keeps latency low without pinning a core at rest.
     fn compute_poll_ms(&self) -> u64 {
-        if self.state.stream.phase.is_streaming() || self.state.flags.ui.dirty {
+        if self.state.thread().stream.phase.is_streaming() || self.state.flags.ui.dirty {
             EVENT_POLL_MS // 8ms — responsive during streaming/active updates
         } else if super::threads::bridge_active(&self.state) {
             2 // bridge-active idle — keep web command→apply latency ≤ a few ms
@@ -292,7 +292,7 @@ impl App {
         // the phase AFTER it (inside the hook) would almost always see `Idle`
         // mid-turn and wrongly take the idle auto-read branch instead of the
         // inline streaming push.
-        let was_streaming = self.state.stream.phase.is_streaming();
+        let was_streaming = self.state.thread().stream.phase.is_streaming();
         super::streaming::finalize_stream(self);
         // Incoming-message behavior on the focused thread: inline push while
         // streaming, idle auto-read otherwise. Runs before the spine check so an
@@ -393,7 +393,7 @@ impl App {
     /// Persist the message with the given display `id` (if it still exists) plus
     /// the full state — the `ActionResult::SaveMessage` side-effect.
     fn save_message_by_id(&self, id: &str) {
-        if let Some(msg) = self.state.messages.iter().find(|m| m.id == id) {
+        if let Some(msg) = self.state.thread().messages.iter().find(|m| m.id == id) {
             self.save_message_async(msg);
         }
         self.save_state_async();
@@ -423,7 +423,7 @@ impl App {
             module.on_stream_stop(&mut self.state);
         }
         self.state.touch_panel(Kind::SPINE);
-        if let Some(msg) = self.state.messages.last()
+        if let Some(msg) = self.state.thread().messages.last()
             && msg.role == "assistant"
         {
             self.save_message_async(msg);
@@ -443,14 +443,14 @@ impl App {
             // Guard rail blocked — notification already created by engine.
             // Only mark dirty and save if this is a NEW block reason, to avoid
             // burning CPU/disk on every tick (~125/sec) when persistently blocked.
-            if self.state.guard_rail_blocked.as_ref() != Some(&reason) {
-                self.state.guard_rail_blocked = Some(reason);
+            if self.state.thread().guard_rail_blocked.as_ref() != Some(&reason) {
+                self.state.thread_mut().guard_rail_blocked = Some(reason);
                 self.state.flags.ui.dirty = true;
                 self.save_state_async();
             }
         } else if let SpineDecision::Continue(action) = decision {
             // Auto-continuation fired — apply it and start streaming
-            self.state.guard_rail_blocked = None;
+            self.state.thread_mut().guard_rail_blocked = None;
             let should_stream = apply_continuation(&mut self.state, action);
             if should_stream {
                 self.typewriter.reset();

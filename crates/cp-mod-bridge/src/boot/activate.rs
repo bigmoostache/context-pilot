@@ -153,7 +153,7 @@ pub(crate) fn publish_frame(state: &mut State, kind: StreamKind) {
     // thread during its advancement step — so live frames route to the right UI
     // pane. Empty when no thread is resident yet (cold boot), matching the
     // pre-multi-thread single-conversation behaviour.
-    let message_id = state.messages.last().map(|m| m.id.clone()).unwrap_or_default();
+    let message_id = state.thread().messages.last().map(|m| m.id.clone()).unwrap_or_default();
     let thread_id = state.executing_thread_id().unwrap_or_default().to_owned();
 
     let bs = state.ext_mut::<BridgeState>();

@@ -31,7 +31,7 @@ pub(super) fn token_usage_blocks(state: &State) -> Vec<Block> {
     let system_prompt = cp_mod_prompt::seed::get_active_agent_content(state);
     let system_prompt_tokens = crate::state::estimate_tokens(&system_prompt).saturating_mul(2);
     let tool_def_tokens = super::context::estimate_tool_definitions_tokens(state);
-    let panel_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
+    let panel_tokens: usize = state.thread().context.iter().map(|c| c.token_count).sum();
     let total_tokens = system_prompt_tokens.saturating_add(tool_def_tokens).saturating_add(panel_tokens);
     let budget = state.effective_context_budget();
     let threshold = state.cleaning_threshold_tokens();
@@ -274,7 +274,7 @@ pub(super) fn context_elements_blocks(state: &State) -> Vec<Block> {
     rows.push(non_panel_row(format!("tool-defs ({enabled_count} enabled)"), tool_def_tokens, accumulated));
 
     // Panels sorted by last_refresh_ms, conversation forced to end
-    let mut sorted_contexts: Vec<&crate::state::Entry> = state.context.iter().collect();
+    let mut sorted_contexts: Vec<&crate::state::Entry> = state.thread().context.iter().collect();
     sorted_contexts.sort_by_key(|ctx| ctx.last_refresh_ms);
     let (mut panels, mut conversation): (Vec<_>, Vec<_>) =
         sorted_contexts.into_iter().partition(|ctx| ctx.id != "chat");
@@ -300,8 +300,8 @@ pub(super) fn statistics_blocks(state: &State) -> Vec<Block> {
     out.push(Block::Empty);
 
     // Panel counts
-    let panel_count = state.context.len().saturating_add(2);
-    let fixed_count = state.context.iter().filter(|c| c.context_type.is_fixed()).count();
+    let panel_count = state.thread().context.len().saturating_add(2);
+    let fixed_count = state.thread().context.iter().filter(|c| c.context_type.is_fixed()).count();
     let dynamic_count = panel_count.saturating_sub(fixed_count).saturating_sub(2);
 
     out.push(Block::line(vec![
@@ -311,9 +311,9 @@ pub(super) fn statistics_blocks(state: &State) -> Vec<Block> {
     ]));
 
     // Message counts
-    let user_msgs = state.messages.iter().filter(|m| m.role == "user").count();
-    let assistant_msgs = state.messages.iter().filter(|m| m.role == "assistant").count();
-    let total_msgs = state.messages.len();
+    let user_msgs = state.thread().messages.iter().filter(|m| m.role == "user").count();
+    let assistant_msgs = state.thread().messages.iter().filter(|m| m.role == "assistant").count();
+    let total_msgs = state.thread().messages.len();
 
     out.push(Block::line(vec![
         Span::muted(" Messages: ".to_owned()),

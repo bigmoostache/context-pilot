@@ -289,7 +289,12 @@ mod tests {
         // State now holds the runtime's values, and the runtime holds what State
         // used to hold (the defaults). Tuple compares keep this one branch.
         assert_eq!(
-            (state.composer.text.as_str(), state.next_user_id, state.total_output_tokens, state.tempo),
+            (
+                state.thread().composer.text.as_str(),
+                state.thread().next_user_id,
+                state.thread().total_output_tokens,
+                state.thread().tempo
+            ),
             ("hello", 42, 1000, false)
         );
         assert_eq!((rt.composer.text.as_str(), rt.next_user_id, rt.tempo), ("", 1, true));
@@ -306,7 +311,7 @@ mod tests {
         rt.swap_with(&mut state);
 
         // Two swaps restore the original arrangement.
-        assert_eq!((state.composer.text.as_str(), state.next_user_id), ("", 1));
+        assert_eq!((state.thread().composer.text.as_str(), state.thread().next_user_id), ("", 1));
         assert_eq!((rt.composer.text.as_str(), rt.next_user_id), ("hello", 42));
     }
 

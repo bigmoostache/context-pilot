@@ -45,7 +45,7 @@ impl Panel for ThreadsPanel {
         let content = crate::tools::resident_panel_content(state);
         let token_count = estimate_tokens(&content);
 
-        for ctx in &mut state.context {
+        for ctx in &mut state.thread_mut().context {
             if ctx.context_type.as_str() == Kind::THREADS {
                 ctx.token_count = token_count;
                 let _changed = cp_base::panels::update_if_changed(ctx, &content);
@@ -62,6 +62,7 @@ impl Panel for ThreadsPanel {
         // Per-thread view: return THIS thread's content, not the shared string.
         let content = crate::tools::resident_panel_content(state);
         let (id, last_refresh_ms) = state
+            .thread()
             .context
             .iter()
             .find(|c| c.context_type.as_str() == Kind::THREADS)

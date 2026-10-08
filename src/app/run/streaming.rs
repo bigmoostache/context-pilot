@@ -30,7 +30,7 @@ pub(super) fn process_stream_events(app: &mut App) {
         }
     }
     for evt in events {
-        if !app.state.stream.phase.is_streaming() {
+        if !app.state.thread().stream.phase.is_streaming() {
             continue;
         }
         app.state.flags.ui.dirty = true;
@@ -63,7 +63,7 @@ fn apply_stream_event(app: &mut App, evt: StreamEvent) {
     } = evt
     {
         app.typewriter.mark_done();
-        app.state.streaming_tool = None;
+        app.state.thread_mut().streaming_tool = None;
         app.pending_done = Some((
             input_tokens,
             output_tokens,
@@ -76,7 +76,7 @@ fn apply_stream_event(app: &mut App, evt: StreamEvent) {
             alive_positions_permille,
         ));
         // API call succeeded — reset retry counter immediately at tick level
-        app.state.api_retry_count = 0;
+        app.state.thread_mut().api_retry_count = 0;
     } else if let StreamEvent::Error(e) = evt {
         handle_stream_error_event(app, e);
     } else {
@@ -98,7 +98,7 @@ fn broadcast_tool_progress(app: &mut App, name: String, input_so_far: String) {
     for module in crate::modules::all_modules() {
         module.on_tool_progress(&name, &input_so_far, &mut app.state);
     }
-    app.state.streaming_tool = Some(crate::state::StreamingTool::new(name, input_so_far));
+    app.state.thread_mut().streaming_tool = Some(crate::state::StreamingTool::new(name, input_so_far));
 }
 
 /// Notify modules a tool call completed (e.g. clear typing), clear the preview,
@@ -107,7 +107,7 @@ fn broadcast_tool_use(app: &mut App, tool: cp_base::tools::ToolUse) {
     for module in crate::modules::all_modules() {
         module.on_tool_complete(&tool.name, &mut app.state);
     }
-    app.state.streaming_tool = None;
+    app.state.thread_mut().streaming_tool = None;
     app.pending_tools.push(tool);
 }
 
@@ -116,7 +116,7 @@ fn broadcast_tool_use(app: &mut App, tool: cp_base::tools::ToolUse) {
 fn handle_stream_error_event(app: &mut App, e: String) {
     app.typewriter.reset();
     // Log every error to disk for debugging
-    let attempt = app.state.api_retry_count.saturating_add(1);
+    let attempt = app.state.thread().api_retry_count.saturating_add(1);
     let will_retry = attempt <= MAX_API_RETRIES;
     let provider = format!("{:?}", app.state.llm_provider);
     let model = app.state.current_model();
@@ -136,11 +136,11 @@ fn handle_stream_error_event(app: &mut App, e: String) {
 
     // Check if we should retry
     if will_retry {
-        app.state.api_retry_count = app.state.api_retry_count.saturating_add(1);
+        app.state.thread_mut().api_retry_count = app.state.thread_mut().api_retry_count.saturating_add(1);
         app.pending_retry_error = Some(e);
     } else {
         // Max retries reached, show error
-        app.state.api_retry_count = 0;
+        app.state.thread_mut().api_retry_count = 0;
         // Track consecutive failed continuations for backoff
         let spine = cp_mod_spine::types::SpineState::get_mut(&mut app.state);
         spine.config.consecutive_continuation_errors = spine.config.consecutive_continuation_errors.saturating_add(1);
@@ -153,9 +153,9 @@ fn handle_stream_error_event(app: &mut App, e: String) {
 pub(super) fn handle_retry(app: &mut App) {
     if let Some(_error) = app.pending_retry_error.take() {
         // Still streaming, retry the request
-        if app.state.stream.phase.is_streaming() {
+        if app.state.thread().stream.phase.is_streaming() {
             // Clear any partial assistant message content before retrying
-            if let Some(msg) = app.state.messages.last_mut()
+            if let Some(msg) = app.state.thread_mut().messages.last_mut()
                 && msg.role == "assistant"
             {
                 msg.content.clear();
@@ -174,7 +174,7 @@ pub(super) fn handle_retry(app: &mut App) {
 /// Flush buffered typewriter characters into the assistant message.
 pub(super) fn process_typewriter(app: &mut App) {
     let _guard = crate::profile!("app::typewriter");
-    if app.state.stream.phase.is_streaming()
+    if app.state.thread().stream.phase.is_streaming()
         && let Some(chars) = app.typewriter.take_chars()
     {
         let _r = apply_action(&mut app.state, Action::AppendChars(chars));
@@ -200,7 +200,7 @@ pub(super) fn continue_streaming(app: &mut App) {
     // Tool results are appended by now: a notification deferred during the
     // tool call can finally be injected without orphaning a tool_use.
     let _injected = cp_mod_spine::types::SpineState::flush_deferred_inject(&mut app.state);
-    app.state.stream.phase.transition(StreamPhase::Receiving);
+    app.state.thread_mut().stream.phase.transition(StreamPhase::Receiving);
     app.typewriter.reset();
     app.pending_done = None;
     spawn_stream_with_context(app, true);
@@ -229,13 +229,13 @@ pub(in crate::app::run) fn spawn_stream_with_context(app: &mut App, include_last
 /// Finalize a completed stream: apply `StreamDone`, reset counters, and unblock spine.
 pub(super) fn finalize_stream(app: &mut App) {
     let _fg = cp_base::flame!("finalize_stream");
-    if !app.state.stream.phase.is_streaming() {
+    if !app.state.thread().stream.phase.is_streaming() {
         return;
     }
     // Don't finalize while waiting for panels or deferred sleep —
     // pending_done is still Some from the intermediate stream, and
     // continue_streaming will clear it when the deferred state resolves.
-    if app.state.waiting_for_panels || app.deferred_tool_sleeping {
+    if app.state.thread().waiting_for_panels || app.deferred_tool_sleeping {
         return;
     }
     // Don't finalize while a console blocking wait is pending
@@ -279,7 +279,7 @@ fn apply_stream_done(app: &mut App, done: StreamDonePayload) {
         Action::StreamDone { input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason },
     );
     if let ActionResult::SaveMessage(id) = result {
-        if let Some(msg) = app.state.messages.iter().find(|m| m.id == id) {
+        if let Some(msg) = app.state.thread().messages.iter().find(|m| m.id == id) {
             app.save_message_async(msg);
         }
         app.save_state_async();
@@ -330,35 +330,35 @@ fn record_stream_breakpoints(app: &mut App, record: BreakpointRecord) {
     // request can detect the cache frontier and place breakpoints optimally.
     if !bp_hashes.is_empty() {
         let now_ms = cp_base::panels::now_ms();
-        let mut engine = app.state.cache_engine_json.as_deref().map_or_else(
+        let mut engine = app.state.thread().cache_engine_json.as_deref().map_or_else(
             crate::llms::cache::cache_engine::CacheEngine::default,
             crate::llms::cache::cache_engine::CacheEngine::from_json,
         );
         engine.prune(now_ms);
         engine.record_breakpoints(&bp_hashes, now_ms);
-        app.state.tick_alive_breakpoints = alive_count;
-        app.state.tick_alive_bp_positions = alive_positions_permille;
-        app.state.cache_engine_json = Some(engine.to_json());
+        app.state.thread_mut().tick_alive_breakpoints = alive_count;
+        app.state.thread_mut().tick_alive_bp_positions = alive_positions_permille;
+        app.state.thread_mut().cache_engine_json = Some(engine.to_json());
     }
 
     // Record which panels carried a breakpoint this turn — the freeze pass
     // reads it next turn to widen the free-to-update region back to the last
     // alive breakpoint before the culprit (BP-anchored free region).
-    app.state.previous_breakpoint_panel_ids = bp_panel_ids;
+    app.state.thread_mut().previous_breakpoint_panel_ids = bp_panel_ids;
 }
 
 // ─── Panel Wait Helpers ─────────────────────────────────────────────────────
 
 /// Check if any async-wait panels have `cache_deprecated` = true.
 pub(super) fn has_dirty_panels(state: &State) -> bool {
-    state.context.iter().any(|c| {
+    state.thread().context.iter().any(|c| {
         get_context_type_meta(c.context_type.as_str()).is_some_and(|m| m.needs_async_wait) && c.cache_deprecated
     })
 }
 
 /// Check if any async-wait panels need refresh before continuing the stream.
 pub(super) fn has_dirty_file_panels(state: &State) -> bool {
-    state.context.iter().any(|c| {
+    state.thread().context.iter().any(|c| {
         get_context_type_meta(c.context_type.as_str()).is_some_and(|m| m.needs_async_wait) && c.cache_deprecated
     })
 }
@@ -367,7 +367,7 @@ pub(super) fn has_dirty_file_panels(state: &State) -> bool {
 /// Returns true if any panels needed refresh.
 pub(super) fn trigger_dirty_panel_refresh(state: &State, cache_tx: &Sender<CacheUpdate>) -> bool {
     let mut any_triggered = false;
-    for ctx in &state.context {
+    for ctx in &state.thread().context {
         let needs_wait = get_context_type_meta(ctx.context_type.as_str()).is_some_and(|m| m.needs_async_wait);
         if needs_wait && ctx.cache_deprecated && !ctx.cache_in_flight {
             let panel = crate::app::panels::get_panel(&ctx.context_type);

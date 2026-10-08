@@ -80,7 +80,7 @@ fn handle_key_event(key: &KeyEvent, state: &State) -> Option<Action> {
     }
 
     // Escape stops streaming.
-    if key.code == KeyCode::Esc && state.stream.phase.is_streaming() {
+    if key.code == KeyCode::Esc && state.thread().stream.phase.is_streaming() {
         return Some(Action::StopStreaming);
     }
 
@@ -324,7 +324,7 @@ fn handle_context_pattern_submit(key: &KeyEvent, state: &State) -> Option<Action
         || key.modifiers.contains(KeyModifiers::ALT);
     let is_submit = (key.code == KeyCode::Enter && !has_modifier) || key.code == KeyCode::Char(' ');
     if is_submit
-        && let Some(id) = parse_context_pattern(&state.composer.text)
+        && let Some(id) = parse_context_pattern(&state.thread().composer.text)
         && find_context_by_id(state, &id).is_some()
     {
         return Some(Action::InputSubmit);
@@ -336,10 +336,11 @@ fn handle_context_pattern_submit(key: &KeyEvent, state: &State) -> Option<Action
 /// always owns input routing. `None` when no panel consumes the key.
 fn handle_panel_key(key: &KeyEvent, state: &State) -> Option<Action> {
     if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
-        let ctx = state.context.iter().find(|c| c.context_type.as_str() == crate::state::Kind::CONVERSATION)?;
+        let ctx =
+            state.thread().context.iter().find(|c| c.context_type.as_str() == crate::state::Kind::CONVERSATION)?;
         return get_panel(&ctx.context_type).handle_key(key, state);
     }
-    let ctx = state.context.get(state.selected_context)?;
+    let ctx = state.thread().context.get(state.thread().selected_context)?;
     get_panel(&ctx.context_type).handle_key(key, state)
 }
 

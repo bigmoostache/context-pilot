@@ -338,16 +338,19 @@ fn collect_delete_timestamps(thread: &cp_mod_threads::types::Thread, idx: usize,
 fn apply_stop(state: &mut State) {
     use cp_base::state::flags::StreamPhase;
 
-    if state.stream.phase.is_streaming() {
-        state.stream.phase.transition(StreamPhase::Idle);
-        let est = state.streaming_estimated_tokens;
-        if let Some(ctx) =
-            state.context.iter_mut().find(|c| c.context_type.as_str() == cp_base::state::context::Kind::CONVERSATION)
+    if state.thread().stream.phase.is_streaming() {
+        state.thread_mut().stream.phase.transition(StreamPhase::Idle);
+        let est = state.thread().streaming_estimated_tokens;
+        if let Some(ctx) = state
+            .thread_mut()
+            .context
+            .iter_mut()
+            .find(|c| c.context_type.as_str() == cp_base::state::context::Kind::CONVERSATION)
         {
             ctx.token_count = ctx.token_count.saturating_sub(est);
         }
-        state.streaming_estimated_tokens = 0;
-        if let Some(msg) = state.messages.last_mut()
+        state.thread_mut().streaming_estimated_tokens = 0;
+        if let Some(msg) = state.thread_mut().messages.last_mut()
             && msg.role == "assistant"
             && !msg.content.is_empty()
         {

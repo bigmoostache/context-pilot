@@ -244,7 +244,7 @@ impl App {
             self.deliver_to_thread(Some(&tid), move |state| {
                 // Skip if this thread is already working or already nudged — the
                 // two guards that keep the dispatcher from flooding an inbox.
-                if state.stream.phase.is_streaming() {
+                if state.thread().stream.phase.is_streaming() {
                     return;
                 }
                 if cp_mod_spine::types::SpineState::has_unprocessed_notifications(state) {

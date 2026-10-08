@@ -365,7 +365,7 @@ fn boot_app_state(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, steps: 
                 types
             })
             .collect();
-        state.context.retain(|c| known_types.contains(c.context_type.as_str()));
+        state.thread_mut().context.retain(|c| known_types.contains(c.context_type.as_str()));
     }
 
     // Phase 6: Prepare workspace

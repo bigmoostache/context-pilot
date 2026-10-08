@@ -90,7 +90,7 @@ impl Panel for ScratchpadPanel {
         let content = Self::format_cells_for_context(state);
         let token_count = estimate_tokens(&content);
 
-        for ctx in &mut state.context {
+        for ctx in &mut state.thread_mut().context {
             if ctx.context_type.as_str() == Kind::SCRATCHPAD {
                 ctx.token_count = token_count;
                 let _changed = cp_base::panels::update_if_changed(ctx, &content);
@@ -107,6 +107,7 @@ impl Panel for ScratchpadPanel {
         let content = Self::format_cells_for_context(state);
         // Find the Scratchpad context element to get its ID and timestamp
         let (id, last_refresh_ms) = state
+            .thread()
             .context
             .iter()
             .find(|c| c.context_type.as_str() == Kind::SCRATCHPAD)

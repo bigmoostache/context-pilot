@@ -54,16 +54,16 @@ use cp_base::cast::float_math;
 /// Stop an in-progress stream: mark idle, roll back the streaming token
 /// estimate, and append a `[Stopped]` marker to the last assistant message.
 fn handle_stop_streaming(state: &mut State) -> ActionResult {
-    if !state.stream.phase.is_streaming() {
+    if !state.thread().stream.phase.is_streaming() {
         return ActionResult::Nothing;
     }
-    state.stream.phase.transition(StreamPhase::Idle);
-    let est = state.streaming_estimated_tokens;
-    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
+    state.thread_mut().stream.phase.transition(StreamPhase::Idle);
+    let est = state.thread().streaming_estimated_tokens;
+    if let Some(ctx) = state.thread_mut().context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
         ctx.token_count = ctx.token_count.saturating_sub(est);
     }
-    state.streaming_estimated_tokens = 0;
-    if let Some(msg) = state.messages.last_mut()
+    state.thread_mut().streaming_estimated_tokens = 0;
+    if let Some(msg) = state.thread_mut().messages.last_mut()
         && msg.role == "assistant"
         && !msg.content.is_empty()
     {
@@ -75,21 +75,21 @@ fn handle_stop_streaming(state: &mut State) -> ActionResult {
 /// Zero every session, per-stream, and per-tick cost/token accumulator and clear
 /// the guard-rail + cache-engine snapshots — the full effect of `ResetSessionCosts`.
 fn reset_session_costs(state: &mut State) {
-    state.cache_hit_tokens = 0;
-    state.cache_miss_tokens = 0;
-    state.total_output_tokens = 0;
-    state.uncached_input_tokens = 0;
-    state.cost_hit_usd = 0.0f64;
-    state.cost_miss_usd = 0.0f64;
-    state.cost_output_usd = 0.0f64;
-    state.stream_cost_hit_usd = 0.0f64;
-    state.stream_cost_miss_usd = 0.0f64;
-    state.stream_cost_output_usd = 0.0f64;
-    state.tick_cost_hit_usd = 0.0f64;
-    state.tick_cost_miss_usd = 0.0f64;
-    state.tick_cost_output_usd = 0.0f64;
-    state.guard_rail_blocked = None;
-    state.cache_engine_json = None;
+    state.thread_mut().cache_hit_tokens = 0;
+    state.thread_mut().cache_miss_tokens = 0;
+    state.thread_mut().total_output_tokens = 0;
+    state.thread_mut().uncached_input_tokens = 0;
+    state.thread_mut().cost_hit_usd = 0.0f64;
+    state.thread_mut().cost_miss_usd = 0.0f64;
+    state.thread_mut().cost_output_usd = 0.0f64;
+    state.thread_mut().stream_cost_hit_usd = 0.0f64;
+    state.thread_mut().stream_cost_miss_usd = 0.0f64;
+    state.thread_mut().stream_cost_output_usd = 0.0f64;
+    state.thread_mut().tick_cost_hit_usd = 0.0f64;
+    state.thread_mut().tick_cost_miss_usd = 0.0f64;
+    state.thread_mut().tick_cost_output_usd = 0.0f64;
+    state.thread_mut().guard_rail_blocked = None;
+    state.thread_mut().cache_engine_json = None;
 }
 
 /// Copy the Ctrl+I index overlay's plain-text form to the clipboard via `pbcopy`.
@@ -111,16 +111,17 @@ fn handle_copy_index_overlay(state: &mut State) {
 /// then trigger `@`-autocomplete or `/command` expansion when warranted.
 fn handle_input_char(state: &mut State, ch: char) {
     let _r = cursor::delete_selection(state);
-    state.composer.push_undo(cp_base::state::runtime::textarea::EditKind::Insert);
-    let pos = state.composer.cursor;
-    state.composer.text.insert(pos, ch);
-    state.composer.cursor = state.composer.cursor.saturating_add(ch.len_utf8());
+    state.thread_mut().composer.push_undo(cp_base::state::runtime::textarea::EditKind::Insert);
+    let pos = state.thread().composer.cursor;
+    state.thread_mut().composer.text.insert(pos, ch);
+    state.thread_mut().composer.cursor = state.thread_mut().composer.cursor.saturating_add(ch.len_utf8());
 
     // '@' at input start or after whitespace opens directory autocomplete.
     if ch == '@' {
-        let anchor_pos = state.composer.cursor.saturating_sub(1);
+        let anchor_pos = state.thread().composer.cursor.saturating_sub(1);
         let should_trigger = anchor_pos == 0
             || state
+                .thread()
                 .composer
                 .text
                 .as_bytes()
@@ -147,52 +148,53 @@ fn handle_input_char(state: &mut State, ch: char) {
 /// Insert literal text at the cursor, replacing any active selection.
 fn handle_insert_text(state: &mut State, text: &str) {
     let _r = cursor::delete_selection(state);
-    state.composer.push_undo(cp_base::state::runtime::textarea::EditKind::Other);
-    let pos = state.composer.cursor;
-    state.composer.text.insert_str(pos, text);
-    state.composer.cursor = state.composer.cursor.saturating_add(text.len());
+    state.thread_mut().composer.push_undo(cp_base::state::runtime::textarea::EditKind::Other);
+    let pos = state.thread().composer.cursor;
+    state.thread_mut().composer.text.insert_str(pos, text);
+    state.thread_mut().composer.cursor = state.thread_mut().composer.cursor.saturating_add(text.len());
 }
 
 /// Stash a pasted blob in a paste buffer and insert a `\x00{idx}\x00` sentinel
 /// at the cursor (expanded to the real text at submit time).
 fn handle_paste_text(state: &mut State, text: String) {
     let _r = cursor::delete_selection(state);
-    state.composer.push_undo(cp_base::state::runtime::textarea::EditKind::Other);
-    let idx = state.paste_buffers.len();
-    state.paste_buffers.push(text);
-    state.paste_buffer_labels.push(None);
+    state.thread_mut().composer.push_undo(cp_base::state::runtime::textarea::EditKind::Other);
+    let idx = state.thread().paste_buffers.len();
+    state.thread_mut().paste_buffers.push(text);
+    state.thread_mut().paste_buffer_labels.push(None);
     let sentinel = format!("\x00{idx}\x00");
-    let pos = state.composer.cursor;
-    state.composer.text.insert_str(pos, &sentinel);
-    state.composer.cursor = state.composer.cursor.saturating_add(sentinel.len());
+    let pos = state.thread().composer.cursor;
+    state.thread_mut().composer.text.insert_str(pos, &sentinel);
+    state.thread_mut().composer.cursor = state.thread_mut().composer.cursor.saturating_add(sentinel.len());
 }
 
 /// Delete the selection if any, else the character to the right of the cursor.
 fn handle_input_delete(state: &mut State) {
-    if !cursor::delete_selection(state) && state.composer.cursor < state.composer.text.len() {
-        state.composer.push_undo(cp_base::state::runtime::textarea::EditKind::Delete);
-        let pos = state.composer.cursor;
-        let _r = state.composer.text.remove(pos);
+    if !cursor::delete_selection(state) && state.thread().composer.cursor < state.thread().composer.text.len() {
+        state.thread_mut().composer.push_undo(cp_base::state::runtime::textarea::EditKind::Delete);
+        let pos = state.thread().composer.cursor;
+        let _r = state.thread_mut().composer.text.remove(pos);
     }
 }
 
 /// Scroll the conversation up (`up = true`) or down, applying + growing the
 /// scroll-acceleration factor. Sets `user_scrolled` when scrolling up.
 fn handle_scroll(state: &mut State, amount: f32, up: bool) {
-    let accel = float_math::mul_f32(amount, state.scroll_accel);
+    let accel = float_math::mul_f32(amount, state.thread().scroll_accel);
     if up {
-        state.scroll_offset = float_math::sub_f32(state.scroll_offset, accel).max(0.0);
-        state.stream.user_scrolled = true;
+        state.thread_mut().scroll_offset = float_math::sub_f32(state.thread_mut().scroll_offset, accel).max(0.0);
+        state.thread_mut().stream.user_scrolled = true;
     } else {
-        state.scroll_offset = float_math::add_f32(state.scroll_offset, accel);
+        state.thread_mut().scroll_offset = float_math::add_f32(state.thread_mut().scroll_offset, accel);
     }
-    state.scroll_accel = float_math::add_f32(state.scroll_accel, SCROLL_ACCEL_INCREMENT).min(SCROLL_ACCEL_MAX);
+    state.thread_mut().scroll_accel =
+        float_math::add_f32(state.thread_mut().scroll_accel, SCROLL_ACCEL_INCREMENT).min(SCROLL_ACCEL_MAX);
 }
 
 /// Send `keys` to the tmux `pane_id` and record them on the matching context.
 fn handle_tmux_send_keys(state: &mut State, pane_id: &str, keys: &str) {
     let _r = std::process::Command::new("tmux").args(["send-keys", "-t", pane_id, keys]).output();
-    if let Some(ctx) = state.context.iter_mut().find(|c| c.get_meta_str("tmux_pane_id") == Some(pane_id)) {
+    if let Some(ctx) = state.thread_mut().context.iter_mut().find(|c| c.get_meta_str("tmux_pane_id") == Some(pane_id)) {
         ctx.set_meta("tmux_last_keys", &keys.to_owned());
         ctx.cache_deprecated = true;
     }
@@ -202,7 +204,7 @@ fn handle_tmux_send_keys(state: &mut State, pane_id: &str, keys: &str) {
 /// to the input module's submit handler.
 fn handle_input_submit_action(state: &mut State) -> ActionResult {
     history::ensure_history_nav(state);
-    let trimmed = state.composer.text.trim_end().to_owned();
+    let trimmed = state.thread().composer.text.trim_end().to_owned();
     let nav = state.ext_mut::<history::PromptHistoryNav>();
     if !trimmed.is_empty() {
         nav.push(trimmed);
@@ -213,7 +215,7 @@ fn handle_input_submit_action(state: &mut State) -> ActionResult {
 
 /// Switch to the panel whose id equals `id`, if one exists.
 fn handle_select_context_by_id(state: &mut State, id: &str) {
-    if let Some(idx) = state.context.iter().position(|c| c.id == id) {
+    if let Some(idx) = state.thread().context.iter().position(|c| c.id == id) {
         switch_to_panel(state, idx);
         state.flags.ui.dirty = true;
     }
@@ -237,8 +239,8 @@ fn think_threshold(state: &mut State, up: bool) {
 /// Cycle to the next view mode, resetting scroll so the new view starts clean.
 fn cycle_view_mode(state: &mut State) {
     state.view_mode = state.view_mode.next();
-    state.scroll_offset = 0.0;
-    state.stream.user_scrolled = false;
+    state.thread_mut().scroll_offset = 0.0;
+    state.thread_mut().stream.user_scrolled = false;
     state.flags.ui.dirty = true;
 }
 
@@ -265,7 +267,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
 fn dispatch_action(state: &mut State, action: Action) -> ActionResult {
     // Reset scroll acceleration on any non-scroll action.
     if !matches!(action, Action::ScrollUp(_) | Action::ScrollDown(_)) {
-        state.scroll_accel = 1.0;
+        state.thread_mut().scroll_accel = 1.0;
     }
 
     match action {

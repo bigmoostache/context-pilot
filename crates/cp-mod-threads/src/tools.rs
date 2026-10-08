@@ -151,7 +151,7 @@ fn collect_thread_summaries(ts: &ThreadsState, focused_tid: &str) -> Vec<String>
 /// `u8::MAX` forces the Fresh branch (one-shot; Fresh resets it to 0). `u8::MAX`
 /// is also the sanctioned "not frozen" sentinel (excluded by the freeze indicator).
 fn force_refresh_threads_panel(state: &mut State) {
-    for ctx in &mut state.context {
+    for ctx in &mut state.thread_mut().context {
         if ctx.context_type.as_str() == Kind::THREADS {
             ctx.cache_deprecated = true;
             ctx.freeze_count = u8::MAX;
@@ -271,6 +271,7 @@ struct ReadResult<'read> {
 fn build_read_result(state: &State, r: &ReadResult<'_>) -> String {
     // Find the Threads panel display ID so the result points the LLM at it.
     let threads_panel_id = state
+        .thread()
         .context
         .iter()
         .find(|c| c.context_type.as_str() == Kind::THREADS)

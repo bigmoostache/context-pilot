@@ -47,6 +47,7 @@ pub(crate) fn check_and_trigger_trap(state: &mut State) -> Option<String> {
 
     // Collect history panels sorted oldest → newest (for optional-keep selection)
     let mut panels: Vec<(String, u64)> = state
+        .thread()
         .context
         .iter()
         .filter(|c| c.context_type.as_str() == Kind::CONVERSATION_HISTORY)
@@ -109,7 +110,8 @@ pub(crate) fn maybe_deactivate_trap(state: &mut State) {
         return;
     }
 
-    let remaining = state.context.iter().filter(|c| c.context_type.as_str() == Kind::CONVERSATION_HISTORY).count();
+    let remaining =
+        state.thread().context.iter().filter(|c| c.context_type.as_str() == Kind::CONVERSATION_HISTORY).count();
 
     if remaining < TRAP_THRESHOLD {
         let qs = QueueState::get_mut(state);
@@ -153,6 +155,7 @@ pub(crate) fn force_deactivate_trap(state: &mut State) {
 /// queued `Close_conversation_history` calls execute.
 fn project_remaining_panels(state: &State) -> usize {
     let current_ids: Vec<String> = state
+        .thread()
         .context
         .iter()
         .filter(|c| c.context_type.as_str() == Kind::CONVERSATION_HISTORY)
@@ -180,6 +183,7 @@ fn project_remaining_panels(state: &State) -> usize {
 /// Build the "blocked" message listing panels still open.
 fn format_blocked_message(state: &State) -> String {
     let remaining: Vec<String> = state
+        .thread()
         .context
         .iter()
         .filter(|c| c.context_type.as_str() == Kind::CONVERSATION_HISTORY)

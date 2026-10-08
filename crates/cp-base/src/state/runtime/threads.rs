@@ -25,7 +25,7 @@ struct Slot {
 #[derive(Debug, Default)]
 pub struct ThreadStore {
     /// Stored thread contexts. A `Vec` (not a map): a handful of threads, and
-    /// the hot `Deref` path is a cached index, not a hash.
+    /// the hot `State::thread()` path is a cached index, not a hash.
     slots: Vec<Slot>,
     /// Cached index into `slots` of the executing thread (`None` = unbound).
     cursor: Option<usize>,

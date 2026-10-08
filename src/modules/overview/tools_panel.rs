@@ -28,6 +28,7 @@ impl Panel for ToolsPanel {
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let content = generate_tools_context(state);
         let (id, last_refresh_ms) = state
+            .thread()
             .context
             .iter()
             .find(|c| c.context_type.as_str() == "tools")
@@ -39,7 +40,7 @@ impl Panel for ToolsPanel {
         let content = generate_tools_context(state);
         let token_count = crate::state::estimate_tokens(&content);
 
-        if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == "tools") {
+        if let Some(ctx) = state.thread_mut().context.iter_mut().find(|c| c.context_type.as_str() == "tools") {
             ctx.token_count = token_count;
             ctx.cached_content = Some(content.clone());
             let _r = crate::app::panels::update_if_changed(ctx, &content);
