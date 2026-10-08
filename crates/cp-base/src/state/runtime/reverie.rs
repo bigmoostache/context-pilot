@@ -35,7 +35,7 @@ pub struct Session {
     pub report_retries: usize,
     /// Whether this reverie's tool calls should be queued (RAM-only, not persisted).
     pub queue_active: bool,
-    /// Thread that owned the context when this reverie was launched (resident,
+    /// Thread that owned the context when this reverie was launched (executing,
     /// else focused). Reverie lifecycle notifications (launch / end / error /
     /// cap) are routed back to it, so they land on the launching thread rather
     /// than wherever focus happens to be when the async reverie finishes.

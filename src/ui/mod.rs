@@ -31,8 +31,8 @@ use crate::ui::perf::PERF;
 /// view mode is active **and** the human has not drilled into a specific thread.
 ///
 /// When drilled (G3), the renderer paints the drilled thread's full panel body
-/// (sidebar + panels) instead of the list — `render_frame` has already swapped
-/// that thread's runtime into `state`, so the normal body renders it
+/// (sidebar + panels) instead of the list — `render_frame` has already made
+/// that thread the executing one, so the normal body renders it
 /// pixel-identically to its own main view.
 fn showing_threads_list(state: &State) -> bool {
     state.view_mode == cp_base::state::data::config::ViewMode::Threads

@@ -10,19 +10,19 @@ use crate::app::context::{build_stream_params, get_active_agent_content, prepare
 use crate::state::cache::{CacheUpdate, process_cache_request};
 use crate::state::{State, StreamPhase, get_context_type_meta};
 
-/// Drain the resident thread's stream channel and apply each event (chunks,
+/// Drain the executing thread's stream channel and apply each event (chunks,
 /// tools, done, errors).
 ///
-/// Only the **resident** thread's channel is drained — the thread whose runtime
-/// is currently in `state` ([`resident_key`](crate::app::App::resident_key)):
+/// Only the **executing** thread's channel is drained
+/// ([`executing_key`](crate::app::App::executing_key)):
 /// the focused thread in the main phase, or a background thread during its
 /// advancement step. Draining any other thread's channel here would apply its
-/// events to the resident's bundle (cross-thread contamination); each thread's
-/// channel is instead drained on the tick it is resident.
+/// events to the executing thread's runtime (cross-thread contamination); each
+/// thread's channel is drained while it executes.
 pub(super) fn process_stream_events(app: &mut App) {
     let _guard = crate::profile!("app::stream_events");
     let _fg = cp_base::flame!("stream");
-    let key = app.resident_key();
+    let key = app.executing_key();
     let mut events: Vec<StreamEvent> = Vec::new();
     if let Some(ts) = app.thread_streams.get(&key) {
         while let Ok(evt) = ts.rx.try_recv() {

@@ -22,7 +22,7 @@ pub(crate) fn editing_new_thread_title(state: &State) -> bool {
 }
 
 /// The textarea keystrokes currently edit: the new-thread title on that row,
-/// otherwise the resident composer.
+/// otherwise the executing thread's composer.
 pub(crate) fn active_textarea(state: &State) -> &cp_base::state::runtime::textarea::TextArea {
     if editing_new_thread_title(state) { &FocusState::get(state).new_thread_title } else { &state.thread().composer }
 }
@@ -142,11 +142,11 @@ fn dispatch_archive(state: &mut State, action: &Action) -> ActionResult {
 }
 
 /// User-focus the thread the list cursor now sits on, so the footer (built from
-/// the resident thread) tracks the selection as the human arrows up/down —
+/// the executing thread) tracks the selection as the human arrows up/down —
 /// without entering the panel-centric view (that is [`drill_in`]'s job on
 /// Right). This sets only [`FocusState::focused_thread_id`]; the loop's
-/// `relocate_resident_on_focus_change` makes that thread resident on the next
-/// tick (an O(1) bundle swap), and the status bar then reflects its state.
+/// `follow_focus` makes that thread executing on the next
+/// tick (an id change), and the status bar then reflects its state.
 ///
 /// This is TUI user-focus, not worker/exec focus — the background scheduler is
 /// unaffected. No-op on the virtual "+ New Thread" entry or an empty selection
@@ -227,7 +227,7 @@ fn create_cancel(state: &mut State) -> ActionResult {
 /// [`FocusState::focused_thread_id`] to the selected thread and flips
 /// [`view_mode`](cp_base::state::runtime::State::view_mode) to
 /// [`Normal`](cp_base::state::data::config::ViewMode::Normal). The loop's
-/// `relocate_resident_on_focus_change` then makes that thread resident on the
+/// `follow_focus` then makes that thread executing on the
 /// next tick, so the ordinary Normal render path paints *its* panels /
 /// conversation — the same TUI as before, just for a different focused thread
 /// (the previously-focused thread keeps running as a background thread).

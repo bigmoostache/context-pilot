@@ -1,29 +1,17 @@
 //! Per-thread runtime bundle — the mutable context a single thread owns.
 //!
-//! The multi-thread model keeps [`State`] *flat*: the whole existing pipeline
-//! (stream processing, tool execution, the cache/freeze engine) reads and writes
-//! `state.messages` / `state.context` / `state.stream` directly and must
-//! stay untouched. Instead of threading a per-thread context parameter through
-//! all of it, the loop keeps one thread *resident* in `State` and swaps a
-//! different thread in/out around a single advancement step.
-//!
-//! [`ThreadRuntime`] is the carrier for that swap: it mirrors exactly the subset
-//! of `State` fields that belong to one thread (conversation, editor/view state,
-//! token+cost telemetry, the cache/freeze engine snapshots, per-thread module
-//! data). [`ThreadRuntime::swap_with`] exchanges every one of those fields with a
-//! `State` in O(1) via [`std::mem::swap`] — no clone, no pipeline change. Fields
-//! NOT present here (tools, active modules, theme, provider/model, the shared
-//! module `TypeMap`, `global_next_uid`, the highlight fn, reveries) are
-//! fleet-shared and never move.
-//!
-//! This module is purely additive until the loop is wired (Phase C): nothing
-//! calls [`swap_with`](ThreadRuntime::swap_with) yet, so behaviour at a single
-//! resident thread is unchanged.
+//! [`ThreadRuntime`] holds everything that belongs to one thread: conversation,
+//! panels, editor/view state, stream phase, token+cost telemetry, the
+//! cache/freeze engine snapshots and per-thread module data. Every thread's
+//! runtime lives permanently in [`ThreadStore`](super::threads::ThreadStore),
+//! keyed by thread id; code reaches the executing one through
+//! [`State::thread`](super::State::thread) / [`State::thread_mut`](super::State::thread_mut).
+//! Fleet-shared data (tools, modules, theme, provider/model, shared module
+//! data, `global_next_uid`, reveries) stays on [`State`](super::State).
 
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
-use super::State;
 use crate::panels::ContextItem;
 use crate::state::context::Entry;
 use crate::state::data::TickTelemetry;
@@ -34,10 +22,8 @@ use crate::ui::render_cache::{FullCache, InputCache, MessageCache};
 
 /// The complete mutable context owned by one thread.
 ///
-/// Every field mirrors a per-thread field of [`State`] (same name, same type);
-/// [`swap_with`](Self::swap_with) exchanges them all with a `State`. The resident
-/// thread's values live in `State`; every non-resident thread parks its values
-/// here inside the fleet registry.
+/// Stored per thread in [`ThreadStore`](super::threads::ThreadStore); see the
+/// module docs.
 pub struct ThreadRuntime {
     // === Conversation + panels ===
     /// Active context panels (dynamic + fixed), ordered for LLM injection.
@@ -170,15 +156,14 @@ pub struct ThreadRuntime {
     pub full_content_cache: Option<FullCache>,
 
     // === Per-thread module data ===
-    /// The resident thread's per-thread module `TypeMap` (spine inbox, queue,
+    /// This thread's per-thread module `TypeMap` (spine inbox, queue,
     /// console ownership, watcher registry, search/git views, …).
     pub thread_module_data: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
 }
 
 impl Default for ThreadRuntime {
     fn default() -> Self {
-        // Mirrors the per-thread field defaults in `State::default` so a freshly
-        // created thread starts exactly like today's single resident thread.
+        // A freshly created thread starts empty, at single-thread defaults.
         Self {
             context: vec![],
             messages: vec![],
@@ -258,77 +243,5 @@ impl ThreadRuntime {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Exchange this bundle with the runtime `state` currently derefs to, in
-    /// O(1). Symmetric: a second call restores the original arrangement.
-    ///
-    /// Transitional (T840 step 2): callers are being moved to
-    /// [`ThreadStore`](super::threads::ThreadStore), where switching the
-    /// executing thread is an id change and nothing is swapped.
-    pub fn swap_with(&mut self, state: &mut State) {
-        std::mem::swap(self, state.thread_store.current_mut());
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn swap_loads_into_state() {
-        let mut rt = ThreadRuntime::new();
-        rt.composer.text = "hello".to_owned();
-        rt.next_user_id = 42;
-        rt.total_output_tokens = 1000;
-        rt.tempo = false;
-
-        let mut state = State::default();
-        rt.swap_with(&mut state);
-
-        // State now holds the runtime's values, and the runtime holds what State
-        // used to hold (the defaults). Tuple compares keep this one branch.
-        assert_eq!(
-            (
-                state.thread().composer.text.as_str(),
-                state.thread().next_user_id,
-                state.thread().total_output_tokens,
-                state.thread().tempo
-            ),
-            ("hello", 42, 1000, false)
-        );
-        assert_eq!((rt.composer.text.as_str(), rt.next_user_id, rt.tempo), ("", 1, true));
-    }
-
-    #[test]
-    fn swap_is_symmetric() {
-        let mut rt = ThreadRuntime::new();
-        rt.composer.text = "hello".to_owned();
-        rt.next_user_id = 42;
-
-        let mut state = State::default();
-        rt.swap_with(&mut state);
-        rt.swap_with(&mut state);
-
-        // Two swaps restore the original arrangement.
-        assert_eq!((state.thread().composer.text.as_str(), state.thread().next_user_id), ("", 1));
-        assert_eq!((rt.composer.text.as_str(), rt.next_user_id), ("hello", 42));
-    }
-
-    #[test]
-    fn thread_module_data_travels() {
-        let mut rt = ThreadRuntime::new();
-        let mut state = State::default();
-        state.set_ext_thread(99u32);
-        assert_eq!(state.get_ext::<u32>(), Some(&99));
-
-        // Swapping moves the per-thread module data out of state…
-        rt.swap_with(&mut state);
-        let parked = rt.thread_module_data.get(&TypeId::of::<u32>()).and_then(|b| b.downcast_ref::<u32>());
-        assert_eq!((state.get_ext::<u32>(), parked), (None, Some(&99)));
-
-        // …and swapping back restores it.
-        rt.swap_with(&mut state);
-        assert_eq!(state.get_ext::<u32>(), Some(&99));
     }
 }

@@ -40,7 +40,7 @@ pub struct State {
 
     /// Boolean status flags that are fleet-global (UI redraw, config overlay,
     /// reload lifecycle, module overlays). Per-thread stream/scroll state is on
-    /// [`resident.stream`](bundle::ThreadRuntime::stream), reached via deref as
+    /// [`executing.stream`](bundle::ThreadRuntime::stream), reached via deref as
     /// `state.stream`.
     pub flags: StatusBools,
     /// Selected bar in config view (0=budget, 1=threshold, 2=target)
@@ -87,10 +87,10 @@ pub struct State {
     /// Takes `(file_path, content)` and returns `cp_render::Span` per line.
     pub highlight_ir_fn: Option<HighlightIrFn>,
 
-    // === Module extension data (fleet-shared half; per-thread half on resident) ===
+    // === Module extension data (fleet-shared half; per-thread half on executing) ===
     /// Fleet-shared module-owned state stored by `TypeId` (one instance across
     /// all threads — e.g. memory, logs, entities, the threads registry). The
-    /// per-thread half lives on [`resident.thread_module_data`](bundle::ThreadRuntime::thread_module_data).
+    /// per-thread half lives on [`executing.thread_module_data`](bundle::ThreadRuntime::thread_module_data).
     ///
     /// A given `TypeId` lives in exactly ONE of the two maps, so the `get_ext`
     /// family searches both and `set_ext` updates whichever already holds the
@@ -99,7 +99,7 @@ pub struct State {
     /// Ambient scope for the *next* first-insert via [`set_ext`](Self::set_ext),
     /// set by the boot/init loops around `init_state` / `load_module_data`:
     /// `Some(true)` → [`shared_module_data`](Self::shared_module_data),
-    /// `Some(false)` or `None` → the resident's per-thread map.
+    /// `Some(false)` or `None` → the executing thread's per-thread map.
     /// Updates to already-registered types ignore this (they stay in place).
     pub init_is_global: Option<bool>,
 }

@@ -50,12 +50,12 @@ type ModuleDataMaps = (HashMap<String, serde_json::Value>, HashMap<String, serde
 /// (`important_panel_uids` by kind, `panel_uid` → local id) worker maps.
 type PanelUidMaps = (HashMap<Kind, String>, HashMap<String, String>);
 
-/// The `states/<id>.json` file id for whichever thread is currently resident
-/// in `state` — the file this save writes.
+/// The `states/<id>.json` file id for the executing thread — the file this
+/// save writes.
 ///
 /// Both thread kinds write a file named after their own thread id:
-/// - a **background** thread (resident only during its advancement step, so
-///   `resident_thread_id != focused_thread_id`) writes `states/<tid>.json`,
+/// - a **background** thread (executing only during its advancement step or
+///   save) writes `states/<tid>.json`,
 ///   which is why a background thread's mid-step `save_state_async` cannot
 ///   clobber the focused thread's file;
 /// - the **focused** thread writes `states/<tid>.json` too. Keying it by id
@@ -69,7 +69,7 @@ type PanelUidMaps = (HashMap<Kind, String>, HashMap<String, String>);
 /// [`DEFAULT_WORKER_ID`] file. Boot selects the matching id through
 /// [`worker::focused_worker_id`], which mirrors this rule and adds a one-shot
 /// fallback to the legacy name for installs saved before pointers existed.
-fn resident_worker_id(state: &State) -> String {
+fn executing_worker_id(state: &State) -> String {
     let focused = cp_mod_threads::types::FocusState::get(state).focused_thread_id.clone();
     match state.executing_thread_id() {
         Some(tid) if Some(tid) != focused.as_deref() => tid.to_owned(),
@@ -262,8 +262,8 @@ fn shared_config_op(
     Some(WriteOp { path: dir.join(CONFIG_FILE), content: json.into_bytes() })
 }
 
-/// Serialize the resident thread's `states/<id>.json` (see
-/// [`resident_worker_id`]). Timed as `….worker_state`.
+/// Serialize the executing thread's `states/<id>.json` (see
+/// [`executing_worker_id`]). Timed as `….worker_state`.
 fn worker_state_op(
     state: &State,
     worker_modules: HashMap<String, serde_json::Value>,
@@ -271,7 +271,7 @@ fn worker_state_op(
 ) -> Option<WriteOp> {
     let _g = crate::profile!("worker_state");
     let (important_uids, panel_uid_to_local_id) = build_panel_uid_maps(state);
-    let worker_id = resident_worker_id(state);
+    let worker_id = executing_worker_id(state);
     let worker_state = WorkerState::default()
         .with_worker_id(worker_id.clone())
         .with_panel_uids(important_uids, panel_uid_to_local_id)
@@ -338,7 +338,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     writes.extend(worker_state_op(state, worker_modules, &dir));
 
     // Panels + history messages. NOTE: orphan pruning is deliberately NOT done
-    // here — a single-thread save only knows the RESIDENT's UIDs, so pruning
+    // here — a single-thread save only knows the EXECUTING thread's UIDs, so pruning
     // would delete every OTHER thread's `panels/<uid>.json` (the dir is shared,
     // keyed by the fleet-global UID counter). Pruning runs once over the union
     // of all threads' UIDs in `App::save_all_threads` (reload/quit).

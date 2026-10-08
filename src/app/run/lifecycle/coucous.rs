@@ -12,9 +12,9 @@ use crate::app::App;
 #[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
     /// Deliver every coucou due now. Runs on the main loop with the focused
-    /// thread resident (never inside a background step), so
+    /// thread executing (never inside a background step), so
     /// [`deliver_to_thread`](Self::deliver_to_thread) resolves "focused" against
-    /// the real resident. Unscoped coucous (`thread_id: None`) go to the focused
+    /// the real executing. Unscoped coucous (`thread_id: None`) go to the focused
     /// thread.
     ///
     /// A background target is flipped to `MyTurn`: its inbox notification alone
@@ -73,7 +73,7 @@ impl App {
     }
 }
 
-/// Take the resident thread's legacy coucous, stamping `owner` on unscoped ones.
+/// Take the executing thread's legacy coucous, stamping `owner` on unscoped ones.
 fn drain_legacy(state: &mut cp_base::state::runtime::State, owner: Option<&str>) -> Vec<cp_mod_spine::coucou::Record> {
     let mut list = std::mem::take(&mut SpineState::get_mut(state).legacy_coucous);
     for coucou in &mut list {

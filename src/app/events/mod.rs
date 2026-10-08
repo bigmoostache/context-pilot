@@ -234,7 +234,7 @@ fn handle_index_overlay_key(key: &KeyEvent, state: &State) -> Option<Action> {
 /// Threads-nav while the human has drilled into a thread's panel view (G3):
 /// only Left/Esc exits back to the list; every other key is swallowed
 /// (`Action::None`) so a glance stays read-only. Events run against the focused
-/// resident (the drill-in swap is render-scoped only), so letting keys through
+/// thread (the drill-in switch is render-scoped only), so letting keys through
 /// would scroll/mutate the *focused* thread while the screen shows the drilled
 /// one — Model 2 forbids a glance disturbing the agent's thread. Written as an
 /// `if`/`else` on `matches!` rather than a `match` with a `_` arm to avoid the

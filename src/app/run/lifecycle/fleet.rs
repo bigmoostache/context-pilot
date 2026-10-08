@@ -1,11 +1,11 @@
 //! Background-thread advancement — the multi-thread loop step (Phase C).
 //!
-//! The focused (resident) thread is stepped in place by `run_background_phase`
-//! in the parent [`lifecycle`](super) module; this module advances every *other*
-//! active thread by swapping its parked [`ThreadRuntime`] into
-//! [`State`](crate::state::State) for one step, then swapping the focused thread
-//! back. At N=1 the registry is empty, so the whole pass is a no-op and the tick
-//! is byte-identical to single-thread execution.
+//! The focused thread is stepped by `run_background_phase` in the parent
+//! [`lifecycle`](super) module; this module advances every *other* active
+//! thread by making it the executing thread for one step
+//! (`thread_store.set_executing`), then restoring the previous one. No runtime
+//! moves: each [`ThreadRuntime`] stays in its own `ThreadStore` slot. At N=1
+//! the registry is empty and the pass is a no-op.
 
 use cp_fleet::{Entry, Role, ThreadExecState, promote};
 use cp_mod_threads::types::{ThreadStatus, ThreadsState};
@@ -49,14 +49,14 @@ impl App {
     ///   gets a freshly initialized one.
     /// - `want` is `None` (focus cleared): the unbound runtime becomes current,
     ///   re-initialized so per-thread module states exist for the next render.
-    pub(super) fn relocate_resident_on_focus_change(&mut self) {
+    pub(super) fn follow_focus(&mut self) {
         let want = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
         let have = self.state.executing_thread_id().map(str::to_owned);
         if want == have {
             return;
         }
 
-        // A deleted outgoing thread (slot gone) has nothing to park.
+        // A deleted outgoing thread (slot gone) needs no fleet entry.
         if let Some(have_id) = have.as_deref().filter(|id| self.state.thread_store.contains(id)) {
             self.park_outgoing(have_id.to_owned());
         }
@@ -118,12 +118,12 @@ impl App {
     /// each tick, before [`advance_background_threads`](Self::advance_background_threads)
     /// steps the schedulable ones.
     ///
-    /// Reconcile rules (the **resident/focused** thread is excluded — its context
-    /// lives flat in [`State`](crate::state::State), not in an `Entry`):
+    /// Reconcile rules (the **focused** thread has no entry: it is stepped by
+    /// the main pipeline, not the background loop):
     /// - a non-focused, non-archived thread missing from the registry gets a
-    ///   fresh `Idle` [`Entry`] (empty [`ThreadRuntime`](cp_base::state::runtime::bundle::ThreadRuntime));
-    /// - an entry whose thread vanished, was archived, or became the focused
-    ///   resident is removed;
+    ///   fresh `Idle` [`Entry`], and an initialized runtime if it has none;
+    /// - an entry whose thread vanished, was archived, or became focused is
+    ///   removed (a vanished or archived thread also loses its runtime);
     /// - each surviving **non-active** entry's `exec_state` is derived from its
     ///   thread status (`MyTurn` → `Runnable`, else `Idle`); active entries are
     ///   left to the step loop (see [`derive_exec_state`](Self::derive_exec_state)).
@@ -178,8 +178,8 @@ impl App {
         // purely the roster-mirror + Idle<->Runnable derivation above.
     }
 
-    /// Boot-load every background thread's persisted per-thread context into the
-    /// fleet registry — the boot half of F1 (design doc I-10 "boot loads N →
+    /// Boot-load every background thread's persisted runtime into the
+    /// `ThreadStore` and register it in the fleet — the boot half of F1 (design doc I-10 "boot loads N →
     /// registry"). Called once at the start of [`run`](super::App::run), before
     /// the loop's first [`reconcile_fleet_registry`](Self::reconcile_fleet_registry).
     ///
@@ -187,9 +187,9 @@ impl App {
     /// [`boot_load_thread_runtime`](crate::state::persistence::boot_load_thread_runtime),
     /// which returns the thread's persisted [`ThreadRuntime`] or `None` when the
     /// thread has no `states/<tid>.json` yet (a cold thread). A loaded runtime is
-    /// registered with its `exec_state` derived from the thread's status; a cold
-    /// thread is left for `reconcile_fleet_registry` to insert with a fresh empty
-    /// runtime on the first tick.
+    /// stored and registered with its `exec_state` derived from the thread's
+    /// status; a cold thread is left for `reconcile_fleet_registry`, which gives
+    /// it a fresh initialized runtime on the first tick.
     ///
     /// At N=1 (and for any agent whose background threads have not yet been
     /// persisted per-thread) every lookup is `None`, so the fleet stays empty and
@@ -218,7 +218,7 @@ impl App {
         }
     }
 
-    /// Derive one non-resident entry's [`ThreadExecState`] from its thread status.
+    /// Derive one background entry's [`ThreadExecState`] from its thread status.
     ///
     /// An **active** entry ([`Streaming`](ThreadExecState::Streaming) /
     /// [`AwaitingLlm`](ThreadExecState::AwaitingLlm)) is owned by the advancement
@@ -254,18 +254,16 @@ impl App {
         }
     }
 
-    /// Advance every schedulable *background* (non-resident, capped) thread one
+    /// Advance every schedulable *background* (non-focused, capped) thread one
     /// step: the currently-active ones (continuing their stream) plus the ones
     /// [`promote`] selects to fill free concurrency slots (their kickoff step).
     ///
-    /// For each, it removes the entry, marks it the stepping resident, swaps its
-    /// parked [`ThreadRuntime`](cp_base::state::runtime::bundle::ThreadRuntime)
-    /// into `state`, runs the advancement core
+    /// For each, it makes the thread the executing one (and the stepping thread,
+    /// so stream spawn/drain key by it), runs the advancement core
     /// ([`step_one_thread`](Self::step_one_thread)) — whose `check_spine` may
-    /// start the thread's stream — then re-derives the entry's
-    /// [`ThreadExecState`] from the post-step stream phase, swaps the focused
-    /// thread back, and re-inserts. The swap is O(1), so a tick costs at most
-    /// `K` swaps. Empty at N=1 (no background peer has work) → no-op.
+    /// start the thread's stream — re-derives the entry's [`ThreadExecState`]
+    /// from the post-step stream phase, then restores the previous executing
+    /// thread. Switching is an id change; nothing is copied. Empty at N=1 → no-op.
     pub(super) fn advance_background_threads(&mut self) {
         let focused = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
         let promotable: std::collections::HashSet<String> = promote(&self.fleet).into_iter().collect();
@@ -300,17 +298,17 @@ impl App {
     }
 
     /// Re-derive a just-stepped background thread's [`ThreadExecState`] from the
-    /// state it left behind (the thread is still resident in `state`).
+    /// state it left behind (the thread is still the executing one).
     ///
-    /// Delegates to [`exec_state_from_residency`](Self::exec_state_from_residency)
+    /// Delegates to [`exec_state_from_facts`](Self::exec_state_from_facts)
     /// so the step loop and the display mirror cannot drift apart.
     fn post_step_exec_state(&self, id: &str) -> ThreadExecState {
         let errs = cp_mod_spine::types::SpineState::get(&self.state).config.consecutive_continuation_errors;
         let status = ThreadsState::get(&self.state).threads.iter().find(|t| t.id == id).map(|t| t.status);
-        Self::exec_state_from_residency(self.state.thread().stream.phase.is_streaming(), errs, status)
+        Self::exec_state_from_facts(self.state.thread().stream.phase.is_streaming(), errs, status)
     }
 
-    /// The single definition of "what exec state do these residency facts imply".
+    /// The single definition of "what exec state do these thread facts imply".
     ///
     /// Shared by two callers that must agree: the step loop's post-step
     /// derivation ([`post_step_exec_state`](Self::post_step_exec_state)) and the
@@ -321,7 +319,7 @@ impl App {
     /// Order matters: a live stream wins (the thread holds its `K` slot), then a
     /// fatal error streak parks it as `Errored`, and only then does the turn
     /// status decide `Runnable` vs `Idle`.
-    const fn exec_state_from_residency(
+    const fn exec_state_from_facts(
         is_streaming: bool,
         consecutive_errors: usize,
         status: Option<ThreadStatus>,
@@ -344,18 +342,17 @@ impl App {
 
     /// Republish the display-only exec-state mirror
     /// ([`FleetExecMirror`](cp_mod_threads::view_state::FleetExecMirror)) from the
-    /// registry plus the resident's own facts.
+    /// registry plus the focused thread's own facts.
     ///
     /// Called once per tick, **after** the step loop, so the map reflects
     /// post-step derivations rather than the pre-step reconcile. Rebuilding
     /// wholesale (not merging) is what lets a deleted or archived thread vanish
     /// from the UI instead of lingering.
     ///
-    /// The **focused** thread needs its own source: the registry deliberately
-    /// excludes it (its context lives flat in `state`, the resident=focused
-    /// invariant), so a registry-only mirror would leave the row the human is
-    /// looking at blank. Its stream phase and error streak are read from
-    /// `state`, which *is* that thread while the loop is at rest.
+    /// The **focused** thread needs its own source: the registry excludes it, so
+    /// a registry-only mirror would leave the row the human is looking at blank.
+    /// Its stream phase and error streak are read from the executing thread,
+    /// which is the focused one while the loop is at rest.
     pub(super) fn publish_fleet_view_states(&mut self) {
         let mut exec_states: std::collections::HashMap<String, ThreadExecState> =
             self.fleet.iter().map(|entry| (entry.0.clone(), entry.1.exec_state)).collect();
@@ -364,9 +361,9 @@ impl App {
         if let Some(id) = focused {
             let errs = cp_mod_spine::types::SpineState::get(&self.state).config.consecutive_continuation_errors;
             let status = ThreadsState::get(&self.state).threads.iter().find(|t| t.id == id).map(|t| t.status);
-            let resident =
-                Self::exec_state_from_residency(self.state.thread().stream.phase.is_streaming(), errs, status);
-            let _inserted = exec_states.insert(id, resident);
+            let focused_state =
+                Self::exec_state_from_facts(self.state.thread().stream.phase.is_streaming(), errs, status);
+            let _inserted = exec_states.insert(id, focused_state);
         }
 
         cp_mod_threads::view_state::FleetExecMirror::get_mut(&mut self.state).replace_all(exec_states);
@@ -375,7 +372,7 @@ impl App {
     /// The per-thread advancement core: drain this thread's stream, retry a
     /// failed request, flush the typewriter, **resolve its pending blocking
     /// waits**, run its tool pipeline, finalize a completed stream, and evaluate
-    /// its spine. Called once per background thread while it is swapped in.
+    /// its spine. Called once per background thread while it is executing.
     /// Fleet-global work (bridge, file-watch events, cache channel drain,
     /// reverie) is NOT here — it runs once per tick, not once per thread.
     ///
@@ -383,17 +380,16 @@ impl App {
     /// ([`check_waiting_for_panels`](super::super::tools::checks::check_waiting_for_panels),
     /// [`check_deferred_sleep`](super::super::tools::checks::check_deferred_sleep),
     /// [`check_watchers`](super::super::tools::cleanup::check_watchers)) MUST run
-    /// here, mirroring the resident pipeline in
+    /// here, mirroring the focused pipeline in
     /// [`run_background_phase`](super::App::run_background_phase). Without them a
     /// background thread that issues a blocking tool (e.g. `console_easy_bash`
     /// "sleep 3") parks on `pending_console_wait_tool_results` + a blocking
-    /// `ConsoleWatcher` in its OWN (now swapped-in) registry, but that registry
-    /// is only ever polled for the resident — so the sentinel is never replaced,
+    /// `ConsoleWatcher` in its OWN registry, but without these checks that
+    /// registry is only polled for the focused thread — the sentinel is never replaced,
     /// `finalize_stream` keeps bailing, and the thread stalls permanently while
-    /// the focused thread (which does get these checks) advances. They operate
-    /// only on per-thread swapped-in state (the thread's `WatcherRegistry` plus
-    /// its `StreamRuntime` accumulators), so running them here targets this
-    /// thread and this thread only.
+    /// the focused thread advances. They operate only on the executing thread's
+    /// data (its `WatcherRegistry` plus its `StreamRuntime` accumulators), so
+    /// running them here targets this thread and this thread only.
     fn step_one_thread(&mut self) {
         super::super::streaming::process_stream_events(self);
         super::super::streaming::handle_retry(self);

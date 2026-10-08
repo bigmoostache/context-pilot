@@ -313,9 +313,9 @@ pub struct FocusState {
     pub focused_thread_id: Option<String>,
     /// Which thread the human has *drilled into* in the TUI (`None` = showing the
     /// thread list). Pure view state (G3): it selects whose full panel view is
-    /// painted, and never moves execution — the renderer swaps the drilled
-    /// thread's parked runtime in only for the duration of one paint, then
-    /// restores the resident (Model 2: a human glance must not disturb the
+    /// painted, and never moves execution — the renderer makes the drilled
+    /// thread executing only for the duration of one paint, then
+    /// restores the previous one (Model 2: a human glance must not disturb the
     /// agent's work). Defaults to `None` (back-compat; byte-identical until set).
     #[serde(default)]
     pub drilled_thread_id: Option<String>,

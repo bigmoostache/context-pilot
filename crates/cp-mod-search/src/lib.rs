@@ -140,8 +140,7 @@ impl Module for SearchModule {
     /// Fleet-shared (thread-centric model): `SearchState` holds index config and
     /// metrics for the single project-wide Meilisearch daemon — one index shared
     /// by every thread, not per-thread state. The search *result panels* are
-    /// per-thread (they live in `state.context`, carried by the resident-thread
-    /// swap); the index metadata stays shared so it is not duplicated per thread.
+    /// per-thread (they live in each thread's `context`); the index metadata stays shared so it is not duplicated per thread.
     /// Inert at N=1.
     fn is_global(&self) -> bool {
         true

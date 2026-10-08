@@ -328,7 +328,7 @@ impl Module for GitModule {
     /// (branch, repo status, diff stats, diff base) — identical across every
     /// thread of a project, not per-thread view state. The git *result panels*
     /// are per-thread (they live in `state.context`, carried by the
-    /// resident-thread swap); the underlying repo data stays shared so it is
+    /// thread's runtime); the underlying repo data stays shared so it is
     /// computed once, not duplicated per thread. Inert at N=1.
     fn is_global(&self) -> bool {
         true

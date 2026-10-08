@@ -75,7 +75,7 @@ impl Module for ThreadsModule {
         state.set_ext(ThreadsState::new());
         // FocusState is UI-global: "which thread the human is looking at" is one
         // singleton pointer, NOT per-thread state. set_ext_global pins it to the
-        // shared map so it never rides the resident-thread swap (`ThreadRuntime`).
+        // shared map so it never rides the thread's runtime (`ThreadRuntime`).
         state.set_ext_global(FocusState::new());
         // FleetExecMirror describes EVERY thread, so it too must be shared — a
         // per-thread copy would only ever hold that thread's own state. It is
@@ -142,7 +142,7 @@ impl Module for ThreadsModule {
 
     fn load_worker_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Ok(fs) = serde_json::from_value::<FocusState>(data.clone()) {
-            // UI-global (see init_state): pin to the shared map, never swapped.
+            // UI-global (see init_state): pin to the shared map, never per-thread.
             state.set_ext_global(fs);
         }
     }
@@ -276,14 +276,14 @@ impl Module for ThreadsModule {
 /// param, and any agent-authored ` ```form ` block must be well-formed (design
 /// doc §7).
 ///
-/// `Send` always targets the caller's own (resident) thread — there is no
+/// `Send` always targets the caller's own (executing) thread — there is no
 /// target parameter, so a thread can never post into another thread's voice.
 /// Sending to a `THEIR_TURN` thread is allowed — the AI may post follow-ups
 /// without waiting; status simply stays `THEIR_TURN`.
 fn preflight_send(tool: &ToolUse, state: &State, pf: &mut Verdict) {
-    let tid = tools::resident_thread_id(state);
+    let tid = tools::executing_thread_id_or_empty(state);
     if !ThreadsState::get(state).threads.iter().any(|t| t.id == tid) {
-        pf.errors.push(format!("Send has no owning thread (resident thread '{tid}' not found)"));
+        pf.errors.push(format!("Send has no owning thread (executing thread '{tid}' not found)"));
     }
     let markdown = tool.input.get("markdown").and_then(|v| v.as_str());
     let has_markdown = markdown.is_some_and(|s| !s.is_empty());

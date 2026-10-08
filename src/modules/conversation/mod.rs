@@ -41,7 +41,7 @@ impl Module for ConversationModule {
     /// Per-thread (thread-centric model): a thread's conversation is its own.
     /// This module holds no `TypeMap` data — the conversation lives in
     /// `state.messages` + the `CONVERSATION` panel `Entry`, both carried by the
-    /// resident-thread swap (`ThreadRuntime`). The flag is per-thread for intent;
+    /// thread's runtime (`ThreadRuntime`). The flag is per-thread for intent;
     /// it is inert at N=1 (save/load are no-ops), so routing anything it ever
     /// gains lands in the per-thread map.
     fn is_global(&self) -> bool {

@@ -175,12 +175,11 @@ fn pre_start_daemons(progress: &mut impl FnMut(&str)) {
 /// [`boot_load_thread_runtime`].
 ///
 /// Global modules are deliberately skipped: they are fleet-shared singletons
-/// that already live in the focused (resident) state's `shared_module_data`;
+/// that already live in the live state's `shared_module_data`;
 /// re-initialising them here would create a second, discarded copy. Only the
 /// per-thread module data (spine inbox, queue, console ownership, watcher
-/// registry, search/git views, …) is built, so the subsequent
-/// [`ThreadRuntime::swap_with`] carries exactly that thread's per-thread state
-/// out. Mirrors [`load_one_module_data`]'s per-thread branch (two passes: all
+/// registry, search/git views, …) is built, so the runtime taken out of the
+/// throwaway state carries exactly that thread's per-thread state. Mirrors [`load_one_module_data`]'s per-thread branch (two passes: all
 /// inits, then all loads) restricted to non-global modules.
 fn boot_init_thread_modules(state: &mut State, worker_modules: &HashMap<String, serde_json::Value>) {
     let null = serde_json::Value::Null;
@@ -216,8 +215,7 @@ fn boot_init_thread_modules(state: &mut State, worker_modules: &HashMap<String, 
 /// It reuses the focused boot loaders ([`boot_load_panels`] /
 /// [`boot_load_messages`], which read only `cfg.worker`, ignoring `cfg.shared`)
 /// to rebuild the thread's panels + conversation, then assembles a throwaway
-/// background `State` and [`swap_with`](ThreadRuntime::swap_with)s its per-thread
-/// fields out into the returned runtime. The composer draft comes from the
+/// background `State` and takes its (unbound) runtime out as the returned one. The composer draft comes from the
 /// thread's own `states/<tid>.json`, so each thread restores its own unsent text.
 pub(crate) fn boot_load_thread_runtime(
     thread_id: &str,
@@ -250,9 +248,8 @@ pub(crate) fn boot_load_thread_runtime(
     // collide with another thread's on `panels/<uid>.json`.
     ensure_thread_fixed_panels(&mut bg, next_uid, active_modules);
 
-    let mut runtime = ThreadRuntime::new();
-    runtime.swap_with(&mut bg); // runtime now holds this thread's per-thread context
-    Some(runtime)
+    // `bg` never executed a thread, so its runtime is the unbound one.
+    Some(bg.thread_store.take_unbound(ThreadRuntime::new()))
 }
 
 /// Build a [`ThreadRuntime`] for a **cold** thread — one in the roster with no
@@ -263,11 +260,11 @@ pub(crate) fn boot_load_thread_runtime(
 /// conversation, panels and counters start empty. The one thing that must NOT
 /// be empty is the per-thread **module map**. A bare
 /// [`ThreadRuntime::new()`](ThreadRuntime::new) carries an empty
-/// `thread_module_data`, so the moment the scheduler promotes the thread, swaps
-/// it in and steps it, `check_spine`'s first `ext::<SpineState>()` would panic
+/// `thread_module_data`, so the moment the scheduler promotes and steps the
+/// thread, `check_spine`'s first `ext::<SpineState>()` would panic
 /// with "module state not initialized". This runs the same per-thread module
 /// init as a disk load ([`boot_init_thread_modules`] over an empty map) so the
-/// swapped-in state is fully formed.
+/// runtime is fully formed.
 pub(crate) fn fresh_thread_runtime(
     next_uid: &mut usize,
     active_modules: &std::collections::HashSet<String>,
@@ -279,9 +276,7 @@ pub(crate) fn fresh_thread_runtime(
     // panel-centric view rather than an empty one. UIDs are minted from the
     // shared counter (fleet-wide uniqueness for `panels/<uid>.json`).
     ensure_thread_fixed_panels(&mut bg, next_uid, active_modules);
-    let mut runtime = ThreadRuntime::new();
-    runtime.swap_with(&mut bg);
-    runtime
+    bg.thread_store.take_unbound(ThreadRuntime::new())
 }
 
 /// Create the fixed base panels (conversation + Todo/Overview/Memory/… at

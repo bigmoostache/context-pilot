@@ -98,9 +98,9 @@ pub(super) fn apply_command(app: &mut App, cmd: Command) {
 /// Returns `true` if the message was applied (thread existed). The per-thread
 /// lifecycle hook (`on_user_message`, which resets *that thread's* spine
 /// counters — D4/S7) is NOT fired here: it needs [`App::deliver_to_thread`] to
-/// target the owner thread's state rather than the resident's, so the caller
+/// target the owner thread's state rather than the executing thread's, so the caller
 /// (`apply_command`) routes it after this returns. Firing it here on `state`
-/// would reset the *resident* (focused) thread's counters for a message sent to
+/// would reset the *executing* (focused) thread's counters for a message sent to
 /// a *background* thread.
 fn apply_send_message(state: &mut State, thread_id: &str, content: &str) -> bool {
     let threads_state = ThreadsState::get_mut(state);
@@ -124,14 +124,14 @@ fn apply_send_message(state: &mut State, thread_id: &str, content: &str) -> bool
 /// Routed through [`App::deliver_to_thread`] so a message sent to a *background*
 /// thread resets *that* thread's spine counters (auto-continuation count,
 /// autonomous-start clock, `user_stopped`, error backoff), never the focused
-/// resident's. At N=1 (or when the target IS the focused resident, or a
+/// executing's. At N=1 (or when the target IS the focused thread, or a
 /// just-created thread not yet in the registry) `deliver_to_thread` runs the
 /// hook directly on `state` — byte-identical to the former inline loop.
 ///
 /// After the reset, [`App::clear_errored_entry`] flips a stuck (`Errored`)
 /// thread back to `Runnable`: a fresh user message is the human-intervention
 /// recovery path for a thread the loop had given up on (F4). A no-op for the
-/// resident / unknown threads, so N=1 is unaffected.
+/// executing / unknown threads, so N=1 is unaffected.
 fn route_on_user_message(app: &mut App, thread_id: &str) {
     app.deliver_to_thread(Some(thread_id), |state| {
         for module in crate::modules::all_modules() {

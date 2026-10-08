@@ -34,7 +34,7 @@ pub(crate) type PendingDone = (usize, usize, usize, usize, Option<String>, Vec<S
 /// Created at stream start (one of the three start sites: `check_spine`,
 /// `continue_streaming`, `handle_retry`), drained by `process_stream_events`.
 ///
-/// At N=1 there is a single resident thread, so the map holds a single entry
+/// At N=1 there is a single thread, so the map holds a single entry
 /// keyed by [`App::main_stream_key`]. Phase C3 generalises the key to the
 /// actually-advancing thread id so the loop can drive several threads at once.
 pub(crate) struct ThreadStream {
@@ -102,23 +102,15 @@ pub(crate) struct App {
     /// At N=1 holds a single entry under [`App::main_stream_key`]; the loop
     /// (Phase C3) will key this by the advancing thread id for true concurrency.
     pub thread_streams: std::collections::HashMap<String, ThreadStream>,
-    /// Fleet registry: the source of truth for every non-resident thread's
-    /// runtime bundle + its execution state and role (Phase C).
-    ///
-    /// The resident (focused) thread's bundle lives *flat* in [`App::state`];
-    /// every other thread parks its [`ThreadRuntime`](cp_base::state::runtime::bundle::ThreadRuntime)
-    /// here inside an `Entry`, and the loop swaps it into `state` for one
-    /// advancement step (see `advance_background_threads`). Empty at N=1 — the
-    /// single resident thread is the only one that exists — so the background
-    /// advancement pass is a no-op and behaviour is identical to single-thread.
-    /// Population (reconcile from `ThreadsState`) is wired in C4.
+    /// Fleet registry: scheduling metadata (role, exec state, wait stamp) for
+    /// every background (non-focused) thread. Runtimes live in
+    /// `state.thread_store`. Empty at N=1, so background advancement is a no-op.
     pub fleet: cp_fleet::FleetRegistry,
-    /// Id of the background thread currently swapped into [`state`](Self::state)
-    /// for an advancement step, or `None` when the resident is the focused
-    /// thread (the normal case). It is the override half of
-    /// [`resident_key`](Self::resident_key): stream spawn and drain both key by
-    /// the resident thread, so during a background step they target that
-    /// thread's channel rather than the focused thread's.
+    /// Id of the background thread executing an advancement step, or `None`
+    /// outside a background step. It is the override half of
+    /// [`executing_key`](Self::executing_key): stream spawn and drain both key by
+    /// it, so during a background step they target that thread's channel rather
+    /// than the focused thread's.
     pub stepping_thread: Option<String>,
     /// Result of the previous iteration's idle `event::poll(timeout)`, consumed
     /// by the next input phase so it can skip its own `poll(ZERO)`. `None` on

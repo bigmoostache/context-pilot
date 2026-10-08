@@ -25,7 +25,7 @@ use cp_mod_threads::types::{ThreadMessage, ThreadsState};
 use cp_wire::types::snapshot::RosterThread;
 
 /// Branch A + B of the incoming-message behavior, run once per main-loop tick on
-/// the **focused** thread (the resident at rest, per the resident=focused
+/// the **focused** thread (the executing at rest, per the executing=focused
 /// invariant). Splits on `was_streaming` — the agent's stream phase snapshotted
 /// by the caller BEFORE `finalize_stream` runs this tick (see the call site):
 ///
@@ -214,11 +214,11 @@ fn roster_gate(app: &App) -> (bool, Option<u64>) {
     (ROSTER_HASH.get() == Some(hash), Some(hash))
 }
 
-/// Append an auto **tool-activity trace** to the owner (resident) thread, if any.
+/// Append an auto **tool-activity trace** to the owner (executing) thread, if any.
 ///
 /// Every tool call leaves a lightweight `{verb · tool — intent}` breadcrumb in
 /// the conversation of the thread that is actually executing it — the
-/// **resident** thread (`State::executing_thread_id`), never the human focus. So a human watching a thread sees
+/// **executing** thread (`State::executing_thread_id`), never the human focus. So a human watching a thread sees
 /// that thread's own live work without the agent having to narrate it, even when
 /// several threads run concurrently and the human is looking at a different one.
 /// The message is marked
@@ -230,7 +230,7 @@ fn roster_gate(app: &App) -> (bool, Option<u64>) {
 /// - **Never changes turn or focus.** The trace is `Assistant`-authored and
 ///   `acknowledged` (so it can't flip the thread to `MY_TURN` or count as
 ///   unread), and no spine notification / `on_user_message` hook fires.
-/// - **No-op when no owner thread.** No resident/focused thread ⇒ nothing
+/// - **No-op when no owner thread.** No executing/focused thread ⇒ nothing
 ///   happens.
 /// - **Skips the thread-native tools** (`Send` / `Read`): `Send` already writes
 ///   a real bubble (a second auto trace would double it) and `Read` is the
@@ -242,7 +242,7 @@ fn roster_gate(app: &App) -> (bool, Option<u64>) {
 /// `auto` flag).
 pub(in crate::app::run) fn maybe_append_tool_activity(state: &mut State, tool: &ToolUse) {
     // Attribute the trace to the OWNER thread — the one whose runtime is
-    // currently resident in `state` (the thread actually executing this tool),
+    // currently executing in `state` (the thread actually executing this tool),
     // NOT the human's on-screen focus. With N>1 these differ: a background
     // thread can run tools while the human views another thread, and its
     // breadcrumbs must land in its own conversation.

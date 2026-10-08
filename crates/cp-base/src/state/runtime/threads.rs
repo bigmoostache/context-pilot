@@ -4,7 +4,7 @@
 //! executing" is just an id ([`set_executing`](ThreadStore::set_executing));
 //! nothing is moved when it changes.
 //!
-//! [`State`](super::State) derefs to [`current`](ThreadStore::current): the
+//! [`State::thread`](super::State::thread) returns [`current`](ThreadStore::current): the
 //! executing thread's runtime, or the *unbound* runtime when no stored thread
 //! is executing (cold boot before the first focus, or focus cleared). Boot
 //! assembles the focused thread's data into the unbound runtime;

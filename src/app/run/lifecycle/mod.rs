@@ -20,8 +20,8 @@ use crate::app::App;
 mod animation;
 /// Fleet-shared coucou delivery (once per tick) + legacy per-thread migration.
 mod coucous;
-/// Background-thread advancement: swap-in/step/swap-out each non-resident active
-/// thread around the shared pipeline (Phase C). No-op at N=1.
+/// Background-thread advancement: execute each non-focused active thread for
+/// one step of the shared pipeline (Phase C). No-op at N=1.
 mod fleet;
 /// Fleet lifecycle I/O (Phase F): console orphan-prune, N-thread save, hard-delete
 /// teardown, Errored re-engage. Split from `fleet` for the 500-line cap.
@@ -29,9 +29,9 @@ mod fleet_lifecycle;
 /// The `loop.input` phase: event poll/read/route, every step profile-guarded.
 mod input_phase;
 
-/// Per-thread stream runtime (typewriter/pending-tools/pending-done/…): the
-/// per-stream analogue of `ThreadRuntime`, swapped around each background step
-/// so one thread's in-flight stream never bleeds into another's (N>1 fix).
+/// Per-thread stream runtime (typewriter/pending-tools/pending-done/…), stored
+/// in each thread's module data so one thread's in-flight stream never bleeds
+/// into another's.
 pub(crate) mod stream_runtime;
 use cp_mod_spine::engine::{SpineDecision, apply_continuation, check_spine};
 use cp_mod_spine::types::{NotificationType, SpineState};
@@ -212,7 +212,7 @@ impl App {
         // thread, make it the executing one just for this paint, then restore.
         // Focus and scheduling are untouched (Model 2).
         let drilled = {
-            let _guard = crate::profile!("drill_swap");
+            let _guard = crate::profile!("drill_in");
             self.take_drilled_runtime_for_render()
         };
         // `terminal_draw` = widget build (`ui_render` child) + ratatui buffer
@@ -254,16 +254,14 @@ impl App {
         super::threads::poll_bridge_commands(self);
         super::tools::watchdog::mark(super::tools::watchdog::Step::ThreadsEmit);
         super::threads::emit_bridge_deltas(self);
-        // Make the resident bundle follow the focused thread: if focus changed
-        // since last tick (agent `Read`, later a human drill-in), park the old
-        // resident and swap the newly-focused thread's bundle into `state`, so the
-        // focused pipeline below operates on the correct thread and its stream
-        // frames are tagged with its id. No-op at N=1 (focus never switches).
-        // Background steps re-point the resident around their swap (see
-        // `advance_background_threads`).
+        // Make the focused thread the executing one: if focus changed since
+        // last tick (agent `Read`, human drill-in), register the old one for
+        // background stepping and execute the new one, so the focused pipeline
+        // below operates on the correct thread and its stream frames are tagged
+        // with its id. No-op when focus is unchanged.
         {
-            let _guard = crate::profile!("relocate_resident");
-            self.relocate_resident_on_focus_change();
+            let _guard = crate::profile!("follow_focus");
+            self.follow_focus();
         }
         super::tools::watchdog::mark(super::tools::watchdog::Step::Stream);
         super::streaming::process_stream_events(self);
@@ -280,7 +278,7 @@ impl App {
         // Check watchers (blocking sentinel replacement + async → spine notifications)
         super::tools::cleanup::check_watchers(self);
         // Fleet-shared coucous: polled once per tick for every thread, with the
-        // focused thread resident (background steps never see them).
+        // focused thread executing (background steps never see them).
         self.check_coucous();
         self.recover_bridge_if_pending(current_ms);
         self.drain_chat_sync_if_due(current_ms);
@@ -304,11 +302,9 @@ impl App {
         super::streaming::process_api_check_results(self);
 
         // === BACKGROUND THREADS (Phase C) ===
-        // After the focused/resident thread has been stepped in place above,
-        // advance every OTHER active thread one step by swapping it into `state`
-        // around the same advancement core (`step_one_thread`). Empty at N=1 —
-        // the resident is the only thread — so this is a no-op and the tick is
-        // byte-identical to single-thread.
+        // After the focused thread has been stepped above, advance every OTHER
+        // active thread one step by making it executing around the same
+        // advancement core (`step_one_thread`). No-op at N=1.
         //
         // C4 scheduling-decision layer: reconcile the registry against the thread
         // roster and compute the promotion decision (never setting an active

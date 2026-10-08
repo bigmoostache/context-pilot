@@ -76,13 +76,13 @@ impl App {
             self.handle_action(action);
         }
 
-        // Make the resident follow a focus change the action may have just made
+        // Make the executing follow a focus change the action may have just made
         // (e.g. Right-arrow drill-in switching the focused thread) BEFORE the
-        // post-input render below — else this frame paints the previous resident
+        // post-input render below — else this frame paints the previous executing
         // ("one stale frame until I type" bug). No-op when focus did not change.
         {
-            let _guard = crate::profile!("relocate_resident");
-            self.relocate_resident_on_focus_change();
+            let _guard = crate::profile!("follow_focus");
+            self.follow_focus();
         }
 
         // Render immediately after input for instant feedback, but never faster

@@ -247,7 +247,7 @@ fn cycle_view_mode(state: &mut State) {
 // ── Entry point ──────────────────────────────────────────────────────────────
 
 /// Apply an `Action`. Text-editing actions on the virtual "+ New Thread" row
-/// edit that row's own title textarea instead of the resident composer.
+/// edit that row's own title textarea instead of the executing thread's composer.
 pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
     if threads::is_title_edit(&action) && threads::editing_new_thread_title(state) {
         return threads::with_new_thread_title(state, action, dispatch_action);
