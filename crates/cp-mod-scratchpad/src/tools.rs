@@ -50,7 +50,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Thread-owned: a cell must live in the focused thread (mirrors Think.todo).
-    let Some(thread_id) = state.resident_thread_id.clone().or_else(|| ScratchpadState::get(state).focus_filter.clone())
+    let Some(thread_id) = state.executing_thread_id().map(str::to_owned)
     else {
         return ToolResult::new(
             tool.id.clone(),
@@ -89,7 +89,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Thread-owned: only cells of the focused thread are editable.
-    let Some(thread_id) = state.resident_thread_id.clone().or_else(|| ScratchpadState::get(state).focus_filter.clone())
+    let Some(thread_id) = state.executing_thread_id().map(str::to_owned)
     else {
         return ToolResult::new(
             tool.id.clone(),
@@ -135,7 +135,7 @@ pub(crate) fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Thread-owned: wiping only ever touches the focused thread's cells.
-    let Some(thread_id) = state.resident_thread_id.clone().or_else(|| ScratchpadState::get(state).focus_filter.clone())
+    let Some(thread_id) = state.executing_thread_id().map(str::to_owned)
     else {
         return ToolResult::new(
             tool.id.clone(),

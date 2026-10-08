@@ -11,7 +11,7 @@ use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
-use crate::types::{FocusState, ThreadAuthor, ThreadMessage, ThreadStatus, ThreadsState};
+use crate::types::{ThreadAuthor, ThreadMessage, ThreadStatus, ThreadsState};
 
 /// Truncate `s` to at most `max` bytes on a char boundary (no ellipsis).
 fn clamp_bytes(s: &str, max: usize) -> String {
@@ -378,7 +378,7 @@ fn write_message(output: &mut String, msg: &ThreadMessage, now_ms: u64) {
 
 /// The id of the thread whose context currently lives in `state` — the
 /// **resident** thread (the focused thread at rest, or a background thread while
-/// it is being stepped). Falls back to the focused pointer, then empty.
+/// it is being stepped). Empty before the first tick places a thread.
 ///
 /// This is the identity the Threads panel must render for: the panel instance is
 /// per-thread (its `Entry` rides the resident-thread swap), so each thread's
@@ -387,7 +387,7 @@ fn write_message(output: &mut String, msg: &ThreadMessage, now_ms: u64) {
 /// single shared `panel_content` baked for the focused thread, so a background
 /// thread's Threads panel showed the focused thread's conversation.
 pub(crate) fn resident_thread_id(state: &State) -> String {
-    state.resident_thread_id.clone().or_else(|| FocusState::get(state).focused_thread_id.clone()).unwrap_or_default()
+    state.executing_thread_id().unwrap_or_default().to_owned()
 }
 
 /// Build the Threads panel content for the **resident** thread (roster list +

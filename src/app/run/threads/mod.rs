@@ -21,7 +21,7 @@ pub(super) use paused::emit_thread_paused;
 use crate::app::App;
 use cp_base::state::runtime::State;
 use cp_base::tools::ToolUse;
-use cp_mod_threads::types::{FocusState, ThreadMessage, ThreadsState};
+use cp_mod_threads::types::{ThreadMessage, ThreadsState};
 use cp_wire::types::snapshot::RosterThread;
 
 /// Branch A + B of the incoming-message behavior, run once per main-loop tick on
@@ -218,8 +218,7 @@ fn roster_gate(app: &App) -> (bool, Option<u64>) {
 ///
 /// Every tool call leaves a lightweight `{verb · tool — intent}` breadcrumb in
 /// the conversation of the thread that is actually executing it — the
-/// **resident** thread (`State.resident_thread_id`), falling back to the focused
-/// pointer when no thread is resident yet. So a human watching a thread sees
+/// **resident** thread (`State::executing_thread_id`), never the human focus. So a human watching a thread sees
 /// that thread's own live work without the agent having to narrate it, even when
 /// several threads run concurrently and the human is looking at a different one.
 /// The message is marked
@@ -246,10 +245,8 @@ pub(in crate::app::run) fn maybe_append_tool_activity(state: &mut State, tool: &
     // currently resident in `state` (the thread actually executing this tool),
     // NOT the human's on-screen focus. With N>1 these differ: a background
     // thread can run tools while the human views another thread, and its
-    // breadcrumbs must land in its own conversation. Falls back to the focused
-    // pointer when no thread is resident yet (cold boot / N=1 before focus).
-    let Some(tid) = state.resident_thread_id.clone().or_else(|| FocusState::get(state).focused_thread_id.clone())
-    else {
+    // breadcrumbs must land in its own conversation.
+    let Some(tid) = state.executing_thread_id().map(str::to_owned) else {
         return;
     };
     // Thread-native tools are excluded — see the doc comment.

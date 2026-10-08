@@ -34,7 +34,7 @@ pub struct FireResult {
 /// `resident_thread_id` is `None` → the key degrades to the old callback-id-only
 /// behaviour with a constant prefix.
 fn dedup_key(state: &State, callback_id: &str) -> String {
-    let tid = state.resident_thread_id.as_deref().unwrap_or(constants::DEFAULT_WORKER_ID);
+    let tid = state.executing_thread_id().unwrap_or(constants::DEFAULT_WORKER_ID);
     format!("{tid}\u{1f}{callback_id}")
 }
 
@@ -218,7 +218,7 @@ pub fn fire_callback(
         deadline_ms,
         desc: watcher_desc,
         matched_files: matched.matched_files.clone(),
-        fired_by_thread: state.resident_thread_id.clone(),
+        fired_by_thread: state.executing_thread_id().map(str::to_owned),
         concurrency_friendly: def.concurrency_friendly,
         deferred_panel: DeferredPanel::new(
             session_key.clone(),

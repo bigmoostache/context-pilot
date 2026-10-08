@@ -60,7 +60,7 @@ impl App {
             .is_some_and(|reg| reg.active_watchers().iter().any(|w| w.fire_at_ms().is_some()))
             || state
                 .get_ext::<cp_mod_spine::schedule::CoucouRegistry>()
-                .is_some_and(|reg| reg.has_pending_for(state.resident_thread_id.as_deref()));
+                .is_some_and(|reg| reg.has_pending_for(state.executing_thread_id()));
         if has_timed_watcher {
             return true;
         }

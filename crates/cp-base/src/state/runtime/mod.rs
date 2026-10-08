@@ -139,7 +139,17 @@ mod default;
 mod ext;
 
 impl State {
+    /// The thread executing right now: owner of every per-thread write (todos,
+    /// scratchpad, tool traces, notifications). Never the human's focus — that
+    /// is UI-only and can point at another thread while this one runs.
+    /// `None` only before the first tick has placed a thread.
+    #[must_use]
+    pub fn executing_thread_id(&self) -> Option<&str> {
+        self.resident_thread_id.as_deref()
+    }
+
     // === Boot builder (cross-crate reconstruction from persisted state) ===
+
 
     /// Set the loaded context panels (builder).
     #[must_use]

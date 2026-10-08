@@ -5,7 +5,6 @@ use cp_base::state::actions::Action;
 use cp_base::state::context::{Kind, estimate_tokens};
 use cp_base::state::runtime::State;
 
-use crate::types::TodoState;
 use cp_base::panels::scroll_key_action;
 
 /// Panel that renders the focused thread's task tree as canonical YAML.
@@ -17,13 +16,12 @@ impl TodoPanel {
     /// Identical to what the model edits with the `Todo` tool (via `{prev,new}`
     /// diffs) — one rigorous, byte-stable projection shared by panel + tool.
     fn format_todos_for_context(state: &State) -> String {
-        let ts = TodoState::get(state);
         // Per-thread view: scope to the RESIDENT thread (the thread this panel
         // instance belongs to — focused at rest, or a background thread while it
-        // is being stepped), falling back to the shared focus pointer. Scoping to
+        // is being stepped), never the shared focus pointer. Scoping to
         // the shared `focus_filter` alone made every thread's Todo panel show the
         // focused thread's tasks (same class as the Threads-panel bug).
-        let Some(focus) = state.resident_thread_id.as_deref().or(ts.focus_filter.as_deref()) else {
+        let Some(focus) = state.executing_thread_id() else {
             return "No focused thread".to_owned();
         };
         let yaml = crate::yaml::render(state, focus);
@@ -38,9 +36,8 @@ impl Panel for TodoPanel {
 
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
         use cp_render::{Block, Semantic, Span as S};
-        let ts = TodoState::get(state);
         // Per-thread view: scope to the resident thread (see format_todos_for_context).
-        let Some(focus) = state.resident_thread_id.as_deref().or(ts.focus_filter.as_deref()) else {
+        let Some(focus) = state.executing_thread_id() else {
             return vec![Block::Line(vec![S::muted("  No focused thread".into()).italic()])];
         };
         let yaml = crate::yaml::render(state, focus);

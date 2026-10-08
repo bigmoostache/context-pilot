@@ -154,7 +154,7 @@ pub(crate) fn publish_frame(state: &mut State, kind: StreamKind) {
     // pane. Empty when no thread is resident yet (cold boot), matching the
     // pre-multi-thread single-conversation behaviour.
     let message_id = state.messages.last().map(|m| m.id.clone()).unwrap_or_default();
-    let thread_id = state.resident_thread_id.clone().unwrap_or_default();
+    let thread_id = state.executing_thread_id().unwrap_or_default().to_owned();
 
     let bs = state.ext_mut::<BridgeState>();
 

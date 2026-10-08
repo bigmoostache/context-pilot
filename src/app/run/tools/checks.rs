@@ -143,12 +143,7 @@ pub(crate) fn sync_scratchpad_focus(app: &mut App) {
 /// not re-fire on every tool call; it resets when the condition clears (a task
 /// is created / a WIP item is picked) or when focus moves to another thread.
 pub(crate) fn maybe_hygiene_nudge(app: &mut App) {
-    let Some(tid) = app
-        .state
-        .resident_thread_id
-        .clone()
-        .or_else(|| cp_mod_threads::types::FocusState::get(&app.state).focused_thread_id.clone())
-    else {
+    let Some(tid) = app.state.executing_thread_id().map(str::to_owned) else {
         return; // No focused thread → no nudge.
     };
     let (no_tasks, has_planned, has_in_progress) = {
@@ -219,12 +214,7 @@ pub(crate) fn promote_declared_tasks(
     tools: &[cp_base::tools::ToolUse],
     tool_results: &mut [crate::infra::tools::ToolResult],
 ) {
-    let Some(focused) = app
-        .state
-        .resident_thread_id
-        .clone()
-        .or_else(|| cp_mod_threads::types::FocusState::get(&app.state).focused_thread_id.clone())
-    else {
+    let Some(focused) = app.state.executing_thread_id().map(str::to_owned) else {
         return; // No focused thread → task_id not enforced, nothing to promote.
     };
 
