@@ -55,8 +55,9 @@ pub struct Notification {
     pub timestamp_ms: u64,
     /// Human-readable description
     pub content: String,
-    /// Thread this notification is bound to (if any). Set by thread-aware
-    /// sources so `Read`-ing that thread can clear it. `None` = global.
+    /// Thread this notification is bound to. Stamped at creation with the
+    /// executing thread (whose inbox holds it); `Read`-ing that thread clears
+    /// it. `None` only before any thread is placed.
     #[serde(default)]
     pub thread_id: Option<String>,
 }
@@ -256,11 +257,15 @@ impl SpineState {
             }
         }
 
+        // Owner = the executing thread, whose inbox this lands in (design §7.5:
+        // every notification names its thread). `set_notification_thread` can
+        // still re-address it afterwards.
+        let owner = state.executing_thread_id().map(str::to_owned);
         {
             let ss = Self::get_mut(state);
             ss.next_notification_id = ss.next_notification_id.saturating_add(1);
             let mut notification = Notification::new(id.clone(), kind, source, content);
-            notification.thread_id = None;
+            notification.thread_id = owner;
             ss.notifications.push(notification);
             // Inline gc: cap at 100
             if ss.notifications.len() > 100 {
