@@ -24,6 +24,10 @@ thread_local! {
     /// Last stamp written per own-file module. Starts empty, so the first save
     /// after boot/reload writes every own-file module once.
     static SAVED_REVISIONS: std::cell::RefCell<HashMap<String, u64>> = std::cell::RefCell::new(HashMap::new());
+    /// History-panel message files already written this process. Those
+    /// messages are frozen once detached, so each file is written only once.
+    static SAVED_HISTORY_MSGS: std::cell::RefCell<std::collections::HashSet<String>> =
+        std::cell::RefCell::new(std::collections::HashSet::new());
 }
 
 /// `modules/<id>.json` writes for own-file modules whose stamp moved since the
@@ -173,7 +177,9 @@ fn build_panel_write_ops(
     writes
 }
 
-/// Emit one `{uid}.yaml` write op per message held in a `ConversationHistory` panel.
+/// Emit one `{uid}.yaml` write op per `ConversationHistory` message not yet
+/// written this process. Goes on the durable lane: the id is marked written
+/// as soon as the op is built, so a coalesced batch must not drop it.
 fn build_history_message_ops(state: &State, messages_dir: &std::path::Path) -> Vec<WriteOp> {
     let mut writes = Vec::new();
     for ctx in &state.thread().context {
@@ -182,6 +188,9 @@ fn build_history_message_ops(state: &State, messages_dir: &std::path::Path) -> V
         {
             for msg in msgs {
                 let file_id = msg.uid.as_ref().unwrap_or(&msg.id);
+                if !SAVED_HISTORY_MSGS.with_borrow_mut(|s| s.insert(file_id.clone())) {
+                    continue;
+                }
                 if let Ok(yaml) = serde_yaml::to_string(msg) {
                     writes.push(WriteOp {
                         path: messages_dir.join(format!("{file_id}.yaml")),
@@ -351,7 +360,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     }
     {
         let _g = crate::profile!("history_msgs");
-        writes.extend(build_history_message_ops(state, &messages_dir));
+        durable.extend(build_history_message_ops(state, &messages_dir));
     }
 
     WriteBatch { writes, deletes: Vec::new(), ensure_dirs, durable }
