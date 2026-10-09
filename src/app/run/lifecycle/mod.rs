@@ -215,24 +215,45 @@ impl App {
             let _guard = crate::profile!("drill_in");
             self.take_drilled_runtime_for_render()
         };
-        // `terminal_draw` = widget build (`ui_render` child) + ratatui buffer
-        // diff + stdout flush (the remainder not covered by children).
         let draw_result = {
             let _guard = crate::profile!("terminal_draw");
-            terminal.draw(|frame| {
-                ui::render(frame, &mut self.state);
-                let _palette = crate::profile!("command_palette");
-                self.command_palette.render(frame, &self.state);
-            })
+            self.draw_timed(terminal)
         };
         {
             let _guard = crate::profile!("drill_restore");
             self.restore_drilled_runtime_after_render(drilled);
         }
-        let _r = draw_result?;
+        draw_result?;
         self.state.flags.ui.dirty = false;
         self.last_render_ms = current_ms;
         Ok(())
+    }
+
+    /// `Terminal::draw` inlined so each stage gets its own span: resize check,
+    /// widget build (`ui_render`), buffer diff written to the backend, then the
+    /// stdout flush — the last two can block on a slow terminal.
+    ///
+    /// Same steps as ratatui's `try_draw`. The app never sets a frame cursor,
+    /// so the cursor is always hidden, as `draw` does for `None`.
+    fn draw_timed(&mut self, terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> {
+        {
+            let _g = crate::profile!("term_autoresize");
+            terminal.autoresize()?;
+        }
+        {
+            let mut frame = terminal.get_frame();
+            ui::render(&mut frame, &mut self.state);
+            let _palette = crate::profile!("command_palette");
+            self.command_palette.render(&mut frame, &self.state);
+        }
+        {
+            let _g = crate::profile!("term_diff_write");
+            terminal.flush()?;
+        }
+        let _g = crate::profile!("term_stdout_flush");
+        terminal.hide_cursor()?;
+        terminal.swap_buffers();
+        io::Write::flush(terminal.backend_mut())
     }
 
     /// Adaptive poll interval: short while streaming/active or bridge-driven,

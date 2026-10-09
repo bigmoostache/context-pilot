@@ -249,7 +249,12 @@ impl YamlSync {
             if let Some(parent) = path.parent() {
                 let _mkdir = fs::create_dir_all(parent);
             }
-            if fs::write(path, &yaml_str).is_ok() {
+            let written = {
+                let _w = crate::perf_span!("yaml_fs_write");
+                fs::write(path, &yaml_str).is_ok()
+            };
+            if written {
+                let _c = crate::perf_span!("yaml_cache_store");
                 cache_store(path, map);
             }
         }
