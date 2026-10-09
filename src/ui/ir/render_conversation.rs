@@ -28,7 +28,7 @@ pub(crate) fn render_conversation_from_ir(
     let base_style = Style::default().bg(theme::bg_surface());
 
     // Title reflects streaming state
-    let title = if !conversation.streaming_tools.is_empty() || state.stream.phase.is_streaming() {
+    let title = if !conversation.streaming_tools.is_empty() || state.thread().stream.phase.is_streaming() {
         "Conversation *"
     } else {
         "Conversation"
@@ -47,7 +47,7 @@ pub(crate) fn render_conversation_from_ir(
     frame.render_widget(block, inner_area);
 
     // Update viewport width BEFORE building content so it can pre-wrap lines
-    state.last_viewport_width = content_area.width;
+    state.thread_mut().last_viewport_width = content_area.width;
 
     // Use the existing cached content builder (multi-level: full → per-message → input)
     let text = build_content_cached(state, base_style);
@@ -57,23 +57,25 @@ pub(crate) fn render_conversation_from_ir(
     let content_height = text.len();
 
     let max_scroll = content_height.saturating_sub(viewport_height).to_f32();
-    state.max_scroll = max_scroll;
+    state.thread_mut().max_scroll = max_scroll;
 
     // Auto-scroll: snap to bottom unless user manually scrolled up
-    if state.stream.user_scrolled && state.scroll_offset.to_f64() >= float_math::sub(max_scroll.to_f64(), 0.5) {
-        state.stream.user_scrolled = false;
+    if state.thread().stream.user_scrolled
+        && state.thread().scroll_offset.to_f64() >= float_math::sub(max_scroll.to_f64(), 0.5)
+    {
+        state.thread_mut().stream.user_scrolled = false;
     }
-    if !state.stream.user_scrolled {
-        state.scroll_offset = max_scroll;
+    if !state.thread().stream.user_scrolled {
+        state.thread_mut().scroll_offset = max_scroll;
     }
-    state.scroll_offset = state.scroll_offset.clamp(0.0, max_scroll);
+    state.thread_mut().scroll_offset = state.thread_mut().scroll_offset.clamp(0.0, max_scroll);
 
     let paragraph = {
         let _guard = crate::profile!("conv::paragraph_new");
         Paragraph::new(text)
             .style(base_style)
             // No .wrap() — content is pre-wrapped for performance
-            .scroll((state.scroll_offset.round().to_u16(), 0))
+            .scroll((state.thread().scroll_offset.round().to_u16(), 0))
     };
 
     {
@@ -89,7 +91,7 @@ pub(crate) fn render_conversation_from_ir(
             .thumb_style(Style::default().fg(theme::accent_dim()));
 
         let mut scrollbar_state =
-            ScrollbarState::new(max_scroll.to_usize()).position(state.scroll_offset.round().to_usize());
+            ScrollbarState::new(max_scroll.to_usize()).position(state.thread().scroll_offset.round().to_usize());
 
         frame.render_stateful_widget(
             scrollbar,

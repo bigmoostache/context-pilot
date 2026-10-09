@@ -113,7 +113,7 @@ pub struct ModuleOverlays {
 ///
 /// Per-thread stream/scroll state is NOT here — it lives on the thread's own
 /// [`StreamState`](crate::state::runtime::bundle::ThreadRuntime) and is reached
-/// via `state.stream` (the resident thread), never on the fleet-global flags.
+/// via `state.stream` (the executing thread), never on the fleet-global flags.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct StatusBools {
     /// UI rendering and debug toggles.

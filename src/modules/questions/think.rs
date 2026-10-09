@@ -93,11 +93,7 @@ pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
 /// preserved** (FR8): `touch_panel` marks it stale so the fresh tree emits at
 /// tempo exhaustion, never forced immediately.
 fn apply_todo_upsert(items_val: &serde_json::Value, state: &mut State) -> Result<String, String> {
-    let Some(tid) = state
-        .resident_thread_id
-        .clone()
-        .or_else(|| cp_mod_threads::types::FocusState::get(state).focused_thread_id.clone())
-    else {
+    let Some(tid) = state.executing_thread_id().map(str::to_owned) else {
         return Err("no focused thread (tasks must live in a thread; Read a thread first).".to_owned());
     };
     let items = cp_mod_todo::upsert::parse_items(items_val)?;

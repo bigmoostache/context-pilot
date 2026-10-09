@@ -4,7 +4,7 @@
 //! (the shared engine). This module holds the composer-specific logic that the
 //! engine deliberately stays out of: paste-sentinel (`\x00{idx}\x00`) skipping /
 //! removal and `/command` expansion, which depend on the per-thread paste
-//! buffers. Field access goes through `state.composer` (the resident thread's
+//! buffers. Field access goes through `state.composer` (the executing thread's
 //! [`TextArea`]).
 
 use super::helpers::eject_cursor_from_sentinel;
@@ -16,12 +16,12 @@ use cp_base::state::runtime::textarea::EditKind;
 /// Delete selected text and collapse cursor to selection start.
 /// Returns `true` if there was a non-empty selection that was deleted.
 pub(super) fn delete_selection(state: &mut State) -> bool {
-    state.composer.delete_selection()
+    state.thread_mut().composer.delete_selection()
 }
 
 /// Ensure a selection anchor is set (for Shift+movement).
 fn extend_selection(state: &mut State) {
-    state.composer.extend_anchor();
+    state.thread_mut().composer.extend_anchor();
 }
 
 // ── Sentinel detection ───────────────────────────────────────────────
@@ -126,109 +126,115 @@ fn compute_char_right(input: &str, cursor: usize) -> usize {
 
 /// Move cursor to the start of the previous word.
 fn move_word_left(state: &mut State) {
-    if state.composer.cursor > 0 {
-        let before = state.composer.text.get(..state.composer.cursor).unwrap_or("");
+    let composer = &mut state.thread_mut().composer;
+    if composer.cursor > 0 {
+        let before = composer.text.get(..composer.cursor).unwrap_or("");
         let trimmed = before.trim_end();
-        if trimmed.is_empty() {
-            state.composer.cursor = 0;
+        composer.cursor = if trimmed.is_empty() {
+            0
         } else {
-            state.composer.cursor = trimmed.rfind(|c: char| c.is_whitespace()).map_or(0, |i| i.saturating_add(1));
-        }
-        state.composer.cursor = eject_cursor_from_sentinel(&state.composer.text, state.composer.cursor);
+            trimmed.rfind(|c: char| c.is_whitespace()).map_or(0, |i| i.saturating_add(1))
+        };
+        composer.cursor = eject_cursor_from_sentinel(&composer.text, composer.cursor);
     }
 }
 
 /// Move cursor to the start of the next word.
 fn move_word_right(state: &mut State) {
-    if state.composer.cursor < state.composer.text.len() {
-        let after = state.composer.text.get(state.composer.cursor..).unwrap_or("");
+    let composer = &mut state.thread_mut().composer;
+    if composer.cursor < composer.text.len() {
+        let after = composer.text.get(composer.cursor..).unwrap_or("");
         let skip_word = after.find(|c: char| c.is_whitespace()).unwrap_or(after.len());
         let remaining = after.get(skip_word..).unwrap_or("");
         let skip_space = remaining.find(|c: char| !c.is_whitespace()).unwrap_or(remaining.len());
-        state.composer.cursor = state.composer.cursor.saturating_add(skip_word.saturating_add(skip_space));
-        state.composer.cursor = eject_cursor_from_sentinel(&state.composer.text, state.composer.cursor);
+        composer.cursor = composer.cursor.saturating_add(skip_word.saturating_add(skip_space));
+        composer.cursor = eject_cursor_from_sentinel(&composer.text, composer.cursor);
     }
 }
 
 /// Move cursor to the beginning of the current line.
 fn move_home(state: &mut State) {
-    let before_cursor = state.composer.text.get(..state.composer.cursor).unwrap_or("");
-    state.composer.cursor = before_cursor.rfind('\n').map_or(0, |i| i.saturating_add(1));
-    state.composer.cursor = eject_cursor_from_sentinel(&state.composer.text, state.composer.cursor);
+    let composer = &mut state.thread_mut().composer;
+    let before_cursor = composer.text.get(..composer.cursor).unwrap_or("");
+    composer.cursor = before_cursor.rfind('\n').map_or(0, |i| i.saturating_add(1));
+    composer.cursor = eject_cursor_from_sentinel(&composer.text, composer.cursor);
 }
 
 /// Move cursor to the end of the current line.
 fn move_end(state: &mut State) {
-    let after_cursor = state.composer.text.get(state.composer.cursor..).unwrap_or("");
-    state.composer.cursor = state.composer.cursor.saturating_add(after_cursor.find('\n').unwrap_or(after_cursor.len()));
-    state.composer.cursor = eject_cursor_from_sentinel(&state.composer.text, state.composer.cursor);
+    let composer = &mut state.thread_mut().composer;
+    let after_cursor = composer.text.get(composer.cursor..).unwrap_or("");
+    composer.cursor = composer.cursor.saturating_add(after_cursor.find('\n').unwrap_or(after_cursor.len()));
+    composer.cursor = eject_cursor_from_sentinel(&composer.text, composer.cursor);
 }
 
 // ── Public handlers: non-selecting movement ──────────────────────────
 
 /// Handle `CursorLeft` — move one character left, collapse selection if active.
 pub(super) fn handle_cursor_left(state: &mut State) {
-    if let Some((start, _)) = state.composer.selection_range() {
-        state.composer.cursor = start;
-        state.composer.clear_selection();
+    if let Some((start, _)) = state.thread().composer.selection_range() {
+        state.thread_mut().composer.cursor = start;
+        state.thread_mut().composer.clear_selection();
         return;
     }
-    state.composer.clear_selection();
-    state.composer.cursor = compute_char_left(&state.composer.text, state.composer.cursor);
+    state.thread_mut().composer.clear_selection();
+    let composer = &mut state.thread_mut().composer;
+    composer.cursor = compute_char_left(&composer.text, composer.cursor);
 }
 
 /// Handle `CursorRight` — move one character right, collapse selection if active.
 pub(super) fn handle_cursor_right(state: &mut State) {
-    if let Some((_, end)) = state.composer.selection_range() {
-        state.composer.cursor = end;
-        state.composer.clear_selection();
+    if let Some((_, end)) = state.thread().composer.selection_range() {
+        state.thread_mut().composer.cursor = end;
+        state.thread_mut().composer.clear_selection();
         return;
     }
-    state.composer.clear_selection();
-    state.composer.cursor = compute_char_right(&state.composer.text, state.composer.cursor);
+    state.thread_mut().composer.clear_selection();
+    let composer = &mut state.thread_mut().composer;
+    composer.cursor = compute_char_right(&composer.text, composer.cursor);
 }
 
 /// Handle `CursorWordLeft` — move to start of previous word, collapse selection if active.
 pub(super) fn handle_cursor_word_left(state: &mut State) {
-    if let Some((start, _)) = state.composer.selection_range() {
-        state.composer.cursor = start;
-        state.composer.clear_selection();
+    if let Some((start, _)) = state.thread().composer.selection_range() {
+        state.thread_mut().composer.cursor = start;
+        state.thread_mut().composer.clear_selection();
         return;
     }
-    state.composer.clear_selection();
+    state.thread_mut().composer.clear_selection();
     move_word_left(state);
 }
 
 /// Handle `CursorWordRight` — move to start of next word, collapse selection if active.
 pub(super) fn handle_cursor_word_right(state: &mut State) {
-    if let Some((_, end)) = state.composer.selection_range() {
-        state.composer.cursor = end;
-        state.composer.clear_selection();
+    if let Some((_, end)) = state.thread().composer.selection_range() {
+        state.thread_mut().composer.cursor = end;
+        state.thread_mut().composer.clear_selection();
         return;
     }
-    state.composer.clear_selection();
+    state.thread_mut().composer.clear_selection();
     move_word_right(state);
 }
 
 /// Handle `CursorHome` — move to beginning of current line, collapse selection if active.
 pub(super) fn handle_cursor_home(state: &mut State) {
-    if let Some((start, _)) = state.composer.selection_range() {
-        state.composer.cursor = start;
-        state.composer.clear_selection();
+    if let Some((start, _)) = state.thread().composer.selection_range() {
+        state.thread_mut().composer.cursor = start;
+        state.thread_mut().composer.clear_selection();
         return;
     }
-    state.composer.clear_selection();
+    state.thread_mut().composer.clear_selection();
     move_home(state);
 }
 
 /// Handle `CursorEnd` — move to end of current line, collapse selection if active.
 pub(super) fn handle_cursor_end(state: &mut State) {
-    if let Some((_, end)) = state.composer.selection_range() {
-        state.composer.cursor = end;
-        state.composer.clear_selection();
+    if let Some((_, end)) = state.thread().composer.selection_range() {
+        state.thread_mut().composer.cursor = end;
+        state.thread_mut().composer.clear_selection();
         return;
     }
-    state.composer.clear_selection();
+    state.thread_mut().composer.clear_selection();
     move_end(state);
 }
 
@@ -237,13 +243,15 @@ pub(super) fn handle_cursor_end(state: &mut State) {
 /// Handle `CursorLeftSelect` — extend selection one character left.
 pub(super) fn handle_cursor_left_select(state: &mut State) {
     extend_selection(state);
-    state.composer.cursor = compute_char_left(&state.composer.text, state.composer.cursor);
+    let composer = &mut state.thread_mut().composer;
+    composer.cursor = compute_char_left(&composer.text, composer.cursor);
 }
 
 /// Handle `CursorRightSelect` — extend selection one character right.
 pub(super) fn handle_cursor_right_select(state: &mut State) {
     extend_selection(state);
-    state.composer.cursor = compute_char_right(&state.composer.text, state.composer.cursor);
+    let composer = &mut state.thread_mut().composer;
+    composer.cursor = compute_char_right(&composer.text, composer.cursor);
 }
 
 /// Handle `CursorWordLeftSelect` — extend selection one word left.
@@ -272,12 +280,12 @@ pub(super) fn handle_cursor_end_select(state: &mut State) {
 
 /// Handle `SelectAll` — select entire input (Ctrl+A).
 pub(super) fn handle_select_all(state: &mut State) {
-    state.composer.select_all();
+    state.thread_mut().composer.select_all();
 }
 
 /// Handle `Undo` — revert the composer to its previous snapshot (Ctrl+Z).
 pub(super) fn handle_undo(state: &mut State) {
-    let _reverted = state.composer.undo();
+    let _reverted = state.thread_mut().composer.undo();
 }
 
 // ── Existing helpers ─────────────────────────────────────────────────
@@ -285,8 +293,8 @@ pub(super) fn handle_undo(state: &mut State) {
 /// Handle `/command` expansion after typing space or newline.
 pub(super) fn handle_command_expansion(state: &mut State) {
     // Find start of current "word" — scan back past the space we just inserted
-    let before_space = state.composer.cursor.saturating_sub(1); // position of the space
-    let bytes = state.composer.text.as_bytes();
+    let before_space = state.thread().composer.cursor.saturating_sub(1); // position of the space
+    let bytes = state.thread().composer.text.as_bytes();
     let mut word_start = before_space;
     // Scan backwards to find word boundary (newline, space, or sentinel \x00)
     while word_start > 0 {
@@ -297,10 +305,10 @@ pub(super) fn handle_command_expansion(state: &mut State) {
         word_start = word_start.saturating_sub(1);
     }
     // Ensure we land on a valid char boundary (backward scan is byte-level)
-    while word_start < before_space && !state.composer.text.is_char_boundary(word_start) {
+    while word_start < before_space && !state.thread().composer.text.is_char_boundary(word_start) {
         word_start = word_start.saturating_add(1);
     }
-    let word = state.composer.text.get(word_start..before_space).unwrap_or("");
+    let word = state.thread().composer.text.get(word_start..before_space).unwrap_or("");
     if let Some(cmd_name) = word.strip_prefix('/') {
         let cmd_content = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Command)
             .iter()
@@ -308,18 +316,18 @@ pub(super) fn handle_command_expansion(state: &mut State) {
             .map(|cmd| cmd.content.clone());
         if let Some(content) = cmd_content {
             let label = cmd_name.to_owned();
-            let idx = state.paste_buffers.len();
-            state.paste_buffers.push(content);
-            state.paste_buffer_labels.push(Some(label));
+            let idx = state.thread().paste_buffers.len();
+            state.thread_mut().paste_buffers.push(content);
+            state.thread_mut().paste_buffer_labels.push(Some(label));
             let sentinel = format!("\x00{idx}\x00");
             // Replace /command<space> with sentinel
-            state.composer.text = format!(
+            state.thread_mut().composer.text = format!(
                 "{}{}\n{}",
-                state.composer.text.get(..word_start).unwrap_or(""),
+                state.thread().composer.text.get(..word_start).unwrap_or(""),
                 sentinel,
-                state.composer.text.get(state.composer.cursor..).unwrap_or(""),
+                state.thread().composer.text.get(state.thread().composer.cursor..).unwrap_or(""),
             );
-            state.composer.cursor = word_start.saturating_add(sentinel.len()).saturating_add(1);
+            state.thread_mut().composer.cursor = word_start.saturating_add(sentinel.len()).saturating_add(1);
         }
     }
 }
@@ -327,8 +335,8 @@ pub(super) fn handle_command_expansion(state: &mut State) {
 /// Cursor is just past a closing `\x00`: remove the whole sentinel by scanning
 /// back to the opening `\x00`. Returns `true` when a sentinel was removed.
 fn backspace_closing_sentinel(state: &mut State) -> bool {
-    let bytes = state.composer.text.as_bytes();
-    let mut scan = state.composer.cursor.saturating_sub(2); // skip closing \x00
+    let bytes = state.thread().composer.text.as_bytes();
+    let mut scan = state.thread().composer.cursor.saturating_sub(2); // skip closing \x00
     while let Some(&b) = bytes.get(scan) {
         if b == 0 || scan == 0 {
             break;
@@ -338,12 +346,12 @@ fn backspace_closing_sentinel(state: &mut State) -> bool {
     if bytes.get(scan) != Some(&0) {
         return false;
     }
-    state.composer.text = format!(
+    state.thread_mut().composer.text = format!(
         "{}{}",
-        state.composer.text.get(..scan).unwrap_or(""),
-        state.composer.text.get(state.composer.cursor..).unwrap_or("")
+        state.thread().composer.text.get(..scan).unwrap_or(""),
+        state.thread().composer.text.get(state.thread().composer.cursor..).unwrap_or("")
     );
-    state.composer.cursor = scan;
+    state.thread_mut().composer.cursor = scan;
     true
 }
 
@@ -351,7 +359,7 @@ fn backspace_closing_sentinel(state: &mut State) -> bool {
 /// sentinel. Returns `true` when a sentinel was removed, `false` to fall through
 /// to a normal backspace.
 fn backspace_digit_sentinel(state: &mut State, cursor_prev: usize) -> bool {
-    let bytes = state.composer.text.as_bytes();
+    let bytes = state.thread().composer.text.as_bytes();
     let mut scan = cursor_prev;
     while let Some(&b) = bytes.get(scan) {
         if !b.is_ascii_digit() || scan == 0 {
@@ -363,7 +371,7 @@ fn backspace_digit_sentinel(state: &mut State, cursor_prev: usize) -> bool {
         return false;
     }
     // Inside a sentinel — find the closing \x00.
-    let mut end = state.composer.cursor;
+    let mut end = state.thread().composer.cursor;
     while let Some(&b) = bytes.get(end) {
         if b == 0 {
             break;
@@ -373,9 +381,12 @@ fn backspace_digit_sentinel(state: &mut State, cursor_prev: usize) -> bool {
     if bytes.get(end) == Some(&0) {
         end = end.saturating_add(1); // include closing \x00
     }
-    state.composer.text =
-        format!("{}{}", state.composer.text.get(..scan).unwrap_or(""), state.composer.text.get(end..).unwrap_or(""));
-    state.composer.cursor = scan;
+    state.thread_mut().composer.text = format!(
+        "{}{}",
+        state.thread().composer.text.get(..scan).unwrap_or(""),
+        state.thread().composer.text.get(end..).unwrap_or("")
+    );
+    state.thread_mut().composer.cursor = scan;
     true
 }
 
@@ -385,18 +396,18 @@ pub(super) fn handle_input_backspace(state: &mut State) {
     if delete_selection(state) {
         return;
     }
-    if state.composer.cursor == 0 {
+    if state.thread().composer.cursor == 0 {
         return;
     }
-    state.composer.push_undo(EditKind::Delete);
-    let cursor_prev = state.composer.cursor.saturating_sub(1);
-    let Some(&prev_b) = state.composer.text.as_bytes().get(cursor_prev) else { return };
+    state.thread_mut().composer.push_undo(EditKind::Delete);
+    let cursor_prev = state.thread().composer.cursor.saturating_sub(1);
+    let Some(&prev_b) = state.thread().composer.text.as_bytes().get(cursor_prev) else { return };
 
     if prev_b == 0 {
         if !backspace_closing_sentinel(state) {
             normal_backspace(state);
         }
-    } else if state.composer.cursor >= 2 && prev_b.is_ascii_digit() {
+    } else if state.thread().composer.cursor >= 2 && prev_b.is_ascii_digit() {
         if !backspace_digit_sentinel(state, cursor_prev) {
             normal_backspace(state);
         }
@@ -407,10 +418,17 @@ pub(super) fn handle_input_backspace(state: &mut State) {
 
 /// Remove one character before the cursor (normal backspace).
 fn normal_backspace(state: &mut State) {
-    let prev =
-        state.composer.text.get(..state.composer.cursor).unwrap_or("").char_indices().last().map_or(0, |(i, _)| i);
-    let _r = state.composer.text.remove(prev);
-    state.composer.cursor = prev;
+    let prev = state
+        .thread()
+        .composer
+        .text
+        .get(..state.thread().composer.cursor)
+        .unwrap_or("")
+        .char_indices()
+        .last()
+        .map_or(0, |(i, _)| i);
+    let _r = state.thread_mut().composer.text.remove(prev);
+    state.thread_mut().composer.cursor = prev;
 }
 
 /// Handle `DeleteWordLeft` — delete the word before the cursor.
@@ -419,35 +437,35 @@ pub(super) fn handle_delete_word_left(state: &mut State) {
     if delete_selection(state) {
         return;
     }
-    if state.composer.cursor > 0 {
-        state.composer.push_undo(EditKind::Delete);
-        let before = state.composer.text.get(..state.composer.cursor).unwrap_or("");
+    if state.thread().composer.cursor > 0 {
+        state.thread_mut().composer.push_undo(EditKind::Delete);
+        let before = state.thread().composer.text.get(..state.thread().composer.cursor).unwrap_or("");
         let trimmed = before.trim_end();
         let word_start = if trimmed.is_empty() {
             0
         } else {
             trimmed.rfind(|c: char| c.is_whitespace()).map_or(0, |i| i.saturating_add(1))
         };
-        state.composer.text = format!(
+        state.thread_mut().composer.text = format!(
             "{}{}",
-            state.composer.text.get(..word_start).unwrap_or(""),
-            state.composer.text.get(state.composer.cursor..).unwrap_or("")
+            state.thread().composer.text.get(..word_start).unwrap_or(""),
+            state.thread().composer.text.get(state.thread().composer.cursor..).unwrap_or("")
         );
-        state.composer.cursor = word_start;
+        state.thread_mut().composer.cursor = word_start;
     }
 }
 
 /// Handle `RemoveListItem` — delete from line start to cursor.
 pub(super) fn handle_remove_list_item(state: &mut State) {
-    if state.composer.cursor > 0 {
-        state.composer.push_undo(EditKind::Delete);
-        let before = state.composer.text.get(..state.composer.cursor).unwrap_or("");
+    if state.thread().composer.cursor > 0 {
+        state.thread_mut().composer.push_undo(EditKind::Delete);
+        let before = state.thread().composer.text.get(..state.thread().composer.cursor).unwrap_or("");
         let line_start = before.rfind('\n').map_or(0, |i| i.saturating_add(1));
-        state.composer.text = format!(
+        state.thread_mut().composer.text = format!(
             "{}{}",
-            state.composer.text.get(..line_start).unwrap_or(""),
-            state.composer.text.get(state.composer.cursor..).unwrap_or("")
+            state.thread().composer.text.get(..line_start).unwrap_or(""),
+            state.thread().composer.text.get(state.thread().composer.cursor..).unwrap_or("")
         );
-        state.composer.cursor = line_start;
+        state.thread_mut().composer.cursor = line_start;
     }
 }

@@ -12,9 +12,7 @@ use cp_base::config::constants;
 use cp_base::panels::now_ms;
 
 use crate::CONSOLE_DIR;
-use crate::pollers::{
-    DetachedLaunch, FilePoller, StatusPoller, create_request, pid_of, send_create, start_file_poller,
-};
+use crate::pollers::{DetachedLaunch, FilePoller, StatusPoller, create_request, start_file_poller};
 use crate::ring_buffer::RingBuffer;
 use crate::types::ProcessStatus;
 use cp_base::cast::Safe as _;
@@ -288,30 +286,11 @@ fn probe_session_alive(
 }
 
 impl SessionHandle {
-    /// Spawn a new child process via the console server.
-    ///
-    /// # Errors
-    ///
-    /// Returns `Err` if the server is unreachable and cannot be restarted,
-    /// or if the spawn request fails.
-    pub fn spawn(name: String, command: String, cwd: Option<String>) -> Result<Self, String> {
-        let handle = Self::unstarted(name, command, cwd);
-        let req = create_request(&handle.name, &handle.command, &handle.log_path, handle.cwd.as_deref());
-        let pid = {
-            let _p = cp_base::perf_span!("console_create_req");
-            pid_of(&send_create(&req)?)
-        };
-        *handle.child_id.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(pid);
-        let _p = cp_base::perf_span!("console_start_pollers");
-        start_file_poller(PathBuf::from(&handle.log_path), handle.buffer.clone(), Arc::clone(&handle.stop_polling));
-        let poller = handle.status_poller();
-        drop(std::thread::spawn(move || poller.run()));
-        Ok(handle)
-    }
-
-    /// Non-blocking [`Self::spawn`] for edit callbacks: returns a `Running`
-    /// handle at once and sends `create` from a worker thread. A spawn error
-    /// lands in the output buffer and flips the status to `Failed(-1)`.
+    /// Spawn a child via the console server without blocking the main loop:
+    /// returns a `Running` handle at once and sends `create` from a worker
+    /// thread (the round-trip took up to 127 ms on the loop). The pid is filled
+    /// once the server answers; a spawn error lands in the output buffer and
+    /// flips the status to `Failed(-1)`.
     #[must_use]
     pub fn spawn_detached(name: String, command: String, cwd: Option<String>) -> Self {
         let handle = Self::unstarted(name, command, cwd);

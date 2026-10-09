@@ -31,8 +31,8 @@ impl Module for ConversationHistoryModule {
     }
     /// Per-thread (thread-centric model): a thread's history is its own.
     /// This module holds no `TypeMap` data — history chunks live in the
-    /// `conversation_history` panel `Entry`s (carried by the resident-thread
-    /// swap via `ThreadRuntime.context`). The flag is per-thread for intent; it
+    /// `conversation_history` panel `Entry`s (owned by each thread's
+    /// `ThreadRuntime.context`). The flag is per-thread for intent; it
     /// is inert at N=1 (save/load are no-ops).
     fn is_global(&self) -> bool {
         false

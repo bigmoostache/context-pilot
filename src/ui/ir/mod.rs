@@ -60,15 +60,15 @@ pub(crate) mod render_panel {
             text.iter().map(|line| count_wrapped_lines(line, viewport_width)).sum()
         };
         let max_scroll = content_height.saturating_sub(viewport_height).to_f32();
-        state.max_scroll = max_scroll;
-        state.scroll_offset = state.scroll_offset.clamp(0.0, max_scroll);
+        state.thread_mut().max_scroll = max_scroll;
+        state.thread_mut().scroll_offset = state.thread_mut().scroll_offset.clamp(0.0, max_scroll);
 
         let paragraph = {
             let _guard = crate::profile!("panel::paragraph_new");
             Paragraph::new(text)
                 .style(base_style)
                 .wrap(Wrap { trim: false })
-                .scroll((state.scroll_offset.round().to_u16(), 0))
+                .scroll((state.thread().scroll_offset.round().to_u16(), 0))
         };
 
         {
@@ -453,7 +453,7 @@ pub(crate) fn build_conversation_ir(state: &State) -> cp_render::conversation::C
 /// Returns a [`PanelContent`] with title, blocks, and optional refresh timestamp.
 #[must_use]
 pub(crate) fn build_active_panel(state: &State) -> PanelContent {
-    let context_type = state.context.get(state.selected_context).map_or_else(
+    let context_type = state.thread().context.get(state.thread().selected_context).map_or_else(
         || cp_base::state::context::Kind::new(cp_base::state::context::Kind::CONVERSATION),
         |c| c.context_type.clone(),
     );
@@ -463,8 +463,12 @@ pub(crate) fn build_active_panel(state: &State) -> PanelContent {
     let blocks = panel.blocks(state);
 
     // Build "refreshed N ago" for dynamic panels
-    let refreshed_ago =
-        state.context.get(state.selected_context).filter(|ctx| !ctx.context_type.is_fixed()).and_then(|ctx| {
+    let refreshed_ago = state
+        .thread()
+        .context
+        .get(state.thread().selected_context)
+        .filter(|ctx| !ctx.context_type.is_fixed())
+        .and_then(|ctx| {
             let ts = ctx.last_refresh_ms;
             if ts < 1_577_836_800_000 {
                 return None;

@@ -50,7 +50,7 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
         if invalidations.is_empty() {
             cp_base::panels::mark_panels_dirty(state, Kind::GIT_RESULT);
         } else {
-            for ctx in &mut state.context {
+            for ctx in &mut state.thread_mut().context {
                 if ctx.context_type.as_str() == Kind::GIT_RESULT
                     && let Some(cached_cmd) = ctx.get_meta_str("result_command")
                     && invalidations.iter().any(|re| re.is_match(cached_cmd))

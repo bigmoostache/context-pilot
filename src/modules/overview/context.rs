@@ -49,7 +49,7 @@ pub(crate) fn context_usage(state: &State) -> (usize, usize, usize) {
     let system_prompt = cp_mod_prompt::seed::get_active_agent_content(state);
     let system_prompt_tokens = estimate_tokens(&system_prompt).saturating_mul(2);
     let tool_def_tokens = estimate_tool_definitions_tokens(state);
-    let panel_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
+    let panel_tokens: usize = state.thread().context.iter().map(|c| c.token_count).sum();
     let used = system_prompt_tokens.saturating_add(tool_def_tokens).saturating_add(panel_tokens);
     (used, state.cleaning_threshold_tokens(), state.effective_context_budget())
 }
@@ -80,7 +80,7 @@ pub(crate) fn context_hit_miss(state: &State) -> (usize, usize) {
 
     let mut hit = system_prompt_tokens.saturating_add(tool_def_tokens);
     let mut miss = 0usize;
-    for ctx in &state.context {
+    for ctx in &state.thread().context {
         if ctx.panel_cache_hit {
             hit = hit.saturating_add(ctx.token_count);
         } else {
@@ -171,7 +171,7 @@ pub(crate) fn generate_context_content(state: &State) -> String {
     );
 
     // --- Panels sorted by last_refresh_ms, with Conversation forced to end ---
-    let mut sorted_contexts: Vec<&crate::state::Entry> = state.context.iter().collect();
+    let mut sorted_contexts: Vec<&crate::state::Entry> = state.thread().context.iter().collect();
     sorted_contexts.sort_by_key(|ctx| ctx.last_refresh_ms);
 
     // Partition: conversation ("chat") always last
@@ -187,10 +187,15 @@ pub(crate) fn generate_context_content(state: &State) -> String {
     }
 
     // Statistics
-    let user_msgs = state.messages.iter().filter(|m| m.role == "user").count();
-    let assistant_msgs = state.messages.iter().filter(|m| m.role == "assistant").count();
-    let _r5 =
-        write!(output, "\nMessages: {} ({} user, {} assistant)\n", state.messages.len(), user_msgs, assistant_msgs);
+    let user_msgs = state.thread().messages.iter().filter(|m| m.role == "user").count();
+    let assistant_msgs = state.thread().messages.iter().filter(|m| m.role == "assistant").count();
+    let _r5 = write!(
+        output,
+        "\nMessages: {} ({} user, {} assistant)\n",
+        state.thread().messages.len(),
+        user_msgs,
+        assistant_msgs
+    );
 
     // Module-specific overview sections (todos, memories, git status, etc.)
     for module in &modules {

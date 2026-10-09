@@ -38,15 +38,16 @@ impl Panel for FilePanel {
         // hand-closed (the describe-before-close gate is unsatisfiable for a path
         // tree_describe rejects as "not found").
         let Some(path) = ctx.get_meta_str("file_path") else { return false };
-        if PathBuf::from(path).exists() {
+        // Reap only a panel that never loaded (initial state) or has a refresh
+        // pending (`cache_deprecated` — the watcher flagged a change). A loaded
+        // panel with a FRESH cache is spared so an editor's atomic
+        // save-via-rename (a sub-ms unlink before the new file lands) doesn't
+        // nuke a live panel mid-save. Checked BEFORE the stat: this runs every
+        // 100 ms per open panel, and a fresh panel can never be reaped anyway.
+        if ctx.cached_content.is_some() && !ctx.cache_deprecated {
             return false;
         }
-        // File is gone. Reap the panel when it never loaded (initial state) or when
-        // a refresh is pending (`cache_deprecated` — the watcher flagged a change
-        // and the file is confirmed absent at this point). A loaded panel with a
-        // FRESH cache is spared so an editor's atomic save-via-rename (a sub-ms
-        // unlink before the new file lands) doesn't nuke a live panel mid-save.
-        ctx.cached_content.is_none() || ctx.cache_deprecated
+        !PathBuf::from(path).exists()
     }
 
     fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {
@@ -54,7 +55,7 @@ impl Panel for FilePanel {
     }
 
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
-        let selected = state.context.get(state.selected_context);
+        let selected = state.thread().context.get(state.thread().selected_context);
 
         let (content, file_path) = selected.map_or_else(
             || (String::new(), String::new()),
@@ -99,7 +100,11 @@ impl Panel for FilePanel {
         blocks
     }
     fn title(&self, state: &State) -> String {
-        state.context.get(state.selected_context).map_or_else(|| "File".to_owned(), |ctx| ctx.name.clone())
+        state
+            .thread()
+            .context
+            .get(state.thread().selected_context)
+            .map_or_else(|| "File".to_owned(), |ctx| ctx.name.clone())
     }
 
     fn build_cache_request(&self, ctx: &Entry, _state: &State) -> Option<CacheRequest> {
@@ -174,6 +179,7 @@ impl Panel for FilePanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         state
+            .thread()
             .context
             .iter()
             .filter(|c| c.context_type.as_str() == Kind::FILE)

@@ -140,8 +140,7 @@ impl Module for SearchModule {
     /// Fleet-shared (thread-centric model): `SearchState` holds index config and
     /// metrics for the single project-wide Meilisearch daemon — one index shared
     /// by every thread, not per-thread state. The search *result panels* are
-    /// per-thread (they live in `state.context`, carried by the resident-thread
-    /// swap); the index metadata stays shared so it is not duplicated per thread.
+    /// per-thread (they live in each thread's `context`); the index metadata stays shared so it is not duplicated per thread.
     /// Inert at N=1.
     fn is_global(&self) -> bool {
         true
@@ -239,13 +238,10 @@ impl Module for SearchModule {
         let Some(ss) = state.get_ext::<SearchState>() else {
             return serde_json::Value::Null;
         };
-        // Snapshot metrics into persist so they survive TUI reload
-        let mut persist = ss.persist.clone();
-        if let Ok(m) = ss.metrics.lock() {
-            persist.recompute_counts.clone_from(&m.recompute_counts);
-            persist.last_sent_ms.clone_from(&m.last_sent_ms);
-        }
-        serde_json::to_value(&persist).unwrap_or(serde_json::Value::Null)
+        // Diagnostic maps (recompute_counts / last_sent_ms) stay live-only in
+        // `metrics`: persisting them cost a 28 KB clone under the indexer's
+        // mutex on every save, for data the Ctrl+I overlay can rebuild.
+        serde_json::to_value(&ss.persist).unwrap_or(serde_json::Value::Null)
     }
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {

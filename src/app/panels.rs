@@ -61,7 +61,7 @@ impl Panel for FallbackPanel {
 /// Refresh all panels (update token counts, etc.)
 pub(crate) fn refresh_all_panels(state: &mut State) {
     // Get unique context types from state
-    let context_types: Vec<Kind> = state.context.iter().map(|c| c.context_type.clone()).collect();
+    let context_types: Vec<Kind> = state.thread().context.iter().map(|c| c.context_type.clone()).collect();
 
     for context_type in &context_types {
         // `get_panel` rebuilds every module (`all_modules()`) per lookup, so it
@@ -87,10 +87,12 @@ pub(crate) fn collect_all_context(state: &State) -> Vec<ContextItem> {
     // Get UNIQUE context types from state (dedup to avoid multiplying items!)
     let mut seen = std::collections::HashSet::new();
     let context_types: Vec<Kind> =
-        state.context.iter().map(|c| c.context_type.clone()).filter(|ct| seen.insert(ct.clone())).collect();
+        state.thread().context.iter().map(|c| c.context_type.clone()).filter(|ct| seen.insert(ct.clone())).collect();
 
     for context_type in &context_types {
         let panel = get_panel(context_type);
+        // One row per panel kind (`ctx_collect_all.ctx_<kind>`) to find the slow panel.
+        let _guard = crate::infra::profiler::dyn_guard("ctx_", context_type.as_str());
         items.extend(panel.context(state));
     }
 

@@ -42,7 +42,7 @@ impl Panel for SkillPanel {
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
         use cp_render::{Block, Semantic, Span as S};
 
-        let selected = state.context.get(state.selected_context);
+        let selected = state.thread().context.get(state.thread().selected_context);
         if let Some(ctx) = selected
             && ctx.context_type == Kind::new(Kind::SKILL)
             && let Some(skill_id) = ctx.get_meta_str("skill_prompt_id")
@@ -66,7 +66,7 @@ impl Panel for SkillPanel {
     }
 
     fn title(&self, state: &State) -> String {
-        let selected = state.context.get(state.selected_context);
+        let selected = state.thread().context.get(state.thread().selected_context);
         if let Some(ctx) = selected
             && ctx.context_type == Kind::new(Kind::SKILL)
             && let Some(skill_id) = ctx.get_meta_str("skill_prompt_id")
@@ -82,6 +82,7 @@ impl Panel for SkillPanel {
     fn refresh(&self, state: &mut State) {
         // Collect skill panel info first
         let skills: Vec<(String, usize)> = state
+            .thread()
             .context
             .iter()
             .enumerate()
@@ -107,7 +108,7 @@ impl Panel for SkillPanel {
             .collect();
 
         for (idx, content, tokens) in updates {
-            if let Some(ctx) = state.context.get_mut(idx) {
+            if let Some(ctx) = state.thread_mut().context.get_mut(idx) {
                 ctx.cached_content = Some(content);
                 ctx.token_count = tokens;
             }
@@ -120,7 +121,7 @@ impl Panel for SkillPanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let mut items = Vec::new();
-        for ctx in &state.context {
+        for ctx in &state.thread().context {
             if ctx.context_type == Kind::new(Kind::SKILL)
                 && let Some(content) = ctx.cached_content.as_ref()
             {

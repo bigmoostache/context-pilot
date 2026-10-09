@@ -70,6 +70,13 @@ pub(crate) const EVENT_POLL_MS: u64 = 8;
 /// Minimum time between renders (ms) - caps at 100fps
 pub(crate) const RENDER_THROTTLE_MS: u64 = 10;
 
+/// Interval between forced full repaints (ms): clears ratatui's diff buffer so
+/// resize/terminal artifacts that the cell diff cannot see get overwritten.
+pub(crate) const FULL_REDRAW_MS: u64 = 1000;
+
+/// Redraw + snapshot interval of the F12 perf overlay while open (ms) - 30fps
+pub(crate) const PERF_OVERLAY_FRAME_MS: u64 = 33;
+
 /// Interval for CPU/RAM stats refresh in perf overlay (ms)
 pub(crate) const PERF_STATS_REFRESH_MS: u64 = 500;
 

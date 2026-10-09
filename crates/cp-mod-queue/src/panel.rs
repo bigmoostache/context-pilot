@@ -65,7 +65,7 @@ impl Panel for QueuePanel {
     fn refresh(&self, state: &mut State) {
         let content = Self::format_context_text(state);
         let token_count = estimate_tokens(&content);
-        for ctx in &mut state.context {
+        for ctx in &mut state.thread_mut().context {
             if ctx.context_type.as_str() == Kind::QUEUE {
                 ctx.token_count = token_count;
                 // Hash content and only bump last_refresh_ms when it actually changes.
@@ -85,6 +85,7 @@ impl Panel for QueuePanel {
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let content = Self::format_context_text(state);
         let (id, last_refresh_ms) = state
+            .thread()
             .context
             .iter()
             .find(|c| c.context_type.as_str() == Kind::QUEUE)

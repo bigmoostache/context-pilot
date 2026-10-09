@@ -58,15 +58,15 @@ impl ConversationPanel {
         // Hash viewport width
         std::hash::Hash::hash(&viewport_width, &mut hasher);
         std::hash::Hash::hash(&state.flags.ui.dev_mode, &mut hasher);
-        std::hash::Hash::hash(&state.stream.phase.is_streaming(), &mut hasher);
+        std::hash::Hash::hash(&state.thread().stream.phase.is_streaming(), &mut hasher);
 
         // Hash conversation history panel count (invalidate when panels added/removed)
         let history_count =
-            state.context.iter().filter(|c| c.context_type.as_str() == Kind::CONVERSATION_HISTORY).count();
+            state.thread().context.iter().filter(|c| c.context_type.as_str() == Kind::CONVERSATION_HISTORY).count();
         std::hash::Hash::hash(&history_count, &mut hasher);
 
         // Hash all message content that affects rendering
-        for msg in &state.messages {
+        for msg in &state.thread().messages {
             std::hash::Hash::hash(&msg.id, &mut hasher);
             std::hash::Hash::hash(&msg.content, &mut hasher);
             std::hash::Hash::hash(&msg.role, &mut hasher);
@@ -77,15 +77,15 @@ impl ConversationPanel {
         }
 
         // Hash streaming tool state (invalidate when tool preview changes)
-        if let Some(st) = state.streaming_tool.as_ref() {
+        if let Some(st) = state.thread().streaming_tool.as_ref() {
             std::hash::Hash::hash(&st.name, &mut hasher);
             std::hash::Hash::hash(&st.input_so_far, &mut hasher);
         }
 
         // Hash input
-        std::hash::Hash::hash(&state.composer.text, &mut hasher);
-        std::hash::Hash::hash(&state.composer.cursor, &mut hasher);
-        std::hash::Hash::hash(&state.composer.anchor, &mut hasher);
+        std::hash::Hash::hash(&state.thread().composer.text, &mut hasher);
+        std::hash::Hash::hash(&state.thread().composer.cursor, &mut hasher);
+        std::hash::Hash::hash(&state.thread().composer.anchor, &mut hasher);
 
         std::hash::Hasher::finish(&hasher)
     }
@@ -94,7 +94,7 @@ impl ConversationPanel {
     /// wrapped message blocks.
     fn push_history_panels(state: &State, blocks: &mut Vec<Block>, viewport_width: u16) {
         let mut history_panels: Vec<_> =
-            state.context.iter().filter(|c| c.context_type.as_str() == Kind::CONVERSATION_HISTORY).collect();
+            state.thread().context.iter().filter(|c| c.context_type.as_str() == Kind::CONVERSATION_HISTORY).collect();
         history_panels.sort_by_key(|c| c.last_refresh_ms);
 
         for ctx in &history_panels {
@@ -122,21 +122,23 @@ impl ConversationPanel {
     /// Render the live conversation messages (with per-message caching), skipping
     /// deleted + empty-non-streaming messages.
     fn push_message_blocks(state: &mut State, blocks: &mut Vec<Block>, viewport_width: u16) {
-        let last_msg_id = state.messages.last().map(|m| m.id.clone());
-        for msg in &state.resident.messages {
+        let dev_mode = state.flags.ui.dev_mode;
+        let rt = state.thread_store.current_mut();
+        let last_msg_id = rt.messages.last().map(|m| m.id.clone());
+        for msg in &rt.messages {
             if msg.status == MsgStatus::Deleted {
                 continue;
             }
             let is_last = last_msg_id.as_ref() == Some(&msg.id);
-            let is_streaming_this = state.stream.phase.is_streaming() && is_last && msg.role == "assistant";
+            let is_streaming_this = rt.stream.phase.is_streaming() && is_last && msg.role == "assistant";
 
             // Skip empty text messages (unless streaming)
             if msg.msg_type == MsgKind::TextMessage && msg.content.trim().is_empty() && !is_streaming_this {
                 continue;
             }
 
-            let hash = Self::compute_message_hash(msg, viewport_width, state.flags.ui.dev_mode);
-            if let Some(cached) = state.resident.message_cache.get(&msg.id)
+            let hash = Self::compute_message_hash(msg, viewport_width, dev_mode);
+            if let Some(cached) = rt.message_cache.get(&msg.id)
                 && cached.content_hash == hash
                 && cached.viewport_width == viewport_width
             {
@@ -146,15 +148,10 @@ impl ConversationPanel {
 
             let rendered = render_blocks::render_message_blocks(
                 msg,
-                &MessageBlockOpts {
-                    viewport_width,
-                    is_streaming: is_streaming_this,
-                    dev_mode: state.flags.ui.dev_mode,
-                },
+                &MessageBlockOpts { viewport_width, is_streaming: is_streaming_this, dev_mode },
             );
             if !is_streaming_this {
-                let _r = state
-                    .resident
+                let _r = rt
                     .message_cache
                     .insert(msg.id.clone(), MessageCache::new(Rc::from(rendered.as_slice()), hash, viewport_width));
             }
@@ -170,17 +167,18 @@ impl ConversationPanel {
                 .map(|c| c.id.clone())
                 .collect();
         let input_blocks = render_input_blocks::render_input_blocks(
-            &state.composer.text,
-            state.composer.cursor,
-            state.composer.anchor,
+            &state.thread().composer.text,
+            state.thread().composer.cursor,
+            state.thread().composer.anchor,
             &InputBlockCtx {
                 command_ids: &command_ids,
-                paste_buffers: &state.paste_buffers,
-                paste_buffer_labels: &state.paste_buffer_labels,
+                paste_buffers: &state.thread().paste_buffers,
+                paste_buffer_labels: &state.thread().paste_buffer_labels,
                 viewport_width,
             },
         );
-        state.input_cache = Some(InputCache::new(Rc::from(input_blocks.as_slice()), input_hash, viewport_width));
+        state.thread_mut().input_cache =
+            Some(InputCache::new(Rc::from(input_blocks.as_slice()), input_hash, viewport_width));
         input_blocks
     }
 
@@ -188,19 +186,20 @@ impl ConversationPanel {
     /// popup's visual-line count. Renders fresh + stores on cache miss.
     fn push_input_area(state: &mut State, blocks: &mut Vec<Block>, viewport_width: u16) {
         let input_hash = Self::compute_input_hash(
-            &state.composer.text,
-            state.composer.cursor,
-            state.composer.anchor,
+            &state.thread().composer.text,
+            state.thread().composer.cursor,
+            state.thread().composer.anchor,
             viewport_width,
         );
 
         let cache_hit = state
+            .thread()
             .input_cache
             .as_ref()
             .is_some_and(|c| c.input_hash == input_hash && c.viewport_width == viewport_width);
 
         let out_blocks: Vec<Block> = if cache_hit {
-            state.input_cache.as_ref().map_or_else(Vec::new, |c| c.blocks.to_vec())
+            state.thread().input_cache.as_ref().map_or_else(Vec::new, |c| c.blocks.to_vec())
         } else {
             Self::render_and_cache_input(state, input_hash, viewport_width)
         };
@@ -217,7 +216,7 @@ impl ConversationPanel {
     fn assemble_body(state: &mut State, blocks: &mut Vec<Block>, viewport_width: u16) {
         Self::push_history_panels(state, blocks, viewport_width);
 
-        if state.messages.is_empty() {
+        if state.thread().messages.is_empty() {
             blocks.push(Block::empty());
             blocks.push(Block::empty());
             blocks.push(Block::line(vec![
@@ -232,7 +231,7 @@ impl ConversationPanel {
         }
 
         // Streaming tool preview (between messages and input)
-        if let Some(streaming_tool) = state.streaming_tool.as_ref() {
+        if let Some(streaming_tool) = state.thread().streaming_tool.as_ref() {
             blocks.extend(render_blocks::render_streaming_tool_blocks(
                 &streaming_tool.name,
                 &streaming_tool.input_so_far,
@@ -246,23 +245,24 @@ impl ConversationPanel {
     /// Build content with caching - called from `render()` which has &mut State
     fn build_content_cached_inner(state: &mut State) -> Vec<Block> {
         let _guard = crate::profile!("panel::conversation::content");
-        let viewport_width = state.last_viewport_width;
+        let viewport_width = state.thread().last_viewport_width;
 
         // Compute full content hash for top-level cache check
         let full_hash = Self::compute_full_content_hash(state, viewport_width);
 
         // Check full content cache first - if valid, return immediately
-        if let Some(cached) = state.full_content_cache.as_ref()
+        if let Some(cached) = state.thread().full_content_cache.as_ref()
             && cached.content_hash == full_hash
         {
             return cached.blocks.to_vec();
         }
 
         // Cache miss — viewport width change invalidates per-message caches
-        let width_changed = state.message_cache.values().next().is_some_and(|c| c.viewport_width != viewport_width);
+        let width_changed =
+            state.thread().message_cache.values().next().is_some_and(|c| c.viewport_width != viewport_width);
         if width_changed {
-            state.message_cache.clear();
-            state.input_cache = None;
+            state.thread_mut().message_cache.clear();
+            state.thread_mut().input_cache = None;
         }
 
         let mut blocks: Vec<Block> = Vec::new();
@@ -274,7 +274,7 @@ impl ConversationPanel {
         }
 
         // Store in full content cache
-        state.full_content_cache = Some(FullCache::new(Rc::from(blocks.as_slice()), full_hash));
+        state.thread_mut().full_content_cache = Some(FullCache::new(Rc::from(blocks.as_slice()), full_hash));
 
         blocks
     }
@@ -294,7 +294,7 @@ impl Panel for ConversationPanel {
         Vec::new()
     }
     fn title(&self, state: &State) -> String {
-        if state.stream.phase.is_streaming() { "Conversation *".to_owned() } else { "Conversation".to_owned() }
+        if state.thread().stream.phase.is_streaming() { "Conversation *".to_owned() } else { "Conversation".to_owned() }
     }
 
     fn handle_key(&self, key: &KeyEvent, state: &State) -> Option<Action> {
@@ -410,7 +410,7 @@ const fn handle_modifier_combo(code: KeyCode, mods: &Mods) -> Option<Action> {
 fn left_action(state: &State, shift: bool) -> Action {
     if shift {
         Action::CursorLeftSelect
-    } else if state.composer.text.is_empty() && state.composer.anchor.is_none() {
+    } else if state.thread().composer.text.is_empty() && state.thread().composer.anchor.is_none() {
         Action::CycleViewMode
     } else {
         Action::CursorLeft
@@ -457,14 +457,14 @@ fn handle_plain_key(key: &KeyEvent, state: &State, shift: bool) -> Option<Action
 /// else continue/close a markdown list, else insert a newline.
 fn handle_enter_key(state: &State) -> Action {
     // Send if: cursor at end AND (input empty OR ends with empty line)
-    let at_end = state.composer.cursor >= state.composer.text.len();
-    let ends_with_empty_line =
-        state.composer.text.ends_with('\n') || state.composer.text.lines().last().is_none_or(|l| l.trim().is_empty());
+    let at_end = state.thread().composer.cursor >= state.thread().composer.text.len();
+    let ends_with_empty_line = state.thread().composer.text.ends_with('\n')
+        || state.thread().composer.text.lines().last().is_none_or(|l| l.trim().is_empty());
 
     if at_end && ends_with_empty_line {
         return Action::InputSubmit;
     }
-    match list::detect_list_action(&state.composer.text) {
+    match list::detect_list_action(&state.thread().composer.text) {
         Some(ListAction::Continue(text)) => Action::InsertText(text),
         Some(ListAction::RemoveItem) => Action::RemoveListItem,
         None => Action::InputChar('\n'),

@@ -191,7 +191,7 @@ impl Module for SpineModule {
         // The spine panel was removed (notifications are backend-only now).
         // Evict any spine context entry persisted by an older build so it does
         // not linger as an orphaned FallbackPanel.
-        state.context.retain(|c| c.context_type.as_str() != Kind::SPINE);
+        state.thread_mut().context.retain(|c| c.context_type.as_str() != Kind::SPINE);
     }
 
     fn fixed_panel_types(&self) -> Vec<Kind> {

@@ -63,6 +63,7 @@ fn check_git_gh_guardrail(input: &str) -> Option<String> {
 /// Returns (`session_key`, `panel_id`) or an error.
 fn resolve_session_key(state: &State, panel_id: &str) -> Result<String, String> {
     state
+        .thread()
         .context
         .iter()
         .find(|c| c.id == panel_id && c.context_type.as_str() == Kind::CONSOLE)
@@ -94,11 +95,8 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         key
     };
 
-    // Spawn the process
-    let handle = match SessionHandle::spawn(session_key.clone(), command.clone(), cwd.clone()) {
-        Ok(h) => h,
-        Err(e) => return ToolResult::new(tool.id.clone(), e, true),
-    };
+    // Spawn the process off the main loop; a spawn error lands in the panel output.
+    let handle = SessionHandle::spawn_detached(session_key.clone(), command.clone(), cwd.clone());
 
     // Display name: description if provided, else truncated command
     let display_name = description.as_deref().unwrap_or_else(|| truncate_str(&command, 30));
@@ -118,7 +116,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     if let Some(dir) = cwd.as_ref() {
         ctx.set_meta("console_cwd", dir);
     }
-    state.context.push(ctx);
+    state.thread_mut().context.push(ctx);
 
     // Store handle
     let cs = ConsoleState::get_mut(state);
@@ -167,7 +165,7 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Short delay for output to arrive
-    state.tool_sleep_until_ms = now_ms().saturating_add(500);
+    state.thread_mut().tool_sleep_until_ms = now_ms().saturating_add(500);
 
     ToolResult::new(tool.id.clone(), format!("Sent input to console '{panel_id}'"), false)
 }
@@ -366,10 +364,9 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
         key
     };
 
-    let handle = match SessionHandle::spawn(session_key.clone(), command.clone(), cwd.clone()) {
-        Ok(h) => h,
-        Err(e) => return ToolResult::new(tool.id.clone(), format!("Failed to execute: {e}"), true),
-    };
+    // A spawn error flips the status to Failed(-1) with the message in the
+    // output buffer, so the exit watcher below reports it.
+    let handle = SessionHandle::spawn_detached(session_key.clone(), command.clone(), cwd.clone());
 
     // Store the handle (needed for watcher to check status + read output)
     // NO panel created — the watcher decides inline vs. deferred panel at completion.

@@ -51,7 +51,7 @@ impl Module for QuestionsModule {
     }
     /// Per-thread (thread-centric model): the `Think`-reminder cadence is each
     /// thread's own. `ThinkState` (consecutive-count + next-notification point)
-    /// lives in the per-thread `TypeMap` and rides the resident-thread swap; it
+    /// lives in the per-thread `TypeMap` and rides the thread's runtime; it
     /// is already persisted per-thread via `save_worker_data`/`load_worker_data`,
     /// so the flip aligns the in-memory map with the on-disk location (no data
     /// loss) and is inert at N=1.

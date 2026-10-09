@@ -77,23 +77,15 @@ fn push_crud_cheatsheet(content: &mut String) {
 pub(crate) struct LibraryPanel;
 
 /// Everything the Library text depends on, without reading file contents:
-/// name + size + mtime of each behaviour `.md` (built-ins are compiled in),
-/// plus the active agent and loaded skills. Equal fingerprint ⇒ same text.
+/// the behaviour-dir stat fingerprint (built-ins are compiled in), plus the
+/// active agent and loaded skills. Equal fingerprint ⇒ same text.
+///
+/// Also the sole periodic revalidation point of the in-memory prompt index:
+/// a changed dir fingerprint drops the index, so external edits surface here.
 fn library_fingerprint(state: &State) -> String {
     use std::hash::{Hash as _, Hasher as _};
     let mut h = std::collections::hash_map::DefaultHasher::new();
-    for pt in [PromptType::Agent, PromptType::Skill, PromptType::Command] {
-        // Order-independent sum of per-file hashes: `read_dir` order is unspecified.
-        let files = std::fs::read_dir(crate::storage::dir_for(pt)).map_or(0u64, |rd| {
-            rd.flatten().fold(0u64, |acc, e| {
-                let mut fh = std::collections::hash_map::DefaultHasher::new();
-                e.file_name().hash(&mut fh);
-                e.metadata().ok().map(|m| (m.len(), m.modified().ok())).hash(&mut fh);
-                acc.wrapping_add(fh.finish())
-            })
-        });
-        files.hash(&mut h);
-    }
+    crate::storage::revalidate_index().hash(&mut h);
     let ps = PromptState::get(state);
     ps.active_agent_id.hash(&mut h);
     ps.loaded_skill_ids.hash(&mut h);
@@ -142,12 +134,12 @@ impl Panel for LibraryPanel {
         // fingerprint) and the active agent / loaded skills are the same.
         let fingerprint = library_fingerprint(state);
         let lib = Kind::new(Kind::LIBRARY);
-        let entry = state.context.iter().find(|c| c.context_type == lib);
+        let entry = state.thread().context.iter().find(|c| c.context_type == lib);
         if entry.is_some_and(|c| c.cached_content.is_some() && c.source_hash.as_deref() == Some(fingerprint.as_str())) {
             return;
         }
         let items = self.context(state);
-        if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type == lib) {
+        if let Some(ctx) = state.thread_mut().context.iter_mut().find(|c| c.context_type == lib) {
             let total: usize = items.iter().map(|i| cp_base::state::context::estimate_tokens(&i.content)).sum();
             ctx.token_count = total;
             let combined: String = items.iter().map(|i| i.content.as_str()).collect::<Vec<_>>().join("\n");
@@ -161,7 +153,7 @@ impl Panel for LibraryPanel {
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
-        let Some(ctx) = state.context.iter().find(|c| c.context_type == Kind::new(Kind::LIBRARY)) else {
+        let Some(ctx) = state.thread().context.iter().find(|c| c.context_type == Kind::new(Kind::LIBRARY)) else {
             return Vec::new();
         };
 

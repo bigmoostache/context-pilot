@@ -9028,3 +9028,89 @@ index 87a6b469..fecc0ddc 100644
    script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-ts-tests.sh" --callback
    last_edited_ms: 1783511056445
 # --- End entry #112 ---
+113:0e4a31643b65d3151a7359a040d83eb01b049653b761b475f920f6afde28df4b:f8e0f0cf9e69946b49c302dc426d912bb4557863a5e69266f216e2ccce826f0e:ade0e13b15cb25a432939d445ffa10bfe39e46f4796487b0dce7671ecebfadeb
+# --- Diff for entry #113 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index ed988f56..c7a44457 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -191,6 +191,19 @@ exceptions:
+       Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
+       would push that file over the limit. The split is the honest shape.
+ 
++  - path: "src/app/run/lifecycle/spine_phase.rs"
++    match: 'App methods split across run/ submodules for readability'
++    reason: >
++      The main-loop spine phase (run_spine_phase: spine check, API-check
++      results, background-thread reconcile/dispatch/advance, fleet view
++      publish, each under its own perf guard) is its own impl App block, moved
++      out of lifecycle/mod.rs when the timers pushed that file past the
++      500-line cap. multiple_inherent_impl (forbid) fires on this additional
++      block, so it carries the #[expect].
++    strategy: >
++      Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
++      would push that file over the limit. The split is the honest shape.
++
+   - path: "src/app/run/lifecycle/coucous.rs"
+     match: 'App methods split across run/ submodules for readability'
+     reason: >
+diff --git a/.context-pilot/shared/callbacks.yaml b/.context-pilot/shared/callbacks.yaml
+index 87a6b469..fecc0ddc 100644
+--- a/.context-pilot/shared/callbacks.yaml
++++ b/.context-pilot/shared/callbacks.yaml
+@@ -6,6 +6,7 @@ api-contract-rust:
+   timeout_secs: 180
+   success_message: API contract OK ✓
+   is_global: true
++  concurrency_friendly: false
+   script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-api-contract.sh" --callback
+   last_edited_ms: 1787907566116
+ api-contract-ts:
+@@ -16,6 +17,7 @@ api-contract-ts:
+   timeout_secs: 180
+   success_message: API contract OK ✓
+   is_global: true
++  concurrency_friendly: false
+   script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-api-contract.sh" --callback
+   last_edited_ms: 1783511056446
+ mobile-mirror:
+@@ -26,6 +28,7 @@ mobile-mirror:
+   timeout_secs: 30
+   success_message: Mobile mirror OK ✓
+   is_global: true
++  concurrency_friendly: false
+   script_content: exec .github/checks/check-mobile-mirror.sh $CP_CHANGED_FILES
+   last_edited_ms: 1784633228156
+ rust-lints:
+@@ -36,6 +39,7 @@ rust-lints:
+   timeout_secs: 120
+   success_message: Rust lints OK ✓
+   is_global: true
++  concurrency_friendly: false
+   script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-rust-lints.sh" --callback
+   last_edited_ms: 1783511056443
+ structure-rust:
+@@ -46,6 +50,7 @@ structure-rust:
+   timeout_secs: 30
+   success_message: Structure OK ✓
+   is_global: true
++  concurrency_friendly: false
+   script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-structure.sh" --callback
+   last_edited_ms: 1783511056442
+ structure-web:
+@@ -56,6 +61,7 @@ structure-web:
+   timeout_secs: 30
+   success_message: Structure OK ✓
+   is_global: true
++  concurrency_friendly: false
+   script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-structure.sh" --callback
+   last_edited_ms: 1783511056442
+ ts-tests:
+@@ -66,5 +72,6 @@ ts-tests:
+   timeout_secs: 30
+   success_message: TS tests OK ✓
+   is_global: true
++  concurrency_friendly: false
+   script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-ts-tests.sh" --callback
+   last_edited_ms: 1783511056445
+# --- End entry #113 ---

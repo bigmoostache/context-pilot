@@ -40,7 +40,7 @@ impl Panel for ConsolePanel {
         // This auto-closes stale failure panels when the callback re-fires.
         if let Some(cb_id) = ctx.get_meta_str("callback_id") {
             let my_ts = ctx.last_refresh_ms;
-            let has_newer = state.context.iter().any(|c| {
+            let has_newer = state.thread().context.iter().any(|c| {
                 c.id != ctx.id
                     && c.context_type == Kind::new(Kind::CONSOLE)
                     && c.get_meta_str("callback_id") == Some(cb_id)
@@ -142,7 +142,7 @@ impl Panel for ConsolePanel {
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
         use cp_render::{Block, Semantic, Span as S};
 
-        let (content, command, status) = state.context.get(state.selected_context).map_or_else(
+        let (content, command, status) = state.thread().context.get(state.thread().selected_context).map_or_else(
             || (String::new(), String::new(), String::new()),
             |ctx| {
                 let content = ctx.cached_content.clone().unwrap_or_else(|| {
@@ -177,7 +177,7 @@ impl Panel for ConsolePanel {
         blocks
     }
     fn title(&self, state: &State) -> String {
-        state.context.get(state.selected_context).map_or_else(
+        state.thread().context.get(state.thread().selected_context).map_or_else(
             || "Console".to_owned(),
             |ctx| {
                 let desc = ctx
@@ -202,6 +202,7 @@ impl Panel for ConsolePanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         state
+            .thread()
             .context
             .iter()
             .filter(|c| c.context_type.as_str() == Kind::CONSOLE)

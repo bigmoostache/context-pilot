@@ -58,7 +58,7 @@ pub struct CallbackState {
     /// Active callback sessions: dedup key → `session_key`.
     ///
     /// The dedup key is **per (executing thread, callback)** — composed from the
-    /// resident thread id and the callback id (see `firing::dedup_key`). Keying
+    /// executing thread id and the callback id (see `firing::dedup_key`). Keying
     /// by thread as well as callback means one thread's edit re-firing a
     /// callback kills only *its own* prior run, never another thread's in-flight
     /// run of the same callback (§13/H2, S6). At N=1 the thread component is

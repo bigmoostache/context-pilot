@@ -30,7 +30,7 @@ fn create_console_panel_for(app: &mut App, result: &mut cp_base::state::watchers
     if let Some(dir) = dp.cwd.as_ref() {
         ctx.set_meta("console_cwd", dir);
     }
-    app.state.context.push(ctx);
+    app.state.thread_mut().context.push(ctx);
     // Panel is already populated and exited — no console_wait needed.
     result.description.push_str(" \u{2192} see ");
     result.description.push_str(&panel_id);
@@ -63,7 +63,7 @@ fn create_dyn_panel_for(app: &mut App, result: &mut cp_base::state::watchers::ca
         ctx.total_pages = cp_base::state::context::compute_total_pages(ctx.token_count);
         ctx.cache_deprecated = false;
     }
-    app.state.context.push(ctx);
+    app.state.thread_mut().context.push(ctx);
     result.description = result.description.replace(cp_base::state::watchers::DYN_PANEL_ID_PLACEHOLDER, &panel_id);
 }
 
@@ -101,20 +101,20 @@ fn process_async_completions(app: &mut App, async_results: &mut [cp_base::state:
         if result.close_panel
             && let Some(panel_id) = result.panel_id.as_ref()
         {
-            if let Some(ctx) = app.state.context.iter().find(|c| c.id == *panel_id)
+            if let Some(ctx) = app.state.thread().context.iter().find(|c| c.id == *panel_id)
                 && let Some(name) = ctx.get_meta::<String>("console_name")
             {
                 cp_mod_console::types::ConsoleState::kill_session(&mut app.state, &name);
             }
-            app.state.context.retain(|c| c.id != *panel_id);
+            app.state.thread_mut().context.retain(|c| c.id != *panel_id);
         }
     }
 
     for result in async_results.iter() {
         // Route the notification into the OWNER thread's spine inbox (delivery,
-        // not advancement). At N=1 the owner is always the focused resident, so
+        // not advancement). At N=1 the owner is always the focused thread, so
         // this is a direct, byte-identical delivery. The result PANEL is still
-        // created on the resident's context above — moving panels into the owner
+        // created on the executing thread's context above — moving panels into the owner
         // thread is a Phase F (per-thread panels/teardown) concern.
         let tid = result.thread_id.clone();
         let tid_tag = tid.clone();
@@ -236,7 +236,7 @@ fn replace_blocking_sentinels(
         // A stale tool_use_id left a sentinel unmatched. If real watchers remain,
         // stash and wait; otherwise force-resolve to avoid an infinite stall.
         if WatcherRegistry::get(&app.state).has_blocking_watchers() {
-            app.pending_console_wait_tool_results = Some(std::mem::take(tool_results));
+            app.stream_rt_mut().pending_console_wait_tool_results = Some(std::mem::take(tool_results));
             return true;
         }
         force_resolve_stragglers(tool_results);
@@ -254,13 +254,17 @@ pub(crate) fn check_watchers(app: &mut App) {
     // per-thread, so it normally lives in `thread_module_data`; fall back to the
     // shared map defensively, and restore it to its canonical per-thread home.
     let watcher_id = std::any::TypeId::of::<WatcherRegistry>();
-    let removed =
-        app.state.thread_module_data.remove(&watcher_id).or_else(|| app.state.shared_module_data.remove(&watcher_id));
+    let removed = app
+        .state
+        .thread_mut()
+        .thread_module_data
+        .remove(&watcher_id)
+        .or_else(|| app.state.shared_module_data.remove(&watcher_id));
     let mut registry = match removed {
         Some(boxed) => match boxed.downcast::<WatcherRegistry>() {
             Ok(r) => *r,
             Err(returned) => {
-                let _r = app.state.thread_module_data.insert(watcher_id, returned);
+                let _r = app.state.thread_mut().thread_module_data.insert(watcher_id, returned);
                 return;
             }
         },
@@ -281,7 +285,7 @@ pub(crate) fn check_watchers(app: &mut App) {
     }
 
     // --- Blocking sentinel replacement ---
-    if app.pending_console_wait_tool_results.is_none() {
+    if app.stream_rt_mut().pending_console_wait_tool_results.is_none() {
         return;
     }
 
@@ -302,7 +306,7 @@ pub(crate) fn check_watchers(app: &mut App) {
     // Accumulate partial blocking results into App-level storage.
     // Multiple blocking callbacks share one sentinel_id but complete at different times.
     // We must wait for ALL of them before resuming the pipeline.
-    app.accumulated_blocking_results.extend(blocking_results);
+    app.stream_rt_mut().accumulated_blocking_results.extend(blocking_results);
 
     // Check if there are STILL blocking watchers pending in the registry.
     // If so, don't resume yet — more results are coming.
@@ -312,9 +316,9 @@ pub(crate) fn check_watchers(app: &mut App) {
     }
 
     // All blocking watchers done — merge accumulated results and resume pipeline.
-    let mut merged_blocking = std::mem::take(&mut app.accumulated_blocking_results);
+    let mut merged_blocking = std::mem::take(&mut app.stream_rt_mut().accumulated_blocking_results);
 
-    let Some(mut tool_results) = app.pending_console_wait_tool_results.take() else {
+    let Some(mut tool_results) = app.stream_rt_mut().pending_console_wait_tool_results.take() else {
         return;
     };
 
@@ -348,15 +352,15 @@ fn resume_pipeline_after_blocking(
     // Now that we have the real results, break tempo if any watcher says so.
     for result in merged_blocking {
         if !result.preserves_tempo {
-            app.state.tempo = false;
+            app.state.thread_mut().tempo = false;
             break;
         }
     }
 
     // All resolved — resume normal pipeline: create result message + continue streaming
-    let result_id = format!("R{}", app.state.next_result_id);
+    let result_id = format!("R{}", app.state.thread().next_result_id);
     let result_global_uid = format!("UID_{}_R", app.state.global_next_uid);
-    app.state.next_result_id = app.state.next_result_id.saturating_add(1);
+    app.state.thread_mut().next_result_id = app.state.thread_mut().next_result_id.saturating_add(1);
     app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
     let tool_result_records: Vec<ToolResultRecord> = tool_results
         .iter()
@@ -369,21 +373,21 @@ fn resume_pipeline_after_blocking(
         .collect();
     let result_msg = Message::new_tool_result(result_id, Some(result_global_uid), tool_result_records);
     app.save_message_async(&result_msg);
-    app.state.messages.push(result_msg);
+    app.state.thread_mut().messages.push(result_msg);
 
     if app.state.flags.lifecycle.reload_pending {
         return;
     }
 
     // Create new assistant message for continued streaming
-    let assistant_id = format!("A{}", app.state.next_assistant_id);
+    let assistant_id = format!("A{}", app.state.thread().next_assistant_id);
     let assistant_global_uid = format!("UID_{}_A", app.state.global_next_uid);
-    app.state.next_assistant_id = app.state.next_assistant_id.saturating_add(1);
+    app.state.thread_mut().next_assistant_id = app.state.thread_mut().next_assistant_id.saturating_add(1);
     app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
     let new_assistant_msg = Message::new_assistant(assistant_id, assistant_global_uid);
-    app.state.messages.push(new_assistant_msg);
+    app.state.thread_mut().messages.push(new_assistant_msg);
 
-    app.state.streaming_estimated_tokens = 0;
+    app.state.thread_mut().streaming_estimated_tokens = 0;
 
     // Accumulate token stats + costs from intermediate stream (same logic as
     // the non-blocking path in pipeline.rs — includes $ computation).
@@ -397,8 +401,8 @@ fn resume_pipeline_after_blocking(
 
     let _r = crate::app::run::streaming::trigger_dirty_panel_refresh(&app.state, &app.cache_tx);
     if crate::app::run::streaming::has_dirty_file_panels(&app.state) {
-        app.state.waiting_for_panels = true;
-        app.wait_started_ms = now_ms();
+        app.state.thread_mut().waiting_for_panels = true;
+        app.stream_rt_mut().wait_started_ms = now_ms();
     } else {
         crate::app::run::streaming::continue_streaming(app);
     }
@@ -417,12 +421,12 @@ pub(crate) fn flush_pending_tool_results_as_interrupted(app: &mut App) {
     // Collect all pending tool results from both blocking paths
     let mut all_pending: Vec<crate::infra::tools::ToolResult> = Vec::new();
 
-    if let Some(results) = app.pending_console_wait_tool_results.take() {
+    if let Some(results) = app.stream_rt_mut().pending_console_wait_tool_results.take() {
         all_pending.extend(results);
     }
 
     // Clear any accumulated blocking results from partial callback completions
-    app.accumulated_blocking_results.clear();
+    app.stream_rt_mut().accumulated_blocking_results.clear();
 
     // Scuttle stale blocking watchers whose tool_use_ids match the interrupted results.
     // Without this, interrupted watchers linger in the registry and fire later with
@@ -444,9 +448,9 @@ pub(crate) fn flush_pending_tool_results_as_interrupted(app: &mut App) {
     }
 
     // Create a tool_result message pairing each pending tool_use
-    let result_id = format!("R{}", app.state.next_result_id);
+    let result_id = format!("R{}", app.state.thread().next_result_id);
     let result_global_uid = format!("UID_{}_R", app.state.global_next_uid);
-    app.state.next_result_id = app.state.next_result_id.saturating_add(1);
+    app.state.thread_mut().next_result_id = app.state.thread_mut().next_result_id.saturating_add(1);
     app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
 
     let tool_result_records: Vec<ToolResultRecord> = all_pending
@@ -460,5 +464,5 @@ pub(crate) fn flush_pending_tool_results_as_interrupted(app: &mut App) {
 
     let result_msg = Message::new_tool_result(result_id, Some(result_global_uid), tool_result_records);
     app.save_message_async(&result_msg);
-    app.state.messages.push(result_msg);
+    app.state.thread_mut().messages.push(result_msg);
 }

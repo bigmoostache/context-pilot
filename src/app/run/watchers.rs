@@ -25,6 +25,7 @@ pub(super) fn schedule_initial_cache_refreshes(app: &mut App) {
     // Collect requests first (immutable borrow), then mark in-flight (mutable borrow).
     let requests: Vec<(usize, CacheRequest)> = app
         .state
+        .thread()
         .context
         .iter()
         .enumerate()
@@ -36,7 +37,7 @@ pub(super) fn schedule_initial_cache_refreshes(app: &mut App) {
         .collect();
     for (i, request) in requests {
         process_cache_request(request, app.cache_tx.clone());
-        if let Some(ctx) = app.state.context.get_mut(i) {
+        if let Some(ctx) = app.state.thread_mut().context.get_mut(i) {
             ctx.cache_in_flight = true;
         }
     }
@@ -51,7 +52,7 @@ pub(super) fn process_cache_updates(app: &mut App, cache_rx: &Receiver<CacheUpda
 /// Returns `true` when the update was of this kind (caller should skip on).
 fn apply_unchanged_update(state: &mut State, update: &CacheUpdate) -> bool {
     let Some(context_id) = update.unchanged_context_id() else { return false };
-    if let Some(ctx) = state.context.iter_mut().find(|c| c.id == context_id) {
+    if let Some(ctx) = state.thread_mut().context.iter_mut().find(|c| c.id == context_id) {
         ctx.cache_in_flight = false;
         ctx.cache_deprecated = false;
     }
@@ -62,12 +63,12 @@ fn apply_unchanged_update(state: &mut State, update: &CacheUpdate) -> bool {
 /// mismatch, hands the update back via `Err` for the `Content` path.
 fn apply_module_specific_update(state: &mut State, update: CacheUpdate) -> Result<(), CacheUpdate> {
     let Some(context_type) = update.module_specific_type().cloned() else { return Err(update) };
-    let Some(idx) = state.context.iter().position(|c| c.context_type == context_type) else { return Ok(()) };
-    let mut ctx = state.context.remove(idx);
+    let Some(idx) = state.thread().context.iter().position(|c| c.context_type == context_type) else { return Ok(()) };
+    let mut ctx = state.thread_mut().context.remove(idx);
     let panel = crate::app::panels::get_panel(&ctx.context_type);
     let _changed = panel.apply_cache_update(update, &mut ctx, state);
     ctx.cache_in_flight = false;
-    state.context.insert(idx, ctx);
+    state.thread_mut().context.insert(idx, ctx);
     state.flags.ui.dirty = true;
     Ok(())
 }
@@ -75,13 +76,13 @@ fn apply_module_specific_update(state: &mut State, update: CacheUpdate) -> Resul
 /// Apply a `Content` cache update (matched by context id).
 fn apply_content_update(state: &mut State, update: CacheUpdate) {
     let Some(context_id) = update.content_context_id() else { return };
-    let Some(idx) = state.context.iter().position(|c| c.id == context_id) else { return };
-    let mut ctx = state.context.remove(idx);
+    let Some(idx) = state.thread().context.iter().position(|c| c.id == context_id) else { return };
+    let mut ctx = state.thread_mut().context.remove(idx);
     let panel = crate::app::panels::get_panel(&ctx.context_type);
     // apply_cache_update calls update_if_changed which sets last_refresh_ms on change
     let _changed = panel.apply_cache_update(update, &mut ctx, state);
     ctx.cache_in_flight = false;
-    state.context.insert(idx, ctx);
+    state.thread_mut().context.insert(idx, ctx);
     state.flags.ui.dirty = true;
 }
 
@@ -110,7 +111,7 @@ fn apply_kind_guard(state: &State, update: &CacheUpdate) -> Option<crate::infra:
     }
     let kind = update.module_specific_type().cloned().or_else(|| {
         let id = update.content_context_id()?;
-        state.context.iter().find(|c| c.id == id).map(|c| c.context_type.clone())
+        state.thread().context.iter().find(|c| c.id == id).map(|c| c.context_type.clone())
     })?;
     Some(crate::profile!(crate::infra::profiler::intern(format!("apply_{}", kind.as_str()))))
 }
@@ -120,7 +121,7 @@ fn apply_kind_guard(state: &State, update: &CacheUpdate) -> Option<crate::infra:
 fn invalidate_matching_panels(app: &mut App, path: &str, is_dir_event: bool) -> Vec<usize> {
     let modules = crate::modules::all_modules();
     let mut refresh_indices = Vec::new();
-    for (i, ctx) in app.state.resident.context.iter_mut().enumerate() {
+    for (i, ctx) in app.state.thread_store.current_mut().context.iter_mut().enumerate() {
         for module in &modules {
             if module.should_invalidate_on_fs_change(ctx, path, is_dir_event) {
                 ctx.cache_deprecated = true;
@@ -160,7 +161,7 @@ fn dispatch_refresh_requests(app: &mut App, mut refresh_indices: Vec<usize>) {
     refresh_indices.sort_unstable();
     refresh_indices.dedup();
     for i in refresh_indices {
-        let Some(ctx) = app.state.context.get(i) else { continue };
+        let Some(ctx) = app.state.thread().context.get(i) else { continue };
         if ctx.cache_in_flight {
             continue;
         }
@@ -168,7 +169,7 @@ fn dispatch_refresh_requests(app: &mut App, mut refresh_indices: Vec<usize>) {
         let built = panel.build_cache_request(ctx, &app.state);
         if let Some(request) = built {
             process_cache_request(request, app.cache_tx.clone());
-            if let Some(ctx_mut) = app.state.context.get_mut(i) {
+            if let Some(ctx_mut) = app.state.thread_mut().context.get_mut(i) {
                 ctx_mut.cache_in_flight = true;
             }
         }
@@ -223,12 +224,17 @@ enum TimerOutcome {
 /// interval), or nothing. Pure read of `app` — no mutation.
 fn classify_timer_panel(app: &App, ctx: &crate::state::Entry, current_ms: u64) -> Option<TimerOutcome> {
     let panel = crate::app::panels::get_panel(&ctx.context_type);
-    if panel.suicide(ctx, &app.state) {
+    let suicide = {
+        let _g = crate::infra::profiler::dyn_guard("tr_suicide_", ctx.context_type.as_str());
+        panel.suicide(ctx, &app.state)
+    };
+    if suicide {
         return Some(TimerOutcome::Suicide);
     }
     if ctx.cache_in_flight {
         return None;
     }
+    let _g = crate::infra::profiler::dyn_guard("tr_req_", ctx.context_type.as_str());
     // Case 1: Initial load — panel has no content yet.
     // Case 2: Explicitly dirty (watcher event, tool, self-invalidation).
     let needs_initial = ctx.cached_content.is_none() && ctx.context_type.needs_cache();
@@ -250,7 +256,7 @@ fn collect_timer_requests(app: &App, current_ms: u64) -> TimerScan {
     let mut requests: Vec<(usize, CacheRequest)> = Vec::new();
     let mut suicide_indices: Vec<usize> = Vec::new();
 
-    for (i, ctx) in app.state.context.iter().enumerate() {
+    for (i, ctx) in app.state.thread().context.iter().enumerate() {
         match classify_timer_panel(app, ctx, current_ms) {
             Some(TimerOutcome::Suicide) => suicide_indices.push(i),
             Some(TimerOutcome::Refresh(req)) => requests.push((i, req)),
@@ -267,25 +273,27 @@ fn remove_suicided_panels(app: &mut App, suicide_indices: &[usize]) {
         return;
     }
     // Save current scroll state before removals (entry might shift or disappear)
-    if let Some(current) = app.state.resident.context.get_mut(app.state.resident.selected_context) {
-        current.scroll_state.offset = app.state.resident.scroll_offset;
-        current.scroll_state.user_scrolled = app.state.resident.stream.user_scrolled;
+    let rt = app.state.thread_store.current_mut();
+    if let Some(current) = rt.context.get_mut(rt.selected_context) {
+        current.scroll_state.offset = rt.scroll_offset;
+        current.scroll_state.user_scrolled = rt.stream.user_scrolled;
     }
     for &i in suicide_indices.iter().rev() {
         // Fix selected_context if it pointed at or past the removed panel
-        if app.state.selected_context >= app.state.context.len().saturating_sub(1) {
-            app.state.selected_context = app.state.context.len().saturating_sub(2);
-        } else if app.state.selected_context > i {
-            app.state.selected_context = app.state.selected_context.saturating_sub(1);
+        if app.state.thread().selected_context >= app.state.thread().context.len().saturating_sub(1) {
+            app.state.thread_mut().selected_context = app.state.thread_mut().context.len().saturating_sub(2);
+        } else if app.state.thread().selected_context > i {
+            app.state.thread_mut().selected_context = app.state.thread_mut().selected_context.saturating_sub(1);
         } else {
             // Selection is before the removed panel — index unaffected.
         }
-        drop(app.state.context.remove(i));
+        drop(app.state.thread_mut().context.remove(i));
     }
     // Restore scroll from the (possibly new) selected panel
-    if let Some(incoming) = app.state.resident.context.get(app.state.resident.selected_context) {
-        app.state.resident.scroll_offset = incoming.scroll_state.offset;
-        app.state.resident.stream.user_scrolled = incoming.scroll_state.user_scrolled;
+    let after = app.state.thread_store.current_mut();
+    if let Some(incoming) = after.context.get(after.selected_context) {
+        after.scroll_offset = incoming.scroll_state.offset;
+        after.stream.user_scrolled = incoming.scroll_state.user_scrolled;
     }
     app.state.flags.ui.dirty = true;
 }
@@ -324,7 +332,7 @@ pub(super) fn check_timer_based_deprecation(app: &mut App) {
     // Mutable pass: send requests, mark in-flight, update poll timestamps
     for (i, request) in requests {
         process_cache_request(request, app.cache_tx.clone());
-        if let Some(ctx) = app.state.context.get_mut(i) {
+        if let Some(ctx) = app.state.thread_mut().context.get_mut(i) {
             ctx.cache_in_flight = true;
             let _r = app.last_poll_ms.insert(ctx.id.clone(), current_ms);
         }
@@ -419,8 +427,36 @@ fn sync_file_watchers(app: &mut App) {
     if app.file_watcher.is_none() {
         return;
     }
+    let specs_hash = watch_specs_fingerprint(app);
+    if specs_hash == app.watch_specs_hash {
+        return;
+    }
+    app.watch_specs_hash = specs_hash;
     let (wanted_files, wanted_dirs) = collect_wanted_paths(app);
     remove_stale_watches(app, &wanted_files, &wanted_dirs);
     add_file_watches(app, wanted_files);
     add_dir_watches(app);
+}
+
+/// Order-sensitive hash of every module's `watch_paths()` (variant + path).
+/// In-memory only: no filesystem access.
+fn watch_specs_fingerprint(app: &App) -> u64 {
+    use cp_base::panels::WatchSpec;
+    use std::hash::{Hash as _, Hasher as _};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    for module in &crate::modules::all_modules() {
+        for spec in module.watch_paths(&app.state) {
+            // `if let` (not exhaustive match) so WatchSpec stays #[non_exhaustive].
+            if let WatchSpec::File(path) = spec {
+                (0u8, path).hash(&mut h);
+            } else if let WatchSpec::Dir(path) = spec {
+                (1u8, path).hash(&mut h);
+            } else if let WatchSpec::DirRecursive(path) = spec {
+                (2u8, path).hash(&mut h);
+            } else {
+                // Future non_exhaustive variants: ignored by the watcher sync.
+            }
+        }
+    }
+    h.finish()
 }

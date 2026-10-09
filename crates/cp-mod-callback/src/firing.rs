@@ -27,14 +27,14 @@ pub struct FireResult {
 
 /// Dedup key for a callback's active session: `"<thread>\u{1f}<callback_id>"`.
 ///
-/// The thread component is the resident (executing) thread at fire time, so two
+/// The thread component is the executing (executing) thread at fire time, so two
 /// threads firing the same callback get distinct keys and never kill each
 /// other's in-flight run (§13/H2, S6). The `\u{1f}` (ASCII unit separator) can't
 /// appear in a thread id or callback id, so the join is collision-free. At N=1
-/// `resident_thread_id` is `None` → the key degrades to the old callback-id-only
+/// `executing_thread_id()` is `None` → the key degrades to the old callback-id-only
 /// behaviour with a constant prefix.
 fn dedup_key(state: &State, callback_id: &str) -> String {
-    let tid = state.resident_thread_id.as_deref().unwrap_or(constants::DEFAULT_WORKER_ID);
+    let tid = state.executing_thread_id().unwrap_or(constants::DEFAULT_WORKER_ID);
     format!("{tid}\u{1f}{callback_id}")
 }
 
@@ -218,7 +218,7 @@ pub fn fire_callback(
         deadline_ms,
         desc: watcher_desc,
         matched_files: matched.matched_files.clone(),
-        fired_by_thread: state.resident_thread_id.clone(),
+        fired_by_thread: state.executing_thread_id().map(str::to_owned),
         concurrency_friendly: def.concurrency_friendly,
         deferred_panel: DeferredPanel::new(
             session_key.clone(),
@@ -338,7 +338,7 @@ pub struct CallbackWatcher {
     pub desc: String,
     /// Files that triggered this callback (for env var injection).
     pub matched_files: Vec<String>,
-    /// Resident (executing) thread id at fire time, or `None` at N=1.
+    /// Executing (executing) thread id at fire time, or `None` at N=1.
     ///
     /// Used only to decide whether *another* thread is concurrently running the
     /// same callback when this one fails, so a cross-thread note can be appended

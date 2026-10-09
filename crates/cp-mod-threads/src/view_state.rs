@@ -1,15 +1,15 @@
 //! Read-only execution-state snapshot for the threads view.
 //!
 //! This is a **derived mirror**, not a source of truth. `App::fleet`
-//! holds the authoritative [`Entry`](cp_fleet::Entry) per non-resident thread;
+//! holds the authoritative [`Entry`](cp_fleet::Entry) per non-executing thread;
 //! this map is rewritten in full every tick from that registry plus the
-//! resident's own [`State`], purely so the renderer can read it without
+//! executing's own [`State`], purely so the renderer can read it without
 //! threading `App` through the entire render stack.
 //!
 //! **Never read this for scheduling.** Promotion, the `K` cap, and the step
 //! loop all consult `App::fleet`. Reading a mirror for a scheduling decision
 //! reintroduces the split-brain this type exists to avoid — the mirror can be
-//! one tick stale and omits the resident by construction.
+//! one tick stale and omits the executing by construction.
 
 use std::collections::HashMap;
 
@@ -28,10 +28,10 @@ use serde::{Deserialize, Serialize};
 pub struct FleetExecMirror {
     /// Last-known execution state per thread id.
     ///
-    /// Includes the focused thread, whose state is derived from the resident
+    /// Includes the focused thread, whose state is derived from the executing
     /// [`State`] rather than the registry — the registry deliberately excludes
     /// the focused thread because its context lives flat in `State` (the
-    /// resident=focused invariant).
+    /// executing=focused invariant).
     pub exec_states: HashMap<String, ThreadExecState>,
 }
 

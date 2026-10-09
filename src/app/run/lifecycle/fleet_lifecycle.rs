@@ -14,6 +14,12 @@ use cp_mod_threads::types::{ThreadStatus, ThreadsState};
 
 use crate::app::App;
 
+/// Executing thread to restore after a drill-in paint (`None` = unbound).
+pub(super) struct DrillRestore {
+    /// Thread that was executing before the drilled thread was made current.
+    prev: Option<String>,
+}
+
 #[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
     /// Kill console-server sessions that belong to **no** loaded thread, in a
@@ -26,7 +32,7 @@ impl App {
     /// *other* thread's live sessions (the exact class of bug as the F1c
     /// per-thread panel prune). So the per-thread kill was removed and this pass
     /// runs it once, after [`load_background_threads`](Self::load_background_threads),
-    /// over the union of the focused thread's keys plus each parked thread's keys.
+    /// over the union of the focused thread's keys plus each background thread's keys.
     ///
     /// Session reconnection stays per-thread (each thread reattaches its own
     /// sessions when its module data loads); only the orphan *kill* is unioned.
@@ -38,31 +44,25 @@ impl App {
     pub(super) fn prune_orphaned_console_sessions(&mut self) {
         use cp_mod_console::types::ConsoleState;
 
-        // Focused (resident) thread's live session keys.
+        // Executing (focused) thread's live session keys.
         let mut known: std::collections::HashSet<String> =
             ConsoleState::get(&self.state).sessions.keys().cloned().collect();
 
-        // Union in each background thread's keys via a transient swap (pure read;
-        // no stream is spawned, so no `stepping_thread`/`resident_thread_id`
-        // bookkeeping is needed — those only matter for stream spawn/drain).
+        // Union in each background thread's keys (pure read, no stream spawned).
         let bg_ids: Vec<String> = self.fleet.iter().map(|entry| entry.0.clone()).collect();
         for id in bg_ids {
-            let Some(mut entry) = self.fleet.remove(&id) else { continue };
-            entry.runtime.swap_with(&mut self.state); // thread `id` resident
-            known.extend(ConsoleState::get(&self.state).sessions.keys().cloned());
-            entry.runtime.swap_with(&mut self.state); // restore focused
-            self.fleet.insert(id, entry);
+            self.deliver_to_thread(Some(&id), |state| {
+                known.extend(ConsoleState::get(state).sessions.keys().cloned());
+            });
         }
 
         cp_mod_console::manager::kill_orphaned_processes(&known);
     }
 
-    /// Persist **every** thread to disk — the resident (focused) thread first,
-    /// then each background thread by swapping its parked
-    /// [`ThreadRuntime`](cp_base::state::runtime::bundle::ThreadRuntime) into
-    /// `state`, saving, and swapping back (design doc §F1 "save stores the
-    /// resident first", I-10). Called on reload and quit, replacing the
-    /// single-thread `save_state`.
+    /// Persist **every** thread to disk — the focused thread first, then each
+    /// background thread by making it the executing one and saving (design doc
+    /// §F1, I-10). Called on reload and quit, replacing the single-thread
+    /// `save_state`.
     ///
     /// Why this exists and not just `save_state`: `build_save_batch` deliberately
     /// no longer prunes orphaned `panels/<uid>.json` per call (that would delete
@@ -71,39 +71,32 @@ impl App {
     /// panel UIDs are unioned via [`panel_uids_of`](crate::state::persistence::save::panel_uids_of),
     /// and the orphan-prune runs **exactly once** over that union at the end.
     ///
-    /// The swap machinery mirrors
-    /// [`advance_background_threads`](Self::advance_background_threads): mark the
-    /// stepping thread so `resident_worker_id` routes its save to
-    /// `states/<tid>.json`, swap in, save, swap the focused thread back. At N=1
-    /// the fleet is empty, so this saves only the focused thread to
-    /// `main_worker.json` and prunes over its UIDs — byte-identical to the former
-    /// `save_state` (bar the deferred-prune timing, which is inert: boot loads
-    /// from the persisted UID index, never a dir scan).
+    /// `save_state` writes the executing thread to `states/<tid>.json`, so each
+    /// save is preceded by `set_executing(tid)`; the previous executing thread is
+    /// restored at the end. At N=1 this saves only the focused thread and prunes
+    /// over its UIDs (boot loads from the persisted UID index, never a dir scan).
     pub(super) fn save_all_threads(&mut self) {
         use crate::state::persistence::save;
 
         let focused = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
         let mut known: std::collections::HashSet<String> = std::collections::HashSet::new();
 
-        // Resident (focused) first → states/main_worker.json (focused == resident).
-        self.state.resident_thread_id.clone_from(&focused);
+        // Focused thread first.
+        self.state.thread_store.set_executing(focused.clone());
         known.extend(save::panel_uids_of(&self.state));
         save::save_state(&self.state);
 
-        // Each background thread: swap in, snapshot to its own file, swap back.
+        // Each background thread: execute it, snapshot to its own file.
         let bg_ids: Vec<String> = self.fleet.iter().map(|entry| entry.0.clone()).collect();
         for id in bg_ids {
-            let Some(mut entry) = self.fleet.remove(&id) else { continue };
-            self.stepping_thread = Some(id.clone());
-            entry.runtime.swap_with(&mut self.state); // thread `id` resident; focused parks into entry
-            self.state.resident_thread_id = Some(id.clone());
+            if !self.state.thread_store.contains(&id) {
+                continue;
+            }
+            self.state.thread_store.set_executing(Some(id));
             known.extend(save::panel_uids_of(&self.state));
-            save::save_state(&self.state); // → states/<id>.json (resident != focused), no deletes
-            entry.runtime.swap_with(&mut self.state); // restore focused; thread `id` parks back
-            self.stepping_thread = None;
-            self.fleet.insert(id, entry);
+            save::save_state(&self.state); // → states/<id>.json (executing != focused), no deletes
         }
-        self.state.resident_thread_id = focused;
+        self.state.thread_store.set_executing(focused);
 
         // Union orphan-prune, exactly once over every thread's live UIDs.
         for del in save::collect_orphan_deletes(&save::panels_dir(), &known) {
@@ -117,7 +110,7 @@ impl App {
     /// This is the **human-intervention recovery path** (design doc §8): a stuck
     /// thread is only revived by a fresh user message, which `route_on_user_message`
     /// routes here after resetting the thread's spine error counters. A no-op when
-    /// the thread has no entry (the focused resident, or an unknown thread) or when
+    /// the thread has no entry (the focused thread, or an unknown thread) or when
     /// the entry is not `Errored` — so at N=1 (focused thread never in the registry)
     /// it never fires.
     pub(crate) fn clear_errored_entry(&mut self, thread_id: &str) {
@@ -130,7 +123,8 @@ impl App {
     }
 
     /// Structural teardown of a **hard-deleted** thread (design doc §F5 / H15):
-    /// kill its external console processes, then drop its runtime bundle (which
+    /// kill its external console processes, then remove its runtime from the
+    /// `ThreadStore` (which
     /// drops the thread's per-thread resources — the [`WatcherRegistry`], queue,
     /// spine inbox — cancelling its in-process watchers by `Drop`).
     ///
@@ -141,70 +135,62 @@ impl App {
     ///
     /// Console sessions are per-thread ([`ConsoleState`](cp_mod_console::types::ConsoleState)
     /// is `is_global() == false`), so
-    /// [`deliver_to_thread`](Self::deliver_to_thread) swaps the thread's context
-    /// in and [`shutdown_all`](cp_mod_console::types::ConsoleState::shutdown_all)
+    /// [`deliver_to_thread`](Self::deliver_to_thread) makes the thread executing
+    /// and [`shutdown_all`](cp_mod_console::types::ConsoleState::shutdown_all)
     /// kills exactly *its* sessions (by their own keys, via the existing
-    /// per-session kill — no server protocol change), then swaps the focused
-    /// thread back. The in-process watcher drop is `Drop` on the removed
+    /// per-session kill — no server protocol change). The in-process watcher
+    /// drop is `Drop` on the removed
     /// [`ThreadRuntime`](cp_base::state::runtime::bundle::ThreadRuntime): a
     /// [`ChannelWatcher`](cp_base::state::watchers::ChannelWatcher) drops its
     /// receiver so its worker thread's later send fails harmlessly (cancellation);
     /// timer/console watchers are data-only.
     ///
-    /// N=1 identical: deleting the focused resident runs `shutdown_all` directly
-    /// on `state` and [`fleet.remove`](cp_fleet::FleetRegistry::remove) is a no-op
-    /// (the focused thread is never in the registry); deleting a background thread
-    /// takes the swap path. Either way behaviour matches single-thread, and no
-    /// console key or on-disk path changes.
+    /// Deleting the focused thread runs `shutdown_all` directly and
+    /// [`fleet.remove`](cp_fleet::FleetRegistry::remove) is a no-op (the focused
+    /// thread is never in the registry). No console key or on-disk path changes.
     pub(crate) fn teardown_thread(&mut self, thread_id: &str) {
         self.deliver_to_thread(Some(thread_id), |state| {
             cp_mod_console::types::ConsoleState::shutdown_all(state);
         });
         let _removed = self.fleet.remove(thread_id);
+        drop(self.state.thread_store.remove(thread_id));
+        // Deleting the executing thread: fall back to an initialized unbound
+        // runtime so the next render's per-thread `ext` lookups still resolve.
+        if self.state.executing_thread_id() == Some(thread_id) {
+            let fresh = self.fresh_runtime();
+            drop(self.state.thread_store.take_unbound(fresh));
+            self.state.thread_store.set_executing(None);
+        }
     }
 
-    /// Render-scoped drill-in: temporarily make the human-drilled thread
-    /// ([`FocusState::drilled_thread_id`](cp_mod_threads::types::FocusState)) resident
-    /// in `state` **only for the duration of one paint**, returning the removed
-    /// registry entry the caller must pass to
+    /// Render-scoped drill-in: make the human-drilled thread
+    /// ([`FocusState::drilled_thread_id`](cp_mod_threads::types::FocusState)) the
+    /// executing one **for one paint only**. Returns the previous executing id,
+    /// which the caller passes to
     /// [`restore_drilled_runtime_after_render`](Self::restore_drilled_runtime_after_render)
-    /// right after `terminal.draw` to swap it back.
+    /// right after `terminal.draw`.
     ///
-    /// This is the G3 "pixel-identical panel view" mechanism and the one place
-    /// focus-as-view and execution are deliberately decoupled (Model 2): the
-    /// drilled thread's panels are painted by swapping its parked
-    /// [`ThreadRuntime`](cp_base::state::runtime::bundle::ThreadRuntime) into
-    /// `state`, then restored before the next tick — so `resident_thread_id`,
-    /// `focused_thread_id`, and all scheduling are untouched and a human glance
-    /// never parks a mid-stream thread.
+    /// Focus-as-view and execution stay decoupled (Model 2): no data moves,
+    /// `focused_thread_id` and scheduling are untouched, and a human glance never
+    /// parks a mid-stream thread.
     ///
-    /// Returns `None` (no swap) when there is no drill-in, when the drilled
-    /// thread **is** the resident (already flat in `state` — painted directly),
-    /// or when it has no registry entry (cold/unknown). At N=1 the field is
-    /// always `None`, so this is a no-op and rendering is byte-identical.
-    pub(super) fn take_drilled_runtime_for_render(
-        &mut self,
-    ) -> Option<(String, cp_fleet::Entry<cp_base::state::runtime::bundle::ThreadRuntime>)> {
+    /// `None` when there is no drill-in, the drilled thread is already executing,
+    /// or it has no stored runtime (cold/unknown).
+    pub(super) fn take_drilled_runtime_for_render(&mut self) -> Option<DrillRestore> {
         let drilled = cp_mod_threads::types::FocusState::get(&self.state).drilled_thread_id.clone()?;
-        // Resident (== focused) thread is already flat in `state`; nothing to swap.
-        if self.state.resident_thread_id.as_deref() == Some(drilled.as_str()) {
+        if self.state.executing_thread_id() == Some(drilled.as_str()) || !self.state.thread_store.contains(&drilled) {
             return None;
         }
-        let mut entry = self.fleet.remove(&drilled)?;
-        entry.runtime.swap_with(&mut self.state); // drilled thread resident for the paint; focused parks into entry
-        Some((drilled, entry))
+        let prev = self.state.executing_thread_id().map(str::to_owned);
+        self.state.thread_store.set_executing(Some(drilled));
+        Some(DrillRestore { prev })
     }
 
     /// Undo [`take_drilled_runtime_for_render`](Self::take_drilled_runtime_for_render):
-    /// swap the focused thread back into `state` and re-park the drilled thread's
-    /// runtime in the registry, leaving `state` + fleet exactly as before the paint.
-    pub(super) fn restore_drilled_runtime_after_render(
-        &mut self,
-        drilled: Option<(String, cp_fleet::Entry<cp_base::state::runtime::bundle::ThreadRuntime>)>,
-    ) {
-        if let Some((id, mut entry)) = drilled {
-            entry.runtime.swap_with(&mut self.state); // restore focused resident; drilled parks back
-            self.fleet.insert(id, entry);
+    /// restore the executing thread that was current before the paint.
+    pub(super) fn restore_drilled_runtime_after_render(&mut self, restore: Option<DrillRestore>) {
+        if let Some(r) = restore {
+            self.state.thread_store.set_executing(r.prev);
         }
     }
 
@@ -218,7 +204,7 @@ impl App {
     /// (focused-only since this dispatcher subsumed its background fallback), so
     /// the two nudge paths never overlap on the same thread.
     ///
-    /// For each candidate it swaps the thread in (via
+    /// For each candidate it runs against that thread (via
     /// [`deliver_to_thread`](Self::deliver_to_thread)) and, **only if** that
     /// thread is idle (not streaming) and its inbox holds no unprocessed
     /// notification, drops a single `Custom`/`threads` notification bound to it.
@@ -226,13 +212,13 @@ impl App {
     /// already-nudged is skipped, and [`SpineState::create_notification`] itself
     /// dedups on `(kind, source)`, so re-running every tick never piles up.
     ///
-    /// At N=1 the only `MyTurn` thread is the focused resident (excluded), so the
+    /// At N=1 the only `MyTurn` thread is the focused one (excluded), so the
     /// candidate set is empty and this is a no-op — byte-identical to
     /// single-thread.
     pub(super) fn dispatch_background_my_turn(&mut self) {
         let focused = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
         // Snapshot (id, name) of eligible background threads before touching the
-        // per-thread state (the swap below borrows `state`).
+        // per-thread state (delivery below borrows `state`).
         let candidates: Vec<(String, String)> = ThreadsState::get(&self.state)
             .threads
             .iter()
@@ -250,7 +236,7 @@ impl App {
             self.deliver_to_thread(Some(&tid), move |state| {
                 // Skip if this thread is already working or already nudged — the
                 // two guards that keep the dispatcher from flooding an inbox.
-                if state.stream.phase.is_streaming() {
+                if state.thread().stream.phase.is_streaming() {
                     return;
                 }
                 if cp_mod_spine::types::SpineState::has_unprocessed_notifications(state) {
@@ -277,41 +263,34 @@ impl App {
     /// Delivery is distinct from advancement: it mutates a thread's own context
     /// (its spine inbox, its conversation) without stepping its pipeline. This is
     /// how a watcher fire, a coucou, or a bridge message for a *background*
-    /// thread lands in *that* thread's inbox rather than the resident's.
+    /// thread lands in *that* thread's inbox rather than the focused one's.
     ///
-    /// Routing (the resident = the focused thread, whose context lives flat in
-    /// [`State`](cp_base::state::runtime::State)):
-    /// - `None`, or a `thread_id` equal to the focused resident → run `f` on
-    ///   `state` directly (today's single-thread path);
-    /// - any other (background) owner → swap its parked
-    ///   [`ThreadRuntime`](cp_base::state::runtime::bundle::ThreadRuntime) into
-    ///   `state` (O(1), no clone), run `f`, then swap the focused thread back —
-    ///   so `state` and the registry are left exactly as found.
+    /// Routing:
+    /// - `None`, or the focused thread's id → run `f` on `state` as is;
+    /// - any other stored thread → make it executing, run `f`, restore the
+    ///   previous executing thread (an id change, nothing is copied).
     ///
-    /// At N=1 the only working thread is the focused resident, so every target
-    /// is `None` or the resident and the swap branch is never taken: behaviour
-    /// is byte-identical to single-thread. A `thread_id` that is neither focused
-    /// nor in the registry (unknown/archived) is logged and delivered to the
-    /// resident as a last-resort safety net (never reached at N=1).
+    /// A `thread_id` with no stored runtime (unknown/archived) is logged and
+    /// delivered to the executing thread as a last-resort safety net.
     pub(crate) fn deliver_to_thread<F>(&mut self, thread_id: Option<&str>, f: F)
     where
         F: FnOnce(&mut cp_base::state::runtime::State),
     {
         let focused = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
         let Some(tid) = thread_id.filter(|t| focused.as_deref() != Some(*t)) else {
-            // None, or targets the focused resident → deliver directly.
+            // None, or targets the focused thread → deliver directly.
             f(&mut self.state);
             return;
         };
-        // Background owner: swap its parked runtime in, deliver, swap back.
-        let Some(mut entry) = self.fleet.remove(tid) else {
-            log::warn!("deliver_to_thread: unknown/unparked thread {tid}; delivering to resident");
+        if !self.state.thread_store.contains(tid) {
+            log::warn!("deliver_to_thread: unknown thread {tid}; delivering to the executing thread");
             f(&mut self.state);
             return;
-        };
-        entry.runtime.swap_with(&mut self.state); // thread `tid` resident; focused parks into entry
+        }
+        // Background owner: execute it for the duration of `f`, then restore.
+        let prev = self.state.executing_thread_id().map(str::to_owned);
+        self.state.thread_store.set_executing(Some(tid.to_owned()));
         f(&mut self.state);
-        entry.runtime.swap_with(&mut self.state); // restore focused; thread `tid` parks back
-        self.fleet.insert(tid.to_owned(), entry);
+        self.state.thread_store.set_executing(prev);
     }
 }

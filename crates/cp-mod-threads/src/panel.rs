@@ -22,7 +22,7 @@ impl Panel for ThreadsPanel {
 
         // Per-thread view: render THIS thread's roster + own conversation, not the
         // shared `panel_content` baked for the focused thread.
-        let content = crate::tools::resident_panel_content(state);
+        let content = crate::tools::executing_panel_content(state);
 
         if content.is_empty() {
             return vec![Block::Line(vec![S::muted("  (empty \u{2014} AI must call Read to populate)".into())])];
@@ -40,12 +40,12 @@ impl Panel for ThreadsPanel {
     }
 
     fn refresh(&self, state: &mut State) {
-        // Per-thread view: content is rebuilt for the resident thread (roster +
+        // Per-thread view: content is rebuilt for the executing thread (roster +
         // its own conversation), not copied from the shared `panel_content`.
-        let content = crate::tools::resident_panel_content(state);
+        let content = crate::tools::executing_panel_content(state);
         let token_count = estimate_tokens(&content);
 
-        for ctx in &mut state.context {
+        for ctx in &mut state.thread_mut().context {
             if ctx.context_type.as_str() == Kind::THREADS {
                 ctx.token_count = token_count;
                 let _changed = cp_base::panels::update_if_changed(ctx, &content);
@@ -60,8 +60,9 @@ impl Panel for ThreadsPanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         // Per-thread view: return THIS thread's content, not the shared string.
-        let content = crate::tools::resident_panel_content(state);
+        let content = crate::tools::executing_panel_content(state);
         let (id, last_refresh_ms) = state
+            .thread()
             .context
             .iter()
             .find(|c| c.context_type.as_str() == Kind::THREADS)

@@ -80,7 +80,7 @@ fn handle_key_event(key: &KeyEvent, state: &State) -> Option<Action> {
     }
 
     // Escape stops streaming.
-    if key.code == KeyCode::Esc && state.stream.phase.is_streaming() {
+    if key.code == KeyCode::Esc && state.thread().stream.phase.is_streaming() {
         return Some(Action::StopStreaming);
     }
 
@@ -234,7 +234,7 @@ fn handle_index_overlay_key(key: &KeyEvent, state: &State) -> Option<Action> {
 /// Threads-nav while the human has drilled into a thread's panel view (G3):
 /// only Left/Esc exits back to the list; every other key is swallowed
 /// (`Action::None`) so a glance stays read-only. Events run against the focused
-/// resident (the drill-in swap is render-scoped only), so letting keys through
+/// thread (the drill-in switch is render-scoped only), so letting keys through
 /// would scroll/mutate the *focused* thread while the screen shows the drilled
 /// one — Model 2 forbids a glance disturbing the agent's thread. Written as an
 /// `if`/`else` on `matches!` rather than a `match` with a `_` arm to avoid the
@@ -324,7 +324,7 @@ fn handle_context_pattern_submit(key: &KeyEvent, state: &State) -> Option<Action
         || key.modifiers.contains(KeyModifiers::ALT);
     let is_submit = (key.code == KeyCode::Enter && !has_modifier) || key.code == KeyCode::Char(' ');
     if is_submit
-        && let Some(id) = parse_context_pattern(&state.composer.text)
+        && let Some(id) = parse_context_pattern(&state.thread().composer.text)
         && find_context_by_id(state, &id).is_some()
     {
         return Some(Action::InputSubmit);
@@ -336,10 +336,11 @@ fn handle_context_pattern_submit(key: &KeyEvent, state: &State) -> Option<Action
 /// always owns input routing. `None` when no panel consumes the key.
 fn handle_panel_key(key: &KeyEvent, state: &State) -> Option<Action> {
     if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
-        let ctx = state.context.iter().find(|c| c.context_type.as_str() == crate::state::Kind::CONVERSATION)?;
+        let ctx =
+            state.thread().context.iter().find(|c| c.context_type.as_str() == crate::state::Kind::CONVERSATION)?;
         return get_panel(&ctx.context_type).handle_key(key, state);
     }
-    let ctx = state.context.get(state.selected_context)?;
+    let ctx = state.thread().context.get(state.thread().selected_context)?;
     get_panel(&ctx.context_type).handle_key(key, state)
 }
 

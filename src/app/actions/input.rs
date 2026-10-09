@@ -11,16 +11,16 @@ use crate::modules::all_modules;
 
 /// Handle `InputSubmit` action — context switching, message creation, stream start.
 pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
-    if state.composer.text.is_empty() {
+    if state.thread().composer.text.is_empty() {
         return ActionResult::Nothing;
     }
 
     // Context switching is always allowed, even during streaming
-    if let Some(id) = parse_context_pattern(&state.composer.text)
+    if let Some(id) = parse_context_pattern(&state.thread().composer.text)
         && let Some(index) = find_context_by_id(state, &id)
     {
         super::switch_to_panel(state, index);
-        state.composer.reset();
+        state.thread_mut().composer.reset();
         return ActionResult::Nothing;
     }
 
@@ -30,18 +30,18 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
     }
 
     let commands = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Command);
-    let commanded = replace_commands(&state.composer.text, &commands);
+    let commanded = replace_commands(&state.thread().composer.text, &commands);
     // Expand paste sentinels: replace \x00{idx}\x00 with actual paste buffer content
-    let content = expand_paste_sentinels(&commanded, &state.paste_buffers);
-    state.composer.reset();
-    state.paste_buffers.clear();
-    state.paste_buffer_labels.clear();
+    let content = expand_paste_sentinels(&commanded, &state.thread().paste_buffers);
+    state.thread_mut().composer.reset();
+    state.thread_mut().paste_buffers.clear();
+    state.thread_mut().paste_buffer_labels.clear();
     let user_token_estimate = estimate_tokens(&content);
 
     // Assign user display ID and UID
-    let user_id = format!("U{}", state.next_user_id);
+    let user_id = format!("U{}", state.thread().next_user_id);
     let user_global_uid = format!("UID_{}_U", state.global_next_uid);
-    state.next_user_id = state.next_user_id.saturating_add(1);
+    state.thread_mut().next_user_id = state.thread_mut().next_user_id.saturating_add(1);
     state.global_next_uid = state.global_next_uid.saturating_add(1);
 
     // Capture info for notification before moving user_msg
@@ -59,7 +59,7 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
     save_message(&user_msg);
 
     // Add user message tokens to Conversation context and update timestamp
-    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
+    if let Some(ctx) = state.thread_mut().context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
         ctx.token_count = ctx.token_count.saturating_add(user_token_estimate);
         ctx.last_refresh_ms = crate::app::panels::now_ms();
     }
@@ -75,13 +75,13 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
 
     // During streaming: insert BEFORE the streaming assistant message
     // The notification will be picked up when the current stream ends
-    if state.stream.phase.is_streaming() {
-        let insert_pos = state.messages.len().saturating_sub(1);
-        state.messages.insert(insert_pos, user_msg);
+    if state.thread().stream.phase.is_streaming() {
+        let insert_pos = state.thread().messages.len().saturating_sub(1);
+        state.thread_mut().messages.insert(insert_pos, user_msg);
         return ActionResult::Save;
     }
 
-    state.messages.push(user_msg);
+    state.thread_mut().messages.push(user_msg);
 
     reset_stream_and_tick_counters(state);
 
@@ -93,33 +93,33 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
 /// Zero the per-stream and per-tick token + USD telemetry counters ahead of a
 /// new user-initiated stream, so the next stream's stats start from a clean base.
 fn reset_stream_and_tick_counters(state: &mut State) {
-    state.stream_cache_hit_tokens = 0;
-    state.stream_cache_miss_tokens = 0;
-    state.stream_output_tokens = 0;
-    state.stream_uncached_input_tokens = 0;
-    state.stream_cost_hit_usd = 0.0f64;
-    state.stream_cost_miss_usd = 0.0f64;
-    state.stream_cost_output_usd = 0.0f64;
-    state.tick_cache_hit_tokens = 0;
-    state.tick_cache_miss_tokens = 0;
-    state.tick_output_tokens = 0;
-    state.tick_uncached_input_tokens = 0;
-    state.tick_cost_hit_usd = 0.0f64;
-    state.tick_cost_miss_usd = 0.0f64;
-    state.tick_cost_output_usd = 0.0f64;
+    state.thread_mut().stream_cache_hit_tokens = 0;
+    state.thread_mut().stream_cache_miss_tokens = 0;
+    state.thread_mut().stream_output_tokens = 0;
+    state.thread_mut().stream_uncached_input_tokens = 0;
+    state.thread_mut().stream_cost_hit_usd = 0.0f64;
+    state.thread_mut().stream_cost_miss_usd = 0.0f64;
+    state.thread_mut().stream_cost_output_usd = 0.0f64;
+    state.thread_mut().tick_cache_hit_tokens = 0;
+    state.thread_mut().tick_cache_miss_tokens = 0;
+    state.thread_mut().tick_output_tokens = 0;
+    state.thread_mut().tick_uncached_input_tokens = 0;
+    state.thread_mut().tick_cost_hit_usd = 0.0f64;
+    state.thread_mut().tick_cost_miss_usd = 0.0f64;
+    state.thread_mut().tick_cost_output_usd = 0.0f64;
 }
 
 /// Handle `ClearConversation` action.
 pub(crate) fn handle_clear_conversation(state: &mut State) -> ActionResult {
-    for msg in &state.messages {
+    for msg in &state.thread().messages {
         // Delete by UID if available, otherwise by id
         let file_id = msg.uid.as_ref().unwrap_or(&msg.id);
         delete_message(file_id);
     }
-    state.messages.clear();
-    state.composer.reset();
+    state.thread_mut().messages.clear();
+    state.thread_mut().composer.reset();
     // Reset token count for Conversation context and update timestamp
-    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
+    if let Some(ctx) = state.thread_mut().context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
         ctx.token_count = 0;
         ctx.last_refresh_ms = crate::app::panels::now_ms();
     }
@@ -168,13 +168,13 @@ fn handle_thread_input_submit(state: &mut State) -> ActionResult {
     };
 
     let commands = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Command);
-    let commanded = replace_commands(&state.composer.text, &commands);
-    let content = expand_paste_sentinels(&commanded, &state.paste_buffers);
+    let commanded = replace_commands(&state.thread().composer.text, &commands);
+    let content = expand_paste_sentinels(&commanded, &state.thread().paste_buffers);
 
     // Clear input state
-    state.composer.reset();
-    state.paste_buffers.clear();
-    state.paste_buffer_labels.clear();
+    state.thread_mut().composer.reset();
+    state.thread_mut().paste_buffers.clear();
+    state.thread_mut().paste_buffer_labels.clear();
 
     // Record to persistent prompt history
     record_prompt_history(&content);
@@ -212,10 +212,10 @@ fn handle_thread_create(state: &mut State) -> ActionResult {
     /// Maximum thread name length to prevent state bloat.
     const MAX_THREAD_NAME_LEN: usize = 200;
 
-    let raw_name = state.composer.text.trim().to_owned();
+    let raw_name = state.thread().composer.text.trim().to_owned();
 
     // Clear input regardless of outcome
-    state.composer.reset();
+    state.thread_mut().composer.reset();
 
     if raw_name.is_empty() {
         return ActionResult::Nothing;

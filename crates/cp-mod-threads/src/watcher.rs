@@ -72,7 +72,7 @@ impl Watcher for IdleMyTurnDetector {
 
     fn check(&self, state: &State) -> Option<WatcherResult> {
         // Only fire when the agent is NOT streaming (i.e. idle).
-        if state.stream.phase.is_streaming() {
+        if state.thread().stream.phase.is_streaming() {
             return None;
         }
 
@@ -116,7 +116,7 @@ impl Watcher for IdleMyTurnDetector {
         // filter, errors). Only fire for normal completion ("end_turn") or
         // mid-tool-use ("tool_use") — those indicate the agent voluntarily
         // stopped and should be nudged.
-        if !is_normal_stop(state.last_stop_reason.as_deref()) {
+        if !is_normal_stop(state.thread().last_stop_reason.as_deref()) {
             return Some(WatcherResult {
                 description: format!(
                     "Thread \"{}\" ({}) is MY_TURN but the last LLM turn ended \
@@ -125,7 +125,7 @@ impl Watcher for IdleMyTurnDetector {
                      and suggest changing the model to continue.",
                     thread.name,
                     thread.id,
-                    state.last_stop_reason.as_deref().unwrap_or("unknown/error"),
+                    state.thread().last_stop_reason.as_deref().unwrap_or("unknown/error"),
                 ),
                 panel_id: None,
                 tool_use_id: None,

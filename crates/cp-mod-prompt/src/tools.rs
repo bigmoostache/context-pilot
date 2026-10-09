@@ -71,6 +71,7 @@ fn behaviour_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     if let Err(e) = fs::write(&path, &file_content) {
         return ToolResult::new(tool.id.clone(), format!("Failed to write file: {e}"), true);
     }
+    storage::invalidate_index();
 
     state.touch_panel(Kind::LIBRARY);
     if prompt_type == PromptType::Agent {
@@ -158,7 +159,7 @@ fn skill_load(tool: &ToolUse, state: &mut State) -> ToolResult {
     elem.cached_content = Some(content);
     elem.last_refresh_ms = cp_base::panels::now_ms();
 
-    state.context.push(elem);
+    state.thread_mut().context.push(elem);
     PromptState::get_mut(state).loaded_skill_ids.push(id.to_owned());
 
     state.touch_panel(Kind::LIBRARY);

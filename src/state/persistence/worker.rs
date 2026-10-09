@@ -35,7 +35,7 @@ pub(crate) fn load_worker(worker_id: &str) -> Option<WorkerState> {
 /// focused.
 ///
 /// This is the read half of the write half
-/// ([`resident_worker_id`](super::save::resident_worker_id)), and the two must
+/// ([`executing_worker_id`](super::save::executing_worker_id)), and the two must
 /// agree or a reload silently restores the wrong conversation. `focus_file` is
 /// the pointer that save records in the shared config, because the focused
 /// thread's own id lives *inside* the file this function chooses — boot cannot

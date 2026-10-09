@@ -168,8 +168,7 @@ pub struct StatusBar {
     pub skills: Vec<SkillCard>,
     /// Git branch + changes summary.
     pub git: Option<GitChanges>,
-    /// Auto-continuation indicator.
-    pub auto_continue: Option<AutoContinue>,
+
     /// Active reverie sub-agent cards (multiple concurrent possible).
     pub reveries: Vec<ReverieCard>,
     /// Queue status.
@@ -231,15 +230,6 @@ pub struct GitChanges {
     pub additions: u32,
     /// Lines removed.
     pub deletions: u32,
-}
-
-/// Auto-continuation status.
-#[derive(Debug, Clone, Copy, Serialize)]
-pub struct AutoContinue {
-    /// Current continuation count.
-    pub count: u32,
-    /// Maximum allowed continuations (if set).
-    pub max: Option<u32>,
 }
 
 /// Active reverie sub-agent indicator.

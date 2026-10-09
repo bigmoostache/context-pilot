@@ -31,7 +31,7 @@ pub(crate) fn build_conversation(state: &State) -> Conversation {
 /// Build history sections from `ConversationHistory` context elements.
 fn build_history_sections(state: &State) -> Vec<HistorySection> {
     let mut history_panels: Vec<_> =
-        state.context.iter().filter(|c| c.context_type.as_str() == Kind::CONVERSATION_HISTORY).collect();
+        state.thread().context.iter().filter(|c| c.context_type.as_str() == Kind::CONVERSATION_HISTORY).collect();
     history_panels.sort_by_key(|c| c.last_refresh_ms);
 
     history_panels
@@ -52,9 +52,10 @@ fn build_history_sections(state: &State) -> Vec<HistorySection> {
 
 /// Build the visible message list from current conversation.
 fn build_messages(state: &State) -> Vec<IrMessage> {
-    let last_msg_id = state.messages.last().map(|m| m.id.clone());
+    let last_msg_id = state.thread().messages.last().map(|m| m.id.clone());
 
     state
+        .thread()
         .messages
         .iter()
         .filter(|msg| {
@@ -63,7 +64,7 @@ fn build_messages(state: &State) -> Vec<IrMessage> {
             }
             // Skip empty text messages (unless currently streaming)
             let is_last = last_msg_id.as_ref() == Some(&msg.id);
-            let is_streaming = state.stream.phase.is_streaming() && is_last && msg.role == "assistant";
+            let is_streaming = state.thread().stream.phase.is_streaming() && is_last && msg.role == "assistant";
             if msg.msg_type == MsgKind::TextMessage && msg.content.trim().is_empty() && !is_streaming {
                 return false;
             }
@@ -131,6 +132,7 @@ fn tool_result_to_ir(tr: &ToolResultRecord) -> ToolResultPreview {
 /// Build streaming tool previews from state.
 fn build_streaming_tools(state: &State) -> Vec<StreamingTool> {
     state
+        .thread()
         .streaming_tool
         .as_ref()
         .map(|st| vec![StreamingTool { tool_name: st.name.clone(), partial_input: st.input_so_far.clone() }])
@@ -142,10 +144,10 @@ fn build_streaming_tools(state: &State) -> Vec<StreamingTool> {
 /// Build the input area from state.
 fn build_input(state: &State) -> InputArea {
     InputArea {
-        text: state.composer.text.clone(),
-        cursor: state.composer.cursor,
+        text: state.thread().composer.text.clone(),
+        cursor: state.thread().composer.cursor,
         placeholder: "Type a message\u{2026}".into(),
-        focused: !state.stream.phase.is_streaming(),
+        focused: !state.thread().stream.phase.is_streaming(),
     }
 }
 
@@ -321,11 +323,33 @@ fn build_perf_budget_bars(frame_avg_ms: f64) -> Vec<PerfBudgetBar> {
     vec![build_bar("60fps", FRAME_BUDGET_60FPS), build_bar("30fps", FRAME_BUDGET_30FPS)]
 }
 
+/// Minimum age before the F12 overlay rebuilds its perf snapshot.
+const SNAPSHOT_TTL: std::time::Duration =
+    std::time::Duration::from_millis(crate::infra::constants::PERF_OVERLAY_FRAME_MS);
+
+/// A perf snapshot plus the instant it was taken.
+type TimedSnapshot = (std::time::Instant, std::sync::Arc<crate::ui::perf::PerfSnapshot>);
+
+/// Last perf snapshot and when it was taken. `PERF.snapshot()` locks and sorts
+/// every op (~730); rebuilding it every frame made `ir_overlays` spike to 55 ms.
+static SNAPSHOT_CACHE: std::sync::Mutex<Option<TimedSnapshot>> = std::sync::Mutex::new(None);
+
+/// The perf snapshot, rebuilt at most every [`SNAPSHOT_TTL`] (30 per second).
+fn cached_snapshot() -> std::sync::Arc<crate::ui::perf::PerfSnapshot> {
+    let mut slot = SNAPSHOT_CACHE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some(entry) = slot.as_ref()
+        && entry.0.elapsed() < SNAPSHOT_TTL
+    {
+        return std::sync::Arc::clone(&entry.1);
+    }
+    let snap = std::sync::Arc::new(crate::ui::perf::PERF.snapshot());
+    *slot = Some((std::time::Instant::now(), std::sync::Arc::clone(&snap)));
+    snap
+}
+
 /// Build the perf overlay IR data from the perf metrics snapshot.
 fn build_perf_overlay(state: &State) -> PerfOverlay {
-    use crate::ui::perf::PERF;
-
-    let snapshot = PERF.snapshot();
+    let snapshot = cached_snapshot();
 
     let fps = if snapshot.frame_avg_ms > 0.0f64 { float_math::div(1_000.0f64, snapshot.frame_avg_ms) } else { 0.0f64 };
 
@@ -347,7 +371,7 @@ fn build_perf_overlay(state: &State) -> PerfOverlay {
         share_names: LOOP_SHARE_STEPS.iter().map(|name| name.trim_start_matches("loop.").to_owned()).collect(),
         share_bars: build_perf_share_bars(&snapshot),
         loop_iterations: loop_iterations(&snapshot),
-        sparkline: snapshot.frame_times_ms,
+        sparkline: snapshot.frame_times_ms.clone(),
         operations,
     }
 }

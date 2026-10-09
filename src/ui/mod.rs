@@ -31,8 +31,8 @@ use crate::ui::perf::PERF;
 /// view mode is active **and** the human has not drilled into a specific thread.
 ///
 /// When drilled (G3), the renderer paints the drilled thread's full panel body
-/// (sidebar + panels) instead of the list — `render_frame` has already swapped
-/// that thread's runtime into `state`, so the normal body renders it
+/// (sidebar + panels) instead of the list — `render_frame` has already made
+/// that thread the executing one, so the normal body renders it
 /// pixel-identically to its own main view.
 fn showing_threads_list(state: &State) -> bool {
     state.view_mode == cp_base::state::data::config::ViewMode::Threads
@@ -115,6 +115,7 @@ fn render_modal_overlays(frame: &mut Frame<'_>, area: Rect, overlays: &[cp_rende
             | cp_render::conversation::Overlay::SearchIndex(_) => None,
         })
     }) {
+        let _g = crate::profile!("perf_overlay_draw");
         perf::render_perf_overlay_from_ir(frame, area, perf_overlay);
     }
 
@@ -195,8 +196,9 @@ fn render_main_content(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
 fn render_content_panel(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
     let _guard = crate::profile!("ui::render_panel");
     let context_type = state
+        .thread()
         .context
-        .get(state.selected_context)
+        .get(state.thread().selected_context)
         .map_or_else(|| Kind::new(Kind::CONVERSATION), |c| c.context_type.clone());
 
     // ConversationPanel renders from its multi-level cached content builder,

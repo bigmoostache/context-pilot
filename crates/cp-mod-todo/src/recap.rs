@@ -63,7 +63,7 @@ pub fn strip_superseded(state: &mut State) -> Vec<usize> {
     // final one is the live tree and stays untouched.
     let mut budget = total.saturating_sub(1);
     let mut touched: Vec<usize> = Vec::new();
-    for (idx, msg) in state.messages.iter_mut().enumerate() {
+    for (idx, msg) in state.thread_mut().messages.iter_mut().enumerate() {
         if budget == 0 {
             break;
         }
@@ -95,6 +95,7 @@ fn collapse_message(msg: &mut cp_base::state::data::message::Message, budget: &m
 /// Total number of well-formed recap blocks across the live conversation.
 fn count_recaps(state: &State) -> usize {
     state
+        .thread()
         .messages
         .iter()
         .flat_map(|m| m.tool_results.iter())
@@ -196,15 +197,15 @@ mod tests {
 
     /// The content of every tool-result record, in conversation order.
     fn contents(state: &State) -> Vec<String> {
-        state.messages.iter().flat_map(|m| m.tool_results.iter()).map(|r| r.content.clone()).collect()
+        state.thread().messages.iter().flat_map(|m| m.tool_results.iter()).map(|r| r.content.clone()).collect()
     }
 
     #[test]
     fn strips_every_recap_but_the_last_across_messages() {
         let mut state = State::default();
-        state.messages.push(result_msg("R1", format!("Todo applied.\n\n{}", block("first"))));
-        state.messages.push(result_msg("R2", format!("Todo applied.\n\n{}", block("second"))));
-        state.messages.push(result_msg("R3", format!("Todo applied.\n\n{}", block("third"))));
+        state.thread_mut().messages.push(result_msg("R1", format!("Todo applied.\n\n{}", block("first"))));
+        state.thread_mut().messages.push(result_msg("R2", format!("Todo applied.\n\n{}", block("second"))));
+        state.thread_mut().messages.push(result_msg("R3", format!("Todo applied.\n\n{}", block("third"))));
 
         // The two rewritten messages are reported so the caller can persist them;
         // the message holding the live recap is NOT.
@@ -223,7 +224,7 @@ mod tests {
     fn single_recap_is_left_alone() {
         let mut state = State::default();
         let only = format!("Todo applied.\n\n{}", block("only"));
-        state.messages.push(result_msg("R1", only.clone()));
+        state.thread_mut().messages.push(result_msg("R1", only.clone()));
 
         assert!(strip_superseded(&mut state).is_empty());
         assert_eq!(contents(&state).first(), Some(&only));
@@ -232,8 +233,8 @@ mod tests {
     #[test]
     fn repeated_passes_are_idempotent() {
         let mut state = State::default();
-        state.messages.push(result_msg("R1", block("first")));
-        state.messages.push(result_msg("R2", block("second")));
+        state.thread_mut().messages.push(result_msg("R1", block("first")));
+        state.thread_mut().messages.push(result_msg("R2", block("second")));
 
         assert_eq!(strip_superseded(&mut state), vec![0]);
         let after_first = contents(&state);
@@ -248,12 +249,12 @@ mod tests {
         let mut state = State::default();
         let full = block("first");
         let record = ToolResultRecord::new("u1".to_owned(), full.clone(), false).display(Some(full.clone()));
-        state.messages.push(Message::new_tool_result("R1".to_owned(), None, vec![record]));
-        state.messages.push(result_msg("R2", block("second")));
+        state.thread_mut().messages.push(Message::new_tool_result("R1".to_owned(), None, vec![record]));
+        state.thread_mut().messages.push(result_msg("R2", block("second")));
 
         assert_eq!(strip_superseded(&mut state), vec![0]);
 
-        let first = state.messages.first().and_then(|m| m.tool_results.first()).expect("first result record");
+        let first = state.thread().messages.first().and_then(|m| m.tool_results.first()).expect("first result record");
         assert_eq!(first.content, STUB, "content collapses (the model's view)");
         assert_eq!(first.display.as_deref(), Some(full.as_str()), "display keeps the human's scrollback");
     }

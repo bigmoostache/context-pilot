@@ -88,6 +88,10 @@ impl Module for TreeModule {
         state.set_ext(cp_base::state::autocomplete::Suggestions::new());
     }
 
+    fn save_revision(&self, state: &State) -> Option<u64> {
+        Some(TreeState::get(state).revision)
+    }
+
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         let ts = TreeState::get(state);
         json!({

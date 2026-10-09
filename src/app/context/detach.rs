@@ -115,7 +115,7 @@ fn chunk_name(first_ts: u64, last_ts: u64, active_seen: usize) -> String {
 /// Create the `ConversationHistory` panel for `messages[..boundary]` and push it
 /// onto `state.context`. Returns `false` when the chunk content is empty (bail).
 fn push_history_chunk(state: &mut crate::state::State, boundary: usize) -> bool {
-    let chunk_msgs = state.messages.get(..boundary).unwrap_or_default();
+    let chunk_msgs = state.thread().messages.get(..boundary).unwrap_or_default();
     let first_timestamp = chunk_msgs
         .iter()
         .find(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached)
@@ -134,7 +134,7 @@ fn push_history_chunk(state: &mut crate::state::State, boundary: usize) -> bool 
         .cloned()
         .collect();
 
-    let content = format_chunk_content(&state.messages, 0, boundary);
+    let content = format_chunk_content(&state.thread().messages, 0, boundary);
     if content.is_empty() {
         return false;
     }
@@ -151,7 +151,7 @@ fn push_history_chunk(state: &mut crate::state::State, boundary: usize) -> bool 
     let panel_global_uid = format!("UID_{}_P", state.global_next_uid);
     state.global_next_uid = state.global_next_uid.saturating_add(1);
 
-    state.context.push(
+    state.thread_mut().context.push(
         cp_base::state::context::make_default_entry(&panel_id, Kind::new(Kind::CONVERSATION_HISTORY), &name, false)
             .with_uid(panel_global_uid)
             .with_token_count(token_count)
@@ -163,7 +163,7 @@ fn push_history_chunk(state: &mut crate::state::State, boundary: usize) -> bool 
     );
 
     // Remove detached messages from state and disk.
-    let removed: Vec<Message> = state.messages.drain(..boundary).collect();
+    let removed: Vec<Message> = state.thread_mut().messages.drain(..boundary).collect();
     for msg in &removed {
         if let Some(uid) = msg.uid.as_ref() {
             crate::state::persistence::delete_message(uid);
@@ -184,22 +184,22 @@ pub(super) fn detach_conversation_chunks(state: &mut crate::state::State) {
     let _fg = cp_base::flame!("detach");
     // Don't detach while context is frozen — detaching would invalidate
     // the cached prompt prefix that freezing is trying to preserve.
-    if cp_mod_queue::types::QueueState::get(state).active || state.tempo {
+    if cp_mod_queue::types::QueueState::get(state).active || state.thread().tempo {
         return;
     }
 
     loop {
         // Quick check: bail if we can't satisfy both chunk minimums while
         // leaving enough in the tip.
-        if active_count(&state.messages) < DETACH_CHUNK_MIN_MESSAGES.saturating_add(DETACH_KEEP_MIN_MESSAGES) {
+        if active_count(&state.thread().messages) < DETACH_CHUNK_MIN_MESSAGES.saturating_add(DETACH_KEEP_MIN_MESSAGES) {
             break;
         }
-        if active_tokens(&state.messages) < DETACH_CHUNK_MIN_TOKENS.saturating_add(DETACH_KEEP_MIN_TOKENS) {
+        if active_tokens(&state.thread().messages) < DETACH_CHUNK_MIN_TOKENS.saturating_add(DETACH_KEEP_MIN_TOKENS) {
             break;
         }
 
-        let Some(boundary) = find_detach_boundary(&state.messages) else { break };
-        if !tip_keeps_enough(&state.messages, boundary) {
+        let Some(boundary) = find_detach_boundary(&state.thread().messages) else { break };
+        if !tip_keeps_enough(&state.thread().messages, boundary) {
             break;
         }
         if !push_history_chunk(state, boundary) {

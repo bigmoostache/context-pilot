@@ -16,7 +16,7 @@ const HEADER: &str = "datetime\tbefore_three_last_tools\tbefore_culprit_type\tbe
 /// Consumes `state.tick_telemetry` (takes it, leaving `None`). No-op if telemetry
 /// was never populated (e.g. reverie ticks that skip `prepare_stream_context`).
 pub(crate) fn append_cost_tsv(state: &mut State) {
-    let Some(tel) = state.tick_telemetry.take() else {
+    let Some(tel) = state.thread_mut().tick_telemetry.take() else {
         return;
     };
 
@@ -30,7 +30,7 @@ pub(crate) fn append_cost_tsv(state: &mut State) {
     // the API-reported total input (hit + miss), preserving their proportions.
     let proxy_total =
         tel.tokens_before_culprit.saturating_add(tel.tokens_culprit).saturating_add(tel.tokens_after_culprit);
-    let api_total = state.tick_cache_hit_tokens.saturating_add(state.tick_cache_miss_tokens);
+    let api_total = state.thread().tick_cache_hit_tokens.saturating_add(state.thread().tick_cache_miss_tokens);
 
     let (before, culp_tok, after) = if proxy_total > 0 && api_total > 0 {
         let before = tel.tokens_before_culprit.saturating_mul(api_total).checked_div(proxy_total).unwrap_or(0);
@@ -50,12 +50,12 @@ pub(crate) fn append_cost_tsv(state: &mut State) {
         tempo = tel.tempo_is_active,
         break_kind = tel.break_kind.as_tsv(),
         max_freezes = tel.culprit_max_freezes,
-        hit_tok = state.tick_cache_hit_tokens,
-        hit_cost = state.tick_cost_hit_usd,
-        miss_tok = state.tick_cache_miss_tokens,
-        miss_cost = state.tick_cost_miss_usd,
-        out_tok = state.tick_output_tokens,
-        out_cost = state.tick_cost_output_usd,
+        hit_tok = state.thread().tick_cache_hit_tokens,
+        hit_cost = state.thread().tick_cost_hit_usd,
+        miss_tok = state.thread().tick_cache_miss_tokens,
+        miss_cost = state.thread().tick_cost_miss_usd,
+        out_tok = state.thread().tick_output_tokens,
+        out_cost = state.thread().tick_cost_output_usd,
     );
 
     // Best-effort append — telemetry must never block the pipeline
@@ -86,23 +86,33 @@ fn append_line(line: &str) -> std::io::Result<()> {
 /// `pending_done` would otherwise be lost (only the final tick goes through
 /// `finalize_stream → handle_stream_done → apply_token_usage`).
 pub(crate) fn accumulate_pending_token_stats(app: &mut App) {
-    if let Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, _, _, _, _, _)) = app.pending_done {
+    if let Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, _, _, _, _, _)) =
+        app.stream_rt_mut().pending_done
+    {
         // Fold uncached input into cache_miss for correct cost accounting
         let effective_miss = cache_miss_tokens.saturating_add(input_tokens);
 
         // --- Token accumulation ---
-        app.state.tick_cache_hit_tokens = cache_hit_tokens;
-        app.state.tick_cache_miss_tokens = effective_miss;
-        app.state.tick_output_tokens = output_tokens;
-        app.state.tick_uncached_input_tokens = input_tokens;
-        app.state.stream_cache_hit_tokens = app.state.stream_cache_hit_tokens.saturating_add(cache_hit_tokens);
-        app.state.stream_cache_miss_tokens = app.state.stream_cache_miss_tokens.saturating_add(effective_miss);
-        app.state.stream_output_tokens = app.state.stream_output_tokens.saturating_add(output_tokens);
-        app.state.stream_uncached_input_tokens = app.state.stream_uncached_input_tokens.saturating_add(input_tokens);
-        app.state.cache_hit_tokens = app.state.cache_hit_tokens.saturating_add(cache_hit_tokens);
-        app.state.cache_miss_tokens = app.state.cache_miss_tokens.saturating_add(effective_miss);
-        app.state.total_output_tokens = app.state.total_output_tokens.saturating_add(output_tokens);
-        app.state.uncached_input_tokens = app.state.uncached_input_tokens.saturating_add(input_tokens);
+        app.state.thread_mut().tick_cache_hit_tokens = cache_hit_tokens;
+        app.state.thread_mut().tick_cache_miss_tokens = effective_miss;
+        app.state.thread_mut().tick_output_tokens = output_tokens;
+        app.state.thread_mut().tick_uncached_input_tokens = input_tokens;
+        app.state.thread_mut().stream_cache_hit_tokens =
+            app.state.thread_mut().stream_cache_hit_tokens.saturating_add(cache_hit_tokens);
+        app.state.thread_mut().stream_cache_miss_tokens =
+            app.state.thread_mut().stream_cache_miss_tokens.saturating_add(effective_miss);
+        app.state.thread_mut().stream_output_tokens =
+            app.state.thread_mut().stream_output_tokens.saturating_add(output_tokens);
+        app.state.thread_mut().stream_uncached_input_tokens =
+            app.state.thread_mut().stream_uncached_input_tokens.saturating_add(input_tokens);
+        app.state.thread_mut().cache_hit_tokens =
+            app.state.thread_mut().cache_hit_tokens.saturating_add(cache_hit_tokens);
+        app.state.thread_mut().cache_miss_tokens =
+            app.state.thread_mut().cache_miss_tokens.saturating_add(effective_miss);
+        app.state.thread_mut().total_output_tokens =
+            app.state.thread_mut().total_output_tokens.saturating_add(output_tokens);
+        app.state.thread_mut().uncached_input_tokens =
+            app.state.thread_mut().uncached_input_tokens.saturating_add(input_tokens);
 
         // --- Cost accumulation (frozen at consumption-time pricing) ---
         let cost_hit = token_cost(cache_hit_tokens, app.state.cache_hit_price_per_mtok());
@@ -112,15 +122,20 @@ pub(crate) fn accumulate_pending_token_stats(app: &mut App) {
         );
         let cost_output = token_cost(output_tokens, app.state.output_price_per_mtok());
 
-        app.state.tick_cost_hit_usd = cost_hit;
-        app.state.tick_cost_miss_usd = cost_miss;
-        app.state.tick_cost_output_usd = cost_output;
-        app.state.stream_cost_hit_usd = cp_base::cast::float_math::add(app.state.stream_cost_hit_usd, cost_hit);
-        app.state.stream_cost_miss_usd = cp_base::cast::float_math::add(app.state.stream_cost_miss_usd, cost_miss);
-        app.state.stream_cost_output_usd =
-            cp_base::cast::float_math::add(app.state.stream_cost_output_usd, cost_output);
-        app.state.cost_hit_usd = cp_base::cast::float_math::add(app.state.cost_hit_usd, cost_hit);
-        app.state.cost_miss_usd = cp_base::cast::float_math::add(app.state.cost_miss_usd, cost_miss);
-        app.state.cost_output_usd = cp_base::cast::float_math::add(app.state.cost_output_usd, cost_output);
+        app.state.thread_mut().tick_cost_hit_usd = cost_hit;
+        app.state.thread_mut().tick_cost_miss_usd = cost_miss;
+        app.state.thread_mut().tick_cost_output_usd = cost_output;
+        app.state.thread_mut().stream_cost_hit_usd =
+            cp_base::cast::float_math::add(app.state.thread_mut().stream_cost_hit_usd, cost_hit);
+        app.state.thread_mut().stream_cost_miss_usd =
+            cp_base::cast::float_math::add(app.state.thread_mut().stream_cost_miss_usd, cost_miss);
+        app.state.thread_mut().stream_cost_output_usd =
+            cp_base::cast::float_math::add(app.state.thread_mut().stream_cost_output_usd, cost_output);
+        app.state.thread_mut().cost_hit_usd =
+            cp_base::cast::float_math::add(app.state.thread_mut().cost_hit_usd, cost_hit);
+        app.state.thread_mut().cost_miss_usd =
+            cp_base::cast::float_math::add(app.state.thread_mut().cost_miss_usd, cost_miss);
+        app.state.thread_mut().cost_output_usd =
+            cp_base::cast::float_math::add(app.state.thread_mut().cost_output_usd, cost_output);
     }
 }

@@ -20,9 +20,9 @@ fn save_tool_call_message(app: &mut App, tool: &cp_base::tools::ToolUse) {
     // Leave an auto tool-activity trace in the focused thread (no-op unfocused).
     crate::app::run::threads::maybe_append_tool_activity(&mut app.state, tool);
 
-    let tool_id = format!("T{}", app.state.next_tool_id);
+    let tool_id = format!("T{}", app.state.thread().next_tool_id);
     let tool_global_uid = format!("UID_{}_T", app.state.global_next_uid);
-    app.state.next_tool_id = app.state.next_tool_id.saturating_add(1);
+    app.state.thread_mut().next_tool_id = app.state.thread_mut().next_tool_id.saturating_add(1);
     app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
 
     let tool_msg = Message::new_tool_call(
@@ -31,7 +31,7 @@ fn save_tool_call_message(app: &mut App, tool: &cp_base::tools::ToolUse) {
         vec![ToolUseRecord::new(tool.id.clone(), tool.name.clone(), tool.input.clone())],
     );
     app.save_message_async(&tool_msg);
-    app.state.messages.push(tool_msg);
+    app.state.thread_mut().messages.push(tool_msg);
 }
 
 /// Execute one tool through the pre-flight → queue-intercept → execute pipeline.
@@ -222,7 +222,7 @@ fn apply_tempo_break(app: &mut App, tool_results: &[crate::infra::tools::ToolRes
             continue; // Deferred — watcher decides later
         }
         if !tr.preserves_tempo {
-            app.state.tempo = false;
+            app.state.thread_mut().tempo = false;
             break; // One break is enough
         }
     }
@@ -245,26 +245,26 @@ struct ToolBatch {
 /// of [`handle_tool_execution`]. Returns `None` when the pipeline should not run
 /// this tick (not streaming, nothing pending, waiting on panels/sleep).
 fn collect_tool_results(app: &mut App) -> Option<ToolBatch> {
-    if !app.state.stream.phase.is_streaming()
-        || app.pending_done.is_none()
-        || !app.typewriter.pending_chars.is_empty()
-        || app.pending_tools.is_empty()
+    if !app.state.thread().stream.phase.is_streaming()
+        || app.stream_rt_mut().pending_done.is_none()
+        || !app.stream_rt_mut().typewriter.pending_chars.is_empty()
+        || app.stream_rt_mut().pending_tools.is_empty()
     {
         return None;
     }
     // Don't process new tools while waiting for panels or deferred sleep
-    if app.state.waiting_for_panels || app.deferred_tool_sleeping {
+    if app.state.thread().waiting_for_panels || app.stream_rt_mut().deferred_tool_sleeping {
         return None;
     }
 
     app.state.flags.ui.dirty = true;
-    app.state.stream.phase.transition(StreamPhase::ExecutingTools);
-    let mut tools = std::mem::take(&mut app.pending_tools);
+    app.state.thread_mut().stream.phase.transition(StreamPhase::ExecutingTools);
+    let mut tools = std::mem::take(&mut app.stream_rt_mut().pending_tools);
     let mut tool_results: Vec<crate::infra::tools::ToolResult> = Vec::new();
     let mut flushed_tools: Vec<super::queue_flush::FlushedTool> = Vec::new();
 
     // Finalize current assistant message
-    if let Some(msg) = app.state.messages.last_mut()
+    if let Some(msg) = app.state.thread_mut().messages.last_mut()
         && msg.role == "assistant"
     {
         // Clean any LLM ID prefixes before saving
@@ -358,7 +358,7 @@ pub(crate) fn handle_tool_execution(app: &mut App) {
     // Check if any tool triggered a console blocking wait
     let has_console_wait = tool_results.iter().any(|r| r.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL));
     if has_console_wait {
-        app.pending_console_wait_tool_results = Some(tool_results);
+        app.stream_rt_mut().pending_console_wait_tool_results = Some(tool_results);
         app.save_state_async();
         crate::infra::profiler::log_tool_time(&tool_names, pipeline_start.elapsed());
         return;
@@ -390,9 +390,9 @@ struct ToolCycle<'cycle> {
 fn finalize_tool_cycle(app: &mut App, cycle: &ToolCycle<'_>) {
     let ToolCycle { tools, tool_results, tool_names, pipeline_start } = *cycle;
     // Create tool result message
-    let result_id = format!("R{}", app.state.next_result_id);
+    let result_id = format!("R{}", app.state.thread().next_result_id);
     let result_global_uid = format!("UID_{}_R", app.state.global_next_uid);
-    app.state.next_result_id = app.state.next_result_id.saturating_add(1);
+    app.state.thread_mut().next_result_id = app.state.thread_mut().next_result_id.saturating_add(1);
     app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
     let tool_result_records: Vec<ToolResultRecord> = tool_results
         .iter()
@@ -409,7 +409,7 @@ fn finalize_tool_cycle(app: &mut App, cycle: &ToolCycle<'_>) {
         let _g = crate::profile!("save_result_msg");
         app.save_message_async(&result_msg);
     }
-    app.state.messages.push(result_msg);
+    app.state.thread_mut().messages.push(result_msg);
 
     // Check if reload was requested — main loop will handle flag + exit
     if app.state.flags.lifecycle.reload_pending {
@@ -418,7 +418,7 @@ fn finalize_tool_cycle(app: &mut App, cycle: &ToolCycle<'_>) {
     }
 
     push_new_assistant_message(app);
-    app.state.streaming_estimated_tokens = 0;
+    app.state.thread_mut().streaming_estimated_tokens = 0;
 
     // Accumulate token stats from intermediate stream before discarding pending_done
     super::cost_log::accumulate_pending_token_stats(app);
@@ -435,11 +435,11 @@ fn finalize_tool_cycle(app: &mut App, cycle: &ToolCycle<'_>) {
     }
 
     // Check if any tool requested a sleep (e.g., console send_keys delay)
-    if app.state.tool_sleep_until_ms > 0 {
+    if app.state.thread().tool_sleep_until_ms > 0 {
         // Defer everything — main loop will check timer and continue
-        app.deferred_tool_sleeping = true;
-        app.deferred_tool_sleep_until_ms = app.state.tool_sleep_until_ms;
-        app.state.tool_sleep_until_ms = 0; // Clear from state (App owns it now)
+        app.stream_rt_mut().deferred_tool_sleeping = true;
+        app.stream_rt_mut().deferred_tool_sleep_until_ms = app.state.thread().tool_sleep_until_ms;
+        app.state.thread_mut().tool_sleep_until_ms = 0; // Clear from state (App owns it now)
         crate::infra::profiler::log_tool_time(tool_names, pipeline_start.elapsed());
         return;
     }
@@ -453,8 +453,8 @@ fn finalize_tool_cycle(app: &mut App, cycle: &ToolCycle<'_>) {
     // Check if we need to wait for panels before continuing stream
     if has_dirty_file_panels(&app.state) {
         // Set waiting flag — main loop will check and continue streaming when ready
-        app.state.waiting_for_panels = true;
-        app.wait_started_ms = now_ms();
+        app.state.thread_mut().waiting_for_panels = true;
+        app.stream_rt_mut().wait_started_ms = now_ms();
     } else {
         let _g = crate::profile!("continue_streaming");
         // No dirty panels — continue streaming immediately
@@ -465,12 +465,12 @@ fn finalize_tool_cycle(app: &mut App, cycle: &ToolCycle<'_>) {
 
 /// Push a fresh empty assistant message to receive the next stream turn.
 fn push_new_assistant_message(app: &mut App) {
-    let assistant_id = format!("A{}", app.state.next_assistant_id);
+    let assistant_id = format!("A{}", app.state.thread().next_assistant_id);
     let assistant_global_uid = format!("UID_{}_A", app.state.global_next_uid);
-    app.state.next_assistant_id = app.state.next_assistant_id.saturating_add(1);
+    app.state.thread_mut().next_assistant_id = app.state.thread_mut().next_assistant_id.saturating_add(1);
     app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
     let new_assistant_msg = Message::new_assistant(assistant_id, assistant_global_uid);
-    app.state.messages.push(new_assistant_msg);
+    app.state.thread_mut().messages.push(new_assistant_msg);
 }
 
 // Post-execution checks (panels, sleep, question form) live in tool_checks.rs

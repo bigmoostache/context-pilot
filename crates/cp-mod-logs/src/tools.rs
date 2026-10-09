@@ -74,11 +74,11 @@ pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut Sta
         };
 
         // Find the panel and verify it's a ConversationHistory
-        let Some(panel_idx) = state.context.iter().position(|c| c.id == panel_id) else {
+        let Some(panel_idx) = state.thread().context.iter().position(|c| c.id == panel_id) else {
             output_parts.push(format!("Panel '{panel_id}' not found"));
             continue;
         };
-        let Some(panel) = state.context.get(panel_idx) else {
+        let Some(panel) = state.thread().context.get(panel_idx) else {
             output_parts.push(format!("Panel index {panel_idx} out of bounds"));
             continue;
         };
@@ -116,8 +116,9 @@ pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut Sta
         }
 
         // Close the conversation history panel
-        let panel_name = state.context.iter().find(|c| c.id == panel_id).map(|c| c.name.clone()).unwrap_or_default();
-        state.context.retain(|c| c.id != panel_id);
+        let panel_name =
+            state.thread().context.iter().find(|c| c.id == panel_id).map(|c| c.name.clone()).unwrap_or_default();
+        state.thread_mut().context.retain(|c| c.id != panel_id);
         output_parts.push(format!("Closed {panel_id} ({panel_name}) — {log_count} log(s)"));
     }
 

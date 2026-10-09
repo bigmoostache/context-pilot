@@ -22,9 +22,9 @@ pub(crate) fn editing_new_thread_title(state: &State) -> bool {
 }
 
 /// The textarea keystrokes currently edit: the new-thread title on that row,
-/// otherwise the resident composer.
+/// otherwise the executing thread's composer.
 pub(crate) fn active_textarea(state: &State) -> &cp_base::state::runtime::textarea::TextArea {
-    if editing_new_thread_title(state) { &FocusState::get(state).new_thread_title } else { &state.composer }
+    if editing_new_thread_title(state) { &FocusState::get(state).new_thread_title } else { &state.thread().composer }
 }
 
 /// Actions that read or mutate the focused textarea (and so must target the
@@ -67,10 +67,10 @@ pub(super) fn with_new_thread_title(
     run: fn(&mut State, Action) -> ActionResult,
 ) -> ActionResult {
     let parked_title = core::mem::take(&mut FocusState::get_mut(state).new_thread_title);
-    let draft = core::mem::replace(&mut state.composer, parked_title);
+    let draft = core::mem::replace(&mut state.thread_mut().composer, parked_title);
     let edit = if let Action::PasteText(text) = action { Action::InsertText(text) } else { action };
     let result = run(state, edit);
-    let edited_title = core::mem::replace(&mut state.composer, draft);
+    let edited_title = core::mem::replace(&mut state.thread_mut().composer, draft);
     FocusState::get_mut(state).new_thread_title = edited_title;
     result
 }
@@ -142,11 +142,11 @@ fn dispatch_archive(state: &mut State, action: &Action) -> ActionResult {
 }
 
 /// User-focus the thread the list cursor now sits on, so the footer (built from
-/// the resident thread) tracks the selection as the human arrows up/down —
+/// the executing thread) tracks the selection as the human arrows up/down —
 /// without entering the panel-centric view (that is [`drill_in`]'s job on
 /// Right). This sets only [`FocusState::focused_thread_id`]; the loop's
-/// `relocate_resident_on_focus_change` makes that thread resident on the next
-/// tick (an O(1) bundle swap), and the status bar then reflects its state.
+/// `follow_focus` makes that thread executing on the next
+/// tick (an id change), and the status bar then reflects its state.
 ///
 /// This is TUI user-focus, not worker/exec focus — the background scheduler is
 /// unaffected. No-op on the virtual "+ New Thread" entry or an empty selection
@@ -177,8 +177,8 @@ fn select_next(state: &mut State) -> ActionResult {
         focus.selected_thread_idx.saturating_add(1)
     };
     focus_selected_thread(state);
-    state.scroll_offset = 0.0;
-    state.stream.user_scrolled = false;
+    state.thread_mut().scroll_offset = 0.0;
+    state.thread_mut().stream.user_scrolled = false;
     state.flags.ui.dirty = true;
     ActionResult::Nothing
 }
@@ -195,8 +195,8 @@ fn select_prev(state: &mut State) -> ActionResult {
         focus.selected_thread_idx.saturating_sub(1)
     };
     focus_selected_thread(state);
-    state.scroll_offset = 0.0;
-    state.stream.user_scrolled = false;
+    state.thread_mut().scroll_offset = 0.0;
+    state.thread_mut().stream.user_scrolled = false;
     state.flags.ui.dirty = true;
     ActionResult::Nothing
 }
@@ -205,7 +205,7 @@ fn select_prev(state: &mut State) -> ActionResult {
 fn create_start(state: &mut State) -> ActionResult {
     let focus = FocusState::get_mut(state);
     focus.creating_thread = true;
-    state.composer.reset();
+    state.thread_mut().composer.reset();
     state.flags.ui.dirty = true;
     ActionResult::Nothing
 }
@@ -214,7 +214,7 @@ fn create_start(state: &mut State) -> ActionResult {
 fn create_cancel(state: &mut State) -> ActionResult {
     let focus = FocusState::get_mut(state);
     focus.creating_thread = false;
-    state.composer.reset();
+    state.thread_mut().composer.reset();
     state.flags.ui.dirty = true;
     ActionResult::Nothing
 }
@@ -227,7 +227,7 @@ fn create_cancel(state: &mut State) -> ActionResult {
 /// [`FocusState::focused_thread_id`] to the selected thread and flips
 /// [`view_mode`](cp_base::state::runtime::State::view_mode) to
 /// [`Normal`](cp_base::state::data::config::ViewMode::Normal). The loop's
-/// `relocate_resident_on_focus_change` then makes that thread resident on the
+/// `follow_focus` then makes that thread executing on the
 /// next tick, so the ordinary Normal render path paints *its* panels /
 /// conversation — the same TUI as before, just for a different focused thread
 /// (the previously-focused thread keeps running as a background thread).
@@ -255,9 +255,9 @@ fn drill_in(state: &mut State) -> ActionResult {
     // without this the newly-focused thread keeps its own stale
     // `selected_context` (e.g. a File/Todo panel), and Char keys route to that
     // panel and silently no-op ("can't type" bug). Conversation is index 0.
-    state.selected_context = 0;
-    state.scroll_offset = 0.0;
-    state.stream.user_scrolled = false;
+    state.thread_mut().selected_context = 0;
+    state.thread_mut().scroll_offset = 0.0;
+    state.thread_mut().stream.user_scrolled = false;
     state.flags.ui.dirty = true;
     // Persist the focus switch (focused thread is keyed into its own state file).
     ActionResult::Save
@@ -266,8 +266,8 @@ fn drill_in(state: &mut State) -> ActionResult {
 /// Exit the drilled panel view back to the thread list (G3 — Left/Esc).
 fn drill_out(state: &mut State) -> ActionResult {
     FocusState::get_mut(state).drilled_thread_id = None;
-    state.scroll_offset = 0.0;
-    state.stream.user_scrolled = false;
+    state.thread_mut().scroll_offset = 0.0;
+    state.thread_mut().stream.user_scrolled = false;
     state.flags.ui.dirty = true;
     ActionResult::Nothing
 }
@@ -297,8 +297,8 @@ fn toggle_archived_view(state: &mut State) -> ActionResult {
     focus.viewing_archived = !focus.viewing_archived;
     focus.selected_thread_idx = 0;
     focus.confirming_archive = false;
-    state.scroll_offset = 0.0;
-    state.stream.user_scrolled = false;
+    state.thread_mut().scroll_offset = 0.0;
+    state.thread_mut().stream.user_scrolled = false;
     state.flags.ui.dirty = true;
     ActionResult::Nothing
 }

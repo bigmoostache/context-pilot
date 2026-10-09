@@ -269,7 +269,7 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
         .get("thread_id")
         .and_then(|v| v.as_str())
         .map(String::from)
-        .or_else(|| state.resident_thread_id.clone());
+        .or_else(|| state.executing_thread_id().map(str::to_owned));
 
     let (interval_ms, recurrence_label) = match parse_recurrence(tool) {
         Ok(r) => r,

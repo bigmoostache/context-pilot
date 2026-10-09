@@ -5,12 +5,11 @@
 
 use cp_render::Semantic;
 use cp_render::frame::{
-    AgentCard, AutoContinue, Badge, GitChanges, QueueCard, ReverieCard, SkillCard, StatusBar, StopReason, ThinkCard,
+    AgentCard, Badge, GitChanges, QueueCard, ReverieCard, SkillCard, StatusBar, StopReason, ThinkCard,
 };
 use ratatui::prelude::{Frame, Line, Rect, Span, Style};
 use ratatui::widgets::Paragraph;
 
-use crate::infra::config::normalize_icon;
 use crate::state::State;
 use crate::ui::{helpers::spinner, theme};
 use cp_base::cast::Safe as _;
@@ -92,18 +91,8 @@ fn push_git(spans: &mut Vec<Span<'static>>, status: &StatusBar, base: Style) {
     }
 }
 
-/// Auto-continue + reverie + queue + think cards.
+/// Reverie + queue + think cards.
 fn push_activity_cards(spans: &mut Vec<Span<'static>>, status: &StatusBar, spin: &str, base: Style) {
-    if let Some(ac) = status.auto_continue.as_ref() {
-        let (icon, bg_color) = if ac.max.is_some() {
-            (normalize_icon("\u{1f501}"), theme::warning())
-        } else {
-            (normalize_icon("\u{1f504}"), theme::text_muted())
-        };
-        let label = if ac.max.is_some() { "Auto-continue" } else { "No Auto-continue" };
-        push_card(spans, format!(" {icon}{label} "), Style::default().fg(theme::bg_base()).bg(bg_color).bold(), base);
-    }
-
     for rev in &status.reveries {
         push_card(
             spans,
@@ -209,20 +198,21 @@ pub(crate) fn build_status_bar(state: &State) -> StatusBar {
         agent: build_agent(state),
         skills: build_skills(state),
         git: build_git(state),
-        auto_continue: Some(build_auto_continue(state)),
+
         reveries: build_reveries(state),
         queue: build_queue(state),
         think: build_think(state),
         stop_reason: build_stop_reason(state),
-        retry_count: state.api_retry_count.to_u8(),
+        retry_count: state.thread().api_retry_count.to_u8(),
         max_retries: crate::infra::constants::MAX_API_RETRIES.to_u8(),
         loading_count: state
+            .thread()
             .context
             .iter()
             .filter(|c| c.cached_content.is_none() && c.context_type.needs_cache())
             .count()
             .to_u16(),
-        input_char_count: state.composer.text.chars().count().to_u32(),
+        input_char_count: state.thread().composer.text.chars().count().to_u32(),
     }
 }
 
@@ -237,17 +227,17 @@ fn build_badge(state: &State) -> Badge {
             .is_some_and(|reg| reg.active_watchers().iter().any(|w| w.fire_at_ms().is_some()))
             || state
                 .get_ext::<cp_mod_spine::schedule::CoucouRegistry>()
-                .is_some_and(|reg| reg.has_pending_for(state.resident_thread_id.as_deref()))
+                .is_some_and(|reg| reg.has_pending_for(state.executing_thread_id()))
     };
 
-    if state.guard_rail_blocked.is_some() {
+    if state.thread().guard_rail_blocked.is_some() {
         Badge {
-            label: format!("BLOCKED: {}", state.guard_rail_blocked.as_deref().unwrap_or("?")),
+            label: format!("BLOCKED: {}", state.thread().guard_rail_blocked.as_deref().unwrap_or("?")),
             semantic: Semantic::Error,
         }
-    } else if state.stream.phase.is_streaming() && !state.stream.phase.is_tooling() {
+    } else if state.thread().stream.phase.is_streaming() && !state.thread().stream.phase.is_tooling() {
         Badge { label: "STREAMING".into(), semantic: Semantic::Success }
-    } else if state.stream.phase.is_streaming() && state.stream.phase.is_tooling() {
+    } else if state.thread().stream.phase.is_streaming() && state.thread().stream.phase.is_tooling() {
         Badge { label: "TOOLING".into(), semantic: Semantic::Info }
     } else if has_timed_watcher {
         Badge { label: "WAITING".into(), semantic: Semantic::AccentDim }
@@ -302,17 +292,6 @@ fn build_git(state: &State) -> Option<GitChanges> {
     })
 }
 
-// ── Auto-continue ────────────────────────────────────────────────────
-
-/// Build auto-continuation indicator.
-fn build_auto_continue(state: &State) -> AutoContinue {
-    let cfg = &cp_mod_spine::types::SpineState::get(state).config;
-    AutoContinue {
-        count: cfg.auto_continuation_count.to_u32(),
-        max: cfg.max_auto_retries.map(cp_base::cast::Safe::to_u32),
-    }
-}
-
 // ── Reverie ──────────────────────────────────────────────────────────
 
 /// Build active reverie cards (all concurrent reveries, sorted by key).
@@ -347,10 +326,10 @@ fn build_queue(state: &State) -> Option<QueueCard> {
 
 /// Build stop reason indicator from last completion.
 fn build_stop_reason(state: &State) -> Option<StopReason> {
-    if state.stream.phase.is_streaming() {
+    if state.thread().stream.phase.is_streaming() {
         return None;
     }
-    let reason = state.last_stop_reason.as_ref()?;
+    let reason = state.thread().last_stop_reason.as_ref()?;
     let semantic = if reason == "max_tokens" { Semantic::Error } else { Semantic::Muted };
     Some(StopReason { reason: reason.clone(), semantic })
 }

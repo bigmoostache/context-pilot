@@ -41,7 +41,7 @@ impl Module for ConversationModule {
     /// Per-thread (thread-centric model): a thread's conversation is its own.
     /// This module holds no `TypeMap` data — the conversation lives in
     /// `state.messages` + the `CONVERSATION` panel `Entry`, both carried by the
-    /// resident-thread swap (`ThreadRuntime`). The flag is per-thread for intent;
+    /// thread's runtime (`ThreadRuntime`). The flag is per-thread for intent;
     /// it is inert at N=1 (save/load are no-ops), so routing anything it ever
     /// gains lands in the per-thread map.
     fn is_global(&self) -> bool {
@@ -108,12 +108,12 @@ impl Module for ConversationModule {
     /// background thread was rehydrated, which reset tot to the stream value.
     fn save_worker_data(&self, state: &State) -> serde_json::Value {
         serde_json::json!({
-            "cache_hit_tokens": state.cache_hit_tokens,
-            "cache_miss_tokens": state.cache_miss_tokens,
-            "total_output_tokens": state.total_output_tokens,
-            "cost_hit_usd": state.cost_hit_usd,
-            "cost_miss_usd": state.cost_miss_usd,
-            "cost_output_usd": state.cost_output_usd,
+            "cache_hit_tokens": state.thread().cache_hit_tokens,
+            "cache_miss_tokens": state.thread().cache_miss_tokens,
+            "total_output_tokens": state.thread().total_output_tokens,
+            "cost_hit_usd": state.thread().cost_hit_usd,
+            "cost_miss_usd": state.thread().cost_miss_usd,
+            "cost_output_usd": state.thread().cost_output_usd,
         })
     }
 

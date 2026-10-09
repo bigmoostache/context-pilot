@@ -177,7 +177,7 @@ pub enum Action {
     ThreadToggleArchivedView,
     /// Drill into the selected thread's full panel view (G3, read-only
     /// inspection — Right arrow). Sets `FocusState::drilled_thread_id`; the
-    /// renderer swaps that thread's parked runtime in for the paint without
+    /// renderer makes that thread executing for the paint without
     /// moving execution (Model 2).
     ThreadDrillIn,
     /// Exit the drilled panel view back to the thread list (G3 — Left/Esc).

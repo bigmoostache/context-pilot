@@ -76,6 +76,10 @@ impl Module for TodoModule {
         state.set_ext(TodoState::new());
     }
 
+    fn save_revision(&self, state: &State) -> Option<u64> {
+        Some(TodoState::get(state).revision)
+    }
+
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         let ts = TodoState::get(state);
         json!({

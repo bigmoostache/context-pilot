@@ -24,6 +24,7 @@ pub(crate) fn estimate_message_tokens(m: &crate::state::Message) -> usize {
 pub(crate) fn refresh_conversation_context(state: &mut State) {
     // Calculate total tokens from all active messages (content + tool uses + tool results)
     let total_tokens: usize = state
+        .thread()
         .messages
         .iter()
         .filter(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached)
@@ -31,7 +32,7 @@ pub(crate) fn refresh_conversation_context(state: &mut State) {
         .sum();
 
     // Update the Conversation context element's token count
-    for ctx in &mut state.context {
+    for ctx in &mut state.thread_mut().context {
         if ctx.context_type.as_str() == Kind::CONVERSATION {
             ctx.token_count = total_tokens;
             break;

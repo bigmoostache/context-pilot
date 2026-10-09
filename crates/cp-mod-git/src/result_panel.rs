@@ -97,7 +97,11 @@ impl Panel for GitResultPanel {
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
         use cp_render::{Block, Semantic, Span as S};
 
-        let ctx_opt = state.context.get(state.selected_context).filter(|c| c.context_type.as_str() == Kind::GIT_RESULT);
+        let ctx_opt = state
+            .thread()
+            .context
+            .get(state.thread().selected_context)
+            .filter(|c| c.context_type.as_str() == Kind::GIT_RESULT);
 
         let Some(ctx) = ctx_opt else {
             return vec![Block::styled_text(" No git result panel".into(), Semantic::Muted)];
@@ -129,7 +133,7 @@ impl Panel for GitResultPanel {
             .collect()
     }
     fn title(&self, state: &State) -> String {
-        if let Some(ctx) = state.context.get(state.selected_context)
+        if let Some(ctx) = state.thread().context.get(state.thread().selected_context)
             && ctx.context_type.as_str() == Kind::GIT_RESULT
             && let Some(cmd) = ctx.get_meta_str("result_command")
         {
@@ -149,7 +153,7 @@ impl Panel for GitResultPanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let mut items = Vec::new();
-        for ctx in &state.context {
+        for ctx in &state.thread().context {
             if ctx.context_type.as_str() != Kind::GIT_RESULT {
                 continue;
             }

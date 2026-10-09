@@ -40,7 +40,7 @@ pub(crate) fn recompute_tree_folders(state: &mut State) {
     let _new = folders.insert(".".to_owned());
 
     // ── 1. Ancestor folders of every open file panel ────────────────────
-    for ctx in &state.context {
+    for ctx in &state.thread().context {
         if ctx.context_type.as_str() != Kind::FILE {
             continue;
         }
@@ -50,10 +50,10 @@ pub(crate) fn recompute_tree_folders(state: &mut State) {
     }
 
     // ── 2. Explicitly opened folders from the current conversation ──────
-    collect_opened_folders_from_messages(&state.messages, &mut folders);
+    collect_opened_folders_from_messages(&state.thread().messages, &mut folders);
 
     // ── 3. Explicitly opened folders from remaining history panels ──────
-    for ctx in &state.context {
+    for ctx in &state.thread().context {
         if ctx.context_type.as_str() != Kind::CONVERSATION_HISTORY {
             continue;
         }

@@ -276,7 +276,7 @@ pub fn update_if_changed(ctx: &mut Entry, content: &str) -> bool {
 /// Also sets `state.dirty = true` so the UI re-renders.
 /// Resets freeze protection so the next prompt assembly emits fresh content.
 pub fn mark_panels_dirty(state: &mut State, context_type: &str) {
-    for ctx in &mut state.context {
+    for ctx in &mut state.thread_mut().context {
         if ctx.context_type.as_str() == context_type {
             ctx.cache_deprecated = true;
             ctx.freeze_count = u8::MAX;

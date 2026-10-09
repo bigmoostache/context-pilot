@@ -44,6 +44,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Check if file is already open in context
     let already_open = state
+        .thread_mut()
         .context
         .iter_mut()
         .find(|c| c.context_type.as_str() == Kind::FILE && c.get_meta_str("file_path") == Some(path_str));
@@ -66,7 +67,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         elem.token_count = token_count;
         elem.cached_content = Some(contents.to_owned());
         elem.set_meta("file_path", &path_str.to_owned());
-        state.context.push(elem);
+        state.thread_mut().context.push(elem);
 
         // Invalidate tree cache
         cp_base::panels::mark_panels_dirty(state, Kind::TREE);

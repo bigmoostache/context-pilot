@@ -558,6 +558,7 @@ dependencies = [
  "cp-vault",
  "cp-wire",
  "crossterm",
+ "ignore",
  "log",
  "notify",
  "reqwest",
