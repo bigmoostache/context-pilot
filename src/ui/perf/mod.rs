@@ -16,7 +16,10 @@ mod sys_stat;
 /// Plain-text dump of the perf snapshot (Ctrl+R clipboard copy).
 pub(crate) mod text;
 pub(crate) use overlay::render_perf_overlay_from_ir;
-use snapshot::compute_op_snapshot;
+use snapshot::{compute_op_snapshot, ring_std_ms};
+
+/// Rows of the F12 op table; only these get the windowed std computed.
+const STD_DISPLAY_ROWS: usize = 10;
 use sys_stat::read_proc_stat;
 
 use crate::infra::constants::PERF_STATS_REFRESH_MS;
@@ -270,54 +273,43 @@ impl PerfMetrics {
 
     /// Get snapshot of metrics for display
     pub(crate) fn snapshot(&self) -> PerfSnapshot {
-        /// Type alias for raw operation data extracted under lock:
-        /// `(name, total_us, count, sum_sq_us, max_us, recent_samples)`.
-        type RawOp = (&'static str, u64, u64, u64, u64, Vec<u64>);
-
         // Extract frame data and release lock before processing ops
         let frame_samples: Vec<f64> = {
             let frame_times = self.frame_times.read().unwrap_or_else(std::sync::PoisonError::into_inner);
             frame_times.recent(40).iter().map(|&us| float_math::div_u64(us, 1_000.0f64)).collect()
         };
 
-        // Extract op data under lock, then process without holding it
-        let raw_ops: Vec<RawOp> = {
-            let ops = self.ops.read().unwrap_or_else(std::sync::PoisonError::into_inner);
+        // Atomics only for every op (~850): no per-op ring lock or copy.
+        let ops = self.ops.read().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut op_snapshots: Vec<OpSnapshot> = {
+            let _g = crate::profile!("perf_snap_ops");
             ops.iter()
                 .map(|(name, stats)| {
-                    let recent = stats
-                        .samples
-                        .read()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner)
-                        .recent(SAMPLE_RING_SIZE);
-                    (
-                        *name,
-                        stats.total_us.load(Ordering::Relaxed),
-                        stats.count.load(Ordering::Relaxed),
-                        stats.sum_sq_us.load(Ordering::Relaxed),
-                        stats.max_us.load(Ordering::Relaxed),
-                        recent,
-                    )
+                    compute_op_snapshot(&OpRaw {
+                        name,
+                        total_us: stats.total_us.load(Ordering::Relaxed),
+                        count: stats.count.load(Ordering::Relaxed),
+                        sum_sq_us: stats.sum_sq_us.load(Ordering::Relaxed),
+                        max_us: stats.max_us.load(Ordering::Relaxed),
+                    })
                 })
                 .collect()
         };
 
-        let mut op_snapshots: Vec<OpSnapshot> = raw_ops
-            .iter()
-            .map(|entry| {
-                compute_op_snapshot(&OpRaw {
-                    name: entry.0,
-                    total_us: entry.1,
-                    count: entry.2,
-                    sum_sq_us: entry.3,
-                    max_us: entry.4,
-                    recent: &entry.5,
-                })
-            })
-            .collect();
-
         // Sort by total time descending (hotspots first)
-        op_snapshots.sort_by(|a, b| b.total_ms.partial_cmp(&a.total_ms).unwrap_or(std::cmp::Ordering::Equal));
+        {
+            let _g = crate::profile!("perf_snap_sort");
+            op_snapshots.sort_by(|a, b| b.total_ms.partial_cmp(&a.total_ms).unwrap_or(std::cmp::Ordering::Equal));
+        }
+
+        // Windowed std only for the rows the F12 op table displays.
+        for op in op_snapshots.iter_mut().take(STD_DISPLAY_ROWS) {
+            if let Some(stats) = ops.get(op.name) {
+                let ring = stats.samples.read().unwrap_or_else(std::sync::PoisonError::into_inner);
+                op.std_ms = ring_std_ms(&ring.recent(SAMPLE_RING_SIZE));
+            }
+        }
+        drop(ops);
 
         let frame_avg_ms = if frame_samples.is_empty() { 0.0f64 } else { float_math::mean(&frame_samples) };
         let frame_max_ms = frame_samples.iter().copied().fold(0.0f64, f64::max);
@@ -399,7 +391,7 @@ impl PerfMetrics {
 
 /// One operation's raw lifetime counters plus its recent-sample ring, as
 /// extracted under lock (bundled to stay under the argument cap).
-struct OpRaw<'snap> {
+struct OpRaw {
     /// Operation name.
     name: &'static str,
     /// Cumulative time (µs).
@@ -410,8 +402,6 @@ struct OpRaw<'snap> {
     sum_sq_us: u64,
     /// Lifetime maximum sample (µs).
     max_us: u64,
-    /// Recent-sample ring contents (µs).
-    recent: &'snap [u64],
 }
 
 /// Snapshot of operation statistics for display.
