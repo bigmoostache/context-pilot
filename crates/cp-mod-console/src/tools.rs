@@ -95,11 +95,8 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         key
     };
 
-    // Spawn the process
-    let handle = match SessionHandle::spawn(session_key.clone(), command.clone(), cwd.clone()) {
-        Ok(h) => h,
-        Err(e) => return ToolResult::new(tool.id.clone(), e, true),
-    };
+    // Spawn the process off the main loop; a spawn error lands in the panel output.
+    let handle = SessionHandle::spawn_detached(session_key.clone(), command.clone(), cwd.clone());
 
     // Display name: description if provided, else truncated command
     let display_name = description.as_deref().unwrap_or_else(|| truncate_str(&command, 30));
@@ -367,10 +364,9 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
         key
     };
 
-    let handle = match SessionHandle::spawn(session_key.clone(), command.clone(), cwd.clone()) {
-        Ok(h) => h,
-        Err(e) => return ToolResult::new(tool.id.clone(), format!("Failed to execute: {e}"), true),
-    };
+    // A spawn error flips the status to Failed(-1) with the message in the
+    // output buffer, so the exit watcher below reports it.
+    let handle = SessionHandle::spawn_detached(session_key.clone(), command.clone(), cwd.clone());
 
     // Store the handle (needed for watcher to check status + read output)
     // NO panel created — the watcher decides inline vs. deferred panel at completion.
