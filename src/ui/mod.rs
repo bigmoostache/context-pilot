@@ -115,6 +115,7 @@ fn render_modal_overlays(frame: &mut Frame<'_>, area: Rect, overlays: &[cp_rende
             | cp_render::conversation::Overlay::SearchIndex(_) => None,
         })
     }) {
+        let _g = crate::profile!("perf_overlay_draw");
         perf::render_perf_overlay_from_ir(frame, area, perf_overlay);
     }
 

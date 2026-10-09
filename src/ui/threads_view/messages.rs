@@ -52,16 +52,26 @@ fn message_key(msg: &cp_mod_threads::types::ThreadMessage, viewport_width: u16) 
 
 /// Fingerprint of everything [`build_thread_message_lines`] reads: thread id,
 /// width, active theme (colors are resolved at line build time) and each
-/// message's role/auto flag/content. Hashing is ~µs; rebuilding is ~ms.
+/// message's role/auto flag/content. Runs every frame, so content is NOT hashed
+/// byte by byte (that was O(thread text), ~0.3 ms on long threads): each
+/// message contributes its content length + heap address, which any append or
+/// replacement changes. The last message (where streaming edits land) is
+/// hashed in full as a guard against same-length in-place edits.
 fn lines_fingerprint(thread: &cp_mod_threads::types::Thread, viewport_width: u16) -> u64 {
+    let _g = crate::profile!("tv_fingerprint");
     let mut h = std::collections::hash_map::DefaultHasher::new();
     thread.id.hash(&mut h);
     viewport_width.hash(&mut h);
     std::ptr::from_ref(cp_base::config::accessors::active_theme()).addr().hash(&mut h);
+    thread.messages.len().hash(&mut h);
     for msg in &thread.messages {
         msg.auto.hash(&mut h);
         matches!(msg.author, ThreadAuthor::Assistant).hash(&mut h);
-        msg.content.hash(&mut h);
+        msg.timestamp.hash(&mut h);
+        msg.content.as_ref().map(|c| (c.len(), c.as_ptr().addr())).hash(&mut h);
+    }
+    if let Some(last) = thread.messages.last() {
+        last.content.hash(&mut h);
     }
     h.finish()
 }
@@ -148,10 +158,12 @@ pub(super) fn render_message_area_with_input(frame: &mut Frame<'_>, state: &mut 
 
         lines = cached_thread_message_lines(thread, m_area.width);
         msg_area = m_area;
+        let _g = crate::profile!("tv_input");
         render_thread_input(frame, state, input_area);
     }
 
     // ── Phase 2: mutable borrow of `state` — scroll management + paint. ─────
+    let _g = crate::profile!("tv_paint");
     paint_thread_messages(frame, state, &lines, msg_area);
 }
 

@@ -55,7 +55,10 @@ pub(crate) fn render_threads_view(frame: &mut Frame<'_>, state: &mut State, area
         let (Some(&list_area), Some(&msg_area)) = (layout.first(), layout.get(1)) else {
             return;
         };
-        render_thread_list(frame, state, list_area);
+        {
+            let _g = crate::profile!("tv_list");
+            render_thread_list(frame, state, list_area);
+        }
         if on_virtual_new {
             render_new_thread_prompt(frame, state, msg_area);
         } else if let Some(&real_idx) = visible.get(selected_idx) {
