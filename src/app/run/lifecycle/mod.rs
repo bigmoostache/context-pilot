@@ -29,6 +29,8 @@ mod fleet_lifecycle;
 /// The `loop.input` phase: event poll/read/route, every step profile-guarded.
 mod input_phase;
 
+/// Spine step body (spine check + background threads), with per-call timers.
+mod spine_phase;
 /// Per-thread stream runtime (typewriter/pending-tools/pending-done/…), stored
 /// in each thread's module data so one thread's in-flight stream never bleeds
 /// into another's.
@@ -319,24 +321,7 @@ impl App {
         super::threads::handle_incoming_focused_messages(self, was_streaming);
         cp_mod_threads::types::FocusState::tick_read_dwell(&mut self.state, current_ms);
         super::tools::watchdog::mark(super::tools::watchdog::Step::Spine);
-        self.check_spine();
-        super::streaming::process_api_check_results(self);
-
-        // === BACKGROUND THREADS (Phase C) ===
-        // After the focused thread has been stepped above, advance every OTHER
-        // active thread one step by making it executing around the same
-        // advancement core (`step_one_thread`). No-op at N=1.
-        //
-        // C4 scheduling-decision layer: reconcile the registry against the thread
-        // roster and compute the promotion decision (never setting an active
-        // state, so advancement stays deferred to Phase D/F2).
-        self.reconcile_fleet_registry(current_ms);
-        self.dispatch_background_my_turn();
-        self.advance_background_threads();
-        // G2 display mirror: republish AFTER the step loop so it reflects
-        // post-step derivations. The focused thread's row is derived from
-        // `state` here — the loop is at rest, so `state` is that thread again.
-        self.publish_fleet_view_states();
+        self.run_spine_phase(current_ms);
 
         // === REVERIE (CONTEXT OPTIMIZER SUB-AGENT) ===
         super::tools::watchdog::mark(super::tools::watchdog::Step::Reverie);
