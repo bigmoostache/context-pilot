@@ -98,6 +98,13 @@ pub const MAX_API_RETRIES: u32 = 3;
 /// Directory for storing state and messages
 pub const STORE_DIR: &str = "./.context-pilot";
 
+/// The project root: the process cwd, fixed at launch and never changed
+/// (threads switch worktrees via [`State::workdir`](crate::state::State::workdir)).
+#[must_use]
+pub fn project_root() -> std::path::PathBuf {
+    std::env::current_dir().unwrap_or_else(|_err| std::path::PathBuf::from("."))
+}
+
 /// Messages subdirectory
 pub const MESSAGES_DIR: &str = "messages";
 

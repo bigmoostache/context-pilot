@@ -135,6 +135,22 @@ impl State {
         self.thread_store.current_mut()
     }
 
+    /// Directory the executing thread works in: its worktree, else the
+    /// project root. Every project-relative path and subprocess cwd goes
+    /// through here; `.context-pilot/` state stays anchored to the root.
+    #[must_use]
+    pub fn workdir(&self) -> std::path::PathBuf {
+        self.thread().workdir.clone().unwrap_or_else(crate::config::constants::project_root)
+    }
+
+    /// Resolve a tool-supplied path: absolute kept, relative joined onto
+    /// [`workdir`](Self::workdir).
+    #[must_use]
+    pub fn resolve_path(&self, path: &str) -> std::path::PathBuf {
+        let p = std::path::Path::new(path);
+        if p.is_absolute() { p.to_path_buf() } else { self.workdir().join(p) }
+    }
+
     // === Boot builder (cross-crate reconstruction from persisted state) ===
 
     /// Set the loaded context panels (builder).

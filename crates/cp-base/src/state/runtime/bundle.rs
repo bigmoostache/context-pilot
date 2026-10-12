@@ -155,6 +155,12 @@ pub struct ThreadRuntime {
     /// Full content cache (entire conversation output).
     pub full_content_cache: Option<FullCache>,
 
+    // === Working directory ===
+    /// Git worktree this thread works in (set by the `Worktree` tool).
+    /// `None` = the project root. Read through [`State::workdir`](super::State::workdir),
+    /// never the process cwd: concurrent threads share one process.
+    pub workdir: Option<std::path::PathBuf>,
+
     // === Per-thread module data ===
     /// This thread's per-thread module `TypeMap` (spine inbox, queue,
     /// console ownership, watcher registry, search/git views, …).
@@ -222,6 +228,7 @@ impl Default for ThreadRuntime {
             message_cache: HashMap::new(),
             input_cache: None,
             full_content_cache: None,
+            workdir: None,
             thread_module_data: HashMap::new(),
         }
     }

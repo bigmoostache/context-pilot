@@ -333,10 +333,18 @@ impl Module for GitModule {
     fn is_global(&self) -> bool {
         true
     }
-    fn save_worker_data(&self, _state: &State) -> serde_json::Value {
-        serde_json::Value::Null
+    fn save_worker_data(&self, state: &State) -> serde_json::Value {
+        state
+            .thread()
+            .workdir
+            .as_ref()
+            .map_or(serde_json::Value::Null, |dir| serde_json::json!({ "workdir": dir.to_string_lossy() }))
     }
-    fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
+    fn load_worker_data(&self, data: &serde_json::Value, state: &mut State) {
+        // A worktree removed outside Context Pilot falls back to the project root.
+        let dir = data.get("workdir").and_then(serde_json::Value::as_str).map(std::path::PathBuf::from);
+        state.thread_mut().workdir = dir.filter(|d| d.is_dir());
+    }
     fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<cp_base::tools::pre_flight::Verdict> {
         None
     }
