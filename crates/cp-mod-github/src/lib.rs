@@ -11,6 +11,8 @@ pub mod classify;
 mod panel;
 /// Output parsing: extract PR/issue data from `gh` CLI output.
 pub mod parse;
+/// Non-blocking per-worktree PR badge for the threads list.
+pub mod pr_badge;
 /// Tool implementations for `gh_execute`.
 mod tools;
 /// GitHub state types: `GithubState`, `GhCommand`, `GhWatch`.

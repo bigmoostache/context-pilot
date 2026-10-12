@@ -198,6 +198,17 @@ fn leading_slot(lb: &ListBuild<'_>, thread: &cp_mod_threads::types::Thread) -> S
     }
 }
 
+/// `<worktree folder>` plus ` #123-🟢` when its branch has an open PR, for a
+/// thread working in a worktree; `None` at the project root. The badge is a
+/// non-blocking cached lookup (see `cp_mod_github::pr_badge`).
+fn worktree_line(state: &State, thread_id: &str) -> Option<String> {
+    let dir = state.thread_store.get(thread_id)?.workdir.as_deref()?;
+    let name = dir.file_name()?.to_string_lossy();
+    let token = cp_mod_github::types::GithubState::get(state).github_token.as_deref();
+    let badge = token.and_then(|t| cp_mod_github::pr_badge::badge(dir, t));
+    Some(badge.map_or_else(|| name.to_string(), |b| format!("{name} {}", b.label())))
+}
+
 /// Push one thread's entry (status-colored circle + name), plus a muted
 /// `⎇ <worktree>` line below when the thread works in a git worktree,
 /// recording its selected line range.
@@ -336,12 +347,7 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
         let Some(thread) = ts.threads.get(real) else {
             continue;
         };
-        let worktree = state
-            .thread_store
-            .get(&thread.id)
-            .and_then(|rt| rt.workdir.as_deref())
-            .and_then(std::path::Path::file_name)
-            .map(|n| n.to_string_lossy());
+        let worktree = worktree_line(state, &thread.id);
         push_thread_entry(&mut lb, thread, i == selected, worktree.as_deref());
         if confirming && i == selected {
             push_archive_confirm_bubble(lb.blocks, viewing_archived);
