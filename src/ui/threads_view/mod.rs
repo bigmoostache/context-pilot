@@ -181,18 +181,13 @@ fn has_unread_reply(
         .is_some_and(|tail| tail.iter().any(|m| !m.auto && matches!(m.author, ThreadAuthor::Assistant)))
 }
 
-/// Push one thread's single-line entry (status-colored circle + name),
-/// recording its selected line range.
-fn push_thread_entry(lb: &mut ListBuild<'_>, thread: &cp_mod_threads::types::Thread, is_selected: bool) {
-    // Leading slot (2 cols), mirroring the footer:
-    //   working            → the footer's square spinner,
-    //   idle AND MyTurn     → a ⚠ warning (the LLM owes a turn but is doing
-    //                         nothing — a stall the human should notice),
-    //   unread LLM reply    → a ◆ marker (cleared once the row has stayed
-    //                         selected 2s, see FocusState::tick_read_dwell),
-    //   otherwise           → void.
-    let working = thread_is_working(lb.mirror.exec_state_of(&thread.id));
-    let leading = if working {
+/// Leading 2-col slot of a thread row, mirroring the footer:
+/// working → the footer's square spinner; idle AND `MyTurn` → ⚠ (the LLM owes
+/// a turn but is doing nothing, a stall the human should notice); unread LLM
+/// reply → ◆ (cleared once the row has stayed selected 2s, see
+/// `FocusState::tick_read_dwell`); otherwise void.
+fn leading_slot(lb: &ListBuild<'_>, thread: &cp_mod_threads::types::Thread) -> S {
+    if thread_is_working(lb.mirror.exec_state_of(&thread.id)) {
         S::styled(format!("{} ", crate::ui::helpers::spinner()), Semantic::Accent)
     } else if matches!(thread.status, ThreadStatus::MyTurn) {
         S::styled("\u{26a0} ".to_owned(), Semantic::Error)
@@ -200,7 +195,19 @@ fn push_thread_entry(lb: &mut ListBuild<'_>, thread: &cp_mod_threads::types::Thr
         S::styled("\u{25c6} ".to_owned(), Semantic::Accent)
     } else {
         S::styled("  ".to_owned(), Semantic::Default)
-    };
+    }
+}
+
+/// Push one thread's entry (status-colored circle + name), plus a muted
+/// `⎇ <worktree>` line below when the thread works in a git worktree,
+/// recording its selected line range.
+fn push_thread_entry(
+    lb: &mut ListBuild<'_>,
+    thread: &cp_mod_threads::types::Thread,
+    is_selected: bool,
+    worktree: Option<&str>,
+) {
+    let leading = leading_slot(lb, thread);
     let (cr, cg, cb) = thread_circle_rgb(thread);
     let name = truncate_str(&thread.name, lb.inner_width.saturating_sub(6).into());
 
@@ -208,6 +215,10 @@ fn push_thread_entry(lb: &mut ListBuild<'_>, thread: &cp_mod_threads::types::Thr
         lb.sel.start = Some(lb.blocks.len());
     }
     lb.blocks.push(IrBlock::Line(vec![leading, S::rgb("\u{25cf} ".to_owned(), cr, cg, cb), S::new(name)]));
+    if let Some(wt) = worktree {
+        let label = truncate_str(wt, lb.inner_width.saturating_sub(8).into());
+        lb.blocks.push(IrBlock::Line(vec![S::muted(format!("    \u{2387} {label}"))]));
+    }
     if is_selected {
         lb.sel.end = Some(lb.blocks.len());
     }
@@ -325,7 +336,13 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
         let Some(thread) = ts.threads.get(real) else {
             continue;
         };
-        push_thread_entry(&mut lb, thread, i == selected);
+        let worktree = state
+            .thread_store
+            .get(&thread.id)
+            .and_then(|rt| rt.workdir.as_deref())
+            .and_then(std::path::Path::file_name)
+            .map(|n| n.to_string_lossy());
+        push_thread_entry(&mut lb, thread, i == selected, worktree.as_deref());
         if confirming && i == selected {
             push_archive_confirm_bubble(lb.blocks, viewing_archived);
         }
