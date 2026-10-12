@@ -198,15 +198,40 @@ fn leading_slot(lb: &ListBuild<'_>, thread: &cp_mod_threads::types::Thread) -> S
     }
 }
 
-/// `<worktree folder>` plus ` #123-🟢` when its branch has an open PR, for a
-/// thread working in a worktree; `None` at the project root. The badge is a
-/// non-blocking cached lookup (see `cp_mod_github::pr_badge`).
-fn worktree_line(state: &State, thread_id: &str) -> Option<String> {
+/// Worktree folder name of a thread, plus its branch's open PR (if any).
+struct WorktreeLine {
+    /// Worktree folder name.
+    name: String,
+    /// Open PR badge (non-blocking cached lookup, see `cp_mod_github::pr_badge`).
+    badge: Option<cp_mod_github::pr_badge::Badge>,
+}
+
+/// The thread's [`WorktreeLine`]; `None` at the project root.
+fn worktree_line(state: &State, thread_id: &str) -> Option<WorktreeLine> {
     let dir = state.thread_store.get(thread_id)?.workdir.as_deref()?;
-    let name = dir.file_name()?.to_string_lossy();
+    let name = dir.file_name()?.to_string_lossy().into_owned();
     let token = cp_mod_github::types::GithubState::get(state).github_token.as_deref();
     let badge = token.and_then(|t| cp_mod_github::pr_badge::badge(dir, t));
-    Some(badge.map_or_else(|| name.to_string(), |b| format!("{name} {}", b.label())))
+    Some(WorktreeLine { name, badge })
+}
+
+/// Spans of the muted `⎇ <worktree> #123 ●` line; the `●` is the same dot as
+/// the thread rows, coloured by CI (green pass, yellow pending, red failing).
+fn worktree_spans(wt: &WorktreeLine, width: u16) -> Vec<S> {
+    use cp_mod_github::pr_badge::CheckColor;
+    let label = truncate_str(&wt.name, width.saturating_sub(8).into());
+    let mut spans = vec![S::muted(format!("    \u{2387} {label}"))];
+    if let Some(b) = wt.badge {
+        let color = match b.color {
+            CheckColor::Green => theme::success(),
+            CheckColor::Yellow => theme::warning(),
+            CheckColor::Red => theme::error(),
+        };
+        let (r, g, bl) = if let ratatui::style::Color::Rgb(r, g, bl) = color { (r, g, bl) } else { (200, 200, 200) };
+        spans.push(S::muted(format!(" {} ", b.label())));
+        spans.push(S::rgb("\u{25cf}".to_owned(), r, g, bl));
+    }
+    spans
 }
 
 /// Push one thread's entry (status-colored circle + name), plus a muted
@@ -216,7 +241,7 @@ fn push_thread_entry(
     lb: &mut ListBuild<'_>,
     thread: &cp_mod_threads::types::Thread,
     is_selected: bool,
-    worktree: Option<&str>,
+    worktree: Option<&WorktreeLine>,
 ) {
     let leading = leading_slot(lb, thread);
     let (cr, cg, cb) = thread_circle_rgb(thread);
@@ -227,8 +252,7 @@ fn push_thread_entry(
     }
     lb.blocks.push(IrBlock::Line(vec![leading, S::rgb("\u{25cf} ".to_owned(), cr, cg, cb), S::new(name)]));
     if let Some(wt) = worktree {
-        let label = truncate_str(wt, lb.inner_width.saturating_sub(8).into());
-        lb.blocks.push(IrBlock::Line(vec![S::muted(format!("    \u{2387} {label}"))]));
+        lb.blocks.push(IrBlock::Line(worktree_spans(wt, lb.inner_width)));
     }
     if is_selected {
         lb.sel.end = Some(lb.blocks.len());
@@ -348,7 +372,7 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
             continue;
         };
         let worktree = worktree_line(state, &thread.id);
-        push_thread_entry(&mut lb, thread, i == selected, worktree.as_deref());
+        push_thread_entry(&mut lb, thread, i == selected, worktree.as_ref());
         if confirming && i == selected {
             push_archive_confirm_bubble(lb.blocks, viewing_archived);
         }

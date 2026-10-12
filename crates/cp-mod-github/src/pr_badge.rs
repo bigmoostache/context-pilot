@@ -1,4 +1,4 @@
-//! Per-worktree PR badge (`#123-🟢`) for the TUI threads list.
+//! Per-worktree PR badge (`#123 ●`, dot coloured by CI) for the TUI threads list.
 //!
 //! The list renders every frame, so [`badge`] never blocks: it returns the
 //! cached value and, when that is older than [`TTL`], refreshes it on a
@@ -40,15 +40,10 @@ pub struct Badge {
 }
 
 impl Badge {
-    /// `#123-🟢` form shown in the threads list.
+    /// `#123` text; the caller renders the coloured `●` after it.
     #[must_use]
     pub fn label(&self) -> String {
-        let dot = match self.color {
-            CheckColor::Green => "\u{1f7e2}",
-            CheckColor::Yellow => "\u{1f7e1}",
-            CheckColor::Red => "\u{1f534}",
-        };
-        format!("#{}-{dot}", self.number)
+        format!("#{}", self.number)
     }
 }
 
