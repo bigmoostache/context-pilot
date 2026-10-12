@@ -5,6 +5,18 @@ import { UniverSheetsCorePreset } from "@univerjs/preset-sheets-core"
 import UniverPresetSheetsCoreEnUS from "@univerjs/preset-sheets-core/locales/en-US"
 import UniverPresetSheetsCoreFrFR from "@univerjs/preset-sheets-core/locales/fr-FR"
 import "@univerjs/preset-sheets-core/lib/index.css"
+import { UniverSheetsConditionalFormattingPreset } from "@univerjs/preset-sheets-conditional-formatting"
+import CfEnUS from "@univerjs/preset-sheets-conditional-formatting/locales/en-US"
+import CfFrFR from "@univerjs/preset-sheets-conditional-formatting/locales/fr-FR"
+import "@univerjs/preset-sheets-conditional-formatting/lib/index.css"
+import { UniverSheetsHyperLinkPreset } from "@univerjs/preset-sheets-hyper-link"
+import LinkEnUS from "@univerjs/preset-sheets-hyper-link/locales/en-US"
+import LinkFrFR from "@univerjs/preset-sheets-hyper-link/locales/fr-FR"
+import "@univerjs/preset-sheets-hyper-link/lib/index.css"
+import { UniverSheetsNotePreset } from "@univerjs/preset-sheets-note"
+import NoteEnUS from "@univerjs/preset-sheets-note/locales/en-US"
+import NoteFrFR from "@univerjs/preset-sheets-note/locales/fr-FR"
+import "@univerjs/preset-sheets-note/lib/index.css"
 import { Save } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { saveToRealm, toWorkbookData, type SheetPayload } from "./sheetState"
@@ -39,7 +51,26 @@ function patchedLocale() {
   fr["sheets-ui"]["info"] ??= {}
   fr["sheets-ui"]["info"]["error"] = "Erreur dans la cellule"
   fr["sheets-ui"]["info"]["forceStringInfo"] = "Valeur forcée en texte"
-  return mergeLocales(UniverPresetSheetsCoreEnUS, fr)
+  return mergeLocales(
+    UniverPresetSheetsCoreEnUS,
+    CfEnUS,
+    LinkEnUS,
+    NoteEnUS,
+    fr,
+    CfFrFR,
+    LinkFrFR,
+    NoteFrFR,
+  )
+}
+
+/** Core preset plus conditional formats, hyperlinks and notes (read from workbook resources). */
+function sheetPresets(container: HTMLElement) {
+  return [
+    UniverSheetsCorePreset({ container, formulaBar: false }),
+    UniverSheetsConditionalFormattingPreset(),
+    UniverSheetsHyperLinkPreset(),
+    UniverSheetsNotePreset(),
+  ]
 }
 
 /**
@@ -111,12 +142,7 @@ export function SheetGrid({
     const { univerAPI } = createUniver({
       locale: LocaleType.FR_FR,
       locales: { [LocaleType.FR_FR]: patchedLocale() },
-      presets: [
-        UniverSheetsCorePreset({
-          container: el,
-          formulaBar: false,
-        }),
-      ],
+      presets: sheetPresets(el),
     })
 
     const fWorkbook = univerAPI.createWorkbook(data)

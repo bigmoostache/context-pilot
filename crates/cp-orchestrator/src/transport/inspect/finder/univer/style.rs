@@ -46,7 +46,7 @@ impl StyleRegistry {
 }
 
 /// Build one `IStyleData` object; `None` when the style sets nothing.
-fn style_data(style: &Style, theme: &Theme) -> Option<Map<String, Value>> {
+pub(super) fn style_data(style: &Style, theme: &Theme) -> Option<Map<String, Value>> {
     let mut out = Map::new();
     if let Some(font) = style.font() {
         font_part(&mut out, font, theme);

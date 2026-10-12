@@ -9,15 +9,18 @@
 //! Parsing uses `umya-spreadsheet` (calamine is values-only). Other formats
 //! (`xls`/`xlsb`/`ods`/`csv`) stay on the calamine path in `sheet.rs`.
 
+mod cf;
 mod grid;
+mod notes;
 mod rich;
 mod style;
 
 use std::path::Path;
 
 use cp_base::cast::Safe as _;
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 
+use grid::Ctx;
 use style::StyleRegistry;
 
 /// Largest workbook file converted (25 MiB); bigger files get a 413 so the UI
@@ -38,17 +41,26 @@ pub(super) struct Converted {
 pub(super) fn convert(path: &Path) -> Option<Converted> {
     let book = umya_spreadsheet::reader::xlsx::read(path).ok()?;
     let theme = book.theme();
-    let mut styles = StyleRegistry::default();
-    let mut order: Vec<String> = Vec::new();
-    let mut sheets = serde_json::Map::new();
+    let wss = book.sheet_collection();
+    let order: Vec<String> = (0..wss.len()).map(|idx| format!("sheet-{idx}")).collect();
+    let sheet_ids = wss.iter().zip(&order).map(|(ws, id)| (ws.name().to_owned(), id.clone())).collect();
+    let mut ctx = Ctx { theme, styles: StyleRegistry::default(), sheet_ids };
+    let mut sheets = Map::new();
+    let (mut rules, mut notes) = (Map::new(), Map::new());
     let mut truncated = false;
 
-    for (idx, ws) in book.sheet_collection().iter().enumerate() {
-        let id = format!("sheet-{idx}");
-        let out = grid::sheet_json(ws, &id, theme, &mut styles);
+    for (ws, id) in wss.iter().zip(&order) {
+        let out = grid::sheet_json(ws, id, &mut ctx);
         truncated |= out.truncated;
         let _prev = sheets.insert(id.clone(), out.data);
-        order.push(id);
+        let sheet_rules = cf::sheet_rules(ws, theme);
+        if !sheet_rules.is_empty() {
+            let _r = rules.insert(id.clone(), json!(sheet_rules));
+        }
+        let sheet_notes = notes::sheet_notes(ws);
+        if !sheet_notes.is_empty() {
+            let _n = notes.insert(id.clone(), Value::Object(sheet_notes));
+        }
     }
     let first = order.first()?.clone();
     let active_idx = book.workbook_view().active_tab().to_usize();
@@ -60,11 +72,23 @@ pub(super) fn convert(path: &Path) -> Option<Converted> {
         "appVersion": "",
         "locale": "frFR",
         "sheetOrder": order,
-        "styles": styles.into_table(),
+        "styles": ctx.styles.into_table(),
         "sheets": sheets,
+        "resources": resources(rules, notes),
     });
     Some(Converted { workbook, active_sheet, truncated })
 }
 
+/// Plugin resources; Univer expects each `data` as a JSON string.
+fn resources(rules: Map<String, Value>, notes: Map<String, Value>) -> Vec<Value> {
+    [("SHEET_CONDITIONAL_FORMATTING_PLUGIN", rules), ("SHEET_NOTE_PLUGIN", notes)]
+        .into_iter()
+        .filter(|entry| !entry.1.is_empty())
+        .map(|(name, data)| json!({ "name": name, "data": Value::Object(data).to_string() }))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_p3;

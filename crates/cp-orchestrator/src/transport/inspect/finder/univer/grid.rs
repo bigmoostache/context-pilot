@@ -4,12 +4,14 @@
 //! column width in characters (`px ≈ chars × 7 + 5`, Calibri 11 max-digit
 //! width) and row height in points (`px = pt × 4/3`).
 
+use std::collections::HashMap;
+
 use cp_base::cast::Safe as _;
 use serde_json::{Map, Value, json};
 use umya_spreadsheet::drawing::Theme;
-use umya_spreadsheet::{CellRawValue, PaneStateValues, Range, SheetStateValues, Worksheet};
+use umya_spreadsheet::{Cell, CellRawValue, PaneStateValues, Range, SheetStateValues, Worksheet};
 
-use super::rich::rich_doc;
+use super::rich::{LinkCtx, add_link, rich_doc};
 use super::style::{StyleRegistry, color_hex};
 
 /// Rows kept per sheet; deeper rows are dropped and the sheet flagged truncated.
@@ -45,8 +47,19 @@ pub(super) struct SheetOut {
     pub truncated: bool,
 }
 
+/// Workbook-wide inputs shared by every sheet conversion.
+pub(super) struct Ctx<'ctx> {
+    /// Workbook theme, for theme-relative colours.
+    pub theme: &'ctx Theme,
+    /// Interned style table.
+    pub styles: StyleRegistry,
+    /// Sheet name → Univer sheet id, for links inside the workbook.
+    pub sheet_ids: HashMap<String, String>,
+}
+
 /// Convert one worksheet. `id` is the Univer sheet id (`sheet-<n>`).
-pub(super) fn sheet_json(ws: &Worksheet, id: &str, theme: &Theme, styles: &mut StyleRegistry) -> SheetOut {
+pub(super) fn sheet_json(ws: &Worksheet, id: &str, ctx: &mut Ctx<'_>) -> SheetOut {
+    let theme = ctx.theme;
     let (max_col, max_row) = ws.highest_column_and_row();
     let truncated = max_row > MAX_ROWS || max_col > MAX_COLS;
     let (default_w, default_h) = default_sizes(ws);
@@ -62,7 +75,7 @@ pub(super) fn sheet_json(ws: &Worksheet, id: &str, theme: &Theme, styles: &mut S
         "mergeData": merges(ws),
         "rowData": row_data(ws),
         "columnData": column_data(ws),
-        "cellData": cell_data(ws, theme, styles),
+        "cellData": cell_data(ws, id, ctx),
     });
     if let Some(obj) = data.as_object_mut() {
         view_part(obj, ws, theme);
@@ -181,7 +194,7 @@ fn column_data(ws: &Worksheet) -> Map<String, Value> {
 }
 
 /// Sparse `cellData` matrix: `{ row: { col: ICellData } }`, 0-based.
-fn cell_data(ws: &Worksheet, theme: &Theme, styles: &mut StyleRegistry) -> Map<String, Value> {
+fn cell_data(ws: &Worksheet, sheet_id: &str, ctx: &mut Ctx<'_>) -> Map<String, Value> {
     let mut rows: Map<String, Value> = Map::new();
     for cell in ws.cells() {
         let coord = cell.coordinate();
@@ -189,14 +202,7 @@ fn cell_data(ws: &Worksheet, theme: &Theme, styles: &mut StyleRegistry) -> Map<S
         if r == 0 || c == 0 || r > MAX_ROWS || c > MAX_COLS {
             continue;
         }
-        let mut entry = value_part(cell.cell_value().raw_value(), theme);
-        let formula = cell.formula();
-        if !formula.is_empty() {
-            let _f = entry.insert("f".to_owned(), json!(format!("={formula}")));
-        }
-        if let Some(sid) = styles.intern(cell.style(), theme) {
-            let _s = entry.insert("s".to_owned(), json!(sid));
-        }
+        let entry = cell_entry(cell, &format!("link-{sheet_id}-{r}-{c}"), ctx);
         if entry.is_empty() {
             continue;
         }
@@ -207,6 +213,23 @@ fn cell_data(ws: &Worksheet, theme: &Theme, styles: &mut StyleRegistry) -> Map<S
     }
     rows
 }
+
+/// One cell's `ICellData`: value, formula, style id and hyperlink.
+fn cell_entry(cell: &Cell, link_id: &str, ctx: &mut Ctx<'_>) -> Map<String, Value> {
+    let mut entry = value_part(cell.cell_value().raw_value(), ctx.theme);
+    let formula = cell.formula();
+    if !formula.is_empty() {
+        let _f = entry.insert("f".to_owned(), json!(format!("={formula}")));
+    }
+    if let Some(sid) = ctx.styles.intern(cell.style(), ctx.theme) {
+        let _s = entry.insert("s".to_owned(), json!(sid));
+    }
+    if let Some(link) = cell.hyperlink() {
+        add_link(&mut entry, link, &LinkCtx { sheet_ids: &ctx.sheet_ids, range_id: link_id.to_owned() });
+    }
+    entry
+}
+
 
 /// Cached value → `{ v, t }` (Univer `CellValueType`: 1 string, 2 number, 3 bool);
 /// rich text also gets its per-run document `p`.
