@@ -216,6 +216,13 @@ fn remove(state: &mut State, branch: &str) -> Result<String, String> {
         return Err(format!("branch '{branch}' is checked out at the project root, which cannot be removed"));
     }
     let path = dir.display().to_string();
+    let live = live_consoles(state, &dir);
+    if !live.is_empty() {
+        return Err(format!(
+            "consoles are still running inside {path}: {}. Close them with Close_panel first.",
+            live.join(", ")
+        ));
+    }
     if dir.is_dir() {
         if !git(&dir, &["status", "--porcelain"])?.is_empty() {
             return Err(format!("{path} has uncommitted changes; commit or discard them first"));
@@ -230,6 +237,27 @@ fn remove(state: &mut State, branch: &str) -> Result<String, String> {
         msg.push_str(" This thread was inside it and is back at the project root.");
     }
     Ok(msg)
+}
+
+/// Running console panels, in any thread, whose cwd lies inside `dir`:
+/// `"P21 'bash' (thread T857)"`. Removing the folder would strand them.
+fn live_consoles(state: &State, dir: &Path) -> Vec<String> {
+    let mut threads: Vec<(String, &cp_base::state::runtime::bundle::ThreadRuntime)> =
+        state.thread_store.ids().into_iter().filter_map(|id| state.thread_store.get(&id).map(|rt| (id, rt))).collect();
+    if state.thread_store.executing().is_none_or(|id| !state.thread_store.contains(id)) {
+        threads.push(("unbound".to_owned(), state.thread()));
+    }
+    let mut live = Vec::new();
+    for (tid, rt) in threads {
+        for ctx in rt.context.iter().filter(|c| c.context_type.as_str() == Kind::CONSOLE) {
+            let running = ctx.get_meta_str("console_status").is_some_and(|s| s.starts_with("running"));
+            let inside = ctx.get_meta_str("console_cwd").is_some_and(|cwd| Path::new(cwd).starts_with(dir));
+            if running && inside {
+                live.push(format!("{} '{}' (thread {tid})", ctx.id, ctx.name));
+            }
+        }
+    }
+    live
 }
 
 #[cfg(test)]
