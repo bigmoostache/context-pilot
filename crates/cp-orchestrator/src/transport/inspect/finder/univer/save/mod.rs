@@ -12,6 +12,7 @@
 
 mod cells;
 mod layout;
+mod lazy;
 mod style;
 
 use std::path::Path;
@@ -34,8 +35,10 @@ static NULL: Value = Value::Null;
 /// Patch `path` with `snapshot`; returns the number of cells changed.
 pub(in crate::transport::inspect::finder) fn save(path: &Path, snapshot: &Value) -> Result<usize, &'static str> {
     let base = super::convert(path).ok_or("could not read the original workbook")?.workbook;
-    let mut book = umya_spreadsheet::reader::xlsx::read(path).map_err(|_err| "could not read the original workbook")?;
+    let mut book =
+        umya_spreadsheet::reader::xlsx::lazy_read(path).map_err(|_err| "could not read the original workbook")?;
     let patched = patch_book(&mut book, &base, snapshot)?;
+    lazy::load_chart_sources(&mut book)?;
     write_atomic(&book, path)?;
     Ok(patched)
 }
@@ -51,16 +54,31 @@ fn patch_book(book: &mut Workbook, base: &Value, new: &Value) -> Result<usize, &
         .collect();
     let styles = Styles { base: table(base, "styles"), new: table(new, "styles") };
     let (base_sheets, new_sheets) = (table(base, "sheets"), table(new, "sheets"));
+    let restyled: Vec<&String> =
+        styles.new.keys().chain(styles.base.keys()).filter(|k| styles.base.get(*k) != styles.new.get(*k)).collect();
     let mut patched = 0usize;
     for (id, idx) in sheet_slots(book, &order, new_sheets)? {
         let old = base_sheets.get(&id).unwrap_or(&NULL);
         let sheet = new_sheets.get(&id).unwrap_or(&NULL);
+        if old == sheet && !uses_any(sheet, &restyled) {
+            continue; // untouched: stays raw and is written back verbatim
+        }
         let ws = book.sheet_mut(idx).map_err(|_err| "sheet vanished while saving")?;
         rename(ws, old, sheet);
         layout::patch(ws, old, sheet);
         patched = patched.saturating_add(cells::patch(ws, (old, sheet), &styles));
     }
     Ok(patched)
+}
+
+/// Whether any cell of `sheet` points at one of the style ids in `ids`.
+fn uses_any(sheet: &Value, ids: &[&String]) -> bool {
+    !ids.is_empty()
+        && table(sheet, "cellData")
+            .values()
+            .filter_map(Value::as_object)
+            .flat_map(Map::values)
+            .any(|cell| cell.get("s").and_then(Value::as_str).is_some_and(|s| ids.iter().any(|id| id.as_str() == s)))
 }
 
 /// Object field of a JSON node; empty when absent.
@@ -122,9 +140,10 @@ fn write_atomic(book: &Workbook, path: &Path) -> Result<(), &'static str> {
     let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("workbook");
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("xlsx");
     let staging = path.with_file_name(format!(".{stem}.saving.{ext}"));
-    if umya_spreadsheet::writer::xlsx::write(book, &staging).is_err() {
+    if let Err(err) = lazy::write_guarded(book, &staging) {
         let _gone = std::fs::remove_file(&staging);
-        return Err("could not write the workbook");
+        let _tmp = std::fs::remove_file(format!("{}tmp", staging.display()));
+        return Err(err);
     }
     std::fs::rename(&staging, path).map_err(|_err| "could not replace the original file")
 }

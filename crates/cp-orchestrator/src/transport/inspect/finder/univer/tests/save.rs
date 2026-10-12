@@ -98,3 +98,43 @@ fn refuses_a_foreign_snapshot() {
     assert_eq!(save(&path, &snap), Err("snapshot does not match this workbook; reload the file"));
     assert_eq!(std::fs::read(&path).ok(), before);
 }
+
+/// Real-file check: `CP_SHEET_SAMPLE=<xlsx> cargo test ... -- --ignored`.
+/// Edits A1 of every sheet in turn on a copy; save must never panic, and a
+/// refusal must leave the copy byte-identical.
+#[test]
+#[ignore = "needs CP_SHEET_SAMPLE pointing at a real workbook"]
+fn real_workbook_saves_without_panic() {
+    let Ok(sample) = std::env::var("CP_SHEET_SAMPLE") else { return };
+    let Ok(dir) = tempfile::tempdir() else { panic!("no temp dir") };
+    let path = dir.path().join("sample.xlsx");
+    let Ok(_bytes) = std::fs::copy(&sample, &path) else { panic!("copy failed") };
+    let Some(out) = convert(&path) else { panic!("convert failed") };
+    let only = std::env::var("CP_SHEET_NAMES").unwrap_or_default();
+    let wanted = |id: &str| {
+        let name = out.workbook.get("sheets").and_then(|s| s.get(id)).and_then(|s| s.get("name"));
+        only.is_empty() || name.and_then(Value::as_str).is_some_and(|n| only.split(',').any(|o| o == n))
+    };
+    let ids: Vec<String> = out
+        .workbook
+        .get("sheetOrder")
+        .and_then(Value::as_array)
+        .map(|a| a.iter().filter_map(Value::as_str).filter(|id| wanted(id)).map(str::to_owned).collect())
+        .unwrap_or_default();
+    assert!(!ids.is_empty(), "no sheet matched CP_SHEET_NAMES");
+    for id in ids {
+        let Some(base) = convert(&path) else { panic!("re-convert failed") };
+        // Same trip as the browser: JSON text out, JSON text back in.
+        let Ok(text) = serde_json::to_string(&base.workbook) else { panic!("serialize failed") };
+        let Ok(mut snap) = serde_json::from_str::<Value>(&text) else { panic!("parse failed") };
+        *slot(&mut snap, &["sheets", &id, "cellData", "0", "0"]) = json!({ "v": "edited", "t": 1u8 });
+        let before = std::fs::read(&path).ok();
+        match save(&path, &snap) {
+            Ok(n) => assert!(n >= 1, "{id}: nothing patched"),
+            Err(msg) => {
+                assert_eq!(std::fs::read(&path).ok(), before, "{id}: file changed on refusal");
+                assert!(std::env::var("CP_SHEET_MAY_REFUSE").is_ok(), "{id}: refused: {msg}");
+            }
+        }
+    }
+}

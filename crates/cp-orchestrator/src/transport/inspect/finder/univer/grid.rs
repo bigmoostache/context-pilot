@@ -194,9 +194,16 @@ fn column_data(ws: &Worksheet) -> Map<String, Value> {
 }
 
 /// Sparse `cellData` matrix: `{ row: { col: ICellData } }`, 0-based.
+///
+/// Cells are walked in (row, col) order: umya stores them in a `HashMap`, and
+/// style ids are handed out on first sight, so an unordered walk would give a
+/// different `styles` table on every read and the save diff would see every
+/// sheet as edited.
 fn cell_data(ws: &Worksheet, sheet_id: &str, ctx: &mut Ctx<'_>) -> Map<String, Value> {
     let mut rows: Map<String, Value> = Map::new();
-    for cell in ws.cells() {
+    let mut cells = ws.cells();
+    cells.sort_by_key(|cell| (cell.coordinate().row_num(), cell.coordinate().col_num()));
+    for cell in cells {
         let coord = cell.coordinate();
         let (r, c) = (coord.row_num(), coord.col_num());
         if r == 0 || c == 0 || r > MAX_ROWS || c > MAX_COLS {
