@@ -43,6 +43,7 @@ use rusqlite as _;
 use serde as _;
 use serde_yaml as _;
 use sha2 as _;
+use umya_spreadsheet as _;
 use utoipa as _;
 
 use std::path::Path;

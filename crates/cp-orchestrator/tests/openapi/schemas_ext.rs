@@ -336,7 +336,16 @@ pub(super) fn transport() -> Value {
             "type": "object",
             "properties": {
                 "sheets": arr(r("SheetTab")),
-                "truncated": { "type": "boolean" }
+                "truncated": { "type": "boolean" },
+                "workbook": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "Full Univer IWorkbookData snapshot (xlsx/xlsm only); `sheets` is empty when set."
+                },
+                "activeSheet": {
+                    "type": "string",
+                    "description": "Univer sheet id the workbook opens on (xlsx/xlsm only)."
+                }
             },
             "required": ["sheets", "truncated"]
         },

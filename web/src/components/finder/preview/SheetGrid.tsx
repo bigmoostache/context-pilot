@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import type { FUniver } from "@univerjs/presets"
+import type { FUniver, IWorkbookData } from "@univerjs/presets"
 import { createUniver, LocaleType, mergeLocales } from "@univerjs/presets"
 import { UniverSheetsCorePreset } from "@univerjs/preset-sheets-core"
 import UniverPresetSheetsCoreEnUS from "@univerjs/preset-sheets-core/locales/en-US"
@@ -8,6 +8,39 @@ import "@univerjs/preset-sheets-core/lib/index.css"
 import { Save } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { saveToRealm, toWorkbookData, type SheetPayload } from "./sheetState"
+
+/** Backend Univer snapshot when present (xlsx/xlsm), else the values-only payload. */
+function resolveWorkbook(
+  workbook: Record<string, unknown> | undefined,
+  sheets: SheetPayload[],
+): IWorkbookData {
+  if (isWorkbookData(workbook)) return workbook
+  return toWorkbookData(sheets)
+}
+
+/** Shape check for the backend snapshot (free-form object in the OpenAPI contract). */
+function isWorkbookData(value: unknown): value is IWorkbookData {
+  if (typeof value !== "object" || value === null) return false
+  return "sheetOrder" in value && Array.isArray(value.sheetOrder) && "sheets" in value
+}
+
+/**
+ * EN locale as complete base, FR overrides what's translated.
+ * mergeLocales() does a SHALLOW top-key merge, so custom patches must be
+ * deep-merged into the FR pack BEFORE calling mergeLocales — otherwise a
+ * `{ "sheets-ui": { info } }` patch would REPLACE the entire sheets-ui key.
+ */
+function patchedLocale() {
+  const fr = structuredClone(UniverPresetSheetsCoreFrFR) as Record<
+    string,
+    Record<string, Record<string, string>>
+  >
+  fr["sheets-ui"] ??= {}
+  fr["sheets-ui"]["info"] ??= {}
+  fr["sheets-ui"]["info"]["error"] = "Erreur dans la cellule"
+  fr["sheets-ui"]["info"]["forceStringInfo"] = "Valeur forcée en texte"
+  return mergeLocales(UniverPresetSheetsCoreEnUS, fr)
+}
 
 /**
  * Univer spreadsheet viewer/editor — near-Excel UX in Finder preview.
@@ -20,10 +53,15 @@ import { saveToRealm, toWorkbookData, type SheetPayload } from "./sheetState"
  */
 export function SheetGrid({
   sheets,
+  workbook,
+  activeSheet,
   path,
   agentId,
 }: {
   sheets: SheetPayload[]
+  /** Backend Univer snapshot (xlsx/xlsm) and the sheet id it opens on. Wins over `sheets`. */
+  workbook?: Record<string, unknown> | undefined
+  activeSheet?: string | undefined
   path: string
   /** Agent realm to save back to. Without this, Save is disabled. */
   agentId?: string | undefined
@@ -35,8 +73,9 @@ export function SheetGrid({
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle")
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  const workbookData = useMemo(() => toWorkbookData(sheets), [sheets])
-  const storageKey = `univer-sheet:${path}`
+  const workbookData = useMemo(() => resolveWorkbook(workbook, sheets), [workbook, sheets])
+  // v2: snapshots from the old values-only payload must not mask the full workbook.
+  const storageKey = `univer-sheet:v2:${path}`
 
   const handleSave = useCallback(async () => {
     if (!univerRef.current || !agentId) return
@@ -69,24 +108,9 @@ export function SheetGrid({
       /* corrupt entry — fall through to calamine data */
     }
 
-    // EN locale as complete base, FR overrides what's translated.
-    // mergeLocales() does a SHALLOW top-key merge, so custom patches must be
-    // deep-merged into the FR pack BEFORE calling mergeLocales — otherwise our
-    // patches object { "sheets-ui": { info: {...} } } would REPLACE the entire
-    // sheets-ui key from EN/FR, wiping toolbar/align/etc.
-    const frWithPatches = structuredClone(UniverPresetSheetsCoreFrFR) as Record<
-      string,
-      Record<string, Record<string, string>>
-    >
-    frWithPatches["sheets-ui"] ??= {}
-    frWithPatches["sheets-ui"]["info"] ??= {}
-    frWithPatches["sheets-ui"]["info"]["error"] = "Erreur dans la cellule"
-    frWithPatches["sheets-ui"]["info"]["forceStringInfo"] = "Valeur forcée en texte"
-    const patchedLocale = mergeLocales(UniverPresetSheetsCoreEnUS, frWithPatches)
-
     const { univerAPI } = createUniver({
       locale: LocaleType.FR_FR,
-      locales: { [LocaleType.FR_FR]: patchedLocale },
+      locales: { [LocaleType.FR_FR]: patchedLocale() },
       presets: [
         UniverSheetsCorePreset({
           container: el,
@@ -95,7 +119,9 @@ export function SheetGrid({
       ],
     })
 
-    univerAPI.createWorkbook(data)
+    const fWorkbook = univerAPI.createWorkbook(data)
+    const opening = activeSheet ? fWorkbook.getSheetBySheetId(activeSheet) : null
+    if (opening) fWorkbook.setActiveSheet(opening)
     univerRef.current = univerAPI
     // Deferred: avoids synchronous setState in effect (eslint-react/set-state-in-effect).
     const readyFrame = requestAnimationFrame(() => setReady(true))
@@ -136,7 +162,7 @@ export function SheetGrid({
       univerRef.current = null
       setReady(false)
     }
-  }, [workbookData, storageKey])
+  }, [workbookData, storageKey, activeSheet])
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">

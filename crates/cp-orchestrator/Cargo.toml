@@ -50,6 +50,9 @@ portable-pty = "0.9"
 # renders any spreadsheet as a table.
 calamine = "0.26"
 csv = "1"
+# Full-fidelity xlsx/xlsm reader for the Univer viewer (T851): styles, merges,
+# freeze panes, sizes, notes, links, conditional formats — calamine is values-only.
+umya-spreadsheet = "3.1"
 # Password hashing — Argon2id (OWASP current recommendation). Pure-Rust,
 # memory-hard. Default features bring password-hash PHC format + OsRng for salt
 # generation. Used by services/auth for credential storage (FR-01, NFR-01).

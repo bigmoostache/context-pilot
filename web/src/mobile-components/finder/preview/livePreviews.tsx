@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, lazy, Suspense } from "react"
 import { Check, Save } from "lucide-react"
 import type { FinderNode } from "@/lib/types"
 import { useFsPreview, useFsSheet, useWriteFile } from "@/lib/live"
-import { rawUrl } from "@/lib/api"
+import { downloadFile, rawUrl } from "@/lib/api"
 import { highlightCode } from "./codeHighlight"
 /** Lazy-loaded — TipTap + ProseMirror deferred until a markdown file is edited.
  *  Points at the MOBILE MarkdownEditor twin (@/mobile-components) — the leak
@@ -138,21 +138,51 @@ export function LivePdfPreview({ agentId, node }: { agentId: string; node: Finde
 export function LiveSheetPreview({ agentId, node }: { agentId: string; node: FinderNode }) {
   const { data, loading, error } = useFsSheet(agentId, node.path, true)
   if (loading) return <PreviewStatus label="Loading spreadsheet…" />
-  if (error || !data || data.sheets.length === 0) return <Generic node={node} />
+  if (error && isTooLarge(error)) return <SheetTooLarge agentId={agentId} path={node.path} />
+  if (error || !data || (!data.workbook && data.sheets.length === 0)) return <Generic node={node} />
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <Suspense fallback={<PreviewStatus label="Loading spreadsheet…" />}>
-        <LazySheetGrid sheets={data.sheets} path={node.path} agentId={agentId} />
+        <LazySheetGrid
+          sheets={data.sheets}
+          workbook={data.workbook}
+          activeSheet={data.activeSheet}
+          path={node.path}
+          agentId={agentId}
+        />
       </Suspense>
 
       {data.truncated && (
         <div className="flex items-center border-t border-border bg-muted/20 px-3 py-1.5">
           <span className="text-[11px] text-muted-foreground/50 italic">
-            Preview clipped — large sheet capped at 1 000 rows × 50 columns
+            Preview truncated — sheets are capped at 100 000 rows × 500 columns
           </span>
         </div>
       )}
+    </div>
+  )
+}
+
+/** The backend refuses workbooks over its size cap with a 413 "too large". */
+function isTooLarge(error: Error): boolean {
+  return error.message.includes("too large")
+}
+
+/** "Too large to preview" state with a download fallback. */
+function SheetTooLarge({ agentId, path }: { agentId: string; path: string }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
+      <span className="text-[13px] text-muted-foreground">
+        Workbook too large to preview (over 25 MB)
+      </span>
+      <button
+        type="button"
+        className="rounded-md bg-muted px-4 py-2 text-[13px] font-medium hover:bg-muted/70"
+        onClick={() => void downloadFile(agentId, path)}
+      >
+        Download
+      </button>
     </div>
   )
 }

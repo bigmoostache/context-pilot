@@ -669,8 +669,18 @@ export type SessionInfo = {
 };
 
 export type SheetData = {
+    /**
+     * Univer sheet id the workbook opens on (xlsx/xlsm only).
+     */
+    activeSheet?: string;
     sheets: Array<SheetTab>;
     truncated: boolean;
+    /**
+     * Full Univer IWorkbookData snapshot (xlsx/xlsm only); `sheets` is empty when set.
+     */
+    workbook?: {
+        [key: string]: unknown;
+    };
 };
 
 export type SheetTab = {

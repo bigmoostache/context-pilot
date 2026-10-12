@@ -59,6 +59,12 @@ pub(crate) fn fs_sheet(state: &Mutex<Backend>, agent_id: &str, query: &str) -> H
 
     let ext = target.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
 
+    if matches!(ext.as_str(), "xlsx" | "xlsm")
+        && let Some(reply) = univer_reply(&target)
+    {
+        return reply;
+    }
+
     let parsed = match ext.as_str() {
         "csv" => parse_delimited(&target, b','),
         "tsv" => parse_delimited(&target, b'\t'),
@@ -73,6 +79,23 @@ pub(crate) fn fs_sheet(state: &Mutex<Backend>, agent_id: &str, query: &str) -> H
         })),
         None => HttpReply::error(415, "could not parse spreadsheet"),
     }
+}
+
+/// Full-fidelity `xlsx`/`xlsm` reply: `413` over [`super::univer::MAX_FILE_BYTES`],
+/// else the Univer snapshot (`workbook` + `activeSheet`, empty `sheets`).
+/// `None` when umya can't read the file, so the caller falls back to calamine.
+fn univer_reply(target: &std::path::Path) -> Option<HttpReply> {
+    let size = target.metadata().map_or(0, |m| m.len());
+    if size > super::univer::MAX_FILE_BYTES {
+        return Some(HttpReply::error(413, "workbook too large to preview"));
+    }
+    let out = super::univer::convert(target)?;
+    Some(HttpReply::ok(&serde_json::json!({
+        "sheets": [],
+        "truncated": out.truncated,
+        "workbook": out.workbook,
+        "activeSheet": out.active_sheet,
+    })))
 }
 
 /// A parsed spreadsheet: named sheets of stringified cell grids + a clip flag.

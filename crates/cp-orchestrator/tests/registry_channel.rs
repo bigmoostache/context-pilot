@@ -47,6 +47,7 @@ use serde as _;
 use serde_yaml as _;
 use sha2 as _;
 use tiny_http as _;
+use umya_spreadsheet as _;
 use utoipa as _;
 
 use std::os::unix::net::UnixListener;

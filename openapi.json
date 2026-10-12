@@ -1961,6 +1961,10 @@
       },
       "SheetData": {
         "properties": {
+          "activeSheet": {
+            "description": "Univer sheet id the workbook opens on (xlsx/xlsm only).",
+            "type": "string"
+          },
           "sheets": {
             "items": {
               "$ref": "#/components/schemas/SheetTab"
@@ -1969,6 +1973,11 @@
           },
           "truncated": {
             "type": "boolean"
+          },
+          "workbook": {
+            "additionalProperties": true,
+            "description": "Full Univer IWorkbookData snapshot (xlsx/xlsm only); `sheets` is empty when set.",
+            "type": "object"
           }
         },
         "required": [

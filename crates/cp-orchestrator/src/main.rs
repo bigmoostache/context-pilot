@@ -39,6 +39,7 @@ use sha2 as _;
 #[cfg(test)]
 use tempfile as _;
 use tiny_http as _;
+use umya_spreadsheet as _;
 use utoipa as _;
 
 fn main() -> ExitCode {
