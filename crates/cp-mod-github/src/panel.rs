@@ -28,9 +28,10 @@ impl Panel for GithubResultPanel {
     fn build_cache_request(&self, ctx: &Entry, state: &State) -> Option<CacheRequest> {
         let command = ctx.get_meta_str("result_command")?.to_owned();
         let token = GithubState::get(state).github_token.as_ref()?;
+        let cwd = ctx.get_meta_str("result_cwd").map_or_else(|| state.workdir(), std::path::PathBuf::from);
         Some(CacheRequest::new(
             Kind::new(Kind::GITHUB_RESULT),
-            Box::new(GithubResultRequest { context_id: ctx.id.clone(), command, github_token: token.clone() }),
+            Box::new(GithubResultRequest { context_id: ctx.id.clone(), command, github_token: token.clone(), cwd }),
         ))
     }
 
@@ -67,6 +68,7 @@ impl Panel for GithubResultPanel {
         let mut cmd = std::process::Command::new("gh");
         let _r = cmd
             .args(&args)
+            .current_dir(&req.cwd)
             .env("GITHUB_TOKEN", &req.github_token)
             .env("GH_TOKEN", &req.github_token)
             .env("GH_PROMPT_DISABLED", "1")
