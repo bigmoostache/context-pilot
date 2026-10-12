@@ -16,6 +16,8 @@ mod tools;
 pub mod types;
 /// Background git-status worker (keeps `git` off the main loop).
 pub mod worker;
+/// `Worktree` tool: per-thread git worktree enter/leave/list/remove.
+mod worktree;
 
 use types::{GitChangeType, GitFileChange, GitState};
 use worker::GitSnapshot;
@@ -237,12 +239,14 @@ impl Module for GitModule {
                 .category("Git")
                 .param("command", ParamType::String, true)
                 .build(),
+            worktree::definition(t),
         ]
     }
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
             "git_execute" => Some(tools::execute_git_command(tool, state)),
+            "Worktree" => Some(worktree::execute(tool, state)),
             _ => None,
         }
     }
