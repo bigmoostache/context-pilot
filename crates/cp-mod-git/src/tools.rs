@@ -1,4 +1,5 @@
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
 use super::GIT_CMD_TIMEOUT_SECS;
@@ -11,7 +12,7 @@ use cp_base::state::watchers::carriers::DynPanel;
 use cp_base::tools::async_exec::{ToolOutput, spawn_async_tool};
 use cp_base::tools::{ToolResult, ToolUse};
 
-use super::classify::{CommandClass, classify_git, validate_git_command};
+use super::classify::{CommandClass, check_worktree_safety, classify_git, validate_git_command};
 
 /// Max lines for inline output (matches console's `easy_bash` threshold).
 const INLINE_MAX_LINES: usize = 150;
@@ -41,6 +42,11 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
         }
     };
 
+    let cwd = state.workdir();
+    if let Err(e) = check_worktree_safety(&args).and_then(|()| check_workdir(&cwd)) {
+        return ToolResult::new(tool.id.clone(), format!("Error: {e}"), true);
+    }
+
     // Classify
     let class = classify_git(&args);
 
@@ -64,12 +70,26 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
     // All commands: run async, decide inline vs panel on completion.
     let command_owned = command.to_owned();
     let github_token = cp_vault::vault().get("github").map(|s| s.expose().to_owned());
-    let cwd = state.workdir();
 
     spawn_async_tool(state, tool, GIT_CMD_TIMEOUT_SECS.saturating_add(5), move || {
         run_git_command(&args, github_token.as_ref(), &command_owned, &cwd)
     })
 }
+
+/// Fail clearly when the thread's workdir vanished (worktree removed by another
+/// thread or by hand) instead of a misleading spawn error.
+fn check_workdir(cwd: &std::path::Path) -> Result<(), String> {
+    if cwd.is_dir() {
+        return Ok(());
+    }
+    Err(format!(
+        "this thread's workdir {} no longer exists (worktree removed?). Run Worktree(action=leave) to return to the project root.",
+        cwd.display()
+    ))
+}
+
+/// Per-invocation suffix so concurrent pushes never share an askpass script.
+static ASKPASS_SEQ: AtomicU64 = AtomicU64::new(0);
 
 /// Run one git invocation off the main loop: wire up `GIT_ASKPASS` from a
 /// token-bearing temp script (when a token is present), execute with a timeout,
@@ -83,11 +103,18 @@ fn run_git_command(
     let start = Instant::now();
 
     let mut cmd = Command::new("git");
-    let _c = cmd.args(args).current_dir(cwd).env("GIT_TERMINAL_PROMPT", "0");
+    // An inherited GIT_DIR / GIT_WORK_TREE would override the cwd.
+    let _c = cmd
+        .args(args)
+        .current_dir(cwd)
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_WORK_TREE")
+        .env("GIT_TERMINAL_PROMPT", "0");
 
     // HTTPS auth via GIT_ASKPASS when GITHUB_TOKEN is available.
     let askpass_tempfile = github_token.and_then(|token| {
-        let askpass_path = std::env::temp_dir().join(format!("cpilot_askpass_{}", std::process::id()));
+        let seq = ASKPASS_SEQ.fetch_add(1, Ordering::Relaxed);
+        let askpass_path = std::env::temp_dir().join(format!("cpilot_askpass_{}_{seq}", std::process::id()));
         let script = format!("#!/bin/sh\necho '{}'", token.replace('\'', "'\\''"));
         std::fs::write(&askpass_path, &script).is_ok().then(|| {
             #[cfg(unix)]

@@ -76,14 +76,14 @@ fn worker() -> &'static Worker {
     })
 }
 
-/// Take the latest finished snapshot, if a new one is ready.
+/// Take the latest finished snapshot if it was computed for `dir`.
 ///
-/// Returns `None` when nothing has completed since the last call, so the
-/// caller can keep its current state untouched.
+/// Returns `None` when nothing new is ready or the snapshot belongs to another
+/// thread's workdir; that one stays in the slot for its owner to apply.
 #[must_use]
-pub fn take_latest() -> Option<GitSnapshot> {
+pub fn take_latest_for(dir: &std::path::Path) -> Option<GitSnapshot> {
     let mut slot = worker().latest.lock().ok()?;
-    slot.take()
+    slot.take_if(|s| s.dir == dir)
 }
 
 /// Ask the worker for a fresh snapshot unless one is already being computed.

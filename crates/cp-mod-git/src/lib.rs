@@ -125,8 +125,8 @@ pub fn compute_git_snapshot(dir: &std::path::Path, diff_base: Option<&str>) -> G
 /// Both steps are O(µs).
 pub fn refresh_git_status(state: &mut State) {
     let dir = state.workdir();
-    // A snapshot of another thread's worktree is stale for this one: drop it.
-    if let Some(snapshot) = worker::take_latest().filter(|s| s.dir == dir) {
+    // Leave another thread's snapshot in the slot for that thread to apply.
+    if let Some(snapshot) = worker::take_latest_for(&dir) {
         let gs = GitState::get_mut(state);
         gs.is_repo = snapshot.is_repo;
         gs.branch = snapshot.branch;

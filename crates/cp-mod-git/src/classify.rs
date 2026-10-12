@@ -118,6 +118,41 @@ pub(crate) fn validate_git_command(command: &str) -> Result<Vec<String>, String>
     Ok(args)
 }
 
+/// Refuse `git_execute` calls that would bypass the thread's workdir.
+///
+/// `-C`, `--git-dir` and `--work-tree` (global options, before the subcommand)
+/// point git at another tree; `worktree add|remove|move|prune` changes
+/// worktrees behind the `Worktree` tool's back, leaving threads aimed at
+/// missing folders.
+pub(crate) fn check_worktree_safety(args: &[String]) -> Result<(), String> {
+    let mut rest = args.iter().map(String::as_str);
+    while let Some(arg) = rest.next() {
+        if !arg.starts_with('-') {
+            return check_worktree_subcmd(arg, rest.next());
+        }
+        if arg == "-C" || arg.starts_with("--git-dir") || arg.starts_with("--work-tree") {
+            return Err(format!(
+                "'{arg}' is not allowed: git already runs in this thread's workdir. Use the Worktree tool to switch trees."
+            ));
+        }
+        // `-c key=value` / `--namespace ns`: the next word is a value, not the subcommand.
+        if arg == "-c" || arg == "--namespace" {
+            let _value = rest.next();
+        }
+    }
+    Ok(())
+}
+
+/// Refuse `git worktree add|remove|move|prune`: only the `Worktree` tool may reshape worktrees.
+fn check_worktree_subcmd(subcmd: &str, action: Option<&str>) -> Result<(), String> {
+    match (subcmd, action) {
+        ("worktree", Some(a @ ("add" | "remove" | "move" | "prune"))) => {
+            Err(format!("'git worktree {a}' is not allowed here; use the Worktree tool instead."))
+        }
+        _ => Ok(()),
+    }
+}
+
 /// Git subcommands that only ever read repository state.
 fn is_read_only_subcmd(subcmd: &str) -> bool {
     matches!(
@@ -266,4 +301,35 @@ pub(crate) fn classify_git(args: &[String]) -> CommandClass {
 
     let rest: Vec<&str> = args.get(1..).unwrap_or_default().iter().map(String::as_str).collect();
     classify_contextual(subcmd, &rest)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{check_worktree_safety, validate_git_command};
+
+    /// `true` when the guard refuses `cmd`.
+    fn rejected(cmd: &str) -> bool {
+        check_worktree_safety(&validate_git_command(cmd).expect("valid command")).is_err()
+    }
+
+    #[test]
+    fn worktree_guard_refuses_escapes() {
+        assert!(rejected("git -C /tmp status"));
+        assert!(rejected("git --git-dir=/x/.git log"));
+        assert!(rejected("git --work-tree /x status"));
+    }
+
+    #[test]
+    fn worktree_guard_refuses_reshaping() {
+        assert!(rejected("git worktree add ../x"));
+        assert!(rejected("git worktree remove x"));
+        assert!(rejected("git -c core.pager=cat worktree prune"));
+    }
+
+    #[test]
+    fn worktree_guard_allows_normal_use() {
+        assert!(!rejected("git worktree list"));
+        assert!(!rejected("git log -C --stat"));
+        assert!(!rejected("git status"));
+    }
 }

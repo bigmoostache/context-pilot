@@ -65,7 +65,12 @@ impl Panel for GitResultPanel {
         let args = super::classify::validate_git_command(&command).ok()?;
 
         let mut cmd = std::process::Command::new("git");
-        let _c = cmd.args(&args).current_dir(&cwd).env("GIT_TERMINAL_PROMPT", "0");
+        let _c = cmd
+            .args(&args)
+            .current_dir(&cwd)
+            .env_remove("GIT_DIR")
+            .env_remove("GIT_WORK_TREE")
+            .env("GIT_TERMINAL_PROMPT", "0");
         let output = run_with_timeout(cmd, GIT_CMD_TIMEOUT_SECS);
 
         match output {

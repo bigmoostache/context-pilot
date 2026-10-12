@@ -67,7 +67,12 @@ fn worktree_dir(branch: &str) -> PathBuf {
 /// Run `git <args>` in `dir`; stdout on success, stderr (or stdout) on failure.
 fn git(dir: &Path, args: &[&str]) -> Result<String, String> {
     let mut cmd = Command::new("git");
-    let _c = cmd.args(args).current_dir(dir).env("GIT_TERMINAL_PROMPT", "0");
+    let _c = cmd
+        .args(args)
+        .current_dir(dir)
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_WORK_TREE")
+        .env("GIT_TERMINAL_PROMPT", "0");
     let out = run_with_timeout(cmd, GIT_CMD_TIMEOUT_SECS).map_err(|e| format!("git failed to run: {e}"))?;
     let stdout = String::from_utf8_lossy(&out.stdout).trim().to_owned();
     if out.status.success() {
@@ -98,6 +103,12 @@ fn enter(state: &mut State, branch: &str) -> Result<String, String> {
             vec!["worktree", "add", "-b", branch, &path]
         };
         let _out = git(&root, &args)?;
+    } else {
+        // `a/b` and `a-b` share a folder: never land on the wrong branch.
+        let head = git(&dir, &["branch", "--show-current"])?;
+        if head != branch {
+            return Err(format!("{} is checked out on '{head}', not '{branch}'", dir.display()));
+        }
     }
     let shown = dir.display().to_string();
     set_workdir(state, Some(dir));
