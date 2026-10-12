@@ -121,13 +121,11 @@ fn build_callback_command(
         ));
     }
 
+    // Scripts live in the shared root store, whatever the thread's workdir.
     let scripts_dir = std::path::PathBuf::from(constants::STORE_DIR).join("scripts");
-    let script_path = scripts_dir.join(format!("{}.sh", def.name));
-    let script_path_str = if script_path.is_absolute() {
-        script_path.to_string_lossy().to_string()
-    } else {
-        format!("{}/{}", project_root, script_path.to_string_lossy())
-    };
+    let script_rel = scripts_dir.join(format!("{}.sh", def.name));
+    let script_path = if script_rel.is_absolute() { script_rel } else { constants::project_root().join(script_rel) };
+    let script_path_str = script_path.to_string_lossy().to_string();
 
     if !script_path.exists() {
         return Err(format!("Callback '{}' script not found: {}", def.name, script_path.display()));
@@ -140,6 +138,12 @@ fn build_callback_command(
         name = shell_escape(&def.name),
         script = shell_escape(&script_path_str),
     ))
+}
+
+/// Script cwd: the editing thread's workdir (a worktree when entered), or the
+/// callback's own `cwd` resolved against it.
+fn callback_cwd(def: &crate::types::CallbackDefinition, state: &State, workdir: &str) -> String {
+    def.cwd.as_deref().map_or_else(|| workdir.to_owned(), |c| state.resolve_path(c).to_string_lossy().into_owned())
 }
 
 /// Fire a single callback by spawning its script via the console server.
@@ -167,10 +171,8 @@ pub fn fire_callback(
         || ("CP_CHANGED_FILES", build_changed_files_env(&matched.matched_files)),
         |file| ("CP_CHANGED_FILE", file.to_owned()),
     );
-    let project_root = std::env::current_dir().unwrap_or_default().to_string_lossy().to_string();
-
-    // Use the callback's cwd if set, otherwise project root
-    let cwd = def.cwd.clone().or_else(|| Some(project_root.clone()));
+    let project_root = state.workdir().to_string_lossy().to_string();
+    let cwd = Some(callback_cwd(def, state, &project_root));
 
     let command = build_callback_command(def, env_key, &env_val, &project_root)?;
 

@@ -54,13 +54,15 @@ fn merge_changed_file(hull: &mut Vec<ChangedFile>, path: String, skip_names: Vec
     }
 }
 
-/// Collect changed file paths from a batch of tool uses.
+/// Collect changed file paths from a batch of tool uses, relative to `workdir`.
+///
+/// `workdir` is the editing thread's workdir, so globs match worktree files too.
 /// Extracts `file_path` from Edit and Write tool inputs.
 /// Also collects `skip_callbacks` names per tool for selective skipping.
 #[must_use]
-pub fn collect_changed_files(tools: &[cp_base::tools::ToolUse]) -> Vec<ChangedFile> {
+pub fn collect_changed_files(tools: &[cp_base::tools::ToolUse], workdir: &Path) -> Vec<ChangedFile> {
     let mut hull: Vec<ChangedFile> = Vec::new();
-    let project_root = std::env::current_dir().unwrap_or_default().to_string_lossy().to_string();
+    let project_root = workdir.to_string_lossy().to_string();
     for tool in tools {
         if !matches!(tool.name.as_str(), "Edit" | "Write") {
             continue;
