@@ -280,27 +280,24 @@ impl PerfMetrics {
         };
 
         // Atomics only for every op (~850): no per-op ring lock or copy.
+        // NO profile! guards while `ops` is locked: recording a new op name
+        // takes `ops.write()` on this same thread and deadlocks.
         let ops = self.ops.read().unwrap_or_else(std::sync::PoisonError::into_inner);
-        let mut op_snapshots: Vec<OpSnapshot> = {
-            let _g = crate::profile!("perf_snap_ops");
-            ops.iter()
-                .map(|(name, stats)| {
-                    compute_op_snapshot(&OpRaw {
-                        name,
-                        total_us: stats.total_us.load(Ordering::Relaxed),
-                        count: stats.count.load(Ordering::Relaxed),
-                        sum_sq_us: stats.sum_sq_us.load(Ordering::Relaxed),
-                        max_us: stats.max_us.load(Ordering::Relaxed),
-                    })
+        let mut op_snapshots: Vec<OpSnapshot> = ops
+            .iter()
+            .map(|(name, stats)| {
+                compute_op_snapshot(&OpRaw {
+                    name,
+                    total_us: stats.total_us.load(Ordering::Relaxed),
+                    count: stats.count.load(Ordering::Relaxed),
+                    sum_sq_us: stats.sum_sq_us.load(Ordering::Relaxed),
+                    max_us: stats.max_us.load(Ordering::Relaxed),
                 })
-                .collect()
-        };
+            })
+            .collect();
 
         // Sort by total time descending (hotspots first)
-        {
-            let _g = crate::profile!("perf_snap_sort");
-            op_snapshots.sort_by(|a, b| b.total_ms.partial_cmp(&a.total_ms).unwrap_or(std::cmp::Ordering::Equal));
-        }
+        op_snapshots.sort_by(|a, b| b.total_ms.partial_cmp(&a.total_ms).unwrap_or(std::cmp::Ordering::Equal));
 
         // Windowed std only for the rows the F12 op table displays.
         for op in op_snapshots.iter_mut().take(STD_DISPLAY_ROWS) {
