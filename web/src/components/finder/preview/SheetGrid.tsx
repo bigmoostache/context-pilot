@@ -17,6 +17,10 @@ import { UniverSheetsNotePreset } from "@univerjs/preset-sheets-note"
 import NoteEnUS from "@univerjs/preset-sheets-note/locales/en-US"
 import NoteFrFR from "@univerjs/preset-sheets-note/locales/fr-FR"
 import "@univerjs/preset-sheets-note/lib/index.css"
+import { UniverSheetsFindReplacePreset } from "@univerjs/preset-sheets-find-replace"
+import FindEnUS from "@univerjs/preset-sheets-find-replace/locales/en-US"
+import FindFrFR from "@univerjs/preset-sheets-find-replace/locales/fr-FR"
+import "@univerjs/preset-sheets-find-replace/lib/index.css"
 import { Save } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { saveToRealm, toWorkbookData, type SheetPayload } from "./sheetState"
@@ -56,20 +60,32 @@ function patchedLocale() {
     CfEnUS,
     LinkEnUS,
     NoteEnUS,
+    FindEnUS,
     fr,
     CfFrFR,
     LinkFrFR,
     NoteFrFR,
+    FindFrFR,
   )
 }
 
-/** Core preset plus conditional formats, hyperlinks and notes (read from workbook resources). */
+/**
+ * Core preset (formula bar; footer with sheet tabs — whose list shows and
+ * unhides hidden sheets — selection statistics and zoom slider) plus
+ * conditional formats, hyperlinks, notes (read from workbook resources) and
+ * find & replace (Ctrl/Cmd+F).
+ */
 function sheetPresets(container: HTMLElement) {
   return [
-    UniverSheetsCorePreset({ container, formulaBar: false }),
+    UniverSheetsCorePreset({
+      container,
+      formulaBar: true,
+      footer: { sheetBar: true, statisticBar: true, menus: true, zoomSlider: true },
+    }),
     UniverSheetsConditionalFormattingPreset(),
     UniverSheetsHyperLinkPreset(),
     UniverSheetsNotePreset(),
+    UniverSheetsFindReplacePreset(),
   ]
 }
 

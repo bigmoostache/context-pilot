@@ -68,6 +68,9 @@ importers:
       '@univerjs/preset-sheets-core':
         specifier: ^0.25.1
         version: 0.25.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rxjs@7.8.2)
+      '@univerjs/preset-sheets-find-replace':
+        specifier: 0.25.1
+        version: 0.25.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rxjs@7.8.2)
       '@univerjs/preset-sheets-hyper-link':
         specifier: ^0.25.1
         version: 0.25.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rxjs@7.8.2)
