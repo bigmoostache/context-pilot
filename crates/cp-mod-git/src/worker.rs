@@ -19,6 +19,8 @@ use crate::{GitFileChange, compute_git_snapshot};
 /// Immutable result of one git-status computation.
 #[derive(Debug, Clone, Default)]
 pub struct GitSnapshot {
+    /// Directory the snapshot was computed in (a thread's workdir).
+    pub dir: std::path::PathBuf,
     /// Whether the project root is inside a git repository.
     pub is_repo: bool,
     /// Current branch (`None` = detached HEAD or not a repo).
@@ -27,12 +29,15 @@ pub struct GitSnapshot {
     pub file_changes: Vec<GitFileChange>,
 }
 
-/// Channel for handing `diff_base` requests to the worker thread.
-type RequestTx = Sender<Option<String>>;
+/// One request: directory to inspect + optional diff base.
+type Request = (std::path::PathBuf, Option<String>);
+
+/// Channel for handing requests to the worker thread.
+type RequestTx = Sender<Request>;
 
 /// Shared worker handles: the request sender + the latest finished snapshot.
 struct Worker {
-    /// Drop a `diff_base` here to ask for a fresh computation.
+    /// Drop a request here to ask for a fresh computation.
     request_tx: RequestTx,
     /// Latest finished snapshot (`None` until the first run completes).
     latest: &'static Mutex<Option<GitSnapshot>>,
@@ -46,18 +51,18 @@ static WORKER: OnceLock<Worker> = OnceLock::new();
 /// Spawn the worker thread once and return the shared handles.
 fn worker() -> &'static Worker {
     WORKER.get_or_init(|| {
-        let (request_tx, request_rx): (RequestTx, Receiver<Option<String>>) = std::sync::mpsc::channel();
+        let (request_tx, request_rx): (RequestTx, Receiver<Request>) = std::sync::mpsc::channel();
         let latest: &'static Mutex<Option<GitSnapshot>> = Box::leak(Box::new(Mutex::new(None)));
         let in_flight: &'static Mutex<bool> = Box::leak(Box::new(Mutex::new(false)));
 
         let _handle = thread::Builder::new().name("git-status".to_owned()).spawn(move || {
             // Coalesce bursts: if several requests queued while we computed,
-            // keep only the most recent diff_base.
-            while let Ok(mut diff_base) = request_rx.recv() {
+            // keep only the most recent one.
+            while let Ok(mut req) = request_rx.recv() {
                 while let Ok(newer) = request_rx.try_recv() {
-                    diff_base = newer;
+                    req = newer;
                 }
-                let snapshot = compute_git_snapshot(diff_base.as_deref());
+                let snapshot = compute_git_snapshot(&req.0, req.1.as_deref());
                 if let Ok(mut slot) = latest.lock() {
                     *slot = Some(snapshot);
                 }
@@ -84,7 +89,7 @@ pub fn take_latest() -> Option<GitSnapshot> {
 /// Ask the worker for a fresh snapshot unless one is already being computed.
 ///
 /// Non-blocking: dropping the request onto the channel is all it does.
-pub fn request(diff_base: Option<String>) {
+pub fn request(dir: std::path::PathBuf, diff_base: Option<String>) {
     let w = worker();
     let Ok(mut flag) = w.in_flight.lock() else {
         return;
@@ -94,7 +99,7 @@ pub fn request(diff_base: Option<String>) {
     }
     *flag = true;
     drop(flag);
-    if w.request_tx.send(diff_base).is_err() {
+    if w.request_tx.send((dir, diff_base)).is_err() {
         // Worker gone (process shutting down) — clear the guard so a later
         // attempt is not wedged.
         if let Ok(mut reset) = w.in_flight.lock() {

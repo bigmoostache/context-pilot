@@ -64,20 +64,26 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
     // All commands: run async, decide inline vs panel on completion.
     let command_owned = command.to_owned();
     let github_token = cp_vault::vault().get("github").map(|s| s.expose().to_owned());
+    let cwd = state.workdir();
 
     spawn_async_tool(state, tool, GIT_CMD_TIMEOUT_SECS.saturating_add(5), move || {
-        run_git_command(&args, github_token.as_ref(), &command_owned)
+        run_git_command(&args, github_token.as_ref(), &command_owned, &cwd)
     })
 }
 
 /// Run one git invocation off the main loop: wire up `GIT_ASKPASS` from a
 /// token-bearing temp script (when a token is present), execute with a timeout,
 /// clean the script up, and fold the result into a [`ToolOutput`].
-fn run_git_command(args: &[String], github_token: Option<&String>, command_owned: &str) -> ToolOutput {
+fn run_git_command(
+    args: &[String],
+    github_token: Option<&String>,
+    command_owned: &str,
+    cwd: &std::path::Path,
+) -> ToolOutput {
     let start = Instant::now();
 
     let mut cmd = Command::new("git");
-    let _c = cmd.args(args).env("GIT_TERMINAL_PROMPT", "0");
+    let _c = cmd.args(args).current_dir(cwd).env("GIT_TERMINAL_PROMPT", "0");
 
     // HTTPS auth via GIT_ASKPASS when GITHUB_TOKEN is available.
     let askpass_tempfile = github_token.and_then(|token| {
@@ -103,7 +109,7 @@ fn run_git_command(args: &[String], github_token: Option<&String>, command_owned
     }
 
     match result {
-        Ok(output) => format_git_output(&output, command_owned, elapsed_ms),
+        Ok(output) => format_git_output(&output, command_owned, elapsed_ms, cwd),
         Err(e) => {
             let content = if e.kind() == std::io::ErrorKind::NotFound {
                 "git not found. Ensure git is installed and on PATH.".to_owned()
@@ -116,7 +122,12 @@ fn run_git_command(args: &[String], github_token: Option<&String>, command_owned
 }
 
 /// Decide inline-vs-panel for a completed git command.
-fn format_git_output(output: &std::process::Output, command: &str, elapsed_ms: u128) -> ToolOutput {
+fn format_git_output(
+    output: &std::process::Output,
+    command: &str,
+    elapsed_ms: u128,
+    cwd: &std::path::Path,
+) -> ToolOutput {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     let combined = if stderr.trim().is_empty() {
@@ -156,7 +167,10 @@ fn format_git_output(output: &std::process::Output, command: &str, elapsed_ms: u
         is_error,
         Some(
             DynPanel::new(Kind::GIT_RESULT.to_owned(), display_name)
-                .metadata(vec![("result_command".to_owned(), command.to_owned())])
+                .metadata(vec![
+                    ("result_command".to_owned(), command.to_owned()),
+                    ("result_cwd".to_owned(), cwd.to_string_lossy().into_owned()),
+                ])
                 .content(display_content),
         ),
         false,

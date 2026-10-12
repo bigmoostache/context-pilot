@@ -39,9 +39,9 @@ fn parse_numstat_line(line: &str) -> Option<(i32, i32, String)> {
 }
 
 /// Collect tracked (working-tree) changes via `git diff --numstat <base>`.
-fn collect_tracked_changes(diff_args: &[&str]) -> Vec<GitFileChange> {
+fn collect_tracked_changes(dir: &std::path::Path, diff_args: &[&str]) -> Vec<GitFileChange> {
     let mut changes = Vec::new();
-    let Ok(output) = Command::new("git").args(diff_args).output() else {
+    let Ok(output) = Command::new("git").args(diff_args).current_dir(dir).output() else {
         return changes;
     };
     if !output.status.success() {
@@ -49,8 +49,7 @@ fn collect_tracked_changes(diff_args: &[&str]) -> Vec<GitFileChange> {
     }
     for line in String::from_utf8_lossy(&output.stdout).lines() {
         if let Some((additions, deletions, path)) = parse_numstat_line(line) {
-            let change_type =
-                if std::path::Path::new(&path).exists() { GitChangeType::Modified } else { GitChangeType::Deleted };
+            let change_type = if dir.join(&path).exists() { GitChangeType::Modified } else { GitChangeType::Deleted };
             changes.push(GitFileChange { path, additions, deletions, change_type });
         }
     }
@@ -58,8 +57,9 @@ fn collect_tracked_changes(diff_args: &[&str]) -> Vec<GitFileChange> {
 }
 
 /// Append untracked files (`git ls-files --others`) with their line counts.
-fn append_untracked_files(changes: &mut Vec<GitFileChange>) {
-    let Ok(output) = Command::new("git").args(["ls-files", "--others", "--exclude-standard"]).output() else {
+fn append_untracked_files(dir: &std::path::Path, changes: &mut Vec<GitFileChange>) {
+    let Ok(output) = Command::new("git").args(["ls-files", "--others", "--exclude-standard"]).current_dir(dir).output()
+    else {
         return;
     };
     if !output.status.success() {
@@ -70,7 +70,7 @@ fn append_untracked_files(changes: &mut Vec<GitFileChange>) {
         if path.is_empty() {
             continue;
         }
-        let line_count = std::fs::read_to_string(&path).map_or(0i32, |c| c.lines().count().to_i32());
+        let line_count = std::fs::read_to_string(dir.join(&path)).map_or(0i32, |c| c.lines().count().to_i32());
         changes.push(GitFileChange {
             path,
             additions: line_count,
@@ -89,12 +89,12 @@ fn append_untracked_files(changes: &mut Vec<GitFileChange>) {
 /// `diff --cached` pass is dropped. `rev-parse --git-dir` is folded into the
 /// `branch --show-current` exit status.
 #[must_use]
-pub fn compute_git_snapshot(diff_base: Option<&str>) -> GitSnapshot {
+pub fn compute_git_snapshot(dir: &std::path::Path, diff_base: Option<&str>) -> GitSnapshot {
     // `branch --show-current` fails (non-zero) outside a repo — use it as the
     // repo probe and the branch read in one call.
-    let probe = Command::new("git").args(["branch", "--show-current"]).output().ok();
+    let probe = Command::new("git").args(["branch", "--show-current"]).current_dir(dir).output().ok();
     let Some(branch_out) = probe.filter(|o| o.status.success()) else {
-        return GitSnapshot::default();
+        return GitSnapshot { dir: dir.to_path_buf(), ..GitSnapshot::default() };
     };
 
     let branch_name = String::from_utf8_lossy(&branch_out.stdout).trim().to_owned();
@@ -102,6 +102,7 @@ pub fn compute_git_snapshot(diff_base: Option<&str>) -> GitSnapshot {
         // Detached HEAD: fall back to the short commit hash.
         Command::new("git")
             .args(["rev-parse", "--short", "HEAD"])
+            .current_dir(dir)
             .output()
             .ok()
             .map(|h| format!("detached:{}", String::from_utf8_lossy(&h.stdout).trim()))
@@ -110,10 +111,10 @@ pub fn compute_git_snapshot(diff_base: Option<&str>) -> GitSnapshot {
     };
 
     let diff_args = diff_base.map_or_else(|| vec!["diff", "--numstat", "HEAD"], |base| vec!["diff", "--numstat", base]);
-    let mut file_changes = collect_tracked_changes(&diff_args);
-    append_untracked_files(&mut file_changes);
+    let mut file_changes = collect_tracked_changes(dir, &diff_args);
+    append_untracked_files(dir, &mut file_changes);
 
-    GitSnapshot { is_repo: true, branch, file_changes }
+    GitSnapshot { dir: dir.to_path_buf(), is_repo: true, branch, file_changes }
 }
 
 /// Refresh git status into `GitState` WITHOUT blocking the main loop.
@@ -123,14 +124,16 @@ pub fn compute_git_snapshot(diff_base: Option<&str>) -> GitSnapshot {
 /// the worker for a fresh one (a no-op if a computation is already running).
 /// Both steps are O(µs).
 pub fn refresh_git_status(state: &mut State) {
-    if let Some(snapshot) = worker::take_latest() {
+    let dir = state.workdir();
+    // A snapshot of another thread's worktree is stale for this one: drop it.
+    if let Some(snapshot) = worker::take_latest().filter(|s| s.dir == dir) {
         let gs = GitState::get_mut(state);
         gs.is_repo = snapshot.is_repo;
         gs.branch = snapshot.branch;
         gs.file_changes = snapshot.file_changes;
     }
     let diff_base = GitState::get(state).diff_base.clone();
-    worker::request(diff_base);
+    worker::request(dir, diff_base);
 }
 
 /// Timeout for git commands (seconds)

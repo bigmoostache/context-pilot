@@ -24,11 +24,12 @@ impl Panel for GitResultPanel {
         None
     }
 
-    fn build_cache_request(&self, ctx: &Entry, _state: &State) -> Option<CacheRequest> {
+    fn build_cache_request(&self, ctx: &Entry, state: &State) -> Option<CacheRequest> {
         let command = ctx.get_meta_str("result_command")?;
+        let cwd = ctx.get_meta_str("result_cwd").map_or_else(|| state.workdir(), std::path::PathBuf::from);
         Some(CacheRequest::new(
             Kind::new(Kind::GIT_RESULT),
-            Box::new(GitResultRequest { context_id: ctx.id.clone(), command: command.to_owned() }),
+            Box::new(GitResultRequest { context_id: ctx.id.clone(), command: command.to_owned(), cwd }),
         ))
     }
 
@@ -58,13 +59,13 @@ impl Panel for GitResultPanel {
 
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
         let req = request.data.downcast::<GitResultRequest>().ok()?;
-        let GitResultRequest { context_id, command } = *req;
+        let GitResultRequest { context_id, command, cwd } = *req;
 
         // Parse and execute the command with timeout
         let args = super::classify::validate_git_command(&command).ok()?;
 
         let mut cmd = std::process::Command::new("git");
-        let _c = cmd.args(&args).env("GIT_TERMINAL_PROMPT", "0");
+        let _c = cmd.args(&args).current_dir(&cwd).env("GIT_TERMINAL_PROMPT", "0");
         let output = run_with_timeout(cmd, GIT_CMD_TIMEOUT_SECS);
 
         match output {
