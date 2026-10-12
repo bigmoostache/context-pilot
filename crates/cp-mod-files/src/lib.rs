@@ -36,7 +36,8 @@ fn build_virtual_content(disk_content: &str, canonical_path: &str, state: &State
 
     for call in &qs.queued_calls {
         let path_val = call.input.get("file_path").and_then(|v| v.as_str()).unwrap_or("");
-        let call_canonical = std::path::Path::new(path_val)
+        let call_canonical = state
+            .resolve_path(path_val)
             .canonicalize()
             .map_or_else(|_| path_val.to_owned(), |p| p.to_string_lossy().to_string());
         if call_canonical != canonical_path {
@@ -81,7 +82,8 @@ fn preflight_open(tool: &ToolUse, state: &State) -> Verdict {
         return pf;
     };
     for path in &paths {
-        let p = std::path::Path::new(path);
+        let resolved = state.resolve_path(path);
+        let p = resolved.as_path();
         if !p.exists() {
             pf.errors.push(format!("File '{path}' not found"));
         } else if !p.is_file() {
@@ -142,7 +144,8 @@ fn preflight_edit(tool: &ToolUse, state: &State) -> Verdict {
     let Some(path_str) = tool.input.get("file_path").and_then(|v| v.as_str()) else {
         return pf;
     };
-    let p = std::path::Path::new(path_str);
+    let resolved = state.resolve_path(path_str);
+    let p = resolved.as_path();
     if !p.exists() {
         pf.errors.push(format!("File '{path_str}' not found"));
         return pf;
@@ -166,12 +169,12 @@ fn preflight_edit(tool: &ToolUse, state: &State) -> Verdict {
 
 /// Pre-flight for `Write`: activate queue, warn if parent dir is missing (it is
 /// auto-created).
-fn preflight_write(tool: &ToolUse) -> Verdict {
+fn preflight_write(tool: &ToolUse, state: &State) -> Verdict {
     let mut pf = Verdict::new();
     // File writes are destructive — auto-activate queue for batching
     pf.activate_queue = true;
     if let Some(path_str) = tool.input.get("file_path").and_then(|v| v.as_str()) {
-        let p = std::path::Path::new(path_str);
+        let p = state.resolve_path(path_str);
         if let Some(parent) = p.parent()
             && !parent.as_os_str().is_empty()
             && !parent.exists()
@@ -265,7 +268,7 @@ impl Module for FilesModule {
         match tool.name.as_str() {
             "Open" => Some(preflight_open(tool, state)),
             "Edit" => Some(preflight_edit(tool, state)),
-            "Write" => Some(preflight_write(tool)),
+            "Write" => Some(preflight_write(tool, state)),
             _ => None,
         }
     }

@@ -1,10 +1,19 @@
 use std::fs;
-use std::path::Path;
 
 use cp_base::state::context::{Kind, estimate_tokens};
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 use std::fmt::Write as _;
+
+/// Create `path`'s missing parent directories; error message on failure.
+fn ensure_parent_dir(path: &std::path::Path) -> Result<(), String> {
+    match path.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() && !parent.exists() => {
+            fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory '{}': {}", parent.display(), e))
+        }
+        _ => Ok(()),
+    }
+}
 
 /// Execute the Write tool: create or overwrite a file and update context.
 pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -18,20 +27,12 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), "Missing required parameter: contents".to_owned(), true);
     };
 
-    let path = Path::new(path_str);
+    let resolved = state.resolve_path(path_str);
+    let path = resolved.as_path();
     let is_new = !path.exists();
 
-    // Create parent directories if needed
-    if let Some(parent) = path.parent()
-        && !parent.as_os_str().is_empty()
-        && !parent.exists()
-        && let Err(e) = fs::create_dir_all(parent)
-    {
-        return ToolResult::new(
-            tool.id.clone(),
-            format!("Failed to create directory '{}': {}", parent.display(), e),
-            true,
-        );
+    if let Err(msg) = ensure_parent_dir(path) {
+        return ToolResult::new(tool.id.clone(), msg, true);
     }
 
     // Write the file
@@ -41,13 +42,15 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let token_count = estimate_tokens(contents);
     let line_count = contents.lines().count();
+    // Absolute key, so panels match Open/Edit and survive a workdir change.
+    let canonical =
+        path.canonicalize().map_or_else(|_| path.to_string_lossy().to_string(), |p| p.to_string_lossy().to_string());
 
     // Check if file is already open in context
-    let already_open = state
-        .thread_mut()
-        .context
-        .iter_mut()
-        .find(|c| c.context_type.as_str() == Kind::FILE && c.get_meta_str("file_path") == Some(path_str));
+    let already_open = state.thread_mut().context.iter_mut().find(|c| {
+        c.context_type.as_str() == Kind::FILE
+            && matches!(c.get_meta_str("file_path"), Some(p) if p == canonical || p == path_str)
+    });
 
     if let Some(ctx) = already_open {
         // Update existing context element
@@ -66,7 +69,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         elem.uid = Some(uid);
         elem.token_count = token_count;
         elem.cached_content = Some(contents.to_owned());
-        elem.set_meta("file_path", &path_str.to_owned());
+        elem.set_meta("file_path", &canonical);
         state.thread_mut().context.push(elem);
 
         // Invalidate tree cache

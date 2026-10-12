@@ -1,5 +1,4 @@
 use std::fs;
-use std::path::Path;
 
 use cp_base::state::context::{Kind, estimate_tokens};
 use cp_base::state::runtime::State;
@@ -197,8 +196,10 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Check if file is open in context (canonicalize for consistent comparison)
-    let path = Path::new(path_str);
-    let canonical = path.canonicalize().map_or_else(|_| path_str.to_owned(), |p| p.to_string_lossy().to_string());
+    let resolved = state.resolve_path(path_str);
+    let path = resolved.as_path();
+    let canonical =
+        path.canonicalize().map_or_else(|_| path.to_string_lossy().to_string(), |p| p.to_string_lossy().to_string());
     let is_open = state
         .thread()
         .context
