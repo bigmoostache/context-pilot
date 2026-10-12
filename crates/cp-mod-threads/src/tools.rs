@@ -54,8 +54,6 @@ fn push_send_message(state: &mut State, tid: &str, msg: ThreadMessage, still_my_
 pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     /// Maximum markdown content length (bytes) to prevent state/disk bloat.
     const MAX_CONTENT_BYTES: usize = 100_000;
-    /// Maximum `file_path` length (bytes).
-    const MAX_FILE_PATH_BYTES: usize = 1_024;
 
     // Always the caller's own thread: Send has no target parameter.
     let owned_tid = executing_thread_id_or_empty(state);
@@ -63,8 +61,6 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let markdown =
         tool.input.get("markdown").and_then(serde_json::Value::as_str).map(|s| clamp_bytes(s, MAX_CONTENT_BYTES));
-    let file_path =
-        tool.input.get("file_path").and_then(serde_json::Value::as_str).map(|s| clamp_bytes(s, MAX_FILE_PATH_BYTES));
 
     let now = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis().to_u64());
 
@@ -75,7 +71,8 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     let msg = ThreadMessage {
         author: ThreadAuthor::Assistant,
         content: markdown,
-        file_path,
+        // Attachments ride inline ```file-upload``` blocks in the markdown.
+        file_path: None,
         timestamp: now,
         acknowledged: true,
         auto: false,
@@ -87,7 +84,7 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
         let ts = ThreadsState::get(state);
         let thread = ts.threads.iter().find(|t| t.id == tid);
         let name = thread.map_or_else(|| tid.to_owned(), |t| t.name.clone());
-        let preview = msg.content.as_deref().unwrap_or("[attachment]");
+        let preview = msg.content.as_deref().unwrap_or_default();
         (name, preview_ellipsis(preview, 80))
     };
 

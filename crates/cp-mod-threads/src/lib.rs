@@ -169,8 +169,7 @@ impl Module for ThreadsModule {
                 .short_desc("Post message to thread")
                 .category("Threads")
                 .reverie_allowed(false)
-                .param("markdown", ParamType::String, false)
-                .param("file_path", ParamType::String, false)
+                .param("markdown", ParamType::String, true)
                 .param("still_my_turn", ParamType::Boolean, false)
                 .build(),
             ToolDefinition::from_yaml("Read", t)
@@ -286,10 +285,8 @@ fn preflight_send(tool: &ToolUse, state: &State, pf: &mut Verdict) {
         pf.errors.push(format!("Send has no owning thread (executing thread '{tid}' not found)"));
     }
     let markdown = tool.input.get("markdown").and_then(|v| v.as_str());
-    let has_markdown = markdown.is_some_and(|s| !s.is_empty());
-    let has_file = tool.input.get("file_path").and_then(|v| v.as_str()).is_some_and(|s| !s.is_empty());
-    if !has_markdown && !has_file {
-        pf.errors.push("Send requires at least one of: markdown, file_path".to_owned());
+    if markdown.is_none_or(str::is_empty) {
+        pf.errors.push("Send requires a non-empty markdown".to_owned());
     }
     if let Some(md) = markdown {
         for err in forms::validate_form_blocks(md) {
