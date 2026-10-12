@@ -150,10 +150,11 @@ impl App {
     /// No-op if the popup was torn down between borrows.
     fn autocomplete_refresh_matches(&mut self) {
         let filter = cp_mod_tree::types::TreeState::get(&self.state).filter.clone();
+        let root = self.state.workdir();
         let Some(ac) = self.state.get_ext_mut::<cp_base::state::autocomplete::Suggestions>() else { return };
         let dir = ac.current_dir().to_owned();
         let prefix = ac.current_prefix().to_owned();
-        let entries = cp_mod_tree::tools::list_dir_entries(&filter, &dir, &prefix);
+        let entries = cp_mod_tree::tools::list_dir_entries(&root, &filter, &dir, &prefix);
         let Some(ac_set) = self.state.get_ext_mut::<cp_base::state::autocomplete::Suggestions>() else { return };
         ac_set.set_matches(entries);
     }

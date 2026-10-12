@@ -8,23 +8,25 @@
 use std::collections::HashSet;
 use std::fmt::Write as _;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use ignore::gitignore::GitignoreBuilder;
 
 use crate::tools::{SHOW_CONTEXT_PILOT, compute_file_hash};
 use crate::types::TreeFileDescription;
 
-/// Generate tree string without mutating state (for read-only rendering)
+/// Generate tree string without mutating state (for read-only rendering).
+///
+/// `root` is the executing thread's workdir; rows stay keyed by root-relative
+/// paths, so descriptions and open folders are shared across worktrees.
 pub(crate) fn generate_tree_string(
+    root: &Path,
     tree_filter: &str,
     tree_open_folders: &[String],
     tree_descriptions: &[TreeFileDescription],
 ) -> String {
-    let root = PathBuf::from(".");
-
     // Build gitignore matcher from filter
-    let mut builder = GitignoreBuilder::new(&root);
+    let mut builder = GitignoreBuilder::new(root);
     for line in tree_filter.lines() {
         let trimmed = line.trim();
         if !trimmed.is_empty() && !trimmed.starts_with('#') {
@@ -42,13 +44,11 @@ pub(crate) fn generate_tree_string(
     let mut output = String::new();
 
     // Show pwd at the top
-    if let Ok(cwd) = std::env::current_dir() {
-        let _r = writeln!(output, "pwd: {}", cwd.display());
-    }
+    let _r = writeln!(output, "pwd: {}", root.display());
 
     // Build tree recursively - directly show contents without root folder line
     let ctx = TreeContext { gitignore: gitignore.as_ref(), open_set: &open_set, desc_map: &desc_map };
-    build_tree_new(&TreeNode { dir: &root, path_str: ".", prefix: "" }, &ctx, &mut output);
+    build_tree_new(&TreeNode { dir: root, path_str: ".", prefix: "" }, &ctx, &mut output);
 
     output
 }

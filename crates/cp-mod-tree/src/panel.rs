@@ -18,6 +18,8 @@ pub(crate) struct TreeCacheRequest {
     pub open_folders: Vec<String>,
     /// File/folder description annotations.
     pub descriptions: Vec<crate::types::TreeFileDescription>,
+    /// Directory to render: the executing thread's workdir.
+    pub root: std::path::PathBuf,
 }
 
 /// Worker output: rendered tree plus the stale-description swaps the main
@@ -101,6 +103,7 @@ impl Panel for TreePanel {
                 filter: ts.filter.clone(),
                 open_folders: ts.open_folders.clone(),
                 descriptions: ts.descriptions.clone(),
+                root: state.workdir(),
             }),
         ))
     }
@@ -137,10 +140,10 @@ impl Panel for TreePanel {
 
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
         let req = request.data.downcast::<TreeCacheRequest>().ok()?;
-        let TreeCacheRequest { filter, open_folders, mut descriptions } = *req;
+        let TreeCacheRequest { filter, open_folders, mut descriptions, root } = *req;
         // YAML parse + per-file hashing happen here, off the main thread.
         let patches = crate::storage::refresh_stale_from_yaml(&mut descriptions);
-        let content = crate::render::generate_tree_string(&filter, &open_folders, &descriptions);
+        let content = crate::render::generate_tree_string(&root, &filter, &open_folders, &descriptions);
         let token_count = estimate_tokens(&content);
         Some(CacheUpdate::ModuleSpecific {
             context_type: Kind::new(Kind::TREE),

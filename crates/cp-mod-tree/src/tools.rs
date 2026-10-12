@@ -75,7 +75,7 @@ fn do_open(state: &mut State, normalized: &str) -> Option<ToggleChange> {
 /// Apply one folder toggle. `action` is `"open"`, `"close"`, or anything else
 /// (treated as a toggle: close when open, open when closed).
 fn toggle_path(state: &mut State, path: &Path, normalized: &str, action: &str) -> Result<Option<ToggleChange>, String> {
-    if !path.is_dir() && normalized != "." {
+    if !state.resolve_path(&path.to_string_lossy()).is_dir() && normalized != "." {
         return Err(format!("{normalized}: not a directory"));
     }
     let is_open = TreeState::get(state).open_folders.contains(&normalized.to_owned());
@@ -217,9 +217,9 @@ fn try_delete_description(
 }
 
 /// Close the open FILE panel for `normalized`, if any; returns its `"id (path)"` tag.
-fn auto_close_file_panel(state: &mut State, normalized: &str, cwd: Option<&PathBuf>) -> Option<String> {
-    let cwd_path = cwd?;
-    let abs_path = cwd_path.join(normalized).to_string_lossy().to_string();
+fn auto_close_file_panel(state: &mut State, normalized: &str) -> Option<String> {
+    let abs = state.resolve_path(normalized);
+    let abs_path = abs.canonicalize().unwrap_or(abs).to_string_lossy().to_string();
     let pos = state
         .thread()
         .context
@@ -231,7 +231,7 @@ fn auto_close_file_panel(state: &mut State, normalized: &str, cwd: Option<&PathB
 }
 
 /// Process one description object (add / update / delete + optional panel close).
-fn describe_one(state: &mut State, desc_obj: &serde_json::Value, cwd: Option<&PathBuf>, tally: &mut DescribeTally) {
+fn describe_one(state: &mut State, desc_obj: &serde_json::Value, tally: &mut DescribeTally) {
     let Some(path_str) = desc_obj.get("path").and_then(|v| v.as_str()) else {
         tally.errors.push("Missing 'path' in description".to_owned());
         return;
@@ -248,12 +248,13 @@ fn describe_one(state: &mut State, desc_obj: &serde_json::Value, cwd: Option<&Pa
         return;
     };
 
-    if !path.exists() {
+    let on_disk = state.resolve_path(&path.to_string_lossy());
+    if !on_disk.exists() {
         tally.errors.push(format!("{path_str}: path not found"));
         return;
     }
 
-    let file_hash = compute_file_hash(&path).unwrap_or_default();
+    let file_hash = compute_file_hash(&on_disk).unwrap_or_default();
     match upsert_description(state, &normalized, description.to_owned(), file_hash) {
         UpsertKind::Added => tally.added.push(normalized.clone()),
         UpsertKind::Updated => tally.updated.push(normalized.clone()),
@@ -261,7 +262,7 @@ fn describe_one(state: &mut State, desc_obj: &serde_json::Value, cwd: Option<&Pa
 
     // Auto-close the file's open panel unless close_panel=false.
     let should_close = desc_obj.get("close_panel").and_then(serde_json::Value::as_bool).unwrap_or(true);
-    if should_close && let Some(tag) = auto_close_file_panel(state, &normalized, cwd) {
+    if should_close && let Some(tag) = auto_close_file_panel(state, &normalized) {
         tally.auto_closed.push(tag);
     }
 }
@@ -290,11 +291,8 @@ pub(crate) fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolR
 
     let mut tally = DescribeTally::default();
 
-    // Resolve CWD once for absolute path matching when auto-closing panels.
-    let cwd = std::env::current_dir().ok();
-
     for desc_obj in descriptions {
-        describe_one(state, desc_obj, cwd.as_ref(), &mut tally);
+        describe_one(state, desc_obj, &mut tally);
     }
 
     let DescribeTally { added, updated, removed, auto_closed, errors } = tally;
@@ -338,18 +336,18 @@ pub(crate) fn execute_edit_filter(tool: &ToolUse, state: &mut State) -> ToolResu
 
 /// List directory entries (files + folders) matching a prefix, respecting the gitignore filter.
 ///
+/// `root` is the executing thread's workdir; `dir_prefix` is relative to it.
 /// Returns entries sorted: directories first, then alphabetically (case-insensitive).
 /// Used by the `@` autocomplete popup.
 #[must_use]
 pub fn list_dir_entries(
+    root: &Path,
     tree_filter: &str,
     dir_prefix: &str,
     name_prefix: &str,
 ) -> Vec<cp_base::state::autocomplete::Completion> {
-    let root = PathBuf::from(".");
-
     // Build gitignore matcher from filter
-    let mut builder = GitignoreBuilder::new(&root);
+    let mut builder = GitignoreBuilder::new(root);
     for line in tree_filter.lines() {
         let trimmed = line.trim();
         if !trimmed.is_empty() && !trimmed.starts_with('#') {
@@ -358,7 +356,7 @@ pub fn list_dir_entries(
     }
     let gitignore = builder.build().ok();
 
-    let dir_path = if dir_prefix.is_empty() { PathBuf::from(".") } else { PathBuf::from(dir_prefix) };
+    let dir_path = root.join(dir_prefix);
 
     if !dir_path.is_dir() {
         return Vec::new();

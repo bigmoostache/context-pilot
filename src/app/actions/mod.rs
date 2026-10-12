@@ -129,7 +129,7 @@ fn handle_input_char(state: &mut State, ch: char) {
                 .is_some_and(|&b| b == b' ' || b == b'\n' || b == b'\t');
         if should_trigger {
             let filter = cp_mod_tree::types::TreeState::get(state).filter.clone();
-            let entries = cp_mod_tree::tools::list_dir_entries(&filter, "", "");
+            let entries = cp_mod_tree::tools::list_dir_entries(&state.workdir(), &filter, "", "");
             if let Some(ac) = state.get_ext_mut::<cp_base::state::autocomplete::Suggestions>() {
                 ac.activate(anchor_pos);
                 ac.set_matches(entries);
