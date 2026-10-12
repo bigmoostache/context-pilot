@@ -9,6 +9,7 @@ use serde_json::{Map, Value, json};
 use umya_spreadsheet::drawing::Theme;
 use umya_spreadsheet::{CellRawValue, PaneStateValues, Range, SheetStateValues, Worksheet};
 
+use super::rich::rich_doc;
 use super::style::{StyleRegistry, color_hex};
 
 /// Rows kept per sheet; deeper rows are dropped and the sheet flagged truncated.
@@ -188,7 +189,7 @@ fn cell_data(ws: &Worksheet, theme: &Theme, styles: &mut StyleRegistry) -> Map<S
         if r == 0 || c == 0 || r > MAX_ROWS || c > MAX_COLS {
             continue;
         }
-        let mut entry = value_part(cell.cell_value().raw_value());
+        let mut entry = value_part(cell.cell_value().raw_value(), theme);
         let formula = cell.formula();
         if !formula.is_empty() {
             let _f = entry.insert("f".to_owned(), json!(format!("={formula}")));
@@ -207,17 +208,21 @@ fn cell_data(ws: &Worksheet, theme: &Theme, styles: &mut StyleRegistry) -> Map<S
     rows
 }
 
-/// Cached value → `{ v, t }` (Univer `CellValueType`: 1 string, 2 number, 3 bool).
-fn value_part(raw: &CellRawValue) -> Map<String, Value> {
+/// Cached value → `{ v, t }` (Univer `CellValueType`: 1 string, 2 number, 3 bool);
+/// rich text also gets its per-run document `p`.
+fn value_part(raw: &CellRawValue, theme: &Theme) -> Map<String, Value> {
+    let mut out = Map::new();
     let (v, t) = cp_macros::deref_match!(raw, {
-        CellRawValue::Empty => return Map::new(),
+        CellRawValue::Empty => return out,
         CellRawValue::Numeric(n) => (json!(n), 2u8),
         CellRawValue::Bool(b) => (json!(u8::from(b)), 3u8),
         CellRawValue::String(ref s) | CellRawValue::Lazy(ref s) => (json!(s), 1u8),
-        CellRawValue::RichText(ref rt) => (json!(rt.text()), 1u8),
+        CellRawValue::RichText(ref rt) => {
+            let _p = out.insert("p".to_owned(), rich_doc(rt, theme));
+            (json!(rt.text()), 1u8)
+        }
         CellRawValue::Error(ref e) => (json!(e.to_string()), 1u8),
     });
-    let mut out = Map::new();
     let _v = out.insert("v".to_owned(), v);
     let _t = out.insert("t".to_owned(), json!(t));
     out

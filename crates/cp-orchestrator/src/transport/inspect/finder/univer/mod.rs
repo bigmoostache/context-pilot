@@ -10,6 +10,7 @@
 //! (`xls`/`xlsb`/`ods`/`csv`) stay on the calamine path in `sheet.rs`.
 
 mod grid;
+mod rich;
 mod style;
 
 use std::path::Path;

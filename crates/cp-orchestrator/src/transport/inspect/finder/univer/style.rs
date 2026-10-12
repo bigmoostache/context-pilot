@@ -93,7 +93,8 @@ fn solid_fill(style: &Style) -> Option<&Color> {
 }
 
 /// Font face (family, size, colour) then marks (weight, slant, lines).
-fn font_part(out: &mut Map<String, Value>, font: &Font, theme: &Theme) {
+/// Shared with rich-text runs, whose `ts` uses the same keys.
+pub(super) fn font_part(out: &mut Map<String, Value>, font: &Font, theme: &Theme) {
     if !font.name().is_empty() {
         let _prev = out.insert("ff".to_owned(), json!(font.name()));
     }
@@ -180,7 +181,15 @@ fn align_part(out: &mut Map<String, Value>, alignment: &Alignment) {
     if let Some(tr) = rotation(alignment.text_rotation()) {
         put("tr", tr);
     }
+    let indent = alignment.indent();
+    if indent > 0 {
+        // One Excel indent level ≈ 3 spaces of Calibri 11 ≈ 9 px.
+        put("pd", json!({ "l": indent.saturating_mul(INDENT_PX) }));
+    }
 }
+
+/// Pixels per Excel indent level.
+const INDENT_PX: u32 = 9;
 
 /// Excel horizontal alignment → Univer `HorizontalAlign`; `None` = General.
 const fn horizontal(h: &HorizontalAlignmentValues) -> Option<u8> {
