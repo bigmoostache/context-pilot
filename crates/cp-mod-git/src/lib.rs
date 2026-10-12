@@ -352,6 +352,9 @@ impl Module for GitModule {
         let dir = data.get("workdir").and_then(serde_json::Value::as_str).map(std::path::PathBuf::from);
         state.thread_mut().workdir = dir.filter(|d| d.is_dir());
     }
+    fn worker_data_is_thread_scoped(&self) -> bool {
+        true
+    }
     fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<cp_base::tools::pre_flight::Verdict> {
         None
     }

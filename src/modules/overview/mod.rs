@@ -155,6 +155,10 @@ impl Module for OverviewModule {
         }
     }
 
+    fn worker_data_is_thread_scoped(&self) -> bool {
+        true
+    }
+
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         json!({
             "active_modules": state.active_modules.iter().collect::<Vec<_>>(),

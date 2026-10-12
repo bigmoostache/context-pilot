@@ -107,6 +107,14 @@ pub trait Module: Send + Sync {
     /// Deserialize worker-specific data. Always loaded from `WorkerState`.
     fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
 
+    /// `true` when [`Self::load_worker_data`] writes ONLY the thread runtime
+    /// (`state.thread_mut()`), never shared state. Background threads skip
+    /// global modules at boot; this opt-in lets their per-thread slice
+    /// (e.g. the git workdir) still be restored there.
+    fn worker_data_is_thread_scoped(&self) -> bool {
+        false
+    }
+
     /// Tool definitions provided by this module
     fn tool_definitions(&self) -> Vec<ToolDefinition>;
     /// Execute a tool. Returns None if this module doesn't own the tool.

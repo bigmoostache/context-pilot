@@ -193,6 +193,7 @@ fn boot_init_thread_modules(state: &mut State, worker_modules: &HashMap<String, 
     }
     for module in &modules {
         if module.is_global() {
+            load_thread_scoped_worker_data(module.as_ref(), worker_modules, state);
             continue;
         }
         let data = worker_modules.get(module.id()).unwrap_or(&null);
@@ -204,6 +205,23 @@ fn boot_init_thread_modules(state: &mut State, worker_modules: &HashMap<String, 
         module.load_worker_data(worker_data, state);
     }
     state.set_init_scope(None);
+}
+
+/// Restore a global module's per-thread `_worker` slice (e.g. the git workdir)
+/// into a background-thread `State`, when the module declares that slice
+/// thread-scoped. Its shared half is never touched here.
+fn load_thread_scoped_worker_data(
+    module: &dyn crate::modules::Module,
+    worker_modules: &HashMap<String, serde_json::Value>,
+    state: &mut State,
+) {
+    if !module.worker_data_is_thread_scoped() {
+        return;
+    }
+    let null = serde_json::Value::Null;
+    let worker_data = worker_modules.get(&format!("{}_worker", module.id())).unwrap_or(&null);
+    state.set_init_scope(Some(false));
+    module.load_worker_data(worker_data, state);
 }
 
 /// Load one background thread's persisted per-thread context into a
