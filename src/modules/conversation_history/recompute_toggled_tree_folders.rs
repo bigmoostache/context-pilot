@@ -31,7 +31,7 @@ pub(crate) fn recompute_tree_folders(state: &mut State) {
         return;
     }
 
-    let Some(cwd) = std::env::current_dir().ok() else {
+    let Ok(cwd) = state.workdir().canonicalize() else {
         return;
     };
 

@@ -53,7 +53,7 @@ fn check_tree_description_gate(pf: &mut Verdict, state: &State, id: &str) {
     if !std::path::Path::new(file_path).exists() {
         return;
     }
-    let Ok(cwd) = std::env::current_dir().and_then(|d| d.canonicalize()) else { return };
+    let Ok(cwd) = state.workdir().canonicalize() else { return };
     let Ok(rel) = std::path::Path::new(file_path).strip_prefix(&cwd) else { return };
     let rel_str = rel.to_string_lossy();
     let ts = cp_mod_tree::types::TreeState::get(state);

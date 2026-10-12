@@ -27,7 +27,7 @@ fn file_panel_needs_describe(state: &State, ctx: &Entry) -> Option<String> {
     if !std::path::Path::new(file_path).exists() {
         return None;
     }
-    let cwd = std::env::current_dir().and_then(|d| d.canonicalize()).ok()?;
+    let cwd = state.workdir().canonicalize().ok()?;
     let rel = std::path::Path::new(file_path).strip_prefix(&cwd).ok()?;
     let rel_str = rel.to_string_lossy();
     let ts = cp_mod_tree::types::TreeState::get(state);

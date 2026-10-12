@@ -127,7 +127,7 @@ fn send_v2_request(
 /// `~/.context-pilot/refusals/{project}_{worker_id}_{utc_compact}.json` so
 /// refusals from every agent on the host land in one place.
 fn dump_refusal_request(worker_id: &str, model: &str, api_request: &serde_json::Value) {
-    let project_dir = std::env::current_dir().unwrap_or_default();
+    let project_dir = cp_base::config::constants::project_root();
     let project = project_dir.file_name().and_then(|n| n.to_str()).unwrap_or("unknown").to_owned();
     let record = serde_json::json!({
         "stop_reason": "refusal",
