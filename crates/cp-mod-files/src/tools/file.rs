@@ -34,7 +34,10 @@ pub(crate) fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
 /// Open a single file and add it as a context element, returning a status message.
 fn open_single_file(path: &str, state: &mut State) -> String {
     // Check if file exists (quick metadata check, not a full read)
-    let resolved = state.resolve_path(path);
+    let resolved = match state.try_resolve_path(path) {
+        Ok(p) => p,
+        Err(e) => return format!("Error: {e}"),
+    };
     let path_obj = resolved.as_path();
     if !path_obj.exists() {
         return format!("Error: File '{path}' not found");

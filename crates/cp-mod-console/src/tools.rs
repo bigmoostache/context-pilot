@@ -84,7 +84,10 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), msg, true);
     }
 
-    let cwd = Some(resolve_cwd(tool, state));
+    let cwd = match resolve_cwd(tool, state) {
+        Ok(c) => Some(c),
+        Err(e) => return ToolResult::new(tool.id.clone(), format!("Error: {e}"), true),
+    };
     let description = tool.input.get("description").and_then(|v| v.as_str()).map(str::to_owned);
 
     // Auto-generate session key
@@ -342,9 +345,13 @@ pub fn execute_watch(tool: &ToolUse, state: &mut State) -> ToolResult {
 
 /// Process cwd for a spawned command: the `cwd` param resolved against the
 /// thread's workdir, or the workdir itself — never the shared process cwd.
-fn resolve_cwd(tool: &ToolUse, state: &State) -> String {
+/// Errors when the thread's worktree folder no longer exists.
+fn resolve_cwd(tool: &ToolUse, state: &State) -> Result<String, String> {
+    if let Some(e) = state.workdir_error() {
+        return Err(e);
+    }
     let raw = tool.input.get("cwd").and_then(|v| v.as_str()).unwrap_or(".");
-    state.resolve_path(raw).to_string_lossy().into_owned()
+    Ok(state.resolve_path(raw).to_string_lossy().into_owned())
 }
 
 /// Handle `console_easy_bash`: spawn, block until exit or 10s timeout, return output inline
@@ -361,7 +368,10 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), msg, true);
     }
 
-    let cwd = Some(resolve_cwd(tool, state));
+    let cwd = match resolve_cwd(tool, state) {
+        Ok(c) => Some(c),
+        Err(e) => return ToolResult::new(tool.id.clone(), format!("Error: {e}"), true),
+    };
 
     // Spawn via the console server (non-blocking to the main loop)
     let session_key = {

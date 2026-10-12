@@ -151,6 +151,34 @@ impl State {
         if p.is_absolute() { p.to_path_buf() } else { self.workdir().join(p) }
     }
 
+    /// Error text when the thread's worktree folder vanished (removed by hand
+    /// or by another thread); `None` while it exists or at the project root.
+    #[must_use]
+    pub fn workdir_error(&self) -> Option<String> {
+        let dir = self.thread().workdir.as_ref()?;
+        (!dir.is_dir()).then(|| {
+            format!(
+                "this thread's workdir {} no longer exists (worktree removed?). Run Worktree(action=leave) to return to the project root.",
+                dir.display()
+            )
+        })
+    }
+
+    /// [`resolve_path`](Self::resolve_path), refusing relative paths while
+    /// the worktree folder is gone, so callers never recreate it by accident.
+    ///
+    /// # Errors
+    /// The [`workdir_error`](Self::workdir_error) text.
+    pub fn try_resolve_path(&self, path: &str) -> Result<std::path::PathBuf, String> {
+        if std::path::Path::new(path).is_relative()
+            && let Some(e) = self.workdir_error()
+        {
+            return Err(e);
+        }
+        Ok(self.resolve_path(path))
+    }
+
+
     // === Boot builder (cross-crate reconstruction from persisted state) ===
 
     /// Set the loaded context panels (builder).

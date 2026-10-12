@@ -196,7 +196,10 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Check if file is open in context (canonicalize for consistent comparison)
-    let resolved = state.resolve_path(path_str);
+    let resolved = match state.try_resolve_path(path_str) {
+        Ok(p) => p,
+        Err(e) => return ToolResult::new(tool.id.clone(), format!("Error: {e}"), true),
+    };
     let path = resolved.as_path();
     let canonical =
         path.canonicalize().map_or_else(|_| path.to_string_lossy().to_string(), |p| p.to_string_lossy().to_string());
@@ -209,9 +212,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Read file
     let mut content = match fs::read_to_string(path) {
         Ok(c) => c,
-        Err(e) => {
-            return ToolResult::new(tool.id.clone(), format!("Failed to read file: {e}"), true);
-        }
+        Err(e) => return ToolResult::new(tool.id.clone(), format!("Failed to read file: {e}"), true),
     };
 
     // Try normalized matching (handles trailing whitespace differences).

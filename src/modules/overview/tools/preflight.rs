@@ -55,6 +55,9 @@ fn check_tree_description_gate(pf: &mut Verdict, state: &State, id: &str) {
     }
     let Ok(cwd) = state.workdir().canonicalize() else { return };
     let Ok(rel) = std::path::Path::new(file_path).strip_prefix(&cwd) else { return };
+    if rel.starts_with(cp_base::config::constants::WORKTREES_DIR) {
+        return;
+    }
     let rel_str = rel.to_string_lossy();
     let ts = cp_mod_tree::types::TreeState::get(state);
     if let Some(desc) = ts.descriptions.iter().find(|d| d.path == rel_str.as_ref()) {

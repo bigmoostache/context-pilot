@@ -27,7 +27,11 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), "Missing required parameter: contents".to_owned(), true);
     };
 
-    let resolved = state.resolve_path(path_str);
+    // try_: create_dir_all below would otherwise silently recreate a deleted worktree.
+    let resolved = match state.try_resolve_path(path_str) {
+        Ok(p) => p,
+        Err(e) => return ToolResult::new(tool.id.clone(), format!("Error: {e}"), true),
+    };
     let path = resolved.as_path();
     let is_new = !path.exists();
 

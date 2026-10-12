@@ -29,6 +29,10 @@ fn file_panel_needs_describe(state: &State, ctx: &Entry) -> Option<String> {
     }
     let cwd = state.workdir().canonicalize().ok()?;
     let rel = std::path::Path::new(file_path).strip_prefix(&cwd).ok()?;
+    // Another worktree's copy of a file: descriptions belong to the root tree, not to it.
+    if rel.starts_with(cp_base::config::constants::WORKTREES_DIR) {
+        return None;
+    }
     let rel_str = rel.to_string_lossy();
     let ts = cp_mod_tree::types::TreeState::get(state);
     let needs_skip = ts.descriptions.iter().find(|d| d.path == rel_str.as_ref()).map_or_else(

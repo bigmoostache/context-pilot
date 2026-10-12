@@ -105,6 +105,9 @@ pub fn project_root() -> std::path::PathBuf {
     std::env::current_dir().unwrap_or_else(|_err| std::path::PathBuf::from("."))
 }
 
+/// Folder (under the project root) holding every managed git worktree.
+pub const WORKTREES_DIR: &str = ".worktrees";
+
 /// Messages subdirectory
 pub const MESSAGES_DIR: &str = "messages";
 

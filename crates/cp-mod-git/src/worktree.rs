@@ -1,7 +1,9 @@
 //! `Worktree` tool — moves the executing thread into a git worktree.
 //!
 //! Worktrees live under `<project root>/.worktrees/<branch>` (slashes become
-//! dashes). Entering one sets the thread's
+//! `+`, which branch names may not contain, so every branch gets its own
+//! folder). Git's own worktree list is the source of truth for where a
+//! branch's worktree is. Entering one sets the thread's
 //! [`workdir`](cp_base::state::runtime::bundle::ThreadRuntime::workdir), which
 //! every path- or cwd-sensitive module resolves through
 //! [`State::workdir`]. The process cwd never changes, so threads running
@@ -10,16 +12,13 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use cp_base::config::constants::project_root;
+use cp_base::config::constants::{WORKTREES_DIR, project_root};
 use cp_base::modules::run_with_timeout;
 use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolDefinition, ToolResult, ToolTexts, ToolUse};
 
 use super::GIT_CMD_TIMEOUT_SECS;
-
-/// Folder (under the project root) holding every managed worktree.
-const WORKTREES_DIR: &str = ".worktrees";
 
 /// Tool definition, built here to keep `lib.rs` under the line cap.
 pub(crate) fn definition(t: &ToolTexts) -> ToolDefinition {
@@ -59,9 +58,15 @@ fn validate_branch(branch: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// `<root>/.worktrees/<branch>` with `/` flattened to `-`.
+/// Folder name for a new worktree: `/` → `+`. Injective because
+/// [`validate_branch`] never lets `+` into a name (`a/b` ≠ `a-b`).
+fn folder_name(branch: &str) -> String {
+    branch.replace('/', "+")
+}
+
+/// `<root>/.worktrees/<folder_name>` — where a NEW worktree for `branch` goes.
 fn worktree_dir(branch: &str) -> PathBuf {
-    project_root().join(WORKTREES_DIR).join(branch.replace('/', "-"))
+    project_root().join(WORKTREES_DIR).join(folder_name(branch))
 }
 
 /// Run `git <args>` in `dir`; stdout on success, stderr (or stdout) on failure.
@@ -82,34 +87,56 @@ fn git(dir: &Path, args: &[&str]) -> Result<String, String> {
     Err(if stderr.is_empty() { stdout } else { stderr })
 }
 
+/// Path git has registered for `branch`'s worktree (main one included),
+/// whether or not the folder still exists on disk.
+fn registered(root: &Path, branch: &str) -> Result<Option<PathBuf>, String> {
+    let listing = git(root, &["worktree", "list", "--porcelain"])?;
+    Ok(find_in_porcelain(&listing, branch))
+}
+
+/// Parse `git worktree list --porcelain`: blank-line separated records of
+/// `worktree <path>` / `HEAD <sha>` / `branch refs/heads/<name>` lines.
+fn find_in_porcelain(listing: &str, branch: &str) -> Option<PathBuf> {
+    let want = format!("branch refs/heads/{branch}");
+    listing
+        .split("\n\n")
+        .find(|rec| rec.lines().any(|l| l == want))
+        .and_then(|rec| rec.lines().find_map(|l| l.strip_prefix("worktree ")))
+        .map(PathBuf::from)
+}
+
+/// Same folder, tolerant of symlinked spellings; raw compare once a side is gone.
+fn same_dir(a: &Path, b: &Path) -> bool {
+    match (a.canonicalize(), b.canonicalize()) {
+        (Ok(ca), Ok(cb)) => ca == cb,
+        _ => a == b,
+    }
+}
+
 /// Point the executing thread at `dir` (`None` = project root) and refresh git panels.
 fn set_workdir(state: &mut State, dir: Option<PathBuf>) {
     state.thread_mut().workdir = dir;
     cp_base::panels::mark_panels_dirty(state, Kind::GIT_RESULT);
 }
 
-/// Create the worktree if missing (new branch when it doesn't exist), then enter it.
+/// Enter `branch`'s worktree, creating it (and the branch if new) when git has none.
 fn enter(state: &mut State, branch: &str) -> Result<String, String> {
     let root = project_root();
-    let dir = worktree_dir(branch);
-    let created = !dir.is_dir();
-    if created {
-        ensure_worktrees_dir(&root)?;
-        let path = dir.to_string_lossy().into_owned();
-        let ref_name = format!("refs/heads/{branch}");
-        let args: Vec<&str> = if git(&root, &["rev-parse", "--verify", "--quiet", &ref_name]).is_ok() {
-            vec!["worktree", "add", &path, branch]
-        } else {
-            vec!["worktree", "add", "-b", branch, &path]
-        };
-        let _out = git(&root, &args)?;
-    } else {
-        // `a/b` and `a-b` share a folder: never land on the wrong branch.
-        let head = git(&dir, &["branch", "--show-current"])?;
-        if head != branch {
-            return Err(format!("{} is checked out on '{head}', not '{branch}'", dir.display()));
+    let (dir, created) = match registered(&root, branch)? {
+        Some(dir) if same_dir(&dir, &root) => {
+            return Err(format!(
+                "branch '{branch}' is checked out at the project root; run Worktree(action=leave) to work there"
+            ));
         }
-    }
+        Some(dir) if dir.is_dir() => (dir, false),
+        Some(dir) => {
+            return Err(format!(
+                "the worktree for '{branch}' ({}) was deleted from disk; run Worktree(action=remove, branch={branch}) to clean it up, then enter again",
+                dir.display()
+            ));
+        }
+        None => (add_worktree(&root, branch)?, true),
+    };
     let shown = dir.display().to_string();
     set_workdir(state, Some(dir));
     let verb = if created { "Created and entered" } else { "Entered" };
@@ -117,6 +144,38 @@ fn enter(state: &mut State, branch: &str) -> Result<String, String> {
         "{verb} worktree {shown} (branch {branch}). Relative paths, git, gh, consoles and callbacks now run there. \
          Search still indexes the project root only."
     ))
+}
+
+/// `git worktree add` a fresh folder for `branch` (new branch when it doesn't exist).
+fn add_worktree(root: &Path, branch: &str) -> Result<PathBuf, String> {
+    let dir = worktree_dir(branch);
+    if dir.exists() {
+        return Err(format!("{} exists but is not a worktree of '{branch}'; move it away first", dir.display()));
+    }
+    ensure_worktrees_dir(root)?;
+    let path = dir.to_string_lossy().into_owned();
+    let ref_name = format!("refs/heads/{branch}");
+    let args: Vec<&str> = if git(root, &["rev-parse", "--verify", "--quiet", &ref_name]).is_ok() {
+        vec!["worktree", "add", &path, branch]
+    } else {
+        vec!["worktree", "add", "-b", branch, &path]
+    };
+    let _out = git(root, &args).map_err(|e| friendly_add_error(branch, &e))?;
+    Ok(dir)
+}
+
+/// Turn git's "already checked out" refusal into a plain explanation.
+fn friendly_add_error(branch: &str, err: &str) -> String {
+    let at = ["is already used by worktree at ", "is already checked out at "]
+        .iter()
+        .find_map(|marker| err.split_once(marker).map(|(_, rest)| rest));
+    at.map_or_else(
+        || err.to_owned(),
+        |rest| {
+            let place = rest.lines().next().unwrap_or("").trim().trim_matches('\'');
+            format!("branch '{branch}' is already checked out at {place}; a branch can live in only one worktree")
+        },
+    )
 }
 
 /// Create `.worktrees/` with a self-ignoring `.gitignore`, leaving the repo's own untouched.
@@ -146,19 +205,62 @@ fn list(state: &State) -> Result<String, String> {
     Ok(format!("{listing}\n\nThis thread works in: {}", state.workdir().display()))
 }
 
-/// Delete a clean worktree (the branch is kept); refuses on uncommitted changes.
+/// Delete `branch`'s worktree (the branch is kept). Refuses on uncommitted
+/// changes; a folder already deleted from disk is pruned from git's records.
 fn remove(state: &mut State, branch: &str) -> Result<String, String> {
-    let dir = worktree_dir(branch);
-    if !dir.is_dir() {
-        return Err(format!("no worktree at {}", dir.display()));
+    let root = project_root();
+    let Some(dir) = registered(&root, branch)? else {
+        return Err(format!("no worktree for branch '{branch}'"));
+    };
+    if same_dir(&dir, &root) {
+        return Err(format!("branch '{branch}' is checked out at the project root, which cannot be removed"));
     }
-    if !git(&dir, &["status", "--porcelain"])?.is_empty() {
-        return Err(format!("{} has uncommitted changes; commit or discard them first", dir.display()));
+    let path = dir.display().to_string();
+    if dir.is_dir() {
+        if !git(&dir, &["status", "--porcelain"])?.is_empty() {
+            return Err(format!("{path} has uncommitted changes; commit or discard them first"));
+        }
+        let _out = git(&root, &["worktree", "remove", &path])?;
+    } else {
+        let _out = git(&root, &["worktree", "prune"])?;
     }
-    let path = dir.to_string_lossy().into_owned();
-    let _out = git(&project_root(), &["worktree", "remove", &path])?;
-    if state.thread().workdir.as_deref() == Some(dir.as_path()) {
+    let mut msg = format!("Removed worktree {path} (branch {branch} kept).");
+    if state.thread().workdir.as_deref().is_some_and(|w| same_dir(w, &dir)) {
         set_workdir(state, None);
+        msg.push_str(" This thread was inside it and is back at the project root.");
     }
-    Ok(format!("Removed worktree {path} (branch {branch} kept)."))
+    Ok(msg)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{find_in_porcelain, folder_name, friendly_add_error};
+
+    /// Two worktrees as printed by `git worktree list --porcelain`.
+    const LISTING: &str = "worktree /repo\nHEAD 1\nbranch refs/heads/main\n\n\
+                           worktree /repo/.worktrees/a+b\nHEAD 2\nbranch refs/heads/a/b\nprunable gitdir file points to non-existent location";
+
+    #[test]
+    fn porcelain_lookup_matches_exact_branch() {
+        assert_eq!(find_in_porcelain(LISTING, "a/b").as_deref(), Some(std::path::Path::new("/repo/.worktrees/a+b")));
+        assert_eq!(find_in_porcelain(LISTING, "main").as_deref(), Some(std::path::Path::new("/repo")));
+        assert!(find_in_porcelain(LISTING, "a").is_none());
+        assert!(find_in_porcelain(LISTING, "a-b").is_none());
+    }
+
+    #[test]
+    fn folder_names_never_collide() {
+        assert_ne!(folder_name("a/b"), folder_name("a-b"));
+        assert_eq!(folder_name("feat/x/y"), "feat+x+y");
+    }
+
+    #[test]
+    fn checked_out_elsewhere_is_explained() {
+        let err = "Preparing worktree (checking out 'm')\nfatal: 'm' is already used by worktree at '/repo'";
+        assert_eq!(
+            friendly_add_error("m", err),
+            "branch 'm' is already checked out at /repo; a branch can live in only one worktree"
+        );
+        assert_eq!(friendly_add_error("m", "fatal: other"), "fatal: other");
+    }
 }

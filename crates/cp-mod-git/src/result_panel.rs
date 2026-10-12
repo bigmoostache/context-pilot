@@ -64,6 +64,13 @@ impl Panel for GitResultPanel {
         // Parse and execute the command with timeout
         let args = super::classify::validate_git_command(&command).ok()?;
 
+        // A vanished worktree makes git report every file as deleted: say so instead.
+        if !cwd.is_dir() {
+            let content = format!("Error: workdir {} no longer exists (worktree removed?).", cwd.display());
+            let token_count = estimate_tokens(&content);
+            return Some(CacheUpdate::Content { context_id, content, token_count });
+        }
+
         let mut cmd = std::process::Command::new("git");
         let _c = cmd
             .args(&args)
