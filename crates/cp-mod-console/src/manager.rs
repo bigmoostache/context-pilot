@@ -63,7 +63,7 @@ fn server_binary_path() -> PathBuf {
 #[must_use]
 pub fn log_file_path(key: &str) -> PathBuf {
     let base = PathBuf::from(constants::STORE_DIR).join(CONSOLE_DIR).join(format!("{key}.log"));
-    if base.is_absolute() { base } else { std::env::current_dir().unwrap_or_default().join(base) }
+    if base.is_absolute() { base } else { constants::project_root().join(base) }
 }
 
 // ---------------------------------------------------------------------------
