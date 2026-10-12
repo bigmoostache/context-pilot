@@ -159,6 +159,9 @@ pub(super) fn route_rest(method: &Method, segments: &[&str], ctx: RouteCtx<'_>) 
         (&Method::Post, &["api", "agent", id, "fs", "upload-unique"]) => {
             inspect::finder::fs_upload_unique(state, id, query, body_bytes)
         }
+        (&Method::Post, &["api", "agent", id, "fs", "sheet", "save"]) => {
+            inspect::finder::fs_sheet_save(state, id, query, body_bytes)
+        }
         (&Method::Post, &["api", "agent", id, "fs", "write"]) => {
             inspect::finder::fs_write(state, id, query, body_bytes)
         }

@@ -7,7 +7,7 @@ use umya_spreadsheet::{
     ConditionalFormattingRule, Formula, Hyperlink, SequenceOfReferences,
 };
 
-use super::convert;
+use super::super::convert;
 
 /// Fixture: a `> 10` rule on A1:A5, a note on B2, an external and an internal link.
 fn fixture(path: &std::path::Path) {

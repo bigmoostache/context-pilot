@@ -39,8 +39,6 @@ pub(super) fn sheet_notes(ws: &Worksheet) -> Map<String, Value> {
 /// Plain text of a note, whether stored as plain or rich text.
 fn note_text(comment: &Comment) -> String {
     let body = comment.text();
-    body.text().map_or_else(
-        || body.rich_text().map(|rt| rt.text().into_owned()).unwrap_or_default(),
-        |t| t.value().to_owned(),
-    )
+    body.text()
+        .map_or_else(|| body.rich_text().map(|rt| rt.text().into_owned()).unwrap_or_default(), |t| t.value().to_owned())
 }

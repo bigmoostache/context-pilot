@@ -13,7 +13,10 @@ mod cf;
 mod grid;
 mod notes;
 mod rich;
+mod save;
 mod style;
+
+pub(super) use save::save;
 
 use std::path::Path;
 
@@ -90,5 +93,3 @@ fn resources(rules: Map<String, Value>, notes: Map<String, Value>) -> Vec<Value>
 
 #[cfg(test)]
 mod tests;
-#[cfg(test)]
-mod tests_p3;

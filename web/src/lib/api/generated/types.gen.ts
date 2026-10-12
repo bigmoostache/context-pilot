@@ -683,6 +683,18 @@ export type SheetData = {
     };
 };
 
+export type SheetSaveResult = {
+    /**
+     * Cells changed in the original file.
+     */
+    patched: number;
+    path: string;
+    /**
+     * Saved file size in bytes.
+     */
+    written: number;
+};
+
 export type SheetTab = {
     name: string;
     rows: Array<Array<string>>;
@@ -1411,6 +1423,37 @@ export type GetApiAgentByIdFsSheetResponses = {
 };
 
 export type GetApiAgentByIdFsSheetResponse = GetApiAgentByIdFsSheetResponses[keyof GetApiAgentByIdFsSheetResponses];
+
+export type PostApiAgentByIdFsSheetSaveData = {
+    body: {
+        [key: string]: unknown;
+    };
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+    };
+    url: '/api/agent/{id}/fs/sheet/save';
+};
+
+export type PostApiAgentByIdFsSheetSaveErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiAgentByIdFsSheetSaveError = PostApiAgentByIdFsSheetSaveErrors[keyof PostApiAgentByIdFsSheetSaveErrors];
+
+export type PostApiAgentByIdFsSheetSaveResponses = {
+    /**
+     * Success
+     */
+    200: SheetSaveResult;
+};
+
+export type PostApiAgentByIdFsSheetSaveResponse = PostApiAgentByIdFsSheetSaveResponses[keyof PostApiAgentByIdFsSheetSaveResponses];
 
 export type PostApiAgentByIdFsTrashData = {
     body: {

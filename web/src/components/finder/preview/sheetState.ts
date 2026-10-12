@@ -12,7 +12,7 @@ import type {
 } from "@univerjs/presets"
 import { BooleanNumber } from "@univerjs/presets"
 import ExcelJS from "exceljs"
-import { uploadFile } from "@/lib/api"
+import { saveSheet, uploadFile } from "@/lib/api"
 
 /** Backend sheet shape from the calamine `/fs/sheet` endpoint. */
 export interface SheetPayload {
@@ -196,15 +196,24 @@ export async function generateXlsxBlob(univerAPI: FUniver): Promise<Blob | null>
 }
 
 /**
- * Generate a modified XLSX from Univer state and upload it back to the agent
- * realm, overwriting the original file. The realm's file becomes the new
- * source of truth.
+ * Write Univer edits back to the agent realm file.
+ *
+ * xlsx/xlsm: the snapshot goes to the backend, which patches only the changed
+ * cells into the original file, so its formatting survives. Other formats are
+ * rebuilt from Univer state via ExcelJS and uploaded over the original.
  */
 export async function saveToRealm(
   univerAPI: FUniver,
   agentId: string,
   realmPath: string,
 ): Promise<void> {
+  if (/\.xls[xm]$/i.test(realmPath)) {
+    const workbook = univerAPI.getActiveWorkbook()
+    if (!workbook) throw new Error("No active workbook")
+    const snapshot: Record<string, unknown> = { ...workbook.save() }
+    await saveSheet(agentId, realmPath, snapshot)
+    return
+  }
   const blob = await generateXlsxBlob(univerAPI)
   if (!blob) throw new Error("No active workbook")
 

@@ -221,6 +221,14 @@ pub(super) fn paths() -> Value {
                 "*/*": { "schema": { "type": "string", "format": "binary" } }
             }}}
         }})),
+        "/api/agent/{id}/fs/sheet/save": with_agent(json!({ "post": {
+            "tags": ["fs"], "summary": "Save spreadsheet edits (patches the original xlsx/xlsm)",
+            "parameters": [qp("path")],
+            "requestBody": { "required": true, "content": {
+                "application/json": { "schema": { "type": "object", "additionalProperties": true } }
+            }},
+            "responses": merge(ok(r("SheetSaveResult")), err())
+        }})),
         "/api/agent/{id}/fs/write": with_agent(json!({ "post": {
             "tags": ["fs"], "summary": "Write file",
             "parameters": [qp("path")],

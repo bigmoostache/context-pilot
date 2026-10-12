@@ -8,6 +8,7 @@ import type {
   FinderNode,
   FsPreview,
   SheetData,
+  SheetSaveResult,
   UploadResult,
   UploadUniqueResult,
   WriteResult,
@@ -17,6 +18,7 @@ import {
   getApiAgentByIdFsDescriptions,
   getApiAgentByIdFsPreview,
   getApiAgentByIdFsSheet,
+  postApiAgentByIdFsSheetSave,
   postApiAgentByIdFsUpload,
   postApiAgentByIdFsUploadUnique,
   postApiAgentByIdFsWrite,
@@ -25,7 +27,7 @@ import { BASE, getToken, sdk } from "./client"
 
 // ── Type re-exports (preserve import surface) ────────────────────────
 
-export type { FinderNode, FsPreview, SheetData } from "./generated/types.gen"
+export type { FinderNode, FsPreview, SheetData, SheetSaveResult } from "./generated/types.gen"
 export type { WriteResult, UploadResult, UploadUniqueResult } from "./generated/types.gen"
 
 // ── GET endpoints (SDK) ──────────────────────────────────────────────
@@ -50,6 +52,20 @@ export function fetchSheet(agentId: string, path: string): Promise<SheetData> {
 
 export function writeFile(agentId: string, path: string, content: string): Promise<WriteResult> {
   return sdk(postApiAgentByIdFsWrite({ path: { id: agentId }, query: { path }, body: content }))
+}
+
+/**
+ * Save Univer edits to an xlsx/xlsm by patching the original file server-side
+ * (formatting Univer doesn't model is kept). `snapshot` = `workbook.save()`.
+ */
+export function saveSheet(
+  agentId: string,
+  path: string,
+  snapshot: Record<string, unknown>,
+): Promise<SheetSaveResult> {
+  return sdk(
+    postApiAgentByIdFsSheetSave({ path: { id: agentId }, query: { path }, body: snapshot }),
+  )
 }
 
 export function uploadFile(agentId: string, dir: string, file: File): Promise<UploadResult> {

@@ -81,6 +81,54 @@ pub(crate) fn fs_sheet(state: &Mutex<Backend>, agent_id: &str, query: &str) -> H
     }
 }
 
+/// `POST /api/agent/{id}/fs/sheet/save?path=` — body = Univer snapshot JSON.
+///
+/// Patches the original `xlsx`/`xlsm` in place with only what the snapshot
+/// changed, so formatting Univer doesn't model survives (see `univer::save`).
+/// Replies `{ written, path, patched }`; `415` for other formats, `400` for a
+/// malformed or mismatched snapshot, `413` over the preview size cap.
+pub(crate) fn fs_sheet_save(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8]) -> HttpReply {
+    let folder = match agent_folder(state, agent_id) {
+        Ok(f) => f,
+        Err(reply) => return reply,
+    };
+    let relative = match extract_param(query, "path") {
+        Some(p) if !p.is_empty() => p,
+        _ => return HttpReply::error(400, "missing path parameter"),
+    };
+    let Some(target) = confined_path(&folder, &relative) else {
+        return HttpReply::error(403, "path outside agent realm");
+    };
+    if let Some(reply) = save_guard(&target) {
+        return reply;
+    }
+    let Ok(snapshot) = serde_json::from_slice::<serde_json::Value>(body) else {
+        return HttpReply::error(400, "body is not a JSON snapshot");
+    };
+    match super::univer::save(&target, &snapshot) {
+        Ok(patched) => HttpReply::ok(&serde_json::json!({
+            "written": target.metadata().map_or(0, |m| m.len()),
+            "path": relative,
+            "patched": patched,
+        })),
+        Err(msg) => HttpReply::error(400, msg),
+    }
+}
+
+/// Refuse what can't be patched: missing file (`404`), non-xlsx (`415`),
+/// over the size cap (`413`).
+fn save_guard(target: &std::path::Path) -> Option<HttpReply> {
+    if !target.is_file() {
+        return Some(HttpReply::error(404, "file not found"));
+    }
+    let ext = target.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    if !matches!(ext.as_str(), "xlsx" | "xlsm") {
+        return Some(HttpReply::error(415, "only xlsx/xlsm can be patched"));
+    }
+    (target.metadata().map_or(0, |m| m.len()) > super::univer::MAX_FILE_BYTES)
+        .then(|| HttpReply::error(413, "workbook too large"))
+}
+
 /// Full-fidelity `xlsx`/`xlsm` reply: `413` over [`super::univer::MAX_FILE_BYTES`],
 /// else the Univer snapshot (`workbook` + `activeSheet`, empty `sheets`).
 /// `None` when umya can't read the file, so the caller falls back to calamine.

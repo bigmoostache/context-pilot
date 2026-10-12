@@ -33,5 +33,5 @@ pub(crate) use listing::{conversation, fs_descriptions, fs_list, fs_preview};
 pub(crate) use mutate::{fs_mkdir, fs_move, fs_rename, fs_trash, fs_write};
 // Private re-export so sibling `upload` can reach these via `super::`.
 use mutate::{is_bare_name, rel_child};
-pub(crate) use sheet::fs_sheet;
+pub(crate) use sheet::{fs_sheet, fs_sheet_save};
 pub(crate) use upload::{fs_upload, fs_upload_unique};

@@ -354,6 +354,15 @@ pub(super) fn transport() -> Value {
             "properties": { "written": { "type": "integer" }, "path": { "type": "string" } },
             "required": ["written", "path"]
         },
+        "SheetSaveResult": {
+            "type": "object",
+            "properties": {
+                "written": { "type": "integer", "description": "Saved file size in bytes." },
+                "path": { "type": "string" },
+                "patched": { "type": "integer", "description": "Cells changed in the original file." }
+            },
+            "required": ["written", "path", "patched"]
+        },
         "MkdirResult": {
             "type": "object",
             "properties": { "created": { "type": "string" } },

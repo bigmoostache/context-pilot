@@ -1986,6 +1986,27 @@
         ],
         "type": "object"
       },
+      "SheetSaveResult": {
+        "properties": {
+          "patched": {
+            "description": "Cells changed in the original file.",
+            "type": "integer"
+          },
+          "path": {
+            "type": "string"
+          },
+          "written": {
+            "description": "Saved file size in bytes.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "written",
+          "path",
+          "patched"
+        ],
+        "type": "object"
+      },
       "SheetTab": {
         "properties": {
           "name": {
@@ -3506,6 +3527,65 @@
           }
         },
         "summary": "Spreadsheet data",
+        "tags": [
+          "fs"
+        ]
+      }
+    },
+    "/api/agent/{id}/fs/sheet/save": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SheetSaveResult"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Save spreadsheet edits (patches the original xlsx/xlsm)",
         "tags": [
           "fs"
         ]

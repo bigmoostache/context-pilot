@@ -230,7 +230,6 @@ fn cell_entry(cell: &Cell, link_id: &str, ctx: &mut Ctx<'_>) -> Map<String, Valu
     entry
 }
 
-
 /// Cached value → `{ v, t }` (Univer `CellValueType`: 1 string, 2 number, 3 bool);
 /// rich text also gets its per-run document `p`.
 fn value_part(raw: &CellRawValue, theme: &Theme) -> Map<String, Value> {

@@ -8,8 +8,8 @@
 use std::collections::HashMap;
 
 use serde_json::{Map, Value, json};
-use umya_spreadsheet::{Hyperlink, RichText};
 use umya_spreadsheet::drawing::Theme;
+use umya_spreadsheet::{Hyperlink, RichText};
 
 use super::style::font_part;
 
@@ -23,11 +23,8 @@ pub(super) fn add_link(entry: &mut Map<String, Value>, link: &Hyperlink, ctx: &L
     let Some(url) = link_url(link, ctx) else {
         return;
     };
-    let Some(text) = entry
-        .get("v")
-        .and_then(Value::as_str)
-        .filter(|_| entry.get("t") == Some(&json!(1u8)))
-        .map(str::to_owned)
+    let Some(text) =
+        entry.get("v").and_then(Value::as_str).filter(|_| entry.get("t") == Some(&json!(1u8))).map(str::to_owned)
     else {
         return;
     };

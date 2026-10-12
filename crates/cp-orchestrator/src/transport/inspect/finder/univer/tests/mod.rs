@@ -6,6 +6,9 @@ use umya_spreadsheet::{Color, Pane, PaneStateValues, RichText, SheetView, TextEl
 
 use super::convert;
 
+mod p3;
+mod save;
+
 /// Build a fixture workbook covering values, formula, style, merge, sizes,
 /// hidden row, freeze, tab colour and a second (active) sheet.
 fn fixture(path: &std::path::Path) {
