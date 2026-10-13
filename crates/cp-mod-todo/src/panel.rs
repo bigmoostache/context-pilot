@@ -22,7 +22,7 @@ impl TodoPanel {
         // the shared `focus_filter` alone made every agent's Todo panel show the
         // focused agent's tasks (same class as the Threads-panel bug).
         let Some(focus) = state.executing_agent_id() else {
-            return "No focused thread".to_owned();
+            return "No focused agent".to_owned();
         };
         let yaml = crate::yaml::render(state, focus);
         if yaml.trim().is_empty() { "No tasks".to_owned() } else { yaml.trim_end().to_owned() }
@@ -38,7 +38,7 @@ impl Panel for TodoPanel {
         use cp_render::{Block, Semantic, Span as S};
         // Per-thread view: scope to the executing agent (see format_todos_for_context).
         let Some(focus) = state.executing_agent_id() else {
-            return vec![Block::Line(vec![S::muted("  No focused thread".into()).italic()])];
+            return vec![Block::Line(vec![S::muted("  No focused agent".into()).italic()])];
         };
         let yaml = crate::yaml::render(state, focus);
         if yaml.trim().is_empty() {

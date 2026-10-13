@@ -52,7 +52,7 @@ fn message_created_sets_agent_head() {
 
     let agent = view.get("a1").expect("agent present");
     assert_eq!(agent.rev, 0);
-    let head = agent.heads.agents.iter().find(|h| h.agent_id == "T1").expect("thread head present");
+    let head = agent.heads.agents.iter().find(|h| h.agent_id == "T1").expect("agent head present");
     assert_eq!(head.last_message_hash, ContentHash::new([0x11; 32]));
 }
 

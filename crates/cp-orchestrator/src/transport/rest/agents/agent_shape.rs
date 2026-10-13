@@ -362,7 +362,7 @@ mod tests {
             .msg_count(1)
             .build()];
         overlay_roster(&mut details, &roster, "a1");
-        let d = details.first().expect("no duplicate appended for a matched thread");
+        let d = details.first().expect("no duplicate appended for a matched agent");
         assert_eq!(str_at(d, "status"), Some("MY_TURN"), "status refreshed from the view");
         assert_eq!(bool_at(d, "archived"), Some(true), "archived refreshed from the view");
         assert_eq!(u64_at(d, "lastActivity"), Some(500), "activity is the later of disk/view");

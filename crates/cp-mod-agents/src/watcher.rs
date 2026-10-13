@@ -23,7 +23,7 @@ use crate::types::{AgentStatus, AgentsState, FocusState};
 /// a literal (dodges `unnecessary_literal_bound` without a redundant annotation).
 const WATCHER_ID: &str = "my_turn_watcher";
 /// Watcher description (same trick as [`WATCHER_ID`]).
-const WATCHER_DESC: &str = "Detects idle agent with MY_TURN threads needing a response";
+const WATCHER_DESC: &str = "Detects idle agent with MY_TURN agents needing a response";
 
 /// Minimum interval between watcher fires (ms). Prevents flood from the
 /// persistent watcher firing every ~50ms poll cycle.
@@ -119,8 +119,8 @@ impl Watcher for IdleMyTurnDetector {
         if !is_normal_stop(state.agent().last_stop_reason.as_deref()) {
             return Some(WatcherResult {
                 description: format!(
-                    "Thread \"{}\" ({}) is MY_TURN but the last LLM turn ended \
-                     abnormally (reason: {}). Send a message in that thread \
+                    "Agent \"{}\" ({}) is MY_TURN but the last LLM turn ended \
+                     abnormally (reason: {}). Send a message in that agent \
                      explaining to the user that a guardrail or error fired, \
                      and suggest changing the model to continue.",
                     agent.name,
@@ -141,7 +141,7 @@ impl Watcher for IdleMyTurnDetector {
 
         Some(WatcherResult {
             description: format!(
-                "Thread \"{}\" ({}) is MY_TURN and needs a response. \
+                "Agent \"{}\" ({}) is MY_TURN and needs a response. \
                  Use Read to focus on it, then Send your reply.",
                 agent.name, agent.id,
             ),

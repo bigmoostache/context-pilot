@@ -171,7 +171,7 @@ pub(crate) fn maybe_hygiene_nudge(app: &mut App) {
     }
 
     let msg = if no_tasks {
-        "This thread has no tasks yet \u{2014} use Think's todo to sketch a checklist before you dig in."
+        "This agent has no tasks yet \u{2014} use Think's todo to sketch a checklist before you dig in."
     } else {
         "You have planned tasks but none in progress \u{2014} mark one in_progress so your plan is visible."
     };

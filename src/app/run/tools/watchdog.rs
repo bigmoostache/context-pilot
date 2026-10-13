@@ -108,7 +108,7 @@ impl Step {
             Self::Idle => "Idle (input poll)",
             Self::Input => "Input handling",
             Self::Bridge => "Bridge socket",
-            Self::AgentsEmit => "Thread/vitals emit",
+            Self::AgentsEmit => "Agent/vitals emit",
             Self::Stream => "Stream event drain",
             Self::Cache => "Cache updates",
             Self::Watchers => "Watcher events",

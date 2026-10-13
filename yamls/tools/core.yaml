@@ -36,7 +36,7 @@ tools:
 
   Todo:
     description: |
-      Upsert tasks on the CURRENTLY FOCUSED thread. Tasks are thread-owned, so this is rejected when no thread is focused — Read a thread first.
+      Upsert tasks on the CURRENTLY FOCUSED agent. Tasks are agent-owned, so this is rejected when no agent is focused — Read an agent first.
 
       You pass `items`: a list of tasks. Each one either UPDATES an existing task (it carries an `id`) or CREATES a new one (it does not). Nesting is how you express parenthood — there is no parent_id anywhere.
 
@@ -66,7 +66,7 @@ tools:
 
       DELETING is an explicit `{"id": "X41", "status": "cancelled"}` — a cancelled task is soft-deleted (hidden, recoverable, sorted last), never hard-removed. Omitting a task NEVER deletes it.
 
-      The whole call is ATOMIC and validated first: a nested `id`, an `id` that doesn't exist on this thread, a repeated `id`, a create with no `title`, or a bad `status` rejects the ENTIRE call and changes nothing — the error names every problem at once. After applying, the tool echoes the fresh task tree; check it to confirm the interpreted result.
+      The whole call is ATOMIC and validated first: a nested `id`, an `id` that doesn't exist on this agent, a repeated `id`, a create with no `title`, or a bad `status` rejects the ENTIRE call and changes nothing — the error names every problem at once. After applying, the tool echoes the fresh task tree; check it to confirm the interpreted result.
 
       Reparenting and reordering existing tasks are not supported — create the task where you want it.
     parameters:

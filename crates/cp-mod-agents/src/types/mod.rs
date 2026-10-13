@@ -280,12 +280,12 @@ impl AgentsState {
     /// or holds no message stamped `at_ts`; the state is left untouched.
     pub fn branch(&mut self, source_id: &str, at_ts: u64, name: &str) -> Result<String, String> {
         let source =
-            self.agents.iter().find(|t| t.id == source_id).ok_or_else(|| format!("thread {source_id} not found"))?;
+            self.agents.iter().find(|t| t.id == source_id).ok_or_else(|| format!("agent {source_id} not found"))?;
         let cut = source
             .messages
             .iter()
             .position(|m| m.timestamp == at_ts)
-            .ok_or_else(|| format!("no message with ts={at_ts} in thread {source_id}"))?;
+            .ok_or_else(|| format!("no message with ts={at_ts} in agent {source_id}"))?;
         let messages: Vec<AgentMessage> = source
             .messages
             .iter()

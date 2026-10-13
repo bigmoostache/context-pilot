@@ -53,7 +53,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(agent_id) = state.executing_agent_id().map(str::to_owned) else {
         return ToolResult::new(
             tool.id.clone(),
-            "No focused thread \u{2014} scratchpad cells live in a thread; Read a thread first.".to_owned(),
+            "No focused agent \u{2014} scratchpad cells live in an agent; Read an agent first.".to_owned(),
             true,
         );
     };
@@ -91,7 +91,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(agent_id) = state.executing_agent_id().map(str::to_owned) else {
         return ToolResult::new(
             tool.id.clone(),
-            "No focused thread \u{2014} scratchpad cells live in a thread; Read a thread first.".to_owned(),
+            "No focused agent \u{2014} scratchpad cells live in an agent; Read an agent first.".to_owned(),
             true,
         );
     };
@@ -136,7 +136,7 @@ pub(crate) fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(agent_id) = state.executing_agent_id().map(str::to_owned) else {
         return ToolResult::new(
             tool.id.clone(),
-            "No focused thread \u{2014} scratchpad cells live in a thread; Read a thread first.".to_owned(),
+            "No focused agent \u{2014} scratchpad cells live in an agent; Read an agent first.".to_owned(),
             true,
         );
     };

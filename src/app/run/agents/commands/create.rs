@@ -52,7 +52,7 @@ pub(super) fn apply_create_agent(state: &mut State, name: &str, seed: &Seed<'_>)
 
     ts.agents.push(cp_mod_agents::types::Agent::new(id.clone(), name.to_owned()));
     announce_agent(state, &id, name, None);
-    log::info!("bridge: created thread {id} \"{name}\"");
+    log::info!("bridge: created agent {id} \"{name}\"");
     apply_seed(state, &id, seed);
     id
 }
@@ -83,7 +83,7 @@ pub(super) fn apply_branch_agent(
         }
     };
     announce_agent(state, &id, name, Some(source));
-    log::info!("bridge: branched thread {id} \"{name}\" out of {source} at ts={}", point.message_ts);
+    log::info!("bridge: branched agent {id} \"{name}\" out of {source} at ts={}", point.message_ts);
     apply_seed(state, &id, seed);
     Some(id)
 }

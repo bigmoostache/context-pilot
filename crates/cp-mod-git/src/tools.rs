@@ -83,7 +83,7 @@ fn check_workdir(cwd: &std::path::Path) -> Result<(), String> {
         return Ok(());
     }
     Err(format!(
-        "this thread's workdir {} no longer exists (worktree removed?). Run Worktree(action=leave) to return to the project root.",
+        "this agent's workdir {} no longer exists (worktree removed?). Run Worktree(action=leave) to return to the project root.",
         cwd.display()
     ))
 }

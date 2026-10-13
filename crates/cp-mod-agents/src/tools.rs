@@ -111,7 +111,7 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     // focus, so for the on-screen agent this is a no-op; for a background
     // agent it must not steal focus. Focus changes only on explicit human nav.
     let suffix = if still_my_turn { " (still your turn)" } else { "" };
-    let unarchived_note = if unarchived { " [thread was archived \u{2014} automatically unarchived]" } else { "" };
+    let unarchived_note = if unarchived { " [agent was archived \u{2014} automatically unarchived]" } else { "" };
     let mut result = ToolResult::new(
         tool.id.clone(),
         format!("Sent to {tid} \"{agent_name}\": {msg_preview}{suffix}{unarchived_note}"),
@@ -192,7 +192,7 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
     // --- Phase 1: Collect summary across ALL agents (before marking) ---
     let ts = AgentsState::get(state);
     let Some(target_agent) = ts.agents.iter().find(|t| t.id == tid) else {
-        return ToolResult::new(tool.id.clone(), format!("Thread '{tid}' not found"), true);
+        return ToolResult::new(tool.id.clone(), format!("Agent '{tid}' not found"), true);
     };
 
     let agent_name = target_agent.name.clone();
@@ -283,9 +283,9 @@ fn build_read_result(state: &State, r: &ReadResult<'_>) -> String {
         .map_or_else(|| "[no messages]".to_owned(), |c| preview_ellipsis(c, 80));
 
     let (tid, agent_name, agent_status) = (r.tid, r.agent_name, r.agent_status);
-    let mut lines = vec![format!("Thread {tid} \"{agent_name}\" [{agent_status}] — your thread, refreshed.\n")];
+    let mut lines = vec![format!("Agent {tid} \"{agent_name}\" [{agent_status}] — your agent, refreshed.\n")];
     if r.agent_summaries.is_empty() {
-        lines.push("No unacknowledged messages across active threads.".to_owned());
+        lines.push("No unacknowledged messages across active agents.".to_owned());
     } else {
         lines.push("Unacknowledged messages:".to_owned());
         lines.extend(r.agent_summaries.iter().cloned());
@@ -299,7 +299,7 @@ fn build_read_result(state: &State, r: &ReadResult<'_>) -> String {
     }
 
     lines.push(format!(
-        "\n⟳ The Threads panel ({agents_panel_id}) has been FORCE-REFRESHED and now \
+        "\n⟳ The Agents panel ({agents_panel_id}) has been FORCE-REFRESHED and now \
          contains the MOST RECENT conversation for {tid}. Last message: \"{last_msg_preview}\""
     ));
     lines.join("\n")
@@ -411,7 +411,7 @@ pub(crate) fn build_panel_content(state: &State, focused_tid: &str, now_ms: u64)
     const MAX_PANEL_MESSAGES: usize = 50;
 
     let ts = AgentsState::get(state);
-    let mut output = String::from("threads:\n");
+    let mut output = String::from("agents:\n");
     write_agent_list(&mut output, ts, focused_tid);
 
     // Focused agent's conversation (last MAX_PANEL_MESSAGES messages)
@@ -428,7 +428,7 @@ pub(crate) fn build_panel_content(state: &State, focused_tid: &str, now_ms: u64)
     let skip = total.saturating_sub(MAX_PANEL_MESSAGES);
 
     _ = writeln!(output, "\nconversation:");
-    _ = writeln!(output, "  thread_id: {}", agent.id);
+    _ = writeln!(output, "  agent_id: {}", agent.id);
     _ = writeln!(output, "  name: \"{}\"", yaml_escape(&agent.name));
     _ = writeln!(output, "  status: {}", agent.status);
     write_origin(&mut output, agent);

@@ -132,7 +132,7 @@ pub(crate) fn check_worktree_safety(args: &[String]) -> Result<(), String> {
         }
         if arg == "-C" || arg.starts_with("--git-dir") || arg.starts_with("--work-tree") {
             return Err(format!(
-                "'{arg}' is not allowed: git already runs in this thread's workdir. Use the Worktree tool to switch trees."
+                "'{arg}' is not allowed: git already runs in this agent's workdir. Use the Worktree tool to switch trees."
             ));
         }
         // `-c key=value` / `--namespace ns`: the next word is a value, not the subcommand.

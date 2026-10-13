@@ -92,7 +92,7 @@ impl CoucouRegistry {
                 agent_id: c.agent_id.clone(),
                 description: c.agent_id.as_ref().map_or_else(
                     || format!("⏰ Coucou! {}", c.message),
-                    |tid| format!("⏰ Coucou (thread {tid})! {}", c.message),
+                    |tid| format!("⏰ Coucou (agent {tid})! {}", c.message),
                 ),
             });
             if c.interval_ms > 0 {

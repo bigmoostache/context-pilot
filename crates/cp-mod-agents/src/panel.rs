@@ -36,7 +36,7 @@ impl Panel for AgentsPanel {
     }
 
     fn title(&self, _state: &State) -> String {
-        "Threads".to_owned()
+        "Agents".to_owned()
     }
 
     fn refresh(&self, state: &mut State) {
@@ -67,7 +67,7 @@ impl Panel for AgentsPanel {
             .iter()
             .find(|c| c.context_type.as_str() == Kind::AGENTS)
             .map_or(("P?", 0), |c| (c.id.as_str(), c.last_refresh_ms));
-        vec![ContextItem::new(id, "Threads", content, last_refresh_ms)]
+        vec![ContextItem::new(id, "Agents", content, last_refresh_ms)]
     }
 
     fn needs_cache(&self) -> bool {

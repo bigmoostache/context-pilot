@@ -113,7 +113,7 @@ fn snapshot_without_roster_field_decodes_to_empty() {
 
 /// The first roster entry, or a test failure — avoids `roster[0]` indexing.
 fn first(roster: &[RosterAgent]) -> &RosterAgent {
-    roster.first().expect("roster has at least one thread")
+    roster.first().expect("roster has at least one agent")
 }
 
 #[test]

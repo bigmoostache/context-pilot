@@ -149,7 +149,7 @@ fn validate_existing(ctx: &mut Ctx<'_>, id: &str) {
     let exists = TodoState::get(ctx.state).todos.iter().any(|t| t.id == id && t.agent_id == ctx.agent_id);
     if !exists {
         ctx.errors.push(format!(
-            "item id `{id}` does not exist on this thread \u{2014} ids are backend-assigned; omit `id` to create"
+            "item id `{id}` does not exist on this agent \u{2014} ids are backend-assigned; omit `id` to create"
         ));
         return;
     }

@@ -58,7 +58,7 @@ const GAP: &str = "    ";
 #[must_use]
 pub fn result_annex(state: &State, agent_id: &str) -> String {
     let tree = render(state, agent_id);
-    let body = if tree.is_empty() { "(no tasks on this thread)" } else { tree.trim_end() };
+    let body = if tree.is_empty() { "(no tasks on this agent)" } else { tree.trim_end() };
     let mut out = format!("{RECAP_OPEN}\nCurrent tasks:\n\n{body}");
     if let Some(warning) = in_progress_leaf_warning(state, agent_id) {
         let _w = write!(out, "\n\n{warning}");

@@ -390,7 +390,7 @@ mod tests {
         assert_eq!(fast, full, "fast path (checkpoint-seeded) equals full replay");
         assert!(
             fast.roster.iter().any(|e| e.agent_id == "T-early"),
-            "the early thread survives via the checkpoint roster",
+            "the early agent survives via the checkpoint roster",
         );
     }
 

@@ -211,14 +211,14 @@ mod tests {
                 .agents
                 .iter()
                 .find(|h| &h.agent_id == agent)
-                .unwrap_or_else(|| panic!("thread {agent} missing from recovered heads"));
+                .unwrap_or_else(|| panic!("agent {agent} missing from recovered heads"));
             assert_eq!(
                 head.last_message_hash,
                 ContentHash::new([*byte; 32]),
-                "thread {agent} head must be its last write",
+                "agent {agent} head must be its last write",
             );
         }
-        assert_eq!(recovered.heads.agents.len(), expected_last.len(), "no phantom threads in recovered heads");
+        assert_eq!(recovered.heads.agents.len(), expected_last.len(), "no phantom agents in recovered heads");
     }
 
     #[test]

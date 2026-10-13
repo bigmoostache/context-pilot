@@ -141,8 +141,8 @@ fn validate_task_declaration(tool: &ToolUse, state: &State, result: &mut Verdict
             "Task '{task_id}' does not exist in your Todo list. Declare a real task id, or create it first."
         )),
         Some(item) if item.agent_id != focused => result.warnings.push(format!(
-            "Task '{task_id}' belongs to thread {}, not the focused thread {focused}. \
-             Declare a task from the focused thread.",
+            "Task '{task_id}' belongs to agent {}, not the focused agent {focused}. \
+             Declare a task from the focused agent.",
             item.agent_id
         )),
         // A finished/cancelled task is a wrong thing to declare work against —

@@ -240,7 +240,7 @@ impl App {
                     return;
                 }
                 let content = format!(
-                    "Thread \"{name}\" ({tid_for_bind}) is MY_TURN and needs a response. \
+                    "Agent \"{name}\" ({tid_for_bind}) is MY_TURN and needs a response. \
                      Use Read to focus on it, then Send your reply.",
                 );
                 let nid = cp_mod_spine::types::SpineState::create_notification(
@@ -280,7 +280,7 @@ impl App {
             return;
         };
         if !self.state.agent_store.contains(tid) {
-            log::warn!("deliver_to_thread: unknown thread {tid}; delivering to the executing thread");
+            log::warn!("deliver_to_thread: unknown agent {tid}; delivering to the executing agent");
             f(&mut self.state);
             return;
         }

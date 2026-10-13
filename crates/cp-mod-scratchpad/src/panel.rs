@@ -21,7 +21,7 @@ impl ScratchpadPanel {
         // the shared `focus_filter` alone made every agent's Scratchpad panel
         // show the focused agent's cells (same class as the Threads-panel bug).
         let Some(focus) = state.executing_agent_id() else {
-            return "No focused thread".to_owned();
+            return "No focused agent".to_owned();
         };
         let cells: Vec<&crate::types::ScratchpadCell> =
             ss.scratchpad_cells.iter().filter(|c| c.agent_id == focus).collect();
@@ -52,7 +52,7 @@ impl Panel for ScratchpadPanel {
 
         // Per-thread view: scope to the executing agent (see format_cells_for_context).
         let Some(focus) = state.executing_agent_id() else {
-            return vec![Block::Line(vec![S::muted("  No focused thread".into()).italic()])];
+            return vec![Block::Line(vec![S::muted("  No focused agent".into()).italic()])];
         };
         let cells: Vec<&crate::types::ScratchpadCell> =
             ss.scratchpad_cells.iter().filter(|c| c.agent_id == focus).collect();

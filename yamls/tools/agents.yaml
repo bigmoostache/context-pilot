@@ -1,12 +1,12 @@
 tools:
   Send:
     description: |
-      Posts a message to the thread you own (your current thread). The AI uses
-      this to respond to thread messages.
+      Posts a message to your own conversation (you are an agent). The AI uses
+      this to respond to incoming messages.
       To attach files, embed ```file-upload``` blocks in markdown (see below).
-      By default the thread stays MY_TURN (progress update); pass
+      By default the agent stays MY_TURN (progress update); pass
       still_my_turn=false to hand it back to the user (THEIR_TURN). Focus stays
-      on the thread either way — only a Read of another thread moves it.
+      on the agent either way — only a Read of another agent moves it.
 
       WRITING STYLE (read before composing any reply):
       Je passe mes journées à lire des réponses d'agents LLM, verbeuses, lourdes et illisibles.
@@ -89,7 +89,7 @@ tools:
       derives "answered" from a matching ```form-answer``` message the user's
       submit creates, and you read that block to learn the answers.
 
-      Format (YAML body). Pick a `form-id` that is UNIQUE WITHIN THE THREAD
+      Format (YAML body). Pick a `form-id` that is UNIQUE WITHIN THE AGENT
       (a short slug or UUID):
 
         ```form
@@ -135,7 +135,7 @@ tools:
             confirm-word: DEPLOY
         ```
 
-      Global keys: `form-id` (REQUIRED, thread-unique), `title` (optional),
+      Global keys: `form-id` (REQUIRED, agent-unique), `title` (optional),
       `submit` (optional button label), `fields` (REQUIRED, ordered list).
       Every field has `id` (unique in the form) + `label` + `type`. ALL fields
       are mandatory for the user — there is no "required" flag.
@@ -154,7 +154,7 @@ tools:
                   of realm-relative paths.
 
       When the user submits, a user message carrying a ```form-answer``` block
-      (same `form-id`, an `answers` list of {id, answer}) appears in the thread.
+      (same `form-id`, an `answers` list of {id, answer}) appears in your conversation.
       Read it to learn the choices (scalar for single/text/number/date/toggle/
       confirm; list for multi/files). A malformed ```form``` block (missing
       `form-id` or `fields`) is rejected — the Send fails with an error.
@@ -181,14 +181,14 @@ tools:
     parameters:
       markdown: "Markdown text content for the message (may embed ```file-upload``` and ```form``` blocks)"
 
-      still_my_turn: "If true (default), the thread stays yours after sending — use for progress updates. Set false when you're done and want to hand the thread back to the user (flips to THEIR_TURN)."
+      still_my_turn: "If true (default), the agent stays yours after sending — use for progress updates. Set false when you're done and want to hand the agent back to the user (flips to THEIR_TURN)."
 
   Read:
     description: |
-      Refreshes the Threads panel with the most recent conversation of the
-      thread you are currently on (the focused thread). Takes no arguments —
-      you do not choose which thread is shown; the panel always reflects the
-      focused thread. Marks that thread's messages as acknowledged.
+      Refreshes the Agents panel with your most recent conversation (you are the
+      executing agent). Takes no arguments —
+      you do not choose which agent is shown; the panel always reflects the
+      focused agent. Marks that agent's messages as acknowledged.
 
-      Use it to pull the latest state of your thread into the panel after
+      Use it to pull the latest state of your agent into the panel after
       activity you want to re-read.

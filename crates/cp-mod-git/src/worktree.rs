@@ -24,7 +24,7 @@ use super::GIT_CMD_TIMEOUT_SECS;
 pub(crate) fn definition(t: &ToolTexts) -> ToolDefinition {
     ToolDefinition::from_yaml("Worktree", t)
         .declares_task()
-        .short_desc("Move this thread into a git worktree")
+        .short_desc("Move this agent into a git worktree")
         .category("Git")
         .param_enum("action", &["enter", "leave", "list", "remove"], true)
         .param("branch", cp_base::tools::ParamType::String, false)
@@ -199,7 +199,7 @@ fn leave(state: &mut State) -> Result<String, String> {
     if other_users(state, &dir, me.as_deref()).is_empty() {
         let branch = git(&dir, &["rev-parse", "--abbrev-ref", "HEAD"]).unwrap_or_else(|_| "<branch>".to_owned());
         return Err(format!(
-            "this thread is the last one in {}; leaving would orphan it. Commit (or discard) your work, then \
+            "this agent is the last one in {}; leaving would orphan it. Commit (or discard) your work, then \
              run Worktree(action=remove, branch={branch}): it deletes the worktree and returns you to the root.",
             dir.display()
         ));
@@ -234,7 +234,7 @@ pub fn release_agent(state: &mut State, agent_id: &str) -> Option<String> {
             Err(e) => return Some(format!("kept worktree {shown}: {e}")),
         }
     } else {
-        format!("left worktree {shown} (still used by other threads)")
+        format!("left worktree {shown} (still used by other agents)")
     };
     if let Some(rt) = state.agent_store.get_mut(agent_id) {
         rt.workdir = None;
@@ -245,7 +245,7 @@ pub fn release_agent(state: &mut State, agent_id: &str) -> Option<String> {
 /// `git worktree list` plus where this agent currently works.
 fn list(state: &State) -> Result<String, String> {
     let listing = git(&project_root(), &["worktree", "list"])?;
-    Ok(format!("{listing}\n\nThis thread works in: {}", state.workdir().display()))
+    Ok(format!("{listing}\n\nThis agent works in: {}", state.workdir().display()))
 }
 
 /// Delete `branch`'s worktree (the branch is kept). Refuses on uncommitted
@@ -263,7 +263,7 @@ fn remove(state: &mut State, branch: &str) -> Result<String, String> {
     let mut msg = format!("Removed worktree {path} (branch {branch} kept).");
     if state.agent().workdir.as_deref().is_some_and(|w| same_dir(w, &dir)) {
         set_workdir(state, None);
-        msg.push_str(" This thread was inside it and is back at the project root.");
+        msg.push_str(" This agent was inside it and is back at the project root.");
     }
     Ok(msg)
 }
@@ -305,7 +305,7 @@ fn live_consoles(state: &State, dir: &Path) -> Vec<String> {
             let running = ctx.get_meta_str("console_status").is_some_and(|s| s.starts_with("running"));
             let inside = ctx.get_meta_str("console_cwd").is_some_and(|cwd| Path::new(cwd).starts_with(dir));
             if running && inside {
-                live.push(format!("{} '{}' (thread {tid})", ctx.id, ctx.name));
+                live.push(format!("{} '{}' (agent {tid})", ctx.id, ctx.name));
             }
         }
     }

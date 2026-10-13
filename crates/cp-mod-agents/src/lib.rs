@@ -37,7 +37,7 @@ use cp_base::tools::{ParamType, ToolDefinition, ToolResult, ToolTexts, ToolUse};
 
 /// Lazily-parsed tool descriptions loaded from the agents YAML definition.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
-    std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/threads.yaml")));
+    std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/agents.yaml")));
 
 use self::panel::AgentsPanel;
 
@@ -65,10 +65,10 @@ impl Module for AgentsModule {
         "threads"
     }
     fn name(&self) -> &'static str {
-        "Threads"
+        "Agents"
     }
     fn description(&self) -> &'static str {
-        "Parallel discussion and work topics"
+        "Agents: one conversation and runtime each"
     }
 
     fn init_state(&self, state: &mut State) {
@@ -152,7 +152,7 @@ impl Module for AgentsModule {
     }
 
     fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
-        vec![(Kind::new(Kind::AGENTS), "Threads", false)]
+        vec![(Kind::new(Kind::AGENTS), "Agents", false)]
     }
 
     fn create_panel(&self, context_type: &Kind) -> Option<Box<dyn Panel>> {
@@ -166,15 +166,15 @@ impl Module for AgentsModule {
         let t = &*TOOL_TEXTS;
         vec![
             ToolDefinition::from_yaml("Send", t)
-                .short_desc("Post message to thread")
-                .category("Threads")
+                .short_desc("Post message to agent")
+                .category("Agents")
                 .reverie_allowed(false)
                 .param("markdown", ParamType::String, true)
                 .param("still_my_turn", ParamType::Boolean, false)
                 .build(),
             ToolDefinition::from_yaml("Read", t)
-                .short_desc("Refresh the Threads panel")
-                .category("Threads")
+                .short_desc("Refresh the Agents panel")
+                .category("Agents")
                 .reverie_allowed(false)
                 .build(),
         ]
@@ -205,14 +205,14 @@ impl Module for AgentsModule {
             is_fixed: true,
             needs_cache: false,
             fixed_order: Some(5),
-            display_name: "threads",
-            short_name: "threads",
+            display_name: "agents",
+            short_name: "agents",
             needs_async_wait: false,
         }]
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
-        vec![("Threads", "Parallel discussion and work topics with turn-based messaging")]
+        vec![("Agents", "Agents (one conversation each) with turn-based messaging")]
     }
 
     fn dependencies(&self) -> &[&'static str] {
@@ -282,7 +282,7 @@ impl Module for AgentsModule {
 fn preflight_send(tool: &ToolUse, state: &State, pf: &mut Verdict) {
     let tid = tools::executing_agent_id_or_empty(state);
     if !AgentsState::get(state).agents.iter().any(|t| t.id == tid) {
-        pf.errors.push(format!("Send has no owning thread (executing thread '{tid}' not found)"));
+        pf.errors.push(format!("Send has no owning agent (executing agent '{tid}' not found)"));
     }
     let markdown = tool.input.get("markdown").and_then(|v| v.as_str());
     if markdown.is_none_or(str::is_empty) {

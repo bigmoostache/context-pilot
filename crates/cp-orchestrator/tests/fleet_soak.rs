@@ -103,7 +103,7 @@ mod tests {
     fn agent_created(agent: &str) -> OpEntryKind {
         OpEntryKind::AgentCreated {
             agent_id: agent.to_owned(),
-            name: format!("thread {agent}"),
+            name: format!("agent {agent}"),
             status: AgentTurn::TheirTurn,
             timestamp_ms: 0,
             branched_from: None,
@@ -145,7 +145,7 @@ mod tests {
     fn run_agent_workload(dir: &Path, _agent_idx: usize) {
         let oplog = OplogService::spawn(dir).expect("spawn agent oplog");
 
-        let _agent_rev = oplog.append_durable(agent_created("T1")).expect("thread durable");
+        let _agent_rev = oplog.append_durable(agent_created("T1")).expect("agent durable");
         for byte in 0..RECORDS_PER_AGENT {
             // A best-effort phase + cost between every durable head — these may be
             // shed under pressure, and that shedding must NOT tear the rev stream.
@@ -208,7 +208,7 @@ mod tests {
             ContentHash::new([RECORDS_PER_AGENT.saturating_sub(1); 32]),
             "{fleet_id}: head is this agent's own last message, not a neighbour's",
         );
-        assert!(agent.roster.iter().any(|t| t.agent_id == "T1"), "{fleet_id}: roster carries its own thread");
+        assert!(agent.roster.iter().any(|t| t.agent_id == "T1"), "{fleet_id}: roster carries its own agent");
     }
 
     // ── V10 + V8(scaled): concurrent fleet, gap-free + isolated ─────────────────

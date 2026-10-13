@@ -105,7 +105,7 @@ pub(super) fn apply_command(app: &mut App, cmd: Command) {
 fn apply_send_message(state: &mut State, agent_id: &str, content: &str) -> bool {
     let agents_state = AgentsState::get_mut(state);
     let Some(agent) = agents_state.agents.iter_mut().find(|t| t.id == agent_id) else {
-        log::warn!("bridge: SendMessage for unknown thread {agent_id}");
+        log::warn!("bridge: SendMessage for unknown agent {agent_id}");
         return false;
     };
 
@@ -113,7 +113,7 @@ fn apply_send_message(state: &mut State, agent_id: &str, content: &str) -> bool 
     agent.status = AgentStatus::MyTurn;
 
     state.flags.ui.dirty = true;
-    log::info!("bridge: applied SendMessage on thread {agent_id}");
+    log::info!("bridge: applied SendMessage on agent {agent_id}");
     true
 }
 
@@ -147,7 +147,7 @@ fn route_on_user_message(app: &mut App, agent_id: &str) {
 fn apply_archive_agent(state: &mut State, agent_id: &str) {
     let ts = AgentsState::get_mut(state);
     let Some(agent) = ts.agents.iter_mut().find(|t| t.id == agent_id) else {
-        log::warn!("bridge: ArchiveThread for unknown thread {agent_id}");
+        log::warn!("bridge: ArchiveThread for unknown agent {agent_id}");
         return;
     };
     agent.archived = true;
@@ -168,7 +168,7 @@ fn apply_archive_agent(state: &mut State, agent_id: &str) {
     }
 
     state.flags.ui.dirty = true;
-    log::info!("bridge: archived thread {agent_id}");
+    log::info!("bridge: archived agent {agent_id}");
 }
 
 // ── RestoreAgent ───────────────────────────────────────────────────────
@@ -183,9 +183,9 @@ fn apply_restore_agent(state: &mut State, agent_id: &str) {
             let _prev = bs.agent_archived_memo.insert(agent_id.to_owned(), false);
         }
         state.flags.ui.dirty = true;
-        log::info!("bridge: restored thread {agent_id}");
+        log::info!("bridge: restored agent {agent_id}");
     } else {
-        log::warn!("bridge: RestoreThread for unknown thread {agent_id}");
+        log::warn!("bridge: RestoreThread for unknown agent {agent_id}");
     }
 }
 
@@ -201,9 +201,9 @@ fn apply_pause_agent(state: &mut State, agent_id: &str) {
             let _prev = bs.agent_paused_memo.insert(agent_id.to_owned(), true);
         }
         state.flags.ui.dirty = true;
-        log::info!("bridge: paused thread {agent_id}");
+        log::info!("bridge: paused agent {agent_id}");
     } else {
-        log::warn!("bridge: PauseThread for unknown thread {agent_id}");
+        log::warn!("bridge: PauseThread for unknown agent {agent_id}");
     }
 }
 
@@ -219,9 +219,9 @@ fn apply_resume_agent(state: &mut State, agent_id: &str) {
             let _prev = bs.agent_paused_memo.insert(agent_id.to_owned(), false);
         }
         state.flags.ui.dirty = true;
-        log::info!("bridge: resumed thread {agent_id}");
+        log::info!("bridge: resumed agent {agent_id}");
     } else {
-        log::warn!("bridge: ResumeThread for unknown thread {agent_id}");
+        log::warn!("bridge: ResumeThread for unknown agent {agent_id}");
     }
 }
 
@@ -232,7 +232,7 @@ fn apply_delete_agent(state: &mut State, agent_id: &str) {
     let ts = AgentsState::get_mut(state);
     let existed = ts.agents.iter().any(|t| t.id == agent_id);
     if !existed {
-        log::warn!("bridge: DeleteThread for unknown thread {agent_id}");
+        log::warn!("bridge: DeleteThread for unknown agent {agent_id}");
         return;
     }
     ts.agents.retain(|t| t.id != agent_id);
@@ -263,7 +263,7 @@ fn apply_delete_agent(state: &mut State, agent_id: &str) {
     }
 
     state.flags.ui.dirty = true;
-    log::info!("bridge: permanently deleted thread {agent_id}");
+    log::info!("bridge: permanently deleted agent {agent_id}");
 }
 
 // ── DeleteMessage ───────────────────────────────────────────────────
@@ -280,13 +280,13 @@ fn apply_delete_agent(state: &mut State, agent_id: &str) {
 fn apply_delete_message(state: &mut State, agent_id: &str, message_ts: u64) {
     let ts = AgentsState::get_mut(state);
     let Some(agent) = ts.agents.iter_mut().find(|t| t.id == agent_id) else {
-        log::warn!("bridge: DeleteMessage for unknown thread {agent_id}");
+        log::warn!("bridge: DeleteMessage for unknown agent {agent_id}");
         return;
     };
 
     // Find the target message index.
     let Some(idx) = agent.messages.iter().position(|m| m.timestamp == message_ts) else {
-        log::warn!("bridge: DeleteMessage no message with ts={message_ts} in thread {agent_id}");
+        log::warn!("bridge: DeleteMessage no message with ts={message_ts} in agent {agent_id}");
         return;
     };
 
@@ -311,7 +311,7 @@ fn apply_delete_message(state: &mut State, agent_id: &str, message_ts: u64) {
     }
 
     state.flags.ui.dirty = true;
-    log::info!("bridge: deleted {} message(s) from thread {agent_id} (target ts={message_ts})", to_delete.len());
+    log::info!("bridge: deleted {} message(s) from agent {agent_id} (target ts={message_ts})", to_delete.len());
 }
 
 /// Timestamps to delete for a `DeleteMessage`: the target plus, when the target

@@ -158,7 +158,7 @@ impl State {
         let dir = self.agent().workdir.as_ref()?;
         (!dir.is_dir()).then(|| {
             format!(
-                "this thread's workdir {} no longer exists (worktree removed?). Run Worktree(action=leave) to return to the project root.",
+                "this agent's workdir {} no longer exists (worktree removed?). Run Worktree(action=leave) to return to the project root.",
                 dir.display()
             )
         })

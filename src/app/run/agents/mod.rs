@@ -62,12 +62,12 @@ pub(super) fn handle_incoming_focused_messages(app: &mut App, was_streaming: boo
             let quoted: Vec<String> = messages.iter().map(|m| format!("---\n{m}")).collect();
             let tail = if truncated {
                 "Finish your current step, then respond. Some content was truncated: the full text \
-                 will be in the Threads panel once you are idle."
+                 will be in the Agents panel once you are idle."
             } else {
                 "Finish your current step, then respond (no need to call Read)."
             };
             let content = format!(
-                "New message(s) from the user in the focused thread \"{name}\" while you were working:\n{}\n---\n{tail}",
+                "New message(s) from the user in the focused agent \"{name}\" while you were working:\n{}\n---\n{tail}",
                 quoted.join("\n")
             );
             let nid = SpineState::create_notification(
@@ -84,12 +84,12 @@ pub(super) fn handle_incoming_focused_messages(app: &mut App, was_streaming: boo
             let cp_mod_agents::incoming::StreamingPush { tid, name, messages, truncated } = push;
             let quoted: Vec<String> = messages.iter().map(|m| format!("---\n{m}")).collect();
             let tail = if truncated {
-                "Some content was truncated: the full text is in the Threads panel. Respond directly (no need to call Read)."
+                "Some content was truncated: the full text is in the Agents panel. Respond directly (no need to call Read)."
             } else {
                 "Respond directly (no need to call Read)."
             };
             let content = format!(
-                "New message(s) from the user in the focused thread \"{name}\":\n{}\n---\n{tail}",
+                "New message(s) from the user in the focused agent \"{name}\":\n{}\n---\n{tail}",
                 quoted.join("\n")
             );
             let nid = SpineState::create_notification(
