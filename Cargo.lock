@@ -454,6 +454,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cp-coordination"
+version = "0.2.13"
+dependencies = [
+ "cp-base",
+ "cp-groups",
+ "cp-mod-agents",
+ "cp-render",
+ "serde_json",
+]
+
+[[package]]
 name = "cp-env"
 version = "0.2.13"
 dependencies = [
@@ -3857,6 +3868,7 @@ name = "tui"
 version = "0.2.13"
 dependencies = [
  "cp-base",
+ "cp-coordination",
  "cp-env",
  "cp-fleet",
  "cp-groups",

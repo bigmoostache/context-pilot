@@ -123,6 +123,7 @@ pub(crate) fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(cp_groups::wiring::GroupsModule::new()),
         Box::new(AgentsModule::new()),
         Box::new(cp_management::wiring::ManagementModule::new()),
+        Box::new(cp_coordination::wiring::CoordinationModule::new()),
         Box::new(SpineModule::new()),
         Box::new(CoucouModule::new()),
         Box::new(LogsModule::new()),
