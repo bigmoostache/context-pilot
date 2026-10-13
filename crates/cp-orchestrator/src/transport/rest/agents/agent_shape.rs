@@ -70,10 +70,10 @@ fn roster_notes_value(entry: &RosterEntry) -> serde_json::Value {
 /// log-less `AgentDetail` so an agent created since the last disk flush still
 /// appears immediately.
 pub(crate) fn overlay_roster(details: &mut Vec<serde_json::Value>, roster: &[RosterEntry], fleet_id: &str) {
-    for entry in roster {
-        let existing = details
-            .iter_mut()
-            .find(|d| d.get("id").and_then(serde_json::Value::as_str) == Some(entry.agent_id.as_str()));
+    for entry in roster.iter().filter(|e| !superseded(e, roster)) {
+        let existing = details.iter_mut().find(|d| {
+            d.get("id").and_then(serde_json::Value::as_str).is_some_and(|id| same_agent(id, &entry.agent_id))
+        });
         match existing {
             Some(detail) => {
                 if let Some(obj) = detail.as_object_mut() {
@@ -98,6 +98,24 @@ pub(crate) fn overlay_roster(details: &mut Vec<serde_json::Value>, roster: &[Ros
             None => details.push(synthesize_from_roster(entry, fleet_id)),
         }
     }
+}
+
+/// Whether two agent ids name the same agent across the T860 id migration:
+/// equal, or `T<n>` (pre-migration, still in the oplog-fed view) vs `A<n>`.
+pub(crate) fn same_agent(a: &str, b: &str) -> bool {
+    a == b || (legacy_number(a).is_some() && legacy_number(a) == legacy_number(b))
+}
+
+/// The `<n>` of a `T<n>` / `A<n>` agent id.
+fn legacy_number(id: &str) -> Option<&str> {
+    let n = id.strip_prefix('T').or_else(|| id.strip_prefix('A'))?;
+    (!n.is_empty() && n.bytes().all(|b| b.is_ascii_digit())).then_some(n)
+}
+
+/// A pre-migration `T<n>` roster entry whose `A<n>` twin is also present.
+fn superseded(entry: &RosterEntry, roster: &[RosterEntry]) -> bool {
+    entry.agent_id.starts_with('T')
+        && roster.iter().any(|o| o.agent_id != entry.agent_id && same_agent(&o.agent_id, &entry.agent_id))
 }
 
 /// Build a `AgentDetail` from a roster entry alone — no message bodies yet.
@@ -149,7 +167,10 @@ pub(crate) fn attach_disk_tasks(details: &mut [serde_json::Value], config: Optio
         };
         let tasks: Vec<serde_json::Value> = todos
             .iter()
-            .filter(|todo| todo.get("agent_id").or_else(|| todo.get("thread_id")).and_then(serde_json::Value::as_str) == Some(tid.as_str()))
+            .filter(|todo| {
+                todo.get("agent_id").or_else(|| todo.get("thread_id")).and_then(serde_json::Value::as_str)
+                    == Some(tid.as_str())
+            })
             .filter(|todo| todo.get("status").and_then(serde_json::Value::as_str) != Some("cancelled"))
             .map(disk_task_json)
             .collect();
@@ -201,7 +222,10 @@ pub(crate) fn attach_disk_notes(details: &mut [serde_json::Value], config: Optio
         };
         let notes: Vec<serde_json::Value> = cells
             .iter()
-            .filter(|cell| cell.get("agent_id").or_else(|| cell.get("thread_id")).and_then(serde_json::Value::as_str) == Some(tid.as_str()))
+            .filter(|cell| {
+                cell.get("agent_id").or_else(|| cell.get("thread_id")).and_then(serde_json::Value::as_str)
+                    == Some(tid.as_str())
+            })
             .map(disk_note_json)
             .collect();
         if let Some(obj) = detail.as_object_mut() {

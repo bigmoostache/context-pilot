@@ -9,4 +9,4 @@
 pub(super) mod agent_shape;
 pub(super) mod conversations;
 
-pub(crate) use agent_shape::{attach_disk_notes, attach_disk_tasks, overlay_roster, reshape_agent};
+pub(crate) use agent_shape::{attach_disk_notes, attach_disk_tasks, overlay_roster, reshape_agent, same_agent};

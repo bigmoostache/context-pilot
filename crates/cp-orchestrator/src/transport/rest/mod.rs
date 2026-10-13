@@ -366,7 +366,11 @@ pub fn agents(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
         // bounded backstop).
         let (roster, view_focus) =
             b.view.get(fleet_id).map(|v| (v.roster.clone(), v.focused_agent_id.clone())).unwrap_or_default();
-        let focused = view_focus.or(disk_focus);
+        // A pre-T860 view focus `T<n>` yields to its migrated disk twin `A<n>`.
+        let focused = match (view_focus, disk_focus) {
+            (Some(view), Some(disk)) if agents::same_agent(&view, &disk) => Some(disk),
+            (view, disk) => view.or(disk),
+        };
         (cfg, focused, roster)
     };
 
