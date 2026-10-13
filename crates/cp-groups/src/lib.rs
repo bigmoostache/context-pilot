@@ -6,8 +6,12 @@
 
 /// Group message types (formerly the agents' own message types).
 pub mod chat;
+/// `groups` (fixed) and `group` (dynamic) panels.
+pub mod panels;
 /// Per-group message files (`groups/<id>.json`), written only when dirty.
 pub mod persist;
+/// LLM-facing YAML rendering of groups.
+pub mod render;
 /// `Group`, `GroupKind`, `GroupsState`.
 pub mod types;
 /// `GroupsModule`: state registration + metadata persistence.

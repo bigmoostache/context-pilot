@@ -473,6 +473,7 @@ version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-render",
+ "crossterm",
  "serde",
  "serde_json",
 ]

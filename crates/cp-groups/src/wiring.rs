@@ -13,6 +13,7 @@ use cp_base::state::runtime::State;
 use cp_base::tools::pre_flight::Verdict;
 use cp_base::tools::{ToolDefinition, ToolResult, ToolUse};
 
+use crate::panels::{GROUP_KIND, GROUPS_KIND, GroupPanel, GroupsPanel};
 use crate::persist::{GroupMeta, load_group_messages};
 use crate::types::GroupsState;
 
@@ -77,13 +78,17 @@ impl Module for GroupsModule {
     }
     fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
     fn fixed_panel_types(&self) -> Vec<Kind> {
-        vec![]
+        vec![Kind::new(GROUPS_KIND)]
     }
     fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
-        vec![]
+        vec![(Kind::new(GROUPS_KIND), "Groups", false)]
     }
-    fn create_panel(&self, _context_type: &Kind) -> Option<Box<dyn Panel>> {
-        None
+    fn create_panel(&self, context_type: &Kind) -> Option<Box<dyn Panel>> {
+        match context_type.as_str() {
+            GROUPS_KIND => Some(Box::new(GroupsPanel)),
+            GROUP_KIND => Some(Box::new(GroupPanel)),
+            _ => None,
+        }
     }
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
         vec![]
@@ -95,7 +100,29 @@ impl Module for GroupsModule {
         None
     }
     fn context_type_metadata(&self) -> Vec<cp_base::state::context::TypeMeta> {
-        vec![]
+        use cp_base::state::context::TypeMeta;
+        vec![
+            TypeMeta {
+                context_type: GROUPS_KIND,
+                icon_id: "groups",
+                is_fixed: true,
+                needs_cache: false,
+                fixed_order: Some(10),
+                display_name: "groups",
+                short_name: "groups",
+                needs_async_wait: false,
+            },
+            TypeMeta {
+                context_type: GROUP_KIND,
+                icon_id: "group",
+                is_fixed: false,
+                needs_cache: false,
+                fixed_order: None,
+                display_name: "group",
+                short_name: "group",
+                needs_async_wait: false,
+            },
+        ]
     }
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
         vec![]
@@ -113,7 +140,7 @@ impl Module for GroupsModule {
         vec![]
     }
     fn dynamic_panel_types(&self) -> Vec<Kind> {
-        vec![]
+        vec![Kind::new(GROUP_KIND)]
     }
     fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {
         None

@@ -225,8 +225,13 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
     // has now read its own thread, so its pending nudges are moot.
     let _cleared = cp_mod_spine::types::SpineState::delete_notifications_by_agent(state, tid);
 
-    // --- Phase 4: Build panel content (agent list + focused conversation) ---
+    // --- Phase 4: Rebuild the roster panel and open the human group's panel,
+    // which now carries the conversation (closeable, re-opened by each Read).
     rebuild_agents_panel(state, tid, now_ms);
+    let human_gid = msgs::human_group_id(AgentsState::get(state), tid).unwrap_or_default().to_owned();
+    if !human_gid.is_empty() {
+        let _panel = cp_groups::panels::open_group_panel(state, &human_gid);
+    }
 
     // --- Phase 5: Build lightweight tool result ---
     let result_body = build_read_result(
@@ -269,12 +274,16 @@ struct ReadResult<'read> {
 /// cross-thread unacknowledged summary, newly acknowledged previews, and a
 /// pointer at the force-refreshed Agents panel with its last message.
 fn build_read_result(state: &State, r: &ReadResult<'_>) -> String {
-    // Find the Agents panel display ID so the result points the LLM at it.
-    let agents_panel_id = state
+    // Point the LLM at the human group's panel, which holds the conversation.
+    let gid = msgs::human_group_id(AgentsState::get(state), r.tid).unwrap_or_default();
+    let group_panel_id = state
         .agent()
         .context
         .iter()
-        .find(|c| c.context_type.as_str() == Kind::AGENTS)
+        .find(|c| {
+            c.context_type.as_str() == cp_groups::panels::GROUP_KIND
+                && c.metadata.get(cp_groups::panels::META_GROUP_ID).and_then(serde_json::Value::as_str) == Some(gid)
+        })
         .map_or_else(|| "??".to_owned(), |c| c.id.clone());
 
     let last_msg_preview = msgs::messages(state, r.tid)
@@ -299,7 +308,7 @@ fn build_read_result(state: &State, r: &ReadResult<'_>) -> String {
     }
 
     lines.push(format!(
-        "\n⟳ The Agents panel ({agents_panel_id}) has been FORCE-REFRESHED and now \
+        "\n⟳ The group panel ({group_panel_id}, human group {gid}) is open and \
          contains the MOST RECENT conversation for {tid}. Last message: \"{last_msg_preview}\""
     ));
     lines.join("\n")
@@ -325,26 +334,6 @@ fn write_origin(output: &mut String, agent: &crate::types::Agent) {
     );
 }
 
-/// Write a single YAML message entry (author, age, text block/inline, file) into `output`.
-fn write_message(output: &mut String, msg: &AgentMessage, now_ms: u64) {
-    let age = format_age(now_ms, msg.timestamp);
-    _ = writeln!(output, "    - author: {}", msg.author);
-    _ = writeln!(output, "      ts: \"{age}\"");
-    let content = msg.content.as_deref().unwrap_or("[no text]");
-    // Use YAML block scalar for multi-line text, inline for single.
-    if content.contains('\n') {
-        _ = writeln!(output, "      text: |");
-        for line in content.lines() {
-            _ = writeln!(output, "        {line}");
-        }
-    } else {
-        _ = writeln!(output, "      text: \"{}\"", yaml_escape(content));
-    }
-    if let Some(fp) = msg.file_path.as_ref() {
-        _ = writeln!(output, "      file: \"{}\"", yaml_escape(fp));
-    }
-}
-
 /// The id of the agent whose context currently lives in `state` — the
 /// **executing** agent (the focused agent at rest, or a background agent while
 /// it is being stepped). Empty before the first tick places an agent.
@@ -360,7 +349,7 @@ pub(crate) fn executing_agent_id_or_empty(state: &State) -> String {
 }
 
 /// Build the Agents panel content for the **executing** agent (roster list +
-/// that agent's own conversation). This is the per-agent render source used by
+/// a `you:` block). This is the per-agent render source used by
 /// [`AgentsPanel`](crate::panel::AgentsPanel) in place of the shared, focused-
 /// thread-baked `AgentsState::panel_content`.
 pub(crate) fn executing_panel_content(state: &State) -> String {
@@ -369,68 +358,26 @@ pub(crate) fn executing_panel_content(state: &State) -> String {
     build_panel_content(state, &tid, now_ms)
 }
 
-/// Build the full panel content: agent overview + the given agent's conversation.
-///
-/// Renders the roster list plus `focused_tid`'s own conversation, capped to the
-/// last [`MAX_PANEL_MESSAGES`] messages to keep token usage bounded for
-/// long-lived agents.
+/// Build the Agents panel content: roster plus a `you:` block for
+/// `focused_tid` (id, status, human group). The conversation itself is shown
+/// by the human group's `group` panel (cp-groups).
 ///
 /// Emits **YAML-structured** output (T372) so the LLM can parse agent state
 /// cleanly — matching the style of the Search result panels.
-pub(crate) fn build_panel_content(state: &State, focused_tid: &str, now_ms: u64) -> String {
-    /// Maximum messages shown in the panel for a single focused agent.
-    const MAX_PANEL_MESSAGES: usize = 50;
-
+pub(crate) fn build_panel_content(state: &State, focused_tid: &str, _now_ms: u64) -> String {
     let ts = AgentsState::get(state);
     let mut output = String::from("agents:\n");
     crate::types::roster::write_agent_list(&mut output, state, focused_tid);
 
-    // Focused agent's conversation (last MAX_PANEL_MESSAGES messages)
+    // Who "you" are; the conversation itself lives in the human group's `group` panel.
     let Some(agent) = ts.agents.iter().find(|t| t.id == focused_tid) else {
         return output;
     };
-
-    // Auto tool-activity traces are hidden from the AI's own context —
-    // the model should never re-read its own action log (token bloat +
-    // self-referential loop risk). They remain visible (collapsed) in
-    // the web UI / TUI for the human.
-    let visible: Vec<&AgentMessage> = msgs::messages(state, &agent.id).iter().filter(|m| !m.auto).collect();
-    let total = visible.len();
-    let skip = total.saturating_sub(MAX_PANEL_MESSAGES);
-
-    _ = writeln!(output, "\nconversation:");
+    _ = writeln!(output, "\nyou:");
     _ = writeln!(output, "  agent_id: {}", agent.id);
     _ = writeln!(output, "  name: \"{}\"", yaml_escape(&agent.name));
     _ = writeln!(output, "  status: {}", agent.status);
+    _ = writeln!(output, "  human_group_id: {}", agent.human_group_id);
     write_origin(&mut output, agent);
-    if skip > 0 {
-        _ = writeln!(output, "  omitted: {skip}");
-    }
-
-    if visible.is_empty() {
-        _ = writeln!(output, "  messages: []");
-    } else {
-        _ = writeln!(output, "  messages:");
-        for msg in visible.iter().skip(skip) {
-            write_message(&mut output, msg, now_ms);
-        }
-    }
-
     output
-}
-
-/// Format an age duration from two epoch-ms timestamps as a human-readable
-/// relative string (e.g. "5s ago", "3m ago", "1h02m ago").
-fn format_age(now_ms: u64, ts_ms: u64) -> String {
-    let diff_s = now_ms.saturating_sub(ts_ms).wrapping_div(1000);
-    if diff_s < 60 {
-        return format!("{diff_s}s ago");
-    }
-    let mins = diff_s.wrapping_div(60);
-    if mins < 60 {
-        return format!("{mins}m ago");
-    }
-    let hours = mins.wrapping_div(60);
-    let rem_mins = mins.wrapping_rem(60);
-    format!("{hours}h{rem_mins:02}m ago")
 }
