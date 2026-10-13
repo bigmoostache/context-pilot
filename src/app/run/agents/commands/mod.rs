@@ -228,6 +228,22 @@ fn apply_resume_agent(state: &mut State, agent_id: &str) {
 
 // ── DeleteAgent ────────────────────────────────────────────────────────
 
+/// Apply the `Agent` tool's queued effects (cp-management): announce created
+/// sub-agents on the bridge, hard-delete doomed ones (deepest first) with
+/// their runtimes.
+pub(in crate::app::run) fn drain_management(app: &mut App) {
+    let (created, doomed) = cp_management::types::ManagementState::drain(&mut app.state);
+    for id in &created {
+        let agent = AgentsState::get(&app.state).agents.iter().find(|a| a.id == *id);
+        let name = agent.map(|a| a.name.clone()).unwrap_or_default();
+        create::announce_agent(&mut app.state, id, &name, None);
+    }
+    for id in &doomed {
+        apply_delete_agent(&mut app.state, id);
+        app.teardown_agent(id);
+    }
+}
+
 /// Permanently delete an agent and all its messages.
 fn apply_delete_agent(state: &mut State, agent_id: &str) {
     let ts = AgentsState::get_mut(state);

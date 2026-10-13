@@ -484,6 +484,18 @@ name = "cp-macros"
 version = "0.2.13"
 
 [[package]]
+name = "cp-management"
+version = "0.2.13"
+dependencies = [
+ "cp-base",
+ "cp-fleet",
+ "cp-groups",
+ "cp-mod-agents",
+ "cp-render",
+ "serde_json",
+]
+
+[[package]]
 name = "cp-mod-agents"
 version = "0.2.13"
 dependencies = [
@@ -3849,6 +3861,7 @@ dependencies = [
  "cp-fleet",
  "cp-groups",
  "cp-macros",
+ "cp-management",
  "cp-mod-agents",
  "cp-mod-brave",
  "cp-mod-bridge",

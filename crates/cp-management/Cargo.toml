@@ -1,0 +1,22 @@
+[package]
+name = "cp-management"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Context Pilot management: agents creating and managing sub-agents"
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+publish = false
+
+[dependencies]
+cp-base.workspace = true
+cp-render.workspace = true
+cp-groups.workspace = true
+cp-fleet = { path = "../cp-fleet" }
+cp-mod-agents = { path = "../cp-mod-agents" }
+serde_json.workspace = true
+
+[lints]
+workspace = true

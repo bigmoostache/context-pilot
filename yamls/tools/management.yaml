@@ -1,0 +1,21 @@
+tools:
+  Agent:
+    description: |
+      Create and manage your sub-agents. `operation` picks the action:
+        create  name, description?  -> a new direct child of yours plus a 1:1
+                coordination group (returned). The child stays idle until you
+                Send in that group with next=GIVE_TALKING_STICK_TO <child id>.
+                Depth is capped (default 2 below a root). No id allowed.
+        read    id? (default: you)  -> stats: parent, children, turn, execution
+                state, groups, messages, open panels, context tokens.
+        update  id, name?, description?  -> direct children only.
+        delete  id, key?  -> any of your descendants, with its whole subtree
+                and their coordination groups. If it has sub-agents the call
+                fails with the subtree and a confirmation key; repeat with that
+                key (valid 5 minutes) to confirm.
+    parameters:
+      operation: "create | read | update | delete"
+      id: "Target agent id (A<n>). Forbidden for create; read defaults to you."
+      name: "Agent name (create: required; update: optional)."
+      description: "One-line purpose shown in the agents tree (create/update)."
+      key: "Confirmation key returned by a refused delete."

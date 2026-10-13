@@ -275,6 +275,7 @@ impl App {
     fn run_background_phase(&mut self, ch: &EventChannels<'_>, current_ms: u64) {
         super::tools::watchdog::mark(super::tools::watchdog::Step::Bridge);
         super::agents::poll_bridge_commands(self);
+        super::agents::drain_management(self);
         super::tools::watchdog::mark(super::tools::watchdog::Step::AgentsEmit);
         super::agents::emit_bridge_deltas(self);
         // Make the focused agent the executing one: if focus changed since

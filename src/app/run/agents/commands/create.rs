@@ -91,7 +91,7 @@ pub(super) fn apply_branch_agent(
 /// matches what the status chokepoint would emit, and the status memo is primed
 /// to it so a create immediately followed by a send produces exactly one
 /// follow-up `AgentStatusChanged`.
-fn announce_agent(state: &mut State, id: &str, name: &str, branched_from: Option<&str>) {
+pub(super) fn announce_agent(state: &mut State, id: &str, name: &str, branched_from: Option<&str>) {
     let created_turn = wire_turn(AgentStatus::TheirTurn);
     emit_roster_delta(
         state,

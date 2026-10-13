@@ -16,6 +16,9 @@ tools:
       Sending replaces your own pending turn in that group with what `next` says.
       Focus never moves.
 
+      Messages to other agents (non-human groups) land in their context: keep
+      them as compact and synthetic as possible, no pleasantries or recaps.
+
       WRITING STYLE (read before composing any reply):
       Je passe mes journées à lire des réponses d'agents LLM, verbeuses, lourdes et illisibles.
       Ne fais pas ça. Réduis au minimum la charge cognitive de tes messages : réponds à ma

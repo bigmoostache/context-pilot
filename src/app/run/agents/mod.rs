@@ -14,6 +14,7 @@ mod paused;
 mod query;
 pub(super) use archived::emit_agent_archived;
 pub(super) use bridge::{bridge_active, emit_agent_status, emit_vitals, poll_bridge_commands};
+pub(super) use commands::drain_management;
 pub(super) use messages::{emit_messages, emit_notes, emit_task_lists};
 pub(super) use observers::{emit_agent_focus, emit_behaviour};
 pub(super) use paused::emit_agent_paused;
