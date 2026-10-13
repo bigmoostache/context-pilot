@@ -12,8 +12,8 @@
 //! disposable UI state, so a dropped delta self-heals from the agent's tier-②
 //! files on the next read.
 
+use cp_mod_agents::types::FocusState;
 use cp_mod_bridge::BridgeState;
-use cp_mod_threads::types::FocusState;
 use cp_wire::types::oplog::OpEntryKind;
 
 use crate::app::App;

@@ -57,7 +57,7 @@ impl App {
         if let Some(id) = self.stepping_thread.as_ref() {
             return id.clone();
         }
-        cp_mod_threads::types::FocusState::get(&self.state)
+        cp_mod_agents::types::FocusState::get(&self.state)
             .focused_thread_id
             .clone()
             .unwrap_or_else(|| crate::infra::constants::DEFAULT_WORKER_ID.to_owned())

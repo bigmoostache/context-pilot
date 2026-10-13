@@ -13,10 +13,10 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash as _, Hasher as _};
 
 use cp_base::state::runtime::State;
+use cp_mod_agents::types::{ThreadAuthor, ThreadMessage, ThreadsState};
 use cp_mod_bridge::BridgeState;
 use cp_mod_bridge::body::Stored;
 use cp_mod_scratchpad::types::ScratchpadState;
-use cp_mod_threads::types::{ThreadAuthor, ThreadMessage, ThreadsState};
 use cp_mod_todo::types::{TodoState, TodoStatus};
 use cp_wire::types::oplog::OpEntryKind;
 use cp_wire::types::snapshot::notes::WireNote;

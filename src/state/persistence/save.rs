@@ -74,7 +74,7 @@ type PanelUidMaps = (HashMap<Kind, String>, HashMap<String, String>);
 /// [`worker::focused_worker_id`], which mirrors this rule and adds a one-shot
 /// fallback to the legacy name for installs saved before pointers existed.
 fn executing_worker_id(state: &State) -> String {
-    let focused = cp_mod_threads::types::FocusState::get(state).focused_thread_id.clone();
+    let focused = cp_mod_agents::types::FocusState::get(state).focused_thread_id.clone();
     match state.executing_thread_id() {
         Some(tid) if Some(tid) != focused.as_deref() => tid.to_owned(),
         _ => focused.unwrap_or_else(|| DEFAULT_WORKER_ID.to_owned()),
@@ -308,15 +308,15 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
         dir.join(crate::infra::constants::MESSAGES_DIR),
         dir.join(cp_mod_logs::LOGS_DIR),
         dir.join(cp_mod_console::CONSOLE_DIR),
-        dir.join(cp_mod_threads::types::persist::THREADS_DIR),
+        dir.join(cp_mod_agents::types::persist::THREADS_DIR),
         dir.join(MODULES_DIR),
     ];
 
     // Per-thread message files, only for threads changed since last write.
     let mut durable: Vec<WriteOp> = {
         let _g = crate::profile!("thread_files");
-        let threads = &cp_mod_threads::types::ThreadsState::get(state).threads;
-        cp_mod_threads::types::persist::dirty_thread_file_ops(threads)
+        let threads = &cp_mod_agents::types::ThreadsState::get(state).threads;
+        cp_mod_agents::types::persist::dirty_thread_file_ops(threads)
             .into_iter()
             .map(|(path, content)| WriteOp { path, content })
             .collect()

@@ -50,7 +50,7 @@ pub(crate) fn check_deferred_sleep(app: &mut App) {
 // ─── Todo focus-scoping + work-hygiene nudge (thread-owned tasks rework) ──────
 //
 // Two post-tool-batch steps, hosted in the main crate because they bridge
-// `cp-mod-threads` (`FocusState`) and `cp-mod-todo` (`TodoState`), which never
+// `cp-mod-agents` (`FocusState`) and `cp-mod-todo` (`TodoState`), which never
 // import each other (design §8 dependency-injection rule).
 
 /// Collapse every superseded task recap in the live conversation, keeping only
@@ -99,7 +99,7 @@ pub(crate) fn strip_superseded_recaps(app: &mut App) {
 /// `freeze_count = u8::MAX` (the sanctioned "not frozen" sentinel that forces
 /// the Fresh branch), and break tempo (design §4.1 focus-change row).
 pub(crate) fn sync_todo_focus(app: &mut App) {
-    let focused = cp_mod_threads::types::FocusState::get(&app.state).focused_thread_id.clone();
+    let focused = cp_mod_agents::types::FocusState::get(&app.state).focused_thread_id.clone();
     if cp_mod_todo::tools::set_focus_filter(&mut app.state, focused) {
         for ctx in &mut app.state.thread_mut().context {
             if ctx.context_type.as_str() == crate::state::Kind::TODO {
@@ -121,7 +121,7 @@ pub(crate) fn sync_todo_focus(app: &mut App) {
 /// deprecate the cache and set `freeze_count = u8::MAX` (the sanctioned "not
 /// frozen" sentinel that forces the Fresh branch), and break tempo.
 pub(crate) fn sync_scratchpad_focus(app: &mut App) {
-    let focused = cp_mod_threads::types::FocusState::get(&app.state).focused_thread_id.clone();
+    let focused = cp_mod_agents::types::FocusState::get(&app.state).focused_thread_id.clone();
     if cp_mod_scratchpad::tools::set_focus_filter(&mut app.state, focused) {
         for ctx in &mut app.state.thread_mut().context {
             if ctx.context_type.as_str() == crate::state::Kind::SCRATCHPAD {

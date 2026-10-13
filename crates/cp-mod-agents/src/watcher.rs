@@ -100,7 +100,7 @@ impl Watcher for IdleMyTurnDetector {
         })?;
 
         // Unacknowledged (unseen) messages are the idle **auto-read** hook's job
-        // (`cp_mod_threads::tools::take_idle_autoread` acknowledges them,
+        // (`cp_mod_agents::tools::take_idle_autoread` acknowledges them,
         // force-refreshes the panel, and nudges). This watcher only fires the
         // plain "please respond" notification once the agent has ALREADY SEEN
         // everything in the thread and simply went idle without replying — so

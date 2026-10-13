@@ -7,8 +7,8 @@
 //! message-count memo yet, so every copied message becomes a `MessageCreated`).
 
 use cp_base::state::runtime::State;
+use cp_mod_agents::types::{ThreadStatus, ThreadsState};
 use cp_mod_bridge::BridgeState;
-use cp_mod_threads::types::{ThreadStatus, ThreadsState};
 use cp_wire::types::oplog::OpEntryKind;
 
 use crate::app::panels::now_ms;
@@ -50,7 +50,7 @@ pub(super) fn apply_create_thread(state: &mut State, name: &str, seed: &Seed<'_>
     let id = format!("T{}", ts.next_id);
     ts.next_id = ts.next_id.saturating_add(1);
 
-    ts.threads.push(cp_mod_threads::types::Thread::new(id.clone(), name.to_owned()));
+    ts.threads.push(cp_mod_agents::types::Thread::new(id.clone(), name.to_owned()));
     announce_thread(state, &id, name, None);
     log::info!("bridge: created thread {id} \"{name}\"");
     apply_seed(state, &id, seed);

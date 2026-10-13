@@ -8,8 +8,8 @@
 //! action, the `Send` tool's auto-unarchive) with one uniform path.
 
 use cp_base::state::runtime::State;
+use cp_mod_agents::types::ThreadsState;
 use cp_mod_bridge::BridgeState;
-use cp_mod_threads::types::ThreadsState;
 use cp_wire::types::oplog::OpEntryKind;
 
 use super::bridge::{bridge_active, emit_roster_delta};

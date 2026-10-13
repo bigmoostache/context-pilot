@@ -20,7 +20,7 @@ use crate::index;
 pub(crate) fn build_conversation_docs(state: &State) -> Vec<index::reconcile::conversations::ConversationDoc> {
     use index::reconcile::conversations::{ConversationDoc, DocParts};
 
-    let threads = &cp_mod_threads::types::ThreadsState::get(state).threads;
+    let threads = &cp_mod_agents::types::ThreadsState::get(state).threads;
     let mut docs = Vec::new();
     for thread in threads {
         for (index, msg) in thread.messages.iter().enumerate() {

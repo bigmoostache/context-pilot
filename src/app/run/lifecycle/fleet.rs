@@ -8,7 +8,7 @@
 //! the registry is empty and the pass is a no-op.
 
 use cp_fleet::{Entry, Role, ThreadExecState, promote};
-use cp_mod_threads::types::{ThreadStatus, ThreadsState};
+use cp_mod_agents::types::{ThreadStatus, ThreadsState};
 
 use cp_base::state::runtime::bundle::ThreadRuntime;
 
@@ -50,7 +50,7 @@ impl App {
     /// - `want` is `None` (focus cleared): the unbound runtime becomes current,
     ///   re-initialized so per-thread module states exist for the next render.
     pub(super) fn follow_focus(&mut self) {
-        let want = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
+        let want = cp_mod_agents::types::FocusState::get(&self.state).focused_thread_id.clone();
         let have = self.state.executing_thread_id().map(str::to_owned);
         if want == have {
             return;
@@ -131,7 +131,7 @@ impl App {
     /// Promotion + stepping live in `advance_background_threads`; reconcile only
     /// mirrors membership and the Idle↔Runnable derivation.
     pub(super) fn reconcile_fleet_registry(&mut self, now_ms: u64) {
-        let focused = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
+        let focused = cp_mod_agents::types::FocusState::get(&self.state).focused_thread_id.clone();
 
         // Snapshot the current roster: (id, status, eligible) for every thread
         // that should own a registry entry (non-focused, non-archived).
@@ -195,7 +195,7 @@ impl App {
     /// persisted per-thread) every lookup is `None`, so the fleet stays empty and
     /// boot is byte-identical: reconcile then behaves exactly as before.
     pub(super) fn load_background_threads(&mut self) {
-        let focused = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
+        let focused = cp_mod_agents::types::FocusState::get(&self.state).focused_thread_id.clone();
         let now = cp_base::panels::now_ms();
         let roster: Vec<(String, ThreadStatus)> = ThreadsState::get(&self.state)
             .threads
@@ -265,7 +265,7 @@ impl App {
     /// from the post-step stream phase, then restores the previous executing
     /// thread. Switching is an id change; nothing is copied. Empty at N=1 → no-op.
     pub(super) fn advance_background_threads(&mut self) {
-        let focused = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
+        let focused = cp_mod_agents::types::FocusState::get(&self.state).focused_thread_id.clone();
         let promotable: std::collections::HashSet<String> = promote(&self.fleet).into_iter().collect();
         let ids: Vec<String> = self
             .fleet
@@ -341,7 +341,7 @@ impl App {
     }
 
     /// Republish the display-only exec-state mirror
-    /// ([`FleetExecMirror`](cp_mod_threads::view_state::FleetExecMirror)) from the
+    /// ([`FleetExecMirror`](cp_mod_agents::view_state::FleetExecMirror)) from the
     /// registry plus the focused thread's own facts.
     ///
     /// Called once per tick, **after** the step loop, so the map reflects
@@ -357,7 +357,7 @@ impl App {
         let mut exec_states: std::collections::HashMap<String, ThreadExecState> =
             self.fleet.iter().map(|entry| (entry.0.clone(), entry.1.exec_state)).collect();
 
-        let focused = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
+        let focused = cp_mod_agents::types::FocusState::get(&self.state).focused_thread_id.clone();
         if let Some(id) = focused {
             let errs = cp_mod_spine::types::SpineState::get(&self.state).config.consecutive_continuation_errors;
             let status = ThreadsState::get(&self.state).threads.iter().find(|t| t.id == id).map(|t| t.status);
@@ -366,7 +366,7 @@ impl App {
             let _inserted = exec_states.insert(id, focused_state);
         }
 
-        cp_mod_threads::view_state::FleetExecMirror::get_mut(&mut self.state).replace_all(exec_states);
+        cp_mod_agents::view_state::FleetExecMirror::get_mut(&mut self.state).replace_all(exec_states);
     }
 
     /// The per-thread advancement core: drain this thread's stream, retry a

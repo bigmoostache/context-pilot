@@ -186,7 +186,7 @@ fn handle_threads_ctrl(key: &KeyEvent, state: &State) -> Option<Action> {
         // the 2-second window confirms (ThreadArchiveConfirm). A press after the
         // window lapsed simply re-arms — `archive_start` re-stamps the time.
         KeyCode::Char('x') => {
-            let focus = cp_mod_threads::types::FocusState::get(state);
+            let focus = cp_mod_agents::types::FocusState::get(state);
             let within_window = focus.confirming_archive
                 && cp_base::panels::now_ms().saturating_sub(focus.archive_armed_at_ms) <= ARCHIVE_CONFIRM_WINDOW_MS;
             Some(if within_window { Action::ThreadArchiveConfirm } else { Action::ThreadArchiveStart })
@@ -249,8 +249,8 @@ const fn drilled_threads_nav(key: &KeyEvent) -> Dispatch {
 
 /// True when the list cursor sits on a real thread row (not the virtual
 /// "+ New Thread" entry, not an empty list) — i.e. drill-in has a target.
-fn selection_is_real_thread(focus: &cp_mod_threads::types::FocusState, state: &State) -> bool {
-    let visible = cp_mod_threads::types::ThreadsState::get(state).visible_indices(focus.viewing_archived);
+fn selection_is_real_thread(focus: &cp_mod_agents::types::FocusState, state: &State) -> bool {
+    let visible = cp_mod_agents::types::ThreadsState::get(state).visible_indices(focus.viewing_archived);
     focus.selected_thread_idx < visible.len()
 }
 
@@ -258,7 +258,7 @@ fn selection_is_real_thread(focus: &cp_mod_threads::types::FocusState, state: &S
 /// Esc exit. `Fallthrough` when the key isn't a threads-nav key.
 fn handle_threads_nav(key: &KeyEvent, state: &State) -> Dispatch {
     let shift = key.modifiers.contains(KeyModifiers::SHIFT);
-    let focus = cp_mod_threads::types::FocusState::get(state);
+    let focus = cp_mod_agents::types::FocusState::get(state);
     let confirming = focus.confirming_archive;
 
     if focus.drilled_thread_id.is_some() {

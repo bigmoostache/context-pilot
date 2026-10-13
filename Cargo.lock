@@ -472,6 +472,19 @@ name = "cp-macros"
 version = "0.2.13"
 
 [[package]]
+name = "cp-mod-agents"
+version = "0.2.13"
+dependencies = [
+ "cp-base",
+ "cp-fleet",
+ "cp-mod-spine",
+ "cp-render",
+ "crossterm",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "cp-mod-brave"
 version = "0.2.13"
 dependencies = [
@@ -668,8 +681,8 @@ dependencies = [
  "cp-base",
  "cp-env",
  "cp-macros",
+ "cp-mod-agents",
  "cp-mod-logs",
- "cp-mod-threads",
  "cp-mod-utilities",
  "cp-render",
  "cp-vault",
@@ -700,19 +713,6 @@ dependencies = [
  "cp-base",
  "cp-mod-utilities",
  "cp-render",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "cp-mod-threads"
-version = "0.2.13"
-dependencies = [
- "cp-base",
- "cp-fleet",
- "cp-mod-spine",
- "cp-render",
- "crossterm",
  "serde",
  "serde_json",
 ]
@@ -3834,6 +3834,7 @@ dependencies = [
  "cp-env",
  "cp-fleet",
  "cp-macros",
+ "cp-mod-agents",
  "cp-mod-brave",
  "cp-mod-bridge",
  "cp-mod-callback",
@@ -3851,7 +3852,6 @@ dependencies = [
  "cp-mod-scratchpad",
  "cp-mod-search",
  "cp-mod-spine",
- "cp-mod-threads",
  "cp-mod-todo",
  "cp-mod-tree",
  "cp-mod-utilities",

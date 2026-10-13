@@ -21,8 +21,8 @@ use crate::state::State;
 use crate::ui::{ir, theme};
 use cp_base::cast::Safe as _;
 use cp_fleet::ThreadExecState;
-use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadStatus, ThreadsState};
-use cp_mod_threads::view_state::FleetExecMirror;
+use cp_mod_agents::types::{FocusState, ThreadAuthor, ThreadStatus, ThreadsState};
+use cp_mod_agents::view_state::FleetExecMirror;
 
 /// Width of the thread list pane in columns.
 ///
@@ -139,7 +139,7 @@ fn push_new_thread_entry(lb: &mut ListBuild<'_>, state: &State, on_virtual: bool
 /// a turn), yellow/amber = paused. Returned as a raw triple (via
 /// [`Span::rgb`](cp_render::Span::rgb)) because the IR `Semantic` palette has no
 /// distinct orange-vs-amber pair.
-fn thread_circle_rgb(thread: &cp_mod_threads::types::Thread) -> (u8, u8, u8) {
+fn thread_circle_rgb(thread: &cp_mod_agents::types::Thread) -> (u8, u8, u8) {
     let color = if thread.paused {
         theme::warning()
     } else if matches!(thread.status, ThreadStatus::MyTurn) {
@@ -169,7 +169,7 @@ const fn thread_is_working(exec: ThreadExecState) -> bool {
 /// [`last_read_count`](FocusState::last_read_count). A thread with no entry
 /// was never tracked and counts as read, so old threads don't all light up.
 fn has_unread_reply(
-    thread: &cp_mod_threads::types::Thread,
+    thread: &cp_mod_agents::types::Thread,
     last_read: &std::collections::BTreeMap<String, usize>,
 ) -> bool {
     let Some(&seen) = last_read.get(&thread.id) else {
@@ -186,7 +186,7 @@ fn has_unread_reply(
 /// a turn but is doing nothing, a stall the human should notice); unread LLM
 /// reply → ◆ (cleared once the row has stayed selected 2s, see
 /// `FocusState::tick_read_dwell`); otherwise void.
-fn leading_slot(lb: &ListBuild<'_>, thread: &cp_mod_threads::types::Thread) -> S {
+fn leading_slot(lb: &ListBuild<'_>, thread: &cp_mod_agents::types::Thread) -> S {
     if thread_is_working(lb.mirror.exec_state_of(&thread.id)) {
         S::styled(format!("{} ", crate::ui::helpers::spinner()), Semantic::Accent)
     } else if matches!(thread.status, ThreadStatus::MyTurn) {
@@ -240,7 +240,7 @@ fn worktree_spans(wt: &WorktreeLine, width: u16) -> Vec<S> {
 /// recording its selected line range.
 fn push_thread_entry(
     lb: &mut ListBuild<'_>,
-    thread: &cp_mod_threads::types::Thread,
+    thread: &cp_mod_agents::types::Thread,
     is_selected: bool,
     worktree: Option<&WorktreeLine>,
 ) {

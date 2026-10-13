@@ -190,7 +190,7 @@ pub enum LifecycleState {
 /// backend's materialized roster knows, without a disk read, whether a thread
 /// is waiting on the human (`MyTurn`) or owned by the agent (`TheirTurn`).
 /// Defined here in the I/O-free protocol crate rather than imported from
-/// `cp-mod-threads` to keep the layering one-directional (modules depend on the
+/// `cp-mod-agents` to keep the layering one-directional (modules depend on the
 /// wire, never the reverse).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]

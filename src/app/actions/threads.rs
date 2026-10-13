@@ -2,7 +2,7 @@
 //!
 //! Extracted from `mod.rs` to keep the central dispatch under the 500-line limit.
 
-use cp_mod_threads::types::{FocusState, ThreadsState};
+use cp_mod_agents::types::{FocusState, ThreadsState};
 
 use crate::state::State;
 

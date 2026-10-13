@@ -13,9 +13,9 @@ use cp_base::config::llm::models::{
 use cp_base::config::llm::openrouter_model::OpenRouterModel;
 use cp_base::config::llm::types::LlmProvider;
 use cp_base::state::runtime::State;
+use cp_mod_agents::types::{FocusState, ThreadAuthor, ThreadMessage, ThreadStatus, ThreadsState};
 use cp_mod_bridge::BridgeState;
 use cp_mod_spine::types::SpineState;
-use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadMessage, ThreadStatus, ThreadsState};
 use cp_wire::types::command::{Command, Kind as CommandKind};
 use cp_wire::types::oplog::OpEntryKind;
 
@@ -317,7 +317,7 @@ fn apply_delete_message(state: &mut State, thread_id: &str, message_ts: u64) {
 /// Timestamps to delete for a `DeleteMessage`: the target plus, when the target
 /// is an assistant message, all *consecutive* `auto:true` messages immediately
 /// *preceding* it (tool-trace cleanup — stops at the first non-auto message).
-fn collect_delete_timestamps(thread: &cp_mod_threads::types::Thread, idx: usize, message_ts: u64) -> Vec<u64> {
+fn collect_delete_timestamps(thread: &cp_mod_agents::types::Thread, idx: usize, message_ts: u64) -> Vec<u64> {
     let mut to_delete: Vec<u64> = vec![message_ts];
     let is_assistant = thread.messages.get(idx).is_some_and(|m| m.author == ThreadAuthor::Assistant);
     if !is_assistant {

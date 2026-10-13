@@ -3,7 +3,7 @@
 //! Extracted from `lifecycle.rs` to keep it under the 500-line limit.
 //! Contains the bridge delta emission chokepoints and the per-tool-call
 //! thread-activity trace; the idle `MY_TURN` detection now lives in a
-//! standard `Watcher` (`cp_mod_threads::watcher::MyTurnWatcher`).
+//! standard `Watcher` (`cp_mod_agents::watcher::MyTurnWatcher`).
 
 mod archived;
 mod bridge;
@@ -21,7 +21,7 @@ pub(super) use paused::emit_thread_paused;
 use crate::app::App;
 use cp_base::state::runtime::State;
 use cp_base::tools::ToolUse;
-use cp_mod_threads::types::{ThreadMessage, ThreadsState};
+use cp_mod_agents::types::{ThreadMessage, ThreadsState};
 use cp_wire::types::snapshot::RosterThread;
 
 /// Branch A + B of the incoming-message behavior, run once per main-loop tick on
@@ -57,8 +57,8 @@ pub(super) fn handle_incoming_focused_messages(app: &mut App, was_streaming: boo
     // "was the agent mid-turn this tick?" semantics so Branch B fires.
     if was_streaming {
         // Branch B — inline push, non-interrupting.
-        if let Some(push) = cp_mod_threads::incoming::take_streaming_push(&mut app.state) {
-            let cp_mod_threads::incoming::StreamingPush { tid, name, messages, truncated } = push;
+        if let Some(push) = cp_mod_agents::incoming::take_streaming_push(&mut app.state) {
+            let cp_mod_agents::incoming::StreamingPush { tid, name, messages, truncated } = push;
             let quoted: Vec<String> = messages.iter().map(|m| format!("---\n{m}")).collect();
             let tail = if truncated {
                 "Finish your current step, then respond. Some content was truncated: the full text \
@@ -80,8 +80,8 @@ pub(super) fn handle_incoming_focused_messages(app: &mut App, was_streaming: boo
         }
     } else {
         // Branch A — idle auto-read: content is already pulled into the panel.
-        if let Some(push) = cp_mod_threads::incoming::take_idle_autoread(&mut app.state) {
-            let cp_mod_threads::incoming::StreamingPush { tid, name, messages, truncated } = push;
+        if let Some(push) = cp_mod_agents::incoming::take_idle_autoread(&mut app.state) {
+            let cp_mod_agents::incoming::StreamingPush { tid, name, messages, truncated } = push;
             let quoted: Vec<String> = messages.iter().map(|m| format!("---\n{m}")).collect();
             let tail = if truncated {
                 "Some content was truncated: the full text is in the Threads panel. Respond directly (no need to call Read)."
@@ -201,7 +201,7 @@ fn roster_gate(app: &App) -> (bool, Option<u64>) {
     for t in &ThreadsState::get(&app.state).threads {
         t.id.hash(&mut h);
         t.messages.len().hash(&mut h);
-        (t.status == cp_mod_threads::types::ThreadStatus::MyTurn).hash(&mut h);
+        (t.status == cp_mod_agents::types::ThreadStatus::MyTurn).hash(&mut h);
         t.archived.hash(&mut h);
         t.paused.hash(&mut h);
     }

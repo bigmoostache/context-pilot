@@ -15,7 +15,7 @@ use crate::state::{Message, State};
 use crate::ui::{ir, theme};
 use cp_base::cast::Safe as _;
 use cp_base::cast::float_math;
-use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadStatus, ThreadsState};
+use cp_mod_agents::types::{FocusState, ThreadAuthor, ThreadStatus, ThreadsState};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::hash::{Hash as _, Hasher as _};
@@ -40,7 +40,7 @@ const MSG_CACHE_SLACK: usize = 4096;
 
 /// Key of one message's rendered lines: everything `render_message_blocks`
 /// reads from it, plus width and active theme.
-fn message_key(msg: &cp_mod_threads::types::ThreadMessage, viewport_width: u16) -> u64 {
+fn message_key(msg: &cp_mod_agents::types::ThreadMessage, viewport_width: u16) -> u64 {
     let mut h = std::collections::hash_map::DefaultHasher::new();
     viewport_width.hash(&mut h);
     std::ptr::from_ref(cp_base::config::accessors::active_theme()).addr().hash(&mut h);
@@ -57,7 +57,7 @@ fn message_key(msg: &cp_mod_threads::types::ThreadMessage, viewport_width: u16) 
 /// message contributes its content length + heap address, which any append or
 /// replacement changes. The last message (where streaming edits land) is
 /// hashed in full as a guard against same-length in-place edits.
-fn lines_fingerprint(thread: &cp_mod_threads::types::Thread, viewport_width: u16) -> u64 {
+fn lines_fingerprint(thread: &cp_mod_agents::types::Thread, viewport_width: u16) -> u64 {
     let _g = crate::profile!("tv_fingerprint");
     let mut h = std::collections::hash_map::DefaultHasher::new();
     thread.id.hash(&mut h);
@@ -77,7 +77,7 @@ fn lines_fingerprint(thread: &cp_mod_threads::types::Thread, viewport_width: u16
 }
 
 /// Message lines for `thread`, rebuilt only when its fingerprint changes.
-fn cached_thread_message_lines(thread: &cp_mod_threads::types::Thread, viewport_width: u16) -> CachedLines {
+fn cached_thread_message_lines(thread: &cp_mod_agents::types::Thread, viewport_width: u16) -> CachedLines {
     let key = lines_fingerprint(thread, viewport_width);
     LINE_CACHE.with_borrow_mut(|slot| {
         if let Some(entry) = slot.as_ref()
@@ -175,7 +175,7 @@ pub(super) fn render_message_area_with_input(frame: &mut Frame<'_>, state: &mut 
 /// Returned lines hold no borrow of `State`, so the caller can take a mutable
 /// borrow afterwards for scroll management.
 fn build_thread_message_lines(
-    thread: &cp_mod_threads::types::Thread,
+    thread: &cp_mod_agents::types::Thread,
     viewport_width: u16,
 ) -> Vec<ratatui::text::Line<'static>> {
     if thread.messages.is_empty() {
@@ -323,7 +323,7 @@ fn render_thread_input(frame: &mut Frame<'_>, state: &State, area: Rect) {
 /// Strip the leading auto-trace marker from an auto message's content for the
 /// compact dim line (the structured `auto` flag already identifies the trace,
 /// so the inline `/⁠* auto *⁠/` marker is redundant in the rendered line).
-fn auto_line(msg: &cp_mod_threads::types::ThreadMessage) -> String {
+fn auto_line(msg: &cp_mod_agents::types::ThreadMessage) -> String {
     const MARKER: &str = "/* auto */ ";
     let content = msg.content.as_deref().unwrap_or("");
     content.strip_prefix(MARKER).unwrap_or(content).to_owned()
@@ -343,7 +343,7 @@ fn auto_line(msg: &cp_mod_threads::types::ThreadMessage) -> String {
 ///
 /// Parsing is defensive: a missing separator degrades gracefully (the whole
 /// remainder collapses into the tool-name token) rather than dropping content.
-fn auto_trace_spans(msg: &cp_mod_threads::types::ThreadMessage) -> Vec<S> {
+fn auto_trace_spans(msg: &cp_mod_agents::types::ThreadMessage) -> Vec<S> {
     let body = auto_line(msg);
     let (verb, rest) = body.split_once(" \u{b7} ").unwrap_or(("", body.as_str()));
     let (tool, intent) = rest.split_once(" \u{2014} ").unwrap_or((rest, ""));
@@ -362,7 +362,7 @@ fn auto_trace_spans(msg: &cp_mod_threads::types::ThreadMessage) -> Vec<S> {
 }
 
 /// Convert a `ThreadMessage` to a `Message` for the conversation IR renderer.
-fn thread_message_to_message(msg: &cp_mod_threads::types::ThreadMessage) -> Message {
+fn thread_message_to_message(msg: &cp_mod_agents::types::ThreadMessage) -> Message {
     let role = if matches!(msg.author, ThreadAuthor::Assistant) { "assistant" } else { "user" };
     let content = msg.content.clone().unwrap_or_default();
 

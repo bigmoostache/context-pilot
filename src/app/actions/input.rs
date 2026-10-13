@@ -1,9 +1,9 @@
 use crate::state::persistence::message::record_prompt_history;
 use crate::state::persistence::{delete_message, save_message};
 use crate::state::{Kind, Message, State, estimate_tokens};
+use cp_mod_agents::types::{FocusState, ThreadMessage, ThreadStatus, ThreadsState};
 use cp_mod_prompt::types::PromptItem;
 use cp_mod_spine::types::{NotificationType, SpineState};
-use cp_mod_threads::types::{FocusState, ThreadMessage, ThreadStatus, ThreadsState};
 
 use super::ActionResult;
 use super::helpers::{find_context_by_id, parse_context_pattern};
@@ -233,7 +233,7 @@ fn handle_thread_create(state: &mut State) -> ActionResult {
     let id = format!("T{}", threads_state.next_id);
     threads_state.next_id = threads_state.next_id.saturating_add(1);
 
-    let thread = cp_mod_threads::types::Thread::new(id, name);
+    let thread = cp_mod_agents::types::Thread::new(id, name);
     threads_state.threads.push(thread);
 
     // Select the newly created thread — it is the last entry of the active

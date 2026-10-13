@@ -21,8 +21,8 @@
 use std::time::Duration;
 
 use cp_base::state::runtime::State;
+use cp_mod_agents::types::{ThreadStatus, ThreadsState};
 use cp_mod_bridge::BridgeState;
-use cp_mod_threads::types::{ThreadStatus, ThreadsState};
 use cp_wire::types::command::Command;
 use cp_wire::types::oplog::OpEntryKind;
 use cp_wire::types::payload::query::Query;

@@ -118,7 +118,7 @@ impl Module for TodoModule {
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
         // No tools of its own: `Think.todo` + `todo_mark` are hosted in the main
-        // crate (they need the focused thread from `cp-mod-threads::FocusState`).
+        // crate (they need the focused thread from `cp-mod-agents::FocusState`).
         vec![]
     }
 

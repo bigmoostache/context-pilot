@@ -10,7 +10,7 @@
 //! re-engage of an `Errored` thread (F4).
 
 use cp_fleet::ThreadExecState;
-use cp_mod_threads::types::{ThreadStatus, ThreadsState};
+use cp_mod_agents::types::{ThreadStatus, ThreadsState};
 
 use crate::app::App;
 
@@ -78,7 +78,7 @@ impl App {
     pub(super) fn save_all_threads(&mut self) {
         use crate::state::persistence::save;
 
-        let focused = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
+        let focused = cp_mod_agents::types::FocusState::get(&self.state).focused_thread_id.clone();
         let mut known: std::collections::HashSet<String> = std::collections::HashSet::new();
 
         // Focused thread first.
@@ -164,7 +164,7 @@ impl App {
     }
 
     /// Render-scoped drill-in: make the human-drilled thread
-    /// ([`FocusState::drilled_thread_id`](cp_mod_threads::types::FocusState)) the
+    /// ([`FocusState::drilled_thread_id`](cp_mod_agents::types::FocusState)) the
     /// executing one **for one paint only**. Returns the previous executing id,
     /// which the caller passes to
     /// [`restore_drilled_runtime_after_render`](Self::restore_drilled_runtime_after_render)
@@ -177,7 +177,7 @@ impl App {
     /// `None` when there is no drill-in, the drilled thread is already executing,
     /// or it has no stored runtime (cold/unknown).
     pub(super) fn take_drilled_runtime_for_render(&mut self) -> Option<DrillRestore> {
-        let drilled = cp_mod_threads::types::FocusState::get(&self.state).drilled_thread_id.clone()?;
+        let drilled = cp_mod_agents::types::FocusState::get(&self.state).drilled_thread_id.clone()?;
         if self.state.executing_thread_id() == Some(drilled.as_str()) || !self.state.thread_store.contains(&drilled) {
             return None;
         }
@@ -200,7 +200,7 @@ impl App {
     /// doc §7.3).
     ///
     /// The **focused** thread is deliberately excluded — it is handled by the
-    /// [`IdleMyTurnDetector`](cp_mod_threads::watcher::IdleMyTurnDetector) watcher
+    /// [`IdleMyTurnDetector`](cp_mod_agents::watcher::IdleMyTurnDetector) watcher
     /// (focused-only since this dispatcher subsumed its background fallback), so
     /// the two nudge paths never overlap on the same thread.
     ///
@@ -216,7 +216,7 @@ impl App {
     /// candidate set is empty and this is a no-op — byte-identical to
     /// single-thread.
     pub(super) fn dispatch_background_my_turn(&mut self) {
-        let focused = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
+        let focused = cp_mod_agents::types::FocusState::get(&self.state).focused_thread_id.clone();
         // Snapshot (id, name) of eligible background threads before touching the
         // per-thread state (delivery below borrows `state`).
         let candidates: Vec<(String, String)> = ThreadsState::get(&self.state)
@@ -276,7 +276,7 @@ impl App {
     where
         F: FnOnce(&mut cp_base::state::runtime::State),
     {
-        let focused = cp_mod_threads::types::FocusState::get(&self.state).focused_thread_id.clone();
+        let focused = cp_mod_agents::types::FocusState::get(&self.state).focused_thread_id.clone();
         let Some(tid) = thread_id.filter(|t| focused.as_deref() != Some(*t)) else {
             // None, or targets the focused thread → deliver directly.
             f(&mut self.state);

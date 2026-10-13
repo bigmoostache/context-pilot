@@ -36,7 +36,7 @@ use crate::ui::perf::PERF;
 /// pixel-identically to its own main view.
 fn showing_threads_list(state: &State) -> bool {
     state.view_mode == cp_base::state::data::config::ViewMode::Threads
-        && cp_mod_threads::types::FocusState::get(state).drilled_thread_id.is_none()
+        && cp_mod_agents::types::FocusState::get(state).drilled_thread_id.is_none()
 }
 
 /// Top-level render entry point: draws the entire TUI frame.

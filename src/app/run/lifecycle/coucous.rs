@@ -3,9 +3,9 @@
 //! thread when it sits in the background. Plus the one-shot boot migration of
 //! legacy per-thread `pending_coucous`.
 
+use cp_mod_agents::types::{FocusState, ThreadStatus, ThreadsState};
 use cp_mod_spine::schedule::CoucouRegistry;
 use cp_mod_spine::types::{NotificationType, SpineState};
-use cp_mod_threads::types::{FocusState, ThreadStatus, ThreadsState};
 
 use crate::app::App;
 
