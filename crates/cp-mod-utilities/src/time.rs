@@ -382,7 +382,8 @@ fn parse_tz_suffix(tz_part: &str) -> Option<i32> {
 ///
 /// Uses `date +%z` to retrieve the system timezone offset (e.g. `+0200`).
 /// Falls back to 0 (UTC) if the command fails.
-fn local_utc_offset_secs() -> i32 {
+#[must_use]
+pub fn local_utc_offset_secs() -> i32 {
     /// Cached offset value.
     static OFFSET: OnceLock<i32> = OnceLock::new();
     *OFFSET.get_or_init(|| {
