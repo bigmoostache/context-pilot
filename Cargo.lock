@@ -785,6 +785,7 @@ dependencies = [
  "cp-wire",
  "csv",
  "dotenvy",
+ "flate2",
  "minisign-verify",
  "nix 0.30.1",
  "notify",

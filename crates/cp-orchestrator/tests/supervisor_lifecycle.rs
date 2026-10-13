@@ -32,6 +32,7 @@ use cp_oplog as _;
 use cp_vault as _;
 use csv as _;
 use dotenvy as _;
+use flate2 as _;
 use minisign_verify as _;
 use notify as _;
 use openssl as _;

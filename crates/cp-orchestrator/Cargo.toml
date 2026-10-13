@@ -34,6 +34,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip"] }
 serde_yaml = "0.9"
 tiny_http = "0.12"
+flate2 = "1"
 # Filesystem event watcher (kqueue/inotify) — wakes the SSE producer the instant
 # an agent appends to its oplog, so a delta reaches the browser in single-digit
 # ms instead of waiting on a poll tick (design doc I12: inotify primary).
