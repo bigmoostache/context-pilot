@@ -23,7 +23,7 @@ import FindFrFR from "@univerjs/preset-sheets-find-replace/locales/fr-FR"
 import "@univerjs/preset-sheets-find-replace/lib/index.css"
 import { Save } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { saveToRealm, toWorkbookData, type SheetPayload } from "./sheetState"
+import { saveToRealm, toWorkbookData, touchedSheet, type SheetPayload } from "./sheetState"
 
 /** Backend Univer snapshot when present (xlsx/xlsm), else the values-only payload. */
 function resolveWorkbook(
@@ -116,6 +116,8 @@ export function SheetGrid({
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const univerRef = useRef<FUniver | null>(null)
+  // Sheets the user changed since the last save: Save uploads only these.
+  const touchedRef = useRef(new Set<string>())
   const [ready, setReady] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle")
@@ -133,7 +135,8 @@ export function SheetGrid({
     setSaveStatus("saving")
     setSaveError(null)
     try {
-      await saveToRealm(univerRef.current, fleetId, path)
+      await saveToRealm(univerRef.current, fleetId, path, touchedRef.current)
+      touchedRef.current.clear()
       // Remote file is now the source of truth — wipe localStorage so next
       // mount loads from the freshly-saved remote, not a stale snapshot.
       localStorage.removeItem(storageKey)
@@ -181,7 +184,10 @@ export function SheetGrid({
     // as crash recovery (not the primary save — that's the explicit Save
     // button which uploads to the agent realm).
     let timer: ReturnType<typeof setTimeout> | null = null
-    const sub = univerAPI.addEvent(univerAPI.Event.CommandExecuted, () => {
+    touchedRef.current.clear()
+    const sub = univerAPI.addEvent(univerAPI.Event.CommandExecuted, (event) => {
+      const sheetId = touchedSheet(event)
+      if (sheetId) touchedRef.current.add(sheetId)
       setDirty(true)
       if (!backup) return
       if (timer) clearTimeout(timer)

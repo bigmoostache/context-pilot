@@ -206,12 +206,12 @@ export async function saveToRealm(
   univerAPI: FUniver,
   fleetId: string,
   realmPath: string,
+  touched: ReadonlySet<string>,
 ): Promise<void> {
   if (/\.xls[xm]$/i.test(realmPath)) {
     const workbook = univerAPI.getActiveWorkbook()
     if (!workbook) throw new Error("No active workbook")
-    const snapshot: Record<string, unknown> = { ...workbook.save() }
-    await saveSheet(fleetId, realmPath, snapshot)
+    await saveSheet(fleetId, realmPath, partialSnapshot(workbook.save(), touched))
     return
   }
   const blob = await generateXlsxBlob(univerAPI)
@@ -224,6 +224,56 @@ export async function saveToRealm(
 
   const file = new File([blob], name, { type: blob.type })
   await uploadFile(fleetId, dir, file)
+}
+
+// ── Partial save ────────────────────────────────────────────────────
+
+/** Mutations Univer runs on its own (measuring rows), not user edits. */
+const SELF_MUTATIONS = new Set([
+  "sheet.mutation.set-worksheet-row-auto-height",
+  "sheet.mutation.set-worksheet-row-is-auto-height",
+])
+
+/** Sheet id a user mutation changed, if any (fed from `CommandExecuted`). */
+export function touchedSheet(event: { id: string; params: unknown }): string | null {
+  if (!event.id.startsWith("sheet.mutation.") || SELF_MUTATIONS.has(event.id)) return null
+  const params = event.params
+  if (typeof params !== "object" || params === null) return null
+  if ("subUnitId" in params && typeof params.subUnitId === "string") return params.subUnitId
+  return null
+}
+
+/**
+ * Snapshot trimmed to the touched sheets (plus sheets created in Univer,
+ * whose ids don't follow the converter's `sheet-<n>`) and the styles their
+ * cells use. `sheetOrder` stays whole: the server reads deletions from it.
+ * Turns a multi-MB upload into a few KB.
+ */
+function partialSnapshot(
+  full: IWorkbookData,
+  touched: ReadonlySet<string>,
+): Record<string, unknown> {
+  const keep = (id: string) => touched.has(id) || !/^sheet-\d+$/.test(id)
+  const sheets = Object.fromEntries(Object.entries(full.sheets).filter(([id]) => keep(id)))
+  const used = new Set<string>()
+  for (const sheet of Object.values(sheets)) collectStyleIds(sheet.cellData, used)
+  const styles = Object.fromEntries(Object.entries(full.styles).filter(([id]) => used.has(id)))
+  return { id: full.id, sheetOrder: full.sheetOrder, styles, sheets }
+}
+
+/** Add every style id referenced by a sheet's cells to `out`. */
+function collectStyleIds(
+  cells: IObjectMatrixPrimitiveType<Nullable<ICellData>> | undefined,
+  out: Set<string>,
+): void {
+  const rows: Record<number, Record<number, Nullable<ICellData>> | undefined> = cells ?? {}
+  for (const r of Object.keys(rows)) {
+    const row = rows[Number(r)] ?? {}
+    for (const c of Object.keys(row)) {
+      const style = row[Number(c)]?.s
+      if (typeof style === "string") out.add(style)
+    }
+  }
 }
 
 // ── Style mapping ───────────────────────────────────────────────────

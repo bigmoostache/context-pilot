@@ -88,6 +88,26 @@ fn check_kept(ws: &umya_spreadsheet::Worksheet) {
     assert_eq!(ws.comments().len(), 1);
 }
 
+/// A partial snapshot (only the edited sheet in `sheets`) patches that sheet;
+/// one listing no sheet bodies leaves the file alone.
+#[test]
+fn partial_snapshot_patches_only_sent_sheets() {
+    let Ok(dir) = tempfile::tempdir() else { panic!("no temp dir") };
+    let path = dir.path().join("save.xlsx");
+    fixture(&path);
+    let Some(out) = convert(&path) else { panic!("convert failed") };
+    let order = out.workbook.get("sheetOrder").cloned().unwrap_or_default();
+    let empty = json!({ "sheetOrder": order, "styles": {}, "sheets": {} });
+    assert_eq!(save(&path, &empty), Ok(0));
+    let mut snap = out.workbook;
+    edit(&mut snap);
+    if let Some(res) = snap.as_object_mut() {
+        let _gone = res.remove("resources");
+    }
+    assert_eq!(save(&path, &snap), Ok(3));
+    check(&path);
+}
+
 #[test]
 fn refuses_a_foreign_snapshot() {
     let Ok(dir) = tempfile::tempdir() else { panic!("no temp dir") };

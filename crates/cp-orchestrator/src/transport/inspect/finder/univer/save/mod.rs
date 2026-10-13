@@ -9,6 +9,11 @@
 //! Everything Univer doesn't model (charts, images, data validation, defined
 //! names, untouched styles, conditional formats, notes) survives untouched.
 //! The result is written to a sibling temp file, then renamed over the original.
+//!
+//! The snapshot may be partial: `sheetOrder` always lists every sheet (a
+//! missing original id means the user deleted it), but `sheets` only carries
+//! the ones the browser touched. A listed sheet absent from `sheets` is kept
+//! as is.
 
 mod cells;
 mod layout;
@@ -57,7 +62,9 @@ fn patch_book(book: &mut Workbook, base: &Value, new: &Value) -> Result<usize, &
     let mut patched = 0usize;
     for (id, idx) in sheet_slots(book, &order, new_sheets)? {
         let old = base_sheets.get(&id).unwrap_or(&NULL);
-        let sheet = new_sheets.get(&id).unwrap_or(&NULL);
+        let Some(sheet) = new_sheets.get(&id) else {
+            continue; // partial snapshot: the browser only sends the sheets it touched
+        };
         if !edited(old, sheet, &styles) {
             continue; // untouched: stays raw and is written back verbatim
         }
