@@ -47,16 +47,48 @@ fn cell_at(rows: &Map<String, Value>, r: u32, c: u32) -> &Value {
     rows.get(&r.to_string()).and_then(|cols| cols.get(c.to_string())).unwrap_or(&NULL)
 }
 
+/// Whether any cell of the sheet pair differs in a way [`patch`] would write.
+pub(super) fn changed(sheets: (&Value, &Value), styles: &Styles<'_>) -> bool {
+    let old_rows = sheets.0.get("cellData").and_then(Value::as_object).unwrap_or(&*EMPTY);
+    let new_rows = sheets.1.get("cellData").and_then(Value::as_object).unwrap_or(&*EMPTY);
+    let mut all = coords(old_rows);
+    all.extend(coords(new_rows));
+    all.into_iter().any(|(r, c)| {
+        let (value, style) = cell_diff((cell_at(old_rows, r, c), cell_at(new_rows, r, c)), styles);
+        value || style
+    })
+}
+
+/// `(value changed, style changed)`, blind to what Univer rewrites on its own:
+/// the cached result of an unchanged formula (it recalculates) and the
+/// underline/strike colour it fills in.
+fn cell_diff(pair: (&Value, &Value), styles: &Styles<'_>) -> (bool, bool) {
+    let (old, new) = pair;
+    let value = formula(old) != formula(new) || (formula(new).is_none() && !same_value(&value(old), &value(new)));
+    let style = resolve(old, styles.base);
+    (value, !same_json(&Value::Object(style), &Value::Object(resolve(new, styles.new))))
+}
+
+/// Deep JSON equality where numbers compare by value (`10.0` == `10`):
+/// the converter writes sizes as floats, Univer sends them back as integers.
+fn same_json(lhs: &Value, rhs: &Value) -> bool {
+    if let (Some(l), Some(r)) = (lhs.as_object(), rhs.as_object()) {
+        return l.len() == r.len() && l.iter().all(|(k, v)| r.get(k).is_some_and(|w| same_json(v, w)));
+    }
+    if let (Some(l), Some(r)) = (lhs.as_array(), rhs.as_array()) {
+        return l.len() == r.len() && l.iter().zip(r).all(|(v, w)| same_json(v, w));
+    }
+    same_value(lhs, rhs)
+}
+
 /// Patch one cell (`coord` = 1-based `(col, row)`); `true` when anything changed.
 fn patch_cell(ws: &mut Worksheet, coord: (u32, u32), pair: (&Value, &Value), styles: &Styles<'_>) -> bool {
-    let (old, new) = pair;
-    let value_changed = formula(old) != formula(new) || !same_value(&value(old), &value(new));
+    let (value_changed, style_changed) = cell_diff(pair, styles);
     if value_changed {
-        write_value(ws.cell_mut(coord), new);
+        write_value(ws.cell_mut(coord), pair.1);
     }
-    let (old_style, new_style) = (resolve(old, styles.base), resolve(new, styles.new));
-    let style_changed = old_style != new_style;
     if style_changed {
+        let (old_style, new_style) = (resolve(pair.0, styles.base), resolve(pair.1, styles.new));
         super::style::patch(ws.style_mut(coord), &old_style, &new_style);
     }
     value_changed || style_changed
@@ -93,7 +125,13 @@ fn resolve(cell: &Value, table: &Map<String, Value>) -> Map<String, Value> {
     let found = s
         .and_then(Value::as_str)
         .map_or_else(|| s.and_then(Value::as_object), |id| table.get(id).and_then(Value::as_object));
-    found.cloned().unwrap_or_default()
+    let mut style = found.cloned().unwrap_or_default();
+    for line in ["ul", "st", "ol"] {
+        if let Some(obj) = style.get_mut(line).and_then(Value::as_object_mut) {
+            let _cl = obj.remove("cl"); // Univer fills it in; the converter never sends it
+        }
+    }
+    style
 }
 
 /// Write the snapshot's value (or formula + cached result) into `cell`.

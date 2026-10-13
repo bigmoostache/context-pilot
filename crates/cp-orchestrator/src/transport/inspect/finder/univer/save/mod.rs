@@ -54,13 +54,11 @@ fn patch_book(book: &mut Workbook, base: &Value, new: &Value) -> Result<usize, &
         .collect();
     let styles = Styles { base: table(base, "styles"), new: table(new, "styles") };
     let (base_sheets, new_sheets) = (table(base, "sheets"), table(new, "sheets"));
-    let restyled: Vec<&String> =
-        styles.new.keys().chain(styles.base.keys()).filter(|k| styles.base.get(*k) != styles.new.get(*k)).collect();
     let mut patched = 0usize;
     for (id, idx) in sheet_slots(book, &order, new_sheets)? {
         let old = base_sheets.get(&id).unwrap_or(&NULL);
         let sheet = new_sheets.get(&id).unwrap_or(&NULL);
-        if old == sheet && !uses_any(sheet, &restyled) {
+        if !edited(old, sheet, &styles) {
             continue; // untouched: stays raw and is written back verbatim
         }
         let ws = book.sheet_mut(idx).map_err(|_err| "sheet vanished while saving")?;
@@ -71,14 +69,17 @@ fn patch_book(book: &mut Workbook, base: &Value, new: &Value) -> Result<usize, &
     Ok(patched)
 }
 
-/// Whether any cell of `sheet` points at one of the style ids in `ids`.
-fn uses_any(sheet: &Value, ids: &[&String]) -> bool {
-    !ids.is_empty()
-        && table(sheet, "cellData")
-            .values()
-            .filter_map(Value::as_object)
-            .flat_map(Map::values)
-            .any(|cell| cell.get("s").and_then(Value::as_str).is_some_and(|s| ids.iter().any(|id| id.as_str() == s)))
+/// Whether the user changed anything the patch writes.
+///
+/// Raw JSON equality is useless here: Univer re-encodes every sheet (view
+/// keys, recalculated formula results, filled-in line colours, auto heights),
+/// and a sheet wrongly seen as edited gets deserialized and rewritten by umya.
+/// A new sheet (no `old`) always counts.
+fn edited(old: &Value, new: &Value, styles: &Styles<'_>) -> bool {
+    old.is_null()
+        || old.get("name") != new.get("name")
+        || layout::edited(old, new)
+        || cells::changed((old, new), styles)
 }
 
 /// Object field of a JSON node; empty when absent.

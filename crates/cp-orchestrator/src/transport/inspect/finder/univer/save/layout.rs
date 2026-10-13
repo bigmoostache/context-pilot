@@ -64,11 +64,25 @@ fn rows(ws: &mut Worksheet, old: &Map<String, Value>, new: &Map<String, Value>) 
     }
 }
 
+/// Whether merges, sizes or hidden rows/columns differ.
+pub(super) fn edited(old: &Value, new: &Value) -> bool {
+    old.get("mergeData") != new.get("mergeData")
+        || !changed(field(old, "columnData"), field(new, "columnData")).is_empty()
+        || !changed(field(old, "rowData"), field(new, "rowData")).is_empty()
+}
+
+/// An entry minus `ah` (the auto height Univer measures and adds itself).
+fn sans_auto(entry: Option<&Value>) -> Option<Map<String, Value>> {
+    entry
+        .and_then(Value::as_object)
+        .map(|o| o.iter().filter(|&(k, _)| k != "ah").map(|(k, v)| (k.clone(), v.clone())).collect())
+}
+
 /// Entries whose value differs (a removed entry yields `null` = defaults).
 fn changed<'json>(old: &'json Map<String, Value>, new: &'json Map<String, Value>) -> Vec<(u32, &'json Value)> {
     let keys: std::collections::BTreeSet<&String> = old.keys().chain(new.keys()).collect();
     keys.into_iter()
-        .filter(|k| old.get(k.as_str()) != new.get(k.as_str()))
+        .filter(|k| sans_auto(old.get(k.as_str())) != sans_auto(new.get(k.as_str())))
         .filter_map(|k| Some((k.parse::<u32>().ok()?, new.get(k.as_str()).unwrap_or(&Value::Null))))
         .collect()
 }

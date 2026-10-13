@@ -99,6 +99,25 @@ fn refuses_a_foreign_snapshot() {
     assert_eq!(std::fs::read(&path).ok(), before);
 }
 
+/// Browser replay: `CP_SHEET_SAMPLE=<xlsx> CP_SHEET_SNAPSHOT=<json>` saves a
+/// real Univer snapshot on a copy; Univer's re-encoding must not count as edits.
+#[test]
+#[ignore = "needs CP_SHEET_SAMPLE + CP_SHEET_SNAPSHOT"]
+fn browser_snapshot_patches_only_edits() {
+    let (Ok(sample), Ok(snap_path)) = (std::env::var("CP_SHEET_SAMPLE"), std::env::var("CP_SHEET_SNAPSHOT")) else {
+        return;
+    };
+    let Ok(dir) = tempfile::tempdir() else { panic!("no temp dir") };
+    let path = dir.path().join("sample.xlsx");
+    let Ok(_bytes) = std::fs::copy(&sample, &path) else { panic!("copy failed") };
+    let Ok(text) = std::fs::read_to_string(&snap_path) else { panic!("snapshot unreadable") };
+    let Ok(snap) = serde_json::from_str::<Value>(&text) else { panic!("snapshot not JSON") };
+    match save(&path, &snap) {
+        Ok(n) => assert!(n >= 1, "nothing patched"),
+        Err(msg) => panic!("refused: {msg}"),
+    }
+}
+
 /// Real-file check: `CP_SHEET_SAMPLE=<xlsx> cargo test ... -- --ignored`.
 /// Edits A1 of every sheet in turn on a copy; save must never panic, and a
 /// refusal must leave the copy byte-identical.
