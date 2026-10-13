@@ -257,6 +257,39 @@ impl App {
         }
     }
 
+    /// Advance every group's time-driven social substates (T860 D4).
+    ///
+    /// Due `ComingBack`s become `SimpleTurn`s and their reminder is delivered
+    /// to the woken agent's spine inbox; each `Dispatch` then goes to its first
+    /// idle candidate. Runs right before
+    /// [`dispatch_background_my_turn`](Self::dispatch_background_my_turn), so
+    /// a dispatch never picks an agent the same tick already relaunches.
+    /// "Idle" = active, unpaused, and [`AgentExecState::Idle`] in the exec mirror.
+    pub(super) fn tick_social(&mut self, now_ms: u64) {
+        let mirror = cp_mod_agents::view_state::FleetExecMirror::get(&self.state);
+        let idle: std::collections::HashSet<String> = AgentsState::get(&self.state)
+            .agents
+            .iter()
+            .filter(|a| !a.archived && !a.paused && mirror.exec_state_of(&a.id) == AgentExecState::Idle)
+            .map(|a| a.id.clone())
+            .collect();
+        let groups = &mut cp_groups::types::GroupsState::get_mut(&mut self.state).groups;
+        let fired = cp_groups::social::tick(groups, now_ms, &|id: &str| idle.contains(id));
+        for f in fired {
+            let content = format!("Coming back in {}: {}", f.group_id, f.message);
+            let bind = f.agent_id.clone();
+            self.deliver_to_agent(Some(&f.agent_id), move |state| {
+                let nid = cp_mod_spine::types::SpineState::create_notification(
+                    state,
+                    cp_mod_spine::types::NotificationType::Custom,
+                    "social".to_owned(),
+                    content,
+                );
+                cp_mod_spine::types::SpineState::set_notification_agent(state, &nid, Some(bind));
+            });
+        }
+    }
+
     /// Run `f` against the state of the agent that owns `agent_id` — the
     /// **delivery seam** for thread-addressed spine routing (Phase D1).
     ///

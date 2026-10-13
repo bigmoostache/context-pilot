@@ -27,6 +27,10 @@ impl App {
             self.reconcile_fleet_registry(current_ms);
         }
         {
+            let _g = crate::profile!("sp_tick_social");
+            self.tick_social(current_ms);
+        }
+        {
             let _g = crate::profile!("sp_dispatch_bg");
             self.dispatch_background_my_turn();
         }
