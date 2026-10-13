@@ -101,6 +101,9 @@ pub(super) fn core() -> Value {
                 // Parent agent id when this agent was branched out of another
                 // (branch_agent command); null for an agent created from scratch.
                 "branchedFrom": { "type": "string", "nullable": true },
+                // Managing agent (T860 sub-agents); null for a root agent.
+                "parentAgentId": { "type": "string", "nullable": true },
+                "description": { "type": "string" },
                 "log": arr(r("AgentMsg")),
                 "tasks": arr(r("AgentTask")),
                 "notes": arr(r("AgentNote"))

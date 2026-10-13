@@ -298,6 +298,8 @@ pub(crate) fn reshape_agent(raw: &serde_json::Value, fleet_id: &str) -> serde_js
         "archived": raw.get("archived").and_then(serde_json::Value::as_bool).unwrap_or(false),
         "paused": raw.get("paused").and_then(serde_json::Value::as_bool).unwrap_or(false),
         "branchedFrom": raw.pointer("/origin/agent_id").or_else(|| raw.pointer("/origin/thread_id")).and_then(serde_json::Value::as_str),
+        "parentAgentId": raw.get("parent_agent_id").and_then(serde_json::Value::as_str),
+        "description": raw.get("description").and_then(serde_json::Value::as_str).unwrap_or(""),
         "log": log,
         "tasks": serde_json::Value::Array(Vec::new()),
         "notes": serde_json::Value::Array(Vec::new()),

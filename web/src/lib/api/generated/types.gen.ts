@@ -21,6 +21,7 @@ export type AgentDetail = {
     archived?: boolean;
     branchedFrom?: string | null;
     createdAt?: string;
+    description?: string;
     fleet?: string;
     fleetId: string;
     focused?: boolean;
@@ -30,6 +31,7 @@ export type AgentDetail = {
     log: Array<AgentMsg>;
     name: string;
     notes?: Array<AgentNote>;
+    parentAgentId?: string | null;
     paused?: boolean;
     status: 'MY_TURN' | 'THEIR_TURN' | 'ACTIVE';
     tasks?: Array<AgentTask>;
