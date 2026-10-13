@@ -194,6 +194,15 @@ pub(crate) enum ContentBlock {
     },
 }
 
+/// Stand-in for blank text: the Messages API rejects (400) any text block
+/// that is empty or whitespace-only.
+const BLANK_TEXT_PLACEHOLDER: &str = ".";
+
+/// `text`, or [`BLANK_TEXT_PLACEHOLDER`] when it is empty or whitespace-only.
+pub(crate) fn non_blank_text(text: &str) -> &str {
+    if text.trim().is_empty() { BLANK_TEXT_PLACEHOLDER } else { text }
+}
+
 /// A single message in the API conversation format.
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct ApiMessage {
@@ -339,7 +348,7 @@ pub(crate) fn api_messages_to_cc_json(api_messages: &[ApiMessage], engine_json: 
                 let should_tag = plan.positions.contains(&(msg_idx, blk_idx));
                 cp_macros::deref_match!(block, {
                     ContentBlock::Text { ref text } => {
-                        let mut obj = serde_json::json!({"type": "text", "text": text});
+                        let mut obj = serde_json::json!({"type": "text", "text": non_blank_text(text)});
                         if should_tag && let Some(o) = obj.as_object_mut() {
                             let _prev = o.insert("cache_control".to_owned(), serde_json::json!({"type": "ephemeral"}));
                         }
