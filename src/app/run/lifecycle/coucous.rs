@@ -41,7 +41,7 @@ impl App {
                 && let Some(agent) = AgentsState::get(&self.state).agents.iter().find(|t| t.id == target)
                 && !agent.archived
             {
-                cp_mod_agents::types::turn::give(&mut self.state, &target);
+                give_turn_in(&mut self.state, &target, coucou.group_id.as_deref());
             }
         }
         self.state.flags.ui.dirty = true;
@@ -71,6 +71,19 @@ impl App {
         }
         self.save_state_async();
     }
+}
+
+/// Give `agent_id` the turn in `group_id` when it is still a member there,
+/// else in its human group.
+fn give_turn_in(state: &mut cp_base::state::runtime::State, agent_id: &str, group_id: Option<&str>) {
+    let groups = cp_groups::types::GroupsState::get_mut(state);
+    if let Some(group) =
+        group_id.and_then(|g| groups.find_mut(g)).filter(|g| g.member_ids.iter().any(|m| m == agent_id))
+    {
+        cp_groups::social::give_turn(group, agent_id);
+        return;
+    }
+    cp_mod_agents::types::turn::give(state, agent_id);
 }
 
 /// Take the executing agent's legacy coucous, stamping `owner` on unscoped ones.

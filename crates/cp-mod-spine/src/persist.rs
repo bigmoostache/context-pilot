@@ -57,6 +57,7 @@ impl Module for CoucouModule {
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         let mut registry: CoucouRegistry = serde_json::from_value(data.clone()).unwrap_or_default();
         registry.reseed_counter();
+        registry.migrate_legacy_recurrences();
         state.set_ext_global(registry);
     }
 

@@ -747,6 +747,7 @@ name = "cp-mod-spine"
 version = "0.2.13"
 dependencies = [
  "cp-base",
+ "cp-groups",
  "cp-mod-utilities",
  "cp-render",
  "serde",

@@ -220,20 +220,20 @@ impl Module for SpineModule {
                 .param("max_auto_retries", ParamType::Integer, false)
                 .param("reset_counters", ParamType::Boolean, false)
                 .build(),
-            ToolDefinition::from_yaml("coucou", t)
-                .short_desc("Schedule a reminder notification")
+            ToolDefinition::from_yaml("Coucou", t)
+                .short_desc("Schedule a reminder for an agent")
                 .category("Spine")
-                // `mode`/`message` are required for the schedule path but NOT the
-                // cancel path (cancel_id only). Declared optional; runtime
-                // validation in execute_coucou enforces them when scheduling.
-                .param("mode", ParamType::String, false)
-                .param("message", ParamType::String, false)
+                .param("message", ParamType::String, true)
+                .param("agent_id", ParamType::String, false)
+                .param("group_id", ParamType::String, false)
                 .param("delay", ParamType::String, false)
                 .param("datetime", ParamType::String, false)
-                .param("recurrence", ParamType::String, false)
-                .param("interval", ParamType::String, false)
-                .param("agent_id", ParamType::String, false)
-                .param("cancel_id", ParamType::String, false)
+                .param("cron", ParamType::String, false)
+                .build(),
+            ToolDefinition::from_yaml("Coucou_delete", t)
+                .short_desc("Delete a scheduled reminder")
+                .category("Spine")
+                .param("coucou_id", ParamType::String, true)
                 .build(),
         ]
     }
@@ -262,7 +262,8 @@ impl Module for SpineModule {
         match tool.name.as_str() {
             "notification_mark_processed" => Some(tools::execute_mark_processed(tool, state)),
             "spine_configure" => Some(tools::execute_configure(tool, state)),
-            "coucou" => Some(coucou::execute_coucou(tool, state)),
+            "Coucou" => Some(coucou::execute_coucou(tool, state)),
+            "Coucou_delete" => Some(coucou::execute_coucou_delete(tool, state)),
             _ => None,
         }
     }
