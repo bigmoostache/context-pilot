@@ -227,7 +227,7 @@ fn inspect_agents(state: &Mutex<Backend>, folder: &str) -> (usize, bool, u64, St
         .unwrap_or(&empty_arr);
 
     let count = agents.len();
-    let has_my_turn = agents.iter().any(|t| t.get("status").and_then(serde_json::Value::as_str) == Some("MyTurn"));
+    let has_my_turn = agents.iter().any(is_my_turn);
     let last_activity = agents
         .iter()
         .filter_map(|t| {
@@ -243,13 +243,20 @@ fn inspect_agents(state: &Mutex<Backend>, folder: &str) -> (usize, bool, u64, St
     // Task = name of the first MY_TURN agent, or empty.
     let task = agents
         .iter()
-        .find(|t| t.get("status").and_then(serde_json::Value::as_str) == Some("MyTurn"))
+        .find(|t| is_my_turn(t))
         .and_then(|t| t.get("name"))
         .and_then(serde_json::Value::as_str)
         .unwrap_or("")
         .to_owned();
 
     (count, has_my_turn, last_activity, task)
+}
+
+/// Whether a `config.json` agent entry is `MY_TURN`: the derived `turn` key
+/// (T860 D, turn lives in group social state) or the legacy stored `status`
+/// written by agents still on an older binary.
+fn is_my_turn(agent: &serde_json::Value) -> bool {
+    ["turn", "status"].iter().any(|k| agent.get(*k).and_then(serde_json::Value::as_str) == Some("MyTurn"))
 }
 
 /// Read the agent's configured LLM provider id from `config.json`

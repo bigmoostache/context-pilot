@@ -47,14 +47,19 @@ pub struct AgentMeta<'agent> {
     /// See [`Agent::description`].
     #[serde(skip_serializing_if = "str::is_empty")]
     description: &'agent str,
+    /// Derived turn, written for outside readers (the orchestrator's fleet
+    /// meta) and never read back. Not `status`: that key is the pre-T860-D
+    /// stored flag the boot migration consumes.
+    turn: super::AgentStatus,
 }
 
-impl<'agent> From<&'agent Agent> for AgentMeta<'agent> {
-    fn from(t: &'agent Agent) -> Self {
+impl<'agent> AgentMeta<'agent> {
+    /// Metadata view of `t`, its turn derived from `groups`.
+    #[must_use]
+    pub fn new(t: &'agent Agent, groups: &[cp_groups::types::Group]) -> Self {
         Self {
             id: &t.id,
             name: &t.name,
-
             human_group_id: &t.human_group_id,
             created_at: t.created_at,
             archived: t.archived,
@@ -62,6 +67,7 @@ impl<'agent> From<&'agent Agent> for AgentMeta<'agent> {
             origin: t.origin.as_ref(),
             parent_agent_id: t.parent_agent_id.as_deref(),
             description: &t.description,
+            turn: super::turn::status_of(groups, &t.id),
         }
     }
 }

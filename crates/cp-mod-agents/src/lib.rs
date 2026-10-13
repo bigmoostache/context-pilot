@@ -100,7 +100,9 @@ impl Module for AgentsModule {
         let focus_file = FocusState::get(state).focused_agent_id.clone().unwrap_or_default();
         // Messages are NOT serialized here: they live in the agent's human
         // group (`groups/<id>.json`, written by the save batch when dirty).
-        let agents: Vec<types::persist::AgentMeta<'_>> = ts.agents.iter().map(Into::into).collect();
+        let groups = &cp_groups::types::GroupsState::get(state).groups;
+        let agents: Vec<types::persist::AgentMeta<'_>> =
+            ts.agents.iter().map(|a| types::persist::AgentMeta::new(a, groups)).collect();
         json!({
             "agents": agents,
             "next_id": ts.next_id,
