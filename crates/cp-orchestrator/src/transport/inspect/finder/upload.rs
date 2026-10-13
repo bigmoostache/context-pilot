@@ -12,7 +12,7 @@ use crate::transport::rest::HttpReply;
 use super::support::{agent_folder, confined_path, extract_param};
 use super::{is_bare_name, rel_child};
 
-/// `POST /api/agent/{id}/fs/upload?path={dir}&name={file}` — upload one file.
+/// `POST /api/fleet/{id}/fs/upload?path={dir}&name={file}` — upload one file.
 ///
 /// The request body is the file's raw bytes (the transport caps it at
 /// `MAX_BODY`); `path` is the confined destination directory (empty = realm
@@ -59,7 +59,7 @@ pub(crate) fn fs_upload(state: &Mutex<Backend>, agent_id: &str, query: &str, bod
     }))
 }
 
-/// `POST /api/agent/{id}/fs/upload-unique?path={dir}&name={name}` — upload a
+/// `POST /api/fleet/{id}/fs/upload-unique?path={dir}&name={name}` — upload a
 /// file, auto-creating the destination directory and never overwriting.
 ///
 /// Like [`fs_upload`], the body is the file's raw bytes and `name` is the bare

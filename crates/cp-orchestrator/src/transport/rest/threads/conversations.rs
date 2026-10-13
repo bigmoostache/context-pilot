@@ -1,4 +1,4 @@
-//! `POST /api/agent/{id}/conversations/search` — hybrid conversation search
+//! `POST /api/fleet/{id}/conversations/search` — hybrid conversation search
 //! (T671).
 //!
 //! The read-path twin of [`command`](super::super::command): where a command
@@ -52,7 +52,7 @@ struct SearchResponse {
     hits: Vec<ConvHit>,
 }
 
-/// Handle `POST /api/agent/{id}/conversations/search`.
+/// Handle `POST /api/fleet/{id}/conversations/search`.
 ///
 /// Returns `400` for a malformed body, `404` for an unknown agent, and `502`
 /// when the agent is unreachable or reports the lookup failed.

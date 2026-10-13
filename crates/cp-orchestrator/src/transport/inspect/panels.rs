@@ -22,7 +22,7 @@ use crate::transport::rest::HttpReply;
 
 use super::helpers::{agent_folder, extract_worker_param};
 
-/// `GET /api/agent/{id}/usage` — current session cost data from worker state.
+/// `GET /api/fleet/{id}/usage` — current session cost data from worker state.
 ///
 /// Returns the cumulative token counts and cost from the agent's active
 /// worker. The web client can poll this to build a time series.
@@ -67,7 +67,7 @@ fn resolve_worker_id(folder_path: &Path, query: &str) -> Result<String, HttpRepl
     Ok(first.clone())
 }
 
-/// `GET /api/agent/{id}/library` — prompt library items.
+/// `GET /api/fleet/{id}/library` — prompt library items.
 ///
 /// Scans the agent's `.context-pilot/{agents,skills,commands}/` directories
 /// for `.md` files with YAML frontmatter and returns them as `LibraryItem[]`.

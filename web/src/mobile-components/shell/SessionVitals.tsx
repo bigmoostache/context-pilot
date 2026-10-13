@@ -7,7 +7,7 @@ import { fetchVitals, type Vital } from "@/lib/api"
  * (no dialog chrome of its own). Mobile twin of `components/shell/SessionVitals`.
  *
  * Rendered inside the Agent Configuration surface (manage mode). The backend
- * (`GET /api/agent/{id}/vitals`) runs the checks it can reach; we prepend the
+ * (`GET /api/fleet/{id}/vitals`) runs the checks it can reach; we prepend the
  * two only the browser can observe (this app is alive, and the measured
  * round-trip), so the board covers the whole dependency chain end to end.
  * Healthy rows stay quiet (a coloured dot + latency); a degraded/unreachable

@@ -849,1155 +849,6 @@ export type ItNetworkResponseWritable = {
     status: ItNetworkStatus;
 };
 
-export type GetApiAgentByIdData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}';
-};
-
-export type GetApiAgentByIdErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdError = GetApiAgentByIdErrors[keyof GetApiAgentByIdErrors];
-
-export type GetApiAgentByIdResponses = {
-    /**
-     * Success
-     */
-    200: {
-        [key: string]: unknown;
-    };
-};
-
-export type GetApiAgentByIdResponse = GetApiAgentByIdResponses[keyof GetApiAgentByIdResponses];
-
-export type GetApiAgentByIdAclData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/acl';
-};
-
-export type GetApiAgentByIdAclErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdAclError = GetApiAgentByIdAclErrors[keyof GetApiAgentByIdAclErrors];
-
-export type GetApiAgentByIdAclResponses = {
-    /**
-     * Success
-     */
-    200: Array<AclEntry>;
-};
-
-export type GetApiAgentByIdAclResponse = GetApiAgentByIdAclResponses[keyof GetApiAgentByIdAclResponses];
-
-export type PostApiAgentByIdAclData = {
-    body: {
-        role?: string;
-        user_id: string;
-    };
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/acl';
-};
-
-export type PostApiAgentByIdAclErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type PostApiAgentByIdAclError = PostApiAgentByIdAclErrors[keyof PostApiAgentByIdAclErrors];
-
-export type PostApiAgentByIdAclResponses = {
-    /**
-     * Success
-     */
-    200: AclEntry;
-};
-
-export type PostApiAgentByIdAclResponse = PostApiAgentByIdAclResponses[keyof PostApiAgentByIdAclResponses];
-
-export type DeleteApiAgentByIdAclByUserIdData = {
-    body?: never;
-    path: {
-        id: string;
-        userId: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/acl/{userId}';
-};
-
-export type DeleteApiAgentByIdAclByUserIdErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type DeleteApiAgentByIdAclByUserIdError = DeleteApiAgentByIdAclByUserIdErrors[keyof DeleteApiAgentByIdAclByUserIdErrors];
-
-export type DeleteApiAgentByIdAclByUserIdResponses = {
-    /**
-     * Success
-     */
-    200: OkResponse;
-};
-
-export type DeleteApiAgentByIdAclByUserIdResponse = DeleteApiAgentByIdAclByUserIdResponses[keyof DeleteApiAgentByIdAclByUserIdResponses];
-
-export type PatchApiAgentByIdAclByUserIdData = {
-    body: {
-        role: string;
-    };
-    path: {
-        id: string;
-        userId: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/acl/{userId}';
-};
-
-export type PatchApiAgentByIdAclByUserIdErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type PatchApiAgentByIdAclByUserIdError = PatchApiAgentByIdAclByUserIdErrors[keyof PatchApiAgentByIdAclByUserIdErrors];
-
-export type PatchApiAgentByIdAclByUserIdResponses = {
-    /**
-     * Success
-     */
-    200: AclEntry;
-};
-
-export type PatchApiAgentByIdAclByUserIdResponse = PatchApiAgentByIdAclByUserIdResponses[keyof PatchApiAgentByIdAclByUserIdResponses];
-
-export type DeleteApiAgentByIdAvatarData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/avatar';
-};
-
-export type DeleteApiAgentByIdAvatarErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type DeleteApiAgentByIdAvatarError = DeleteApiAgentByIdAvatarErrors[keyof DeleteApiAgentByIdAvatarErrors];
-
-export type DeleteApiAgentByIdAvatarResponses = {
-    /**
-     * Success
-     */
-    200: OkResponse;
-};
-
-export type DeleteApiAgentByIdAvatarResponse = DeleteApiAgentByIdAvatarResponses[keyof DeleteApiAgentByIdAvatarResponses];
-
-export type GetApiAgentByIdAvatarData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/avatar';
-};
-
-export type GetApiAgentByIdAvatarResponses = {
-    /**
-     * Avatar image bytes
-     */
-    200: Blob | File;
-};
-
-export type GetApiAgentByIdAvatarResponse = GetApiAgentByIdAvatarResponses[keyof GetApiAgentByIdAvatarResponses];
-
-export type PostApiAgentByIdAvatarData = {
-    body: Blob | File;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/avatar';
-};
-
-export type PostApiAgentByIdAvatarErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type PostApiAgentByIdAvatarError = PostApiAgentByIdAvatarErrors[keyof PostApiAgentByIdAvatarErrors];
-
-export type PostApiAgentByIdAvatarResponses = {
-    /**
-     * Success
-     */
-    200: OkResponse;
-};
-
-export type PostApiAgentByIdAvatarResponse = PostApiAgentByIdAvatarResponses[keyof PostApiAgentByIdAvatarResponses];
-
-export type GetApiAgentByIdBodyByHashData = {
-    body?: never;
-    path: {
-        id: string;
-        hash: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/body/{hash}';
-};
-
-export type GetApiAgentByIdBodyByHashErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdBodyByHashError = GetApiAgentByIdBodyByHashErrors[keyof GetApiAgentByIdBodyByHashErrors];
-
-export type GetApiAgentByIdBodyByHashResponses = {
-    /**
-     * Success
-     */
-    200: BodyPayload;
-};
-
-export type GetApiAgentByIdBodyByHashResponse = GetApiAgentByIdBodyByHashResponses[keyof GetApiAgentByIdBodyByHashResponses];
-
-export type PostApiAgentByIdCommandData = {
-    body: {
-        [key: string]: unknown;
-    };
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/command';
-};
-
-export type PostApiAgentByIdCommandErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type PostApiAgentByIdCommandError = PostApiAgentByIdCommandErrors[keyof PostApiAgentByIdCommandErrors];
-
-export type PostApiAgentByIdCommandResponses = {
-    /**
-     * Success
-     */
-    200: CommandReceipt;
-};
-
-export type PostApiAgentByIdCommandResponse = PostApiAgentByIdCommandResponses[keyof PostApiAgentByIdCommandResponses];
-
-export type GetApiAgentByIdConversationData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/conversation';
-};
-
-export type GetApiAgentByIdConversationErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdConversationError = GetApiAgentByIdConversationErrors[keyof GetApiAgentByIdConversationErrors];
-
-export type GetApiAgentByIdConversationResponses = {
-    /**
-     * Success
-     */
-    200: Array<ConversationMsg>;
-};
-
-export type GetApiAgentByIdConversationResponse = GetApiAgentByIdConversationResponses[keyof GetApiAgentByIdConversationResponses];
-
-export type PostApiAgentByIdConversationsSearchData = {
-    body: {
-        limit?: number;
-        query: string;
-        thread_id?: string;
-    };
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/conversations/search';
-};
-
-export type PostApiAgentByIdConversationsSearchErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type PostApiAgentByIdConversationsSearchError = PostApiAgentByIdConversationsSearchErrors[keyof PostApiAgentByIdConversationsSearchErrors];
-
-export type PostApiAgentByIdConversationsSearchResponses = {
-    /**
-     * Success
-     */
-    200: ConversationSearchResult;
-};
-
-export type PostApiAgentByIdConversationsSearchResponse = PostApiAgentByIdConversationsSearchResponses[keyof PostApiAgentByIdConversationsSearchResponses];
-
-export type GetApiAgentByIdFsData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: {
-        path?: string;
-    };
-    url: '/api/agent/{id}/fs';
-};
-
-export type GetApiAgentByIdFsErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdFsError = GetApiAgentByIdFsErrors[keyof GetApiAgentByIdFsErrors];
-
-export type GetApiAgentByIdFsResponses = {
-    /**
-     * Success
-     */
-    200: Array<FinderNode>;
-};
-
-export type GetApiAgentByIdFsResponse = GetApiAgentByIdFsResponses[keyof GetApiAgentByIdFsResponses];
-
-export type GetApiAgentByIdFsDescriptionsData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/fs/descriptions';
-};
-
-export type GetApiAgentByIdFsDescriptionsErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdFsDescriptionsError = GetApiAgentByIdFsDescriptionsErrors[keyof GetApiAgentByIdFsDescriptionsErrors];
-
-export type GetApiAgentByIdFsDescriptionsResponses = {
-    /**
-     * Success
-     */
-    200: FsDescriptions;
-};
-
-export type GetApiAgentByIdFsDescriptionsResponse = GetApiAgentByIdFsDescriptionsResponses[keyof GetApiAgentByIdFsDescriptionsResponses];
-
-export type GetApiAgentByIdFsDownloadData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query: {
-        path: string;
-    };
-    url: '/api/agent/{id}/fs/download';
-};
-
-export type GetApiAgentByIdFsDownloadResponses = {
-    /**
-     * Raw file bytes
-     */
-    200: Blob | File;
-};
-
-export type GetApiAgentByIdFsDownloadResponse = GetApiAgentByIdFsDownloadResponses[keyof GetApiAgentByIdFsDownloadResponses];
-
-export type PostApiAgentByIdFsMkdirData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query: {
-        path: string;
-        name: string;
-    };
-    url: '/api/agent/{id}/fs/mkdir';
-};
-
-export type PostApiAgentByIdFsMkdirErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type PostApiAgentByIdFsMkdirError = PostApiAgentByIdFsMkdirErrors[keyof PostApiAgentByIdFsMkdirErrors];
-
-export type PostApiAgentByIdFsMkdirResponses = {
-    /**
-     * Success
-     */
-    200: MkdirResult;
-};
-
-export type PostApiAgentByIdFsMkdirResponse = PostApiAgentByIdFsMkdirResponses[keyof PostApiAgentByIdFsMkdirResponses];
-
-export type PostApiAgentByIdFsMoveData = {
-    body: {
-        dest: string;
-        items: Array<string>;
-    };
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/fs/move';
-};
-
-export type PostApiAgentByIdFsMoveErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type PostApiAgentByIdFsMoveError = PostApiAgentByIdFsMoveErrors[keyof PostApiAgentByIdFsMoveErrors];
-
-export type PostApiAgentByIdFsMoveResponses = {
-    /**
-     * Success
-     */
-    200: MoveResult;
-};
-
-export type PostApiAgentByIdFsMoveResponse = PostApiAgentByIdFsMoveResponses[keyof PostApiAgentByIdFsMoveResponses];
-
-export type GetApiAgentByIdFsPreviewData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query: {
-        path: string;
-    };
-    url: '/api/agent/{id}/fs/preview';
-};
-
-export type GetApiAgentByIdFsPreviewErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdFsPreviewError = GetApiAgentByIdFsPreviewErrors[keyof GetApiAgentByIdFsPreviewErrors];
-
-export type GetApiAgentByIdFsPreviewResponses = {
-    /**
-     * Success
-     */
-    200: FsPreview;
-};
-
-export type GetApiAgentByIdFsPreviewResponse = GetApiAgentByIdFsPreviewResponses[keyof GetApiAgentByIdFsPreviewResponses];
-
-export type GetApiAgentByIdFsRawData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query: {
-        path: string;
-    };
-    url: '/api/agent/{id}/fs/raw';
-};
-
-export type GetApiAgentByIdFsRawResponses = {
-    /**
-     * Raw file bytes inline
-     */
-    200: Blob | File;
-};
-
-export type GetApiAgentByIdFsRawResponse = GetApiAgentByIdFsRawResponses[keyof GetApiAgentByIdFsRawResponses];
-
-export type PostApiAgentByIdFsRenameData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query: {
-        path: string;
-        name: string;
-    };
-    url: '/api/agent/{id}/fs/rename';
-};
-
-export type PostApiAgentByIdFsRenameErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type PostApiAgentByIdFsRenameError = PostApiAgentByIdFsRenameErrors[keyof PostApiAgentByIdFsRenameErrors];
-
-export type PostApiAgentByIdFsRenameResponses = {
-    /**
-     * Success
-     */
-    200: RenameResult;
-};
-
-export type PostApiAgentByIdFsRenameResponse = PostApiAgentByIdFsRenameResponses[keyof PostApiAgentByIdFsRenameResponses];
-
-export type GetApiAgentByIdFsSheetData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query: {
-        path: string;
-    };
-    url: '/api/agent/{id}/fs/sheet';
-};
-
-export type GetApiAgentByIdFsSheetErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdFsSheetError = GetApiAgentByIdFsSheetErrors[keyof GetApiAgentByIdFsSheetErrors];
-
-export type GetApiAgentByIdFsSheetResponses = {
-    /**
-     * Success
-     */
-    200: SheetData;
-};
-
-export type GetApiAgentByIdFsSheetResponse = GetApiAgentByIdFsSheetResponses[keyof GetApiAgentByIdFsSheetResponses];
-
-export type PostApiAgentByIdFsSheetSaveData = {
-    body: {
-        [key: string]: unknown;
-    };
-    path: {
-        id: string;
-    };
-    query: {
-        path: string;
-    };
-    url: '/api/agent/{id}/fs/sheet/save';
-};
-
-export type PostApiAgentByIdFsSheetSaveErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type PostApiAgentByIdFsSheetSaveError = PostApiAgentByIdFsSheetSaveErrors[keyof PostApiAgentByIdFsSheetSaveErrors];
-
-export type PostApiAgentByIdFsSheetSaveResponses = {
-    /**
-     * Success
-     */
-    200: SheetSaveResult;
-};
-
-export type PostApiAgentByIdFsSheetSaveResponse = PostApiAgentByIdFsSheetSaveResponses[keyof PostApiAgentByIdFsSheetSaveResponses];
-
-export type PostApiAgentByIdFsTrashData = {
-    body: {
-        items: Array<string>;
-    };
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/fs/trash';
-};
-
-export type PostApiAgentByIdFsTrashErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type PostApiAgentByIdFsTrashError = PostApiAgentByIdFsTrashErrors[keyof PostApiAgentByIdFsTrashErrors];
-
-export type PostApiAgentByIdFsTrashResponses = {
-    /**
-     * Success
-     */
-    200: TrashResult;
-};
-
-export type PostApiAgentByIdFsTrashResponse = PostApiAgentByIdFsTrashResponses[keyof PostApiAgentByIdFsTrashResponses];
-
-export type PostApiAgentByIdFsUploadData = {
-    body: Blob | File;
-    path: {
-        id: string;
-    };
-    query: {
-        path: string;
-        name: string;
-    };
-    url: '/api/agent/{id}/fs/upload';
-};
-
-export type PostApiAgentByIdFsUploadErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type PostApiAgentByIdFsUploadError = PostApiAgentByIdFsUploadErrors[keyof PostApiAgentByIdFsUploadErrors];
-
-export type PostApiAgentByIdFsUploadResponses = {
-    /**
-     * Success
-     */
-    200: UploadResult;
-};
-
-export type PostApiAgentByIdFsUploadResponse = PostApiAgentByIdFsUploadResponses[keyof PostApiAgentByIdFsUploadResponses];
-
-export type PostApiAgentByIdFsUploadUniqueData = {
-    body: Blob | File;
-    path: {
-        id: string;
-    };
-    query: {
-        path: string;
-        name: string;
-    };
-    url: '/api/agent/{id}/fs/upload-unique';
-};
-
-export type PostApiAgentByIdFsUploadUniqueErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type PostApiAgentByIdFsUploadUniqueError = PostApiAgentByIdFsUploadUniqueErrors[keyof PostApiAgentByIdFsUploadUniqueErrors];
-
-export type PostApiAgentByIdFsUploadUniqueResponses = {
-    /**
-     * Success
-     */
-    200: UploadUniqueResult;
-};
-
-export type PostApiAgentByIdFsUploadUniqueResponse = PostApiAgentByIdFsUploadUniqueResponses[keyof PostApiAgentByIdFsUploadUniqueResponses];
-
-export type PostApiAgentByIdFsWriteData = {
-    body: string;
-    path: {
-        id: string;
-    };
-    query: {
-        path: string;
-    };
-    url: '/api/agent/{id}/fs/write';
-};
-
-export type PostApiAgentByIdFsWriteErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type PostApiAgentByIdFsWriteError = PostApiAgentByIdFsWriteErrors[keyof PostApiAgentByIdFsWriteErrors];
-
-export type PostApiAgentByIdFsWriteResponses = {
-    /**
-     * Success
-     */
-    200: WriteResult;
-};
-
-export type PostApiAgentByIdFsWriteResponse = PostApiAgentByIdFsWriteResponses[keyof PostApiAgentByIdFsWriteResponses];
-
-export type GetApiAgentByIdLibraryData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/library';
-};
-
-export type GetApiAgentByIdLibraryErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdLibraryError = GetApiAgentByIdLibraryErrors[keyof GetApiAgentByIdLibraryErrors];
-
-export type GetApiAgentByIdLibraryResponses = {
-    /**
-     * Success
-     */
-    200: Array<LibraryItem>;
-};
-
-export type GetApiAgentByIdLibraryResponse = GetApiAgentByIdLibraryResponses[keyof GetApiAgentByIdLibraryResponses];
-
-export type DeleteApiAgentByIdLibraryAgentByItemData = {
-    body?: never;
-    path: {
-        id: string;
-        item: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/library/agent/{item}';
-};
-
-export type DeleteApiAgentByIdLibraryAgentByItemErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type DeleteApiAgentByIdLibraryAgentByItemError = DeleteApiAgentByIdLibraryAgentByItemErrors[keyof DeleteApiAgentByIdLibraryAgentByItemErrors];
-
-export type DeleteApiAgentByIdLibraryAgentByItemResponses = {
-    /**
-     * Success
-     */
-    200: CreateCommandReceipt;
-};
-
-export type DeleteApiAgentByIdLibraryAgentByItemResponse = DeleteApiAgentByIdLibraryAgentByItemResponses[keyof DeleteApiAgentByIdLibraryAgentByItemResponses];
-
-export type GetApiAgentByIdLibraryAgentByItemData = {
-    body?: never;
-    path: {
-        id: string;
-        item: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/library/agent/{item}';
-};
-
-export type GetApiAgentByIdLibraryAgentByItemErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdLibraryAgentByItemError = GetApiAgentByIdLibraryAgentByItemErrors[keyof GetApiAgentByIdLibraryAgentByItemErrors];
-
-export type GetApiAgentByIdLibraryAgentByItemResponses = {
-    /**
-     * Success
-     */
-    200: LibraryAgentRaw;
-};
-
-export type GetApiAgentByIdLibraryAgentByItemResponse = GetApiAgentByIdLibraryAgentByItemResponses[keyof GetApiAgentByIdLibraryAgentByItemResponses];
-
-export type PutApiAgentByIdLibraryAgentByItemData = {
-    body: {
-        body: string;
-        description?: string;
-        name: string;
-    };
-    path: {
-        id: string;
-        item: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/library/agent/{item}';
-};
-
-export type PutApiAgentByIdLibraryAgentByItemErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type PutApiAgentByIdLibraryAgentByItemError = PutApiAgentByIdLibraryAgentByItemErrors[keyof PutApiAgentByIdLibraryAgentByItemErrors];
-
-export type PutApiAgentByIdLibraryAgentByItemResponses = {
-    /**
-     * Success
-     */
-    200: CreateCommandReceipt;
-};
-
-export type PutApiAgentByIdLibraryAgentByItemResponse = PutApiAgentByIdLibraryAgentByItemResponses[keyof PutApiAgentByIdLibraryAgentByItemResponses];
-
-export type PostApiAgentByIdLibraryCommandData = {
-    body: {
-        body: string;
-        description?: string;
-        name: string;
-    };
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/library/command';
-};
-
-export type PostApiAgentByIdLibraryCommandErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type PostApiAgentByIdLibraryCommandError = PostApiAgentByIdLibraryCommandErrors[keyof PostApiAgentByIdLibraryCommandErrors];
-
-export type PostApiAgentByIdLibraryCommandResponses = {
-    /**
-     * Success
-     */
-    200: CreateCommandReceipt;
-};
-
-export type PostApiAgentByIdLibraryCommandResponse = PostApiAgentByIdLibraryCommandResponses[keyof PostApiAgentByIdLibraryCommandResponses];
-
-export type PutApiAgentByIdLibraryCommandByItemData = {
-    body: {
-        body: string;
-        description?: string;
-        name: string;
-    };
-    path: {
-        id: string;
-        item: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/library/command/{item}';
-};
-
-export type PutApiAgentByIdLibraryCommandByItemErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type PutApiAgentByIdLibraryCommandByItemError = PutApiAgentByIdLibraryCommandByItemErrors[keyof PutApiAgentByIdLibraryCommandByItemErrors];
-
-export type PutApiAgentByIdLibraryCommandByItemResponses = {
-    /**
-     * Success
-     */
-    200: CreateCommandReceipt;
-};
-
-export type PutApiAgentByIdLibraryCommandByItemResponse = PutApiAgentByIdLibraryCommandByItemResponses[keyof PutApiAgentByIdLibraryCommandByItemResponses];
-
-export type GetApiAgentByIdMetaData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/meta';
-};
-
-export type GetApiAgentByIdMetaErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdMetaError = GetApiAgentByIdMetaErrors[keyof GetApiAgentByIdMetaErrors];
-
-export type GetApiAgentByIdMetaResponses = {
-    /**
-     * Success
-     */
-    200: Agent;
-};
-
-export type GetApiAgentByIdMetaResponse = GetApiAgentByIdMetaResponses[keyof GetApiAgentByIdMetaResponses];
-
-export type GetApiAgentByIdMetricsData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/metrics';
-};
-
-export type GetApiAgentByIdMetricsErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdMetricsError = GetApiAgentByIdMetricsErrors[keyof GetApiAgentByIdMetricsErrors];
-
-export type GetApiAgentByIdMetricsResponses = {
-    /**
-     * Success
-     */
-    200: AgentMetrics;
-};
-
-export type GetApiAgentByIdMetricsResponse = GetApiAgentByIdMetricsResponses[keyof GetApiAgentByIdMetricsResponses];
-
-export type PostApiAgentByIdRenameData = {
-    body: {
-        name: string;
-    };
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/rename';
-};
-
-export type PostApiAgentByIdRenameErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type PostApiAgentByIdRenameError = PostApiAgentByIdRenameErrors[keyof PostApiAgentByIdRenameErrors];
-
-export type PostApiAgentByIdRenameResponses = {
-    /**
-     * Success
-     */
-    200: OkResponse;
-};
-
-export type PostApiAgentByIdRenameResponse = PostApiAgentByIdRenameResponses[keyof PostApiAgentByIdRenameResponses];
-
-export type PostApiAgentByIdRestartData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/restart';
-};
-
-export type PostApiAgentByIdRestartErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type PostApiAgentByIdRestartError = PostApiAgentByIdRestartErrors[keyof PostApiAgentByIdRestartErrors];
-
-export type PostApiAgentByIdRestartResponses = {
-    /**
-     * Success
-     */
-    200: RestartReceipt;
-};
-
-export type PostApiAgentByIdRestartResponse = PostApiAgentByIdRestartResponses[keyof PostApiAgentByIdRestartResponses];
-
-export type PostApiAgentByIdRetireData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/retire';
-};
-
-export type PostApiAgentByIdRetireErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type PostApiAgentByIdRetireError = PostApiAgentByIdRetireErrors[keyof PostApiAgentByIdRetireErrors];
-
-export type PostApiAgentByIdRetireResponses = {
-    /**
-     * Success
-     */
-    200: RetireReceipt;
-};
-
-export type PostApiAgentByIdRetireResponse = PostApiAgentByIdRetireResponses[keyof PostApiAgentByIdRetireResponses];
-
-export type GetApiAgentByIdThreadsData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/threads';
-};
-
-export type GetApiAgentByIdThreadsErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdThreadsError = GetApiAgentByIdThreadsErrors[keyof GetApiAgentByIdThreadsErrors];
-
-export type GetApiAgentByIdThreadsResponses = {
-    /**
-     * Success
-     */
-    200: ThreadsResponse;
-};
-
-export type GetApiAgentByIdThreadsResponse = GetApiAgentByIdThreadsResponses[keyof GetApiAgentByIdThreadsResponses];
-
-export type PostApiAgentByIdUnretireData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/unretire';
-};
-
-export type PostApiAgentByIdUnretireErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type PostApiAgentByIdUnretireError = PostApiAgentByIdUnretireErrors[keyof PostApiAgentByIdUnretireErrors];
-
-export type PostApiAgentByIdUnretireResponses = {
-    /**
-     * Success
-     */
-    200: UnretireReceipt;
-};
-
-export type PostApiAgentByIdUnretireResponse = PostApiAgentByIdUnretireResponses[keyof PostApiAgentByIdUnretireResponses];
-
-export type GetApiAgentByIdUsageData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/usage';
-};
-
-export type GetApiAgentByIdUsageErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdUsageError = GetApiAgentByIdUsageErrors[keyof GetApiAgentByIdUsageErrors];
-
-export type GetApiAgentByIdUsageResponses = {
-    /**
-     * Success
-     */
-    200: {
-        [key: string]: unknown;
-    };
-};
-
-export type GetApiAgentByIdUsageResponse = GetApiAgentByIdUsageResponses[keyof GetApiAgentByIdUsageResponses];
-
-export type GetApiAgentByIdVitalsData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/vitals';
-};
-
-export type GetApiAgentByIdVitalsErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdVitalsError = GetApiAgentByIdVitalsErrors[keyof GetApiAgentByIdVitalsErrors];
-
-export type GetApiAgentByIdVitalsResponses = {
-    /**
-     * Success
-     */
-    200: Array<Vital>;
-};
-
-export type GetApiAgentByIdVitalsResponse = GetApiAgentByIdVitalsResponses[keyof GetApiAgentByIdVitalsResponses];
-
 export type PostApiAuthLoginData = {
     body: {
         email: string;
@@ -2685,6 +1536,1155 @@ export type GetApiFeaturesResponses = {
 };
 
 export type GetApiFeaturesResponse = GetApiFeaturesResponses[keyof GetApiFeaturesResponses];
+
+export type GetApiFleetByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}';
+};
+
+export type GetApiFleetByIdErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiFleetByIdError = GetApiFleetByIdErrors[keyof GetApiFleetByIdErrors];
+
+export type GetApiFleetByIdResponses = {
+    /**
+     * Success
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type GetApiFleetByIdResponse = GetApiFleetByIdResponses[keyof GetApiFleetByIdResponses];
+
+export type GetApiFleetByIdAclData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/acl';
+};
+
+export type GetApiFleetByIdAclErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiFleetByIdAclError = GetApiFleetByIdAclErrors[keyof GetApiFleetByIdAclErrors];
+
+export type GetApiFleetByIdAclResponses = {
+    /**
+     * Success
+     */
+    200: Array<AclEntry>;
+};
+
+export type GetApiFleetByIdAclResponse = GetApiFleetByIdAclResponses[keyof GetApiFleetByIdAclResponses];
+
+export type PostApiFleetByIdAclData = {
+    body: {
+        role?: string;
+        user_id: string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/acl';
+};
+
+export type PostApiFleetByIdAclErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiFleetByIdAclError = PostApiFleetByIdAclErrors[keyof PostApiFleetByIdAclErrors];
+
+export type PostApiFleetByIdAclResponses = {
+    /**
+     * Success
+     */
+    200: AclEntry;
+};
+
+export type PostApiFleetByIdAclResponse = PostApiFleetByIdAclResponses[keyof PostApiFleetByIdAclResponses];
+
+export type DeleteApiFleetByIdAclByUserIdData = {
+    body?: never;
+    path: {
+        id: string;
+        userId: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/acl/{userId}';
+};
+
+export type DeleteApiFleetByIdAclByUserIdErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type DeleteApiFleetByIdAclByUserIdError = DeleteApiFleetByIdAclByUserIdErrors[keyof DeleteApiFleetByIdAclByUserIdErrors];
+
+export type DeleteApiFleetByIdAclByUserIdResponses = {
+    /**
+     * Success
+     */
+    200: OkResponse;
+};
+
+export type DeleteApiFleetByIdAclByUserIdResponse = DeleteApiFleetByIdAclByUserIdResponses[keyof DeleteApiFleetByIdAclByUserIdResponses];
+
+export type PatchApiFleetByIdAclByUserIdData = {
+    body: {
+        role: string;
+    };
+    path: {
+        id: string;
+        userId: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/acl/{userId}';
+};
+
+export type PatchApiFleetByIdAclByUserIdErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PatchApiFleetByIdAclByUserIdError = PatchApiFleetByIdAclByUserIdErrors[keyof PatchApiFleetByIdAclByUserIdErrors];
+
+export type PatchApiFleetByIdAclByUserIdResponses = {
+    /**
+     * Success
+     */
+    200: AclEntry;
+};
+
+export type PatchApiFleetByIdAclByUserIdResponse = PatchApiFleetByIdAclByUserIdResponses[keyof PatchApiFleetByIdAclByUserIdResponses];
+
+export type DeleteApiFleetByIdAvatarData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/avatar';
+};
+
+export type DeleteApiFleetByIdAvatarErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type DeleteApiFleetByIdAvatarError = DeleteApiFleetByIdAvatarErrors[keyof DeleteApiFleetByIdAvatarErrors];
+
+export type DeleteApiFleetByIdAvatarResponses = {
+    /**
+     * Success
+     */
+    200: OkResponse;
+};
+
+export type DeleteApiFleetByIdAvatarResponse = DeleteApiFleetByIdAvatarResponses[keyof DeleteApiFleetByIdAvatarResponses];
+
+export type GetApiFleetByIdAvatarData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/avatar';
+};
+
+export type GetApiFleetByIdAvatarResponses = {
+    /**
+     * Avatar image bytes
+     */
+    200: Blob | File;
+};
+
+export type GetApiFleetByIdAvatarResponse = GetApiFleetByIdAvatarResponses[keyof GetApiFleetByIdAvatarResponses];
+
+export type PostApiFleetByIdAvatarData = {
+    body: Blob | File;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/avatar';
+};
+
+export type PostApiFleetByIdAvatarErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiFleetByIdAvatarError = PostApiFleetByIdAvatarErrors[keyof PostApiFleetByIdAvatarErrors];
+
+export type PostApiFleetByIdAvatarResponses = {
+    /**
+     * Success
+     */
+    200: OkResponse;
+};
+
+export type PostApiFleetByIdAvatarResponse = PostApiFleetByIdAvatarResponses[keyof PostApiFleetByIdAvatarResponses];
+
+export type GetApiFleetByIdBodyByHashData = {
+    body?: never;
+    path: {
+        id: string;
+        hash: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/body/{hash}';
+};
+
+export type GetApiFleetByIdBodyByHashErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiFleetByIdBodyByHashError = GetApiFleetByIdBodyByHashErrors[keyof GetApiFleetByIdBodyByHashErrors];
+
+export type GetApiFleetByIdBodyByHashResponses = {
+    /**
+     * Success
+     */
+    200: BodyPayload;
+};
+
+export type GetApiFleetByIdBodyByHashResponse = GetApiFleetByIdBodyByHashResponses[keyof GetApiFleetByIdBodyByHashResponses];
+
+export type PostApiFleetByIdCommandData = {
+    body: {
+        [key: string]: unknown;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/command';
+};
+
+export type PostApiFleetByIdCommandErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiFleetByIdCommandError = PostApiFleetByIdCommandErrors[keyof PostApiFleetByIdCommandErrors];
+
+export type PostApiFleetByIdCommandResponses = {
+    /**
+     * Success
+     */
+    200: CommandReceipt;
+};
+
+export type PostApiFleetByIdCommandResponse = PostApiFleetByIdCommandResponses[keyof PostApiFleetByIdCommandResponses];
+
+export type GetApiFleetByIdConversationData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/conversation';
+};
+
+export type GetApiFleetByIdConversationErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiFleetByIdConversationError = GetApiFleetByIdConversationErrors[keyof GetApiFleetByIdConversationErrors];
+
+export type GetApiFleetByIdConversationResponses = {
+    /**
+     * Success
+     */
+    200: Array<ConversationMsg>;
+};
+
+export type GetApiFleetByIdConversationResponse = GetApiFleetByIdConversationResponses[keyof GetApiFleetByIdConversationResponses];
+
+export type PostApiFleetByIdConversationsSearchData = {
+    body: {
+        limit?: number;
+        query: string;
+        thread_id?: string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/conversations/search';
+};
+
+export type PostApiFleetByIdConversationsSearchErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiFleetByIdConversationsSearchError = PostApiFleetByIdConversationsSearchErrors[keyof PostApiFleetByIdConversationsSearchErrors];
+
+export type PostApiFleetByIdConversationsSearchResponses = {
+    /**
+     * Success
+     */
+    200: ConversationSearchResult;
+};
+
+export type PostApiFleetByIdConversationsSearchResponse = PostApiFleetByIdConversationsSearchResponses[keyof PostApiFleetByIdConversationsSearchResponses];
+
+export type GetApiFleetByIdFsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: {
+        path?: string;
+    };
+    url: '/api/fleet/{id}/fs';
+};
+
+export type GetApiFleetByIdFsErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiFleetByIdFsError = GetApiFleetByIdFsErrors[keyof GetApiFleetByIdFsErrors];
+
+export type GetApiFleetByIdFsResponses = {
+    /**
+     * Success
+     */
+    200: Array<FinderNode>;
+};
+
+export type GetApiFleetByIdFsResponse = GetApiFleetByIdFsResponses[keyof GetApiFleetByIdFsResponses];
+
+export type GetApiFleetByIdFsDescriptionsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/fs/descriptions';
+};
+
+export type GetApiFleetByIdFsDescriptionsErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiFleetByIdFsDescriptionsError = GetApiFleetByIdFsDescriptionsErrors[keyof GetApiFleetByIdFsDescriptionsErrors];
+
+export type GetApiFleetByIdFsDescriptionsResponses = {
+    /**
+     * Success
+     */
+    200: FsDescriptions;
+};
+
+export type GetApiFleetByIdFsDescriptionsResponse = GetApiFleetByIdFsDescriptionsResponses[keyof GetApiFleetByIdFsDescriptionsResponses];
+
+export type GetApiFleetByIdFsDownloadData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+    };
+    url: '/api/fleet/{id}/fs/download';
+};
+
+export type GetApiFleetByIdFsDownloadResponses = {
+    /**
+     * Raw file bytes
+     */
+    200: Blob | File;
+};
+
+export type GetApiFleetByIdFsDownloadResponse = GetApiFleetByIdFsDownloadResponses[keyof GetApiFleetByIdFsDownloadResponses];
+
+export type PostApiFleetByIdFsMkdirData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+        name: string;
+    };
+    url: '/api/fleet/{id}/fs/mkdir';
+};
+
+export type PostApiFleetByIdFsMkdirErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiFleetByIdFsMkdirError = PostApiFleetByIdFsMkdirErrors[keyof PostApiFleetByIdFsMkdirErrors];
+
+export type PostApiFleetByIdFsMkdirResponses = {
+    /**
+     * Success
+     */
+    200: MkdirResult;
+};
+
+export type PostApiFleetByIdFsMkdirResponse = PostApiFleetByIdFsMkdirResponses[keyof PostApiFleetByIdFsMkdirResponses];
+
+export type PostApiFleetByIdFsMoveData = {
+    body: {
+        dest: string;
+        items: Array<string>;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/fs/move';
+};
+
+export type PostApiFleetByIdFsMoveErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiFleetByIdFsMoveError = PostApiFleetByIdFsMoveErrors[keyof PostApiFleetByIdFsMoveErrors];
+
+export type PostApiFleetByIdFsMoveResponses = {
+    /**
+     * Success
+     */
+    200: MoveResult;
+};
+
+export type PostApiFleetByIdFsMoveResponse = PostApiFleetByIdFsMoveResponses[keyof PostApiFleetByIdFsMoveResponses];
+
+export type GetApiFleetByIdFsPreviewData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+    };
+    url: '/api/fleet/{id}/fs/preview';
+};
+
+export type GetApiFleetByIdFsPreviewErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiFleetByIdFsPreviewError = GetApiFleetByIdFsPreviewErrors[keyof GetApiFleetByIdFsPreviewErrors];
+
+export type GetApiFleetByIdFsPreviewResponses = {
+    /**
+     * Success
+     */
+    200: FsPreview;
+};
+
+export type GetApiFleetByIdFsPreviewResponse = GetApiFleetByIdFsPreviewResponses[keyof GetApiFleetByIdFsPreviewResponses];
+
+export type GetApiFleetByIdFsRawData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+    };
+    url: '/api/fleet/{id}/fs/raw';
+};
+
+export type GetApiFleetByIdFsRawResponses = {
+    /**
+     * Raw file bytes inline
+     */
+    200: Blob | File;
+};
+
+export type GetApiFleetByIdFsRawResponse = GetApiFleetByIdFsRawResponses[keyof GetApiFleetByIdFsRawResponses];
+
+export type PostApiFleetByIdFsRenameData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+        name: string;
+    };
+    url: '/api/fleet/{id}/fs/rename';
+};
+
+export type PostApiFleetByIdFsRenameErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiFleetByIdFsRenameError = PostApiFleetByIdFsRenameErrors[keyof PostApiFleetByIdFsRenameErrors];
+
+export type PostApiFleetByIdFsRenameResponses = {
+    /**
+     * Success
+     */
+    200: RenameResult;
+};
+
+export type PostApiFleetByIdFsRenameResponse = PostApiFleetByIdFsRenameResponses[keyof PostApiFleetByIdFsRenameResponses];
+
+export type GetApiFleetByIdFsSheetData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+    };
+    url: '/api/fleet/{id}/fs/sheet';
+};
+
+export type GetApiFleetByIdFsSheetErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiFleetByIdFsSheetError = GetApiFleetByIdFsSheetErrors[keyof GetApiFleetByIdFsSheetErrors];
+
+export type GetApiFleetByIdFsSheetResponses = {
+    /**
+     * Success
+     */
+    200: SheetData;
+};
+
+export type GetApiFleetByIdFsSheetResponse = GetApiFleetByIdFsSheetResponses[keyof GetApiFleetByIdFsSheetResponses];
+
+export type PostApiFleetByIdFsSheetSaveData = {
+    body: {
+        [key: string]: unknown;
+    };
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+    };
+    url: '/api/fleet/{id}/fs/sheet/save';
+};
+
+export type PostApiFleetByIdFsSheetSaveErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiFleetByIdFsSheetSaveError = PostApiFleetByIdFsSheetSaveErrors[keyof PostApiFleetByIdFsSheetSaveErrors];
+
+export type PostApiFleetByIdFsSheetSaveResponses = {
+    /**
+     * Success
+     */
+    200: SheetSaveResult;
+};
+
+export type PostApiFleetByIdFsSheetSaveResponse = PostApiFleetByIdFsSheetSaveResponses[keyof PostApiFleetByIdFsSheetSaveResponses];
+
+export type PostApiFleetByIdFsTrashData = {
+    body: {
+        items: Array<string>;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/fs/trash';
+};
+
+export type PostApiFleetByIdFsTrashErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiFleetByIdFsTrashError = PostApiFleetByIdFsTrashErrors[keyof PostApiFleetByIdFsTrashErrors];
+
+export type PostApiFleetByIdFsTrashResponses = {
+    /**
+     * Success
+     */
+    200: TrashResult;
+};
+
+export type PostApiFleetByIdFsTrashResponse = PostApiFleetByIdFsTrashResponses[keyof PostApiFleetByIdFsTrashResponses];
+
+export type PostApiFleetByIdFsUploadData = {
+    body: Blob | File;
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+        name: string;
+    };
+    url: '/api/fleet/{id}/fs/upload';
+};
+
+export type PostApiFleetByIdFsUploadErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiFleetByIdFsUploadError = PostApiFleetByIdFsUploadErrors[keyof PostApiFleetByIdFsUploadErrors];
+
+export type PostApiFleetByIdFsUploadResponses = {
+    /**
+     * Success
+     */
+    200: UploadResult;
+};
+
+export type PostApiFleetByIdFsUploadResponse = PostApiFleetByIdFsUploadResponses[keyof PostApiFleetByIdFsUploadResponses];
+
+export type PostApiFleetByIdFsUploadUniqueData = {
+    body: Blob | File;
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+        name: string;
+    };
+    url: '/api/fleet/{id}/fs/upload-unique';
+};
+
+export type PostApiFleetByIdFsUploadUniqueErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiFleetByIdFsUploadUniqueError = PostApiFleetByIdFsUploadUniqueErrors[keyof PostApiFleetByIdFsUploadUniqueErrors];
+
+export type PostApiFleetByIdFsUploadUniqueResponses = {
+    /**
+     * Success
+     */
+    200: UploadUniqueResult;
+};
+
+export type PostApiFleetByIdFsUploadUniqueResponse = PostApiFleetByIdFsUploadUniqueResponses[keyof PostApiFleetByIdFsUploadUniqueResponses];
+
+export type PostApiFleetByIdFsWriteData = {
+    body: string;
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+    };
+    url: '/api/fleet/{id}/fs/write';
+};
+
+export type PostApiFleetByIdFsWriteErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiFleetByIdFsWriteError = PostApiFleetByIdFsWriteErrors[keyof PostApiFleetByIdFsWriteErrors];
+
+export type PostApiFleetByIdFsWriteResponses = {
+    /**
+     * Success
+     */
+    200: WriteResult;
+};
+
+export type PostApiFleetByIdFsWriteResponse = PostApiFleetByIdFsWriteResponses[keyof PostApiFleetByIdFsWriteResponses];
+
+export type GetApiFleetByIdLibraryData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/library';
+};
+
+export type GetApiFleetByIdLibraryErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiFleetByIdLibraryError = GetApiFleetByIdLibraryErrors[keyof GetApiFleetByIdLibraryErrors];
+
+export type GetApiFleetByIdLibraryResponses = {
+    /**
+     * Success
+     */
+    200: Array<LibraryItem>;
+};
+
+export type GetApiFleetByIdLibraryResponse = GetApiFleetByIdLibraryResponses[keyof GetApiFleetByIdLibraryResponses];
+
+export type DeleteApiFleetByIdLibraryAgentByItemData = {
+    body?: never;
+    path: {
+        id: string;
+        item: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/library/agent/{item}';
+};
+
+export type DeleteApiFleetByIdLibraryAgentByItemErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type DeleteApiFleetByIdLibraryAgentByItemError = DeleteApiFleetByIdLibraryAgentByItemErrors[keyof DeleteApiFleetByIdLibraryAgentByItemErrors];
+
+export type DeleteApiFleetByIdLibraryAgentByItemResponses = {
+    /**
+     * Success
+     */
+    200: CreateCommandReceipt;
+};
+
+export type DeleteApiFleetByIdLibraryAgentByItemResponse = DeleteApiFleetByIdLibraryAgentByItemResponses[keyof DeleteApiFleetByIdLibraryAgentByItemResponses];
+
+export type GetApiFleetByIdLibraryAgentByItemData = {
+    body?: never;
+    path: {
+        id: string;
+        item: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/library/agent/{item}';
+};
+
+export type GetApiFleetByIdLibraryAgentByItemErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiFleetByIdLibraryAgentByItemError = GetApiFleetByIdLibraryAgentByItemErrors[keyof GetApiFleetByIdLibraryAgentByItemErrors];
+
+export type GetApiFleetByIdLibraryAgentByItemResponses = {
+    /**
+     * Success
+     */
+    200: LibraryAgentRaw;
+};
+
+export type GetApiFleetByIdLibraryAgentByItemResponse = GetApiFleetByIdLibraryAgentByItemResponses[keyof GetApiFleetByIdLibraryAgentByItemResponses];
+
+export type PutApiFleetByIdLibraryAgentByItemData = {
+    body: {
+        body: string;
+        description?: string;
+        name: string;
+    };
+    path: {
+        id: string;
+        item: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/library/agent/{item}';
+};
+
+export type PutApiFleetByIdLibraryAgentByItemErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PutApiFleetByIdLibraryAgentByItemError = PutApiFleetByIdLibraryAgentByItemErrors[keyof PutApiFleetByIdLibraryAgentByItemErrors];
+
+export type PutApiFleetByIdLibraryAgentByItemResponses = {
+    /**
+     * Success
+     */
+    200: CreateCommandReceipt;
+};
+
+export type PutApiFleetByIdLibraryAgentByItemResponse = PutApiFleetByIdLibraryAgentByItemResponses[keyof PutApiFleetByIdLibraryAgentByItemResponses];
+
+export type PostApiFleetByIdLibraryCommandData = {
+    body: {
+        body: string;
+        description?: string;
+        name: string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/library/command';
+};
+
+export type PostApiFleetByIdLibraryCommandErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiFleetByIdLibraryCommandError = PostApiFleetByIdLibraryCommandErrors[keyof PostApiFleetByIdLibraryCommandErrors];
+
+export type PostApiFleetByIdLibraryCommandResponses = {
+    /**
+     * Success
+     */
+    200: CreateCommandReceipt;
+};
+
+export type PostApiFleetByIdLibraryCommandResponse = PostApiFleetByIdLibraryCommandResponses[keyof PostApiFleetByIdLibraryCommandResponses];
+
+export type PutApiFleetByIdLibraryCommandByItemData = {
+    body: {
+        body: string;
+        description?: string;
+        name: string;
+    };
+    path: {
+        id: string;
+        item: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/library/command/{item}';
+};
+
+export type PutApiFleetByIdLibraryCommandByItemErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PutApiFleetByIdLibraryCommandByItemError = PutApiFleetByIdLibraryCommandByItemErrors[keyof PutApiFleetByIdLibraryCommandByItemErrors];
+
+export type PutApiFleetByIdLibraryCommandByItemResponses = {
+    /**
+     * Success
+     */
+    200: CreateCommandReceipt;
+};
+
+export type PutApiFleetByIdLibraryCommandByItemResponse = PutApiFleetByIdLibraryCommandByItemResponses[keyof PutApiFleetByIdLibraryCommandByItemResponses];
+
+export type GetApiFleetByIdMetaData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/meta';
+};
+
+export type GetApiFleetByIdMetaErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiFleetByIdMetaError = GetApiFleetByIdMetaErrors[keyof GetApiFleetByIdMetaErrors];
+
+export type GetApiFleetByIdMetaResponses = {
+    /**
+     * Success
+     */
+    200: Agent;
+};
+
+export type GetApiFleetByIdMetaResponse = GetApiFleetByIdMetaResponses[keyof GetApiFleetByIdMetaResponses];
+
+export type GetApiFleetByIdMetricsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/metrics';
+};
+
+export type GetApiFleetByIdMetricsErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiFleetByIdMetricsError = GetApiFleetByIdMetricsErrors[keyof GetApiFleetByIdMetricsErrors];
+
+export type GetApiFleetByIdMetricsResponses = {
+    /**
+     * Success
+     */
+    200: AgentMetrics;
+};
+
+export type GetApiFleetByIdMetricsResponse = GetApiFleetByIdMetricsResponses[keyof GetApiFleetByIdMetricsResponses];
+
+export type PostApiFleetByIdRenameData = {
+    body: {
+        name: string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/rename';
+};
+
+export type PostApiFleetByIdRenameErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiFleetByIdRenameError = PostApiFleetByIdRenameErrors[keyof PostApiFleetByIdRenameErrors];
+
+export type PostApiFleetByIdRenameResponses = {
+    /**
+     * Success
+     */
+    200: OkResponse;
+};
+
+export type PostApiFleetByIdRenameResponse = PostApiFleetByIdRenameResponses[keyof PostApiFleetByIdRenameResponses];
+
+export type PostApiFleetByIdRestartData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/restart';
+};
+
+export type PostApiFleetByIdRestartErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiFleetByIdRestartError = PostApiFleetByIdRestartErrors[keyof PostApiFleetByIdRestartErrors];
+
+export type PostApiFleetByIdRestartResponses = {
+    /**
+     * Success
+     */
+    200: RestartReceipt;
+};
+
+export type PostApiFleetByIdRestartResponse = PostApiFleetByIdRestartResponses[keyof PostApiFleetByIdRestartResponses];
+
+export type PostApiFleetByIdRetireData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/retire';
+};
+
+export type PostApiFleetByIdRetireErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiFleetByIdRetireError = PostApiFleetByIdRetireErrors[keyof PostApiFleetByIdRetireErrors];
+
+export type PostApiFleetByIdRetireResponses = {
+    /**
+     * Success
+     */
+    200: RetireReceipt;
+};
+
+export type PostApiFleetByIdRetireResponse = PostApiFleetByIdRetireResponses[keyof PostApiFleetByIdRetireResponses];
+
+export type GetApiFleetByIdThreadsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/threads';
+};
+
+export type GetApiFleetByIdThreadsErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiFleetByIdThreadsError = GetApiFleetByIdThreadsErrors[keyof GetApiFleetByIdThreadsErrors];
+
+export type GetApiFleetByIdThreadsResponses = {
+    /**
+     * Success
+     */
+    200: ThreadsResponse;
+};
+
+export type GetApiFleetByIdThreadsResponse = GetApiFleetByIdThreadsResponses[keyof GetApiFleetByIdThreadsResponses];
+
+export type PostApiFleetByIdUnretireData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/unretire';
+};
+
+export type PostApiFleetByIdUnretireErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiFleetByIdUnretireError = PostApiFleetByIdUnretireErrors[keyof PostApiFleetByIdUnretireErrors];
+
+export type PostApiFleetByIdUnretireResponses = {
+    /**
+     * Success
+     */
+    200: UnretireReceipt;
+};
+
+export type PostApiFleetByIdUnretireResponse = PostApiFleetByIdUnretireResponses[keyof PostApiFleetByIdUnretireResponses];
+
+export type GetApiFleetByIdUsageData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/usage';
+};
+
+export type GetApiFleetByIdUsageErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiFleetByIdUsageError = GetApiFleetByIdUsageErrors[keyof GetApiFleetByIdUsageErrors];
+
+export type GetApiFleetByIdUsageResponses = {
+    /**
+     * Success
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type GetApiFleetByIdUsageResponse = GetApiFleetByIdUsageResponses[keyof GetApiFleetByIdUsageResponses];
+
+export type GetApiFleetByIdVitalsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/vitals';
+};
+
+export type GetApiFleetByIdVitalsErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiFleetByIdVitalsError = GetApiFleetByIdVitalsErrors[keyof GetApiFleetByIdVitalsErrors];
+
+export type GetApiFleetByIdVitalsResponses = {
+    /**
+     * Success
+     */
+    200: Array<Vital>;
+};
+
+export type GetApiFleetByIdVitalsResponse = GetApiFleetByIdVitalsResponses[keyof GetApiFleetByIdVitalsResponses];
 
 export type GetApiFleetsData = {
     body?: never;

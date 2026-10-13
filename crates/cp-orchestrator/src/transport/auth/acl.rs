@@ -12,11 +12,11 @@ use crate::services::auth::types::{AccessGrant, User};
 
 /// Extract an agent id from URL segments if the route is agent-scoped.
 ///
-/// Matches `["api", "agent", id, ..]` — every route that targets a
+/// Matches `["api", "fleet", id, ..]` — every route that targets a
 /// specific agent.
 pub(crate) fn extract_agent_id<'seg>(segments: &[&'seg str]) -> Option<&'seg str> {
     match *segments {
-        ["api", "agent", id, ..] => Some(id),
+        ["api", "fleet", id, ..] => Some(id),
         _ => None,
     }
 }
@@ -49,7 +49,7 @@ fn can_manage_acl(state: &Mutex<Backend>, agent_id: &str, user: &User) -> bool {
 
 // ───────────────── ACL CRUD endpoints (Phase 6) ──────────────────────
 
-/// `GET /api/agent/{id}/acl` — list users with access (admin or
+/// `GET /api/fleet/{id}/acl` — list users with access (admin or
 /// agent-admin).
 pub(crate) fn acl_list(state: &Mutex<Backend>, agent_id: &str, auth_user: Option<&User>) -> HttpReply {
     let Some(caller) = auth_user else {
@@ -68,7 +68,7 @@ pub(crate) fn acl_list(state: &Mutex<Backend>, agent_id: &str, auth_user: Option
         .map_or_else(|_| HttpReply::error(500, "database error"), |entries| HttpReply::ok(&entries))
 }
 
-/// `POST /api/agent/{id}/acl` — grant a user access (with role).
+/// `POST /api/fleet/{id}/acl` — grant a user access (with role).
 ///
 /// Body: `{ "user_id": "...", "role": "agent-user" }`
 pub(crate) fn acl_grant(state: &Mutex<Backend>, agent_id: &str, body: &[u8], auth_user: Option<&User>) -> HttpReply {
@@ -110,7 +110,7 @@ pub(crate) fn acl_grant(state: &Mutex<Backend>, agent_id: &str, body: &[u8], aut
     }
 }
 
-/// `PATCH /api/agent/{id}/acl/{userId}` — change a user's per-agent role.
+/// `PATCH /api/fleet/{id}/acl/{userId}` — change a user's per-agent role.
 ///
 /// Body: `{ "role": "agent-admin" }`
 pub(crate) fn acl_update_role(
@@ -149,7 +149,7 @@ pub(crate) fn acl_update_role(
     }
 }
 
-/// `DELETE /api/agent/{id}/acl/{userId}` — revoke a user's access.
+/// `DELETE /api/fleet/{id}/acl/{userId}` — revoke a user's access.
 pub(crate) fn acl_revoke(
     state: &Mutex<Backend>,
     agent_id: &str,

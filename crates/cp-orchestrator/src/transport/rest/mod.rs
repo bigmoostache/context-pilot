@@ -151,7 +151,7 @@ pub fn fleet(state: &Mutex<Backend>, auth_user: Option<&crate::services::auth::t
     HttpReply::ok(&Envelope { rev: max_rev, data: agents })
 }
 
-/// `GET /api/agent/{id}` — one agent's projected view, or `404`.
+/// `GET /api/fleet/{id}` — one agent's projected view, or `404`.
 pub fn agent(state: &Mutex<Backend>, id: &str) -> HttpReply {
     let Ok(backend) = state.lock() else {
         return HttpReply::error(500, "backend lock poisoned");
@@ -174,7 +174,7 @@ pub fn mint_ticket(state: &Mutex<Backend>, auth_user: Option<&crate::services::a
     HttpReply { status: 200, body: format!("{{\"ticket\":{}}}", json_string(&token)) }
 }
 
-/// `GET /api/agent/{id}/body/{hash}` — hydrate a content-addressed body.
+/// `GET /api/fleet/{id}/body/{hash}` — hydrate a content-addressed body.
 ///
 /// Returns the raw bytes as a JSON string-free octet payload on success, `400`
 /// for a malformed hash, `404` for an unknown agent or absent/inlined body, and
@@ -197,7 +197,7 @@ pub fn body(state: &Mutex<Backend>, id: &str, hash_hex: &str) -> HttpReply {
     }
 }
 
-/// `POST /api/agent/{id}/command` — submit a command to an agent.
+/// `POST /api/fleet/{id}/command` — submit a command to an agent.
 ///
 /// Returns `400` for a malformed command, `404` for an unknown agent, and `502`
 /// if the agent is unreachable.
@@ -232,7 +232,7 @@ pub fn command(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> HttpReply
     }
 }
 
-/// `POST /api/agent/{id}/rename` — set or clear a custom display name.
+/// `POST /api/fleet/{id}/rename` — set or clear a custom display name.
 ///
 /// Body: `{ "name": "My Custom Name" }`.  An empty or whitespace-only name
 /// reverts to the folder-derived default.  The override is persisted in the
@@ -252,7 +252,7 @@ pub fn rename_agent(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> Http
     HttpReply::ok(&serde_json::json!({ "ok": true }))
 }
 
-/// `POST /api/agent/{id}/avatar` — upload or replace an agent's profile picture.
+/// `POST /api/fleet/{id}/avatar` — upload or replace an agent's profile picture.
 ///
 /// Body: raw image bytes (PNG/JPEG/GIF/WebP/SVG). Content type is sniffed from
 /// magic bytes — the `Content-Type` header is not required. Max 2 MiB
@@ -270,7 +270,7 @@ pub fn upload_avatar(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> Htt
     }
 }
 
-/// `DELETE /api/agent/{id}/avatar` — remove an agent's profile picture.
+/// `DELETE /api/fleet/{id}/avatar` — remove an agent's profile picture.
 pub fn delete_avatar(state: &Mutex<Backend>, id: &str) -> HttpReply {
     let Ok(mut b) = state.lock() else {
         return HttpReply::error(500, "backend lock poisoned");
@@ -309,7 +309,7 @@ fn ack_status(status: &cp_wire::types::ack::Status) -> String {
     }
 }
 
-/// `GET /api/agent/{id}/threads` — the thread list, served roster-first.
+/// `GET /api/fleet/{id}/threads` — the thread list, served roster-first.
 ///
 /// The thread **roster** (which threads exist, their turn status, archived
 /// flag, and last activity) comes from the in-memory

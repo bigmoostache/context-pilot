@@ -8,7 +8,7 @@ use crate::transport::rest::HttpReply;
 
 use super::support::{agent_folder, confined_path, count_visible_children, extract_param, infer_kind};
 
-/// `GET /api/agent/{id}/fs/descriptions` — the agent's tree descriptions.
+/// `GET /api/fleet/{id}/fs/descriptions` — the agent's tree descriptions.
 ///
 /// Reads the agent's `tree` module persistence
 /// (`<folder>/.context-pilot/shared/tree-descriptions.yaml`) and returns a flat
@@ -58,7 +58,7 @@ const MAX_PREVIEW_BYTES: u64 = 1024 * 1024;
 /// Maximum number of conversation messages returned per request.
 const MAX_CONVERSATION_MESSAGES: usize = 200;
 
-/// `GET /api/agent/{id}/fs?path=` — confined directory listing.
+/// `GET /api/fleet/{id}/fs?path=` — confined directory listing.
 ///
 /// Lists one level of the agent's working directory at the given relative
 /// path. Returns an array of `FinderNode` objects. The path is confined to
@@ -186,7 +186,7 @@ pub(crate) fn fs_preview(state: &Mutex<Backend>, agent_id: &str, query: &str) ->
     }))
 }
 
-/// `GET /api/agent/{id}/conversation` — conversation messages.
+/// `GET /api/fleet/{id}/conversation` — conversation messages.
 ///
 /// Reads YAML message files from the agent's `.context-pilot/messages/`
 /// directory, sorted by filename (which encodes chronological order), capped

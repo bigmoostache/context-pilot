@@ -19,7 +19,7 @@
 //! ```
 //!
 //! * **A command journals on the agent and re-emerges as an SSE delta.** A
-//!   `POST /api/agent/{id}/command` reaches a real [`Intake`], is durably
+//!   `POST /api/fleet/{id}/command` reaches a real [`Intake`], is durably
 //!   journalled, and the receipt carries `cmd_id` + `dedup_token` + the durable
 //!   `rev`. The backend's [`Tailer`] then tails that same oplog and the client
 //!   streaming `/api/stream` sees the command's effect arrive as a delta —
@@ -187,7 +187,7 @@ mod tests {
 
         // ── Client: POST a command; the receipt carries the durable rev. ──
         let cmd = br#"{"schema_version":1,"id":"cmd-e2e","seq":1,"dedup_token":"d-e2e","kind":{"kind":"send_message","thread_id":"T1","content":"hi"}}"#;
-        let receipt = common::post_json(&addr, "/api/agent/agent-e2e/command", cmd);
+        let receipt = common::post_json(&addr, "/api/fleet/agent-e2e/command", cmd);
         assert_command_receipt(&receipt);
 
         agent.join().expect("agent thread joined");
@@ -233,16 +233,16 @@ mod tests {
         let (addr, _state) = serve_backend(agents.path());
 
         // A good hash hydrates the exact bytes (returned as a JSON number array).
-        let ok = common::get(&addr, &format!("/api/agent/agent-body/body/{hash_hex}"), &[]);
+        let ok = common::get(&addr, &format!("/api/fleet/agent-body/body/{hash_hex}"), &[]);
         assert_eq!(ok.status, 200, "a known body hydrates");
         let first = i64::from(payload.first().copied().unwrap_or(0));
         assert!(ok.body.contains(&first.to_string()), "the body payload bytes are returned");
 
         // A malformed hash is a 400; an absent (well-formed) hash is a 404.
-        let bad = common::get(&addr, "/api/agent/agent-body/body/not-a-hash", &[]);
+        let bad = common::get(&addr, "/api/fleet/agent-body/body/not-a-hash", &[]);
         assert_eq!(bad.status, 400, "a malformed hash is rejected");
         let absent_hash = ContentHash::new([0xAB; 32]).to_hex();
-        let absent = common::get(&addr, &format!("/api/agent/agent-body/body/{absent_hash}"), &[]);
+        let absent = common::get(&addr, &format!("/api/fleet/agent-body/body/{absent_hash}"), &[]);
         assert_eq!(absent.status, 404, "an unknown body is a 404");
     }
 

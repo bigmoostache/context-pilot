@@ -8,7 +8,7 @@ use crate::transport::rest::HttpReply;
 
 use super::support::{agent_folder, confined_path, extract_param};
 
-/// `POST /api/agent/{id}/fs/write?path={file}` — overwrite a file's contents.
+/// `POST /api/fleet/{id}/fs/write?path={file}` — overwrite a file's contents.
 ///
 /// The request body is the file's new contents (the transport caps it at
 /// `MAX_BODY`); `path` is the confined realm-relative path of an **existing**
@@ -53,7 +53,7 @@ pub(crate) fn fs_write(state: &Mutex<Backend>, agent_id: &str, query: &str, body
     }))
 }
 
-/// `POST /api/agent/{id}/fs/mkdir?path={dir}&name={name}` — create a folder.
+/// `POST /api/fleet/{id}/fs/mkdir?path={dir}&name={name}` — create a folder.
 ///
 /// Creates a single new directory `name` inside the confined directory `path`
 /// (empty = realm root). Powers the Finder's "New Folder" action (toolbar +
@@ -102,7 +102,7 @@ pub(crate) fn fs_mkdir(state: &Mutex<Backend>, agent_id: &str, query: &str) -> H
     HttpReply::ok(&serde_json::json!({ "created": rel_child(&relative_dir, &name) }))
 }
 
-/// `POST /api/agent/{id}/fs/rename?path={item}&name={newname}` — rename one entry.
+/// `POST /api/fleet/{id}/fs/rename?path={item}&name={newname}` — rename one entry.
 ///
 /// Renames the file or folder at the confined realm-relative `path` to the bare
 /// new name `name`, keeping it in the same parent directory. Powers the Finder's
@@ -160,7 +160,7 @@ pub(crate) fn fs_rename(state: &Mutex<Backend>, agent_id: &str, query: &str) -> 
     HttpReply::ok(&serde_json::json!({ "renamed": rel_sibling(&relative, &name) }))
 }
 
-/// `POST /api/agent/{id}/fs/move` — move one or more entries into a directory.
+/// `POST /api/fleet/{id}/fs/move` — move one or more entries into a directory.
 ///
 /// Body is JSON `{ "items": ["rel/a", "rel/b"], "dest": "rel/dir" }`: each
 /// `items` entry is a realm-relative file/folder path, `dest` the realm-relative
@@ -247,7 +247,7 @@ pub(crate) fn fs_move(state: &Mutex<Backend>, agent_id: &str, body: &[u8]) -> Ht
 /// crosses the confinement boundary.
 const TRASH_DIR: &str = ".context-pilot/trash";
 
-/// `POST /api/agent/{id}/fs/trash` — move one or more entries to the realm trash.
+/// `POST /api/fleet/{id}/fs/trash` — move one or more entries to the realm trash.
 ///
 /// Body is JSON `{ "items": ["rel/a", "rel/b"] }`: each entry is a realm-relative
 /// file/folder path. Powers the Finder's right-click "Move to Trash". Rather than

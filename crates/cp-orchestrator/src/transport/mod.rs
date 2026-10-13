@@ -24,8 +24,8 @@
 //! | Method | Path | Handler |
 //! |---|---|---|
 //! | `GET`  | `/api/fleets` | [`rest::fleet`] |
-//! | `GET`  | `/api/agent/{id}` | [`rest::agent`] |
-//! | `POST` | `/api/agent/{id}/command` | [`rest::command`] |
+//! | `GET`  | `/api/fleet/{id}` | [`rest::agent`] |
+//! | `POST` | `/api/fleet/{id}/command` | [`rest::command`] |
 //! | `GET`  | `/api/stream?agent={id}&ticket={t}` | SSE (this module) |
 
 mod auth;

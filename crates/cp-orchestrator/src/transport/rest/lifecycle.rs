@@ -7,7 +7,7 @@
 //!
 //! # Restart
 //!
-//! `POST /api/agent/{id}/restart` — kill a running agent and respawn it.  The
+//! `POST /api/fleet/{id}/restart` — kill a running agent and respawn it.  The
 //! motivating case: an agent whose **running binary is stale** (it predates a
 //! new command the web cockpit wants to send), so its bridge socket rejects the
 //! command with `502 agent unreachable`.  Restarting respawns the agent from
@@ -22,7 +22,7 @@
 //!
 //! # Retire / Unretire
 //!
-//! `POST /api/agent/{id}/retire` + `/unretire` — stop-and-keep an agent, or
+//! `POST /api/fleet/{id}/retire` + `/unretire` — stop-and-keep an agent, or
 //! bring it back (T271).  Retiring is the dashboard's "archive" action,
 //! deliberately **not** a delete:
 //!
@@ -47,7 +47,7 @@ use crate::supervisor;
 
 // ── Restart ─────────────────────────────────────────────────────────────
 
-/// `POST /api/agent/{id}/restart` — terminate the agent's process and respawn
+/// `POST /api/fleet/{id}/restart` — terminate the agent's process and respawn
 /// it on the same realm folder with the backend's current `cp` binary.
 ///
 /// Flow:
@@ -134,7 +134,7 @@ struct RestartReceipt {
 
 // ── Retire ──────────────────────────────────────────────────────────────
 
-/// `POST /api/agent/{id}/retire` — stop the agent (process + console server),
+/// `POST /api/fleet/{id}/retire` — stop the agent (process + console server),
 /// keep its folder, and record it as retired.
 ///
 /// Flow:
@@ -203,7 +203,7 @@ pub(crate) fn retire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply 
     HttpReply::json(200, &RetireReceipt { status: "retired", id: agent_id, folder })
 }
 
-/// `POST /api/agent/{id}/unretire` — clear the retired flag and respawn the
+/// `POST /api/fleet/{id}/unretire` — clear the retired flag and respawn the
 /// agent on its kept folder.
 ///
 /// Returns `202 {status:"unretiring", id, folder, pid}` on success, `404` if

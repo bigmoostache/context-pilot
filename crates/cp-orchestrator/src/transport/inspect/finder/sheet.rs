@@ -34,7 +34,7 @@ const MAX_SHEETS: usize = 20;
 /// is read up to the cap and flagged `truncated`.
 const MAX_CSV_BYTES: u64 = 8 * 1024 * 1024;
 
-/// `GET /api/agent/{id}/fs/sheet?path=` — spreadsheet → table JSON.
+/// `GET /api/fleet/{id}/fs/sheet?path=` — spreadsheet → table JSON.
 ///
 /// Returns `{ sheets: [{ name, rows: [[cell, …]] }], truncated }` where every
 /// cell is a string (numbers/dates are stringified for display). Confined to
@@ -81,7 +81,7 @@ pub(crate) fn fs_sheet(state: &Mutex<Backend>, agent_id: &str, query: &str) -> H
     }
 }
 
-/// `POST /api/agent/{id}/fs/sheet/save?path=` — body = Univer snapshot JSON.
+/// `POST /api/fleet/{id}/fs/sheet/save?path=` — body = Univer snapshot JSON.
 ///
 /// Patches the original `xlsx`/`xlsm` in place with only what the snapshot
 /// changed, so formatting Univer doesn't model survives (see `univer::save`).

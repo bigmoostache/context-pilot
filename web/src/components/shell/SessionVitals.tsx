@@ -7,7 +7,7 @@ import { fetchVitals, type Vital } from "@/lib/api"
  * (no dialog chrome of its own).
  *
  * Rendered inside the Agent Configuration dialog ({@link AgentModal} manage
- * mode) right column. The backend (`GET /api/agent/{id}/vitals`) runs the checks
+ * mode) right column. The backend (`GET /api/fleet/{id}/vitals`) runs the checks
  * it can reach; we prepend the two only the browser can observe (this app is
  * alive, and the measured round-trip), so the board covers the whole dependency
  * chain end to end. Healthy rows stay quiet (a coloured dot + latency); a

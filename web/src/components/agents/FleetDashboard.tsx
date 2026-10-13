@@ -239,7 +239,7 @@ function healthCondition(
 }
 
 /**
- * §19 health badge for an agent row. Polls `/api/agent/{id}/metrics` and, only
+ * §19 health badge for an agent row. Polls `/api/fleet/{id}/metrics` and, only
  * when something is off, surfaces the first non-nominal condition as a small
  * amber uppercase pill (the thread-row badge idiom) so a degraded stream or a
  * lagging projection stays visible at a glance rather than a silent backend

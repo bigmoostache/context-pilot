@@ -14,7 +14,7 @@ const MAX_DOWNLOAD_BYTES: u64 = 100 * 1024 * 1024;
 /// Maximum zip archive size for folder downloads (500 MiB).
 const MAX_ZIP_BYTES: u64 = 500 * 1024 * 1024;
 
-/// `GET /api/agent/{id}/fs/download?path=` — file or folder download.
+/// `GET /api/fleet/{id}/fs/download?path=` — file or folder download.
 ///
 /// **Files** are returned as raw bytes with `Content-Disposition: attachment`,
 /// capped at [`MAX_DOWNLOAD_BYTES`].
@@ -96,7 +96,7 @@ fn zip_and_download(dir: &Path) -> Result<(Vec<u8>, String), HttpReply> {
     Ok((bytes, zip_name))
 }
 
-/// `GET /api/agent/{id}/fs/raw?path=` — serve a file's raw bytes **inline**.
+/// `GET /api/fleet/{id}/fs/raw?path=` — serve a file's raw bytes **inline**.
 ///
 /// Unlike [`fs_download`] (which forces `Content-Disposition: attachment`), this
 /// serves the bytes with an inferred `Content-Type` and no attachment header, so

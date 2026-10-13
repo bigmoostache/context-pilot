@@ -1,5 +1,5 @@
 //! On-demand service-connectivity **vitals** endpoint (`GET
-//! /api/agent/{id}/vitals`).
+//! /api/fleet/{id}/vitals`).
 //!
 //! Where [`metrics`](super::metrics) reports the *durable* observability slice
 //! the backend already holds (stream health, rev lag), this endpoint
@@ -58,7 +58,7 @@ const PROBE_TIMEOUT: Duration = Duration::from_secs(3);
 /// a timeout rather than hanging the endpoint.
 const COLLECT_DEADLINE: Duration = Duration::from_secs(6);
 
-/// `GET /api/agent/{id}/vitals` — run live connectivity checks for one agent.
+/// `GET /api/fleet/{id}/vitals` — run live connectivity checks for one agent.
 ///
 /// Returns a JSON array of vital objects (`{name, category, status, latencyMs?,
 /// detail?}`). Unknown agent → `404`.

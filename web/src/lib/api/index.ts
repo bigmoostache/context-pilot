@@ -39,14 +39,14 @@ import {
   deleteApiClaudeAccountsByEmail,
   getApiFleetsMeta,
   getApiFleetsRetired,
-  getApiAgentByIdMeta,
-  getApiAgentByIdMetrics,
-  getApiAgentByIdVitals,
-  getApiAgentByIdLibrary,
-  getApiAgentByIdLibraryAgentByItem,
-  putApiAgentByIdLibraryAgentByItem,
-  deleteApiAgentByIdLibraryAgentByItem,
-  getApiAgentByIdThreads,
+  getApiFleetByIdMeta,
+  getApiFleetByIdMetrics,
+  getApiFleetByIdVitals,
+  getApiFleetByIdLibrary,
+  getApiFleetByIdLibraryAgentByItem,
+  putApiFleetByIdLibraryAgentByItem,
+  deleteApiFleetByIdLibraryAgentByItem,
+  getApiFleetByIdThreads,
   getApiProviders,
   getApiUpdateStatus,
   postApiUpdateCheck,
@@ -54,15 +54,15 @@ import {
   putApiUpdateMode,
   getApiMetrics,
   postApiFleetsCreate,
-  postApiAgentByIdRestart,
-  postApiAgentByIdRetire,
-  postApiAgentByIdUnretire,
-  postApiAgentByIdRename,
-  postApiAgentByIdAvatar,
-  postApiAgentByIdCommand,
-  postApiAgentByIdLibraryCommand,
-  putApiAgentByIdLibraryCommandByItem,
-  postApiAgentByIdConversationsSearch,
+  postApiFleetByIdRestart,
+  postApiFleetByIdRetire,
+  postApiFleetByIdUnretire,
+  postApiFleetByIdRename,
+  postApiFleetByIdAvatar,
+  postApiFleetByIdCommand,
+  postApiFleetByIdLibraryCommand,
+  putApiFleetByIdLibraryCommandByItem,
+  postApiFleetByIdConversationsSearch,
   postApiTicket,
 } from "./generated"
 import { buildCommandEnvelope, sdk } from "./client"
@@ -115,48 +115,48 @@ export function createAgent(body: {
 }
 
 export function restartAgent(agentId: string): Promise<RestartReceipt> {
-  return sdk(postApiAgentByIdRestart({ path: { id: agentId } }))
+  return sdk(postApiFleetByIdRestart({ path: { id: agentId } }))
 }
 
 export function retireAgent(agentId: string): Promise<RetireReceipt> {
-  return sdk(postApiAgentByIdRetire({ path: { id: agentId } }))
+  return sdk(postApiFleetByIdRetire({ path: { id: agentId } }))
 }
 
 export function unretireAgent(agentId: string): Promise<UnretireReceipt> {
-  return sdk(postApiAgentByIdUnretire({ path: { id: agentId } }))
+  return sdk(postApiFleetByIdUnretire({ path: { id: agentId } }))
 }
 
 export function renameAgent(agentId: string, name: string): Promise<{ ok: boolean }> {
-  return sdk(postApiAgentByIdRename({ path: { id: agentId }, body: { name } }))
+  return sdk(postApiFleetByIdRename({ path: { id: agentId }, body: { name } }))
 }
 
 // ── Agent meta (SDK) ──────────────────────────────────────────────────
 
 export function fetchAgentMeta(agentId: string): Promise<Agent> {
-  return sdk(getApiAgentByIdMeta({ path: { id: agentId } }))
+  return sdk(getApiFleetByIdMeta({ path: { id: agentId } }))
 }
 
 // ── Agent avatar ──────────────────────────────────────────────────────
 
 export function uploadAvatar(agentId: string, file: File): Promise<{ ok: boolean }> {
-  return sdk(postApiAgentByIdAvatar({ path: { id: agentId }, body: file }))
+  return sdk(postApiFleetByIdAvatar({ path: { id: agentId }, body: file }))
 }
 
 /** Build the URL to an agent's avatar image (for use as `<img src>`). */
 export function avatarUrl(agentId: string, cacheBust?: number): string {
   const base = (import.meta.env["VITE_API_URL"] as string | undefined) || ""
   const v = cacheBust ? `?v=${cacheBust}` : ""
-  return `${base}/api/agent/${agentId}/avatar${v}`
+  return `${base}/api/fleet/${agentId}/avatar${v}`
 }
 
 // ── Tools / Radar / Entities (SDK) ────────────────────────────────────
 
 export function fetchMetrics(agentId: string): Promise<AgentMetrics> {
-  return sdk(getApiAgentByIdMetrics({ path: { id: agentId } }))
+  return sdk(getApiFleetByIdMetrics({ path: { id: agentId } }))
 }
 
 export function fetchVitals(agentId: string): Promise<Vital[]> {
-  return sdk(getApiAgentByIdVitals({ path: { id: agentId } }))
+  return sdk(getApiFleetByIdVitals({ path: { id: agentId } }))
 }
 
 export function fetchFleetMetrics(): Promise<AgentMetrics[]> {
@@ -166,7 +166,7 @@ export function fetchFleetMetrics(): Promise<AgentMetrics[]> {
 // ── Usage / Library (SDK) ─────────────────────────────────────────────
 
 export function fetchLibrary(agentId: string): Promise<LibraryItem[]> {
-  return sdk(getApiAgentByIdLibrary({ path: { id: agentId } }))
+  return sdk(getApiFleetByIdLibrary({ path: { id: agentId } }))
 }
 
 // ── Providers (SDK) ───────────────────────────────────────────────────
@@ -221,7 +221,7 @@ export async function sendCommand(
   kind: Record<string, unknown>,
 ): Promise<CommandReceipt> {
   return sdk(
-    postApiAgentByIdCommand({
+    postApiFleetByIdCommand({
       path: { id: agentId },
       body: buildCommandEnvelope(kind) as Record<string, unknown>,
     }),
@@ -232,7 +232,7 @@ export function createCommand(
   agentId: string,
   cmd: { name: string; description?: string; body: string },
 ): Promise<CreateCommandReceipt> {
-  return sdk(postApiAgentByIdLibraryCommand({ path: { id: agentId }, body: cmd }))
+  return sdk(postApiFleetByIdLibraryCommand({ path: { id: agentId }, body: cmd }))
 }
 
 /** Create or overwrite a `/command` `.md` by its file id (the bubble row's
@@ -245,7 +245,7 @@ export function updateCommand(
   cmd: { name: string; description?: string; body: string },
 ): Promise<CreateCommandReceipt> {
   return sdk(
-    putApiAgentByIdLibraryCommandByItem({ path: { id: agentId, item: itemId }, body: cmd }),
+    putApiFleetByIdLibraryCommandByItem({ path: { id: agentId, item: itemId }, body: cmd }),
   )
 }
 
@@ -255,7 +255,7 @@ export type LibraryAgentRaw = import("./generated/types.gen").LibraryAgentRaw
 
 /** Read one behaviour agent's raw authoring fields (Export + Edit-prefill). */
 export function fetchLibraryAgent(agentId: string, itemId: string): Promise<LibraryAgentRaw> {
-  return sdk(getApiAgentByIdLibraryAgentByItem({ path: { id: agentId, item: itemId } }))
+  return sdk(getApiFleetByIdLibraryAgentByItem({ path: { id: agentId, item: itemId } }))
 }
 
 /** Create or overwrite a behaviour agent `.md` (user agent or built-in override). */
@@ -265,13 +265,13 @@ export function upsertLibraryAgent(
   agent: { name: string; description?: string; body: string },
 ): Promise<CreateCommandReceipt> {
   return sdk(
-    putApiAgentByIdLibraryAgentByItem({ path: { id: agentId, item: itemId }, body: agent }),
+    putApiFleetByIdLibraryAgentByItem({ path: { id: agentId, item: itemId }, body: agent }),
   )
 }
 
 /** Delete a behaviour agent's on-disk `.md` (override revert, or user agent removal). */
 export function deleteLibraryAgent(agentId: string, itemId: string): Promise<CreateCommandReceipt> {
-  return sdk(deleteApiAgentByIdLibraryAgentByItem({ path: { id: agentId, item: itemId } }))
+  return sdk(deleteApiFleetByIdLibraryAgentByItem({ path: { id: agentId, item: itemId } }))
 }
 
 // ── Ticket (SDK) ──────────────────────────────────────────────────────
@@ -297,7 +297,7 @@ export function formatAge(epochMs: number): string {
 
 export async function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
   const res = await sdk<{ focusedThreadId?: string | null; threads: ThreadDetail[] }>(
-    getApiAgentByIdThreads({ path: { id: agentId } }),
+    getApiFleetByIdThreads({ path: { id: agentId } }),
   )
   const focusedId = res.focusedThreadId ?? null
   return res.threads.map((t) => {
@@ -334,7 +334,7 @@ export function searchConversations(
   opts?: { limit?: number; threadId?: string },
 ): Promise<import("./generated/types.gen").ConvHit[]> {
   return sdk<{ hits: import("./generated/types.gen").ConvHit[] }>(
-    postApiAgentByIdConversationsSearch({
+    postApiFleetByIdConversationsSearch({
       path: { id: agentId },
       body: {
         query,

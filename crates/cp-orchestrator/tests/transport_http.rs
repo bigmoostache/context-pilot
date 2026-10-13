@@ -9,7 +9,7 @@
 //! reading, status codes, the ticket gate, and reconnect-replay-by-`rev` all
 //! work end-to-end on the wire.
 //!
-//! * **REST envelopes.** `GET /api/fleets` and `/api/agent/{id}` carry the
+//! * **REST envelopes.** `GET /api/fleets` and `/api/fleet/{id}` carry the
 //!   `rev` they reflect; an unknown agent is a real `404`.
 //! * **Actions.** `POST /api/ticket` mints a token; `POST .../command` is a
 //!   real `400` on malformed input.
@@ -180,11 +180,11 @@ mod tests {
         assert!(fleet.body.contains("\"rev\""), "fleet wraps a rev envelope");
         assert!(fleet.body.contains("agent-a"), "the agent appears in the fleet");
 
-        let agent = common::get(&h.addr, "/api/agent/agent-a", &[]);
+        let agent = common::get(&h.addr, "/api/fleet/agent-a", &[]);
         assert_eq!(agent.status, 200);
         assert!(agent.body.contains("\"rev\""), "agent view wraps a rev");
 
-        let missing = common::get(&h.addr, "/api/agent/ghost", &[]);
+        let missing = common::get(&h.addr, "/api/fleet/ghost", &[]);
         assert_eq!(missing.status, 404, "unknown agent is a real 404");
     }
 
@@ -212,7 +212,7 @@ mod tests {
         assert_eq!(ticket.status, 200);
         assert!(ticket.body.contains("\"ticket\""), "a ticket token is minted");
 
-        let bad = common::post_json(&h.addr, "/api/agent/agent-b/command", b"{not json");
+        let bad = common::post_json(&h.addr, "/api/fleet/agent-b/command", b"{not json");
         assert_eq!(bad.status, 400, "a malformed command is a real 400");
     }
 

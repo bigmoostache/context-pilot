@@ -2,7 +2,7 @@
 //! combining registry records, oplog-projected state, thread inspection, and
 //! git branch info.
 //!
-//! * [`agent_meta`] — one agent's enriched info (`GET /api/agent/{id}/meta`).
+//! * [`agent_meta`] — one agent's enriched info (`GET /api/fleet/{id}/meta`).
 //! * [`fleet_meta`] — all known agents as an enriched array
 //!   (`GET /api/fleets/meta`).
 
@@ -14,7 +14,7 @@ use crate::services::materialized_view::ContextSnapshot;
 use crate::transport::Backend;
 use crate::transport::rest::HttpReply;
 
-/// `GET /api/agent/{id}/meta` — enriched agent info for the fleet/agent views.
+/// `GET /api/fleet/{id}/meta` — enriched agent info for the fleet/agent views.
 ///
 /// Combines registry record (name, folder, model), oplog-projected state
 /// (phase, cost), thread inspection (count, any-MY_TURN → "needs-you"), and

@@ -22,7 +22,7 @@
 //! follow-up. This endpoint reports only figures the backend genuinely holds —
 //! no fabricated metrics.
 //!
-//! * [`agent_metrics`] — one agent (`GET /api/agent/{id}/metrics`).
+//! * [`agent_metrics`] — one agent (`GET /api/fleet/{id}/metrics`).
 //! * [`fleet_metrics`] — every known agent (`GET /api/metrics`).
 
 use std::path::Path;
@@ -33,7 +33,7 @@ use cp_wire::types::registry::Entry;
 use crate::transport::Backend;
 use crate::transport::rest::HttpReply;
 
-/// `GET /api/agent/{id}/metrics` — the §19 observability snapshot for one agent.
+/// `GET /api/fleet/{id}/metrics` — the §19 observability snapshot for one agent.
 pub fn agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     let entry = match crate::transport::rest::resolve_entry(state, agent_id) {
         Ok(e) => e,

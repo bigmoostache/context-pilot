@@ -2,7 +2,7 @@
 //! corresponding path+method in `openapi.json`, and vice-versa.
 //!
 //! This is the mechanical guard-rail that prevents "forgot to add the new
-//! endpoint to the spec": if someone adds a `(Method::Post, ["api", "agent",
+//! endpoint to the spec": if someone adds a `(Method::Post, ["api", "fleet",
 //! id, "new-thing"])` match arm without a corresponding spec entry, **this
 //! test fails**.
 //!
@@ -21,7 +21,7 @@
 mod tests {
     use std::collections::BTreeSet;
 
-    /// A canonical route: `("GET", "/api/agent/{}/meta")`.
+    /// A canonical route: `("GET", "/api/fleet/{}/meta")`.
     ///
     /// Path parameters are erased to `{}` so the comparison is shape-only —
     /// the test does not care whether the spec calls a param `{id}` or
@@ -213,7 +213,7 @@ mod tests {
 
     #[test]
     fn canonicalize_erases_param_names() {
-        assert_eq!(canonicalize_spec_path("/api/agent/{id}/acl/{userId}"), "/api/agent/{}/acl/{}");
+        assert_eq!(canonicalize_spec_path("/api/fleet/{id}/acl/{userId}"), "/api/fleet/{}/acl/{}");
         assert_eq!(canonicalize_spec_path("/api/fleets"), "/api/fleets");
         assert_eq!(canonicalize_spec_path("/api/env-keys/{name}"), "/api/env-keys/{}");
     }
@@ -223,15 +223,15 @@ mod tests {
         let health = extract_bracket_segments(r#"["api", "health"]"#).unwrap();
         assert_eq!(health, vec!["api", "health"]);
 
-        let meta = extract_bracket_segments(r#"["api", "agent", id, "meta"]"#).unwrap();
-        assert_eq!(meta, vec!["api", "agent", "{}", "meta"]);
+        let meta = extract_bracket_segments(r#"["api", "fleet", id, "meta"]"#).unwrap();
+        assert_eq!(meta, vec!["api", "fleet", "{}", "meta"]);
 
-        let body = extract_bracket_segments(r#"["api", "agent", id, "body", hash]"#).unwrap();
-        assert_eq!(body, vec!["api", "agent", "{}", "body", "{}"]);
+        let body = extract_bracket_segments(r#"["api", "fleet", id, "body", hash]"#).unwrap();
+        assert_eq!(body, vec!["api", "fleet", "{}", "body", "{}"]);
     }
 
     #[test]
     fn segments_join_to_path() {
-        assert_eq!(segments_to_path(&["api".into(), "agent".into(), "{}".into(), "meta".into()]), "/api/agent/{}/meta");
+        assert_eq!(segments_to_path(&["api".into(), "agent".into(), "{}".into(), "meta".into()]), "/api/fleet/{}/meta");
     }
 }

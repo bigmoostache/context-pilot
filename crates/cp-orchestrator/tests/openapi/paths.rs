@@ -182,46 +182,46 @@ pub(super) fn paths() -> Value {
             "responses": merge(ok(r("ForceLogoutResponse")), err())
         }}),
         // ── Agent (single) ──────────────────────────────────────────
-        "/api/agent/{id}": with_agent(get("agent", "Raw agent view (rev-envelope)", json!({ "type": "object" }))),
-        "/api/agent/{id}/meta": with_agent(get("agent", "Agent enriched info", r("Agent"))),
-        "/api/agent/{id}/metrics": with_agent(get("agent", "Agent metrics", r("AgentMetrics"))),
-        "/api/agent/{id}/vitals": with_agent(get("agent", "Agent service vitals", arr(r("Vital")))),
-        "/api/agent/{id}/threads": with_agent(get("agent", "Agent threads + conversation", r("ThreadsResponse"))),
-        "/api/agent/{id}/usage": with_agent(get("agent", "Usage analytics", json!({ "type": "object" }))),
-        "/api/agent/{id}/library": with_agent(get("agent", "Prompt library", arr(r("LibraryItem")))),
-        "/api/agent/{id}/conversation": with_agent(get("agent", "Conversation feed", arr(r("ConversationMsg")))),
+        "/api/fleet/{id}": with_agent(get("agent", "Raw agent view (rev-envelope)", json!({ "type": "object" }))),
+        "/api/fleet/{id}/meta": with_agent(get("agent", "Agent enriched info", r("Agent"))),
+        "/api/fleet/{id}/metrics": with_agent(get("agent", "Agent metrics", r("AgentMetrics"))),
+        "/api/fleet/{id}/vitals": with_agent(get("agent", "Agent service vitals", arr(r("Vital")))),
+        "/api/fleet/{id}/threads": with_agent(get("agent", "Agent threads + conversation", r("ThreadsResponse"))),
+        "/api/fleet/{id}/usage": with_agent(get("agent", "Usage analytics", json!({ "type": "object" }))),
+        "/api/fleet/{id}/library": with_agent(get("agent", "Prompt library", arr(r("LibraryItem")))),
+        "/api/fleet/{id}/conversation": with_agent(get("agent", "Conversation feed", arr(r("ConversationMsg")))),
         // ── Filesystem ──────────────────────────────────────────────
-        "/api/agent/{id}/fs": with_agent(json!({ "get": {
+        "/api/fleet/{id}/fs": with_agent(json!({ "get": {
             "tags": ["fs"], "summary": "List directory",
             "parameters": [qp_opt("path")],
             "responses": merge(ok(arr(r("FinderNode"))), err())
         }})),
-        "/api/agent/{id}/fs/descriptions": with_agent(get("fs", "File/folder descriptions", r("FsDescriptions"))),
-        "/api/agent/{id}/fs/preview": with_agent(json!({ "get": {
+        "/api/fleet/{id}/fs/descriptions": with_agent(get("fs", "File/folder descriptions", r("FsDescriptions"))),
+        "/api/fleet/{id}/fs/preview": with_agent(json!({ "get": {
             "tags": ["fs"], "summary": "Text preview",
             "parameters": [qp("path")],
             "responses": merge(ok(r("FsPreview")), err())
         }})),
-        "/api/agent/{id}/fs/sheet": with_agent(json!({ "get": {
+        "/api/fleet/{id}/fs/sheet": with_agent(json!({ "get": {
             "tags": ["fs"], "summary": "Spreadsheet data",
             "parameters": [qp("path")],
             "responses": merge(ok(r("SheetData")), err())
         }})),
-        "/api/agent/{id}/fs/download": with_agent(json!({ "get": {
+        "/api/fleet/{id}/fs/download": with_agent(json!({ "get": {
             "tags": ["fs"], "summary": "Download file or folder",
             "parameters": [qp("path")],
             "responses": { "200": { "description": "Raw file bytes", "content": {
                 "application/octet-stream": { "schema": { "type": "string", "format": "binary" } }
             }}}
         }})),
-        "/api/agent/{id}/fs/raw": with_agent(json!({ "get": {
+        "/api/fleet/{id}/fs/raw": with_agent(json!({ "get": {
             "tags": ["fs"], "summary": "Inline raw file (image/PDF preview)",
             "parameters": [qp("path")],
             "responses": { "200": { "description": "Raw file bytes inline", "content": {
                 "*/*": { "schema": { "type": "string", "format": "binary" } }
             }}}
         }})),
-        "/api/agent/{id}/fs/sheet/save": with_agent(json!({ "post": {
+        "/api/fleet/{id}/fs/sheet/save": with_agent(json!({ "post": {
             "tags": ["fs"], "summary": "Save spreadsheet edits (patches the original xlsx/xlsm)",
             "parameters": [qp("path")],
             "requestBody": { "required": true, "content": {
@@ -229,7 +229,7 @@ pub(super) fn paths() -> Value {
             }},
             "responses": merge(ok(r("SheetSaveResult")), err())
         }})),
-        "/api/agent/{id}/fs/write": with_agent(json!({ "post": {
+        "/api/fleet/{id}/fs/write": with_agent(json!({ "post": {
             "tags": ["fs"], "summary": "Write file",
             "parameters": [qp("path")],
             "requestBody": { "required": true, "content": {
@@ -237,27 +237,27 @@ pub(super) fn paths() -> Value {
             }},
             "responses": merge(ok(r("WriteResult")), err())
         }})),
-        "/api/agent/{id}/fs/mkdir": with_agent(json!({ "post": {
+        "/api/fleet/{id}/fs/mkdir": with_agent(json!({ "post": {
             "tags": ["fs"], "summary": "Create folder",
             "parameters": [qp("path"), qp("name")],
             "responses": merge(ok(r("MkdirResult")), err())
         }})),
-        "/api/agent/{id}/fs/rename": with_agent(json!({ "post": {
+        "/api/fleet/{id}/fs/rename": with_agent(json!({ "post": {
             "tags": ["fs"], "summary": "Rename item",
             "parameters": [qp("path"), qp("name")],
             "responses": merge(ok(r("RenameResult")), err())
         }})),
-        "/api/agent/{id}/fs/move": with_agent(post("fs", "Move items", Some(json!({
+        "/api/fleet/{id}/fs/move": with_agent(post("fs", "Move items", Some(json!({
             "type": "object",
             "properties": { "items": arr(json!({ "type": "string" })), "dest": { "type": "string" } },
             "required": ["items", "dest"]
         })), r("MoveResult"))),
-        "/api/agent/{id}/fs/trash": with_agent(post("fs", "Trash items", Some(json!({
+        "/api/fleet/{id}/fs/trash": with_agent(post("fs", "Trash items", Some(json!({
             "type": "object",
             "properties": { "items": arr(json!({ "type": "string" })) },
             "required": ["items"]
         })), r("TrashResult"))),
-        "/api/agent/{id}/fs/upload": with_agent(json!({ "post": {
+        "/api/fleet/{id}/fs/upload": with_agent(json!({ "post": {
             "tags": ["fs"], "summary": "Upload file",
             "parameters": [qp("path"), qp("name")],
             "requestBody": { "required": true, "content": {
@@ -265,7 +265,7 @@ pub(super) fn paths() -> Value {
             }},
             "responses": merge(ok(r("UploadResult")), err())
         }})),
-        "/api/agent/{id}/fs/upload-unique": with_agent(json!({ "post": {
+        "/api/fleet/{id}/fs/upload-unique": with_agent(json!({ "post": {
             "tags": ["fs"], "summary": "Upload file (unique name)",
             "parameters": [qp("path"), qp("name")],
             "requestBody": { "required": true, "content": {
@@ -274,7 +274,7 @@ pub(super) fn paths() -> Value {
             "responses": merge(ok(r("UploadUniqueResult")), err())
         }})),
         // ── Agent lifecycle + misc ──────────────────────────────────
-        "/api/agent/{id}/body/{hash}": json!({ "get": {
+        "/api/fleet/{id}/body/{hash}": json!({ "get": {
             "tags": ["agent"], "summary": "Hydrate content body",
             "parameters": [
                 { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
@@ -282,9 +282,9 @@ pub(super) fn paths() -> Value {
             ],
             "responses": merge(ok(r("BodyPayload")), err())
         }}),
-        "/api/agent/{id}/command": with_agent(post("agent", "Send command to agent",
+        "/api/fleet/{id}/command": with_agent(post("agent", "Send command to agent",
             Some(json!({ "type": "object" })), r("CommandReceipt"))),
-        "/api/agent/{id}/conversations/search": with_agent(post("agent", "Hybrid conversation search", Some(json!({
+        "/api/fleet/{id}/conversations/search": with_agent(post("agent", "Hybrid conversation search", Some(json!({
             "type": "object",
             "properties": {
                 "query": { "type": "string" },
@@ -293,13 +293,13 @@ pub(super) fn paths() -> Value {
             },
             "required": ["query"]
         })), r("ConversationSearchResult"))),
-        "/api/agent/{id}/restart": with_agent(post("agent", "Restart agent", None, r("RestartReceipt"))),
-        "/api/agent/{id}/retire": with_agent(post("agent", "Retire agent", None, r("RetireReceipt"))),
-        "/api/agent/{id}/unretire": with_agent(post("agent", "Unretire agent", None, r("UnretireReceipt"))),
-        "/api/agent/{id}/rename": with_agent(post("agent", "Rename agent", Some(json!({
+        "/api/fleet/{id}/restart": with_agent(post("agent", "Restart agent", None, r("RestartReceipt"))),
+        "/api/fleet/{id}/retire": with_agent(post("agent", "Retire agent", None, r("RetireReceipt"))),
+        "/api/fleet/{id}/unretire": with_agent(post("agent", "Unretire agent", None, r("UnretireReceipt"))),
+        "/api/fleet/{id}/rename": with_agent(post("agent", "Rename agent", Some(json!({
             "type": "object", "properties": { "name": { "type": "string" } }, "required": ["name"]
         })), r("OkResponse"))),
-        "/api/agent/{id}/avatar": merge(
+        "/api/fleet/{id}/avatar": merge(
             with_agent(json!({ "get": {
                 "tags": ["agent"], "summary": "Get agent avatar image",
                 "responses": { "200": { "description": "Avatar image bytes", "content": {
@@ -312,12 +312,12 @@ pub(super) fn paths() -> Value {
                 with_agent(del("agent", "Delete avatar"))
             )
         ),
-        "/api/agent/{id}/library/command": with_agent(post("agent", "Create command", Some(json!({
+        "/api/fleet/{id}/library/command": with_agent(post("agent", "Create command", Some(json!({
             "type": "object",
             "properties": { "name": { "type": "string" }, "description": { "type": "string" }, "body": { "type": "string" } },
             "required": ["name", "body"]
         })), r("CreateCommandReceipt"))),
-        "/api/agent/{id}/library/command/{item}": json!({ "put": {
+        "/api/fleet/{id}/library/command/{item}": json!({ "put": {
             "tags": ["agent"], "summary": "Create or overwrite a command",
             "parameters": [
                 { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
@@ -330,7 +330,7 @@ pub(super) fn paths() -> Value {
             }}}},
             "responses": merge(ok(r("CreateCommandReceipt")), err())
         }}),
-        "/api/agent/{id}/library/agent/{item}": merge(
+        "/api/fleet/{id}/library/agent/{item}": merge(
             merge(
                 json!({ "get": {
                     "tags": ["agent"], "summary": "Read behaviour agent raw",
@@ -364,7 +364,7 @@ pub(super) fn paths() -> Value {
             }})
         ),
         // ── ACL ─────────────────────────────────────────────────────
-        "/api/agent/{id}/acl": merge(
+        "/api/fleet/{id}/acl": merge(
             with_agent(get("auth", "List agent ACL", arr(r("AclEntry")))),
             with_agent(post("auth", "Grant agent access", Some(json!({
                 "type": "object",
@@ -372,7 +372,7 @@ pub(super) fn paths() -> Value {
                 "required": ["user_id"]
             })), r("AclEntry")))
         ),
-        "/api/agent/{id}/acl/{userId}": merge(
+        "/api/fleet/{id}/acl/{userId}": merge(
             json!({ "patch": {
                 "tags": ["auth"], "summary": "Update agent role",
                 "parameters": [

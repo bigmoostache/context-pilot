@@ -18,19 +18,19 @@ import type {
   SessionInfo,
 } from "./generated/types.gen"
 import {
-  deleteApiAgentByIdAclByUserId,
+  deleteApiFleetByIdAclByUserId,
   deleteApiAuthSessionsById,
   deleteApiAuthUsersByUserId,
-  getApiAgentByIdAcl,
+  getApiFleetByIdAcl,
   getApiAuthMe,
   getApiAuthSessions,
   getApiAuthStatus,
   getApiAuthUsers,
   getApiFeatures,
   getApiSettings,
-  patchApiAgentByIdAclByUserId,
+  patchApiFleetByIdAclByUserId,
   patchApiAuthMe,
-  postApiAgentByIdAcl,
+  postApiFleetByIdAcl,
   postApiAuthLogin,
   postApiAuthLogout,
   postApiAuthPassword,
@@ -159,7 +159,7 @@ export function forceLogoutUser(userId: string): Promise<ForceLogoutResponse> {
 // ── Per-agent ACL management ─────────────────────────────────────────
 
 export function fetchAgentAcl(agentId: string): Promise<AclEntry[]> {
-  return sdk(getApiAgentByIdAcl({ path: { id: agentId } }))
+  return sdk(getApiFleetByIdAcl({ path: { id: agentId } }))
 }
 
 export function grantAccess(
@@ -168,7 +168,7 @@ export function grantAccess(
   role: "agent-admin" | "agent-user" = "agent-user",
 ): Promise<OkResponse> {
   return sdk(
-    postApiAgentByIdAcl({
+    postApiFleetByIdAcl({
       path: { id: agentId },
       body: { user_id: userId, role },
     }),
@@ -181,7 +181,7 @@ export function updateAgentRole(
   role: "agent-admin" | "agent-user",
 ): Promise<OkResponse> {
   return sdk(
-    patchApiAgentByIdAclByUserId({
+    patchApiFleetByIdAclByUserId({
       path: { id: agentId, userId },
       body: { role },
     }),
@@ -189,5 +189,5 @@ export function updateAgentRole(
 }
 
 export function revokeAccess(agentId: string, userId: string): Promise<OkResponse> {
-  return sdk(deleteApiAgentByIdAclByUserId({ path: { id: agentId, userId } }))
+  return sdk(deleteApiFleetByIdAclByUserId({ path: { id: agentId, userId } }))
 }

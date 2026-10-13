@@ -1,4 +1,4 @@
-//! `POST /api/fleets/create` + `POST /api/agent/{id}/library/command` —
+//! `POST /api/fleets/create` + `POST /api/fleet/{id}/library/command` —
 //! create agents and prompt-library commands.
 //!
 //! Split out of [`rest`](super) for the 500-line file budget. Owns the

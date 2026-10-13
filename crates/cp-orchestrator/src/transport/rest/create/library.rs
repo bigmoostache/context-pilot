@@ -16,7 +16,7 @@ use super::slugify;
 
 // ── Create command (prompt library) ─────────────────────────────────
 
-/// `POST /api/agent/{id}/library/command` — write a new command markdown file.
+/// `POST /api/fleet/{id}/library/command` — write a new command markdown file.
 ///
 /// Body: `{ "name": "...", "description": "...?", "body": "..." }`. `name` and
 /// `body` are required (the slug is derived from `name`, the body is the prompt
@@ -75,7 +75,7 @@ pub(crate) fn create_command(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]
     HttpReply::json(201, &CreateCommandReceipt { id: slug, status: "created" })
 }
 
-/// `PUT /api/agent/{id}/library/command/{item}` — create or overwrite a
+/// `PUT /api/fleet/{id}/library/command/{item}` — create or overwrite a
 /// `/command` markdown file (the command bubble row's per-command Edit button).
 ///
 /// The command twin of [`upsert_library_agent`]: unlike [`create_command`]
@@ -139,7 +139,7 @@ fn yaml_scalar(s: &str) -> String {
     out
 }
 
-/// The `POST /api/agent/{id}/library/command` request body.
+/// The `POST /api/fleet/{id}/library/command` request body.
 #[derive(Deserialize)]
 struct CreateCommandReq {
     /// Command display name — the `commands/<slug>.md` file id is derived from it.
@@ -162,7 +162,7 @@ struct CreateCommandReceipt {
 
 // ── Agent library CRUD (T581 footer editor) ─────────────────────────
 
-/// `GET /api/agent/{id}/library/agent/{itemId}` — one behaviour agent's raw
+/// `GET /api/fleet/{id}/library/agent/{itemId}` — one behaviour agent's raw
 /// authoring fields for the footer selector's Export + Edit-prefill.
 ///
 /// Returns `{ name, description, body, builtin }`. Reads the on-disk
@@ -201,7 +201,7 @@ pub(crate) fn read_library_agent(state: &Mutex<Backend>, id: &str, item_id: &str
     )
 }
 
-/// `PUT /api/agent/{id}/library/agent/{itemId}` — create or overwrite a
+/// `PUT /api/fleet/{id}/library/agent/{itemId}` — create or overwrite a
 /// behaviour agent's `.md` (create a user agent, or write a local override of a
 /// built-in).
 ///
@@ -242,7 +242,7 @@ pub(crate) fn upsert_library_agent(state: &Mutex<Backend>, id: &str, item_id: &s
     HttpReply::json(200, &CreateCommandReceipt { id: item_id.to_owned(), status: "saved" })
 }
 
-/// `DELETE /api/agent/{id}/library/agent/{itemId}` — remove a behaviour agent's
+/// `DELETE /api/fleet/{id}/library/agent/{itemId}` — remove a behaviour agent's
 /// on-disk `.md`.
 ///
 /// If the file was a local override of a built-in, the compiled-in seed
@@ -325,7 +325,7 @@ struct LibraryAgentRaw {
     builtin: bool,
 }
 
-/// The `PUT /api/agent/{id}/library/agent/{itemId}` request body.
+/// The `PUT /api/fleet/{id}/library/agent/{itemId}` request body.
 #[derive(Deserialize)]
 struct UpsertAgentReq {
     /// The behaviour agent's display name (frontmatter `name`).
