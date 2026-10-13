@@ -1,8 +1,8 @@
 //! Synthetic task-tree rendering for tool results (T686).
 //!
-//! Two pieces, both read-only projections of [`TodoState`] scoped to one thread:
+//! Two pieces, both read-only projections of [`TodoState`] scoped to one agent:
 //!
-//!   1. [`render`] — an ASCII box-drawing tree of the thread's live
+//!   1. [`render`] — an ASCII box-drawing tree of the agent's live
 //!      (non-cancelled) tasks: one line per item carrying its status glyph, id
 //!      and title (never the description). This is what the `Todo` tool result
 //!      now shows (replacing the raw canonical YAML echo, which is still visible
@@ -69,7 +69,7 @@ pub fn result_annex(state: &State, agent_id: &str) -> String {
 
 /// The ASCII box-drawing tree of `agent_id`'s live (non-cancelled) tasks.
 ///
-/// Empty string when the thread has no live tasks. Siblings follow the canonical
+/// Empty string when the agent has no live tasks. Siblings follow the canonical
 /// [`TodoItem::order`]; nesting is by `parent_id`.
 #[must_use]
 pub fn render(state: &State, agent_id: &str) -> String {

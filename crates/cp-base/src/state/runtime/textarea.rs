@@ -7,7 +7,7 @@
 //!
 //! Scope boundary: the pure buffer/cursor/selection/undo operations live here.
 //! Paste-sentinel (`\x00{idx}\x00`) and `/command` expansion remain in the
-//! composer's action layer because they depend on per-thread paste buffers —
+//! composer's action layer because they depend on per-agent paste buffers —
 //! this engine stays sentinel-agnostic and reusable by plain-text fields.
 
 use std::collections::VecDeque;

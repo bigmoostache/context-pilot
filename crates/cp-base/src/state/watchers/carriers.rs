@@ -31,9 +31,9 @@ pub struct WatcherResult {
     /// If set, create a generic dynamic panel when this watcher fires.
     /// Unlike `create_panel` (console-specific), this works for any panel type.
     pub create_dyn_panel: Option<DynPanel>,
-    /// Thread this result is bound to (if any). Stamped by thread-aware watchers
+    /// Agent this result is bound to (if any). Stamped by thread-aware watchers
     /// (e.g. the idle `MY_TURN` detector) so the resulting spine notification can
-    /// be cleared when that thread is `Read`.
+    /// be cleared when that agent is `Read`.
     pub agent_id: Option<String>,
 }
 
@@ -134,8 +134,8 @@ impl WatcherResult {
         self
     }
 
-    /// Bind this result to a thread, so the spine notification it produces can
-    /// be cleared when that thread is `Read`.
+    /// Bind this result to an agent, so the spine notification it produces can
+    /// be cleared when that agent is `Read`.
     #[must_use]
     pub fn agent_id<S>(mut self, id: S) -> Self
     where

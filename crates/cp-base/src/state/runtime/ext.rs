@@ -3,7 +3,7 @@
 //!
 //! Module-owned state is stored in two scope maps on `State`:
 //! `shared_module_data` (fleet-wide, one instance) and `agent_module_data`
-//! (per-thread, the executing thread's). A given `TypeId` lives in
+//! (per-agent, the executing agent's). A given `TypeId` lives in
 //! exactly one map, so the `get_ext` family searches both; `set_ext` updates
 //! whichever already holds the type and routes first-inserts by the ambient
 //! `init_is_global` scope set by the boot/init loops.
@@ -20,7 +20,7 @@ impl State {
     /// Get a reference to module-owned state by type.
     ///
     /// Searches both scope maps (a `TypeId` lives in exactly one), so callers
-    /// need not know whether the type is fleet-shared or per-thread.
+    /// need not know whether the type is fleet-shared or per-agent.
     #[must_use]
     pub fn get_ext<T>(&self) -> Option<&T>
     where
@@ -87,7 +87,7 @@ impl State {
     /// If the type is already registered, it is updated in whichever scope map
     /// holds it. For a first insert, the target map is chosen by the ambient
     /// [`init_is_global`](Self::init_is_global) scope (`Some(true)` → shared,
-    /// otherwise per-thread) — set by the boot/init loops.
+    /// otherwise per-agent) — set by the boot/init loops.
     pub fn set_ext<T>(&mut self, val: T)
     where
         T: 'static + Send + Sync,
@@ -116,9 +116,9 @@ impl State {
         drop(self.shared_module_data.insert(id, Box::new(val)));
     }
 
-    /// Insert per-thread module state, overriding scope routing. Use when a
+    /// Insert per-agent module state, overriding scope routing. Use when a
     /// value must live in [`agent_module_data`](Self::agent_module_data)
-    /// (the executing thread's) regardless of ambient init scope.
+    /// (the executing agent's) regardless of ambient init scope.
     pub fn set_ext_agent<T>(&mut self, val: T)
     where
         T: 'static + Send + Sync,
@@ -131,7 +131,7 @@ impl State {
     /// Set the ambient scope used to route the next first-insert via
     /// [`set_ext`](Self::set_ext). Called by the boot/init loops around
     /// `Module::init_state` / `load_module_data` (global) and
-    /// `load_worker_data` (always per-thread). `None` clears it.
+    /// `load_worker_data` (always per-agent). `None` clears it.
     pub const fn set_init_scope(&mut self, is_global: Option<bool>) {
         self.init_is_global = is_global;
     }

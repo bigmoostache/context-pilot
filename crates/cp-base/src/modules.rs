@@ -107,9 +107,9 @@ pub trait Module: Send + Sync {
     /// Deserialize worker-specific data. Always loaded from `WorkerState`.
     fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
 
-    /// `true` when [`Self::load_worker_data`] writes ONLY the thread runtime
-    /// (`state.agent_mut()`), never shared state. Background threads skip
-    /// global modules at boot; this opt-in lets their per-thread slice
+    /// `true` when [`Self::load_worker_data`] writes ONLY the agent runtime
+    /// (`state.agent_mut()`), never shared state. Background agents skip
+    /// global modules at boot; this opt-in lets their per-agent slice
     /// (e.g. the git workdir) still be restored there.
     fn worker_data_is_agent_scoped(&self) -> bool {
         false

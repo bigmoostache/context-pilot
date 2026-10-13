@@ -13,7 +13,7 @@ use cp_base::state::actions::Action;
 use cp_base::state::context::{Entry, Kind, compute_total_pages, estimate_tokens};
 use cp_base::state::runtime::State;
 
-/// Data sent to the background cache thread for a file panel refresh.
+/// Data sent to the background cache agent for a file panel refresh.
 pub(crate) struct FileCacheRequest {
     /// Identifier of the context element to update.
     pub context_id: String,

@@ -410,7 +410,7 @@ use cp_base::panels::now_ms;
 /// overlays. The body content (conversation OR active panel) is built lazily
 /// by the body renderer, so a frame never builds a region it does not draw.
 pub(crate) struct FrameChrome {
-    /// Sidebar IR; `None` when the threads list replaces the body (no sidebar).
+    /// Sidebar IR; `None` when the agents list replaces the body (no sidebar).
     pub sidebar: Option<Sidebar>,
     /// Bottom status bar IR.
     pub status_bar: StatusBar,
@@ -420,7 +420,7 @@ pub(crate) struct FrameChrome {
 
 /// Build the always-painted frame regions from application state.
 ///
-/// Called once per render tick. `with_sidebar` is false when the threads list
+/// Called once per render tick. `with_sidebar` is false when the agents list
 /// owns the body, where the sidebar is never drawn.
 #[must_use]
 pub(crate) fn build_frame(state: &State, with_sidebar: bool) -> FrameChrome {

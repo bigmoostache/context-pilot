@@ -18,12 +18,12 @@ pub(crate) struct TreeCacheRequest {
     pub open_folders: Vec<String>,
     /// File/folder description annotations.
     pub descriptions: Vec<crate::types::TreeFileDescription>,
-    /// Directory to render: the executing thread's workdir.
+    /// Directory to render: the executing agent's workdir.
     pub root: std::path::PathBuf,
 }
 
 /// Worker output: rendered tree plus the stale-description swaps the main
-/// thread must replay onto `TreeState`.
+/// agent must replay onto `TreeState`.
 struct TreeCacheResult {
     /// Rendered tree text.
     content: String,

@@ -32,7 +32,7 @@ pub(super) struct ReverieContext {
     pub system_id: String,
     /// Optional directive (from `optimize_context`) injected into the preamble.
     /// Carried here so prompt building never looks the reverie up in the
-    /// `state.reveries` map — that map is keyed by an opaque per-thread slot.
+    /// `state.reveries` map — that map is keyed by an opaque per-agent slot.
     pub directive: Option<String>,
     /// The reverie's own conversation messages (may be empty on first run)
     pub messages: Vec<Message>,

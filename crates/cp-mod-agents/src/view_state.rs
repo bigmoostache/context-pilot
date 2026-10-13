@@ -1,7 +1,7 @@
-//! Read-only execution-state snapshot for the threads view.
+//! Read-only execution-state snapshot for the agents view.
 //!
 //! This is a **derived mirror**, not a source of truth. `App::fleet`
-//! holds the authoritative [`Entry`](cp_fleet::Entry) per non-executing thread;
+//! holds the authoritative [`Entry`](cp_fleet::Entry) per non-executing agent;
 //! this map is rewritten in full every tick from that registry plus the
 //! executing's own [`State`], purely so the renderer can read it without
 //! threading `App` through the entire render stack.
@@ -17,26 +17,26 @@ use cp_base::state::runtime::State;
 use cp_fleet::AgentExecState;
 use serde::{Deserialize, Serialize};
 
-/// Per-thread execution state for the threads view. Registered as UI-global
+/// Per-thread execution state for the agents view. Registered as UI-global
 /// module state and never persisted: rebuilt from the fleet registry each tick.
 ///
-/// A thread absent from the map is not an error — archived threads have no
-/// registry entry, and a freshly created thread has none until the next
+/// An agent absent from the map is not an error — archived agents have no
+/// registry entry, and a freshly created agent has none until the next
 /// reconcile pass. Renderers fall back to [`AgentExecState::Idle`] rather than
 /// failing.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FleetExecMirror {
-    /// Last-known execution state per thread id.
+    /// Last-known execution state per agent id.
     ///
-    /// Includes the focused thread, whose state is derived from the executing
+    /// Includes the focused agent, whose state is derived from the executing
     /// [`State`] rather than the registry — the registry deliberately excludes
-    /// the focused thread because its context lives flat in `State` (the
+    /// the focused agent because its context lives flat in `State` (the
     /// executing=focused invariant).
     pub exec_states: HashMap<String, AgentExecState>,
 }
 
 impl FleetExecMirror {
-    /// An empty snapshot (no thread has been observed yet).
+    /// An empty snapshot (no agent has been observed yet).
     ///
     /// Not `const`: unlike `AgentsState::new`, this holds a `HashMap`, which
     /// has no const constructor.
@@ -67,8 +67,8 @@ impl FleetExecMirror {
     /// Execution state for `agent_id`, defaulting to `Idle` when absent.
     ///
     /// Defaulting (rather than `Option`) keeps the caller's match total: a
-    /// thread with no registry entry is indistinguishable from one with nothing
-    /// to do, which is true for archived and just-created threads alike.
+    /// agent with no registry entry is indistinguishable from one with nothing
+    /// to do, which is true for archived and just-created agents alike.
     #[must_use]
     pub fn exec_state_of(&self, agent_id: &str) -> AgentExecState {
         self.exec_states.get(agent_id).copied().unwrap_or_default()
@@ -76,7 +76,7 @@ impl FleetExecMirror {
 
     /// Replace the whole snapshot.
     ///
-    /// Rebuilding rather than merging matters: a thread deleted or archived
+    /// Rebuilding rather than merging matters: an agent deleted or archived
     /// since the last tick must *disappear* from the map, not linger with a
     /// stale state forever.
     pub fn replace_all(&mut self, exec_states: HashMap<String, AgentExecState>) {

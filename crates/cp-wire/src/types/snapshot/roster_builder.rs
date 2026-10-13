@@ -25,23 +25,23 @@ use super::{AgentTurn, RosterAgent};
 /// Fields are private, so the builder itself never triggers `exhaustive_structs`.
 #[derive(Clone, Debug)]
 pub struct RosterAgentBuilder {
-    /// Thread identifier (e.g. `"T7"`).
+    /// Agent identifier (e.g. `"T7"`).
     agent_id: String,
-    /// User-chosen thread label.
+    /// User-chosen agent label.
     name: String,
     /// Current turn ownership.
     status: AgentTurn,
-    /// Whether the thread is archived (soft-deleted).
+    /// Whether the agent is archived (soft-deleted).
     archived: bool,
-    /// Whether the thread is paused (no idle `MY_TURN` notifications).
+    /// Whether the agent is paused (no idle `MY_TURN` notifications).
     paused: bool,
     /// Epoch-ms of the latest activity.
     last_activity_ms: u64,
-    /// Number of messages folded into this thread so far.
+    /// Number of messages folded into this agent so far.
     msg_count: u32,
-    /// The thread's projected tasks (read-only todo items).
+    /// The agent's projected tasks (read-only todo items).
     tasks: Vec<WireTask>,
-    /// The thread's projected scratchpad notes (read-only cells).
+    /// The agent's projected scratchpad notes (read-only cells).
     notes: Vec<WireNote>,
 }
 
@@ -67,14 +67,14 @@ impl RosterAgentBuilder {
         }
     }
 
-    /// Mark the thread archived (soft-deleted). Default `false`.
+    /// Mark the agent archived (soft-deleted). Default `false`.
     #[must_use]
     pub const fn archived(mut self, archived: bool) -> Self {
         self.archived = archived;
         self
     }
 
-    /// Mark the thread paused (no idle `MY_TURN` notifications). Default `false`.
+    /// Mark the agent paused (no idle `MY_TURN` notifications). Default `false`.
     #[must_use]
     pub const fn paused(mut self, paused: bool) -> Self {
         self.paused = paused;
@@ -95,14 +95,14 @@ impl RosterAgentBuilder {
         self
     }
 
-    /// Set the thread's projected tasks. Default empty.
+    /// Set the agent's projected tasks. Default empty.
     #[must_use]
     pub fn tasks(mut self, tasks: Vec<WireTask>) -> Self {
         self.tasks = tasks;
         self
     }
 
-    /// Set the thread's projected scratchpad notes. Default empty.
+    /// Set the agent's projected scratchpad notes. Default empty.
     #[must_use]
     pub fn notes(mut self, notes: Vec<WireNote>) -> Self {
         self.notes = notes;

@@ -54,22 +54,22 @@ type ModuleDataMaps = (HashMap<String, serde_json::Value>, HashMap<String, serde
 /// (`important_panel_uids` by kind, `panel_uid` → local id) worker maps.
 type PanelUidMaps = (HashMap<Kind, String>, HashMap<String, String>);
 
-/// The `states/<id>.json` file id for the executing thread — the file this
+/// The `states/<id>.json` file id for the executing agent — the file this
 /// save writes.
 ///
 /// Both thread kinds write a file named after their own thread id:
-/// - a **background** thread (executing only during its advancement step or
+/// - a **background** agent (executing only during its advancement step or
 ///   save) writes `states/<tid>.json`,
-///   which is why a background thread's mid-step `save_state_async` cannot
-///   clobber the focused thread's file;
-/// - the **focused** thread writes `states/<tid>.json` too. Keying it by id
+///   which is why a background agent's mid-step `save_state_async` cannot
+///   clobber the focused agent's file;
+/// - the **focused** agent writes `states/<tid>.json` too. Keying it by id
 ///   rather than by position is what makes focus-switching safe across a
 ///   reload: under a fixed `main_worker` name, switching focus and then
-///   reloading loads the *previously* focused thread's context into the newly
+///   reloading loads the *previously* focused agent's context into the newly
 ///   focused one.
 ///
 /// An **unfocused** agent (boot before any `Read`; focus cleared by
-/// archive/delete) has no thread to name, so it keeps the legacy
+/// archive/delete) has no agent to name, so it keeps the legacy
 /// [`DEFAULT_WORKER_ID`] file. Boot selects the matching id through
 /// [`worker::focused_worker_id`], which mirrors this rule and adds a one-shot
 /// fallback to the legacy name for installs saved before pointers existed.
@@ -86,8 +86,8 @@ fn executing_worker_id(state: &State) -> String {
 /// SYSTEM / LIBRARY panels.
 ///
 /// [`save_all_agents`](crate::app::App::save_all_agents) unions this across
-/// every thread to prune orphaned `panels/<uid>.json` exactly once — pruning
-/// per-thread would delete other threads' panels (all threads share the
+/// every agent to prune orphaned `panels/<uid>.json` exactly once — pruning
+/// per-agent would delete other agents' panels (all agents share the
 /// `panels/` dir, keyed by the fleet-global UID counter).
 pub(crate) fn panel_uids_of(state: &State) -> std::collections::HashSet<String> {
     state
@@ -207,7 +207,7 @@ fn build_history_message_ops(state: &State, messages_dir: &std::path::Path) -> V
 /// no longer live in `known_uids`.
 ///
 /// `pub(crate)` so [`save_all_agents`](crate::app::App::save_all_agents) can
-/// run it once over the union of every thread's UIDs (see [`panel_uids_of`]).
+/// run it once over the union of every agent's UIDs (see [`panel_uids_of`]).
 pub(crate) fn collect_orphan_deletes(
     panels_dir: &std::path::Path,
     known_uids: &std::collections::HashSet<String>,
@@ -261,7 +261,7 @@ fn shared_config_op(
     let shared_config = SharedConfig::default()
         .with_active_theme(state.active_theme.clone())
         .with_owner_pid(Some(current_pid()))
-        // Draft lives per-thread in `states/<id>.json`; the shared slot is
+        // Draft lives per-agent in `states/<id>.json`; the shared slot is
         // emptied so a background-thread save can't clobber the focused draft.
         .with_ui(state.agent().selected_context, String::new(), 0)
         .with_view_mode(state.view_mode)
@@ -271,7 +271,7 @@ fn shared_config_op(
     Some(WriteOp { path: dir.join(CONFIG_FILE), content: json.into_bytes() })
 }
 
-/// Serialize the executing thread's `states/<id>.json` (see
+/// Serialize the executing agent's `states/<id>.json` (see
 /// [`executing_worker_id`]). Timed as `….worker_state`.
 fn worker_state_op(
     state: &State,
@@ -312,7 +312,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
         dir.join(MODULES_DIR),
     ];
 
-    // Per-thread message files, only for threads changed since last write.
+    // Per-thread message files, only for agents changed since last write.
     let mut durable: Vec<WriteOp> = {
         let _g = crate::profile!("thread_files");
         let agents = &cp_mod_agents::types::AgentsState::get(state).agents;
@@ -348,9 +348,9 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
 
     // Panels + history messages. NOTE: orphan pruning is deliberately NOT done
     // here — a single-thread save only knows the EXECUTING thread's UIDs, so pruning
-    // would delete every OTHER thread's `panels/<uid>.json` (the dir is shared,
+    // would delete every OTHER agent's `panels/<uid>.json` (the dir is shared,
     // keyed by the fleet-global UID counter). Pruning runs once over the union
-    // of all threads' UIDs in `App::save_all_agents` (reload/quit).
+    // of all agents' UIDs in `App::save_all_agents` (reload/quit).
     let panels_dir = dir.join(crate::infra::constants::PANELS_DIR);
     let messages_dir = dir.join(crate::infra::constants::MESSAGES_DIR);
     let mut known_uids: std::collections::HashSet<String> = std::collections::HashSet::new();

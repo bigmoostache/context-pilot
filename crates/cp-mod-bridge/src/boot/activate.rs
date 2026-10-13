@@ -141,17 +141,17 @@ pub fn try_recover(state: &mut State) {
 /// chunk to `state.messages.last_mut()`). Carrying that id lets the frontend
 /// route live `Token` frames to the right conversation bubble and reconcile the
 /// streamed text against the durable `MessageCreated` entry (which references
-/// the same `Message::id`). `agent_id` is the **executing** thread (the one
+/// the same `Message::id`). `agent_id` is the **executing** agent (the one
 /// whose conversation is in `state` while these tokens stream), so a background
-/// thread's live frames route to its own UI pane rather than the focused one; it
-/// is empty only before any thread is executing (cold boot).
+/// agent's live frames route to its own UI pane rather than the focused one; it
+/// is empty only before any agent is executing (cold boot).
 pub(crate) fn publish_frame(state: &mut State, kind: StreamKind) {
-    // Read the active streaming message id + the executing thread id BEFORE the
+    // Read the active streaming message id + the executing agent id BEFORE the
     // mutable `ext_mut` borrow (short clones, negligible against the LLM/network
-    // cost of a chunk). The executing is the thread whose conversation is in
-    // `state` right now — the focused thread in the main phase, or a background
-    // thread during its advancement step — so live frames route to the right UI
-    // pane. Empty when no thread is executing yet (cold boot), matching the
+    // cost of a chunk). The executing is the agent whose conversation is in
+    // `state` right now — the focused agent in the main phase, or a background
+    // agent during its advancement step — so live frames route to the right UI
+    // pane. Empty when no agent is executing yet (cold boot), matching the
     // pre-multi-thread single-conversation behaviour.
     let message_id = state.agent().messages.last().map(|m| m.id.clone()).unwrap_or_default();
     let agent_id = state.executing_agent_id().unwrap_or_default().to_owned();

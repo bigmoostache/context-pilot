@@ -9,10 +9,10 @@ pub mod persist;
 // Enums
 // =============================================================================
 
-/// Thread turn status — who needs to act next.
+/// Agent turn status — who needs to act next.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AgentStatus {
-    /// The AI's turn — thread has user input awaiting response.
+    /// The AI's turn — agent has user input awaiting response.
     MyTurn,
     /// The user's turn — AI has responded, waiting for user.
     #[default]
@@ -28,7 +28,7 @@ impl std::fmt::Display for AgentStatus {
     }
 }
 
-/// Who authored a thread message.
+/// Who authored an agent message.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AgentAuthor {
     /// Message from the human user.
@@ -56,7 +56,7 @@ const fn default_true() -> bool {
     true
 }
 
-/// A single message within a thread.
+/// A single message within an agent.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AgentMessage {
     /// Who wrote this message.
@@ -76,11 +76,11 @@ pub struct AgentMessage {
     pub acknowledged: bool,
     /// True when this is an auto-generated **tool-activity trace** — a
     /// lightweight `{verb · tool — intent}` line appended on every tool call
-    /// while the AI is focused on the thread (see the tool pipeline). Auto
+    /// while the AI is focused on the agent (see the tool pipeline). Auto
     /// messages are *hidden from the AI's own context* (skipped in
     /// [`build_panel_content`](crate::tools)) so the model never re-reads its
     /// own action log, and are rendered as a **collapsible group** in the web
-    /// UI and TUI rather than as normal bubbles. They never change a thread's
+    /// UI and TUI rather than as normal bubbles. They never change an agent's
     /// turn/focus. Defaults to `false` (back-compat with pre-feature data).
     #[serde(default)]
     pub auto: bool,
@@ -129,11 +129,11 @@ impl AgentMessage {
     }
 }
 
-/// Where a branched thread came from: the parent thread and the message it was
-/// cut at (inclusive). Set only on threads created by [`AgentsState::branch`].
+/// Where a branched agent came from: the parent agent and the message it was
+/// cut at (inclusive). Set only on agents created by [`AgentsState::branch`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AgentOrigin {
-    /// Id of the parent thread at branch time (may since have been deleted).
+    /// Id of the parent agent at branch time (may since have been deleted).
     #[serde(rename = "thread_id")]
     pub agent_id: String,
     /// Epoch-ms timestamp of the last parent message copied into the branch.
@@ -155,25 +155,25 @@ pub struct Agent {
     pub messages: Vec<AgentMessage>,
     /// Creation timestamp (epoch ms).
     pub created_at: u64,
-    /// Soft-delete flag — archived threads are hidden from the active list
+    /// Soft-delete flag — archived agents are hidden from the active list
     /// but retained in state so the web frontend can display and restore them.
     #[serde(default)]
     pub archived: bool,
-    /// Pause flag — paused threads suppress `MY_TURN` idle notifications so
+    /// Pause flag — paused agents suppress `MY_TURN` idle notifications so
     /// the AI does not nag about them, but remain visible and fully functional.
     /// The user sets this when they are still composing input and do not want
     /// the agent to act yet.
     #[serde(default)]
     pub paused: bool,
-    /// Parent thread + branch point when this thread was branched out of
-    /// another one (`None` for a thread created from scratch). Defaults to
+    /// Parent agent + branch point when this agent was branched out of
+    /// another one (`None` for an agent created from scratch). Defaults to
     /// `None` (back-compat with pre-feature data).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<AgentOrigin>,
 }
 
 impl Agent {
-    /// A fresh empty thread: caller's turn is `TheirTurn` (user types first),
+    /// A fresh empty agent: caller's turn is `TheirTurn` (user types first),
     /// not archived, not paused, stamped now.
     #[must_use]
     pub fn new(id: String, name: String) -> Self {
@@ -194,15 +194,15 @@ impl Agent {
 // Module State — shared (is_global=true)
 // =============================================================================
 
-/// Shared thread state, persisted via `save_module_data`.
+/// Shared agent state, persisted via `save_module_data`.
 #[derive(Debug)]
 pub struct AgentsState {
-    /// All active threads.
+    /// All active agents.
     pub agents: Vec<Agent>,
-    /// Counter for generating unique thread IDs (T1, T2, ...).
+    /// Counter for generating unique agent IDs (T1, T2, ...).
     pub next_id: u32,
     /// Pre-rendered panel content for the LLM. Only updated by `Read`.
-    /// Contains the thread list summary + focused thread's full conversation.
+    /// Contains the agent list summary + focused agent's full conversation.
     pub panel_content: String,
 }
 
@@ -213,7 +213,7 @@ impl Default for AgentsState {
 }
 
 impl AgentsState {
-    /// Create an empty threads state with ID counter at 1.
+    /// Create an empty agents state with ID counter at 1.
     #[must_use]
     pub const fn new() -> Self {
         Self { agents: vec![], next_id: 1, panel_content: String::new() }
@@ -238,45 +238,45 @@ impl AgentsState {
         state.ext_mut::<Self>()
     }
 
-    /// Returns true if any *non-archived* thread is in `MyTurn` status.
+    /// Returns true if any *non-archived* agent is in `MyTurn` status.
     ///
-    /// Archived threads are invisible to the LLM (T9): they never trigger
-    /// `MY_TURN` idle nudges, never appear in context. Restoring a thread
+    /// Archived agents are invisible to the LLM (T9): they never trigger
+    /// `MY_TURN` idle nudges, never appear in context. Restoring an agent
     /// makes it count again.
     #[must_use]
     pub fn has_my_turn_agents(&self) -> bool {
         self.agents.iter().any(|t| !t.archived && !t.paused && t.status == AgentStatus::MyTurn)
     }
 
-    /// Indices into [`Self::agents`] of the threads whose `archived` flag
+    /// Indices into [`Self::agents`] of the agents whose `archived` flag
     /// matches `archived`, in storage order.
     ///
     /// The TUI thread-centered view shows one subset at a time — the active
     /// list (`archived = false`) or the archived list (`archived = true`,
     /// toggled by Ctrl+U). Selection (`selected_agent_idx`) is a position
     /// **into this filtered slice**, resolved back to a real index here so a
-    /// soft-deleted thread keeps its place in storage without polluting the
+    /// soft-deleted agent keeps its place in storage without polluting the
     /// visible list.
     #[must_use]
     pub fn visible_indices(&self, archived: bool) -> Vec<usize> {
         self.agents.iter().enumerate().filter(|entry| entry.1.archived == archived).map(|entry| entry.0).collect()
     }
 
-    /// Branch a new thread out of `source_id`: a fresh thread named `name`
+    /// Branch a new agent out of `source_id`: a fresh agent named `name`
     /// whose history is a copy of the parent's messages up to and including the
-    /// one stamped `at_ts`. Returns the new thread's id.
+    /// one stamped `at_ts`. Returns the new agent's id.
     ///
     /// Copied messages keep their original timestamps (still unique within the
     /// branch, so `DeleteMessage` works on it) and are all marked acknowledged —
     /// the branch starts from context the agent has already seen. The branch is
-    /// a plain `TheirTurn` thread (never archived/paused, even if the parent
+    /// a plain `TheirTurn` agent (never archived/paused, even if the parent
     /// is) recording its parent in [`Agent::origin`]. Nothing else the parent
     /// owns (todos, scratchpad) is copied: those only exist as a *current*
     /// snapshot, which would leak whatever happened after the branch point.
     ///
     /// # Errors
     ///
-    /// Returns a human-readable message when the source thread does not exist
+    /// Returns a human-readable message when the source agent does not exist
     /// or holds no message stamped `at_ts`; the state is left untouched.
     pub fn branch(&mut self, source_id: &str, at_ts: u64, name: &str) -> Result<String, String> {
         let source =
@@ -307,28 +307,28 @@ impl AgentsState {
 // Focus State — per-worker (save_worker_data / load_worker_data)
 // =============================================================================
 
-/// Per-worker focus tracking for thread enforcement.
+/// Per-worker focus tracking for agent enforcement.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FocusState {
-    /// Which thread the AI is currently focused on (None = unfocused).
+    /// Which agent the AI is currently focused on (None = unfocused).
     #[serde(rename = "focused_thread_id")]
     pub focused_agent_id: Option<String>,
-    /// Which thread the human has *drilled into* in the TUI (`None` = showing the
-    /// thread list). Pure view state (G3): it selects whose full panel view is
+    /// Which agent the human has *drilled into* in the TUI (`None` = showing the
+    /// agent list). Pure view state (G3): it selects whose full panel view is
     /// painted, and never moves execution — the renderer makes the drilled
-    /// thread executing only for the duration of one paint, then
+    /// agent executing only for the duration of one paint, then
     /// restores the previous one (Model 2: a human glance must not disturb the
     /// agent's work). Defaults to `None` (back-compat; byte-identical until set).
     #[serde(default)]
     #[serde(rename = "drilled_thread_id")]
     pub drilled_agent_id: Option<String>,
-    /// Index of the currently selected thread in the TUI threads view.
+    /// Index of the currently selected agent in the TUI agents view.
     /// Used for navigation (Tab/Shift+Tab) and message area display.
     #[serde(default)]
     #[serde(rename = "selected_thread_idx")]
     pub selected_agent_idx: usize,
-    /// When true, the input field is being used to name a new thread.
-    /// Set by pressing 'n' in Threads view, cleared on Enter or Esc.
+    /// When true, the input field is being used to name a new agent.
+    /// Set by pressing 'n' in Agents view, cleared on Enter or Esc.
     #[serde(default)]
     #[serde(rename = "creating_thread")]
     pub creating_agent: bool,
@@ -342,25 +342,25 @@ pub struct FocusState {
     /// while `now - archive_armed_at_ms <= 2000`; a later press re-arms instead.
     #[serde(default)]
     pub archive_armed_at_ms: u64,
-    /// When true, the TUI thread-centered view shows the *archived* threads
+    /// When true, the TUI thread-centered view shows the *archived* agents
     /// instead of the active ones (toggled by Ctrl+U). Selection indexes into
     /// the matching filtered slice ([`AgentsState::visible_indices`]); the
-    /// virtual "+ New Thread" entry only appears in the active (non-archived)
+    /// virtual "+ New Agent" entry only appears in the active (non-archived)
     /// view.
     #[serde(default)]
     pub viewing_archived: bool,
-    /// Per-thread last-read message count, keyed by thread ID.
-    /// Used for unread indicators — a thread is "unread" when
+    /// Per-thread last-read message count, keyed by agent ID.
+    /// Used for unread indicators — an agent is "unread" when
     /// `messages.len() > last_read_count[agent_id]`.
     #[serde(default)]
     pub last_read_count: std::collections::BTreeMap<String, usize>,
-    /// Thread currently under the list cursor and the ms it got there. A thread
+    /// Agent currently under the list cursor and the ms it got there. An agent
     /// is only marked read after [`READ_DWELL_MS`] of continuous selection, so
     /// arrowing past rows leaves their unread marker intact. Transient.
     #[serde(skip)]
     pub read_dwell: Option<(String, u64)>,
-    /// Draft name typed on the virtual "+ New Thread" row. Its own textarea
-    /// (not a thread's composer) so it survives navigation and reloads.
+    /// Draft name typed on the virtual "+ New Agent" row. Its own textarea
+    /// (not an agent's composer) so it survives navigation and reloads.
     #[serde(default)]
     #[serde(rename = "new_thread_title")]
     pub new_agent_title: cp_base::state::runtime::textarea::TextArea,
@@ -409,8 +409,8 @@ impl FocusState {
         state.ext_mut::<Self>()
     }
 
-    /// Mark the currently selected thread as fully read.
-    /// Updates `last_read_count` to the thread's current message count.
+    /// Mark the currently selected agent as fully read.
+    /// Updates `last_read_count` to the agent's current message count.
     ///
     /// `selected_agent_idx` is a position into the visible slice for the
     /// current view, so it is resolved through [`AgentsState::visible_indices`]
@@ -435,8 +435,8 @@ impl FocusState {
         }
     }
 
-    /// Per-tick read tracking for the Threads view: restart the dwell clock
-    /// when the selected thread changes; once it has stayed selected for
+    /// Per-tick read tracking for the Agents view: restart the dwell clock
+    /// when the selected agent changes; once it has stayed selected for
     /// [`READ_DWELL_MS`], mark it read (and keep doing so while it stays, so
     /// replies arriving under the cursor count as seen).
     pub fn tick_read_dwell(state: &mut State, now_ms: u64) {
@@ -464,7 +464,7 @@ impl FocusState {
     }
 }
 
-/// Continuous selection time before a thread's messages count as user-read.
+/// Continuous selection time before an agent's messages count as user-read.
 pub const READ_DWELL_MS: u64 = 2_000;
 
 #[cfg(test)]

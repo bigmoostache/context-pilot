@@ -168,8 +168,8 @@ mod tests {
 
     #[test]
     fn heads_upsert_is_last_write_wins_per_agent() {
-        // A thread's head is overwritten in place, never duplicated — the property
-        // that keeps the head set bounded at one entry per thread (I3).
+        // An agent's head is overwritten in place, never duplicated — the property
+        // that keeps the head set bounded at one entry per agent (I3).
         let mut heads = Heads::default();
         heads.set_agent_head("T1", ContentHash::of(b"first"));
         heads.set_agent_head("T1", ContentHash::of(b"second"));

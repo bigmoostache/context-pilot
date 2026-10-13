@@ -1,10 +1,10 @@
 //! Thread-list shaping — pure transforms from agent state + live roster to the
 //! maquette `AgentDetail` JSON shape.
 //!
-//! The `/agents` handler ([`agents`](super::threads)) combines two
+//! The `/agents` handler ([`agents`](super::agents)) combines two
 //! sources: the agent's on-disk `config.json` (full message logs) and the
 //! in-memory [`MaterializedView`](crate::services::materialized_view::MaterializedView) roster
-//! (the live, up-to-the-millisecond thread list). The functions here perform
+//! (the live, up-to-the-millisecond agent list). The functions here perform
 //! the reshaping and the merge, kept separate from the request-handling code so
 //! both stay small and independently testable.
 
@@ -62,12 +62,12 @@ fn roster_notes_value(entry: &RosterEntry) -> serde_json::Value {
     serde_json::Value::Array(entry.notes.iter().map(reshape_note).collect())
 }
 
-/// Merge the live view roster into the disk-derived thread list (X848).
+/// Merge the live view roster into the disk-derived agent list (X848).
 ///
-/// For each roster entry: if a disk thread with that id exists, refresh its
+/// For each roster entry: if a disk agent with that id exists, refresh its
 /// `status`, `archived`, and `lastActivity` from the view (the authoritative,
 /// up-to-the-millisecond source — design doc I5); otherwise synthesise a
-/// log-less `AgentDetail` so a thread created since the last disk flush still
+/// log-less `AgentDetail` so an agent created since the last disk flush still
 /// appears immediately.
 pub(crate) fn overlay_roster(details: &mut Vec<serde_json::Value>, roster: &[RosterEntry], fleet_id: &str) {
     for entry in roster {
@@ -119,15 +119,15 @@ fn synthesize_from_roster(entry: &RosterEntry, fleet_id: &str) -> serde_json::Va
     })
 }
 
-/// Attach first-paint tasks to disk-derived thread details from the agent's
+/// Attach first-paint tasks to disk-derived agent details from the agent's
 /// `config.json` todo module (`modules.todo.todos`).
 ///
-/// Thread-owned todos live **separately** from the thread record in the shared
+/// Thread-owned todos live **separately** from the agent record in the shared
 /// todo module, so [`reshape_agent`] cannot see them — it defaults `tasks` to
 /// empty. This fills that gap for the cold-start / pre-delta window: it groups
 /// the flat todo list by `agent_id`, excludes cancelled items (the projection
 /// contract), reshapes each to the camelCase `AgentTask` shape, and writes the
-/// per-thread array onto the matching detail. The live [`overlay_roster`] then
+/// per-agent array onto the matching detail. The live [`overlay_roster`] then
 /// overrides these with the fresher view-fed task lists where the roster has
 /// them.
 ///
@@ -171,14 +171,14 @@ fn disk_task_json(todo: &serde_json::Value) -> serde_json::Value {
     })
 }
 
-/// Attach first-paint notes to disk-derived thread details from the agent's
+/// Attach first-paint notes to disk-derived agent details from the agent's
 /// `config.json` scratchpad module (`modules.scratchpad.scratchpad_cells`).
 ///
 /// The twin of [`attach_disk_tasks`] for the thread-owned scratchpad: cells live
-/// **separately** from the thread record in the shared scratchpad module, so
+/// **separately** from the agent record in the shared scratchpad module, so
 /// [`reshape_agent`] cannot see them — it defaults `notes` to empty. This fills
 /// the cold-start / pre-delta window: it groups the flat cell list by
-/// `agent_id` and writes the per-thread `AgentNote` array onto the matching
+/// `agent_id` and writes the per-agent `AgentNote` array onto the matching
 /// detail. The live [`overlay_roster`] then overrides these with the fresher
 /// view-fed note lists where the roster has them. Scratchpad cells have no
 /// cancelled/soft-deleted state, so (unlike tasks) there is no exclusion filter.
@@ -229,10 +229,10 @@ fn roster_status_value(status: AgentTurn) -> serde_json::Value {
     serde_json::Value::String(s.to_owned())
 }
 
-/// Reshape one raw thread from agent state to the maquette `AgentDetail`
+/// Reshape one raw agent from agent state to the maquette `AgentDetail`
 /// shape: `snake_case` → camelCase, computed fields (`messageCount`, `unread`,
 /// `lastMessage`, `lastActivity`), `origin.agent_id` flattened to
-/// `branchedFrom` (null for a non-branched thread), and messages mapped to `log`.
+/// `branchedFrom` (null for a non-branched agent), and messages mapped to `log`.
 pub(crate) fn reshape_agent(raw: &serde_json::Value, fleet_id: &str) -> serde_json::Value {
     let messages = raw.get("messages").and_then(serde_json::Value::as_array);
     let msg_count = messages.map_or(0, Vec::len);
@@ -244,8 +244,8 @@ pub(crate) fn reshape_agent(raw: &serde_json::Value, fleet_id: &str) -> serde_js
         .and_then(|m| m.get("content"))
         .and_then(serde_json::Value::as_str)
         .unwrap_or("");
-    // Latest of the last message and the thread's own creation: a branched
-    // thread's copied history keeps the parent's (older) timestamps, so its
+    // Latest of the last message and the agent's own creation: a branched
+    // agent's copied history keeps the parent's (older) timestamps, so its
     // creation is what marks it as recent until a new message lands.
     let last_activity = messages
         .and_then(|msgs| msgs.last())
@@ -280,7 +280,7 @@ pub(crate) fn reshape_agent(raw: &serde_json::Value, fleet_id: &str) -> serde_js
     })
 }
 
-/// Reshape one thread message to the maquette `AgentMsg` shape.
+/// Reshape one agent message to the maquette `AgentMsg` shape.
 fn reshape_message(raw: &serde_json::Value, index: usize) -> serde_json::Value {
     let role = match raw.get("author").and_then(serde_json::Value::as_str).unwrap_or("User") {
         "Assistant" => "assistant",
@@ -329,7 +329,7 @@ mod tests {
 
     #[test]
     fn overlay_synthesises_view_only_agent() {
-        // A thread present in the roster but absent on disk is appended with an
+        // An agent present in the roster but absent on disk is appended with an
         // empty log — the instant-appearance path.
         let mut details: Vec<serde_json::Value> = Vec::new();
         let roster = [RosterEntry::builder("T9", "fresh", AgentTurn::TheirTurn).last_activity_ms(4_242).build()];
@@ -345,7 +345,7 @@ mod tests {
 
     #[test]
     fn overlay_refreshes_status_archived_and_activity_on_disk_agent() {
-        // A disk thread keeps its log but takes the view's fresher status,
+        // A disk agent keeps its log but takes the view's fresher status,
         // archived flag, and (later) activity.
         let mut details = vec![serde_json::json!({
             "id": "T1",

@@ -229,7 +229,7 @@ fn library_item(parts: &LibraryItemParts<'_>) -> serde_json::Value {
 /// YAML frontmatter block.
 ///
 /// This is the text a `/command` expands to (the prompt that replaces the
-/// `/cmd` literal). The web thread composer seeds it into the textarea when a
+/// `/cmd` literal). The web agent composer seeds it into the textarea when a
 /// suggestion bubble is clicked (T350), so a `/boss-hunt` bubble fills with the
 /// command's actual prompt rather than the bare `/boss-hunt` token.
 ///

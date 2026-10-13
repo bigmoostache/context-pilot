@@ -18,7 +18,7 @@ use cp_base::tools::{ToolResult, ToolUse};
 // ============================================================
 
 /// Serializable coucou record, held in the fleet-shared [`CoucouRegistry`].
-/// Also the shape of the legacy per-thread `pending_coucous` array, migrated
+/// Also the shape of the legacy per-agent `pending_coucous` array, migrated
 /// into the registry on boot.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Record {
@@ -30,8 +30,8 @@ pub struct Record {
     pub registered_at_ms: u64,
     /// When the notification should fire (ms since epoch).
     pub fire_at_ms: u64,
-    /// Target thread. Stamped with the scheduling thread when the tool call
-    /// omits `agent_id`; `None` only for coucous scheduled outside any thread.
+    /// Target agent. Stamped with the scheduling agent when the tool call
+    /// omits `agent_id`; `None` only for coucous scheduled outside any agent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(rename = "thread_id")]
     pub agent_id: Option<String>,
@@ -263,8 +263,8 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    // Unscoped calls target the calling thread, so a background thread's
-    // reminder lands back in its own inbox, not whichever thread is focused.
+    // Unscoped calls target the calling agent, so a background agent's
+    // reminder lands back in its own inbox, not whichever agent is focused.
     let agent_id = tool
         .input
         .get("thread_id")

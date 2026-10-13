@@ -1,8 +1,8 @@
 //! Live thread-archived emission for the main event loop.
 //!
 //! The `emit_agent_archived` function is a main-loop **observe-on-change
-//! chokepoint**: it diffs each thread's live `archived` flag against the
-//! per-thread snapshot held in [`BridgeState::agent_archived_memo`] and
+//! chokepoint**: it diffs each agent's live `archived` flag against the
+//! per-agent snapshot held in [`BridgeState::agent_archived_memo`] and
 //! emits a durable [`AgentArchived`] / [`AgentRestored`] delta only on an
 //! actual change — capturing mutations from *every* source (web command, TUI
 //! action, the `Send` tool's auto-unarchive) with one uniform path.
@@ -15,7 +15,7 @@ use cp_wire::types::oplog::OpEntryKind;
 use super::bridge::{bridge_active, emit_roster_delta};
 use crate::app::App;
 
-/// Replay the agent's oplog to recover the **last per-thread archived flag
+/// Replay the agent's oplog to recover the **last per-agent archived flag
 /// the log recorded** — i.e. exactly what the backend's view has folded.
 ///
 /// This is the correct seed for the archived chokepoint on the first pass
@@ -25,14 +25,14 @@ use crate::app::App;
 /// first pass — self-healing disk↔oplog divergence.
 ///
 /// Returns an empty map when the bridge is OFF or replay fails (degraded:
-/// every live thread looks "new" and has its current archived flag emitted).
+/// every live agent looks "new" and has its current archived flag emitted).
 fn oplog_roster_archived(state: &State) -> std::collections::HashMap<String, bool> {
     super::oplog_roster(state).map(|r| r.iter().map(|t| (t.agent_id.clone(), t.archived)).collect()).unwrap_or_default()
 }
 
-/// Emit [`AgentArchived`] / [`AgentRestored`] the instant any thread's
+/// Emit [`AgentArchived`] / [`AgentRestored`] the instant any agent's
 /// archived flag flips, so the backend view (and the web roster) hide or
-/// reveal the thread in milliseconds.
+/// reveal the agent in milliseconds.
 ///
 /// Mirrors [`emit_agent_status`](super::bridge::emit_agent_status) exactly:
 /// seeds from the oplog roster on the first pass (what the view has folded),
@@ -82,7 +82,7 @@ fn seed_archived_memo_if_needed(app: &mut App) {
 }
 
 /// Diff live archived flags against the memo; collect (`agent_id`, archived) for
-/// each thread whose flag changed.
+/// each agent whose flag changed.
 fn collect_archived_changes(app: &App) -> Vec<(String, bool)> {
     let ts = AgentsState::get(&app.state);
     let memo = &app.state.ext::<BridgeState>().agent_archived_memo;

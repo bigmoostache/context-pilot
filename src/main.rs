@@ -421,8 +421,8 @@ fn main() -> ExitCode {
     let _r_paste_on = io::stdout().execute(EnableBracketedPaste);
     // Capture mouse so the wheel arrives as distinct `Event::Mouse(ScrollUp/Down)`
     // rather than being folded into Up/Down arrow keys by the terminal's
-    // alternate-scroll mode — lets the threads list keep arrows for selection
-    // while the wheel scrolls the selected thread's conversation history.
+    // alternate-scroll mode — lets the agents list keep arrows for selection
+    // while the wheel scrolls the selected agent's conversation history.
     // Button tracking (1000) + SGR encoding (1006) only — NOT crossterm's
     // EnableMouseCapture, which also turns on any-motion tracking (1003) and
     // floods the loop with an event per mouse move. The wheel still arrives
@@ -432,7 +432,7 @@ fn main() -> ExitCode {
     // alone does not reset it, and some terminals keep translating the wheel
     // into Up/Down arrow keys even with tracking on — which leaked through as
     // thread-list selection ("wheel-down at the bottom sometimes selects a
-    // thread"). With 1007 off, the wheel is ALWAYS an SGR mouse event, never an
+    // agent"). With 1007 off, the wheel is ALWAYS an SGR mouse event, never an
     // arrow key, so selection stays exclusively on the real arrow keys.
     let _r_altscroll_off = io::stdout().write_all(b"\x1b[?1007l");
     let _r_altscroll_flush = io::stdout().flush();

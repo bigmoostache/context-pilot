@@ -16,7 +16,7 @@ mod tools;
 pub mod types;
 /// Background git-status worker (keeps `git` off the main loop).
 pub mod worker;
-/// `Worktree` tool: per-thread git worktree enter/leave/list/remove.
+/// `Worktree` tool: per-agent git worktree enter/leave/list/remove.
 pub mod worktree;
 
 use types::{GitChangeType, GitFileChange, GitState};
@@ -82,7 +82,7 @@ fn append_untracked_files(dir: &std::path::Path, changes: &mut Vec<GitFileChange
 
 /// Compute a full git snapshot (repo flag, branch, file changes) by shelling
 /// out to `git`. PURE — reads no `State`, so it is safe to run on a background
-/// thread (see [`worker`]).
+/// agent (see [`worker`]).
 ///
 /// Call budget vs the old path: `diff --numstat` against the base already
 /// reports staged changes merged with the working tree, so the separate
@@ -125,7 +125,7 @@ pub fn compute_git_snapshot(dir: &std::path::Path, diff_base: Option<&str>) -> G
 /// Both steps are O(µs).
 pub fn refresh_git_status(state: &mut State) {
     let dir = state.workdir();
-    // Leave another thread's snapshot in the slot for that thread to apply.
+    // Leave another agent's snapshot in the slot for that agent to apply.
     if let Some(snapshot) = worker::take_latest_for(&dir) {
         let gs = GitState::get_mut(state);
         gs.is_repo = snapshot.is_repo;
@@ -333,10 +333,10 @@ impl Module for GitModule {
     }
     /// Fleet-shared (thread-centric model): `GitState` is project-level data
     /// (branch, repo status, diff stats, diff base) — identical across every
-    /// thread of a project, not per-thread view state. The git *result panels*
-    /// are per-thread (they live in `state.context`, carried by the
-    /// thread's runtime); the underlying repo data stays shared so it is
-    /// computed once, not duplicated per thread. Inert at N=1.
+    /// agent of a project, not per-agent view state. The git *result panels*
+    /// are per-agent (they live in `state.context`, carried by the
+    /// agent's runtime); the underlying repo data stays shared so it is
+    /// computed once, not duplicated per agent. Inert at N=1.
     fn is_global(&self) -> bool {
         true
     }

@@ -1,11 +1,11 @@
-//! Per-thread runtime bundle — the mutable context a single thread owns.
+//! Per-thread runtime bundle — the mutable context a single agent owns.
 //!
-//! [`AgentRuntime`] holds everything that belongs to one thread: conversation,
+//! [`AgentRuntime`] holds everything that belongs to one agent: conversation,
 //! panels, editor/view state, stream phase, token+cost telemetry, the
-//! cache/freeze engine snapshots and per-thread module data. Every thread's
-//! runtime lives permanently in [`AgentStore`](super::threads::AgentStore),
-//! keyed by thread id; code reaches the executing one through
-//! [`State::thread`](super::State::thread) / [`State::agent_mut`](super::State::agent_mut).
+//! cache/freeze engine snapshots and per-agent module data. Every agent's
+//! runtime lives permanently in [`AgentStore`](super::agents::AgentStore),
+//! keyed by agent id; code reaches the executing one through
+//! [`State::agent`](super::State::agent) / [`State::agent_mut`](super::State::agent_mut).
 //! Fleet-shared data (tools, modules, theme, provider/model, shared module
 //! data, `global_next_uid`, reveries) stays on [`State`](super::State).
 
@@ -20,9 +20,9 @@ use crate::state::flags::{StreamState, StreamingTool};
 use crate::state::runtime::textarea::TextArea;
 use crate::ui::render_cache::{FullCache, InputCache, MessageCache};
 
-/// The complete mutable context owned by one thread.
+/// The complete mutable context owned by one agent.
 ///
-/// Stored per thread in [`AgentStore`](super::threads::AgentStore); see the
+/// Stored per agent in [`AgentStore`](super::agents::AgentStore); see the
 /// module docs.
 pub struct AgentRuntime {
     // === Conversation + panels ===
@@ -48,7 +48,7 @@ pub struct AgentRuntime {
     pub max_scroll: f32,
 
     // === Stream lifecycle ===
-    /// Current [`StreamState`] (phase + scroll tracking) for this thread.
+    /// Current [`StreamState`] (phase + scroll tracking) for this agent.
     pub stream: StreamState,
     /// Tool call currently being streamed (advisory, for UI rendering).
     pub streaming_tool: Option<StreamingTool>,
@@ -56,7 +56,7 @@ pub struct AgentRuntime {
     pub last_stop_reason: Option<String>,
     /// Estimated tokens added during the current streaming session.
     pub streaming_estimated_tokens: usize,
-    /// Whether this thread is waiting for file panels before continuing its stream.
+    /// Whether this agent is waiting for file panels before continuing its stream.
     pub waiting_for_panels: bool,
 
     // === Per-conversation message-ID counters ===
@@ -69,7 +69,7 @@ pub struct AgentRuntime {
     /// Next result message ID (R1, R2, …).
     pub next_result_id: usize,
 
-    // === Token accumulators (per-thread budget) ===
+    // === Token accumulators (per-agent budget) ===
     /// Accumulated `prompt_cache_hit_tokens` across API calls.
     pub cache_hit_tokens: usize,
     /// Accumulated `prompt_cache_miss_tokens` across API calls.
@@ -123,7 +123,7 @@ pub struct AgentRuntime {
     /// Sleep timer: the tool pipeline waits until this ms timestamp.
     pub tool_sleep_until_ms: u64,
 
-    // === Cache / freeze engine state (duplicated verbatim per thread) ===
+    // === Cache / freeze engine state (duplicated verbatim per agent) ===
     /// Previous panel hash list for cache cost tracking.
     pub previous_panel_hash_list: Vec<String>,
     /// Saved panel ID order from the last emitted tick (freeze stability).
@@ -156,13 +156,13 @@ pub struct AgentRuntime {
     pub full_content_cache: Option<FullCache>,
 
     // === Working directory ===
-    /// Git worktree this thread works in (set by the `Worktree` tool).
+    /// Git worktree this agent works in (set by the `Worktree` tool).
     /// `None` = the project root. Read through [`State::workdir`](super::State::workdir),
-    /// never the process cwd: concurrent threads share one process.
+    /// never the process cwd: concurrent agents share one process.
     pub workdir: Option<std::path::PathBuf>,
 
     // === Per-thread module data ===
-    /// This thread's per-thread module `TypeMap` (spine inbox, queue,
+    /// This agent's per-agent module `TypeMap` (spine inbox, queue,
     /// console ownership, watcher registry, search/git views, …).
     pub agent_module_data: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
 }

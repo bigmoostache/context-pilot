@@ -2,7 +2,7 @@
 //! observe-on-change live-emission chokepoints.
 //!
 //! Each live emitter (messages, statuses, focus, archived, paused, behaviour,
-//! tasks, notes) seeds its per-thread diff memo on the first
+//! tasks, notes) seeds its per-agent diff memo on the first
 //! post-boot pass
 //! *without* emitting, so a (re)started agent does not replay its whole backlog
 //! onto the oplog. This bitfield records which of those first-pass seeds have

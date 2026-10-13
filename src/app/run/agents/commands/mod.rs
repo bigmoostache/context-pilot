@@ -88,20 +88,20 @@ pub(super) fn apply_command(app: &mut App, cmd: Command) {
 
 // ── SendMessage (K7) ────────────────────────────────────────────────────
 
-/// Inject a user message into the given thread, flipping it to `MyTurn`.
+/// Inject a user message into the given agent, flipping it to `MyTurn`.
 ///
 /// This is the **K7 path**: commands enter the agent through the same
-/// mechanism as local user input — a `AgentMessage(User)` on the thread and a
-/// `MyTurn` status flip (the per-thread dispatcher then nudges it into its own
+/// mechanism as local user input — a `AgentMessage(User)` on the agent and a
+/// `MyTurn` status flip (the per-agent dispatcher then nudges it into its own
 /// spine inbox once it is schedulable).
 ///
-/// Returns `true` if the message was applied (thread existed). The per-thread
-/// lifecycle hook (`on_user_message`, which resets *that thread's* spine
+/// Returns `true` if the message was applied (agent existed). The per-agent
+/// lifecycle hook (`on_user_message`, which resets *that agent's* spine
 /// counters — D4/S7) is NOT fired here: it needs [`App::deliver_to_agent`] to
-/// target the owner thread's state rather than the executing thread's, so the caller
+/// target the owner agent's state rather than the executing agent's, so the caller
 /// (`apply_command`) routes it after this returns. Firing it here on `state`
-/// would reset the *executing* (focused) thread's counters for a message sent to
-/// a *background* thread.
+/// would reset the *executing* (focused) agent's counters for a message sent to
+/// a *background* agent.
 fn apply_send_message(state: &mut State, agent_id: &str, content: &str) -> bool {
     let agents_state = AgentsState::get_mut(state);
     let Some(agent) = agents_state.agents.iter_mut().find(|t| t.id == agent_id) else {
@@ -118,19 +118,19 @@ fn apply_send_message(state: &mut State, agent_id: &str, content: &str) -> bool 
 }
 
 /// Fire every module's `on_user_message` lifecycle hook against the owner
-/// thread's state — the per-thread counter reset (D4/S7) — then re-engage the
-/// thread if it was parked [`Errored`](cp_fleet::AgentExecState::Errored).
+/// agent's state — the per-agent counter reset (D4/S7) — then re-engage the
+/// agent if it was parked [`Errored`](cp_fleet::AgentExecState::Errored).
 ///
 /// Routed through [`App::deliver_to_agent`] so a message sent to a *background*
-/// thread resets *that* thread's spine counters (auto-continuation count,
+/// agent resets *that* agent's spine counters (auto-continuation count,
 /// autonomous-start clock, `user_stopped`, error backoff), never the focused
-/// executing's. At N=1 (or when the target IS the focused thread, or a
-/// just-created thread not yet in the registry) `deliver_to_agent` runs the
+/// executing's. At N=1 (or when the target IS the focused agent, or a
+/// just-created agent not yet in the registry) `deliver_to_agent` runs the
 /// hook directly on `state` — byte-identical to the former inline loop.
 ///
 /// After the reset, [`App::clear_errored_entry`] flips a stuck (`Errored`)
-/// thread back to `Runnable`: a fresh user message is the human-intervention
-/// recovery path for a thread the loop had given up on (F4). A no-op for the
+/// agent back to `Runnable`: a fresh user message is the human-intervention
+/// recovery path for an agent the loop had given up on (F4). A no-op for the
 /// executing / unknown threads, so N=1 is unaffected.
 fn route_on_user_message(app: &mut App, agent_id: &str) {
     app.deliver_to_agent(Some(agent_id), |state| {
@@ -143,7 +143,7 @@ fn route_on_user_message(app: &mut App, agent_id: &str) {
 
 // ── ArchiveAgent ───────────────────────────────────────────────────────
 
-/// Mark the thread as archived (soft-delete).
+/// Mark the agent as archived (soft-delete).
 fn apply_archive_agent(state: &mut State, agent_id: &str) {
     let ts = AgentsState::get_mut(state);
     let Some(agent) = ts.agents.iter_mut().find(|t| t.id == agent_id) else {
@@ -152,7 +152,7 @@ fn apply_archive_agent(state: &mut State, agent_id: &str) {
     };
     agent.archived = true;
 
-    // Clean up focus references (mirrors archive_confirm in threads.rs).
+    // Clean up focus references (mirrors archive_confirm in agents.rs).
     let focus = FocusState::get_mut(state);
     if focus.focused_agent_id.as_deref() == Some(agent_id) {
         focus.focused_agent_id = None;
@@ -173,7 +173,7 @@ fn apply_archive_agent(state: &mut State, agent_id: &str) {
 
 // ── RestoreAgent ───────────────────────────────────────────────────────
 
-/// Restore an archived thread (clear the soft-delete flag).
+/// Restore an archived agent (clear the soft-delete flag).
 fn apply_restore_agent(state: &mut State, agent_id: &str) {
     let ts = AgentsState::get_mut(state);
     if let Some(agent) = ts.agents.iter_mut().find(|t| t.id == agent_id) {
@@ -191,7 +191,7 @@ fn apply_restore_agent(state: &mut State, agent_id: &str) {
 
 // ── PauseAgent ─────────────────────────────────────────────────────────
 
-/// Pause a thread — suppress `MY_TURN` notifications without archiving.
+/// Pause an agent — suppress `MY_TURN` notifications without archiving.
 fn apply_pause_agent(state: &mut State, agent_id: &str) {
     let ts = AgentsState::get_mut(state);
     if let Some(agent) = ts.agents.iter_mut().find(|t| t.id == agent_id) {
@@ -209,7 +209,7 @@ fn apply_pause_agent(state: &mut State, agent_id: &str) {
 
 // ── ResumeAgent ────────────────────────────────────────────────────────
 
-/// Resume a paused thread — re-enable `MY_TURN` notifications.
+/// Resume a paused agent — re-enable `MY_TURN` notifications.
 fn apply_resume_agent(state: &mut State, agent_id: &str) {
     let ts = AgentsState::get_mut(state);
     if let Some(agent) = ts.agents.iter_mut().find(|t| t.id == agent_id) {
@@ -227,7 +227,7 @@ fn apply_resume_agent(state: &mut State, agent_id: &str) {
 
 // ── DeleteAgent ────────────────────────────────────────────────────────
 
-/// Permanently delete a thread and all its messages.
+/// Permanently delete an agent and all its messages.
 fn apply_delete_agent(state: &mut State, agent_id: &str) {
     let ts = AgentsState::get_mut(state);
     let existed = ts.agents.iter().any(|t| t.id == agent_id);
@@ -246,13 +246,13 @@ fn apply_delete_agent(state: &mut State, agent_id: &str) {
 
     emit_roster_delta(state, OpEntryKind::AgentDeleted { agent_id: agent_id.to_owned() });
 
-    // Thread-owned todos and scratchpad: hard-deleting a thread cascades removal
+    // Thread-owned todos and scratchpad: hard-deleting an agent cascades removal
     // of its tasks (FR13) and scratchpad cells (archive keeps both, only
     // hard-delete cascades).
     let _todos = cp_mod_todo::tools::purge_agent_todos(state, agent_id);
     let _cells = cp_mod_scratchpad::tools::purge_agent_cells(state, agent_id);
 
-    // Clean up all bridge memos for the deleted thread.
+    // Clean up all bridge memos for the deleted agent.
     if let Some(bs) = state.get_ext_mut::<BridgeState>() {
         let _status = bs.agent_statuses.remove(agent_id);
         let _archived = bs.agent_archived_memo.remove(agent_id);
@@ -268,8 +268,8 @@ fn apply_delete_agent(state: &mut State, agent_id: &str) {
 
 // ── DeleteMessage ───────────────────────────────────────────────────
 
-/// Delete a single message from a thread, identified by its epoch-ms
-/// timestamp (unique within a thread).
+/// Delete a single message from an agent, identified by its epoch-ms
+/// timestamp (unique within an agent).
 ///
 /// **Cascade rule:** when the deleted message is from the assistant,
 /// all *consecutive* `auto: true` messages immediately *preceding* it are

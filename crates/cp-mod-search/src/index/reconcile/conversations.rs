@@ -1,11 +1,11 @@
 //! Conversation (thread-message) ⇄ index reconciliation (T671).
 //!
-//! The thread-search palette hybrid-searches everything ever said in a thread,
-//! so every user/assistant thread message is mirrored as one Meilisearch
+//! The thread-search palette hybrid-searches everything ever said in an agent,
+//! so every user/assistant agent message is mirrored as one Meilisearch
 //! document in `cp_{hash}_conversations`. Unlike the file indexer (event-driven
-//! off an fs watcher), thread messages have no filesystem to watch — they live
+//! off an fs watcher), agent messages have no filesystem to watch — they live
 //! in the agent's in-memory `AgentsState`. So this runs as a periodic + boot
-//! **batch reconcile**: the caller snapshots the live threads into a
+//! **batch reconcile**: the caller snapshots the live agents into a
 //! [`ConversationDoc`] list, and this module diffs that desired set against
 //! what's already indexed, embedding only what changed and purging what's gone.
 //!
@@ -13,10 +13,10 @@
 //! - **Re-embed only changed messages.** Each doc carries a `content_hash`; a
 //!   doc whose hash still matches the index is left untouched (no Voyage call).
 //! - **Purge deprecated / deleted.** Any indexed id absent from the desired set
-//!   is deleted — this covers edited-away messages, regenerated threads, and
-//!   **deleted threads** (their messages simply stop appearing in the snapshot).
-//! - **No archived/deleted bookkeeping in Meili.** An *archived* thread is still
-//!   present in the snapshot, so its docs stay searchable; a *deleted* thread is
+//!   is deleted — this covers edited-away messages, regenerated agents, and
+//!   **deleted agents** (their messages simply stop appearing in the snapshot).
+//! - **No archived/deleted bookkeeping in Meili.** An *archived* agent is still
+//!   present in the snapshot, so its docs stay searchable; a *deleted* agent is
 //!   absent, so its docs are purged. Tool-trace (`auto`) and empty messages are
 //!   never handed to us by the builder, so they never enter the index.
 
@@ -25,21 +25,21 @@ use serde::Serialize;
 use crate::meili::api::MeiliClient;
 use crate::meili::tasks;
 
-/// One indexed thread message.
+/// One indexed agent message.
 ///
 /// The `id` is stable per `(agent, position)` so re-running the reconcile on an
-/// append-only thread upserts in place rather than duplicating. `content_hash`
-/// folds in everything the embedding template reads (author, thread name, text)
+/// append-only agent upserts in place rather than duplicating. `content_hash`
+/// folds in everything the embedding template reads (author, agent name, text)
 /// so a rename or edit flips the hash and triggers a re-embed, while an
 /// unchanged message hashes identically and is skipped.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub(crate) struct ConversationDoc {
     /// Meilisearch primary key — `"{agent_id}-{index}"`.
     pub id: String,
-    /// Owning thread id (filterable — lets a search scope to one thread).
+    /// Owning agent id (filterable — lets a search scope to one agent).
     #[serde(rename = "thread_id")]
     pub agent_id: String,
-    /// Owning thread's display name (searchable + embedded for context).
+    /// Owning agent's display name (searchable + embedded for context).
     #[serde(rename = "thread_name")]
     pub agent_name: String,
     /// `"user"` or `"assistant"` (filterable).
@@ -58,11 +58,11 @@ pub(crate) struct ConversationDoc {
 /// builder call-site readable and dodges `too_many_arguments`. All fields are
 /// borrowed — the builder owns copies only for the fields it stores.
 pub(crate) struct DocParts<'src> {
-    /// Owning thread id.
+    /// Owning agent id.
     pub agent_id: &'src str,
-    /// Message position in the thread (stable for append-only threads).
+    /// Message position in the agent (stable for append-only agents).
     pub index: usize,
-    /// Owning thread's display name.
+    /// Owning agent's display name.
     pub agent_name: &'src str,
     /// `"user"` or `"assistant"`.
     pub author: &'src str,
@@ -75,7 +75,7 @@ pub(crate) struct DocParts<'src> {
 impl ConversationDoc {
     /// Build a doc, computing its `content_hash` from the embedding-relevant
     /// fields. The id is `"{agent_id}-{index}"` where `index` is the message's
-    /// position in the thread (stable for append-only threads).
+    /// position in the agent (stable for append-only agents).
     pub(crate) fn from_parts(p: &DocParts<'_>) -> Self {
         // Everything the embedder template reads goes into the hash, so any
         // change that would alter the embedding (edit, rename, author) forces a
@@ -230,7 +230,7 @@ mod tests {
 
     #[test]
     fn plan_deletes_vanished_id() {
-        // Index holds a message the desired set no longer has (thread deleted
+        // Index holds a message the desired set no longer has (agent deleted
         // or message edited away).
         let existing = std::collections::HashMap::from([("T9-0".to_owned(), "h".to_owned())]);
         let p = plan(&existing, &[]);

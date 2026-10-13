@@ -1,4 +1,4 @@
-//! Incoming-message behavior for the **focused** thread.
+//! Incoming-message behavior for the **focused** agent.
 //!
 //! Two entry points, both driven once per main-loop tick by the binary's
 //! `handle_incoming_focused_messages` hook (which owns the `&mut State` the
@@ -24,15 +24,15 @@ use crate::tools::rebuild_agents_panel;
 use crate::types::{AgentStatus, AgentsState, FocusState};
 
 /// Branch A of the incoming-message behavior — **idle auto-read** of the focused
-/// thread.
+/// agent.
 ///
 /// When the agent is idle (the caller guarantees "not streaming") and the
-/// focused thread is `MY_TURN` with at least one *unacknowledged* (unseen)
-/// message, this acknowledges every message in that thread and force-refreshes
-/// the Threads panel — the panel's frozen snapshot is rebuilt so the new
+/// focused agent is `MY_TURN` with at least one *unacknowledged* (unseen)
+/// message, this acknowledges every message in that agent and force-refreshes
+/// the Agents panel — the panel's frozen snapshot is rebuilt so the new
 /// content is in the agent's context on the very next stream, with **no** extra
 /// `Read` round-trip. Returns `Some((tid, agent_name))` so the caller can raise
-/// a spine continuation nudge bound to that thread; returns `None` (and mutates
+/// a spine continuation nudge bound to that agent; returns `None` (and mutates
 /// nothing) when there is no unseen incoming message to pull in.
 ///
 /// The "panel not reached / not seen" proxy is the message-level
@@ -67,7 +67,7 @@ pub fn take_idle_autoread(state: &mut State) -> Option<StreamingPush> {
             messages.push(text);
         }
     }
-    // ... and force the Threads panel to re-emit fresh this tick.
+    // ... and force the Agents panel to re-emit fresh this tick.
     let now_ms = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis().to_u64());
     rebuild_agents_panel(state, &tid, now_ms);
 
@@ -77,7 +77,7 @@ pub fn take_idle_autoread(state: &mut State) -> Option<StreamingPush> {
 /// Branch B of the incoming-message behavior — **inline push** while streaming.
 ///
 /// The caller guarantees the agent is mid-stream (guard b). For the focused
-/// thread, this marks every message that is still *unacknowledged* (guard c —
+/// agent, this marks every message that is still *unacknowledged* (guard c —
 /// not yet seen) **and** not yet pushed (guard a —
 /// [`has_been_pushed`](crate::types::AgentMessage::has_been_pushed) `== false`)
 /// as pushed, and returns `Some((tid, agent_name, count))` so the caller can
@@ -125,9 +125,9 @@ pub const PUSH_INLINE_MAX_BYTES: usize = 4000;
 /// notification.
 #[derive(Debug)]
 pub struct StreamingPush {
-    /// Focused thread id the messages arrived on.
+    /// Focused agent id the messages arrived on.
     pub tid: String,
-    /// That thread's display name.
+    /// That agent's display name.
     pub name: String,
     /// Inlined text of each newly pushed message, in arrival order.
     pub messages: Vec<String>,

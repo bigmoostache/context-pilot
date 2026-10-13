@@ -10,15 +10,15 @@ use crate::app::context::{build_stream_params, get_active_system_content, prepar
 use crate::state::cache::{CacheUpdate, process_cache_request};
 use crate::state::{State, StreamPhase, get_context_type_meta};
 
-/// Drain the executing thread's stream channel and apply each event (chunks,
+/// Drain the executing agent's stream channel and apply each event (chunks,
 /// tools, done, errors).
 ///
-/// Only the **executing** thread's channel is drained
+/// Only the **executing** agent's channel is drained
 /// ([`executing_key`](crate::app::App::executing_key)):
-/// the focused thread in the main phase, or a background thread during its
-/// advancement step. Draining any other thread's channel here would apply its
-/// events to the executing thread's runtime (cross-thread contamination); each
-/// thread's channel is drained while it executes.
+/// the focused agent in the main phase, or a background agent during its
+/// advancement step. Draining any other agent's channel here would apply its
+/// events to the executing agent's runtime (cross-thread contamination); each
+/// agent's channel is drained while it executes.
 pub(super) fn process_stream_events(app: &mut App) {
     let _guard = crate::profile!("app::stream_events");
     let _fg = cp_base::flame!("stream");
@@ -207,7 +207,7 @@ pub(super) fn continue_streaming(app: &mut App) {
 }
 
 /// Build the full prompt (context, system prompt, params) and spawn the stream
-/// thread. Each phase gets its own perf row, so the per-turn request-building
+/// agent. Each phase gets its own perf row, so the per-turn request-building
 /// cost stays visible wherever a stream starts (tool cycle or spine).
 pub(in crate::app::run) fn spawn_stream_with_context(app: &mut App, include_last_message: bool) {
     let ctx = {

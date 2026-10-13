@@ -1,4 +1,4 @@
-//! Thread action handlers — dispatches `Agent*` action variants.
+//! Agent action handlers — dispatches `Agent*` action variants.
 //!
 //! Extracted from `mod.rs` to keep the central dispatch under the 500-line limit.
 
@@ -8,8 +8,8 @@ use crate::state::State;
 
 use super::{Action, ActionResult};
 
-/// True while the human types a new thread's name: Threads view, active list,
-/// not drilled in, selection on the virtual "+ New Thread" row.
+/// True while the human types a new agent's name: Agents view, active list,
+/// not drilled in, selection on the virtual "+ New Agent" row.
 pub(crate) fn editing_new_agent_title(state: &State) -> bool {
     if state.view_mode != cp_base::state::data::config::ViewMode::Agents {
         return false;
@@ -22,7 +22,7 @@ pub(crate) fn editing_new_agent_title(state: &State) -> bool {
 }
 
 /// The textarea keystrokes currently edit: the new-thread title on that row,
-/// otherwise the executing thread's composer.
+/// otherwise the executing agent's composer.
 pub(crate) fn active_textarea(state: &State) -> &cp_base::state::runtime::textarea::TextArea {
     if editing_new_agent_title(state) { &FocusState::get(state).new_agent_title } else { &state.agent().composer }
 }
@@ -141,22 +141,22 @@ fn dispatch_archive(state: &mut State, action: &Action) -> ActionResult {
     ActionResult::Nothing
 }
 
-/// User-focus the thread the list cursor now sits on, so the footer (built from
-/// the executing thread) tracks the selection as the human arrows up/down —
+/// User-focus the agent the list cursor now sits on, so the footer (built from
+/// the executing agent) tracks the selection as the human arrows up/down —
 /// without entering the panel-centric view (that is [`drill_in`]'s job on
 /// Right). This sets only [`FocusState::focused_agent_id`]; the loop's
-/// `follow_focus` makes that thread executing on the next
+/// `follow_focus` makes that agent executing on the next
 /// tick (an id change), and the status bar then reflects its state.
 ///
 /// This is TUI user-focus, not worker/exec focus — the background scheduler is
-/// unaffected. No-op on the virtual "+ New Thread" entry or an empty selection
-/// (the cursor position does not resolve to a real thread), leaving focus as-is.
+/// unaffected. No-op on the virtual "+ New Agent" entry or an empty selection
+/// (the cursor position does not resolve to a real agent), leaving focus as-is.
 fn focus_selected_agent(state: &mut State) {
     let focus = FocusState::get(state);
     let (viewing_archived, pos) = (focus.viewing_archived, focus.selected_agent_idx);
     let visible = AgentsState::get(state).visible_indices(viewing_archived);
     let Some(&real_idx) = visible.get(pos) else {
-        return; // virtual "+ New Thread" or empty selection — keep current focus
+        return; // virtual "+ New Agent" or empty selection — keep current focus
     };
     let Some(id) = AgentsState::get(state).agents.get(real_idx).map(|t| t.id.clone()) else {
         return;
@@ -164,11 +164,11 @@ fn focus_selected_agent(state: &mut State) {
     FocusState::get_mut(state).focused_agent_id = Some(id);
 }
 
-/// Navigate to the next thread (or wrap to first).
+/// Navigate to the next agent (or wrap to first).
 fn select_next(state: &mut State) -> ActionResult {
     let viewing_archived = FocusState::get(state).viewing_archived;
     let visible_count = AgentsState::get(state).visible_indices(viewing_archived).len();
-    // Active view has a trailing virtual "+ New Thread" entry; archived view does not.
+    // Active view has a trailing virtual "+ New Agent" entry; archived view does not.
     let total = if viewing_archived { visible_count } else { visible_count.saturating_add(1) };
     let focus = FocusState::get_mut(state);
     focus.selected_agent_idx = if focus.selected_agent_idx >= total.saturating_sub(1) {
@@ -183,7 +183,7 @@ fn select_next(state: &mut State) -> ActionResult {
     ActionResult::Nothing
 }
 
-/// Navigate to the previous thread (or wrap to last).
+/// Navigate to the previous agent (or wrap to last).
 fn select_prev(state: &mut State) -> ActionResult {
     let viewing_archived = FocusState::get(state).viewing_archived;
     let visible_count = AgentsState::get(state).visible_indices(viewing_archived).len();
@@ -201,7 +201,7 @@ fn select_prev(state: &mut State) -> ActionResult {
     ActionResult::Nothing
 }
 
-/// Enter thread creation mode — switches input to naming.
+/// Enter agent creation mode — switches input to naming.
 fn create_start(state: &mut State) -> ActionResult {
     let focus = FocusState::get_mut(state);
     focus.creating_agent = true;
@@ -210,7 +210,7 @@ fn create_start(state: &mut State) -> ActionResult {
     ActionResult::Nothing
 }
 
-/// Cancel thread creation without creating.
+/// Cancel agent creation without creating.
 fn create_cancel(state: &mut State) -> ActionResult {
     let focus = FocusState::get_mut(state);
     focus.creating_agent = false;
@@ -219,29 +219,29 @@ fn create_cancel(state: &mut State) -> ActionResult {
     ActionResult::Nothing
 }
 
-/// Open the selected thread's full panel view (Right arrow from the thread
-/// list) by **switching the focused thread** and leaving the list for the
+/// Open the selected agent's full panel view (Right arrow from the agent
+/// list) by **switching the focused agent** and leaving the list for the
 /// normal panel-centric view.
 ///
 /// This is a real focus switch, not a read-only glance: it sets
-/// [`FocusState::focused_agent_id`] to the selected thread and flips
+/// [`FocusState::focused_agent_id`] to the selected agent and flips
 /// [`view_mode`](cp_base::state::runtime::State::view_mode) to
 /// [`Normal`](cp_base::state::data::config::ViewMode::Normal). The loop's
-/// `follow_focus` then makes that thread executing on the
+/// `follow_focus` then makes that agent executing on the
 /// next tick, so the ordinary Normal render path paints *its* panels /
-/// conversation — the same TUI as before, just for a different focused thread
-/// (the previously-focused thread keeps running as a background thread).
-/// `Left` on an empty composer cycles back to the thread list.
+/// conversation — the same TUI as before, just for a different focused agent
+/// (the previously-focused agent keeps running as a background agent).
+/// `Left` on an empty composer cycles back to the agent list.
 ///
-/// No-op on the virtual "+ New Thread" entry or an empty selection (the
-/// position does not map to a real thread).
+/// No-op on the virtual "+ New Agent" entry or an empty selection (the
+/// position does not map to a real agent).
 fn drill_in(state: &mut State) -> ActionResult {
     let focus = FocusState::get(state);
     let viewing_archived = focus.viewing_archived;
     let pos = focus.selected_agent_idx;
     let visible = AgentsState::get(state).visible_indices(viewing_archived);
     let Some(&real_idx) = visible.get(pos) else {
-        return ActionResult::Nothing; // virtual "+ New Thread" or empty selection
+        return ActionResult::Nothing; // virtual "+ New Agent" or empty selection
     };
     let Some(id) = AgentsState::get(state).agents.get(real_idx).map(|t| t.id.clone()) else {
         return ActionResult::Nothing;
@@ -252,18 +252,18 @@ fn drill_in(state: &mut State) -> ActionResult {
     focus_mut.drilled_agent_id = None;
     state.view_mode = cp_base::state::data::config::ViewMode::Normal;
     // Land on the Conversation panel so the composer is immediately typable —
-    // without this the newly-focused thread keeps its own stale
+    // without this the newly-focused agent keeps its own stale
     // `selected_context` (e.g. a File/Todo panel), and Char keys route to that
     // panel and silently no-op ("can't type" bug). Conversation is index 0.
     state.agent_mut().selected_context = 0;
     state.agent_mut().scroll_offset = 0.0;
     state.agent_mut().stream.user_scrolled = false;
     state.flags.ui.dirty = true;
-    // Persist the focus switch (focused thread is keyed into its own state file).
+    // Persist the focus switch (focused agent is keyed into its own state file).
     ActionResult::Save
 }
 
-/// Exit the drilled panel view back to the thread list (G3 — Left/Esc).
+/// Exit the drilled panel view back to the agent list (G3 — Left/Esc).
 fn drill_out(state: &mut State) -> ActionResult {
     FocusState::get_mut(state).drilled_agent_id = None;
     state.agent_mut().scroll_offset = 0.0;
@@ -272,10 +272,10 @@ fn drill_out(state: &mut State) -> ActionResult {
     ActionResult::Nothing
 }
 
-/// Start thread archive — show confirmation prompt.
+/// Start agent archive — show confirmation prompt.
 ///
 /// Guards on the *visible* list for the current view (active or archived),
-/// so the prompt only appears when there is actually a thread to act on.
+/// so the prompt only appears when there is actually an agent to act on.
 fn archive_start(state: &mut State) -> ActionResult {
     let viewing_archived = FocusState::get(state).viewing_archived;
     let has_visible = !AgentsState::get(state).visible_indices(viewing_archived).is_empty();
@@ -288,7 +288,7 @@ fn archive_start(state: &mut State) -> ActionResult {
     ActionResult::Nothing
 }
 
-/// Toggle between the active and archived thread lists (Ctrl+U).
+/// Toggle between the active and archived agent lists (Ctrl+U).
 ///
 /// Resets the selection to the top of the newly-shown list and clears any
 /// pending archive confirmation, so the two views never share stale state.
@@ -303,16 +303,16 @@ fn toggle_archived_view(state: &mut State) -> ActionResult {
     ActionResult::Nothing
 }
 
-/// Confirm thread archive (active view) or restore (archived view).
+/// Confirm agent archive (active view) or restore (archived view).
 ///
 /// `selected_agent_idx` is a position into the *visible* slice
-/// ([`AgentsState::visible_indices`]) — the active threads in the normal
+/// ([`AgentsState::visible_indices`]) — the active agents in the normal
 /// view, the archived ones in the archived view. We resolve it to a real
 /// storage index, then **soft-delete** (set `archived = true`) or **restore**
-/// (`archived = false`) instead of removing the thread, so it is retained in
+/// (`archived = false`) instead of removing the agent, so it is retained in
 /// state and the web frontend can still display it.
 ///
-/// Cleans up all `FocusState` references to a thread being archived:
+/// Cleans up all `FocusState` references to an agent being archived:
 /// focused ID, last-read count, `MY_TURN` notification debounce.
 fn archive_confirm(state: &mut State) -> ActionResult {
     let focus = FocusState::get(state);
@@ -343,7 +343,7 @@ fn archive_confirm(state: &mut State) -> ActionResult {
         focus_after.selected_agent_idx = new_visible_len.saturating_sub(1);
     }
 
-    // Clean up focus references to a thread leaving the active list (archive only).
+    // Clean up focus references to an agent leaving the active list (archive only).
     if !viewing_archived && let Some(aid) = toggled_id {
         if focus_after.focused_agent_id.as_deref() == Some(&aid) {
             focus_after.focused_agent_id = None;
@@ -358,7 +358,7 @@ fn archive_confirm(state: &mut State) -> ActionResult {
     ActionResult::Save
 }
 
-/// Cancel thread archive — dismiss confirmation.
+/// Cancel agent archive — dismiss confirmation.
 fn archive_cancel(state: &mut State) -> ActionResult {
     FocusState::get_mut(state).confirming_archive = false;
     state.flags.ui.dirty = true;

@@ -18,9 +18,9 @@ use crate::app::App;
 
 /// Spinner-animation redraw cadence (extracted for the 500-line cap).
 mod animation;
-/// Fleet-shared coucou delivery (once per tick) + legacy per-thread migration.
+/// Fleet-shared coucou delivery (once per tick) + legacy per-agent migration.
 mod coucous;
-/// Background-thread advancement: execute each non-focused active thread for
+/// Background-thread advancement: execute each non-focused active agent for
 /// one step of the shared pipeline (Phase C). No-op at N=1.
 mod fleet;
 /// Fleet lifecycle I/O (Phase F): console orphan-prune, N-thread save, hard-delete
@@ -29,10 +29,10 @@ mod fleet_lifecycle;
 /// The `loop.input` phase: event poll/read/route, every step profile-guarded.
 mod input_phase;
 
-/// Spine step body (spine check + background threads), with per-call timers.
+/// Spine step body (spine check + background agents), with per-call timers.
 mod spine_phase;
 /// Per-thread stream runtime (typewriter/pending-tools/pending-done/…), stored
-/// in each thread's module data so one thread's in-flight stream never bleeds
+/// in each agent's module data so one agent's in-flight stream never bleeds
 /// into another's.
 pub(crate) mod stream_runtime;
 use cp_mod_spine::engine::{SpineDecision, apply_continuation, check_spine};
@@ -69,19 +69,19 @@ impl App {
         // Claim ownership immediately
         save_state(&self.state);
 
-        // Boot-load every background thread's persisted per-thread context into
+        // Boot-load every background agent's persisted per-agent context into
         // the fleet registry before the loop starts reconciling (F1 boot half).
-        // No-op at N=1 (no per-thread files) — byte-identical boot.
+        // No-op at N=1 (no per-agent files) — byte-identical boot.
         self.load_background_agents();
 
-        // Kill console sessions on the server that belong to no loaded thread —
-        // ONCE over the union of every thread's session keys (the per-thread
+        // Kill console sessions on the server that belong to no loaded agent —
+        // ONCE over the union of every agent's session keys (the per-agent
         // kill was removed from the console module: it would cross-kill other
-        // threads' live sessions, F6/S2). N=1-identical: union = focused keys.
+        // agents' live sessions, F6/S2). N=1-identical: union = focused keys.
         self.prune_orphaned_console_sessions();
 
-        // Coucous moved from per-thread watcher registries to one fleet-shared
-        // registry: fold any legacy per-thread records in, once.
+        // Coucous moved from per-agent watcher registries to one fleet-shared
+        // registry: fold any legacy per-agent records in, once.
         self.migrate_legacy_coucous();
 
         // Start the interactive main-loop watchdog (purely observational — dumps
@@ -100,7 +100,7 @@ impl App {
             let _fg = cp_base::flame!("loop");
 
             // Main-loop heartbeat: a fresh tick every iteration. The watchdog
-            // thread declares a wedge if this stops advancing (the loop ticks at
+            // agent declares a wedge if this stops advancing (the loop ticks at
             // least every ~50 ms even while idle, so staleness is unambiguous).
             super::tools::watchdog::beat();
             super::tools::watchdog::mark(super::tools::watchdog::Step::Input);
@@ -211,7 +211,7 @@ impl App {
         current_ms: u64,
     ) -> io::Result<()> {
         // G3 render-scoped drill-in: if the human has drilled into another
-        // thread, make it the executing one just for this paint, then restore.
+        // agent, make it the executing one just for this paint, then restore.
         // Focus and scheduling are untouched (Model 2).
         let drilled = {
             let _guard = crate::profile!("drill_in");
@@ -270,17 +270,17 @@ impl App {
         }
     }
 
-    /// Run all background processing for one tick: bridge, threads, stream,
+    /// Run all background processing for one tick: bridge, agents, stream,
     /// cache, watchers, tools, spine, reverie. Linear pipeline, no branching.
     fn run_background_phase(&mut self, ch: &EventChannels<'_>, current_ms: u64) {
         super::tools::watchdog::mark(super::tools::watchdog::Step::Bridge);
         super::agents::poll_bridge_commands(self);
         super::tools::watchdog::mark(super::tools::watchdog::Step::AgentsEmit);
         super::agents::emit_bridge_deltas(self);
-        // Make the focused thread the executing one: if focus changed since
+        // Make the focused agent the executing one: if focus changed since
         // last tick (agent `Read`, human drill-in), register the old one for
         // background stepping and execute the new one, so the focused pipeline
-        // below operates on the correct thread and its stream frames are tagged
+        // below operates on the correct agent and its stream frames are tagged
         // with its id. No-op when focus is unchanged.
         {
             let _guard = crate::profile!("follow_focus");
@@ -300,8 +300,8 @@ impl App {
         super::tools::checks::check_deferred_sleep(self);
         // Check watchers (blocking sentinel replacement + async → spine notifications)
         super::tools::cleanup::check_watchers(self);
-        // Fleet-shared coucous: polled once per tick for every thread, with the
-        // focused thread executing (background steps never see them).
+        // Fleet-shared coucous: polled once per tick for every agent, with the
+        // focused agent executing (background steps never see them).
         self.check_coucous();
         self.recover_bridge_if_pending(current_ms);
         self.drain_chat_sync_if_due(current_ms);
@@ -315,7 +315,7 @@ impl App {
         // inline streaming push.
         let was_streaming = self.state.agent().stream.phase.is_streaming();
         super::streaming::finalize_stream(self);
-        // Incoming-message behavior on the focused thread: inline push while
+        // Incoming-message behavior on the focused agent: inline push while
         // streaming, idle auto-read otherwise. Runs before the spine check so an
         // idle auto-read's continuation nudge is picked up this same tick.
         super::agents::handle_incoming_focused_messages(self, was_streaming);

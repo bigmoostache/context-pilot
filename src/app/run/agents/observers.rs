@@ -20,10 +20,10 @@ use crate::app::App;
 
 use super::bridge::{bridge_active, emit_best_effort};
 
-// ── Thread focus emission (focused-thread highlight — design doc I8) ──────
+// ── Agent focus emission (focused-thread highlight — design doc I8) ──────
 
 /// Emit a [`AgentFocusChanged`](OpEntryKind::AgentFocusChanged) the instant
-/// the agent's focused thread changes, so the backend view (and the web UI's
+/// the agent's focused agent changes, so the backend view (and the web UI's
 /// focused-thread highlight) reflect it in milliseconds instead of waiting on
 /// the debounced tier-② disk write plus the frontend's backstop poll.
 ///

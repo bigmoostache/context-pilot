@@ -142,9 +142,9 @@ impl Module for GithubModule {
 
     /// Fleet-shared (thread-centric model): `GithubState` holds the GitHub token
     /// (read once at boot from the vault) and the current branch's PR info — both
-    /// fleet/project-level, not per-thread. If it were per-thread data, only
-    /// the executing thread at boot would receive the token and other threads
-    /// would see `None`. The github *result panels* are per-thread (in
+    /// fleet/project-level, not per-agent. If it were per-agent data, only
+    /// the executing agent at boot would receive the token and other agents
+    /// would see `None`. The github *result panels* are per-agent (in
     /// `state.context`); the token/PR data stays shared. Inert at N=1.
     fn is_global(&self) -> bool {
         true

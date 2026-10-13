@@ -336,7 +336,7 @@ pub(crate) fn execute_edit_filter(tool: &ToolUse, state: &mut State) -> ToolResu
 
 /// List directory entries (files + folders) matching a prefix, respecting the gitignore filter.
 ///
-/// `root` is the executing thread's workdir; `dir_prefix` is relative to it.
+/// `root` is the executing agent's workdir; `dir_prefix` is relative to it.
 /// Returns entries sorted: directories first, then alphabetically (case-insensitive).
 /// Used by the `@` autocomplete popup.
 #[must_use]

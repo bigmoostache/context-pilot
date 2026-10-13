@@ -164,12 +164,12 @@ mod tests {
 
     // ── replay rebuilds ground truth ──────────────────────────────────────────
 
-    /// Ground truth tracked alongside the writes: the last head byte per thread
+    /// Ground truth tracked alongside the writes: the last head byte per agent
     /// and the set of committed dedup tokens.
     type GroundTruth = (BTreeMap<String, u8>, BTreeSet<String>);
 
-    /// Seed a rolled log with three interleaved threads plus periodic command
-    /// effects, returning the ground truth to check replay against. The thread
+    /// Seed a rolled log with three interleaved agents plus periodic command
+    /// effects, returning the ground truth to check replay against. The agent
     /// rotation and every-fourth effect cadence are tracked with explicit
     /// counters rather than `%` (the modulo operator is disallowed in this
     /// foundational crate). Extracted from the test to keep it under the
@@ -201,8 +201,8 @@ mod tests {
         (expected_last, expected_tokens)
     }
 
-    /// Assert every thread's recovered head is exactly the last byte written for
-    /// it, with no phantom threads. Extracted from the test to keep it under the
+    /// Assert every agent's recovered head is exactly the last byte written for
+    /// it, with no phantom agents. Extracted from the test to keep it under the
     /// cognitive-complexity cap.
     fn assert_recovered_heads(recovered: &Recovered, expected_last: &BTreeMap<String, u8>) {
         for (agent, byte) in expected_last {
@@ -225,11 +225,11 @@ mod tests {
     fn replay_rebuilds_ground_truth_heads_and_seen_over_a_rolled_reopened_log() {
         let dir = tempfile::tempdir().expect("tempdir");
 
-        // Interleave three threads' messages with command effects, forcing many
+        // Interleave three agents' messages with command effects, forcing many
         // rolls so replay must lean on the checkpoint fast path.
         let (mut expected_last, expected_tokens) = seed_ground_truth(dir.path());
 
-        // Reopen and add one more head per thread, so replay must also cross the
+        // Reopen and add one more head per agent, so replay must also cross the
         // session boundary correctly.
         {
             let mut writer = OplogWriter::open_with_segment_limit(dir.path(), TINY_LIMIT).expect("reopen");
@@ -241,7 +241,7 @@ mod tests {
 
         let recovered = replay(dir.path()).expect("replay");
 
-        // Every thread's recovered head must be the last byte we wrote for it.
+        // Every agent's recovered head must be the last byte we wrote for it.
         assert_recovered_heads(&recovered, &expected_last);
 
         // Every committed dedup token must be in the recovered seen-set, and none

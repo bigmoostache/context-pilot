@@ -76,7 +76,7 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
     })
 }
 
-/// Fail clearly when the thread's workdir vanished (worktree removed by another
+/// Fail clearly when the agent's workdir vanished (worktree removed by another
 /// thread or by hand) instead of a misleading spawn error.
 fn check_workdir(cwd: &std::path::Path) -> Result<(), String> {
     if cwd.is_dir() {

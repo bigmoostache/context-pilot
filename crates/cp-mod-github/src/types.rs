@@ -72,6 +72,6 @@ pub struct GithubResultRequest {
     pub command: String,
     /// GitHub token for authentication.
     pub github_token: String,
-    /// Directory to run `gh` in (the creating thread's workdir).
+    /// Directory to run `gh` in (the creating agent's workdir).
     pub cwd: std::path::PathBuf,
 }

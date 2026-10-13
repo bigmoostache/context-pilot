@@ -24,7 +24,7 @@ use super::tools;
 /// # Panics
 /// Only call when `state.reveries` contains the given `system_id`.
 pub(crate) fn start_reverie_stream(state: &mut State, slot: &str, tx: Sender<StreamEvent>) {
-    // `slot` is the opaque per-thread map key. The agent's real identity (for
+    // `slot` is the opaque per-agent map key. The agent's real identity (for
     // prompt loading) and its directive live on the Session, NOT in the key.
     let (system_id, directive) =
         state.reveries.get(slot).map_or_else(|| (slot.to_owned(), None), |r| (r.system_id.clone(), r.context.clone()));

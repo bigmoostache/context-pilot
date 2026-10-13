@@ -8,14 +8,14 @@ use cp_base::state::runtime::State;
 
 use crate::index;
 
-/// Build the desired conversation-doc set from the live threads (T671).
+/// Build the desired conversation-doc set from the live agents (T671).
 ///
 /// One [`index::reconcile::conversations::ConversationDoc`] per non-`auto`,
-/// non-empty thread message. `auto` (tool-trace) and empty-content messages are
+/// non-empty agent message. `auto` (tool-trace) and empty-content messages are
 /// dropped here so they never enter the index — matching the reconcile
-/// contract. The doc `index` is the message's position in its thread, giving a
-/// stable id (`"{agent_id}-{index}"`) for append-only threads. Archived threads
-/// are still included (their docs stay searchable); a deleted thread simply
+/// contract. The doc `index` is the message's position in its agent, giving a
+/// stable id (`"{agent_id}-{index}"`) for append-only agents. Archived agents
+/// are still included (their docs stay searchable); a deleted agent simply
 /// stops appearing, so the reconciler purges its docs.
 pub(crate) fn build_conversation_docs(state: &State) -> Vec<index::reconcile::conversations::ConversationDoc> {
     use index::reconcile::conversations::{ConversationDoc, DocParts};

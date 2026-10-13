@@ -3,8 +3,8 @@
 //! The pure selection/undo primitives live on [`TextArea`](cp_base::state::runtime::textarea::TextArea)
 //! (the shared engine). This module holds the composer-specific logic that the
 //! engine deliberately stays out of: paste-sentinel (`\x00{idx}\x00`) skipping /
-//! removal and `/command` expansion, which depend on the per-thread paste
-//! buffers. Field access goes through `state.composer` (the executing thread's
+//! removal and `/command` expansion, which depend on the per-agent paste
+//! buffers. Field access goes through `state.composer` (the executing agent's
 //! [`TextArea`]).
 
 use super::helpers::eject_cursor_from_sentinel;

@@ -91,13 +91,13 @@ pub(crate) struct SearchState {
     /// Read by the Ctrl+I overlay and overview panel.
     pub metrics: Arc<Mutex<SearchMetrics>>,
     /// Cached Context Radar panel content.  Shared with background refresh
-    /// threads via `Arc<Mutex<>>`.  Updated by [`crate::radar::refresh`].
+    /// agents via `Arc<Mutex<>>`.  Updated by [`crate::radar::refresh`].
     pub radar_cache: SharedRadarCache,
-    /// Per-agent Meilisearch supervision thread. `None` when the server never
+    /// Per-agent Meilisearch supervision agent. `None` when the server never
     /// came up (port 0). Dropping it (on reload) stops the old watchdog so a
     /// reload never stacks a second supervisor on the same global server.
     pub watchdog: Option<super::meili::server::watchdog::WatchdogHandle>,
-    /// Hourly reconcile + embedding-backup tick thread. `None` when the server
+    /// Hourly reconcile + embedding-backup tick agent. `None` when the server
     /// never came up. Dropped on reload so a reload never stacks two tickers.
     pub backup_tick: Option<super::index::tick::BackupTickHandle>,
 }
@@ -267,7 +267,7 @@ pub(crate) enum IndexerCmd {
     /// The initial full-project scan has finished.
     ScanComplete,
     /// Batch-reconcile the conversations index against a desired doc set
-    /// (T671). Built on a State-bearing thread from the live `AgentsState`,
+    /// (T671). Built on a State-bearing agent from the live `AgentsState`,
     /// then run on the indexer thread (which owns the Meilisearch client).
     ReconcileConversations(Vec<crate::index::reconcile::conversations::ConversationDoc>),
 }
@@ -416,10 +416,10 @@ pub(crate) fn logs_index_settings() -> serde_json::Value {
 
 /// Meilisearch settings for the **conversations** index (T671).
 ///
-/// Indexes one document per user/assistant thread message so the thread-search
+/// Indexes one document per user/assistant agent message so the thread-search
 /// palette can hybrid-search (keyword + semantic) across everything ever said
-/// in a thread, not just its name. `agent_id` is filterable so the reconciler
-/// can scope per-thread purges; `author` is filterable for future faceting;
+/// in an agent, not just its name. `agent_id` is filterable so the reconciler
+/// can scope per-agent purges; `author` is filterable for future faceting;
 /// `ts_ms` is sortable so recency ties can break toward newer messages.
 pub(crate) fn conversations_index_settings() -> serde_json::Value {
     serde_json::json!({

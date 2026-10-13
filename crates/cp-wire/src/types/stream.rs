@@ -31,7 +31,7 @@ pub struct Frame {
     /// Worker within the agent (future multi-worker; single today).
     pub worker_id: String,
 
-    /// Thread context for routing to the correct UI pane.
+    /// Agent context for routing to the correct UI pane.
     #[serde(rename = "thread_id")]
     pub agent_id: String,
 

@@ -2,14 +2,14 @@
 //!
 //! Replaying the oplog reconstructs a small, bounded set of structures:
 //!
-//! * [`Heads`] — per-thread and per-panel content hashes (the latest state of
-//!   each, **O(threads + panels)** rather than O(total-files); design doc I3,
+//! * [`Heads`] — per-agent and per-panel content hashes (the latest state of
+//!   each, **O(agents + panels)** rather than O(total-files); design doc I3,
 //!   resolves K3);
 //! * [`SeenSet`] — the dedup-tokens of command effects that are durable but not
 //!   yet acknowledged-and-evicted, which makes command application
 //!   **exactly-once** across a replay (design doc I4); and
-//! * a [`RosterAgent`] list — the bounded thread roster so the backend can
-//!   render the thread list after oplog **compaction** without folding roster
+//! * a [`RosterAgent`] list — the bounded agent roster so the backend can
+//!   render the agent list after oplog **compaction** without folding roster
 //!   deltas from offset 0 (design doc I5 / §16).
 //!
 //! A [`Snapshot`] bundles all three. It is what a `Checkpoint` oplog record
@@ -46,9 +46,9 @@ pub struct Snapshot {
     /// Dedup-tokens of durable, not-yet-evicted command effects.
     pub seen: SeenSet,
 
-    /// The thread roster as of this `rev` — one entry per live thread (design
-    /// doc §16 journals thread create/archive/restore; carrying it in the
-    /// checkpoint is what lets a backend rebuild the thread list after oplog
+    /// The agent roster as of this `rev` — one entry per live agent (design
+    /// doc §16 journals agent create/archive/restore; carrying it in the
+    /// checkpoint is what lets a backend rebuild the agent list after oplog
     /// **compaction** without folding from offset 0, design doc I5).
     ///
     /// Additive + `serde(default)`: a checkpoint written by an older agent
@@ -71,8 +71,8 @@ impl Snapshot {
     }
 }
 
-/// One thread's snapshotted roster entry — the lightweight per-thread metadata
-/// needed to render a thread list (name, turn, archived, activity, count)
+/// One agent's snapshotted roster entry — the lightweight per-agent metadata
+/// needed to render an agent list (name, turn, archived, activity, count)
 /// without hydrating any message body.
 ///
 /// Folded from the thread-roster oplog deltas
@@ -84,22 +84,22 @@ impl Snapshot {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct RosterAgent {
-    /// Thread identifier (e.g. `"T7"`).
+    /// Agent identifier (e.g. `"T7"`).
     #[serde(rename = "thread_id")]
     pub agent_id: String,
 
-    /// User-chosen thread label.
+    /// User-chosen agent label.
     pub name: String,
 
     /// Current turn ownership.
     pub status: AgentTurn,
 
-    /// Whether the thread is archived (soft-deleted: hidden from the active
+    /// Whether the agent is archived (soft-deleted: hidden from the active
     /// list but restorable).
     pub archived: bool,
 
-    /// Whether the thread is paused — `MY_TURN` status no longer fires idle
-    /// notifications, but the thread remains visible and functional.
+    /// Whether the agent is paused — `MY_TURN` status no longer fires idle
+    /// notifications, but the agent remains visible and functional.
     #[serde(default)]
     pub paused: bool,
 
@@ -107,10 +107,10 @@ pub struct RosterAgent {
     /// message.
     pub last_activity_ms: u64,
 
-    /// Number of messages folded into this thread so far.
+    /// Number of messages folded into this agent so far.
     pub msg_count: u32,
 
-    /// The thread's projected tasks (read-only todo items), a flat list with
+    /// The agent's projected tasks (read-only todo items), a flat list with
     /// nesting expressed via [`WireTask::parent_id`]. Cancelled tasks are
     /// excluded upstream. Replaced wholesale by each
     /// [`TaskListChanged`](super::oplog::OpEntryKind::TaskListChanged) delta
@@ -122,7 +122,7 @@ pub struct RosterAgent {
     #[serde(default)]
     pub tasks: Vec<WireTask>,
 
-    /// The thread's projected scratchpad notes (read-only cells), a flat list.
+    /// The agent's projected scratchpad notes (read-only cells), a flat list.
     /// Replaced wholesale by each
     /// [`NotesChanged`](super::oplog::OpEntryKind::NotesChanged) delta
     /// (whole-list snapshot semantics — the twin of [`tasks`](Self::tasks)).
@@ -146,16 +146,16 @@ pub struct RosterAgent {
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
 pub struct AgentCreation<'src> {
-    /// Thread identifier (e.g. `"T7"`).
+    /// Agent identifier (e.g. `"T7"`).
     pub agent_id: &'src str,
 
-    /// User-chosen thread label.
+    /// User-chosen agent label.
     pub name: &'src str,
 
     /// Turn ownership at creation.
     pub status: AgentTurn,
 
-    /// Epoch-ms the thread was created (seeds `last_activity_ms`).
+    /// Epoch-ms the agent was created (seeds `last_activity_ms`).
     pub timestamp_ms: u64,
 }
 
@@ -236,7 +236,7 @@ impl RosterAgent {
     }
 
     /// Record a message in `agent_id`: bump its count and advance its activity
-    /// timestamp (a no-op if the thread is not in the roster — e.g. a message
+    /// timestamp (a no-op if the agent is not in the roster — e.g. a message
     /// folded before its creation delta was seen).
     pub fn fold_message(roster: &mut [Self], agent_id: &str, timestamp_ms: u64) {
         if let Some(existing) = roster.iter_mut().find(|e| e.agent_id == agent_id) {
@@ -248,8 +248,8 @@ impl RosterAgent {
     /// Replace `agent_id`'s task list wholesale — whole-list snapshot
     /// semantics (each
     /// [`TaskListChanged`](super::oplog::OpEntryKind::TaskListChanged) carries
-    /// the thread's complete cancelled-excluded list, so folding is an
-    /// assignment). A no-op if the thread is not in the roster.
+    /// the agent's complete cancelled-excluded list, so folding is an
+    /// assignment). A no-op if the agent is not in the roster.
     pub fn fold_tasks(roster: &mut [Self], agent_id: &str, tasks: Vec<WireTask>) {
         if let Some(existing) = roster.iter_mut().find(|e| e.agent_id == agent_id) {
             existing.tasks = tasks;
@@ -259,8 +259,8 @@ impl RosterAgent {
     /// Replace `agent_id`'s note list wholesale — whole-list snapshot
     /// semantics (each
     /// [`NotesChanged`](super::oplog::OpEntryKind::NotesChanged) carries the
-    /// thread's complete note list, so folding is an assignment). A no-op if the
-    /// thread is not in the roster. The twin of [`fold_tasks`](Self::fold_tasks).
+    /// agent's complete note list, so folding is an assignment). A no-op if the
+    /// agent is not in the roster. The twin of [`fold_tasks`](Self::fold_tasks).
     pub fn fold_notes(roster: &mut [Self], agent_id: &str, notes: Vec<WireNote>) {
         if let Some(existing) = roster.iter_mut().find(|e| e.agent_id == agent_id) {
             existing.notes = notes;
@@ -301,8 +301,8 @@ impl Heads {
     /// Set (or insert) the last-message head for `agent_id`.
     ///
     /// Replay folds a `MessageCreated` entry through this: the most recent
-    /// message of a thread overwrites the previous head, so the head set stays
-    /// bounded at one entry per thread (design doc I3). Insertion order is
+    /// message of an agent overwrites the previous head, so the head set stays
+    /// bounded at one entry per agent (design doc I3). Insertion order is
     /// deterministic (append-on-first-sight, update-in-place), so two replays
     /// of the same log produce byte-identical heads.
     pub fn set_agent_head(&mut self, agent_id: &str, last_message_hash: ContentHash) {
@@ -314,15 +314,15 @@ impl Heads {
     }
 }
 
-/// A single thread's head — the hash of its most recent message body.
+/// A single agent's head — the hash of its most recent message body.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct AgentHead {
-    /// Thread identifier.
+    /// Agent identifier.
     #[serde(rename = "thread_id")]
     pub agent_id: String,
 
-    /// Content hash of the last message body in this thread.
+    /// Content hash of the last message body in this agent.
     pub last_message_hash: ContentHash,
 }
 

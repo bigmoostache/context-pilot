@@ -25,20 +25,20 @@ const CONVERSATION_SEMANTIC_RATIO: f64 = 0.5;
 
 /// Max characters of a message returned in a [`ConvHit`]. A search hit is a
 /// preview line, not the whole message, so the stored text is snippet-capped
-/// here at the source: it keeps the reply small (a whole thread's worth of
+/// here at the source: it keeps the reply small (a whole agent's worth of
 /// multi-KB messages otherwise blows the backend's framed-read bound) and
 /// matches what the palette actually renders — one truncated line. UTF-8-safe
 /// (cut on a `char` boundary via `chars().take`).
 const HIT_SNIPPET_CHARS: usize = 280;
 
-/// Candidate over-fetch multiplier for per-thread dedupe. The index holds ONE
-/// doc per message, so a hot thread would otherwise flood the result list with
+/// Candidate over-fetch multiplier for per-agent dedupe. The index holds ONE
+/// doc per message, so a hot agent would otherwise flood the result list with
 /// its own name repeated. We fetch `limit * OVERFETCH` message-hits from Meili,
-/// then collapse to the best-scored message per thread (see
+/// then collapse to the best-scored message per agent (see
 /// [`dedupe_by_agent`]) so the caller gets `limit` DISTINCT conversations —
 /// the "find the conversation" behaviour the palette wants. Over-fetching is
-/// what makes N distinct threads reachable even when the top hits cluster in a
-/// few threads.
+/// what makes N distinct agents reachable even when the top hits cluster in a
+/// few agents.
 const CANDIDATE_OVERFETCH: u32 = 8;
 
 /// Hard cap on candidate fetch, so a huge `limit` can't ask Meili for an
@@ -76,8 +76,8 @@ pub struct SearchConvParams<'src> {
 /// Run a hybrid keyword+semantic search over the conversations index and return
 /// the hits as transport-ready [`ConvHit`]s (best-scored first).
 ///
-/// `agent_id` scopes the search to a single thread when `Some` (a Meilisearch
-/// `agent_id = '…'` filter); `None` searches every thread. The index name is
+/// `agent_id` scopes the search to a single agent when `Some` (a Meilisearch
+/// `agent_id = '…'` filter); `None` searches every agent. The index name is
 /// derived from `project_hash` exactly as the bootstrap/reconcile paths derive
 /// it (`cp_{hash}_conversations`), so this queries the same index the
 /// reconciler fills.
@@ -92,14 +92,14 @@ pub fn search_conversations(p: &SearchConvParams<'_>) -> Result<Vec<ConvHit>, St
     let client = MeiliClient::new(p.port, p.master_key)?;
     let uid = format!("cp_{}_conversations", p.project_hash);
 
-    // Single-quote-escape a caller-supplied thread id before splicing it into
+    // Single-quote-escape a caller-supplied agent id before splicing it into
     // the Meilisearch filter expression, matching the file-indexer's own
     // escaping (`delete_one_file`) so a stray quote can't malform the filter.
     let filter = p.agent_id.map(|t| format!("thread_id = '{}'", t.replace('\'', "\\'")));
 
-    // Over-fetch message-hits, then collapse to one (best-scored) per thread so
+    // Over-fetch message-hits, then collapse to one (best-scored) per agent so
     // the caller gets `limit` DISTINCT conversations, not every message of a hot
-    // thread. Meili has no native group-by, so we dedupe in Rust (M141 — logic
+    // agent. Meili has no native group-by, so we dedupe in Rust (M141 — logic
     // in the backend, not the palette).
     let candidates = p.limit.saturating_mul(CANDIDATE_OVERFETCH).min(MAX_CANDIDATES).max(p.limit);
 
@@ -121,13 +121,13 @@ pub fn search_conversations(p: &SearchConvParams<'_>) -> Result<Vec<ConvHit>, St
     Ok(dedupe_by_agent(hits, keep))
 }
 
-/// Collapse message-hits to one per thread, keeping the FIRST occurrence of each
-/// `agent_id` and truncating to `limit` threads.
+/// Collapse message-hits to one per agent, keeping the FIRST occurrence of each
+/// `agent_id` and truncating to `limit` agents.
 ///
 /// Meili returns hits already sorted by descending `_rankingScore`, so the first
-/// hit seen for a thread is its best-scoring message — the natural representative
+/// hit seen for an agent is its best-scoring message — the natural representative
 /// for a "find the conversation" result. Insertion order is preserved (highest
-/// overall score first), so the returned list stays score-ranked across threads.
+/// overall score first), so the returned list stays score-ranked across agents.
 fn dedupe_by_agent(hits: Vec<ConvHit>, limit: usize) -> Vec<ConvHit> {
     let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
     let mut out: Vec<ConvHit> = Vec::new();
@@ -233,7 +233,7 @@ mod tests {
     #[test]
     fn dedupe_keeps_first_per_agent() {
         // T1 appears twice: only its FIRST (best-scored) message survives; order
-        // across threads is preserved.
+        // across agents is preserved.
         let hits = vec![hit("T1", "best"), hit("T2", "a"), hit("T1", "worse"), hit("T3", "b")];
         let out = dedupe_by_agent(hits, 10);
         let ids: Vec<&str> = out.iter().map(|h| h.agent_id.as_str()).collect();

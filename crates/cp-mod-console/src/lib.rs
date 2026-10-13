@@ -8,7 +8,7 @@
 pub mod manager;
 /// Panel rendering for console session output.
 mod panel;
-/// Background polling threads for log tailing and process status.
+/// Background polling agents for log tailing and process status.
 mod pollers;
 /// Thread-safe ring buffer for capturing process output.
 pub mod ring_buffer;
@@ -154,12 +154,12 @@ impl Module for ConsoleModule {
         }
 
         // NOTE: orphan cleanup is deliberately NOT done here. `load_module_data`
-        // runs once PER THREAD at boot, but the console server's session map is
-        // fleet-wide; killing "orphans" relative to a single thread's keys would
-        // kill every OTHER thread's live sessions (same class as the F1c
-        // per-thread panel prune). The orphan-kill runs exactly once over the
-        // UNION of all threads' session keys in
-        // `App::prune_orphaned_console_sessions` after every thread is loaded.
+        // runs once PER AGENT at boot, but the console server's session map is
+        // fleet-wide; killing "orphans" relative to a single agent's keys would
+        // kill every OTHER agent's live sessions (same class as the F1c
+        // per-agent panel prune). The orphan-kill runs exactly once over the
+        // UNION of all agents' session keys in
+        // `App::prune_orphaned_console_sessions` after every agent is loaded.
 
         // Phase 1: Reconnect sessions (no &mut State needed)
         let mut reconnected: Vec<(String, SessionHandle)> = Vec::new();

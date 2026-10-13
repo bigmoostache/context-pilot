@@ -1,4 +1,4 @@
-//! Unit tests for the thread types (extracted from `types.rs` for the
+//! Unit tests for the agent types (extracted from `types.rs` for the
 //! 500-line cap). `super` is the `types` module, so `use super::*` keeps the
 //! exact same scope the tests had when inlined.
 
@@ -17,7 +17,7 @@ fn msg(author: AgentAuthor, text: &str, ts: u64) -> AgentMessage {
     }
 }
 
-/// State holding one parent thread `T1` with four messages (ts 10..=40),
+/// State holding one parent agent `T1` with four messages (ts 10..=40),
 /// archived + paused + `MyTurn` so the test can check none of it carries over.
 fn parent_state() -> AgentsState {
     let mut ts = AgentsState::new();

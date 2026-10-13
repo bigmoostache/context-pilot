@@ -18,23 +18,23 @@ pub mod textarea;
 /// Runtime application state.
 ///
 /// `State` holds **only fleet-shared data** — things that are single-instance
-/// across every thread: the active model/provider, the theme, the tool set, the
+/// across every agent: the active model/provider, the theme, the tool set, the
 /// fleet-shared module `TypeMap`, the global UID counter, UI-global flags, and
 /// the ephemeral reverie sessions.
 ///
-/// **No conversation, no panels, no per-thread anything lives here as a field.**
-/// Everything a thread owns (its messages, its panel/context set, its editor and
+/// **No conversation, no panels, no per-agent anything lives here as a field.**
+/// Everything an agent owns (its messages, its panel/context set, its editor and
 /// scroll state, its token/cost telemetry, its cache/freeze engine snapshots,
-/// its per-thread module data, its stream phase) lives on a
+/// its per-agent module data, its stream phase) lives on a
 /// [`AgentRuntime`](bundle::AgentRuntime) stored in
-/// [`agent_store`](Self::agent_store), keyed by thread id. Code reaches the
-/// executing thread's data explicitly through [`agent`](Self::thread) /
+/// [`agent_store`](Self::agent_store), keyed by agent id. Code reaches the
+/// executing agent's data explicitly through [`agent`](Self::agent) /
 /// [`agent_mut`](Self::agent_mut); `State` itself holds only shared data.
 pub struct State {
-    /// Every thread's per-thread context (conversation, panels, editor/scroll,
-    /// token/cost telemetry, cache/freeze snapshots, stream phase, per-thread
-    /// module `TypeMap`), stored permanently by thread id, plus the id of the
-    /// thread executing right now. `State` derefs to the executing thread's
+    /// Every agent's per-agent context (conversation, panels, editor/scroll,
+    /// token/cost telemetry, cache/freeze snapshots, stream phase, per-agent
+    /// module `TypeMap`), stored permanently by agent id, plus the id of the
+    /// agent executing right now. `State` derefs to the executing agent's
     /// runtime; changing it moves no data.
     pub agent_store: agents::AgentStore,
 
@@ -48,7 +48,7 @@ pub struct State {
     /// Global UID counter for all shared elements (messages, panels)
     pub global_next_uid: usize,
     /// Cleaning threshold (0.0–1.0) of the context budget that triggers
-    /// auto-cleaning. Fleet-wide: the Ctrl+H setting applies to every thread.
+    /// auto-cleaning. Fleet-wide: the Ctrl+H setting applies to every agent.
     pub cleaning_threshold: f32,
     /// Context budget in tokens (`None` = model's full window). Fleet-wide.
     pub context_budget: Option<usize>,
@@ -74,7 +74,7 @@ pub struct State {
     pub openrouter_model: crate::config::llm::openrouter_model::OpenRouterModel,
     /// Active Claude Code V2 model variant.
     pub claude_code_v2_model: crate::config::llm::models::ClaudeCodeV2Model,
-    /// View mode: Normal (full sidebar), Collapsed (icons), Hidden, Threads
+    /// View mode: Normal (full sidebar), Collapsed (icons), Hidden, Agents
     pub view_mode: ViewMode,
     /// Active reverie sessions keyed by `system_id` (e.g., "cleaner", "cartographer").
     /// Ephemeral — not persisted, discarded after each run.
@@ -87,10 +87,10 @@ pub struct State {
     /// Takes `(file_path, content)` and returns `cp_render::Span` per line.
     pub highlight_ir_fn: Option<HighlightIrFn>,
 
-    // === Module extension data (fleet-shared half; per-thread half on executing) ===
+    // === Module extension data (fleet-shared half; per-agent half on executing) ===
     /// Fleet-shared module-owned state stored by `TypeId` (one instance across
-    /// all threads — e.g. memory, logs, entities, the threads registry). The
-    /// per-thread half lives on [`executing.agent_module_data`](bundle::AgentRuntime::agent_module_data).
+    /// all agents — e.g. memory, logs, entities, the agents registry). The
+    /// per-agent half lives on [`executing.agent_module_data`](bundle::AgentRuntime::agent_module_data).
     ///
     /// A given `TypeId` lives in exactly ONE of the two maps, so the `get_ext`
     /// family searches both and `set_ext` updates whichever already holds the
@@ -99,7 +99,7 @@ pub struct State {
     /// Ambient scope for the *next* first-insert via [`set_ext`](Self::set_ext),
     /// set by the boot/init loops around `init_state` / `load_module_data`:
     /// `Some(true)` → [`shared_module_data`](Self::shared_module_data),
-    /// `Some(false)` or `None` → the executing thread's per-thread map.
+    /// `Some(false)` or `None` → the executing agent's per-agent map.
     /// Updates to already-registered types ignore this (they stay in place).
     pub init_is_global: Option<bool>,
 }
@@ -114,28 +114,28 @@ mod default;
 mod ext;
 
 impl State {
-    /// The thread executing right now: owner of every per-thread write (todos,
+    /// The agent executing right now: owner of every per-agent write (todos,
     /// scratchpad, tool traces, notifications). Never the human's focus — that
-    /// is UI-only and can point at another thread while this one runs.
-    /// `None` when no thread is placed (cold boot, focus cleared).
+    /// is UI-only and can point at another agent while this one runs.
+    /// `None` when no agent is placed (cold boot, focus cleared).
     #[must_use]
     pub fn executing_agent_id(&self) -> Option<&str> {
         self.agent_store.executing()
     }
 
-    /// The executing thread's runtime (conversation, panels, stream, per-thread
-    /// module data). The unbound runtime when no thread is executing.
+    /// The executing agent's runtime (conversation, panels, stream, per-agent
+    /// module data). The unbound runtime when no agent is executing.
     #[must_use]
     pub fn agent(&self) -> &bundle::AgentRuntime {
         self.agent_store.current()
     }
 
-    /// Mutable twin of [`agent`](Self::thread).
+    /// Mutable twin of [`agent`](Self::agent).
     pub fn agent_mut(&mut self) -> &mut bundle::AgentRuntime {
         self.agent_store.current_mut()
     }
 
-    /// Directory the executing thread works in: its worktree, else the
+    /// Directory the executing agent works in: its worktree, else the
     /// project root. Every project-relative path and subprocess cwd goes
     /// through here; `.context-pilot/` state stays anchored to the root.
     #[must_use]
@@ -151,8 +151,8 @@ impl State {
         if p.is_absolute() { p.to_path_buf() } else { self.workdir().join(p) }
     }
 
-    /// Error text when the thread's worktree folder vanished (removed by hand
-    /// or by another thread); `None` while it exists or at the project root.
+    /// Error text when the agent's worktree folder vanished (removed by hand
+    /// or by another agent); `None` while it exists or at the project root.
     #[must_use]
     pub fn workdir_error(&self) -> Option<String> {
         let dir = self.agent().workdir.as_ref()?;

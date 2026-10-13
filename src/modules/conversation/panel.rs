@@ -404,7 +404,7 @@ const fn handle_modifier_combo(code: KeyCode, mods: &Mods) -> Option<Action> {
 
 /// Resolve a bare `Left` press in the composer. With `Shift`, extends the
 /// selection. With an empty composer and no active selection, Left navigates
-/// OUT to the threads list (the panel→list entry gesture G1 left unwired after
+/// OUT to the agents list (the panel→list entry gesture G1 left unwired after
 /// dropping Ctrl+V). Otherwise it moves the cursor, so editing is never
 /// hijacked.
 fn left_action(state: &State, shift: bool) -> Action {

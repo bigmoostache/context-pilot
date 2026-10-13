@@ -105,7 +105,7 @@ pub(crate) fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolRes
     let system_id =
         tool.input.get("agent").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).unwrap_or("cleaner").to_owned();
 
-    // Guard: this agent type is already running FOR THIS THREAD. The authoritative
+    // Guard: this agent type is already running FOR THIS AGENT. The authoritative
     // guard is in `start_manual_reverie`; this one gives the user an immediate error.
     let owner = super::trigger::owner_agent_id(state);
     let slot = super::trigger::reverie_slot(owner.as_deref(), &system_id);

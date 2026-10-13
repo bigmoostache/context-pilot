@@ -1,21 +1,21 @@
-//! Per-thread *stream* runtime: the mutable bookkeeping a thread owns while
+//! Per-thread *stream* runtime: the mutable bookkeeping an agent owns while
 //! its LLM turn is in flight (typewriter, pending tool calls, the deferred
 //! `StreamDone` payload, console-wait / blocking-watcher accumulators, the
 //! deferred-sleep flags).
 //!
-//! It lives in the thread's own per-thread module data
+//! It lives in the agent's own per-agent module data
 //! ([`AgentRuntime::agent_module_data`](cp_base::state::runtime::bundle::AgentRuntime)),
-//! so it follows the executing thread like the rest of its context: switching
-//! threads moves nothing, and a thread's in-flight stream can never bleed into
+//! so it follows the executing agent like the rest of its context: switching
+//! agents moves nothing, and an agent's in-flight stream can never bleed into
 //! another's. Reach it through [`App::stream_rt`] / [`App::stream_rt_mut`].
 
 use crate::app::{App, PendingDone};
 use crate::infra::tools::{ToolResult, ToolUse};
 use crate::ui::TypewriterBuffer;
 
-/// The complete per-stream mutable runtime owned by one thread.
+/// The complete per-stream mutable runtime owned by one agent.
 ///
-/// Stored per thread; see the module docs.
+/// Stored per agent; see the module docs.
 pub(crate) struct StreamRuntime {
     /// Streaming typewriter buffer (pending chars + speed estimation).
     pub typewriter: TypewriterBuffer,
@@ -62,12 +62,12 @@ impl StreamRuntime {
 
 #[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
-    /// The executing thread's stream runtime, if it has been touched yet.
+    /// The executing agent's stream runtime, if it has been touched yet.
     pub(crate) fn stream_rt(&self) -> Option<&StreamRuntime> {
         self.state.get_ext::<StreamRuntime>()
     }
 
-    /// The executing thread's stream runtime, created on first use.
+    /// The executing agent's stream runtime, created on first use.
     pub(crate) fn stream_rt_mut(&mut self) -> &mut StreamRuntime {
         if self.state.get_ext::<StreamRuntime>().is_none() {
             self.state.set_ext_agent(StreamRuntime::new());

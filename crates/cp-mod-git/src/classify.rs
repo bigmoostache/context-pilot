@@ -118,11 +118,11 @@ pub(crate) fn validate_git_command(command: &str) -> Result<Vec<String>, String>
     Ok(args)
 }
 
-/// Refuse `git_execute` calls that would bypass the thread's workdir.
+/// Refuse `git_execute` calls that would bypass the agent's workdir.
 ///
 /// `-C`, `--git-dir` and `--work-tree` (global options, before the subcommand)
 /// point git at another tree; `worktree add|remove|move|prune` changes
-/// worktrees behind the `Worktree` tool's back, leaving threads aimed at
+/// worktrees behind the `Worktree` tool's back, leaving agents aimed at
 /// missing folders.
 pub(crate) fn check_worktree_safety(args: &[String]) -> Result<(), String> {
     let mut rest = args.iter().map(String::as_str);

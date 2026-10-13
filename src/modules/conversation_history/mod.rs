@@ -29,10 +29,10 @@ impl Module for ConversationHistoryModule {
     fn is_core(&self) -> bool {
         true
     }
-    /// Per-thread (thread-centric model): a thread's history is its own.
+    /// Per-thread (thread-centric model): an agent's history is its own.
     /// This module holds no `TypeMap` data — history chunks live in the
-    /// `conversation_history` panel `Entry`s (owned by each thread's
-    /// `AgentRuntime.context`). The flag is per-thread for intent; it
+    /// `conversation_history` panel `Entry`s (owned by each agent's
+    /// `AgentRuntime.context`). The flag is per-agent for intent; it
     /// is inert at N=1 (save/load are no-ops).
     fn is_global(&self) -> bool {
         false

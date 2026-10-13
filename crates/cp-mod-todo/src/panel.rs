@@ -7,20 +7,20 @@ use cp_base::state::runtime::State;
 
 use cp_base::panels::scroll_key_action;
 
-/// Panel that renders the focused thread's task tree as canonical YAML.
+/// Panel that renders the focused agent's task tree as canonical YAML.
 pub(crate) struct TodoPanel;
 
 impl TodoPanel {
-    /// Render the focused thread's tasks as canonical YAML for LLM context.
+    /// Render the focused agent's tasks as canonical YAML for LLM context.
     ///
     /// Identical to what the model edits with the `Todo` tool (via `{prev,new}`
     /// diffs) — one rigorous, byte-stable projection shared by panel + tool.
     fn format_todos_for_context(state: &State) -> String {
-        // Per-thread view: scope to the EXECUTING thread (the thread this panel
-        // instance belongs to — focused at rest, or a background thread while it
+        // Per-thread view: scope to the EXECUTING agent (the agent this panel
+        // instance belongs to — focused at rest, or a background agent while it
         // is being stepped), never the shared focus pointer. Scoping to
-        // the shared `focus_filter` alone made every thread's Todo panel show the
-        // focused thread's tasks (same class as the Threads-panel bug).
+        // the shared `focus_filter` alone made every agent's Todo panel show the
+        // focused agent's tasks (same class as the Threads-panel bug).
         let Some(focus) = state.executing_agent_id() else {
             return "No focused thread".to_owned();
         };
@@ -36,7 +36,7 @@ impl Panel for TodoPanel {
 
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
         use cp_render::{Block, Semantic, Span as S};
-        // Per-thread view: scope to the executing thread (see format_todos_for_context).
+        // Per-thread view: scope to the executing agent (see format_todos_for_context).
         let Some(focus) = state.executing_agent_id() else {
             return vec![Block::Line(vec![S::muted("  No focused thread".into()).italic()])];
         };

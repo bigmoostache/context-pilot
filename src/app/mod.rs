@@ -28,17 +28,17 @@ use crate::ui::help::CommandPalette;
 pub(crate) type PendingDone = (usize, usize, usize, usize, Option<String>, Vec<String>, Vec<String>, usize, Vec<u16>);
 
 /// Per-thread main-stream state — holds the receiver channel for a running
-/// thread stream (the thread-centric analogue of [`ReverieStream`]).
+/// agent stream (the thread-centric analogue of [`ReverieStream`]).
 ///
-/// One entry lives in [`App::agent_streams`] per actively-streaming thread.
+/// One entry lives in [`App::agent_streams`] per actively-streaming agent.
 /// Created at stream start (one of the three start sites: `check_spine`,
 /// `continue_streaming`, `handle_retry`), drained by `process_stream_events`.
 ///
-/// At N=1 there is a single thread, so the map holds a single entry
+/// At N=1 there is a single agent, so the map holds a single entry
 /// keyed by [`App::main_stream_key`]. Phase C3 generalises the key to the
-/// actually-advancing thread id so the loop can drive several threads at once.
+/// actually-advancing agent id so the loop can drive several agents at once.
 pub(crate) struct AgentStream {
-    /// Receiver for this thread's LLM stream events.
+    /// Receiver for this agent's LLM stream events.
     pub rx: Receiver<crate::infra::api::StreamEvent>,
 }
 
@@ -56,7 +56,7 @@ pub(crate) struct ReverieStream {
 pub(crate) struct App {
     /// Shared runtime state (context, messages, config, flags).
     pub state: State,
-    /// Sender for cache update requests to the background cache thread.
+    /// Sender for cache update requests to the background cache agent.
     pub cache_tx: Sender<CacheUpdate>,
     /// Optional file-system watcher for auto-refresh on file changes.
     pub file_watcher: Option<FileWatcher>,
@@ -98,19 +98,19 @@ pub(crate) struct App {
     pub last_poll_ms: std::collections::HashMap<String, u64>,
     /// Active reverie streams keyed by `system_id` (one per agent type)
     pub reverie_streams: std::collections::HashMap<String, ReverieStream>,
-    /// Active main-thread streams keyed by thread id (one per streaming thread).
+    /// Active main-thread streams keyed by agent id (one per streaming agent).
     /// At N=1 holds a single entry under [`App::main_stream_key`]; the loop
-    /// (Phase C3) will key this by the advancing thread id for true concurrency.
+    /// (Phase C3) will key this by the advancing agent id for true concurrency.
     pub agent_streams: std::collections::HashMap<String, AgentStream>,
     /// Fleet registry: scheduling metadata (role, exec state, wait stamp) for
-    /// every background (non-focused) thread. Runtimes live in
+    /// every background (non-focused) agent. Runtimes live in
     /// `state.agent_store`. Empty at N=1, so background advancement is a no-op.
     pub fleet: cp_fleet::FleetRegistry,
-    /// Id of the background thread executing an advancement step, or `None`
+    /// Id of the background agent executing an advancement step, or `None`
     /// outside a background step. It is the override half of
     /// [`executing_key`](Self::executing_key): stream spawn and drain both key by
-    /// it, so during a background step they target that thread's channel rather
-    /// than the focused thread's.
+    /// it, so during a background step they target that agent's channel rather
+    /// than the focused agent's.
     pub stepping_agent: Option<String>,
     /// Result of the previous iteration's idle `event::poll(timeout)`, consumed
     /// by the next input phase so it can skip its own `poll(ZERO)`. `None` on

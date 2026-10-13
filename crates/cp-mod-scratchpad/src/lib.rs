@@ -87,7 +87,7 @@ impl Module for ScratchpadModule {
         if let Some(v) = data.get("next_scratchpad_id").and_then(serde_json::Value::as_u64) {
             ss.next_scratchpad_id = v.to_usize();
         }
-        // Thread-owned rework: forever-purge legacy cells lacking a agent_id
+        // Thread-owned rework: forever-purge legacy cells lacking an agent_id
         // (old schema), mirroring the todo migration's agentless purge.
         tools::purge_agentless(state);
     }
@@ -139,8 +139,8 @@ impl Module for ScratchpadModule {
 
     fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
         let ss = ScratchpadState::get(state);
-        // Thread-owned: existence checks are scoped to the focused thread's
-        // cells. With no focused thread, execute returns the canonical
+        // Thread-owned: existence checks are scoped to the focused agent's
+        // cells. With no focused agent, execute returns the canonical
         // no-focus error, so pre_flight stays silent here.
         let focus = state.executing_agent_id();
         match tool.name.as_str() {

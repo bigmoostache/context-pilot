@@ -1,49 +1,49 @@
-//! Thread-runtime storage, keyed by thread id.
+//! Thread-runtime storage, keyed by agent id.
 //!
-//! Every thread's [`AgentRuntime`] lives here permanently. "Which thread is
+//! Every agent's [`AgentRuntime`] lives here permanently. "Which agent is
 //! executing" is just an id ([`set_executing`](AgentStore::set_executing));
 //! nothing is moved when it changes.
 //!
-//! [`State::thread`](super::State::thread) returns [`current`](AgentStore::current): the
-//! executing thread's runtime, or the *unbound* runtime when no stored thread
+//! [`State::agent`](super::State::agent) returns [`current`](AgentStore::current): the
+//! executing agent's runtime, or the *unbound* runtime when no stored agent
 //! is executing (cold boot before the first focus, or focus cleared). Boot
-//! assembles the focused thread's data into the unbound runtime;
-//! [`take_unbound`](AgentStore::take_unbound) hands it to its thread.
+//! assembles the focused agent's data into the unbound runtime;
+//! [`take_unbound`](AgentStore::take_unbound) hands it to its agent.
 
 use super::bundle::AgentRuntime;
 
-/// One stored thread runtime.
+/// One stored agent runtime.
 #[derive(Debug)]
 struct Slot {
-    /// Owning thread id.
+    /// Owning agent id.
     id: String,
-    /// The thread's whole per-thread context.
+    /// The agent's whole per-agent context.
     runtime: AgentRuntime,
 }
 
-/// Owner of every thread's [`AgentRuntime`] plus the executing-thread id.
+/// Owner of every agent's [`AgentRuntime`] plus the executing-thread id.
 #[derive(Debug, Default)]
 pub struct AgentStore {
-    /// Stored thread contexts. A `Vec` (not a map): a handful of threads, and
-    /// the hot `State::thread()` path is a cached index, not a hash.
+    /// Stored agent contexts. A `Vec` (not a map): a handful of agents, and
+    /// the hot `State::agent()` path is a cached index, not a hash.
     slots: Vec<Slot>,
-    /// Cached index into `slots` of the executing thread (`None` = unbound).
+    /// Cached index into `slots` of the executing agent (`None` = unbound).
     cursor: Option<usize>,
-    /// Context used when no stored thread is executing.
+    /// Context used when no stored agent is executing.
     unbound: AgentRuntime,
-    /// The executing thread's id (see [`executing`](Self::executing)).
+    /// The executing agent's id (see [`executing`](Self::executing)).
     executing: Option<String>,
 }
 
 impl AgentStore {
-    /// The thread executing right now: owner of every per-thread write.
-    /// `None` when no thread is placed (cold boot, focus cleared).
+    /// The agent executing right now: owner of every per-agent write.
+    /// `None` when no agent is placed (cold boot, focus cleared).
     #[must_use]
     pub fn executing(&self) -> Option<&str> {
         self.executing.as_deref()
     }
 
-    /// Make `id` the executing thread (`None` = the unbound runtime). No data
+    /// Make `id` the executing agent (`None` = the unbound runtime). No data
     /// moves. An id without a stored runtime resolves to the unbound runtime
     /// until one is inserted.
     pub fn set_executing(&mut self, id: Option<String>) {
@@ -51,7 +51,7 @@ impl AgentStore {
         self.resolve_cursor();
     }
 
-    /// Store `runtime` as thread `id`'s context, replacing any previous one.
+    /// Store `runtime` as agent `id`'s context, replacing any previous one.
     pub fn insert(&mut self, id: String, runtime: AgentRuntime) {
         if let Some(slot) = self.slots.iter_mut().find(|s| s.id == id) {
             slot.runtime = runtime;
@@ -61,7 +61,7 @@ impl AgentStore {
         self.resolve_cursor();
     }
 
-    /// Drop thread `id`'s stored context. Returns it, if any.
+    /// Drop agent `id`'s stored context. Returns it, if any.
     pub fn remove(&mut self, id: &str) -> Option<AgentRuntime> {
         let pos = self.slots.iter().position(|s| s.id == id)?;
         let slot = self.slots.swap_remove(pos);
@@ -69,25 +69,25 @@ impl AgentStore {
         Some(slot.runtime)
     }
 
-    /// Whether thread `id` has a stored context.
+    /// Whether agent `id` has a stored context.
     #[must_use]
     pub fn contains(&self, id: &str) -> bool {
         self.slots.iter().any(|s| s.id == id)
     }
 
-    /// Ids of every thread with a stored context.
+    /// Ids of every agent with a stored context.
     #[must_use]
     pub fn ids(&self) -> Vec<String> {
         self.slots.iter().map(|s| s.id.clone()).collect()
     }
 
-    /// Read-only access to a stored thread's context, by id.
+    /// Read-only access to a stored agent's context, by id.
     #[must_use]
     pub fn get(&self, id: &str) -> Option<&AgentRuntime> {
         self.slots.iter().find(|s| s.id == id).map(|s| &s.runtime)
     }
 
-    /// Mutable access to a stored thread's context, by id.
+    /// Mutable access to a stored agent's context, by id.
     pub fn get_mut(&mut self, id: &str) -> Option<&mut AgentRuntime> {
         self.slots.iter_mut().find(|s| s.id == id).map(|s| &mut s.runtime)
     }
@@ -111,7 +111,7 @@ impl AgentStore {
         }
     }
 
-    /// Recompute the cached slot index of the executing thread.
+    /// Recompute the cached slot index of the executing agent.
     fn resolve_cursor(&mut self) {
         self.cursor = self.executing.as_deref().and_then(|id| self.slots.iter().position(|s| s.id == id));
     }

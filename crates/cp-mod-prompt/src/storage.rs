@@ -213,7 +213,7 @@ struct PromptIndex {
     lists: [Option<Arc<[PromptItem]>>; 3],
 }
 
-/// In-memory prompt index. Frame code (status bar, sidebar, threads view) reads
+/// In-memory prompt index. Frame code (status bar, sidebar, agents view) reads
 /// it on every render, so it must never touch the disk: it is invalidated by
 /// [`revalidate_index`] (stat-only, on panel refresh) and [`invalidate_index`]
 /// (after our own writes).

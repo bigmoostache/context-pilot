@@ -77,7 +77,7 @@ pub enum Kind {
         /// Maximum number of hits to return.
         limit: u32,
         /// Optional single-thread scope (filters on `agent_id`). `None`
-        /// searches every thread.
+        /// searches every agent.
         #[serde(rename = "thread_id")]
         agent_id: Option<String>,
     },
@@ -135,9 +135,9 @@ impl Frame {
     reason = "borrowed builder params for ConvHit: built by struct literal cross-crate (the agent maps a Meilisearch row into it); a constructor would take six positional arguments and re-trip too_many_arguments, which is exactly what this params struct exists to avoid, so #[non_exhaustive] is impossible"
 )]
 pub struct HitParts<'src> {
-    /// Owning thread id — the navigation target.
+    /// Owning agent id — the navigation target.
     pub agent_id: &'src str,
-    /// Owning thread's display name.
+    /// Owning agent's display name.
     pub agent_name: &'src str,
     /// `"user"` or `"assistant"`.
     pub author: &'src str,
@@ -152,16 +152,16 @@ pub struct HitParts<'src> {
 /// One conversation-search hit returned to the backend.
 ///
 /// A flattened, transport-ready view of a Meilisearch conversation document:
-/// enough to render a palette result row (thread name + author + snippet) and
-/// to navigate to the source thread (`agent_id`).
+/// enough to render a palette result row (agent name + author + snippet) and
+/// to navigate to the source agent (`agent_id`).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[non_exhaustive]
 pub struct ConvHit {
-    /// Owning thread id — the navigation target.
+    /// Owning agent id — the navigation target.
     #[serde(rename = "thread_id")]
     pub agent_id: String,
-    /// Owning thread's display name.
+    /// Owning agent's display name.
     #[serde(rename = "thread_name")]
     pub agent_name: String,
     /// `"user"` or `"assistant"`.

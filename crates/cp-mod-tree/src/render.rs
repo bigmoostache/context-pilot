@@ -17,7 +17,7 @@ use crate::types::TreeFileDescription;
 
 /// Generate tree string without mutating state (for read-only rendering).
 ///
-/// `root` is the executing thread's workdir; rows stay keyed by root-relative
+/// `root` is the executing agent's workdir; rows stay keyed by root-relative
 /// paths, so descriptions and open folders are shared across worktrees.
 pub(crate) fn generate_tree_string(
     root: &Path,

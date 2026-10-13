@@ -1,7 +1,7 @@
 //! Fleet-shared coucou delivery: poll the [`CoucouRegistry`] once per tick and
-//! route each due reminder into its target thread's spine inbox, waking that
-//! thread when it sits in the background. Plus the one-shot boot migration of
-//! legacy per-thread `pending_coucous`.
+//! route each due reminder into its target agent's spine inbox, waking that
+//! agent when it sits in the background. Plus the one-shot boot migration of
+//! legacy per-agent `pending_coucous`.
 
 use cp_mod_agents::types::{AgentStatus, AgentsState, FocusState};
 use cp_mod_spine::schedule::CoucouRegistry;
@@ -12,14 +12,14 @@ use crate::app::App;
 #[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
     /// Deliver every coucou due now. Runs on the main loop with the focused
-    /// thread executing (never inside a background step), so
+    /// agent executing (never inside a background step), so
     /// [`deliver_to_agent`](Self::deliver_to_agent) resolves "focused" against
     /// the real executing. Unscoped coucous (`agent_id: None`) go to the focused
-    /// thread.
+    /// agent.
     ///
     /// A background target is flipped to `MyTurn`: its inbox notification alone
-    /// does not schedule it (only `MyTurn` threads are promoted), so without the
-    /// flip a `THEIR_TURN` thread would hold the reminder unread until the human
+    /// does not schedule it (only `MyTurn` agents are promoted), so without the
+    /// flip a `THEIR_TURN` agent would hold the reminder unread until the human
     /// returned to it.
     pub(super) fn check_coucous(&mut self) {
         let fired = CoucouRegistry::get_mut(&mut self.state).take_due(cp_base::panels::now_ms());
@@ -48,11 +48,11 @@ impl App {
         self.save_state_async();
     }
 
-    /// Move coucous persisted by older builds in each thread's own spine slot
+    /// Move coucous persisted by older builds in each agent's own spine slot
     /// into the fleet-shared registry. Each record keeps its explicit target, or
-    /// is stamped with the thread that stored it, and gets a fresh id: the old
-    /// per-thread counters all started at `coucou_0`, so the ids collide.
-    /// Called once at boot, after background threads are loaded.
+    /// is stamped with the agent that stored it, and gets a fresh id: the old
+    /// per-agent counters all started at `coucou_0`, so the ids collide.
+    /// Called once at boot, after background agents are loaded.
     pub(super) fn migrate_legacy_coucous(&mut self) {
         let focused = FocusState::get(&self.state).focused_agent_id.clone();
         let mut moved = drain_legacy(&mut self.state, focused.as_deref());
@@ -73,7 +73,7 @@ impl App {
     }
 }
 
-/// Take the executing thread's legacy coucous, stamping `owner` on unscoped ones.
+/// Take the executing agent's legacy coucous, stamping `owner` on unscoped ones.
 fn drain_legacy(state: &mut cp_base::state::runtime::State, owner: Option<&str>) -> Vec<cp_mod_spine::coucou::Record> {
     let mut list = std::mem::take(&mut SpineState::get_mut(state).legacy_coucous);
     for coucou in &mut list {

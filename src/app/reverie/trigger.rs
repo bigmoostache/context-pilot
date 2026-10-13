@@ -22,9 +22,9 @@ pub(crate) fn check_threshold_trigger(state: &mut State) -> bool {
         return false;
     }
 
-    // Guard: a cleaner reverie is already running FOR THIS THREAD. The limit is
-    // one reverie per (thread, agent), not one globally — a background thread
-    // cleaning its own context must not block another thread from cleaning its.
+    // Guard: a cleaner reverie is already running FOR THIS AGENT. The limit is
+    // one reverie per (agent, agent), not one globally — a background agent
+    // cleaning its own context must not block another agent from cleaning its.
     let owner = owner_agent_id(state);
     let slot = reverie_slot(owner.as_deref(), "cleaner");
     if state.reveries.contains_key(&slot) {
@@ -53,7 +53,7 @@ pub(crate) fn check_threshold_trigger(state: &mut State) -> bool {
 /// `system_id` when no owner thread is known (cold boot / single-thread).
 ///
 /// `state.reveries` and `App::reverie_streams` are both keyed by this slot so
-/// the running-reverie limit is scoped to a single (thread, agent) pair rather
+/// the running-reverie limit is scoped to a single (agent, agent) pair rather
 /// than globally per agent type. The agent's *identity* (for prompt loading) is
 /// never derived from this key — it lives on [`Session::system_id`].
 #[must_use]
@@ -61,9 +61,9 @@ pub(crate) fn reverie_slot(agent_id: Option<&str>, system_id: &str) -> String {
     agent_id.map_or_else(|| system_id.to_owned(), |tid| format!("{tid}\u{1}{system_id}"))
 }
 
-/// Resolve the thread that owns the current context (the executing thread).
+/// Resolve the agent that owns the current context (the executing agent).
 /// Reverie lifecycle notifications are routed back here so they land on the
-/// launching thread, not wherever focus drifts while the reverie runs.
+/// launching agent, not wherever focus drifts while the reverie runs.
 pub(crate) fn owner_agent_id(state: &State) -> Option<String> {
     state.executing_agent_id().map(str::to_owned)
 }
@@ -75,8 +75,8 @@ pub(crate) fn owner_agent_id(state: &State) -> Option<String> {
 ///
 /// Returns `true` if the reverie was started, `false` if guards prevented it.
 pub(crate) fn start_manual_reverie(state: &mut State, system_id: String, context: Option<String>) -> bool {
-    // Guard: this agent type is already running FOR THIS THREAD (one reverie per
-    // (thread, agent), not one globally — see `reverie_slot`).
+    // Guard: this agent type is already running FOR THIS AGENT (one reverie per
+    // (agent, agent), not one globally — see `reverie_slot`).
     let owner = owner_agent_id(state);
     let slot = reverie_slot(owner.as_deref(), &system_id);
     if state.reveries.contains_key(&slot) {

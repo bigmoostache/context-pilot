@@ -309,29 +309,29 @@ fn ack_status(status: &cp_wire::types::ack::Status) -> String {
     }
 }
 
-/// `GET /api/fleet/{id}/agents` — the thread list, served roster-first.
+/// `GET /api/fleet/{id}/agents` — the agent list, served roster-first.
 ///
-/// The thread **roster** (which threads exist, their turn status, archived
+/// The agent **roster** (which agents exist, their turn status, archived
 /// flag, and last activity) comes from the in-memory
 /// [`MaterializedView`](crate::services::materialized_view::MaterializedView) — folded live from
-/// the agent's oplog, so a just-created/archived/restored thread is reflected
+/// the agent's oplog, so a just-created/archived/restored agent is reflected
 /// in milliseconds, never waiting on the debounced tier-② disk write (design
 /// doc I5: live reads ride the view, not disk).
 ///
-/// The per-thread **message log** is hydrated best-effort from the agent's
+/// The per-agent **message log** is hydrated best-effort from the agent's
 /// `config.json` (via [`StateReader`](crate::inspect::StateReader)): the view
 /// roster carries message *counts* but not bodies, and the conversation log is
-/// only needed once a thread is opened. The two are merged by thread id:
+/// only needed once an agent is opened. The two are merged by agent id:
 ///
-/// * a thread present in both — disk supplies its `log`, the view supplies the
+/// * an agent present in both — disk supplies its `log`, the view supplies the
 ///   fresher `status` / `archived` / `lastActivity` (the disk copy may lag);
-/// * a thread only in the view (created after the last disk flush) — synthesised
+/// * an agent only in the view (created after the last disk flush) — synthesised
 ///   from the roster alone with an empty log (it gains its log on the next disk
 ///   flush, and later via live `MessageCreated` deltas);
-/// * a thread only on disk (created before roster journaling began) — kept
+/// * an agent only on disk (created before roster journaling began) — kept
 ///   verbatim from disk.
 ///
-/// This makes thread *appearance* instant (the user's latency complaint) while
+/// This makes agent *appearance* instant (the user's latency complaint) while
 /// keeping conversations intact during the migration to a fully delta-driven
 /// read path.
 pub fn agents(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
@@ -358,7 +358,7 @@ pub fn agents(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
                     .map(String::from)
             });
         // The `reader` borrow ends with `cfg`/`focused` (both owned); now read
-        // the live roster + focused thread from the view under the same lock.
+        // the live roster + focused agent from the view under the same lock.
         // The view's focus (push-fed via `AgentFocusChanged`) is the fresher
         // authority; fall back to the disk `FocusState` only when the view has
         // none yet (a backend cold start before the agent's first focus
@@ -370,8 +370,8 @@ pub fn agents(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
         (cfg, focused, roster)
     };
 
-    // Disk threads (full logs). Absent config is tolerated: the view roster
-    // alone can still render newly-created threads.
+    // Disk agents (full logs). Absent config is tolerated: the view roster
+    // alone can still render newly-created agents.
     let empty: Vec<serde_json::Value> = Vec::new();
     let raw_agents = config
         .as_ref()
@@ -384,13 +384,13 @@ pub fn agents(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
     let mut details: Vec<serde_json::Value> = raw_agents.iter().map(|t| reshape_agent(t, fleet_id)).collect();
 
     // First-paint tasks from the agent's `config.json` todo module (thread-owned
-    // todos live separately from the thread record). The live roster overlay
+    // todos live separately from the agent record). The live roster overlay
     // below overrides these with the fresher delta-fed task lists where present.
     attach_disk_tasks(&mut details, config.as_ref());
     attach_disk_notes(&mut details, config.as_ref());
 
-    // Overlay the view's fresher roster onto matching disk threads, then append
-    // any view-only threads the disk has not yet flushed.
+    // Overlay the view's fresher roster onto matching disk agents, then append
+    // any view-only agents the disk has not yet flushed.
     overlay_roster(&mut details, &roster, fleet_id);
 
     HttpReply::ok(&serde_json::json!({

@@ -103,7 +103,7 @@ pub trait Watcher: Send + Sync {
         None
     }
 
-    /// Optional thread ID this watcher is scoped to (for coucou thread integration).
+    /// Optional agent ID this watcher is scoped to (for coucou agent integration).
     /// Used for persistence across reloads.
     fn agent_id(&self) -> Option<&str> {
         None

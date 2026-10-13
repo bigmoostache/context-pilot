@@ -94,11 +94,11 @@ struct GhRun {
     token: String,
     /// Raw command string, used for panel naming and refresh.
     command: String,
-    /// Executing thread's workdir.
+    /// Executing agent's workdir.
     cwd: std::path::PathBuf,
 }
 
-/// Run `gh` in the thread's workdir with a timeout and shape the result.
+/// Run `gh` in the agent's workdir with a timeout and shape the result.
 fn run_gh(run: &GhRun) -> ToolOutput {
     let start = Instant::now();
 

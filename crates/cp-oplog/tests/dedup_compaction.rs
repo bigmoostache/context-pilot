@@ -107,13 +107,13 @@ mod tests {
 
     // ── compaction preserves replay ─────────────────────────────────────────────
 
-    /// Build a rich, many-roll log: three threads, several command effects, all
+    /// Build a rich, many-roll log: three agents, several command effects, all
     /// interleaved under a tiny segment limit. Returns the oplog dir (kept alive by
     /// the returned guard) and the tokens committed.
     fn build_rich_log(guard: &tempfile::TempDir) -> Vec<String> {
         let mut tokens = Vec::new();
         let mut writer = OplogWriter::open_with_segment_limit(guard.path(), TINY_LIMIT).expect("open");
-        // Thread rotation (every 3rd) and effect cadence (every 5th) are tracked with
+        // Agent rotation (every 3rd) and effect cadence (every 5th) are tracked with
         // explicit counters rather than `%` — the modulo operator is disallowed in
         // this foundational crate.
         let agents = ["T1", "T2", "T3"];

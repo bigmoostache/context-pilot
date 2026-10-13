@@ -205,7 +205,7 @@ pub(crate) fn refresh(state: &State) {
     };
 
     // Spawn background thread — fire-and-forget.
-    // The thread does the expensive Meilisearch queries and writes the
+    // The agent does the expensive Meilisearch queries and writes the
     // result to the shared RadarCache when done.
     let _handle = std::thread::Builder::new().name("radar-refresh".into()).spawn(move || {
         refresh_inner(&job);

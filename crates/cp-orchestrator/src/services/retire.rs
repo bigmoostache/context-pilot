@@ -7,7 +7,7 @@
 //!
 //! It lives in [`services`](super) beside the other pure, single-owner backend
 //! data structures (the materialized view): like them it owns
-//! no I/O thread, just in-memory state with a disk-backed persistence helper.
+//! no I/O agent, just in-memory state with a disk-backed persistence helper.
 //!
 //! # Why a separate store (not the registry `Entry`)
 //!

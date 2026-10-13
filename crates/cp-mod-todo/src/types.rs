@@ -9,7 +9,7 @@ use std::str::FromStr;
 /// `Pending`), `InProgress`, `Done`, and `Cancelled` — the soft-delete. A
 /// cancelled item is hidden from the panel and excluded from every count and
 /// from `check_done_allowed`; it is never hard-removed except when its owning
-/// thread is deleted.
+/// agent is deleted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum TodoStatus {
@@ -59,8 +59,8 @@ impl FromStr for TodoStatus {
 pub struct TodoItem {
     /// Todo ID (X1, X2, ...)
     pub id: String,
-    /// Owning thread id (compulsory, thread-owned tasks rework). An item with
-    /// no owning thread cannot exist; legacy items lacking one are purged on
+    /// Owning agent id (compulsory, thread-owned tasks rework). An item with
+    /// no owning agent cannot exist; legacy items lacking one are purged on
     /// load. Serialized unconditionally (no skip) — it is a foreign key.
     #[serde(default)]
     #[serde(rename = "thread_id")]
@@ -95,11 +95,11 @@ pub struct TodoState {
     /// Counter for generating unique IDs (X1, X2, ...).
     pub next_todo_id: usize,
     /// Injected focused-thread id for panel scoping (thread-owned tasks
-    /// rework). The main crate stamps the current focused thread id here on
+    /// rework). The main crate stamps the current focused agent id here on
     /// focus change; the panel renders only items whose `agent_id` matches.
     /// **Transient** — never serialized (see `save_module_data`).
     pub focus_filter: Option<String>,
-    /// The thread most recently work-hygiene-nudged (FR11 fire-once tracking).
+    /// The agent most recently work-hygiene-nudged (FR11 fire-once tracking).
     /// The main crate sets this after emitting a nudge so it does not re-fire on
     /// every tool call; it clears when the condition clears or focus moves.
     /// **Transient** — never serialized.

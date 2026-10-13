@@ -6,7 +6,7 @@
 //! opaque markdown — it never parses or tracks form state.
 //!
 //! The one exception is this module: a light **send-time guard** that catches a
-//! malformed form before it reaches the thread (where it would render as
+//! malformed form before it reaches the agent (where it would render as
 //! nothing). It is deliberately shallow — a real YAML parse would pull a new
 //! dependency for zero durable benefit — so it only checks the two structural
 //! invariants a usable form cannot omit: a `form-id` and a `fields` list. A

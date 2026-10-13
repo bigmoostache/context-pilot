@@ -1,19 +1,19 @@
 //! Fleet mechanism — the I/O-free core of Context Pilot's multi-thread model.
 //!
-//! A **thread** is the unit of execution: it owns its context and its execution
+//! A **agent** is the unit of execution: it owns its context and its execution
 //! state. This crate holds the *mechanism* that lets one cooperative loop drive
-//! many threads at once, without any knowledge of what a thread's context
+//! many agents at once, without any knowledge of what an agent's context
 //! actually contains:
 //!
-//! - [`AgentExecState`] — where a thread sits in the loop.
-//! - [`Role`] — whether a registry entry is a peer thread or a subordinate
-//!   reverie (only peer threads count against the concurrency cap).
-//! - [`FleetRegistry`] — scheduling metadata per thread id. Thread runtimes
+//! - [`AgentExecState`] — where an agent sits in the loop.
+//! - [`Role`] — whether a registry entry is a peer agent or a subordinate
+//!   reverie (only peer agents count against the concurrency cap).
+//! - [`FleetRegistry`] — scheduling metadata per agent id. Agent runtimes
 //!   live in `cp-base`'s `AgentStore`; this crate must not depend on `cp-base`.
 //! - [`K`] — the concurrency cap, and [`promote`] — the starvation-free policy
 //!   that fills free active slots from the waiting queue.
 //!
-//! The split is deliberate: the *bundle* of per-thread state (`cp-base`'s
+//! The split is deliberate: the *bundle* of per-agent state (`cp-base`'s
 //! `AgentRuntime`) holds editor/conversation/cache types that live in
 //! `cp-base`; this crate stays dependency-light and holds only the vocabulary
 //! and the scheduling policy.
@@ -22,24 +22,24 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-/// Maximum number of threads that may be *actively executing* at once.
+/// Maximum number of agents that may be *actively executing* at once.
 ///
 /// This is the only thing left of the old fixed "worker pool": a bound on
 /// concurrency (LLM streams in flight, cost/rate-limit pressure), demoted from
-/// an entity to a number. A thread beyond this bound is `Runnable` but waits for
+/// an entity to a number. An agent beyond this bound is `Runnable` but waits for
 /// a free slot (see [`promote`]).
 pub const K: usize = 2;
 
-/// Where a thread sits in the cooperative loop.
+/// Where an agent sits in the cooperative loop.
 ///
-/// A thread is *active* (occupies a concurrency slot) only while it is driving
+/// An agent is *active* (occupies a concurrency slot) only while it is driving
 /// the LLM — i.e. [`Streaming`](Self::Streaming) /
-/// [`AwaitingLlm`](Self::AwaitingLlm). A thread parked on a background tool
+/// [`AwaitingLlm`](Self::AwaitingLlm). An agent parked on a background tool
 /// yields its slot ([`AwaitingTool`](Self::AwaitingTool)) and re-enters the
 /// runnable queue when the result lands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum AgentExecState {
-    /// No work to do — the thread is `THEIR_TURN` or finished. Not scheduled.
+    /// No work to do — the agent is `THEIR_TURN` or finished. Not scheduled.
     #[default]
     Idle,
     /// Has queued work (a chunk to consume, a tool result to apply, a fresh
@@ -50,7 +50,7 @@ pub enum AgentExecState {
     /// Waiting for the LLM to begin responding. Holds a slot.
     AwaitingLlm,
     /// A background tool (console/callback/web/OCR) is running; the LLM is idle,
-    /// so the thread releases its slot until the tool's watcher fires.
+    /// so the agent releases its slot until the tool's watcher fires.
     AwaitingTool,
     /// The last turn failed (guard rail, API error). Surfaced in the UI; not
     /// scheduled until re-engaged.
@@ -67,7 +67,7 @@ impl AgentExecState {
         matches!(self, Self::Streaming | Self::AwaitingLlm)
     }
 
-    /// Whether this thread has work ready and is waiting only for a free slot.
+    /// Whether this agent has work ready and is waiting only for a free slot.
     #[must_use]
     pub const fn is_runnable(self) -> bool {
         matches!(self, Self::Runnable)
@@ -77,12 +77,12 @@ impl AgentExecState {
 /// The role a registry entry plays in the fleet.
 ///
 /// There is one execution primitive; `Role` distinguishes its two uses. Only a
-/// [`Agent`](Self::Thread) counts against the concurrency cap [`K`]; a
+/// [`Agent`](Self::Agent) counts against the concurrency cap [`K`]; a
 /// [`Reverie`](Self::Reverie) is a background subordinate scoped to a parent and
 /// is never gated by the cap.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum Role {
-    /// A user-facing peer thread. Persistent; counts against [`K`].
+    /// A user-facing peer agent. Persistent; counts against [`K`].
     #[default]
     #[serde(rename = "Thread")]
     Agent,
@@ -98,13 +98,13 @@ impl Role {
     }
 }
 
-/// One entry in the [`FleetRegistry`]: a thread's scheduling metadata.
+/// One entry in the [`FleetRegistry`]: an agent's scheduling metadata.
 ///
-/// The thread's runtime is not here: it lives permanently in `cp-base`'s
-/// `AgentStore`, keyed by the same thread id.
+/// The agent's runtime is not here: it lives permanently in `cp-base`'s
+/// `AgentStore`, keyed by the same agent id.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Entry {
-    /// Peer thread or subordinate reverie.
+    /// Peer agent or subordinate reverie.
     pub role: Role,
     /// Current position in the cooperative loop.
     pub exec_state: AgentExecState,
@@ -122,13 +122,13 @@ impl Entry {
     }
 }
 
-/// A generic table of fleet entries keyed by thread id.
+/// A generic table of fleet entries keyed by agent id.
 ///
 /// Holds the *mechanism* (membership, counts, lookup). Scheduling policy lives
 /// in [`promote`].
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FleetRegistry {
-    /// Entries keyed by thread id.
+    /// Entries keyed by agent id.
     entries: HashMap<String, Entry>,
 }
 
@@ -145,7 +145,7 @@ impl FleetRegistry {
     }
 
     /// Remove and return the entry for `id`, if present. Scheduling metadata
-    /// only: the thread's runtime is dropped via `AgentStore::remove`.
+    /// only: the agent's runtime is dropped via `AgentStore::remove`.
     pub fn remove(&mut self, id: &str) -> Option<Entry> {
         self.entries.remove(id)
     }
@@ -167,7 +167,7 @@ impl FleetRegistry {
         self.entries.contains_key(id)
     }
 
-    /// Number of entries (threads + reveries).
+    /// Number of entries (agents + reveries).
     #[must_use]
     pub fn len(&self) -> usize {
         self.entries.len()
@@ -189,7 +189,7 @@ impl FleetRegistry {
         self.entries.iter_mut()
     }
 
-    /// Count of currently-active capped entries — i.e. peer threads occupying a
+    /// Count of currently-active capped entries — i.e. peer agents occupying a
     /// concurrency slot. Reveries never count (see [`Role::is_capped`]).
     #[must_use]
     pub fn active_capped_count(&self) -> usize {
@@ -212,10 +212,10 @@ impl FleetRegistry {
     }
 }
 
-/// Decide which waiting-runnable threads to promote into free active slots.
+/// Decide which waiting-runnable agents to promote into free active slots.
 ///
 /// Returns the ids to promote this tick: the oldest-waiting runnable capped
-/// threads, up to the number of free slots (`K - active`). A thread is its own
+/// agents, up to the number of free slots (`K - active`). An agent is its own
 /// executor, so there is nothing to arbitrate — promotion only picks from the
 /// waiting queue. Reveries are never promoted here (they are not capped).
 #[must_use]
@@ -281,11 +281,11 @@ mod tests {
     #[test]
     fn promote_fills_free_slots_oldest_first() {
         let mut reg = FleetRegistry::new();
-        // One active thread → one free slot (K=2).
+        // One active agent → one free slot (K=2).
         let mut active = Entry::new(Role::Agent);
         active.exec_state = AgentExecState::Streaming;
         reg.insert("A".to_owned(), active);
-        // Two waiting runnable threads with different wait times.
+        // Two waiting runnable agents with different wait times.
         let mut w_new = Entry::new(Role::Agent);
         w_new.exec_state = AgentExecState::Runnable;
         w_new.waiting_since_ms = Some(200);

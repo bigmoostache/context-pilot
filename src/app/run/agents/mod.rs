@@ -25,7 +25,7 @@ use cp_mod_agents::types::{AgentMessage, AgentsState};
 use cp_wire::types::snapshot::RosterAgent;
 
 /// Branch A + B of the incoming-message behavior, run once per main-loop tick on
-/// the **focused** thread (the executing at rest, per the executing=focused
+/// the **focused** agent (the executing at rest, per the executing=focused
 /// invariant). Splits on `was_streaming` — the agent's stream phase snapshotted
 /// by the caller BEFORE `finalize_stream` runs this tick (see the call site):
 ///
@@ -35,16 +35,16 @@ use cp_wire::types::snapshot::RosterAgent;
 ///   [`SpineState::create_notification`] injects inline mid-stream (the same path
 ///   the Think reminder uses). The `has_been_pushed` flag makes this fire at most
 ///   once per message, so a long stream never re-pushes.
-/// - **Idle (Branch A):** if the focused `MY_TURN` thread has unseen messages,
-///   auto-read them (acknowledge + force-refresh the Threads panel) and raise a
+/// - **Idle (Branch A):** if the focused `MY_TURN` agent has unseen messages,
+///   auto-read them (acknowledge + force-refresh the Agents panel) and raise a
 ///   continuation nudge whose content is already in-panel — skipping the explicit
 ///   `Read` round-trip. When everything is already seen, this is a no-op and the
 ///   `IdleMyTurnDetector` watcher fires the plain "please respond" notification.
 ///
-/// Both notifications are bound to the thread (so `Read`-ing it clears them) and
+/// Both notifications are bound to the agent (so `Read`-ing it clears them) and
 /// deduplicated on their `(kind, source)` key by the spine. Focused-thread only
-/// (background `MY_TURN` threads are the dispatcher's job), so this is
-/// N=1-correct and a no-op whenever the focused thread has nothing new.
+/// (background `MY_TURN` agents are the dispatcher's job), so this is
+/// N=1-correct and a no-op whenever the focused agent has nothing new.
 pub(super) fn handle_incoming_focused_messages(app: &mut App, was_streaming: bool) {
     use cp_mod_spine::types::{NotificationType, SpineState};
 
@@ -134,7 +134,7 @@ pub(super) fn emit_bridge_deltas(app: &mut App) {
         let _guard = crate::profile!(name);
         emit(app);
     }
-    // Emitters never mutate threads, so `hash` still describes the live roster
+    // Emitters never mutate agents, so `hash` still describes the live roster
     // and every roster memo now matches it.
     ROSTER_HASH.set(hash);
     // Drop the tick's replay so a later reseed (bridge recovery) reads fresh.
@@ -184,10 +184,10 @@ thread_local! {
 /// Decide whether the four roster emitters (messages, status, archived,
 /// paused) can be skipped this tick, and return the fingerprint to store.
 ///
-/// They diff only `(id, message count, status, archived, paused)` per thread
+/// They diff only `(id, message count, status, archived, paused)` per agent
 /// against memos that equal the live values after every pass. So once all four
 /// memos are seeded, an unchanged fingerprint guarantees an empty diff, saving
-/// four O(threads) walks with hash lookups on every loop tick.
+/// four O(agents) walks with hash lookups on every loop tick.
 fn roster_gate(app: &App) -> (bool, Option<u64>) {
     use std::hash::{Hash as _, Hasher as _};
     if !bridge_active(&app.state) {
@@ -214,13 +214,13 @@ fn roster_gate(app: &App) -> (bool, Option<u64>) {
     (ROSTER_HASH.get() == Some(hash), Some(hash))
 }
 
-/// Append an auto **tool-activity trace** to the owner (executing) thread, if any.
+/// Append an auto **tool-activity trace** to the owner (executing) agent, if any.
 ///
 /// Every tool call leaves a lightweight `{verb · tool — intent}` breadcrumb in
-/// the conversation of the thread that is actually executing it — the
-/// **executing** thread (`State::executing_agent_id`), never the human focus. So a human watching a thread sees
-/// that thread's own live work without the agent having to narrate it, even when
-/// several threads run concurrently and the human is looking at a different one.
+/// the conversation of the agent that is actually executing it — the
+/// **executing** agent (`State::executing_agent_id`), never the human focus. So a human watching an agent sees
+/// that agent's own live work without the agent having to narrate it, even when
+/// several agents run concurrently and the human is looking at a different one.
 /// The message is marked
 /// [`auto`](AgentMessage::auto): it is **hidden from the agent's own context**
 /// (skipped in `build_panel_content`) and rendered as a **collapsible run** in
@@ -228,9 +228,9 @@ fn roster_gate(app: &App) -> (bool, Option<u64>) {
 ///
 /// Invariants this upholds:
 /// - **Never changes turn or focus.** The trace is `Assistant`-authored and
-///   `acknowledged` (so it can't flip the thread to `MY_TURN` or count as
+///   `acknowledged` (so it can't flip the agent to `MY_TURN` or count as
 ///   unread), and no spine notification / `on_user_message` hook fires.
-/// - **No-op when no owner thread.** No executing/focused thread ⇒ nothing
+/// - **No-op when no owner agent.** No executing/focused agent ⇒ nothing
 ///   happens.
 /// - **Skips the thread-native tools** (`Send` / `Read`): `Send` already writes
 ///   a real bubble (a second auto trace would double it) and `Read` is the
@@ -238,13 +238,13 @@ fn roster_gate(app: &App) -> (bool, Option<u64>) {
 ///
 /// The live [`emit_messages`] chokepoint picks the appended message up on the
 /// next loop tick and pushes it to the backend view (and the web UI) for free,
-/// since an auto message is an ordinary thread message on the wire (carrying its
+/// since an auto message is an ordinary agent message on the wire (carrying its
 /// `auto` flag).
 pub(in crate::app::run) fn maybe_append_tool_activity(state: &mut State, tool: &ToolUse) {
-    // Attribute the trace to the OWNER thread — the one whose runtime is
-    // currently executing in `state` (the thread actually executing this tool),
+    // Attribute the trace to the OWNER agent — the one whose runtime is
+    // currently executing in `state` (the agent actually executing this tool),
     // NOT the human's on-screen focus. With N>1 these differ: a background
-    // thread can run tools while the human views another thread, and its
+    // agent can run tools while the human views another agent, and its
     // breadcrumbs must land in its own conversation.
     let Some(tid) = state.executing_agent_id().map(str::to_owned) else {
         return;

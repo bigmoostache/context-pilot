@@ -2,7 +2,7 @@
 //!
 //! Supports both static (one-shot) and live (auto-refreshing) panels.
 //! Live panels store the SQL query in metadata and re-execute it every 2 seconds
-//! via the background cache thread.
+//! via the background cache agent.
 
 use cp_base::panels::{
     CacheRequest, CacheUpdate, ContextItem, Panel, hash_content, paginate_content, update_if_changed,
@@ -50,7 +50,7 @@ pub(crate) struct LivePanelMeta<'sql> {
 /// Create a live (auto-refreshing) entity result panel.
 ///
 /// Stores the SQL query and database path in metadata so the background cache
-/// thread can re-execute the query periodically. Returns the panel ID.
+/// agent can re-execute the query periodically. Returns the panel ID.
 pub(crate) fn create_live_result_panel(
     state: &mut State,
     title: &str,
@@ -89,7 +89,7 @@ fn create_panel_inner(state: &mut State, title: &str, content: &str, live: Optio
 }
 
 // =============================================================================
-// Live query refresh (runs on background cache thread)
+// Live query refresh (runs on background cache agent)
 // =============================================================================
 
 /// Re-execute a live query and return a cache update if the result changed.
@@ -122,7 +122,7 @@ struct EntityRestoreRequest {
     content: String,
 }
 
-/// Cache request for live panels — re-executes SQL on background thread.
+/// Cache request for live panels — re-executes SQL on background agent.
 struct LiveQueryRequest {
     /// Panel context ID (e.g., "P15").
     context_id: String,

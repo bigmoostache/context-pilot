@@ -1,25 +1,25 @@
 //! Threads module — parallel discussion and work topics.
 //!
 //! Provides structured async back-and-forth between the user and the AI
-//! across multiple concurrent threads. Each thread has a turn-based status
+//! across multiple concurrent agents. Each agent has a turn-based status
 //! (`MY_TURN` / `THEIR_TURN`) and its own message history.
 //!
-//! Two tools: `Send` (post a message to a thread) and
-//! `Read` (retrieve thread messages, sets focus).
+//! Two tools: `Send` (post a message to an agent) and
+//! `Read` (retrieve agent messages, sets focus).
 
 /// Send-time validation of agent-authored ` ```form ` blocks.
 mod forms;
-/// Incoming-message behavior for the focused thread (idle auto-read + streaming push).
+/// Incoming-message behavior for the focused agent (idle auto-read + streaming push).
 pub mod incoming;
-/// Panel rendering for the thread list.
+/// Panel rendering for the agent list.
 mod panel;
 /// Tool execution handlers: `Send` and `Read`.
 pub mod tools;
-/// Thread state types: `Agent`, `AgentMessage`, `AgentsState`, `FocusState`.
+/// Agent state types: `Agent`, `AgentMessage`, `AgentsState`, `FocusState`.
 pub mod types;
-/// Display-only mirror of per-thread execution state (see the module docs).
+/// Display-only mirror of per-agent execution state (see the module docs).
 pub mod view_state;
-/// Persistent watcher: fires a notification when idle + `MY_TURN` thread exists.
+/// Persistent watcher: fires a notification when idle + `MY_TURN` agent exists.
 pub mod watcher;
 
 use types::{AgentsState, FocusState};
@@ -35,7 +35,7 @@ use cp_base::state::runtime::State;
 use cp_base::tools::pre_flight::Verdict;
 use cp_base::tools::{ParamType, ToolDefinition, ToolResult, ToolTexts, ToolUse};
 
-/// Lazily-parsed tool descriptions loaded from the threads YAML definition.
+/// Lazily-parsed tool descriptions loaded from the agents YAML definition.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/threads.yaml")));
 
@@ -73,12 +73,12 @@ impl Module for AgentsModule {
 
     fn init_state(&self, state: &mut State) {
         state.set_ext(AgentsState::new());
-        // FocusState is UI-global: "which thread the human is looking at" is one
-        // singleton pointer, NOT per-thread state. set_ext_global pins it to the
-        // shared map so it never rides the thread's runtime (`AgentRuntime`).
+        // FocusState is UI-global: "which agent the human is looking at" is one
+        // singleton pointer, NOT per-agent state. set_ext_global pins it to the
+        // shared map so it never rides the agent's runtime (`AgentRuntime`).
         state.set_ext_global(FocusState::new());
-        // FleetExecMirror describes EVERY thread, so it too must be shared — a
-        // per-thread copy would only ever hold that thread's own state. It is
+        // FleetExecMirror describes EVERY agent, so it too must be shared — a
+        // per-agent copy would only ever hold that agent's own state. It is
         // runtime-only (rebuilt from the fleet registry on the first tick after
         // boot), hence no save/load arm.
         state.set_ext_global(FleetExecMirror::new());
@@ -92,14 +92,14 @@ impl Module for AgentsModule {
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         let ts = AgentsState::get(state);
-        // `focus_file` records which thread's `states/<id>.json` holds the
+        // `focus_file` records which agent's `states/<id>.json` holds the
         // focused context. It cannot live in that file (boot needs it to
         // choose the file), so it is written here, in the shared config, in the
         // same save as the keyed write — the two land together or the boot-side
         // fallback covers the gap.
         let focus_file = FocusState::get(state).focused_agent_id.clone().unwrap_or_default();
         // Messages are NOT serialized here: they live in `agents/<id>.json`,
-        // written by the save batch only for threads that changed.
+        // written by the save batch only for agents that changed.
         let agents: Vec<types::persist::AgentMeta<'_>> = ts.agents.iter().map(Into::into).collect();
         json!({
             "threads": agents,
@@ -142,7 +142,7 @@ impl Module for AgentsModule {
 
     fn load_worker_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Ok(fs) = serde_json::from_value::<FocusState>(data.clone()) {
-            // UI-global (see init_state): pin to the shared map, never per-thread.
+            // UI-global (see init_state): pin to the shared map, never per-agent.
             state.set_ext_global(fs);
         }
     }
@@ -271,13 +271,13 @@ impl Module for AgentsModule {
     }
 }
 
-/// Pre-flight for `Send`: the calling thread must exist, at least one content
+/// Pre-flight for `Send`: the calling agent must exist, at least one content
 /// param, and any agent-authored ` ```form ` block must be well-formed (design
 /// doc §7).
 ///
-/// `Send` always targets the caller's own (executing) thread — there is no
-/// target parameter, so a thread can never post into another thread's voice.
-/// Sending to a `THEIR_TURN` thread is allowed — the AI may post follow-ups
+/// `Send` always targets the caller's own (executing) agent — there is no
+/// target parameter, so an agent can never post into another agent's voice.
+/// Sending to a `THEIR_TURN` agent is allowed — the AI may post follow-ups
 /// without waiting; status simply stays `THEIR_TURN`.
 fn preflight_send(tool: &ToolUse, state: &State, pf: &mut Verdict) {
     let tid = tools::executing_agent_id_or_empty(state);

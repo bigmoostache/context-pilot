@@ -1,5 +1,5 @@
 //! Spine step of the main loop: focused-thread spine check, API-check results,
-//! then one advancement round of the background threads. Each call carries its
+//! then one advancement round of the background agents. Each call carries its
 //! own perf span so `loop.spine` self time is attributable.
 
 use crate::app::App;
@@ -17,9 +17,9 @@ impl App {
             super::super::streaming::process_api_check_results(self);
         }
 
-        // === BACKGROUND THREADS (Phase C) ===
-        // After the focused thread has been stepped, advance every OTHER active
-        // thread one step by making it executing around the same advancement
+        // === BACKGROUND AGENTS (Phase C) ===
+        // After the focused agent has been stepped, advance every OTHER active
+        // agent one step by making it executing around the same advancement
         // core (`step_one_agent`). No-op at N=1. Reconcile first: registry vs
         // roster + promotion decision.
         {
@@ -36,7 +36,7 @@ impl App {
         }
         // G2 display mirror: republish AFTER the step loop so it reflects
         // post-step derivations; the loop is at rest, so `state` is the focused
-        // thread again.
+        // agent again.
         {
             let _g = crate::profile!("sp_publish_fleet_view");
             self.publish_fleet_view_states();

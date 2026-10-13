@@ -1,5 +1,5 @@
 //! Enriched **agent meta** endpoints — maquette-compatible `Agent` objects
-//! combining registry records, oplog-projected state, thread inspection, and
+//! combining registry records, oplog-projected state, agent inspection, and
 //! git branch info.
 //!
 //! * [`fleet_meta`] — one agent's enriched info (`GET /api/fleet/{id}/meta`).
@@ -17,7 +17,7 @@ use crate::transport::rest::HttpReply;
 /// `GET /api/fleet/{id}/meta` — enriched agent info for the fleet/agent views.
 ///
 /// Combines registry record (name, folder, model), oplog-projected state
-/// (phase, cost), thread inspection (count, any-MY_TURN → "needs-you"), and
+/// (phase, cost), agent inspection (count, any-MY_TURN → "needs-you"), and
 /// `git` branch. Returns a JSON object matching the maquette `Agent` shape.
 pub fn agent(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
     let entry = match crate::transport::rest::resolve_entry(state, fleet_id) {
@@ -142,7 +142,7 @@ fn build_fleet_meta(state: &Mutex<Backend>, fleet_id: &str, entry: &Entry) -> se
         },
     );
 
-    // Thread count + any-MY_TURN + last activity from config.json.
+    // Agent count + any-MY_TURN + last activity from config.json.
     let (agents_count, has_my_turn, last_activity_ms, task) = inspect_agents(state, folder);
 
     let branch = git_branch(folder);
@@ -205,8 +205,8 @@ fn build_fleet_meta(state: &Mutex<Backend>, fleet_id: &str, entry: &Entry) -> se
     })
 }
 
-/// Inspect an agent's threads from config.json for count, `MY_TURN` status,
-/// last activity, and current task (focused thread name).
+/// Inspect an agent's agents from config.json for count, `MY_TURN` status,
+/// last activity, and current task (focused agent name).
 fn inspect_agents(state: &Mutex<Backend>, folder: &str) -> (usize, bool, u64, String) {
     let folder_path = std::path::Path::new(folder);
     let cfg = {
@@ -240,7 +240,7 @@ fn inspect_agents(state: &Mutex<Backend>, folder: &str) -> (usize, bool, u64, St
         .max()
         .unwrap_or(0);
 
-    // Task = name of the first MY_TURN thread, or empty.
+    // Task = name of the first MY_TURN agent, or empty.
     let task = agents
         .iter()
         .find(|t| t.get("status").and_then(serde_json::Value::as_str) == Some("MyTurn"))
@@ -324,7 +324,7 @@ fn git_branch(folder: &str) -> String {
         .unwrap_or_default()
 }
 
-/// Derive the maquette `FleetStatus` from lifecycle, phase, thread state, and
+/// Derive the maquette `FleetStatus` from lifecycle, phase, agent state, and
 /// registry liveness.
 ///
 /// A **stale** agent (dead PID / stale heartbeat, detected by the registry
@@ -333,7 +333,7 @@ fn git_branch(folder: &str) -> String {
 /// a graceful-shutdown lifecycle (`Stopping`/`Stopped`, I8) can never be
 /// "working": the authoritative oplog signal wins over a stale phase that a
 /// torn shutdown might have left behind. Otherwise the live `phase` decides
-/// "working", falling back to "needs-you" (any `MY_TURN` thread) or "idle".
+/// "working", falling back to "needs-you" (any `MY_TURN` agent) or "idle".
 fn derive_status(
     phase: Option<cp_wire::types::Phase>,
     lifecycle: Option<cp_wire::types::LifecycleState>,

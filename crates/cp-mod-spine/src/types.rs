@@ -55,9 +55,9 @@ pub struct Notification {
     pub timestamp_ms: u64,
     /// Human-readable description
     pub content: String,
-    /// Thread this notification is bound to. Stamped at creation with the
-    /// executing thread (whose inbox holds it); `Read`-ing that thread clears
-    /// it. `None` only before any thread is placed.
+    /// Agent this notification is bound to. Stamped at creation with the
+    /// executing agent (whose inbox holds it); `Read`-ing that agent clears
+    /// it. `None` only before any agent is placed.
     #[serde(default)]
     #[serde(rename = "thread_id")]
     pub agent_id: Option<String>,
@@ -151,10 +151,10 @@ pub struct SpineState {
     /// Flushed by [`Self::flush_deferred_inject`] once the tool result lands;
     /// latest wins (T736: at most one live notification message).
     pub deferred_inject: Option<(String, String)>,
-    /// Coucous read from this thread's legacy `pending_coucous` save slot (they
-    /// lived per-thread before the fleet-shared registry). Drained once at boot
+    /// Coucous read from this agent's legacy `pending_coucous` save slot (they
+    /// lived per-agent before the fleet-shared registry). Drained once at boot
     /// by the app into [`CoucouRegistry`](crate::schedule::CoucouRegistry),
-    /// stamped with this thread as owner. Never re-saved.
+    /// stamped with this agent as owner. Never re-saved.
     pub legacy_coucous: Vec<crate::coucou::Record>,
 }
 
@@ -258,8 +258,8 @@ impl SpineState {
             }
         }
 
-        // Owner = the executing thread, whose inbox this lands in (design §7.5:
-        // every notification names its thread). `set_notification_agent` can
+        // Owner = the executing agent, whose inbox this lands in (design §7.5:
+        // every notification names its agent). `set_notification_agent` can
         // still re-address it afterwards.
         let owner = state.executing_agent_id().map(str::to_owned);
         {
@@ -306,10 +306,10 @@ impl SpineState {
         removed
     }
 
-    /// Delete all notifications bound to a thread (matching `agent_id`).
+    /// Delete all notifications bound to an agent (matching `agent_id`).
     ///
-    /// Called when a thread is `Read` — its pending notifications are moot once
-    /// the agent has focused the thread. Returns the number removed.
+    /// Called when an agent is `Read` — its pending notifications are moot once
+    /// the agent has focused the agent. Returns the number removed.
     pub fn delete_notifications_by_agent(state: &mut State, agent_id: &str) -> usize {
         let removed = {
             let ss = Self::get_mut(state);
@@ -323,8 +323,8 @@ impl SpineState {
         removed
     }
 
-    /// Bind an existing notification (by ID) to a thread, so `Read`-ing that
-    /// thread clears it. No-op when `agent_id` is `None` or the ID is unknown.
+    /// Bind an existing notification (by ID) to an agent, so `Read`-ing that
+    /// agent clears it. No-op when `agent_id` is `None` or the ID is unknown.
     /// Used by the watcher chokepoint after `create_notification` returns.
     pub fn set_notification_agent(state: &mut State, id: &str, agent_id: Option<String>) {
         let Some(tid) = agent_id else { return };

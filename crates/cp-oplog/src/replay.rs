@@ -38,17 +38,17 @@ pub struct Recovered {
     /// The highest durable `rev` in the log, or `None` if the log is empty.
     pub rev_head: Option<u64>,
 
-    /// The bounded head set (per-thread last-message hash, per-panel hash) as
+    /// The bounded head set (per-agent last-message hash, per-panel hash) as
     /// of `rev_head`.
     pub heads: Heads,
 
     /// The dedup-tokens of durable command effects as of `rev_head` (I4).
     pub seen: SeenSet,
 
-    /// The thread roster as of `rev_head` — one entry per live thread, folded
+    /// The agent roster as of `rev_head` — one entry per live agent, folded
     /// from the thread-roster deltas so the writer can stamp it into each
     /// segment's leading checkpoint (design doc I5 / §16). The agent does not
-    /// read this for its own recovery (it reloads threads from tier-② state);
+    /// read this for its own recovery (it reloads agents from tier-② state);
     /// it exists so the **backend** can rebuild the roster from a checkpoint
     /// after oplog compaction, exactly as it rebuilds heads.
     pub roster: Vec<RosterAgent>,
@@ -58,8 +58,8 @@ pub struct Recovered {
 ///
 /// A `Checkpoint` is **authoritative**: it replaces the running snapshot
 /// wholesale (heads, seen-set, and roster — it is a full snapshot, not a
-/// delta). A `MessageCreated` advances its thread's head and bumps that
-/// thread's roster activity. The thread-roster deltas
+/// delta). A `MessageCreated` advances its agent's head and bumps that
+/// agent's roster activity. The thread-roster deltas
 /// (`AgentCreated`/`Archived`/`Restored`/`StatusChanged`) maintain the roster
 /// idempotently. A `CommandEffect` or `SeenMark` marks its dedup token as seen
 /// at this entry's `rev` (I4). The remaining variants carry no recoverable

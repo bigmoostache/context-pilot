@@ -1,6 +1,6 @@
-//! Canonical YAML render of a thread's task tree.
+//! Canonical YAML render of an agent's task tree.
 //!
-//! A **read-only projection**: [`render`] turns a thread's tasks into a
+//! A **read-only projection**: [`render`] turns an agent's tasks into a
 //! byte-stable YAML document with deterministic field order, 2-space indent and
 //! `description: |` block scalars. It feeds the Todo panel — the human- and
 //! model-facing view of the tree.
@@ -19,7 +19,7 @@ use crate::types::{TodoItem, TodoStatus};
 
 /// The canonical YAML for `agent_id`'s task tree.
 ///
-/// Empty string when the thread has no items. Siblings are ordered by
+/// Empty string when the agent has no items. Siblings are ordered by
 /// [`TodoItem::order`]; a cancelled item sorts **last** in its group
 /// (soft-delete convention).
 #[must_use]

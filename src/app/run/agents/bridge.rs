@@ -167,7 +167,7 @@ fn accept_commands(state: &mut State) -> Option<Vec<Command>> {
 /// durable** path ([`submit_durable`](cp_oplog::service::Service::submit_durable)):
 /// the record is group-committed + `fdatasync`'d off-loop by the oplog thread,
 /// so the main loop never blocks on a sync (design doc I2) yet the delta is
-/// never dropped (a created/archived thread cannot be silently lost).
+/// never dropped (a created/archived agent cannot be silently lost).
 ///
 /// [`submit_durable`]: cp_oplog::service::Service::submit_durable
 pub(super) fn emit_roster_delta(state: &State, kind: OpEntryKind) {
@@ -322,7 +322,7 @@ fn context_inputs_changed(state: &State) -> bool {
     !fresh
 }
 
-// ── Thread status emission (Phase 1.4 status_changed — design doc I8) ─────
+// ── Agent status emission (Phase 1.4 status_changed — design doc I8) ─────
 
 /// Map the agent's [`AgentStatus`] to the wire [`AgentTurn`] observers see.
 ///
@@ -338,13 +338,13 @@ pub(super) const fn wire_turn(status: AgentStatus) -> AgentTurn {
 }
 
 /// Emit a [`AgentStatusChanged`](OpEntryKind::AgentStatusChanged) the instant
-/// any thread's turn-status flips, so the backend view (and the web roster)
-/// move the thread to the right bucket in milliseconds instead of waiting on
+/// any agent's turn-status flips, so the backend view (and the web roster)
+/// move the agent to the right bucket in milliseconds instead of waiting on
 /// the debounced tier-② disk write.
 ///
 /// Like [`emit_messages`](super::messages::emit_messages), this is a main-loop
-/// **observe-on-change chokepoint**: it diffs each thread's live status against
-/// the per-thread snapshot held in [`BridgeState`] and emits **only on an
+/// **observe-on-change chokepoint**: it diffs each agent's live status against
+/// the per-agent snapshot held in [`BridgeState`] and emits **only on an
 /// actual flip**, so it captures a transition from *every* source — a web
 /// `SendMessage`, the agent's `Send` tool, a TUI reply, the agent finishing a
 /// turn — with one uniform path rather than an emit call scattered at each
@@ -353,11 +353,11 @@ pub(super) const fn wire_turn(status: AgentStatus) -> AgentTurn {
 /// ([`emit_roster_delta`]).
 ///
 /// The first pass after boot **seeds** the snapshot without emitting, so a
-/// (re)started agent does not replay every thread's status as a spurious
+/// (re)started agent does not replay every agent's status as a spurious
 /// change (the cold roster rides the frontend's initial tier-② load).
 ///
 /// No-op when the bridge is OFF.
-/// Replay the agent's own oplog to recover the **last per-thread status the log
+/// Replay the agent's own oplog to recover the **last per-agent status the log
 /// recorded** — i.e. exactly what the backend's view has folded.
 ///
 /// This is the correct seed for [`emit_agent_status`]'s change-memo on the
@@ -368,20 +368,20 @@ pub(super) const fn wire_turn(status: AgentStatus) -> AgentTurn {
 /// [`emit_agent_status`]).
 ///
 /// Returns an empty map when the bridge is OFF or the replay fails: the caller
-/// then seeds nothing, so every live thread looks "new" to the diff and has its
+/// then seeds nothing, so every live agent looks "new" to the diff and has its
 /// current status emitted — a safe, if chattier, degradation that still
-/// converges the view (it never leaves a thread stale).
+/// converges the view (it never leaves an agent stale).
 fn oplog_roster_statuses(state: &State) -> std::collections::HashMap<String, AgentTurn> {
     super::oplog_roster(state).map(|r| r.iter().map(|t| (t.agent_id.clone(), t.status)).collect()).unwrap_or_default()
 }
 
 /// Emit a [`AgentStatusChanged`](OpEntryKind::AgentStatusChanged) the instant
-/// any thread's turn-status flips, so the backend view (and the web roster)
-/// move the thread to the right bucket in milliseconds instead of waiting on
+/// any agent's turn-status flips, so the backend view (and the web roster)
+/// move the agent to the right bucket in milliseconds instead of waiting on
 /// the debounced tier-② disk write.
 ///
-/// A main-loop **observe-on-change chokepoint**: it diffs each thread's live
-/// status against the per-thread snapshot held in [`BridgeState`] and emits
+/// A main-loop **observe-on-change chokepoint**: it diffs each agent's live
+/// status against the per-agent snapshot held in [`BridgeState`] and emits
 /// **only on an actual flip**, so it captures a transition from *every* source
 /// — a web `SendMessage`, the agent's `Send` tool, a TUI reply, the agent
 /// finishing a turn — with one uniform path. A status flip is user-visible
@@ -401,7 +401,7 @@ pub(in crate::app::run) fn emit_agent_status(app: &mut App) {
     }
 
     // First pass after (re)boot: seed the memo from the **oplog's** last-known
-    // per-thread status — i.e. exactly what the backend's view has folded — and
+    // per-agent status — i.e. exactly what the backend's view has folded — and
     // then FALL THROUGH to the diff+emit below.
     //
     // The memo must be seeded from the oplog, NOT from the live (disk) status:
@@ -411,10 +411,10 @@ pub(in crate::app::run) fn emit_agent_status(app: &mut App) {
     // never journaled as a `AgentStatusChanged` delta. If we seeded from the
     // live status, that post-flip value would become the baseline and the lost
     // transition would be swallowed forever — leaving the backend view (rebuilt
-    // from the oplog) permanently stale (the "thread shows under the wrong
+    // from the oplog) permanently stale (the "agent shows under the wrong
     // turn" bug). Seeding from the oplog roster and then running the normal
     // diff makes the very first pass emit precisely the transitions the oplog
-    // is missing, self-healing disk↔oplog divergence on every boot. Threads the
+    // is missing, self-healing disk↔oplog divergence on every boot. Agents the
     // oplog has never recorded a status for are simply absent from the seed, so
     // the diff emits their current status (correct — the view doesn't know it).
     let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.statuses());
@@ -423,7 +423,7 @@ pub(in crate::app::run) fn emit_agent_status(app: &mut App) {
         let bs = app.state.ext_mut::<BridgeState>();
         // `extend` (not an explicit `for` over the map) keeps us off the
         // `iter_over_hash_type` lint; insertion order is irrelevant since each
-        // thread id appears once in the roster and the memo is keyed by id.
+        // agent id appears once in the roster and the memo is keyed by id.
         bs.agent_statuses.extend(oplog_statuses);
         bs.seeded.seed_statuses();
         // Intentionally NO early return: fall through so the diff below emits

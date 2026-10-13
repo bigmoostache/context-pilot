@@ -344,8 +344,8 @@ pub fn execute_watch(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Process cwd for a spawned command: the `cwd` param resolved against the
-/// thread's workdir, or the workdir itself — never the shared process cwd.
-/// Errors when the thread's worktree folder no longer exists.
+/// agent's workdir, or the workdir itself — never the shared process cwd.
+/// Errors when the agent's worktree folder no longer exists.
 fn resolve_cwd(tool: &ToolUse, state: &State) -> Result<String, String> {
     if let Some(e) = state.workdir_error() {
         return Err(e);

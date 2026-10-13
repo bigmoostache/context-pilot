@@ -87,7 +87,7 @@ fn str_field(obj: &serde_json::Map<String, serde_json::Value>, key: &str) -> Opt
 ///
 /// # Errors
 /// Returns `Err` when a nested item carries an `id` (children are
-/// creation-only), an `id` does not resolve to a task of this thread, an `id`
+/// creation-only), an `id` does not resolve to a task of this agent, an `id`
 /// repeats within the call, a creation is missing its `title`, or a `status`
 /// string is not one of the four accepted values.
 pub fn upsert(state: &mut State, agent_id: &str, items: &[Item]) -> Result<Vec<String>, String> {
@@ -106,7 +106,7 @@ pub fn upsert(state: &mut State, agent_id: &str, items: &[Item]) -> Result<Vec<S
 struct Ctx<'ctx> {
     /// Live state, read-only during validation.
     state: &'ctx State,
-    /// Thread whose tasks the payload targets.
+    /// Agent whose tasks the payload targets.
     agent_id: &'ctx str,
     /// Ids already claimed by an earlier item in this same call.
     seen: HashSet<String>,
@@ -144,7 +144,7 @@ fn validate_one(ctx: &mut Ctx<'_>, item: &Item, nested: bool) {
     validate_status(ctx, item);
 }
 
-/// An `id` must resolve to a task of this thread, and appear only once.
+/// An `id` must resolve to a task of this agent, and appear only once.
 fn validate_existing(ctx: &mut Ctx<'_>, id: &str) {
     let exists = TodoState::get(ctx.state).todos.iter().any(|t| t.id == id && t.agent_id == ctx.agent_id);
     if !exists {
@@ -179,10 +179,10 @@ fn validate_status(ctx: &mut Ctx<'_>, item: &Item) {
 // Apply
 // =============================================================================
 
-/// A sibling group's location: owning thread + parent id (`None` = root group).
+/// A sibling group's location: owning agent + parent id (`None` = root group).
 #[derive(Clone, Copy)]
 struct Loc<'loc> {
-    /// Owning thread id.
+    /// Owning agent id.
     agent_id: &'loc str,
     /// Parent task id, or `None` for the root group.
     parent: Option<&'loc str>,

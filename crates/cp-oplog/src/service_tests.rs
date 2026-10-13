@@ -1,4 +1,4 @@
-//! Unit tests for [`crate::service`] — the off-loop group-commit thread and
+//! Unit tests for [`crate::service`] — the off-loop group-commit agent and
 //! its asymmetric backpressure policy (design doc GAP 2 / I2 / V11).
 //!
 //! Split out of `service.rs` to keep that file within the 500-line structure
@@ -90,7 +90,7 @@ fn mixed_workload_replays_correctly() {
 fn group_commit_rolls_segments_and_replays() {
     let dir = tempdir().expect("tempdir");
     {
-        // Tiny limit forces rolls inside the commit thread; the buffered
+        // Tiny limit forces rolls inside the commit agent; the buffered
         // roll must flush the old segment so nothing is lost.
         let service = Service::spawn_with_segment_limit(dir.path(), 16).expect("spawn");
         let mut last = 0;
@@ -146,13 +146,13 @@ fn v11_emit_burst_never_blocks_the_loop_on_fsync() {
     // Design doc V11 / I2: the main loop NEVER fsyncs. A burst of phase
     // transitions during streaming must leave per-emit latency decoupled
     // from `fdatasync` latency — the loop only *enqueues*; the dedicated
-    // commit thread group-commits off-loop.
+    // commit agent group-commits off-loop.
     //
     // This is deterministic, not a flaky wall-clock race: `append_best_effort`
     // is a `try_send` on a bounded channel — it is *structurally*
     // non-blocking (returns `Dropped` instead of waiting when the queue is
     // full). So the strongest provable property is that no single emit call
-    // stalls on the commit thread's `fdatasync`, regardless of disk speed.
+    // stalls on the commit agent's `fdatasync`, regardless of disk speed.
     // We measure the WORST individual emit latency across a large burst and
     // assert it stays far below what even one fsync-per-call would cost.
     use std::time::Instant;

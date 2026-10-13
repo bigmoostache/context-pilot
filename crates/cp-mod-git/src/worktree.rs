@@ -1,12 +1,12 @@
-//! `Worktree` tool — moves the executing thread into a git worktree.
+//! `Worktree` tool — moves the executing agent into a git worktree.
 //!
 //! Worktrees live under `<project root>/.worktrees/<branch>` (slashes become
 //! `+`, which branch names may not contain, so every branch gets its own
 //! folder). Git's own worktree list is the source of truth for where a
-//! branch's worktree is. Entering one sets the thread's
+//! branch's worktree is. Entering one sets the agent's
 //! [`workdir`](cp_base::state::runtime::bundle::AgentRuntime::workdir), which
 //! every path- or cwd-sensitive module resolves through
-//! [`State::workdir`]. The process cwd never changes, so threads running
+//! [`State::workdir`]. The process cwd never changes, so agents running
 //! concurrently can each sit in a different worktree.
 
 use std::path::{Path, PathBuf};
@@ -113,7 +113,7 @@ fn same_dir(a: &Path, b: &Path) -> bool {
     }
 }
 
-/// Point the executing thread at `dir` (`None` = project root) and refresh git panels.
+/// Point the executing agent at `dir` (`None` = project root) and refresh git panels.
 fn set_workdir(state: &mut State, dir: Option<PathBuf>) {
     state.agent_mut().workdir = dir;
     cp_base::panels::mark_panels_dirty(state, Kind::GIT_RESULT);
@@ -189,8 +189,8 @@ fn ensure_worktrees_dir(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Return the executing thread to the project root. Refused for the last
-/// thread in a worktree: leaving would strand it, so it must be removed.
+/// Return the executing agent to the project root. Refused for the last
+/// agent in a worktree: leaving would strand it, so it must be removed.
 fn leave(state: &mut State) -> Result<String, String> {
     let Some(dir) = state.agent().workdir.clone() else {
         return Ok("Already at the project root.".to_owned());
@@ -208,7 +208,7 @@ fn leave(state: &mut State) -> Result<String, String> {
     Ok(format!("Left worktree {}; back at the project root.", dir.display()))
 }
 
-/// Ids of threads other than `me` whose workdir is `dir`.
+/// Ids of agents other than `me` whose workdir is `dir`.
 fn other_users(state: &State, dir: &Path, me: Option<&str>) -> Vec<String> {
     state
         .agent_store
@@ -219,12 +219,12 @@ fn other_users(state: &State, dir: &Path, me: Option<&str>) -> Vec<String> {
         .collect()
 }
 
-/// Release `agent_id`'s worktree when the thread is archived.
+/// Release `agent_id`'s worktree when the agent is archived.
 ///
-/// Removed when no other thread works there, else simply left. A worktree
+/// Removed when no other agent works there, else simply left. A worktree
 /// that can't be removed (uncommitted changes, running consoles) is kept, and
-/// so is the thread's workdir, so restoring the thread brings it back. Returns
-/// a one-line outcome, `None` when the thread was at the project root.
+/// so is the agent's workdir, so restoring the agent brings it back. Returns
+/// a one-line outcome, `None` when the agent was at the project root.
 pub fn release_agent(state: &mut State, agent_id: &str) -> Option<String> {
     let dir = state.agent_store.get(agent_id)?.workdir.clone()?;
     let shown = dir.display().to_string();
@@ -242,7 +242,7 @@ pub fn release_agent(state: &mut State, agent_id: &str) -> Option<String> {
     Some(outcome)
 }
 
-/// `git worktree list` plus where this thread currently works.
+/// `git worktree list` plus where this agent currently works.
 fn list(state: &State) -> Result<String, String> {
     let listing = git(&project_root(), &["worktree", "list"])?;
     Ok(format!("{listing}\n\nThis thread works in: {}", state.workdir().display()))
@@ -291,7 +291,7 @@ fn remove_dir(state: &State, dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Running console panels, in any thread, whose cwd lies inside `dir`:
+/// Running console panels, in any agent, whose cwd lies inside `dir`:
 /// `"P21 'bash' (agent T857)"`. Removing the folder would strand them.
 fn live_consoles(state: &State, dir: &Path) -> Vec<String> {
     let mut agents: Vec<(String, &cp_base::state::runtime::bundle::AgentRuntime)> =

@@ -24,7 +24,7 @@ enum Dispatch {
 }
 
 /// How long (ms) after the first Ctrl+X a confirming second Ctrl+X still
-/// archives/restores the selected thread. A later press re-arms instead.
+/// archives/restores the selected agent. A later press re-arms instead.
 const ARCHIVE_CONFIRM_WINDOW_MS: u64 = 2_000;
 
 /// Map a terminal event to an application action.
@@ -34,8 +34,8 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
     if let &Event::Key(key) = event {
         return handle_key_event(&key, state);
     }
-    // Mouse wheel → scroll the shown conversation/history pane. In the threads
-    // list this scrolls the SELECTED thread's conversation (arrows stay bound to
+    // Mouse wheel → scroll the shown conversation/history pane. In the agents
+    // list this scrolls the SELECTED agent's conversation (arrows stay bound to
     // selection via `handle_agents_nav`); in a panel view it scrolls the active
     // pane exactly as before. Non-scroll mouse events (clicks/drag/move) are
     // ignored. Written as `matches!`/`else` rather than a `match` with a `_` arm
@@ -84,7 +84,7 @@ fn handle_key_event(key: &KeyEvent, state: &State) -> Option<Action> {
         return Some(Action::StopStreaming);
     }
 
-    // Threads view: intercept navigation keys before panel/scroll handling.
+    // Agents view: intercept navigation keys before panel/scroll handling.
     if state.view_mode == cp_base::state::data::config::ViewMode::Agents
         && let Dispatch::Act(action) = handle_agents_nav(key, state)
     {
@@ -231,12 +231,12 @@ fn handle_index_overlay_key(key: &KeyEvent, state: &State) -> Option<Action> {
     Some(if key.code == KeyCode::Esc { Action::ToggleIndexOverlay } else { Action::None })
 }
 
-/// Threads-nav while the human has drilled into a thread's panel view (G3):
+/// Threads-nav while the human has drilled into an agent's panel view (G3):
 /// only Left/Esc exits back to the list; every other key is swallowed
 /// (`Action::None`) so a glance stays read-only. Events run against the focused
-/// thread (the drill-in switch is render-scoped only), so letting keys through
-/// would scroll/mutate the *focused* thread while the screen shows the drilled
-/// one — Model 2 forbids a glance disturbing the agent's thread. Written as an
+/// agent (the drill-in switch is render-scoped only), so letting keys through
+/// would scroll/mutate the *focused* agent while the screen shows the drilled
+/// one — Model 2 forbids a glance disturbing the agent's agent. Written as an
 /// `if`/`else` on `matches!` rather than a `match` with a `_` arm to avoid the
 /// forbidden `wildcard_enum_match_arm`.
 const fn drilled_agents_nav(key: &KeyEvent) -> Dispatch {
@@ -247,8 +247,8 @@ const fn drilled_agents_nav(key: &KeyEvent) -> Dispatch {
     }
 }
 
-/// True when the list cursor sits on a real thread row (not the virtual
-/// "+ New Thread" entry, not an empty list) — i.e. drill-in has a target.
+/// True when the list cursor sits on a real agent row (not the virtual
+/// "+ New Agent" entry, not an empty list) — i.e. drill-in has a target.
 fn selection_is_real_agent(focus: &cp_mod_agents::types::FocusState, state: &State) -> bool {
     let visible = cp_mod_agents::types::AgentsState::get(state).visible_indices(focus.viewing_archived);
     focus.selected_agent_idx < visible.len()
@@ -271,26 +271,26 @@ fn handle_agents_nav(key: &KeyEvent, state: &State) -> Dispatch {
         // cancels the pending arm.
         _ if confirming => Dispatch::Act(Action::AgentArchiveCancel),
         KeyCode::Tab if !shift => Dispatch::Act(Action::AgentSelectNext),
-        // Design 9.1: Up/Down move the selection within the list. The threads
+        // Design 9.1: Up/Down move the selection within the list. The agents
         // view IS the list surface, so selection wins over the message pane's
         // scroll; Shift+Up/Down and PageUp/PageDown still scroll that pane.
         KeyCode::Up | KeyCode::Down if shift => Dispatch::Act(scroll_key_action(key).unwrap_or(Action::None)),
         KeyCode::BackTab | KeyCode::Up => Dispatch::Act(Action::AgentSelectPrev),
         KeyCode::Down => Dispatch::Act(Action::AgentSelectNext),
         // Design 9.1: Esc navigates *out* to the panel view. On a real row it
-        // opens the SELECTED thread (drill-in commits the list cursor as
+        // opens the SELECTED agent (drill-in commits the list cursor as
         // focus), never whatever `focused_agent_id` last held — an agent's
         // Read/Send can move focus after the cursor was placed. On the virtual
-        // "+ New Thread" row (or an empty list) it just leaves the list.
+        // "+ New Agent" row (or an empty list) it just leaves the list.
         KeyCode::Esc => Dispatch::Act(if selection_is_real_agent(focus, state) {
             Action::AgentDrillIn
         } else {
             Action::CycleViewMode
         }),
-        // Left is deliberately inert in the list: only Right opens a thread.
+        // Left is deliberately inert in the list: only Right opens an agent.
         KeyCode::Left => Dispatch::Act(Action::None),
-        // Right drills into the selected thread's full panel view (G3). The
-        // handler no-ops on the virtual "+ New Thread" entry / empty selection.
+        // Right drills into the selected agent's full panel view (G3). The
+        // handler no-ops on the virtual "+ New Agent" entry / empty selection.
         KeyCode::Right => Dispatch::Act(Action::AgentDrillIn),
         KeyCode::Backspace
         | KeyCode::Enter
@@ -332,7 +332,7 @@ fn handle_context_pattern_submit(key: &KeyEvent, state: &State) -> Option<Action
     None
 }
 
-/// Let the active panel handle the key. In Threads view the conversation panel
+/// Let the active panel handle the key. In Agents view the conversation panel
 /// always owns input routing. `None` when no panel consumes the key.
 fn handle_panel_key(key: &KeyEvent, state: &State) -> Option<Action> {
     if state.view_mode == cp_base::state::data::config::ViewMode::Agents {
@@ -354,7 +354,7 @@ fn handle_global_fallback(key: &KeyEvent) -> Action {
         KeyCode::Up | KeyCode::Down | KeyCode::PageUp | KeyCode::PageDown => {
             scroll_key_action(key).unwrap_or(Action::None)
         }
-        // Left on a non-composer panel navigates to the threads list (the
+        // Left on a non-composer panel navigates to the agents list (the
         // conversation panel handles its own composer-aware Left separately).
         KeyCode::Left => Action::CycleViewMode,
         KeyCode::Backspace

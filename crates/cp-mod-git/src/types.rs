@@ -103,6 +103,6 @@ pub struct GitResultRequest {
     pub context_id: String,
     /// Git command to re-run for content refresh.
     pub command: String,
-    /// Directory to run it in (the creating thread's workdir).
+    /// Directory to run it in (the creating agent's workdir).
     pub cwd: std::path::PathBuf,
 }

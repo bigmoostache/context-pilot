@@ -77,7 +77,7 @@ impl App {
         }
 
         // Make the executing follow a focus change the action may have just made
-        // (e.g. Right-arrow drill-in switching the focused thread) BEFORE the
+        // (e.g. Right-arrow drill-in switching the focused agent) BEFORE the
         // post-input render below — else this frame paints the previous executing
         // ("one stale frame until I type" bug). No-op when focus did not change.
         {

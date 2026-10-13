@@ -1,7 +1,7 @@
 //! Global (fleet-shared) module owning the [`CoucouRegistry`].
 //!
-//! Split from [`SpineModule`](crate::SpineModule), which is per-thread: the
-//! registry must persist ONCE in the shared config, not in every thread's
+//! Split from [`SpineModule`](crate::SpineModule), which is per-agent: the
+//! registry must persist ONCE in the shared config, not in every agent's
 //! worker file. No tools or panels — the `coucou` tool stays on the spine
 //! module and writes here through the shared `State` extension.
 

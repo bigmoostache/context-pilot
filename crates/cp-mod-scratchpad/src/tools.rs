@@ -23,7 +23,7 @@ pub fn purge_agentless(state: &mut State) {
     ScratchpadState::get_mut(state).scratchpad_cells.retain(|c| !c.agent_id.is_empty());
 }
 
-/// Remove every cell owned by `agent_id` — cascade cleanup when a thread is
+/// Remove every cell owned by `agent_id` — cascade cleanup when an agent is
 /// hard-deleted (mirrors the thread-owned model). Returns the number removed.
 pub fn purge_agent_cells(state: &mut State, agent_id: &str) -> usize {
     let ss = ScratchpadState::get_mut(state);
@@ -49,7 +49,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     };
 
-    // Thread-owned: a cell must live in the focused thread (mirrors Think.todo).
+    // Thread-owned: a cell must live in the focused agent (mirrors Think.todo).
     let Some(agent_id) = state.executing_agent_id().map(str::to_owned) else {
         return ToolResult::new(
             tool.id.clone(),
@@ -87,7 +87,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), "Missing 'cell_id' parameter".to_owned(), true);
     };
 
-    // Thread-owned: only cells of the focused thread are editable.
+    // Thread-owned: only cells of the focused agent are editable.
     let Some(agent_id) = state.executing_agent_id().map(str::to_owned) else {
         return ToolResult::new(
             tool.id.clone(),
@@ -132,7 +132,7 @@ pub(crate) fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), "Missing 'cell_ids' array parameter".to_owned(), true);
     };
 
-    // Thread-owned: wiping only ever touches the focused thread's cells.
+    // Thread-owned: wiping only ever touches the focused agent's cells.
     let Some(agent_id) = state.executing_agent_id().map(str::to_owned) else {
         return ToolResult::new(
             tool.id.clone(),
@@ -141,7 +141,7 @@ pub(crate) fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
         );
     };
 
-    // If empty array, wipe all of THIS thread's cells
+    // If empty array, wipe all of THIS agent's cells
     if cell_ids.is_empty() {
         let ss = ScratchpadState::get_mut(state);
         let before = ss.scratchpad_cells.len();
@@ -152,7 +152,7 @@ pub(crate) fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), format!("Wiped all {count} scratchpad cell(s)"), false);
     }
 
-    // Otherwise, delete specific cells (restricted to the focused thread)
+    // Otherwise, delete specific cells (restricted to the focused agent)
     let ids_to_delete: Vec<String> = cell_ids.iter().filter_map(|v| v.as_str().map(str::to_owned)).collect();
 
     let ss = ScratchpadState::get_mut(state);

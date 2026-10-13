@@ -97,7 +97,7 @@ fn main() -> ExitCode {
     }
 
     // Health-gated commit of a staged update (update-policy §5.5): a committer
-    // thread polls our own `/healthz` and, only after a real `200` within the
+    // agent polls our own `/healthz` and, only after a real `200` within the
     // deadline, commits the binary swap and promotes the release state
     // (`active_tag`, agent binary). If the probe never turns healthy, the
     // rollback markers stay and the next boot's `boot_check` self-heals.

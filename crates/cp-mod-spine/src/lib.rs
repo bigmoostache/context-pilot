@@ -180,7 +180,7 @@ impl Module for SpineModule {
         // Prune stale processed notifications on load too
         prune_notifications(&mut SpineState::get_mut(state).notifications);
 
-        // Legacy per-thread coucous: stash for the boot migration into the
+        // Legacy per-agent coucous: stash for the boot migration into the
         // fleet-shared registry (`App::migrate_legacy_coucous`).
         if let Some(coucous) = data.get("pending_coucous")
             && let Ok(list) = serde_json::from_value::<Vec<coucou::Record>>(coucous.clone())

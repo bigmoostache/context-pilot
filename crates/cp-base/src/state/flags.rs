@@ -111,9 +111,9 @@ pub struct ModuleOverlays {
 /// Access individual flags via domain sub-structs: `flags.ui.dirty`,
 /// `flags.config.reverie_enabled`, `flags.lifecycle.reload_pending`.
 ///
-/// Per-thread stream/scroll state is NOT here — it lives on the thread's own
+/// Per-thread stream/scroll state is NOT here — it lives on the agent's own
 /// [`StreamState`](crate::state::runtime::bundle::AgentRuntime) and is reached
-/// via `state.stream` (the executing thread), never on the fleet-global flags.
+/// via `state.stream` (the executing agent), never on the fleet-global flags.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct StatusBools {
     /// UI rendering and debug toggles.

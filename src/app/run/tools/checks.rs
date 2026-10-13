@@ -91,11 +91,11 @@ pub(crate) fn strip_superseded_recaps(app: &mut App) {
     log::debug!("todo recap: collapsed superseded recap(s) in {} message(s)", saved.len());
 }
 
-/// Push the focused thread id onto `TodoState` so the Todo panel scopes to it.
+/// Push the focused agent id onto `TodoState` so the Todo panel scopes to it.
 ///
 /// When focus changed, the panel's previous content is stale (it pointed at the
-/// old thread's tasks), so the Todo panel is forced fresh immediately — mirrors
-/// the threads panel's force-refresh: deprecate the cache and set
+/// old agent's tasks), so the Todo panel is forced fresh immediately — mirrors
+/// the agents panel's force-refresh: deprecate the cache and set
 /// `freeze_count = u8::MAX` (the sanctioned "not frozen" sentinel that forces
 /// the Fresh branch), and break tempo (design §4.1 focus-change row).
 pub(crate) fn sync_todo_focus(app: &mut App) {
@@ -112,12 +112,12 @@ pub(crate) fn sync_todo_focus(app: &mut App) {
     }
 }
 
-/// Push the focused thread id onto `ScratchpadState` so the Scratchpad panel
+/// Push the focused agent id onto `ScratchpadState` so the Scratchpad panel
 /// scopes to it (thread-owned scratchpad rework — the twin of
 /// [`sync_todo_focus`]).
 ///
 /// When focus changed, the panel's previous content is stale (it pointed at the
-/// old thread's cells), so the Scratchpad panel is forced fresh immediately:
+/// old agent's cells), so the Scratchpad panel is forced fresh immediately:
 /// deprecate the cache and set `freeze_count = u8::MAX` (the sanctioned "not
 /// frozen" sentinel that forces the Fresh branch), and break tempo.
 pub(crate) fn sync_scratchpad_focus(app: &mut App) {
@@ -135,16 +135,16 @@ pub(crate) fn sync_scratchpad_focus(app: &mut App) {
 }
 
 /// Fire a **once-per-focused-thread** work-hygiene nudge (FR11) when the focused
-/// thread has (a) no tasks, or (b) planned work but nothing in progress.
+/// agent has (a) no tasks, or (b) planned work but nothing in progress.
 ///
 /// The nudge is injected into the chat but not accumulated (mirrors the Think
 /// reminder): a `Custom` spine notification created then immediately marked
-/// processed. `TodoState.nudged_agent` tracks the last-nudged thread so it does
+/// processed. `TodoState.nudged_agent` tracks the last-nudged agent so it does
 /// not re-fire on every tool call; it resets when the condition clears (a task
-/// is created / a WIP item is picked) or when focus moves to another thread.
+/// is created / a WIP item is picked) or when focus moves to another agent.
 pub(crate) fn maybe_hygiene_nudge(app: &mut App) {
     let Some(tid) = app.state.executing_agent_id().map(str::to_owned) else {
-        return; // No focused thread → no nudge.
+        return; // No focused agent → no nudge.
     };
     let (no_tasks, has_planned, has_in_progress) = {
         use cp_mod_todo::types::{TodoState, TodoStatus};
@@ -160,14 +160,14 @@ pub(crate) fn maybe_hygiene_nudge(app: &mut App) {
     let already = cp_mod_todo::types::TodoState::get(&app.state).nudged_agent.as_deref() == Some(tid.as_str());
 
     if !should_nudge {
-        // Condition cleared for this thread — reset its fire-once flag.
+        // Condition cleared for this agent — reset its fire-once flag.
         if already {
             cp_mod_todo::types::TodoState::get_mut(&mut app.state).nudged_agent = None;
         }
         return;
     }
     if already {
-        return; // Already nudged this thread (fire-once).
+        return; // Already nudged this agent (fire-once).
     }
 
     let msg = if no_tasks {
@@ -190,7 +190,7 @@ pub(crate) fn maybe_hygiene_nudge(app: &mut App) {
 /// actually happened (T686).
 ///
 /// When an executed tool that opted into task declaration (`declares_task`)
-/// carries a valid `task_id` belonging to the focused thread and that task is
+/// carries a valid `task_id` belonging to the focused agent and that task is
 /// still `planned`, flip it to `in_progress` — so declaring work on a task marks
 /// it started, live. Finished/cancelled tasks are left untouched (pre-flight
 /// already warned); an already-`in_progress` task is a silent no-op.
@@ -215,7 +215,7 @@ pub(crate) fn promote_declared_tasks(
     tool_results: &mut [crate::infra::tools::ToolResult],
 ) {
     let Some(focused) = app.state.executing_agent_id().map(str::to_owned) else {
-        return; // No focused thread → task_id not enforced, nothing to promote.
+        return; // No focused agent → task_id not enforced, nothing to promote.
     };
 
     for (tool, result) in tools.iter().zip(tool_results.iter_mut()) {
@@ -223,7 +223,7 @@ pub(crate) fn promote_declared_tasks(
             continue;
         };
         if flip_planned_to_in_progress(app, &focused, &task_id) {
-            // A real status change → append the thread's task tree (+ warning).
+            // A real status change → append the agent's task tree (+ warning).
             let annex = cp_mod_todo::tree::result_annex(&app.state, &focused);
             let _w = write!(result.content, "\n\n{annex}");
         }
@@ -231,7 +231,7 @@ pub(crate) fn promote_declared_tasks(
 }
 
 /// The trimmed, non-empty `task_id` an opted-in (`declares_task`) tool declared
-/// that resolves to a task of the `focused` thread — else `None`.
+/// that resolves to a task of the `focused` agent — else `None`.
 fn declared_focused_task(app: &App, tool: &cp_base::tools::ToolUse, focused: &str) -> Option<String> {
     let opted_in = app.state.tools.iter().any(|d| d.id == tool.name && d.declares_task);
     if !opted_in {

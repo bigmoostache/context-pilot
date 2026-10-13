@@ -4,7 +4,7 @@
 //! Each [`poll`](Tailer::poll) returns only the entries appended since the
 //! previous call, in `rev` order. The `rev` is monotonic and no entry is
 //! skipped, so the consumer sees a complete, ordered event stream. The tailer
-//! is a **pure poll primitive** — no kernel watch, no thread. The live driver
+//! is a **pure poll primitive** — no kernel watch, no agent. The live driver
 //! (inotify + backstop timer) belongs to the runtime loop, exactly as
 //! [`FleetScanner`](crate::registry::FleetScanner) is a pure scan+diff driven
 //! by an external cadence.

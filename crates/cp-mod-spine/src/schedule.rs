@@ -1,11 +1,11 @@
 //! Fleet-shared coucou registry.
 //!
-//! Coucous used to live as `CoucouWatcher`s in each thread's own
-//! `WatcherRegistry`, which is only polled while that thread is stepped — so a
-//! background thread idle on THEIR_TURN never fired its reminders. They now
+//! Coucous used to live as `CoucouWatcher`s in each agent's own
+//! `WatcherRegistry`, which is only polled while that agent is stepped — so a
+//! background agent idle on THEIR_TURN never fired its reminders. They now
 //! live here, ONE instance for the whole fleet (in `shared_module_data`),
 //! polled once per tick by the app loop and delivered into each coucou's
-//! target thread inbox.
+//! target agent inbox.
 
 use serde::{Deserialize, Serialize};
 
@@ -28,7 +28,7 @@ pub struct CoucouRegistry {
 pub struct FiredCoucou {
     /// Coucou id (`coucou_<n>`), used as the notification source for dedup.
     pub id: String,
-    /// Target thread; `None` = whichever thread is focused.
+    /// Target agent; `None` = whichever agent is focused.
     pub agent_id: Option<String>,
     /// Notification text.
     pub description: String,
@@ -73,7 +73,7 @@ impl CoucouRegistry {
     }
 
     /// Whether any coucou targets `agent_id` (or is unscoped). Drives the
-    /// WAITING badge of the focused thread.
+    /// WAITING badge of the focused agent.
     #[must_use]
     pub fn has_pending_for(&self, agent_id: Option<&str>) -> bool {
         self.pending.iter().any(|c| c.agent_id.is_none() || c.agent_id.as_deref() == agent_id)

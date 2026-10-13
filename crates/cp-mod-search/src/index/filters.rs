@@ -124,7 +124,7 @@ pub(crate) fn is_indexable(
 /// [`EXCLUDED_DIRS`] and the `.gitignore` files found along the tree. Ignored
 /// directories are pruned, never entered. Without this, a gitignored
 /// `.claude/worktrees/` (full repo copies) or `.venv` meant ~200k stats on the
-/// boot thread.
+/// boot agent.
 ///
 /// Only `.gitignore` files count (no global gitignore, no `.git/info/exclude`,
 /// no parent dirs above `root`), matching [`GitignoreCache`] used by the live

@@ -288,7 +288,7 @@ fn probe_session_alive(
 impl SessionHandle {
     /// Spawn a child via the console server without blocking the main loop:
     /// returns a `Running` handle at once and sends `create` from a worker
-    /// thread (the round-trip took up to 127 ms on the loop). The pid is filled
+    /// agent (the round-trip took up to 127 ms on the loop). The pid is filled
     /// once the server answers; a spawn error lands in the output buffer and
     /// flips the status to `Failed(-1)`.
     #[must_use]

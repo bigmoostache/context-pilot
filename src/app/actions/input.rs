@@ -24,7 +24,7 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
         return ActionResult::Nothing;
     }
 
-    // Threads view: route input to the selected thread instead of conversation
+    // Agents view: route input to the selected agent instead of conversation
     if state.view_mode == cp_base::state::data::config::ViewMode::Agents {
         return handle_agent_input_submit(state);
     }
@@ -140,20 +140,20 @@ fn create_user_notification(state: &mut State, user_id: &str, content_preview: &
 
 /// Handle input submission when `ViewMode::Agents` is active.
 ///
-/// Routes the user's text to the currently selected thread as a
-/// `AgentMessage(User)`, sets the thread to `MyTurn`, and creates
+/// Routes the user's text to the currently selected agent as a
+/// `AgentMessage(User)`, sets the agent to `MyTurn`, and creates
 /// a spine notification so the AI picks up the new message.
 ///
-/// When `creating_agent` is active, creates a new thread with the
-/// input text as the thread name instead.
+/// When `creating_agent` is active, creates a new agent with the
+/// input text as the agent name instead.
 fn handle_agent_input_submit(state: &mut State) -> ActionResult {
-    // `selected_agent_idx` indexes into the VISIBLE (view-filtered) thread
+    // `selected_agent_idx` indexes into the VISIBLE (view-filtered) agent
     // slice, not the raw storage vec — resolve it through `visible_indices`
-    // for the current view (T9 archive refactor). The virtual "+ New Thread"
+    // for the current view (T9 archive refactor). The virtual "+ New Agent"
     // entry lives only in the active (non-archived) view, positioned just past
-    // the last visible thread; comparing against the raw thread count would
-    // mis-route the New-Thread row as a message into another thread whenever
-    // any thread is archived.
+    // the last visible agent; comparing against the raw agent count would
+    // mis-route the New-Thread row as a message into another agent whenever
+    // any agent is archived.
     let (selected_idx, viewing_archived) = {
         let focus = FocusState::get(state);
         (focus.selected_agent_idx, focus.viewing_archived)
@@ -179,14 +179,14 @@ fn handle_agent_input_submit(state: &mut State) -> ActionResult {
     // Record to persistent prompt history
     record_prompt_history(&content);
 
-    // Find the selected thread (real storage index resolved above)
+    // Find the selected agent (real storage index resolved above)
     let agents_state = AgentsState::get_mut(state);
 
     let Some(agent) = agents_state.agents.get_mut(real_idx) else {
         return ActionResult::Nothing;
     };
 
-    // Create a user message in the thread
+    // Create a user message in the agent
     let msg = AgentMessage::user(content);
     agent.messages.push(msg);
     agent.status = AgentStatus::MyTurn;
@@ -203,13 +203,13 @@ fn handle_agent_input_submit(state: &mut State) -> ActionResult {
     ActionResult::Save
 }
 
-/// Create a new thread from the input text (used as thread name).
+/// Create a new agent from the input text (used as agent name).
 ///
-/// Called when the virtual "New Thread" entry is selected and the user
-/// presses Enter. Generates a unique thread ID, creates an empty
-/// `TheirTurn` thread, and selects it.
+/// Called when the virtual "New Agent" entry is selected and the user
+/// presses Enter. Generates a unique agent ID, creates an empty
+/// `TheirTurn` agent, and selects it.
 fn handle_agent_create(state: &mut State) -> ActionResult {
-    /// Maximum thread name length to prevent state bloat.
+    /// Maximum agent name length to prevent state bloat.
     const MAX_AGENT_NAME_LEN: usize = 200;
 
     let raw_name = state.agent().composer.text.trim().to_owned();
@@ -221,14 +221,14 @@ fn handle_agent_create(state: &mut State) -> ActionResult {
         return ActionResult::Nothing;
     }
 
-    // Cap thread name length
+    // Cap agent name length
     let name = if raw_name.len() > MAX_AGENT_NAME_LEN {
         raw_name.get(..raw_name.floor_char_boundary(MAX_AGENT_NAME_LEN)).unwrap_or(&raw_name).to_owned()
     } else {
         raw_name
     };
 
-    // Generate thread ID and create the thread
+    // Generate agent ID and create the agent
     let agents_state = AgentsState::get_mut(state);
     let id = format!("T{}", agents_state.next_id);
     agents_state.next_id = agents_state.next_id.saturating_add(1);
@@ -236,7 +236,7 @@ fn handle_agent_create(state: &mut State) -> ActionResult {
     let agent = cp_mod_agents::types::Agent::new(id, name);
     agents_state.agents.push(agent);
 
-    // Select the newly created thread — it is the last entry of the active
+    // Select the newly created agent — it is the last entry of the active
     // (non-archived) visible slice, so the stored selection is a VISIBLE-list
     // position (consistent with `handle_agent_input_submit`), not a raw index.
     let new_idx = AgentsState::get(state).visible_indices(false).len().saturating_sub(1);

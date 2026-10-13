@@ -56,7 +56,7 @@ fn merge_changed_file(hull: &mut Vec<ChangedFile>, path: String, skip_names: Vec
 
 /// Collect changed file paths from a batch of tool uses, relative to `workdir`.
 ///
-/// `workdir` is the editing thread's workdir, so globs match worktree files too.
+/// `workdir` is the editing agent's workdir, so globs match worktree files too.
 /// Extracts `file_path` from Edit and Write tool inputs.
 /// Also collects `skip_callbacks` names per tool for selective skipping.
 #[must_use]

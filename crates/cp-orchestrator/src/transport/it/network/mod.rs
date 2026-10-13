@@ -224,7 +224,7 @@ fn sync_caddy(state: &Mutex<Backend>, previous: &NetworkConfig, next: &NetworkCo
 
 /// Whether this box physically carries a 5G modem — the hardware fact the whole
 /// 5G surface hangs off. Re-exported so the REST layer reads it once per request
-/// and threads it in, keeping the handlers pure with respect to the machine they
+/// and agents it in, keeping the handlers pure with respect to the machine they
 /// happen to be running on (and therefore testable without mutating the
 /// environment, which this workspace forbids `unsafe` for).
 pub(crate) fn modem_present() -> bool {

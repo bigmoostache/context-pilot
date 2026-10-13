@@ -2,7 +2,7 @@
 //! and supervisor primitives.
 //!
 //! Each service is a pure, single-owner data structure driven by the
-//! orchestrator loop; none owns I/O threads of its own (the socket reads and
+//! orchestrator loop; none owns I/O agents of its own (the socket reads and
 //! the WebSocket writer that feed them arrive with the transport phase):
 //!
 //! * [`materialized_view`] — [`MaterializedView`], the in-memory fleet-state

@@ -44,15 +44,15 @@ impl App {
         }
     }
 
-    /// Key identifying the executing thread — the channel key used for both stream
+    /// Key identifying the executing agent — the channel key used for both stream
     /// *spawn* and stream *drain*, so the two can never diverge.
     ///
     /// During a background advancement step this is
     /// [`stepping_agent`](crate::app::App::stepping_agent); otherwise it is the
-    /// focused thread (or [`DEFAULT_WORKER_ID`](crate::infra::constants::DEFAULT_WORKER_ID)
-    /// before any thread is focused). Deriving the key from the same source at
+    /// focused agent (or [`DEFAULT_WORKER_ID`](crate::infra::constants::DEFAULT_WORKER_ID)
+    /// before any agent is focused). Deriving the key from the same source at
     /// spawn and drain time is what keeps each thread's stream events on its own
-    /// bundle once several threads advance concurrently.
+    /// bundle once several agents advance concurrently.
     pub(super) fn executing_key(&self) -> String {
         if let Some(id) = self.stepping_agent.as_ref() {
             return id.clone();
@@ -63,16 +63,16 @@ impl App {
             .unwrap_or_else(|| crate::infra::constants::DEFAULT_WORKER_ID.to_owned())
     }
 
-    /// Start an LLM stream for the executing thread over a fresh per-thread
+    /// Start an LLM stream for the executing agent over a fresh per-agent
     /// channel, storing its receiver in
     /// [`agent_streams`](crate::app::App::agent_streams) for the loop to drain.
     ///
     /// This replaces the former single app-wide stream channel: each stream now
     /// owns its mpsc (mirroring reverie streams), so concurrent threads can each
     /// have a live stream. The channel is keyed by
-    /// [`executing_key`](Self::executing_key) — the thread currently in `state` —
-    /// so a background thread's stream lands under its own id, never colliding
-    /// with the focused thread's.
+    /// [`executing_key`](Self::executing_key) — the agent currently in `state` —
+    /// so a background agent's stream lands under its own id, never colliding
+    /// with the focused agent's.
     pub(super) fn spawn_agent_stream(&mut self, params: crate::llms::StreamParams) {
         let (tx, rx) = std::sync::mpsc::channel();
         crate::infra::api::start_streaming(params, tx);

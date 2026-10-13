@@ -94,7 +94,7 @@ fn checkpoint_restores_roster_wholesale() {
 
     // A checkpoint carrying a *different* roster must replace, not merge —
     // this is the cold-restart-after-compaction path (I5): the backend
-    // rebuilds the thread list from the snapshot alone.
+    // rebuilds the agent list from the snapshot alone.
     let mut snapshot = Snapshot::default();
     snapshot.roster.push(
         RosterEntry::builder("T7", "carried", AgentTurn::MyTurn)
@@ -115,7 +115,7 @@ fn checkpoint_restores_roster_wholesale() {
 #[test]
 fn roster_survives_compaction_via_checkpoint_then_folds_tail() {
     // The full cold-restart shape: a checkpoint seeds the roster, then the
-    // post-checkpoint delta tail (a new thread + a message) folds on top.
+    // post-checkpoint delta tail (a new agent + a message) folds on top.
     let mut view = MaterializedView::new();
     let mut snapshot = Snapshot::default();
     snapshot

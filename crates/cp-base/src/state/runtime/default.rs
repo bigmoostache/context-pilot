@@ -8,8 +8,8 @@ use super::State;
 use crate::config::llm::types::LlmProvider;
 
 impl Default for State {
-    // `State` now holds only fleet-shared data plus the executing thread's
-    // per-thread bundle; the ~45 per-thread leaf fields moved onto
+    // `State` now holds only fleet-shared data plus the executing agent's
+    // per-agent bundle; the ~45 per-agent leaf fields moved onto
     // [`AgentRuntime`](super::bundle::AgentRuntime) and are initialized by its
     // own `Default`. This initializer is a short linear literal of the shared
     // fields + an empty `AgentStore`.

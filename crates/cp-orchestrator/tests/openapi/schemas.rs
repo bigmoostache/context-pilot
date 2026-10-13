@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 
 use super::{arr, r};
 
-/// Agent/thread/panel/tool schemas — the domain model.
+/// Agent/agent/panel/tool schemas — the domain model.
 #[expect(
     clippy::too_many_lines,
     reason = "flat OpenAPI schema literal: one linear json! object enumerating the domain schemas; splitting it into sub-builders is churn with no readability gain — the openapi spec-builder twin of the flat State::default initializer"
@@ -98,8 +98,8 @@ pub(super) fn core() -> Value {
                 "archived": { "type": "boolean" },
                 "paused": { "type": "boolean" },
                 "focused": { "type": "boolean" },
-                // Parent thread id when this thread was branched out of another
-                // (branch_agent command); null for a thread created from scratch.
+                // Parent agent id when this agent was branched out of another
+                // (branch_agent command); null for an agent created from scratch.
                 "branchedFrom": { "type": "string", "nullable": true },
                 "log": arr(r("ThreadMsg")),
                 "tasks": arr(r("ThreadTask")),

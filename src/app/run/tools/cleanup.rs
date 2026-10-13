@@ -111,11 +111,11 @@ fn process_async_completions(app: &mut App, async_results: &mut [cp_base::state:
     }
 
     for result in async_results.iter() {
-        // Route the notification into the OWNER thread's spine inbox (delivery,
-        // not advancement). At N=1 the owner is always the focused thread, so
+        // Route the notification into the OWNER agent's spine inbox (delivery,
+        // not advancement). At N=1 the owner is always the focused agent, so
         // this is a direct, byte-identical delivery. The result PANEL is still
-        // created on the executing thread's context above — moving panels into the owner
-        // thread is a Phase F (per-thread panels/teardown) concern.
+        // created on the executing agent's context above — moving panels into the owner
+        // agent is a Phase F (per-agent panels/teardown) concern.
         let tid = result.agent_id.clone();
         let tid_tag = tid.clone();
         let desc = result.description.clone();
@@ -194,7 +194,7 @@ fn force_resolve_stragglers(tool_results: &mut [crate::infra::tools::ToolResult]
             } else {
                 // Console/async-tool sentinel with appended pre-flight text — not a
                 // callback. The appended text is typically pre-flight warnings
-                // (e.g. "\nWarning: Task 'X525' belongs to thread T92…").
+                // (e.g. "\nWarning: Task 'X525' belongs to agent T92…").
                 tr.content = format!("Blocking tool result unavailable (watcher expired or was interrupted).{after}");
             }
         } else {
@@ -251,8 +251,8 @@ pub(crate) fn check_watchers(app: &mut App) {
     let _fg = cp_base::flame!("watchers");
     // Take the registry out of state to avoid borrow conflict
     // (poll_all needs &mut registry + &state simultaneously). WatcherRegistry is
-    // per-thread, so it normally lives in `agent_module_data`; fall back to the
-    // shared map defensively, and restore it to its canonical per-thread home.
+    // per-agent, so it normally lives in `agent_module_data`; fall back to the
+    // shared map defensively, and restore it to its canonical per-agent home.
     let watcher_id = std::any::TypeId::of::<WatcherRegistry>();
     let removed = app
         .state
@@ -273,7 +273,7 @@ pub(crate) fn check_watchers(app: &mut App) {
 
     let (blocking_results, mut async_results) = registry.poll_all(&app.state);
 
-    // Put registry back in its canonical per-thread map.
+    // Put registry back in its canonical per-agent map.
     app.state.set_ext_agent(registry);
 
     // --- Session cleanup for inline easy_bash results (no panel to close) ---

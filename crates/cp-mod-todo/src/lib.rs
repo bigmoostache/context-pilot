@@ -3,7 +3,7 @@
 //! State (`TodoState`) owns all task items; each item carries a compulsory
 //! `agent_id` (thread-owned tasks rework). Structural edits and status marking
 //! are hosted in the main crate (`Think.todo` + `todo_mark`) which resolves the
-//! focused thread and calls the pure ops in [`tools`]; this module exposes the
+//! focused agent and calls the pure ops in [`tools`]; this module exposes the
 //! pure task operations + the focus-scoped Todo panel and owns **no tools** of
 //! its own. `TodoState` is shared (`is_global == true`).
 
@@ -19,7 +19,7 @@ pub mod tree;
 pub mod types;
 /// Structured nested upsert — the `Todo` tool's core.
 pub mod upsert;
-/// Canonical YAML render of a thread's task tree (feeds the Todo panel).
+/// Canonical YAML render of an agent's task tree (feeds the Todo panel).
 pub mod yaml;
 
 use types::{TodoState, TodoStatus};
@@ -97,7 +97,7 @@ impl Module for TodoModule {
         if let Some(v) = data.get("next_todo_id").and_then(serde_json::Value::as_u64) {
             ts.next_todo_id = v.to_usize();
         }
-        // FR4: forever-purge legacy items lacking a agent_id (old schema).
+        // FR4: forever-purge legacy items lacking an agent_id (old schema).
         tools::purge_agentless(state);
     }
 
@@ -118,7 +118,7 @@ impl Module for TodoModule {
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
         // No tools of its own: `Think.todo` + `todo_mark` are hosted in the main
-        // crate (they need the focused thread from `cp-mod-agents::FocusState`).
+        // crate (they need the focused agent from `cp-mod-agents::FocusState`).
         vec![]
     }
 
@@ -149,7 +149,7 @@ impl Module for TodoModule {
 
     fn overview_context_section(&self, state: &State) -> Option<String> {
         let ts = TodoState::get(state);
-        // Global rollup across all threads; cancelled items are excluded from
+        // Global rollup across all agents; cancelled items are excluded from
         // both the numerator and denominator (they are soft-deleted).
         let counted: Vec<&types::TodoItem> = ts.todos.iter().filter(|t| t.status != TodoStatus::Cancelled).collect();
         if counted.is_empty() {

@@ -17,7 +17,7 @@ use std::fmt::Write as _;
 /// Create and persist a `tool_call` message for a single `ToolUse`.
 /// Used for both direct tool calls and queue-flushed replays.
 fn save_tool_call_message(app: &mut App, tool: &cp_base::tools::ToolUse) {
-    // Leave an auto tool-activity trace in the focused thread (no-op unfocused).
+    // Leave an auto tool-activity trace in the focused agent (no-op unfocused).
     crate::app::run::agents::maybe_append_tool_activity(&mut app.state, tool);
 
     let tool_id = format!("T{}", app.state.agent().next_tool_id);
@@ -337,12 +337,12 @@ pub(crate) fn handle_tool_execution(app: &mut App) {
 
     {
         let _g = crate::profile!("focus_checks");
-        // Sync the Todo panel's focus filter to the focused thread (forces a fresh
+        // Sync the Todo panel's focus filter to the focused agent (forces a fresh
         // Todo panel on focus change), then evaluate the fire-once hygiene nudge.
         super::checks::sync_todo_focus(app);
         super::checks::maybe_hygiene_nudge(app);
         // Same focus-scoping for the thread-owned Scratchpad panel — a focus change
-        // (or a scratchpad edit) forces a fresh panel showing the focused thread's
+        // (or a scratchpad edit) forces a fresh panel showing the focused agent's
         // cells.
         super::checks::sync_scratchpad_focus(app);
     }
@@ -350,7 +350,7 @@ pub(crate) fn handle_tool_execution(app: &mut App) {
         let _g = crate::profile!("promote_declared_tasks");
         // Promote any planned task declared via `task_id` on an opted-in tool to
         // in_progress (done/cancelled left be — pre-flight warned; the live delta
-        // rides the emit_task_lists chokepoint). On a real flip, the thread's task
+        // rides the emit_task_lists chokepoint). On a real flip, the agent's task
         // tree is appended to that tool's result (T686).
         super::checks::promote_declared_tasks(app, &tools, &mut tool_results);
     }

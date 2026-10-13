@@ -1,7 +1,7 @@
 //! Read-only **inspection** of an agent's on-disk state (design doc §3.1,
 //! tier-② files).
 //!
-//! The orchestration backend serves rich agent data (threads, memory, todos,
+//! The orchestration backend serves rich agent data (agents, memory, todos,
 //! panels, finder trees…) to the web frontend. Rather than bloating the oplog
 //! with every piece of mutable state, the **inspection plane** reads the
 //! agent's own persistence files — the same ones the agent's
@@ -36,14 +36,14 @@ use serde_json::Value;
 /// Subdirectory the agent stores its persistence files in.
 const CP_DIR: &str = ".context-pilot";
 
-/// The global shared configuration file (threads, memory, tree, logs, etc.).
+/// The global shared configuration file (agents, memory, tree, logs, etc.).
 const CONFIG_FILE: &str = "config.json";
 
 /// Directory holding per-worker state files (`<worker_id>.json`).
 const STATES_DIR: &str = "states";
 
-/// Directory holding per-thread message files (`<agent_id>.json`). The agent
-/// keeps only slim thread metadata in `config.json`; messages live here.
+/// Directory holding per-agent message files (`<agent_id>.json`). The agent
+/// keeps only slim agent metadata in `config.json`; messages live here.
 const AGENTS_DIR: &str = "threads";
 
 /// Directory holding large global modules saved outside `config.json`
@@ -73,7 +73,7 @@ struct FleetCache {
     /// Cached parses of `states/<worker>.json`, keyed by worker id.
     workers: HashMap<String, CachedJson>,
 
-    /// Cached parses of `agents/<id>.json`, keyed by thread id.
+    /// Cached parses of `agents/<id>.json`, keyed by agent id.
     agents: HashMap<String, CachedJson>,
 
     /// Cached parses of `modules/<id>.json`, keyed by module id.
@@ -108,7 +108,7 @@ impl StateReader {
     ///
     /// # Errors
     ///
-    /// Thread entries stored slim (no `messages` key) get their messages
+    /// Agent entries stored slim (no `messages` key) get their messages
     /// spliced back from `agents/<id>.json`, so callers see the full shape.
     ///
     /// # Errors
@@ -179,7 +179,7 @@ fn overlay_module_files(modules_dir: &Path, config: &mut Value, cache: &mut Hash
     }
 }
 
-/// Splice `messages` from `<agents_dir>/<id>.json` into every thread entry of
+/// Splice `messages` from `<agents_dir>/<id>.json` into every agent entry of
 /// `config` lacking them. Legacy configs (inline messages) pass through as-is;
 /// a missing/unreadable file leaves the entry without messages.
 fn hydrate_agent_messages(agents_dir: &Path, config: &mut Value, cache: &mut HashMap<String, CachedJson>) {

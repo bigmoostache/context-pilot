@@ -38,12 +38,12 @@ impl Module for ConversationModule {
     fn is_core(&self) -> bool {
         true
     }
-    /// Per-thread (thread-centric model): a thread's conversation is its own.
+    /// Per-thread (thread-centric model): an agent's conversation is its own.
     /// This module holds no `TypeMap` data — the conversation lives in
     /// `state.messages` + the `CONVERSATION` panel `Entry`, both carried by the
-    /// thread's runtime (`AgentRuntime`). The flag is per-thread for intent;
+    /// agent's runtime (`AgentRuntime`). The flag is per-agent for intent;
     /// it is inert at N=1 (save/load are no-ops), so routing anything it ever
-    /// gains lands in the per-thread map.
+    /// gains lands in the per-agent map.
     fn is_global(&self) -> bool {
         false
     }
@@ -103,9 +103,9 @@ impl Module for ConversationModule {
     fn load_module_data(&self, _data: &serde_json::Value, _state: &mut State) {}
 
     /// Per-thread lifetime ("tot") token + cost accumulators. They live on the
-    /// thread bundle, so they must ride the thread's own worker file: the
-    /// global overview slot was shared by every thread and skipped when a
-    /// background thread was rehydrated, which reset tot to the stream value.
+    /// agent bundle, so they must ride the agent's own worker file: the
+    /// global overview slot was shared by every agent and skipped when a
+    /// background agent was rehydrated, which reset tot to the stream value.
     fn save_worker_data(&self, state: &State) -> serde_json::Value {
         serde_json::json!({
             "cache_hit_tokens": state.agent().cache_hit_tokens,

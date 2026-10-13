@@ -3,7 +3,7 @@
 //! Split from the sibling [`bridge`](super::bridge) module so each file stays
 //! under the 500-line limit. This half owns exactly one responsibility: the
 //! main-loop **observe-on-change chokepoint** that appends a `MessageCreated`
-//! oplog delta the instant a new thread message appears, staging its body in
+//! oplog delta the instant a new agent message appears, staging its body in
 //! the content-addressed body store first (the I13 body-before-reference
 //! barrier).
 
@@ -25,15 +25,15 @@ use cp_wire::types::snapshot::todo::{WireTask, WireTaskStatus};
 use super::bridge::{bridge_active, emit_roster_delta};
 use crate::app::App;
 
-/// Emit a [`MessageCreated`](OpEntryKind::MessageCreated) for every thread
+/// Emit a [`MessageCreated`](OpEntryKind::MessageCreated) for every agent
 /// message appended since the last pass, so a new chat message reaches the
 /// backend view (and the web UI) in milliseconds instead of waiting on the
 /// debounced tier-② disk write.
 ///
 /// Like [`emit_vitals`](super::bridge::emit_vitals), this is a main-loop
 /// **observe-on-change chokepoint** rather than a hook scattered across the
-/// (many) message-append sites: it diffs each thread's live message vector
-/// against the per-thread count memoised in [`BridgeState`], so it captures
+/// (many) message-append sites: it diffs each agent's live message vector
+/// against the per-agent count memoised in [`BridgeState`], so it captures
 /// messages from *every* source — the agent's `Send` tool, a TUI-typed reply,
 /// or a web `SendMessage` command — with one uniform path.
 ///
@@ -45,7 +45,7 @@ use crate::app::App;
 /// The delta itself is journalled durably-but-non-blocking ([`submit_durable`]),
 /// so a message can never be silently lost yet the loop never `fsync`s (I2).
 ///
-/// The first pass after boot **seeds** the memo from the threads already on
+/// The first pass after boot **seeds** the memo from the agents already on
 /// disk without emitting, so a (re)started agent does not replay its whole
 /// backlog onto the oplog — only post-boot messages become deltas.
 ///
@@ -95,13 +95,13 @@ pub(in crate::app::run) fn emit_messages(app: &mut App) {
     }
 }
 
-/// One thread message staged for emission.
+/// One agent message staged for emission.
 struct PendingMessage {
-    /// Owning thread id.
+    /// Owning agent id.
     agent_id: String,
     /// Synthesised stable message id (`"{agent_id}-m{index}"`).
     message_id: String,
-    /// Storage index within the thread's message vector.
+    /// Storage index within the agent's message vector.
     index: usize,
     /// UTF-8 JSON body the observer renders the bubble from.
     body: String,
@@ -109,7 +109,7 @@ struct PendingMessage {
 
 /// Build the [`PendingMessage`] for the message at `idx` in `agent_id`.
 ///
-/// The body is the JSON the maquette thread view renders directly — author
+/// The body is the JSON the maquette agent view renders directly — author
 /// (so the bubble lands on the right side), text, timestamp, and any embedded
 /// question / file reference.
 fn build_pending(agent_id: &str, msg: &AgentMessage, idx: usize) -> PendingMessage {
@@ -172,8 +172,8 @@ const fn wire_task_status(status: TodoStatus) -> Option<WireTaskStatus> {
     }
 }
 
-/// Project a thread's todo items into the read-only [`WireTask`] list the web
-/// aside renders: the thread's own items **sorted by sibling order** (YAML-diff
+/// Project an agent's todo items into the read-only [`WireTask`] list the web
+/// aside renders: the agent's own items **sorted by sibling order** (YAML-diff
 /// rework — the backend's `order` int is the single source of truth for sibling
 /// order), cancelled excluded, nesting expressed via [`WireTask::parent_id`].
 fn project_agent_tasks(mut items: Vec<&cp_mod_todo::types::TodoItem>) -> Vec<WireTask> {
@@ -195,7 +195,7 @@ fn project_agent_tasks(mut items: Vec<&cp_mod_todo::types::TodoItem>) -> Vec<Wir
         .collect()
 }
 
-/// Replay the agent's oplog to recover the **last per-thread task list the log
+/// Replay the agent's oplog to recover the **last per-agent task list the log
 /// recorded** — i.e. exactly what the backend's view has folded.
 ///
 /// The correct seed for the task chokepoint on the first pass after a (re)boot:
@@ -224,16 +224,16 @@ fn seed_tasks_memo_if_needed(app: &mut App) {
     bs.seeded.seed_tasks();
 }
 
-/// Diff each thread's live task projection against the memo; collect
-/// (`agent_id`, tasks) for every thread whose list changed. A thread absent
-/// from the memo is treated as having an empty list, so a thread that never had
+/// Diff each agent's live task projection against the memo; collect
+/// (`agent_id`, tasks) for every agent whose list changed. An agent absent
+/// from the memo is treated as having an empty list, so an agent that never had
 /// tasks (and still has none) yields no spurious emission.
 fn collect_task_changes(app: &App) -> Vec<(String, Vec<WireTask>)> {
     let ts = AgentsState::get(&app.state);
     let todos = TodoState::get(&app.state);
     let memo = &app.state.ext::<BridgeState>().agent_tasks;
     let empty: Vec<WireTask> = Vec::new();
-    // One pass over the todos instead of one per thread.
+    // One pass over the todos instead of one per agent.
     let mut by_agent: HashMap<&str, Vec<&cp_mod_todo::types::TodoItem>> = HashMap::new();
     for t in &todos.todos {
         by_agent.entry(t.agent_id.as_str()).or_default().push(t);
@@ -248,15 +248,15 @@ fn collect_task_changes(app: &App) -> Vec<(String, Vec<WireTask>)> {
 }
 
 /// Emit a [`TaskListChanged`](OpEntryKind::TaskListChanged) the instant any
-/// thread's projected task list changes, so the backend view (and the web todo
+/// agent's projected task list changes, so the backend view (and the web todo
 /// aside) reflect a `Think.todo` / `todo_mark` in milliseconds.
 ///
 /// A main-loop **observe-on-change chokepoint** mirroring
 /// [`emit_agent_archived`](super::archived::emit_agent_archived): it seeds the
-/// per-thread task memo from the oplog roster on the first pass (what the view
+/// per-agent task memo from the oplog roster on the first pass (what the view
 /// has folded), then falls through to the diff so any change the oplog missed
 /// while the bridge was down is emitted immediately. Each delta carries the
-/// thread's **complete** cancelled-excluded list (whole-list snapshot), and
+/// agent's **complete** cancelled-excluded list (whole-list snapshot), and
 /// rides the **durable** path ([`emit_roster_delta`]) — task state is
 /// user-visible roster state that must never be silently lost.
 ///
@@ -269,7 +269,7 @@ pub(in crate::app::run) fn emit_task_lists(app: &mut App) {
     seed_tasks_memo_if_needed(app);
 
     // Inputs unchanged since the last full diff ⇒ memo already equals every
-    // live projection: skip the O(threads × todos) rebuild entirely.
+    // live projection: skip the O(agents × todos) rebuild entirely.
     let hash = tasks_input_hash(app);
     if TASKS_INPUT_HASH.get() == Some(hash) {
         return;
@@ -294,8 +294,8 @@ thread_local! {
     static NOTES_INPUT_HASH: Cell<Option<u64>> = const { Cell::new(None) };
 }
 
-/// Skip key for [`collect_task_changes`]: the todo change stamp plus the thread
-/// id set. Equal key ⇒ no thread's task list can differ. O(threads), never
+/// Skip key for [`collect_task_changes`]: the todo change stamp plus the agent
+/// id set. Equal key ⇒ no agent's task list can differ. O(agents), never
 /// touches todo content.
 fn tasks_input_hash(app: &App) -> u64 {
     let mut h = DefaultHasher::new();
@@ -305,7 +305,7 @@ fn tasks_input_hash(app: &App) -> u64 {
 }
 
 /// Skip key for [`collect_note_changes`]: the scratchpad change stamp plus the
-/// thread id set. Equal key ⇒ no thread's note list can differ.
+/// agent id set. Equal key ⇒ no agent's note list can differ.
 fn notes_input_hash(app: &App) -> u64 {
     let mut h = DefaultHasher::new();
     ScratchpadState::get(&app.state).revision.hash(&mut h);
@@ -313,7 +313,7 @@ fn notes_input_hash(app: &App) -> u64 {
     h.finish()
 }
 
-/// Feed every thread id into `h` (thread create/delete changes the diff set).
+/// Feed every agent id into `h` (agent create/delete changes the diff set).
 fn hash_agent_ids(app: &App, h: &mut DefaultHasher) {
     for t in &AgentsState::get(&app.state).agents {
         t.id.hash(h);
@@ -322,8 +322,8 @@ fn hash_agent_ids(app: &App, h: &mut DefaultHasher) {
 
 // ── Note-list emission (thread-owned scratchpad → frontend, T716) ─────────
 
-/// Project a thread's scratchpad cells into the read-only [`WireNote`] list the
-/// web Notes aside renders: the thread's own cells in creation order (the
+/// Project an agent's scratchpad cells into the read-only [`WireNote`] list the
+/// web Notes aside renders: the agent's own cells in creation order (the
 /// `scratchpad_cells` Vec is already ordered by creation), each mapped to its
 /// `id`/`title`/`content`. The twin of [`project_agent_tasks`].
 fn project_agent_notes(cells: Vec<&cp_mod_scratchpad::types::ScratchpadCell>) -> Vec<WireNote> {
@@ -333,7 +333,7 @@ fn project_agent_notes(cells: Vec<&cp_mod_scratchpad::types::ScratchpadCell>) ->
         .collect()
 }
 
-/// Replay the agent's oplog to recover the **last per-thread note list the log
+/// Replay the agent's oplog to recover the **last per-agent note list the log
 /// recorded** — the correct seed for the note chokepoint's first post-boot pass
 /// (mirrors [`oplog_roster_tasks`]): comparing the live projection against this
 /// (not the live list itself) emits any note change that landed on disk while
@@ -359,9 +359,9 @@ fn seed_notes_memo_if_needed(app: &mut App) {
     bs.seeded.seed_notes();
 }
 
-/// Diff each thread's live note projection against the memo; collect
-/// (`agent_id`, notes) for every thread whose list changed. A thread absent
-/// from the memo is treated as having an empty list, so a thread that never had
+/// Diff each agent's live note projection against the memo; collect
+/// (`agent_id`, notes) for every agent whose list changed. An agent absent
+/// from the memo is treated as having an empty list, so an agent that never had
 /// notes (and still has none) yields no spurious emission. Twin of
 /// [`collect_task_changes`].
 fn collect_note_changes(app: &App) -> Vec<(String, Vec<WireNote>)> {
@@ -382,12 +382,12 @@ fn collect_note_changes(app: &App) -> Vec<(String, Vec<WireNote>)> {
         .collect()
 }
 
-/// Emit a [`NotesChanged`](OpEntryKind::NotesChanged) the instant any thread's
+/// Emit a [`NotesChanged`](OpEntryKind::NotesChanged) the instant any agent's
 /// projected note list changes, so the backend view (and the web Notes aside)
 /// reflect a `scratchpad_create_cell` / `scratchpad_edit_cell` /
 /// `scratchpad_wipe` in milliseconds. The twin of [`emit_task_lists`]: it seeds
-/// the per-thread note memo from the oplog roster on the first pass, then falls
-/// through to the diff. Each delta carries the thread's **complete** current
+/// the per-agent note memo from the oplog roster on the first pass, then falls
+/// through to the diff. Each delta carries the agent's **complete** current
 /// note list (whole-list snapshot) and rides the **durable** path — note state
 /// is user-visible roster state that must never be silently lost.
 ///

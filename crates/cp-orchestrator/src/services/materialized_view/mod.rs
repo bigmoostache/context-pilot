@@ -23,10 +23,10 @@ use cp_wire::types::oplog::{OpEntry, OpEntryKind};
 use cp_wire::types::snapshot::{Heads, RosterAgent};
 use cp_wire::types::{LifecycleState, Phase};
 
-/// One thread's roster entry — the lightweight per-thread metadata the
+/// One agent's roster entry — the lightweight per-agent metadata the
 /// `/agents` endpoint serves directly from the view.
 ///
-/// No tier-② disk read (design doc §16 journals thread create/archive/restore;
+/// No tier-② disk read (design doc §16 journals agent create/archive/restore;
 /// I5 keeps live reads off disk).
 ///
 /// This is [`cp_wire::types::snapshot::RosterAgent`] — the *same* type the
@@ -92,7 +92,7 @@ impl ContextSnapshot {
 /// One agent's current projected state.
 ///
 /// Folded from the agent's [`OpEntry`] stream; every field reflects the most
-/// recent relevant entry (heads accumulate per thread, the scalars are
+/// recent relevant entry (heads accumulate per agent, the scalars are
 /// latest-wins).
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize)]
 pub struct FleetView {
@@ -102,11 +102,11 @@ pub struct FleetView {
     /// Per-thread / per-panel content heads as of `rev`.
     pub heads: Heads,
 
-    /// Thread roster — the live list `/agents` serves from (folded from the
+    /// Agent roster — the live list `/agents` serves from (folded from the
     /// thread-roster deltas; design doc I5).
     pub roster: Vec<RosterEntry>,
 
-    /// The thread the agent is currently *focused* on (actively working), or
+    /// The agent the agent is currently *focused* on (actively working), or
     /// `None` when focus is released. Folded latest-wins from
     /// [`AgentFocusChanged`](OpEntryKind::AgentFocusChanged) — ephemeral,
     /// disposable UI state (like [`phase`](Self::phase)): it is **not** carried
@@ -138,9 +138,9 @@ impl FleetView {
     /// A [`Checkpoint`](OpEntryKind::Checkpoint) replaces the heads **and the
     /// roster** wholesale (authoritative reset, the mechanism behind
     /// count-bounded restart — a backend that cold-starts after oplog
-    /// compaction rebuilds the thread list from the checkpoint, not from the
+    /// compaction rebuilds the agent list from the checkpoint, not from the
     /// original deltas); a [`MessageCreated`](OpEntryKind::MessageCreated)
-    /// updates a single thread head and bumps that thread's roster activity;
+    /// updates a single agent head and bumps that agent's roster activity;
     /// the thread-roster deltas (`AgentCreated`/`Archived`/`Restored`/
     /// `StatusChanged`) maintain the roster idempotently via the shared
     /// [`RosterAgent`] fold helpers (so this fold and the agent's replay fold

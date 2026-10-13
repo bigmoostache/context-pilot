@@ -34,7 +34,7 @@ pub struct Frame {
 pub enum SidebarMode {
     /// Full sidebar with entries, token bar, help hints.
     Normal,
-    /// Completely hidden (used in Threads view).
+    /// Completely hidden (used in Agents view).
     Hidden,
 }
 

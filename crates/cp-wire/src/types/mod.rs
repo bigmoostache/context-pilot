@@ -182,12 +182,12 @@ pub enum LifecycleState {
     Stopped,
 }
 
-/// Whose turn it is on a thread — the wire mirror of the threads module's
+/// Whose turn it is on an agent — the wire mirror of the agents module's
 /// `AgentStatus`.
 ///
 /// Carried by [`OpEntryKind::AgentCreated`](oplog::OpEntryKind::AgentCreated)
 /// and [`AgentStatusChanged`](oplog::OpEntryKind::AgentStatusChanged) so the
-/// backend's materialized roster knows, without a disk read, whether a thread
+/// backend's materialized roster knows, without a disk read, whether an agent
 /// is waiting on the human (`MyTurn`) or owned by the agent (`TheirTurn`).
 /// Defined here in the I/O-free protocol crate rather than imported from
 /// `cp-mod-agents` to keep the layering one-directional (modules depend on the
@@ -200,9 +200,9 @@ pub enum LifecycleState {
     reason = "wire-protocol contract: ThreadTurn already carries an Unknown catch-all for N-1 forward-compat; the variant set is otherwise closed and constructed cross-crate, so #[non_exhaustive] would forbid that construction while adding nothing the Unknown variant does not already provide"
 )]
 pub enum AgentTurn {
-    /// The thread is waiting on the human — it needs a user response.
+    /// The agent is waiting on the human — it needs a user response.
     MyTurn,
-    /// The agent owns the thread (working it / will respond).
+    /// The agent owns the agent (working it / will respond).
     TheirTurn,
     /// A turn value from a newer protocol version (N-1 forward-compat).
     #[serde(other)]

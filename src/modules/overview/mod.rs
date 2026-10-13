@@ -84,9 +84,9 @@ fn load_budgets_and_costs(data: &serde_json::Value, state: &mut State) {
 
 /// Restore cumulative token counters and dollar-cost accumulators.
 ///
-/// Per-thread values: the conversation module persists them in each thread's
+/// Per-thread values: the conversation module persists them in each agent's
 /// worker data. The call from [`load_budgets_and_costs`] only reads the legacy
-/// global slot (pre-T809 configs); the per-thread value overrides it.
+/// global slot (pre-T809 configs); the per-agent value overrides it.
 pub(crate) fn load_token_cost_accumulators(data: &serde_json::Value, state: &mut State) {
     if let Some(v) = data.get("cache_hit_tokens").and_then(serde_json::Value::as_u64) {
         state.agent_mut().cache_hit_tokens = v.to_usize();

@@ -1,4 +1,4 @@
-//! Thread message area rendering — right pane of the Threads view.
+//! Agent message area rendering — right pane of the Agents view.
 //!
 //! Handles message display, input area, question form overlay, and
 //! conversion helpers. All content goes through the IR pipeline.
@@ -21,15 +21,15 @@ use std::collections::HashMap;
 use std::hash::{Hash as _, Hasher as _};
 use std::rc::Rc;
 
-/// Rendered message lines for one thread, shared between frames.
+/// Rendered message lines for one agent, shared between frames.
 type CachedLines = Rc<Vec<ratatui::text::Line<'static>>>;
 
 thread_local! {
     /// Last built message lines and the fingerprint they were built from.
-    /// Single slot: the threads view shows one thread at a time.
+    /// Single slot: the agents view shows one agent at a time.
     static LINE_CACHE: RefCell<Option<(u64, CachedLines)>> = const { RefCell::new(None) };
-    /// Rendered lines per message, keyed by [`message_key`]. When the thread
-    /// changes (new message, switch back to a thread), only messages missing
+    /// Rendered lines per message, keyed by [`message_key`]. When the agent
+    /// changes (new message, switch back to an agent), only messages missing
     /// here are rendered again; the rest are copied.
     static MSG_CACHE: RefCell<HashMap<u64, CachedLines>> = RefCell::new(HashMap::new());
 }
@@ -50,10 +50,10 @@ fn message_key(msg: &cp_mod_agents::types::AgentMessage, viewport_width: u16) ->
     h.finish()
 }
 
-/// Fingerprint of everything [`build_agent_message_lines`] reads: thread id,
+/// Fingerprint of everything [`build_agent_message_lines`] reads: agent id,
 /// width, active theme (colors are resolved at line build time) and each
 /// message's role/auto flag/content. Runs every frame, so content is NOT hashed
-/// byte by byte (that was O(thread text), ~0.3 ms on long threads): each
+/// byte by byte (that was O(agent text), ~0.3 ms on long agents): each
 /// message contributes its content length + heap address, which any append or
 /// replacement changes. The last message (where streaming edits land) is
 /// hashed in full as a guard against same-length in-place edits.
@@ -94,7 +94,7 @@ fn cached_agent_message_lines(agent: &cp_mod_agents::types::Agent, viewport_widt
     })
 }
 
-/// Render the right-pane message area with input box for the selected thread.
+/// Render the right-pane message area with input box for the selected agent.
 ///
 /// Messages and input render through the IR pipeline (same `render_message_blocks`
 /// and `render_input_blocks` as the main conversation). Border title uses
@@ -111,7 +111,7 @@ pub(super) fn render_message_area_with_input(frame: &mut Frame<'_>, state: &mut 
             return;
         };
 
-        // Title: thread name + status — colors via semantic mapping
+        // Title: agent name + status — colors via semantic mapping
         let focus = FocusState::get(state);
         let is_focused = focus.focused_agent_id.as_deref() == Some(agent.id.as_str());
         let (status_label, status_sem) = if is_focused {
@@ -167,7 +167,7 @@ pub(super) fn render_message_area_with_input(frame: &mut Frame<'_>, state: &mut 
     paint_agent_messages(frame, state, &lines, msg_area);
 }
 
-/// Build the message lines for a thread (owned, `'static`) via the conversation
+/// Build the message lines for an agent (owned, `'static`) via the conversation
 /// IR renderer.
 ///
 /// Converts `AgentMessage` → `Message`, feeds to `render_message_blocks()`
@@ -282,7 +282,7 @@ fn paint_agent_messages(frame: &mut Frame<'_>, state: &mut State, lines: &[ratat
     }
 }
 
-/// Render the input area at the bottom of the thread message area.
+/// Render the input area at the bottom of the agent message area.
 ///
 /// Separator line and input content both go through the IR pipeline.
 fn render_agent_input(frame: &mut Frame<'_>, state: &State, area: Rect) {

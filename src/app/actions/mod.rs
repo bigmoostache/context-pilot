@@ -6,7 +6,7 @@
 //! - `config` — Configuration bar and theme controls
 //! - `cursor` — Cursor movement, text editing, and command expansion
 //! - `history` — Prompt history navigation and panel clipboard copy
-//! - `agents` — Thread action handlers (`Agent*` variants)
+//! - `agents` — Agent action handlers (`Agent*` variants)
 //!
 //! [`apply_action`] itself is a single flat `match` over the closed [`Action`]
 //! enum — the dispatch twin of a flat aggregate initializer. Every arm delegates
@@ -24,7 +24,7 @@
 //! carries a single `clippy::too_many_lines` allowance, exactly like the flat
 //! `State::default` initializer.
 
-/// Thread action handlers (Thread* variants).
+/// Agent action handlers (Agent* variants).
 pub(crate) mod agents;
 /// Configuration bar and theme controls.
 pub(crate) mod config;
@@ -246,8 +246,8 @@ fn cycle_view_mode(state: &mut State) {
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 
-/// Apply an `Action`. Text-editing actions on the virtual "+ New Thread" row
-/// edit that row's own title textarea instead of the executing thread's composer.
+/// Apply an `Action`. Text-editing actions on the virtual "+ New Agent" row
+/// edit that row's own title textarea instead of the executing agent's composer.
 pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
     if agents::is_title_edit(&action) && agents::editing_new_agent_title(state) {
         return agents::with_new_agent_title(state, action, dispatch_action);
@@ -446,7 +446,7 @@ fn dispatch_action(state: &mut State, action: Action) -> ActionResult {
         Action::OpenCommandPalette | Action::None => {}
         Action::CycleViewMode => cycle_view_mode(state),
 
-        // ── Threads (all no-data variants delegate to the thread dispatcher) ─
+        // ── Agents (all no-data variants delegate to the agent dispatcher) ─
         Action::AgentSelectNext
         | Action::AgentSelectPrev
         | Action::AgentCreateStart

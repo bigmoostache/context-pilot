@@ -50,9 +50,9 @@ impl Module for QuestionsModule {
         true
     }
     /// Per-thread (thread-centric model): the `Think`-reminder cadence is each
-    /// thread's own. `ThinkState` (consecutive-count + next-notification point)
-    /// lives in the per-thread `TypeMap` and rides the thread's runtime; it
-    /// is already persisted per-thread via `save_worker_data`/`load_worker_data`,
+    /// agent's own. `ThinkState` (consecutive-count + next-notification point)
+    /// lives in the per-agent `TypeMap` and rides the agent's runtime; it
+    /// is already persisted per-agent via `save_worker_data`/`load_worker_data`,
     /// so the flip aligns the in-memory map with the on-disk location (no data
     /// loss) and is inert at N=1.
     fn is_global(&self) -> bool {

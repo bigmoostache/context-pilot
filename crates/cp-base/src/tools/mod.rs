@@ -223,7 +223,7 @@ pub struct ToolDefinition {
     /// Whether this tool opts into task declaration: when `true`, a compulsory
     /// `task_id` parameter is injected into the LLM-facing schema (like
     /// `intent`/`verb`) and validated non-blockingly (warn on missing / unknown
-    /// / cross-thread when a thread is focused). Default `false` (opt-out).
+    /// / cross-thread when an agent is focused). Default `false` (opt-out).
     pub declares_task: bool,
 }
 
@@ -338,7 +338,7 @@ impl ToolDefBuilder<'_> {
 
     /// Opt this tool into task declaration — a compulsory `task_id` parameter is
     /// injected into the LLM-facing schema and validated non-blockingly (warn on
-    /// missing / unknown / cross-thread when a thread is focused).
+    /// missing / unknown / cross-thread when an agent is focused).
     #[must_use]
     pub const fn declares_task(mut self) -> Self {
         self.declares_task = true;

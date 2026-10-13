@@ -139,8 +139,8 @@ impl Module for SearchModule {
 
     /// Fleet-shared (thread-centric model): `SearchState` holds index config and
     /// metrics for the single project-wide Meilisearch daemon — one index shared
-    /// by every thread, not per-thread state. The search *result panels* are
-    /// per-thread (they live in each thread's `context`); the index metadata stays shared so it is not duplicated per thread.
+    /// by every agent, not per-agent state. The search *result panels* are
+    /// per-agent (they live in each agent's `context`); the index metadata stays shared so it is not duplicated per agent.
     /// Inert at N=1.
     fn is_global(&self) -> bool {
         true
@@ -292,7 +292,7 @@ impl Module for SearchModule {
         // It health-checks every few seconds and respawns the global server on
         // the SAME port if it dies mid-session, so a deployment self-heals with
         // no manual restart. Stored in SearchState so a reload drops+replaces it
-        // (its Drop stops the old thread — never stacks two watchdogs).
+        // (its Drop stops the old agent — never stacks two watchdogs).
         let watchdog = (persist.port > 0)
             .then(|| meili::server::watchdog::WatchdogHandle::spawn(persist.port, persist.master_key.clone()));
 
@@ -323,7 +323,7 @@ impl Module for SearchModule {
         // Backfill: push any existing logs to Meilisearch (idempotent upsert)
         index::logsync::sync_logs_to_meilisearch(state);
 
-        // Backfill the conversations index once at boot from persisted threads
+        // Backfill the conversations index once at boot from persisted agents
         // (periodic freshening thereafter rides `on_stream_stop`).
         queue_conversation_reconcile(state);
 
@@ -397,8 +397,8 @@ impl Module for SearchModule {
     fn on_user_message(&self, _state: &mut State) {}
 
     fn on_stream_stop(&self, state: &mut State) {
-        // A turn just ended, so thread messages may have changed. Snapshot the
-        // live threads and hand a fresh desired-doc set to the indexer thread,
+        // A turn just ended, so agent messages may have changed. Snapshot the
+        // live agents and hand a fresh desired-doc set to the indexer thread,
         // which diffs+applies against the conversations index (T671). Cheap when
         // nothing changed — the hash diff skips every unchanged message.
         queue_conversation_reconcile(state);
@@ -447,7 +447,7 @@ pub fn push_task_signal(state: &mut State, content: &str) {
     radar::push_signal(state, content);
 }
 
-/// Snapshot the live threads and queue a conversations-index reconcile on the
+/// Snapshot the live agents and queue a conversations-index reconcile on the
 /// background indexer thread (T671).
 ///
 /// Doc-building must run here (it needs `AgentsState` from `State`), but the

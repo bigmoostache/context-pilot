@@ -54,7 +54,7 @@ pub(crate) struct BootPanels {
     pub panel_count: usize,
 }
 
-/// The focused thread id recorded by the last save, from the threads module's
+/// The focused agent id recorded by the last save, from the agents module's
 /// shared blob in `config.json`.
 ///
 /// This is a raw peek rather than a `FocusState` read because boot has not

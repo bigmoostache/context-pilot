@@ -1,12 +1,12 @@
 //! Per-thread message files: `.context-pilot/agents/<id>.json`.
 //!
-//! Thread *metadata* stays in `config.json` (slim, see [`AgentMeta`]); each
-//! thread's `messages` live in their own file, rewritten only when that
-//! thread's [`fingerprint`] changed since the last write. This keeps the save
-//! path from re-serializing every message of every thread on each save.
+//! Agent *metadata* stays in `config.json` (slim, see [`AgentMeta`]); each
+//! agent's `messages` live in their own file, rewritten only when that
+//! agent's [`fingerprint`] changed since the last write. This keeps the save
+//! path from re-serializing every message of every agent on each save.
 //!
 //! On-disk shape: `{"id": "<id>", "messages": [...]}`. The orchestrator reads
-//! the same files to rebuild full thread logs for the web UI.
+//! the same files to rebuild full agent logs for the web UI.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -17,10 +17,10 @@ use serde::Serialize;
 
 use super::{Agent, AgentMessage, AgentOrigin, AgentStatus};
 
-/// Directory (under the store dir) holding one message file per thread.
+/// Directory (under the store dir) holding one message file per agent.
 pub const AGENTS_DIR: &str = "threads";
 
-/// Path of a thread's message file.
+/// Path of an agent's message file.
 #[must_use]
 pub fn agent_file(id: &str) -> PathBuf {
     PathBuf::from(STORE_DIR).join(AGENTS_DIR).join(format!("{id}.json"))
@@ -63,16 +63,16 @@ impl<'agent> From<&'agent Agent> for AgentMeta<'agent> {
     }
 }
 
-/// On-disk body of a thread message file.
+/// On-disk body of an agent message file.
 #[derive(Serialize)]
 struct AgentFile<'agent> {
-    /// Owning thread id.
+    /// Owning agent id.
     id: &'agent str,
     /// Full ordered message log.
     messages: &'agent [AgentMessage],
 }
 
-/// Cheap change detector over a thread's messages — no serialization.
+/// Cheap change detector over an agent's messages — no serialization.
 ///
 /// Folds every field a mutation can touch (count, timestamps, content and
 /// path lengths, flags) so any push/retain/edit/ack changes the value.
@@ -92,13 +92,13 @@ fn fingerprint(messages: &[AgentMessage]) -> u64 {
     h
 }
 
-/// Fingerprint of each thread's file as last written / loaded.
+/// Fingerprint of each agent's file as last written / loaded.
 fn clean_map() -> &'static Mutex<HashMap<String, u64>> {
     static CLEAN: OnceLock<Mutex<HashMap<String, u64>>> = OnceLock::new();
     CLEAN.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-/// Serialize the message files of threads changed since their last write.
+/// Serialize the message files of agents changed since their last write.
 ///
 /// Marks them clean on return: callers must hand every op to a writer that
 /// never drops it (the persistence writer's durable lane).
@@ -118,9 +118,9 @@ pub fn dirty_agent_file_ops(agents: &[Agent]) -> Vec<(PathBuf, Vec<u8>)> {
     ops
 }
 
-/// Fill `messages` of threads loaded slim from `config.json` from their files.
+/// Fill `messages` of agents loaded slim from `config.json` from their files.
 ///
-/// Threads that already carry inline messages (legacy `config.json`) are left
+/// Agents that already carry inline messages (legacy `config.json`) are left
 /// as-is and stay unmarked, so the first save migrates them to files.
 pub fn load_agent_messages(agents: &mut [Agent]) {
     let Ok(mut clean) = clean_map().lock() else { return };

@@ -4,7 +4,7 @@
 //! tool applies `{prev, new}` diffs to a virtual YAML, reconciled by id). This
 //! module keeps only the small pure ops the main crate still calls around
 //! that: panel focus-scoping, the one-time legacy backlog purge, and the
-//! per-thread purge on thread hard-delete.
+//! per-agent purge on agent hard-delete.
 
 use cp_base::state::runtime::State;
 
@@ -16,7 +16,7 @@ pub fn purge_agentless(state: &mut State) {
     TodoState::get_mut(state).todos.retain(|t| !t.agent_id.is_empty());
 }
 
-/// Remove every item owned by `agent_id` — cascade cleanup when a thread is
+/// Remove every item owned by `agent_id` — cascade cleanup when an agent is
 /// hard-deleted (FR13; archiving keeps them). Returns the number removed.
 pub fn purge_agent_todos(state: &mut State, agent_id: &str) -> usize {
     let ts = TodoState::get_mut(state);

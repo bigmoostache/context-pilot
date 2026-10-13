@@ -20,7 +20,7 @@ pub(super) fn setup_file_watchers(app: &mut App) {
 /// Dynamic panels (File, Glob, Grep, Tmux, `GitResult`, `GithubResult`) will be
 /// populated gradually by `check_timer_based_deprecation` via its `needs_initial`
 /// path, staggered by the `cache_in_flight` guard — preventing a massive burst
-/// of concurrent background threads on startup when many panels are persisted.
+/// of concurrent background agents on startup when many panels are persisted.
 pub(super) fn schedule_initial_cache_refreshes(app: &mut App) {
     // Collect requests first (immutable borrow), then mark in-flight (mutable borrow).
     let requests: Vec<(usize, CacheRequest)> = app

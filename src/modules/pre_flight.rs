@@ -41,15 +41,15 @@ pub(crate) fn pre_flight_tool(tool: &ToolUse, state: &State, active_modules: &Ha
     // If tool not found in definitions, skip schema check — dispatch will catch it
 
     // While the history-cleanup trap is active, the only permitted tool is
-    // `Close_conversation_history`. The threads module's focus enforcement
-    // would otherwise reject that tool ("focus on a thread"), deadlocking the
+    // `Close_conversation_history`. The agents module's focus enforcement
+    // would otherwise reject that tool ("focus on an agent"), deadlocking the
     // two traps against each other. Pause focus enforcement for the duration
     // of the history-cleanup trap so it can be defused.
     let history_trap_active = cp_mod_queue::types::QueueState::get(state).trap_active;
 
     // Phase 2: Module-specific semantic checks
     for module in all_modules() {
-        // Skip the threads module entirely while the history-cleanup trap is
+        // Skip the agents module entirely while the history-cleanup trap is
         // active — its focus pre-flight is the one that deadlocks the trap.
         if history_trap_active && module.id() == "threads" {
             continue;
@@ -107,18 +107,18 @@ fn check_duplicate_close(tool: &ToolUse, state: &State) -> Option<String> {
 /// `task_id` is compulsory in the tool's advertised schema (injected like
 /// `intent`/`verb`), but enforcement here is **soft**: it only produces
 /// [`warnings`](Verdict::warnings), never [`errors`](Verdict::errors), and only
-/// when a thread is focused (per the design, `task_id` is "compulsory whenever a
-/// thread is focused"). With no focused thread the declaration is irrelevant, so
+/// when an agent is focused (per the design, `task_id` is "compulsory whenever a
+/// agent is focused"). With no focused agent the declaration is irrelevant, so
 /// this returns silently.
 ///
-/// When a thread IS focused, it warns on three conditions:
+/// When an agent IS focused, it warns on three conditions:
 /// - `task_id` missing/empty — the AI forgot to declare the task;
-/// - `task_id` matches no todo in ANY thread — a stale/typo'd id;
-/// - `task_id` matches a todo owned by a DIFFERENT thread — a cross-thread
-///   reference (the precise "wrong thread" warning the all-todos scope enables).
+/// - `task_id` matches no todo in ANY agent — a stale/typo'd id;
+/// - `task_id` matches a todo owned by a DIFFERENT agent — a cross-thread
+///   reference (the precise "wrong agent" warning the all-todos scope enables).
 fn validate_task_declaration(tool: &ToolUse, state: &State, result: &mut Verdict) {
     let Some(focused) = state.executing_agent_id().map(str::to_owned) else {
-        return; // No focused thread → task_id not enforced.
+        return; // No focused agent → task_id not enforced.
     };
 
     let declared =
@@ -133,7 +133,7 @@ fn validate_task_declaration(tool: &ToolUse, state: &State, result: &mut Verdict
         return;
     };
 
-    // Look up across ALL todos so an "exists but wrong thread" case yields the
+    // Look up across ALL todos so an "exists but wrong agent" case yields the
     // precise cross-thread warning rather than a generic "unknown".
     let todos = &cp_mod_todo::types::TodoState::get(state).todos;
     match todos.iter().find(|t| t.id == task_id) {

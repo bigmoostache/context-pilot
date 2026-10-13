@@ -425,8 +425,8 @@ pub(super) fn transport() -> Value {
                 "name": { "type": "string" },
                 "status": { "type": "string" },
                 "timestamp_ms": { "type": "integer" },
-                // agent_created delta payload: the parent thread id when the new
-                // thread was branched out of another one (absent otherwise).
+                // agent_created delta payload: the parent agent id when the new
+                // agent was branched out of another one (absent otherwise).
                 "branched_from": { "type": "string" },
                 "phase": { "type": "string" },
                 // Lifecycle delta payload: the agent's new process state
@@ -449,10 +449,10 @@ pub(super) fn transport() -> Value {
                 "system_id": { "type": "string" },
                 // Legacy (pre-T860) name of `system_id`, still emitted by older agents.
                 "agent_id": { "type": "string" },
-                // task_list_changed delta payload: the thread's complete current
+                // task_list_changed delta payload: the agent's complete current
                 // (cancelled-excluded) task list, carried by a `kind:"task_list_changed"` entry.
                 "tasks": arr(r("ThreadTask")),
-                // notes_changed delta payload: the thread's complete current
+                // notes_changed delta payload: the agent's complete current
                 // scratchpad-note list, carried by a `kind:"notes_changed"` entry.
                 "notes": arr(r("ThreadNote"))
             },

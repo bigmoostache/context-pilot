@@ -156,7 +156,7 @@ fn lifecycle_running_on_boot_and_stopping_on_drop() {
     let oplog_dir = sync_dir_for(agents.path(), &folder_id(&canonical.to_string_lossy())).join(OPLOG_DIR);
 
     // Boot emits Lifecycle::Running; dropping it emits Lifecycle::Stopping. The
-    // drop joins the oplog commit thread, draining + fsyncing both records
+    // drop joins the oplog commit agent, draining + fsyncing both records
     // before it returns, so reading after the drop is race-free.
     let booted = boot(folder.path(), agents.path()).expect("boot");
     drop(booted);

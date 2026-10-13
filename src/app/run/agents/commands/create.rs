@@ -1,9 +1,9 @@
-//! Thread *creation* commands — `CreateAgent` and `BranchAgent`.
+//! Agent *creation* commands — `CreateAgent` and `BranchAgent`.
 //!
-//! Both end the same way: announce the new thread on the oplog, then apply the
+//! Both end the same way: announce the new agent on the oplog, then apply the
 //! optional pause and first message in strict create -> pause -> send order
 //! (T687). A branch additionally starts with a copy of its parent's history,
-//! which `emit_messages` streams out on the next tick (the new thread has no
+//! which `emit_messages` streams out on the next tick (the new agent has no
 //! message-count memo yet, so every copied message becomes a `MessageCreated`).
 
 use cp_base::state::runtime::State;
@@ -16,34 +16,34 @@ use crate::app::panels::now_ms;
 use super::super::bridge::{emit_roster_delta, wire_turn};
 use super::{apply_pause_agent, apply_send_message};
 
-/// What a freshly created thread is seeded with once it exists.
+/// What a freshly created agent is seeded with once it exists.
 pub(super) struct Seed<'seed> {
     /// Optional first user message (blank = none).
     pub initial_message: Option<&'seed str>,
-    /// Create the thread already paused.
+    /// Create the agent already paused.
     pub paused: bool,
 }
 
 /// The message a `BranchAgent` cuts its parent at (inclusive).
 pub(super) struct BranchPoint<'point> {
-    /// Parent thread id.
+    /// Parent agent id.
     pub source_agent_id: &'point str,
     /// Epoch-ms timestamp of the last parent message to copy.
     pub message_ts: u64,
 }
 
-/// Create a new thread with the given name, optionally seeding a first user
+/// Create a new agent with the given name, optionally seeding a first user
 /// message and starting it paused.
 ///
 /// Strict order (T687): create, then pause (if requested), then seed the first
 /// message through [`apply_send_message`]. Pausing before the send guarantees
-/// the seeded message lands on an already-paused thread, so it can never nudge
+/// the seeded message lands on an already-paused agent, so it can never nudge
 /// the agent — the whole sequence is one atomic command application, with no
 /// frontend id round-trip and no window where the message exists un-paused.
 /// The message content rides the durable command payload, closing the
 /// data-loss race a frontend create -> wait-id -> send orchestration had.
 ///
-/// Returns the new thread's id so the caller can route the per-thread
+/// Returns the new agent's id so the caller can route the per-agent
 /// `on_user_message` hook (D4) when a first message was seeded.
 pub(super) fn apply_create_agent(state: &mut State, name: &str, seed: &Seed<'_>) -> String {
     let ts = AgentsState::get_mut(state);
@@ -57,7 +57,7 @@ pub(super) fn apply_create_agent(state: &mut State, name: &str, seed: &Seed<'_>)
     id
 }
 
-/// Branch a new thread out of an existing one: copy the parent's messages up
+/// Branch a new agent out of an existing one: copy the parent's messages up
 /// to and including the branch point (see [`AgentsState::branch`]), then seed
 /// it exactly like [`apply_create_agent`].
 ///
@@ -65,8 +65,8 @@ pub(super) fn apply_create_agent(state: &mut State, name: &str, seed: &Seed<'_>)
 /// through [`apply_send_message`]. An unknown parent or branch point is
 /// logged and ignored — nothing is created.
 ///
-/// Returns the new thread's id on success (so the caller can route the
-/// per-thread `on_user_message` hook when a first message was seeded), or
+/// Returns the new agent's id on success (so the caller can route the
+/// per-agent `on_user_message` hook when a first message was seeded), or
 /// `None` when the branch was rejected.
 pub(super) fn apply_branch_agent(
     state: &mut State,
@@ -88,10 +88,10 @@ pub(super) fn apply_branch_agent(
     Some(id)
 }
 
-/// Emit the durable `AgentCreated` roster delta for a thread just pushed onto
+/// Emit the durable `AgentCreated` roster delta for an agent just pushed onto
 /// [`AgentsState`], so the backend view reflects it in ms (Leg 0 keystone).
 ///
-/// A new thread is the user's turn. The status goes through `wire_turn` so it
+/// A new agent is the user's turn. The status goes through `wire_turn` so it
 /// matches what the status chokepoint would emit, and the status memo is primed
 /// to it so a create immediately followed by a send produces exactly one
 /// follow-up `AgentStatusChanged`.
@@ -113,17 +113,17 @@ fn announce_agent(state: &mut State, id: &str, name: &str, branched_from: Option
     state.flags.ui.dirty = true;
 }
 
-/// Apply a [`Seed`] to the just-created thread `id` in strict pause -> send
+/// Apply a [`Seed`] to the just-created agent `id` in strict pause -> send
 /// order (T687): pausing FIRST means the seeded message lands on an
-/// already-paused thread and can never nudge the agent, even transiently.
+/// already-paused agent and can never nudge the agent, even transiently.
 fn apply_seed(state: &mut State, id: &str, seed: &Seed<'_>) {
     if seed.paused {
         apply_pause_agent(state, id);
     }
     if let Some(content) = seed.initial_message.filter(|c| !c.trim().is_empty()) {
-        // Ignore the applied-flag: the thread was just created, so it always
+        // Ignore the applied-flag: the agent was just created, so it always
         // exists. The create path's `on_user_message` reset is routed by the
-        // caller (`apply_command`) once it has the new thread id.
+        // caller (`apply_command`) once it has the new agent id.
         let _applied = apply_send_message(state, id, content);
     }
 }

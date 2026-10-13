@@ -1,6 +1,6 @@
 /// Character constants re-exported from the infra layer.
 pub(crate) use crate::infra::constants::chars;
-/// Threads view: dedicated layout for thread management.
+/// Agents view: dedicated layout for agent management.
 mod agents_view;
 /// Help subsystem: config overlay, command palette, input overlays.
 pub(crate) mod help;
@@ -27,12 +27,12 @@ use crate::infra::constants::STATUS_BAR_HEIGHT;
 use crate::state::{Kind, State};
 use crate::ui::perf::PERF;
 
-/// Whether the threads-list surface should be painted this frame: the Threads
-/// view mode is active **and** the human has not drilled into a specific thread.
+/// Whether the threads-list surface should be painted this frame: the Agents
+/// view mode is active **and** the human has not drilled into a specific agent.
 ///
-/// When drilled (G3), the renderer paints the drilled thread's full panel body
+/// When drilled (G3), the renderer paints the drilled agent's full panel body
 /// (sidebar + panels) instead of the list — `render_frame` has already made
-/// that thread the executing one, so the normal body renders it
+/// that agent the executing one, so the normal body renders it
 /// pixel-identically to its own main view.
 fn showing_agents_list(state: &State) -> bool {
     state.view_mode == cp_base::state::data::config::ViewMode::Agents
@@ -79,7 +79,7 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     }
 
     // Render autocomplete popup if active (via IR overlays).
-    // In Threads mode the input lives inside the right pane (past the thread
+    // In Agents mode the input lives inside the right pane (past the agent
     // list), so offset by AGENT_LIST_WIDTH instead of the sidebar width.
     {
         let _g = crate::profile!("autocomplete");
@@ -148,11 +148,11 @@ fn render_modal_overlays(frame: &mut Frame<'_>, area: Rect, overlays: &[cp_rende
 }
 
 /// Render the body area: sidebar (if visible) and main content panel,
-/// or the threads view when `ViewMode::Agents` is active.
+/// or the agents view when `ViewMode::Agents` is active.
 fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &ir::FrameChrome) {
-    // Threads mode: completely different layout (no sidebar, no panels) —
-    // unless the human has drilled into a thread (G3), in which case fall
-    // through to the normal body to paint that thread's full panel view.
+    // Agents mode: completely different layout (no sidebar, no panels) —
+    // unless the human has drilled into an agent (G3), in which case fall
+    // through to the normal body to paint that agent's full panel view.
     if showing_agents_list(state) {
         let _agents = crate::profile!("threads_view");
         agents_view::render_agents_view(frame, state, area);
