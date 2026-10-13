@@ -96,7 +96,7 @@ pub(crate) struct App {
     /// for timer-based panels (Tmux, Git, `GitResult`, `GithubResult`, Glob, Grep).
     /// Separate from `Entry.last_refresh_ms` which tracks actual content changes.
     pub last_poll_ms: std::collections::HashMap<String, u64>,
-    /// Active reverie streams keyed by `agent_id` (one per agent type)
+    /// Active reverie streams keyed by `system_id` (one per agent type)
     pub reverie_streams: std::collections::HashMap<String, ReverieStream>,
     /// Active main-thread streams keyed by thread id (one per streaming thread).
     /// At N=1 holds a single entry under [`App::main_stream_key`]; the loop

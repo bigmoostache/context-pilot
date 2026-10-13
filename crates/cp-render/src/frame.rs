@@ -162,8 +162,8 @@ pub struct HelpHint {
 pub struct StatusBar {
     /// Primary status badge (e.g. "Streaming", "Ready").
     pub badge: Badge,
-    /// Active agent card.
-    pub agent: Option<SystemCard>,
+    /// Active system (persona) card.
+    pub system: Option<SystemCard>,
     /// Loaded skills.
     pub skills: Vec<SkillCard>,
     /// Git branch + changes summary.
@@ -205,7 +205,7 @@ pub struct StopReason {
     pub semantic: Semantic,
 }
 
-/// Active agent indicator.
+/// Active system (persona) indicator.
 #[derive(Debug, Clone, Serialize)]
 pub struct SystemCard {
     /// Agent display name.
@@ -235,8 +235,8 @@ pub struct GitChanges {
 /// Active reverie sub-agent indicator.
 #[derive(Debug, Clone, Serialize)]
 pub struct ReverieCard {
-    /// Agent name driving the reverie.
-    pub agent: String,
+    /// System (persona) name driving the reverie.
+    pub system: String,
     /// Tool calls completed so far.
     pub tool_count: u32,
 }

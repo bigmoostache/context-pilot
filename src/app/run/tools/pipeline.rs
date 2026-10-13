@@ -201,14 +201,14 @@ fn sync_logs_and_radar(
 /// Start a reverie if any tool result carries a `REVERIE_START:` sentinel
 /// (emitted by `optimize_context`).
 fn maybe_trigger_reverie(app: &mut App, tool_results: &[crate::infra::tools::ToolResult]) {
-    // Sentinel format: REVERIE_START:<agent_id>\n<context_or_empty>\n<human_readable_msg>
+    // Sentinel format: REVERIE_START:<system_id>\n<context_or_empty>\n<human_readable_msg>
     for tr in tool_results {
         if let Some(rest) = tr.content.strip_prefix("REVERIE_START:") {
             let mut lines = rest.lines();
-            let agent_id = lines.next().unwrap_or("cleaner").to_owned();
+            let system_id = lines.next().unwrap_or("cleaner").to_owned();
             let context_line = lines.next().unwrap_or("");
             let context = if context_line.is_empty() { None } else { Some(context_line.to_owned()) };
-            let _r = crate::app::reverie::trigger::start_manual_reverie(&mut app.state, agent_id, context);
+            let _r = crate::app::reverie::trigger::start_manual_reverie(&mut app.state, system_id, context);
             break;
         }
     }

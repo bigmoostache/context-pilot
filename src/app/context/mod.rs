@@ -29,7 +29,7 @@ pub(super) struct StreamContext {
 /// reverie's own messages. Panels and tools remain IDENTICAL for cache hits.
 pub(super) struct ReverieContext {
     /// Agent ID driving this reverie (e.g., "cleaner", "cartographer")
-    pub agent_id: String,
+    pub system_id: String,
     /// Optional directive (from `optimize_context`) injected into the preamble.
     /// Carried here so prompt building never looks the reverie up in the
     /// `state.reveries` map — that map is keyed by an opaque per-thread slot.
@@ -222,10 +222,10 @@ fn build_reverie_stream_context(
 /// restrictions + a conversation-follows marker.
 fn build_reverie_panel_content(rev: &ReverieContext) -> String {
     let mut content = String::new();
-    let agents = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::System);
-    if let Some(agent) = agents.iter().find(|a| a.id == rev.agent_id) {
+    let systems = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::System);
+    if let Some(system) = systems.iter().find(|a| a.id == rev.system_id) {
         content.push_str("## Agent Instructions\n");
-        content.push_str(&agent.content);
+        content.push_str(&system.content);
         content.push('\n');
     }
     if let Some(ctx) = rev.directive.as_ref() {

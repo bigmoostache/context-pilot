@@ -67,7 +67,7 @@ fn load_dotenv_files() {
 /// The rendered report when the environment is invalid.
 pub(crate) fn preflight_env() -> Result<(), String> {
     load_dotenv_files();
-    let loaded = cp_env::load(cp_env::spec::Target::Agent).map_err(|report| report.to_string())?;
+    let loaded = cp_env::load(cp_env::spec::Target::Fleet).map_err(|report| report.to_string())?;
     if cp_env::install(loaded.env) { Ok(()) } else { Err("environment installed twice".to_owned()) }
 }
 
@@ -75,7 +75,7 @@ pub(crate) fn preflight_env() -> Result<(), String> {
 /// for the terminal, with the exit status to use.
 pub(crate) fn check_env() -> (String, bool) {
     load_dotenv_files();
-    cp_env::check(cp_env::spec::Target::Agent)
+    cp_env::check(cp_env::spec::Target::Fleet)
 }
 
 /// Trigger vault initialization (the `.env` files were merged by

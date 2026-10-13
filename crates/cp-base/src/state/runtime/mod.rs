@@ -76,7 +76,7 @@ pub struct State {
     pub claude_code_v2_model: crate::config::llm::models::ClaudeCodeV2Model,
     /// View mode: Normal (full sidebar), Collapsed (icons), Hidden, Threads
     pub view_mode: ViewMode,
-    /// Active reverie sessions keyed by `agent_id` (e.g., "cleaner", "cartographer").
+    /// Active reverie sessions keyed by `system_id` (e.g., "cleaner", "cartographer").
     /// Ephemeral — not persisted, discarded after each run.
     pub reveries: HashMap<String, reverie::Session>,
     /// Result of the last API check
@@ -177,7 +177,6 @@ impl State {
         }
         Ok(self.resolve_path(path))
     }
-
 
     // === Boot builder (cross-crate reconstruction from persisted state) ===
 

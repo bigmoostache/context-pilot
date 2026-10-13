@@ -50,15 +50,15 @@ pub(crate) fn check_threshold_trigger(state: &mut State) -> bool {
 }
 
 /// Build the map slot key for a reverie: `"{thread_id}\u{1}{agent_id}"`, or just
-/// `agent_id` when no owner thread is known (cold boot / single-thread).
+/// `system_id` when no owner thread is known (cold boot / single-thread).
 ///
 /// `state.reveries` and `App::reverie_streams` are both keyed by this slot so
 /// the running-reverie limit is scoped to a single (thread, agent) pair rather
 /// than globally per agent type. The agent's *identity* (for prompt loading) is
-/// never derived from this key — it lives on [`Session::agent_id`].
+/// never derived from this key — it lives on [`Session::system_id`].
 #[must_use]
-pub(crate) fn reverie_slot(thread_id: Option<&str>, agent_id: &str) -> String {
-    thread_id.map_or_else(|| agent_id.to_owned(), |tid| format!("{tid}\u{1}{agent_id}"))
+pub(crate) fn reverie_slot(thread_id: Option<&str>, system_id: &str) -> String {
+    thread_id.map_or_else(|| system_id.to_owned(), |tid| format!("{tid}\u{1}{system_id}"))
 }
 
 /// Resolve the thread that owns the current context (the executing thread).
@@ -74,11 +74,11 @@ pub(crate) fn owner_thread_id(state: &State) -> Option<String> {
 /// in a tool result from `execute_optimize_context()`.
 ///
 /// Returns `true` if the reverie was started, `false` if guards prevented it.
-pub(crate) fn start_manual_reverie(state: &mut State, agent_id: String, context: Option<String>) -> bool {
+pub(crate) fn start_manual_reverie(state: &mut State, system_id: String, context: Option<String>) -> bool {
     // Guard: this agent type is already running FOR THIS THREAD (one reverie per
     // (thread, agent), not one globally — see `reverie_slot`).
     let owner = owner_thread_id(state);
-    let slot = reverie_slot(owner.as_deref(), &agent_id);
+    let slot = reverie_slot(owner.as_deref(), &system_id);
     if state.reveries.contains_key(&slot) {
         return false;
     }
@@ -90,7 +90,7 @@ pub(crate) fn start_manual_reverie(state: &mut State, agent_id: String, context:
     }
 
     // Start the reverie session
-    let mut rev = Session::new(Kind::ContextOptimizer, agent_id, context);
+    let mut rev = Session::new(Kind::ContextOptimizer, system_id, context);
     rev.queue_active = true;
     rev.thread_id = owner;
     let _r = state.reveries.insert(slot, rev);

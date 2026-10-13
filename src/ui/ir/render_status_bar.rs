@@ -40,8 +40,8 @@ fn push_retry_loading(spans: &mut Vec<Span<'static>>, status: &StatusBar, spin: 
     }
 }
 
-/// Stop-reason + agent + skill cards.
-fn push_stop_agent_skills(spans: &mut Vec<Span<'static>>, status: &StatusBar, base: Style) {
+/// Stop-reason + system + skill cards.
+fn push_stop_system_skills(spans: &mut Vec<Span<'static>>, status: &StatusBar, base: Style) {
     if let Some(sr) = status.stop_reason.as_ref() {
         let label = sr.reason.to_uppercase();
         let style = if sr.semantic == Semantic::Error {
@@ -51,10 +51,10 @@ fn push_stop_agent_skills(spans: &mut Vec<Span<'static>>, status: &StatusBar, ba
         };
         push_card(spans, format!(" {label} "), style, base);
     }
-    if let Some(agent) = status.agent.as_ref() {
+    if let Some(system) = status.system.as_ref() {
         push_card(
             spans,
-            format!(" 🤖 {} ", agent.name),
+            format!(" 🤖 {} ", system.name),
             Style::default().fg(theme::card_text()).bg(theme::card_system_bg()).bold(),
             base,
         );
@@ -96,7 +96,7 @@ fn push_activity_cards(spans: &mut Vec<Span<'static>>, status: &StatusBar, spin:
     for rev in &status.reveries {
         push_card(
             spans,
-            format!(" {spin} 🧠 {} ({} tools) ", rev.agent, rev.tool_count),
+            format!(" {spin} 🧠 {} ({} tools) ", rev.system, rev.tool_count),
             Style::default().fg(theme::card_text()).bg(theme::card_reverie_bg()).bold(),
             base,
         );
@@ -139,7 +139,7 @@ pub(crate) fn render_status_bar_from_ir(frame: &mut Frame<'_>, status: &StatusBa
     spans.push(Span::styled(" ", base_style));
 
     push_retry_loading(&mut spans, status, spin, base_style);
-    push_stop_agent_skills(&mut spans, status, base_style);
+    push_stop_system_skills(&mut spans, status, base_style);
     push_git(&mut spans, status, base_style);
     push_activity_cards(&mut spans, status, spin, base_style);
 
@@ -195,7 +195,7 @@ const fn needs_spinner(semantic: Semantic) -> bool {
 pub(crate) fn build_status_bar(state: &State) -> StatusBar {
     StatusBar {
         badge: build_badge(state),
-        agent: build_system(state),
+        system: build_system(state),
         skills: build_skills(state),
         git: build_git(state),
 
@@ -248,12 +248,12 @@ fn build_badge(state: &State) -> Badge {
 
 // ── Agent + skills ───────────────────────────────────────────────────
 
-/// Build active agent card.
+/// Build active system card.
 fn build_system(state: &State) -> Option<SystemCard> {
     let ps = cp_mod_prompt::types::PromptState::get(state);
-    let agent_id = ps.active_system_id.as_ref()?;
-    let agents = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::System);
-    let name = agents.iter().find(|a| &a.id == agent_id).map_or_else(|| agent_id.clone(), |a| a.name.clone());
+    let system_id = ps.active_system_id.as_ref()?;
+    let systems = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::System);
+    let name = systems.iter().find(|a| &a.id == system_id).map_or_else(|| system_id.clone(), |a| a.name.clone());
     Some(SystemCard { name })
 }
 
@@ -296,7 +296,7 @@ fn build_git(state: &State) -> Option<GitChanges> {
 
 /// Build active reverie cards (all concurrent reveries, sorted by key).
 fn build_reveries(state: &State) -> Vec<ReverieCard> {
-    let agents = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::System);
+    let systems = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::System);
     let mut sorted_keys: Vec<_> = state.reveries.keys().collect();
     sorted_keys.sort();
 
@@ -304,9 +304,11 @@ fn build_reveries(state: &State) -> Vec<ReverieCard> {
         .into_iter()
         .filter_map(|key| {
             let rev = state.reveries.get(key)?;
-            let agent_name =
-                agents.iter().find(|a| a.id == rev.agent_id).map_or_else(|| rev.agent_id.clone(), |a| a.name.clone());
-            Some(ReverieCard { agent: agent_name, tool_count: rev.tool_call_count.to_u32() })
+            let system_name = systems
+                .iter()
+                .find(|a| a.id == rev.system_id)
+                .map_or_else(|| rev.system_id.clone(), |a| a.name.clone());
+            Some(ReverieCard { system: system_name, tool_count: rev.tool_call_count.to_u32() })
         })
         .collect()
 }

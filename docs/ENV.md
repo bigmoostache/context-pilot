@@ -91,8 +91,8 @@ How a spawned agent finds its orchestrator. The orchestrator sets these on every
 
 | Variable | Type | Default | Scope | Required | Description |
 |---|---|---|---|---|---|
-| `CP_BRIDGE` | bool (0/1/true/false) | `0` | agent |  | Activate the orchestration bridge module and the bridge-backed vault. The orchestrator sets 1 on every agent it spawns; `cpilot --bridge` is the CLI equivalent. |
-| `CP_BRIDGE_URL` | http(s) URL | `http://127.0.0.1:7878` | agent |  | The orchestrator API as seen by the agent. |
+| `CP_BRIDGE` | bool (0/1/true/false) | `0` | fleet |  | Activate the orchestration bridge module and the bridge-backed vault. The orchestrator sets 1 on every agent it spawns; `cpilot --bridge` is the CLI equivalent. |
+| `CP_BRIDGE_URL` | http(s) URL | `http://127.0.0.1:7878` | fleet |  | The orchestrator API as seen by the agent. |
 
 ## Appliance gates
 
@@ -139,10 +139,10 @@ Local development only.
 
 | Variable | Type | Default | Scope | Required | Description |
 |---|---|---|---|---|---|
-| `CP_FLAMEGRAPH` | bool (0/1/true/false) | `0` | agent |  | Write flame-graph profiling data (`run.sh --flamegraph`). |
-| `CP_MEASURE_LOOPS` | integer | `0` | agent |  | Set by `run.sh --measure N`: profile N main-loop iterations, write `tmp/loop-profile.html`, then exit (`0` = off). |
-| `CP_RUN_SH` | bool (0/1/true/false) | `0` | agent |  | Set by `run.sh`: the supervisor script handles reloads, so the agent must not re-exec itself. |
-| `SHOW_CONTEXT_PILOT_IN_TREE` | bool (0/1/true/false) | `0` | agent |  | Show the `.context-pilot/` directory in the tree tool. |
+| `CP_FLAMEGRAPH` | bool (0/1/true/false) | `0` | fleet |  | Write flame-graph profiling data (`run.sh --flamegraph`). |
+| `CP_MEASURE_LOOPS` | integer | `0` | fleet |  | Set by `run.sh --measure N`: profile N main-loop iterations, write `tmp/loop-profile.html`, then exit (`0` = off). |
+| `CP_RUN_SH` | bool (0/1/true/false) | `0` | fleet |  | Set by `run.sh`: the supervisor script handles reloads, so the agent must not re-exec itself. |
+| `SHOW_CONTEXT_PILOT_IN_TREE` | bool (0/1/true/false) | `0` | fleet |  | Show the `.context-pilot/` directory in the tree tool. |
 
 ## Credentials
 

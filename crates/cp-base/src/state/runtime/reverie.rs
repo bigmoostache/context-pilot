@@ -22,7 +22,7 @@ pub struct Session {
     pub kind: Kind,
     /// Agent ID driving this reverie (e.g., "cleaner"). The agent's content
     /// is injected into the P-reverie panel, NOT as a system prompt.
-    pub agent_id: String,
+    pub system_id: String,
     /// Optional additional context from the caller (e.g., "focus on UI files").
     pub context: Option<String>,
     /// The reverie's own conversation (separate from main chat).
@@ -45,10 +45,10 @@ pub struct Session {
 impl Session {
     /// Create a new reverie session driven by the given agent.
     #[must_use]
-    pub const fn new(kind: Kind, agent_id: String, context: Option<String>) -> Self {
+    pub const fn new(kind: Kind, system_id: String, context: Option<String>) -> Self {
         Self {
             kind,
-            agent_id,
+            system_id,
             context,
             messages: Vec::new(),
             tool_call_count: 0,

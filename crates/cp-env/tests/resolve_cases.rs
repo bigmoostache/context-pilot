@@ -324,7 +324,7 @@ mod tests {
     fn scope_filters_what_each_binary_parses() {
         let dir = tempfile::tempdir().unwrap();
         let src = source(dir.path(), &[("CP_ORCH_PORT", "abc"), ("CP_BRIDGE", "1")]);
-        drop(resolve(Target::Agent, &src, Strictness::Strict).unwrap());
+        drop(resolve(Target::Fleet, &src, Strictness::Strict).unwrap());
         let lines = errors(resolve(Target::Orchestrator, &src, Strictness::Strict));
         assert_eq!(lines, vec!["CP_ORCH_PORT: expected an integer 1-65535, got \"abc\"".to_owned()]);
     }
@@ -333,13 +333,13 @@ mod tests {
     #[test]
     fn bridge_flag_is_a_boolean() {
         let dir = tempfile::tempdir().unwrap();
-        let on = Env::from_map(&source(dir.path(), &[("CP_BRIDGE", "1")]), Target::Agent).unwrap();
-        let off = Env::from_map(&source(dir.path(), &[("CP_BRIDGE", "0")]), Target::Agent).unwrap();
+        let on = Env::from_map(&source(dir.path(), &[("CP_BRIDGE", "1")]), Target::Fleet).unwrap();
+        let off = Env::from_map(&source(dir.path(), &[("CP_BRIDGE", "0")]), Target::Fleet).unwrap();
         assert_eq!(
             (on.bridge.enabled, on.bridge.url.as_str(), off.bridge.enabled),
             (true, "http://127.0.0.1:7878", false)
         );
-        let bad = errors(resolve(Target::Agent, &source(dir.path(), &[("CP_BRIDGE", "yes")]), Strictness::Strict));
+        let bad = errors(resolve(Target::Fleet, &source(dir.path(), &[("CP_BRIDGE", "yes")]), Strictness::Strict));
         assert_eq!(bad, vec!["CP_BRIDGE: expected a boolean (0, 1, true or false), got \"yes\"".to_owned()]);
     }
 
