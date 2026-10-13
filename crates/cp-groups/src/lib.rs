@@ -12,6 +12,8 @@ pub mod panels;
 pub mod persist;
 /// LLM-facing YAML rendering of groups.
 pub mod render;
+/// Social substates (who acts next), the `next` DSL, and the tick.
+pub mod social;
 /// `Group`, `GroupKind`, `GroupsState`.
 pub mod types;
 /// `GroupsModule`: state registration + metadata persistence.

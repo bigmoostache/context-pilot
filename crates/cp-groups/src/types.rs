@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use cp_base::state::runtime::State;
 
 use crate::chat::GroupMessage;
+use crate::social::Substate;
 
 /// Pseudo-agent id of the human user as a group member / talking-stick target.
 pub const HUMAN: &str = "HUMAN";
@@ -46,6 +47,9 @@ pub struct Group {
     /// Creation timestamp (epoch ms).
     #[serde(default)]
     pub created_at: u64,
+    /// Pending obligations: who must act next (see [`crate::social`]).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub social: Vec<Substate>,
 }
 
 /// Fleet-shared group store, persisted via the groups module.

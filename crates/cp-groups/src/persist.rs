@@ -12,6 +12,7 @@ use cp_base::config::constants::STORE_DIR;
 use serde::Serialize;
 
 use crate::chat::{GroupAuthor, GroupMessage};
+use crate::social::Substate;
 use crate::types::{Group, GroupKind};
 
 /// Directory (under the store dir) holding one message file per group.
@@ -41,6 +42,9 @@ pub struct GroupMeta<'group> {
     kind: GroupKind,
     /// See [`Group::created_at`].
     created_at: u64,
+    /// See [`Group::social`].
+    #[serde(skip_serializing_if = "<[Substate]>::is_empty")]
+    social: &'group [Substate],
 }
 
 impl<'group> From<&'group Group> for GroupMeta<'group> {
@@ -53,6 +57,7 @@ impl<'group> From<&'group Group> for GroupMeta<'group> {
             member_ids: &g.member_ids,
             kind: g.kind,
             created_at: g.created_at,
+            social: &g.social,
         }
     }
 }

@@ -472,6 +472,7 @@ name = "cp-groups"
 version = "0.2.13"
 dependencies = [
  "cp-base",
+ "cp-macros",
  "cp-render",
  "crossterm",
  "serde",
