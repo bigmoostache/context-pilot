@@ -66,7 +66,7 @@ struct CachedJson {
 
 /// Cached state for one agent's `.context-pilot/` directory.
 #[derive(Debug, Default)]
-struct AgentCache {
+struct FleetCache {
     /// Cached parse of `config.json`.
     config: Option<CachedJson>,
 
@@ -85,13 +85,13 @@ struct AgentCache {
 /// Read-only, mtime-cached reader of agent persistence files.
 ///
 /// One [`StateReader`] serves the whole fleet; internally it maintains a
-/// per-agent [`AgentCache`] so repeated requests for the same agent amortise
+/// per-agent [`FleetCache`] so repeated requests for the same agent amortise
 /// the file I/O across the mtime-check fast path.
 #[derive(Debug, Default)]
 pub struct StateReader {
     /// Per-agent caches, keyed by the agent's **folder** (canonical working
     /// directory).
-    agents: HashMap<PathBuf, AgentCache>,
+    agents: HashMap<PathBuf, FleetCache>,
 }
 
 impl StateReader {

@@ -59,7 +59,7 @@ use cp_orchestrator::transport::serve_bound;
 
 use cp_wire::types::ContentHash;
 use cp_wire::types::oplog::{OpEntry, OpEntryKind};
-use cp_wire::types::registry::{AgentStatus, Entry};
+use cp_wire::types::registry::{FleetStatus, Entry};
 
 use tiny_http::Server;
 
@@ -86,7 +86,7 @@ mod tests {
             tee_socket_path: oplog_dir.join("tee.sock").to_string_lossy().into_owned(),
             cap_token: "cap-token".to_owned(),
             started_at_ms: 0,
-            status: AgentStatus::Running,
+            status: FleetStatus::Running,
         }
     }
 

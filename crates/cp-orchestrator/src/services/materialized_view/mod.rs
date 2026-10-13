@@ -15,7 +15,7 @@
 //! segment reconstructs its complete heads — so rebuilding the whole view costs
 //! one short replay per agent, independent of total oplog size on disk. The
 //! fold here is what makes that guarantee real at the view layer: see
-//! [`AgentView::apply`].
+//! [`FleetView::apply`].
 
 use std::collections::HashMap;
 
@@ -32,7 +32,7 @@ use cp_wire::types::{LifecycleState, Phase};
 /// This is [`cp_wire::types::snapshot::RosterThread`] — the *same* type the
 /// checkpoint carries — so a roster rebuilt by folding live deltas and one
 /// restored wholesale from a checkpoint are byte-identical, and the
-/// checkpoint-restore is a plain clone (see [`AgentView::apply`]).
+/// checkpoint-restore is a plain clone (see [`FleetView::apply`]).
 pub type RosterEntry = RosterThread;
 
 /// The latest cumulative cost figures reported by an agent.
@@ -95,7 +95,7 @@ impl ContextSnapshot {
 /// recent relevant entry (heads accumulate per thread, the scalars are
 /// latest-wins).
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize)]
-pub struct AgentView {
+pub struct FleetView {
     /// Highest `rev` folded into this view so far.
     pub rev: u64,
 
@@ -131,7 +131,7 @@ pub struct AgentView {
     pub context: ContextSnapshot,
 }
 
-impl AgentView {
+impl FleetView {
     /// Fold one oplog entry into this view, advancing `rev`.
     ///
     /// A [`Checkpoint`](OpEntryKind::Checkpoint) replaces the heads **and the
@@ -210,7 +210,7 @@ impl AgentView {
     }
 }
 
-/// The fleet-wide materialized view: one [`AgentView`] per known agent.
+/// The fleet-wide materialized view: one [`FleetView`] per known agent.
 ///
 /// Driven by the orchestrator loop, which polls each agent's
 /// [`Tailer`](crate::tailer::Tailer) and feeds the resulting entries through
@@ -218,7 +218,7 @@ impl AgentView {
 #[derive(Debug, Default)]
 pub struct MaterializedView {
     /// Per-agent projected state, keyed by `agent_id`.
-    agents: HashMap<String, AgentView>,
+    agents: HashMap<String, FleetView>,
 }
 
 impl MaterializedView {
@@ -247,14 +247,14 @@ impl MaterializedView {
 
     /// The current projection for `agent_id`, or `None` if unknown.
     #[must_use]
-    pub fn get(&self, agent_id: &str) -> Option<&AgentView> {
+    pub fn get(&self, agent_id: &str) -> Option<&FleetView> {
         self.agents.get(agent_id)
     }
 
     /// Drop an agent's projection (called when discovery reports it gone).
     ///
     /// Returns the removed view, if any.
-    pub fn remove(&mut self, agent_id: &str) -> Option<AgentView> {
+    pub fn remove(&mut self, agent_id: &str) -> Option<FleetView> {
         self.agents.remove(agent_id)
     }
 

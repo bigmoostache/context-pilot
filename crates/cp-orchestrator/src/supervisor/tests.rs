@@ -119,7 +119,7 @@ fn adopt_and_detect_vanish() {
         tee_socket_path: String::new(),
         cap_token: String::new(),
         started_at_ms: 0,
-        status: cp_wire::types::registry::AgentStatus::Running,
+        status: cp_wire::types::registry::FleetStatus::Running,
     };
 
     sup.adopt("a2".into(), &entry, PathBuf::from("/bin/sleep")).unwrap_or_else(|e| panic!("adopt: {e}"));

@@ -1,7 +1,7 @@
 //! Unit tests for the auth store — schema, hashing, CRUD, sessions.
 
 use super::super::types::AccessGrant;
-use super::super::types::AgentRole;
+use super::super::types::FleetRole;
 use super::super::types::UserRole;
 use super::*;
 
@@ -133,13 +133,13 @@ fn migration_idempotent() {
 
 #[test]
 fn agent_role_roundtrip() {
-    use super::super::types::AgentRole;
-    assert_eq!(AgentRole::from_sql("agent-admin"), AgentRole::AgentAdmin);
-    assert_eq!(AgentRole::from_sql("AGENT-ADMIN"), AgentRole::AgentAdmin);
-    assert_eq!(AgentRole::from_sql("agent-user"), AgentRole::AgentUser);
-    assert_eq!(AgentRole::from_sql("unknown"), AgentRole::AgentUser);
-    assert_eq!(AgentRole::AgentAdmin.as_str(), "agent-admin");
-    assert_eq!(AgentRole::AgentUser.as_str(), "agent-user");
+    use super::super::types::FleetRole;
+    assert_eq!(FleetRole::from_sql("agent-admin"), FleetRole::FleetAdmin);
+    assert_eq!(FleetRole::from_sql("AGENT-ADMIN"), FleetRole::FleetAdmin);
+    assert_eq!(FleetRole::from_sql("agent-user"), FleetRole::FleetUser);
+    assert_eq!(FleetRole::from_sql("unknown"), FleetRole::FleetUser);
+    assert_eq!(FleetRole::FleetAdmin.as_str(), "agent-admin");
+    assert_eq!(FleetRole::FleetUser.as_str(), "agent-user");
 }
 
 #[test]
@@ -261,12 +261,12 @@ fn grant_and_check_access() {
         .grant_access(AccessGrant {
             agent_id: "agent-1",
             user_id: &user.id,
-            role: AgentRole::AgentUser,
+            role: FleetRole::FleetUser,
             granted_by: None,
         })
         .unwrap_or_else(|err| panic!("grant failed: {err}"));
     let granted = store.check_access("agent-1", &user.id).unwrap_or_else(|err| panic!("check failed: {err}"));
-    assert_eq!(granted, Some(AgentRole::AgentUser));
+    assert_eq!(granted, Some(FleetRole::FleetUser));
     assert!(!store.is_agent_admin("agent-1", &user.id).unwrap_or(true));
 }
 
@@ -282,15 +282,15 @@ fn update_agent_role() {
         .grant_access(AccessGrant {
             agent_id: "agent-1",
             user_id: &user.id,
-            role: AgentRole::AgentUser,
+            role: FleetRole::FleetUser,
             granted_by: None,
         })
         .unwrap_or_else(|err| panic!("grant failed: {err}"));
     // Promote to agent-admin.
-    assert!(store.update_agent_role("agent-1", &user.id, AgentRole::AgentAdmin).unwrap_or(false));
+    assert!(store.update_agent_role("agent-1", &user.id, FleetRole::FleetAdmin).unwrap_or(false));
     assert!(store.is_agent_admin("agent-1", &user.id).unwrap_or(false));
     // Update non-existent entry returns false.
-    assert!(!store.update_agent_role("agent-99", &user.id, AgentRole::AgentAdmin).unwrap_or(true));
+    assert!(!store.update_agent_role("agent-99", &user.id, FleetRole::FleetAdmin).unwrap_or(true));
 }
 
 #[test]
@@ -310,7 +310,7 @@ fn revoke_access() {
         .grant_access(AccessGrant {
             agent_id: "agent-1",
             user_id: &user.id,
-            role: AgentRole::AgentUser,
+            role: FleetRole::FleetUser,
             granted_by: None,
         })
         .unwrap_or_else(|err| panic!("grant failed: {err}"));
@@ -338,7 +338,7 @@ fn list_agent_users_and_user_agents() {
         .grant_access(AccessGrant {
             agent_id: "agent-1",
             user_id: &alice.id,
-            role: AgentRole::AgentAdmin,
+            role: FleetRole::FleetAdmin,
             granted_by: None,
         })
         .expect("grant alice a1");
@@ -346,7 +346,7 @@ fn list_agent_users_and_user_agents() {
         .grant_access(AccessGrant {
             agent_id: "agent-1",
             user_id: &bob.id,
-            role: AgentRole::AgentUser,
+            role: FleetRole::FleetUser,
             granted_by: Some(&alice.id),
         })
         .expect("grant bob a1");
@@ -354,7 +354,7 @@ fn list_agent_users_and_user_agents() {
         .grant_access(AccessGrant {
             agent_id: "agent-2",
             user_id: &alice.id,
-            role: AgentRole::AgentUser,
+            role: FleetRole::FleetUser,
             granted_by: None,
         })
         .expect("grant alice a2");
@@ -365,12 +365,12 @@ fn list_agent_users_and_user_agents() {
     let second = users.get(1).expect("second ACL entry");
     assert_eq!(
         (first.user_name.as_str(), first.role, first.user_email.as_str(), first.granted_by.is_none()),
-        ("Alice", AgentRole::AgentAdmin, "alice-acl@x.com", true),
+        ("Alice", FleetRole::FleetAdmin, "alice-acl@x.com", true),
         "first ACL entry (Alice, admin, ungranted)"
     );
     assert_eq!(
         (second.user_name.as_str(), second.role, second.granted_by.as_deref(), second.granted_at > 0),
-        ("Bob", AgentRole::AgentUser, Some(alice.id.as_str()), true),
+        ("Bob", FleetRole::FleetUser, Some(alice.id.as_str()), true),
         "second ACL entry (Bob, user, granted by Alice)"
     );
     // List agents for alice.
@@ -395,7 +395,7 @@ fn delete_user_cascades_acl() {
         .grant_access(AccessGrant {
             agent_id: "agent-1",
             user_id: &user.id,
-            role: AgentRole::AgentUser,
+            role: FleetRole::FleetUser,
             granted_by: None,
         })
         .unwrap_or_else(|err| panic!("grant failed: {err}"));
@@ -416,7 +416,7 @@ fn grant_overwrites_previous() {
         .grant_access(AccessGrant {
             agent_id: "agent-1",
             user_id: &user.id,
-            role: AgentRole::AgentUser,
+            role: FleetRole::FleetUser,
             granted_by: None,
         })
         .unwrap_or_else(|err| panic!("grant failed: {err}"));
@@ -425,11 +425,11 @@ fn grant_overwrites_previous() {
         .grant_access(AccessGrant {
             agent_id: "agent-1",
             user_id: &user.id,
-            role: AgentRole::AgentAdmin,
+            role: FleetRole::FleetAdmin,
             granted_by: None,
         })
         .unwrap_or_else(|err| panic!("re-grant failed: {err}"));
-    assert_eq!(store.check_access("agent-1", &user.id).unwrap_or(None), Some(AgentRole::AgentAdmin),);
+    assert_eq!(store.check_access("agent-1", &user.id).unwrap_or(None), Some(FleetRole::FleetAdmin),);
     // Only one entry, not two.
     let users = store.list_agent_users("agent-1").unwrap_or_else(|err| panic!("list failed: {err}"));
     assert_eq!(users.len(), 1);

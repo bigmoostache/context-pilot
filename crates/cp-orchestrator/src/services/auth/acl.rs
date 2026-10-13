@@ -4,7 +4,7 @@
 
 use super::db::AuthStore;
 use super::helpers::now_ms;
-use super::types::{AccessGrant, AclEntry, AgentRole, AuthError};
+use super::types::{AccessGrant, AclEntry, FleetRole, AuthError};
 
 impl AuthStore {
     /// Grant a user access to an agent with a specific per-agent role.
@@ -51,7 +51,7 @@ impl AuthStore {
         &self,
         agent_id: &str,
         user_id: &str,
-        new_role: AgentRole,
+        new_role: FleetRole,
     ) -> Result<bool, AuthError> {
         let updated = self.conn.execute(
             "UPDATE agent_acl SET role = ?1 WHERE agent_id = ?2 AND user_id = ?3",
@@ -66,11 +66,11 @@ impl AuthStore {
     /// # Errors
     ///
     /// Returns [`AuthError::Database`] on `SQLite` failure.
-    pub(crate) fn check_access(&self, agent_id: &str, user_id: &str) -> Result<Option<AgentRole>, AuthError> {
+    pub(crate) fn check_access(&self, agent_id: &str, user_id: &str) -> Result<Option<FleetRole>, AuthError> {
         let mut stmt = self.conn.prepare("SELECT role FROM agent_acl WHERE agent_id = ?1 AND user_id = ?2")?;
         let mut rows = stmt.query_map(rusqlite::params![agent_id, user_id], |row| {
             let role_str: String = row.get(0)?;
-            Ok(AgentRole::from_sql(&role_str))
+            Ok(FleetRole::from_sql(&role_str))
         })?;
         match rows.next() {
             Some(role) => Ok(Some(role?)),
@@ -98,7 +98,7 @@ impl AuthStore {
             Ok(AclEntry {
                 agent_id: row.get(0)?,
                 user_id: row.get(1)?,
-                role: AgentRole::from_sql(&role_str),
+                role: FleetRole::from_sql(&role_str),
                 granted_at: row.get(3)?,
                 granted_by: row.get(4)?,
                 user_email: row.get(5)?,
@@ -134,6 +134,6 @@ impl AuthStore {
     ///
     /// Returns [`AuthError::Database`] on `SQLite` failure.
     pub(crate) fn is_agent_admin(&self, agent_id: &str, user_id: &str) -> Result<bool, AuthError> {
-        Ok(self.check_access(agent_id, user_id)? == Some(AgentRole::AgentAdmin))
+        Ok(self.check_access(agent_id, user_id)? == Some(FleetRole::FleetAdmin))
     }
 }

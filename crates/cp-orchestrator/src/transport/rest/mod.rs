@@ -22,7 +22,7 @@ use cp_wire::types::command::Command;
 use cp_wire::types::registry::Entry;
 use serde::Serialize;
 
-use crate::channel::AgentHandle;
+use crate::channel::FleetHandle;
 
 // `pub mod` (not private `mod`) so `Backend`/`Paths` are reachable at
 // a fully-public path (`transport::rest::backend::Backend`) for external test
@@ -188,7 +188,7 @@ pub fn body(state: &Mutex<Backend>, id: &str, hash_hex: &str) -> HttpReply {
         Err(reply) => return reply,
     };
     // Hydrate is blocking agent I/O — performed with no lock held.
-    match AgentHandle::from_entry(&entry).hydrate(hash) {
+    match FleetHandle::from_entry(&entry).hydrate(hash) {
         Ok(Some(bytes)) => {
             HttpReply { status: 200, body: serde_json::to_string(&BodyPayload { bytes: &bytes }).unwrap_or_default() }
         }
@@ -211,7 +211,7 @@ pub fn command(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> HttpReply
         Err(reply) => return reply,
     };
     let dedup_token = command.dedup_token.clone();
-    match AgentHandle::from_entry(&entry).send(command) {
+    match FleetHandle::from_entry(&entry).send(command) {
         Ok(ack) => {
             // Mark state dirty so SSE producers emit an `invalidate` event,
             // prompting connected frontends to refetch tier-② data.

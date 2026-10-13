@@ -1,15 +1,15 @@
 //! Per-agent **channel** — the backend's read/write handle to one agent.
 //!
-//! An [`AgentHandle`] is constructed from a registry [`Entry`] and exposes
+//! An [`FleetHandle`] is constructed from a registry [`Entry`] and exposes
 //! the backend's two runtime operations against that agent:
 //!
-//! * [`hydrate`](AgentHandle::hydrate) — on-demand, content-addressed body
+//! * [`hydrate`](FleetHandle::hydrate) — on-demand, content-addressed body
 //!   fetch from the agent's body store (`oplog/bodies/{hash}`). The oplog tail
 //!   delivers heads (content hashes); hydrate resolves them to bytes, verifying
 //!   integrity.
-//! * [`send`](AgentHandle::send) — deliver a [`Command`] to the agent over its
+//! * [`send`](FleetHandle::send) — deliver a [`Command`] to the agent over its
 //!   UDS stream socket, returning the durable [`Ack`] (journal-then-ack, I11).
-//! * [`query`](AgentHandle::query) — ask the agent a **read-only** question
+//! * [`query`](FleetHandle::query) — ask the agent a **read-only** question
 //!   over that same socket (T671), returning a
 //!   [`Response`](cp_wire::types::payload::query::Response). Nothing is
 //!   journaled and no `rev` is assigned; the reply carries data, not a durable
@@ -49,10 +49,10 @@ const ACK_READ_TIMEOUT: Duration = Duration::from_secs(5);
 const READ_CHUNK: usize = 4096;
 
 /// Delay between connection retries when the agent's socket is not yet
-/// ready (used only by [`send_with_retry`](AgentHandle::send_with_retry)).
+/// ready (used only by [`send_with_retry`](FleetHandle::send_with_retry)).
 const RETRY_DELAY: Duration = Duration::from_millis(100);
 
-// ── AgentHandle ───────────────────────────────────────────────────────
+// ── FleetHandle ───────────────────────────────────────────────────────
 
 /// The backend's read/write handle to one agent (hydrate bodies + send
 /// commands).
@@ -60,7 +60,7 @@ const RETRY_DELAY: Duration = Duration::from_millis(100);
 /// Constructed from a registry [`Entry`]; holds the paths and credential
 /// needed to reach the agent's body store and command socket.
 #[derive(Debug)]
-pub struct AgentHandle {
+pub struct FleetHandle {
     /// Path to the agent's UDS stream socket.
     socket_path: PathBuf,
 
@@ -71,7 +71,7 @@ pub struct AgentHandle {
     bodies_dir: PathBuf,
 }
 
-impl AgentHandle {
+impl FleetHandle {
     /// Build a channel from a registry record.
     #[must_use]
     pub fn from_entry(entry: &Entry) -> Self {
@@ -209,7 +209,7 @@ fn read_ack(stream: &mut UnixStream) -> io::Result<Ack> {
 /// [`MAX_ACK_BUFFER`].
 ///
 /// Shared by the command path ([`read_ack`]) and the query path
-/// ([`AgentHandle::query`]) — both speak the same envelope, differing only in
+/// ([`FleetHandle::query`]) — both speak the same envelope, differing only in
 /// the payload type. `what` names the expected payload in error messages so a
 /// decode failure says which half of the protocol broke.
 fn read_framed<T>(stream: &mut UnixStream, what: &str) -> io::Result<T>
@@ -250,8 +250,8 @@ mod tests {
 
     // ── hydrate tests ──────────────────────────────────────────────────
 
-    fn make_channel(bodies_dir: &Path) -> AgentHandle {
-        AgentHandle {
+    fn make_channel(bodies_dir: &Path) -> FleetHandle {
+        FleetHandle {
             socket_path: PathBuf::from("/tmp/unused.sock"),
             cap_token: "tok".to_owned(),
             bodies_dir: bodies_dir.to_path_buf(),
@@ -325,7 +325,7 @@ mod tests {
 
         let server = thread::spawn(move || echo_ack_server(&listener));
 
-        let ch = AgentHandle { socket_path: sock, cap_token: "tok".to_owned(), bodies_dir: PathBuf::new() };
+        let ch = FleetHandle { socket_path: sock, cap_token: "tok".to_owned(), bodies_dir: PathBuf::new() };
         let ack = ch.send(test_command("echo")).expect("send");
         assert_eq!(ack.status, Status::Accepted);
         assert_eq!(ack.rev, Some(42));
@@ -335,7 +335,7 @@ mod tests {
 
     #[test]
     fn send_returns_error_on_connection_refused() {
-        let ch = AgentHandle {
+        let ch = FleetHandle {
             socket_path: PathBuf::from("/tmp/nonexistent_socket_for_test.sock"),
             cap_token: "tok".to_owned(),
             bodies_dir: PathBuf::new(),
@@ -388,7 +388,7 @@ mod tests {
 
         let server = thread::spawn(move || echo_hits_server(&listener));
 
-        let ch = AgentHandle { socket_path: sock, cap_token: "tok".to_owned(), bodies_dir: PathBuf::new() };
+        let ch = FleetHandle { socket_path: sock, cap_token: "tok".to_owned(), bodies_dir: PathBuf::new() };
         let response = ch.query(test_query()).expect("query");
         assert_eq!(response.query_id, "q-1", "the reply echoes the query id");
         match response.result {
@@ -401,7 +401,7 @@ mod tests {
 
     #[test]
     fn query_returns_error_on_connection_refused() {
-        let ch = AgentHandle {
+        let ch = FleetHandle {
             socket_path: PathBuf::from("/tmp/nonexistent_query_socket_for_test.sock"),
             cap_token: "tok".to_owned(),
             bodies_dir: PathBuf::new(),

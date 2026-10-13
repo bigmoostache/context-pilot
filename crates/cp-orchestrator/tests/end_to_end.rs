@@ -7,7 +7,7 @@
 //!
 //! ```text
 //!   HTTP client ──REST POST /command──▶ backend transport
-//!                                          │ AgentHandle::send (UDS)
+//!                                          │ FleetHandle::send (UDS)
 //!                                          ▼
 //!                                       agent: Intake.handle_connection
 //!                                          │ journal-then-ack (fsync)
@@ -76,7 +76,7 @@ use cp_orchestrator::transport::serve_bound;
 
 use cp_wire::types::ContentHash;
 use cp_wire::types::oplog::OpEntryKind;
-use cp_wire::types::registry::{AgentStatus, Entry};
+use cp_wire::types::registry::{FleetStatus, Entry};
 
 use tempfile::tempdir;
 
@@ -105,7 +105,7 @@ mod tests {
             tee_socket_path: dir.join("tee.sock").to_string_lossy().into_owned(),
             cap_token: cap_token.to_owned(),
             started_at_ms: 0,
-            status: AgentStatus::Running,
+            status: FleetStatus::Running,
         }
     }
 

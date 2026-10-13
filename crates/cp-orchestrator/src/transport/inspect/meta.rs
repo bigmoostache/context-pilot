@@ -324,7 +324,7 @@ fn git_branch(folder: &str) -> String {
         .unwrap_or_default()
 }
 
-/// Derive the maquette `AgentStatus` from lifecycle, phase, thread state, and
+/// Derive the maquette `FleetStatus` from lifecycle, phase, thread state, and
 /// registry liveness.
 ///
 /// A **stale** agent (dead PID / stale heartbeat, detected by the registry

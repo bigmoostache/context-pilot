@@ -101,7 +101,7 @@ fn pid_alive(pid: u32) -> bool {
 mod tests {
     use super::*;
     use cp_wire::heartbeat::DEFAULT_MAX_AGE;
-    use cp_wire::types::registry::AgentStatus;
+    use cp_wire::types::registry::FleetStatus;
     use std::path::Path;
 
     /// Boot ids of the exact 32-hex-char width the heartbeat record requires.
@@ -127,7 +127,7 @@ mod tests {
             tee_socket_path: "/tmp/agent/tee.sock".to_owned(),
             cap_token: "tok".to_owned(),
             started_at_ms: 0,
-            status: AgentStatus::Running,
+            status: FleetStatus::Running,
         }
     }
 

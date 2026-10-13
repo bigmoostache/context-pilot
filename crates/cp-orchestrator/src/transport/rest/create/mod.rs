@@ -10,7 +10,7 @@ use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 
 use super::{Backend, HttpReply};
-use crate::services::auth::types::{AccessGrant, AgentRole, User};
+use crate::services::auth::types::{AccessGrant, FleetRole, User};
 use crate::supervisor;
 
 /// FNV-1a 64-bit offset basis (same constants as the agent-side identity
@@ -113,7 +113,7 @@ pub(crate) fn create_agent(state: &Mutex<Backend>, body_bytes: &[u8], auth_user:
                 let _grant = auth.grant_access(AccessGrant {
                     agent_id: &agent_id,
                     user_id: &user.id,
-                    role: AgentRole::AgentAdmin,
+                    role: FleetRole::FleetAdmin,
                     granted_by: None,
                 });
             }

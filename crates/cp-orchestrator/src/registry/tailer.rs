@@ -10,7 +10,7 @@
 //! by an external cadence.
 //!
 //! Split out of `channel.rs` (which retains the read/write
-//! [`AgentHandle`](crate::registry::channel::AgentHandle)) to keep each file
+//! [`FleetHandle`](crate::registry::channel::FleetHandle)) to keep each file
 //! within the workspace's per-file line budget; the `Tailer` remains reachable
 //! at `tailer::Tailer` (the crate root re-exports the `tailer` module).
 

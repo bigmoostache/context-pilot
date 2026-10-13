@@ -57,7 +57,7 @@ use nix::sys::signal::kill;
 use nix::unistd::Pid;
 
 use cp_orchestrator::supervisor::{Event, ProcManager, SpawnPlan};
-use cp_wire::types::registry::{AgentStatus, Entry};
+use cp_wire::types::registry::{FleetStatus, Entry};
 
 use tempfile::tempdir;
 
@@ -98,7 +98,7 @@ mod tests {
             tee_socket_path: String::new(),
             cap_token: String::new(),
             started_at_ms: 0,
-            status: AgentStatus::Running,
+            status: FleetStatus::Running,
         }
     }
 

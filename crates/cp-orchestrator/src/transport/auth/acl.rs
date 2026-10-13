@@ -76,10 +76,10 @@ pub(crate) fn acl_grant(state: &Mutex<Backend>, agent_id: &str, body: &[u8], aut
     struct Req {
         user_id: String,
         #[serde(default = "default_agent_role")]
-        role: crate::services::auth::types::AgentRole,
+        role: crate::services::auth::types::FleetRole,
     }
-    const fn default_agent_role() -> crate::services::auth::types::AgentRole {
-        crate::services::auth::types::AgentRole::AgentUser
+    const fn default_agent_role() -> crate::services::auth::types::FleetRole {
+        crate::services::auth::types::FleetRole::FleetUser
     }
 
     let Some(caller) = auth_user else {
@@ -121,7 +121,7 @@ pub(crate) fn acl_update_role(
 ) -> HttpReply {
     #[derive(serde::Deserialize)]
     struct Req {
-        role: crate::services::auth::types::AgentRole,
+        role: crate::services::auth::types::FleetRole,
     }
 
     let (agent_id, target_user_id) = ids;

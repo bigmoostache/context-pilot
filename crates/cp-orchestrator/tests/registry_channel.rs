@@ -16,10 +16,10 @@
 //!   `Stale`, and a still-stale agent stays quiet.
 //! * **The body store → oplog → tailer → hydrate chain reconnects.** A spilled
 //!   body the agent wrote is picked up by the backend's [`Tailer`] as a
-//!   `MessageCreated` head and resolved by [`AgentHandle::hydrate`], integrity
+//!   `MessageCreated` head and resolved by [`FleetHandle::hydrate`], integrity
 //!   verified; an inlined body is *not* hydratable (it rides its entry).
 //! * **A command round-trips backend → real intake and stays exactly-once.**
-//!   [`AgentHandle::send`] reaches a real [`cp_mod_bridge::command::Intake`],
+//!   [`FleetHandle::send`] reaches a real [`cp_mod_bridge::command::Intake`],
 //!   is journalled-then-acked, and a redelivery is deduped — one durable
 //!   effect, ever.
 
@@ -62,7 +62,7 @@ use cp_mod_bridge::command::Intake;
 use cp_oplog::replay::replay;
 use cp_oplog::service::Service as OplogService;
 
-use cp_orchestrator::registry::channel::AgentHandle;
+use cp_orchestrator::registry::channel::FleetHandle;
 use cp_orchestrator::registry::liveness::Liveness;
 use cp_orchestrator::registry::tailer::Tailer;
 use cp_orchestrator::registry::{Event, FleetScanner};
@@ -71,7 +71,7 @@ use cp_wire::heartbeat::Heartbeat;
 use cp_wire::types::ack::Status;
 use cp_wire::types::command::{Command, Kind as CommandKind};
 use cp_wire::types::oplog::OpEntryKind;
-use cp_wire::types::registry::{AgentStatus, Entry};
+use cp_wire::types::registry::{FleetStatus, Entry};
 
 use tempfile::tempdir;
 
@@ -117,7 +117,7 @@ mod tests {
             tee_socket_path: String::new(),
             cap_token: "tok".to_owned(),
             started_at_ms: 0,
-            status: AgentStatus::Running,
+            status: FleetStatus::Running,
         }
     }
 
@@ -252,7 +252,7 @@ mod tests {
 
         // The channel hydrates the spilled body (integrity verified), but an
         // inlined body has no file to hydrate — it rode its oplog entry.
-        let ch = AgentHandle::from_entry(&entry("a", &dir.path().join("hb"), &oplog_dir, &dir.path().join("a.sock")));
+        let ch = FleetHandle::from_entry(&entry("a", &dir.path().join("hb"), &oplog_dir, &dir.path().join("a.sock")));
         assert_eq!(
             ch.hydrate(head).expect("hydrate"),
             Some(b"a large body that spills to its own durable file".to_vec()),
@@ -289,7 +289,7 @@ mod tests {
 
         // The backend side: build a channel from a record advertising this socket.
         let record = Entry { cap_token: token, ..entry("a", &dir.path().join("hb"), &oplog_dir, &sock) };
-        let ch = AgentHandle::from_entry(&record);
+        let ch = FleetHandle::from_entry(&record);
 
         // First send is accepted; the same command redelivered is still acked
         // accepted (idempotent) but journals no second effect.
