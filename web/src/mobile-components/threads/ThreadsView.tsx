@@ -52,9 +52,9 @@ export function ThreadsView({
   disconnected?: boolean
   onReconnect?: () => void
 }) {
-  const { data: agents = [] } = useFleet()
+  const { data: fleets = [] } = useFleet()
   const { data: threads = [] } = useThreads(activeFleetId)
-  const hasFleet = agents.some((a) => a.id === activeFleetId)
+  const hasFleet = fleets.some((a) => a.id === activeFleetId)
 
   const sel = useThreadSelection(activeFleetId, threads)
   const actions = useThreadActions(activeFleetId, threads, sel)
@@ -141,7 +141,7 @@ export function ThreadsView({
         />
       ) : (
         <EmptyRealm
-          fleetName={agents.find((a) => a.id === activeFleetId)?.name}
+          fleetName={fleets.find((a) => a.id === activeFleetId)?.name}
           onNewThread={() => setDrawerOpen(true)}
         />
       )}

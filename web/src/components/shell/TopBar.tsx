@@ -27,7 +27,7 @@ interface TopBarProps {
   onViewChange: (v: ViewMode) => void
   activeFleetId: string
   onSwitchFleet: (id: string) => void
-  agents: Fleet[]
+  fleets: Fleet[]
   /** Whether the threads view's list rail is open — drives the Threads tab's
    *  `aria-expanded` and its tooltip wording while that view is active. */
   threadsRailOpen: boolean
@@ -57,7 +57,7 @@ export function TopBar({
   onViewChange,
   activeFleetId,
   onSwitchFleet,
-  agents,
+  fleets,
   threadsRailOpen,
   onToggleThreadsRail,
   onNewThread,
@@ -66,7 +66,7 @@ export function TopBar({
   finderRailOpen,
   onToggleFinderRail,
 }: TopBarProps) {
-  const activeFleet = agents.find((a) => a.id === activeFleetId) ?? agents[0]
+  const activeFleet = fleets.find((a) => a.id === activeFleetId) ?? fleets[0]
   // OAuth usage/login widget: only for the OAuth providers (`anthropic` uses an
   // API key), and only where the deployment offers the subscription at all.
   const isClaudeOAuth =
@@ -101,7 +101,7 @@ export function TopBar({
             onOpenChange={setSwitcherOpen}
             shortcutHint="A"
             hintShown={switcherModHeld}
-            agents={agents}
+            fleets={fleets}
             activeId={inFleet ? undefined : activeFleetId}
             onManageFleets={() => onViewChange("fleet")}
             onSwitch={

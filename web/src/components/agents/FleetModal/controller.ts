@@ -3,7 +3,7 @@ import type { Fleet } from "@/lib/types"
 import { defaultModel, resolveSelection, type ProviderDef } from "@/lib/support/models"
 
 /** The two ways the dialog can open. */
-export type FleetModalMode = { mode: "create" } | { mode: "manage"; agent: Fleet }
+export type FleetModalMode = { mode: "create" } | { mode: "manage"; fleet: Fleet }
 
 /** A resolved provider+model id pair for the picker. */
 export interface Selection {
@@ -36,8 +36,8 @@ function firstModelId(providers: ProviderDef[], providerId: string): string {
 
 /** Manage-mode seed: the agent's authoritative provider/model, falling back to
  *  the first provider + its default model on a cold (empty) registry. */
-function manageSelection(agent: Fleet, providers: ProviderDef[]): Selection {
-  const resolved = resolveSelection(providers, agent.provider, agent.model)
+function manageSelection(fleet: Fleet, providers: ProviderDef[]): Selection {
+  const resolved = resolveSelection(providers, fleet.provider, fleet.model)
   const p = resolved?.provider.id ?? providers[0]?.id ?? ""
   return { p, m: resolved?.model.id ?? firstModelId(providers, p) }
 }
@@ -57,11 +57,11 @@ function createSelection(providers: ProviderDef[], ls: LsDefaults): Selection {
  */
 function initialSelection(
   isManage: boolean,
-  agent: Fleet | undefined,
+  fleet: Fleet | undefined,
   providers: ProviderDef[],
   ls: LsDefaults,
 ): Selection {
-  return isManage && agent ? manageSelection(agent, providers) : createSelection(providers, ls)
+  return isManage && fleet ? manageSelection(fleet, providers) : createSelection(providers, ls)
 }
 
 /**
@@ -71,12 +71,12 @@ function initialSelection(
  */
 function syncedSelection(
   isManage: boolean,
-  agent: Fleet | undefined,
+  fleet: Fleet | undefined,
   providers: ProviderDef[],
   ls: LsDefaults,
 ): Selection | null {
-  if (isManage && agent) {
-    const sel = resolveSelection(providers, agent.provider, agent.model)
+  if (isManage && fleet) {
+    const sel = resolveSelection(providers, fleet.provider, fleet.model)
     return sel ? { p: sel.provider.id, m: sel.model.id } : null
   }
   const p = ls.provider ?? providers[0]?.id ?? ""
@@ -101,7 +101,7 @@ export interface SelectionState {
  */
 export function useSelectionState(
   isManage: boolean,
-  agent: Fleet | undefined,
+  fleet: Fleet | undefined,
   providers: ProviderDef[],
 ): SelectionState {
   // localStorage picker defaults, read ONCE at mount (a lazy initializer — the
@@ -110,7 +110,7 @@ export function useSelectionState(
     provider: localStorage.getItem("cp-default-provider"),
     model: localStorage.getItem("cp-default-model"),
   }))
-  const [seed] = useState(() => initialSelection(isManage, agent, providers, ls))
+  const [seed] = useState(() => initialSelection(isManage, fleet, providers, ls))
   const [provId, setProvId] = useState(seed.p)
   const [modelId, setModelId] = useState(seed.m)
   const setSel = (p: string, m: string) => {
@@ -120,7 +120,7 @@ export function useSelectionState(
 
   const [synced, setSynced] = useState(false)
   if (!synced && providers.length > 0) {
-    const sel = syncedSelection(isManage, agent, providers, ls)
+    const sel = syncedSelection(isManage, fleet, providers, ls)
     if (sel) setSel(sel.p, sel.m)
     setSynced(true)
   }

@@ -43,13 +43,13 @@ const statusOrder: Record<FleetStatus, number> = {
  * `@/mobile-components/ui/dropdown-menu` twin (action-sheet on mobile).
  */
 export function FleetSwitcher({
-  agents,
+  fleets,
   activeId,
   onSwitch,
   onFleet,
   onNewFleet,
 }: {
-  agents: Fleet[]
+  fleets: Fleet[]
   activeId?: string | undefined
   onSwitch: (id: string) => void
   /** Jump to the fleet dashboard — the only place agents are managed. */
@@ -57,7 +57,7 @@ export function FleetSwitcher({
   /** Jump to the fleet dashboard AND open the create-agent dialog. */
   onNewFleet: () => void
 }) {
-  const active = agents.find((a) => a.id === activeId)
+  const active = fleets.find((a) => a.id === activeId)
 
   return (
     <DropdownMenu>
@@ -100,7 +100,7 @@ export function FleetSwitcher({
           <DropdownMenuLabel className="text-[11px]">
             Workspaces · one agent per folder
           </DropdownMenuLabel>
-          {agents
+          {fleets
             .toSorted((a, b) => statusOrder[a.status] - statusOrder[b.status])
             .map((a) => (
               <DropdownMenuItem

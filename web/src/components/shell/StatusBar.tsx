@@ -25,7 +25,7 @@ const phaseMeta: Record<StreamPhase, { label: string; color: string }> = {
  */
 export function StatusBar({
   fleet = false,
-  agents = [],
+  fleets = [],
   activeFleet,
   activeFleetId = "",
   connected = true,
@@ -34,7 +34,7 @@ export function StatusBar({
   loading = false,
 }: {
   fleet?: boolean
-  agents?: Fleet[]
+  fleets?: Fleet[]
   activeFleet?: Fleet | undefined
   /** The focused agent's id — drives the behaviour selector's library query + command. */
   activeFleetId?: string
@@ -48,10 +48,10 @@ export function StatusBar({
   loading?: boolean
 }) {
   return fleet ? (
-    <FleetStatus agents={agents} />
+    <FleetStatus fleets={fleets} />
   ) : (
     <ActiveFleetStatus
-      agent={activeFleet}
+      fleet={activeFleet}
       fleetId={activeFleetId}
       connected={connected}
       onRestart={onRestart}
@@ -62,10 +62,10 @@ export function StatusBar({
 }
 
 /** Fleet-wide aggregates — shown when no single agent is focused. */
-function FleetStatus({ agents }: { agents: Fleet[] }) {
-  const totalSpend = agents.reduce((sum, a) => sum + a.costUsd, 0)
-  const needsYou = agents.filter((a) => a.status === "needs-you").length
-  const totalThreads = agents.reduce((sum, a) => sum + a.agents, 0)
+function FleetStatus({ fleets }: { fleets: Fleet[] }) {
+  const totalSpend = fleets.reduce((sum, a) => sum + a.costUsd, 0)
+  const needsYou = fleets.filter((a) => a.status === "needs-you").length
+  const totalThreads = fleets.reduce((sum, a) => sum + a.agents, 0)
 
   return (
     // Bare chrome, like the header rail: no fill, no `border-t`, no margin —
@@ -82,7 +82,7 @@ function FleetStatus({ agents }: { agents: Fleet[] }) {
       </Tip>
 
       <Tip title="Fleets" body="How many fleets you run." side="top">
-        <Metric icon={Boxes} label="Fleets" value={String(agents.length)} />
+        <Metric icon={Boxes} label="Fleets" value={String(fleets.length)} />
       </Tip>
       <Tip title="Threads" body="Open threads, summed across every fleet." side="top">
         <Metric icon={MessagesSquare} label="Threads" value={String(totalThreads)} />
@@ -121,37 +121,37 @@ function FleetStatus({ agents }: { agents: Fleet[] }) {
  *  push-delta `phase` (streaming/tooling/idle), falling back to `status` before
  *  the first PhaseTransition has been observed. A flat if-chain, not a nested
  *  ternary. */
-function resolvePhase(agent?: Fleet): StreamPhase {
-  if (agent?.phase === "streaming") return "streaming"
-  if (agent?.phase === "tooling") return "tooling"
-  if (agent?.phase === "idle") return "ready"
-  if (agent?.status === "working") return "streaming"
+function resolvePhase(fleet?: Fleet): StreamPhase {
+  if (fleet?.phase === "streaming") return "streaming"
+  if (fleet?.phase === "tooling") return "tooling"
+  if (fleet?.phase === "idle") return "ready"
+  if (fleet?.status === "working") return "streaming"
   return "ready"
 }
 
 /** Pull the footer's numeric vitals off the agent with safe fallbacks, so the
  *  host component's branch count stays under the complexity budget. */
-function fleetVitals(agent?: Fleet) {
+function fleetVitals(fleet?: Fleet) {
   return {
-    costUsd: agent?.costUsd ?? 0,
-    used: agent?.contextUsed ?? 0,
-    budget: agent?.contextBudget ?? 200_000,
-    threshold: agent?.contextThreshold ?? 0,
-    hit: agent?.contextHit ?? 0,
-    miss: agent?.contextMiss ?? 0,
+    costUsd: fleet?.costUsd ?? 0,
+    used: fleet?.contextUsed ?? 0,
+    budget: fleet?.contextBudget ?? 200_000,
+    threshold: fleet?.contextThreshold ?? 0,
+    hit: fleet?.contextHit ?? 0,
+    miss: fleet?.contextMiss ?? 0,
   }
 }
 
 /** Single-agent session vitals — shown while an agent is focused. */
 function ActiveFleetStatus({
-  agent,
+  fleet,
   fleetId,
   connected = true,
   onRestart,
   restarting = false,
   loading = false,
 }: {
-  agent?: Fleet | undefined
+  fleet?: Fleet | undefined
   fleetId?: string
   connected?: boolean
   onRestart?: (() => void) | undefined
@@ -162,12 +162,12 @@ function ActiveFleetStatus({
   // so the footer distinguishes streaming · tooling · ready instead of the old
   // 2-state projection of `status`. Falls back to `status` only before the
   // first phase transition has been observed (phase still undefined).
-  const phase: StreamPhase = resolvePhase(agent)
+  const phase: StreamPhase = resolvePhase(fleet)
   const p = phaseMeta[phase]
   // Context-window meter figures — the agent's OWN authoritative occupancy +
   // cache split, folded from the ContextUsage push delta (T297), byte-identical
   // to the ratatui sidebar.
-  const { costUsd, used, budget, threshold, hit, miss } = fleetVitals(agent)
+  const { costUsd, used, budget, threshold, hit, miss } = fleetVitals(fleet)
 
   return (
     // Same bare treatment as the fleet footer above and the header rail: no
@@ -193,7 +193,7 @@ function ActiveFleetStatus({
           body="The LLM provider and model this fleet runs on. Switch it here — applies immediately."
           side="top"
         >
-          <ModelChip fleetId={fleetId} agent={agent} />
+          <ModelChip fleetId={fleetId} fleet={fleet} />
         </Tip>
       ) : null}
 

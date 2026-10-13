@@ -46,12 +46,12 @@ function groupBySubprovider(models: ModelDef[]): [string, ModelDef[]][] {
  *  from the agent's authoritative provider id + model apiName. */
 function activeSelection(
   providers: ProviderDef[],
-  agent: Fleet | undefined,
+  fleet: Fleet | undefined,
 ): { provider: ProviderDef | undefined; model: ModelDef | undefined } {
   const provider =
-    providers.find((p) => p.id === agent?.provider) ??
-    providers.find((p) => p.models.some((m) => m.apiName === agent?.model))
-  const model = provider?.models.find((m) => m.apiName === agent?.model) ?? provider?.models[0]
+    providers.find((p) => p.id === fleet?.provider) ??
+    providers.find((p) => p.models.some((m) => m.apiName === fleet?.model))
+  const model = provider?.models.find((m) => m.apiName === fleet?.model) ?? provider?.models[0]
   return { provider, model }
 }
 
@@ -72,9 +72,9 @@ function activeSelection(
  * applies immediately, no save step. The active provider/model comes back
  * through the agent-meta fold, so the chip re-labels on the next delta.
  */
-export function ModelChip({ fleetId, agent }: { fleetId: string; agent: Fleet | undefined }) {
+export function ModelChip({ fleetId, fleet }: { fleetId: string; fleet: Fleet | undefined }) {
   const { data: providers = [] } = usePickerProviders()
-  const { provider: activeProv, model: activeModel } = activeSelection(providers, agent)
+  const { provider: activeProv, model: activeModel } = activeSelection(providers, fleet)
   const label = activeModel?.displayName ?? "model"
 
   const select = (providerId: string, modelId: string) => {

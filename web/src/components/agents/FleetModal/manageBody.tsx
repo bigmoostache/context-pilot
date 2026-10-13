@@ -28,7 +28,7 @@ export function ManageBody({ c }: { c: Controller }) {
             SessionVitals' OWN "Service vitals" heading, and a second label above
             it would read as two headings for one board. */}
         <div className="mx-6 border-t border-border/50" />
-        {c.agent && <VitalsTab c={c} fleetId={c.agent.id} />}
+        {c.fleet && <VitalsTab c={c} fleetId={c.fleet.id} />}
       </div>
     </div>
   )
@@ -50,12 +50,12 @@ export function ManageBody({ c }: { c: Controller }) {
  * shuffling never also trips the label's file dialog.
  */
 function AvatarField({
-  agent,
+  fleet,
   avatarBust,
   onAvatarChange,
   onRandomizeAvatar,
 }: {
-  agent: Fleet
+  fleet: Fleet
   avatarBust: number
   onAvatarChange: (file: File) => void
   onRandomizeAvatar: () => void
@@ -72,10 +72,10 @@ function AvatarField({
             title="Click to change the fleet image"
             className="flex size-16 cursor-pointer items-center justify-center overflow-hidden rounded-2xl bg-(--signal)/14 text-(--signal) ring-1 ring-(--signal)/25 transition-opacity ring-inset hover:opacity-80"
           >
-            {agent.hasAvatar ? (
+            {fleet.hasAvatar ? (
               <img
-                src={avatarUrl(agent.id, avatarBust || undefined)}
-                alt={agent.name}
+                src={avatarUrl(fleet.id, avatarBust || undefined)}
+                alt={fleet.name}
                 className="size-16 rounded-2xl object-cover"
               />
             ) : (
@@ -120,9 +120,9 @@ export function LlmTab({ c }: { c: Controller }) {
   const { name, setName, realm } = c
   return (
     <div className="flex flex-col gap-5 px-6 py-5">
-      {c.agent && (
+      {c.fleet && (
         <AvatarField
-          agent={c.agent}
+          fleet={c.fleet}
           avatarBust={c.avatarBust}
           onAvatarChange={c.onAvatarChange}
           onRandomizeAvatar={c.onRandomizeAvatar}

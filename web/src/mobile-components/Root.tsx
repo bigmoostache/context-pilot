@@ -109,7 +109,7 @@ type MobileView = Extract<ViewMode, "fleet" | "threads" | "finder">
  * follow-up work, not part of proving the mirror mechanism.
  */
 function MobileShell() {
-  const { data: agents = [] } = useFleet()
+  const { data: fleets = [] } = useFleet()
   const [view, setView] = useState<MobileView>(() => {
     const stored = localStorage.getItem("cp-view")
     return stored === "threads" || stored === "finder" ? stored : "fleet"
@@ -123,7 +123,7 @@ function MobileShell() {
   // per the T636 spec: "agentsList" or the agent id (opened from that thread).
   const [settingsFleetId, setSettingsFleetId] = useState<string | null>(null)
 
-  const activeFleet = agents.find((a) => a.id === activeFleetId) ?? agents[0]
+  const activeFleet = fleets.find((a) => a.id === activeFleetId) ?? fleets[0]
 
   // Persist view + agent selection (write-through, same keys as desktop).
   const changeView = useCallback((next: MobileView) => {
@@ -180,13 +180,13 @@ function MobileShell() {
 
   // The agent whose Settings page is open, resolved to a live fleet member (a
   // just-retired agent vanishes from the list → the overlay closes itself).
-  const settingsFleet = settingsFleetId ? agents.find((a) => a.id === settingsFleetId) : undefined
+  const settingsFleet = settingsFleetId ? fleets.find((a) => a.id === settingsFleetId) : undefined
 
   const body = () => {
     if (effectiveView === "fleet") {
       return (
         <FleetDashboard
-          agents={agents}
+          fleets={fleets}
           onOpenFleet={openFleet}
           onManageFleet={(id) => openFleetSettings(id, true)}
           autoCreate={false}
@@ -200,7 +200,7 @@ function MobileShell() {
       return (
         <Finder
           key={activeFleet.id}
-          agent={activeFleet}
+          fleet={activeFleet}
           revealPath={finderRevealPath}
           onRevealConsumed={() => setFinderRevealPath(null)}
           disconnected={false}
@@ -276,7 +276,7 @@ function MobileShell() {
       {/* Agent Settings page — a full-screen (fixed inset-0) overlay above every
           view. Rendered only when open AND the target agent still exists; its own
           back chevron calls backFromSettings to return to the stashed origin. */}
-      {settingsFleet && <FleetModal agent={settingsFleet} onClose={backFromSettings} />}
+      {settingsFleet && <FleetModal fleet={settingsFleet} onClose={backFromSettings} />}
     </div>
   )
 }

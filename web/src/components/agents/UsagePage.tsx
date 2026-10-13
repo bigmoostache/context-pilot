@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils"
 
 /** One agent's live usage row, joined from fleet meta + §19 metrics. */
 interface Row {
-  agent: Fleet
+  fleet: Fleet
   spendUsd: number
   inputTokens: number
   outputTokens: number
@@ -64,24 +64,24 @@ export function UsagePage() {
   const [unit, setUnit] = useState<UsageUnit>("usd")
   const [fleetId, setFleetId] = useState<string>("all")
 
-  const { data: agents = [] } = useFleet()
+  const { data: fleets = [] } = useFleet()
   const { data: metrics = [] } = useFleetMetrics()
 
   // Join the two live sources by agent id into one usage row each.
   const rows = useMemo<Row[]>(() => {
     const byId = new Map<string, FleetMetrics>(metrics.map((m) => [m.id, m]))
-    return agents.map((agent) => {
-      const m = byId.get(agent.id)
+    return fleets.map((fleet) => {
+      const m = byId.get(fleet.id)
       return {
-        agent,
-        spendUsd: agent.costUsd,
+        fleet,
+        spendUsd: fleet.costUsd,
         inputTokens: m?.tokens?.input ?? 0,
         outputTokens: m?.tokens?.output ?? 0,
       }
     })
-  }, [agents, metrics])
+  }, [fleets, metrics])
 
-  const visible = fleetId === "all" ? rows : rows.filter((r) => r.agent.id === fleetId)
+  const visible = fleetId === "all" ? rows : rows.filter((r) => r.fleet.id === fleetId)
 
   const totals = useMemo(
     () =>
@@ -120,7 +120,7 @@ export function UsagePage() {
               aria-label="Filter by fleet"
             >
               <option value="all">All fleets</option>
-              {agents.map((a) => (
+              {fleets.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name}
                 </option>
@@ -213,14 +213,14 @@ function UsageTable({ visible, totals }: { visible: Row[]; totals: Totals }) {
             </TableHeader>
             <TableBody>
               {visible.map((r) => (
-                <TableRow key={r.agent.id}>
+                <TableRow key={r.fleet.id}>
                   <TableCell className="font-medium text-foreground/85">
                     <span className="flex items-center gap-2">
                       <span
                         className="size-2 shrink-0 rounded-full"
-                        style={{ background: fleetAccent(r.agent) }}
+                        style={{ background: fleetAccent(r.fleet) }}
                       />
-                      {r.agent.name}
+                      {r.fleet.name}
                     </span>
                   </TableCell>
                   <TableCell className="text-right text-foreground/75 tabular-nums">

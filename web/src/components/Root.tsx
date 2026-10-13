@@ -172,7 +172,7 @@ function useNavHistory(
  *  router, all behaviour lives in the handlers passed down. */
 interface ShellViewsProps {
   effectiveView: ViewMode
-  agents: Fleet[]
+  fleets: Fleet[]
   activeFleet: ReturnType<typeof useFleetMeta>["data"] | undefined
   activeFleetId: string
   openFleet: (id: string) => void
@@ -195,7 +195,7 @@ interface ShellViewsProps {
  *  so each branch reads cleanly and the fleet fallthrough is explicit. */
 function ShellViews(p: ShellViewsProps) {
   if (p.effectiveView === "fleet") {
-    return <FleetDashboard agents={p.agents} onOpenFleet={p.openFleet} />
+    return <FleetDashboard fleets={p.fleets} onOpenFleet={p.openFleet} />
   }
   if (p.effectiveView === "costs") {
     return (
@@ -210,7 +210,7 @@ function ShellViews(p: ShellViewsProps) {
     return (
       <Finder
         key={p.activeFleet.id}
-        agent={p.activeFleet}
+        fleet={p.activeFleet}
         railOpen={p.finderRailOpen}
         revealPath={p.finderRevealPath}
         onRevealConsumed={p.onRevealConsumed}
@@ -243,20 +243,20 @@ function ShellViews(p: ShellViewsProps) {
  *  and lives in its own flag rather than in {@link NavState}. */
 function FleetSettingsDialog({
   open,
-  agent,
+  fleet,
   onClose,
 }: {
   open: boolean
-  agent: ShellViewsProps["activeFleet"]
+  fleet: ShellViewsProps["activeFleet"]
   onClose: () => void
 }) {
-  if (!open || !agent) return null
-  return <FleetModal modal={{ mode: "manage", agent }} onClose={onClose} />
+  if (!open || !fleet) return null
+  return <FleetModal modal={{ mode: "manage", fleet }} onClose={onClose} />
 }
 
 function AppShell() {
   const { devMode } = useDevMode()
-  const { data: agents = [] } = useFleet()
+  const { data: fleets = [] } = useFleet()
   const [view, setView] = useState<ViewMode>(() => {
     const modes: Record<string, ViewMode> = {
       fleet: "fleet",
@@ -298,7 +298,7 @@ function AppShell() {
   // bridge folds in real time (T297). Spreading the delta-folded meta over the
   // fleet row makes the always-visible TopBar + StatusBar reactive instead of
   // riding the 15s fleet poll — the same gold path threads already use.
-  const fleetAgent = agents.find((a) => a.id === activeFleetId) ?? agents[0]
+  const fleetAgent = fleets.find((a) => a.id === activeFleetId) ?? fleets[0]
   const { data: liveFleet, loading: fleetLoading } = useFleetMeta(activeFleetId)
   const activeFleet = liveFleet ?? fleetAgent
   const sseConnected = useSseConnected(activeFleetId)
@@ -424,7 +424,7 @@ function AppShell() {
           onViewChange={setView}
           activeFleetId={activeFleetId}
           onSwitchFleet={setActiveFleetId}
-          agents={agents}
+          fleets={fleets}
           threadsRailOpen={threadsRailOpen}
           onToggleThreadsRail={() => setThreadsRailOpen((o) => !o)}
           onNewThread={() => setNewThreadOpen(true)}
@@ -440,7 +440,7 @@ function AppShell() {
           <TelemetryProfiler id={effectiveView}>
             <ShellViews
               effectiveView={effectiveView}
-              agents={agents}
+              fleets={fleets}
               activeFleet={activeFleet}
               activeFleetId={activeFleetId}
               openFleet={openFleet}
@@ -464,7 +464,7 @@ function AppShell() {
 
       <StatusBar
         fleet={effectiveView === "fleet"}
-        agents={agents}
+        fleets={fleets}
         activeFleet={activeFleet}
         activeFleetId={activeFleetId}
         connected={sseConnected && !fleetStale}
@@ -481,7 +481,7 @@ function AppShell() {
           entry. */}
       <FleetSettingsDialog
         open={manageOpen}
-        agent={activeFleet}
+        fleet={activeFleet}
         onClose={() => setManageOpen(false)}
       />
 

@@ -41,19 +41,19 @@ export type { FleetModalMode } from "./controller"
  * (the dialog batches them behind its Save button, the page saves per-field).
  */
 export function FleetModal({
-  agent,
+  fleet,
   onClose,
   onFlash,
 }: {
-  agent: Fleet
+  fleet: Fleet
   onClose: () => void
   onFlash?: (m: string) => void
 }) {
   // Server-computed picker list: only providers with a configured key, org
   // allowlist already applied (empty ⇒ all).
   const { data: providers = [] } = usePickerProviders()
-  const sel = useSelectionState(true, agent, providers)
-  const [name, setName] = useState(agent.name)
+  const sel = useSelectionState(true, fleet, providers)
+  const [name, setName] = useState(fleet.name)
   const renameFleet = useRenameFleet()
 
   // One transient confirmation toast at a time; cleared on unmount so a late
@@ -81,7 +81,7 @@ export function FleetModal({
   // is the back-to-origin handler, so retire success returns there.
   const actions = useFleetModalActions({
     isManage: true,
-    agent,
+    fleet,
     name,
     sel,
     providers,
@@ -92,9 +92,9 @@ export function FleetModal({
   /** Auto-save the name on blur / Return — no-op when unchanged or empty. */
   const saveName = () => {
     const n = name.trim()
-    if (n === "" || n === agent.name || renameFleet.isPending) return
+    if (n === "" || n === fleet.name || renameFleet.isPending) return
     renameFleet.mutate(
-      { fleetId: agent.id, name: n },
+      { fleetId: fleet.id, name: n },
       {
         onSuccess: () => flash(`Renamed to ${n}`),
         onError: (e) => flash(e instanceof Error ? e.message : "Could not rename the fleet"),
@@ -105,7 +105,7 @@ export function FleetModal({
   /** Auto-save the provider/model the instant it's picked (fires `configure`). */
   const setSelAndSave = (p: string, m: string) => {
     sel.setSel(p, m)
-    sendCommand(agent.id, { kind: "configure", provider: p, model: m })
+    sendCommand(fleet.id, { kind: "configure", provider: p, model: m })
       .then(() => flash("Model updated"))
       .catch((e: unknown) => flash(e instanceof Error ? e.message : "Could not update the model"))
   }
@@ -142,11 +142,11 @@ export function FleetModal({
           <h1 className="text-[28px] leading-none font-bold tracking-tight text-foreground">
             Agent Settings
           </h1>
-          <span className="truncate text-[13px] text-muted-foreground/70">{agent.name}</span>
+          <span className="truncate text-[13px] text-muted-foreground/70">{fleet.name}</span>
         </header>
 
         <AvatarHero
-          agent={agent}
+          fleet={fleet}
           avatarBust={actions.avatarBust}
           onAvatarChange={actions.onAvatarChange}
           onRandomizeAvatar={actions.onRandomizeAvatar}
@@ -166,7 +166,7 @@ export function FleetModal({
         </Section>
 
         <Section label="Service vitals">
-          <VitalsBody fleetId={agent.id} />
+          <VitalsBody fleetId={fleet.id} />
         </Section>
 
         {actions.error && (

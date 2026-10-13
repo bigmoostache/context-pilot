@@ -23,7 +23,7 @@ const statusMeta: Record<FleetStatus, { label: string; color: string }> = {
  *  turn-first grouping). Groups with no members are skipped. */
 const GROUP_ORDER: FleetStatus[] = ["needs-you", "working", "waiting", "idle", "disconnected"]
 
-type Modal = { mode: "create" } | { mode: "manage"; agent: Fleet } | null
+type Modal = { mode: "create" } | { mode: "manage"; fleet: Fleet } | null
 
 /**
  * Fleet dashboard — mission control and the SOLE place agents are managed.
@@ -34,10 +34,10 @@ type Modal = { mode: "create" } | { mode: "manage"; agent: Fleet } | null
  * hover gear manages it. Live status/cost fold in over the SSE bridge (T297).
  */
 export function FleetDashboard({
-  agents,
+  fleets,
   onOpenFleet,
 }: {
-  agents: Fleet[]
+  fleets: Fleet[]
   onOpenFleet: (id: string) => void
 }) {
   const [modal, setModal] = useState<Modal>(null)
@@ -51,9 +51,9 @@ export function FleetDashboard({
   const openRow = (a: Fleet) => (
     <FleetRow
       key={a.id}
-      agent={a}
+      fleet={a}
       onOpen={() => onOpenFleet(a.id)}
-      onManage={() => setModal({ mode: "manage", agent: a })}
+      onManage={() => setModal({ mode: "manage", fleet: a })}
     />
   )
 
@@ -67,7 +67,7 @@ export function FleetDashboard({
             <div className="flex items-center gap-2">
               <h1 className="text-[15px] font-semibold tracking-tight text-foreground">Fleets</h1>
               <span className="text-[12px] text-muted-foreground/60 tabular-nums">
-                {agents.length}
+                {fleets.length}
               </span>
             </div>
             <button
@@ -81,7 +81,7 @@ export function FleetDashboard({
 
           <div className="mt-3">
             {GROUP_ORDER.map((status) => {
-              const members = agents.filter((a) => a.status === status)
+              const members = fleets.filter((a) => a.status === status)
               if (members.length === 0) return null
               return (
                 <section key={status} className="mb-2">
@@ -127,19 +127,19 @@ function GroupHeader({ status, count }: { status: FleetStatus; count: number }) 
 }
 
 function FleetRow({
-  agent,
+  fleet,
   onOpen,
   onManage,
 }: {
-  agent: Fleet
+  fleet: Fleet
   onOpen: () => void
   onManage: () => void
 }) {
   // Live vitals (status, cost) ride the per-agent meta cache the SSE bridge folds
   // in real time (T297); the polled fleet row is the fallback until the first
   // delta lands. ensureSync(agent.id) is triggered by this hook.
-  const { data: live } = useFleetMeta(agent.id)
-  const a = live ?? agent
+  const { data: live } = useFleetMeta(fleet.id)
+  const a = live ?? fleet
   const accent = accentVar[a.accent]
 
   return (
@@ -154,8 +154,8 @@ function FleetRow({
           summary trailing on the same line so the row stays single-height. */}
       {a.hasAvatar ? (
         <img
-          src={avatarUrl(agent.id)}
-          alt={agent.name}
+          src={avatarUrl(fleet.id)}
+          alt={fleet.name}
           className="size-6 shrink-0 rounded-md object-cover ring-1 ring-border/60 ring-inset"
         />
       ) : (
@@ -167,27 +167,27 @@ function FleetRow({
         </span>
       )}
       <span className="shrink-0 truncate text-[13px] font-medium text-foreground/90">
-        {agent.name}
+        {fleet.name}
       </span>
-      {agent.task && (
+      {fleet.task && (
         <>
           <span className="shrink-0 text-muted-foreground/30">·</span>
           <span className="min-w-0 flex-1 truncate text-[11.5px] text-muted-foreground/55">
-            {agent.task}
+            {fleet.task}
           </span>
         </>
       )}
 
       {/* Health — only when non-nominal (§19, T121): rides beside the name so the
           trailing model/cost columns stay aligned whether or not it's present. */}
-      <HealthBadge fleetId={agent.id} />
+      <HealthBadge fleetId={fleet.id} />
 
-      <span className={agent.task ? "shrink-0" : "flex-1"} />
+      <span className={fleet.task ? "shrink-0" : "flex-1"} />
 
       {/* Model — plain muted token in a fixed column so rows align down the
           list; no per-row icon (the column position already reads as "model"). */}
       <span className="hidden w-[136px] shrink-0 justify-end truncate text-[11.5px] text-muted-foreground/70 sm:inline-flex">
-        {agent.model}
+        {fleet.model}
       </span>
 
       {/* Cost — tabular, right-aligned in its own column, data-weight ink. */}

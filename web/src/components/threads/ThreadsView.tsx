@@ -58,9 +58,9 @@ export function ThreadsView({
   disconnected?: boolean
   onReconnect?: () => void
 }) {
-  const { data: agents = [] } = useFleet()
+  const { data: fleets = [] } = useFleet()
   const { data: threads = [] } = useThreads(activeFleetId)
-  const agent = agents.find((a) => a.id === activeFleetId)
+  const fleet = fleets.find((a) => a.id === activeFleetId)
 
   // The dialog flag is INJECTED into the selection hook rather than used
   // alongside it, so `handleCreate`'s own `setNewOpen(false)` closes the very
@@ -79,7 +79,7 @@ export function ThreadsView({
   // Only bail to a bare empty state when there is genuinely no agent. A fresh
   // agent with zero threads MUST still render the sidebar — that is where the
   // "New Thread" button lives — otherwise the realm is a dead end.
-  if (!agent) {
+  if (!fleet) {
     return <EmptyRealm fleetName={undefined} />
   }
 
@@ -161,7 +161,7 @@ export function ThreadsView({
           }}
         />
       ) : (
-        <EmptyRealm fleetName={agent.name} onNewThread={() => sel.setNewOpen(true)} />
+        <EmptyRealm fleetName={fleet.name} onNewThread={() => sel.setNewOpen(true)} />
       )}
 
       <NewThreadDialog

@@ -98,10 +98,10 @@ export function useSseConnected(fleetId: string): boolean {
 export function useRestartFlow(fleetId: string) {
   const mutation = useRestartFleet()
   const client = useQueryClient()
-  const { data: agent } = useFleetMeta(fleetId)
+  const { data: fleet } = useFleetMeta(fleetId)
 
   const restart = useCallback(() => {
-    if (!fleetId || mutation.isPending || agent?.status === "waiting") return
+    if (!fleetId || mutation.isPending || fleet?.status === "waiting") return
     mutation.mutate(fleetId, {
       onSuccess: () => {
         client.setQueryData<Fleet>(qk.agent(fleetId), (prev) => {
@@ -110,11 +110,11 @@ export function useRestartFlow(fleetId: string) {
         })
       },
     })
-  }, [fleetId, mutation, agent?.status, client])
+  }, [fleetId, mutation, fleet?.status, client])
 
   return {
     restart,
-    restarting: mutation.isPending || agent?.status === "waiting",
+    restarting: mutation.isPending || fleet?.status === "waiting",
     error: mutation.error instanceof Error ? mutation.error.message : null,
   }
 }

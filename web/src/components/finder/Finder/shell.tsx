@@ -45,14 +45,14 @@ const pointerFirst: CollisionDetection = (args) => {
  * served.
  */
 export function FinderShell({
-  agent,
+  fleet,
   tree,
   groups,
   railOpen = true,
   disconnected,
   onReconnect,
 }: {
-  agent: Fleet
+  fleet: Fleet
   tree: TreeState
   groups: GroupsState
   /** Whether the explorer rail is expanded. When false the tree slides off the
@@ -64,7 +64,7 @@ export function FinderShell({
 }) {
   // The agent's tree descriptions (realm-relative path → text), for the ⓘ badge
   // on described rows. One fetch per agent, shared across the whole tree.
-  const { data: descriptions } = useFsDescriptions(agent.id)
+  const { data: descriptions } = useFsDescriptions(fleet.id)
 
   // ONE DndContext spanning the explorer AND every editor group (T630 P1–P3).
   // It hosts three drag systems: each group's tab SortableContext (reorder),
@@ -105,8 +105,8 @@ export function FinderShell({
           aria-hidden={!railOpen}
         >
           <ExplorerTree
-            fleetId={agent.id}
-            fleetFolder={agent.folder}
+            fleetId={fleet.id}
+            fleetFolder={fleet.folder}
             tree={tree}
             descriptions={descriptions}
             activePath={groups.activePath}
@@ -121,7 +121,7 @@ export function FinderShell({
           />
         </div>
 
-        <TabHost groups={groups} fleetId={agent.id} />
+        <TabHost groups={groups} fleetId={fleet.id} />
       </div>
     </DndContext>
   )

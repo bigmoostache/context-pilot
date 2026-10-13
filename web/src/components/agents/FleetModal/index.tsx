@@ -39,16 +39,16 @@ export function FleetModal({
   onFlash?: (m: string) => void
 }) {
   const isManage = modal.mode === "manage"
-  const agent = isManage ? modal.agent : undefined
-  const [name, setName] = useState(agent?.name ?? "")
+  const fleet = isManage ? modal.fleet : undefined
+  const [name, setName] = useState(fleet?.name ?? "")
 
   // The picker list is computed server-side: only providers with a configured
   // key, with the org model allowlist already applied (empty ⇒ all).
   const { data: providers = [] } = usePickerProviders()
-  const sel = useSelectionState(isManage, agent, providers)
+  const sel = useSelectionState(isManage, fleet, providers)
   const actions = useFleetModalActions({
     isManage,
-    agent,
+    fleet,
     name,
     sel,
     providers,
@@ -59,12 +59,12 @@ export function FleetModal({
 
   // Realm folder: derived live from the name in create mode; the agent's fixed,
   // read-only realm in manage mode.
-  const realm = isManage ? (agent?.folder ?? "") : `~/code/${slugify(name)}`
+  const realm = isManage ? (fleet?.folder ?? "") : `~/code/${slugify(name)}`
   const canSubmit = (isManage || name.trim().length > 0) && !actions.pending
 
   const c: Controller = {
     isManage,
-    agent,
+    fleet,
     name,
     setName,
     providers,
@@ -96,7 +96,7 @@ export function FleetModal({
       >
         <FleetModalHeader
           isManage={c.isManage}
-          agent={c.agent}
+          fleet={c.fleet}
           avatarBust={c.avatarBust}
           onAvatarChange={c.onAvatarChange}
           onRandomizeAvatar={c.onRandomizeAvatar}

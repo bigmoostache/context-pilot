@@ -29,7 +29,7 @@ export function RetiredSection({ onFlash }: { onFlash: (m: string) => void }) {
       <ul className="flex flex-col">
         {retired.map((a) => (
           <li key={a.id}>
-            <RetiredSwipeRow agent={a} onFlash={onFlash} />
+            <RetiredSwipeRow fleet={a} onFlash={onFlash} />
           </li>
         ))}
       </ul>
@@ -39,16 +39,16 @@ export function RetiredSection({ onFlash }: { onFlash: (m: string) => void }) {
 
 /** A retired agent row — swipe-left reveals a single Unretire action (respawns
  *  it on its kept folder). No tap-to-open (there's no live process). */
-function RetiredSwipeRow({ agent, onFlash }: { agent: Fleet; onFlash: (m: string) => void }) {
+function RetiredSwipeRow({ fleet, onFlash }: { fleet: Fleet; onFlash: (m: string) => void }) {
   const { rowRef, close, bind } = useSwipeRow(68)
   const unretire = useUnretireFleet()
 
   const onUnretire = () => {
     close()
     if (unretire.isPending) return
-    unretire.mutate(agent.id, {
-      onSuccess: () => onFlash(`Bringing ${agent.name} back — it will reconnect in a moment`),
-      onError: (e) => onFlash(e instanceof Error ? e.message : `Could not unretire ${agent.name}`),
+    unretire.mutate(fleet.id, {
+      onSuccess: () => onFlash(`Bringing ${fleet.name} back — it will reconnect in a moment`),
+      onError: (e) => onFlash(e instanceof Error ? e.message : `Could not unretire ${fleet.name}`),
     })
   }
 
@@ -77,8 +77,8 @@ function RetiredSwipeRow({ agent, onFlash }: { agent: Fleet; onFlash: (m: string
           <FolderGit2 className="size-5" />
         </span>
         <span className="flex min-w-0 flex-1 flex-col leading-tight">
-          <span className="truncate text-[16px] font-medium text-foreground/75">{agent.name}</span>
-          <span className="truncate text-[12.5px] text-muted-foreground/60">{agent.folder}</span>
+          <span className="truncate text-[16px] font-medium text-foreground/75">{fleet.name}</span>
+          <span className="truncate text-[12.5px] text-muted-foreground/60">{fleet.folder}</span>
         </span>
         <span className="shrink-0 rounded-full bg-muted/60 px-2 py-0.5 text-[10.5px] font-medium text-muted-foreground/70">
           Retired

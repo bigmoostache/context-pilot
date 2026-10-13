@@ -51,13 +51,13 @@ const statusMeta: Record<FleetStatus, { label: string; color: string }> = {
  * create flow and the intermediate `NewFleetSheet` bottom sheet.
  */
 export function FleetDashboard({
-  agents,
+  fleets,
   onOpenFleet,
   onManageFleet,
   autoCreate,
   onAutoCreateConsumed,
 }: {
-  agents: Fleet[]
+  fleets: Fleet[]
   onOpenFleet: (id: string) => void
   onManageFleet: (id: string) => void
   autoCreate?: boolean | undefined
@@ -115,7 +115,7 @@ export function FleetDashboard({
   // types (matching name substring, case-insensitive). Whatever is typed is ALSO
   // the draft name for the create button below — same dual-use as ThreadList.
   const q = query.trim().toLowerCase()
-  const filtered = q === "" ? agents : agents.filter((a) => a.name.toLowerCase().includes(q))
+  const filtered = q === "" ? fleets : fleets.filter((a) => a.name.toLowerCase().includes(q))
 
   // #1 List cascade (anime.js): stagger the rows in the first time the roster
   // lands. A ref guard runs it ONCE — creating/retiring later must not re-cascade
@@ -124,7 +124,7 @@ export function FleetDashboard({
   const cascadedRef = useRef(false)
   useEffect(() => {
     const el = listRef.current
-    if (!el || cascadedRef.current || agents.length === 0 || prefersReducedMotion()) return
+    if (!el || cascadedRef.current || fleets.length === 0 || prefersReducedMotion()) return
     cascadedRef.current = true
     animate(el.children, {
       opacity: [0, 1],
@@ -133,7 +133,7 @@ export function FleetDashboard({
       duration: 300,
       ease: "out(2)",
     })
-  }, [agents.length])
+  }, [fleets.length])
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -146,9 +146,9 @@ export function FleetDashboard({
 
       <ScrollArea className="min-h-0 flex-1 bg-background">
         <div className={cn("mx-auto flex w-full flex-col", FLEET_MAX_W)}>
-          <FleetHeader count={agents.length} />
+          <FleetHeader count={fleets.length} />
 
-          {agents.length === 0 ? (
+          {fleets.length === 0 ? (
             <p className="px-4 py-16 text-center text-[14px] text-muted-foreground/55">
               No agents yet — type a name below to create one.
             </p>
@@ -161,7 +161,7 @@ export function FleetDashboard({
               {filtered.map((a) => (
                 <li key={a.id}>
                   <FleetSwipeRow
-                    agent={a}
+                    fleet={a}
                     onOpen={() => onOpenFleet(a.id)}
                     onManage={() => onManageFleet(a.id)}
                     onFlash={flash}
@@ -304,12 +304,12 @@ function FleetHeader({ count }: { count: number }) {
  * face itself is the primary tap target (open the agent).
  */
 function FleetSwipeRow({
-  agent,
+  fleet,
   onOpen,
   onManage,
   onFlash,
 }: {
-  agent: Fleet
+  fleet: Fleet
   onOpen: () => void
   onManage: () => void
   onFlash: (m: string) => void
@@ -320,9 +320,9 @@ function FleetSwipeRow({
   const onRetire = () => {
     close()
     if (retire.isPending) return
-    retire.mutate(agent.id, {
-      onSuccess: () => onFlash(`Retiring ${agent.name} — its folder is kept`),
-      onError: (e) => onFlash(e instanceof Error ? e.message : `Could not retire ${agent.name}`),
+    retire.mutate(fleet.id, {
+      onSuccess: () => onFlash(`Retiring ${fleet.name} — its folder is kept`),
+      onError: (e) => onFlash(e instanceof Error ? e.message : `Could not retire ${fleet.name}`),
     })
   }
 
@@ -354,7 +354,7 @@ function FleetSwipeRow({
           directly to this node (never via a React `style` prop) so a drag causes
           zero re-renders. Tapping while open just closes. */}
       <div ref={rowRef} {...bind} className="relative touch-pan-y bg-background select-none">
-        <FleetRow agent={agent} onOpen={onOpen} />
+        <FleetRow fleet={fleet} onOpen={onOpen} />
       </div>
     </div>
   )
@@ -366,13 +366,13 @@ function FleetSwipeRow({
  * trailing cost + chevron. Live vitals ride the per-agent meta cache; the polled
  * fleet row is the fallback until the first delta. Whole row taps open (T632).
  */
-function FleetRow({ agent, onOpen }: { agent: Fleet; onOpen: () => void }) {
-  const { data: live } = useFleetMeta(agent.id)
-  const a = live ?? agent
+function FleetRow({ fleet, onOpen }: { fleet: Fleet; onOpen: () => void }) {
+  const { data: live } = useFleetMeta(fleet.id)
+  const a = live ?? fleet
   const s = statusMeta[a.status]
   const accent = accentVar[a.accent]
   const attention = a.status === "needs-you"
-  const subtitle = [agent.model, agent.task].filter(Boolean).join(" · ")
+  const subtitle = [fleet.model, fleet.task].filter(Boolean).join(" · ")
 
   return (
     <button
@@ -382,8 +382,8 @@ function FleetRow({ agent, onOpen }: { agent: Fleet; onOpen: () => void }) {
       <span className="relative shrink-0">
         {a.hasAvatar ? (
           <img
-            src={avatarUrl(agent.id)}
-            alt={agent.name}
+            src={avatarUrl(fleet.id)}
+            alt={fleet.name}
             className="size-10 rounded-lg object-cover"
           />
         ) : (
@@ -412,9 +412,9 @@ function FleetRow({ agent, onOpen }: { agent: Fleet; onOpen: () => void }) {
               attention ? "font-semibold" : "font-medium",
             )}
           >
-            {agent.name}
+            {fleet.name}
           </span>
-          <HealthDot fleetId={agent.id} />
+          <HealthDot fleetId={fleet.id} />
           <span className="ml-auto shrink-0 text-[12.5px] font-semibold text-foreground/75 tabular-nums">
             {fmtCost(a.costUsd)}
           </span>

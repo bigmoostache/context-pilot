@@ -44,7 +44,7 @@ const DICEBEAR_STYLES = [
  *  stays within the max-params budget. */
 export interface ActionsArgs {
   isManage: boolean
-  agent: Fleet | undefined
+  fleet: Fleet | undefined
   name: string
   sel: SelectionState
   providers: ProviderDef[]
@@ -61,13 +61,13 @@ export interface ActionsArgs {
  * without an inline eslint-disable, P4-banned).
  */
 export function useFleetModalActions(args: ActionsArgs): Actions {
-  const { isManage, agent, name, sel, providers, onClose, onFlash } = args
+  const { isManage, fleet, name, sel, providers, onClose, onFlash } = args
   const createFleet = useCreateFleet()
   const {
     restart: doRestart,
     restarting: restartBusy,
     error: restartFlowError,
-  } = useRestartFlow(agent?.id ?? "")
+  } = useRestartFlow(fleet?.id ?? "")
   const retireFleet = useRetireFleet()
   const renameFleet = useRenameFleet()
   const uploadAvatar = useUploadAvatar()
@@ -78,9 +78,9 @@ export function useFleetModalActions(args: ActionsArgs): Actions {
   const pending = createFleet.isPending || saving || restartBusy || retireFleet.isPending
 
   const onAvatarChange = (file: File) => {
-    if (!agent) return
+    if (!fleet) return
     uploadAvatar.mutate(
-      { fleetId: agent.id, file },
+      { fleetId: fleet.id, file },
       {
         onSuccess: () => setAvatarBust(Date.now()),
         onError: (err) =>
@@ -93,7 +93,7 @@ export function useFleetModalActions(args: ActionsArgs): Actions {
    *  and push it through the SAME upload mutation as a manual file pick (so the
    *  bytes land on the agent identically — no new backend surface). */
   const onRandomizeAvatar = () => {
-    if (!agent) return
+    if (!fleet) return
     const style = DICEBEAR_STYLES[Math.floor(Math.random() * DICEBEAR_STYLES.length)] ?? "bottts"
     const seed = crypto.randomUUID()
     const url = `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}`
@@ -103,7 +103,7 @@ export function useFleetModalActions(args: ActionsArgs): Actions {
       .then((blob) => {
         const file = new File([blob], `${style}-${seed}.svg`, { type: "image/svg+xml" })
         uploadAvatar.mutate(
-          { fleetId: agent.id, file },
+          { fleetId: fleet.id, file },
           {
             onSuccess: () => setAvatarBust(Date.now()),
             onError: (err) =>
@@ -120,7 +120,7 @@ export function useFleetModalActions(args: ActionsArgs): Actions {
    *  commands the old binary rejected with `502 agent unreachable`. Spins until
    *  the SSE push plane reconnects (full lifecycle, not just API ack). */
   const restart = () => {
-    if (!agent || restartBusy) return
+    if (!fleet || restartBusy) return
     setLocalError(null)
     doRestart()
   }
@@ -131,11 +131,11 @@ export function useFleetModalActions(args: ActionsArgs): Actions {
   /** Retire (archive) the agent: stop its process + console server, keep its
    *  folder, and move it to the dashboard's Retired section. Reversible. */
   const retire = () => {
-    if (!agent || retireFleet.isPending) return
+    if (!fleet || retireFleet.isPending) return
     setLocalError(null)
-    retireFleet.mutate(agent.id, {
+    retireFleet.mutate(fleet.id, {
       onSuccess: () => {
-        onFlash?.(`Retired ${agent.name} — moved to the Retired section`)
+        onFlash?.(`Retired ${fleet.name} — moved to the Retired section`)
         onClose()
       },
       onError: (e) => setLocalError(e instanceof Error ? e.message : "Could not retire the fleet."),
@@ -186,7 +186,7 @@ export function useFleetModalActions(args: ActionsArgs): Actions {
   const canSubmit = (isManage || name.trim().length > 0) && !pending
   const submit = () => {
     if (!canSubmit) return
-    if (isManage && agent) saveManage(agent)
+    if (isManage && fleet) saveManage(fleet)
     else create()
   }
 

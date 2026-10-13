@@ -41,7 +41,7 @@ const statusOrder: Record<FleetStatus, number> = {
  * placeholder, so the header entry point never disappears.
  */
 export function FleetSwitcher({
-  agents,
+  fleets,
   activeId,
   onSwitch,
   onManageFleets,
@@ -51,7 +51,7 @@ export function FleetSwitcher({
   shortcutHint,
   hintShown,
 }: {
-  agents: Fleet[]
+  fleets: Fleet[]
   activeId?: string | undefined
   onSwitch: (id: string) => void
   /** open the fleet dashboard — the sole place agents are created/managed
@@ -72,7 +72,7 @@ export function FleetSwitcher({
   shortcutHint?: string | undefined
   hintShown?: boolean | undefined
 }) {
-  const active = agents.find((a) => a.id === activeId)
+  const active = fleets.find((a) => a.id === activeId)
 
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
@@ -120,7 +120,7 @@ export function FleetSwitcher({
           </>
         )}
         <DropdownMenuGroup>
-          {agents
+          {fleets
             .filter((a) => a.id !== activeId)
             .toSorted((a, b) => statusOrder[a.status] - statusOrder[b.status])
             .map((a) => (

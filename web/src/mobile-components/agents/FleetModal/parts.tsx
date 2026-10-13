@@ -29,12 +29,12 @@ import { cn, prefersReducedMotion } from "@/lib/utils"
  * successful upload so the new image shows immediately.
  */
 export function AvatarHero({
-  agent,
+  fleet,
   avatarBust,
   onAvatarChange,
   onRandomizeAvatar,
 }: {
-  agent: Fleet
+  fleet: Fleet
   avatarBust: number
   onAvatarChange: (file: File) => void
   onRandomizeAvatar: () => void
@@ -47,10 +47,10 @@ export function AvatarHero({
           title="Tap to change avatar"
           className="flex size-24 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-(--signal)/14 text-(--signal) ring-1 ring-(--signal)/25 transition-opacity ring-inset active:opacity-80"
         >
-          {agent.hasAvatar ? (
+          {fleet.hasAvatar ? (
             <img
-              src={avatarUrl(agent.id, avatarBust || undefined)}
-              alt={agent.name}
+              src={avatarUrl(fleet.id, avatarBust || undefined)}
+              alt={fleet.name}
               className="size-24 rounded-full object-cover"
             />
           ) : (

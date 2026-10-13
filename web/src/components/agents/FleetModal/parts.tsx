@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils"
 /** Everything the render subcomponents need — assembled in {@link FleetModal}. */
 export interface Controller {
   isManage: boolean
-  agent: Fleet | undefined
+  fleet: Fleet | undefined
   name: string
   setName: (v: string) => void
   providers: ProviderDef[]
@@ -54,14 +54,14 @@ function submitLabel(pending: boolean, saving: boolean, isManage: boolean): stri
  *  subtitle, and the close button. */
 export function FleetModalHeader({
   isManage,
-  agent,
+  fleet,
   avatarBust,
   onAvatarChange,
   onRandomizeAvatar,
   onClose,
 }: {
   isManage: boolean
-  agent: Fleet | undefined
+  fleet: Fleet | undefined
   avatarBust: number
   onAvatarChange: (file: File) => void
   onRandomizeAvatar: () => void
@@ -90,10 +90,10 @@ export function FleetModalHeader({
               "bg-(--signal)/14 text-(--signal) ring-(--signal)/25",
             )}
           >
-            {agent?.hasAvatar ? (
+            {fleet?.hasAvatar ? (
               <img
-                src={avatarUrl(agent.id, avatarBust || undefined)}
-                alt={agent.name}
+                src={avatarUrl(fleet.id, avatarBust || undefined)}
+                alt={fleet.name}
                 className="size-11 rounded-xl object-cover"
               />
             ) : (
@@ -133,7 +133,7 @@ export function FleetModalHeader({
       )}
       <div className="relative flex flex-1 flex-col gap-0.5 pt-0.5">
         <h3 className="text-[17px] font-semibold tracking-tight text-foreground">
-          {isManage ? `Manage ${agent?.name}` : "Create a fleet"}
+          {isManage ? `Manage ${fleet?.name}` : "Create a fleet"}
         </h3>
         <p className="text-[12px] leading-relaxed text-muted-foreground">
           {isManage

@@ -24,20 +24,20 @@ export function RetiredSection({ onFlash }: { onFlash: (m: string) => void }) {
         <span className="text-[11px] text-muted-foreground/45 tabular-nums">{retired.length}</span>
       </div>
       {retired.map((a) => (
-        <RetiredRow key={a.id} agent={a} onFlash={onFlash} />
+        <RetiredRow key={a.id} fleet={a} onFlash={onFlash} />
       ))}
     </section>
   )
 }
 
-function RetiredRow({ agent, onFlash }: { agent: Fleet; onFlash: (m: string) => void }) {
+function RetiredRow({ fleet, onFlash }: { fleet: Fleet; onFlash: (m: string) => void }) {
   const unretire = useUnretireFleet()
 
   const onUnretire = () => {
     if (unretire.isPending) return
-    unretire.mutate(agent.id, {
-      onSuccess: () => onFlash(`Bringing ${agent.name} back — it will reconnect in a moment`),
-      onError: (e) => onFlash(e instanceof Error ? e.message : `Could not unretire ${agent.name}`),
+    unretire.mutate(fleet.id, {
+      onSuccess: () => onFlash(`Bringing ${fleet.name} back — it will reconnect in a moment`),
+      onError: (e) => onFlash(e instanceof Error ? e.message : `Could not unretire ${fleet.name}`),
     })
   }
 
@@ -48,15 +48,15 @@ function RetiredRow({ agent, onFlash }: { agent: Fleet; onFlash: (m: string) => 
         <FolderGit2 className="size-3.5" />
       </span>
       <span className="shrink-0 truncate text-[13px] font-medium text-foreground/60">
-        {agent.name}
+        {fleet.name}
       </span>
       <span className="min-w-0 flex-1 truncate text-[11.5px] text-muted-foreground/45">
-        {agent.folder}
+        {fleet.folder}
       </span>
 
       {/* Model — fixed column, aligned with active rows above (no per-row icon). */}
       <span className="hidden w-[136px] shrink-0 justify-end truncate text-[11.5px] text-muted-foreground/60 sm:inline-flex">
-        {agent.model}
+        {fleet.model}
       </span>
 
       {/* Unretire — revealed on row hover. */}
