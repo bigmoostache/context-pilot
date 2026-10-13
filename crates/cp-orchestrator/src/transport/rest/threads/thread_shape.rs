@@ -106,7 +106,7 @@ fn synthesize_from_roster(entry: &RosterEntry, fleet_id: &str) -> serde_json::Va
         "id": entry.thread_id,
         "name": entry.name,
         "status": roster_status_value(entry.status),
-        "agentId": fleet_id,
+        "fleetId": fleet_id,
         "lastMessage": "",
         "lastActivity": entry.last_activity_ms,
         "messageCount": entry.msg_count,
@@ -266,7 +266,7 @@ pub(crate) fn reshape_thread(raw: &serde_json::Value, fleet_id: &str) -> serde_j
         "id": raw.get("id").and_then(serde_json::Value::as_str).unwrap_or(""),
         "name": raw.get("name").and_then(serde_json::Value::as_str).unwrap_or(""),
         "status": status_str,
-        "agentId": fleet_id,
+        "fleetId": fleet_id,
         "lastMessage": last_msg,
         "lastActivity": last_activity,
         "messageCount": msg_count,
@@ -338,7 +338,7 @@ mod tests {
         assert_eq!(str_at(d, "id"), Some("T9"));
         assert_eq!(str_at(d, "name"), Some("fresh"));
         assert_eq!(str_at(d, "status"), Some("THEIR_TURN"));
-        assert_eq!(str_at(d, "agentId"), Some("a1"));
+        assert_eq!(str_at(d, "fleetId"), Some("a1"));
         assert_eq!(u64_at(d, "lastActivity"), Some(4_242));
         assert_eq!(arr_at(d, "log").map(Vec::len), Some(0), "empty log");
     }
@@ -351,7 +351,7 @@ mod tests {
             "id": "T1",
             "name": "old",
             "status": "THEIR_TURN",
-            "agentId": "a1",
+            "fleetId": "a1",
             "lastActivity": 100u64,
             "archived": false,
             "log": [{"id": "msg_0", "role": "user", "content": "hi", "timestamp": 100u64}],

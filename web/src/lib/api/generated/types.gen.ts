@@ -8,7 +8,7 @@ export type ClientOptions = {
 export type AccentToken = 'signal' | 'interactive' | 'ok' | 'warn' | 'danger';
 
 export type AclEntry = {
-    agent_id: string;
+    fleet_id: string;
     granted_at?: number;
     granted_by?: string | null;
     role: 'agent-admin' | 'agent-user';
@@ -701,11 +701,11 @@ export type SheetTab = {
 };
 
 export type ThreadDetail = {
-    agent?: string;
-    agentId: string;
     archived?: boolean;
     branchedFrom?: string | null;
     createdAt?: string;
+    fleet?: string;
+    fleetId: string;
     focused?: boolean;
     id: string;
     lastActivity?: string;

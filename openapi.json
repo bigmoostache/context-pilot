@@ -13,7 +13,7 @@
       },
       "AclEntry": {
         "properties": {
-          "agent_id": {
+          "fleet_id": {
             "type": "string"
           },
           "granted_at": {
@@ -41,7 +41,7 @@
           }
         },
         "required": [
-          "agent_id",
+          "fleet_id",
           "user_id",
           "role",
           "user_email",
@@ -2030,12 +2030,6 @@
       },
       "ThreadDetail": {
         "properties": {
-          "agent": {
-            "type": "string"
-          },
-          "agentId": {
-            "type": "string"
-          },
           "archived": {
             "type": "boolean"
           },
@@ -2044,6 +2038,12 @@
             "type": "string"
           },
           "createdAt": {
+            "type": "string"
+          },
+          "fleet": {
+            "type": "string"
+          },
+          "fleetId": {
             "type": "string"
           },
           "focused": {
@@ -2098,7 +2098,7 @@
           "id",
           "name",
           "status",
-          "agentId",
+          "fleetId",
           "log"
         ],
         "type": "object"

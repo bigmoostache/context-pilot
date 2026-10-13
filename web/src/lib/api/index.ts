@@ -308,7 +308,6 @@ export async function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
     const la = t.lastActivity as string | number
     return {
       ...t,
-      agentId: t.agentId,
       lastActivity: typeof la === "number" ? formatAge(la) : la,
       lastActivityMs:
         typeof t.lastActivityMs === "number" ? t.lastActivityMs : typeof la === "number" ? la : 0,

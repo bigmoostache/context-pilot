@@ -89,8 +89,8 @@ pub(super) fn core() -> Value {
                 "id": { "type": "string" },
                 "name": { "type": "string" },
                 "status": { "type": "string", "enum": ["MY_TURN", "THEIR_TURN", "ACTIVE"] },
-                "agentId": { "type": "string" },
-                "agent": { "type": "string" },
+                "fleetId": { "type": "string" },
+                "fleet": { "type": "string" },
                 "createdAt": { "type": "string" },
                 "lastActivity": { "type": "string" },
                 "lastActivityMs": { "type": "integer" },
@@ -105,7 +105,7 @@ pub(super) fn core() -> Value {
                 "tasks": arr(r("ThreadTask")),
                 "notes": arr(r("ThreadNote"))
             },
-            "required": ["id", "name", "status", "agentId", "log"]
+            "required": ["id", "name", "status", "fleetId", "log"]
         },
         "ThreadTask": {
             "type": "object",

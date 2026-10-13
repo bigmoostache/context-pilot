@@ -181,7 +181,7 @@ pub(super) fn transport() -> Value {
         "AclEntry": {
             "type": "object",
             "properties": {
-                "agent_id": { "type": "string" },
+                "fleet_id": { "type": "string" },
                 "user_id": { "type": "string" },
                 "role": { "type": "string", "enum": ["agent-admin", "agent-user"] },
                 "granted_at": { "type": "integer" },
@@ -189,7 +189,7 @@ pub(super) fn transport() -> Value {
                 "user_email": { "type": "string" },
                 "user_name": { "type": "string" }
             },
-            "required": ["agent_id", "user_id", "role", "user_email", "user_name"]
+            "required": ["fleet_id", "user_id", "role", "user_email", "user_name"]
         },
         // ── Env-keys ────────────────────────────────────────────────
         "EnvKeyStatus": {

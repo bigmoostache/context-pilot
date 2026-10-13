@@ -185,9 +185,7 @@ pub(crate) struct AccessGrant<'req> {
 /// joined with their profile info for display.
 #[derive(Clone, Debug, serde::Serialize)]
 pub(crate) struct AclEntry {
-    /// The fleet this entry grants access to. JSON key stays `agent_id`
-    /// until the web contract rename (T860 A0b-4).
-    #[serde(rename = "agent_id")]
+    /// The fleet this entry grants access to.
     pub fleet_id: String,
     /// The authorized user's UUID.
     pub user_id: String,
