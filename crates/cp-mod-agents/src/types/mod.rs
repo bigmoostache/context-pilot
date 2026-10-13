@@ -5,6 +5,9 @@ use cp_base::state::runtime::State;
 /// Per-thread message files (`agents/<id>.json`), written only when dirty.
 pub mod persist;
 
+/// One-shot boot migration of the pre-T860 `threads` store layout.
+pub mod migrate;
+
 // =============================================================================
 // Enums
 // =============================================================================
@@ -134,7 +137,7 @@ impl AgentMessage {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AgentOrigin {
     /// Id of the parent agent at branch time (may since have been deleted).
-    #[serde(rename = "thread_id")]
+    #[serde(alias = "thread_id")]
     pub agent_id: String,
     /// Epoch-ms timestamp of the last parent message copied into the branch.
     pub message_ts: u64,
@@ -293,7 +296,7 @@ impl AgentsState {
             .map(|m| AgentMessage { acknowledged: true, ..m.clone() })
             .collect();
 
-        let id = format!("T{}", self.next_id);
+        let id = format!("A{}", self.next_id);
         self.next_id = self.next_id.saturating_add(1);
         let mut agent = Agent::new(id.clone(), name.to_owned());
         agent.messages = messages;
@@ -311,7 +314,7 @@ impl AgentsState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FocusState {
     /// Which agent the AI is currently focused on (None = unfocused).
-    #[serde(rename = "focused_thread_id")]
+    #[serde(alias = "focused_thread_id")]
     pub focused_agent_id: Option<String>,
     /// Which agent the human has *drilled into* in the TUI (`None` = showing the
     /// agent list). Pure view state (G3): it selects whose full panel view is
@@ -320,17 +323,17 @@ pub struct FocusState {
     /// restores the previous one (Model 2: a human glance must not disturb the
     /// agent's work). Defaults to `None` (back-compat; byte-identical until set).
     #[serde(default)]
-    #[serde(rename = "drilled_thread_id")]
+    #[serde(alias = "drilled_thread_id")]
     pub drilled_agent_id: Option<String>,
     /// Index of the currently selected agent in the TUI agents view.
     /// Used for navigation (Tab/Shift+Tab) and message area display.
     #[serde(default)]
-    #[serde(rename = "selected_thread_idx")]
+    #[serde(alias = "selected_thread_idx")]
     pub selected_agent_idx: usize,
     /// When true, the input field is being used to name a new agent.
     /// Set by pressing 'n' in Agents view, cleared on Enter or Esc.
     #[serde(default)]
-    #[serde(rename = "creating_thread")]
+    #[serde(alias = "creating_thread")]
     pub creating_agent: bool,
     /// When true, an archive/restore is *armed*: a first Ctrl+X was pressed and
     /// the TUI is waiting for a confirming second Ctrl+X. Cleared on confirm, on
@@ -362,7 +365,7 @@ pub struct FocusState {
     /// Draft name typed on the virtual "+ New Agent" row. Its own textarea
     /// (not an agent's composer) so it survives navigation and reloads.
     #[serde(default)]
-    #[serde(rename = "new_thread_title")]
+    #[serde(alias = "new_thread_title")]
     pub new_agent_title: cp_base::state::runtime::textarea::TextArea,
 }
 

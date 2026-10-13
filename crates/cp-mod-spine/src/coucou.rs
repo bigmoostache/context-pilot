@@ -33,7 +33,7 @@ pub struct Record {
     /// Target agent. Stamped with the scheduling agent when the tool call
     /// omits `agent_id`; `None` only for coucous scheduled outside any agent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "thread_id")]
+    #[serde(alias = "thread_id")]
     pub agent_id: Option<String>,
     /// Repeat interval in milliseconds. 0 = one-shot (no recurrence).
     #[serde(default)]
@@ -267,7 +267,7 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
     // reminder lands back in its own inbox, not whichever agent is focused.
     let agent_id = tool
         .input
-        .get("thread_id")
+        .get("agent_id")
         .and_then(|v| v.as_str())
         .map(String::from)
         .or_else(|| state.executing_agent_id().map(str::to_owned));

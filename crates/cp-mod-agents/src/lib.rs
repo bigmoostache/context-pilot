@@ -62,7 +62,7 @@ impl AgentsModule {
 
 impl Module for AgentsModule {
     fn id(&self) -> &'static str {
-        "threads"
+        "agents"
     }
     fn name(&self) -> &'static str {
         "Agents"
@@ -102,7 +102,7 @@ impl Module for AgentsModule {
         // written by the save batch only for agents that changed.
         let agents: Vec<types::persist::AgentMeta<'_>> = ts.agents.iter().map(Into::into).collect();
         json!({
-            "threads": agents,
+            "agents": agents,
             "next_id": ts.next_id,
             "panel_content": ts.panel_content,
             "focus_file": focus_file,
@@ -115,7 +115,7 @@ impl Module for AgentsModule {
     // circular — the focus it names is what that field holds.
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         let ts = AgentsState::get_mut(state);
-        if let Some(arr) = data.get("threads")
+        if let Some(arr) = data.get("agents").or_else(|| data.get("threads"))
             && let Ok(v) = serde_json::from_value(arr.clone())
         {
             ts.agents = v;
@@ -201,7 +201,7 @@ impl Module for AgentsModule {
     fn context_type_metadata(&self) -> Vec<cp_base::state::context::TypeMeta> {
         vec![cp_base::state::context::TypeMeta {
             context_type: Kind::AGENTS,
-            icon_id: "threads",
+            icon_id: "agents",
             is_fixed: true,
             needs_cache: false,
             fixed_order: Some(5),

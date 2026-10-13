@@ -230,7 +230,7 @@ fn handle_agent_create(state: &mut State) -> ActionResult {
 
     // Generate agent ID and create the agent
     let agents_state = AgentsState::get_mut(state);
-    let id = format!("T{}", agents_state.next_id);
+    let id = format!("A{}", agents_state.next_id);
     agents_state.next_id = agents_state.next_id.saturating_add(1);
 
     let agent = cp_mod_agents::types::Agent::new(id, name);

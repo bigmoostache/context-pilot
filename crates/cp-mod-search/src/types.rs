@@ -423,8 +423,8 @@ pub(crate) fn logs_index_settings() -> serde_json::Value {
 /// `ts_ms` is sortable so recency ties can break toward newer messages.
 pub(crate) fn conversations_index_settings() -> serde_json::Value {
     serde_json::json!({
-        "searchableAttributes": ["text", "thread_name"],
-        "filterableAttributes": ["thread_id", "author"],
+        "searchableAttributes": ["text", "agent_name"],
+        "filterableAttributes": ["agent_id", "author"],
         "sortableAttributes": ["ts_ms"],
         "typoTolerance": {
             "enabled": true,

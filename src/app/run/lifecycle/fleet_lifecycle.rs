@@ -246,7 +246,7 @@ impl App {
                 let nid = cp_mod_spine::types::SpineState::create_notification(
                     state,
                     cp_mod_spine::types::NotificationType::Custom,
-                    "threads".to_owned(),
+                    "agents".to_owned(),
                     content,
                 );
                 cp_mod_spine::types::SpineState::set_notification_agent(state, &nid, Some(tid_for_bind));

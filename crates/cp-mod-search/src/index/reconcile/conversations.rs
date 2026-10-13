@@ -37,10 +37,8 @@ pub(crate) struct ConversationDoc {
     /// Meilisearch primary key — `"{agent_id}-{index}"`.
     pub id: String,
     /// Owning agent id (filterable — lets a search scope to one agent).
-    #[serde(rename = "thread_id")]
     pub agent_id: String,
     /// Owning agent's display name (searchable + embedded for context).
-    #[serde(rename = "thread_name")]
     pub agent_name: String,
     /// `"user"` or `"assistant"` (filterable).
     pub author: String,

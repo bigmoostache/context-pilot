@@ -18,7 +18,7 @@ use serde::Serialize;
 use super::{Agent, AgentMessage, AgentOrigin, AgentStatus};
 
 /// Directory (under the store dir) holding one message file per agent.
-pub const AGENTS_DIR: &str = "threads";
+pub const AGENTS_DIR: &str = "agents";
 
 /// Path of an agent's message file.
 #[must_use]

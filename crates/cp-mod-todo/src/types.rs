@@ -63,7 +63,7 @@ pub struct TodoItem {
     /// no owning agent cannot exist; legacy items lacking one are purged on
     /// load. Serialized unconditionally (no skip) — it is a foreign key.
     #[serde(default)]
-    #[serde(rename = "thread_id")]
+    #[serde(alias = "thread_id")]
     pub agent_id: String,
     /// Parent todo ID (for nesting). Its parent MUST share the same `agent_id`.
     #[serde(default, skip_serializing_if = "Option::is_none")]

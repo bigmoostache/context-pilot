@@ -352,8 +352,8 @@ pub fn agents(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
             crate::inspect::StateReader::list_workers(folder).unwrap_or_default().into_iter().find_map(|wid| {
                 let w = reader.read_worker(folder, &wid).ok()?;
                 w.get("modules")
-                    .and_then(|m| m.get("threads_worker"))
-                    .and_then(|tw| tw.get("focused_thread_id"))
+                    .and_then(|m| m.get("agents_worker").or_else(|| m.get("threads_worker")))
+                    .and_then(|tw| tw.get("focused_agent_id").or_else(|| tw.get("focused_thread_id")))
                     .and_then(serde_json::Value::as_str)
                     .map(String::from)
             });
@@ -376,8 +376,8 @@ pub fn agents(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
     let raw_agents = config
         .as_ref()
         .and_then(|c| c.get("modules"))
-        .and_then(|m| m.get("threads"))
-        .and_then(|t| t.get("threads"))
+        .and_then(|m| m.get("agents"))
+        .and_then(|t| t.get("agents"))
         .and_then(serde_json::Value::as_array)
         .unwrap_or(&empty);
 

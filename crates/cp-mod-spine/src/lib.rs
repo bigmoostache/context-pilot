@@ -232,7 +232,7 @@ impl Module for SpineModule {
                 .param("datetime", ParamType::String, false)
                 .param("recurrence", ParamType::String, false)
                 .param("interval", ParamType::String, false)
-                .param("thread_id", ParamType::String, false)
+                .param("agent_id", ParamType::String, false)
                 .param("cancel_id", ParamType::String, false)
                 .build(),
         ]

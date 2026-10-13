@@ -51,7 +51,7 @@ pub(crate) fn pre_flight_tool(tool: &ToolUse, state: &State, active_modules: &Ha
     for module in all_modules() {
         // Skip the agents module entirely while the history-cleanup trap is
         // active — its focus pre-flight is the one that deadlocks the trap.
-        if history_trap_active && module.id() == "threads" {
+        if history_trap_active && module.id() == "agents" {
             continue;
         }
         if active_modules.contains(module.id())

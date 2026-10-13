@@ -308,7 +308,7 @@ fn conversations_embedder_settings(api_key: &str) -> serde_json::Value {
                     "{{..}}"
                 ]
             },
-            "documentTemplate": "[{{doc.author}}] {{doc.thread_name}}: {{doc.text | truncatewords: 100}}",
+            "documentTemplate": "[{{doc.author}}] {{doc.agent_name}}: {{doc.text | truncatewords: 100}}",
             "documentTemplateMaxBytes": 1024
         }
     })

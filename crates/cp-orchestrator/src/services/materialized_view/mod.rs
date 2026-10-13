@@ -113,7 +113,7 @@ pub struct FleetView {
     /// in a checkpoint, so after a backend cold start it is `None` until the
     /// agent emits its next focus change (the `/agents` handler falls back to
     /// the agent's tier-② `FocusState` to cover that window).
-    #[serde(rename = "focused_thread_id")]
+    #[serde(alias = "focused_thread_id")]
     pub focused_agent_id: Option<String>,
 
     /// Most recent execution phase, or `None` before any phase transition.

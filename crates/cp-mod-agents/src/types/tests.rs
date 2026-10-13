@@ -21,7 +21,7 @@ fn msg(author: AgentAuthor, text: &str, ts: u64) -> AgentMessage {
 /// archived + paused + `MyTurn` so the test can check none of it carries over.
 fn parent_state() -> AgentsState {
     let mut ts = AgentsState::new();
-    let mut parent = Agent::new("T1".to_owned(), "Parent".to_owned());
+    let mut parent = Agent::new("A1".to_owned(), "Parent".to_owned());
     parent.messages = vec![
         msg(AgentAuthor::User, "q1", 10),
         msg(AgentAuthor::Assistant, "a1", 20),
@@ -39,22 +39,22 @@ fn parent_state() -> AgentsState {
 #[test]
 fn branch_copies_history_up_to_and_including_the_branch_point() {
     let mut ts = parent_state();
-    let id = ts.branch("T1", 20, "Alt").unwrap();
-    assert_eq!(id, "T2");
+    let id = ts.branch("A1", 20, "Alt").unwrap();
+    assert_eq!(id, "A2");
     assert_eq!(ts.next_id, 3);
 
-    let branch = ts.agents.iter().find(|t| t.id == "T2").unwrap();
+    let branch = ts.agents.iter().find(|t| t.id == "A2").unwrap();
     let texts: Vec<_> = branch.messages.iter().map(|m| m.content.as_deref().unwrap_or("")).collect();
     assert_eq!(texts, ["q1", "a1"]);
     assert_eq!(branch.messages.iter().map(|m| m.timestamp).collect::<Vec<_>>(), [10, 20]);
     assert!(branch.messages.iter().all(|m| m.acknowledged));
-    assert_eq!(branch.origin, Some(AgentOrigin { agent_id: "T1".to_owned(), message_ts: 20 }));
+    assert_eq!(branch.origin, Some(AgentOrigin { agent_id: "A1".to_owned(), message_ts: 20 }));
 }
 
 #[test]
 fn branch_is_a_fresh_active_agent_and_leaves_the_parent_untouched() {
     let mut ts = parent_state();
-    let id = ts.branch("T1", 20, "Alt").unwrap();
+    let id = ts.branch("A1", 20, "Alt").unwrap();
 
     let branch = ts.agents.iter().find(|t| t.id == id).unwrap();
     assert_eq!(branch.name, "Alt");
@@ -62,7 +62,7 @@ fn branch_is_a_fresh_active_agent_and_leaves_the_parent_untouched() {
     assert!(!branch.archived);
     assert!(!branch.paused);
 
-    let parent = ts.agents.iter().find(|t| t.id == "T1").unwrap();
+    let parent = ts.agents.iter().find(|t| t.id == "A1").unwrap();
     assert_eq!(parent.messages.len(), 4);
     assert!(parent.messages.iter().all(|m| !m.acknowledged));
 }
@@ -70,7 +70,7 @@ fn branch_is_a_fresh_active_agent_and_leaves_the_parent_untouched() {
 #[test]
 fn branch_at_last_message_copies_everything() {
     let mut ts = parent_state();
-    let id = ts.branch("T1", 40, "Copy").unwrap();
+    let id = ts.branch("A1", 40, "Copy").unwrap();
     let branch = ts.agents.iter().find(|t| t.id == id).unwrap();
     assert_eq!(branch.messages.len(), 4);
 }
@@ -78,9 +78,9 @@ fn branch_at_last_message_copies_everything() {
 #[test]
 fn branch_rejects_unknown_agent_or_message() {
     let mut ts = parent_state();
-    let unknown_agent = ts.branch("T9", 20, "x").unwrap_err();
-    assert!(unknown_agent.contains("T9"));
-    let unknown_message = ts.branch("T1", 25, "x").unwrap_err();
+    let unknown_agent = ts.branch("A9", 20, "x").unwrap_err();
+    assert!(unknown_agent.contains("A9"));
+    let unknown_message = ts.branch("A1", 25, "x").unwrap_err();
     assert!(unknown_message.contains("ts=25"));
     assert_eq!(ts.agents.len(), 1);
     assert_eq!(ts.next_id, 2);
@@ -89,12 +89,12 @@ fn branch_rejects_unknown_agent_or_message() {
 #[test]
 fn origin_round_trips_and_defaults_to_none() {
     let legacy: Agent =
-        serde_json::from_str(r#"{"id":"T1","name":"n","status":"TheirTurn","messages":[],"created_at":1}"#).unwrap();
+        serde_json::from_str(r#"{"id":"A1","name":"n","status":"TheirTurn","messages":[],"created_at":1}"#).unwrap();
     assert_eq!(legacy.origin, None);
     assert!(!serde_json::to_string(&legacy).unwrap().contains("origin"));
 
     let mut ts = parent_state();
-    let id = ts.branch("T1", 30, "b").unwrap();
+    let id = ts.branch("A1", 30, "b").unwrap();
     let branch = ts.agents.iter().find(|t| t.id == id).unwrap();
     let back: Agent = serde_json::from_str(&serde_json::to_string(branch).unwrap()).unwrap();
     assert_eq!(back.origin, branch.origin);

@@ -12,7 +12,7 @@ pub struct ScratchpadCell {
     /// cells lacking one are purged on load. Serialized unconditionally (no
     /// skip) — it is a foreign key.
     #[serde(default)]
-    #[serde(rename = "thread_id")]
+    #[serde(alias = "thread_id")]
     pub agent_id: String,
     /// Cell title
     pub title: String,

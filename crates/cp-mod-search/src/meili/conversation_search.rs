@@ -95,7 +95,7 @@ pub fn search_conversations(p: &SearchConvParams<'_>) -> Result<Vec<ConvHit>, St
     // Single-quote-escape a caller-supplied agent id before splicing it into
     // the Meilisearch filter expression, matching the file-indexer's own
     // escaping (`delete_one_file`) so a stray quote can't malform the filter.
-    let filter = p.agent_id.map(|t| format!("thread_id = '{}'", t.replace('\'', "\\'")));
+    let filter = p.agent_id.map(|t| format!("agent_id = '{}'", t.replace('\'', "\\'")));
 
     // Over-fetch message-hits, then collapse to one (best-scored) per agent so
     // the caller gets `limit` DISTINCT conversations, not every message of a hot
@@ -162,8 +162,8 @@ fn hit_from_doc(doc: &serde_json::Value) -> ConvHit {
     // whole message; keeps the framed reply small (see HIT_SNIPPET_CHARS).
     let text: String = str_field("text").chars().take(HIT_SNIPPET_CHARS).collect();
     ConvHit::from_parts(&cp_wire::types::payload::query::HitParts {
-        agent_id: &str_field("thread_id"),
-        agent_name: &str_field("thread_name"),
+        agent_id: &str_field("agent_id"),
+        agent_name: &str_field("agent_name"),
         author: &str_field("author"),
         text: &text,
         ts_ms: doc.get("ts_ms").and_then(serde_json::Value::as_u64).unwrap_or(0),
@@ -187,8 +187,8 @@ mod tests {
         let json = serde_json::json!({
             "hits": [ {
                 "id": "T3-2",
-                "thread_id": "T3",
-                "thread_name": "Auth",
+                "agent_id": "A3",
+                "agent_name": "Auth",
                 "author": "user",
                 "text": "the token check",
                 "ts_ms": 42u64,
@@ -196,7 +196,7 @@ mod tests {
             } ]
         });
         let h = only_hit(&json);
-        assert_eq!(h.agent_id, "T3");
+        assert_eq!(h.agent_id, "A3");
         assert_eq!(h.agent_name, "Auth");
         assert_eq!(h.author, "user");
         assert_eq!(h.text, "the token check");
@@ -211,8 +211,8 @@ mod tests {
 
     #[test]
     fn parse_hits_tolerates_missing_fields() {
-        let h = only_hit(&serde_json::json!({ "hits": [ { "thread_id": "T1" } ] }));
-        assert_eq!(h.agent_id, "T1");
+        let h = only_hit(&serde_json::json!({ "hits": [ { "agent_id": "A1" } ] }));
+        assert_eq!(h.agent_id, "A1");
         assert_eq!(h.text, "");
         assert_eq!(h.ts_ms, 0);
     }

@@ -61,11 +61,16 @@ pub(crate) struct BootPanels {
 /// initialised modules yet — the focus normally lives in the worker file this
 /// pointer selects, so reading it the usual way would be circular.
 fn saved_focus_pointer(shared: &SharedConfig) -> Option<&str> {
-    shared.modules.get("threads")?.get("focus_file")?.as_str()
+    shared.modules.get("agents")?.get("focus_file")?.as_str()
 }
 
 /// Phase 1: Load config.json and worker state from disk.
 pub(crate) fn boot_load_config() -> BootConfig {
+    // One-shot T860 store migration (threads → agents, T<n> → A<n>); must run
+    // before anything reads config.json or the worker files.
+    if let Err(e) = cp_mod_agents::types::migrate::upgrade_store(std::path::Path::new(STORE_DIR)) {
+        log::error!("threads→agents store migration failed, retrying next boot: {e}");
+    }
     let shared = config::load_config().unwrap_or_default();
     let worker_id = worker::focused_worker_id(saved_focus_pointer(&shared), worker::exists);
     let worker = worker::load_worker(&worker_id).unwrap_or_default();

@@ -59,7 +59,7 @@ pub struct Notification {
     /// executing agent (whose inbox holds it); `Read`-ing that agent clears
     /// it. `None` only before any agent is placed.
     #[serde(default)]
-    #[serde(rename = "thread_id")]
+    #[serde(alias = "thread_id")]
     pub agent_id: Option<String>,
 }
 

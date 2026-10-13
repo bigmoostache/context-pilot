@@ -47,7 +47,7 @@ pub(super) struct BranchPoint<'point> {
 /// `on_user_message` hook (D4) when a first message was seeded.
 pub(super) fn apply_create_agent(state: &mut State, name: &str, seed: &Seed<'_>) -> String {
     let ts = AgentsState::get_mut(state);
-    let id = format!("T{}", ts.next_id);
+    let id = format!("A{}", ts.next_id);
     ts.next_id = ts.next_id.saturating_add(1);
 
     ts.agents.push(cp_mod_agents::types::Agent::new(id.clone(), name.to_owned()));

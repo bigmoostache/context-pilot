@@ -221,8 +221,8 @@ fn inspect_agents(state: &Mutex<Backend>, folder: &str) -> (usize, bool, u64, St
     let empty_arr = Vec::new();
     let agents = config
         .get("modules")
-        .and_then(|m| m.get("threads"))
-        .and_then(|t| t.get("threads"))
+        .and_then(|m| m.get("agents"))
+        .and_then(|t| t.get("agents"))
         .and_then(serde_json::Value::as_array)
         .unwrap_or(&empty_arr);
 

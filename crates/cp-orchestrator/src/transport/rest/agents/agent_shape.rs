@@ -149,7 +149,7 @@ pub(crate) fn attach_disk_tasks(details: &mut [serde_json::Value], config: Optio
         };
         let tasks: Vec<serde_json::Value> = todos
             .iter()
-            .filter(|todo| todo.get("thread_id").and_then(serde_json::Value::as_str) == Some(tid.as_str()))
+            .filter(|todo| todo.get("agent_id").or_else(|| todo.get("thread_id")).and_then(serde_json::Value::as_str) == Some(tid.as_str()))
             .filter(|todo| todo.get("status").and_then(serde_json::Value::as_str) != Some("cancelled"))
             .map(disk_task_json)
             .collect();
@@ -201,7 +201,7 @@ pub(crate) fn attach_disk_notes(details: &mut [serde_json::Value], config: Optio
         };
         let notes: Vec<serde_json::Value> = cells
             .iter()
-            .filter(|cell| cell.get("thread_id").and_then(serde_json::Value::as_str) == Some(tid.as_str()))
+            .filter(|cell| cell.get("agent_id").or_else(|| cell.get("thread_id")).and_then(serde_json::Value::as_str) == Some(tid.as_str()))
             .map(disk_note_json)
             .collect();
         if let Some(obj) = detail.as_object_mut() {
@@ -273,7 +273,7 @@ pub(crate) fn reshape_agent(raw: &serde_json::Value, fleet_id: &str) -> serde_js
         "unread": unread,
         "archived": raw.get("archived").and_then(serde_json::Value::as_bool).unwrap_or(false),
         "paused": raw.get("paused").and_then(serde_json::Value::as_bool).unwrap_or(false),
-        "branchedFrom": raw.pointer("/origin/thread_id").and_then(serde_json::Value::as_str),
+        "branchedFrom": raw.pointer("/origin/agent_id").or_else(|| raw.pointer("/origin/thread_id")).and_then(serde_json::Value::as_str),
         "log": log,
         "tasks": serde_json::Value::Array(Vec::new()),
         "notes": serde_json::Value::Array(Vec::new()),

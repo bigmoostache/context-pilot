@@ -44,7 +44,10 @@ const STATES_DIR: &str = "states";
 
 /// Directory holding per-agent message files (`<agent_id>.json`). The agent
 /// keeps only slim agent metadata in `config.json`; messages live here.
-const AGENTS_DIR: &str = "threads";
+const AGENTS_DIR: &str = "agents";
+
+/// Pre-T860 name of [`AGENTS_DIR`], read when the agent binary is older.
+const LEGACY_AGENTS_DIR: &str = "threads";
 
 /// Directory holding large global modules saved outside `config.json`
 /// (`<module_id>.json`, e.g. `tree`, `todo`), rewritten only when they change.
@@ -119,7 +122,9 @@ impl StateReader {
         let path = folder.join(CP_DIR).join(CONFIG_FILE);
         let cache = self.agents.entry(folder.to_path_buf()).or_default();
         let mut config = read_cached_json(&path, &mut cache.config)?;
-        hydrate_agent_messages(&folder.join(CP_DIR).join(AGENTS_DIR), &mut config, &mut cache.agents);
+        let legacy = normalize_legacy_agents(&mut config);
+        let dir = if legacy { LEGACY_AGENTS_DIR } else { AGENTS_DIR };
+        hydrate_agent_messages(&folder.join(CP_DIR).join(dir), &mut config, &mut cache.agents);
         overlay_module_files(&folder.join(CP_DIR).join(MODULES_DIR), &mut config, &mut cache.modules);
         Ok(config)
     }
@@ -179,11 +184,28 @@ fn overlay_module_files(modules_dir: &Path, config: &mut Value, cache: &mut Hash
     }
 }
 
+/// Rename a pre-T860 `modules.threads.threads` to `modules.agents.agents` in
+/// memory, so readers only know the new shape. Returns whether it was legacy.
+fn normalize_legacy_agents(config: &mut Value) -> bool {
+    let Some(modules) = config.get_mut("modules").and_then(Value::as_object_mut) else { return false };
+    if modules.contains_key("agents") {
+        return false;
+    }
+    let Some(mut module) = modules.remove("threads") else { return false };
+    if let Some(obj) = module.as_object_mut()
+        && let Some(list) = obj.remove("threads")
+    {
+        let _prev = obj.insert("agents".to_owned(), list);
+    }
+    let _prev = modules.insert("agents".to_owned(), module);
+    true
+}
+
 /// Splice `messages` from `<agents_dir>/<id>.json` into every agent entry of
 /// `config` lacking them. Legacy configs (inline messages) pass through as-is;
 /// a missing/unreadable file leaves the entry without messages.
 fn hydrate_agent_messages(agents_dir: &Path, config: &mut Value, cache: &mut HashMap<String, CachedJson>) {
-    let Some(entries) = config.pointer_mut("/modules/threads/threads").and_then(Value::as_array_mut) else {
+    let Some(entries) = config.pointer_mut("/modules/agents/agents").and_then(Value::as_array_mut) else {
         return;
     };
     for entry in entries {
@@ -305,7 +327,7 @@ mod tests {
     fn read_config_caches_and_returns_on_mtime_hit() {
         let dir = tempdir().expect("dir");
         let folder = dir.path();
-        let val = serde_json::json!({"modules": {"threads": []}});
+        let val = serde_json::json!({"modules": {"agents": []}});
         write_config(folder, &val);
 
         let mut reader = StateReader::new();
@@ -375,7 +397,7 @@ mod tests {
     }
 
     #[test]
-    fn read_config_hydrates_slim_agents_from_files() {
+    fn read_config_hydrates_legacy_threads_layout() {
         let dir = tempdir().expect("dir");
         let folder = dir.path();
         let cfg = serde_json::json!({"modules": {"threads": {"threads": [
@@ -384,7 +406,7 @@ mod tests {
             {"id": "T3", "name": "no file"},
         ]}}});
         write_config(folder, &cfg);
-        let tdir = folder.join(CP_DIR).join(AGENTS_DIR);
+        let tdir = folder.join(CP_DIR).join(LEGACY_AGENTS_DIR);
         fs::create_dir_all(&tdir).expect("mkdir");
         let t1 = serde_json::json!({"id": "T1", "messages": [{"content": "from file"}]});
         fs::write(tdir.join("T1.json"), serde_json::to_vec(&t1).expect("ser")).expect("write");
@@ -392,9 +414,9 @@ mod tests {
         let mut reader = StateReader::new();
         let read = reader.read_config(folder).expect("read");
         let at = |i: &str| read.pointer(i).and_then(Value::as_str);
-        assert_eq!(at("/modules/threads/threads/0/messages/0/content"), Some("from file"));
-        assert_eq!(at("/modules/threads/threads/1/messages/0/content"), Some("inline"));
-        assert!(read.pointer("/modules/threads/threads/2/messages").is_none());
+        assert_eq!(at("/modules/agents/agents/0/messages/0/content"), Some("from file"));
+        assert_eq!(at("/modules/agents/agents/1/messages/0/content"), Some("inline"));
+        assert!(read.pointer("/modules/agents/agents/2/messages").is_none());
     }
 
     #[test]

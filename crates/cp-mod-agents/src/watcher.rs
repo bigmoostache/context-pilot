@@ -166,7 +166,7 @@ impl Watcher for IdleMyTurnDetector {
     }
 
     fn source_tag(&self) -> &'static str {
-        "threads"
+        "agents"
     }
 
     fn is_persistent(&self) -> bool {
