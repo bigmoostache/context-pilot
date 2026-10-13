@@ -32,6 +32,29 @@ pub(super) fn confined_path(root: &str, relative: &str) -> Option<PathBuf> {
     canonical.starts_with(&root_canonical).then_some(canonical)
 }
 
+/// Read-only roots a preview may reach outside the fleet folder: agents
+/// write scratch files (prompts, reports) to `/tmp` and cite them in cards.
+const PREVIEW_EXTRA_ROOTS: &[&str] = &["/tmp"];
+
+/// [`confined_path`] widened with [`PREVIEW_EXTRA_ROOTS`] — for read-only
+/// preview endpoints only, never for listing or writes. Roots are
+/// canonicalized too (`/tmp` → `/private/tmp` on macOS).
+pub(super) fn previewable_path(root: &str, relative: &str) -> Option<PathBuf> {
+    if let Some(inside) = confined_path(root, relative) {
+        return Some(inside);
+    }
+    let abs = Path::new(relative);
+    if !abs.is_absolute() {
+        return None;
+    }
+    let canonical = abs.canonicalize().ok()?;
+    PREVIEW_EXTRA_ROOTS
+        .iter()
+        .filter_map(|r| Path::new(r).canonicalize().ok())
+        .any(|r| canonical.starts_with(r))
+        .then_some(canonical)
+}
+
 /// Count the non-hidden direct children of a directory.
 ///
 /// Used to annotate folder nodes with an item count for the Finder views.

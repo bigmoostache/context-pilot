@@ -6,7 +6,9 @@ use std::sync::Mutex;
 use crate::transport::Backend;
 use crate::transport::rest::HttpReply;
 
-use super::support::{confined_path, count_visible_children, extract_param, fleet_folder, infer_kind};
+use super::support::{
+    confined_path, count_visible_children, extract_param, fleet_folder, infer_kind, previewable_path,
+};
 
 /// `GET /api/fleet/{id}/fs/descriptions` — the agent's tree descriptions.
 ///
@@ -151,7 +153,7 @@ pub(crate) fn fs_preview(state: &Mutex<Backend>, fleet_id: &str, query: &str) ->
         Some(p) if !p.is_empty() => p,
         _ => return HttpReply::error(400, "missing path parameter"),
     };
-    let Some(target) = confined_path(&folder, &relative) else {
+    let Some(target) = previewable_path(&folder, &relative) else {
         return HttpReply::error(403, "path outside agent realm");
     };
     if !target.is_file() {
