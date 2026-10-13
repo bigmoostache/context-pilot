@@ -37,8 +37,8 @@ import {
   postApiClaudeAccountsStore,
   postApiClaudeAccountsSwitch,
   deleteApiClaudeAccountsByEmail,
-  getApiFleetMeta,
-  getApiFleetRetired,
+  getApiFleetsMeta,
+  getApiFleetsRetired,
   getApiAgentByIdMeta,
   getApiAgentByIdMetrics,
   getApiAgentByIdVitals,
@@ -53,7 +53,7 @@ import {
   postApiUpdateApply,
   putApiUpdateMode,
   getApiMetrics,
-  postApiFleetCreate,
+  postApiFleetsCreate,
   postApiAgentByIdRestart,
   postApiAgentByIdRetire,
   postApiAgentByIdUnretire,
@@ -97,11 +97,11 @@ export type { ConvHit } from "./generated/types.gen"
 // ── Fleet (SDK) ───────────────────────────────────────────────────────
 
 export function fetchFleet(): Promise<Agent[]> {
-  return sdk(getApiFleetMeta())
+  return sdk(getApiFleetsMeta())
 }
 
 export function fetchRetiredFleet(): Promise<Agent[]> {
-  return sdk(getApiFleetRetired())
+  return sdk(getApiFleetsRetired())
 }
 
 // ── Agent lifecycle (SDK) ─────────────────────────────────────────────
@@ -111,7 +111,7 @@ export function createAgent(body: {
   folder?: string
   model?: string
 }): Promise<CreateAgentReceipt> {
-  return sdk(postApiFleetCreate({ body }))
+  return sdk(postApiFleetsCreate({ body }))
 }
 
 export function restartAgent(agentId: string): Promise<RestartReceipt> {

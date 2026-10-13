@@ -284,7 +284,7 @@ mod tests {
         }
 
         // The server is still healthy after the soak: a plain REST call answers.
-        let fleet = common::get(&addr, "/api/fleet", &[]);
+        let fleet = common::get(&addr, "/api/fleets", &[]);
         assert_eq!(fleet.status, 200, "the server stays healthy after the soak");
     }
 

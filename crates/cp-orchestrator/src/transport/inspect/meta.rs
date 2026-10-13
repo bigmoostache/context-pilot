@@ -4,7 +4,7 @@
 //!
 //! * [`agent_meta`] — one agent's enriched info (`GET /api/agent/{id}/meta`).
 //! * [`fleet_meta`] — all known agents as an enriched array
-//!   (`GET /api/fleet/meta`).
+//!   (`GET /api/fleets/meta`).
 
 use std::sync::Mutex;
 
@@ -28,7 +28,7 @@ pub fn agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     HttpReply::ok(&enriched)
 }
 
-/// `GET /api/fleet/meta` — enriched agent list for the fleet dashboard.
+/// `GET /api/fleets/meta` — enriched agent list for the fleet dashboard.
 ///
 /// Returns an array of maquette-compatible `Agent` objects, one per known
 /// agent in the registry directory. Each is built the same way as the
@@ -66,7 +66,7 @@ pub fn fleet(state: &Mutex<Backend>, auth_user: Option<&crate::services::auth::t
     HttpReply::ok(&agents)
 }
 
-/// `GET /api/fleet/retired` — the dashboard's Retired (archived) section.
+/// `GET /api/fleets/retired` — the dashboard's Retired (archived) section.
 ///
 /// Returns one maquette-`Agent`-shaped object per retired agent, built from the
 /// orchestrator's [`RetiredStore`](crate::services::retire::RetiredStore) snapshot rather

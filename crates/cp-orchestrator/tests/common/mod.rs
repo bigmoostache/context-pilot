@@ -34,7 +34,7 @@ mod inner {
     pub(crate) struct ReqSpec<'spec> {
         /// HTTP method (`GET`, `POST`, …).
         pub method: &'spec str,
-        /// Request path (e.g. `/api/fleet`).
+        /// Request path (e.g. `/api/fleets`).
         pub path: &'spec str,
         /// Extra request headers.
         pub headers: &'spec [(&'spec str, &'spec str)],

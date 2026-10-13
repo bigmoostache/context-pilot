@@ -23,7 +23,7 @@
 //!
 //! | Method | Path | Handler |
 //! |---|---|---|
-//! | `GET`  | `/api/fleet` | [`rest::fleet`] |
+//! | `GET`  | `/api/fleets` | [`rest::fleet`] |
 //! | `GET`  | `/api/agent/{id}` | [`rest::agent`] |
 //! | `POST` | `/api/agent/{id}/command` | [`rest::command`] |
 //! | `GET`  | `/api/stream?agent={id}&ticket={t}` | SSE (this module) |
@@ -316,6 +316,6 @@ mod tests {
             split_url("/api/stream?agent=a1&ticket=x"),
             ("/api/stream".to_owned(), "agent=a1&ticket=x".to_owned())
         );
-        assert_eq!(split_url("/api/fleet"), ("/api/fleet".to_owned(), String::new()));
+        assert_eq!(split_url("/api/fleets"), ("/api/fleets".to_owned(), String::new()));
     }
 }

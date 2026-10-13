@@ -5597,7 +5597,7 @@
         ]
       }
     },
-    "/api/fleet": {
+    "/api/fleets": {
       "get": {
         "responses": {
           "200": {
@@ -5623,11 +5623,11 @@
         },
         "summary": "Raw fleet view (rev-envelope)",
         "tags": [
-          "fleet"
+          "fleets"
         ]
       }
     },
-    "/api/fleet/create": {
+    "/api/fleets/create": {
       "post": {
         "requestBody": {
           "content": {
@@ -5677,11 +5677,11 @@
         },
         "summary": "Create a new agent",
         "tags": [
-          "fleet"
+          "fleets"
         ]
       }
     },
-    "/api/fleet/meta": {
+    "/api/fleets/meta": {
       "get": {
         "responses": {
           "200": {
@@ -5710,11 +5710,11 @@
         },
         "summary": "List all agents (enriched)",
         "tags": [
-          "fleet"
+          "fleets"
         ]
       }
     },
-    "/api/fleet/retired": {
+    "/api/fleets/retired": {
       "get": {
         "responses": {
           "200": {
@@ -5743,7 +5743,7 @@
         },
         "summary": "List retired agents",
         "tags": [
-          "fleet"
+          "fleets"
         ]
       }
     },
@@ -6224,7 +6224,7 @@
         },
         "summary": "Fleet-wide metrics",
         "tags": [
-          "fleet"
+          "fleets"
         ]
       }
     },

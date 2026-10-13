@@ -33,15 +33,15 @@ pub(super) fn paths() -> Value {
             "responses": merge(ok(arr(r("ProviderDef"))), err())
         }}),
         // ── Fleet ───────────────────────────────────────────────────
-        "/api/fleet": get("fleet", "Raw fleet view (rev-envelope)", json!({ "type": "object" })),
-        "/api/fleet/meta": get("fleet", "List all agents (enriched)", arr(r("Agent"))),
-        "/api/fleet/retired": get("fleet", "List retired agents", arr(r("Agent"))),
-        "/api/fleet/create": post("fleet", "Create a new agent", Some(json!({
+        "/api/fleets": get("fleets", "Raw fleet view (rev-envelope)", json!({ "type": "object" })),
+        "/api/fleets/meta": get("fleets", "List all agents (enriched)", arr(r("Agent"))),
+        "/api/fleets/retired": get("fleets", "List retired agents", arr(r("Agent"))),
+        "/api/fleets/create": post("fleets", "Create a new agent", Some(json!({
             "type": "object",
             "properties": { "name": { "type": "string" }, "folder": { "type": "string" }, "model": { "type": "string" } },
             "required": ["name"]
         })), r("CreateAgentReceipt")),
-        "/api/metrics": get("fleet", "Fleet-wide metrics", arr(r("AgentMetrics"))),
+        "/api/metrics": get("fleets", "Fleet-wide metrics", arr(r("AgentMetrics"))),
         // ── Env-keys ────────────────────────────────────────────────
         "/api/env-keys": get("env", "List environment keys", arr(r("EnvKeyStatus"))),
         "/api/env-keys/{name}": merge(

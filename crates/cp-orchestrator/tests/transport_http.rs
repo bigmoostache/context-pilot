@@ -9,7 +9,7 @@
 //! reading, status codes, the ticket gate, and reconnect-replay-by-`rev` all
 //! work end-to-end on the wire.
 //!
-//! * **REST envelopes.** `GET /api/fleet` and `/api/agent/{id}` carry the
+//! * **REST envelopes.** `GET /api/fleets` and `/api/agent/{id}` carry the
 //!   `rev` they reflect; an unknown agent is a real `404`.
 //! * **Actions.** `POST /api/ticket` mints a token; `POST .../command` is a
 //!   real `400` on malformed input.
@@ -175,7 +175,7 @@ mod tests {
     fn rest_fleet_and_agent_carry_rev_envelopes() {
         let h = harness("agent-a", 3);
 
-        let fleet = common::get(&h.addr, "/api/fleet", &[]);
+        let fleet = common::get(&h.addr, "/api/fleets", &[]);
         assert_eq!(fleet.status, 200, "fleet served");
         assert!(fleet.body.contains("\"rev\""), "fleet wraps a rev envelope");
         assert!(fleet.body.contains("agent-a"), "the agent appears in the fleet");

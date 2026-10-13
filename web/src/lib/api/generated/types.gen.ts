@@ -2686,23 +2686,23 @@ export type GetApiFeaturesResponses = {
 
 export type GetApiFeaturesResponse = GetApiFeaturesResponses[keyof GetApiFeaturesResponses];
 
-export type GetApiFleetData = {
+export type GetApiFleetsData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/api/fleet';
+    url: '/api/fleets';
 };
 
-export type GetApiFleetErrors = {
+export type GetApiFleetsErrors = {
     /**
      * Error
      */
     default: Error;
 };
 
-export type GetApiFleetError = GetApiFleetErrors[keyof GetApiFleetErrors];
+export type GetApiFleetsError = GetApiFleetsErrors[keyof GetApiFleetsErrors];
 
-export type GetApiFleetResponses = {
+export type GetApiFleetsResponses = {
     /**
      * Success
      */
@@ -2711,9 +2711,9 @@ export type GetApiFleetResponses = {
     };
 };
 
-export type GetApiFleetResponse = GetApiFleetResponses[keyof GetApiFleetResponses];
+export type GetApiFleetsResponse = GetApiFleetsResponses[keyof GetApiFleetsResponses];
 
-export type PostApiFleetCreateData = {
+export type PostApiFleetsCreateData = {
     body: {
         folder?: string;
         model?: string;
@@ -2721,76 +2721,76 @@ export type PostApiFleetCreateData = {
     };
     path?: never;
     query?: never;
-    url: '/api/fleet/create';
+    url: '/api/fleets/create';
 };
 
-export type PostApiFleetCreateErrors = {
+export type PostApiFleetsCreateErrors = {
     /**
      * Error
      */
     default: Error;
 };
 
-export type PostApiFleetCreateError = PostApiFleetCreateErrors[keyof PostApiFleetCreateErrors];
+export type PostApiFleetsCreateError = PostApiFleetsCreateErrors[keyof PostApiFleetsCreateErrors];
 
-export type PostApiFleetCreateResponses = {
+export type PostApiFleetsCreateResponses = {
     /**
      * Success
      */
     200: CreateAgentReceipt;
 };
 
-export type PostApiFleetCreateResponse = PostApiFleetCreateResponses[keyof PostApiFleetCreateResponses];
+export type PostApiFleetsCreateResponse = PostApiFleetsCreateResponses[keyof PostApiFleetsCreateResponses];
 
-export type GetApiFleetMetaData = {
+export type GetApiFleetsMetaData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/api/fleet/meta';
+    url: '/api/fleets/meta';
 };
 
-export type GetApiFleetMetaErrors = {
+export type GetApiFleetsMetaErrors = {
     /**
      * Error
      */
     default: Error;
 };
 
-export type GetApiFleetMetaError = GetApiFleetMetaErrors[keyof GetApiFleetMetaErrors];
+export type GetApiFleetsMetaError = GetApiFleetsMetaErrors[keyof GetApiFleetsMetaErrors];
 
-export type GetApiFleetMetaResponses = {
+export type GetApiFleetsMetaResponses = {
     /**
      * Success
      */
     200: Array<Agent>;
 };
 
-export type GetApiFleetMetaResponse = GetApiFleetMetaResponses[keyof GetApiFleetMetaResponses];
+export type GetApiFleetsMetaResponse = GetApiFleetsMetaResponses[keyof GetApiFleetsMetaResponses];
 
-export type GetApiFleetRetiredData = {
+export type GetApiFleetsRetiredData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/api/fleet/retired';
+    url: '/api/fleets/retired';
 };
 
-export type GetApiFleetRetiredErrors = {
+export type GetApiFleetsRetiredErrors = {
     /**
      * Error
      */
     default: Error;
 };
 
-export type GetApiFleetRetiredError = GetApiFleetRetiredErrors[keyof GetApiFleetRetiredErrors];
+export type GetApiFleetsRetiredError = GetApiFleetsRetiredErrors[keyof GetApiFleetsRetiredErrors];
 
-export type GetApiFleetRetiredResponses = {
+export type GetApiFleetsRetiredResponses = {
     /**
      * Success
      */
     200: Array<Agent>;
 };
 
-export type GetApiFleetRetiredResponse = GetApiFleetRetiredResponses[keyof GetApiFleetRetiredResponses];
+export type GetApiFleetsRetiredResponse = GetApiFleetsRetiredResponses[keyof GetApiFleetsRetiredResponses];
 
 export type GetApiHealthData = {
     body?: never;

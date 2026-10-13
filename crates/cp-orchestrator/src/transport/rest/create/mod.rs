@@ -1,4 +1,4 @@
-//! `POST /api/fleet/create` + `POST /api/agent/{id}/library/command` —
+//! `POST /api/fleets/create` + `POST /api/agent/{id}/library/command` —
 //! create agents and prompt-library commands.
 //!
 //! Split out of [`rest`](super) for the 500-line file budget. Owns the
@@ -32,7 +32,7 @@ fn folder_id(path: &str) -> String {
     format!("{hash:016x}")
 }
 
-/// `POST /api/fleet/create` — create a new agent and spawn it on a pty.
+/// `POST /api/fleets/create` — create a new agent and spawn it on a pty.
 ///
 /// Body: `{ "name": "...", "folder": "...?", "model": "...?" }`. `name` is
 /// required; `folder` defaults to `<agents_root>/<slug(name)>`; `model` is
@@ -153,7 +153,7 @@ pub(super) fn slugify(name: &str) -> String {
     if trimmed.is_empty() { "untitled".to_owned() } else { trimmed.to_owned() }
 }
 
-/// The `POST /api/fleet/create` request body.
+/// The `POST /api/fleets/create` request body.
 ///
 /// A `model` field, if sent by the client, is silently ignored (serde does not
 /// deny unknown fields) — the `cp` TUI has no `--model` flag yet, so a new

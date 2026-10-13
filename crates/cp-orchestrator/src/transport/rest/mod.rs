@@ -118,7 +118,7 @@ pub struct CommandReceipt {
     pub status: String,
 }
 
-/// `GET /api/fleet` — every known agent's projected view.
+/// `GET /api/fleets` — every known agent's projected view.
 ///
 /// The envelope `rev` is the maximum `rev` across all agents, so a client can
 /// open one fleet-wide stream from that point.

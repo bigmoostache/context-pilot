@@ -116,7 +116,7 @@ export function useRestartAgent() {
 
 /**
  * The Retired (archived) fleet — agents stopped-but-kept (T271). Served from
- * the orchestrator's retired store (`GET /api/fleet/retired`), so each card is
+ * the orchestrator's retired store (`GET /api/fleets/retired`), so each card is
  * rendered from a snapshot, not a live process. No SSE bridge (a retired agent
  * emits nothing); a slow poll keeps it eventually-consistent after a retire /
  * unretire on another tab.

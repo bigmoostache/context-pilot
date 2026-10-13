@@ -214,7 +214,7 @@ mod tests {
     #[test]
     fn canonicalize_erases_param_names() {
         assert_eq!(canonicalize_spec_path("/api/agent/{id}/acl/{userId}"), "/api/agent/{}/acl/{}");
-        assert_eq!(canonicalize_spec_path("/api/fleet"), "/api/fleet");
+        assert_eq!(canonicalize_spec_path("/api/fleets"), "/api/fleets");
         assert_eq!(canonicalize_spec_path("/api/env-keys/{name}"), "/api/env-keys/{}");
     }
 

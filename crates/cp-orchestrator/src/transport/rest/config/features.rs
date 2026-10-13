@@ -72,7 +72,7 @@ mod tests {
     #[test]
     fn gate_ignores_unrelated_routes() {
         let all_off = Feature::ALL.iter().fold(Features::default(), |acc, feature| acc.with(*feature, false));
-        for segments in [&["api", "health"][..], &["api", "features"], &["api", "fleet", "meta"], &["api", "env-keys"]]
+        for segments in [&["api", "health"][..], &["api", "features"], &["api", "fleets", "meta"], &["api", "env-keys"]]
         {
             assert!(gate(segments, all_off).is_none(), "{segments:?}");
         }

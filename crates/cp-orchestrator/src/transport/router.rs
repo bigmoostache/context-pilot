@@ -97,9 +97,9 @@ pub(super) fn route_rest(method: &Method, segments: &[&str], ctx: RouteCtx<'_>) 
         (&Method::Delete, &["api", "agent", id, "acl", user_id]) => auth::acl_revoke(state, id, user_id, auth_user),
 
         // ── Fleet + agent routes ────────────────────────────────────
-        (&Method::Get, &["api", "fleet"]) => rest::fleet(state, auth_user),
-        (&Method::Get, &["api", "fleet", "meta"]) => inspect::meta::fleet(state, auth_user),
-        (&Method::Get, &["api", "fleet", "retired"]) => inspect::meta::fleet_retired(state, auth_user),
+        (&Method::Get, &["api", "fleets"]) => rest::fleet(state, auth_user),
+        (&Method::Get, &["api", "fleets", "meta"]) => inspect::meta::fleet(state, auth_user),
+        (&Method::Get, &["api", "fleets", "retired"]) => inspect::meta::fleet_retired(state, auth_user),
         (&Method::Get, &["api", "metrics"]) => inspect::metrics::fleet(state, auth_user),
 
         // ── Env-key inspection (T399) + editing (T404) ────────────
@@ -175,7 +175,7 @@ pub(super) fn route_rest(method: &Method, segments: &[&str], ctx: RouteCtx<'_>) 
         (&Method::Post, &["api", "agent", id, "rename"]) => rest::rename_agent(state, id, body_bytes),
         (&Method::Post, &["api", "agent", id, "avatar"]) => rest::upload_avatar(state, id, body_bytes),
         (&Method::Delete, &["api", "agent", id, "avatar"]) => rest::delete_avatar(state, id),
-        (&Method::Post, &["api", "fleet", "create"]) => rest::create_agent(state, body_bytes, auth_user),
+        (&Method::Post, &["api", "fleets", "create"]) => rest::create_agent(state, body_bytes, auth_user),
         (&Method::Post, &["api", "ticket"]) => rest::mint_ticket(state, auth_user),
 
         // ── Release + update management — IT surface (can_manage_it) ──
