@@ -40,11 +40,11 @@ const statusOrder: Record<AgentStatus, number> = {
  * trigger keeps the same shape but shows a neutral **"Select an agent"**
  * placeholder, so the header entry point never disappears.
  */
-export function AgentSwitcher({
+export function FleetSwitcher({
   agents,
   activeId,
   onSwitch,
-  onManageAgents,
+  onManageFleets,
   rail = false,
   open,
   onOpenChange,
@@ -56,7 +56,7 @@ export function AgentSwitcher({
   onSwitch: (id: string) => void
   /** open the fleet dashboard — the sole place agents are created/managed
    *  (T685: this replaces the removed TopBar home button). */
-  onManageAgents?: (() => void) | undefined
+  onManageFleets?: (() => void) | undefined
   /** Vertical-rail variant: the trigger collapses to the agent glyph alone.
    *  The rail is 56px wide, so the workspace NAME and the chevron have nowhere
    *  to go — and truncating a name to three letters conveys less than the
@@ -99,10 +99,10 @@ export function AgentSwitcher({
         side={rail ? "right" : "bottom"}
         sideOffset={6}
       >
-        {onManageAgents && (
+        {onManageFleets && (
           <>
             <DropdownMenuItem
-              onClick={onManageAgents}
+              onClick={onManageFleets}
               className={cn(
                 "flex items-center gap-2.5 py-1.5 font-medium",
                 "focus:bg-[color-mix(in_oklab,var(--signal)_11%,transparent)]! focus:text-foreground!",
@@ -141,10 +141,10 @@ export function AgentSwitcher({
                   "data-highlighted:bg-[color-mix(in_oklab,var(--signal)_11%,transparent)]! data-highlighted:text-foreground!",
                 )}
               >
-                <AgentDot
+                <FleetDot
                   accent={a.accent}
                   status={a.status}
-                  agentId={a.id}
+                  fleetId={a.id}
                   hasAvatar={a.hasAvatar}
                 />
                 <div className="flex min-w-0 flex-1 leading-tight">
@@ -179,16 +179,16 @@ export function AgentSwitcher({
 /** The switcher trigger's contents: agent glyph, workspace name, chevron. In
  *  `rail` mode the name and chevron are dropped — the 56px rail has no room for
  *  either, and the avatar already identifies the workspace. Extracted from
- *  {@link AgentSwitcher} so that component stays within the 150-line budget. */
+ *  {@link FleetSwitcher} so that component stays within the 150-line budget. */
 function TriggerFace({ active, rail }: { active: Agent | undefined; rail: boolean }) {
   return (
     <>
       {active ? (
         <>
-          <AgentDot
+          <FleetDot
             accent={active.accent}
             status={active.status}
-            agentId={active.id}
+            fleetId={active.id}
             hasAvatar={active.hasAvatar}
             compact
           />
@@ -213,16 +213,16 @@ function TriggerFace({ active, rail }: { active: Agent | undefined; rail: boolea
   )
 }
 
-function AgentDot({
+function FleetDot({
   accent,
   status,
-  agentId,
+  fleetId,
   hasAvatar,
   compact = false,
 }: {
   accent: Agent["accent"]
   status: AgentStatus
-  agentId?: string | undefined
+  fleetId?: string | undefined
   hasAvatar?: boolean | undefined
   /** trigger variant — a smaller 20px glyph so the switcher matches the
    *  view-toggle pill height; the menu rows keep the default 28px dot. */
@@ -235,9 +235,9 @@ function AgentDot({
         compact ? "size-5" : "size-7",
       )}
     >
-      {hasAvatar && agentId ? (
+      {hasAvatar && fleetId ? (
         <img
-          src={avatarUrl(agentId)}
+          src={avatarUrl(fleetId)}
           alt=""
           className={cn("rounded-md object-cover", compact ? "size-5" : "size-7")}
         />

@@ -52,7 +52,7 @@ function messageTsOf(msg: ThreadMsg): number {
  * is auto-selected once it appears, exactly like a plain create.
  */
 export function useThreadBranch(
-  activeAgentId: string,
+  activeFleetId: string,
   sel: AutoSelect,
   flash: (msg: string) => void,
 ): BranchActions {
@@ -75,7 +75,7 @@ export function useThreadBranch(
       setBranchTarget(null)
       const content = buildCombinedContent(opts.firstMessage, opts.files, true)
       sel.armAutoSelect()
-      sendCommand(activeAgentId, {
+      sendCommand(activeFleetId, {
         kind: "branch_thread",
         source_thread_id: branchTarget.threadId,
         message_ts: branchTarget.messageTs,
@@ -87,7 +87,7 @@ export function useThreadBranch(
         flash(describeCommandError("branch the thread", e))
       })
     },
-    [activeAgentId, branchTarget, flash, sel],
+    [activeFleetId, branchTarget, flash, sel],
   )
 
   return { branchTarget, openBranch, closeBranch, handleBranch }

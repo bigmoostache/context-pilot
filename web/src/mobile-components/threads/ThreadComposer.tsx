@@ -29,7 +29,7 @@ export type { CommandSuggestion } from "@/mobile-components/threads/fileUpload/h
  */
 function resolveComposerBanner(
   paused: boolean,
-  agentBusy: boolean,
+  fleetBusy: boolean,
   streaming: boolean,
   focused: boolean,
 ): Banner | null {
@@ -41,7 +41,7 @@ function resolveComposerBanner(
       text: "Thread paused — the agent won't respond until resumed.",
     }
   }
-  if (!agentBusy) return null
+  if (!fleetBusy) return null
   if (streaming) {
     return { working: true, paused: false, color: "var(--ok)", text: "Agent is streaming…" }
   }
@@ -341,8 +341,8 @@ export function ThreadComposer({
 
   const userTurn = status === "THEIR_TURN"
   const streaming = status === "ACTIVE"
-  const agentBusy = !userTurn
-  const banner = resolveComposerBanner(paused, agentBusy, streaming, focused)
+  const fleetBusy = !userTurn
+  const banner = resolveComposerBanner(paused, fleetBusy, streaming, focused)
 
   const sendable = composer.canSend(pendingFiles.length)
 

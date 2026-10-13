@@ -20,15 +20,15 @@ interface Draft {
 const EMPTY_DRAFT: Draft = { title: "", firstMessage: "", files: [], paused: false }
 
 /** Per-agent localStorage key for the in-progress new-thread draft. */
-function draftKey(agentId: string): string {
-  return `cp-newthread-${agentId}`
+function draftKey(fleetId: string): string {
+  return `cp-newthread-${fleetId}`
 }
 
 /** Hydrate the persisted draft for an agent, falling back to an empty draft on a
  *  missing / malformed entry (never throws into render). */
-function loadDraft(agentId: string): Draft {
+function loadDraft(fleetId: string): Draft {
   try {
-    const raw = localStorage.getItem(draftKey(agentId))
+    const raw = localStorage.getItem(draftKey(fleetId))
     if (!raw) return EMPTY_DRAFT
     const d = JSON.parse(raw) as Partial<Draft>
     return {
@@ -48,7 +48,7 @@ function loadDraft(agentId: string): Draft {
  *  `persist` = false (branch mode) keeps the draft in memory only: a branch
  *  draft is tied to one branch point, so it must not leak into the next one. */
 function useNewThreadDraft(
-  agentId: string,
+  fleetId: string,
   open: boolean,
   onCreate: (o: CreateThreadOpts) => void,
   persist: boolean,
@@ -56,7 +56,7 @@ function useNewThreadDraft(
   // Seed all composer state from the persisted per-agent draft (render-phase
   // initializer, runs once per mount). The dialog body unmounts on close (Base
   // UI only renders the Popup while open), so a reopen re-hydrates from here.
-  const initial = () => (persist ? loadDraft(agentId) : EMPTY_DRAFT)
+  const initial = () => (persist ? loadDraft(fleetId) : EMPTY_DRAFT)
   const [title, setTitle] = useState(() => initial().title)
   const [firstMessage, setFirstMessage] = useState(() => initial().firstMessage)
   const [files, setFiles] = useState<UploadedFile[]>(() => initial().files)
@@ -71,8 +71,8 @@ function useNewThreadDraft(
   useEffect(() => {
     if (!persist) return
     const draft: Draft = { title, firstMessage, files, paused }
-    localStorage.setItem(draftKey(agentId), JSON.stringify(draft))
-  }, [agentId, persist, title, firstMessage, files, paused])
+    localStorage.setItem(draftKey(fleetId), JSON.stringify(draft))
+  }, [fleetId, persist, title, firstMessage, files, paused])
 
   // Auto-grow the message editor to fit its content (like the thread composer):
   // reset to `auto`, then set to `scrollHeight`. The CSS `max-h-[44vh]` caps the
@@ -109,7 +109,7 @@ function useNewThreadDraft(
     setFiles([])
     setPaused(false)
     setErr(null)
-    if (persist) localStorage.removeItem(draftKey(agentId))
+    if (persist) localStorage.removeItem(draftKey(fleetId))
   }
 
   const submit = (e: React.SyntheticEvent) => {
@@ -134,7 +134,7 @@ function useNewThreadDraft(
     try {
       const added: UploadedFile[] = []
       for (const f of picked) {
-        const r = await uploadUnique(agentId, ".uploads", f)
+        const r = await uploadUnique(fleetId, ".uploads", f)
         added.push({
           path: r.path,
           name: r.name,
@@ -208,14 +208,14 @@ export function NewThreadDialog({
   open,
   onClose,
   onCreate,
-  agentId,
+  fleetId,
   branch,
 }: {
   open: boolean
   onClose: () => void
   onCreate: (opts: CreateThreadOpts) => void
   /** owning agent — scopes the draft key and receives on-attach uploads */
-  agentId: string
+  fleetId: string
   /** set = branch mode: the parent thread's name + an excerpt of the branch point */
   branch?: { parentName: string; excerpt: string } | undefined
 }) {
@@ -235,7 +235,7 @@ export function NewThreadDialog({
     submit,
     onKeyDown,
     addFiles,
-  } = useNewThreadDraft(agentId, open, onCreate, !branch)
+  } = useNewThreadDraft(fleetId, open, onCreate, !branch)
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(o) => !o && onClose()}>

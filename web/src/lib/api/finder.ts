@@ -32,26 +32,26 @@ export type { WriteResult, UploadResult, UploadUniqueResult } from "./generated/
 
 // ── GET endpoints (SDK) ──────────────────────────────────────────────
 
-export function fetchFs(agentId: string, path = ""): Promise<FinderNode[]> {
-  return sdk(getApiFleetByIdFs({ path: { id: agentId }, query: { path } }))
+export function fetchFs(fleetId: string, path = ""): Promise<FinderNode[]> {
+  return sdk(getApiFleetByIdFs({ path: { id: fleetId }, query: { path } }))
 }
 
-export function fetchDescriptions(agentId: string): Promise<Record<string, string>> {
-  return sdk(getApiFleetByIdFsDescriptions({ path: { id: agentId } }))
+export function fetchDescriptions(fleetId: string): Promise<Record<string, string>> {
+  return sdk(getApiFleetByIdFsDescriptions({ path: { id: fleetId } }))
 }
 
-export function fetchFsPreview(agentId: string, path: string): Promise<FsPreview> {
-  return sdk(getApiFleetByIdFsPreview({ path: { id: agentId }, query: { path } }))
+export function fetchFsPreview(fleetId: string, path: string): Promise<FsPreview> {
+  return sdk(getApiFleetByIdFsPreview({ path: { id: fleetId }, query: { path } }))
 }
 
-export function fetchSheet(agentId: string, path: string): Promise<SheetData> {
-  return sdk(getApiFleetByIdFsSheet({ path: { id: agentId }, query: { path } }))
+export function fetchSheet(fleetId: string, path: string): Promise<SheetData> {
+  return sdk(getApiFleetByIdFsSheet({ path: { id: fleetId }, query: { path } }))
 }
 
 // ── POST endpoints (SDK) ─────────────────────────────────────────────
 
-export function writeFile(agentId: string, path: string, content: string): Promise<WriteResult> {
-  return sdk(postApiFleetByIdFsWrite({ path: { id: agentId }, query: { path }, body: content }))
+export function writeFile(fleetId: string, path: string, content: string): Promise<WriteResult> {
+  return sdk(postApiFleetByIdFsWrite({ path: { id: fleetId }, query: { path }, body: content }))
 }
 
 /**
@@ -59,19 +59,19 @@ export function writeFile(agentId: string, path: string, content: string): Promi
  * (formatting Univer doesn't model is kept). `snapshot` = `workbook.save()`.
  */
 export function saveSheet(
-  agentId: string,
+  fleetId: string,
   path: string,
   snapshot: Record<string, unknown>,
 ): Promise<SheetSaveResult> {
   return sdk(
-    postApiFleetByIdFsSheetSave({ path: { id: agentId }, query: { path }, body: snapshot }),
+    postApiFleetByIdFsSheetSave({ path: { id: fleetId }, query: { path }, body: snapshot }),
   )
 }
 
-export function uploadFile(agentId: string, dir: string, file: File): Promise<UploadResult> {
+export function uploadFile(fleetId: string, dir: string, file: File): Promise<UploadResult> {
   return sdk(
     postApiFleetByIdFsUpload({
-      path: { id: agentId },
+      path: { id: fleetId },
       query: { path: dir, name: file.name },
       body: file,
     }),
@@ -79,13 +79,13 @@ export function uploadFile(agentId: string, dir: string, file: File): Promise<Up
 }
 
 export function uploadUnique(
-  agentId: string,
+  fleetId: string,
   dir: string,
   file: File,
 ): Promise<UploadUniqueResult> {
   return sdk(
     postApiFleetByIdFsUploadUnique({
-      path: { id: agentId },
+      path: { id: fleetId },
       query: { path: dir, name: file.name },
       body: file,
     }),
@@ -98,19 +98,19 @@ export function uploadUnique(
  *  prompt). `fs/raw` is NOT a public route, so an `<img src>` / `<object data>`
  *  pointed straight at this URL can't carry the `Authorization` header and 401s
  *  once auth is on (C2). Kept only for the rare same-origin/no-auth caller. */
-export function rawUrl(agentId: string, path: string): string {
-  return `${BASE}/api/fleet/${agentId}/fs/raw?path=${encodeURIComponent(path)}`
+export function rawUrl(fleetId: string, path: string): string {
+  return `${BASE}/api/fleet/${fleetId}/fs/raw?path=${encodeURIComponent(path)}`
 }
 
 /** Trigger a browser download for a file in the agent's realm. */
-export async function downloadFile(agentId: string, path: string): Promise<void> {
+export async function downloadFile(fleetId: string, path: string): Promise<void> {
   const headers: Record<string, string> = {}
   const token = getToken()
   if (token) headers["Authorization"] = `Bearer ${token}`
 
   const res = await fetch(
     // ok:manual — binary blob download, irreducible
-    `${BASE}/api/fleet/${agentId}/fs/download?path=${encodeURIComponent(path)}`,
+    `${BASE}/api/fleet/${fleetId}/fs/download?path=${encodeURIComponent(path)}`,
     { headers },
   )
   if (!res.ok) {

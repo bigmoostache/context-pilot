@@ -3,7 +3,7 @@ import type { Agent } from "@/lib/types"
 import { defaultModel, resolveSelection, type ProviderDef } from "@/lib/support/models"
 
 /** The two ways the dialog can open. */
-export type AgentModalMode = { mode: "create" } | { mode: "manage"; agent: Agent }
+export type FleetModalMode = { mode: "create" } | { mode: "manage"; agent: Agent }
 
 /** A resolved provider+model id pair for the picker. */
 export interface Selection {

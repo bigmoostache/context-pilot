@@ -321,8 +321,8 @@ export function ThreadComposer({
   const userTurn = status === "THEIR_TURN"
   const streaming = status === "ACTIVE"
   // The agent owes a response on this thread (its turn, or actively streaming).
-  const agentBusy = !userTurn
-  const banner = resolveComposerBanner(paused, agentBusy, streaming, focused)
+  const fleetBusy = !userTurn
+  const banner = resolveComposerBanner(paused, fleetBusy, streaming, focused)
 
   const sendable = composer.canSend(pendingFiles.length)
 

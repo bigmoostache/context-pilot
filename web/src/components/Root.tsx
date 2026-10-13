@@ -4,7 +4,7 @@ import { CostsView } from "@/components/shell/costs/CostsView"
 import { StatusBar } from "@/components/shell/StatusBar"
 import { ThreadsView } from "@/components/threads/ThreadsView"
 import { FleetDashboard } from "@/components/agents/FleetDashboard"
-import { AgentModal } from "@/components/agents/AgentModal"
+import { FleetModal } from "@/components/agents/FleetModal"
 import { Finder } from "@/components/finder/Finder"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { AuthGuard } from "@/components/auth/AuthGuard"
@@ -16,7 +16,7 @@ import { DevModeProvider } from "@/lib/providers/toggles/DevModeProvider"
 import { ShowOverlayProvider } from "@/lib/providers/toggles/ShowOverlayProvider"
 import { AsideDefaultProvider } from "@/lib/providers/toggles/AsideDefaultProvider"
 import { useDevMode } from "@/lib/providers/toggles/devMode"
-import { useFleet, useAgentMeta, useSseConnected, useRestartFlow } from "@/lib/live"
+import { useFleet, useFleetMeta, useSseConnected, useRestartFlow } from "@/lib/live"
 import { TelemetryProfiler } from "@/lib/support/telemetry"
 import { TelemetryHud } from "@/components/shell/widgets/TelemetryHud"
 import type { ViewMode, Agent } from "@/lib/types"
@@ -60,7 +60,7 @@ function Root() {
  *  `view` is recorded, and an entry lacking it decodes fine. */
 interface NavState {
   view: ViewMode
-  agentId: string
+  fleetId: string
   threadId?: string | undefined
 }
 
@@ -74,15 +74,15 @@ function readNav(state: unknown): NavState | undefined {
   if (typeof state !== "object" || state === null) return undefined
   const nav: unknown = (state as { nav?: unknown }).nav
   if (typeof nav !== "object" || nav === null) return undefined
-  const { view, agentId, threadId } = nav as {
+  const { view, fleetId, threadId } = nav as {
     view?: unknown
-    agentId?: unknown
+    fleetId?: unknown
     threadId?: unknown
   }
-  if (typeof view !== "string" || typeof agentId !== "string") return undefined
+  if (typeof view !== "string" || typeof fleetId !== "string") return undefined
   return {
     view: view as ViewMode,
-    agentId,
+    fleetId,
     threadId: typeof threadId === "string" ? threadId : undefined,
   }
 }
@@ -90,7 +90,7 @@ function readNav(state: unknown): NavState | undefined {
 /** Whether two nav entries point at the same surface — the dedupe test that
  *  keeps a redundant push (which would make one Back a no-op) off the stack. */
 function sameNav(a: NavState, b: NavState): boolean {
-  return a.view === b.view && a.agentId === b.agentId && a.threadId === b.threadId
+  return a.view === b.view && a.fleetId === b.fleetId && a.threadId === b.threadId
 }
 
 /** localStorage key holding an agent's last-selected thread. Module-scoped (no
@@ -116,12 +116,12 @@ const threadKeyFor = (id: string) => `cp-thread-${id}`
 function useNavHistory(
   current: {
     view: ViewMode
-    agentId: string
+    fleetId: string
     threadId: string | undefined
   },
   apply: (s: NavState) => void,
 ) {
-  const { view, agentId, threadId } = current
+  const { view, fleetId, threadId } = current
   const applyingRef = useRef(false)
   const bootRef = useRef(false)
 
@@ -138,7 +138,7 @@ function useNavHistory(
     // dedupe test and the restore).
     const nav: NavState = {
       view,
-      agentId,
+      fleetId,
       ...(view === "threads" && threadId && { threadId }),
     }
     if (!bootRef.current) {
@@ -151,7 +151,7 @@ function useNavHistory(
     const cur = readNav(history.state)
     if (cur && sameNav(cur, nav)) return
     history.pushState({ nav }, "")
-  }, [view, agentId, threadId])
+  }, [view, fleetId, threadId])
 
   useEffect(() => {
     const onPop = (e: PopStateEvent) => {
@@ -173,9 +173,9 @@ function useNavHistory(
 interface ShellViewsProps {
   effectiveView: ViewMode
   agents: Agent[]
-  activeAgent: ReturnType<typeof useAgentMeta>["data"] | undefined
-  activeAgentId: string
-  openAgent: (id: string) => void
+  activeFleet: ReturnType<typeof useFleetMeta>["data"] | undefined
+  activeFleetId: string
+  openFleet: (id: string) => void
   showInFinder: (path: string) => void
   disconnected: boolean
   onReconnect: () => void
@@ -195,22 +195,22 @@ interface ShellViewsProps {
  *  so each branch reads cleanly and the fleet fallthrough is explicit. */
 function ShellViews(p: ShellViewsProps) {
   if (p.effectiveView === "fleet") {
-    return <FleetDashboard agents={p.agents} onOpenAgent={p.openAgent} />
+    return <FleetDashboard agents={p.agents} onOpenFleet={p.openFleet} />
   }
   if (p.effectiveView === "costs") {
     return (
       <CostsView
-        agentId={p.activeAgentId}
+        fleetId={p.activeFleetId}
         disconnected={p.disconnected}
         onReconnect={p.onReconnect}
       />
     )
   }
-  if (p.effectiveView === "finder" && p.activeAgent) {
+  if (p.effectiveView === "finder" && p.activeFleet) {
     return (
       <Finder
-        key={p.activeAgent.id}
-        agent={p.activeAgent}
+        key={p.activeFleet.id}
+        agent={p.activeFleet}
         railOpen={p.finderRailOpen}
         revealPath={p.finderRevealPath}
         onRevealConsumed={p.onRevealConsumed}
@@ -221,8 +221,8 @@ function ShellViews(p: ShellViewsProps) {
   }
   return (
     <ThreadsView
-      key={p.activeAgentId}
-      activeAgentId={p.activeAgentId}
+      key={p.activeFleetId}
+      activeFleetId={p.activeFleetId}
       selectedThreadId={p.selectedThreadId}
       onThreadChange={p.onThreadChange}
       onShowInFinder={p.showInFinder}
@@ -241,17 +241,17 @@ function ShellViews(p: ShellViewsProps) {
  *  from {@link AppShell} so the open/agent guards cost the shell no complexity
  *  budget: a dialog is dismissed, never routed to, so it takes no history entry
  *  and lives in its own flag rather than in {@link NavState}. */
-function AgentSettingsDialog({
+function FleetSettingsDialog({
   open,
   agent,
   onClose,
 }: {
   open: boolean
-  agent: ShellViewsProps["activeAgent"]
+  agent: ShellViewsProps["activeFleet"]
   onClose: () => void
 }) {
   if (!open || !agent) return null
-  return <AgentModal modal={{ mode: "manage", agent }} onClose={onClose} />
+  return <FleetModal modal={{ mode: "manage", agent }} onClose={onClose} />
 }
 
 function AppShell() {
@@ -266,7 +266,7 @@ function AppShell() {
     }
     return modes[localStorage.getItem("cp-view") ?? ""] ?? "fleet"
   })
-  const [activeAgentId, setActiveAgentId] = useState(() => localStorage.getItem("cp-agent") ?? "")
+  const [activeFleetId, setActiveFleetId] = useState(() => localStorage.getItem("cp-agent") ?? "")
 
   // The accessed THREAD — one degree finer than view+agent — is OWNED HERE so
   // browser Back/Next can step through it (T636). The
@@ -276,13 +276,13 @@ function AppShell() {
   // hook used, so a reload still returns to the last thread; the shell is now
   // simply the single writer of that key (the hook defers to it when controlled).
   const [selectedThreadId, setSelectedThreadId] = useState(
-    () => localStorage.getItem(threadKeyFor(activeAgentId)) ?? "",
+    () => localStorage.getItem(threadKeyFor(activeFleetId)) ?? "",
   )
 
   // Persist the selected thread per agent (single writer — see above).
   useEffect(() => {
-    if (selectedThreadId) localStorage.setItem(threadKeyFor(activeAgentId), selectedThreadId)
-  }, [activeAgentId, selectedThreadId])
+    if (selectedThreadId) localStorage.setItem(threadKeyFor(activeFleetId), selectedThreadId)
+  }, [activeFleetId, selectedThreadId])
 
   // Persist view + agent selection across reloads (write-through effects rather
   // than setter wrappers, so the useState setters keep their canonical names).
@@ -290,24 +290,24 @@ function AppShell() {
     localStorage.setItem("cp-view", view)
   }, [view])
   useEffect(() => {
-    localStorage.setItem("cp-agent", activeAgentId)
-  }, [activeAgentId])
+    localStorage.setItem("cp-agent", activeFleetId)
+  }, [activeFleetId])
 
   // Identity + roster come from the polled fleet list; the LIVE vitals (phase,
   // cost, tokens, status) come from the per-agent meta cache, which the SSE
   // bridge folds in real time (T297). Spreading the delta-folded meta over the
   // fleet row makes the always-visible TopBar + StatusBar reactive instead of
   // riding the 15s fleet poll — the same gold path threads already use.
-  const fleetAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
-  const { data: liveAgent, loading: agentLoading } = useAgentMeta(activeAgentId)
-  const activeAgent = liveAgent ?? fleetAgent
-  const sseConnected = useSseConnected(activeAgentId)
-  const { restart: restartAgent, restarting: agentRestarting } = useRestartFlow(activeAgentId)
+  const fleetAgent = agents.find((a) => a.id === activeFleetId) ?? agents[0]
+  const { data: liveFleet, loading: fleetLoading } = useFleetMeta(activeFleetId)
+  const activeFleet = liveFleet ?? fleetAgent
+  const sseConnected = useSseConnected(activeFleetId)
+  const { restart: restartFleet, restarting: fleetRestarting } = useRestartFlow(activeFleetId)
 
   // A persisted view of "threads"/"finder" requires a live agent to
   // render. If the fleet is still loading, or the stored agent id no longer
   // matches any live agent (stale localStorage — e.g. the agent was removed),
-  // `activeAgent` is undefined and those views would crash on `activeAgent.id`.
+  // `activeFleet` is undefined and those views would crash on `activeFleet.id`.
   // Fall back to the fleet view in that case (private windows never hit this
   // because they start with empty localStorage → default "fleet").
   //
@@ -316,10 +316,10 @@ function AppShell() {
   // never render a tab the TopBar deliberately hides.
   const effectiveView: ViewMode =
     view === "costs" && !devMode
-      ? activeAgent
+      ? activeFleet
         ? "threads"
         : "fleet"
-      : view !== "fleet" && !activeAgent
+      : view !== "fleet" && !activeFleet
         ? "fleet"
         : view
 
@@ -328,8 +328,8 @@ function AppShell() {
   // last-selected thread synchronously (a direct localStorage read, not a
   // seed effect — an effect would race a nav restore that sets the thread
   // explicitly).
-  const openAgent = (id: string) => {
-    setActiveAgentId(id)
+  const openFleet = (id: string) => {
+    setActiveFleetId(id)
     setSelectedThreadId(localStorage.getItem(threadKeyFor(id)) ?? "")
     setView("threads")
   }
@@ -385,13 +385,13 @@ function AppShell() {
   // never changes identity.
   const applyNav = useCallback((s: NavState) => {
     setView(s.view)
-    setActiveAgentId(s.agentId)
-    setSelectedThreadId(s.threadId ?? localStorage.getItem(threadKeyFor(s.agentId)) ?? "")
+    setActiveFleetId(s.fleetId)
+    setSelectedThreadId(s.threadId ?? localStorage.getItem(threadKeyFor(s.fleetId)) ?? "")
   }, [])
   useNavHistory(
     {
       view: effectiveView,
-      agentId: activeAgentId,
+      fleetId: activeFleetId,
       threadId: selectedThreadId || undefined,
     },
     applyNav,
@@ -400,12 +400,12 @@ function AppShell() {
   // When the agent is unreachable (SSE down OR registry-stale) and we're
   // viewing an agent surface, blur+grey the main content and intercept all
   // clicks to trigger reconnect.
-  const agentStale = activeAgent?.status === "disconnected"
+  const fleetStale = activeFleet?.status === "disconnected"
   // Suppress the blur+grey overlay during an active restart — the spinner
   // already communicates the transition, and flashing "Disconnected" during a
   // controlled restart is visual noise, not a genuine failure signal.
   const showDisconnectOverlay =
-    (!sseConnected || agentStale) && effectiveView !== "fleet" && !agentRestarting
+    (!sseConnected || fleetStale) && effectiveView !== "fleet" && !fleetRestarting
 
   return (
     // Column, not row: the FOOTER is the full-width floor of the window, and
@@ -422,14 +422,14 @@ function AppShell() {
         <TopBar
           view={effectiveView}
           onViewChange={setView}
-          activeAgentId={activeAgentId}
-          onSwitchAgent={setActiveAgentId}
+          activeFleetId={activeFleetId}
+          onSwitchFleet={setActiveFleetId}
           agents={agents}
           threadsRailOpen={threadsRailOpen}
           onToggleThreadsRail={() => setThreadsRailOpen((o) => !o)}
           onNewThread={() => setNewThreadOpen(true)}
           onSearchThreads={() => setThreadSearchOpen(true)}
-          onManageAgent={() => setManageOpen(true)}
+          onManageFleet={() => setManageOpen(true)}
           finderRailOpen={finderRailOpen}
           onToggleFinderRail={() => setFinderRailOpen((o) => !o)}
         />
@@ -441,12 +441,12 @@ function AppShell() {
             <ShellViews
               effectiveView={effectiveView}
               agents={agents}
-              activeAgent={activeAgent}
-              activeAgentId={activeAgentId}
-              openAgent={openAgent}
+              activeFleet={activeFleet}
+              activeFleetId={activeFleetId}
+              openFleet={openFleet}
               showInFinder={showInFinder}
               disconnected={showDisconnectOverlay}
-              onReconnect={restartAgent}
+              onReconnect={restartFleet}
               threadsRailOpen={threadsRailOpen}
               selectedThreadId={selectedThreadId}
               onThreadChange={setSelectedThreadId}
@@ -465,12 +465,12 @@ function AppShell() {
       <StatusBar
         fleet={effectiveView === "fleet"}
         agents={agents}
-        activeAgent={activeAgent}
-        activeAgentId={activeAgentId}
-        connected={sseConnected && !agentStale}
-        onRestart={restartAgent}
-        restarting={agentRestarting}
-        loading={agentLoading}
+        activeFleet={activeFleet}
+        activeFleetId={activeFleetId}
+        connected={sseConnected && !fleetStale}
+        onRestart={restartFleet}
+        restarting={fleetRestarting}
+        loading={fleetLoading}
       />
 
       {/* The agent-settings DIALOG (T760). Sibling of the row above, never a
@@ -479,9 +479,9 @@ function AppShell() {
           button that opens it lives in that rail, the state that flags it here
           — a dialog is dismissed, never routed to, so it takes no history
           entry. */}
-      <AgentSettingsDialog
+      <FleetSettingsDialog
         open={manageOpen}
-        agent={activeAgent}
+        agent={activeFleet}
         onClose={() => setManageOpen(false)}
       />
 

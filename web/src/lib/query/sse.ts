@@ -5,7 +5,7 @@
 // Last-Event-ID to resume from the last seen rev.
 //
 // Usage:
-//   const sse = createSseClient(agentId)
+//   const sse = createSseClient(fleetId)
 //   sse.subscribe("delta", (data) => { ... })
 //   sse.subscribe("stream", (data) => { ... })
 //   // later:
@@ -39,30 +39,30 @@ export interface SseClient {
   readonly hasEverConnected: boolean
 }
 
-/** Shared per-agent SSE clients (singleton per agentId). */
+/** Shared per-agent SSE clients (singleton per fleetId). */
 const clients = new Map<string, SseClient>()
 
 /**
  * Get or create an SSE client for the given agent. Callers share a
  * single EventSource per agent to avoid duplicate connections.
  */
-export function getOrCreateSseClient(agentId: string): SseClient {
-  const existing = clients.get(agentId)
+export function getOrCreateSseClient(fleetId: string): SseClient {
+  const existing = clients.get(fleetId)
   if (existing) return existing
-  const client = createSseClient(agentId)
-  clients.set(agentId, client)
+  const client = createSseClient(fleetId)
+  clients.set(fleetId, client)
   return client
 }
 
 /** Remove the client from the shared map (called on close). */
-function removeClient(agentId: string) {
-  clients.delete(agentId)
+function removeClient(fleetId: string) {
+  clients.delete(fleetId)
 }
 
 const RECONNECT_BASE_MS = 1000
 const RECONNECT_MAX_MS = 30_000
 
-function createSseClient(agentId: string): SseClient {
+function createSseClient(fleetId: string): SseClient {
   const listeners = new Map<string, Set<SseListener>>()
   const connectionListeners = new Set<(connected: boolean) => void>()
   let es: EventSource | null = null
@@ -87,7 +87,7 @@ function createSseClient(agentId: string): SseClient {
     if (closed) return
     try {
       const ticket = await mintTicket()
-      let url = `${BASE}/api/stream?agent=${encodeURIComponent(agentId)}&ticket=${encodeURIComponent(ticket)}`
+      let url = `${BASE}/api/stream?agent=${encodeURIComponent(fleetId)}&ticket=${encodeURIComponent(ticket)}`
       // Resume from the last seen rev. The backend reads the `last_rev` QUERY
       // param (not `last_event_id`): we disable EventSource's native
       // auto-reconnect, so the `Last-Event-ID` *header* is never sent — the
@@ -155,7 +155,7 @@ function createSseClient(agentId: string): SseClient {
       closed = true
       es?.close()
       es = null
-      removeClient(agentId)
+      removeClient(fleetId)
     },
     get connected() {
       return es?.readyState === EventSource.OPEN

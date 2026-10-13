@@ -73,7 +73,7 @@ export function ThreadAside({
   files,
   tasks,
   notes,
-  agentId,
+  fleetId,
   threadId,
   tab,
   onTabChange,
@@ -86,7 +86,7 @@ export function ThreadAside({
   files: ThreadFile[]
   tasks: ThreadTask[]
   notes: ThreadNote[]
-  agentId: string
+  fleetId: string
   threadId: string
   tab: "files" | "tasks" | "notes"
   onTabChange: (tab: "files" | "tasks" | "notes") => void
@@ -143,7 +143,7 @@ export function ThreadAside({
             hasFiles={hasFiles}
             hasNotes={hasNotes}
             previewing={previewing}
-            agentId={agentId}
+            fleetId={fleetId}
             file={selectedFile}
             onBack={() => onSelectFile(null)}
             onHide={onHide}
@@ -160,7 +160,7 @@ export function ThreadAside({
           {/* Notes tab — the focused thread's scratchpad cells (list → expand) */}
           {hasNotes && (
             <TabsContent value="notes" className="min-h-0 flex-1 overflow-y-auto">
-              <NoteList notes={notes} storageKey={`cp-notes-open-${agentId}-${threadId}`} />
+              <NoteList notes={notes} storageKey={`cp-notes-open-${fleetId}-${threadId}`} />
             </TabsContent>
           )}
 
@@ -170,7 +170,7 @@ export function ThreadAside({
               {selectedFile ? (
                 <InlineFilePreview
                   file={selectedFile}
-                  agentId={agentId}
+                  fleetId={fleetId}
                   onBack={() => onSelectFile(null)}
                 />
               ) : (
@@ -199,7 +199,7 @@ function AsideTabBar({
   hasFiles,
   hasNotes,
   previewing,
-  agentId,
+  fleetId,
   file,
   onBack,
   onHide,
@@ -209,7 +209,7 @@ function AsideTabBar({
   hasFiles: boolean
   hasNotes: boolean
   previewing: boolean
-  agentId: string
+  fleetId: string
   file: UploadedFile | null
   onBack: () => void
   onHide: () => void
@@ -249,7 +249,7 @@ function AsideTabBar({
         {previewing && file && (
           <button
             type="button"
-            onClick={() => void downloadFile(agentId, file.path)}
+            onClick={() => void downloadFile(fleetId, file.path)}
             className="inline-flex items-center gap-1.5 px-2 text-[13.5px] font-medium text-foreground/60 transition-colors hover:text-foreground"
           >
             <Download className="size-3.5" />
@@ -339,11 +339,11 @@ function FileList({
  *  list. `onClose` is wired to `onBack` as a harmless fallback. */
 function InlineFilePreview({
   file,
-  agentId,
+  fleetId,
   onBack,
 }: {
   file: UploadedFile
-  agentId: string
+  fleetId: string
   onBack: () => void
 }) {
   return (
@@ -354,7 +354,7 @@ function InlineFilePreview({
     // overflowed and the excess was silently clipped by `overflow-hidden` —
     // the "can't scroll the md file viewer" bug (T673).
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <FinderPreview node={uploadToNode(file)} agentId={agentId} variant="full" onClose={onBack} />
+      <FinderPreview node={uploadToNode(file)} fleetId={fleetId} variant="full" onClose={onBack} />
     </div>
   )
 }

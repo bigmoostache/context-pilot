@@ -2,12 +2,12 @@ import { useState } from "react"
 import { AlertTriangle, FolderGit2, Plus, Settings2 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { accentVar, fmtCost, FLEET_MAX_W } from "@/lib/support/panelMeta"
-import { useMetrics, useAgentMeta } from "@/lib/live"
+import { useMetrics, useFleetMeta } from "@/lib/live"
 import { avatarUrl } from "@/lib/api"
 import { clickable } from "@/lib/support/a11y"
 import type { Agent, AgentStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
-import { AgentModal } from "./AgentModal"
+import { FleetModal } from "./FleetModal"
 import { RetiredSection } from "./FleetRetired"
 
 const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
@@ -35,10 +35,10 @@ type Modal = { mode: "create" } | { mode: "manage"; agent: Agent } | null
  */
 export function FleetDashboard({
   agents,
-  onOpenAgent,
+  onOpenFleet,
 }: {
   agents: Agent[]
-  onOpenAgent: (id: string) => void
+  onOpenFleet: (id: string) => void
 }) {
   const [modal, setModal] = useState<Modal>(null)
   const [toast, setToast] = useState<string | null>(null)
@@ -49,10 +49,10 @@ export function FleetDashboard({
   }
 
   const openRow = (a: Agent) => (
-    <AgentRow
+    <FleetRow
       key={a.id}
       agent={a}
-      onOpen={() => onOpenAgent(a.id)}
+      onOpen={() => onOpenFleet(a.id)}
       onManage={() => setModal({ mode: "manage", agent: a })}
     />
   )
@@ -90,14 +90,14 @@ export function FleetDashboard({
                 </section>
               )
             })}
-            <NewAgentRow onClick={() => setModal({ mode: "create" })} />
+            <NewFleetRow onClick={() => setModal({ mode: "create" })} />
           </div>
 
           <RetiredSection onFlash={flash} />
         </div>
       </ScrollArea>
 
-      {modal && <AgentModal modal={modal} onClose={() => setModal(null)} onFlash={flash} />}
+      {modal && <FleetModal modal={modal} onClose={() => setModal(null)} onFlash={flash} />}
 
       {toast && (
         <div className="pop-shadow absolute bottom-6 left-1/2 z-30 -translate-x-1/2 rounded-lg border border-border bg-card px-4 py-2 text-[12px] text-foreground/90">
@@ -126,7 +126,7 @@ function GroupHeader({ status, count }: { status: AgentStatus; count: number }) 
   )
 }
 
-function AgentRow({
+function FleetRow({
   agent,
   onOpen,
   onManage,
@@ -138,7 +138,7 @@ function AgentRow({
   // Live vitals (status, cost) ride the per-agent meta cache the SSE bridge folds
   // in real time (T297); the polled fleet row is the fallback until the first
   // delta lands. ensureSync(agent.id) is triggered by this hook.
-  const { data: live } = useAgentMeta(agent.id)
+  const { data: live } = useFleetMeta(agent.id)
   const a = live ?? agent
   const accent = accentVar[a.accent]
 
@@ -180,7 +180,7 @@ function AgentRow({
 
       {/* Health — only when non-nominal (§19, T121): rides beside the name so the
           trailing model/cost columns stay aligned whether or not it's present. */}
-      <HealthBadge agentId={agent.id} />
+      <HealthBadge fleetId={agent.id} />
 
       <span className={agent.task ? "shrink-0" : "flex-1"} />
 
@@ -245,8 +245,8 @@ function healthCondition(
  * lagging projection stays visible at a glance rather than a silent backend
  * latch (T121). Nominal renders nothing — a healthy fleet stays uncluttered.
  */
-function HealthBadge({ agentId }: { agentId: string }) {
-  const { data } = useMetrics(agentId)
+function HealthBadge({ fleetId }: { fleetId: string }) {
+  const { data } = useMetrics(fleetId)
   const condition = data ? healthCondition(data) : null
   if (!condition) return null
 
@@ -268,7 +268,7 @@ function HealthBadge({ agentId }: { agentId: string }) {
 
 /** The trailing "new agent" affordance — a soft hover-card row matching the
  *  agent rows, with a dashed chip. */
-function NewAgentRow({ onClick }: { onClick: () => void }) {
+function NewFleetRow({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}

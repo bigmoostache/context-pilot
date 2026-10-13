@@ -24,14 +24,14 @@ const LazySheetGrid = lazy(() => import("./SheetGrid").then((m) => ({ default: m
  * identical to desktop; the touch divergence lives in the leaf renderers below
  * (zoom / copy / save buttons become thumb-sized).
  */
-export function LivePreview({ agentId, node }: { agentId: string; node: FinderNode }) {
-  const { data, loading, error } = useFsPreview(agentId, node.path, true)
+export function LivePreview({ fleetId, node }: { fleetId: string; node: FinderNode }) {
+  const { data, loading, error } = useFsPreview(fleetId, node.path, true)
   if (loading) return <PreviewStatus label="Loading preview…" />
   if (error || !data) return <Generic node={node} />
   if (node.kind === "markdown")
     return (
       <EditableMarkdown
-        agentId={agentId}
+        fleetId={fleetId}
         path={node.path}
         content={data.content}
         truncated={data.truncated}
@@ -48,11 +48,11 @@ export function LivePreview({ agentId, node }: { agentId: string; node: FinderNo
  * as desktop; the zoom control is the divergence — desktop uses 20px (size-5)
  * hover buttons, here they are 36px (size-9) `active:`-press touch targets.
  */
-export function LiveImagePreview({ agentId, node }: { agentId: string; node: FinderNode }) {
+export function LiveImagePreview({ fleetId, node }: { fleetId: string; node: FinderNode }) {
   const [zoom, setZoom] = useState(100)
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null)
   const [failed, setFailed] = useState(false)
-  const src = useMemo(() => rawUrl(agentId, node.path), [agentId, node.path])
+  const src = useMemo(() => rawUrl(fleetId, node.path), [fleetId, node.path])
   if (failed) return <Generic node={node} />
   return (
     <div className="flex flex-col gap-2 p-2">
@@ -105,8 +105,8 @@ export function LiveImagePreview({ agentId, node }: { agentId: string; node: Fin
  * (a full-width "Open PDF" button) matters more here; it's sized as a real
  * touch target.
  */
-export function LivePdfPreview({ agentId, node }: { agentId: string; node: FinderNode }) {
-  const src = useMemo(() => rawUrl(agentId, node.path), [agentId, node.path])
+export function LivePdfPreview({ fleetId, node }: { fleetId: string; node: FinderNode }) {
+  const src = useMemo(() => rawUrl(fleetId, node.path), [fleetId, node.path])
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
       <object data={src} type="application/pdf" className="min-h-0 w-full flex-1 bg-card">
@@ -135,10 +135,10 @@ export function LivePdfPreview({ agentId, node }: { agentId: string; node: Finde
  * ships its own touch handling (pan/select/scroll), so the engine is shared;
  * only the surrounding truncation note is mobile-sized here.
  */
-export function LiveSheetPreview({ agentId, node }: { agentId: string; node: FinderNode }) {
-  const { data, loading, error } = useFsSheet(agentId, node.path, true)
+export function LiveSheetPreview({ fleetId, node }: { fleetId: string; node: FinderNode }) {
+  const { data, loading, error } = useFsSheet(fleetId, node.path, true)
   if (loading) return <PreviewStatus label="Loading spreadsheet…" />
-  if (error && isTooLarge(error)) return <SheetTooLarge agentId={agentId} path={node.path} />
+  if (error && isTooLarge(error)) return <SheetTooLarge fleetId={fleetId} path={node.path} />
   if (error || !data || (!data.workbook && data.sheets.length === 0)) return <Generic node={node} />
 
   return (
@@ -149,7 +149,7 @@ export function LiveSheetPreview({ agentId, node }: { agentId: string; node: Fin
           workbook={data.workbook}
           activeSheet={data.activeSheet}
           path={node.path}
-          agentId={agentId}
+          fleetId={fleetId}
         />
       </Suspense>
 
@@ -170,7 +170,7 @@ function isTooLarge(error: Error): boolean {
 }
 
 /** "Too large to preview" state with a download fallback. */
-function SheetTooLarge({ agentId, path }: { agentId: string; path: string }) {
+function SheetTooLarge({ fleetId, path }: { fleetId: string; path: string }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
       <span className="text-[13px] text-muted-foreground">
@@ -179,7 +179,7 @@ function SheetTooLarge({ agentId, path }: { agentId: string; path: string }) {
       <button
         type="button"
         className="rounded-md bg-muted px-4 py-2 text-[13px] font-medium hover:bg-muted/70"
-        onClick={() => void downloadFile(agentId, path)}
+        onClick={() => void downloadFile(fleetId, path)}
       >
         Download
       </button>
@@ -237,19 +237,19 @@ function HighlightedCode({
  * files fall back to the read-only mobile {@link MarkdownPreview}.
  */
 function EditableMarkdown({
-  agentId,
+  fleetId,
   path,
   content,
   truncated,
 }: {
-  agentId: string
+  fleetId: string
   path: string
   content: string
   truncated?: boolean
 }) {
   const draftRef = useRef(content)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const write = useWriteFile(agentId)
+  const write = useWriteFile(fleetId)
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle")
   const [err, setErr] = useState<string | null>(null)
 

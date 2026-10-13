@@ -1,7 +1,7 @@
 // ── Per-agent ACL management section (Phase 10) — mobile twin ───────
 //
-// Touch twin of the desktop AgentAclSection, embedded inside the mobile
-// AgentModal (manage mode). Logic is byte-identical (list / grant / revoke /
+// Touch twin of the desktop FleetAclSection, embedded inside the mobile
+// FleetModal (manage mode). Logic is byte-identical (list / grant / revoke /
 // toggle-role via the same TanStack Query hooks); the presentation is
 // mobile-tuned: the hover-revealed row actions become always-visible (there is
 // no hover on touch), rows and controls grow to ≥44px touch targets, and the
@@ -12,10 +12,10 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plus, Shield, ShieldCheck, Trash2, X } from "lucide-react"
 import {
-  fetchAgentAcl,
+  fetchFleetAcl,
   fetchUsers,
   grantAccess,
-  updateAgentRole,
+  updateFleetRole,
   revokeAccess,
   type AclEntry,
   type AuthUser,
@@ -23,7 +23,7 @@ import {
 import { cn } from "@/lib/utils"
 
 /** Per-agent role badge — distinct from the system-level RoleBadge. */
-function AgentRoleBadge({ role }: { role: string }) {
+function FleetRoleBadge({ role }: { role: string }) {
   const isAdmin = role === "agent-admin"
   return (
     <span
@@ -38,24 +38,24 @@ function AgentRoleBadge({ role }: { role: string }) {
   )
 }
 
-export function AgentAclSection({ agentId }: { agentId: string }) {
+export function FleetAclSection({ fleetId }: { fleetId: string }) {
   const qc = useQueryClient()
-  const key = ["agent-acl", agentId]
+  const key = ["agent-acl", fleetId]
   const { data: entries = [], isLoading } = useQuery({
     queryKey: key,
-    queryFn: () => fetchAgentAcl(agentId),
+    queryFn: () => fetchFleetAcl(fleetId),
   })
 
   const [showGrant, setShowGrant] = useState(false)
 
   const toggleRole = useMutation({
     mutationFn: (e: AclEntry) =>
-      updateAgentRole(agentId, e.user_id, e.role === "agent-admin" ? "agent-user" : "agent-admin"),
+      updateFleetRole(fleetId, e.user_id, e.role === "agent-admin" ? "agent-user" : "agent-admin"),
     onSuccess: () => qc.invalidateQueries({ queryKey: key }),
   })
 
   const revoke = useMutation({
-    mutationFn: (userId: string) => revokeAccess(agentId, userId),
+    mutationFn: (userId: string) => revokeAccess(fleetId, userId),
     onSuccess: () => qc.invalidateQueries({ queryKey: key }),
   })
 
@@ -76,7 +76,7 @@ export function AgentAclSection({ agentId }: { agentId: string }) {
 
       {showGrant && (
         <GrantForm
-          agentId={agentId}
+          fleetId={fleetId}
           existingUserIds={entries.map((e) => e.user_id)}
           onGranted={() => {
             void qc.invalidateQueries({ queryKey: key })
@@ -123,7 +123,7 @@ export function AgentAclSection({ agentId }: { agentId: string }) {
               disabled={toggleRole.isPending}
               className="transition-opacity active:opacity-80"
             >
-              <AgentRoleBadge role={e.role} />
+              <FleetRoleBadge role={e.role} />
             </button>
             <button
               title="Revoke access"
@@ -143,12 +143,12 @@ export function AgentAclSection({ agentId }: { agentId: string }) {
 // ── Grant access form ────────────────────────────────────────────────
 
 function GrantForm({
-  agentId,
+  fleetId,
   existingUserIds,
   onGranted,
   onCancel,
 }: {
-  agentId: string
+  fleetId: string
   existingUserIds: string[]
   onGranted: () => void
   onCancel: () => void
@@ -164,7 +164,7 @@ function GrantForm({
   const [error, setError] = useState("")
 
   const grant = useMutation({
-    mutationFn: () => grantAccess(agentId, selected, role),
+    mutationFn: () => grantAccess(fleetId, selected, role),
     onSuccess: onGranted,
     onError: (e) => setError(e instanceof Error ? e.message : "Grant failed"),
   })

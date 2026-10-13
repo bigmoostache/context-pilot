@@ -19,7 +19,7 @@ import { fetchVitals, type Vital } from "@/lib/api"
  * (`hover:` becomes `active:`, larger padding). All probe logic — the frontend
  * round-trip prepend, category grouping, status colouring — is identical.
  */
-export function SessionVitals({ agentId }: { agentId: string }) {
+export function SessionVitals({ fleetId }: { fleetId: string }) {
   // ── Check Vitals (on-demand connectivity probe) ────────────────────
   const [vitals, setVitals] = useState<Vital[] | null>(null)
   const [checking, setChecking] = useState(false)
@@ -30,7 +30,7 @@ export function SessionVitals({ agentId }: { agentId: string }) {
     setVitalsErr(null)
     const t0 = performance.now()
     try {
-      const rows = await fetchVitals(agentId)
+      const rows = await fetchVitals(fleetId)
       const rtt = Math.round(performance.now() - t0)
       // The two checks only the browser can observe: that this app is running
       // (we are executing) and the measured round-trip to the orchestrator.
@@ -51,7 +51,7 @@ export function SessionVitals({ agentId }: { agentId: string }) {
     } finally {
       setChecking(false)
     }
-  }, [agentId])
+  }, [fleetId])
 
   // Group the flat probe list by category (first-seen order preserved) so the
   // grid reads as labelled sections rather than a homogeneous wall of rows.

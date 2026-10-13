@@ -9,7 +9,7 @@
 //   • `invalidate` → mark the agent's INSPECTION caches stale so they refetch
 //                    (memory/todos/tree/… have no oplog delta to fold).
 //
-// The PURE folds (the OpEntry shape + applyThreadDelta/applyAgentDelta/
+// The PURE folds (the OpEntry shape + applyThreadDelta/applyFleetDelta/
 // mergeThreadLogs) live in ./reducers; this module owns only the imperative
 // bridge — subscription, `setQueryData`, and the async spilled-body hydrate.
 //
@@ -31,7 +31,7 @@ import type { QueryClient } from "@tanstack/react-query"
 import { getOrCreateSseClient } from "./sse"
 import { queryClient } from "./queryClient"
 import { fetchMessageBody } from "../api"
-import { applyAgentDelta, applyThreadDelta, type OpEntry } from "./reducers"
+import { applyFleetDelta, applyThreadDelta, type OpEntry } from "./reducers"
 import { applyLibraryDelta } from "./library"
 import { measure } from "../support/telemetry"
 import type { Agent, ThreadDetail, LibraryItem } from "../types"
@@ -39,12 +39,12 @@ import type { Agent, ThreadDetail, LibraryItem } from "../types"
 // Re-export the pure folds + delta type so existing `@/lib/query/sync`
 // consumers keep their import surface (the reducers moved to ./reducers for the
 // 500-line file budget).
-export { applyThreadDelta, applyAgentDelta, mergeThreadLogs, type OpEntry } from "./reducers"
+export { applyThreadDelta, applyFleetDelta, mergeThreadLogs, type OpEntry } from "./reducers"
 
 // ── Query keys (the single source of truth for cache identity) ───────
 //
 // Live, delta-covered keys ride the push plane; inspection keys ride
-// `invalidate`. `key[1]` is always the agentId for agent-scoped resources, so
+// `invalidate`. `key[1]` is always the fleetId for agent-scoped resources, so
 // the invalidate predicate can target one agent's inspection caches precisely.
 
 export const qk = {
@@ -94,15 +94,15 @@ const wired = new Set<string>()
  */
 async function hydrateSpilledMessage(
   client: QueryClient,
-  agentId: string,
+  fleetId: string,
   entry: OpEntry,
 ): Promise<void> {
   const head = entry.kind.head
   if (!head) return
-  const tk = qk.threads(agentId)
+  const tk = qk.threads(fleetId)
   let bodyStr: string
   try {
-    bodyStr = await fetchMessageBody(agentId, head)
+    bodyStr = await fetchMessageBody(fleetId, head)
   } catch {
     void client.invalidateQueries({ queryKey: tk }) // hydrate failed → ground-truth refetch
     return
@@ -128,8 +128,8 @@ async function hydrateSpilledMessage(
  * mtime backstop. Extracted from applyDelta to keep its cyclomatic complexity in
  * budget.
  */
-function foldBehaviourIntoLibrary(client: QueryClient, agentId: string, km: OpEntry["kind"]): void {
-  const lk = qk.library(agentId)
+function foldBehaviourIntoLibrary(client: QueryClient, fleetId: string, km: OpEntry["kind"]): void {
+  const lk = qk.library(fleetId)
   const lPrev = client.getQueryData<LibraryItem[]>(lk)
   const lNext = applyLibraryDelta(lPrev, km)
   if (lNext === null) {
@@ -145,11 +145,11 @@ function foldBehaviourIntoLibrary(client: QueryClient, agentId: string, km: OpEn
  * then advances the rev guard. A reducer verdict of `null` ("can't fold")
  * invalidates that key so the next read hydrates ground truth.
  */
-function applyDelta(client: QueryClient, agentId: string, entry: OpEntry): void {
+function applyDelta(client: QueryClient, fleetId: string, entry: OpEntry): void {
   if (typeof entry.rev === "number") {
-    const seen = lastRev.get(agentId) ?? -1
+    const seen = lastRev.get(fleetId) ?? -1
     if (entry.rev <= seen) return // replay dupe
-    lastRev.set(agentId, entry.rev)
+    lastRev.set(fleetId, entry.rev)
   }
 
   // A spilled (large) message has no inline body — its delta carries only the
@@ -159,7 +159,7 @@ function applyDelta(client: QueryClient, agentId: string, entry: OpEntry): void 
   // later when the hydrate resolves.
   const km = entry.kind
   if (km.kind === "message_created" && !km.inline_body && km.head) {
-    void hydrateSpilledMessage(client, agentId, entry)
+    void hydrateSpilledMessage(client, fleetId, entry)
   }
 
   // Behaviour change → invalidate the agent's library query so the footer chip
@@ -172,11 +172,11 @@ function applyDelta(client: QueryClient, agentId: string, entry: OpEntry): void 
   // Behaviour change → fold the authoritative new active-agent id straight into
   // the cached library (see foldBehaviourIntoLibrary).
   if (km.kind === "behaviour_changed") {
-    foldBehaviourIntoLibrary(client, agentId, km)
+    foldBehaviourIntoLibrary(client, fleetId, km)
   }
 
   // Threads cache fold.
-  const tk = qk.threads(agentId)
+  const tk = qk.threads(fleetId)
   const tPrev = client.getQueryData<ThreadDetail[]>(tk)
   const tNext = applyThreadDelta(tPrev, entry)
   if (tNext === null) {
@@ -186,9 +186,9 @@ function applyDelta(client: QueryClient, agentId: string, entry: OpEntry): void 
   }
 
   // Agent-meta cache fold.
-  const ak = qk.agent(agentId)
+  const ak = qk.agent(fleetId)
   const aPrev = client.getQueryData<Agent>(ak)
-  const aNext = applyAgentDelta(aPrev, entry)
+  const aNext = applyFleetDelta(aPrev, entry)
   if (aNext === null) {
     if (aPrev !== undefined) void client.invalidateQueries({ queryKey: ak })
   } else if (aNext !== aPrev) {
@@ -198,14 +198,14 @@ function applyDelta(client: QueryClient, agentId: string, entry: OpEntry): void 
 
 /** Invalidate one agent's INSPECTION caches (delta-covered keys are exempt —
  *  the push plane owns those). Fleet-level keys (length 1) are untouched. */
-function invalidateInspection(client: QueryClient, agentId: string): void {
+function invalidateInspection(client: QueryClient, fleetId: string): void {
   void client.invalidateQueries({
     predicate: (q) => {
       const key = q.queryKey
       return (
         Array.isArray(key) &&
         key.length >= 2 &&
-        key[1] === agentId &&
+        key[1] === fleetId &&
         typeof key[0] === "string" &&
         !DELTA_COVERED.has(key[0])
       )
@@ -229,16 +229,16 @@ function invalidateInspection(client: QueryClient, agentId: string): void {
 const MIN_INVALIDATE_GAP_MS = 10_000
 const lastInvalidateMs = new Map<string, number>()
 
-function throttledInvalidateInspection(client: QueryClient, agentId: string): void {
+function throttledInvalidateInspection(client: QueryClient, fleetId: string): void {
   const now = Date.now()
-  const last = lastInvalidateMs.get(agentId) ?? 0
+  const last = lastInvalidateMs.get(fleetId) ?? 0
   if (now - last < MIN_INVALIDATE_GAP_MS) return
-  lastInvalidateMs.set(agentId, now)
-  invalidateInspection(client, agentId)
+  lastInvalidateMs.set(fleetId, now)
+  invalidateInspection(client, fleetId)
 }
 
 /**
- * Ensure the SSE→cache bridge is live for `agentId`. Idempotent: wires the
+ * Ensure the SSE→cache bridge is live for `fleetId`. Idempotent: wires the
  * subscription exactly once per agent for the app lifetime (the SSE client is a
  * singleton per agent, and reconnect-replay + the rev guard keep the cache
  * correct across drops). A no-op for an empty id.
@@ -247,10 +247,10 @@ function throttledInvalidateInspection(client: QueryClient, agentId: string): vo
  * component observes an agent's data — no explicit teardown is needed because a
  * single long-lived subscription per visited agent is cheap and correct.
  */
-export function ensureSync(agentId: string): void {
-  if (!agentId || wired.has(agentId)) return
-  wired.add(agentId)
-  const client = getOrCreateSseClient(agentId)
+export function ensureSync(fleetId: string): void {
+  if (!fleetId || wired.has(fleetId)) return
+  wired.add(fleetId)
+  const client = getOrCreateSseClient(fleetId)
   client.subscribe("delta", (event) => {
     let entry: OpEntry
     try {
@@ -261,24 +261,24 @@ export function ensureSync(agentId: string): void {
       entry = measure("sse:parse", () => JSON.parse(event.data) as OpEntry)
     } catch {
       // Malformed frame → fall back to a ground-truth refresh of live caches.
-      invalidateLiveCaches(agentId)
+      invalidateLiveCaches(fleetId)
       return
     }
-    measure("sse:apply", () => applyDelta(queryClient, agentId, entry))
+    measure("sse:apply", () => applyDelta(queryClient, fleetId, entry))
   })
-  client.subscribe("invalidate", () => throttledInvalidateInspection(queryClient, agentId))
+  client.subscribe("invalidate", () => throttledInvalidateInspection(queryClient, fleetId))
   client.subscribe("resync", () => {
     // Catastrophic gap (rev beyond the replay buffer): refresh everything for
     // this agent — live caches AND inspection — to re-anchor on ground truth.
     // Bypass the throttle: resync is rare and must not be suppressed.
-    invalidateLiveCaches(agentId)
-    invalidateInspection(queryClient, agentId)
+    invalidateLiveCaches(fleetId)
+    invalidateInspection(queryClient, fleetId)
   })
 }
 
 /** Refresh the two delta-covered caches from ground truth (used when a frame
  *  can't be folded or a resync is signalled). */
-function invalidateLiveCaches(agentId: string): void {
-  void queryClient.invalidateQueries({ queryKey: qk.threads(agentId) })
-  void queryClient.invalidateQueries({ queryKey: qk.agent(agentId) })
+function invalidateLiveCaches(fleetId: string): void {
+  void queryClient.invalidateQueries({ queryKey: qk.threads(fleetId) })
+  void queryClient.invalidateQueries({ queryKey: qk.agent(fleetId) })
 }

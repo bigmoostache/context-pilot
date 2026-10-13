@@ -103,7 +103,7 @@ export function SheetGrid({
   workbook,
   activeSheet,
   path,
-  agentId,
+  fleetId,
 }: {
   sheets: SheetPayload[]
   /** Backend Univer snapshot (xlsx/xlsm) and the sheet id it opens on. Wins over `sheets`. */
@@ -111,7 +111,7 @@ export function SheetGrid({
   activeSheet?: string | undefined
   path: string
   /** Agent realm to save back to. Without this, Save is disabled. */
-  agentId?: string | undefined
+  fleetId?: string | undefined
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const univerRef = useRef<FUniver | null>(null)
@@ -125,11 +125,11 @@ export function SheetGrid({
   const storageKey = `univer-sheet:v2:${path}`
 
   const handleSave = useCallback(async () => {
-    if (!univerRef.current || !agentId) return
+    if (!univerRef.current || !fleetId) return
     setSaveStatus("saving")
     setSaveError(null)
     try {
-      await saveToRealm(univerRef.current, agentId, path)
+      await saveToRealm(univerRef.current, fleetId, path)
       // Remote file is now the source of truth — wipe localStorage so next
       // mount loads from the freshly-saved remote, not a stale snapshot.
       localStorage.removeItem(storageKey)
@@ -140,7 +140,7 @@ export function SheetGrid({
       setSaveStatus("error")
       setSaveError(error instanceof Error ? error.message : "Save failed")
     }
-  }, [agentId, path, storageKey])
+  }, [fleetId, path, storageKey])
 
   useEffect(() => {
     const el = containerRef.current
@@ -211,7 +211,7 @@ export function SheetGrid({
       {/* Save + dirty indicator — top-right overlay */}
       {(dirty || saveStatus !== "idle") && (
         <div className="pointer-events-none absolute top-1.5 right-2 z-50 flex items-center gap-1.5">
-          {dirty && agentId && (
+          {dirty && fleetId && (
             <button
               type="button"
               className="pointer-events-auto flex items-center gap-1 rounded-md bg-warn/90 px-2 py-0.5 text-[10px] font-semibold text-primary-foreground transition-colors hover:bg-warn"
@@ -222,7 +222,7 @@ export function SheetGrid({
               <span>Save</span>
             </button>
           )}
-          {dirty && !agentId && (
+          {dirty && !fleetId && (
             <span className="rounded-md bg-warn/90 px-2 py-0.5 text-[10px] font-medium text-primary-foreground">
               Unsaved changes
             </span>

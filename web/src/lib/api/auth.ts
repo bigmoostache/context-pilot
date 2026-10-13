@@ -158,36 +158,36 @@ export function forceLogoutUser(userId: string): Promise<ForceLogoutResponse> {
 
 // ── Per-agent ACL management ─────────────────────────────────────────
 
-export function fetchAgentAcl(agentId: string): Promise<AclEntry[]> {
-  return sdk(getApiFleetByIdAcl({ path: { id: agentId } }))
+export function fetchFleetAcl(fleetId: string): Promise<AclEntry[]> {
+  return sdk(getApiFleetByIdAcl({ path: { id: fleetId } }))
 }
 
 export function grantAccess(
-  agentId: string,
+  fleetId: string,
   userId: string,
   role: "agent-admin" | "agent-user" = "agent-user",
 ): Promise<OkResponse> {
   return sdk(
     postApiFleetByIdAcl({
-      path: { id: agentId },
+      path: { id: fleetId },
       body: { user_id: userId, role },
     }),
   )
 }
 
-export function updateAgentRole(
-  agentId: string,
+export function updateFleetRole(
+  fleetId: string,
   userId: string,
   role: "agent-admin" | "agent-user",
 ): Promise<OkResponse> {
   return sdk(
     patchApiFleetByIdAclByUserId({
-      path: { id: agentId, userId },
+      path: { id: fleetId, userId },
       body: { role },
     }),
   )
 }
 
-export function revokeAccess(agentId: string, userId: string): Promise<OkResponse> {
-  return sdk(deleteApiFleetByIdAclByUserId({ path: { id: agentId, userId } }))
+export function revokeAccess(fleetId: string, userId: string): Promise<OkResponse> {
+  return sdk(deleteApiFleetByIdAclByUserId({ path: { id: fleetId, userId } }))
 }

@@ -20,7 +20,7 @@ interface ThreadListProps {
   /** all of the realm's threads (archived included) — filtering happens here */
   threads: ThreadDetail[]
   /** owning agent — the conversation-search target for the palette (T671) */
-  agentId: string
+  fleetId: string
   selectedId: string
   onSelect: (id: string) => void
   showArchived: boolean
@@ -45,7 +45,7 @@ interface ThreadListProps {
  */
 export function ThreadList({
   threads: rawThreads,
-  agentId,
+  fleetId,
   selectedId,
   onSelect,
   showArchived,
@@ -59,7 +59,7 @@ export function ThreadList({
   // Overlay each thread's `unread` with the client-side "not read by the user"
   // count (T712) — the badge now reflects the human's read receipts, not the
   // agent's. Opening a thread marks it read as a side effect of this hook.
-  const { unreadOf } = useThreadReadState(agentId, rawThreads, selectedId)
+  const { unreadOf } = useThreadReadState(fleetId, rawThreads, selectedId)
   const threads = rawThreads.map((t) => ({ ...t, unread: unreadOf(t) }))
   const live = threads.filter((t) => !t.archived)
   const archived = threads.filter((t) => t.archived)
@@ -159,7 +159,7 @@ export function ThreadList({
         open={searchOpen}
         onClose={() => onSearchOpenChange(false)}
         threads={threads}
-        agentId={agentId}
+        fleetId={fleetId}
         onSelect={(id) => {
           onSelect(id)
           onSearchOpenChange(false)

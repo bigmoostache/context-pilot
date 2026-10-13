@@ -27,7 +27,7 @@ interface ThreadListProps {
   selectedId: string
   onSelect: (id: string) => void
   /** leave for the agents (fleet) page — the sidebar's top-left corner button (T631) */
-  onGoToAgents?: (() => void) | undefined
+  onGoToFleets?: (() => void) | undefined
   /** live search query (controlled by the parent so it survives navigation) */
   query: string
   onQueryChange: (q: string) => void
@@ -73,7 +73,7 @@ export function ThreadList({
   threads,
   selectedId,
   onSelect,
-  onGoToAgents,
+  onGoToFleets,
   query,
   onQueryChange,
   showArchived,
@@ -122,8 +122,8 @@ export function ThreadList({
       {/* Top-left corner control: leave the thread sidebar for the agents (fleet)
           page (T631). Shares the safe-area-aware CornerButton so it's reachable
           even in standalone; the archived toggle mirrors it on the right. */}
-      {onGoToAgents && (
-        <CornerButton side="left" label="Show agents" onClick={onGoToAgents} className="z-30">
+      {onGoToFleets && (
+        <CornerButton side="left" label="Show agents" onClick={onGoToFleets} className="z-30">
           <LayoutGrid />
         </CornerButton>
       )}

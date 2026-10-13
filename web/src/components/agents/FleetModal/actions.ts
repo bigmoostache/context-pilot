@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react"
 import type { Agent } from "@/lib/types"
 import {
-  useCreateAgent,
-  useRenameAgent,
+  useCreateFleet,
+  useRenameFleet,
   useRestartFlow,
-  useRetireAgent,
+  useRetireFleet,
   useUploadAvatar,
   sendCommand,
 } from "@/lib/live"
@@ -12,7 +12,7 @@ import { findModel, type ProviderDef } from "@/lib/support/models"
 import { slugify, type SelectionState } from "./controller"
 
 /** The mutation surface + derived busy/error flags returned by
- *  {@link useAgentModalActions}. */
+ *  {@link useFleetModalActions}. */
 export interface Actions {
   error: string | null
   saving: boolean
@@ -40,7 +40,7 @@ const DICEBEAR_STYLES = [
   "pixel-art",
 ]
 
-/** Inputs to {@link useAgentModalActions} — bundled into one object so the hook
+/** Inputs to {@link useFleetModalActions} — bundled into one object so the hook
  *  stays within the max-params budget. */
 export interface ActionsArgs {
   isManage: boolean
@@ -60,27 +60,27 @@ export interface ActionsArgs {
  * effect (so the mount-only binding sees live values without re-binding and
  * without an inline eslint-disable, P4-banned).
  */
-export function useAgentModalActions(args: ActionsArgs): Actions {
+export function useFleetModalActions(args: ActionsArgs): Actions {
   const { isManage, agent, name, sel, providers, onClose, onFlash } = args
-  const createAgent = useCreateAgent()
+  const createFleet = useCreateFleet()
   const {
     restart: doRestart,
     restarting: restartBusy,
     error: restartFlowError,
   } = useRestartFlow(agent?.id ?? "")
-  const retireAgent = useRetireAgent()
-  const renameAgent = useRenameAgent()
+  const retireFleet = useRetireFleet()
+  const renameFleet = useRenameFleet()
   const uploadAvatar = useUploadAvatar()
   const [avatarBust, setAvatarBust] = useState(0)
   const [localError, setLocalError] = useState<string | null>(null)
   const error = restartFlowError ?? localError
   const [saving, setSaving] = useState(false)
-  const pending = createAgent.isPending || saving || restartBusy || retireAgent.isPending
+  const pending = createFleet.isPending || saving || restartBusy || retireFleet.isPending
 
   const onAvatarChange = (file: File) => {
     if (!agent) return
     uploadAvatar.mutate(
-      { agentId: agent.id, file },
+      { fleetId: agent.id, file },
       {
         onSuccess: () => setAvatarBust(Date.now()),
         onError: (err) =>
@@ -103,7 +103,7 @@ export function useAgentModalActions(args: ActionsArgs): Actions {
       .then((blob) => {
         const file = new File([blob], `${style}-${seed}.svg`, { type: "image/svg+xml" })
         uploadAvatar.mutate(
-          { agentId: agent.id, file },
+          { fleetId: agent.id, file },
           {
             onSuccess: () => setAvatarBust(Date.now()),
             onError: (err) =>
@@ -131,9 +131,9 @@ export function useAgentModalActions(args: ActionsArgs): Actions {
   /** Retire (archive) the agent: stop its process + console server, keep its
    *  folder, and move it to the dashboard's Retired section. Reversible. */
   const retire = () => {
-    if (!agent || retireAgent.isPending) return
+    if (!agent || retireFleet.isPending) return
     setLocalError(null)
-    retireAgent.mutate(agent.id, {
+    retireFleet.mutate(agent.id, {
       onSuccess: () => {
         onFlash?.(`Retired ${agent.name} — moved to the Retired section`)
         onClose()
@@ -149,7 +149,7 @@ export function useAgentModalActions(args: ActionsArgs): Actions {
     const tasks: Promise<unknown>[] = [
       sendCommand(a.id, { kind: "configure", provider: sel.provId, model: sel.modelId }),
     ]
-    if (nameChanged) tasks.push(renameAgent.mutateAsync({ agentId: a.id, name: name.trim() }))
+    if (nameChanged) tasks.push(renameFleet.mutateAsync({ fleetId: a.id, name: name.trim() }))
     Promise.all(tasks)
       .then(() => {
         onFlash?.(
@@ -168,7 +168,7 @@ export function useAgentModalActions(args: ActionsArgs): Actions {
   const create = () => {
     setLocalError(null)
     const apiName = findModel(providers, sel.provId, sel.modelId)?.apiName
-    createAgent.mutate(
+    createFleet.mutate(
       { name: name.trim(), ...(apiName && { model: apiName }) },
       {
         onSuccess: (receipt) => {
@@ -213,7 +213,7 @@ export function useAgentModalActions(args: ActionsArgs): Actions {
     submit,
     retire,
     restart,
-    retireBusy: retireAgent.isPending,
+    retireBusy: retireFleet.isPending,
     restartBusy,
     avatarBust,
     onAvatarChange,

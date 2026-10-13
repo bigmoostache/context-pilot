@@ -1,5 +1,5 @@
 import { ArchiveRestore, FolderGit2, Loader2 } from "lucide-react"
-import { useRetiredFleet, useUnretireAgent } from "@/lib/live"
+import { useRetiredFleet, useUnretireFleet } from "@/lib/live"
 import type { Agent } from "@/lib/types"
 
 /**
@@ -31,7 +31,7 @@ export function RetiredSection({ onFlash }: { onFlash: (m: string) => void }) {
 }
 
 function RetiredRow({ agent, onFlash }: { agent: Agent; onFlash: (m: string) => void }) {
-  const unretire = useUnretireAgent()
+  const unretire = useUnretireFleet()
 
   const onUnretire = () => {
     if (unretire.isPending) return

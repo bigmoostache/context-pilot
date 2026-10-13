@@ -1,5 +1,5 @@
 import { ArchiveRestore, FolderGit2, Loader2 } from "lucide-react"
-import { useRetiredFleet, useUnretireAgent } from "@/lib/live"
+import { useRetiredFleet, useUnretireFleet } from "@/lib/live"
 import type { Agent } from "@/lib/types"
 import { useSwipeRow } from "@/lib/live/useSwipeRow"
 
@@ -41,7 +41,7 @@ export function RetiredSection({ onFlash }: { onFlash: (m: string) => void }) {
  *  it on its kept folder). No tap-to-open (there's no live process). */
 function RetiredSwipeRow({ agent, onFlash }: { agent: Agent; onFlash: (m: string) => void }) {
   const { rowRef, close, bind } = useSwipeRow(68)
-  const unretire = useUnretireAgent()
+  const unretire = useUnretireFleet()
 
   const onUnretire = () => {
     close()

@@ -9,9 +9,9 @@ import { cn } from "@/lib/utils"
 /**
  * Props every message renderer accepts.
  *
- * `agentId` + `onOpenFile` are threaded through so a ` ```file-upload ` block
+ * `fleetId` + `onOpenFile` are threaded through so a ` ```file-upload ` block
  * embedded in the body can render its clickable attachment chip **inline** (via
- * {@link MessageBody}): `agentId` lets the chip verify the file still exists,
+ * {@link MessageBody}): `fleetId` lets the chip verify the file still exists,
  * `onOpenFile` opens the shared Quick Look drawer for it. Both optional — a
  * surface that doesn't wire them still renders prose (and static, existence-
  * unchecked chips) unchanged.
@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils"
 interface MessageProps {
   msg: ChatMessage
   /** owning agent — enables the inline attachment chip's existence check */
-  agentId?: string | undefined
+  fleetId?: string | undefined
   /** open the shared Quick Look drawer for an inline attachment */
   onOpenFile?: ((file: UploadedFile) => void) | undefined
   /** navigate the Finder to a file's parent and select it */
@@ -32,7 +32,7 @@ interface MessageProps {
 
 export function Message({
   msg,
-  agentId,
+  fleetId,
   onOpenFile,
   onShowInFinder,
   onDelete,
@@ -43,7 +43,7 @@ export function Message({
     return (
       <UserMessage
         msg={msg}
-        agentId={agentId}
+        fleetId={fleetId}
         onOpenFile={onOpenFile}
         onShowInFinder={onShowInFinder}
         onDelete={onDelete}
@@ -53,7 +53,7 @@ export function Message({
   return (
     <AssistantMessage
       msg={msg}
-      agentId={agentId}
+      fleetId={fleetId}
       onOpenFile={onOpenFile}
       onShowInFinder={onShowInFinder}
       onDelete={onDelete}
@@ -75,13 +75,13 @@ export function Message({
 function MessageBody({
   text,
   variant,
-  agentId,
+  fleetId,
   onOpenFile,
   onShowInFinder,
 }: {
   text: string
   variant: MarkdownVariant
-  agentId?: string | undefined
+  fleetId?: string | undefined
   onOpenFile?: ((file: UploadedFile) => void) | undefined
   onShowInFinder?: ((path: string) => void) | undefined
 }) {
@@ -99,7 +99,7 @@ function MessageBody({
           <div key={i} className="my-1">
             <MessageFileChip
               file={seg.file}
-              agentId={agentId}
+              fleetId={fleetId}
               onAccent={variant === "onAccent"}
               onOpen={onOpenFile ? () => onOpenFile(seg.file) : undefined}
               onShowInFinder={onShowInFinder ? () => onShowInFinder(seg.file.path) : undefined}
@@ -163,7 +163,7 @@ function DeleteButton({ align, onDelete }: { align: "start" | "end"; onDelete: (
 
 function UserMessage({
   msg,
-  agentId,
+  fleetId,
   onOpenFile,
   onShowInFinder,
   onDelete,
@@ -175,7 +175,7 @@ function UserMessage({
         <MessageBody
           text={msg.text ?? ""}
           variant="onAccent"
-          agentId={agentId}
+          fleetId={fleetId}
           onOpenFile={onOpenFile}
           onShowInFinder={onShowInFinder}
         />
@@ -195,7 +195,7 @@ function UserMessage({
 
 function AssistantMessage({
   msg,
-  agentId,
+  fleetId,
   onOpenFile,
   onShowInFinder,
   onDelete,
@@ -214,7 +214,7 @@ function AssistantMessage({
         <MessageBody
           text={msg.text ?? ""}
           variant="default"
-          agentId={agentId}
+          fleetId={fleetId}
           onOpenFile={onOpenFile}
           onShowInFinder={onShowInFinder}
         />

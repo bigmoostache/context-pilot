@@ -106,7 +106,7 @@ export function fetchRetiredFleet(): Promise<Agent[]> {
 
 // ── Agent lifecycle (SDK) ─────────────────────────────────────────────
 
-export function createAgent(body: {
+export function createFleet(body: {
   name: string
   folder?: string
   model?: string
@@ -114,49 +114,49 @@ export function createAgent(body: {
   return sdk(postApiFleetsCreate({ body }))
 }
 
-export function restartAgent(agentId: string): Promise<RestartReceipt> {
-  return sdk(postApiFleetByIdRestart({ path: { id: agentId } }))
+export function restartFleet(fleetId: string): Promise<RestartReceipt> {
+  return sdk(postApiFleetByIdRestart({ path: { id: fleetId } }))
 }
 
-export function retireAgent(agentId: string): Promise<RetireReceipt> {
-  return sdk(postApiFleetByIdRetire({ path: { id: agentId } }))
+export function retireFleet(fleetId: string): Promise<RetireReceipt> {
+  return sdk(postApiFleetByIdRetire({ path: { id: fleetId } }))
 }
 
-export function unretireAgent(agentId: string): Promise<UnretireReceipt> {
-  return sdk(postApiFleetByIdUnretire({ path: { id: agentId } }))
+export function unretireFleet(fleetId: string): Promise<UnretireReceipt> {
+  return sdk(postApiFleetByIdUnretire({ path: { id: fleetId } }))
 }
 
-export function renameAgent(agentId: string, name: string): Promise<{ ok: boolean }> {
-  return sdk(postApiFleetByIdRename({ path: { id: agentId }, body: { name } }))
+export function renameFleet(fleetId: string, name: string): Promise<{ ok: boolean }> {
+  return sdk(postApiFleetByIdRename({ path: { id: fleetId }, body: { name } }))
 }
 
 // ── Agent meta (SDK) ──────────────────────────────────────────────────
 
-export function fetchAgentMeta(agentId: string): Promise<Agent> {
-  return sdk(getApiFleetByIdMeta({ path: { id: agentId } }))
+export function fetchFleetMeta(fleetId: string): Promise<Agent> {
+  return sdk(getApiFleetByIdMeta({ path: { id: fleetId } }))
 }
 
 // ── Agent avatar ──────────────────────────────────────────────────────
 
-export function uploadAvatar(agentId: string, file: File): Promise<{ ok: boolean }> {
-  return sdk(postApiFleetByIdAvatar({ path: { id: agentId }, body: file }))
+export function uploadAvatar(fleetId: string, file: File): Promise<{ ok: boolean }> {
+  return sdk(postApiFleetByIdAvatar({ path: { id: fleetId }, body: file }))
 }
 
 /** Build the URL to an agent's avatar image (for use as `<img src>`). */
-export function avatarUrl(agentId: string, cacheBust?: number): string {
+export function avatarUrl(fleetId: string, cacheBust?: number): string {
   const base = (import.meta.env["VITE_API_URL"] as string | undefined) || ""
   const v = cacheBust ? `?v=${cacheBust}` : ""
-  return `${base}/api/fleet/${agentId}/avatar${v}`
+  return `${base}/api/fleet/${fleetId}/avatar${v}`
 }
 
 // ── Tools / Radar / Entities (SDK) ────────────────────────────────────
 
-export function fetchMetrics(agentId: string): Promise<AgentMetrics> {
-  return sdk(getApiFleetByIdMetrics({ path: { id: agentId } }))
+export function fetchMetrics(fleetId: string): Promise<AgentMetrics> {
+  return sdk(getApiFleetByIdMetrics({ path: { id: fleetId } }))
 }
 
-export function fetchVitals(agentId: string): Promise<Vital[]> {
-  return sdk(getApiFleetByIdVitals({ path: { id: agentId } }))
+export function fetchVitals(fleetId: string): Promise<Vital[]> {
+  return sdk(getApiFleetByIdVitals({ path: { id: fleetId } }))
 }
 
 export function fetchFleetMetrics(): Promise<AgentMetrics[]> {
@@ -165,8 +165,8 @@ export function fetchFleetMetrics(): Promise<AgentMetrics[]> {
 
 // ── Usage / Library (SDK) ─────────────────────────────────────────────
 
-export function fetchLibrary(agentId: string): Promise<LibraryItem[]> {
-  return sdk(getApiFleetByIdLibrary({ path: { id: agentId } }))
+export function fetchLibrary(fleetId: string): Promise<LibraryItem[]> {
+  return sdk(getApiFleetByIdLibrary({ path: { id: fleetId } }))
 }
 
 // ── Providers (SDK) ───────────────────────────────────────────────────
@@ -217,22 +217,22 @@ export function setUpdateMode(body: {
 export type CommandReceipt = GenCommandReceipt
 
 export async function sendCommand(
-  agentId: string,
+  fleetId: string,
   kind: Record<string, unknown>,
 ): Promise<CommandReceipt> {
   return sdk(
     postApiFleetByIdCommand({
-      path: { id: agentId },
+      path: { id: fleetId },
       body: buildCommandEnvelope(kind) as Record<string, unknown>,
     }),
   )
 }
 
 export function createCommand(
-  agentId: string,
+  fleetId: string,
   cmd: { name: string; description?: string; body: string },
 ): Promise<CreateCommandReceipt> {
-  return sdk(postApiFleetByIdLibraryCommand({ path: { id: agentId }, body: cmd }))
+  return sdk(postApiFleetByIdLibraryCommand({ path: { id: fleetId }, body: cmd }))
 }
 
 /** Create or overwrite a `/command` `.md` by its file id (the bubble row's
@@ -240,12 +240,12 @@ export function createCommand(
  *  `PUT …/library/command/{item}` deliberately overwrites, unlike the 409-on-
  *  clobber {@link createCommand}. */
 export function updateCommand(
-  agentId: string,
+  fleetId: string,
   itemId: string,
   cmd: { name: string; description?: string; body: string },
 ): Promise<CreateCommandReceipt> {
   return sdk(
-    putApiFleetByIdLibraryCommandByItem({ path: { id: agentId, item: itemId }, body: cmd }),
+    putApiFleetByIdLibraryCommandByItem({ path: { id: fleetId, item: itemId }, body: cmd }),
   )
 }
 
@@ -254,24 +254,24 @@ export function updateCommand(
 export type LibraryAgentRaw = import("./generated/types.gen").LibraryAgentRaw
 
 /** Read one behaviour agent's raw authoring fields (Export + Edit-prefill). */
-export function fetchLibraryAgent(agentId: string, itemId: string): Promise<LibraryAgentRaw> {
-  return sdk(getApiFleetByIdLibraryAgentByItem({ path: { id: agentId, item: itemId } }))
+export function fetchLibraryAgent(fleetId: string, itemId: string): Promise<LibraryAgentRaw> {
+  return sdk(getApiFleetByIdLibraryAgentByItem({ path: { id: fleetId, item: itemId } }))
 }
 
 /** Create or overwrite a behaviour agent `.md` (user agent or built-in override). */
 export function upsertLibraryAgent(
-  agentId: string,
+  fleetId: string,
   itemId: string,
   agent: { name: string; description?: string; body: string },
 ): Promise<CreateCommandReceipt> {
   return sdk(
-    putApiFleetByIdLibraryAgentByItem({ path: { id: agentId, item: itemId }, body: agent }),
+    putApiFleetByIdLibraryAgentByItem({ path: { id: fleetId, item: itemId }, body: agent }),
   )
 }
 
 /** Delete a behaviour agent's on-disk `.md` (override revert, or user agent removal). */
-export function deleteLibraryAgent(agentId: string, itemId: string): Promise<CreateCommandReceipt> {
-  return sdk(deleteApiFleetByIdLibraryAgentByItem({ path: { id: agentId, item: itemId } }))
+export function deleteLibraryAgent(fleetId: string, itemId: string): Promise<CreateCommandReceipt> {
+  return sdk(deleteApiFleetByIdLibraryAgentByItem({ path: { id: fleetId, item: itemId } }))
 }
 
 // ── Ticket (SDK) ──────────────────────────────────────────────────────
@@ -295,9 +295,9 @@ export function formatAge(epochMs: number): string {
   return `${days}d ago`
 }
 
-export async function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
+export async function fetchThreads(fleetId: string): Promise<ThreadDetail[]> {
   const res = await sdk<{ focusedThreadId?: string | null; threads: ThreadDetail[] }>(
-    getApiFleetByIdThreads({ path: { id: agentId } }),
+    getApiFleetByIdThreads({ path: { id: fleetId } }),
   )
   const focusedId = res.focusedThreadId ?? null
   return res.threads.map((t) => {
@@ -328,13 +328,13 @@ export async function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
  * first; an empty array means no match.
  */
 export function searchConversations(
-  agentId: string,
+  fleetId: string,
   query: string,
   opts?: { limit?: number; threadId?: string },
 ): Promise<import("./generated/types.gen").ConvHit[]> {
   return sdk<{ hits: import("./generated/types.gen").ConvHit[] }>(
     postApiFleetByIdConversationsSearch({
-      path: { id: agentId },
+      path: { id: fleetId },
       body: {
         query,
         ...(opts?.limit != null && { limit: opts.limit }),

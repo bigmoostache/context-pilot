@@ -105,8 +105,8 @@ export function FinderShell({
           aria-hidden={!railOpen}
         >
           <ExplorerTree
-            agentId={agent.id}
-            agentFolder={agent.folder}
+            fleetId={agent.id}
+            fleetFolder={agent.folder}
             tree={tree}
             descriptions={descriptions}
             activePath={groups.activePath}
@@ -121,7 +121,7 @@ export function FinderShell({
           />
         </div>
 
-        <TabHost groups={groups} agentId={agent.id} />
+        <TabHost groups={groups} fleetId={agent.id} />
       </div>
     </DndContext>
   )

@@ -5,16 +5,16 @@ import type { UploadedFile } from "./helpers"
 export type ThreadAsideTab = "files" | "tasks" | "notes"
 
 /** localStorage key holding a thread's show/hide choice for its right aside. */
-const hiddenKey = (agentId: string, threadId: string) => `cp-aside-hidden-${agentId}-${threadId}`
+const hiddenKey = (fleetId: string, threadId: string) => `cp-aside-hidden-${fleetId}-${threadId}`
 
 /**
  * Read a thread's persisted aside show/hide choice. `"1"` → hidden, `"0"` →
  * shown; absent → fall back to the global default (`defaultHidden`). Refresh-
  * robust: once a thread is toggled the choice is stored and survives reloads.
  */
-function readHidden(agentId: string, threadId: string, defaultHidden: boolean): boolean {
+function readHidden(fleetId: string, threadId: string, defaultHidden: boolean): boolean {
   if (typeof window === "undefined") return defaultHidden
-  const raw = window.localStorage.getItem(hiddenKey(agentId, threadId))
+  const raw = window.localStorage.getItem(hiddenKey(fleetId, threadId))
   if (raw === "1") return true
   if (raw === "0") return false
   return defaultHidden
@@ -38,19 +38,19 @@ function readHidden(agentId: string, threadId: string, defaultHidden: boolean): 
  * a component-only export surface — the react-refresh/only-export-components
  * invariant that keeps Fast Refresh working.
  */
-export function useThreadAside(agentId: string, threadId: string, defaultHidden: boolean) {
+export function useThreadAside(fleetId: string, threadId: string, defaultHidden: boolean) {
   const [tab, setTab] = useState<ThreadAsideTab>("tasks")
   const [file, setFile] = useState<UploadedFile | null>(null)
-  const [hidden, setHidden] = useState<boolean>(() => readHidden(agentId, threadId, defaultHidden))
+  const [hidden, setHidden] = useState<boolean>(() => readHidden(fleetId, threadId, defaultHidden))
 
   // Re-seed the per-thread hidden choice when the agent/thread key changes
   // (the component instance is reused across thread switches). Guarded by the
   // previous key so it fires exactly once per switch, not every render.
-  const key = hiddenKey(agentId, threadId)
+  const key = hiddenKey(fleetId, threadId)
   const [prevKey, setPrevKey] = useState(key)
   if (prevKey !== key) {
     setPrevKey(key)
-    setHidden(readHidden(agentId, threadId, defaultHidden))
+    setHidden(readHidden(fleetId, threadId, defaultHidden))
   }
 
   // Persist the choice for the current thread whenever it changes.

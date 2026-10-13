@@ -102,19 +102,19 @@ function parseAgentMd(text: string): { name: string; description: string; body: 
  * `PUT …/library/agent/{itemId}` upsert (M141) — this component only renders +
  * calls. Delete is hidden for pure built-ins (no on-disk `.md` to remove).
  */
-export function BehaviourChip({ agentId }: { agentId: string }) {
-  const { data: library = [] } = useLibrary(agentId)
+export function BehaviourChip({ fleetId }: { fleetId: string }) {
+  const { data: library = [] } = useLibrary(fleetId)
   const agentBehaviours = library.filter((item) => item.kind === "agent")
   const active = agentBehaviours.find((item) => item.active)
   const activeName = active?.name ?? "default"
 
   const [editor, setEditor] = useState<EditorState>({ open: false })
-  const del = useDeleteLibraryAgent(agentId)
+  const del = useDeleteLibraryAgent(fleetId)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const select = (id: string) => {
     if (id === active?.id) return
-    void sendCommand(agentId, { kind: "load_behaviour", id }).catch(() => {
+    void sendCommand(fleetId, { kind: "load_behaviour", id }).catch(() => {
       // Fire-and-forget: a failed switch keeps the current behaviour; the
       // library query re-reports ground truth on its next fold/poll.
     })
@@ -122,7 +122,7 @@ export function BehaviourChip({ agentId }: { agentId: string }) {
 
   // Export = fetch the raw `.md` (disk file or built-in seed) and download it.
   const exportAgent = (item: LibraryItem) => {
-    void fetchLibraryAgent(agentId, item.id)
+    void fetchLibraryAgent(fleetId, item.id)
       .then((raw) => {
         const md = `---\nname: ${raw.name}\ndescription: ${raw.description}\n---\n${raw.body}\n`
         const url = URL.createObjectURL(new Blob([md], { type: "text/markdown" }))
@@ -218,7 +218,7 @@ export function BehaviourChip({ agentId }: { agentId: string }) {
         <AgentEditorDialog
           open
           onClose={() => setEditor({ open: false })}
-          agentId={agentId}
+          fleetId={fleetId}
           mode={editor.mode}
           initial={editor.initial}
         />

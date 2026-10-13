@@ -12,13 +12,13 @@ import { cn, prefersReducedMotion } from "@/lib/utils"
 //
 // Render subcomponents for the mobile Agent Settings PAGE (the divergent twin's
 // index reworked from a dialog into a full-screen page, T636). Desktop keeps its
-// floating manage dialog (components/agents/AgentModal); on a phone that dialog
+// floating manage dialog (components/agents/FleetModal); on a phone that dialog
 // is replaced by this page, reached from the agents list (swipe → Manage) and
 // from a thread page's top-right Settings button. Every field auto-saves, so
 // there is no Save button — only the back chevron and a confirmation toast.
 
 // The page's back button + title header are no longer a bespoke sticky bar:
-// AgentModal now renders the app-wide glass `CornerButton` (top-left) for the
+// FleetModal now renders the app-wide glass `CornerButton` (top-left) for the
 // return action and a big left-aligned title header matching the agents page,
 // so the settings surface reads identically to the rest of the mobile chrome.
 
@@ -174,8 +174,8 @@ export function ProviderBody({
 }
 
 /** Service-vitals section body — the on-demand connectivity board. */
-export function VitalsBody({ agentId }: { agentId: string }) {
-  return <SessionVitals agentId={agentId} />
+export function VitalsBody({ fleetId }: { fleetId: string }) {
+  return <SessionVitals fleetId={fleetId} />
 }
 
 /**

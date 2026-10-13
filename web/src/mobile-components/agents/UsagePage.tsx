@@ -35,7 +35,7 @@ interface Row {
   outputTokens: number
 }
 
-const agentAccent = (a: Agent) =>
+const fleetAccent = (a: Agent) =>
   ({
     signal: "var(--signal)",
     interactive: "var(--interactive)",
@@ -58,7 +58,7 @@ const fmtTok = (v: number) =>
 
 export function UsagePage() {
   const [unit, setUnit] = useState<UsageUnit>("usd")
-  const [agentId, setAgentId] = useState<string>("all")
+  const [fleetId, setFleetId] = useState<string>("all")
 
   const { data: agents = [] } = useFleet()
   const { data: metrics = [] } = useFleetMetrics()
@@ -77,7 +77,7 @@ export function UsagePage() {
     })
   }, [agents, metrics])
 
-  const visible = agentId === "all" ? rows : rows.filter((r) => r.agent.id === agentId)
+  const visible = fleetId === "all" ? rows : rows.filter((r) => r.agent.id === fleetId)
 
   const totals = useMemo(
     () =>
@@ -109,8 +109,8 @@ export function UsagePage() {
           <div className="flex flex-wrap items-center gap-2">
             {/* agent filter — 16px text to defeat iOS focus-zoom on the select */}
             <select
-              value={agentId}
-              onChange={(e) => setAgentId(e.target.value)}
+              value={fleetId}
+              onChange={(e) => setFleetId(e.target.value)}
               className="card-shadow flex-1 rounded-lg border border-border bg-card px-2.5 py-2 text-[16px] text-foreground/85"
               aria-label="Filter by agent"
             >
@@ -211,7 +211,7 @@ function UsageTable({ visible, totals }: { visible: Row[]; totals: Totals }) {
                     <span className="flex items-center gap-2">
                       <span
                         className="size-2 shrink-0 rounded-full"
-                        style={{ background: agentAccent(r.agent) }}
+                        style={{ background: fleetAccent(r.agent) }}
                       />
                       {r.agent.name}
                     </span>

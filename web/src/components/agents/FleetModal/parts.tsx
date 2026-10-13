@@ -18,7 +18,7 @@ import { ModelPicker } from "../ModelPicker"
 import { ManageBody } from "./manageBody"
 import { cn } from "@/lib/utils"
 
-/** Everything the render subcomponents need — assembled in {@link AgentModal}. */
+/** Everything the render subcomponents need — assembled in {@link FleetModal}. */
 export interface Controller {
   isManage: boolean
   agent: Agent | undefined
@@ -52,7 +52,7 @@ function submitLabel(pending: boolean, saving: boolean, isManage: boolean): stri
 
 /** Hero header: avatar (a native file-picker <label> in manage mode), title +
  *  subtitle, and the close button. */
-export function AgentModalHeader({
+export function FleetModalHeader({
   isManage,
   agent,
   avatarBust,
@@ -155,7 +155,7 @@ export function AgentModalHeader({
 /** Body: create mode = single form (name + realm preview + provider/model
  *  picker); manage mode = ONE scrolling page (Model · Vitals, no category rail),
  *  delegated to {@link ManageBody}. */
-export function AgentModalBody({ c }: { c: Controller }) {
+export function FleetModalBody({ c }: { c: Controller }) {
   if (c.isManage) return <ManageBody c={c} />
   return <CreateBody c={c} />
 }
@@ -204,7 +204,7 @@ function CreateBody({ c }: { c: Controller }) {
 }
 
 /** Footer actions: retire + restart (manage only) and the primary submit button. */
-export function AgentModalFooter({ c }: { c: Controller }) {
+export function FleetModalFooter({ c }: { c: Controller }) {
   const { isManage, pending, saving, canSubmit } = c
   return (
     <div className="flex items-center gap-2 border-t border-border/70 bg-muted/25 px-6 py-4">

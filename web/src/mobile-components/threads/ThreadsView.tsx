@@ -33,19 +33,19 @@ import { prefersReducedMotion } from "@/lib/utils"
  * two trees can never drift (design-mobile.md §3.2, architecture rule M141).
  */
 export function ThreadsView({
-  activeAgentId,
+  activeFleetId,
   onShowInFinder,
-  onGoToAgents,
+  onGoToFleets,
   onOpenSettings,
   disconnected,
   onReconnect,
 }: {
-  activeAgentId: string
+  activeFleetId: string
   /** navigate the Finder to a file's parent directory and select it (T334) */
   onShowInFinder?: (path: string) => void
   /** leave the conversation for the agents (fleet) page — wired to the thread
    *  drawer's top-left corner button (T631) */
-  onGoToAgents?: (() => void) | undefined
+  onGoToFleets?: (() => void) | undefined
   /** open this agent's full-screen Settings page — wired to the conversation's
    *  top-right corner button (T636). Undefined when no live agent. */
   onOpenSettings?: (() => void) | undefined
@@ -53,11 +53,11 @@ export function ThreadsView({
   onReconnect?: () => void
 }) {
   const { data: agents = [] } = useFleet()
-  const { data: threads = [] } = useThreads(activeAgentId)
-  const hasAgent = agents.some((a) => a.id === activeAgentId)
+  const { data: threads = [] } = useThreads(activeFleetId)
+  const hasFleet = agents.some((a) => a.id === activeFleetId)
 
-  const sel = useThreadSelection(activeAgentId, threads)
-  const actions = useThreadActions(activeAgentId, threads, sel)
+  const sel = useThreadSelection(activeFleetId, threads)
+  const actions = useThreadActions(activeFleetId, threads, sel)
 
   // The one piece of state desktop's always-open rail doesn't need: whether the
   // thread-list drawer is showing. Closed by default when a realm opens (the
@@ -101,8 +101,8 @@ export function ThreadsView({
   }, [drawerOpen])
 
   // No agent at all → bare empty state (no realm to render a roster for).
-  if (!hasAgent) {
-    return <EmptyRealm agentName={undefined} />
+  if (!hasFleet) {
+    return <EmptyRealm fleetName={undefined} />
   }
 
   const thread = threads.find((t) => t.id === sel.effectiveSelectedId)
@@ -129,7 +129,7 @@ export function ThreadsView({
       {thread ? (
         <ThreadConversation
           thread={thread}
-          agentId={activeAgentId}
+          fleetId={activeFleetId}
           onSend={actions.handleSend}
           onAttach={actions.handleAttach}
           pendingFiles={sel.pendingFiles}
@@ -141,7 +141,7 @@ export function ThreadsView({
         />
       ) : (
         <EmptyRealm
-          agentName={agents.find((a) => a.id === activeAgentId)?.name}
+          fleetName={agents.find((a) => a.id === activeFleetId)?.name}
           onNewThread={() => setDrawerOpen(true)}
         />
       )}
@@ -202,7 +202,7 @@ export function ThreadsView({
           threads={threads}
           selectedId={sel.effectiveSelectedId}
           onSelect={openThread}
-          onGoToAgents={onGoToAgents}
+          onGoToFleets={onGoToFleets}
           query={sel.query}
           onQueryChange={sel.setQuery}
           showArchived={sel.showArchived}
@@ -217,7 +217,7 @@ export function ThreadsView({
         />
       </aside>
 
-      <BranchDialog actions={actions} threads={threads} agentId={activeAgentId} />
+      <BranchDialog actions={actions} threads={threads} fleetId={activeFleetId} />
 
       <UndoNotice notice={actions.notice} />
     </div>
@@ -228,10 +228,10 @@ export function ThreadsView({
  *  twin of the desktop EmptyRealm. When `onNewThread` is supplied it offers a
  *  primary action so an empty realm can bootstrap its first thread. */
 function EmptyRealm({
-  agentName,
+  fleetName,
   onNewThread,
 }: {
-  agentName?: string | undefined
+  fleetName?: string | undefined
   onNewThread?: (() => void) | undefined
 }) {
   return (
@@ -240,9 +240,9 @@ function EmptyRealm({
         <FolderGit2 className="size-6" />
       </span>
       <p className="max-w-[320px] text-[13px] text-muted-foreground">
-        {agentName ? (
+        {fleetName ? (
           <>
-            <span className="font-medium text-foreground/80">{agentName}</span> has no threads yet —
+            <span className="font-medium text-foreground/80">{fleetName}</span> has no threads yet —
             tap the menu (top-left) to browse, or start one to put it to work in its folder.
           </>
         ) : (
@@ -295,11 +295,11 @@ function UndoNotice({ notice }: { notice: Notice | null }) {
 function BranchDialog({
   actions,
   threads,
-  agentId,
+  fleetId,
 }: {
   actions: Actions
   threads: ThreadDetail[]
-  agentId: string
+  fleetId: string
 }) {
   const target = actions.branchTarget
   if (!target) return null
@@ -309,7 +309,7 @@ function BranchDialog({
       open
       onClose={actions.closeBranch}
       onCreate={actions.handleBranch}
-      agentId={agentId}
+      fleetId={fleetId}
       branch={{
         parentName: threads.find((t) => t.id === target.threadId)?.name ?? target.threadId,
         excerpt: target.excerpt,

@@ -30,10 +30,10 @@ export interface ThreadForms {
 /**
  * Derive every form's answered state from the thread log and expose the submit
  * handler. `answersByForm` is rebuilt only when the log changes; `onFormSubmit`
- * is stable across renders (deps: agentId + threadId) so it never defeats a
+ * is stable across renders (deps: fleetId + threadId) so it never defeats a
  * child memo boundary.
  */
-export function useThreadForms(log: ThreadMsg[], agentId: string, threadId: string): ThreadForms {
+export function useThreadForms(log: ThreadMsg[], fleetId: string, threadId: string): ThreadForms {
   const answersByForm = useMemo(() => {
     const m = new Map<string, FormAnswer>()
     for (const msg of log) {
@@ -46,9 +46,9 @@ export function useThreadForms(log: ThreadMsg[], agentId: string, threadId: stri
   const onFormSubmit = useCallback(
     (formId: string, entries: FormAnswerEntry[]) => {
       const content = buildFormAnswerContent(formId, entries)
-      void sendCommand(agentId, { kind: "send_message", thread_id: threadId, content })
+      void sendCommand(fleetId, { kind: "send_message", thread_id: threadId, content })
     },
-    [agentId, threadId],
+    [fleetId, threadId],
   )
 
   return { answersByForm, onFormSubmit }

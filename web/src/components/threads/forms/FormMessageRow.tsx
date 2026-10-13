@@ -32,7 +32,7 @@ import {
  */
 export function FormMessageRow({
   msg,
-  agentId,
+  fleetId,
   threadId,
   answersByForm,
   onFormSubmit,
@@ -42,7 +42,7 @@ export function FormMessageRow({
   onBranch,
 }: {
   msg: ThreadMsg
-  agentId: string
+  fleetId: string
   threadId: string
   answersByForm: Map<string, FormAnswer>
   onFormSubmit: (formId: string, entries: FormAnswerEntry[]) => void
@@ -74,7 +74,7 @@ export function FormMessageRow({
       {stripped.length > 0 && (
         <Message
           msg={chatMsg}
-          agentId={agentId}
+          fleetId={fleetId}
           onOpenFile={onOpenFile}
           onShowInFinder={onShowInFinder}
           onDelete={() => onDelete(msg)}
@@ -86,9 +86,9 @@ export function FormMessageRow({
           <FormWidget
             key={spec.formId}
             spec={spec}
-            agentId={agentId}
+            fleetId={fleetId}
             answer={answersByForm.get(spec.formId) ?? null}
-            draftKey={`cp-form-${agentId}-${threadId}-${spec.formId}`}
+            draftKey={`cp-form-${fleetId}-${threadId}-${spec.formId}`}
             onSubmit={onFormSubmit}
           />
         ))}

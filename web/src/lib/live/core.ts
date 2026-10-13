@@ -24,21 +24,21 @@ export interface LiveQueryResult<T> {
 
 /**
  * Wrap a TanStack `useQuery` into the legacy `LiveQueryResult` shape and ensure
- * the agent's SSE→cache bridge is live. `agentId` is optional: fleet-level
+ * the agent's SSE→cache bridge is live. `fleetId` is optional: fleet-level
  * resources pass none (no bridge), agent-scoped ones pass theirs.
  */
 export function useLive<T>(
   queryKey: readonly unknown[],
   queryFn: () => Promise<T>,
-  opts: { agentId?: string; enabled?: boolean; pollMs?: number } = {},
+  opts: { fleetId?: string; enabled?: boolean; pollMs?: number } = {},
 ): LiveQueryResult<T> {
-  const { agentId, enabled = true, pollMs = BACKSTOP_POLL_MS } = opts
+  const { fleetId, enabled = true, pollMs = BACKSTOP_POLL_MS } = opts
 
   // Guarantee the push plane is running for this agent whenever its data is
   // observed. Idempotent + no teardown (one long-lived subscription per agent).
   useEffect(() => {
-    if (agentId) ensureSync(agentId)
-  }, [agentId])
+    if (fleetId) ensureSync(fleetId)
+  }, [fleetId])
 
   const q = useQuery({
     queryKey,

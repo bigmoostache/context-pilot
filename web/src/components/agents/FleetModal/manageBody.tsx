@@ -1,7 +1,7 @@
 import { FolderGit2, Dices, ImagePlus } from "lucide-react"
 import { avatarUrl } from "@/lib/api"
 import type { Agent } from "@/lib/types"
-import { AgentAclSection } from "../../auth/AgentAclSection"
+import { FleetAclSection } from "../../auth/FleetAclSection"
 import { SessionVitals } from "../../shell/SessionVitals"
 import type { Controller } from "./parts"
 
@@ -28,7 +28,7 @@ export function ManageBody({ c }: { c: Controller }) {
             SessionVitals' OWN "Service vitals" heading, and a second label above
             it would read as two headings for one board. */}
         <div className="mx-6 border-t border-border/50" />
-        {c.agent && <VitalsTab c={c} agentId={c.agent.id} />}
+        {c.agent && <VitalsTab c={c} fleetId={c.agent.id} />}
       </div>
     </div>
   )
@@ -40,7 +40,7 @@ export function ManageBody({ c }: { c: Controller }) {
  * Agent image editor — the same avatar affordance the create/manage dialog
  * carries in its header, surfaced as a labelled settings field. The whole
  * upload path (file pick, DiceBear randomize, cache-bust) lives in
- * {@link useAgentModalActions}; this only renders it, so there is no logic
+ * {@link useFleetModalActions}; this only renders it, so there is no logic
  * duplication (M141) — a manual pick and a random shuffle land the bytes
  * through the exact same mutation.
  *
@@ -156,11 +156,11 @@ export function LlmTab({ c }: { c: Controller }) {
 // ── Vitals section ──────────────────────────────────────────────────
 
 /** Service vitals + (when auth is on) the per-agent ACL section. */
-export function VitalsTab({ c, agentId }: { c: Controller; agentId: string }) {
+export function VitalsTab({ c, fleetId }: { c: Controller; fleetId: string }) {
   return (
     <div className="flex flex-col gap-5 px-6 py-5">
-      <SessionVitals agentId={agentId} />
-      {c.authEnabled && <AgentAclSection agentId={agentId} />}
+      <SessionVitals fleetId={fleetId} />
+      {c.authEnabled && <FleetAclSection fleetId={fleetId} />}
     </div>
   )
 }

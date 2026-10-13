@@ -8,7 +8,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react"
 import { ThemeToggle } from "./widgets/ThemeToggle"
-import { AgentSwitcher } from "./widgets/AgentSwitcher"
+import { FleetSwitcher } from "./widgets/FleetSwitcher"
 import { UsageButton } from "./widgets/UsageButton"
 import { HintBadge } from "./chrome/HintBadge"
 import { ConfigModal } from "./config/ConfigModal"
@@ -25,8 +25,8 @@ import { cn } from "@/lib/utils"
 interface TopBarProps {
   view: ViewMode
   onViewChange: (v: ViewMode) => void
-  activeAgentId: string
-  onSwitchAgent: (id: string) => void
+  activeFleetId: string
+  onSwitchFleet: (id: string) => void
   agents: Agent[]
   /** Whether the threads view's list rail is open — drives the Threads tab's
    *  `aria-expanded` and its tooltip wording while that view is active. */
@@ -40,7 +40,7 @@ interface TopBarProps {
   onSearchThreads: () => void
   /** Open the focused agent's settings DIALOG. The rail owns the trigger, so
    *  the flag it flips has to live in the shell — see `manageOpen` in Root. */
-  onManageAgent: () => void
+  onManageFleet: () => void
   /** Whether the finder view's explorer rail is open — drives the Finder tab's
    *  `aria-expanded` and its tooltip wording while that view is active. */
   finderRailOpen: boolean
@@ -55,23 +55,23 @@ interface TopBarProps {
 export function TopBar({
   view,
   onViewChange,
-  activeAgentId,
-  onSwitchAgent,
+  activeFleetId,
+  onSwitchFleet,
   agents,
   threadsRailOpen,
   onToggleThreadsRail,
   onNewThread,
   onSearchThreads,
-  onManageAgent,
+  onManageFleet,
   finderRailOpen,
   onToggleFinderRail,
 }: TopBarProps) {
-  const activeAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
+  const activeFleet = agents.find((a) => a.id === activeFleetId) ?? agents[0]
   // OAuth usage/login widget: only for the OAuth providers (`anthropic` uses an
   // API key), and only where the deployment offers the subscription at all.
   const isClaudeOAuth =
     useFeatures().claude_oauth &&
-    (activeAgent?.provider === "claudecode" || activeAgent?.provider === "claudecodev2")
+    (activeFleet?.provider === "claudecode" || activeFleet?.provider === "claudecodev2")
   const inFleet = view === "fleet"
   const { devMode } = useDevMode()
   const [configOpen, setConfigOpen] = useState(false)
@@ -95,22 +95,22 @@ export function TopBar({
           body="The agent you're working in — one agent, one folder. Switch or manage from here."
           side="right"
         >
-          <AgentSwitcher
+          <FleetSwitcher
             rail
             open={switcherOpen}
             onOpenChange={setSwitcherOpen}
             shortcutHint="A"
             hintShown={switcherModHeld}
             agents={agents}
-            activeId={inFleet ? undefined : activeAgentId}
-            onManageAgents={() => onViewChange("fleet")}
+            activeId={inFleet ? undefined : activeFleetId}
+            onManageFleets={() => onViewChange("fleet")}
             onSwitch={
               inFleet
                 ? (id) => {
-                    onSwitchAgent(id)
+                    onSwitchFleet(id)
                     onViewChange("threads")
                   }
-                : onSwitchAgent
+                : onSwitchFleet
             }
           />
         </Tip>
@@ -136,7 +136,7 @@ export function TopBar({
 
         <TopBarActions
           isClaudeOAuth={isClaudeOAuth}
-          onManageAgent={onManageAgent}
+          onManageFleet={onManageFleet}
           setConfigOpen={setConfigOpen}
           setProfileOpen={setProfileOpen}
           setUsersOpen={setUsersOpen}
@@ -161,13 +161,13 @@ export function TopBar({
  *  and the eye reaches for the appearance controls at the very bottom. */
 function TopBarActions({
   isClaudeOAuth,
-  onManageAgent,
+  onManageFleet,
   setConfigOpen,
   setProfileOpen,
   setUsersOpen,
 }: {
   isClaudeOAuth: boolean
-  onManageAgent: () => void
+  onManageFleet: () => void
   setConfigOpen: (v: boolean) => void
   setProfileOpen: (v: boolean) => void
   setUsersOpen: (v: boolean) => void
@@ -175,7 +175,7 @@ function TopBarActions({
   // ⌘/Ctrl+I opens the agent settings dialog. Bound HERE, beside the button, so
   // the key listener's lifetime matches the control it drives — the same
   // rule {@link ThreadActions} follows for C and P.
-  const modHeld = useModifierShortcuts({ i: onManageAgent })
+  const modHeld = useModifierShortcuts({ i: onManageFleet })
 
   return (
     <div className="mt-auto flex flex-col items-center gap-3">
@@ -185,7 +185,7 @@ function TopBarActions({
           icon={SlidersHorizontal}
           hint="I"
           hintShown={modHeld}
-          onClick={onManageAgent}
+          onClick={onManageFleet}
         />
       </Tip>
       <Tip title="Appearance" body="Switch between light and dark." side="right">

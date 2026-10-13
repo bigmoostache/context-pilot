@@ -421,7 +421,7 @@ function foldLifecycle(prev: Agent, k: Kind): Agent {
  * and NEVER returns `null` for a known agent, so a phase change (notably going
  * idle when a stream ends) never costs a REST hydrate.
  */
-export function applyAgentDelta(prev: Agent | undefined, entry: OpEntry): Agent | null {
+export function applyFleetDelta(prev: Agent | undefined, entry: OpEntry): Agent | null {
   if (!prev) return null // not loaded yet → hydrate
   const k = entry.kind
   switch (k.kind) {

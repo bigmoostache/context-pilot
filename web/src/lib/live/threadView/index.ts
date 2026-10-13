@@ -74,12 +74,12 @@ export interface Selection {
  *                        (mobile), it keeps its own localStorage-backed state.
  */
 export function useThreadSelection(
-  activeAgentId: string,
+  activeFleetId: string,
   threads: ThreadDetail[],
   newThreadDialog?: { open: boolean; setOpen: (v: boolean) => void },
   controlledSelection?: { selectedId: string; setSelectedId: (id: string) => void },
 ): Selection {
-  const threadKey = `cp-thread-${activeAgentId}`
+  const threadKey = `cp-thread-${activeFleetId}`
   // Internal fallback state — used ONLY when the caller does not control the
   // selection (mobile). A controlled caller owns the value + its persistence,
   // so this state (and the seed/persist effects below) sit inert.
@@ -202,7 +202,7 @@ export interface Actions extends BranchActions {
  * setState a dead component).
  */
 export function useThreadActions(
-  activeAgentId: string,
+  activeFleetId: string,
   threads: ThreadDetail[],
   sel: Selection,
 ): Actions {
@@ -234,13 +234,13 @@ export function useThreadActions(
         undo: () => {
           if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current)
           setNotice(null)
-          sendCommand(activeAgentId, { kind: inverseKind, thread_id: id }).catch((e: unknown) =>
+          sendCommand(activeFleetId, { kind: inverseKind, thread_id: id }).catch((e: unknown) =>
             flash(describeCommandError(inverseVerb, e)),
           )
         },
       })
     },
-    [activeAgentId, show, flash],
+    [activeFleetId, show, flash],
   )
   useEffect(
     () => () => {
@@ -257,7 +257,7 @@ export function useThreadActions(
       const verb = t.archived ? "restore the thread" : "archive the thread"
       // Deselect the archived thread so the view falls through to the next one.
       if (!t.archived && id === selectedId) setSelectedId("")
-      sendCommand(activeAgentId, { kind, thread_id: id })
+      sendCommand(activeFleetId, { kind, thread_id: id })
         .then(() =>
           // The action's own inverse, offered as an undo (T636). Archiving is
           // undone by restoring and vice-versa.
@@ -267,7 +267,7 @@ export function useThreadActions(
         )
         .catch((e: unknown) => flash(describeCommandError(verb, e)))
     },
-    [threads, activeAgentId, flash, offerUndo, selectedId, setSelectedId],
+    [threads, activeFleetId, flash, offerUndo, selectedId, setSelectedId],
   )
 
   const handlePause = useCallback(
@@ -276,7 +276,7 @@ export function useThreadActions(
       if (!t) return
       const kind = t.paused ? "resume_thread" : "pause_thread"
       const verb = t.paused ? "resume the thread" : "pause the thread"
-      sendCommand(activeAgentId, { kind, thread_id: id })
+      sendCommand(activeFleetId, { kind, thread_id: id })
         .then(() =>
           t.paused
             ? offerUndo("Thread resumed", id, "pause_thread", "re-pause the thread")
@@ -284,17 +284,17 @@ export function useThreadActions(
         )
         .catch((e: unknown) => flash(describeCommandError(verb, e)))
     },
-    [threads, activeAgentId, flash, offerUndo],
+    [threads, activeFleetId, flash, offerUndo],
   )
 
   const handleDelete = useCallback(
     (id: string) => {
       if (id === selectedId) setSelectedId("")
-      sendCommand(activeAgentId, { kind: "delete_thread", thread_id: id }).catch((e: unknown) =>
+      sendCommand(activeFleetId, { kind: "delete_thread", thread_id: id }).catch((e: unknown) =>
         flash(describeCommandError("delete the thread", e)),
       )
     },
-    [activeAgentId, flash, selectedId, setSelectedId],
+    [activeFleetId, flash, selectedId, setSelectedId],
   )
 
   const handleCreate = useCallback(
@@ -324,7 +324,7 @@ export function useThreadActions(
       sel.armAutoSelect()
       void (async () => {
         try {
-          await sendCommand(activeAgentId, {
+          await sendCommand(activeFleetId, {
             kind: "create_thread",
             name: opts.title.trim() || "Untitled thread",
             ...(content && { initial_message: content }),
@@ -336,7 +336,7 @@ export function useThreadActions(
         }
       })()
     },
-    [activeAgentId, flash, sel],
+    [activeFleetId, flash, sel],
   )
 
   const handleSend = useCallback(
@@ -344,14 +344,14 @@ export function useThreadActions(
       if (!effectiveSelectedId) return
       const content = buildCombinedContent(text, pendingFiles)
       if (!content) return
-      sendCommand(activeAgentId, {
+      sendCommand(activeFleetId, {
         kind: "send_message",
         thread_id: effectiveSelectedId,
         content,
       }).catch((e: unknown) => flash(describeCommandError("send your message", e)))
       setPendingFiles([])
     },
-    [activeAgentId, effectiveSelectedId, flash, pendingFiles, setPendingFiles],
+    [activeFleetId, effectiveSelectedId, flash, pendingFiles, setPendingFiles],
   )
 
   const handleAttach = useCallback(
@@ -363,7 +363,7 @@ export function useThreadActions(
         try {
           const uploaded: UploadedFile[] = []
           for (const f of files) {
-            const r = await uploadUnique(activeAgentId, ".uploads", f)
+            const r = await uploadUnique(activeFleetId, ".uploads", f)
             uploaded.push({
               path: r.path,
               name: r.name,
@@ -377,10 +377,10 @@ export function useThreadActions(
         }
       })()
     },
-    [activeAgentId, effectiveSelectedId, flash, setPendingFiles],
+    [activeFleetId, effectiveSelectedId, flash, setPendingFiles],
   )
 
-  const branch = useThreadBranch(activeAgentId, sel, flash)
+  const branch = useThreadBranch(activeFleetId, sel, flash)
 
   return {
     ...branch,

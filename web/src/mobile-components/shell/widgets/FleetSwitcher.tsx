@@ -32,7 +32,7 @@ const statusOrder: Record<AgentStatus, number> = {
 
 /**
  * Workspace switcher (1 agent = 1 folder) — mobile twin of `components/shell/
- * widgets/AgentSwitcher`.
+ * widgets/FleetSwitcher`.
  *
  * Same dropdown surface as desktop, but sized for touch: the trigger grows from
  * the desktop `h-8` view-pill height to a `h-10` tap target, the menu opens
@@ -42,12 +42,12 @@ const statusOrder: Record<AgentStatus, number> = {
  * — only the presentation forks. The dropdown primitive is the mobile
  * `@/mobile-components/ui/dropdown-menu` twin (action-sheet on mobile).
  */
-export function AgentSwitcher({
+export function FleetSwitcher({
   agents,
   activeId,
   onSwitch,
   onFleet,
-  onNewAgent,
+  onNewFleet,
 }: {
   agents: Agent[]
   activeId?: string | undefined
@@ -55,7 +55,7 @@ export function AgentSwitcher({
   /** Jump to the fleet dashboard — the only place agents are managed. */
   onFleet: () => void
   /** Jump to the fleet dashboard AND open the create-agent dialog. */
-  onNewAgent: () => void
+  onNewFleet: () => void
 }) {
   const active = agents.find((a) => a.id === activeId)
 
@@ -69,10 +69,10 @@ export function AgentSwitcher({
       >
         {active ? (
           <>
-            <AgentDot
+            <FleetDot
               accent={active.accent}
               status={active.status}
-              agentId={active.id}
+              fleetId={active.id}
               hasAvatar={active.hasAvatar}
               compact
             />
@@ -114,10 +114,10 @@ export function AgentSwitcher({
                   "data-highlighted:bg-[color-mix(in_oklab,var(--signal)_11%,transparent)]! data-highlighted:text-foreground!",
                 )}
               >
-                <AgentDot
+                <FleetDot
                   accent={a.accent}
                   status={a.status}
-                  agentId={a.id}
+                  fleetId={a.id}
                   hasAvatar={a.hasAvatar}
                 />
                 <div className="flex min-w-0 flex-1 leading-tight">
@@ -138,7 +138,7 @@ export function AgentSwitcher({
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem
-            onClick={onNewAgent}
+            onClick={onNewFleet}
             className={cn(
               "gap-2 py-2.5 text-[13.5px]",
               "focus:bg-muted! focus:text-foreground! data-highlighted:bg-muted! data-highlighted:text-foreground!",
@@ -163,16 +163,16 @@ export function AgentSwitcher({
   )
 }
 
-function AgentDot({
+function FleetDot({
   accent,
   status,
-  agentId,
+  fleetId,
   hasAvatar,
   compact = false,
 }: {
   accent: Agent["accent"]
   status: AgentStatus
-  agentId?: string | undefined
+  fleetId?: string | undefined
   hasAvatar?: boolean | undefined
   /** trigger variant — a smaller 20px glyph so the switcher matches the
    *  slim TopBar height; the menu rows keep the default 28px dot. */
@@ -185,9 +185,9 @@ function AgentDot({
         compact ? "size-5" : "size-7",
       )}
     >
-      {hasAvatar && agentId ? (
+      {hasAvatar && fleetId ? (
         <img
-          src={avatarUrl(agentId)}
+          src={avatarUrl(fleetId)}
           alt=""
           className={cn("rounded-md object-cover", compact ? "size-5" : "size-7")}
         />

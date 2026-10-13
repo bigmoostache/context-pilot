@@ -75,13 +75,13 @@ function FieldRow({
   value,
   onChange,
   disabled,
-  agentId,
+  fleetId,
 }: {
   field: FormField
   value: AnswerValue
   onChange: (v: AnswerValue) => void
   disabled: boolean
-  agentId: string
+  fleetId: string
 }) {
   return (
     <div className="border-t border-(--border-strong)/70 px-4 pt-2.5 pb-3">
@@ -93,7 +93,7 @@ function FieldRow({
         value={value}
         onChange={onChange}
         disabled={disabled}
-        agentId={agentId}
+        fleetId={fleetId}
       />
     </div>
   )
@@ -212,13 +212,13 @@ function FormFooter({
  */
 export function FormWidget({
   spec,
-  agentId,
+  fleetId,
   answer,
   draftKey,
   onSubmit,
 }: {
   spec: FormSpec
-  agentId: string
+  fleetId: string
   answer: FormAnswer | null
   /** localStorage key for this form's unsent draft (per agent/thread/form-id). */
   draftKey: string
@@ -272,7 +272,7 @@ export function FormWidget({
           value={values[f.id] ?? ""}
           onChange={(v) => setValue(f.id, v)}
           disabled={sent}
-          agentId={agentId}
+          fleetId={fleetId}
         />
       ))}
       <FormFooter

@@ -21,8 +21,8 @@ export type { BodyPayload } from "./generated/types.gen"
  * The body is immutable + stored before the referencing delta is emitted (the
  * I13 body-before-reference barrier), so this hydrate is race-free.
  */
-export function fetchMessageBody(agentId: string, hash: string): Promise<string> {
-  return sdk<BodyPayload>(getApiFleetByIdBodyByHash({ path: { id: agentId, hash } })).then((p) =>
+export function fetchMessageBody(fleetId: string, hash: string): Promise<string> {
+  return sdk<BodyPayload>(getApiFleetByIdBodyByHash({ path: { id: fleetId, hash } })).then((p) =>
     new TextDecoder().decode(new Uint8Array(p.bytes)),
   )
 }

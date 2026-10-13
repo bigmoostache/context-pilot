@@ -21,7 +21,7 @@ export interface TreeState {
   /** Open a folder if closed, close it if open. */
   toggle: (path: string) => void
   /** Open a folder and every ancestor of it. Idempotent. */
-  reveal: (path: string, agentFolder: string) => void
+  reveal: (path: string, fleetFolder: string) => void
 }
 
 export function useTreeState(): TreeState {
@@ -46,8 +46,8 @@ export function useTreeState(): TreeState {
    * is a file it has no children, and if it is a folder the user asked to see
    * it, not to see inside it.
    */
-  const reveal = useCallback((path: string, agentFolder: string) => {
-    const rel = relOf(agentFolder, path)
+  const reveal = useCallback((path: string, fleetFolder: string) => {
+    const rel = relOf(fleetFolder, path)
     if (rel === "") return
 
     setExpanded((prev) => {
@@ -56,7 +56,7 @@ export function useTreeState(): TreeState {
       // Every ancestor, rebuilt from the realm root down. Dropping the leaf
       // (the last segment) — its children are not what a reveal opens.
       const ancestors = segments.slice(0, -1)
-      let walk = agentFolder
+      let walk = fleetFolder
       for (const segment of ancestors) {
         walk += `/${segment}`
         next.add(walk)
@@ -80,9 +80,9 @@ export function useTreeState(): TreeState {
  * silently trimming it would produce a plausible-looking path pointing
  * somewhere else entirely.
  */
-export function relOf(agentFolder: string, path: string): string {
-  if (path === agentFolder) return ""
-  return path.startsWith(`${agentFolder}/`) ? path.slice(agentFolder.length + 1) : path
+export function relOf(fleetFolder: string, path: string): string {
+  if (path === fleetFolder) return ""
+  return path.startsWith(`${fleetFolder}/`) ? path.slice(fleetFolder.length + 1) : path
 }
 
 /**

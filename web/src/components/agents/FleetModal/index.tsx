@@ -3,11 +3,11 @@ import { usePickerProviders } from "@/lib/support/models"
 import { useAuth } from "@/lib/providers/auth"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
-import { slugify, useSelectionState, type AgentModalMode } from "./controller"
-import { useAgentModalActions } from "./actions"
-import { AgentModalHeader, AgentModalBody, AgentModalFooter, type Controller } from "./parts"
+import { slugify, useSelectionState, type FleetModalMode } from "./controller"
+import { useFleetModalActions } from "./actions"
+import { FleetModalHeader, FleetModalBody, FleetModalFooter, type Controller } from "./parts"
 
-export type { AgentModalMode } from "./controller"
+export type { FleetModalMode } from "./controller"
 
 /**
  * Agent create / manage dialog — the single source of truth for both flows.
@@ -23,17 +23,17 @@ export type { AgentModalMode } from "./controller"
  * escapes the header's backdrop-filter containing block.
  *
  * Structure (P8): selection state lives in {@link useSelectionState}, all
- * mutations in {@link useAgentModalActions}, and the render in the
- * {@link AgentModalHeader}/{@link AgentModalBody}/{@link AgentModalFooter}
+ * mutations in {@link useFleetModalActions}, and the render in the
+ * {@link FleetModalHeader}/{@link FleetModalBody}/{@link FleetModalFooter}
  * subcomponents — so every function stays within the P8 budgets and this file
  * stays under the 500-line cap.
  */
-export function AgentModal({
+export function FleetModal({
   modal,
   onClose,
   onFlash,
 }: {
-  modal: AgentModalMode
+  modal: FleetModalMode
   onClose: () => void
   /** Optional toast sink — the fleet dashboard supplies one; the TopBar omits it. */
   onFlash?: (m: string) => void
@@ -46,7 +46,7 @@ export function AgentModal({
   // key, with the org model allowlist already applied (empty ⇒ all).
   const { data: providers = [] } = usePickerProviders()
   const sel = useSelectionState(isManage, agent, providers)
-  const actions = useAgentModalActions({
+  const actions = useFleetModalActions({
     isManage,
     agent,
     name,
@@ -94,7 +94,7 @@ export function AgentModal({
           c.isManage ? "w-[1120px] max-w-[calc(100vw-3rem)]" : "w-[460px]",
         )}
       >
-        <AgentModalHeader
+        <FleetModalHeader
           isManage={c.isManage}
           agent={c.agent}
           avatarBust={c.avatarBust}
@@ -102,7 +102,7 @@ export function AgentModal({
           onRandomizeAvatar={c.onRandomizeAvatar}
           onClose={onClose}
         />
-        <AgentModalBody c={c} />
+        <FleetModalBody c={c} />
         {/* create/save error — surfaced inline so a failure isn't silent */}
         {c.error && (
           <div
@@ -113,7 +113,7 @@ export function AgentModal({
             <span>{c.error}</span>
           </div>
         )}
-        <AgentModalFooter c={c} />
+        <FleetModalFooter c={c} />
       </div>
     </div>
   )

@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils"
  * checkmark on the selected model — instead of the heavy bordered cards.
  *
  * Same registry, same two-level shape, same empty-guard. Shared by the mobile
- * AgentModal (Agent Settings page) and the mobile config GeneralPane.
+ * FleetModal (Agent Settings page) and the mobile config GeneralPane.
  */
 export function ModelPicker({
   providers,

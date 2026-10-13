@@ -26,8 +26,8 @@ const phaseMeta: Record<StreamPhase, { label: string; color: string }> = {
 export function StatusBar({
   fleet = false,
   agents = [],
-  activeAgent,
-  activeAgentId = "",
+  activeFleet,
+  activeFleetId = "",
   connected = true,
   onRestart,
   restarting = false,
@@ -35,12 +35,12 @@ export function StatusBar({
 }: {
   fleet?: boolean
   agents?: Agent[]
-  activeAgent?: Agent | undefined
+  activeFleet?: Agent | undefined
   /** The focused agent's id — drives the behaviour selector's library query + command. */
-  activeAgentId?: string
+  activeFleetId?: string
   /** False when the SSE push plane for this agent is down. */
   connected?: boolean
-  /** Fires the restart API + full reconnect lifecycle (same as AgentModal Restart). */
+  /** Fires the restart API + full reconnect lifecycle (same as FleetModal Restart). */
   onRestart?: () => void
   /** True while the restart lifecycle is in-flight (API call through SSE reconnect). */
   restarting?: boolean
@@ -51,8 +51,8 @@ export function StatusBar({
     <FleetStatus agents={agents} />
   ) : (
     <AgentStatus
-      agent={activeAgent}
-      agentId={activeAgentId}
+      agent={activeFleet}
+      fleetId={activeFleetId}
       connected={connected}
       onRestart={onRestart}
       restarting={restarting}
@@ -131,7 +131,7 @@ function resolvePhase(agent?: Agent): StreamPhase {
 
 /** Pull the footer's numeric vitals off the agent with safe fallbacks, so the
  *  host component's branch count stays under the complexity budget. */
-function agentVitals(agent?: Agent) {
+function fleetVitals(agent?: Agent) {
   return {
     costUsd: agent?.costUsd ?? 0,
     used: agent?.contextUsed ?? 0,
@@ -145,14 +145,14 @@ function agentVitals(agent?: Agent) {
 /** Single-agent session vitals — shown while an agent is focused. */
 function AgentStatus({
   agent,
-  agentId,
+  fleetId,
   connected = true,
   onRestart,
   restarting = false,
   loading = false,
 }: {
   agent?: Agent | undefined
-  agentId?: string
+  fleetId?: string
   connected?: boolean
   onRestart?: (() => void) | undefined
   restarting?: boolean
@@ -167,7 +167,7 @@ function AgentStatus({
   // Context-window meter figures — the agent's OWN authoritative occupancy +
   // cache split, folded from the ContextUsage push delta (T297), byte-identical
   // to the ratatui sidebar.
-  const { costUsd, used, budget, threshold, hit, miss } = agentVitals(agent)
+  const { costUsd, used, budget, threshold, hit, miss } = fleetVitals(agent)
 
   return (
     // Same bare treatment as the fleet footer above and the header rail: no
@@ -187,23 +187,23 @@ function AgentStatus({
         />
       </Tip>
 
-      {agentId ? (
+      {fleetId ? (
         <Tip
           title="Model"
           body="The LLM provider and model this agent runs on. Switch it here — applies immediately."
           side="top"
         >
-          <ModelChip agentId={agentId} agent={agent} />
+          <ModelChip fleetId={fleetId} agent={agent} />
         </Tip>
       ) : null}
 
-      {agentId ? (
+      {fleetId ? (
         <Tip
           title="System prompt"
           body="The behaviour agent driving this one. Switch, edit, create or import one."
           side="top"
         >
-          <BehaviourChip agentId={agentId} />
+          <BehaviourChip fleetId={fleetId} />
         </Tip>
       ) : null}
 

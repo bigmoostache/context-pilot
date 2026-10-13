@@ -49,13 +49,13 @@ const AutoRun = memo(function AutoRun({ msgs }: { msgs: ThreadMsg[] }) {
 
 /**
  * One rendered NON-auto message row — the memoized boundary that kills the T510
- * render storm. Identical comparator to desktop (`msg` identity + `agentId`): a
+ * render storm. Identical comparator to desktop (`msg` identity + `fleetId`): a
  * delta re-render re-renders only the one changed row, not the whole thread.
  */
 const MessageRow = memo(
   function MessageRow({
     msg,
-    agentId,
+    fleetId,
     onOpenFile,
     onShowInFinder,
     onDelete,
@@ -63,7 +63,7 @@ const MessageRow = memo(
     fresh,
   }: {
     msg: ThreadMsg
-    agentId: string
+    fleetId: string
     onOpenFile: (file: UploadedFile) => void
     onShowInFinder: ((path: string) => void) | undefined
     onDelete: (msg: ThreadMsg) => void
@@ -74,7 +74,7 @@ const MessageRow = memo(
       <div className="">
         <Message
           msg={toChatMessage(msg)}
-          agentId={agentId}
+          fleetId={fleetId}
           onOpenFile={onOpenFile}
           onShowInFinder={onShowInFinder}
           onDelete={() => onDelete(msg)}
@@ -91,7 +91,7 @@ const MessageRow = memo(
       </div>
     )
   },
-  (a, b) => a.msg === b.msg && a.agentId === b.agentId && a.fresh === b.fresh,
+  (a, b) => a.msg === b.msg && a.fleetId === b.fleetId && a.fresh === b.fresh,
 )
 
 /**
@@ -138,20 +138,20 @@ function OpenedDivider({
 /**
  * Per-message actions for a thread's rows: delete (via the agent command
  * bridge) and open the Branch dialog. Both are stable across renders (deps:
- * agentId / the stable `onBranch` + thread id) so they don't defeat the
+ * fleetId / the stable `onBranch` + thread id) so they don't defeat the
  * {@link MessageRow} memo boundary, which ignores callback props.
  */
 function useMessageActions(
-  agentId: string,
+  fleetId: string,
   threadId: string,
   onBranch: ((threadId: string, msg: ThreadMsg) => void) | undefined,
 ) {
   const handleDelete = useCallback(
     (msg: ThreadMsg) => {
       const ts = typeof msg.ts === "number" ? msg.ts : new Date(msg.ts ?? "").getTime()
-      void sendCommand(agentId, { kind: "delete_message", thread_id: threadId, message_ts: ts })
+      void sendCommand(fleetId, { kind: "delete_message", thread_id: threadId, message_ts: ts })
     },
-    [agentId, threadId],
+    [fleetId, threadId],
   )
   const handleBranch = useCallback(
     (msg: ThreadMsg) => onBranch?.(threadId, msg),
@@ -183,7 +183,7 @@ function useMessageActions(
  */
 export function ThreadConversation({
   thread,
-  agentId,
+  fleetId,
   onSend,
   onAttach,
   pendingFiles = [],
@@ -195,7 +195,7 @@ export function ThreadConversation({
 }: {
   thread: ThreadDetail
   /** owning agent — needed to open the shared Quick Look drawer for an attachment */
-  agentId: string
+  fleetId: string
   onSend?: ((text: string) => void) | undefined
   /** upload picked files into this thread (composer paperclip). May be async so
    *  callers can `await` it to keep an in-flight loader up (T471). */
@@ -233,7 +233,7 @@ export function ThreadConversation({
 
   // First-message `/command` suggestions (T348), built from the live prompt
   // library (kind === "command"); each command's slash invocation is `/${id}`.
-  const { data: library = [] } = useLibrary(agentId)
+  const { data: library = [] } = useLibrary(fleetId)
   const suggestions = useMemo<CommandSuggestion[]>(() => {
     return library
       .filter((item) => item.kind === "command")
@@ -274,7 +274,7 @@ export function ThreadConversation({
     setPrevCount(nonAuto.length)
   }
 
-  const { handleDelete, handleBranch } = useMessageActions(agentId, thread.id, onBranch)
+  const { handleDelete, handleBranch } = useMessageActions(fleetId, thread.id, onBranch)
 
   // Fold the flat log into render segments ONCE per log change (not per render)
   // so each segment object stays reference-stable across delta re-renders.
@@ -291,7 +291,7 @@ export function ThreadConversation({
   // message always clears it with no dependency on measurement timing.
 
   // Form derivations: answered-state lookup + submit handler (docs/forms.md §5).
-  const { answersByForm, onFormSubmit } = useThreadForms(thread.log, agentId, thread.id)
+  const { answersByForm, onFormSubmit } = useThreadForms(thread.log, fleetId, thread.id)
 
   return (
     <main className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-background">
@@ -312,7 +312,7 @@ export function ThreadConversation({
               <FormMessageRow
                 key={seg.msg.id}
                 msg={seg.msg}
-                agentId={agentId}
+                fleetId={fleetId}
                 threadId={thread.id}
                 answersByForm={answersByForm}
                 onFormSubmit={onFormSubmit}
@@ -325,7 +325,7 @@ export function ThreadConversation({
               <MessageRow
                 key={seg.msg.id}
                 msg={seg.msg}
-                agentId={agentId}
+                fleetId={fleetId}
                 onOpenFile={openInFinder}
                 onShowInFinder={onShowInFinder}
                 onDelete={handleDelete}
@@ -362,22 +362,22 @@ export function ThreadConversation({
           firstMessage={thread.log.length === 0}
           onCreateCommand={() => setCreateCmdOpen(true)}
           onEditCommand={(s) => setEditCmd(s)}
-          draftKey={`cp-draft-${agentId}-${thread.id}`}
-          commandKey={`cp-cmd-${agentId}-${thread.id}`}
+          draftKey={`cp-draft-${fleetId}-${thread.id}`}
+          commandKey={`cp-cmd-${fleetId}-${thread.id}`}
         />
       </div>
 
       <CreateCommandDialog
         open={createCmdOpen}
         onClose={() => setCreateCmdOpen(false)}
-        agentId={agentId}
+        fleetId={fleetId}
       />
 
       {editCmd && (
         <AgentEditorDialog
           open
           onClose={() => setEditCmd(null)}
-          agentId={agentId}
+          fleetId={fleetId}
           variant="command"
           mode={{ kind: "edit", itemId: editCmd.command.slice(1), builtin: false }}
           initial={{

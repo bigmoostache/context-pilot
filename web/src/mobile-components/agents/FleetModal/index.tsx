@@ -2,12 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { animate, stagger } from "animejs"
 import { ChevronLeft, X } from "lucide-react"
 import { usePickerProviders } from "@/lib/support/models"
-import { useRenameAgent, sendCommand } from "@/lib/live"
+import { useRenameFleet, sendCommand } from "@/lib/live"
 import type { Agent } from "@/lib/types"
 import { prefersReducedMotion } from "@/lib/utils"
 import { CornerButton } from "@/mobile-components/shell/chrome/CornerButton"
 import { useSelectionState } from "./controller"
-import { useAgentModalActions } from "./actions"
+import { useFleetModalActions } from "./actions"
 import {
   AvatarHero,
   Section,
@@ -18,29 +18,29 @@ import {
   SettingsToast,
 } from "./parts"
 
-export type { AgentModalMode } from "./controller"
+export type { FleetModalMode } from "./controller"
 
 /**
- * Agent Settings PAGE — the mobile twin of `components/agents/AgentModal`,
+ * Agent Settings PAGE — the mobile twin of `components/agents/FleetModal`,
  * reworked from a dialog into a **full-screen page** (T636). Desktop keeps its
  * floating manage dialog; on a phone the dialog is replaced by this page,
  * reached from two places (the agents list swipe → Manage, and a thread page's
  * top-right Settings button). The caller owns where "Back" returns to (it wrote
- * `cameToAgentSettingsFrom` before opening us and reads it in `onClose`).
+ * `cameToFleetSettingsFrom` before opening us and reads it in `onClose`).
  *
  * There is **no Save button** — every field auto-saves the moment it changes:
- *   • name → `renameAgent` on blur / Return (no-op when unchanged);
+ *   • name → `renameFleet` on blur / Return (no-op when unchanged);
  *   • provider/model → a `configure` command the instant a model is picked;
  *   • avatar → uploaded immediately on file-pick / shuffle.
  * Each save flashes a confirmation toast. Restart and Retire sit at the bottom;
  * Retire returns to the origin via `onClose`.
  *
  * Config mutations (avatar upload + DiceBear shuffle, restart flow, retire) are
- * the SAME shared hooks the desktop dialog uses (`useAgentModalActions`), so the
+ * the SAME shared hooks the desktop dialog uses (`useFleetModalActions`), so the
  * two surfaces never drift; only name + model auto-save are wired here directly
  * (the dialog batches them behind its Save button, the page saves per-field).
  */
-export function AgentModal({
+export function FleetModal({
   agent,
   onClose,
   onFlash,
@@ -54,7 +54,7 @@ export function AgentModal({
   const { data: providers = [] } = usePickerProviders()
   const sel = useSelectionState(true, agent, providers)
   const [name, setName] = useState(agent.name)
-  const renameAgent = useRenameAgent()
+  const renameFleet = useRenameFleet()
 
   // One transient confirmation toast at a time; cleared on unmount so a late
   // save-ack can't setState a dead page.
@@ -79,7 +79,7 @@ export function AgentModal({
   // Shared avatar / restart / retire logic (the dialog's own hook). `submit` is
   // unused here — the page auto-saves name + model per-field instead. `onClose`
   // is the back-to-origin handler, so retire success returns there.
-  const actions = useAgentModalActions({
+  const actions = useFleetModalActions({
     isManage: true,
     agent,
     name,
@@ -92,9 +92,9 @@ export function AgentModal({
   /** Auto-save the name on blur / Return — no-op when unchanged or empty. */
   const saveName = () => {
     const n = name.trim()
-    if (n === "" || n === agent.name || renameAgent.isPending) return
-    renameAgent.mutate(
-      { agentId: agent.id, name: n },
+    if (n === "" || n === agent.name || renameFleet.isPending) return
+    renameFleet.mutate(
+      { fleetId: agent.id, name: n },
       {
         onSuccess: () => flash(`Renamed to ${n}`),
         onError: (e) => flash(e instanceof Error ? e.message : "Could not rename the agent"),
@@ -166,7 +166,7 @@ export function AgentModal({
         </Section>
 
         <Section label="Service vitals">
-          <VitalsBody agentId={agent.id} />
+          <VitalsBody fleetId={agent.id} />
         </Section>
 
         {actions.error && (

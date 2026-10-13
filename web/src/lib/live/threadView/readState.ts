@@ -11,7 +11,7 @@ import { useCallback, useEffect } from "react"
 import type { ThreadDetail } from "@/lib/types"
 
 /** localStorage key holding the set of read LLM-message ids for one thread. */
-const readKey = (agentId: string, threadId: string) => `cp-msg-read-${agentId}-${threadId}`
+const readKey = (fleetId: string, threadId: string) => `cp-msg-read-${fleetId}-${threadId}`
 
 /** Ids of the LLM messages a user reads: assistant-authored, non-auto (auto
  *  tool-activity traces are collapsed noise, never "read"). */
@@ -20,9 +20,9 @@ function llmMessageIds(t: ThreadDetail): string[] {
 }
 
 /** Parse a thread's persisted read-id set from localStorage (empty on miss). */
-function loadReadSet(agentId: string, threadId: string): Set<string> {
+function loadReadSet(fleetId: string, threadId: string): Set<string> {
   try {
-    const raw = localStorage.getItem(readKey(agentId, threadId))
+    const raw = localStorage.getItem(readKey(fleetId, threadId))
     const arr: unknown = raw ? JSON.parse(raw) : []
     return Array.isArray(arr)
       ? new Set(arr.filter((x): x is string => typeof x === "string"))
@@ -39,7 +39,7 @@ function loadReadSet(agentId: string, threadId: string): Set<string> {
  * LLM message in it is persisted read, so the focused thread never shows a
  * count. Per-browser only (localStorage); a thread never opened shows all unread.
  */
-export function useThreadReadState(agentId: string, threads: ThreadDetail[], openThreadId: string) {
+export function useThreadReadState(fleetId: string, threads: ThreadDetail[], openThreadId: string) {
   // Persist the open thread's LLM message ids as "read" — localStorage only, an
   // external-system sync with NO React state, so no cascading renders. The badge
   // reacts through the `openThreadId` / `threads` prop changes, not local state.
@@ -48,22 +48,22 @@ export function useThreadReadState(agentId: string, threads: ThreadDetail[], ope
     if (!t) return
     const ids = llmMessageIds(t)
     if (ids.length === 0) return
-    const set = loadReadSet(agentId, t.id)
+    const set = loadReadSet(fleetId, t.id)
     const before = set.size
     for (const id of ids) set.add(id)
     if (set.size === before) return
-    localStorage.setItem(readKey(agentId, t.id), JSON.stringify([...set]))
-  }, [agentId, openThreadId, threads])
+    localStorage.setItem(readKey(fleetId, t.id), JSON.stringify([...set]))
+  }, [fleetId, openThreadId, threads])
 
   const unreadOf = useCallback(
     (t: ThreadDetail): number => {
       // The open thread is being read right now → always zero (its ids are also
       // persisted by the effect above, so it stays read after you switch away).
       if (t.id === openThreadId) return 0
-      const set = loadReadSet(agentId, t.id)
+      const set = loadReadSet(fleetId, t.id)
       return t.log.filter((m) => m.author === "assistant" && !m.auto && !set.has(m.id)).length
     },
-    [agentId, openThreadId],
+    [fleetId, openThreadId],
   )
 
   return { unreadOf }

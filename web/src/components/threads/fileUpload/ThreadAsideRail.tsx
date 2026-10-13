@@ -29,7 +29,7 @@ import { useModifierShortcuts } from "@/lib/support/a11y"
  * with neither, this renders nothing and the conversation takes the full width.
  */
 export function ThreadAsideRail({
-  agentId,
+  fleetId,
   threadId,
   files,
   tasks,
@@ -37,7 +37,7 @@ export function ThreadAsideRail({
   aside,
   leftRailHidden,
 }: {
-  agentId: string
+  fleetId: string
   threadId: string
   files: ThreadFile[]
   tasks: ThreadTask[]
@@ -83,7 +83,7 @@ export function ThreadAsideRail({
           files={files}
           tasks={tasks}
           notes={notes}
-          agentId={agentId}
+          fleetId={fleetId}
           threadId={threadId}
           tab={aside.tab}
           onTabChange={aside.setTab}

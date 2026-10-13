@@ -12,7 +12,7 @@ import type { ThreadDetail } from "@/lib/types"
  * in its folder and owns the threads inside it, so we only ever show that
  * agent's threads — never a cross-agent global list.
  *
- * This component is keyed by `activeAgentId` in {@link App}, so its local
+ * This component is keyed by `activeFleetId` in {@link App}, so its local
  * thread state is reseeded (fresh mount) whenever the realm changes. Its logic
  * lives in two same-file hooks — {@link useThreadSelection} (selection + view
  * state) and {@link useThreadActions} (mutation handlers + notice) — so the
@@ -23,7 +23,7 @@ import type { ThreadDetail } from "@/lib/types"
  * depends on the rail being visible.
  */
 export function ThreadsView({
-  activeAgentId,
+  activeFleetId,
   selectedThreadId,
   onThreadChange,
   onShowInFinder,
@@ -35,7 +35,7 @@ export function ThreadsView({
   disconnected,
   onReconnect,
 }: {
-  activeAgentId: string
+  activeFleetId: string
   /** Selected thread — CONTROLLED by the shell (Root.tsx) so browser Back/Next
    *  can step through the threads visited (T636). The shell owns the value and
    *  its per-agent persistence; this view feeds it into useThreadSelection. */
@@ -59,14 +59,14 @@ export function ThreadsView({
   onReconnect?: () => void
 }) {
   const { data: agents = [] } = useFleet()
-  const { data: threads = [] } = useThreads(activeAgentId)
-  const agent = agents.find((a) => a.id === activeAgentId)
+  const { data: threads = [] } = useThreads(activeFleetId)
+  const agent = agents.find((a) => a.id === activeFleetId)
 
   // The dialog flag is INJECTED into the selection hook rather than used
   // alongside it, so `handleCreate`'s own `setNewOpen(false)` closes the very
   // flag the rail's button opened.
   const sel = useThreadSelection(
-    activeAgentId,
+    activeFleetId,
     threads,
     {
       open: newOpen,
@@ -74,13 +74,13 @@ export function ThreadsView({
     },
     { selectedId: selectedThreadId, setSelectedId: onThreadChange },
   )
-  const actions = useThreadActions(activeAgentId, threads, sel)
+  const actions = useThreadActions(activeFleetId, threads, sel)
 
   // Only bail to a bare empty state when there is genuinely no agent. A fresh
   // agent with zero threads MUST still render the sidebar — that is where the
   // "New Thread" button lives — otherwise the realm is a dead end.
   if (!agent) {
-    return <EmptyRealm agentName={undefined} />
+    return <EmptyRealm fleetName={undefined} />
   }
 
   const thread = threads.find((t) => t.id === sel.effectiveSelectedId)
@@ -122,7 +122,7 @@ export function ThreadsView({
       >
         <ThreadList
           threads={threads}
-          agentId={activeAgentId}
+          fleetId={activeFleetId}
           selectedId={sel.effectiveSelectedId}
           onSelect={sel.setSelectedId}
           showArchived={sel.showArchived}
@@ -145,7 +145,7 @@ export function ThreadsView({
       {thread ? (
         <ThreadConversation
           thread={thread}
-          agentId={activeAgentId}
+          fleetId={activeFleetId}
           onSend={actions.handleSend}
           onAttach={actions.handleAttach}
           pendingFiles={sel.pendingFiles}
@@ -161,17 +161,17 @@ export function ThreadsView({
           }}
         />
       ) : (
-        <EmptyRealm agentName={agent.name} onNewThread={() => sel.setNewOpen(true)} />
+        <EmptyRealm fleetName={agent.name} onNewThread={() => sel.setNewOpen(true)} />
       )}
 
       <NewThreadDialog
         open={sel.newOpen}
         onClose={() => sel.setNewOpen(false)}
         onCreate={actions.handleCreate}
-        agentId={activeAgentId}
+        fleetId={activeFleetId}
       />
 
-      <BranchDialog actions={actions} threads={threads} agentId={activeAgentId} />
+      <BranchDialog actions={actions} threads={threads} fleetId={activeFleetId} />
 
       {actions.notice && (
         <div
@@ -204,10 +204,10 @@ export function ThreadsView({
  *  offers a primary action so an empty realm can bootstrap its first thread
  *  without hunting for the sidebar button. */
 function EmptyRealm({
-  agentName,
+  fleetName,
   onNewThread,
 }: {
-  agentName?: string | undefined
+  fleetName?: string | undefined
   onNewThread?: (() => void) | undefined
 }) {
   return (
@@ -216,9 +216,9 @@ function EmptyRealm({
         <FolderGit2 className="size-6" />
       </span>
       <p className="max-w-[320px] text-[13px] text-muted-foreground">
-        {agentName ? (
+        {fleetName ? (
           <>
-            <span className="font-medium text-foreground/80">{agentName}</span> has no threads yet —
+            <span className="font-medium text-foreground/80">{fleetName}</span> has no threads yet —
             start one to put it to work in its folder.
           </>
         ) : (
@@ -244,11 +244,11 @@ function EmptyRealm({
 function BranchDialog({
   actions,
   threads,
-  agentId,
+  fleetId,
 }: {
   actions: Actions
   threads: ThreadDetail[]
-  agentId: string
+  fleetId: string
 }) {
   const target = actions.branchTarget
   if (!target) return null
@@ -258,7 +258,7 @@ function BranchDialog({
       open
       onClose={actions.closeBranch}
       onCreate={actions.handleBranch}
-      agentId={agentId}
+      fleetId={fleetId}
       branch={{
         parentName: threads.find((t) => t.id === target.threadId)?.name ?? target.threadId,
         excerpt: target.excerpt,

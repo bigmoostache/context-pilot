@@ -19,13 +19,13 @@ export function ThreadSearchPalette({
   open,
   onClose,
   threads,
-  agentId,
+  fleetId,
   onSelect,
 }: {
   open: boolean
   onClose: () => void
   threads: ThreadDetail[]
-  agentId: string
+  fleetId: string
   onSelect: (id: string) => void
 }) {
   return (
@@ -33,7 +33,7 @@ export function ThreadSearchPalette({
       <DialogContent className="flex max-h-[min(560px,80vh)] w-[720px] max-w-[92vw] flex-col p-0">
         <DialogTitle className="sr-only">Search threads</DialogTitle>
         {open && (
-          <PaletteBody threads={threads} agentId={agentId} onClose={onClose} onSelect={onSelect} />
+          <PaletteBody threads={threads} fleetId={fleetId} onClose={onClose} onSelect={onSelect} />
         )}
       </DialogContent>
     </Dialog>
@@ -72,12 +72,12 @@ const DEBOUNCE_MS = 220
  *  render (`activeIdx`); the only effect is a pure DOM scroll-into-view. */
 function PaletteBody({
   threads,
-  agentId,
+  fleetId,
   onClose,
   onSelect,
 }: {
   threads: ThreadDetail[]
-  agentId: string
+  fleetId: string
   onClose: () => void
   onSelect: (id: string) => void
 }) {
@@ -98,8 +98,8 @@ function PaletteBody({
   // Hybrid search — only when the debounced query is long enough. Keep the
   // previous data on refetch so the list doesn't flash empty between keystrokes.
   const { data: hits, isFetching } = useQuery({
-    queryKey: ["convSearch", agentId, debounced],
-    queryFn: () => searchConversations(agentId, debounced, { limit: 30 }),
+    queryKey: ["convSearch", fleetId, debounced],
+    queryFn: () => searchConversations(fleetId, debounced, { limit: 30 }),
     enabled: serverMode,
     staleTime: 15_000,
     placeholderData: (prev: ConvHit[] | undefined) => prev,

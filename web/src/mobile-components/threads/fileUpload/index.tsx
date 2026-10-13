@@ -39,13 +39,13 @@ function fmtSize(bytes: number): string {
  */
 export function MessageFileChip({
   file,
-  agentId,
+  fleetId,
   onOpen,
   onShowInFinder,
   onAccent = false,
 }: {
   file: UploadedFile
-  agentId?: string | undefined
+  fleetId?: string | undefined
   onOpen?: (() => void) | undefined
   /** navigate the Finder to this file's parent and select it */
   onShowInFinder?: (() => void) | undefined
@@ -54,7 +54,7 @@ export function MessageFileChip({
 }) {
   const parent = file.path.includes("/") ? file.path.slice(0, file.path.lastIndexOf("/")) : ""
   // No agent → can't verify; assume present rather than cry wolf.
-  const { data, loading, error } = useFs(agentId ?? "", parent)
+  const { data, loading, error } = useFs(fleetId ?? "", parent)
   // The matching listing node (by full realm path, falling back to basename).
   const node = data?.find((n) => n.path === file.path || n.name === file.name)
   // A 4xx on the parent listing means the directory can't be served — it
@@ -67,7 +67,7 @@ export function MessageFileChip({
   // A statusless error (a real network blip → `TypeError: Failed to fetch`)
   // does NOT match, so a transient fault never greys a genuinely-present file.
   const parentUnservable = /^4\d\d/.test(error?.message ?? "")
-  const missing = !!agentId && !loading && (parentUnservable || (!!data && !node))
+  const missing = !!fleetId && !loading && (parentUnservable || (!!data && !node))
   // Real, on-disk size — the listing node's byte count. `undefined` while the
   // listing loads, when there is no agent to query, or when the file is gone;
   // the chip then omits the size label rather than echo the untrusted YAML.

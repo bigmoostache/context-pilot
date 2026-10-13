@@ -14,17 +14,17 @@ import { AgentEditorDialog } from "@/components/shell/behaviour/AgentEditorDialo
 export function CreateCommandDialog({
   open,
   onClose,
-  agentId,
+  fleetId,
 }: {
   open: boolean
   onClose: () => void
-  agentId: string
+  fleetId: string
 }) {
   return (
     <AgentEditorDialog
       open={open}
       onClose={onClose}
-      agentId={agentId}
+      fleetId={fleetId}
       mode={{ kind: "create" }}
       variant="command"
     />

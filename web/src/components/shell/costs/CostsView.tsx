@@ -22,17 +22,17 @@ import { CrossTabTable, TokenDistribution, ApiTokenDistribution } from "./tables
  * attribution, and spend breakdown.
  */
 export function CostsView({
-  agentId,
+  fleetId,
   disconnected,
   onReconnect,
 }: {
-  agentId: string
+  fleetId: string
   disconnected?: boolean
   onReconnect?: () => void
 }) {
   const { data, isLoading, error } = useQuery({
-    queryKey: ["cost-tsv", agentId],
-    queryFn: () => fetchFsPreview(agentId, ".context-pilot/logs/cost-tracking.tsv"),
+    queryKey: ["cost-tsv", fleetId],
+    queryFn: () => fetchFsPreview(fleetId, ".context-pilot/logs/cost-tracking.tsv"),
     refetchInterval: 15_000,
     retry: 1,
   })

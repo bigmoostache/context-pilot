@@ -72,14 +72,14 @@ function activeSelection(
  * applies immediately, no save step. The active provider/model comes back
  * through the agent-meta fold, so the chip re-labels on the next delta.
  */
-export function ModelChip({ agentId, agent }: { agentId: string; agent: Agent | undefined }) {
+export function ModelChip({ fleetId, agent }: { fleetId: string; agent: Agent | undefined }) {
   const { data: providers = [] } = usePickerProviders()
   const { provider: activeProv, model: activeModel } = activeSelection(providers, agent)
   const label = activeModel?.displayName ?? "model"
 
   const select = (providerId: string, modelId: string) => {
     if (providerId === activeProv?.id && modelId === activeModel?.id) return
-    void sendCommand(agentId, { kind: "configure", provider: providerId, model: modelId }).catch(
+    void sendCommand(fleetId, { kind: "configure", provider: providerId, model: modelId }).catch(
       () => {
         // Fire-and-forget: a failed switch keeps the current model; the agent-meta
         // fold re-reports ground truth on its next delta/poll.

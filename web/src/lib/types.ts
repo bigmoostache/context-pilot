@@ -121,7 +121,7 @@ export interface FsNode {
   path: string
   kind: "dir" | "file"
   /** when this dir hosts an agent, its id (lets us badge it) */
-  agentId?: string
+  fleetId?: string
   children?: FsNode[]
 }
 

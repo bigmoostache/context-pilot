@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react"
 
 import { FleetDashboard } from "@/mobile-components/agents/FleetDashboard"
-import { AgentModal } from "@/mobile-components/agents/AgentModal"
+import { FleetModal } from "@/mobile-components/agents/FleetModal"
 import { ThreadsView } from "@/mobile-components/threads/ThreadsView"
 import { Finder } from "@/mobile-components/finder/Finder"
 import { TooltipProvider } from "@/mobile-components/ui/tooltip"
@@ -114,25 +114,25 @@ function MobileShell() {
     const stored = localStorage.getItem("cp-view")
     return stored === "threads" || stored === "finder" ? stored : "fleet"
   })
-  const [activeAgentId, setActiveAgentId] = useState(() => localStorage.getItem("cp-agent") ?? "")
+  const [activeFleetId, setActiveFleetId] = useState(() => localStorage.getItem("cp-agent") ?? "")
   const [finderRevealPath, setFinderRevealPath] = useState<string | null>(null)
   // Which agent's full-screen Settings page is open (null = none). It's a
   // transient overlay, NOT a persisted `view` — a reload must never land on it,
   // so it lives in its own state rather than the cp-view union. The origin the
-  // back button returns to is stashed in localStorage (`cameToAgentSettingsFrom`)
+  // back button returns to is stashed in localStorage (`cameToFleetSettingsFrom`)
   // per the T636 spec: "agentsList" or the agent id (opened from that thread).
-  const [settingsAgentId, setSettingsAgentId] = useState<string | null>(null)
+  const [settingsFleetId, setSettingsFleetId] = useState<string | null>(null)
 
-  const activeAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
+  const activeFleet = agents.find((a) => a.id === activeFleetId) ?? agents[0]
 
   // Persist view + agent selection (write-through, same keys as desktop).
   const changeView = useCallback((next: MobileView) => {
     setView(next)
     localStorage.setItem("cp-view", next)
   }, [])
-  const openAgent = useCallback(
+  const openFleet = useCallback(
     (id: string) => {
-      setActiveAgentId(id)
+      setActiveFleetId(id)
       localStorage.setItem("cp-agent", id)
       changeView("threads")
     },
@@ -149,18 +149,18 @@ function MobileShell() {
   // Open the agent Settings page, stashing where Back should return: "agentsList"
   // when opened from the fleet grid, or the agent id when opened from that
   // agent's thread page (so Back re-selects that agent's threads). T636 spec.
-  const openAgentSettings = useCallback((agentId: string, fromList: boolean) => {
-    localStorage.setItem("cameToAgentSettingsFrom", fromList ? "agentsList" : agentId)
-    setSettingsAgentId(agentId)
+  const openFleetSettings = useCallback((fleetId: string, fromList: boolean) => {
+    localStorage.setItem("cameToFleetSettingsFrom", fromList ? "agentsList" : fleetId)
+    setSettingsFleetId(fleetId)
   }, [])
 
   // Close the Settings page and return to origin (read from localStorage): the
   // fleet grid, or that agent's threads view.
   const backFromSettings = useCallback(() => {
-    const from = localStorage.getItem("cameToAgentSettingsFrom")
-    setSettingsAgentId(null)
+    const from = localStorage.getItem("cameToFleetSettingsFrom")
+    setSettingsFleetId(null)
     if (from && from !== "agentsList") {
-      setActiveAgentId(from)
+      setActiveFleetId(from)
       localStorage.setItem("cp-agent", from)
       changeView("threads")
     } else {
@@ -170,7 +170,7 @@ function MobileShell() {
 
   // Any non-fleet view needs a live agent; a stale/empty selection falls back to
   // the fleet grid (mirrors desktop's effectiveView guard).
-  const effectiveView: MobileView = view !== "fleet" && !activeAgent ? "fleet" : view
+  const effectiveView: MobileView = view !== "fleet" && !activeFleet ? "fleet" : view
 
   // Signal the top-buttons provider on every page switch so the corner controls
   // re-spring their glyph in lock-step with the transition (T637). Fires on
@@ -180,15 +180,15 @@ function MobileShell() {
 
   // The agent whose Settings page is open, resolved to a live fleet member (a
   // just-retired agent vanishes from the list → the overlay closes itself).
-  const settingsAgent = settingsAgentId ? agents.find((a) => a.id === settingsAgentId) : undefined
+  const settingsFleet = settingsFleetId ? agents.find((a) => a.id === settingsFleetId) : undefined
 
   const body = () => {
     if (effectiveView === "fleet") {
       return (
         <FleetDashboard
           agents={agents}
-          onOpenAgent={openAgent}
-          onManageAgent={(id) => openAgentSettings(id, true)}
+          onOpenFleet={openFleet}
+          onManageFleet={(id) => openFleetSettings(id, true)}
           autoCreate={false}
           onAutoCreateConsumed={() => {
             /* mobile PoC: auto-create dialog not wired */
@@ -196,11 +196,11 @@ function MobileShell() {
         />
       )
     }
-    if (effectiveView === "finder" && activeAgent) {
+    if (effectiveView === "finder" && activeFleet) {
       return (
         <Finder
-          key={activeAgent.id}
-          agent={activeAgent}
+          key={activeFleet.id}
+          agent={activeFleet}
           revealPath={finderRevealPath}
           onRevealConsumed={() => setFinderRevealPath(null)}
           disconnected={false}
@@ -212,11 +212,11 @@ function MobileShell() {
     }
     return (
       <ThreadsView
-        key={activeAgentId}
-        activeAgentId={activeAgentId}
+        key={activeFleetId}
+        activeFleetId={activeFleetId}
         onShowInFinder={showInFinder}
-        onGoToAgents={() => changeView("fleet")}
-        onOpenSettings={activeAgent ? () => openAgentSettings(activeAgent.id, false) : undefined}
+        onGoToFleets={() => changeView("fleet")}
+        onOpenSettings={activeFleet ? () => openFleetSettings(activeFleet.id, false) : undefined}
         disconnected={false}
         onReconnect={() => {
           /* mobile PoC: live reconnect not wired */
@@ -276,7 +276,7 @@ function MobileShell() {
       {/* Agent Settings page — a full-screen (fixed inset-0) overlay above every
           view. Rendered only when open AND the target agent still exists; its own
           back chevron calls backFromSettings to return to the stashed origin. */}
-      {settingsAgent && <AgentModal agent={settingsAgent} onClose={backFromSettings} />}
+      {settingsFleet && <FleetModal agent={settingsFleet} onClose={backFromSettings} />}
     </div>
   )
 }

@@ -51,7 +51,7 @@ interface Prefill {
 function useAgentEditorFields(
   open: boolean,
   mode: AgentEditorMode,
-  agentId: string,
+  fleetId: string,
   initial?: Prefill,
 ) {
   const [name, setName] = useState("")
@@ -81,7 +81,7 @@ function useAgentEditorFields(
   useEffect(() => {
     if (!open || mode.kind !== "edit" || initial) return
     let cancelled = false
-    fetchLibraryAgent(agentId, mode.itemId)
+    fetchLibraryAgent(fleetId, mode.itemId)
       .then((raw) => {
         if (cancelled) return
         setName(raw.name)
@@ -95,7 +95,7 @@ function useAgentEditorFields(
     return () => {
       cancelled = true
     }
-  }, [open, mode, agentId, initial])
+  }, [open, mode, fleetId, initial])
 
   return { name, setName, description, setDescription, body, setBody, loading }
 }
@@ -164,7 +164,7 @@ interface EditorFieldValues {
 /** What the editor is authoring — the agent id, the item variant, and the
  *  create/edit mode. Bundled so the submit hook stays within the 4-param cap. */
 interface EditorTarget {
-  agentId: string
+  fleetId: string
   variant: AgentEditorVariant
   mode: AgentEditorMode
 }
@@ -180,10 +180,10 @@ function useAgentEditorSubmit(
   fields: EditorFieldValues,
   onClose: () => void,
 ) {
-  const { agentId, variant, mode } = target
-  const upsert = useUpsertLibraryAgent(agentId)
-  const createCmd = useCreateCommand(agentId)
-  const upsertCmd = useUpsertCommand(agentId)
+  const { fleetId, variant, mode } = target
+  const upsert = useUpsertLibraryAgent(fleetId)
+  const createCmd = useCreateCommand(fleetId)
+  const upsertCmd = useUpsertCommand(fleetId)
   const isCommand = variant === "command"
   const isEdit = mode.kind === "edit"
   const mut = isCommand ? (isEdit ? upsertCmd : createCmd) : upsert
@@ -235,14 +235,14 @@ function useAgentEditorSubmit(
 export function AgentEditorDialog({
   open,
   onClose,
-  agentId,
+  fleetId,
   mode,
   initial,
   variant = "agent",
 }: {
   open: boolean
   onClose: () => void
-  agentId: string
+  fleetId: string
   mode: AgentEditorMode
   /** Prefill (Import path passes the parsed `.md`; Edit fetches on open). */
   initial?: Prefill | undefined
@@ -250,9 +250,9 @@ export function AgentEditorDialog({
   variant?: AgentEditorVariant
 }) {
   const { name, setName, description, setDescription, body, setBody, loading } =
-    useAgentEditorFields(open, mode, agentId, initial)
+    useAgentEditorFields(open, mode, fleetId, initial)
   const { mut, slug, canSave, error, isBuiltin, submit, close } = useAgentEditorSubmit(
-    { agentId, variant, mode },
+    { fleetId, variant, mode },
     { name, description, body },
     onClose,
   )

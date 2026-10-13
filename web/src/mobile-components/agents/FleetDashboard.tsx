@@ -17,7 +17,7 @@ import { FrostedBottomBar } from "@/mobile-components/shell/chrome/FrostedBottom
 import { CornerButton } from "@/mobile-components/shell/chrome/CornerButton"
 import { useElementHeight } from "@/lib/live/useElementHeight"
 import { accentVar, fmtCost, FLEET_MAX_W } from "@/lib/support/panelMeta"
-import { useMetrics, useRetireAgent, useAgentMeta, useCreateAgent } from "@/lib/live"
+import { useMetrics, useRetireFleet, useFleetMeta, useCreateFleet } from "@/lib/live"
 import { avatarUrl } from "@/lib/api"
 import { useFeatures } from "@/lib/providers/toggles/features"
 import type { Agent, AgentStatus } from "@/lib/types"
@@ -47,19 +47,19 @@ const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
  * draft name for a new agent; a round `+` button appears only once the field is
  * non-empty, and tapping it (or pressing Return) spawns an agent with that name
  * (folder derived server-side, model defaulted — change it later via Manage)
- * then clears the field. This replaced the earlier full-screen `AgentModal`
- * create flow and the intermediate `NewAgentSheet` bottom sheet.
+ * then clears the field. This replaced the earlier full-screen `FleetModal`
+ * create flow and the intermediate `NewFleetSheet` bottom sheet.
  */
 export function FleetDashboard({
   agents,
-  onOpenAgent,
-  onManageAgent,
+  onOpenFleet,
+  onManageFleet,
   autoCreate,
   onAutoCreateConsumed,
 }: {
   agents: Agent[]
-  onOpenAgent: (id: string) => void
-  onManageAgent: (id: string) => void
+  onOpenFleet: (id: string) => void
+  onManageFleet: (id: string) => void
   autoCreate?: boolean | undefined
   onAutoCreateConsumed?: (() => void) | undefined
 }) {
@@ -71,7 +71,7 @@ export function FleetDashboard({
   const [usageOpen, setUsageOpen] = useState(false)
   // Only where the deployment offers the Claude subscription (CP_FEATURE_CLAUDE_OAUTH).
   const claudeOffered = useFeatures().claude_oauth
-  const createAgent = useCreateAgent()
+  const createFleet = useCreateFleet()
   const inputRef = useRef<HTMLInputElement>(null)
   // Floating glass bottom bar (T637): reserve a 1.5× spacer sized from its
   // measured height so the last row scrolls clear of the frosted bar.
@@ -88,8 +88,8 @@ export function FleetDashboard({
    *  Manage). No-op on an empty field or while a create is already in flight. */
   const create = () => {
     const name = query.trim()
-    if (name === "" || createAgent.isPending) return
-    createAgent.mutate(
+    if (name === "" || createFleet.isPending) return
+    createFleet.mutate(
       { name },
       {
         onSuccess: (receipt) => {
@@ -160,10 +160,10 @@ export function FleetDashboard({
             <ul ref={listRef} className="flex flex-col">
               {filtered.map((a) => (
                 <li key={a.id}>
-                  <AgentSwipeRow
+                  <FleetSwipeRow
                     agent={a}
-                    onOpen={() => onOpenAgent(a.id)}
-                    onManage={() => onManageAgent(a.id)}
+                    onOpen={() => onOpenFleet(a.id)}
+                    onManage={() => onManageFleet(a.id)}
                     onFlash={flash}
                   />
                 </li>
@@ -188,7 +188,7 @@ export function FleetDashboard({
         query={query}
         setQuery={setQuery}
         onCreate={create}
-        creating={createAgent.isPending}
+        creating={createFleet.isPending}
         inputRef={inputRef}
         barRef={barRef}
       />
@@ -303,7 +303,7 @@ function FleetHeader({ count }: { count: number }) {
  * the native iOS list gesture via the shared {@link useSwipeRow} engine. The row
  * face itself is the primary tap target (open the agent).
  */
-function AgentSwipeRow({
+function FleetSwipeRow({
   agent,
   onOpen,
   onManage,
@@ -315,7 +315,7 @@ function AgentSwipeRow({
   onFlash: (m: string) => void
 }) {
   const { rowRef, close, bind } = useSwipeRow(ACTION_W)
-  const retire = useRetireAgent()
+  const retire = useRetireFleet()
 
   const onRetire = () => {
     close()
@@ -354,7 +354,7 @@ function AgentSwipeRow({
           directly to this node (never via a React `style` prop) so a drag causes
           zero re-renders. Tapping while open just closes. */}
       <div ref={rowRef} {...bind} className="relative touch-pan-y bg-background select-none">
-        <AgentRow agent={agent} onOpen={onOpen} />
+        <FleetRow agent={agent} onOpen={onOpen} />
       </div>
     </div>
   )
@@ -366,8 +366,8 @@ function AgentSwipeRow({
  * trailing cost + chevron. Live vitals ride the per-agent meta cache; the polled
  * fleet row is the fallback until the first delta. Whole row taps open (T632).
  */
-function AgentRow({ agent, onOpen }: { agent: Agent; onOpen: () => void }) {
-  const { data: live } = useAgentMeta(agent.id)
+function FleetRow({ agent, onOpen }: { agent: Agent; onOpen: () => void }) {
+  const { data: live } = useFleetMeta(agent.id)
   const a = live ?? agent
   const s = statusMeta[a.status]
   const accent = accentVar[a.accent]
@@ -414,7 +414,7 @@ function AgentRow({ agent, onOpen }: { agent: Agent; onOpen: () => void }) {
           >
             {agent.name}
           </span>
-          <HealthDot agentId={agent.id} />
+          <HealthDot fleetId={agent.id} />
           <span className="ml-auto shrink-0 text-[12.5px] font-semibold text-foreground/75 tabular-nums">
             {fmtCost(a.costUsd)}
           </span>
@@ -448,8 +448,8 @@ function healthCondition(data: NonNullable<ReturnType<typeof useMetrics>["data"]
  * condition, so a silent backend latch stays visible (T121); the full
  * explanation rides the `title` tooltip.
  */
-function HealthDot({ agentId }: { agentId: string }) {
-  const { data } = useMetrics(agentId)
+function HealthDot({ fleetId }: { fleetId: string }) {
+  const { data } = useMetrics(fleetId)
   if (!data || !healthCondition(data)) return null
   return <AlertTriangle className="size-3.5 shrink-0 text-(--warn)" aria-label="Health warning" />
 }

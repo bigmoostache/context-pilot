@@ -281,7 +281,7 @@ export interface Banner {
  */
 export function resolveComposerBanner(
   paused: boolean,
-  agentBusy: boolean,
+  fleetBusy: boolean,
   streaming: boolean,
   focused: boolean,
 ): Banner | null {
@@ -293,7 +293,7 @@ export function resolveComposerBanner(
       text: "Thread paused — the agent won't respond until resumed.",
     }
   }
-  if (!agentBusy) return null
+  if (!fleetBusy) return null
   if (streaming) {
     return { working: true, paused: false, color: "var(--ok)", text: "Agent is streaming…" }
   }

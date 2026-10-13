@@ -26,8 +26,8 @@ import { relOf, sortTreeNodes, type TreeState } from "./treeState"
  * the flag would leave a live query per folder the user ever touched.
  */
 export function ExplorerTree({
-  agentId,
-  agentFolder,
+  fleetId,
+  fleetFolder,
   tree,
   descriptions,
   activePath,
@@ -35,9 +35,9 @@ export function ExplorerTree({
   onPinFile,
   onContext,
 }: {
-  agentId: string
+  fleetId: string
   /** Absolute realm root. Every path below is derived against it. */
-  agentFolder: string
+  fleetFolder: string
   tree: TreeState
   descriptions: Record<string, string> | undefined
   /** Absolute path of the active tab, highlighted in the tree. */
@@ -63,9 +63,9 @@ export function ExplorerTree({
               the row's own guide spacers. */}
           <div className="py-1">
             <ExplorerChildren
-              agentId={agentId}
-              agentFolder={agentFolder}
-              path={agentFolder}
+              fleetId={fleetId}
+              fleetFolder={fleetFolder}
+              path={fleetFolder}
               depth={0}
               tree={tree}
               descriptions={descriptions}
@@ -89,8 +89,8 @@ export function ExplorerTree({
  * presentational leaf that can be rendered anywhere.
  */
 function ExplorerChildren({
-  agentId,
-  agentFolder,
+  fleetId,
+  fleetFolder,
   path,
   depth,
   tree,
@@ -100,8 +100,8 @@ function ExplorerChildren({
   onPinFile,
   onContext,
 }: {
-  agentId: string
-  agentFolder: string
+  fleetId: string
+  fleetFolder: string
   /** Absolute path of the folder being listed. */
   path: string
   depth: number
@@ -112,7 +112,7 @@ function ExplorerChildren({
   onPinFile: (node: FinderNode) => void
   onContext: (node: FinderNode, e: React.MouseEvent) => void
 }) {
-  const { data, loading } = useFs(agentId, relOf(agentFolder, path))
+  const { data, loading } = useFs(fleetId, relOf(fleetFolder, path))
   const nodes = sortTreeNodes(data ?? [])
 
   if (loading && data === undefined) {
@@ -150,7 +150,7 @@ function ExplorerChildren({
               depth={depth}
               expanded={expanded}
               active={node.path === activePath}
-              description={descriptions?.[relOf(agentFolder, node.path)]}
+              description={descriptions?.[relOf(fleetFolder, node.path)]}
               onActivate={() => {
                 if (isFolder) tree.toggle(node.path)
                 else onOpenFile(node)
@@ -163,8 +163,8 @@ function ExplorerChildren({
             />
             {isFolder && expanded && (
               <ExplorerChildren
-                agentId={agentId}
-                agentFolder={agentFolder}
+                fleetId={fleetId}
+                fleetFolder={fleetFolder}
                 path={node.path}
                 depth={depth + 1}
                 tree={tree}

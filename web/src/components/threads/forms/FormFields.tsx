@@ -28,7 +28,7 @@ interface FieldProps {
   onChange: (v: AnswerValue) => void
   disabled: boolean
   /** owning agent — only `files` needs it (immediate upload). */
-  agentId: string
+  fleetId: string
 }
 
 /** Normalise a value to a scalar string (empty when it's a list). */
@@ -321,7 +321,7 @@ function ConfirmField({ field, value, onChange, disabled }: FieldProps) {
 
 /** files — the user answers by uploading; each pick uploads IMMEDIATELY via the
  *  existing `.uploads/` path and the answer accrues the realm-relative paths. */
-function FilesField({ value, onChange, disabled, agentId }: FieldProps) {
+function FilesField({ value, onChange, disabled, fleetId }: FieldProps) {
   const paths = asList(value)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -332,7 +332,7 @@ function FilesField({ value, onChange, disabled, agentId }: FieldProps) {
     try {
       const added: string[] = []
       for (const f of files) {
-        const r = await uploadUnique(agentId, ".uploads", f)
+        const r = await uploadUnique(fleetId, ".uploads", f)
         added.push(r.path)
       }
       onChange([...paths, ...added])
