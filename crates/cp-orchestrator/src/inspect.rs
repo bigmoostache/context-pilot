@@ -46,6 +46,10 @@ const STATES_DIR: &str = "states";
 /// keeps only slim agent metadata in `config.json`; messages live here.
 const AGENTS_DIR: &str = "agents";
 
+/// Directory holding per-group message files (`<group_id>.json`). Since T860
+/// C3 an agent's conversation lives in its human group's file.
+const GROUPS_DIR: &str = "groups";
+
 /// Pre-T860 name of [`AGENTS_DIR`], read when the agent binary is older.
 const LEGACY_AGENTS_DIR: &str = "threads";
 
@@ -124,7 +128,11 @@ impl StateReader {
         let mut config = read_cached_json(&path, &mut cache.config)?;
         let legacy = normalize_legacy_agents(&mut config);
         let dir = if legacy { LEGACY_AGENTS_DIR } else { AGENTS_DIR };
-        hydrate_agent_messages(&folder.join(CP_DIR).join(dir), &mut config, &mut cache.agents);
+        hydrate_agent_messages(
+            &MessageDirs { groups: &folder.join(CP_DIR).join(GROUPS_DIR), agents: &folder.join(CP_DIR).join(dir) },
+            &mut config,
+            &mut cache.agents,
+        );
         overlay_module_files(&folder.join(CP_DIR).join(MODULES_DIR), &mut config, &mut cache.modules);
         Ok(config)
     }
@@ -201,10 +209,19 @@ fn normalize_legacy_agents(config: &mut Value) -> bool {
     true
 }
 
-/// Splice `messages` from `<agents_dir>/<id>.json` into every agent entry of
-/// `config` lacking them. Legacy configs (inline messages) pass through as-is;
-/// a missing/unreadable file leaves the entry without messages.
-fn hydrate_agent_messages(agents_dir: &Path, config: &mut Value, cache: &mut HashMap<String, CachedJson>) {
+/// Where agent messages may live on disk.
+struct MessageDirs<'dirs> {
+    /// `groups/` — current layout, one file per group.
+    groups: &'dirs Path,
+    /// `agents/` (or legacy `threads/`) — pre-groups per-agent files.
+    agents: &'dirs Path,
+}
+
+/// Splice `messages` into every agent entry of `config` lacking them: from
+/// `groups/<human_group_id>.json` when the agent has a human group, else from
+/// the pre-groups `agents/<id>.json`. Legacy configs (inline messages) pass
+/// through as-is; a missing/unreadable file leaves the entry without messages.
+fn hydrate_agent_messages(dirs: &MessageDirs<'_>, config: &mut Value, cache: &mut HashMap<String, CachedJson>) {
     let Some(entries) = config.pointer_mut("/modules/agents/agents").and_then(Value::as_array_mut) else {
         return;
     };
@@ -214,8 +231,12 @@ fn hydrate_agent_messages(agents_dir: &Path, config: &mut Value, cache: &mut Has
             continue;
         }
         let Some(id) = obj.get("id").and_then(Value::as_str).map(str::to_owned) else { continue };
-        let path = agents_dir.join(format!("{id}.json"));
-        let slot = cache.entry(id).or_insert_with(|| CachedJson { mtime: SystemTime::UNIX_EPOCH, data: Value::Null });
+        let group = obj.get("human_group_id").and_then(Value::as_str).filter(|g| !g.is_empty()).map(str::to_owned);
+        let (key, path) = group.map_or_else(
+            || (id.clone(), dirs.agents.join(format!("{id}.json"))),
+            |gid| (format!("group:{gid}"), dirs.groups.join(format!("{gid}.json"))),
+        );
+        let slot = cache.entry(key).or_insert_with(|| CachedJson { mtime: SystemTime::UNIX_EPOCH, data: Value::Null });
         let Ok(file) = read_cached_json_slot(&path, slot) else { continue };
         if let Some(messages) = file.get("messages") {
             let _prev = obj.insert("messages".to_owned(), messages.clone());
@@ -417,6 +438,30 @@ mod tests {
         assert_eq!(at("/modules/agents/agents/0/messages/0/content"), Some("from file"));
         assert_eq!(at("/modules/agents/agents/1/messages/0/content"), Some("inline"));
         assert!(read.pointer("/modules/agents/agents/2/messages").is_none());
+    }
+
+    #[test]
+    fn read_config_hydrates_from_human_group() {
+        let dir = tempdir().expect("dir");
+        let folder = dir.path();
+        let cfg = serde_json::json!({"modules": {"agents": {"agents": [
+            {"id": "A1", "name": "grouped", "human_group_id": "G4"},
+            {"id": "A2", "name": "pre-groups"},
+        ]}}});
+        write_config(folder, &cfg);
+        let gdir = folder.join(CP_DIR).join(GROUPS_DIR);
+        fs::create_dir_all(&gdir).expect("mkdir");
+        fs::write(gdir.join("G4.json"), br#"{"id":"G4","messages":[{"content":"from group"}]}"#).expect("write");
+        let adir = folder.join(CP_DIR).join(AGENTS_DIR);
+        fs::create_dir_all(&adir).expect("mkdir");
+        fs::write(adir.join("A1.json"), br#"{"messages":[{"content":"stale backup"}]}"#).expect("write");
+        fs::write(adir.join("A2.json"), br#"{"messages":[{"content":"from agent file"}]}"#).expect("write");
+
+        let mut reader = StateReader::new();
+        let read = reader.read_config(folder).expect("read");
+        let at = |i: &str| read.pointer(i).and_then(Value::as_str);
+        assert_eq!(at("/modules/agents/agents/0/messages/0/content"), Some("from group"));
+        assert_eq!(at("/modules/agents/agents/1/messages/0/content"), Some("from agent file"));
     }
 
     #[test]
