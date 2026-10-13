@@ -96,7 +96,7 @@ function sameNav(a: NavState, b: NavState): boolean {
 /** localStorage key holding a fleet's last-selected agent. Module-scoped (no
  *  closure over shell state) so it seeds the state initializer, the persist
  *  effect, and the nav-restore fallback from one place. */
-const agentKeyFor = (id: string) => `cp-thread-${id}`
+const agentKeyFor = (id: string) => `cp-agent-sel-${id}`
 
 /**
  * Wire browser Back / Next to the (view, agent, agent) tuple via

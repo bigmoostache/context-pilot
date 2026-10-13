@@ -21,7 +21,7 @@ const EMPTY_DRAFT: Draft = { title: "", firstMessage: "", files: [], paused: fal
 
 /** Per-agent localStorage key for the in-progress new-agent draft. */
 function draftKey(fleetId: string): string {
-  return `cp-newthread-${fleetId}`
+  return `cp-newagent-${fleetId}`
 }
 
 /** Hydrate the persisted draft for an agent, falling back to an empty draft on a

@@ -14,6 +14,28 @@ import App from "./App.tsx"
 initTelemetry()
 
 /**
+ * One-shot T860 browser-storage migration: `cp-thread-<fleet>` (last selected
+ * agent) and `cp-newthread-<fleet>` (new-agent draft) become `cp-agent-sel-*`
+ * / `cp-newagent-*`, and stored agent ids `T<n>` become `A<n>` to match the
+ * agent-side store migration. Idempotent: old keys are removed once moved.
+ */
+function migrateAgentStorage(): void {
+  const renames: [string, string][] = [
+    ["cp-thread-", "cp-agent-sel-"],
+    ["cp-newthread-", "cp-newagent-"],
+  ]
+  for (const key of Object.keys(localStorage)) {
+    const hit = renames.find(([old]) => key.startsWith(old))
+    if (!hit) continue
+    const value = localStorage.getItem(key) ?? ""
+    const next = hit[0] === "cp-thread-" ? value.replace(/^T(\d+)$/, "A$1") : value
+    localStorage.setItem(hit[1] + key.slice(hit[0].length), next)
+    localStorage.removeItem(key)
+  }
+}
+migrateAgentStorage()
+
+/**
  * App-wide error boundary — the safety net the app was missing (T644).
  *
  * Before this, the tree carried NO error boundary anywhere, so a single

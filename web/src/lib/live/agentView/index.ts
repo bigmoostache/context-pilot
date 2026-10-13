@@ -79,7 +79,7 @@ export function useAgentSelection(
   newAgentDialog?: { open: boolean; setOpen: (v: boolean) => void },
   controlledSelection?: { selectedId: string; setSelectedId: (id: string) => void },
 ): Selection {
-  const agentKey = `cp-thread-${activeFleetId}`
+  const agentKey = `cp-agent-sel-${activeFleetId}`
   // Internal fallback state — used ONLY when the caller does not control the
   // selection (mobile). A controlled caller owns the value + its persistence,
   // so this state (and the seed/persist effects below) sit inert.
