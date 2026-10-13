@@ -349,6 +349,9 @@ fn archive_confirm(state: &mut State) -> ActionResult {
             focus_after.focused_thread_id = None;
         }
         let _prev = focus_after.last_read_count.remove(&aid);
+        if let Some(outcome) = cp_mod_git::worktree::release_thread(state, &aid) {
+            log::info!("archive {aid}: {outcome}");
+        }
     }
 
     state.flags.ui.dirty = true;

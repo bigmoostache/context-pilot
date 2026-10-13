@@ -17,7 +17,7 @@ pub mod types;
 /// Background git-status worker (keeps `git` off the main loop).
 pub mod worker;
 /// `Worktree` tool: per-thread git worktree enter/leave/list/remove.
-mod worktree;
+pub mod worktree;
 
 use types::{GitChangeType, GitFileChange, GitState};
 use worker::GitSnapshot;

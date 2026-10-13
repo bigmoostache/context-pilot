@@ -36,7 +36,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let action = tool.input.get("action").and_then(|v| v.as_str()).unwrap_or("");
     let branch = tool.input.get("branch").and_then(|v| v.as_str());
     let outcome = match (action, branch) {
-        ("leave", _) => Ok(leave(state)),
+        ("leave", _) => leave(state),
         ("list", _) => list(state),
         ("enter", Some(b)) => validate_branch(b).and_then(|()| enter(state, b)),
         ("remove", Some(b)) => validate_branch(b).and_then(|()| remove(state, b)),
@@ -189,14 +189,57 @@ fn ensure_worktrees_dir(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Return the executing thread to the project root.
-fn leave(state: &mut State) -> String {
-    let was = state.thread().workdir.as_ref().map(|d| d.display().to_string());
+/// Return the executing thread to the project root. Refused for the last
+/// thread in a worktree: leaving would strand it, so it must be removed.
+fn leave(state: &mut State) -> Result<String, String> {
+    let Some(dir) = state.thread().workdir.clone() else {
+        return Ok("Already at the project root.".to_owned());
+    };
+    let me = state.thread_store.executing().map(str::to_owned);
+    if other_users(state, &dir, me.as_deref()).is_empty() {
+        let branch = git(&dir, &["rev-parse", "--abbrev-ref", "HEAD"]).unwrap_or_else(|_| "<branch>".to_owned());
+        return Err(format!(
+            "this thread is the last one in {}; leaving would orphan it. Commit (or discard) your work, then \
+             run Worktree(action=remove, branch={branch}): it deletes the worktree and returns you to the root.",
+            dir.display()
+        ));
+    }
     set_workdir(state, None);
-    was.map_or_else(
-        || "Already at the project root.".to_owned(),
-        |d| format!("Left worktree {d}; back at the project root."),
-    )
+    Ok(format!("Left worktree {}; back at the project root.", dir.display()))
+}
+
+/// Ids of threads other than `me` whose workdir is `dir`.
+fn other_users(state: &State, dir: &Path, me: Option<&str>) -> Vec<String> {
+    state
+        .thread_store
+        .ids()
+        .into_iter()
+        .filter(|id| Some(id.as_str()) != me)
+        .filter(|id| state.thread_store.get(id).and_then(|rt| rt.workdir.as_deref()).is_some_and(|w| same_dir(w, dir)))
+        .collect()
+}
+
+/// Release `thread_id`'s worktree when the thread is archived.
+///
+/// Removed when no other thread works there, else simply left. A worktree
+/// that can't be removed (uncommitted changes, running consoles) is kept, and
+/// so is the thread's workdir, so restoring the thread brings it back. Returns
+/// a one-line outcome, `None` when the thread was at the project root.
+pub fn release_thread(state: &mut State, thread_id: &str) -> Option<String> {
+    let dir = state.thread_store.get(thread_id)?.workdir.clone()?;
+    let shown = dir.display().to_string();
+    let outcome = if other_users(state, &dir, Some(thread_id)).is_empty() {
+        match remove_dir(state, &dir) {
+            Ok(()) => format!("removed worktree {shown}"),
+            Err(e) => return Some(format!("kept worktree {shown}: {e}")),
+        }
+    } else {
+        format!("left worktree {shown} (still used by other threads)")
+    };
+    if let Some(rt) = state.thread_store.get_mut(thread_id) {
+        rt.workdir = None;
+    }
+    Some(outcome)
 }
 
 /// `git worktree list` plus where this thread currently works.
@@ -216,27 +259,36 @@ fn remove(state: &mut State, branch: &str) -> Result<String, String> {
         return Err(format!("branch '{branch}' is checked out at the project root, which cannot be removed"));
     }
     let path = dir.display().to_string();
-    let live = live_consoles(state, &dir);
-    if !live.is_empty() {
-        return Err(format!(
-            "consoles are still running inside {path}: {}. Close them with Close_panel first.",
-            live.join(", ")
-        ));
-    }
-    if dir.is_dir() {
-        if !git(&dir, &["status", "--porcelain"])?.is_empty() {
-            return Err(format!("{path} has uncommitted changes; commit or discard them first"));
-        }
-        let _out = git(&root, &["worktree", "remove", &path])?;
-    } else {
-        let _out = git(&root, &["worktree", "prune"])?;
-    }
+    remove_dir(state, &dir)?;
     let mut msg = format!("Removed worktree {path} (branch {branch} kept).");
     if state.thread().workdir.as_deref().is_some_and(|w| same_dir(w, &dir)) {
         set_workdir(state, None);
         msg.push_str(" This thread was inside it and is back at the project root.");
     }
     Ok(msg)
+}
+
+/// Delete the worktree at `dir` (branch kept). Refuses while consoles run
+/// inside it or on uncommitted changes; a folder already gone is pruned.
+fn remove_dir(state: &State, dir: &Path) -> Result<(), String> {
+    let path = dir.display().to_string();
+    let live = live_consoles(state, dir);
+    if !live.is_empty() {
+        return Err(format!(
+            "consoles are still running inside {path}: {}. Close them with Close_panel first.",
+            live.join(", ")
+        ));
+    }
+    let root = project_root();
+    if dir.is_dir() {
+        if !git(dir, &["status", "--porcelain"])?.is_empty() {
+            return Err(format!("{path} has uncommitted changes; commit or discard them first"));
+        }
+        let _out = git(&root, &["worktree", "remove", &path])?;
+    } else {
+        let _out = git(&root, &["worktree", "prune"])?;
+    }
+    Ok(())
 }
 
 /// Running console panels, in any thread, whose cwd lies inside `dir`:

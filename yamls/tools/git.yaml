@@ -7,7 +7,7 @@ tools:
   Worktree:
     description: |
       Moves THIS thread into a git worktree so it can work on a branch without disturbing other threads. Worktrees live in .worktrees/<branch> under the project root ('/' in the branch becomes '+'). While inside one, relative file paths, git, gh, consoles and callbacks run in the worktree. Memories, todos, logs and other .context-pilot state stay shared with the root. Search still indexes the project root only.
-      Actions: enter (creates the worktree if missing, plus the branch if it doesn't exist), leave (back to the project root), list (all worktrees + where this thread works), remove (deletes a clean worktree, keeps the branch; refuses on uncommitted changes; cleans up a worktree whose folder was already deleted).
+      Actions: enter (creates the worktree if missing, plus the branch if it doesn't exist), leave (back to the project root; refused when this thread is the last one in the worktree, use remove instead), list (all worktrees + where this thread works), remove (deletes a clean worktree, keeps the branch; refuses on uncommitted changes; cleans up a worktree whose folder was already deleted). Archiving a thread removes its worktree when no other thread uses it.
     parameters:
       action: "enter | leave | list | remove"
       branch: "Branch name (required for enter and remove), e.g. 'feat/login'"

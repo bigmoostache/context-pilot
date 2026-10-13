@@ -158,6 +158,9 @@ fn apply_archive_thread(state: &mut State, thread_id: &str) {
         focus.focused_thread_id = None;
     }
     let _prev = focus.last_read_count.remove(thread_id);
+    if let Some(outcome) = cp_mod_git::worktree::release_thread(state, thread_id) {
+        log::info!("bridge: archive {thread_id}: {outcome}");
+    }
 
     emit_roster_delta(state, OpEntryKind::ThreadArchived { thread_id: thread_id.to_owned() });
     if let Some(bs) = state.get_ext_mut::<BridgeState>() {
