@@ -7,6 +7,7 @@ pub mod persist;
 
 /// One-shot boot migration of the pre-T860 `threads` store layout.
 pub mod migrate;
+pub mod roster;
 pub mod tree;
 
 // =============================================================================

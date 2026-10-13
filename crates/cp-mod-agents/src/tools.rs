@@ -11,6 +11,7 @@ use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
+use crate::types::roster::yaml_escape;
 use crate::types::{AgentAuthor, AgentMessage, AgentStatus, AgentsState};
 
 /// Truncate `s` to at most `max` bytes on a char boundary (no ellipsis).
@@ -305,35 +306,6 @@ fn build_read_result(state: &State, r: &ReadResult<'_>) -> String {
     lines.join("\n")
 }
 
-/// Write the YAML thread-overview list (active agents only) into `output`.
-fn write_agent_list(output: &mut String, ts: &AgentsState, focused_tid: &str) {
-    // Archived agents are invisible to the LLM (T9): only active agents
-    // appear in the context the model reads. Paused agents are hidden from the
-    // panel list too (T663) — a paused agent is deliberately parked, so it
-    // should not clutter the roster — EXCEPT the focused one, which stays visible
-    // because the conversation section below renders it and hiding what you're
-    // actively working would be jarring.
-    for t in ts.agents.iter().filter(|t| !t.archived && (!t.paused || t.id == focused_tid)) {
-        let unack = t.messages.iter().filter(|m| !m.acknowledged).count();
-        _ = writeln!(output, "  - id: {}", t.id);
-        _ = writeln!(output, "    name: \"{}\"", yaml_escape(&t.name));
-        _ = writeln!(output, "    status: {}", t.status);
-        _ = writeln!(output, "    messages: {}", t.messages.len());
-        if unack > 0 {
-            _ = writeln!(output, "    unread: {unack}");
-        }
-        if t.id == focused_tid {
-            _ = writeln!(output, "    focused: true");
-        }
-        if t.paused {
-            _ = writeln!(output, "    paused: true");
-        }
-        if let Some(origin) = t.origin.as_ref() {
-            _ = writeln!(output, "    branched_from: {}", origin.agent_id);
-        }
-    }
-}
-
 /// Write the focused agent's `branched_from` block: the parent id plus a note
 /// telling the agent the branch's history stops at the branch point.
 ///
@@ -412,7 +384,7 @@ pub(crate) fn build_panel_content(state: &State, focused_tid: &str, now_ms: u64)
 
     let ts = AgentsState::get(state);
     let mut output = String::from("agents:\n");
-    write_agent_list(&mut output, ts, focused_tid);
+    crate::types::roster::write_agent_list(&mut output, state, focused_tid);
 
     // Focused agent's conversation (last MAX_PANEL_MESSAGES messages)
     let Some(agent) = ts.agents.iter().find(|t| t.id == focused_tid) else {
@@ -446,11 +418,6 @@ pub(crate) fn build_panel_content(state: &State, focused_tid: &str, now_ms: u64)
     }
 
     output
-}
-
-/// Escape a string for YAML double-quoted context: `\` → `\\`, `"` → `\"`.
-fn yaml_escape(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 /// Format an age duration from two epoch-ms timestamps as a human-readable
