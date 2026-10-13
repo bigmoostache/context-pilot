@@ -75,7 +75,7 @@ export function useScrollPin(
     const el = bottomRef.current
     if (!el) return
     const raf = requestAnimationFrame(() => {
-      measure("threads:scrollIntoView", () => el.scrollIntoView({ block: "end" }))
+      measure("agents:scrollIntoView", () => el.scrollIntoView({ block: "end" }))
     })
     return () => cancelAnimationFrame(raf)
   }, [bottomRef, agentId, nonAutoCount])

@@ -67,7 +67,7 @@ export function ComposerInputRow({
             void onAttach(images)
           }
         }}
-        placeholder="Reply to this thread…"
+        placeholder="Reply to this agent…"
         rows={1}
         className="max-h-[200px] min-h-[24px] w-full resize-none bg-transparent px-1 pt-1 text-[13.5px] leading-relaxed text-foreground/90 outline-none placeholder:text-muted-foreground/60"
       />
@@ -91,7 +91,7 @@ export function ComposerInputRow({
             background to cancel. */}
         <Tip
           title="Attach files"
-          body="Upload files into this thread for the agent to read. Pick several at once, or paste an image straight into the box."
+          body="Upload files for this agent to read. Pick several at once, or paste an image straight into the box."
           triggerClassName="inline-flex"
         >
           <button

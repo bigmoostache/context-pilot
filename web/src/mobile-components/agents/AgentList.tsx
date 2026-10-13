@@ -135,7 +135,7 @@ export function AgentList({
       {(showArchived || archivedCount > 0) && (
         <CornerButton
           side="right"
-          label={showArchived ? "Show active threads" : "Show archived threads"}
+          label={showArchived ? "Show active agents" : "Show archived agents"}
           onClick={() => onToggleArchived(!showArchived)}
           className="z-30"
         >
@@ -206,7 +206,7 @@ export function AgentList({
               e.preventDefault()
               onNewAgent(query.trim())
             }}
-            placeholder={showArchived ? "Search archived" : "Search or create a thread"}
+            placeholder={showArchived ? "Search archived" : "Search or create a agent"}
             className="min-w-0 flex-1 bg-transparent text-foreground/90 outline-none placeholder:text-muted-foreground/55"
           />
           {query && (
@@ -226,7 +226,7 @@ export function AgentList({
         {!showArchived && query.trim() !== "" && (
           <button
             onClick={() => onNewAgent(query.trim())}
-            aria-label="Create thread"
+            aria-label="Create agent"
             className="flex size-11 shrink-0 items-center justify-center rounded-full bg-(--signal) text-(--primary-foreground) transition-[filter] active:brightness-110"
           >
             <Plus className="size-5" />
@@ -240,9 +240,9 @@ export function AgentList({
 /** The empty placeholder — copy adapts to search / which set is shown. */
 function EmptyState({ hasQuery, showArchived }: { hasQuery: boolean; showArchived: boolean }) {
   const message = hasQuery
-    ? "No threads match your search."
+    ? "No agents match your search."
     : showArchived
-      ? "No archived threads."
+      ? "No archived agents."
       : "No conversations yet."
   return <p className="px-4 py-16 text-center text-[14px] text-muted-foreground/55">{message}</p>
 }

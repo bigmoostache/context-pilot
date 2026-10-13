@@ -108,7 +108,7 @@ export function TopBar({
               inFleet
                 ? (id) => {
                     onSwitchFleet(id)
-                    onViewChange("threads")
+                    onViewChange("agents")
                   }
                 : onSwitchFleet
             }
@@ -130,7 +130,7 @@ export function TopBar({
         {/* The agents view's own list actions. Gated on the agents view being
             SELECTED: they act on the agent list, so on Finder or Costs they
             would be controls for a surface that is not on screen. */}
-        {!inFleet && view === "threads" && (
+        {!inFleet && view === "agents" && (
           <AgentActions onNewAgent={onNewAgent} onSearchAgents={onSearchAgents} />
         )}
 
@@ -235,9 +235,9 @@ function AgentActions({
 
   return (
     <div className="flex w-full flex-col items-center gap-0.5">
-      <Tip title="New thread" body="Start a fresh conversation or task in this fleet." side="right">
+      <Tip title="New agent" body="Start a fresh conversation or task in this fleet." side="right">
         <RailAction
-          label="New thread"
+          label="New agent"
           icon={Plus}
           hint="C"
           hintShown={modHeld}
@@ -245,12 +245,12 @@ function AgentActions({
         />
       </Tip>
       <Tip
-        title="Search threads"
-        body="Find a thread by name, or search across every message in this fleet."
+        title="Search agents"
+        body="Find a agent by name, or search across every message in this fleet."
         side="right"
       >
         <RailAction
-          label="Search threads"
+          label="Search agents"
           icon={Search}
           hint="P"
           hintShown={modHeld}
@@ -364,7 +364,7 @@ function useViewShortcuts(a: {
   agentsClick: () => void
   finderClick: () => void
 } {
-  const agentsClick = a.view === "threads" ? a.onToggleAgentsRail : () => a.onViewChange("threads")
+  const agentsClick = a.view === "agents" ? a.onToggleAgentsRail : () => a.onViewChange("agents")
   const finderClick = a.view === "finder" ? a.onToggleFinderRail : () => a.onViewChange("finder")
 
   const modHeld = useModifierShortcuts({ l: agentsClick, k: finderClick })
@@ -400,7 +400,7 @@ function ViewTabs({
   finderRailOpen: boolean
   onToggleFinderRail: () => void
 }) {
-  const onAgents = view === "threads"
+  const onAgents = view === "agents"
   const onFinder = view === "finder"
 
   // ⌘/Ctrl shortcuts (L Agents · K Finder) share ONE handler each with the tab
@@ -420,11 +420,11 @@ function ViewTabs({
     // the opt-in token that survives the transparent `--border`.
     <div className="flex w-full flex-col items-center gap-0.5 rounded-lg border border-(--border-strong) bg-muted/60 p-0.5">
       <Tip
-        title="Threads"
+        title="Agents"
         body={
           onAgents
-            ? `Click again to ${agentsRailOpen ? "hide" : "show"} the thread list.`
-            : "Chat with this fleet. Each thread is a separate conversation or task it can run in parallel."
+            ? `Click again to ${agentsRailOpen ? "hide" : "show"} the agent list.`
+            : "Chat with this fleet. Each agent is a separate conversation or task it can run in parallel."
         }
         side="right"
       >
@@ -437,7 +437,7 @@ function ViewTabs({
           // views the button is a plain navigation control.
           expanded={onAgents ? agentsRailOpen : undefined}
           icon={MessagesSquare}
-          label="Threads"
+          label="Agents"
           // L (not C — C is the new-agent shortcut in AgentActions).
           hint="L"
           hintShown={modHeld}

@@ -199,7 +199,7 @@ function ListHeader({
 /** The empty placeholder shown when no agent is visible — copy adapts to which
  *  set (live/archived) is on screen. */
 function EmptyState({ showArchived }: { showArchived: boolean }) {
-  const message = showArchived ? "No archived threads." : "No threads yet."
+  const message = showArchived ? "No archived agents." : "No agents yet."
   return <p className="px-2.5 py-6 text-center text-[11.5px] text-muted-foreground/55">{message}</p>
 }
 

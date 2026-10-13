@@ -90,7 +90,7 @@ function Root() {
 /** The three primary mobile surfaces — the desktop `costs` view is a dev-only
  *  analytics surface and is intentionally omitted from the mobile shell (P4
  *  proof-of-concept scope). */
-type MobileView = Extract<ViewMode, "fleet" | "threads" | "finder">
+type MobileView = Extract<ViewMode, "fleet" | "agents" | "finder">
 
 /**
  * Mobile app shell — the chrome that diverges from desktop `AppShell`.
@@ -112,7 +112,8 @@ function MobileShell() {
   const { data: fleets = [] } = useFleet()
   const [view, setView] = useState<MobileView>(() => {
     const stored = localStorage.getItem("cp-view")
-    return stored === "threads" || stored === "finder" ? stored : "fleet"
+    if (stored === "threads") return "agents" // pre-T860 persisted value
+    return stored === "agents" || stored === "finder" ? stored : "fleet"
   })
   const [activeFleetId, setActiveFleetId] = useState(() => localStorage.getItem("cp-agent") ?? "")
   const [finderRevealPath, setFinderRevealPath] = useState<string | null>(null)
@@ -134,7 +135,7 @@ function MobileShell() {
     (id: string) => {
       setActiveFleetId(id)
       localStorage.setItem("cp-agent", id)
-      changeView("threads")
+      changeView("agents")
     },
     [changeView],
   )
@@ -162,7 +163,7 @@ function MobileShell() {
     if (from && from !== "agentsList") {
       setActiveFleetId(from)
       localStorage.setItem("cp-agent", from)
-      changeView("threads")
+      changeView("agents")
     } else {
       changeView("fleet")
     }

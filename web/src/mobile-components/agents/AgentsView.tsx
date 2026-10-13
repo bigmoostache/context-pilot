@@ -147,7 +147,7 @@ export function AgentsView({
           tap while the drawer is open lands on the scrim and closes it. */}
       <CornerButton
         side="left"
-        label="Show threads"
+        label="Show agents"
         onClick={() => setDrawerOpen(true)}
         className="z-20"
       >
@@ -168,7 +168,7 @@ export function AgentsView({
           carries keyboard semantics (jsx-a11y). `fixed` (not `absolute`) so it
           covers the viewport, not the tall scrolling AgentsView container. */}
       <button
-        aria-label="Close thread list"
+        aria-label="Close agent list"
         onClick={() => setDrawerOpen(false)}
         tabIndex={drawerOpen ? 0 : -1}
         className={
@@ -241,7 +241,7 @@ function EmptyRealm({
             tap the menu (top-left) to browse, or start one to put it to work in its folder.
           </>
         ) : (
-          "Select a fleet to see its threads."
+          "Select a fleet to see its agents."
         )}
       </p>
       {onNewAgent && (

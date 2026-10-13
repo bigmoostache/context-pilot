@@ -342,7 +342,7 @@ function AsideDefaultToggle() {
   const { defaultHidden, setDefaultHidden } = useAsideDefault()
   return (
     <ToggleRow
-      name="Thread details rail"
+      name="Agent details rail"
       detail="Show the Files & Tasks rail beside conversations by default"
       value={!defaultHidden}
       onChange={(next) => setDefaultHidden(!next)}

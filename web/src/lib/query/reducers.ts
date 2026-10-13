@@ -90,7 +90,7 @@ function foldAgentCreated(prev: AgentDetail[], k: Kind, entry: OpEntry): AgentDe
   const ts = k.timestamp_ms ?? entry.timestamp_ms ?? Date.now()
   const created: AgentDetail = {
     id: k.agent_id,
-    name: k.name ?? "Untitled thread",
+    name: k.name ?? "Untitled agent",
     status: turnToStatus(k.status),
     fleetId: "",
     fleet: "",

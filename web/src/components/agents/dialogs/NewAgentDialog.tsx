@@ -290,7 +290,7 @@ export function NewAgentDialog({
               autoFocus
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder={branch ? "Branch title" : "Thread title"}
+              placeholder={branch ? "Branch title" : "Agent title"}
               className="w-full bg-transparent px-4 pt-1 text-[19px] font-semibold tracking-tight text-foreground outline-none placeholder:text-muted-foreground/40"
             />
 
@@ -345,7 +345,7 @@ export function NewAgentDialog({
                 disabled={!canCreate || busy}
                 className="ml-auto flex items-center gap-1.5 rounded-md bg-(--signal) px-3 py-1.5 text-[12.5px] font-medium text-(--primary-foreground) transition-[filter] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {branch ? "Branch thread" : "Create thread"}
+                {branch ? "Branch agent" : "Create agent"}
                 <CornerDownLeft className="size-3.5 opacity-70" />
               </button>
             </div>

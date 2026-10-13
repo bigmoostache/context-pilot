@@ -84,7 +84,7 @@ export function useAgentBranch(
         paused: opts.paused,
       }).catch((e: unknown) => {
         sel.disarmAutoSelect()
-        flash(describeCommandError("branch the thread", e))
+        flash(describeCommandError("branch the agent", e))
       })
     },
     [activeFleetId, branchTarget, flash, sel],

@@ -142,7 +142,7 @@ function OpenedDivider({
   onOpenAgent: ((id: string) => void) | undefined
 }) {
   const parent = agent.branchedFrom
-  let origin: React.ReactNode = "thread opened"
+  let origin: React.ReactNode = "agent opened"
   if (parent && (parentName === undefined || !onOpenAgent)) origin = `branched from ${parent}`
   else if (parent && onOpenAgent)
     origin = (

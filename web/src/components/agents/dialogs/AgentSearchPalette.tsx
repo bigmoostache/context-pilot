@@ -139,7 +139,7 @@ function PaletteBody({
 
   // Keep the active row scrolled into view (pure DOM side effect, no setState).
   useEffect(() => {
-    listRef.current?.querySelector(`#thread-opt-${activeIdx}`)?.scrollIntoView({ block: "nearest" })
+    listRef.current?.querySelector(`#agent-opt-${activeIdx}`)?.scrollIntoView({ block: "nearest" })
   }, [activeIdx])
 
   const pick = (id: string) => {
@@ -178,7 +178,7 @@ function PaletteBody({
     ? "Searching messages…"
     : serverMode
       ? "No messages match your search."
-      : "No threads match your search."
+      : "No agents match your search."
 
   return (
     <>
@@ -189,15 +189,15 @@ function PaletteBody({
           autoFocus
           role="combobox"
           aria-expanded
-          aria-controls="thread-search-results"
-          aria-activedescendant={rows.length > 0 ? `thread-opt-${activeIdx}` : undefined}
+          aria-controls="agent-search-results"
+          aria-activedescendant={rows.length > 0 ? `agent-opt-${activeIdx}` : undefined}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value)
             setActive(0)
           }}
           onKeyDown={onKeyDown}
-          placeholder="Search threads and messages…"
+          placeholder="Search agents and messages…"
           className="min-w-0 flex-1 bg-transparent text-[14px] text-foreground/90 outline-none placeholder:text-muted-foreground/55"
         />
         <button
@@ -263,9 +263,9 @@ function ResultList({
   return (
     <div
       ref={listRef}
-      id="thread-search-results"
+      id="agent-search-results"
       role="listbox"
-      aria-label="Thread search results"
+      aria-label="Agent search results"
       className="min-h-0 flex-1 overflow-y-auto p-2"
     >
       {rows.length === 0 ? (
@@ -274,7 +274,7 @@ function ResultList({
         rows.map((row, i) => (
           <button
             key={row.key}
-            id={`thread-opt-${i}`}
+            id={`agent-opt-${i}`}
             role="option"
             aria-selected={i === activeIdx}
             onMouseMove={() => onHover(i)}

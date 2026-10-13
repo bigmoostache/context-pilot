@@ -247,15 +247,15 @@ export function dotColor(isFocused: boolean, status: AgentDetail["status"]): str
 export const ROW_ACTION_COPY = {
   archive: {
     title: "Archive",
-    body: "Move this thread out of the active list. You can restore it later.",
+    body: "Move this agent out of the active list. You can restore it later.",
   },
-  restore: { title: "Restore", body: "Move this thread back into the active list." },
+  restore: { title: "Restore", body: "Move this agent back into the active list." },
   remove: {
     title: "Delete permanently",
-    body: "Remove this thread and its whole conversation. This cannot be undone.",
+    body: "Remove this agent and its whole conversation. This cannot be undone.",
   },
-  pause: { title: "Pause", body: "Stop the agent picking this thread up. Queued messages wait." },
-  resume: { title: "Resume", body: "Let the agent work on this thread again." },
+  pause: { title: "Pause", body: "Stop this agent from running. Queued messages wait." },
+  resume: { title: "Resume", body: "Let this agent run again." },
 } as const
 
 /** The turn-status banner shown above the composer input, or null. */
@@ -290,7 +290,7 @@ export function resolveComposerBanner(
       working: false,
       paused: true,
       color: undefined,
-      text: "Thread paused — the agent won't respond until resumed.",
+      text: "Agent paused — it won't respond until resumed.",
     }
   }
   if (!fleetBusy) return null
@@ -302,13 +302,13 @@ export function resolveComposerBanner(
       working: true,
       paused: false,
       color: "var(--signal)",
-      text: "Agent is working this thread…",
+      text: "Agent is working…",
     }
   }
   return {
     working: false,
     paused: false,
     color: undefined,
-    text: "Agent will pick up this thread soon.",
+    text: "Agent will pick this up soon.",
   }
 }

@@ -93,7 +93,7 @@ function sameNav(a: NavState, b: NavState): boolean {
   return a.view === b.view && a.fleetId === b.fleetId && a.agentId === b.agentId
 }
 
-/** localStorage key holding an agent's last-selected agent. Module-scoped (no
+/** localStorage key holding a fleet's last-selected agent. Module-scoped (no
  *  closure over shell state) so it seeds the state initializer, the persist
  *  effect, and the nav-restore fallback from one place. */
 const agentKeyFor = (id: string) => `cp-thread-${id}`
@@ -139,7 +139,7 @@ function useNavHistory(
     const nav: NavState = {
       view,
       fleetId,
-      ...(view === "threads" && agentId && { agentId }),
+      ...(view === "agents" && agentId && { agentId }),
     }
     if (!bootRef.current) {
       // Seed the current location as the base entry rather than pushing a
@@ -260,7 +260,8 @@ function AppShell() {
   const [view, setView] = useState<ViewMode>(() => {
     const modes: Record<string, ViewMode> = {
       fleet: "fleet",
-      agents: "threads",
+      agents: "agents",
+      threads: "agents", // pre-T860 persisted value
       finder: "finder",
       costs: "costs",
     }
@@ -317,7 +318,7 @@ function AppShell() {
   const effectiveView: ViewMode =
     view === "costs" && !devMode
       ? activeFleet
-        ? "threads"
+        ? "agents"
         : "fleet"
       : view !== "fleet" && !activeFleet
         ? "fleet"
@@ -331,7 +332,7 @@ function AppShell() {
   const openFleet = (id: string) => {
     setActiveFleetId(id)
     setSelectedAgentId(localStorage.getItem(agentKeyFor(id)) ?? "")
-    setView("threads")
+    setView("agents")
   }
 
   // Whether the agents view's list rail is open. It lives HERE, not in

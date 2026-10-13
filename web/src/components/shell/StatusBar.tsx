@@ -84,8 +84,8 @@ function FleetStatus({ fleets }: { fleets: Fleet[] }) {
       <Tip title="Fleets" body="How many fleets you run." side="top">
         <Metric icon={Boxes} label="Fleets" value={String(fleets.length)} />
       </Tip>
-      <Tip title="Threads" body="Open threads, summed across every fleet." side="top">
-        <Metric icon={MessagesSquare} label="Threads" value={String(totalAgents)} />
+      <Tip title="Agents" body="Open agents, summed across every fleet." side="top">
+        <Metric icon={MessagesSquare} label="Agents" value={String(totalAgents)} />
       </Tip>
 
       {needsYou > 0 && (

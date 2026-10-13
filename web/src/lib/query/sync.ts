@@ -52,7 +52,7 @@ export const qk = {
   fleetMetrics: () => ["fleet-metrics"] as const,
   retiredFleet: () => ["fleet-retired"] as const,
   agent: (id: string) => ["agent", id] as const,
-  agents: (id: string) => ["threads", id] as const,
+  agents: (id: string) => ["agents", id] as const,
   metrics: (id: string) => ["metrics", id] as const,
   library: (id: string) => ["library", id] as const,
   fs: (id: string, path: string) => ["fs", id, path] as const,
@@ -63,7 +63,7 @@ export const qk = {
 
 /** The two delta-covered cache families — they must NEVER be invalidated (the
  *  push plane owns them). Everything else agent-scoped is inspection. */
-const DELTA_COVERED = new Set(["threads", "agent"])
+const DELTA_COVERED = new Set(["agents", "agent"])
 
 // ── The bridge ────────────────────────────────────────────────────────
 

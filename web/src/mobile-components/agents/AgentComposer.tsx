@@ -35,7 +35,7 @@ function resolveComposerBanner(
       working: false,
       paused: true,
       color: undefined,
-      text: "Thread paused — the agent won't respond until resumed.",
+      text: "Agent paused — it won't respond until resumed.",
     }
   }
   if (!fleetBusy) return null
@@ -47,14 +47,14 @@ function resolveComposerBanner(
       working: true,
       paused: false,
       color: "var(--signal)",
-      text: "Agent is working this thread…",
+      text: "Agent is working…",
     }
   }
   return {
     working: false,
     paused: false,
     color: undefined,
-    text: "Agent will pick up this thread soon.",
+    text: "Agent will pick this up soon.",
   }
 }
 

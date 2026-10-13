@@ -222,7 +222,7 @@ function EmptyRealm({
             start one to put it to work in its folder.
           </>
         ) : (
-          "Select a fleet to see its threads."
+          "Select a fleet to see its agents."
         )}
       </p>
       {onNewAgent && (

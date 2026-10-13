@@ -121,8 +121,8 @@ function BranchButton({ align, onBranch }: { align: "start" | "end"; onBranch: (
     <button
       type="button"
       onClick={onBranch}
-      aria-label="Branch a new thread from this message"
-      title="Branch a new thread from here"
+      aria-label="Branch a new agent from this message"
+      title="Branch a new agent from here"
       className={cn(
         "flex items-center gap-1 rounded-md px-1 py-0.5 text-[10px] transition-colors",
         "opacity-50 outline-none hover:opacity-100 focus-visible:opacity-100",

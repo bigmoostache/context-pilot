@@ -254,7 +254,7 @@ export function useAgentActions(
       const t = agents.find((th) => th.id === id)
       if (!t) return
       const kind = t.archived ? "restore_agent" : "archive_agent"
-      const verb = t.archived ? "restore the thread" : "archive the thread"
+      const verb = t.archived ? "restore the agent" : "archive the agent"
       // Deselect the archived agent so the view falls through to the next one.
       if (!t.archived && id === selectedId) setSelectedId("")
       sendCommand(activeFleetId, { kind, agent_id: id })
@@ -262,8 +262,8 @@ export function useAgentActions(
           // The action's own inverse, offered as an undo (T636). Archiving is
           // undone by restoring and vice-versa.
           t.archived
-            ? offerUndo("Thread restored", id, "archive_agent", "re-archive the thread")
-            : offerUndo("Thread archived", id, "restore_agent", "restore the thread"),
+            ? offerUndo("Agent restored", id, "archive_agent", "re-archive the agent")
+            : offerUndo("Agent archived", id, "restore_agent", "restore the agent"),
         )
         .catch((e: unknown) => flash(describeCommandError(verb, e)))
     },
@@ -275,12 +275,12 @@ export function useAgentActions(
       const t = agents.find((th) => th.id === id)
       if (!t) return
       const kind = t.paused ? "resume_agent" : "pause_agent"
-      const verb = t.paused ? "resume the thread" : "pause the thread"
+      const verb = t.paused ? "resume the agent" : "pause the agent"
       sendCommand(activeFleetId, { kind, agent_id: id })
         .then(() =>
           t.paused
-            ? offerUndo("Thread resumed", id, "pause_agent", "re-pause the thread")
-            : offerUndo("Thread paused", id, "resume_agent", "resume the thread"),
+            ? offerUndo("Agent resumed", id, "pause_agent", "re-pause the agent")
+            : offerUndo("Agent paused", id, "resume_agent", "resume the agent"),
         )
         .catch((e: unknown) => flash(describeCommandError(verb, e)))
     },
@@ -291,7 +291,7 @@ export function useAgentActions(
     (id: string) => {
       if (id === selectedId) setSelectedId("")
       sendCommand(activeFleetId, { kind: "delete_agent", agent_id: id }).catch((e: unknown) =>
-        flash(describeCommandError("delete the thread", e)),
+        flash(describeCommandError("delete the agent", e)),
       )
     },
     [activeFleetId, flash, selectedId, setSelectedId],
@@ -326,13 +326,13 @@ export function useAgentActions(
         try {
           await sendCommand(activeFleetId, {
             kind: "create_agent",
-            name: opts.title.trim() || "Untitled thread",
+            name: opts.title.trim() || "Untitled agent",
             ...(content && { initial_message: content }),
             paused: opts.paused,
           })
         } catch (e) {
           sel.disarmAutoSelect()
-          flash(describeCommandError("create the thread", e))
+          flash(describeCommandError("create the agent", e))
         }
       })()
     },

@@ -148,7 +148,7 @@ export function useAgents(fleetId: string): LiveQueryResult<AgentDetail[]> {
       // The poll reconcile is O(agents × messages) and runs on the main agent
       // on every backstop tick — a prime periodic-freeze suspect on a huge
       // roster. Name it so the HUD attributes a stall landing here.
-      return measure("threads:merge", () => mergeAgentLogs(prev, next))
+      return measure("agents:merge", () => mergeAgentLogs(prev, next))
     },
     { fleetId, enabled: !!fleetId },
   )
