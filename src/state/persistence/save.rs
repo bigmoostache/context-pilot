@@ -309,6 +309,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
         dir.join(cp_mod_logs::LOGS_DIR),
         dir.join(cp_mod_console::CONSOLE_DIR),
         dir.join(cp_mod_agents::types::persist::AGENTS_DIR),
+        dir.join(cp_groups::persist::GROUPS_DIR),
         dir.join(MODULES_DIR),
     ];
 
@@ -316,8 +317,10 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     let mut durable: Vec<WriteOp> = {
         let _g = crate::profile!("thread_files");
         let agents = &cp_mod_agents::types::AgentsState::get(state).agents;
+        let groups = &cp_groups::types::GroupsState::get(state).groups;
         cp_mod_agents::types::persist::dirty_agent_file_ops(agents)
             .into_iter()
+            .chain(cp_groups::persist::dirty_group_file_ops(groups))
             .map(|(path, content)| WriteOp { path, content })
             .collect()
     };
