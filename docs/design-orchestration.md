@@ -17,6 +17,8 @@ Status: v2 (T860). Phases A–G. Grey areas **[Q#]** answered by the user
 | Q6 | `next` is a string DSL, e.g. `GATHER(A1, "msg", [A2, A3])`, parsed and validated in pre-flight. |
 | Q7 | Coucou keeps one-shot `delay`/`datetime`, recurring = cron only (old hourly/daily/weekly/custom records migrated to cron or kept as interval, see phase G). |
 | Q8 | Separate crate `cp-coordination` hosts the `Group_*` tools; `cp-groups` owns the data model, persistence and panels. |
+| Q9 | The cpilot process (today "agent": `AgentRegistry`, `agent_id` = folder, `/api/agent/{id}`) becomes a **fleet**. The orchestrator's current "fleet" (the set of all processes, `/api/fleet`) becomes **fleets**. Inside cpilot, `cp_fleet::FleetRegistry` already means "the agents of this fleet" and keeps its name. Rename order (phase A0, before A): orchestrator `fleet`→`fleets`, then process `agent`→`fleet`, then `thread`→`agent`. |
+| Q10 | Personas (today `agent_load`, `behaviours/agents/*.md`, Library "agents") become **systems**: `system_load`, `behaviours/systems/`, Library section "systems". Folder migrated at boot. |
 
 ## 1. Current model (as of `multi-thread-core-loop`)
 
