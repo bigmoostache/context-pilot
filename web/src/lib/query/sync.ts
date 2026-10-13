@@ -14,7 +14,7 @@
 // bridge — subscription, `setQueryData`, and the async spilled-body hydrate.
 //
 // **Why this kills the T123 class of bug structurally.** A single send emits a
-// burst of two deltas (`message_created` + `thread_status_changed`) in one
+// burst of two deltas (`message_created` + `agent_status_changed`) in one
 // synchronous SSE macrotask. The old hand-rolled engine applied them with a
 // value-form `setData(reducer(dataRef, …))`, so both reducers read the SAME
 // stale snapshot and the second clobbered the first — the message vanished
@@ -34,7 +34,7 @@ import { fetchMessageBody } from "../api"
 import { applyFleetDelta, applyThreadDelta, type OpEntry } from "./reducers"
 import { applyLibraryDelta } from "./library"
 import { measure } from "../support/telemetry"
-import type { Agent, ThreadDetail, LibraryItem } from "../types"
+import type { Fleet, ThreadDetail, LibraryItem } from "../types"
 
 // Re-export the pure folds + delta type so existing `@/lib/query/sync`
 // consumers keep their import surface (the reducers moved to ./reducers for the
@@ -187,7 +187,7 @@ function applyDelta(client: QueryClient, fleetId: string, entry: OpEntry): void 
 
   // Agent-meta cache fold.
   const ak = qk.agent(fleetId)
-  const aPrev = client.getQueryData<Agent>(ak)
+  const aPrev = client.getQueryData<Fleet>(ak)
   const aNext = applyFleetDelta(aPrev, entry)
   if (aNext === null) {
     if (aPrev !== undefined) void client.invalidateQueries({ queryKey: ak })

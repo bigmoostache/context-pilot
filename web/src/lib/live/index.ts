@@ -29,7 +29,7 @@ import { measure } from "../support/telemetry"
 import { useLive, type LiveQueryResult } from "./core"
 import * as api from "../api"
 
-import type { Agent, ThreadDetail, LibraryItem, FinderNode } from "../types"
+import type { Fleet, ThreadDetail, LibraryItem, FinderNode } from "../types"
 
 export * from "./mutations"
 
@@ -104,7 +104,7 @@ export function useRestartFlow(fleetId: string) {
     if (!fleetId || mutation.isPending || agent?.status === "waiting") return
     mutation.mutate(fleetId, {
       onSuccess: () => {
-        client.setQueryData<Agent>(qk.agent(fleetId), (prev) => {
+        client.setQueryData<Fleet>(qk.agent(fleetId), (prev) => {
           if (!prev) return prev
           return { ...prev, status: "waiting" as const, accent: "interactive" as const }
         })
@@ -121,13 +121,13 @@ export function useRestartFlow(fleetId: string) {
 
 // ── Fleet hooks ───────────────────────────────────────────────────────
 
-export function useFleet(): LiveQueryResult<Agent[]> {
+export function useFleet(): LiveQueryResult<Fleet[]> {
   return useLive(qk.fleet(), () => api.fetchFleet())
 }
 
 // ── Agent-scoped hooks ────────────────────────────────────────────────
 
-export function useFleetMeta(fleetId: string): LiveQueryResult<Agent> {
+export function useFleetMeta(fleetId: string): LiveQueryResult<Fleet> {
   // Delta-covered: phase + cost vitals fold in via the bridge (applyFleetDelta).
   return useLive(qk.agent(fleetId), () => api.fetchFleetMeta(fleetId), {
     fleetId,
@@ -237,7 +237,7 @@ export function useFsSheet(
 
 const METRICS_POLL_MS = 4000
 
-export function useMetrics(fleetId: string): LiveQueryResult<api.AgentMetrics> {
+export function useMetrics(fleetId: string): LiveQueryResult<api.FleetMetrics> {
   return useLive(qk.metrics(fleetId), () => api.fetchMetrics(fleetId), {
     fleetId,
     enabled: !!fleetId,
@@ -250,7 +250,7 @@ export function useMetrics(fleetId: string): LiveQueryResult<api.AgentMetrics> {
  * Fleet scope has no single agent to subscribe to, so this rides the metrics
  * poll only (no SSE delta). Powers the Usage page's live per-agent totals.
  */
-export function useFleetMetrics(): LiveQueryResult<api.AgentMetrics[]> {
+export function useFleetMetrics(): LiveQueryResult<api.FleetMetrics[]> {
   return useLive(qk.fleetMetrics(), () => api.fetchFleetMetrics(), {
     pollMs: METRICS_POLL_MS,
   })

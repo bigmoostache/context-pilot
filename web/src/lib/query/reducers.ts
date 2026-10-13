@@ -16,7 +16,7 @@
 // own branch count (cyclomatic complexity) and statement count stay within the
 // P8 budgets and each concern is independently readable.
 
-import type { Agent, ThreadDetail } from "../types"
+import type { Fleet, ThreadDetail } from "../types"
 import { foldTaskList } from "./taskReducer"
 import { foldNoteList } from "./notesReducer"
 
@@ -83,13 +83,13 @@ function ago(epochMs: number): string {
 // sharing collapses it), or `null` when the target is unknown and a hydrate is
 // needed. Extracted from applyThreadDelta so the dispatcher stays within budget.
 
-/** thread_created — prepend a synthesized thread (idempotent on id). */
+/** agent_created — prepend a synthesized thread (idempotent on id). */
 function foldThreadCreated(prev: ThreadDetail[], k: Kind, entry: OpEntry): ThreadDetail[] {
-  if (!k.thread_id) return prev
-  if (prev.some((t) => t.id === k.thread_id)) return prev // idempotent
+  if (!k.agent_id) return prev
+  if (prev.some((t) => t.id === k.agent_id)) return prev // idempotent
   const ts = k.timestamp_ms ?? entry.timestamp_ms ?? Date.now()
   const created: ThreadDetail = {
-    id: k.thread_id,
+    id: k.agent_id,
     name: k.name ?? "Untitled thread",
     status: turnToStatus(k.status),
     fleetId: "",
@@ -122,15 +122,15 @@ function foldThreadFlag(
   return prev.map((t) => (t.id === threadId ? { ...t, ...patch } : t))
 }
 
-/** thread_deleted — drop the thread (idempotent: absent → unchanged). */
+/** agent_deleted — drop the thread (idempotent: absent → unchanged). */
 function foldThreadDeleted(prev: ThreadDetail[], k: Kind): ThreadDetail[] {
-  if (prev.every((t) => t.id !== k.thread_id)) return prev
-  return prev.filter((t) => t.id !== k.thread_id)
+  if (prev.every((t) => t.id !== k.agent_id)) return prev
+  return prev.filter((t) => t.id !== k.agent_id)
 }
 
 /** message_deleted — remove the message at `message_ts` from its thread's log. */
 function foldMessageDeleted(prev: ThreadDetail[], k: Kind): ThreadDetail[] | null {
-  const thread = prev.find((t) => t.id === k.thread_id)
+  const thread = prev.find((t) => t.id === k.agent_id)
   if (!thread) return null // unknown thread → hydrate
   const target = k.message_ts
   if (target === undefined) return prev
@@ -141,18 +141,18 @@ function foldMessageDeleted(prev: ThreadDetail[], k: Kind): ThreadDetail[] | nul
     return mTs !== target
   })
   if (filtered.length === thread.log.length) return prev // no match
-  return prev.map((t) => (t.id === k.thread_id ? { ...t, log: filtered } : t))
+  return prev.map((t) => (t.id === k.agent_id ? { ...t, log: filtered } : t))
 }
 
 /**
- * thread_focus_changed — set `focused` on the target thread and clear it
+ * agent_focus_changed — set `focused` on the target thread and clear it
  * everywhere else, so the UI's focused-thread highlight tracks the agent in
  * real time instead of waiting on the disk-fed backstop poll. A no-op fold
  * (same flags) returns the SAME refs via map, which structural sharing collapses.
  */
 function foldThreadFocus(prev: ThreadDetail[], k: Kind): ThreadDetail[] {
   return prev.map((t) => {
-    const focused = t.id === k.thread_id
+    const focused = t.id === k.agent_id
     return t.focused === focused ? t : { ...t, focused }
   })
 }
@@ -222,14 +222,14 @@ function buildLogRow(
  * already present (dedup no-op) or is a spilled/large body (activity-only bump).
  */
 function foldMessageCreated(prev: ThreadDetail[], k: Kind, entry: OpEntry): ThreadDetail[] | null {
-  const thread = prev.find((t) => t.id === k.thread_id)
+  const thread = prev.find((t) => t.id === k.agent_id)
   if (!thread) return null // unknown thread → hydrate
   const ts = entry.timestamp_ms ?? Date.now()
   // A spilled (large) body has no inline payload — bump activity and let a
   // hydrate fetch the full log (rare for chat).
   if (!k.inline_body) {
     return prev.map((t) =>
-      t.id === k.thread_id ? { ...t, lastActivityMs: ts, lastActivity: ago(ts) } : t,
+      t.id === k.agent_id ? { ...t, lastActivityMs: ts, lastActivity: ago(ts) } : t,
     )
   }
   const raw = parseInlineBody(k.inline_body)
@@ -250,7 +250,7 @@ function foldMessageCreated(prev: ThreadDetail[], k: Kind, entry: OpEntry): Thre
   const sig = msgSignature(appended)
   if (thread.log.some((m) => m.id === appended.id || msgSignature(m) === sig)) return prev
   return prev.map((t) =>
-    t.id === k.thread_id
+    t.id === k.agent_id
       ? { ...t, log: [...t.log, appended], lastActivityMs: ts, lastActivity: ago(ts) }
       : t,
   )
@@ -273,29 +273,29 @@ export function applyThreadDelta(
   if (!prev) return null // not loaded yet → invalidate/hydrate
   const k = entry.kind
   switch (k.kind) {
-    case "thread_created": {
+    case "agent_created": {
       return foldThreadCreated(prev, k, entry)
     }
-    case "thread_archived": {
-      return foldThreadFlag(prev, k.thread_id, { archived: true })
+    case "agent_archived": {
+      return foldThreadFlag(prev, k.agent_id, { archived: true })
     }
-    case "thread_restored": {
-      return foldThreadFlag(prev, k.thread_id, { archived: false })
+    case "agent_restored": {
+      return foldThreadFlag(prev, k.agent_id, { archived: false })
     }
-    case "thread_paused": {
-      return foldThreadFlag(prev, k.thread_id, { paused: true })
+    case "agent_paused": {
+      return foldThreadFlag(prev, k.agent_id, { paused: true })
     }
-    case "thread_resumed": {
-      return foldThreadFlag(prev, k.thread_id, { paused: false })
+    case "agent_resumed": {
+      return foldThreadFlag(prev, k.agent_id, { paused: false })
     }
-    case "thread_deleted": {
+    case "agent_deleted": {
       return foldThreadDeleted(prev, k)
     }
     case "message_deleted": {
       return foldMessageDeleted(prev, k)
     }
-    case "thread_status_changed": {
-      return foldThreadFlag(prev, k.thread_id, { status: turnToStatus(k.status) })
+    case "agent_status_changed": {
+      return foldThreadFlag(prev, k.agent_id, { status: turnToStatus(k.status) })
     }
     case "task_list_changed": {
       return foldTaskList(prev, k)
@@ -303,7 +303,7 @@ export function applyThreadDelta(
     case "notes_changed": {
       return foldNoteList(prev, k)
     }
-    case "thread_focus_changed": {
+    case "agent_focus_changed": {
       return foldThreadFocus(prev, k)
     }
     case "message_created": {
@@ -326,12 +326,12 @@ export function applyThreadDelta(
  * thread-state decision the next /meta backstop reconciles — we never know it
  * from the phase delta alone).
  */
-function foldPhase(prev: Agent, k: Kind): Agent {
+function foldPhase(prev: Fleet, k: Kind): Fleet {
   const phase = k.phase
   if (phase !== "idle" && phase !== "streaming" && phase !== "tooling") {
     return prev // unknown phase → ignore
   }
-  let next: Agent = prev
+  let next: Fleet = prev
   if (prev.phase !== phase) next = { ...next, phase }
   if (phase === "streaming" || phase === "tooling") {
     if (next.status !== "working") next = { ...next, status: "working", accent: "ok" }
@@ -346,8 +346,8 @@ function foldPhase(prev: Agent, k: Kind): Agent {
  * counters so the HUD's token display rides the push plane, not the 15s poll
  * (T297).
  */
-function foldCost(prev: Agent, k: Kind): Agent {
-  let next: Agent = prev
+function foldCost(prev: Fleet, k: Kind): Fleet {
+  let next: Fleet = prev
   if (typeof k.cost_usd === "number" && prev.costUsd !== k.cost_usd) {
     next = { ...next, costUsd: k.cost_usd }
   }
@@ -367,8 +367,8 @@ function foldCost(prev: Agent, k: Kind): Agent {
  * the HUD can render `Used (hit)` / `Used (miss)` matching ratatui's green/amber
  * segments (T297).
  */
-function foldContextUsage(prev: Agent, k: Kind): Agent {
-  let next: Agent = prev
+function foldContextUsage(prev: Fleet, k: Kind): Fleet {
+  let next: Fleet = prev
   if (typeof k.used_tokens === "number" && prev.contextUsed !== k.used_tokens) {
     next = { ...next, contextUsed: k.used_tokens }
   }
@@ -398,7 +398,7 @@ function foldContextUsage(prev: Agent, k: Kind): Agent {
  * Running  → status "idle" (fresh boot, clears both "disconnected" and the
  *   client-only "waiting" restart status).
  */
-function foldLifecycle(prev: Agent, k: Kind): Agent {
+function foldLifecycle(prev: Fleet, k: Kind): Fleet {
   const state = k.state
   if (state === "stopping" || state === "stopped") {
     if (prev.status === "disconnected" || prev.status === "waiting") return prev
@@ -421,7 +421,7 @@ function foldLifecycle(prev: Agent, k: Kind): Agent {
  * and NEVER returns `null` for a known agent, so a phase change (notably going
  * idle when a stream ends) never costs a REST hydrate.
  */
-export function applyFleetDelta(prev: Agent | undefined, entry: OpEntry): Agent | null {
+export function applyFleetDelta(prev: Fleet | undefined, entry: OpEntry): Fleet | null {
   if (!prev) return null // not loaded yet → hydrate
   const k = entry.kind
   switch (k.kind) {

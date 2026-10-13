@@ -3,7 +3,7 @@ import { fmtCost, fmtTokens } from "@/lib/support/panelMeta"
 import { Tip } from "@/components/ui/tip"
 import { BehaviourChip } from "./behaviour/BehaviourChip"
 import { ModelChip } from "./behaviour/ModelChip"
-import type { Agent, StreamPhase } from "@/lib/types"
+import type { Fleet, StreamPhase } from "@/lib/types"
 
 const phaseMeta: Record<StreamPhase, { label: string; color: string }> = {
   ready: { label: "Ready", color: "var(--ok)" },
@@ -34,8 +34,8 @@ export function StatusBar({
   loading = false,
 }: {
   fleet?: boolean
-  agents?: Agent[]
-  activeFleet?: Agent | undefined
+  agents?: Fleet[]
+  activeFleet?: Fleet | undefined
   /** The focused agent's id — drives the behaviour selector's library query + command. */
   activeFleetId?: string
   /** False when the SSE push plane for this agent is down. */
@@ -50,7 +50,7 @@ export function StatusBar({
   return fleet ? (
     <FleetStatus agents={agents} />
   ) : (
-    <AgentStatus
+    <ActiveFleetStatus
       agent={activeFleet}
       fleetId={activeFleetId}
       connected={connected}
@@ -62,10 +62,10 @@ export function StatusBar({
 }
 
 /** Fleet-wide aggregates — shown when no single agent is focused. */
-function FleetStatus({ agents }: { agents: Agent[] }) {
+function FleetStatus({ agents }: { agents: Fleet[] }) {
   const totalSpend = agents.reduce((sum, a) => sum + a.costUsd, 0)
   const needsYou = agents.filter((a) => a.status === "needs-you").length
-  const totalThreads = agents.reduce((sum, a) => sum + a.threads, 0)
+  const totalThreads = agents.reduce((sum, a) => sum + a.agents, 0)
 
   return (
     // Bare chrome, like the header rail: no fill, no `border-t`, no margin —
@@ -121,7 +121,7 @@ function FleetStatus({ agents }: { agents: Agent[] }) {
  *  push-delta `phase` (streaming/tooling/idle), falling back to `status` before
  *  the first PhaseTransition has been observed. A flat if-chain, not a nested
  *  ternary. */
-function resolvePhase(agent?: Agent): StreamPhase {
+function resolvePhase(agent?: Fleet): StreamPhase {
   if (agent?.phase === "streaming") return "streaming"
   if (agent?.phase === "tooling") return "tooling"
   if (agent?.phase === "idle") return "ready"
@@ -131,7 +131,7 @@ function resolvePhase(agent?: Agent): StreamPhase {
 
 /** Pull the footer's numeric vitals off the agent with safe fallbacks, so the
  *  host component's branch count stays under the complexity budget. */
-function fleetVitals(agent?: Agent) {
+function fleetVitals(agent?: Fleet) {
   return {
     costUsd: agent?.costUsd ?? 0,
     used: agent?.contextUsed ?? 0,
@@ -143,7 +143,7 @@ function fleetVitals(agent?: Agent) {
 }
 
 /** Single-agent session vitals — shown while an agent is focused. */
-function AgentStatus({
+function ActiveFleetStatus({
   agent,
   fleetId,
   connected = true,
@@ -151,7 +151,7 @@ function AgentStatus({
   restarting = false,
   loading = false,
 }: {
-  agent?: Agent | undefined
+  agent?: Fleet | undefined
   fleetId?: string
   connected?: boolean
   onRestart?: (() => void) | undefined
@@ -222,7 +222,7 @@ function AgentStatus({
 
 /** The footer's left indicator: a loading / restarting / connected phase dot, or
  *  a clickable "Disconnected" restart button when the push plane is down.
- *  Extracted from {@link AgentStatus} so its host stays under the complexity
+ *  Extracted from {@link ActiveFleetStatus} so its host stays under the complexity
  *  budget — this is where the four-way state cascade lives. */
 function StatusIndicator({
   phase,

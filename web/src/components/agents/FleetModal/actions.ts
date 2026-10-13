@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import type { Agent } from "@/lib/types"
+import type { Fleet } from "@/lib/types"
 import {
   useCreateFleet,
   useRenameFleet,
@@ -44,7 +44,7 @@ const DICEBEAR_STYLES = [
  *  stays within the max-params budget. */
 export interface ActionsArgs {
   isManage: boolean
-  agent: Agent | undefined
+  agent: Fleet | undefined
   name: string
   sel: SelectionState
   providers: ProviderDef[]
@@ -142,7 +142,7 @@ export function useFleetModalActions(args: ActionsArgs): Actions {
     })
   }
 
-  const saveManage = (a: Agent) => {
+  const saveManage = (a: Fleet) => {
     setSaving(true)
     setLocalError(null)
     const nameChanged = name.trim() !== a.name

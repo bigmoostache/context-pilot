@@ -17,7 +17,7 @@ import { downloadFile } from "@/lib/api"
 import { uploadToNode, type UploadedFile } from "./helpers"
 import type { ThreadFile } from "./FileSidebar"
 import { TaskList, NoteList } from "./ThreadAsideTasks"
-import type { ThreadTask, ThreadNote } from "@/lib/types"
+import type { AgentTask, AgentNote } from "@/lib/types"
 
 /**
  * Rail width strategy (dynamic): in LIST mode the rail is EXACTLY the width of
@@ -84,8 +84,8 @@ export function ThreadAside({
   onHide,
 }: {
   files: ThreadFile[]
-  tasks: ThreadTask[]
-  notes: ThreadNote[]
+  tasks: AgentTask[]
+  notes: AgentNote[]
   fleetId: string
   threadId: string
   tab: "files" | "tasks" | "notes"

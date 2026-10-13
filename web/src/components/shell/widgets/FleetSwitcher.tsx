@@ -10,10 +10,10 @@ import {
 import { accentVar } from "@/lib/support/panelMeta"
 import { avatarUrl } from "@/lib/api"
 import { HintBadge } from "../chrome/HintBadge"
-import type { Agent, AgentStatus } from "@/lib/types"
+import type { Fleet, FleetStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
-const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
+const statusMeta: Record<FleetStatus, { label: string; color: string }> = {
   working: { label: "Working", color: "var(--interactive)" },
   "needs-you": { label: "Needs you", color: "var(--signal)" },
   idle: { label: "Idle", color: "var(--muted-foreground)" },
@@ -22,7 +22,7 @@ const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
 }
 
 /** Sort priority: working first, then needs-you, then idle. */
-const statusOrder: Record<AgentStatus, number> = {
+const statusOrder: Record<FleetStatus, number> = {
   working: 0,
   waiting: 0,
   "needs-you": 1,
@@ -51,7 +51,7 @@ export function FleetSwitcher({
   shortcutHint,
   hintShown,
 }: {
-  agents: Agent[]
+  agents: Fleet[]
   activeId?: string | undefined
   onSwitch: (id: string) => void
   /** open the fleet dashboard — the sole place agents are created/managed
@@ -180,7 +180,7 @@ export function FleetSwitcher({
  *  `rail` mode the name and chevron are dropped — the 56px rail has no room for
  *  either, and the avatar already identifies the workspace. Extracted from
  *  {@link FleetSwitcher} so that component stays within the 150-line budget. */
-function TriggerFace({ active, rail }: { active: Agent | undefined; rail: boolean }) {
+function TriggerFace({ active, rail }: { active: Fleet | undefined; rail: boolean }) {
   return (
     <>
       {active ? (
@@ -220,8 +220,8 @@ function FleetDot({
   hasAvatar,
   compact = false,
 }: {
-  accent: Agent["accent"]
-  status: AgentStatus
+  accent: Fleet["accent"]
+  status: FleetStatus
   fleetId?: string | undefined
   hasAvatar?: boolean | undefined
   /** trigger variant — a smaller 20px glyph so the switcher matches the

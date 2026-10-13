@@ -11,8 +11,8 @@ import {
   TableRow,
 } from "@/mobile-components/ui/table"
 import { useFleet, useFleetMetrics } from "@/lib/live"
-import type { Agent, UsageUnit } from "@/lib/types"
-import type { AgentMetrics } from "@/lib/api"
+import type { Fleet, UsageUnit } from "@/lib/types"
+import type { FleetMetrics } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 /**
@@ -29,13 +29,13 @@ import { cn } from "@/lib/utils"
 
 /** One agent's live usage row, joined from fleet meta + §19 metrics. */
 interface Row {
-  agent: Agent
+  agent: Fleet
   spendUsd: number
   inputTokens: number
   outputTokens: number
 }
 
-const fleetAccent = (a: Agent) =>
+const fleetAccent = (a: Fleet) =>
   ({
     signal: "var(--signal)",
     interactive: "var(--interactive)",
@@ -65,7 +65,7 @@ export function UsagePage() {
 
   // Join the two live sources by agent id into one usage row each.
   const rows = useMemo<Row[]>(() => {
-    const byId = new Map<string, AgentMetrics>(metrics.map((m) => [m.id, m]))
+    const byId = new Map<string, FleetMetrics>(metrics.map((m) => [m.id, m]))
     return agents.map((agent) => {
       const m = byId.get(agent.id)
       return {

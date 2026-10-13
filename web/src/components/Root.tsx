@@ -19,7 +19,7 @@ import { useDevMode } from "@/lib/providers/toggles/devMode"
 import { useFleet, useFleetMeta, useSseConnected, useRestartFlow } from "@/lib/live"
 import { TelemetryProfiler } from "@/lib/support/telemetry"
 import { TelemetryHud } from "@/components/shell/widgets/TelemetryHud"
-import type { ViewMode, Agent } from "@/lib/types"
+import type { ViewMode, Fleet } from "@/lib/types"
 import "@/App.css"
 
 /**
@@ -172,7 +172,7 @@ function useNavHistory(
  *  router, all behaviour lives in the handlers passed down. */
 interface ShellViewsProps {
   effectiveView: ViewMode
-  agents: Agent[]
+  agents: Fleet[]
   activeFleet: ReturnType<typeof useFleetMeta>["data"] | undefined
   activeFleetId: string
   openFleet: (id: string) => void

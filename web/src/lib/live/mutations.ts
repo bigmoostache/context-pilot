@@ -8,7 +8,7 @@
 import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query"
 import { qk } from "../query/sync"
 import * as api from "../api"
-import type { Agent } from "../types"
+import type { Fleet } from "../types"
 import { useLive, type LiveQueryResult } from "./core"
 
 /** Invalidate the active-fleet query — refetches the dashboard roster. Hoisted
@@ -121,7 +121,7 @@ export function useRestartFleet() {
  * emits nothing); a slow poll keeps it eventually-consistent after a retire /
  * unretire on another tab.
  */
-export function useRetiredFleet(): LiveQueryResult<Agent[]> {
+export function useRetiredFleet(): LiveQueryResult<Fleet[]> {
   return useLive(qk.retiredFleet(), () => api.fetchRetiredFleet())
 }
 

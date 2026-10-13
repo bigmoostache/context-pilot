@@ -234,7 +234,7 @@ export function useThreadActions(
         undo: () => {
           if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current)
           setNotice(null)
-          sendCommand(activeFleetId, { kind: inverseKind, thread_id: id }).catch((e: unknown) =>
+          sendCommand(activeFleetId, { kind: inverseKind, agent_id: id }).catch((e: unknown) =>
             flash(describeCommandError(inverseVerb, e)),
           )
         },
@@ -253,17 +253,17 @@ export function useThreadActions(
     (id: string) => {
       const t = threads.find((th) => th.id === id)
       if (!t) return
-      const kind = t.archived ? "restore_thread" : "archive_thread"
+      const kind = t.archived ? "restore_agent" : "archive_agent"
       const verb = t.archived ? "restore the thread" : "archive the thread"
       // Deselect the archived thread so the view falls through to the next one.
       if (!t.archived && id === selectedId) setSelectedId("")
-      sendCommand(activeFleetId, { kind, thread_id: id })
+      sendCommand(activeFleetId, { kind, agent_id: id })
         .then(() =>
           // The action's own inverse, offered as an undo (T636). Archiving is
           // undone by restoring and vice-versa.
           t.archived
-            ? offerUndo("Thread restored", id, "archive_thread", "re-archive the thread")
-            : offerUndo("Thread archived", id, "restore_thread", "restore the thread"),
+            ? offerUndo("Thread restored", id, "archive_agent", "re-archive the thread")
+            : offerUndo("Thread archived", id, "restore_agent", "restore the thread"),
         )
         .catch((e: unknown) => flash(describeCommandError(verb, e)))
     },
@@ -274,13 +274,13 @@ export function useThreadActions(
     (id: string) => {
       const t = threads.find((th) => th.id === id)
       if (!t) return
-      const kind = t.paused ? "resume_thread" : "pause_thread"
+      const kind = t.paused ? "resume_agent" : "pause_agent"
       const verb = t.paused ? "resume the thread" : "pause the thread"
-      sendCommand(activeFleetId, { kind, thread_id: id })
+      sendCommand(activeFleetId, { kind, agent_id: id })
         .then(() =>
           t.paused
-            ? offerUndo("Thread resumed", id, "pause_thread", "re-pause the thread")
-            : offerUndo("Thread paused", id, "resume_thread", "resume the thread"),
+            ? offerUndo("Thread resumed", id, "pause_agent", "re-pause the thread")
+            : offerUndo("Thread paused", id, "resume_agent", "resume the thread"),
         )
         .catch((e: unknown) => flash(describeCommandError(verb, e)))
     },
@@ -290,7 +290,7 @@ export function useThreadActions(
   const handleDelete = useCallback(
     (id: string) => {
       if (id === selectedId) setSelectedId("")
-      sendCommand(activeFleetId, { kind: "delete_thread", thread_id: id }).catch((e: unknown) =>
+      sendCommand(activeFleetId, { kind: "delete_agent", agent_id: id }).catch((e: unknown) =>
         flash(describeCommandError("delete the thread", e)),
       )
     },
@@ -325,7 +325,7 @@ export function useThreadActions(
       void (async () => {
         try {
           await sendCommand(activeFleetId, {
-            kind: "create_thread",
+            kind: "create_agent",
             name: opts.title.trim() || "Untitled thread",
             ...(content && { initial_message: content }),
             paused: opts.paused,
@@ -346,7 +346,7 @@ export function useThreadActions(
       if (!content) return
       sendCommand(activeFleetId, {
         kind: "send_message",
-        thread_id: effectiveSelectedId,
+        agent_id: effectiveSelectedId,
         content,
       }).catch((e: unknown) => flash(describeCommandError("send your message", e)))
       setPendingFiles([])

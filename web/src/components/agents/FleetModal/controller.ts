@@ -1,9 +1,9 @@
 import { useState } from "react"
-import type { Agent } from "@/lib/types"
+import type { Fleet } from "@/lib/types"
 import { defaultModel, resolveSelection, type ProviderDef } from "@/lib/support/models"
 
 /** The two ways the dialog can open. */
-export type FleetModalMode = { mode: "create" } | { mode: "manage"; agent: Agent }
+export type FleetModalMode = { mode: "create" } | { mode: "manage"; agent: Fleet }
 
 /** A resolved provider+model id pair for the picker. */
 export interface Selection {
@@ -36,7 +36,7 @@ function firstModelId(providers: ProviderDef[], providerId: string): string {
 
 /** Manage-mode seed: the agent's authoritative provider/model, falling back to
  *  the first provider + its default model on a cold (empty) registry. */
-function manageSelection(agent: Agent, providers: ProviderDef[]): Selection {
+function manageSelection(agent: Fleet, providers: ProviderDef[]): Selection {
   const resolved = resolveSelection(providers, agent.provider, agent.model)
   const p = resolved?.provider.id ?? providers[0]?.id ?? ""
   return { p, m: resolved?.model.id ?? firstModelId(providers, p) }
@@ -57,7 +57,7 @@ function createSelection(providers: ProviderDef[], ls: LsDefaults): Selection {
  */
 function initialSelection(
   isManage: boolean,
-  agent: Agent | undefined,
+  agent: Fleet | undefined,
   providers: ProviderDef[],
   ls: LsDefaults,
 ): Selection {
@@ -71,7 +71,7 @@ function initialSelection(
  */
 function syncedSelection(
   isManage: boolean,
-  agent: Agent | undefined,
+  agent: Fleet | undefined,
   providers: ProviderDef[],
   ls: LsDefaults,
 ): Selection | null {
@@ -101,7 +101,7 @@ export interface SelectionState {
  */
 export function useSelectionState(
   isManage: boolean,
-  agent: Agent | undefined,
+  agent: Fleet | undefined,
   providers: ProviderDef[],
 ): SelectionState {
   // localStorage picker defaults, read ONCE at mount (a lazy initializer — the

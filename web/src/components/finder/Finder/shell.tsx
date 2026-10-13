@@ -1,4 +1,4 @@
-import type { Agent, FinderNode } from "@/lib/types"
+import type { Fleet, FinderNode } from "@/lib/types"
 import {
   DndContext,
   PointerSensor,
@@ -52,7 +52,7 @@ export function FinderShell({
   disconnected,
   onReconnect,
 }: {
-  agent: Agent
+  agent: Fleet
   tree: TreeState
   groups: GroupsState
   /** Whether the explorer rail is expanded. When false the tree slides off the

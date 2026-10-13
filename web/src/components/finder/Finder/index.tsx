@@ -1,5 +1,5 @@
 import { useEffect } from "react"
-import type { Agent, FinderNode } from "@/lib/types"
+import type { Fleet, FinderNode } from "@/lib/types"
 import { useTreeState } from "../explorer/treeState"
 import { useEditorGroups } from "../editor/tabState"
 import { kindOf } from "../support/kind"
@@ -26,7 +26,7 @@ import { FinderShell } from "./shell"
  * {@link FinderShell} for render.
  */
 export function Finder(props: {
-  agent: Agent
+  agent: Fleet
   /** Whether the explorer rail is expanded. Toggled from the header rail's
    *  Finder tab (T624); the tree slides out when false. */
   railOpen?: boolean
@@ -52,7 +52,7 @@ function FinderBody({
   disconnected,
   onReconnect,
 }: {
-  agent: Agent
+  agent: Fleet
   railOpen?: boolean
   revealPath?: string | null | undefined
   onRevealConsumed?: (() => void) | undefined

@@ -11,7 +11,7 @@ import {
 import { usePickerProviders, priceTag, type ModelDef, type ProviderDef } from "@/lib/support/models"
 import { sendCommand } from "@/lib/live"
 import { Tip } from "@/components/ui/tip"
-import type { Agent } from "@/lib/types"
+import type { Fleet } from "@/lib/types"
 
 /** Text-only row highlight (mirrors {@link BehaviourChip}'s ROW_HILITE): brighten
  *  the ink on hover/focus, never wash the background. */
@@ -46,7 +46,7 @@ function groupBySubprovider(models: ModelDef[]): [string, ModelDef[]][] {
  *  from the agent's authoritative provider id + model apiName. */
 function activeSelection(
   providers: ProviderDef[],
-  agent: Agent | undefined,
+  agent: Fleet | undefined,
 ): { provider: ProviderDef | undefined; model: ModelDef | undefined } {
   const provider =
     providers.find((p) => p.id === agent?.provider) ??
@@ -72,7 +72,7 @@ function activeSelection(
  * applies immediately, no save step. The active provider/model comes back
  * through the agent-meta fold, so the chip re-labels on the next delta.
  */
-export function ModelChip({ fleetId, agent }: { fleetId: string; agent: Agent | undefined }) {
+export function ModelChip({ fleetId, agent }: { fleetId: string; agent: Fleet | undefined }) {
   const { data: providers = [] } = usePickerProviders()
   const { provider: activeProv, model: activeModel } = activeSelection(providers, agent)
   const label = activeModel?.displayName ?? "model"

@@ -10,10 +10,10 @@ import {
 } from "@/mobile-components/ui/dropdown-menu"
 import { accentVar } from "@/lib/support/panelMeta"
 import { avatarUrl } from "@/lib/api"
-import type { Agent, AgentStatus } from "@/lib/types"
+import type { Fleet, FleetStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
-const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
+const statusMeta: Record<FleetStatus, { label: string; color: string }> = {
   working: { label: "Working", color: "var(--interactive)" },
   "needs-you": { label: "Needs you", color: "var(--signal)" },
   idle: { label: "Idle", color: "var(--muted-foreground)" },
@@ -22,7 +22,7 @@ const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
 }
 
 /** Sort priority: working first, then needs-you, then idle. */
-const statusOrder: Record<AgentStatus, number> = {
+const statusOrder: Record<FleetStatus, number> = {
   working: 0,
   waiting: 0,
   "needs-you": 1,
@@ -49,7 +49,7 @@ export function FleetSwitcher({
   onFleet,
   onNewFleet,
 }: {
-  agents: Agent[]
+  agents: Fleet[]
   activeId?: string | undefined
   onSwitch: (id: string) => void
   /** Jump to the fleet dashboard — the only place agents are managed. */
@@ -170,8 +170,8 @@ function FleetDot({
   hasAvatar,
   compact = false,
 }: {
-  accent: Agent["accent"]
-  status: AgentStatus
+  accent: Fleet["accent"]
+  status: FleetStatus
   fleetId?: string | undefined
   hasAvatar?: boolean | undefined
   /** trigger variant — a smaller 20px glyph so the switcher matches the

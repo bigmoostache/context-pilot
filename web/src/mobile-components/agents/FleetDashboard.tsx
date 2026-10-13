@@ -20,13 +20,13 @@ import { accentVar, fmtCost, FLEET_MAX_W } from "@/lib/support/panelMeta"
 import { useMetrics, useRetireFleet, useFleetMeta, useCreateFleet } from "@/lib/live"
 import { avatarUrl } from "@/lib/api"
 import { useFeatures } from "@/lib/providers/toggles/features"
-import type { Agent, AgentStatus } from "@/lib/types"
+import type { Fleet, FleetStatus } from "@/lib/types"
 import { cn, prefersReducedMotion } from "@/lib/utils"
 import { useSwipeRow } from "@/lib/live/useSwipeRow"
 import { RetiredSection } from "./FleetRetired"
 import { ClaudeUsagePage } from "./ClaudeUsagePage"
 
-const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
+const statusMeta: Record<FleetStatus, { label: string; color: string }> = {
   working: { label: "Working", color: "var(--interactive)" },
   "needs-you": { label: "Needs input", color: "var(--signal)" },
   idle: { label: "Standby", color: "var(--muted-foreground)" },
@@ -57,7 +57,7 @@ export function FleetDashboard({
   autoCreate,
   onAutoCreateConsumed,
 }: {
-  agents: Agent[]
+  agents: Fleet[]
   onOpenFleet: (id: string) => void
   onManageFleet: (id: string) => void
   autoCreate?: boolean | undefined
@@ -309,7 +309,7 @@ function FleetSwipeRow({
   onManage,
   onFlash,
 }: {
-  agent: Agent
+  agent: Fleet
   onOpen: () => void
   onManage: () => void
   onFlash: (m: string) => void
@@ -366,7 +366,7 @@ function FleetSwipeRow({
  * trailing cost + chevron. Live vitals ride the per-agent meta cache; the polled
  * fleet row is the fallback until the first delta. Whole row taps open (T632).
  */
-function FleetRow({ agent, onOpen }: { agent: Agent; onOpen: () => void }) {
+function FleetRow({ agent, onOpen }: { agent: Fleet; onOpen: () => void }) {
   const { data: live } = useFleetMeta(agent.id)
   const a = live ?? agent
   const s = statusMeta[a.status]

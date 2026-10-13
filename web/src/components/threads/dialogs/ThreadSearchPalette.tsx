@@ -109,9 +109,9 @@ function PaletteBody({
   const rows: Row[] = useMemo(() => {
     if (serverMode) {
       return (hits ?? []).map((h, i) => ({
-        key: `${h.thread_id}-${i}`,
-        threadId: h.thread_id,
-        primary: h.thread_name,
+        key: `${h.agent_id}-${i}`,
+        threadId: h.agent_id,
+        primary: h.agent_name,
         secondary: h.text,
         meta: h.author,
       }))

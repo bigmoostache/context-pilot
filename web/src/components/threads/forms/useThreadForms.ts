@@ -46,7 +46,7 @@ export function useThreadForms(log: ThreadMsg[], fleetId: string, threadId: stri
   const onFormSubmit = useCallback(
     (formId: string, entries: FormAnswerEntry[]) => {
       const content = buildFormAnswerContent(formId, entries)
-      void sendCommand(fleetId, { kind: "send_message", thread_id: threadId, content })
+      void sendCommand(fleetId, { kind: "send_message", agent_id: threadId, content })
     },
     [fleetId, threadId],
   )

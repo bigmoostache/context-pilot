@@ -19,7 +19,7 @@ import { Tip } from "@/components/ui/tip"
 import { useDevMode } from "@/lib/providers/toggles/devMode"
 import { useFeatures } from "@/lib/providers/toggles/features"
 import { useModifierShortcuts } from "@/lib/support/a11y"
-import type { Agent, ViewMode } from "@/lib/types"
+import type { Fleet, ViewMode } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 interface TopBarProps {
@@ -27,7 +27,7 @@ interface TopBarProps {
   onViewChange: (v: ViewMode) => void
   activeFleetId: string
   onSwitchFleet: (id: string) => void
-  agents: Agent[]
+  agents: Fleet[]
   /** Whether the threads view's list rail is open — drives the Threads tab's
    *  `aria-expanded` and its tooltip wording while that view is active. */
   threadsRailOpen: boolean

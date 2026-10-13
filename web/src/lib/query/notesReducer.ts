@@ -6,7 +6,7 @@
 // ./taskReducer's `foldTaskList`.
 
 import type { OpEntry } from "../api/generated/types.gen"
-import type { ThreadDetail, ThreadNote } from "../types"
+import type { ThreadDetail, AgentNote } from "../types"
 
 // The unwrapped delta discriminant (`entry.kind`) — same alias reducers.ts uses.
 type Kind = OpEntry["kind"]
@@ -19,7 +19,7 @@ type Kind = OpEntry["kind"]
  * normalization is needed (contrast foldTaskList's snake→camel parentId fold).
  */
 export function foldNoteList(prev: ThreadDetail[], k: Kind): ThreadDetail[] | null {
-  if (prev.every((t) => t.id !== k.thread_id)) return null // unknown thread → hydrate
-  const notes: ThreadNote[] = k.notes ?? []
-  return prev.map((t) => (t.id === k.thread_id ? { ...t, notes } : t))
+  if (prev.every((t) => t.id !== k.agent_id)) return null // unknown thread → hydrate
+  const notes: AgentNote[] = k.notes ?? []
+  return prev.map((t) => (t.id === k.agent_id ? { ...t, notes } : t))
 }

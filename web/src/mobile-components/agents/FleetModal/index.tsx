@@ -3,7 +3,7 @@ import { animate, stagger } from "animejs"
 import { ChevronLeft, X } from "lucide-react"
 import { usePickerProviders } from "@/lib/support/models"
 import { useRenameFleet, sendCommand } from "@/lib/live"
-import type { Agent } from "@/lib/types"
+import type { Fleet } from "@/lib/types"
 import { prefersReducedMotion } from "@/lib/utils"
 import { CornerButton } from "@/mobile-components/shell/chrome/CornerButton"
 import { useSelectionState } from "./controller"
@@ -45,7 +45,7 @@ export function FleetModal({
   onClose,
   onFlash,
 }: {
-  agent: Agent
+  agent: Fleet
   onClose: () => void
   onFlash?: (m: string) => void
 }) {

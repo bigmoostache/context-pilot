@@ -1,6 +1,6 @@
 import { FolderGit2, Dices, ImagePlus } from "lucide-react"
 import { avatarUrl } from "@/lib/api"
-import type { Agent } from "@/lib/types"
+import type { Fleet } from "@/lib/types"
 import { FleetAclSection } from "../../auth/FleetAclSection"
 import { SessionVitals } from "../../shell/SessionVitals"
 import type { Controller } from "./parts"
@@ -55,7 +55,7 @@ function AvatarField({
   onAvatarChange,
   onRandomizeAvatar,
 }: {
-  agent: Agent
+  agent: Fleet
   avatarBust: number
   onAvatarChange: (file: File) => void
   onRandomizeAvatar: () => void

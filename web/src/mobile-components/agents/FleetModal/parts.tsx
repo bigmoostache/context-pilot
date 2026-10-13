@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react"
 import { animate, createSpring } from "animejs"
 import { Archive, Dices, ImagePlus, RefreshCw } from "lucide-react"
-import type { Agent } from "@/lib/types"
+import type { Fleet } from "@/lib/types"
 import { avatarUrl } from "@/lib/api"
 import { type ProviderDef } from "@/lib/support/models"
 import { ModelPicker } from "../ModelPicker"
@@ -34,7 +34,7 @@ export function AvatarHero({
   onAvatarChange,
   onRandomizeAvatar,
 }: {
-  agent: Agent
+  agent: Fleet
   avatarBust: number
   onAvatarChange: (file: File) => void
   onRandomizeAvatar: () => void

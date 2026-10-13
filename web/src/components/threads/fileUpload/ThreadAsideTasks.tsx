@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react"
 import { Square, SquareCheckBig, ChevronRight, StickyNote } from "lucide-react"
-import type { ThreadTask, ThreadNote } from "@/lib/types"
+import type { AgentTask, AgentNote } from "@/lib/types"
 import { Markdown } from "@/lib/support/markdown"
 
 /**
@@ -15,7 +15,7 @@ import { Markdown } from "@/lib/support/markdown"
  * The tree is projected by the agent (cancelled excluded upstream) and rides the
  * live `task_list_changed` delta, so this stays purely presentational.
  */
-export function TaskList({ tasks }: { tasks: ThreadTask[] }) {
+export function TaskList({ tasks }: { tasks: AgentTask[] }) {
   // Parent → children buckets + the set of ids whose whole subtree is closed
   // (all descendants done/cancelled) — those parents default to collapsed.
   const model = useMemo(() => buildModel(tasks), [tasks])
@@ -36,7 +36,7 @@ export function TaskList({ tasks }: { tasks: ThreadTask[] }) {
     setOverrides((o) => ({ ...o, [id]: !currentlyCollapsed }))
 
   // Pre-order walk, skipping the subtree of any collapsed parent.
-  const rows: { task: ThreadTask; depth: number; hasChildren: boolean; collapsed: boolean }[] = []
+  const rows: { task: AgentTask; depth: number; hasChildren: boolean; collapsed: boolean }[] = []
   const walk = (parentKey: string, depth: number) => {
     const children = model.childrenOf.get(parentKey) ?? []
     for (const t of children) {
@@ -74,7 +74,7 @@ function TaskRow({
   collapsed,
   onToggle,
 }: {
-  task: ThreadTask
+  task: AgentTask
   depth: number
   hasChildren: boolean
   collapsed: boolean
@@ -139,7 +139,7 @@ function TaskRow({
 }
 
 /** The lucide status glyph for a task, colour-keyed to the app palette. */
-function StatusIcon({ status }: { status: ThreadTask["status"] }) {
+function StatusIcon({ status }: { status: AgentTask["status"] }) {
   if (status === "done") {
     return <SquareCheckBig className="size-3 shrink-0 text-(--ok)" />
   }
@@ -189,7 +189,7 @@ const ROOT_KEY = "\u{0}root"
 
 interface TaskModel {
   /** parentKey → ordered children (ROOT_KEY for top-level). */
-  childrenOf: Map<string, ThreadTask[]>
+  childrenOf: Map<string, AgentTask[]>
   /** ids of parents whose entire subtree is done/cancelled (default-collapsed). */
   defaultCollapsed: Set<string>
 }
@@ -199,9 +199,9 @@ interface TaskModel {
  * parent whose whole subtree is finished (done/cancelled) as default-collapsed.
  * A task whose `parentId` is absent or points outside this thread is a root.
  */
-function buildModel(tasks: ThreadTask[]): TaskModel {
+function buildModel(tasks: AgentTask[]): TaskModel {
   const ids = new Set(tasks.map((t) => t.id))
-  const childrenOf = new Map<string, ThreadTask[]>()
+  const childrenOf = new Map<string, AgentTask[]>()
   for (const t of tasks) {
     const key = t.parentId && ids.has(t.parentId) ? t.parentId : ROOT_KEY
     const bucket = childrenOf.get(key)
@@ -212,7 +212,7 @@ function buildModel(tasks: ThreadTask[]): TaskModel {
   const defaultCollapsed = new Set<string>()
   // Cancelled tasks are excluded upstream by the agent, so a finished leaf here
   // is simply `done`.
-  const closed = (status: ThreadTask["status"]) => status === "done"
+  const closed = (status: AgentTask["status"]) => status === "done"
   const allClosed = (id: string): boolean => {
     const kids = childrenOf.get(id)
     if (!kids) return false // leaf — not a collapsible parent
@@ -302,7 +302,7 @@ function useStickySet(storageKey: string): {
  * The list is projected by the agent (thread-owned scratchpad cells) and rides
  * the live `notes_changed` delta, so this stays purely presentational.
  */
-export function NoteList({ notes, storageKey }: { notes: ThreadNote[]; storageKey: string }) {
+export function NoteList({ notes, storageKey }: { notes: AgentNote[]; storageKey: string }) {
   // Ids of expanded note rows (content shown), PERSISTED to localStorage under
   // `storageKey` (per agent+thread) so the open/closed state survives switching
   // aside tabs (which unmounts this list) AND a browser refresh — the user
@@ -334,7 +334,7 @@ function NoteRow({
   open,
   onToggle,
 }: {
-  note: ThreadNote
+  note: AgentNote
   open: boolean
   onToggle: () => void
 }) {

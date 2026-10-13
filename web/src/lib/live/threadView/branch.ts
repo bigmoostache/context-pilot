@@ -1,6 +1,6 @@
 // ── Branch out a thread (shared, non-forked) ─────────────────────────
 //
-// The Branch dialog state + the `branch_thread` command dispatch, consumed by
+// The Branch dialog state + the `branch_agent` command dispatch, consumed by
 // both the desktop and mobile thread views through {@link useThreadActions}.
 // Split out of ./index for the 500-line file budget.
 
@@ -45,10 +45,10 @@ function messageTsOf(msg: ThreadMsg): number {
 
 /**
  * Branch-out state + handlers: which message the Branch dialog is open on, and
- * the submit that sends ONE atomic `branch_thread` command. The agent copies the
+ * the submit that sends ONE atomic `branch_agent` command. The agent copies the
  * parent's history from its own state (the payload only names the branch point
  * by its timestamp), then applies the optional pause + first message in the
- * same create -> pause -> send order as `create_thread` (T687). The new thread
+ * same create -> pause -> send order as `create_agent` (T687). The new thread
  * is auto-selected once it appears, exactly like a plain create.
  */
 export function useThreadBranch(
@@ -76,8 +76,8 @@ export function useThreadBranch(
       const content = buildCombinedContent(opts.firstMessage, opts.files, true)
       sel.armAutoSelect()
       sendCommand(activeFleetId, {
-        kind: "branch_thread",
-        source_thread_id: branchTarget.threadId,
+        kind: "branch_agent",
+        source_agent_id: branchTarget.threadId,
         message_ts: branchTarget.messageTs,
         name: opts.title.trim() || "Untitled branch",
         ...(content && { initial_message: content }),

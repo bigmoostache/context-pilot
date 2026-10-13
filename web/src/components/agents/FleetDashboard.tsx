@@ -5,12 +5,12 @@ import { accentVar, fmtCost, FLEET_MAX_W } from "@/lib/support/panelMeta"
 import { useMetrics, useFleetMeta } from "@/lib/live"
 import { avatarUrl } from "@/lib/api"
 import { clickable } from "@/lib/support/a11y"
-import type { Agent, AgentStatus } from "@/lib/types"
+import type { Fleet, FleetStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { FleetModal } from "./FleetModal"
 import { RetiredSection } from "./FleetRetired"
 
-const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
+const statusMeta: Record<FleetStatus, { label: string; color: string }> = {
   "needs-you": { label: "Needs input", color: "var(--signal)" },
   working: { label: "Working", color: "var(--interactive)" },
   waiting: { label: "Restarting", color: "var(--interactive)" },
@@ -21,9 +21,9 @@ const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
 /** Group render order — the most actionable state first (agents needing input),
  *  then live/restarting, then dormant, then offline (mirrors ThreadList's
  *  turn-first grouping). Groups with no members are skipped. */
-const GROUP_ORDER: AgentStatus[] = ["needs-you", "working", "waiting", "idle", "disconnected"]
+const GROUP_ORDER: FleetStatus[] = ["needs-you", "working", "waiting", "idle", "disconnected"]
 
-type Modal = { mode: "create" } | { mode: "manage"; agent: Agent } | null
+type Modal = { mode: "create" } | { mode: "manage"; agent: Fleet } | null
 
 /**
  * Fleet dashboard — mission control and the SOLE place agents are managed.
@@ -37,7 +37,7 @@ export function FleetDashboard({
   agents,
   onOpenFleet,
 }: {
-  agents: Agent[]
+  agents: Fleet[]
   onOpenFleet: (id: string) => void
 }) {
   const [modal, setModal] = useState<Modal>(null)
@@ -48,7 +48,7 @@ export function FleetDashboard({
     window.setTimeout(() => setToast(null), 2200)
   }
 
-  const openRow = (a: Agent) => (
+  const openRow = (a: Fleet) => (
     <FleetRow
       key={a.id}
       agent={a}
@@ -110,7 +110,7 @@ export function FleetDashboard({
 
 /** A status section's header: a coloured dot + the status label + member count,
  *  in the thread-sidebar group-header type scale. */
-function GroupHeader({ status, count }: { status: AgentStatus; count: number }) {
+function GroupHeader({ status, count }: { status: FleetStatus; count: number }) {
   const s = statusMeta[status]
   return (
     <div className="flex items-center gap-2 px-2.5 pt-3 pb-1.5 first:pt-1">
@@ -131,7 +131,7 @@ function FleetRow({
   onOpen,
   onManage,
 }: {
-  agent: Agent
+  agent: Fleet
   onOpen: () => void
   onManage: () => void
 }) {

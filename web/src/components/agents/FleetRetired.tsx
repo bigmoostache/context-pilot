@@ -1,6 +1,6 @@
 import { ArchiveRestore, FolderGit2, Loader2 } from "lucide-react"
 import { useRetiredFleet, useUnretireFleet } from "@/lib/live"
-import type { Agent } from "@/lib/types"
+import type { Fleet } from "@/lib/types"
 
 /**
  * The Retired (archived) agents section — rendered below the active fleet only
@@ -30,7 +30,7 @@ export function RetiredSection({ onFlash }: { onFlash: (m: string) => void }) {
   )
 }
 
-function RetiredRow({ agent, onFlash }: { agent: Agent; onFlash: (m: string) => void }) {
+function RetiredRow({ agent, onFlash }: { agent: Fleet; onFlash: (m: string) => void }) {
   const unretire = useUnretireFleet()
 
   const onUnretire = () => {

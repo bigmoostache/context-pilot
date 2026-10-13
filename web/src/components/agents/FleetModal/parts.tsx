@@ -11,7 +11,7 @@ import {
   Wand2,
   X,
 } from "lucide-react"
-import type { Agent } from "@/lib/types"
+import type { Fleet } from "@/lib/types"
 import { avatarUrl } from "@/lib/api"
 import { type ProviderDef } from "@/lib/support/models"
 import { ModelPicker } from "../ModelPicker"
@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils"
 /** Everything the render subcomponents need — assembled in {@link FleetModal}. */
 export interface Controller {
   isManage: boolean
-  agent: Agent | undefined
+  agent: Fleet | undefined
   name: string
   setName: (v: string) => void
   providers: ProviderDef[]
@@ -61,7 +61,7 @@ export function FleetModalHeader({
   onClose,
 }: {
   isManage: boolean
-  agent: Agent | undefined
+  agent: Fleet | undefined
   avatarBust: number
   onAvatarChange: (file: File) => void
   onRandomizeAvatar: () => void

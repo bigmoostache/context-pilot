@@ -2,7 +2,7 @@ import { PanelRightOpen } from "lucide-react"
 import { ThreadAside } from "./ThreadAside"
 import type { useThreadAside } from "./useThreadAside"
 import type { ThreadFile } from "./FileSidebar"
-import type { ThreadTask, ThreadNote } from "@/lib/types"
+import type { AgentTask, AgentNote } from "@/lib/types"
 import { HintBadge } from "@/components/shell/chrome/HintBadge"
 import { useModifierShortcuts } from "@/lib/support/a11y"
 
@@ -40,8 +40,8 @@ export function ThreadAsideRail({
   fleetId: string
   threadId: string
   files: ThreadFile[]
-  tasks: ThreadTask[]
-  notes: ThreadNote[]
+  tasks: AgentTask[]
+  notes: AgentNote[]
   aside: ReturnType<typeof useThreadAside>
   /** Whether the left thread-list rail is hidden — forwarded to {@link ThreadAside}
    *  so a file preview widens to half the viewport when it is (T680). */

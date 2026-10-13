@@ -149,7 +149,7 @@ function useMessageActions(
   const handleDelete = useCallback(
     (msg: ThreadMsg) => {
       const ts = typeof msg.ts === "number" ? msg.ts : new Date(msg.ts ?? "").getTime()
-      void sendCommand(fleetId, { kind: "delete_message", thread_id: threadId, message_ts: ts })
+      void sendCommand(fleetId, { kind: "delete_message", agent_id: threadId, message_ts: ts })
     },
     [fleetId, threadId],
   )

@@ -14,11 +14,11 @@
 // `ThrowOnError = false`, hence the `as` casts below — they align the
 // compile-time type with the runtime guarantee.
 
-import type { Agent, ThreadDetail } from "../types"
+import type { Fleet, ThreadDetail } from "../types"
 import type {
-  AgentMetrics,
+  FleetMetrics,
   CommandReceipt as GenCommandReceipt,
-  CreateAgentReceipt,
+  CreateFleetReceipt,
   CreateCommandReceipt,
   LibraryItem,
   RestartReceipt,
@@ -46,7 +46,7 @@ import {
   getApiFleetByIdLibrarySystemByItem,
   putApiFleetByIdLibrarySystemByItem,
   deleteApiFleetByIdLibrarySystemByItem,
-  getApiFleetByIdThreads,
+  getApiFleetByIdAgents,
   getApiProviders,
   getApiUpdateStatus,
   postApiUpdateCheck,
@@ -77,10 +77,10 @@ export * from "./it"
 
 // ── Type re-exports ───────────────────────────────────────────────────
 
-export type { CreateAgentReceipt } from "./generated/types.gen"
+export type { CreateFleetReceipt } from "./generated/types.gen"
 export type { RestartReceipt } from "./generated/types.gen"
 export type { RetireReceipt, UnretireReceipt } from "./generated/types.gen"
-export type { AgentMetrics } from "./generated/types.gen"
+export type { FleetMetrics } from "./generated/types.gen"
 export type { Vital } from "./generated/types.gen"
 export type { CreateCommandReceipt } from "./generated/types.gen"
 export type { ClaudeUsageResponse, ClaudeUsageLimit } from "./generated/types.gen"
@@ -96,11 +96,11 @@ export type { ConvHit } from "./generated/types.gen"
 
 // ── Fleet (SDK) ───────────────────────────────────────────────────────
 
-export function fetchFleet(): Promise<Agent[]> {
+export function fetchFleet(): Promise<Fleet[]> {
   return sdk(getApiFleetsMeta())
 }
 
-export function fetchRetiredFleet(): Promise<Agent[]> {
+export function fetchRetiredFleet(): Promise<Fleet[]> {
   return sdk(getApiFleetsRetired())
 }
 
@@ -110,7 +110,7 @@ export function createFleet(body: {
   name: string
   folder?: string
   model?: string
-}): Promise<CreateAgentReceipt> {
+}): Promise<CreateFleetReceipt> {
   return sdk(postApiFleetsCreate({ body }))
 }
 
@@ -132,7 +132,7 @@ export function renameFleet(fleetId: string, name: string): Promise<{ ok: boolea
 
 // ── Agent meta (SDK) ──────────────────────────────────────────────────
 
-export function fetchFleetMeta(fleetId: string): Promise<Agent> {
+export function fetchFleetMeta(fleetId: string): Promise<Fleet> {
   return sdk(getApiFleetByIdMeta({ path: { id: fleetId } }))
 }
 
@@ -151,7 +151,7 @@ export function avatarUrl(fleetId: string, cacheBust?: number): string {
 
 // ── Tools / Radar / Entities (SDK) ────────────────────────────────────
 
-export function fetchMetrics(fleetId: string): Promise<AgentMetrics> {
+export function fetchMetrics(fleetId: string): Promise<FleetMetrics> {
   return sdk(getApiFleetByIdMetrics({ path: { id: fleetId } }))
 }
 
@@ -159,7 +159,7 @@ export function fetchVitals(fleetId: string): Promise<Vital[]> {
   return sdk(getApiFleetByIdVitals({ path: { id: fleetId } }))
 }
 
-export function fetchFleetMetrics(): Promise<AgentMetrics[]> {
+export function fetchFleetMetrics(): Promise<FleetMetrics[]> {
   return sdk(getApiMetrics())
 }
 
@@ -299,11 +299,11 @@ export function formatAge(epochMs: number): string {
 }
 
 export async function fetchThreads(fleetId: string): Promise<ThreadDetail[]> {
-  const res = await sdk<{ focusedThreadId?: string | null; threads: ThreadDetail[] }>(
-    getApiFleetByIdThreads({ path: { id: fleetId } }),
+  const res = await sdk<{ focusedAgentId?: string | null; agents: ThreadDetail[] }>(
+    getApiFleetByIdAgents({ path: { id: fleetId } }),
   )
-  const focusedId = res.focusedThreadId ?? null
-  return res.threads.map((t) => {
+  const focusedId = res.focusedAgentId ?? null
+  return res.agents.map((t) => {
     // The generated type declares `lastActivity: string`, but the backend sends
     // an epoch number on the REST path and a display string on the SSE path.
     // Widen once (single assertion, no `unknown`) so the typeof-branch narrows
@@ -341,7 +341,7 @@ export function searchConversations(
       body: {
         query,
         ...(opts?.limit != null && { limit: opts.limit }),
-        ...(opts?.threadId != null && { thread_id: opts.threadId }),
+        ...(opts?.threadId != null && { agent_id: opts.threadId }),
       },
     }),
   ).then((r) => r.hits)
