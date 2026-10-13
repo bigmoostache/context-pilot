@@ -73,12 +73,13 @@ function patchedLocale() {
  * Core preset (formula bar; footer with sheet tabs — whose list shows and
  * unhides hidden sheets — selection statistics and zoom slider) plus
  * conditional formats, hyperlinks, notes (read from workbook resources) and
- * find & replace (Ctrl/Cmd+F).
+ * find & replace (Ctrl/Cmd+F). Formulas are computed in `worker`.
  */
-function sheetPresets(container: HTMLElement) {
+function sheetPresets(container: HTMLElement, worker: Worker) {
   return [
     UniverSheetsCorePreset({
       container,
+      workerURL: worker,
       formulaBar: true,
       footer: { sheetBar: true, statisticBar: true, menus: true, zoomSlider: true },
     }),
@@ -123,6 +124,9 @@ export function SheetGrid({
   const workbookData = useMemo(() => resolveWorkbook(workbook, sheets), [workbook, sheets])
   // v2: snapshots from the old values-only payload must not mask the full workbook.
   const storageKey = `univer-sheet:v2:${path}`
+  // Backend workbooks (xlsx/xlsm) skip the localStorage backup: serializing a
+  // multi-MB snapshot after every edit froze the page and overflowed the quota.
+  const backup = !workbook
 
   const handleSave = useCallback(async () => {
     if (!univerRef.current || !fleetId) return
@@ -150,15 +154,20 @@ export function SheetGrid({
     let data = workbookData
     try {
       const saved = localStorage.getItem(storageKey)
-      if (saved) data = JSON.parse(saved) as typeof workbookData
+      if (!backup) localStorage.removeItem(storageKey)
+      else if (saved) data = JSON.parse(saved) as typeof workbookData
     } catch {
       /* corrupt entry — fall through to calamine data */
     }
 
+    // Formula engine off the main thread: recalculating a large workbook froze the tab.
+    const worker = new Worker(new URL("../support/sheetWorker.ts", import.meta.url), {
+      type: "module",
+    })
     const { univerAPI } = createUniver({
       locale: LocaleType.FR_FR,
       locales: { [LocaleType.FR_FR]: patchedLocale() },
-      presets: sheetPresets(el),
+      presets: sheetPresets(el, worker),
     })
 
     const fWorkbook = univerAPI.createWorkbook(data)
@@ -174,6 +183,7 @@ export function SheetGrid({
     let timer: ReturnType<typeof setTimeout> | null = null
     const sub = univerAPI.addEvent(univerAPI.Event.CommandExecuted, () => {
       setDirty(true)
+      if (!backup) return
       if (timer) clearTimeout(timer)
       timer = setTimeout(() => {
         const wb = univerAPI.getActiveWorkbook()
@@ -191,7 +201,7 @@ export function SheetGrid({
       // Flush pending save on unmount.
       if (timer) clearTimeout(timer)
       cancelAnimationFrame(readyFrame)
-      const wb = univerAPI.getActiveWorkbook()
+      const wb = backup ? univerAPI.getActiveWorkbook() : null
       if (wb) {
         try {
           localStorage.setItem(storageKey, JSON.stringify(wb.save()))
@@ -201,10 +211,11 @@ export function SheetGrid({
       }
       sub.dispose()
       univerAPI.dispose()
+      worker.terminate()
       univerRef.current = null
       setReady(false)
     }
-  }, [workbookData, storageKey, activeSheet])
+  }, [workbookData, storageKey, activeSheet, backup])
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
