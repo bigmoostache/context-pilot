@@ -263,7 +263,8 @@ impl AgentsState {
     }
 
     /// Indices into [`Self::agents`] of the agents whose `archived` flag
-    /// matches `archived`, in storage order.
+    /// matches `archived`, in tree order (sub-agents right
+    /// under their parent, see [`tree::preorder`]; storage order among siblings).
     ///
     /// The TUI thread-centered view shows one subset at a time — the active
     /// list (`archived = false`) or the archived list (`archived = true`,
@@ -273,7 +274,9 @@ impl AgentsState {
     /// visible list.
     #[must_use]
     pub fn visible_indices(&self, archived: bool) -> Vec<usize> {
-        self.agents.iter().enumerate().filter(|entry| entry.1.archived == archived).map(|entry| entry.0).collect()
+        let matching: Vec<usize> =
+            self.agents.iter().enumerate().filter(|entry| entry.1.archived == archived).map(|entry| entry.0).collect();
+        tree::preorder(&self.agents, &matching).into_iter().map(|(i, _)| i).collect()
     }
 
     /// Branch a new agent out of `source_id`: a fresh agent named `name`

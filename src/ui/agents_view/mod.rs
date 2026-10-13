@@ -1,6 +1,6 @@
-//! Threads view — dedicated TUI layout when `ViewMode::Agents` is active.
+//! Agents view — dedicated TUI layout when `ViewMode::Agents` is active.
 //!
-//! Renders a two-pane layout: thread list (left) + message area (right).
+//! Renders a two-pane layout: agent list (left) + message area (right).
 //! All content goes through the IR pipeline (`cp_render::Block` / `Span` →
 //! `blocks_to_lines()` → ratatui). Only layout chrome (borders, scrollbars,
 //! area splits) uses ratatui directly — same pattern as the sidebar adapter.
@@ -24,20 +24,20 @@ use cp_fleet::AgentExecState;
 use cp_mod_agents::types::{AgentAuthor, AgentStatus, AgentsState, FocusState};
 use cp_mod_agents::view_state::FleetExecMirror;
 
-/// Width of the thread list pane in columns.
+/// Width of the agent list pane in columns.
 ///
 /// Matched to the panel-centric view's sidebar width ([`ViewMode::width`] for
 /// `Normal` = 36) so the two layouts line up pixel-for-pixel.
 pub(crate) const AGENT_LIST_WIDTH: u16 = 36;
 
-/// Render the threads view: thread list + message area.
+/// Render the agents view: agent list + message area.
 pub(crate) fn render_agents_view(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
     let agents_state = AgentsState::get(state);
     let focus_state = FocusState::get(state);
     let viewing_archived = focus_state.viewing_archived;
 
     // The visible list is the subset matching the current view. The active
-    // view has a trailing virtual "+ New Thread" entry; the archived view
+    // view has a trailing virtual "+ New Agent" entry; the archived view
     // does not.
     let visible = agents_state.visible_indices(viewing_archived);
     let show_new = !viewing_archived;
@@ -45,7 +45,7 @@ pub(crate) fn render_agents_view(frame: &mut Frame<'_>, state: &mut State, area:
     let selected_idx = focus_state.selected_agent_idx.min(total_entries.saturating_sub(1));
     let on_virtual_new = show_new && selected_idx >= visible.len();
 
-    // Two-pane layout: thread list | message area
+    // Two-pane layout: agent list | message area
     if area.width > AGENT_LIST_WIDTH.saturating_add(20) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
@@ -64,10 +64,10 @@ pub(crate) fn render_agents_view(frame: &mut Frame<'_>, state: &mut State, area:
         } else if let Some(&real_idx) = visible.get(selected_idx) {
             messages::render_message_area_with_input(frame, state, real_idx, msg_area);
         } else {
-            // No thread selected — leave the message area blank.
+            // No agent selected — leave the message area blank.
         }
     } else {
-        // Narrow terminal — show thread list only
+        // Narrow terminal — show agent list only
         render_agent_list(frame, state, area);
     }
 }
@@ -95,22 +95,24 @@ fn push_archived_header(blocks: &mut Vec<IrBlock>, viewing_archived: bool) {
 /// Mutable accumulator threaded through the thread-list block builders:
 /// the growing IR block vec, the selected-entry range, and the pane width.
 struct ListBuild<'build> {
-    /// Growing IR block list for the thread list.
+    /// Growing IR block list for the agent list.
     blocks: &'build mut Vec<IrBlock>,
     /// Selected-entry line range, filled as entries are pushed.
     sel: &'build mut SelRange,
     /// Inner pane width (columns) for name truncation.
     inner_width: u16,
-    /// Display-only per-thread exec state, rebuilt each tick by the run loop.
+    /// Display-only per-agent exec state, rebuilt each tick by the run loop.
     /// Drives the leading working-spinner (reuses the fleet mirror; never read
     /// for scheduling).
     mirror: &'build FleetExecMirror,
     /// Per-thread message count the *human* has seen in the TUI
     /// ([`FocusState::last_read_count`]) — drives the unread marker.
     last_read: &'build std::collections::BTreeMap<String, usize>,
+    /// Depth of each visible agent in the tree (root = 0), for indentation.
+    depth_of: std::collections::HashMap<String, usize>,
 }
 
-/// Push the virtual "+ New Thread" entry (active view only, single-line),
+/// Push the virtual "+ New Agent" entry (active view only, single-line),
 /// recording its line range into `sel` when it is the selected entry.
 fn push_new_agent_entry(lb: &mut ListBuild<'_>, state: &State, on_virtual: bool) {
     let new_sem = if on_virtual { Semantic::Accent } else { Semantic::Muted };
@@ -119,7 +121,7 @@ fn push_new_agent_entry(lb: &mut ListBuild<'_>, state: &State, on_virtual: bool)
     }
     let title = &FocusState::get(state).new_agent_title.text;
     let new_name = if title.is_empty() {
-        "New Thread".to_owned()
+        "New Agent".to_owned()
     } else {
         truncate_str(title, lb.inner_width.saturating_sub(6).into())
     };
@@ -133,8 +135,8 @@ fn push_new_agent_entry(lb: &mut ListBuild<'_>, state: &State, on_virtual: bool)
     }
 }
 
-/// Raw RGB for one thread's status circle — a function of thread *state* only,
-/// never of which thread the human happens to be viewing:
+/// Raw RGB for one agent's status circle — a function of agent *state* only,
+/// never of which agent the human happens to be viewing:
 /// orange = `MyTurn` (the LLM owes a turn), green = `TheirTurn` (the human owes
 /// a turn), yellow/amber = paused. Returned as a raw triple (via
 /// [`Span::rgb`](cp_render::Span::rgb)) because the IR `Semantic` palette has no
@@ -150,8 +152,8 @@ fn agent_circle_rgb(agent: &cp_mod_agents::types::Agent) -> (u8, u8, u8) {
     if let ratatui::style::Color::Rgb(r, g, b) = color { (r, g, b) } else { (200, 200, 200) }
 }
 
-/// Whether a thread's exec state should show the "working" spinner — the
-/// per-thread analog of the footer badge needing a spinner (STREAMING /
+/// Whether an agent's exec state should show the "working" spinner — the
+/// per-agent analog of the footer badge needing a spinner (STREAMING /
 /// TOOLING / WAITING). `Idle` is READY (void) and `Errored` is parked (void),
 /// exactly like the footer's READY / BLOCKED badges carry no spinner.
 const fn agent_is_working(exec: AgentExecState) -> bool {
@@ -165,9 +167,9 @@ const fn agent_is_working(exec: AgentExecState) -> bool {
 }
 
 /// Whether `agent` holds an LLM reply the human has not yet seen in the TUI:
-/// a non-auto assistant message at or past the thread's
-/// [`last_read_count`](FocusState::last_read_count). A thread with no entry
-/// was never tracked and counts as read, so old threads don't all light up.
+/// a non-auto assistant message at or past the agent's
+/// [`last_read_count`](FocusState::last_read_count). An agent with no entry
+/// was never tracked and counts as read, so old agents don't all light up.
 fn has_unread_reply(
     agent: &cp_mod_agents::types::Agent,
     last_read: &std::collections::BTreeMap<String, usize>,
@@ -181,7 +183,7 @@ fn has_unread_reply(
         .is_some_and(|tail| tail.iter().any(|m| !m.auto && matches!(m.author, AgentAuthor::Assistant)))
 }
 
-/// Leading 2-col slot of a thread row, mirroring the footer:
+/// Leading 2-col slot of an agent row, mirroring the footer:
 /// working → the footer's square spinner; idle AND `MyTurn` → ⚠ (the LLM owes
 /// a turn but is doing nothing, a stall the human should notice); unread LLM
 /// reply → ◆ (cleared once the row has stayed selected 2s, see
@@ -198,7 +200,7 @@ fn leading_slot(lb: &ListBuild<'_>, agent: &cp_mod_agents::types::Agent) -> S {
     }
 }
 
-/// Worktree folder name of a thread, plus its branch's open PR (if any).
+/// Worktree folder name of an agent, plus its branch's open PR (if any).
 struct WorktreeLine {
     /// Worktree folder name.
     name: String,
@@ -206,7 +208,7 @@ struct WorktreeLine {
     badge: Option<cp_mod_github::pr_badge::Badge>,
 }
 
-/// The thread's [`WorktreeLine`]; `None` at the project root.
+/// The agent's [`WorktreeLine`]; `None` at the project root.
 fn worktree_line(state: &State, agent_id: &str) -> Option<WorktreeLine> {
     let dir = state.agent_store.get(agent_id)?.workdir.as_deref()?;
     let name = dir.file_name()?.to_string_lossy().into_owned();
@@ -216,7 +218,7 @@ fn worktree_line(state: &State, agent_id: &str) -> Option<WorktreeLine> {
 }
 
 /// Spans of the muted `⎇ <worktree> #123 ●` line; the `●` is the same dot as
-/// the thread rows, coloured by state (blue conflicts, red CI failing, yellow CI running, green).
+/// the agent rows, coloured by state (blue conflicts, red CI failing, yellow CI running, green).
 fn worktree_spans(wt: &WorktreeLine, width: u16) -> Vec<S> {
     use cp_mod_github::pr_badge::CheckColor;
     let label = truncate_str(&wt.name, width.saturating_sub(8).into());
@@ -235,8 +237,8 @@ fn worktree_spans(wt: &WorktreeLine, width: u16) -> Vec<S> {
     spans
 }
 
-/// Push one thread's entry (status-colored circle + name), plus a muted
-/// `⎇ <worktree>` line below when the thread works in a git worktree,
+/// Push one agent's entry (status-colored circle + name), plus a muted
+/// `⎇ <worktree>` line below when the agent works in a git worktree,
 /// recording its selected line range.
 fn push_agent_entry(
     lb: &mut ListBuild<'_>,
@@ -246,12 +248,21 @@ fn push_agent_entry(
 ) {
     let leading = leading_slot(lb, agent);
     let (cr, cg, cb) = agent_circle_rgb(agent);
-    let name = truncate_str(&agent.name, lb.inner_width.saturating_sub(6).into());
+    // Sub-agents: one column of indent per depth level (tree order comes from
+    // `visible_indices`).
+    let depth = lb.depth_of.get(&agent.id).copied().unwrap_or(0);
+    let room = usize::from(lb.inner_width.saturating_sub(6)).saturating_sub(depth);
+    let name = truncate_str(&agent.name, room);
 
     if is_selected {
         lb.sel.start = Some(lb.blocks.len());
     }
-    lb.blocks.push(IrBlock::Line(vec![leading, S::rgb("\u{25cf} ".to_owned(), cr, cg, cb), S::new(name)]));
+    lb.blocks.push(IrBlock::Line(vec![
+        leading,
+        S::new(" ".repeat(depth)),
+        S::rgb("\u{25cf} ".to_owned(), cr, cg, cb),
+        S::new(name),
+    ]));
     if let Some(wt) = worktree {
         lb.blocks.push(IrBlock::Line(worktree_spans(wt, lb.inner_width)));
     }
@@ -261,11 +272,11 @@ fn push_agent_entry(
 }
 
 /// Push the inline archive/restore confirm bubble, rendered on its own line
-/// directly below the selected thread's row.
+/// directly below the selected agent's row.
 ///
-/// Leads with a down-right arrow (`\u{21B3}`) hanging off the thread it
+/// Leads with a down-right arrow (`\u{21B3}`) hanging off the agent it
 /// concerns, and is fully red ([`Semantic::Error`]) so the pending confirm
-/// reads as a bubble attached to that specific thread — not the easy-to-miss
+/// reads as a bubble attached to that specific agent — not the easy-to-miss
 /// footer hint it replaces.
 fn push_archive_confirm_bubble(blocks: &mut Vec<IrBlock>, viewing_archived: bool) {
     let verb = if viewing_archived { "restore" } else { "archive" };
@@ -325,17 +336,17 @@ fn apply_selection_highlight(lines: &mut [ratatui::text::Line<'static>], sel: &S
     }
 }
 
-/// Render the left-pane thread list via IR blocks.
+/// Render the left-pane agent list via IR blocks.
 ///
 /// Layout chrome (right border) is direct ratatui. All visible content
-/// (thread entries, indicators, help hints) goes through IR → `blocks_to_lines()`.
+/// (agent entries, indicators, help hints) goes through IR → `blocks_to_lines()`.
 fn render_agent_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let ts = AgentsState::get(state);
     let focus = FocusState::get(state);
     let mirror = FleetExecMirror::get(state);
     let viewing_archived = focus.viewing_archived;
     let visible = ts.visible_indices(viewing_archived);
-    let show_new = !viewing_archived; // virtual "+ New Thread" only in the active view
+    let show_new = !viewing_archived; // virtual "+ New Agent" only in the active view
     let total_entries = visible.len().saturating_add(usize::from(show_new));
     let selected = focus.selected_agent_idx.min(total_entries.saturating_sub(1));
     // The arm is only "live" within the 2-second confirm window; a lapsed arm
@@ -362,6 +373,10 @@ fn render_agent_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
         inner_width: inner.width,
         mirror,
         last_read: &focus.last_read_count,
+        depth_of: cp_mod_agents::types::tree::preorder(&ts.agents, &visible)
+            .into_iter()
+            .filter_map(|(i, d)| Some((ts.agents.get(i)?.id.clone(), d)))
+            .collect(),
     };
     if show_new {
         push_new_agent_entry(&mut lb, state, on_virtual);
@@ -381,7 +396,7 @@ fn render_agent_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
 
     // Empty-state hint when the archived list has nothing in it.
     if viewing_archived && visible.is_empty() {
-        ir_blocks.push(IrBlock::Line(vec![S::muted("  (no archived threads)".to_owned())]));
+        ir_blocks.push(IrBlock::Line(vec![S::muted("  (no archived agents)".to_owned())]));
     }
 
     // Pad to push help hints to the bottom
@@ -403,15 +418,15 @@ fn render_agent_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
     frame.render_widget(paragraph, inner);
 }
 
-/// Render the right pane when the virtual "New Thread" entry is selected.
+/// Render the right pane when the virtual "New Agent" entry is selected.
 ///
-/// Shows a prompt inviting the user to type a thread name in the input area.
+/// Shows a prompt inviting the user to type an agent name in the input area.
 /// Border + title are layout chrome; content goes through IR pipeline.
 fn render_new_agent_prompt(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let border = RBlock::default()
         .borders(Borders::ALL)
         .border_style(ir::semantic_to_style(Semantic::Border))
-        .title(ratatui::text::Span::styled(" New Thread ", ir::semantic_to_style(Semantic::Accent)))
+        .title(ratatui::text::Span::styled(" New Agent ", ir::semantic_to_style(Semantic::Accent)))
         .style(Style::default().bg(theme::bg_base()));
 
     let inner = border.inner(area);
@@ -422,7 +437,7 @@ fn render_new_agent_prompt(frame: &mut Frame<'_>, state: &State, area: Rect) {
 
     let ir_blocks = vec![
         IrBlock::Empty,
-        IrBlock::Line(vec![S::muted("Type a name for the new thread below,".to_owned())]),
+        IrBlock::Line(vec![S::muted("Type a name for the new agent below,".to_owned())]),
         IrBlock::Line(vec![S::muted("then press Enter to create it.".to_owned())]),
         IrBlock::Empty,
         IrBlock::Line(vec![S::accent("  \u{279c} ".to_owned()), S::new(input_preview)]),
