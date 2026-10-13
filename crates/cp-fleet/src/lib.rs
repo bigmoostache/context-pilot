@@ -28,7 +28,10 @@ use serde::{Deserialize, Serialize};
 /// concurrency (LLM streams in flight, cost/rate-limit pressure), demoted from
 /// an entity to a number. An agent beyond this bound is `Runnable` but waits for
 /// a free slot (see [`promote`]).
-pub const K: usize = 2;
+///
+/// Set deliberately high (user decision T864): a dozen agents should all be
+/// able to continue on their own without the human focusing each one.
+pub const K: usize = 50;
 
 /// Where an agent sits in the cooperative loop.
 ///
@@ -281,10 +284,12 @@ mod tests {
     #[test]
     fn promote_fills_free_slots_oldest_first() {
         let mut reg = FleetRegistry::new();
-        // One active agent → one free slot (K=2).
-        let mut active = Entry::new(Role::Agent);
-        active.exec_state = AgentExecState::Streaming;
-        reg.insert("A".to_owned(), active);
+        // K-1 active agents → exactly one free slot.
+        for i in 1..K {
+            let mut active = Entry::new(Role::Agent);
+            active.exec_state = AgentExecState::Streaming;
+            reg.insert(format!("A{i}"), active);
+        }
         // Two waiting runnable agents with different wait times.
         let mut w_new = Entry::new(Role::Agent);
         w_new.exec_state = AgentExecState::Runnable;
@@ -302,15 +307,15 @@ mod tests {
     #[test]
     fn promote_none_when_full() {
         let mut reg = FleetRegistry::new();
-        for id in ["A", "B"] {
+        for i in 0..K {
             let mut e = Entry::new(Role::Agent);
             e.exec_state = AgentExecState::Streaming;
-            reg.insert(id.to_owned(), e);
+            reg.insert(format!("A{i}"), e);
         }
         let mut waiting = Entry::new(Role::Agent);
         waiting.exec_state = AgentExecState::Runnable;
         waiting.waiting_since_ms = Some(1);
         reg.insert("W".to_owned(), waiting);
-        assert!(promote(&reg).is_empty(), "no free slots at K=2");
+        assert!(promote(&reg).is_empty(), "no free slots when K are active");
     }
 }
