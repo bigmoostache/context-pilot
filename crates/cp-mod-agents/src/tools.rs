@@ -12,6 +12,9 @@ use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::types::roster::yaml_escape;
+use cp_groups::social::{self, Next};
+use cp_groups::types::GroupsState;
+
 use crate::types::{AgentAuthor, AgentMessage, AgentStatus, AgentsState, msgs, turn};
 
 /// Truncate `s` to at most `max` bytes on a char boundary (no ellipsis).
@@ -28,52 +31,64 @@ fn preview_ellipsis(s: &str, max: usize) -> String {
     }
 }
 
-/// Push `msg` onto agent `tid`, flipping status when the turn is handed back.
-/// Returns whether an archived agent was resurrected by this send.
-fn push_send_message(state: &mut State, tid: &str, msg: AgentMessage, still_my_turn: bool) -> bool {
-    let ts = AgentsState::get_mut(state);
-    let Some(agent) = ts.agents.iter_mut().find(|t| t.id == tid) else {
-        return false;
-    };
-    // Sending to an archived agent resurrects it (matches frontend on user send).
-    let unarchived = agent.archived;
-    if agent.archived {
-        agent.archived = false;
+/// Parse `Send`'s `group_id` + `next` and check them against the group,
+/// without mutating anything. Shared by pre-flight and execution.
+///
+/// # Errors
+///
+/// Missing params, unknown group, bad `next` syntax, or a `next` the sender
+/// may not use in that group (see [`social::validate`]).
+pub(crate) fn resolve_send(tool: &ToolUse, state: &State, sender: &str) -> Result<(String, Next), String> {
+    let gid = tool.input.get("group_id").and_then(serde_json::Value::as_str).unwrap_or_default().trim();
+    if gid.is_empty() {
+        return Err("Send requires group_id (your human group is shown in the Agents panel)".to_owned());
     }
-    if let Some(history) = msgs::messages_mut(state, tid) {
-        history.push(msg);
-    }
-    if !still_my_turn {
-        turn::end(state, tid);
-    }
-    unarchived
+    let raw = tool.input.get("next").and_then(serde_json::Value::as_str).unwrap_or_default();
+    let next = social::parse_next(raw)?;
+    let group = GroupsState::get(state).find(gid).ok_or_else(|| format!("group {gid} not found"))?;
+    social::validate(group, sender, &next)?;
+    Ok((gid.to_owned(), next))
 }
 
-/// Post a message to an agent.
+/// Push `msg` into group `gid` and apply `next` to its social state.
+/// Returns whether the sender, archived, was resurrected (only when writing to
+/// its own human group, matching the frontend's user-send behaviour).
+fn push_to_group(state: &mut State, (tid, gid): (&str, &str), msg: AgentMessage, next: Next) -> Result<bool, String> {
+    let own_human = msgs::human_group_id(AgentsState::get(state), tid) == Some(gid);
+    let group = GroupsState::get_mut(state).find_mut(gid).ok_or_else(|| format!("group {gid} not found"))?;
+    social::apply_send(group, tid, next)?;
+    group.messages.push(msg);
+    let agent = AgentsState::get_mut(state).agents.iter_mut().find(|t| t.id == tid);
+    Ok(agent.is_some_and(|a| own_human && std::mem::take(&mut a.archived)))
+}
+
+/// Post a message into a group the executing agent belongs to.
 ///
-/// Creates a `AgentMessage(author=Assistant)` and appends it to the agent.
-/// With `still_my_turn = false` the agent flips to `TheirTurn`; focus stays on
-/// the agent either way (T683).
+/// Appends an `Assistant` message and applies `next` (who acts next) to the
+/// group's social state. Focus never moves (T683).
 pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     /// Maximum markdown content length (bytes) to prevent state/disk bloat.
     const MAX_CONTENT_BYTES: usize = 100_000;
 
-    // Always the caller's own thread: Send has no target parameter.
     let owned_tid = executing_agent_id_or_empty(state);
     let tid = owned_tid.as_str();
+    let (gid, next) = match resolve_send(tool, state, tid) {
+        Ok(v) => v,
+        Err(e) => return ToolResult::new(tool.id.clone(), e, true),
+    };
+    let next_raw = tool.input.get("next").and_then(serde_json::Value::as_str).unwrap_or_default().trim().to_owned();
 
     let markdown =
         tool.input.get("markdown").and_then(serde_json::Value::as_str).map(|s| clamp_bytes(s, MAX_CONTENT_BYTES));
 
     let now = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis().to_u64());
-
-    // Default true: agent keeps its turn (progress update). Set false to
-    // hand the agent back to the user (delivery complete).
-    let still_my_turn = tool.input.get("still_my_turn").and_then(serde_json::Value::as_bool).unwrap_or(true);
+    let own_human = msgs::human_group_id(AgentsState::get(state), tid) == Some(gid.as_str());
 
     let msg = AgentMessage {
         author: AgentAuthor::Assistant,
-        author_agent_id: None,
+        // Human groups keep the legacy shape (author implied); elsewhere the
+        // reader must know which agent spoke.
+        author_agent_id: (!own_human).then(|| tid.to_owned()),
         content: markdown,
         // Attachments ride inline ```file-upload``` blocks in the markdown.
         file_path: None,
@@ -83,19 +98,15 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
         has_been_pushed: false,
     };
 
-    // Build result message before mutating — need agent name.
-    let (agent_name, msg_preview) = {
-        let ts = AgentsState::get(state);
-        let agent = ts.agents.iter().find(|t| t.id == tid);
-        let name = agent.map_or_else(|| tid.to_owned(), |t| t.name.clone());
-        let preview = msg.content.as_deref().unwrap_or_default();
-        (name, preview_ellipsis(preview, 80))
-    };
+    let group_name = GroupsState::get(state).find(&gid).map(|g| g.name.clone()).unwrap_or_default();
+    let msg_preview = preview_ellipsis(msg.content.as_deref().unwrap_or_default(), 80);
 
-    // Mutate agent state: push message + conditionally flip status.
     // `unarchived` records whether this Send resurrected an archived agent,
     // surfaced in the result so the AI knows the agent is live again (T353).
-    let unarchived = push_send_message(state, tid, msg, still_my_turn);
+    let unarchived = match push_to_group(state, (tid, &gid), msg, next) {
+        Ok(u) => u,
+        Err(e) => return ToolResult::new(tool.id.clone(), e, true),
+    };
 
     // Refresh the static Agents panel so the just-sent message appears in the
     // LLM-facing panel content without needing a follow-up `Read`. Guarded on
@@ -109,16 +120,13 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // NOTE: `Send` deliberately does NOT move `focused_agent_id`. That pointer
     // is the HUMAN's on-screen view selection (UI-global, shared across the
-    // fleet, never per-agent). A background agent finishing its turn with
-    // `still_my_turn=false` would otherwise yank the human's view onto itself —
-    // the "intempestive agent switch" bug. The focused agent is already the
-    // focus, so for the on-screen agent this is a no-op; for a background
-    // agent it must not steal focus. Focus changes only on explicit human nav.
-    let suffix = if still_my_turn { " (still your turn)" } else { "" };
+    // fleet, never per-agent). A background agent handing its turn back would
+    // otherwise yank the human's view onto itself — the "intempestive agent
+    // switch" bug. Focus changes only on explicit human nav.
     let unarchived_note = if unarchived { " [agent was archived \u{2014} automatically unarchived]" } else { "" };
     let mut result = ToolResult::new(
         tool.id.clone(),
-        format!("Sent to {tid} \"{agent_name}\": {msg_preview}{suffix}{unarchived_note}"),
+        format!("Sent to {gid} \"{group_name}\" (next: {next_raw}): {msg_preview}{unarchived_note}"),
         false,
     );
     result.preserves_tempo = true;

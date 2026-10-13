@@ -1,12 +1,20 @@
 tools:
   Send:
     description: |
-      Posts a message to your own conversation (you are an agent). The AI uses
-      this to respond to incoming messages.
-      To attach files, embed ```file-upload``` blocks in markdown (see below).
-      By default the agent stays MY_TURN (progress update); pass
-      still_my_turn=false to hand it back to the user (THEIR_TURN). Focus stays
-      on the agent either way — only a Read of another agent moves it.
+      Posts a message into a group you belong to (you are an agent). Your
+      conversation with the user is your human group (human_group_id in the
+      Agents panel). To attach files, embed ```file-upload``` blocks in markdown
+      (see below).
+
+      `next` says who acts next in that group:
+        STILL_MY_TURN               you keep working (progress update)
+        GIVE_TALKING_STICK_TO <id>  hand the turn to one member; HUMAN hands
+                                    it back to the user (group owner only)
+        GATHER <id>, <id>...        wait for every listed member, then you resume
+        DISPATCH <id>, <id>...      the first idle listed member takes it
+        OWNER_DONE                  owner closes the exchange (not in human groups)
+      Sending replaces your own pending turn in that group with what `next` says.
+      Focus never moves.
 
       WRITING STYLE (read before composing any reply):
       Je passe mes journées à lire des réponses d'agents LLM, verbeuses, lourdes et illisibles.
@@ -181,7 +189,9 @@ tools:
     parameters:
       markdown: "Markdown text content for the message (may embed ```file-upload``` and ```form``` blocks)"
 
-      still_my_turn: "If true (default), the agent stays yours after sending — use for progress updates. Set false when you're done and want to hand the agent back to the user (flips to THEIR_TURN)."
+      group_id: "Group to post into (G<n>). Your human group for the user."
+
+      next: "Who acts next: STILL_MY_TURN | GIVE_TALKING_STICK_TO <id> | GATHER <id>, <id>... | DISPATCH <id>, <id>... | OWNER_DONE. Use GIVE_TALKING_STICK_TO HUMAN when you are done and the user should answer."
 
   Read:
     description: |

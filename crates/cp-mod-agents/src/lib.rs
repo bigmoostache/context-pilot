@@ -186,7 +186,8 @@ impl Module for AgentsModule {
                 .category("Agents")
                 .reverie_allowed(false)
                 .param("markdown", ParamType::String, true)
-                .param("still_my_turn", ParamType::Boolean, false)
+                .param("group_id", ParamType::String, true)
+                .param("next", ParamType::String, true)
                 .build(),
             ToolDefinition::from_yaml("Read", t)
                 .short_desc("Refresh the Agents panel")
@@ -287,19 +288,21 @@ impl Module for AgentsModule {
     }
 }
 
-/// Pre-flight for `Send`: the calling agent must exist, at least one content
-/// param, and any agent-authored ` ```form ` block must be well-formed (design
-/// doc §7).
+/// Pre-flight for `Send`: the calling agent must exist, `group_id` + `next`
+/// must be legal for it (see [`tools::resolve_send`]), the markdown non-empty,
+/// and any agent-authored ` ```form ` block well-formed (design doc §7).
 ///
-/// `Send` always targets the caller's own (executing) agent — there is no
-/// target parameter, so an agent can never post into another agent's voice.
-/// Sending to a `THEIR_TURN` agent is allowed — the AI may post follow-ups
-/// without waiting; status simply stays `THEIR_TURN`.
+/// The sender is always the executing agent, so an agent can never post in
+/// another agent's voice.
 fn preflight_send(tool: &ToolUse, state: &State, pf: &mut Verdict) {
     let tid = tools::executing_agent_id_or_empty(state);
-    if !AgentsState::get(state).agents.iter().any(|t| t.id == tid) {
-        pf.errors.push(format!("Send has no owning agent (executing agent '{tid}' not found)"));
-    }
+    let known = AgentsState::get(state).agents.iter().any(|t| t.id == tid);
+    let resolved = if known {
+        tools::resolve_send(tool, state, &tid).err()
+    } else {
+        Some(format!("Send has no owning agent (executing agent '{tid}' not found)"))
+    };
+    pf.errors.extend(resolved);
     let markdown = tool.input.get("markdown").and_then(|v| v.as_str());
     if markdown.is_none_or(str::is_empty) {
         pf.errors.push("Send requires a non-empty markdown".to_owned());
