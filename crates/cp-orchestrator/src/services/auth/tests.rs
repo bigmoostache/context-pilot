@@ -259,7 +259,7 @@ fn grant_and_check_access() {
     // Grant agent-user.
     store
         .grant_access(AccessGrant {
-            agent_id: "agent-1",
+            fleet_id: "agent-1",
             user_id: &user.id,
             role: FleetRole::FleetUser,
             granted_by: None,
@@ -267,11 +267,11 @@ fn grant_and_check_access() {
         .unwrap_or_else(|err| panic!("grant failed: {err}"));
     let granted = store.check_access("agent-1", &user.id).unwrap_or_else(|err| panic!("check failed: {err}"));
     assert_eq!(granted, Some(FleetRole::FleetUser));
-    assert!(!store.is_agent_admin("agent-1", &user.id).unwrap_or(true));
+    assert!(!store.is_fleet_admin("agent-1", &user.id).unwrap_or(true));
 }
 
 #[test]
-fn update_agent_role() {
+fn update_fleet_role() {
     let store = AuthStore::open(Path::new(":memory:")).unwrap_or_else(|err| {
         panic!("open failed: {err}");
     });
@@ -280,17 +280,17 @@ fn update_agent_role() {
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     store
         .grant_access(AccessGrant {
-            agent_id: "agent-1",
+            fleet_id: "agent-1",
             user_id: &user.id,
             role: FleetRole::FleetUser,
             granted_by: None,
         })
         .unwrap_or_else(|err| panic!("grant failed: {err}"));
     // Promote to agent-admin.
-    assert!(store.update_agent_role("agent-1", &user.id, FleetRole::FleetAdmin).unwrap_or(false));
-    assert!(store.is_agent_admin("agent-1", &user.id).unwrap_or(false));
+    assert!(store.update_fleet_role("agent-1", &user.id, FleetRole::FleetAdmin).unwrap_or(false));
+    assert!(store.is_fleet_admin("agent-1", &user.id).unwrap_or(false));
     // Update non-existent entry returns false.
-    assert!(!store.update_agent_role("agent-99", &user.id, FleetRole::FleetAdmin).unwrap_or(true));
+    assert!(!store.update_fleet_role("agent-99", &user.id, FleetRole::FleetAdmin).unwrap_or(true));
 }
 
 #[test]
@@ -308,7 +308,7 @@ fn revoke_access() {
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     store
         .grant_access(AccessGrant {
-            agent_id: "agent-1",
+            fleet_id: "agent-1",
             user_id: &user.id,
             role: FleetRole::FleetUser,
             granted_by: None,
@@ -336,7 +336,7 @@ fn list_agent_users_and_user_agents() {
         .expect("create bob");
     store
         .grant_access(AccessGrant {
-            agent_id: "agent-1",
+            fleet_id: "agent-1",
             user_id: &alice.id,
             role: FleetRole::FleetAdmin,
             granted_by: None,
@@ -344,7 +344,7 @@ fn list_agent_users_and_user_agents() {
         .expect("grant alice a1");
     store
         .grant_access(AccessGrant {
-            agent_id: "agent-1",
+            fleet_id: "agent-1",
             user_id: &bob.id,
             role: FleetRole::FleetUser,
             granted_by: Some(&alice.id),
@@ -352,14 +352,14 @@ fn list_agent_users_and_user_agents() {
         .expect("grant bob a1");
     store
         .grant_access(AccessGrant {
-            agent_id: "agent-2",
+            fleet_id: "agent-2",
             user_id: &alice.id,
             role: FleetRole::FleetUser,
             granted_by: None,
         })
         .expect("grant alice a2");
     // List users on agent-1.
-    let users = store.list_agent_users("agent-1").expect("list agent users");
+    let users = store.list_fleet_users("agent-1").expect("list agent users");
     assert_eq!(users.len(), 2, "expected exactly two ACL entries");
     let first = users.first().expect("first ACL entry");
     let second = users.get(1).expect("second ACL entry");
@@ -374,7 +374,7 @@ fn list_agent_users_and_user_agents() {
         "second ACL entry (Bob, user, granted by Alice)"
     );
     // List agents for alice.
-    let agents = store.list_user_agents(&alice.id).expect("list user agents");
+    let agents = store.list_user_fleets(&alice.id).expect("list user agents");
     assert_eq!(agents, vec!["agent-1", "agent-2"]);
 }
 
@@ -393,14 +393,14 @@ fn delete_user_cascades_acl() {
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     store
         .grant_access(AccessGrant {
-            agent_id: "agent-1",
+            fleet_id: "agent-1",
             user_id: &user.id,
             role: FleetRole::FleetUser,
             granted_by: None,
         })
         .unwrap_or_else(|err| panic!("grant failed: {err}"));
     assert!(store.delete_user(&user.id).unwrap_or(false));
-    let users = store.list_agent_users("agent-1").unwrap_or_else(|err| panic!("list failed: {err}"));
+    let users = store.list_fleet_users("agent-1").unwrap_or_else(|err| panic!("list failed: {err}"));
     assert!(users.is_empty(), "ACL entries must cascade on user delete");
 }
 
@@ -414,7 +414,7 @@ fn grant_overwrites_previous() {
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     store
         .grant_access(AccessGrant {
-            agent_id: "agent-1",
+            fleet_id: "agent-1",
             user_id: &user.id,
             role: FleetRole::FleetUser,
             granted_by: None,
@@ -423,7 +423,7 @@ fn grant_overwrites_previous() {
     // Re-grant with different role overwrites.
     store
         .grant_access(AccessGrant {
-            agent_id: "agent-1",
+            fleet_id: "agent-1",
             user_id: &user.id,
             role: FleetRole::FleetAdmin,
             granted_by: None,
@@ -431,6 +431,6 @@ fn grant_overwrites_previous() {
         .unwrap_or_else(|err| panic!("re-grant failed: {err}"));
     assert_eq!(store.check_access("agent-1", &user.id).unwrap_or(None), Some(FleetRole::FleetAdmin),);
     // Only one entry, not two.
-    let users = store.list_agent_users("agent-1").unwrap_or_else(|err| panic!("list failed: {err}"));
+    let users = store.list_fleet_users("agent-1").unwrap_or_else(|err| panic!("list failed: {err}"));
     assert_eq!(users.len(), 1);
 }

@@ -69,7 +69,7 @@ fn roster_notes_value(entry: &RosterEntry) -> serde_json::Value {
 /// up-to-the-millisecond source — design doc I5); otherwise synthesise a
 /// log-less `ThreadDetail` so a thread created since the last disk flush still
 /// appears immediately.
-pub(crate) fn overlay_roster(details: &mut Vec<serde_json::Value>, roster: &[RosterEntry], agent_id: &str) {
+pub(crate) fn overlay_roster(details: &mut Vec<serde_json::Value>, roster: &[RosterEntry], fleet_id: &str) {
     for entry in roster {
         let existing = details
             .iter_mut()
@@ -95,18 +95,18 @@ pub(crate) fn overlay_roster(details: &mut Vec<serde_json::Value>, roster: &[Ros
                     drop(obj.insert("notes".to_owned(), roster_notes_value(entry)));
                 }
             }
-            None => details.push(synthesize_from_roster(entry, agent_id)),
+            None => details.push(synthesize_from_roster(entry, fleet_id)),
         }
     }
 }
 
 /// Build a `ThreadDetail` from a roster entry alone — no message bodies yet.
-fn synthesize_from_roster(entry: &RosterEntry, agent_id: &str) -> serde_json::Value {
+fn synthesize_from_roster(entry: &RosterEntry, fleet_id: &str) -> serde_json::Value {
     serde_json::json!({
         "id": entry.thread_id,
         "name": entry.name,
         "status": roster_status_value(entry.status),
-        "agentId": agent_id,
+        "agentId": fleet_id,
         "lastMessage": "",
         "lastActivity": entry.last_activity_ms,
         "messageCount": entry.msg_count,
@@ -233,7 +233,7 @@ fn roster_status_value(status: ThreadTurn) -> serde_json::Value {
 /// shape: `snake_case` → camelCase, computed fields (`messageCount`, `unread`,
 /// `lastMessage`, `lastActivity`), `origin.thread_id` flattened to
 /// `branchedFrom` (null for a non-branched thread), and messages mapped to `log`.
-pub(crate) fn reshape_thread(raw: &serde_json::Value, agent_id: &str) -> serde_json::Value {
+pub(crate) fn reshape_thread(raw: &serde_json::Value, fleet_id: &str) -> serde_json::Value {
     let messages = raw.get("messages").and_then(serde_json::Value::as_array);
     let msg_count = messages.map_or(0, Vec::len);
     let unread = messages.map_or(0, |msgs| {
@@ -266,7 +266,7 @@ pub(crate) fn reshape_thread(raw: &serde_json::Value, agent_id: &str) -> serde_j
         "id": raw.get("id").and_then(serde_json::Value::as_str).unwrap_or(""),
         "name": raw.get("name").and_then(serde_json::Value::as_str).unwrap_or(""),
         "status": status_str,
-        "agentId": agent_id,
+        "agentId": fleet_id,
         "lastMessage": last_msg,
         "lastActivity": last_activity,
         "messageCount": msg_count,

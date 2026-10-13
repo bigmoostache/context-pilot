@@ -23,8 +23,10 @@ pub struct Frame {
     /// Wire-schema revision for this struct.
     pub schema_version: u32,
 
-    /// Originating agent.
-    pub agent_id: String,
+    /// Originating fleet (one cpilot process). Wire key stays `agent_id`
+    /// until the protocol bump (T860 phase A4).
+    #[serde(rename = "agent_id")]
+    pub fleet_id: String,
 
     /// Worker within the agent (future multi-worker; single today).
     pub worker_id: String,
@@ -97,7 +99,7 @@ mod tests {
     fn stream_frame_round_trip() {
         let frame = Frame {
             schema_version: 1,
-            agent_id: "agent-a".into(),
+            fleet_id: "agent-a".into(),
             worker_id: "w0".into(),
             thread_id: "T1".into(),
             message_id: "msg-42".into(),
@@ -113,7 +115,7 @@ mod tests {
     fn phase_hint_round_trip() {
         let frame = Frame {
             schema_version: 1,
-            agent_id: "a".into(),
+            fleet_id: "a".into(),
             worker_id: "w".into(),
             thread_id: "T".into(),
             message_id: "m".into(),

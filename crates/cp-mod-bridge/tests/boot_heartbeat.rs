@@ -42,7 +42,7 @@ use std::time::SystemTime;
 use cp_mod_bridge::boot::Boot;
 use cp_wire::PROTOCOL_VERSION;
 use cp_wire::heartbeat::{DEFAULT_MAX_AGE, HEARTBEAT_LEN, Heartbeat};
-use cp_wire::types::registry::{FleetStatus, Entry};
+use cp_wire::types::registry::{Entry, FleetStatus};
 use tempfile::TempDir;
 
 // The `#[test]` fns live inside this `#[cfg(test)]` module so

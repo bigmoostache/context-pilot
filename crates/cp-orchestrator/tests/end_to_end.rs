@@ -76,7 +76,7 @@ use cp_orchestrator::transport::serve_bound;
 
 use cp_wire::types::ContentHash;
 use cp_wire::types::oplog::OpEntryKind;
-use cp_wire::types::registry::{FleetStatus, Entry};
+use cp_wire::types::registry::{Entry, FleetStatus};
 
 use tempfile::tempdir;
 

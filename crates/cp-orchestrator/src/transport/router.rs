@@ -169,13 +169,13 @@ pub(super) fn route_rest(method: &Method, segments: &[&str], ctx: RouteCtx<'_>) 
         (&Method::Post, &["api", "fleet", id, "fs", "rename"]) => inspect::finder::fs_rename(state, id, query),
         (&Method::Post, &["api", "fleet", id, "fs", "move"]) => inspect::finder::fs_move(state, id, body_bytes),
         (&Method::Post, &["api", "fleet", id, "fs", "trash"]) => inspect::finder::fs_trash(state, id, body_bytes),
-        (&Method::Post, &["api", "fleet", id, "restart"]) => rest::restart_agent(state, id),
-        (&Method::Post, &["api", "fleet", id, "retire"]) => rest::retire_agent(state, id),
-        (&Method::Post, &["api", "fleet", id, "unretire"]) => rest::unretire_agent(state, id),
+        (&Method::Post, &["api", "fleet", id, "restart"]) => rest::restart_fleet(state, id),
+        (&Method::Post, &["api", "fleet", id, "retire"]) => rest::retire_fleet(state, id),
+        (&Method::Post, &["api", "fleet", id, "unretire"]) => rest::unretire_fleet(state, id),
         (&Method::Post, &["api", "fleet", id, "rename"]) => rest::rename_agent(state, id, body_bytes),
         (&Method::Post, &["api", "fleet", id, "avatar"]) => rest::upload_avatar(state, id, body_bytes),
         (&Method::Delete, &["api", "fleet", id, "avatar"]) => rest::delete_avatar(state, id),
-        (&Method::Post, &["api", "fleets", "create"]) => rest::create_agent(state, body_bytes, auth_user),
+        (&Method::Post, &["api", "fleets", "create"]) => rest::create_fleet(state, body_bytes, auth_user),
         (&Method::Post, &["api", "ticket"]) => rest::mint_ticket(state, auth_user),
 
         // ── Release + update management — IT surface (can_manage_it) ──

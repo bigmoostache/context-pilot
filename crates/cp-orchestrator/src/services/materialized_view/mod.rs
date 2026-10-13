@@ -217,7 +217,7 @@ impl FleetView {
 /// [`apply`](MaterializedView::apply).
 #[derive(Debug, Default)]
 pub struct MaterializedView {
-    /// Per-agent projected state, keyed by `agent_id`.
+    /// Per-agent projected state, keyed by `fleet_id`.
     agents: HashMap<String, FleetView>,
 }
 
@@ -228,34 +228,34 @@ impl MaterializedView {
         Self::default()
     }
 
-    /// Fold one entry into `agent_id`'s view, creating it on first sight.
-    pub fn apply(&mut self, agent_id: &str, entry: &OpEntry) {
-        self.agents.entry(agent_id.to_owned()).or_default().apply(entry);
+    /// Fold one entry into `fleet_id`'s view, creating it on first sight.
+    pub fn apply(&mut self, fleet_id: &str, entry: &OpEntry) {
+        self.agents.entry(fleet_id.to_owned()).or_default().apply(entry);
     }
 
     /// Fold a batch of entries (as returned by one
-    /// [`Tailer::poll`](crate::tailer::Tailer::poll)) into `agent_id`'s view.
-    pub fn apply_batch(&mut self, agent_id: &str, entries: &[OpEntry]) {
+    /// [`Tailer::poll`](crate::tailer::Tailer::poll)) into `fleet_id`'s view.
+    pub fn apply_batch(&mut self, fleet_id: &str, entries: &[OpEntry]) {
         if entries.is_empty() {
             return;
         }
-        let view = self.agents.entry(agent_id.to_owned()).or_default();
+        let view = self.agents.entry(fleet_id.to_owned()).or_default();
         for entry in entries {
             view.apply(entry);
         }
     }
 
-    /// The current projection for `agent_id`, or `None` if unknown.
+    /// The current projection for `fleet_id`, or `None` if unknown.
     #[must_use]
-    pub fn get(&self, agent_id: &str) -> Option<&FleetView> {
-        self.agents.get(agent_id)
+    pub fn get(&self, fleet_id: &str) -> Option<&FleetView> {
+        self.agents.get(fleet_id)
     }
 
     /// Drop an agent's projection (called when discovery reports it gone).
     ///
     /// Returns the removed view, if any.
-    pub fn remove(&mut self, agent_id: &str) -> Option<FleetView> {
-        self.agents.remove(agent_id)
+    pub fn remove(&mut self, fleet_id: &str) -> Option<FleetView> {
+        self.agents.remove(fleet_id)
     }
 
     /// Number of agents currently projected.
@@ -271,7 +271,7 @@ impl MaterializedView {
     }
 
     /// Iterator over the projected agent ids.
-    pub fn agent_ids(&self) -> impl Iterator<Item = &str> {
+    pub fn fleet_ids(&self) -> impl Iterator<Item = &str> {
         self.agents.keys().map(String::as_str)
     }
 }

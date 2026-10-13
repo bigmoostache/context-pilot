@@ -254,7 +254,7 @@ pub(crate) fn delete_release(state: &Mutex<Backend>, tag: &str) -> HttpReply {
 
 /// `POST /api/releases/deploy` — select a release and restart the entire fleet.
 ///
-/// Combines [`select_release`] + a loop of [`restart_agent`](super::restart_agent)
+/// Combines [`select_release`] + a loop of [`restart_fleet`](super::restart_fleet)
 /// into one atomic deploy action. If `tag` is provided, the release is selected
 /// first; otherwise the currently active release is used (agents are just
 /// restarted on the current binary).
@@ -287,20 +287,20 @@ pub(crate) fn deploy_fleet(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     };
 
     // 2. Collect running agent IDs + shared config under one lock.
-    let (agent_ids, agents_dir, binary) = {
+    let (fleet_ids, agents_dir, binary) = {
         let Ok(b) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
         };
-        let ids: Vec<String> = b.view.agent_ids().map(str::to_owned).collect();
+        let ids: Vec<String> = b.view.fleet_ids().map(str::to_owned).collect();
         (ids, b.agents_dir.clone(), b.agent_binary.clone())
     };
 
-    // 3. Restart each agent (same logic as restart_agent, batched).
+    // 3. Restart each agent (same logic as restart_fleet, batched).
     let mut restarted: Vec<serde_json::Value> = Vec::new();
     let mut errors: Vec<String> = Vec::new();
     let agents_dir_str = agents_dir.to_string_lossy().into_owned();
 
-    for id in &agent_ids {
+    for id in &fleet_ids {
         match restart_one(state, id, &agents_dir_str, &binary) {
             Ok(receipt) => restarted.push(receipt),
             Err(msg) => errors.push(msg),

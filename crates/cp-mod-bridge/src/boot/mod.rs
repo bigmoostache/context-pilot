@@ -54,7 +54,7 @@ use cp_wire::PROTOCOL_VERSION;
 use cp_wire::heartbeat::DEFAULT_CADENCE;
 use cp_wire::types::LifecycleState;
 use cp_wire::types::oplog::OpEntryKind;
-use cp_wire::types::registry::{FleetStatus, Entry};
+use cp_wire::types::registry::{Entry, FleetStatus};
 
 use crate::error::{BootResult, Error};
 use crate::heartbeat::Beacon;

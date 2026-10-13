@@ -2,7 +2,7 @@
 //! combining registry records, oplog-projected state, thread inspection, and
 //! git branch info.
 //!
-//! * [`agent_meta`] — one agent's enriched info (`GET /api/fleet/{id}/meta`).
+//! * [`fleet_meta`] — one agent's enriched info (`GET /api/fleet/{id}/meta`).
 //! * [`fleet_meta`] — all known agents as an enriched array
 //!   (`GET /api/fleets/meta`).
 
@@ -19,12 +19,12 @@ use crate::transport::rest::HttpReply;
 /// Combines registry record (name, folder, model), oplog-projected state
 /// (phase, cost), thread inspection (count, any-MY_TURN → "needs-you"), and
 /// `git` branch. Returns a JSON object matching the maquette `Agent` shape.
-pub fn agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
-    let entry = match crate::transport::rest::resolve_entry(state, agent_id) {
+pub fn agent(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
+    let entry = match crate::transport::rest::resolve_entry(state, fleet_id) {
         Ok(e) => e,
         Err(reply) => return reply,
     };
-    let enriched = build_agent_meta(state, agent_id, &entry);
+    let enriched = build_fleet_meta(state, fleet_id, &entry);
     HttpReply::ok(&enriched)
 }
 
@@ -62,7 +62,7 @@ pub fn fleet(state: &Mutex<Backend>, auth_user: Option<&crate::services::auth::t
     let visible: std::collections::HashSet<&str> = visible_ids.iter().map(String::as_str).collect();
 
     let agents: Vec<serde_json::Value> =
-        active.iter().filter(|e| visible.contains(e.id.as_str())).map(|e| build_agent_meta(state, &e.id, e)).collect();
+        active.iter().filter(|e| visible.contains(e.id.as_str())).map(|e| build_fleet_meta(state, &e.id, e)).collect();
     HttpReply::ok(&agents)
 }
 
@@ -120,10 +120,10 @@ pub(crate) fn fleet_retired(
 // ── Helpers ────────────────────────────────────────────────────────────
 
 /// Build the enriched agent JSON for one agent.
-fn build_agent_meta(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> serde_json::Value {
+fn build_fleet_meta(state: &Mutex<Backend>, fleet_id: &str, entry: &Entry) -> serde_json::Value {
     let folder = &entry.folder;
-    let name_override = state.lock().ok().and_then(|b| b.names.get(agent_id).map(str::to_owned));
-    let default_name = std::path::Path::new(folder).file_name().and_then(std::ffi::OsStr::to_str).unwrap_or(agent_id);
+    let name_override = state.lock().ok().and_then(|b| b.names.get(fleet_id).map(str::to_owned));
+    let default_name = std::path::Path::new(folder).file_name().and_then(std::ffi::OsStr::to_str).unwrap_or(fleet_id);
     let name = name_override.as_deref().unwrap_or(default_name);
 
     // Phase + lifecycle + cost + cumulative tokens from the materialized view
@@ -134,8 +134,8 @@ fn build_agent_meta(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> se
     let (phase, lifecycle, cost_usd, input_tokens, output_tokens, context, is_stale) = state.lock().map_or_else(
         |_| (None, None, 0.0f64, 0u64, 0u64, ContextSnapshot::default(), false),
         |b| {
-            let dead = b.liveness.get(agent_id).is_some_and(|l| !l.is_live());
-            b.view.get(agent_id).map_or_else(
+            let dead = b.liveness.get(fleet_id).is_some_and(|l| !l.is_live());
+            b.view.get(fleet_id).map_or_else(
                 || (None, None, 0.0f64, 0u64, 0u64, ContextSnapshot::default(), dead),
                 |v| (v.phase, v.lifecycle, v.cost.cost_usd, v.cost.input_tokens, v.cost.output_tokens, v.context, dead),
             )
@@ -162,10 +162,10 @@ fn build_agent_meta(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> se
 
     let status = derive_status(phase, lifecycle, has_my_turn, is_stale);
     let accent = derive_accent(&status);
-    let has_avatar = state.lock().is_ok_and(|b| b.avatars.has(agent_id));
+    let has_avatar = state.lock().is_ok_and(|b| b.avatars.has(fleet_id));
 
     serde_json::json!({
-        "id": agent_id,
+        "id": fleet_id,
         "name": name,
         "folder": folder,
         "branch": branch,

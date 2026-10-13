@@ -73,7 +73,7 @@ pub(crate) fn run_stream(ctx: &StreamCtx<'_>, last_rev: Option<u64>) {
     // be established, `waiter` is None and the loop degrades to a pure backstop
     // poll at TAIL_REPOLL — correct, just less snappy.
     let waiter = sse::OplogWaiter::new(ctx.oplog_dir).ok();
-    let sub_id = ctx.state.lock().ok().map(|mut b| b.hub.subscribe(ctx.agent_id));
+    let sub_id = ctx.state.lock().ok().map(|mut b| b.hub.subscribe(ctx.fleet_id));
     let mut gap_checked = last_rev.is_none();
     let mut last_keepalive = std::time::Instant::now();
 
@@ -102,7 +102,7 @@ pub(crate) fn run_stream(ctx: &StreamCtx<'_>, last_rev: Option<u64>) {
         // Tier-② state change — the driver loop or a command handler flagged
         // this agent's inspection-plane data as stale. Push an `invalidate`
         // event so connected frontends refetch immediately.
-        let is_dirty = ctx.state.lock().ok().is_some_and(|mut b| b.take_dirty(ctx.agent_id));
+        let is_dirty = ctx.state.lock().ok().is_some_and(|mut b| b.take_dirty(ctx.fleet_id));
         if is_dirty && ctx.sink.send(&sse::Message::invalidate()).is_err() {
             break;
         }
@@ -114,7 +114,7 @@ pub(crate) fn run_stream(ctx: &StreamCtx<'_>, last_rev: Option<u64>) {
         }
         park(waiter.as_ref());
     }
-    cleanup(ctx.state, ctx.agent_id, sub_id);
+    cleanup(ctx.state, ctx.fleet_id, sub_id);
 }
 
 /// Borrowed connection context for one SSE producer run — the four references
@@ -126,7 +126,7 @@ pub(crate) struct StreamCtx<'ctx> {
     /// Shared backend state (stream hub + dirty flags).
     pub state: &'ctx Arc<Mutex<Backend>>,
     /// The agent whose oplog + stream frames this producer tails.
-    pub agent_id: &'ctx str,
+    pub fleet_id: &'ctx str,
     /// That agent's oplog directory.
     pub oplog_dir: &'ctx Path,
 }
@@ -183,7 +183,7 @@ fn send_deltas(ctx: &StreamCtx<'_>, entries: &[OpEntry], last_rev: Option<u64>, 
 
 /// Drain and forward an agent's ephemeral stream frames; `false` on disconnect.
 fn send_frames(ctx: &StreamCtx<'_>, sub: u64) -> bool {
-    let frames = drain_frames(ctx.state, ctx.agent_id, sub);
+    let frames = drain_frames(ctx.state, ctx.fleet_id, sub);
     for frame in &frames {
         let data = serde_json::to_string(frame).unwrap_or_default();
         if ctx.sink.send(&sse::Message::stream(data)).is_err() {
@@ -219,14 +219,14 @@ fn keepalive(ctx: &StreamCtx<'_>, last: &mut std::time::Instant) -> bool {
 }
 
 /// Drain an agent's stream-hub subscriber buffer under a brief lock.
-fn drain_frames(state: &Arc<Mutex<Backend>>, agent_id: &str, sub: u64) -> Vec<Frame> {
-    state.lock().ok().and_then(|mut b| b.hub.drain(agent_id, sub)).unwrap_or_default()
+fn drain_frames(state: &Arc<Mutex<Backend>>, fleet_id: &str, sub: u64) -> Vec<Frame> {
+    state.lock().ok().and_then(|mut b| b.hub.drain(fleet_id, sub)).unwrap_or_default()
 }
 
 /// Release the stream-hub subscriber on producer exit.
-fn cleanup(state: &Arc<Mutex<Backend>>, agent_id: &str, sub_id: Option<u64>) {
+fn cleanup(state: &Arc<Mutex<Backend>>, fleet_id: &str, sub_id: Option<u64>) {
     if let (Ok(mut backend), Some(sub)) = (state.lock(), sub_id) {
-        let _removed = backend.hub.unsubscribe(agent_id, sub);
+        let _removed = backend.hub.unsubscribe(fleet_id, sub);
     }
 }
 

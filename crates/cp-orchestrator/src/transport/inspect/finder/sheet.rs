@@ -18,7 +18,7 @@ use calamine::{Data, Reader as _, open_workbook_auto};
 use crate::transport::Backend;
 use crate::transport::rest::HttpReply;
 
-use super::support::{agent_folder, confined_path, extract_param};
+use super::support::{confined_path, extract_param, fleet_folder};
 
 /// Maximum rows returned per sheet — bounds the response for a tall sheet.
 const MAX_ROWS: usize = 1000;
@@ -41,8 +41,8 @@ const MAX_CSV_BYTES: u64 = 8 * 1024 * 1024;
 /// the agent realm (escape → `403`); a non-file → `404`; an unsupported or
 /// unparseable file → `415`. `truncated` is `true` when any row/column/sheet
 /// cap clipped the data, so the UI can show a "preview clipped" note.
-pub(crate) fn fs_sheet(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
-    let folder = match agent_folder(state, agent_id) {
+pub(crate) fn fs_sheet(state: &Mutex<Backend>, fleet_id: &str, query: &str) -> HttpReply {
+    let folder = match fleet_folder(state, fleet_id) {
         Ok(f) => f,
         Err(reply) => return reply,
     };
@@ -87,8 +87,8 @@ pub(crate) fn fs_sheet(state: &Mutex<Backend>, agent_id: &str, query: &str) -> H
 /// changed, so formatting Univer doesn't model survives (see `univer::save`).
 /// Replies `{ written, path, patched }`; `415` for other formats, `400` for a
 /// malformed or mismatched snapshot, `413` over the preview size cap.
-pub(crate) fn fs_sheet_save(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8]) -> HttpReply {
-    let folder = match agent_folder(state, agent_id) {
+pub(crate) fn fs_sheet_save(state: &Mutex<Backend>, fleet_id: &str, query: &str, body: &[u8]) -> HttpReply {
+    let folder = match fleet_folder(state, fleet_id) {
         Ok(f) => f,
         Err(reply) => return reply,
     };

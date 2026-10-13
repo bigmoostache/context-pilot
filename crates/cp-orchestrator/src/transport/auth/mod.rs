@@ -16,7 +16,7 @@ mod dispatch_rbac;
 mod users;
 
 pub(crate) use acl::{
-    acl_grant, acl_list, acl_revoke, acl_update_role, authorize_agent, extract_agent_id, filter_fleet,
+    acl_grant, acl_list, acl_revoke, acl_update_role, authorize_fleet, extract_fleet_id, filter_fleet,
 };
 pub(crate) use users::{create_user, delete_user, force_logout_user, list_users};
 

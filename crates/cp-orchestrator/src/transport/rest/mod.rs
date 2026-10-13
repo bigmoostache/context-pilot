@@ -51,10 +51,10 @@ pub(crate) use config::settings::{allowed_models, onboarding_completed};
 pub(crate) use config::settings::{get_settings, update_settings};
 pub(crate) use config::update::{APPLY_IN_FLIGHT, update_apply, update_check, update_set_mode, update_status};
 pub(crate) use create::{
-    create_agent, create_command, delete_library_agent, read_library_agent, upsert_library_agent,
+    create_command, create_fleet, delete_library_agent, read_library_agent, upsert_library_agent,
     upsert_library_command,
 };
-pub(crate) use lifecycle::{restart_agent, retire_agent, unretire_agent};
+pub(crate) use lifecycle::{restart_fleet, retire_fleet, unretire_fleet};
 pub(crate) use releases::{
     delete_release, deploy_fleet, download_release, list_releases, releases_break_glass, restart_orchestrator,
     select_release, set_arch,
@@ -129,7 +129,7 @@ pub fn fleet(state: &Mutex<Backend>, auth_user: Option<&crate::services::auth::t
     let Ok(backend) = state.lock() else {
         return HttpReply::error(500, "backend lock poisoned");
     };
-    let all_ids: Vec<String> = backend.view.agent_ids().map(str::to_owned).collect();
+    let all_ids: Vec<String> = backend.view.fleet_ids().map(str::to_owned).collect();
     drop(backend);
 
     // Filter by ACL when auth is enabled (FR-12).
@@ -256,7 +256,7 @@ pub fn rename_agent(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> Http
 ///
 /// Body: raw image bytes (PNG/JPEG/GIF/WebP/SVG). Content type is sniffed from
 /// magic bytes — the `Content-Type` header is not required. Max 2 MiB
-/// ([`MAX_AVATAR_BYTES`](crate::services::agent_meta::MAX_AVATAR_BYTES)).
+/// ([`MAX_AVATAR_BYTES`](crate::services::fleet_meta::MAX_AVATAR_BYTES)).
 pub fn upload_avatar(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> HttpReply {
     if body_bytes.is_empty() {
         return HttpReply::error(400, "empty body");
@@ -334,8 +334,8 @@ fn ack_status(status: &cp_wire::types::ack::Status) -> String {
 /// This makes thread *appearance* instant (the user's latency complaint) while
 /// keeping conversations intact during the migration to a fully delta-driven
 /// read path.
-pub fn threads(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
-    let entry = match resolve_entry(state, agent_id) {
+pub fn threads(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
+    let entry = match resolve_entry(state, fleet_id) {
         Ok(e) => e,
         Err(reply) => return reply,
     };
@@ -365,7 +365,7 @@ pub fn threads(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
         // emission — design doc I5: live reads ride the view, disk is the
         // bounded backstop).
         let (roster, view_focus) =
-            b.view.get(agent_id).map(|v| (v.roster.clone(), v.focused_thread_id.clone())).unwrap_or_default();
+            b.view.get(fleet_id).map(|v| (v.roster.clone(), v.focused_thread_id.clone())).unwrap_or_default();
         let focused = view_focus.or(disk_focus);
         (cfg, focused, roster)
     };
@@ -381,7 +381,7 @@ pub fn threads(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
         .and_then(serde_json::Value::as_array)
         .unwrap_or(&empty);
 
-    let mut details: Vec<serde_json::Value> = raw_threads.iter().map(|t| reshape_thread(t, agent_id)).collect();
+    let mut details: Vec<serde_json::Value> = raw_threads.iter().map(|t| reshape_thread(t, fleet_id)).collect();
 
     // First-paint tasks from the agent's `config.json` todo module (thread-owned
     // todos live separately from the thread record). The live roster overlay
@@ -391,7 +391,7 @@ pub fn threads(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
 
     // Overlay the view's fresher roster onto matching disk threads, then append
     // any view-only threads the disk has not yet flushed.
-    overlay_roster(&mut details, &roster, agent_id);
+    overlay_roster(&mut details, &roster, fleet_id);
 
     HttpReply::ok(&serde_json::json!({
         "focusedThreadId": focused_thread_id,
@@ -423,7 +423,7 @@ mod tests {
         OpEntry::new(1, rev, 0, OpEntryKind::PhaseTransition { phase })
     }
 
-    fn backend_with_agent() -> Mutex<Backend> {
+    fn backend_with_fleet() -> Mutex<Backend> {
         let mut view = MaterializedView::new();
         view.apply("a1", &phase_entry(7, Phase::Streaming));
         Mutex::new(Backend::for_test(PathBuf::from("/tmp/cp-test-agents"), view))
@@ -431,7 +431,7 @@ mod tests {
 
     #[test]
     fn fleet_lists_agents_with_max_rev() {
-        let state = backend_with_agent();
+        let state = backend_with_fleet();
         let reply = fleet(&state, None);
         assert_eq!(reply.status, 200);
         assert!(reply.body.contains("\"rev\":7"), "envelope carries the max rev");
@@ -440,7 +440,7 @@ mod tests {
 
     #[test]
     fn agent_returns_view_with_rev() {
-        let state = backend_with_agent();
+        let state = backend_with_fleet();
         let reply = agent(&state, "a1");
         assert_eq!(reply.status, 200);
         assert!(reply.body.contains("\"rev\":7"));
@@ -448,13 +448,13 @@ mod tests {
 
     #[test]
     fn agent_unknown_is_404() {
-        let state = backend_with_agent();
+        let state = backend_with_fleet();
         assert_eq!(agent(&state, "ghost").status, 404);
     }
 
     #[test]
     fn mint_ticket_returns_token() {
-        let state = backend_with_agent();
+        let state = backend_with_fleet();
         let reply = mint_ticket(&state, None);
         assert_eq!(reply.status, 200);
         assert!(reply.body.contains("\"ticket\""));
@@ -462,13 +462,13 @@ mod tests {
 
     #[test]
     fn body_rejects_malformed_hash() {
-        let state = backend_with_agent();
+        let state = backend_with_fleet();
         assert_eq!(body(&state, "a1", "not-a-hash").status, 400);
     }
 
     #[test]
     fn command_rejects_malformed_body() {
-        let state = backend_with_agent();
+        let state = backend_with_fleet();
         assert_eq!(command(&state, "a1", b"{not json").status, 400);
     }
 }

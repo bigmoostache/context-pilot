@@ -8,8 +8,8 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::inspect::StateReader;
-use crate::services::agent_meta::{AvatarStore, NameOverrides};
 use crate::services::auth::db::AuthStore;
+use crate::services::fleet_meta::{AvatarStore, NameOverrides};
 use crate::services::materialized_view::MaterializedView;
 use crate::services::releases::ReleaseStore;
 use crate::services::retire::RetiredStore;
@@ -48,7 +48,7 @@ pub struct Backend {
     pub agents_dir: PathBuf,
     /// Agents whose tier-② state has changed since the last SSE sweep.
     /// SSE producers drain this per-agent to emit `invalidate` events.
-    pub dirty_agents: HashSet<String>,
+    pub dirty_fleets: HashSet<String>,
     /// Per-agent registry liveness, updated by the driver loop's registry
     /// scan. Stale agents surface as "disconnected" in the fleet meta.
     pub liveness: HashMap<String, crate::liveness::Liveness>,
@@ -160,7 +160,7 @@ impl Backend {
             pkce_session: None,
             auth_db_path: crate::services::auth::default_db_path(),
             agents_dir,
-            dirty_agents: HashSet::new(),
+            dirty_fleets: HashSet::new(),
             liveness: HashMap::new(),
             supervisor: ProcManager::new(std::slice::from_ref(&resolved_binary)),
             agents_root,
@@ -188,14 +188,14 @@ impl Backend {
 
     /// Mark an agent's state as dirty — SSE producers will emit an
     /// `invalidate` event on the next sweep.
-    pub fn mark_dirty(&mut self, agent_id: &str) {
-        let _new = self.dirty_agents.insert(agent_id.to_owned());
+    pub fn mark_dirty(&mut self, fleet_id: &str) {
+        let _new = self.dirty_fleets.insert(fleet_id.to_owned());
     }
 
     /// Check and clear the dirty flag for an agent. Returns `true` if the
     /// agent was dirty (the caller should emit an `invalidate` SSE event).
-    pub fn take_dirty(&mut self, agent_id: &str) -> bool {
-        self.dirty_agents.remove(agent_id)
+    pub fn take_dirty(&mut self, fleet_id: &str) -> bool {
+        self.dirty_fleets.remove(fleet_id)
     }
 
     /// Store the in-flight PKCE login session (set by `/claude-login/start`).
@@ -224,7 +224,7 @@ impl Backend {
             names: NameOverrides::default(),
             avatars: AvatarStore::default(),
             agents_dir,
-            dirty_agents: HashSet::new(),
+            dirty_fleets: HashSet::new(),
             liveness: HashMap::new(),
             supervisor: ProcManager::new(&[]),
             agents_root: PathBuf::from("/tmp/cp-test-realms"),

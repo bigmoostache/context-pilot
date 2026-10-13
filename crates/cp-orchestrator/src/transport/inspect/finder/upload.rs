@@ -9,7 +9,7 @@ use std::sync::Mutex;
 use crate::transport::Backend;
 use crate::transport::rest::HttpReply;
 
-use super::support::{agent_folder, confined_path, extract_param};
+use super::support::{confined_path, extract_param, fleet_folder};
 use super::{is_bare_name, rel_child};
 
 /// `POST /api/fleet/{id}/fs/upload?path={dir}&name={file}` — upload one file.
@@ -24,8 +24,8 @@ use super::{is_bare_name, rel_child};
 /// escape) and must already exist; `name` must be a bare filename (no path
 /// separators, not `.`/`..`) so the write can never land outside the realm.
 /// Returns `{ written, path }` (bytes written + the realm-relative path).
-pub(crate) fn fs_upload(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8]) -> HttpReply {
-    let folder = match agent_folder(state, agent_id) {
+pub(crate) fn fs_upload(state: &Mutex<Backend>, fleet_id: &str, query: &str, body: &[u8]) -> HttpReply {
+    let folder = match fleet_folder(state, fleet_id) {
         Ok(f) => f,
         Err(reply) => return reply,
     };
@@ -79,8 +79,8 @@ pub(crate) fn fs_upload(state: &Mutex<Backend>, agent_id: &str, query: &str, bod
 /// `{ path, name, size }` — the realm-relative path of the **stored** file, its
 /// final (possibly suffixed) name, and the byte count — everything the composer
 /// needs to compose the `file-upload` message block.
-pub(crate) fn fs_upload_unique(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8]) -> HttpReply {
-    let folder = match agent_folder(state, agent_id) {
+pub(crate) fn fs_upload_unique(state: &Mutex<Backend>, fleet_id: &str, query: &str, body: &[u8]) -> HttpReply {
+    let folder = match fleet_folder(state, fleet_id) {
         Ok(f) => f,
         Err(reply) => return reply,
     };

@@ -8,8 +8,8 @@ use crate::transport::Backend;
 use crate::transport::rest::HttpReply;
 
 /// Resolve the agent's working directory from the registry record.
-pub(super) fn agent_folder(state: &Mutex<Backend>, agent_id: &str) -> Result<String, HttpReply> {
-    let entry = crate::transport::rest::resolve_entry(state, agent_id)?;
+pub(super) fn fleet_folder(state: &Mutex<Backend>, fleet_id: &str) -> Result<String, HttpReply> {
+    let entry = crate::transport::rest::resolve_entry(state, fleet_id)?;
     Ok(entry.folder)
 }
 

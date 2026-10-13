@@ -124,7 +124,7 @@ mod tests {
     fn token(agent: &str, seq: u64) -> Frame {
         Frame {
             schema_version: 1,
-            agent_id: agent.to_owned(),
+            fleet_id: agent.to_owned(),
             worker_id: "w0".to_owned(),
             thread_id: "T1".to_owned(),
             message_id: "m1".to_owned(),
@@ -160,16 +160,16 @@ mod tests {
     /// `rev` is 0, every successor increments by exactly one, and the last equals
     /// the recovered head. A shed best-effort record never consumes a `rev`, so a
     /// surviving log is always contiguous (design doc K5 / V10).
-    fn assert_gap_free(entries: &[cp_wire::types::oplog::OpEntry], agent_id: &str) {
-        assert!(!entries.is_empty(), "{agent_id}: replayed a non-empty oplog");
-        assert_eq!(entries.first().expect("non-empty").rev, 0, "{agent_id}: rev stream starts at 0");
+    fn assert_gap_free(entries: &[cp_wire::types::oplog::OpEntry], fleet_id: &str) {
+        assert!(!entries.is_empty(), "{fleet_id}: replayed a non-empty oplog");
+        assert_eq!(entries.first().expect("non-empty").rev, 0, "{fleet_id}: rev stream starts at 0");
         for pair in entries.windows(2) {
             let a = pair.first().expect("window of 2");
             let b = pair.get(1).expect("window of 2");
             assert_eq!(
                 b.rev,
                 a.rev.saturating_add(1),
-                "{agent_id}: gap or reorder in the rev stream ({} -> {})",
+                "{fleet_id}: gap or reorder in the rev stream ({} -> {})",
                 a.rev,
                 b.rev,
             );
@@ -199,16 +199,16 @@ mod tests {
     /// own last message + thread and no neighbour's — the V8 isolation invariant.
     /// Extracted from the test to keep it under the cognitive-complexity cap.
     fn assert_isolated_projection(view: &MaterializedView, idx: usize) {
-        let agent_id = format!("agent-{idx}");
-        let agent = view.get(&agent_id).unwrap_or_else(|| panic!("{agent_id} projected"));
+        let fleet_id = format!("agent-{idx}");
+        let agent = view.get(&fleet_id).unwrap_or_else(|| panic!("{fleet_id} projected"));
         let head =
-            agent.heads.threads.iter().find(|h| h.thread_id == "T1").unwrap_or_else(|| panic!("{agent_id} T1 head"));
+            agent.heads.threads.iter().find(|h| h.thread_id == "T1").unwrap_or_else(|| panic!("{fleet_id} T1 head"));
         assert_eq!(
             head.last_message_hash,
             ContentHash::new([RECORDS_PER_AGENT.saturating_sub(1); 32]),
-            "{agent_id}: head is this agent's own last message, not a neighbour's",
+            "{fleet_id}: head is this agent's own last message, not a neighbour's",
         );
-        assert!(agent.roster.iter().any(|t| t.thread_id == "T1"), "{agent_id}: roster carries its own thread");
+        assert!(agent.roster.iter().any(|t| t.thread_id == "T1"), "{fleet_id}: roster carries its own thread");
     }
 
     // ── V10 + V8(scaled): concurrent fleet, gap-free + isolated ─────────────────
@@ -224,10 +224,10 @@ mod tests {
         // Every agent's oplog is independently gap-free after the concurrent storm.
         let mut view = MaterializedView::new();
         for (idx, dir) in dirs.iter().enumerate() {
-            let agent_id = format!("agent-{idx}");
+            let fleet_id = format!("agent-{idx}");
             let entries = tail_all(dir.path());
-            assert_gap_free(&entries, &agent_id);
-            view.apply_batch(&agent_id, &entries);
+            assert_gap_free(&entries, &fleet_id);
+            view.apply_batch(&fleet_id, &entries);
         }
 
         // The shared view holds N isolated projections — no cross-contamination.

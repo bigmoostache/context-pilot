@@ -55,7 +55,7 @@ fn folder_id(path: &str) -> String {
 /// folder it cannot create or a spawn failure (incl. an off-allow-list
 /// binary — which should never happen since the allow-list is seeded from the
 /// configured binary).
-pub(crate) fn create_agent(state: &Mutex<Backend>, body_bytes: &[u8], auth_user: Option<&User>) -> HttpReply {
+pub(crate) fn create_fleet(state: &Mutex<Backend>, body_bytes: &[u8], auth_user: Option<&User>) -> HttpReply {
     let Ok(req) = serde_json::from_slice::<CreateAgentReq>(body_bytes) else {
         return HttpReply::error(400, "malformed create-agent request");
     };
@@ -109,9 +109,9 @@ pub(crate) fn create_agent(state: &Mutex<Backend>, body_bytes: &[u8], auth_user:
                 && let Some(auth) = b.auth.as_ref()
             {
                 let canonical = folder.canonicalize().unwrap_or_else(|_| folder.clone());
-                let agent_id = folder_id(&canonical.to_string_lossy());
+                let fleet_id = folder_id(&canonical.to_string_lossy());
                 let _grant = auth.grant_access(AccessGrant {
-                    agent_id: &agent_id,
+                    fleet_id: &fleet_id,
                     user_id: &user.id,
                     role: FleetRole::FleetAdmin,
                     granted_by: None,

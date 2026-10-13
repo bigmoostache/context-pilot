@@ -232,6 +232,6 @@ mod tests {
 
     #[test]
     fn segments_join_to_path() {
-        assert_eq!(segments_to_path(&["api".into(), "agent".into(), "{}".into(), "meta".into()]), "/api/fleet/{}/meta");
+        assert_eq!(segments_to_path(&["api".into(), "fleet".into(), "{}".into(), "meta".into()]), "/api/fleet/{}/meta");
     }
 }

@@ -166,9 +166,9 @@ pub(crate) fn publish_frame(state: &mut State, kind: StreamKind) {
     let seq = bs.tee_seq;
     bs.tee_seq = seq.wrapping_add(1);
 
-    let agent_id = bs.boot.as_ref().map(|b| b.id().to_owned()).unwrap_or_default();
+    let fleet_id = bs.boot.as_ref().map(|b| b.id().to_owned()).unwrap_or_default();
 
-    let frame = StreamFrame { schema_version: 1, agent_id, worker_id: String::new(), thread_id, message_id, seq, kind };
+    let frame = StreamFrame { schema_version: 1, fleet_id, worker_id: String::new(), thread_id, message_id, seq, kind };
 
     if let Some(tee) = bs.tee.as_ref() {
         let _outcome = tee.publish(frame);

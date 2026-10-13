@@ -76,7 +76,7 @@ pub struct TeeReader {
 impl TeeReader {
     /// Spawn a reader for the agent whose live-stream socket is at `tee_path`,
     /// republishing its stream frames into `backend`'s
-    /// [`StreamHub`](crate::services::stream_hub::StreamHub) under `agent_id`.
+    /// [`StreamHub`](crate::services::stream_hub::StreamHub) under `fleet_id`.
     ///
     /// `tee_path` is the agent's advertised `tee_socket_path` (T713) — resolved
     /// by the caller, since with the global sync-dir layout the socket is no
@@ -84,10 +84,10 @@ impl TeeReader {
     /// retrying while the socket is absent, and runs until [`stop`](Self::stop)
     /// (or drop) is invoked.
     #[must_use]
-    pub fn spawn(agent_id: String, tee_path: PathBuf, backend: Arc<Mutex<Backend>>) -> Self {
+    pub fn spawn(fleet_id: String, tee_path: PathBuf, backend: Arc<Mutex<Backend>>) -> Self {
         let stop = Arc::new(AtomicBool::new(false));
         let stop_thread = Arc::clone(&stop);
-        let handle = thread::spawn(move || read_loop(&agent_id, &tee_path, &backend, &stop_thread));
+        let handle = thread::spawn(move || read_loop(&fleet_id, &tee_path, &backend, &stop_thread));
         Self { stop, handle: Some(handle) }
     }
 
@@ -113,12 +113,12 @@ impl Drop for TeeReader {
 
 /// The reader thread body: (re)connect to the tee socket and pump frames into
 /// the hub until asked to stop.
-fn read_loop(agent_id: &str, tee_path: &PathBuf, backend: &Arc<Mutex<Backend>>, stop: &AtomicBool) {
+fn read_loop(fleet_id: &str, tee_path: &PathBuf, backend: &Arc<Mutex<Backend>>, stop: &AtomicBool) {
     while !stop.load(Ordering::Relaxed) {
         match UnixStream::connect(tee_path) {
             Ok(stream) => {
                 let _ignored = stream.set_read_timeout(Some(READ_TIMEOUT));
-                pump_connection(agent_id, stream, backend, stop);
+                pump_connection(fleet_id, stream, backend, stop);
                 // Connection ended (EOF / error / stop) — loop reconnects
                 // unless we are stopping, so an agent restart is picked up.
             }
@@ -129,7 +129,7 @@ fn read_loop(agent_id: &str, tee_path: &PathBuf, backend: &Arc<Mutex<Backend>>, 
 
 /// Drain one connected socket frame-by-frame into the hub. Returns when the
 /// connection ends (EOF / hard error) or `stop` is set.
-fn pump_connection(agent_id: &str, mut stream: UnixStream, backend: &Arc<Mutex<Backend>>, stop: &AtomicBool) {
+fn pump_connection(fleet_id: &str, mut stream: UnixStream, backend: &Arc<Mutex<Backend>>, stop: &AtomicBool) {
     let mut buf: Vec<u8> = Vec::with_capacity(READ_CHUNK);
     let mut chunk = vec![0u8; READ_CHUNK];
 
@@ -140,7 +140,7 @@ fn pump_connection(agent_id: &str, mut stream: UnixStream, backend: &Arc<Mutex<B
                 if let Some(got) = chunk.get(..read_n) {
                     buf.extend_from_slice(got);
                 }
-                drain_frames(agent_id, &mut buf, backend);
+                drain_frames(fleet_id, &mut buf, backend);
                 // Desynced past a full frame without decoding — reset. A buffer
                 // that no longer fits a `u32` is unconditionally over the cap.
                 if u32::try_from(buf.len()).map_or(true, |len| len > MAX_PAYLOAD_SIZE) {
@@ -157,12 +157,12 @@ fn pump_connection(agent_id: &str, mut stream: UnixStream, backend: &Arc<Mutex<B
 
 /// Decode and publish every complete frame at the front of `buf`, retaining any
 /// trailing partial frame for the next read.
-fn drain_frames(agent_id: &str, buf: &mut Vec<u8>, backend: &Arc<Mutex<Backend>>) {
+fn drain_frames(fleet_id: &str, buf: &mut Vec<u8>, backend: &Arc<Mutex<Backend>>) {
     loop {
         match decode_raw(buf) {
             Ok((payload, consumed)) => {
                 if let Ok(frame) = serde_json::from_slice::<StreamFrame>(payload) {
-                    publish(agent_id, &frame, backend);
+                    publish(fleet_id, &frame, backend);
                 }
                 // Drop the consumed frame; keep the trailing partial bytes.
                 let _drained = buf.drain(..consumed);
@@ -211,9 +211,9 @@ fn corrupt_frame_span(buf: &[u8]) -> Option<usize> {
 }
 
 /// Publish one frame into the hub under a brief lock.
-fn publish(agent_id: &str, frame: &StreamFrame, backend: &Arc<Mutex<Backend>>) {
+fn publish(fleet_id: &str, frame: &StreamFrame, backend: &Arc<Mutex<Backend>>) {
     if let Ok(mut b) = backend.lock() {
-        let _delivered = b.hub_mut().publish(agent_id, frame);
+        let _delivered = b.hub_mut().publish(fleet_id, frame);
     }
 }
 
@@ -229,7 +229,7 @@ mod tests {
     fn token(seq: u64, text: &str) -> StreamFrame {
         StreamFrame {
             schema_version: 1,
-            agent_id: "a".to_owned(),
+            fleet_id: "a".to_owned(),
             worker_id: "w".to_owned(),
             thread_id: "T1".to_owned(),
             message_id: "m1".to_owned(),
@@ -240,7 +240,7 @@ mod tests {
 
     /// A backend with one subscriber so published frames are retained for the
     /// assertion (the hub drops frames for agents with no subscribers).
-    fn backend_with_subscriber(agent_id: &str) -> (Arc<Mutex<Backend>>, u64) {
+    fn backend_with_subscriber(fleet_id: &str) -> (Arc<Mutex<Backend>>, u64) {
         let dir = tempdir().expect("dir");
         let backend = Arc::new(Mutex::new(Backend::new(
             crate::transport::Paths {
@@ -251,7 +251,7 @@ mod tests {
             None,
             Duration::from_hours(1),
         )));
-        let sub = backend.lock().expect("lock").hub_mut().subscribe(agent_id);
+        let sub = backend.lock().expect("lock").hub_mut().subscribe(fleet_id);
         (backend, sub)
     }
 

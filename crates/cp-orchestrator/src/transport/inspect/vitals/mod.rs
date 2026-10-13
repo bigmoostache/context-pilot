@@ -62,8 +62,8 @@ const COLLECT_DEADLINE: Duration = Duration::from_secs(6);
 ///
 /// Returns a JSON array of vital objects (`{name, category, status, latencyMs?,
 /// detail?}`). Unknown agent → `404`.
-pub fn agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
-    let entry = match crate::transport::rest::resolve_entry(state, agent_id) {
+pub fn agent(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
+    let entry = match crate::transport::rest::resolve_entry(state, fleet_id) {
         Ok(e) => e,
         Err(reply) => return reply,
     };
@@ -76,7 +76,7 @@ pub fn agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     // 2-3. Agent-side reads (heartbeat + folded status), under one short lock.
     let provider = read_provider(state, &entry);
     vitals.push(agent_connection_vital(&entry));
-    vitals.push(agent_status_vital(state, agent_id));
+    vitals.push(agent_status_vital(state, fleet_id));
 
     // 4. Local infra probes that need a discovered address.
     vitals.push(meilisearch_vital());
@@ -145,8 +145,8 @@ fn agent_connection_vital(entry: &Entry) -> serde_json::Value {
 ///
 /// This is a status read, not a connection: `ok` carries the live phase as its
 /// detail; a `Stopped`/`Stopping` lifecycle surfaces as `error`.
-fn agent_status_vital(state: &Mutex<Backend>, agent_id: &str) -> serde_json::Value {
-    let snapshot = state.lock().ok().and_then(|b| b.view.get(agent_id).map(|v| (v.phase, v.lifecycle)));
+fn agent_status_vital(state: &Mutex<Backend>, fleet_id: &str) -> serde_json::Value {
+    let snapshot = state.lock().ok().and_then(|b| b.view.get(fleet_id).map(|v| (v.phase, v.lifecycle)));
     let Some((phase, lifecycle)) = snapshot else {
         return vital(("Agent loop status", "agent"), "unavailable", None, "no view yet");
     };

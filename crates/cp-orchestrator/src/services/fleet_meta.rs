@@ -49,25 +49,25 @@ impl NameOverrides {
         Self { names, path }
     }
 
-    /// Look up a custom display name for `agent_id`.
+    /// Look up a custom display name for `fleet_id`.
     ///
     /// Returns `None` when the agent has no override (callers fall back to the
     /// folder-derived basename).
     #[must_use]
-    pub fn get(&self, agent_id: &str) -> Option<&str> {
-        self.names.get(agent_id).map(String::as_str)
+    pub fn get(&self, fleet_id: &str) -> Option<&str> {
+        self.names.get(fleet_id).map(String::as_str)
     }
 
     /// Set or clear a display-name override.
     ///
     /// An empty or whitespace-only `name` **removes** the override (reverts to
     /// the folder-derived default).  Returns the previous override, if any.
-    pub fn set(&mut self, agent_id: &str, name: &str) -> Option<String> {
+    pub fn set(&mut self, fleet_id: &str, name: &str) -> Option<String> {
         let trimmed = name.trim();
         let prev = if trimmed.is_empty() {
-            self.names.remove(agent_id)
+            self.names.remove(fleet_id)
         } else {
-            self.names.insert(agent_id.to_owned(), trimmed.to_owned())
+            self.names.insert(fleet_id.to_owned(), trimmed.to_owned())
         };
         self.persist();
         prev
@@ -124,19 +124,19 @@ impl AvatarStore {
         Self { types, dir, index_path }
     }
 
-    /// Whether `agent_id` has a stored avatar.
+    /// Whether `fleet_id` has a stored avatar.
     #[must_use]
-    pub fn has(&self, agent_id: &str) -> bool {
-        self.types.contains_key(agent_id)
+    pub fn has(&self, fleet_id: &str) -> bool {
+        self.types.contains_key(fleet_id)
     }
 
-    /// Read the avatar bytes + content type for `agent_id`.
+    /// Read the avatar bytes + content type for `fleet_id`.
     ///
     /// Returns `None` when no avatar is stored or the file is missing/corrupt.
     #[must_use]
-    pub fn get(&self, agent_id: &str) -> Option<(Vec<u8>, String)> {
-        let ctype = self.types.get(agent_id)?;
-        let bytes = std::fs::read(self.dir.join(agent_id)).ok()?;
+    pub fn get(&self, fleet_id: &str) -> Option<(Vec<u8>, String)> {
+        let ctype = self.types.get(fleet_id)?;
+        let bytes = std::fs::read(self.dir.join(fleet_id)).ok()?;
         Some((bytes, ctype.clone()))
     }
 
@@ -146,7 +146,7 @@ impl AvatarStore {
     /// # Errors
     /// Returns an error string if `bytes` exceeds [`MAX_AVATAR_BYTES`], its
     /// format is unrecognised, or the directory/file write fails.
-    pub fn set(&mut self, agent_id: &str, bytes: &[u8]) -> Result<(), String> {
+    pub fn set(&mut self, fleet_id: &str, bytes: &[u8]) -> Result<(), String> {
         if bytes.len() > MAX_AVATAR_BYTES {
             return Err(format!("avatar too large ({} bytes, max {})", bytes.len(), MAX_AVATAR_BYTES));
         }
@@ -156,20 +156,20 @@ impl AvatarStore {
             return Err(format!("mkdir agent-avatars: {e}"));
         }
         // Write the image atomically (tmp → rename).
-        let file_path = self.dir.join(agent_id);
+        let file_path = self.dir.join(fleet_id);
         let tmp_path = file_path.with_extension("tmp");
         std::fs::write(&tmp_path, bytes).map_err(|e| format!("write tmp: {e}"))?;
         std::fs::rename(&tmp_path, &file_path).map_err(|e| format!("rename: {e}"))?;
-        let _prev = self.types.insert(agent_id.to_owned(), ctype.to_owned());
+        let _prev = self.types.insert(fleet_id.to_owned(), ctype.to_owned());
         self.persist_index();
         Ok(())
     }
 
     /// Remove an avatar. Returns `true` if one existed.
-    pub fn remove(&mut self, agent_id: &str) -> bool {
-        let existed = self.types.remove(agent_id).is_some();
+    pub fn remove(&mut self, fleet_id: &str) -> bool {
+        let existed = self.types.remove(fleet_id).is_some();
         if existed {
-            let _rm = std::fs::remove_file(self.dir.join(agent_id));
+            let _rm = std::fs::remove_file(self.dir.join(fleet_id));
             self.persist_index();
         }
         existed

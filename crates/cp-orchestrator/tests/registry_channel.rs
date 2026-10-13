@@ -71,7 +71,7 @@ use cp_wire::heartbeat::Heartbeat;
 use cp_wire::types::ack::Status;
 use cp_wire::types::command::{Command, Kind as CommandKind};
 use cp_wire::types::oplog::OpEntryKind;
-use cp_wire::types::registry::{FleetStatus, Entry};
+use cp_wire::types::registry::{Entry, FleetStatus};
 
 use tempfile::tempdir;
 

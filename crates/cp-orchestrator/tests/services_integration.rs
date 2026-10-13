@@ -86,7 +86,7 @@ mod tests {
     fn token(agent: &str, seq: u64) -> Frame {
         Frame {
             schema_version: 1,
-            agent_id: agent.to_owned(),
+            fleet_id: agent.to_owned(),
             worker_id: "w0".to_owned(),
             thread_id: "T1".to_owned(),
             message_id: "m1".to_owned(),

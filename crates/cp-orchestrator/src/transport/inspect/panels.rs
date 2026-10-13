@@ -20,14 +20,14 @@ use std::sync::Mutex;
 use crate::transport::Backend;
 use crate::transport::rest::HttpReply;
 
-use super::helpers::{agent_folder, extract_worker_param};
+use super::helpers::{extract_worker_param, fleet_folder};
 
 /// `GET /api/fleet/{id}/usage` — current session cost data from worker state.
 ///
 /// Returns the cumulative token counts and cost from the agent's active
 /// worker. The web client can poll this to build a time series.
-pub fn usage(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
-    let folder = match agent_folder(state, agent_id) {
+pub fn usage(state: &Mutex<Backend>, fleet_id: &str, query: &str) -> HttpReply {
+    let folder = match fleet_folder(state, fleet_id) {
         Ok(f) => f,
         Err(reply) => return reply,
     };
@@ -71,8 +71,8 @@ fn resolve_worker_id(folder_path: &Path, query: &str) -> Result<String, HttpRepl
 ///
 /// Scans the agent's `.context-pilot/{agents,skills,commands}/` directories
 /// for `.md` files with YAML frontmatter and returns them as `LibraryItem[]`.
-pub fn library(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
-    let folder = match agent_folder(state, agent_id) {
+pub fn library(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
+    let folder = match fleet_folder(state, fleet_id) {
         Ok(f) => f,
         Err(reply) => return reply,
     };

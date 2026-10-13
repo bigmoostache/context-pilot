@@ -59,7 +59,7 @@ use cp_orchestrator::transport::serve_bound;
 
 use cp_wire::types::ContentHash;
 use cp_wire::types::oplog::{OpEntry, OpEntryKind};
-use cp_wire::types::registry::{FleetStatus, Entry};
+use cp_wire::types::registry::{Entry, FleetStatus};
 
 use tiny_http::Server;
 
@@ -126,7 +126,7 @@ mod tests {
 
     /// Boot a backend serving one discoverable agent whose oplog holds `n_msgs`
     /// message entries, on a freshly-claimed ephemeral port.
-    fn harness(agent_id: &str, n_msgs: u8) -> Harness {
+    fn harness(fleet_id: &str, n_msgs: u8) -> Harness {
         let agents = tempdir().expect("agents dir");
         let oplog = tempdir().expect("oplog dir");
 
@@ -137,7 +137,7 @@ mod tests {
         }
         writer.sync().expect("sync");
 
-        let entry = make_entry(agent_id, oplog.path());
+        let entry = make_entry(fleet_id, oplog.path());
         write_entry(agents.path(), &entry);
 
         let mut backend = Backend::new(
@@ -149,7 +149,7 @@ mod tests {
             None,
             Duration::from_hours(1),
         );
-        backend.view_mut().apply_batch(agent_id, &replay_entries(oplog.path()));
+        backend.view_mut().apply_batch(fleet_id, &replay_entries(oplog.path()));
         let state = Arc::new(Mutex::new(backend));
 
         let server = Server::http("127.0.0.1:0").expect("bind ephemeral");

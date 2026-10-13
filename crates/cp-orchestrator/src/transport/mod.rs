@@ -140,9 +140,9 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
     // Per-agent ACL check (Phase 6). When auth is enabled and the route
     // targets a specific agent, verify the caller has access. System admins
     // bypass (FR-09); regular users need an ACL entry (FR-10).
-    if let Some(agent_id) = auth::extract_agent_id(&segments)
+    if let Some(fleet_id) = auth::extract_fleet_id(&segments)
         && let Some(user) = auth_user.as_ref()
-        && !auth::authorize_agent(state, agent_id, user)
+        && !auth::authorize_fleet(state, fleet_id, user)
     {
         respond_json(request, &rest::HttpReply::error(403, "no access to this agent"));
         return;

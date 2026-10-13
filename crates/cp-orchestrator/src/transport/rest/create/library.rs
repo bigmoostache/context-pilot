@@ -180,12 +180,12 @@ pub(crate) fn read_library_agent(state: &Mutex<Backend>, id: &str, item_id: &str
     // `builtin` flag when its id shadows a compiled-in seed.
     if let Ok(content) = std::fs::read_to_string(&file_path) {
         let (name, description, body) = split_frontmatter(&content);
-        let builtin = seed_agent(item_id).is_some();
+        let builtin = seed_fleet(item_id).is_some();
         return HttpReply::json(200, &LibraryAgentRaw { name, description, body, builtin });
     }
 
     // No disk file — a pure built-in. Serve its seed so Export/Edit still work.
-    seed_agent(item_id).map_or_else(
+    seed_fleet(item_id).map_or_else(
         || HttpReply::error(404, "no such agent"),
         |seed| {
             HttpReply::json(
@@ -265,7 +265,7 @@ pub(crate) fn delete_library_agent(state: &Mutex<Backend>, id: &str, item_id: &s
 
 /// Look up a compiled-in seed agent by id (for the built-in Export/Edit
 /// fallback + the `builtin` flag).
-fn seed_agent(item_id: &str) -> Option<&'static cp_base::config::SeedEntry> {
+fn seed_fleet(item_id: &str) -> Option<&'static cp_base::config::SeedEntry> {
     cp_base::config::accessors::library::agents().iter().find(|s| s.id == item_id)
 }
 

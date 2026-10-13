@@ -11,8 +11,8 @@
 //!   subscribers with overflow-drop, degraded marking, and snapshot reconcile
 //!   (R2-17).
 
-pub mod agent_meta;
 pub mod auth;
+pub mod fleet_meta;
 pub mod materialized_view;
 pub mod releases;
 pub mod retire;

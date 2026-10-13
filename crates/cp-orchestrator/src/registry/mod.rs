@@ -34,7 +34,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
 use cp_wire::heartbeat::{DEFAULT_MAX_AGE, Heartbeat};
-use cp_wire::types::registry::{FleetStatus, Entry};
+use cp_wire::types::registry::{Entry, FleetStatus};
 
 pub mod channel;
 pub mod liveness;

@@ -57,7 +57,7 @@ use nix::sys::signal::kill;
 use nix::unistd::Pid;
 
 use cp_orchestrator::supervisor::{Event, ProcManager, SpawnPlan};
-use cp_wire::types::registry::{FleetStatus, Entry};
+use cp_wire::types::registry::{Entry, FleetStatus};
 
 use tempfile::tempdir;
 
@@ -242,8 +242,8 @@ mod tests {
         let events = sup.check_liveness();
         assert_eq!(events.len(), 2, "both deaths are reported in one pass");
 
-        let saw_exited = events.iter().any(|e| matches!(e, Event::Exited { agent_id, .. } if agent_id == "exits"));
-        let saw_vanished = events.iter().any(|e| matches!(e, Event::Vanished { agent_id } if agent_id == "vanished"));
+        let saw_exited = events.iter().any(|e| matches!(e, Event::Exited { fleet_id, .. } if fleet_id == "exits"));
+        let saw_vanished = events.iter().any(|e| matches!(e, Event::Vanished { fleet_id } if fleet_id == "vanished"));
         assert!(saw_exited, "the spawned child is reported Exited (reaped via try_wait)");
         assert!(saw_vanished, "the adopted process is reported Vanished (signal-0 probe)");
         assert!(sup.is_empty(), "both dead agents are removed");
