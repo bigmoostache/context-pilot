@@ -17,48 +17,52 @@ export type AclEntry = {
     user_name: string;
 };
 
-export type Agent = {
-    accent?: AccentToken;
-    branch?: string;
-    contextBudget?: number;
-    contextHit?: number;
-    contextMiss?: number;
-    contextThreshold?: number;
-    contextUsed?: number;
-    costUsd: number;
-    folder: string;
-    hasAvatar?: boolean;
+export type AgentDetail = {
+    archived?: boolean;
+    branchedFrom?: string | null;
+    createdAt?: string;
+    fleet?: string;
+    fleetId: string;
+    focused?: boolean;
     id: string;
-    inputTokens?: number;
-    lastActivity: string;
-    model?: string;
+    lastActivity?: string;
+    lastActivityMs?: number;
+    log: Array<AgentMsg>;
     name: string;
-    outputTokens?: number;
-    phase?: 'idle' | 'streaming' | 'tooling';
-    provider?: string;
-    status: 'working' | 'needs-you' | 'idle' | 'disconnected';
-    task?: string;
-    threads: number;
+    notes?: Array<AgentNote>;
+    paused?: boolean;
+    status: 'MY_TURN' | 'THEIR_TURN' | 'ACTIVE';
+    tasks?: Array<AgentTask>;
+    unread?: number;
 };
 
-export type AgentMetrics = {
+export type AgentMsg = {
+    author: 'user' | 'assistant';
+    auto?: boolean;
+    fileRef?: string;
     id: string;
-    lifecycle?: string | null;
-    phase?: string | null;
-    rev: {
-        lag?: number;
-        oplogHead?: number | null;
-        view?: number;
-    };
-    stream: {
-        degraded?: boolean;
-        droppedFrames?: number;
-        subscribers?: number;
-    };
-    tokens?: {
-        input?: number;
-        output?: number;
-    };
+    text?: string;
+    tool?: ToolCall;
+    ts?: number;
+};
+
+export type AgentNote = {
+    content: string;
+    id: string;
+    title: string;
+};
+
+export type AgentTask = {
+    description?: string;
+    id: string;
+    name: string;
+    parentId?: string | null;
+    status: 'planned' | 'in_progress' | 'done';
+};
+
+export type AgentsResponse = {
+    agents: Array<AgentDetail>;
+    focusedAgentId?: string | null;
 };
 
 export type AppSettings = {
@@ -172,11 +176,11 @@ export type CommandReceipt = {
 };
 
 export type ConvHit = {
+    agent_id: string;
+    agent_name: string;
     author: string;
     score: number;
     text: string;
-    thread_id: string;
-    thread_name: string;
     ts_ms: number;
 };
 
@@ -199,14 +203,14 @@ export type ConversationSearchResult = {
     hits: Array<ConvHit>;
 };
 
-export type CreateAgentReceipt = {
-    folder: string;
-    pid: number;
+export type CreateCommandReceipt = {
+    id: string;
     status: string;
 };
 
-export type CreateCommandReceipt = {
-    id: string;
+export type CreateFleetReceipt = {
+    folder: string;
+    pid: number;
     status: string;
 };
 
@@ -278,6 +282,50 @@ export type FinderNode = {
     name: string;
     path: string;
     size?: number | null;
+};
+
+export type Fleet = {
+    accent?: AccentToken;
+    agents: number;
+    branch?: string;
+    contextBudget?: number;
+    contextHit?: number;
+    contextMiss?: number;
+    contextThreshold?: number;
+    contextUsed?: number;
+    costUsd: number;
+    folder: string;
+    hasAvatar?: boolean;
+    id: string;
+    inputTokens?: number;
+    lastActivity: string;
+    model?: string;
+    name: string;
+    outputTokens?: number;
+    phase?: 'idle' | 'streaming' | 'tooling';
+    provider?: string;
+    status: 'working' | 'needs-you' | 'idle' | 'disconnected';
+    task?: string;
+};
+
+export type FleetMetrics = {
+    id: string;
+    lifecycle?: string | null;
+    phase?: string | null;
+    rev: {
+        lag?: number;
+        oplogHead?: number | null;
+        view?: number;
+    };
+    stream: {
+        degraded?: boolean;
+        droppedFrames?: number;
+        subscribers?: number;
+    };
+    tokens?: {
+        input?: number;
+        output?: number;
+    };
 };
 
 export type ForceLogoutResponse = {
@@ -590,14 +638,13 @@ export type OpEntryKind = {
     message_ts?: number;
     miss_tokens?: number;
     name?: string;
-    notes?: Array<ThreadNote>;
+    notes?: Array<AgentNote>;
     output_tokens?: number;
     phase?: string;
     state?: string;
     status?: string;
     system_id?: string;
-    tasks?: Array<ThreadTask>;
-    thread_id?: string;
+    tasks?: Array<AgentTask>;
     threshold_tokens?: number;
     timestamp_ms?: number;
     used_tokens?: number;
@@ -699,54 +746,6 @@ export type SheetSaveResult = {
 export type SheetTab = {
     name: string;
     rows: Array<Array<string>>;
-};
-
-export type ThreadDetail = {
-    archived?: boolean;
-    branchedFrom?: string | null;
-    createdAt?: string;
-    fleet?: string;
-    fleetId: string;
-    focused?: boolean;
-    id: string;
-    lastActivity?: string;
-    lastActivityMs?: number;
-    log: Array<ThreadMsg>;
-    name: string;
-    notes?: Array<ThreadNote>;
-    paused?: boolean;
-    status: 'MY_TURN' | 'THEIR_TURN' | 'ACTIVE';
-    tasks?: Array<ThreadTask>;
-    unread?: number;
-};
-
-export type ThreadMsg = {
-    author: 'user' | 'assistant';
-    auto?: boolean;
-    fileRef?: string;
-    id: string;
-    text?: string;
-    tool?: ToolCall;
-    ts?: number;
-};
-
-export type ThreadNote = {
-    content: string;
-    id: string;
-    title: string;
-};
-
-export type ThreadTask = {
-    description?: string;
-    id: string;
-    name: string;
-    parentId?: string | null;
-    status: 'planned' | 'in_progress' | 'done';
-};
-
-export type ThreadsResponse = {
-    focusedThreadId?: string | null;
-    threads: Array<ThreadDetail>;
 };
 
 export type TicketResponse = {
@@ -1682,6 +1681,33 @@ export type PatchApiFleetByIdAclByUserIdResponses = {
 
 export type PatchApiFleetByIdAclByUserIdResponse = PatchApiFleetByIdAclByUserIdResponses[keyof PatchApiFleetByIdAclByUserIdResponses];
 
+export type GetApiFleetByIdAgentsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/agents';
+};
+
+export type GetApiFleetByIdAgentsErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiFleetByIdAgentsError = GetApiFleetByIdAgentsErrors[keyof GetApiFleetByIdAgentsErrors];
+
+export type GetApiFleetByIdAgentsResponses = {
+    /**
+     * Success
+     */
+    200: AgentsResponse;
+};
+
+export type GetApiFleetByIdAgentsResponse = GetApiFleetByIdAgentsResponses[keyof GetApiFleetByIdAgentsResponses];
+
 export type DeleteApiFleetByIdAvatarData = {
     body?: never;
     path: {
@@ -1840,9 +1866,9 @@ export type GetApiFleetByIdConversationResponse = GetApiFleetByIdConversationRes
 
 export type PostApiFleetByIdConversationsSearchData = {
     body: {
+        agent_id?: string;
         limit?: number;
         query: string;
-        thread_id?: string;
     };
     path: {
         id: string;
@@ -2462,7 +2488,7 @@ export type GetApiFleetByIdMetaResponses = {
     /**
      * Success
      */
-    200: Agent;
+    200: Fleet;
 };
 
 export type GetApiFleetByIdMetaResponse = GetApiFleetByIdMetaResponses[keyof GetApiFleetByIdMetaResponses];
@@ -2489,7 +2515,7 @@ export type GetApiFleetByIdMetricsResponses = {
     /**
      * Success
      */
-    200: AgentMetrics;
+    200: FleetMetrics;
 };
 
 export type GetApiFleetByIdMetricsResponse = GetApiFleetByIdMetricsResponses[keyof GetApiFleetByIdMetricsResponses];
@@ -2576,33 +2602,6 @@ export type PostApiFleetByIdRetireResponses = {
 };
 
 export type PostApiFleetByIdRetireResponse = PostApiFleetByIdRetireResponses[keyof PostApiFleetByIdRetireResponses];
-
-export type GetApiFleetByIdThreadsData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/fleet/{id}/threads';
-};
-
-export type GetApiFleetByIdThreadsErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiFleetByIdThreadsError = GetApiFleetByIdThreadsErrors[keyof GetApiFleetByIdThreadsErrors];
-
-export type GetApiFleetByIdThreadsResponses = {
-    /**
-     * Success
-     */
-    200: ThreadsResponse;
-};
-
-export type GetApiFleetByIdThreadsResponse = GetApiFleetByIdThreadsResponses[keyof GetApiFleetByIdThreadsResponses];
 
 export type PostApiFleetByIdUnretireData = {
     body?: never;
@@ -2738,7 +2737,7 @@ export type PostApiFleetsCreateResponses = {
     /**
      * Success
      */
-    200: CreateAgentReceipt;
+    200: CreateFleetReceipt;
 };
 
 export type PostApiFleetsCreateResponse = PostApiFleetsCreateResponses[keyof PostApiFleetsCreateResponses];
@@ -2763,7 +2762,7 @@ export type GetApiFleetsMetaResponses = {
     /**
      * Success
      */
-    200: Array<Agent>;
+    200: Array<Fleet>;
 };
 
 export type GetApiFleetsMetaResponse = GetApiFleetsMetaResponses[keyof GetApiFleetsMetaResponses];
@@ -2788,7 +2787,7 @@ export type GetApiFleetsRetiredResponses = {
     /**
      * Success
      */
-    200: Array<Agent>;
+    200: Array<Fleet>;
 };
 
 export type GetApiFleetsRetiredResponse = GetApiFleetsRetiredResponses[keyof GetApiFleetsRetiredResponses];
@@ -3106,7 +3105,7 @@ export type GetApiMetricsResponses = {
     /**
      * Success
      */
-    200: Array<AgentMetrics>;
+    200: Array<FleetMetrics>;
 };
 
 export type GetApiMetricsResponse = GetApiMetricsResponses[keyof GetApiMetricsResponses];

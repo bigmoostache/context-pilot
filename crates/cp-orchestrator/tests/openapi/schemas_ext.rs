@@ -49,7 +49,7 @@ pub(super) fn transport() -> Value {
             },
             "required": ["cmd_id", "dedup_token", "status"]
         },
-        "CreateAgentReceipt": {
+        "CreateFleetReceipt": {
             "type": "object",
             "properties": {
                 "status": { "type": "string" },
@@ -421,7 +421,7 @@ pub(super) fn transport() -> Value {
             "description": "Discriminated-union payload of a single oplog delta, keyed by `kind`.",
             "properties": {
                 "kind": { "type": "string" },
-                "thread_id": { "type": "string" },
+                "agent_id": { "type": "string" },
                 "name": { "type": "string" },
                 "status": { "type": "string" },
                 "timestamp_ms": { "type": "integer" },
@@ -451,10 +451,10 @@ pub(super) fn transport() -> Value {
                 "agent_id": { "type": "string" },
                 // task_list_changed delta payload: the agent's complete current
                 // (cancelled-excluded) task list, carried by a `kind:"task_list_changed"` entry.
-                "tasks": arr(r("ThreadTask")),
+                "tasks": arr(r("AgentTask")),
                 // notes_changed delta payload: the agent's complete current
                 // scratchpad-note list, carried by a `kind:"notes_changed"` entry.
-                "notes": arr(r("ThreadNote"))
+                "notes": arr(r("AgentNote"))
             },
             "required": ["kind"]
         },

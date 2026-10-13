@@ -40,9 +40,8 @@ struct SearchRequest {
     /// [`DEFAULT_LIMIT`].
     #[serde(default)]
     limit: Option<u32>,
-    /// Optional single-thread scope. `None` searches every thread.
-    #[serde(default)]
-    #[serde(rename = "thread_id")]
+    /// Optional single-agent scope. `None` searches every agent.
+    #[serde(default, alias = "thread_id")]
     agent_id: Option<String>,
 }
 

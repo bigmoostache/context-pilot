@@ -49,152 +49,180 @@
         ],
         "type": "object"
       },
-      "Agent": {
+      "AgentDetail": {
         "properties": {
-          "accent": {
-            "$ref": "#/components/schemas/AccentToken"
+          "archived": {
+            "type": "boolean"
           },
-          "branch": {
+          "branchedFrom": {
+            "nullable": true,
             "type": "string"
           },
-          "contextBudget": {
-            "type": "integer"
-          },
-          "contextHit": {
-            "type": "integer"
-          },
-          "contextMiss": {
-            "type": "integer"
-          },
-          "contextThreshold": {
-            "type": "integer"
-          },
-          "contextUsed": {
-            "type": "integer"
-          },
-          "costUsd": {
-            "type": "number"
-          },
-          "folder": {
+          "createdAt": {
             "type": "string"
           },
-          "hasAvatar": {
+          "fleet": {
+            "type": "string"
+          },
+          "fleetId": {
+            "type": "string"
+          },
+          "focused": {
             "type": "boolean"
           },
           "id": {
             "type": "string"
           },
-          "inputTokens": {
-            "type": "integer"
-          },
           "lastActivity": {
             "type": "string"
           },
-          "model": {
-            "type": "string"
+          "lastActivityMs": {
+            "type": "integer"
+          },
+          "log": {
+            "items": {
+              "$ref": "#/components/schemas/AgentMsg"
+            },
+            "type": "array"
           },
           "name": {
             "type": "string"
           },
-          "outputTokens": {
-            "type": "integer"
+          "notes": {
+            "items": {
+              "$ref": "#/components/schemas/AgentNote"
+            },
+            "type": "array"
           },
-          "phase": {
-            "enum": [
-              "idle",
-              "streaming",
-              "tooling"
-            ],
-            "type": "string"
-          },
-          "provider": {
-            "type": "string"
+          "paused": {
+            "type": "boolean"
           },
           "status": {
             "enum": [
-              "working",
-              "needs-you",
-              "idle",
-              "disconnected"
+              "MY_TURN",
+              "THEIR_TURN",
+              "ACTIVE"
             ],
             "type": "string"
           },
-          "task": {
-            "type": "string"
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/AgentTask"
+            },
+            "type": "array"
           },
-          "threads": {
+          "unread": {
             "type": "integer"
           }
         },
         "required": [
           "id",
           "name",
-          "folder",
           "status",
-          "costUsd",
-          "threads",
-          "lastActivity"
+          "fleetId",
+          "log"
         ],
         "type": "object"
       },
-      "AgentMetrics": {
+      "AgentMsg": {
         "properties": {
+          "author": {
+            "enum": [
+              "user",
+              "assistant"
+            ],
+            "type": "string"
+          },
+          "auto": {
+            "type": "boolean"
+          },
+          "fileRef": {
+            "type": "string"
+          },
           "id": {
             "type": "string"
           },
-          "lifecycle": {
-            "nullable": true,
+          "text": {
             "type": "string"
           },
-          "phase": {
-            "nullable": true,
-            "type": "string"
+          "tool": {
+            "$ref": "#/components/schemas/ToolCall"
           },
-          "rev": {
-            "properties": {
-              "lag": {
-                "type": "integer"
-              },
-              "oplogHead": {
-                "nullable": true,
-                "type": "integer"
-              },
-              "view": {
-                "type": "integer"
-              }
-            },
-            "type": "object"
-          },
-          "stream": {
-            "properties": {
-              "degraded": {
-                "type": "boolean"
-              },
-              "droppedFrames": {
-                "type": "integer"
-              },
-              "subscribers": {
-                "type": "integer"
-              }
-            },
-            "type": "object"
-          },
-          "tokens": {
-            "properties": {
-              "input": {
-                "type": "integer"
-              },
-              "output": {
-                "type": "integer"
-              }
-            },
-            "type": "object"
+          "ts": {
+            "type": "integer"
           }
         },
         "required": [
           "id",
-          "stream",
-          "rev"
+          "author"
+        ],
+        "type": "object"
+      },
+      "AgentNote": {
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "content"
+        ],
+        "type": "object"
+      },
+      "AgentTask": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "parentId": {
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "planned",
+              "in_progress",
+              "done"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "status"
+        ],
+        "type": "object"
+      },
+      "AgentsResponse": {
+        "properties": {
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/AgentDetail"
+            },
+            "type": "array"
+          },
+          "focusedAgentId": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "agents"
         ],
         "type": "object"
       },
@@ -574,6 +602,12 @@
       },
       "ConvHit": {
         "properties": {
+          "agent_id": {
+            "type": "string"
+          },
+          "agent_name": {
+            "type": "string"
+          },
           "author": {
             "type": "string"
           },
@@ -584,20 +618,14 @@
           "text": {
             "type": "string"
           },
-          "thread_id": {
-            "type": "string"
-          },
-          "thread_name": {
-            "type": "string"
-          },
           "ts_ms": {
             "format": "int64",
             "type": "integer"
           }
         },
         "required": [
-          "thread_id",
-          "thread_name",
+          "agent_id",
+          "agent_name",
           "author",
           "text",
           "ts_ms",
@@ -666,7 +694,22 @@
         ],
         "type": "object"
       },
-      "CreateAgentReceipt": {
+      "CreateCommandReceipt": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "type": "object"
+      },
+      "CreateFleetReceipt": {
         "properties": {
           "folder": {
             "type": "string"
@@ -682,21 +725,6 @@
           "status",
           "folder",
           "pid"
-        ],
-        "type": "object"
-      },
-      "CreateCommandReceipt": {
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "status"
         ],
         "type": "object"
       },
@@ -920,6 +948,155 @@
           "name",
           "path",
           "kind"
+        ],
+        "type": "object"
+      },
+      "Fleet": {
+        "properties": {
+          "accent": {
+            "$ref": "#/components/schemas/AccentToken"
+          },
+          "agents": {
+            "type": "integer"
+          },
+          "branch": {
+            "type": "string"
+          },
+          "contextBudget": {
+            "type": "integer"
+          },
+          "contextHit": {
+            "type": "integer"
+          },
+          "contextMiss": {
+            "type": "integer"
+          },
+          "contextThreshold": {
+            "type": "integer"
+          },
+          "contextUsed": {
+            "type": "integer"
+          },
+          "costUsd": {
+            "type": "number"
+          },
+          "folder": {
+            "type": "string"
+          },
+          "hasAvatar": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "inputTokens": {
+            "type": "integer"
+          },
+          "lastActivity": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "outputTokens": {
+            "type": "integer"
+          },
+          "phase": {
+            "enum": [
+              "idle",
+              "streaming",
+              "tooling"
+            ],
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "working",
+              "needs-you",
+              "idle",
+              "disconnected"
+            ],
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "folder",
+          "status",
+          "costUsd",
+          "agents",
+          "lastActivity"
+        ],
+        "type": "object"
+      },
+      "FleetMetrics": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "lifecycle": {
+            "nullable": true,
+            "type": "string"
+          },
+          "phase": {
+            "nullable": true,
+            "type": "string"
+          },
+          "rev": {
+            "properties": {
+              "lag": {
+                "type": "integer"
+              },
+              "oplogHead": {
+                "nullable": true,
+                "type": "integer"
+              },
+              "view": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "stream": {
+            "properties": {
+              "degraded": {
+                "type": "boolean"
+              },
+              "droppedFrames": {
+                "type": "integer"
+              },
+              "subscribers": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "tokens": {
+            "properties": {
+              "input": {
+                "type": "integer"
+              },
+              "output": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "stream",
+          "rev"
         ],
         "type": "object"
       },
@@ -1697,7 +1874,7 @@
           },
           "notes": {
             "items": {
-              "$ref": "#/components/schemas/ThreadNote"
+              "$ref": "#/components/schemas/AgentNote"
             },
             "type": "array"
           },
@@ -1718,12 +1895,9 @@
           },
           "tasks": {
             "items": {
-              "$ref": "#/components/schemas/ThreadTask"
+              "$ref": "#/components/schemas/AgentTask"
             },
             "type": "array"
-          },
-          "thread_id": {
-            "type": "string"
           },
           "threshold_tokens": {
             "type": "integer"
@@ -2028,183 +2202,6 @@
         "required": [
           "name",
           "rows"
-        ],
-        "type": "object"
-      },
-      "ThreadDetail": {
-        "properties": {
-          "archived": {
-            "type": "boolean"
-          },
-          "branchedFrom": {
-            "nullable": true,
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string"
-          },
-          "fleet": {
-            "type": "string"
-          },
-          "fleetId": {
-            "type": "string"
-          },
-          "focused": {
-            "type": "boolean"
-          },
-          "id": {
-            "type": "string"
-          },
-          "lastActivity": {
-            "type": "string"
-          },
-          "lastActivityMs": {
-            "type": "integer"
-          },
-          "log": {
-            "items": {
-              "$ref": "#/components/schemas/ThreadMsg"
-            },
-            "type": "array"
-          },
-          "name": {
-            "type": "string"
-          },
-          "notes": {
-            "items": {
-              "$ref": "#/components/schemas/ThreadNote"
-            },
-            "type": "array"
-          },
-          "paused": {
-            "type": "boolean"
-          },
-          "status": {
-            "enum": [
-              "MY_TURN",
-              "THEIR_TURN",
-              "ACTIVE"
-            ],
-            "type": "string"
-          },
-          "tasks": {
-            "items": {
-              "$ref": "#/components/schemas/ThreadTask"
-            },
-            "type": "array"
-          },
-          "unread": {
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "status",
-          "fleetId",
-          "log"
-        ],
-        "type": "object"
-      },
-      "ThreadMsg": {
-        "properties": {
-          "author": {
-            "enum": [
-              "user",
-              "assistant"
-            ],
-            "type": "string"
-          },
-          "auto": {
-            "type": "boolean"
-          },
-          "fileRef": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "text": {
-            "type": "string"
-          },
-          "tool": {
-            "$ref": "#/components/schemas/ToolCall"
-          },
-          "ts": {
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "author"
-        ],
-        "type": "object"
-      },
-      "ThreadNote": {
-        "properties": {
-          "content": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "title",
-          "content"
-        ],
-        "type": "object"
-      },
-      "ThreadTask": {
-        "properties": {
-          "description": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "parentId": {
-            "nullable": true,
-            "type": "string"
-          },
-          "status": {
-            "enum": [
-              "planned",
-              "in_progress",
-              "done"
-            ],
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "status"
-        ],
-        "type": "object"
-      },
-      "ThreadsResponse": {
-        "properties": {
-          "focusedThreadId": {
-            "nullable": true,
-            "type": "string"
-          },
-          "threads": {
-            "items": {
-              "$ref": "#/components/schemas/ThreadDetail"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "threads"
         ],
         "type": "object"
       },
@@ -3796,6 +3793,46 @@
         ]
       }
     },
+    "/api/fleet/{id}/agents": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentsResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Fleet agents + conversation",
+        "tags": [
+          "agent"
+        ]
+      }
+    },
     "/api/fleet/{id}/avatar": {
       "delete": {
         "parameters": [
@@ -4072,14 +4109,14 @@
             "application/json": {
               "schema": {
                 "properties": {
+                  "agent_id": {
+                    "type": "string"
+                  },
                   "limit": {
                     "format": "int32",
                     "type": "integer"
                   },
                   "query": {
-                    "type": "string"
-                  },
-                  "thread_id": {
                     "type": "string"
                   }
                 },
@@ -5236,7 +5273,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Agent"
+                  "$ref": "#/components/schemas/Fleet"
                 }
               }
             },
@@ -5276,7 +5313,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AgentMetrics"
+                  "$ref": "#/components/schemas/FleetMetrics"
                 }
               }
             },
@@ -5432,46 +5469,6 @@
           }
         },
         "summary": "Retire agent",
-        "tags": [
-          "agent"
-        ]
-      }
-    },
-    "/api/fleet/{id}/threads": {
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ThreadsResponse"
-                }
-              }
-            },
-            "description": "Success"
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Agent threads + conversation",
         "tags": [
           "agent"
         ]
@@ -5661,7 +5658,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CreateAgentReceipt"
+                  "$ref": "#/components/schemas/CreateFleetReceipt"
                 }
               }
             },
@@ -5692,7 +5689,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/Agent"
+                    "$ref": "#/components/schemas/Fleet"
                   },
                   "type": "array"
                 }
@@ -5725,7 +5722,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/Agent"
+                    "$ref": "#/components/schemas/Fleet"
                   },
                   "type": "array"
                 }
@@ -6206,7 +6203,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/AgentMetrics"
+                    "$ref": "#/components/schemas/FleetMetrics"
                   },
                   "type": "array"
                 }

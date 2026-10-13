@@ -22,7 +22,7 @@ pub(super) fn core() -> Value {
             "properties": { "error": { "type": "string" } },
             "required": ["error"]
         },
-        "Agent": {
+        "Fleet": {
             "type": "object",
             "properties": {
                 "id": { "type": "string" },
@@ -42,14 +42,14 @@ pub(super) fn core() -> Value {
                 "contextHit": { "type": "integer" },
                 "contextMiss": { "type": "integer" },
                 "task": { "type": "string" },
-                "threads": { "type": "integer" },
+                "agents": { "type": "integer" },
                 "lastActivity": { "type": "string" },
                 "hasAvatar": { "type": "boolean" },
                 "accent": r("AccentToken")
             },
-            "required": ["id", "name", "folder", "status", "costUsd", "threads", "lastActivity"]
+            "required": ["id", "name", "folder", "status", "costUsd", "agents", "lastActivity"]
         },
-        "AgentMetrics": {
+        "FleetMetrics": {
             "type": "object",
             "properties": {
                 "id": { "type": "string" },
@@ -83,7 +83,7 @@ pub(super) fn core() -> Value {
             },
             "required": ["name", "category", "status"]
         },
-        "ThreadDetail": {
+        "AgentDetail": {
             "type": "object",
             "properties": {
                 "id": { "type": "string" },
@@ -101,13 +101,13 @@ pub(super) fn core() -> Value {
                 // Parent agent id when this agent was branched out of another
                 // (branch_agent command); null for an agent created from scratch.
                 "branchedFrom": { "type": "string", "nullable": true },
-                "log": arr(r("ThreadMsg")),
-                "tasks": arr(r("ThreadTask")),
-                "notes": arr(r("ThreadNote"))
+                "log": arr(r("AgentMsg")),
+                "tasks": arr(r("AgentTask")),
+                "notes": arr(r("AgentNote"))
             },
             "required": ["id", "name", "status", "fleetId", "log"]
         },
-        "ThreadTask": {
+        "AgentTask": {
             "type": "object",
             "properties": {
                 "id": { "type": "string" },
@@ -118,7 +118,7 @@ pub(super) fn core() -> Value {
             },
             "required": ["id", "name", "status"]
         },
-        "ThreadNote": {
+        "AgentNote": {
             "type": "object",
             "properties": {
                 "id": { "type": "string" },
@@ -127,7 +127,7 @@ pub(super) fn core() -> Value {
             },
             "required": ["id", "title", "content"]
         },
-        "ThreadMsg": {
+        "AgentMsg": {
             "type": "object",
             "properties": {
                 "id": { "type": "string" },
@@ -152,13 +152,13 @@ pub(super) fn core() -> Value {
             },
             "required": ["name"]
         },
-        "ThreadsResponse": {
+        "AgentsResponse": {
             "type": "object",
             "properties": {
-                "focusedThreadId": { "type": "string", "nullable": true },
-                "threads": arr(r("ThreadDetail"))
+                "focusedAgentId": { "type": "string", "nullable": true },
+                "agents": arr(r("AgentDetail"))
             },
-            "required": ["threads"]
+            "required": ["agents"]
         },
         "LibraryItem": {
             "type": "object",

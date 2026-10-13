@@ -394,8 +394,8 @@ pub fn agents(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
     overlay_roster(&mut details, &roster, fleet_id);
 
     HttpReply::ok(&serde_json::json!({
-        "focusedThreadId": focused_agent_id,
-        "threads": details,
+        "focusedAgentId": focused_agent_id,
+        "agents": details,
     }))
 }
 

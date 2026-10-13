@@ -34,14 +34,14 @@ pub(super) fn paths() -> Value {
         }}),
         // ── Fleet ───────────────────────────────────────────────────
         "/api/fleets": get("fleets", "Raw fleet view (rev-envelope)", json!({ "type": "object" })),
-        "/api/fleets/meta": get("fleets", "List all agents (enriched)", arr(r("Agent"))),
-        "/api/fleets/retired": get("fleets", "List retired agents", arr(r("Agent"))),
+        "/api/fleets/meta": get("fleets", "List all agents (enriched)", arr(r("Fleet"))),
+        "/api/fleets/retired": get("fleets", "List retired agents", arr(r("Fleet"))),
         "/api/fleets/create": post("fleets", "Create a new agent", Some(json!({
             "type": "object",
             "properties": { "name": { "type": "string" }, "folder": { "type": "string" }, "model": { "type": "string" } },
             "required": ["name"]
-        })), r("CreateAgentReceipt")),
-        "/api/metrics": get("fleets", "Fleet-wide metrics", arr(r("AgentMetrics"))),
+        })), r("CreateFleetReceipt")),
+        "/api/metrics": get("fleets", "Fleet-wide metrics", arr(r("FleetMetrics"))),
         // ── Env-keys ────────────────────────────────────────────────
         "/api/env-keys": get("env", "List environment keys", arr(r("EnvKeyStatus"))),
         "/api/env-keys/{name}": merge(
@@ -183,10 +183,10 @@ pub(super) fn paths() -> Value {
         }}),
         // ── Agent (single) ──────────────────────────────────────────
         "/api/fleet/{id}": with_agent(get("agent", "Raw agent view (rev-envelope)", json!({ "type": "object" }))),
-        "/api/fleet/{id}/meta": with_agent(get("agent", "Agent enriched info", r("Agent"))),
-        "/api/fleet/{id}/metrics": with_agent(get("agent", "Agent metrics", r("AgentMetrics"))),
+        "/api/fleet/{id}/meta": with_agent(get("agent", "Agent enriched info", r("Fleet"))),
+        "/api/fleet/{id}/metrics": with_agent(get("agent", "Agent metrics", r("FleetMetrics"))),
         "/api/fleet/{id}/vitals": with_agent(get("agent", "Agent service vitals", arr(r("Vital")))),
-        "/api/fleet/{id}/threads": with_agent(get("agent", "Agent threads + conversation", r("ThreadsResponse"))),
+        "/api/fleet/{id}/agents": with_agent(get("agent", "Fleet agents + conversation", r("AgentsResponse"))),
         "/api/fleet/{id}/usage": with_agent(get("agent", "Usage analytics", json!({ "type": "object" }))),
         "/api/fleet/{id}/library": with_agent(get("agent", "Prompt library", arr(r("LibraryItem")))),
         "/api/fleet/{id}/conversation": with_agent(get("agent", "Conversation feed", arr(r("ConversationMsg")))),
@@ -289,7 +289,7 @@ pub(super) fn paths() -> Value {
             "properties": {
                 "query": { "type": "string" },
                 "limit": { "type": "integer", "format": "int32" },
-                "thread_id": { "type": "string" }
+                "agent_id": { "type": "string" }
             },
             "required": ["query"]
         })), r("ConversationSearchResult"))),

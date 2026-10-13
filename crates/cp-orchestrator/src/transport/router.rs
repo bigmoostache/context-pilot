@@ -130,6 +130,8 @@ pub(super) fn route_rest(method: &Method, segments: &[&str], ctx: RouteCtx<'_>) 
         (&Method::Get, &["api", "fleet", id, "metrics"]) => inspect::metrics::agent(state, id),
         (&Method::Get, &["api", "fleet", id, "vitals"]) => inspect::vitals::agent(state, id),
         (&Method::Get, &["api", "fleet", id, "body", hash]) => rest::body(state, id, hash),
+        (&Method::Get, &["api", "fleet", id, "agents"]) => rest::agents(state, id),
+        // Pre-T860 alias, kept one version for N-1 frontends.
         (&Method::Get, &["api", "fleet", id, "threads"]) => rest::agents(state, id),
         (&Method::Get, &["api", "fleet", id, "usage"]) => inspect::panels::usage(state, id, query),
         (&Method::Get, &["api", "fleet", id, "library"]) => inspect::panels::library(state, id),
