@@ -47,6 +47,12 @@ pub struct AgentMeta<'agent> {
     /// See [`Agent::origin`].
     #[serde(skip_serializing_if = "Option::is_none")]
     origin: Option<&'agent AgentOrigin>,
+    /// See [`Agent::parent_agent_id`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    parent_agent_id: Option<&'agent str>,
+    /// See [`Agent::description`].
+    #[serde(skip_serializing_if = "str::is_empty")]
+    description: &'agent str,
 }
 
 impl<'agent> From<&'agent Agent> for AgentMeta<'agent> {
@@ -59,6 +65,8 @@ impl<'agent> From<&'agent Agent> for AgentMeta<'agent> {
             archived: t.archived,
             paused: t.paused,
             origin: t.origin.as_ref(),
+            parent_agent_id: t.parent_agent_id.as_deref(),
+            description: &t.description,
         }
     }
 }

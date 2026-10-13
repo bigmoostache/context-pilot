@@ -7,6 +7,7 @@ pub mod persist;
 
 /// One-shot boot migration of the pre-T860 `threads` store layout.
 pub mod migrate;
+pub mod tree;
 
 // =============================================================================
 // Enums
@@ -173,6 +174,13 @@ pub struct Agent {
     /// `None` (back-compat with pre-feature data).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<AgentOrigin>,
+    /// Managing agent (`None` = root agent, created by the user). The parent
+    /// links form a forest: see [`tree`] for the cycle and depth checks.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_agent_id: Option<String>,
+    /// One-line purpose shown next to the name in the agents tree.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub description: String,
 }
 
 impl Agent {
@@ -189,6 +197,8 @@ impl Agent {
             archived: false,
             paused: false,
             origin: None,
+            parent_agent_id: None,
+            description: String::new(),
         }
     }
 }
