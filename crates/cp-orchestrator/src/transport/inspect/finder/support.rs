@@ -13,21 +13,18 @@ pub(super) fn fleet_folder(state: &Mutex<Backend>, fleet_id: &str) -> Result<Str
     Ok(entry.folder)
 }
 
-/// Canonicalize and confine a relative path to a root directory.
+/// Canonicalize and confine a path to a root directory.
 ///
-/// Returns `None` if the resolved path escapes `root` (via `..`, symlinks,
-/// or absolute paths). An empty `relative` resolves to `root` itself.
+/// `relative` may also be absolute: agents in a git worktree cite files by
+/// full path (`<root>/.worktrees/<branch>/…`). Either way, `None` when the
+/// resolved path escapes `root` (via `..`, symlinks, or an absolute path
+/// elsewhere). An empty `relative` resolves to `root` itself.
 pub(super) fn confined_path(root: &str, relative: &str) -> Option<PathBuf> {
     let root_path = Path::new(root);
     let root_canonical = root_path.canonicalize().ok()?;
 
     if relative.is_empty() || relative == "." {
         return Some(root_canonical);
-    }
-
-    // Reject absolute paths outright.
-    if relative.starts_with('/') {
-        return None;
     }
 
     let candidate = root_path.join(relative);
@@ -127,8 +124,18 @@ mod tests {
     fn confined_path_rejects_escape() {
         // Trying to escape via ..
         assert!(confined_path("/tmp", "../etc/passwd").is_none());
-        // Absolute path rejected
+        // Absolute path elsewhere rejected
         assert!(confined_path("/tmp", "/etc/passwd").is_none());
+    }
+
+    #[test]
+    fn confined_path_accepts_absolute_inside_root() {
+        let root = std::env::temp_dir().canonicalize().expect("temp dir");
+        let inner = root.join("cp-confined-abs-probe");
+        std::fs::create_dir_all(&inner).expect("mkdir");
+        let got = confined_path(&root.to_string_lossy(), &inner.to_string_lossy());
+        let _r = std::fs::remove_dir(&inner);
+        assert_eq!(got, Some(inner));
     }
 
     #[test]
