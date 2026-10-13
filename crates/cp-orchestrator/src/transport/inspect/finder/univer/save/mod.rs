@@ -34,10 +34,10 @@ static NULL: Value = Value::Null;
 
 /// Patch `path` with `snapshot`; returns the number of cells changed.
 pub(in crate::transport::inspect::finder) fn save(path: &Path, snapshot: &Value) -> Result<usize, &'static str> {
-    let base = super::convert(path).ok_or("could not read the original workbook")?.workbook;
+    let base = super::convert_cached(path).ok_or("could not read the original workbook")?;
     let mut book =
         umya_spreadsheet::reader::xlsx::lazy_read(path).map_err(|_err| "could not read the original workbook")?;
-    let patched = patch_book(&mut book, &base, snapshot)?;
+    let patched = patch_book(&mut book, &base.workbook, snapshot)?;
     lazy::load_chart_sources(&mut book)?;
     write_atomic(&book, path)?;
     Ok(patched)

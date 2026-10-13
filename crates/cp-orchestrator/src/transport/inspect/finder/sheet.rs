@@ -137,12 +137,12 @@ fn univer_reply(target: &std::path::Path) -> Option<HttpReply> {
     if size > super::univer::MAX_FILE_BYTES {
         return Some(HttpReply::error(413, "workbook too large to preview"));
     }
-    let out = super::univer::convert(target)?;
+    let out = super::univer::convert_cached(target)?;
     Some(HttpReply::ok(&serde_json::json!({
         "sheets": [],
         "truncated": out.truncated,
-        "workbook": out.workbook,
-        "activeSheet": out.active_sheet,
+        "workbook": &out.workbook,
+        "activeSheet": &out.active_sheet,
     })))
 }
 

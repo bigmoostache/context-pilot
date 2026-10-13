@@ -82,6 +82,38 @@ pub(super) fn convert(path: &Path) -> Option<Converted> {
     Some(Converted { workbook, active_sheet, truncated })
 }
 
+/// Cache key: the file as it is on disk (path, modification time, size).
+type CacheKey = (std::path::PathBuf, std::time::SystemTime, u64);
+
+/// Cached conversions, newest first.
+type CacheSlots = std::sync::Mutex<Vec<(CacheKey, std::sync::Arc<Converted>)>>;
+
+/// Recent conversions, newest first. A workbook takes ~1.4 s to convert and
+/// is converted again on every open and every save; a save renames a new file
+/// over the original, so its mtime changes and the old entry just goes stale.
+static CACHE: std::sync::LazyLock<CacheSlots> = std::sync::LazyLock::new(|| std::sync::Mutex::new(Vec::new()));
+
+/// Conversions kept in [`CACHE`].
+const CACHE_SLOTS: usize = 4;
+
+/// [`convert`] through [`CACHE`]; the conversion itself runs outside the lock.
+pub(super) fn convert_cached(path: &Path) -> Option<std::sync::Arc<Converted>> {
+    let meta = path.metadata().ok()?;
+    let key: CacheKey = (path.to_path_buf(), meta.modified().ok()?, meta.len());
+    if let Ok(cache) = CACHE.lock()
+        && let Some(hit) = cache.iter().find(|entry| entry.0 == key)
+    {
+        return Some(std::sync::Arc::clone(&hit.1));
+    }
+    let fresh = std::sync::Arc::new(convert(path)?);
+    if let Ok(mut cache) = CACHE.lock() {
+        cache.retain(|entry| entry.0.0 != key.0);
+        cache.insert(0, (key, std::sync::Arc::clone(&fresh)));
+        cache.truncate(CACHE_SLOTS);
+    }
+    Some(fresh)
+}
+
 /// Plugin resources; Univer expects each `data` as a JSON string.
 fn resources(rules: Map<String, Value>, notes: Map<String, Value>) -> Vec<Value> {
     [("SHEET_CONDITIONAL_FORMATTING_PLUGIN", rules), ("SHEET_NOTE_PLUGIN", notes)]
