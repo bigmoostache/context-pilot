@@ -142,7 +142,7 @@ pub(super) fn prepare_stream_context(
     // Pre-compute system + tools token prefix for tick telemetry
     let prompt_prefix_tokens = {
         let _g = crate::profile!("ctx_prefix_tokens");
-        let system_tokens = crate::state::estimate_tokens(&get_active_agent_content(state));
+        let system_tokens = crate::state::estimate_tokens(&get_active_system_content(state));
         let tools_tokens = modules::overview::context::estimate_tool_definitions_tokens(state);
         system_tokens.saturating_add(tools_tokens)
     };
@@ -222,7 +222,7 @@ fn build_reverie_stream_context(
 /// restrictions + a conversation-follows marker.
 fn build_reverie_panel_content(rev: &ReverieContext) -> String {
     let mut content = String::new();
-    let agents = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Agent);
+    let agents = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::System);
     if let Some(agent) = agents.iter().find(|a| a.id == rev.agent_id) {
         content.push_str("## Agent Instructions\n");
         content.push_str(&agent.content);
@@ -273,7 +273,7 @@ pub(crate) fn build_stream_params(
     ctx: StreamContext,
     seed_content: Option<String>,
 ) -> crate::infra::api::StreamParams {
-    let system_prompt = get_active_agent_content(state);
+    let system_prompt = get_active_system_content(state);
     crate::infra::api::StreamParams {
         provider: state.llm_provider,
         model: state.current_model(),
@@ -290,4 +290,4 @@ pub(crate) fn build_stream_params(
 
 /// Default context initialization (panel creation, UID assignment, agent seeds).
 mod init;
-pub(crate) use init::{ensure_default_agent, ensure_default_contexts, get_active_agent_content};
+pub(crate) use init::{ensure_default_contexts, ensure_default_system, get_active_system_content};

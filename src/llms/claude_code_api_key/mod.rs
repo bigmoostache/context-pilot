@@ -130,7 +130,7 @@ impl LlmClient for ClaudeCodeApiKeyClient {
 
         // Handle cleaner mode or custom system prompt
         let system_text =
-            request.system_prompt.as_ref().map_or_else(|| library::default_agent_content().to_owned(), Clone::clone);
+            request.system_prompt.as_ref().map_or_else(|| library::default_system_content().to_owned(), Clone::clone);
 
         // Build messages (api-message conversion + cleaner context + tool results)
         let super::CcJsonResult { mut json_messages, bp_hashes, bp_panel_ids, alive_count, alive_positions_permille } =

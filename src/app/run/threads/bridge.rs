@@ -305,7 +305,7 @@ fn context_inputs_changed(state: &State) -> bool {
     use cp_base::state::data::model_helpers::ModelPricing as _;
     use std::hash::{Hash as _, Hasher as _};
     let mut h = std::collections::hash_map::DefaultHasher::new();
-    cp_mod_prompt::types::PromptState::get(state).active_agent_id.hash(&mut h);
+    cp_mod_prompt::types::PromptState::get(state).active_system_id.hash(&mut h);
     for tool in &state.tools {
         (&tool.name, tool.enabled).hash(&mut h);
     }

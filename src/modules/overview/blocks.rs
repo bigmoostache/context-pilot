@@ -28,7 +28,7 @@ fn token_bar_semantic(total_tokens: usize, threshold: usize) -> Semantic {
 pub(super) fn token_usage_blocks(state: &State) -> Vec<Block> {
     let mut out = Vec::new();
 
-    let system_prompt = cp_mod_prompt::seed::get_active_agent_content(state);
+    let system_prompt = cp_mod_prompt::seed::get_active_system_content(state);
     let system_prompt_tokens = crate::state::estimate_tokens(&system_prompt).saturating_mul(2);
     let tool_def_tokens = super::context::estimate_tool_definitions_tokens(state);
     let panel_tokens: usize = state.thread().context.iter().map(|c| c.token_count).sum();
@@ -262,7 +262,7 @@ pub(super) fn context_elements_blocks(state: &State) -> Vec<Block> {
     let mut rows: Vec<Vec<Cell>> = Vec::new();
 
     // System prompt entry (×2 — sent in system field + seed re-injection)
-    let system_prompt = cp_mod_prompt::seed::get_active_agent_content(state);
+    let system_prompt = cp_mod_prompt::seed::get_active_system_content(state);
     let system_prompt_tokens = crate::state::estimate_tokens(&system_prompt).saturating_mul(2);
     accumulated = accumulated.saturating_add(system_prompt_tokens);
     rows.push(non_panel_row("system-prompt (\u{d7}2)".to_owned(), system_prompt_tokens, accumulated));

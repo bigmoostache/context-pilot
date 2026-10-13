@@ -266,7 +266,7 @@ pub(crate) fn delete_library_agent(state: &Mutex<Backend>, id: &str, item_id: &s
 /// Look up a compiled-in seed agent by id (for the built-in Export/Edit
 /// fallback + the `builtin` flag).
 fn seed_fleet(item_id: &str) -> Option<&'static cp_base::config::SeedEntry> {
-    cp_base::config::accessors::library::agents().iter().find(|s| s.id == item_id)
+    cp_base::config::accessors::library::systems().iter().find(|s| s.id == item_id)
 }
 
 /// Compose a prompt `.md` — YAML frontmatter (`name`/`description`) + body.

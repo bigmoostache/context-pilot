@@ -163,7 +163,7 @@ pub struct StatusBar {
     /// Primary status badge (e.g. "Streaming", "Ready").
     pub badge: Badge,
     /// Active agent card.
-    pub agent: Option<AgentCard>,
+    pub agent: Option<SystemCard>,
     /// Loaded skills.
     pub skills: Vec<SkillCard>,
     /// Git branch + changes summary.
@@ -207,7 +207,7 @@ pub struct StopReason {
 
 /// Active agent indicator.
 #[derive(Debug, Clone, Serialize)]
-pub struct AgentCard {
+pub struct SystemCard {
     /// Agent display name.
     pub name: String,
 }

@@ -46,7 +46,7 @@ pub(crate) fn estimate_tool_definitions_tokens(state: &State) -> usize {
 /// the `system` field and the seed re-injection) + every enabled tool
 /// definition + the sum of all live context-panel token counts.
 pub(crate) fn context_usage(state: &State) -> (usize, usize, usize) {
-    let system_prompt = cp_mod_prompt::seed::get_active_agent_content(state);
+    let system_prompt = cp_mod_prompt::seed::get_active_system_content(state);
     let system_prompt_tokens = estimate_tokens(&system_prompt).saturating_mul(2);
     let tool_def_tokens = estimate_tool_definitions_tokens(state);
     let panel_tokens: usize = state.thread().context.iter().map(|c| c.token_count).sum();
@@ -74,7 +74,7 @@ pub(crate) fn context_usage(state: &State) -> (usize, usize, usize) {
 /// The non-panel prefix is classed entirely as a hit because it is byte-stable
 /// across turns and therefore always rides the cache breakpoint.
 pub(crate) fn context_hit_miss(state: &State) -> (usize, usize) {
-    let system_prompt = cp_mod_prompt::seed::get_active_agent_content(state);
+    let system_prompt = cp_mod_prompt::seed::get_active_system_content(state);
     let system_prompt_tokens = estimate_tokens(&system_prompt).saturating_mul(2);
     let tool_def_tokens = estimate_tool_definitions_tokens(state);
 
@@ -139,7 +139,7 @@ fn write_panel_line(
 /// This is separate from the TUI rendering (`overview_render.rs`).
 pub(crate) fn generate_context_content(state: &State) -> String {
     // Estimate system prompt tokens
-    let system_prompt = cp_mod_prompt::seed::get_active_agent_content(state);
+    let system_prompt = cp_mod_prompt::seed::get_active_system_content(state);
     // The system prompt is sent twice: once in the system field, once as seed re-injection
     let system_prompt_tokens = estimate_tokens(&system_prompt).saturating_mul(2);
 

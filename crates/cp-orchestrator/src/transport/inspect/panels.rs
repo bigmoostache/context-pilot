@@ -78,12 +78,12 @@ pub fn library(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
     };
 
     // The active behaviour agent is persisted at config.json
-    // `modules.system.active_agent_id` (the PromptModule's global module data —
+    // `modules.system.active_system_id` (the PromptModule's global module data —
     // it is `is_global()`, so `build_module_data_maps` writes it under
     // `Shared.modules["system"]`). Read it via the mtime-cached inspector so
     // the footer selector can mark which agent is loaded, the same disk-read
     // mechanism `usage()` uses. Absent (older state / never switched) → None.
-    let active_agent_id: Option<String> = {
+    let active_system_id: Option<String> = {
         match state.lock() {
             Ok(mut b) => b.inspect_mut().read_config(Path::new(&folder)).ok().and_then(|cfg| {
                 cfg.get("modules")
@@ -104,7 +104,7 @@ pub fn library(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
     let mut items: Vec<serde_json::Value> = Vec::new();
 
     for (kind, subdir) in [("agent", "agents"), ("skill", "skills"), ("command", "commands")] {
-        collect_kind_items(kind, &cp_dir.join(subdir), active_agent_id.as_deref(), &mut items);
+        collect_kind_items(kind, &cp_dir.join(subdir), active_system_id.as_deref(), &mut items);
     }
 
     HttpReply::ok(&items)
@@ -116,7 +116,7 @@ pub fn library(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
 ///
 /// Mirrors the tui-side `cp_mod_prompt::storage::load_prompts_for` merge — one
 /// seed source (`yamls/library.yaml` via `cp_base`), disk wins on id.
-fn collect_kind_items(kind: &str, dir: &Path, active_agent_id: Option<&str>, items: &mut Vec<serde_json::Value>) {
+fn collect_kind_items(kind: &str, dir: &Path, active_system_id: Option<&str>, items: &mut Vec<serde_json::Value>) {
     let seeds = seed_entries(kind);
 
     let mut disk_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -141,7 +141,7 @@ fn collect_kind_items(kind: &str, dir: &Path, active_agent_id: Option<&str>, ite
                 name: &name,
                 description: &description,
                 content: &content,
-                active_agent_id,
+                active_system_id,
                 is_builtin,
             }));
         }
@@ -153,7 +153,7 @@ fn collect_kind_items(kind: &str, dir: &Path, active_agent_id: Option<&str>, ite
         if disk_ids.contains(&seed.id) {
             continue;
         }
-        let active = (kind == "agent" && active_agent_id == Some(seed.id.as_str())).then_some(true);
+        let active = (kind == "agent" && active_system_id == Some(seed.id.as_str())).then_some(true);
         let body = (kind == "command").then(|| seed.content.clone());
         items.push(serde_json::json!({
             "id": seed.id,
@@ -173,7 +173,7 @@ fn collect_kind_items(kind: &str, dir: &Path, active_agent_id: Option<&str>, ite
 fn seed_entries(kind: &str) -> &'static [cp_base::config::SeedEntry] {
     use cp_base::config::accessors::library;
     match kind {
-        "agent" => library::agents(),
+        "agent" => library::systems(),
         "skill" => library::skills(),
         "command" => library::commands(),
         _ => &[],
@@ -195,7 +195,7 @@ struct LibraryItemParts<'parts> {
     /// Raw `.md` file contents (command body is parsed from this).
     content: &'parts str,
     /// The currently loaded behaviour agent id, if any.
-    active_agent_id: Option<&'parts str>,
+    active_system_id: Option<&'parts str>,
     /// Whether this id also exists as a compiled-in seed.
     is_builtin: bool,
 }
@@ -209,7 +209,7 @@ struct LibraryItemParts<'parts> {
 /// file is a local OVERRIDE of a built-in).
 fn library_item(parts: &LibraryItemParts<'_>) -> serde_json::Value {
     let body = (parts.kind == "command").then(|| parse_command_body(parts.content));
-    let active = (parts.kind == "agent" && parts.active_agent_id == Some(parts.id)).then_some(true);
+    let active = (parts.kind == "agent" && parts.active_system_id == Some(parts.id)).then_some(true);
     serde_json::json!({
         "id": parts.id,
         "name": parts.name,

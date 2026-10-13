@@ -13,7 +13,7 @@ pub(crate) mod reverie;
 /// Main event loop, streaming, tool pipeline, watchers.
 pub(crate) mod run;
 
-pub(crate) use context::{ensure_default_agent, ensure_default_contexts};
+pub(crate) use context::{ensure_default_contexts, ensure_default_system};
 
 use std::sync::mpsc::{Receiver, Sender};
 

@@ -172,7 +172,7 @@ pub enum Kind {
 
     /// Switch the agent's active behaviour agent (prompt-library system
     /// prompt) by library id. An empty id reverts to the default agent —
-    /// same contract as the agent-side `agent_load` tool, which this shares.
+    /// same contract as the agent-side `system_load` tool, which this shares.
     #[serde(rename = "load_behaviour")]
     LoadBehaviour {
         /// Prompt-library agent id to activate (empty = default).

@@ -1,6 +1,6 @@
-//! Prompt library module — agents, skills, and commands.
+//! Prompt library module — systems, skills, and commands.
 //!
-//! Three tools: `Behaviour_create` (unified create), `agent_load`, `skill_load`.
+//! Three tools: `Behaviour_create` (unified create), `system_load`, `skill_load`.
 //! Editing and deletion done via file operations — the AI uses `Edit` on `.md`
 //! files directly. Pre-flight validates YAML frontmatter on edits.
 
@@ -8,16 +8,16 @@
 mod library_blocks;
 /// Panel rendering for the prompt library overview.
 mod library_panel;
-/// Built-in agent and skill definitions seeded on first run.
+/// Built-in system and skill definitions seeded on first run.
 pub mod seed;
 /// Panel rendering for loaded skill content.
 mod skill_panel;
-/// Persistent storage for prompt items (agents, skills, commands).
+/// Persistent storage for prompt items (systems, skills, commands).
 pub mod storage;
-/// Tool handlers for `Behaviour_create`, `agent_load`, `skill_load`.
+/// Tool handlers for `Behaviour_create`, `system_load`, `skill_load`.
 ///
-/// Public so the tui bridge can call [`tools::set_active_agent`] to apply a
-/// `LoadBehaviour` command through the same path as the `agent_load` tool.
+/// Public so the tui bridge can call [`tools::set_active_system`] to apply a
+/// `LoadBehaviour` command through the same path as the `system_load` tool.
 pub mod tools;
 /// Prompt item types: `PromptItem`, `PromptState`, `PromptType`.
 pub mod types;
@@ -40,7 +40,7 @@ use cp_base::modules::Module;
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/prompt.yaml")));
 
-/// Prompt library module: agents, skills, commands — the ship's charter.
+/// Prompt library module: systems, skills, commands — the ship's charter.
 #[derive(Debug, Clone, Copy)]
 pub struct PromptModule;
 
@@ -67,7 +67,7 @@ impl Module for PromptModule {
         "System"
     }
     fn description(&self) -> &'static str {
-        "Prompt library \u{2014} agents, skills, commands"
+        "Prompt library \u{2014} systems, skills, commands"
     }
     fn is_core(&self) -> bool {
         true
@@ -86,21 +86,19 @@ impl Module for PromptModule {
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         let ps = PromptState::get(state);
         serde_json::json!({
-            "active_agent_id": ps.active_agent_id,
+            "active_system_id": ps.active_system_id,
+            // Legacy key (pre-T860), still read by older orchestrators.
+            "active_agent_id": ps.active_system_id,
             "loaded_skill_ids": ps.loaded_skill_ids,
         })
     }
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         let ps = PromptState::get_mut(state);
-        if let Some(v) = data.get("active_agent_id") {
-            ps.active_agent_id = v.as_str().map(String::from);
-        }
-        // Backwards compatibility: try old field name
-        if ps.active_agent_id.is_none()
-            && let Some(v) = data.get("active_system_id")
-        {
-            ps.active_agent_id = v.as_str().map(String::from);
+        // `active_agent_id` is the legacy (pre-T860) key; the new one wins.
+        let active = data.get("active_system_id").filter(|v| !v.is_null()).or_else(|| data.get("active_agent_id"));
+        if let Some(v) = active {
+            ps.active_system_id = v.as_str().map(String::from);
         }
         if let Some(arr) = data.get("loaded_skill_ids")
             && let Ok(v) = serde_json::from_value(arr.clone())
@@ -140,9 +138,9 @@ impl Module for PromptModule {
                 .param("description", ParamType::String, false)
                 .param("content", ParamType::String, true)
                 .build(),
-            ToolDefinition::from_yaml("agent_load", t)
-                .short_desc("Activate agent")
-                .category("Agent")
+            ToolDefinition::from_yaml("system_load", t)
+                .short_desc("Activate system prompt")
+                .category("System")
                 .param("id", ParamType::String, false)
                 .build(),
             ToolDefinition::from_yaml("skill_load", t)
@@ -157,7 +155,7 @@ impl Module for PromptModule {
     fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
         match tool.name.as_str() {
             "Behaviour_create" => Some(preflight_behaviour_create(tool)),
-            "agent_load" => Some(preflight_agent_load(tool)),
+            "system_load" => Some(preflight_system_load(tool)),
             "skill_load" => Some(preflight_skill_load(tool, state)),
             "Edit" => preflight_edit_prompt_file(tool),
             _ => None,
@@ -171,7 +169,7 @@ impl Module for PromptModule {
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
         vec![
             ("Behaviour_create", visualize_prompt_output),
-            ("agent_load", visualize_prompt_output),
+            ("system_load", visualize_prompt_output),
             ("skill_load", visualize_prompt_output),
         ]
     }
@@ -218,8 +216,8 @@ impl Module for PromptModule {
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
         vec![
-            ("Behaviour", "Create agents, skills, or commands"),
-            ("Agent", "Activate system prompt agents"),
+            ("Behaviour", "Create systems, skills, or commands"),
+            ("System", "Activate system prompts"),
             ("Skill", "Load knowledge skills as context"),
         ]
     }
@@ -289,11 +287,12 @@ fn preflight_behaviour_create(tool: &ToolUse) -> Verdict {
     let mut pf = Verdict::new();
     let type_str = tool.input.get("type").and_then(|v| v.as_str()).unwrap_or("");
     let pt_opt = match type_str {
-        "agent" => Some(PromptType::Agent),
+        // "agent" kept as a legacy alias (pre-T860 name).
+        "system" | "agent" => Some(PromptType::System),
         "skill" => Some(PromptType::Skill),
         "command" => Some(PromptType::Command),
         _ => {
-            pf.errors.push(format!("Invalid type '{type_str}' — must be 'agent', 'skill', or 'command'"));
+            pf.errors.push(format!("Invalid type '{type_str}' — must be 'system', 'skill', or 'command'"));
             None
         }
     };
@@ -311,15 +310,15 @@ fn preflight_behaviour_create(tool: &ToolUse) -> Verdict {
     pf
 }
 
-/// Pre-flight for `agent_load`: verify the agent ID exists (empty = default).
-fn preflight_agent_load(tool: &ToolUse) -> Verdict {
+/// Pre-flight for `system_load`: verify the system ID exists (empty = default).
+fn preflight_system_load(tool: &ToolUse) -> Verdict {
     let mut pf = Verdict::new();
     if let Some(id) = tool.input.get("id").and_then(|v| v.as_str())
         && !id.is_empty()
     {
-        let agents = storage::load_prompts_for(PromptType::Agent);
-        if !agents.iter().any(|a| a.id == id) {
-            pf.errors.push(format!("Agent '{id}' not found"));
+        let systems = storage::load_prompts_for(PromptType::System);
+        if !systems.iter().any(|a| a.id == id) {
+            pf.errors.push(format!("System '{id}' not found"));
         }
     }
     pf
@@ -345,7 +344,7 @@ fn preflight_skill_load(tool: &ToolUse, state: &State) -> Verdict {
 /// Handles both absolute and relative paths by canonicalizing comparison.
 fn is_prompt_file(path: &str) -> bool {
     let p = std::path::Path::new(path);
-    [PromptType::Agent, PromptType::Skill, PromptType::Command].iter().any(|pt| {
+    [PromptType::System, PromptType::Skill, PromptType::Command].iter().any(|pt| {
         let dir = storage::dir_for(*pt);
         // Try canonical comparison first (handles absolute vs relative)
         if let (Ok(canon_path), Ok(canon_dir)) = (p.canonicalize(), dir.canonicalize()) {
@@ -397,14 +396,14 @@ fn prompt_line_semantic(line: &str) -> cp_render::Semantic {
         Semantic::Info
     } else if line.starts_with("Deleted") || line.starts_with("Unloaded") {
         Semantic::Warning
-    } else if line.contains("agent") || line.contains("skill") || line.contains("command") || line.contains('\'') {
+    } else if line.contains("system") || line.contains("skill") || line.contains("command") || line.contains('\'') {
         Semantic::Info
     } else {
         Semantic::Default
     }
 }
 
-/// Visualizer for prompt/agent/skill/command tool results.
+/// Visualizer for prompt/system/skill/command tool results.
 /// Highlights entity names, shows active status, and differentiates CRUD operations visually.
 fn visualize_prompt_output(content: &str, width: usize) -> Vec<cp_render::Block> {
     use cp_render::{Block, Span};

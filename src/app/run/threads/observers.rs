@@ -78,10 +78,10 @@ pub(in crate::app::run) fn emit_thread_focus(app: &mut App) {
 ///
 /// A main-loop **observe-on-change chokepoint** — the exact idiom of
 /// [`emit_thread_status`] / [`emit_thread_focus`]: it diffs the live
-/// [`PromptState::active_agent_id`] against the snapshot held in
+/// [`PromptState::active_system_id`] against the snapshot held in
 /// [`BridgeState::last_behaviour`] and emits **only on an actual change**, so it
 /// captures a switch from *every* source with one uniform path — the local
-/// `agent_load` tool **and** a web `LoadBehaviour` command — rather than an emit
+/// `system_load` tool **and** a web `LoadBehaviour` command — rather than an emit
 /// call scattered at each mutation site.
 ///
 /// The active behaviour is disposable UI state (the same class as focus/phase),
@@ -100,7 +100,7 @@ pub(in crate::app::run) fn emit_behaviour(app: &mut App) {
         return;
     }
 
-    let active = cp_mod_prompt::types::PromptState::get(&app.state).active_agent_id.clone();
+    let active = cp_mod_prompt::types::PromptState::get(&app.state).active_system_id.clone();
 
     // First pass: snapshot the existing active behaviour without emitting.
     let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.behaviour());

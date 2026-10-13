@@ -302,7 +302,7 @@ pub enum OpEntryKind {
     },
 
     /// The agent's active **behaviour agent** (system prompt) changed — a new
-    /// library agent was loaded (or reverted to default) via the `agent_load`
+    /// library agent was loaded (or reverted to default) via the `system_load`
     /// tool or the web footer's `LoadBehaviour` command.
     ///
     /// Ephemeral, disposable UI signal in the same class as

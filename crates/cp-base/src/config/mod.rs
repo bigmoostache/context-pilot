@@ -19,14 +19,14 @@ pub struct Prompts {
     pub context_threshold_notification: String,
 }
 
-/// Seed data for the prompt library: built-in agents, skills, and commands.
+/// Seed data for the prompt library: built-in systems, skills, and commands.
 /// Loaded from `yamls/library.yaml`.
 #[derive(Debug, Deserialize)]
 pub struct Library {
-    /// ID of the agent used when none is explicitly selected.
-    pub default_agent_id: String,
-    /// Built-in agent definitions (system prompts).
-    pub agents: Vec<SeedEntry>,
+    /// ID of the system used when none is explicitly selected.
+    pub default_system_id: String,
+    /// Built-in system definitions (system prompts).
+    pub systems: Vec<SeedEntry>,
     /// Built-in skill definitions (loadable context panels).
     #[serde(default)]
     pub skills: Vec<SeedEntry>,

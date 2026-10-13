@@ -6,7 +6,7 @@ use crate::infra::api::StreamEvent;
 use crate::infra::constants::MAX_API_RETRIES;
 
 use crate::app::App;
-use crate::app::context::{build_stream_params, get_active_agent_content, prepare_stream_context};
+use crate::app::context::{build_stream_params, get_active_system_content, prepare_stream_context};
 use crate::state::cache::{CacheUpdate, process_cache_request};
 use crate::state::{State, StreamPhase, get_context_type_meta};
 
@@ -161,7 +161,7 @@ pub(super) fn handle_retry(app: &mut App) {
                 msg.content.clear();
             }
             let ctx = prepare_stream_context(&mut app.state, true, None);
-            let system_prompt = get_active_agent_content(&app.state);
+            let system_prompt = get_active_system_content(&app.state);
             app.stream_rt_mut().typewriter.reset();
             app.stream_rt_mut().pending_done = None;
             let params = build_stream_params(&app.state, ctx, Some(system_prompt));
@@ -216,7 +216,7 @@ pub(in crate::app::run) fn spawn_stream_with_context(app: &mut App, include_last
     };
     let system_prompt = {
         let _g = crate::profile!("active_agent_content");
-        get_active_agent_content(&app.state)
+        get_active_system_content(&app.state)
     };
     let params = {
         let _g = crate::profile!("build_stream_params");

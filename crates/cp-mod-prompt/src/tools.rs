@@ -12,13 +12,13 @@ pub(crate) fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> 
     let _fg = cp_base::flame!("prompt_dispatch");
     match tool.name.as_str() {
         "Behaviour_create" => Some(behaviour_create(tool, state)),
-        "agent_load" => Some(agent_load(tool, state)),
+        "system_load" => Some(system_load(tool, state)),
         "skill_load" => Some(skill_load(tool, state)),
         _ => None,
     }
 }
 
-/// Create a new behaviour (agent, skill, or command) as a `.md` file.
+/// Create a new behaviour (system, skill, or command) as a `.md` file.
 /// Fails if a file with that ID already exists.
 fn behaviour_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let name = tool.input.get("name").and_then(|v| v.as_str()).unwrap_or("").to_owned();
@@ -34,13 +34,14 @@ fn behaviour_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     let prompt_type = match type_str {
-        "agent" => PromptType::Agent,
+        // "agent" kept as a legacy alias (pre-T860 name).
+        "system" | "agent" => PromptType::System,
         "skill" => PromptType::Skill,
         "command" => PromptType::Command,
         _ => {
             return ToolResult::new(
                 tool.id.clone(),
-                format!("Invalid type '{type_str}' — must be 'agent', 'skill', or 'command'"),
+                format!("Invalid type '{type_str}' — must be 'system', 'skill', or 'command'"),
                 true,
             );
         }
@@ -74,50 +75,50 @@ fn behaviour_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     storage::invalidate_index();
 
     state.touch_panel(Kind::LIBRARY);
-    if prompt_type == PromptType::Agent {
+    if prompt_type == PromptType::System {
         state.touch_panel(Kind::SYSTEM);
     }
 
     ToolResult::new(tool.id.clone(), format!("Created {type_str} '{name}' (ID: {id}) at {}", path.display()), false)
 }
 
-/// Set the active behaviour agent by id (empty `id` reverts to default).
+/// Set the active behaviour system by id (empty `id` reverts to default).
 ///
-/// Shared by the `agent_load` tool and the bridge `LoadBehaviour` command so
-/// both mutate active-agent state through one path. Touches the SYSTEM +
-/// LIBRARY panels on success and returns the switched-to agent's display name.
+/// Shared by the `system_load` tool and the bridge `LoadBehaviour` command so
+/// both mutate active-system state through one path. Touches the SYSTEM +
+/// LIBRARY panels on success and returns the switched-to system's display name.
 ///
 /// # Errors
 ///
-/// Returns an `Err` message when `id` is non-empty but names no known agent.
-pub fn set_active_agent(state: &mut State, id: &str) -> Result<String, String> {
+/// Returns an `Err` message when `id` is non-empty but names no known system.
+pub fn set_active_system(state: &mut State, id: &str) -> Result<String, String> {
     if id.is_empty() {
-        let default = library::default_agent_id().to_owned();
-        PromptState::get_mut(state).active_agent_id = Some(default.clone());
+        let default = library::default_system_id().to_owned();
+        PromptState::get_mut(state).active_system_id = Some(default.clone());
         state.touch_panel(Kind::SYSTEM);
         state.touch_panel(Kind::LIBRARY);
-        return Ok(format!("default agent ({default})"));
+        return Ok(format!("default system ({default})"));
     }
 
-    // Dynamically load agents from disk to check existence.
-    let all_agents = storage::load_prompts_for(PromptType::Agent);
-    let Some(agent) = all_agents.iter().find(|a| a.id == id) else {
-        return Err(format!("Agent '{id}' not found"));
+    // Dynamically load systems from disk to check existence.
+    let all_systems = storage::load_prompts_for(PromptType::System);
+    let Some(system) = all_systems.iter().find(|a| a.id == id) else {
+        return Err(format!("System '{id}' not found"));
     };
-    let name = agent.name.clone();
+    let name = system.name.clone();
 
-    PromptState::get_mut(state).active_agent_id = Some(id.to_owned());
+    PromptState::get_mut(state).active_system_id = Some(id.to_owned());
     state.touch_panel(Kind::SYSTEM);
     state.touch_panel(Kind::LIBRARY);
     Ok(name)
 }
 
-/// Set the active agent by ID, or revert to the default agent.
-fn agent_load(tool: &ToolUse, state: &mut State) -> ToolResult {
+/// Set the active system by ID, or revert to the default system.
+fn system_load(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = tool.input.get("id").and_then(|v| v.as_str()).unwrap_or("");
-    match set_active_agent(state, id) {
+    match set_active_system(state, id) {
         Ok(name) if id.is_empty() => ToolResult::new(tool.id.clone(), format!("Switched to {name}"), false),
-        Ok(name) => ToolResult::new(tool.id.clone(), format!("Loaded agent '{name}' ({id})"), false),
+        Ok(name) => ToolResult::new(tool.id.clone(), format!("Loaded system '{name}' ({id})"), false),
         Err(e) => ToolResult::new(tool.id.clone(), e, true),
     }
 }

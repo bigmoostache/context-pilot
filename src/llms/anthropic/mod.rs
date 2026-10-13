@@ -76,7 +76,7 @@ pub(in crate::llms) fn build_messages_and_system(request: &LlmRequest) -> (Vec<A
     }
 
     let system_prompt = request.system_prompt.as_ref().map_or_else(
-        || library::default_agent_content().to_owned(),
+        || library::default_system_content().to_owned(),
         |prompt| {
             if let Some(context) = request.extra_context.as_ref() {
                 let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace(concat!("{", "context", "}"), context);

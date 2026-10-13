@@ -1,22 +1,22 @@
-//! Accessors for the seed prompt library (agents, skills, commands).
+//! Accessors for the seed prompt library (systems, skills, commands).
 
 use crate::config::LIBRARY;
 
-/// Default agent ID (used when none is selected).
+/// Default system ID (used when none is selected).
 #[must_use]
-pub fn default_agent_id() -> &'static str {
-    &LIBRARY.default_agent_id
+pub fn default_system_id() -> &'static str {
+    &LIBRARY.default_system_id
 }
-/// Content body of the default agent.
+/// Content body of the default system.
 #[must_use]
-pub fn default_agent_content() -> &'static str {
-    let id = &LIBRARY.default_agent_id;
-    LIBRARY.agents.iter().find(|a| a.id == *id).map_or("", |a| a.content.as_str())
+pub fn default_system_content() -> &'static str {
+    let id = &LIBRARY.default_system_id;
+    LIBRARY.systems.iter().find(|a| a.id == *id).map_or("", |a| a.content.as_str())
 }
-/// All built-in agent definitions.
+/// All built-in system definitions.
 #[must_use]
-pub fn agents() -> &'static [crate::config::SeedEntry] {
-    &LIBRARY.agents
+pub fn systems() -> &'static [crate::config::SeedEntry] {
+    &LIBRARY.systems
 }
 /// All built-in skill definitions.
 #[must_use]

@@ -215,7 +215,7 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 
-use app::{App, ensure_default_agent, ensure_default_contexts};
+use app::{App, ensure_default_contexts, ensure_default_system};
 use state::cache::CacheUpdate;
 use state::persistence::{
     boot_assemble_state, boot_extract_module_data, boot_init_modules, boot_load_config, boot_load_messages,
@@ -370,7 +370,7 @@ fn boot_app_state(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, steps: 
 
     // Phase 6: Prepare workspace
     ensure_default_contexts(&mut state);
-    ensure_default_agent(&mut state);
+    ensure_default_system(&mut state);
     mark_step_done(steps, STEP_WORKSPACE);
     render_boot_screen(terminal, steps);
 

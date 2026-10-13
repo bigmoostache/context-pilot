@@ -9,9 +9,28 @@ use crate::types::{PromptItem, PromptType};
 /// Subdirectory names under .context-pilot/ for each prompt type
 const fn subdir_for(pt: PromptType) -> &'static str {
     match pt {
-        PromptType::Agent => "agents",
+        PromptType::System => "systems",
         PromptType::Skill => "skills",
         PromptType::Command => "commands",
+    }
+}
+
+/// One-shot rename of the shared `behaviours/agents/` dir to `behaviours/systems/` (T860 A0c).
+///
+/// Leaves an `agents -> systems` symlink so binaries still reading the legacy
+/// dir keep working. Idempotent: a no-op once the new dir exists or the legacy
+/// one is gone. Best-effort, errors are ignored.
+pub fn migrate_agents_to_systems() {
+    let root = constants::home_behaviours_dir();
+    let old = root.join("agents");
+    let new = root.join("systems");
+    let old_is_real_dir = fs::symlink_metadata(&old).is_ok_and(|m| m.is_dir());
+    if new.exists() || !old_is_real_dir {
+        return;
+    }
+    if fs::rename(&old, &new).is_ok() {
+        #[cfg(unix)]
+        drop(std::os::unix::fs::symlink("systems", &old));
     }
 }
 
@@ -42,7 +61,7 @@ fn legacy_local_dir(pt: PromptType) -> PathBuf {
 /// so the already-shared file keeps the plain id, untouched. The now-empty
 /// local dirs are left in place (harmless; avoids dir-removal races).
 pub fn migrate_local_to_shared() {
-    for pt in [PromptType::Agent, PromptType::Skill, PromptType::Command] {
+    for pt in [PromptType::System, PromptType::Skill, PromptType::Command] {
         let local = legacy_local_dir(pt);
         let Ok(entries) = fs::read_dir(&local) else { continue };
         let shared = dir_for(pt);
@@ -190,7 +209,7 @@ pub(crate) fn slugify(name: &str) -> String {
 struct PromptIndex {
     /// Fingerprint of the three behaviour dirs at build time (see [`dirs_fingerprint`]).
     fingerprint: u64,
-    /// Agent, skill, command lists, indexed by [`type_slot`]; `None` = not built yet.
+    /// System, skill, command lists, indexed by [`type_slot`]; `None` = not built yet.
     lists: [Option<Arc<[PromptItem]>>; 3],
 }
 
@@ -203,7 +222,7 @@ static INDEX: Mutex<PromptIndex> = Mutex::new(PromptIndex { fingerprint: 0, list
 /// Slot of a prompt type in [`PromptIndex::lists`].
 const fn type_slot(pt: PromptType) -> usize {
     match pt {
-        PromptType::Agent => 0,
+        PromptType::System => 0,
         PromptType::Skill => 1,
         PromptType::Command => 2,
     }
@@ -215,7 +234,7 @@ const fn type_slot(pt: PromptType) -> usize {
 pub fn dirs_fingerprint() -> u64 {
     use std::hash::{Hash as _, Hasher as _};
     let mut h = std::collections::hash_map::DefaultHasher::new();
-    for pt in [PromptType::Agent, PromptType::Skill, PromptType::Command] {
+    for pt in [PromptType::System, PromptType::Skill, PromptType::Command] {
         // Sum of per-file hashes: `read_dir` order is unspecified.
         let files = fs::read_dir(dir_for(pt)).map_or(0u64, |rd| {
             rd.flatten().fold(0u64, |acc, e| {
@@ -272,7 +291,7 @@ fn read_prompts_for(pt: PromptType) -> Vec<PromptItem> {
     let mut items = load_prompts_from_dir(&dir_for(pt), pt);
 
     let builtins = match pt {
-        PromptType::Agent => library::agents(),
+        PromptType::System => library::systems(),
         PromptType::Skill => library::skills(),
         PromptType::Command => library::commands(),
     };

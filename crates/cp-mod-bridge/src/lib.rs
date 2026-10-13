@@ -153,10 +153,10 @@ pub struct BridgeState {
     /// Last active **behaviour agent** id emitted as a
     /// [`BehaviourChanged`](cp_wire::types::oplog::OpEntryKind::BehaviourChanged)
     /// delta. The behaviour chokepoint diffs the live
-    /// `PromptState.active_agent_id` against this memo every tick and emits only
+    /// `PromptState.active_system_id` against this memo every tick and emits only
     /// on an actual change (the same observe-on-change discipline as the
     /// status/focus/vitals chokepoints), so switching the active system prompt
-    /// from *any* source (the `agent_load` tool or the web footer's
+    /// from *any* source (the `system_load` tool or the web footer's
     /// `LoadBehaviour` command) reaches the frontend — which invalidates its
     /// library query — in milliseconds, not on the coarse `config.json` mtime
     /// backstop. `None` until the first seed.

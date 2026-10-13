@@ -421,13 +421,13 @@ fn apply_configure(state: &mut State, provider_str: &str, model_str: &str) {
 /// Switch the agent's active behaviour agent (prompt-library system prompt)
 /// from the web footer selector. An empty `id` reverts to the default agent.
 ///
-/// Routed through the shared [`cp_mod_prompt::tools::set_active_agent`] so the
-/// bridge command and the local `agent_load` tool mutate the same
-/// `PromptState.active_agent_id` through one path (no duplication). The touched
+/// Routed through the shared [`cp_mod_prompt::tools::set_active_system`] so the
+/// bridge command and the local `system_load` tool mutate the same
+/// `PromptState.active_system_id` through one path (no duplication). The touched
 /// SYSTEM + LIBRARY panels re-render; the active flag surfaces to the web
 /// footer on the next `library()` inspect read.
 fn apply_load_behaviour(state: &mut State, id: &str) {
-    match cp_mod_prompt::tools::set_active_agent(state, id) {
+    match cp_mod_prompt::tools::set_active_system(state, id) {
         Ok(name) => {
             state.flags.ui.dirty = true;
             log::info!("bridge: loaded behaviour agent {name} (id={id:?})");

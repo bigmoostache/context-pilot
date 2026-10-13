@@ -5,7 +5,7 @@
 
 use cp_render::Semantic;
 use cp_render::frame::{
-    AgentCard, Badge, GitChanges, QueueCard, ReverieCard, SkillCard, StatusBar, StopReason, ThinkCard,
+    Badge, GitChanges, QueueCard, ReverieCard, SkillCard, StatusBar, StopReason, SystemCard, ThinkCard,
 };
 use ratatui::prelude::{Frame, Line, Rect, Span, Style};
 use ratatui::widgets::Paragraph;
@@ -55,7 +55,7 @@ fn push_stop_agent_skills(spans: &mut Vec<Span<'static>>, status: &StatusBar, ba
         push_card(
             spans,
             format!(" 🤖 {} ", agent.name),
-            Style::default().fg(theme::card_text()).bg(theme::card_agent_bg()).bold(),
+            Style::default().fg(theme::card_text()).bg(theme::card_system_bg()).bold(),
             base,
         );
     }
@@ -195,7 +195,7 @@ const fn needs_spinner(semantic: Semantic) -> bool {
 pub(crate) fn build_status_bar(state: &State) -> StatusBar {
     StatusBar {
         badge: build_badge(state),
-        agent: build_agent(state),
+        agent: build_system(state),
         skills: build_skills(state),
         git: build_git(state),
 
@@ -249,12 +249,12 @@ fn build_badge(state: &State) -> Badge {
 // ── Agent + skills ───────────────────────────────────────────────────
 
 /// Build active agent card.
-fn build_agent(state: &State) -> Option<AgentCard> {
+fn build_system(state: &State) -> Option<SystemCard> {
     let ps = cp_mod_prompt::types::PromptState::get(state);
-    let agent_id = ps.active_agent_id.as_ref()?;
-    let agents = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Agent);
+    let agent_id = ps.active_system_id.as_ref()?;
+    let agents = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::System);
     let name = agents.iter().find(|a| &a.id == agent_id).map_or_else(|| agent_id.clone(), |a| a.name.clone());
-    Some(AgentCard { name })
+    Some(SystemCard { name })
 }
 
 /// Build loaded skill cards.
@@ -296,7 +296,7 @@ fn build_git(state: &State) -> Option<GitChanges> {
 
 /// Build active reverie cards (all concurrent reveries, sorted by key).
 fn build_reveries(state: &State) -> Vec<ReverieCard> {
-    let agents = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Agent);
+    let agents = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::System);
     let mut sorted_keys: Vec<_> = state.reveries.keys().collect();
     sorted_keys.sort();
 
