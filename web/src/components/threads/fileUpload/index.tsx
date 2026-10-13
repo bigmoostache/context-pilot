@@ -397,7 +397,7 @@ export function ComposerBubbles({
 
       {/* Create-command pill — opaque, dashed to read as an action. */}
       {showCommands && onCreateCommand && (
-        <Tip title="Create command" body="Author a new /command for this agent's library.">
+        <Tip title="Create command" body="Author a new /command for this fleet's library.">
           <button
             type="button"
             onClick={onCreateCommand}

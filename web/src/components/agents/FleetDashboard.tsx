@@ -65,7 +65,7 @@ export function FleetDashboard({
               on the right (mirrors the thread sidebar header). */}
           <header className="flex items-center justify-between border-b border-border/60 px-1 pb-2.5">
             <div className="flex items-center gap-2">
-              <h1 className="text-[15px] font-semibold tracking-tight text-foreground">Agents</h1>
+              <h1 className="text-[15px] font-semibold tracking-tight text-foreground">Fleets</h1>
               <span className="text-[12px] text-muted-foreground/60 tabular-nums">
                 {agents.length}
               </span>
@@ -202,7 +202,7 @@ function FleetRow({
           e.stopPropagation()
           onManage()
         }}
-        title="Manage agent"
+        title="Manage fleet"
         className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/50 opacity-0 transition-[opacity,color,background-color] group-hover:opacity-100 hover:bg-muted hover:text-foreground focus-visible:opacity-100"
       >
         <Settings2 className="size-3.5" />

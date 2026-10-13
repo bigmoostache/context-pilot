@@ -75,16 +75,16 @@ function FleetStatus({ agents }: { agents: Agent[] }) {
     <footer className="flex h-8 shrink-0 items-center gap-4 px-2 text-[12px]">
       <Tip
         title="Fleet view"
-        body="Aggregates across every agent you run. Open an agent to see its own vitals here instead."
+        body="Aggregates across every fleet you run. Open a fleet to see its own vitals here instead."
         side="top"
       >
         <span className="font-medium text-foreground/70">Fleet</span>
       </Tip>
 
-      <Tip title="Agents" body="How many agents exist in the fleet." side="top">
-        <Metric icon={Boxes} label="Agents" value={String(agents.length)} />
+      <Tip title="Fleets" body="How many fleets you run." side="top">
+        <Metric icon={Boxes} label="Fleets" value={String(agents.length)} />
       </Tip>
-      <Tip title="Threads" body="Open threads, summed across every agent." side="top">
+      <Tip title="Threads" body="Open threads, summed across every fleet." side="top">
         <Metric icon={MessagesSquare} label="Threads" value={String(totalThreads)} />
       </Tip>
 
@@ -174,8 +174,8 @@ function AgentStatus({
     // fill, no top border, no margin, 0.5rem of horizontal padding.
     <footer className="flex h-8 shrink-0 items-center gap-3 px-2 text-[12px]">
       <Tip
-        title="Agent status"
-        body="Live execution phase — Ready, Streaming, Working or Blocked. When it reads Disconnected, click to restart the agent."
+        title="Fleet status"
+        body="Live execution phase — Ready, Streaming, Working or Blocked. When it reads Disconnected, click to restart the fleet."
         side="top"
       >
         <StatusIndicator
@@ -190,7 +190,7 @@ function AgentStatus({
       {fleetId ? (
         <Tip
           title="Model"
-          body="The LLM provider and model this agent runs on. Switch it here — applies immediately."
+          body="The LLM provider and model this fleet runs on. Switch it here — applies immediately."
           side="top"
         >
           <ModelChip fleetId={fleetId} agent={agent} />
@@ -212,7 +212,7 @@ function AgentStatus({
             (per-segment hit/miss/threshold/free token figures), and a second
             tooltip on the same element would fight it. */}
         <ContextBar used={used} threshold={threshold} budget={budget} hit={hit} miss={miss} />
-        <Tip title="Session cost" body="API spend for this agent since it started." side="top">
+        <Tip title="Session cost" body="API spend for this fleet since it started." side="top">
           <span className="text-muted-foreground tabular-nums">{fmtCost(costUsd)}</span>
         </Tip>
       </span>

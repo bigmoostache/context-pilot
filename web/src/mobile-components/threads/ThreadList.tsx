@@ -123,7 +123,7 @@ export function ThreadList({
           page (T631). Shares the safe-area-aware CornerButton so it's reachable
           even in standalone; the archived toggle mirrors it on the right. */}
       {onGoToFleets && (
-        <CornerButton side="left" label="Show agents" onClick={onGoToFleets} className="z-30">
+        <CornerButton side="left" label="Show fleets" onClick={onGoToFleets} className="z-30">
           <LayoutGrid />
         </CornerButton>
       )}

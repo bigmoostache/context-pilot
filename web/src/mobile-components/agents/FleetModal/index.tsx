@@ -97,7 +97,7 @@ export function FleetModal({
       { fleetId: agent.id, name: n },
       {
         onSuccess: () => flash(`Renamed to ${n}`),
-        onError: (e) => flash(e instanceof Error ? e.message : "Could not rename the agent"),
+        onError: (e) => flash(e instanceof Error ? e.message : "Could not rename the fleet"),
       },
     )
   }

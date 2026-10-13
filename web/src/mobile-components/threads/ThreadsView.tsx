@@ -120,7 +120,7 @@ export function ThreadsView({
         <button
           onClick={onReconnect}
           className="absolute inset-0 z-40 cursor-pointer bg-background/30"
-          aria-label="Reconnect to agent"
+          aria-label="Reconnect to fleet"
         />
       )}
 
@@ -163,7 +163,7 @@ export function ThreadsView({
           top-left is the drawer toggle). Opens this agent's full-screen Settings
           page (T636). z-20 so the drawer scrim (z-40) covers it when open. */}
       {onOpenSettings && (
-        <CornerButton side="right" label="Agent settings" onClick={onOpenSettings} className="z-20">
+        <CornerButton side="right" label="Fleet settings" onClick={onOpenSettings} className="z-20">
           <Settings2 />
         </CornerButton>
       )}
@@ -246,7 +246,7 @@ function EmptyRealm({
             tap the menu (top-left) to browse, or start one to put it to work in its folder.
           </>
         ) : (
-          "Select an agent to see its threads."
+          "Select a fleet to see its threads."
         )}
       </p>
       {onNewThread && (

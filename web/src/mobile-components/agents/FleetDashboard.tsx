@@ -96,7 +96,7 @@ export function FleetDashboard({
           flash(`Spawning “${name}” in ${receipt.folder}`)
           setQuery("")
         },
-        onError: (err) => flash(err instanceof Error ? err.message : "Could not create the agent"),
+        onError: (err) => flash(err instanceof Error ? err.message : "Could not create the fleet"),
       },
     )
   }
@@ -246,7 +246,7 @@ function FleetSearchBar({
             e.preventDefault()
             onCreate()
           }}
-          placeholder="Search or create an agent"
+          placeholder="Search or create a fleet"
           className="min-w-0 flex-1 bg-transparent text-foreground/90 outline-none placeholder:text-muted-foreground/55"
         />
         {query && (
@@ -265,7 +265,7 @@ function FleetSearchBar({
         <button
           onClick={onCreate}
           disabled={creating}
-          aria-label="Create agent"
+          aria-label="Create fleet"
           className="flex size-11 shrink-0 items-center justify-center rounded-full bg-(--interactive) text-(--primary-foreground) transition-[filter] active:brightness-110 disabled:opacity-60"
         >
           {creating ? <Loader2 className="size-5 animate-spin" /> : <Plus className="size-5" />}

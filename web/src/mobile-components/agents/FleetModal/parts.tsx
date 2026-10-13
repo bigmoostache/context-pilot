@@ -148,7 +148,7 @@ export function NameField({
         e.preventDefault()
         e.currentTarget.blur()
       }}
-      placeholder="agent name"
+      placeholder="fleet name"
       className="w-full bg-transparent px-4 py-3.5 text-[16px] font-medium text-foreground outline-none placeholder:font-normal placeholder:text-muted-foreground/45"
     />
   )
@@ -207,7 +207,7 @@ export function DangerActions({
           className="flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[15px] font-medium text-foreground/90 transition-colors active:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-45"
         >
           <RefreshCw className={cn("size-4", restartBusy && "animate-spin")} />
-          {restartBusy ? "Restarting…" : "Restart agent"}
+          {restartBusy ? "Restarting…" : "Restart fleet"}
         </button>
         <button
           onClick={retire}

@@ -100,7 +100,7 @@ function inlinePreview(node: FinderNode): ReactElement | null {
 /**
  * Render a live-fetched preview for a node whose payload isn't inlined (the live
  * Finder), through the mobile live renderers (touch zoom / copy / save). Returns
- * null without an fleetId or for an unpreviewable kind so {@link Body} falls
+ * null without a fleetId or for an unpreviewable kind so {@link Body} falls
  * through to {@link Generic}.
  */
 function livePreview(node: FinderNode, fleetId: string | undefined): ReactElement | null {
@@ -114,7 +114,7 @@ function livePreview(node: FinderNode, fleetId: string | undefined): ReactElemen
 
 /**
  * Route a node to its bespoke preview: an inlined maquette payload first, then a
- * live backend fetch (given an fleetId), then the generic no-preview fallback.
+ * live backend fetch (given a fleetId), then the generic no-preview fallback.
  */
 function Body({ node, fleetId }: { node: FinderNode; fleetId?: string | undefined }) {
   return inlinePreview(node) ?? livePreview(node, fleetId) ?? <Generic node={node} />

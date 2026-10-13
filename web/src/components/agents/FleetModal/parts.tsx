@@ -47,7 +47,7 @@ export interface Controller {
 /** The submit button's label across the create/manage × idle/pending matrix. */
 function submitLabel(pending: boolean, saving: boolean, isManage: boolean): string {
   if (pending) return saving ? "Saving…" : "Creating…"
-  return isManage ? "Save changes" : "Create agent"
+  return isManage ? "Save changes" : "Create fleet"
 }
 
 /** Hero header: avatar (a native file-picker <label> in manage mode), title +
@@ -133,7 +133,7 @@ export function FleetModalHeader({
       )}
       <div className="relative flex flex-1 flex-col gap-0.5 pt-0.5">
         <h3 className="text-[17px] font-semibold tracking-tight text-foreground">
-          {isManage ? `Manage ${agent?.name}` : "Create an agent"}
+          {isManage ? `Manage ${agent?.name}` : "Create a fleet"}
         </h3>
         <p className="text-[12px] leading-relaxed text-muted-foreground">
           {isManage
@@ -212,7 +212,7 @@ export function FleetModalFooter({ c }: { c: Controller }) {
         <button
           onClick={c.retire}
           disabled={pending}
-          title="Stop the agent's process and console server and move it to the Retired section. The realm folder is kept — unretire brings it back."
+          title="Stop the fleet's process and console server and move it to the Retired section. The realm folder is kept — unretire brings it back."
           className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-medium text-(--danger) transition-colors hover:bg-(--danger)/10 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Archive className={cn("size-3.5", c.retireBusy && "animate-pulse")} />
@@ -223,7 +223,7 @@ export function FleetModalFooter({ c }: { c: Controller }) {
         <button
           onClick={c.restart}
           disabled={pending}
-          title="Kill and respawn the agent's process from the current binary — fixes a stale agent that rejects commands with 'agent unreachable'."
+          title="Kill and respawn the fleet's process from the current binary — fixes a stale fleet that rejects commands with 'agent unreachable'."
           className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-medium text-foreground/80 transition-colors hover:bg-muted/70 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <RefreshCw className={cn("size-3.5", c.restartBusy && "animate-spin")} />

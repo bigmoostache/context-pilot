@@ -92,7 +92,7 @@ export function TopBar({
       <header className="flex w-14 shrink-0 flex-col items-center gap-3 p-2">
         <Tip
           title="Workspace"
-          body="The agent you're working in — one agent, one folder. Switch or manage from here."
+          body="The fleet you're working in — one fleet, one folder. Switch or manage from here."
           side="right"
         >
           <FleetSwitcher
@@ -179,9 +179,9 @@ function TopBarActions({
 
   return (
     <div className="mt-auto flex flex-col items-center gap-3">
-      <Tip title="Agent settings" body="This agent's name, model and service vitals." side="right">
+      <Tip title="Fleet settings" body="This fleet's name, model and service vitals." side="right">
         <RailAction
-          label="Agent settings"
+          label="Fleet settings"
           icon={SlidersHorizontal}
           hint="I"
           hintShown={modHeld}
@@ -235,7 +235,7 @@ function ThreadActions({
 
   return (
     <div className="flex w-full flex-col items-center gap-0.5">
-      <Tip title="New thread" body="Start a fresh conversation or task in this agent." side="right">
+      <Tip title="New thread" body="Start a fresh conversation or task in this fleet." side="right">
         <RailAction
           label="New thread"
           icon={Plus}
@@ -246,7 +246,7 @@ function ThreadActions({
       </Tip>
       <Tip
         title="Search threads"
-        body="Find a thread by name, or search across every message in this agent."
+        body="Find a thread by name, or search across every message in this fleet."
         side="right"
       >
         <RailAction
@@ -425,7 +425,7 @@ function ViewTabs({
         body={
           onThreads
             ? `Click again to ${threadsRailOpen ? "hide" : "show"} the thread list.`
-            : "Chat with this agent. Each thread is a separate conversation or task it can run in parallel."
+            : "Chat with this fleet. Each thread is a separate conversation or task it can run in parallel."
         }
         side="right"
       >
@@ -449,7 +449,7 @@ function ViewTabs({
         body={
           onFinder
             ? `Click again to ${finderRailOpen ? "hide" : "show"} the explorer.`
-            : "Browse this agent's files — the project folder it lives in and is confined to."
+            : "Browse this fleet's files — the project folder it lives in and is confined to."
         }
         side="right"
       >

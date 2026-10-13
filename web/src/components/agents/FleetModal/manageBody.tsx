@@ -69,7 +69,7 @@ function AvatarField({
         <div className="relative size-16 shrink-0">
           <label
             htmlFor="agent-settings-avatar"
-            title="Click to change the agent image"
+            title="Click to change the fleet image"
             className="flex size-16 cursor-pointer items-center justify-center overflow-hidden rounded-2xl bg-(--signal)/14 text-(--signal) ring-1 ring-(--signal)/25 transition-opacity ring-inset hover:opacity-80"
           >
             {agent.hasAvatar ? (

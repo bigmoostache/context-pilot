@@ -138,7 +138,7 @@ export function useFleetModalActions(args: ActionsArgs): Actions {
         onFlash?.(`Retired ${agent.name} — moved to the Retired section`)
         onClose()
       },
-      onError: (e) => setLocalError(e instanceof Error ? e.message : "Could not retire the agent."),
+      onError: (e) => setLocalError(e instanceof Error ? e.message : "Could not retire the fleet."),
     })
   }
 
@@ -177,7 +177,7 @@ export function useFleetModalActions(args: ActionsArgs): Actions {
         },
         onError: (e) =>
           setLocalError(
-            e instanceof Error ? e.message : "Could not create the agent. Please try again.",
+            e instanceof Error ? e.message : "Could not create the fleet. Please try again.",
           ),
       },
     )

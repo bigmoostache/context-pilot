@@ -88,7 +88,7 @@ export function FinderShell({
         {disconnected && (
           <div
             {...clickable(() => onReconnect?.())}
-            aria-label="Reconnect agent"
+            aria-label="Reconnect fleet"
             className="absolute inset-0 z-40 cursor-pointer bg-background/30"
           />
         )}

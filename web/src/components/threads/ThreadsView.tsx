@@ -98,7 +98,7 @@ export function ThreadsView({
         <button
           onClick={onReconnect}
           className="absolute inset-0 z-40 cursor-pointer bg-background/30"
-          aria-label="Reconnect to agent"
+          aria-label="Reconnect to fleet"
         />
       )}
       {/* The rail stays mounted and slides in/out via an animated negative
@@ -222,7 +222,7 @@ function EmptyRealm({
             start one to put it to work in its folder.
           </>
         ) : (
-          "Select an agent to see its threads."
+          "Select a fleet to see its threads."
         )}
       </p>
       {onNewThread && (

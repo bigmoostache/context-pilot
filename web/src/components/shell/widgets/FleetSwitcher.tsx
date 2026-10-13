@@ -77,7 +77,7 @@ export function FleetSwitcher({
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger
-        aria-label={active ? `Workspace: ${active.name}` : "Select an agent"}
+        aria-label={active ? `Workspace: ${active.name}` : "Select a fleet"}
         className={cn(
           "relative flex h-8 items-center gap-2 rounded-lg px-1.5 text-left transition-colors outline-none",
           // Exact same hover as a threads-sidebar row (T676): soft card lift.

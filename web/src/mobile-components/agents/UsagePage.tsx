@@ -112,9 +112,9 @@ export function UsagePage() {
               value={fleetId}
               onChange={(e) => setFleetId(e.target.value)}
               className="card-shadow flex-1 rounded-lg border border-border bg-card px-2.5 py-2 text-[16px] text-foreground/85"
-              aria-label="Filter by agent"
+              aria-label="Filter by fleet"
             >
-              <option value="all">All agents</option>
+              <option value="all">All fleets</option>
               {agents.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name}
@@ -187,7 +187,7 @@ interface Totals {
 function UsageTable({ visible, totals }: { visible: Row[]; totals: Totals }) {
   return (
     <section className="flex flex-col gap-2.5">
-      <span className="text-[13px] font-semibold text-foreground/90">By agent</span>
+      <span className="text-[13px] font-semibold text-foreground/90">By fleet</span>
       {visible.length === 0 ? (
         <div className="card-shadow rounded-xl border border-border bg-card p-8 text-center text-[12.5px] text-muted-foreground">
           No agents in the fleet yet.
@@ -197,7 +197,7 @@ function UsageTable({ visible, totals }: { visible: Row[]; totals: Totals }) {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead>Agent</TableHead>
+                <TableHead>Fleet</TableHead>
                 <TableHead className="text-right">Input</TableHead>
                 <TableHead className="text-right">Output</TableHead>
                 <TableHead className="text-right">Spend</TableHead>

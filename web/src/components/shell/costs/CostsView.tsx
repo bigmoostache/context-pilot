@@ -95,7 +95,7 @@ export function CostsView({
         <button
           onClick={onReconnect}
           className="absolute inset-0 z-40 cursor-pointer bg-background/30"
-          aria-label="Reconnect to agent"
+          aria-label="Reconnect to fleet"
         />
       )}
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
@@ -213,7 +213,7 @@ function DisconnectOverlay({ onReconnect }: { onReconnect?: (() => void) | undef
     <button
       onClick={onReconnect}
       className="absolute inset-0 z-40 cursor-pointer bg-background/30"
-      aria-label="Reconnect to agent"
+      aria-label="Reconnect to fleet"
     />
   )
 }

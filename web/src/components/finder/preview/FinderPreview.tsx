@@ -67,7 +67,7 @@ export function FinderPreview({
               <>
                 {/* Download: stream the realm file to the browser via the
                     backend's attachment endpoint. Only actionable in the live
-                    Finder (an fleetId scopes the realm); the mock has none. */}
+                    Finder (a fleetId scopes the realm); the mock has none. */}
                 <IconBtn
                   icon={Download}
                   title="Download"
@@ -117,7 +117,7 @@ function inlinePreview(node: FinderNode): ReactElement | null {
  * Render a live-fetched preview for a node whose payload isn't inlined (the live
  * Finder): images + PDFs stream straight from the backend's inline raw-serve
  * endpoint, text-like kinds fetch their content via the preview/sheet endpoints.
- * Returns null without an fleetId (no realm to fetch from) or for an
+ * Returns null without a fleetId (no realm to fetch from) or for an
  * unpreviewable kind, so {@link Body} falls through to {@link Generic}.
  */
 function livePreview(node: FinderNode, fleetId: string | undefined): ReactElement | null {
@@ -131,7 +131,7 @@ function livePreview(node: FinderNode, fleetId: string | undefined): ReactElemen
 
 /**
  * Route a node to its bespoke preview: an inlined maquette payload first, then a
- * live backend fetch (given an fleetId), then the generic no-preview fallback.
+ * live backend fetch (given a fleetId), then the generic no-preview fallback.
  */
 function Body({ node, fleetId }: { node: FinderNode; fleetId?: string | undefined }) {
   return inlinePreview(node) ?? livePreview(node, fleetId) ?? <Generic node={node} />
