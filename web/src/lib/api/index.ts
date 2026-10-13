@@ -43,9 +43,9 @@ import {
   getApiFleetByIdMetrics,
   getApiFleetByIdVitals,
   getApiFleetByIdLibrary,
-  getApiFleetByIdLibraryAgentByItem,
-  putApiFleetByIdLibraryAgentByItem,
-  deleteApiFleetByIdLibraryAgentByItem,
+  getApiFleetByIdLibrarySystemByItem,
+  putApiFleetByIdLibrarySystemByItem,
+  deleteApiFleetByIdLibrarySystemByItem,
   getApiFleetByIdThreads,
   getApiProviders,
   getApiUpdateStatus,
@@ -236,7 +236,7 @@ export function createCommand(
 }
 
 /** Create or overwrite a `/command` `.md` by its file id (the bubble row's
- *  per-command Edit button). The command twin of {@link upsertLibraryAgent}:
+ *  per-command Edit button). The command twin of {@link upsertLibrarySystem}:
  *  `PUT …/library/command/{item}` deliberately overwrites, unlike the 409-on-
  *  clobber {@link createCommand}. */
 export function updateCommand(
@@ -251,27 +251,30 @@ export function updateCommand(
 
 // ── Agent library CRUD (T581 footer editor) ───────────────────────────
 
-export type LibraryAgentRaw = import("./generated/types.gen").LibraryAgentRaw
+export type LibrarySystemRaw = import("./generated/types.gen").LibrarySystemRaw
 
 /** Read one behaviour agent's raw authoring fields (Export + Edit-prefill). */
-export function fetchLibraryAgent(fleetId: string, itemId: string): Promise<LibraryAgentRaw> {
-  return sdk(getApiFleetByIdLibraryAgentByItem({ path: { id: fleetId, item: itemId } }))
+export function fetchLibrarySystem(fleetId: string, itemId: string): Promise<LibrarySystemRaw> {
+  return sdk(getApiFleetByIdLibrarySystemByItem({ path: { id: fleetId, item: itemId } }))
 }
 
 /** Create or overwrite a behaviour agent `.md` (user agent or built-in override). */
-export function upsertLibraryAgent(
+export function upsertLibrarySystem(
   fleetId: string,
   itemId: string,
   agent: { name: string; description?: string; body: string },
 ): Promise<CreateCommandReceipt> {
   return sdk(
-    putApiFleetByIdLibraryAgentByItem({ path: { id: fleetId, item: itemId }, body: agent }),
+    putApiFleetByIdLibrarySystemByItem({ path: { id: fleetId, item: itemId }, body: agent }),
   )
 }
 
 /** Delete a behaviour agent's on-disk `.md` (override revert, or user agent removal). */
-export function deleteLibraryAgent(fleetId: string, itemId: string): Promise<CreateCommandReceipt> {
-  return sdk(deleteApiFleetByIdLibraryAgentByItem({ path: { id: fleetId, item: itemId } }))
+export function deleteLibrarySystem(
+  fleetId: string,
+  itemId: string,
+): Promise<CreateCommandReceipt> {
+  return sdk(deleteApiFleetByIdLibrarySystemByItem({ path: { id: fleetId, item: itemId } }))
 }
 
 // ── Ticket (SDK) ──────────────────────────────────────────────────────

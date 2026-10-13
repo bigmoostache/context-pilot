@@ -330,18 +330,18 @@ pub(super) fn paths() -> Value {
             }}}},
             "responses": merge(ok(r("CreateCommandReceipt")), err())
         }}),
-        "/api/fleet/{id}/library/agent/{item}": merge(
+        "/api/fleet/{id}/library/system/{item}": merge(
             merge(
                 json!({ "get": {
-                    "tags": ["agent"], "summary": "Read behaviour agent raw",
+                    "tags": ["agent"], "summary": "Read behaviour system raw",
                     "parameters": [
                         { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
                         { "name": "item", "in": "path", "required": true, "schema": { "type": "string" } }
                     ],
-                    "responses": merge(ok(r("LibraryAgentRaw")), err())
+                    "responses": merge(ok(r("LibrarySystemRaw")), err())
                 }}),
                 json!({ "put": {
-                    "tags": ["agent"], "summary": "Create or override behaviour agent",
+                    "tags": ["agent"], "summary": "Create or override behaviour system",
                     "parameters": [
                         { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
                         { "name": "item", "in": "path", "required": true, "schema": { "type": "string" } }
@@ -355,7 +355,7 @@ pub(super) fn paths() -> Value {
                 }})
             ),
             json!({ "delete": {
-                "tags": ["agent"], "summary": "Delete behaviour agent override",
+                "tags": ["agent"], "summary": "Delete behaviour system override",
                 "parameters": [
                     { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
                     { "name": "item", "in": "path", "required": true, "schema": { "type": "string" } }

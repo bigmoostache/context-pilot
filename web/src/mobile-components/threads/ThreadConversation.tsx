@@ -3,7 +3,7 @@ import { ScrollArea } from "@/mobile-components/ui/scroll-area"
 import { Message } from "@/mobile-components/conversation/Message"
 import { ThreadComposer, type CommandSuggestion } from "@/mobile-components/threads/ThreadComposer"
 import { CreateCommandDialog } from "@/mobile-components/threads/CreateCommandDialog"
-import { AgentEditorDialog } from "@/mobile-components/shell/behaviour/AgentEditorDialog"
+import { SystemEditorDialog } from "@/mobile-components/shell/behaviour/SystemEditor"
 import { useLibrary } from "@/lib/live"
 import { sendCommand } from "@/lib/api"
 import type { UploadedFile } from "@/mobile-components/threads/fileUpload/helpers"
@@ -228,7 +228,7 @@ export function ThreadConversation({
   const [createCmdOpen, setCreateCmdOpen] = useState(false)
   // The command whose editor is open (null = closed) — mirrors the desktop
   // twin: the bubble row's per-command Edit button prefills the shared
-  // AgentEditorDialog in command-edit mode (T654).
+  // SystemEditorDialog in command-edit mode (T654).
   const [editCmd, setEditCmd] = useState<CommandSuggestion | null>(null)
 
   // First-message `/command` suggestions (T348), built from the live prompt
@@ -374,7 +374,7 @@ export function ThreadConversation({
       />
 
       {editCmd && (
-        <AgentEditorDialog
+        <SystemEditorDialog
           open
           onClose={() => setEditCmd(null)}
           fleetId={fleetId}

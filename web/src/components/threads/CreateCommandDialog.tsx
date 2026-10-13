@@ -1,10 +1,10 @@
-import { AgentEditorDialog } from "@/components/shell/behaviour/AgentEditorDialog"
+import { SystemEditorDialog } from "@/components/shell/behaviour/SystemEditor"
 
 /**
  * Create Command dialog (T350 / T654) — authors a new `/command` in the active
  * agent's prompt library, opened by the composer's dashed "create command" pill.
  *
- * This is now a thin wrapper over {@link AgentEditorDialog} with
+ * This is now a thin wrapper over {@link SystemEditorDialog} with
  * `variant="command"`: the command flow deliberately reuses the *exact same*
  * dialog component/code as the behaviour-agent editor (big borderless name line,
  * `/slug` preview, description, prompt textarea, sheet-pop-in chrome) so the two
@@ -21,7 +21,7 @@ export function CreateCommandDialog({
   fleetId: string
 }) {
   return (
-    <AgentEditorDialog
+    <SystemEditorDialog
       open={open}
       onClose={onClose}
       fleetId={fleetId}

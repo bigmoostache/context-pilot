@@ -165,7 +165,7 @@ pub(super) fn core() -> Value {
             "properties": {
                 "id": { "type": "string" },
                 "name": { "type": "string" },
-                "kind": { "type": "string", "enum": ["agent", "skill", "command"] },
+                "kind": { "type": "string", "enum": ["system", "skill", "command"] },
                 "description": { "type": "string" },
                 "meta": { "type": "string" },
                 "body": { "type": "string" },

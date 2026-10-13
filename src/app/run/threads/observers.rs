@@ -114,7 +114,7 @@ pub(in crate::app::run) fn emit_behaviour(app: &mut App) {
     // Emit only on an actual change.
     let changed = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.last_behaviour != active);
     if changed {
-        emit_best_effort(&app.state, OpEntryKind::BehaviourChanged { agent_id: active.clone() });
+        emit_best_effort(&app.state, OpEntryKind::BehaviourChanged { system_id: active.clone() });
         app.state.ext_mut::<BridgeState>().last_behaviour = active;
     }
 }

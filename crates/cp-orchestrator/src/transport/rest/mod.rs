@@ -51,8 +51,8 @@ pub(crate) use config::settings::{allowed_models, onboarding_completed};
 pub(crate) use config::settings::{get_settings, update_settings};
 pub(crate) use config::update::{APPLY_IN_FLIGHT, update_apply, update_check, update_set_mode, update_status};
 pub(crate) use create::{
-    create_command, create_fleet, delete_library_agent, read_library_agent, upsert_library_agent,
-    upsert_library_command,
+    create_command, create_fleet, delete_library_system, read_library_system, upsert_library_command,
+    upsert_library_system,
 };
 pub(crate) use lifecycle::{restart_fleet, retire_fleet, unretire_fleet};
 pub(crate) use releases::{

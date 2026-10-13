@@ -148,7 +148,7 @@ fn behaviour_changed_round_trip_and_stable_tag() {
         schema_version: 1,
         rev: 5,
         timestamp_ms: 0,
-        kind: OpEntryKind::BehaviourChanged { agent_id: Some("caveman".into()) },
+        kind: OpEntryKind::BehaviourChanged { system_id: Some("caveman".into()) },
     };
     let with_id_json = serde_json::to_string(&with_id).expect("serialize");
     assert!(with_id_json.contains("\"kind\":\"behaviour_changed\""), "stable tag: {with_id_json}");
@@ -156,9 +156,9 @@ fn behaviour_changed_round_trip_and_stable_tag() {
     assert_eq!(serde_json::from_str::<OpEntry>(&with_id_json).expect("deserialize"), with_id);
 
     let reverted =
-        OpEntry { schema_version: 1, rev: 6, timestamp_ms: 0, kind: OpEntryKind::BehaviourChanged { agent_id: None } };
+        OpEntry { schema_version: 1, rev: 6, timestamp_ms: 0, kind: OpEntryKind::BehaviourChanged { system_id: None } };
     let reverted_json = serde_json::to_string(&reverted).expect("serialize");
-    assert!(!reverted_json.contains("agent_id"), "None id omitted: {reverted_json}");
+    assert!(!reverted_json.contains("system_id"), "None id omitted: {reverted_json}");
     assert_eq!(serde_json::from_str::<OpEntry>(&reverted_json).expect("deserialize"), reverted);
 }
 

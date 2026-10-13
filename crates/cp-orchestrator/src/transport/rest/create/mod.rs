@@ -180,7 +180,7 @@ struct CreateAgentReceipt {
 
 mod library;
 pub(crate) use library::{
-    create_command, delete_library_agent, read_library_agent, upsert_library_agent, upsert_library_command,
+    create_command, delete_library_system, read_library_system, upsert_library_command, upsert_library_system,
 };
 
 #[cfg(test)]

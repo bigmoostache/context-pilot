@@ -301,8 +301,8 @@ pub enum OpEntryKind {
         miss_tokens: u64,
     },
 
-    /// The agent's active **behaviour agent** (system prompt) changed — a new
-    /// library agent was loaded (or reverted to default) via the `system_load`
+    /// The agent's active **system** (persona prompt) changed — a new
+    /// library system was loaded (or reverted to default) via the `system_load`
     /// tool or the web footer's `LoadBehaviour` command.
     ///
     /// Ephemeral, disposable UI signal in the same class as
@@ -312,15 +312,15 @@ pub enum OpEntryKind {
     /// `config.json` mtime backstop. Observers do **not** fold it (the active
     /// behaviour is a tier-② `config.json` read, not view state); they use it to
     /// **invalidate** their cached library/behaviour view so the next read
-    /// surfaces the fresh active agent — the event-driven twin of the mtime
+    /// surfaces the fresh active system — the event-driven twin of the mtime
     /// backstop, matching the thread-roster push discipline (T581).
     #[serde(rename = "behaviour_changed")]
     BehaviourChanged {
-        /// The newly-active behaviour agent id, or `None` on revert-to-default.
+        /// The newly-active system (persona) id, or `None` on revert-to-default.
         /// Informational — an observer may simply refetch the library on any
         /// `behaviour_changed`, ignoring the payload.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        agent_id: Option<String>,
+        #[serde(default, alias = "agent_id", skip_serializing_if = "Option::is_none")]
+        system_id: Option<String>,
     },
 
     /// State checkpoint — bounds replay length on restart (GAP 1 / I5).

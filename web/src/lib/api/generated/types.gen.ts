@@ -520,21 +520,21 @@ export type ItSetIdentityResponse = {
     reloaded: boolean;
 };
 
-export type LibraryAgentRaw = {
-    body: string;
-    builtin: boolean;
-    description: string;
-    name: string;
-};
-
 export type LibraryItem = {
     active?: boolean;
     body?: string;
     builtin?: boolean;
     description: string;
     id: string;
-    kind: 'agent' | 'skill' | 'command';
+    kind: 'system' | 'skill' | 'command';
     meta?: string;
+    name: string;
+};
+
+export type LibrarySystemRaw = {
+    body: string;
+    builtin: boolean;
+    description: string;
     name: string;
 };
 
@@ -595,6 +595,7 @@ export type OpEntryKind = {
     phase?: string;
     state?: string;
     status?: string;
+    system_id?: string;
     tasks?: Array<ThreadTask>;
     thread_id?: string;
     threshold_tokens?: number;
@@ -2288,94 +2289,6 @@ export type GetApiFleetByIdLibraryResponses = {
 
 export type GetApiFleetByIdLibraryResponse = GetApiFleetByIdLibraryResponses[keyof GetApiFleetByIdLibraryResponses];
 
-export type DeleteApiFleetByIdLibraryAgentByItemData = {
-    body?: never;
-    path: {
-        id: string;
-        item: string;
-    };
-    query?: never;
-    url: '/api/fleet/{id}/library/agent/{item}';
-};
-
-export type DeleteApiFleetByIdLibraryAgentByItemErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type DeleteApiFleetByIdLibraryAgentByItemError = DeleteApiFleetByIdLibraryAgentByItemErrors[keyof DeleteApiFleetByIdLibraryAgentByItemErrors];
-
-export type DeleteApiFleetByIdLibraryAgentByItemResponses = {
-    /**
-     * Success
-     */
-    200: CreateCommandReceipt;
-};
-
-export type DeleteApiFleetByIdLibraryAgentByItemResponse = DeleteApiFleetByIdLibraryAgentByItemResponses[keyof DeleteApiFleetByIdLibraryAgentByItemResponses];
-
-export type GetApiFleetByIdLibraryAgentByItemData = {
-    body?: never;
-    path: {
-        id: string;
-        item: string;
-    };
-    query?: never;
-    url: '/api/fleet/{id}/library/agent/{item}';
-};
-
-export type GetApiFleetByIdLibraryAgentByItemErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiFleetByIdLibraryAgentByItemError = GetApiFleetByIdLibraryAgentByItemErrors[keyof GetApiFleetByIdLibraryAgentByItemErrors];
-
-export type GetApiFleetByIdLibraryAgentByItemResponses = {
-    /**
-     * Success
-     */
-    200: LibraryAgentRaw;
-};
-
-export type GetApiFleetByIdLibraryAgentByItemResponse = GetApiFleetByIdLibraryAgentByItemResponses[keyof GetApiFleetByIdLibraryAgentByItemResponses];
-
-export type PutApiFleetByIdLibraryAgentByItemData = {
-    body: {
-        body: string;
-        description?: string;
-        name: string;
-    };
-    path: {
-        id: string;
-        item: string;
-    };
-    query?: never;
-    url: '/api/fleet/{id}/library/agent/{item}';
-};
-
-export type PutApiFleetByIdLibraryAgentByItemErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type PutApiFleetByIdLibraryAgentByItemError = PutApiFleetByIdLibraryAgentByItemErrors[keyof PutApiFleetByIdLibraryAgentByItemErrors];
-
-export type PutApiFleetByIdLibraryAgentByItemResponses = {
-    /**
-     * Success
-     */
-    200: CreateCommandReceipt;
-};
-
-export type PutApiFleetByIdLibraryAgentByItemResponse = PutApiFleetByIdLibraryAgentByItemResponses[keyof PutApiFleetByIdLibraryAgentByItemResponses];
-
 export type PostApiFleetByIdLibraryCommandData = {
     body: {
         body: string;
@@ -2438,6 +2351,94 @@ export type PutApiFleetByIdLibraryCommandByItemResponses = {
 };
 
 export type PutApiFleetByIdLibraryCommandByItemResponse = PutApiFleetByIdLibraryCommandByItemResponses[keyof PutApiFleetByIdLibraryCommandByItemResponses];
+
+export type DeleteApiFleetByIdLibrarySystemByItemData = {
+    body?: never;
+    path: {
+        id: string;
+        item: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/library/system/{item}';
+};
+
+export type DeleteApiFleetByIdLibrarySystemByItemErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type DeleteApiFleetByIdLibrarySystemByItemError = DeleteApiFleetByIdLibrarySystemByItemErrors[keyof DeleteApiFleetByIdLibrarySystemByItemErrors];
+
+export type DeleteApiFleetByIdLibrarySystemByItemResponses = {
+    /**
+     * Success
+     */
+    200: CreateCommandReceipt;
+};
+
+export type DeleteApiFleetByIdLibrarySystemByItemResponse = DeleteApiFleetByIdLibrarySystemByItemResponses[keyof DeleteApiFleetByIdLibrarySystemByItemResponses];
+
+export type GetApiFleetByIdLibrarySystemByItemData = {
+    body?: never;
+    path: {
+        id: string;
+        item: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/library/system/{item}';
+};
+
+export type GetApiFleetByIdLibrarySystemByItemErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiFleetByIdLibrarySystemByItemError = GetApiFleetByIdLibrarySystemByItemErrors[keyof GetApiFleetByIdLibrarySystemByItemErrors];
+
+export type GetApiFleetByIdLibrarySystemByItemResponses = {
+    /**
+     * Success
+     */
+    200: LibrarySystemRaw;
+};
+
+export type GetApiFleetByIdLibrarySystemByItemResponse = GetApiFleetByIdLibrarySystemByItemResponses[keyof GetApiFleetByIdLibrarySystemByItemResponses];
+
+export type PutApiFleetByIdLibrarySystemByItemData = {
+    body: {
+        body: string;
+        description?: string;
+        name: string;
+    };
+    path: {
+        id: string;
+        item: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/library/system/{item}';
+};
+
+export type PutApiFleetByIdLibrarySystemByItemErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PutApiFleetByIdLibrarySystemByItemError = PutApiFleetByIdLibrarySystemByItemErrors[keyof PutApiFleetByIdLibrarySystemByItemErrors];
+
+export type PutApiFleetByIdLibrarySystemByItemResponses = {
+    /**
+     * Success
+     */
+    200: CreateCommandReceipt;
+};
+
+export type PutApiFleetByIdLibrarySystemByItemResponse = PutApiFleetByIdLibrarySystemByItemResponses[keyof PutApiFleetByIdLibrarySystemByItemResponses];
 
 export type GetApiFleetByIdMetaData = {
     body?: never;

@@ -23,20 +23,21 @@ type Kind = OpEntry["kind"]
 
 /**
  * Fold a `behaviour_changed` delta into the cached library: set `active` on the
- * agent item whose id matches the delta's `agent_id`, clear it on every other
- * agent item. A `null`/absent `agent_id` (revert-to-default) clears them all, so
+ * system item whose id matches the delta's `system_id`, clear it on every other
+ * system item. A `null`/absent `system_id` (revert-to-default) clears them all, so
  * the chip falls back to its "default" label — matching the backend's
- * `library()` read, which marks nothing active when `active_agent_id` is empty.
+ * `library()` read, which marks nothing active when `active_system_id` is empty. Older agents
+ * (pre-T860) still send the id as `agent_id`.
  */
 export function applyLibraryDelta(prev: LibraryItem[] | undefined, k: Kind): LibraryItem[] | null {
   if (!prev) return null // not loaded yet (chip unmounted) → hydrate on next read
-  const activeId = k.agent_id ?? null
+  const activeId = k.system_id ?? k.agent_id ?? null
   const next = prev.map((it) => {
-    if (it.kind !== "agent") return it
+    if (it.kind !== "system") return it
     const active = activeId !== null && it.id === activeId
     return (it.active ?? false) === active ? it : { ...it, active }
   })
-  // Structural sharing: if no agent item's flag flipped, every element is the
+  // Structural sharing: if no system item's flag flipped, every element is the
   // SAME reference, so return `prev` to make the setQueryData a no-op. A
   // post-map identity scan (not a mutable flag) keeps the change detection
   // visible to control-flow analysis (a flag mutated inside the map closure is

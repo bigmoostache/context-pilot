@@ -4,7 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Message } from "@/components/conversation/Message"
 import { ThreadComposer, type CommandSuggestion } from "./ThreadComposer"
 import { CreateCommandDialog } from "./CreateCommandDialog"
-import { AgentEditorDialog } from "@/components/shell/behaviour/AgentEditorDialog"
+import { SystemEditorDialog } from "@/components/shell/behaviour/SystemEditor"
 import { useLibrary } from "@/lib/live"
 import { sendCommand } from "@/lib/api"
 import { collectThreadFiles, useConversationDrop, type UploadedFile } from "./fileUpload/helpers"
@@ -214,7 +214,7 @@ function UnarchiveBar({ onUnarchive }: { onUnarchive: () => void }) {
 
 /**
  * The per-command edit dialog (T654) — a thin wrapper over the shared
- * {@link AgentEditorDialog} in command-edit mode, prefilled from the picked
+ * {@link SystemEditorDialog} in command-edit mode, prefilled from the picked
  * suggestion (which carries name/description/body, so no extra fetch). Extracted
  * to module scope so the {@link ThreadConversation} render stays within the P8
  * max-lines-per-function budget.
@@ -229,7 +229,7 @@ function CommandEditDialog({
   onClose: () => void
 }) {
   return (
-    <AgentEditorDialog
+    <SystemEditorDialog
       open
       onClose={onClose}
       fleetId={fleetId}
@@ -324,7 +324,7 @@ export function ThreadConversation({
   // the composer renders beside the /command suggestion bubbles.
   const [createCmdOpen, setCreateCmdOpen] = useState(false)
   // The command whose editor is open (null = closed) — the bubble row's
-  // per-command Edit button sets it, prefilling the shared AgentEditorDialog in
+  // per-command Edit button sets it, prefilling the shared SystemEditorDialog in
   // command-edit mode (T654). CommandSuggestion carries name/description/body, so
   // the editor prefills with no extra fetch.
   const [editCmd, setEditCmd] = useState<CommandSuggestion | null>(null)

@@ -146,12 +146,12 @@ pub(super) fn route_rest(method: &Method, segments: &[&str], ctx: RouteCtx<'_>) 
         (&Method::Put, &["api", "fleet", id, "library", "command", item]) => {
             rest::upsert_library_command(state, id, item, body_bytes)
         }
-        (&Method::Get, &["api", "fleet", id, "library", "agent", item]) => rest::read_library_agent(state, id, item),
-        (&Method::Put, &["api", "fleet", id, "library", "agent", item]) => {
-            rest::upsert_library_agent(state, id, item, body_bytes)
+        (&Method::Get, &["api", "fleet", id, "library", "system", item]) => rest::read_library_system(state, id, item),
+        (&Method::Put, &["api", "fleet", id, "library", "system", item]) => {
+            rest::upsert_library_system(state, id, item, body_bytes)
         }
-        (&Method::Delete, &["api", "fleet", id, "library", "agent", item]) => {
-            rest::delete_library_agent(state, id, item)
+        (&Method::Delete, &["api", "fleet", id, "library", "system", item]) => {
+            rest::delete_library_system(state, id, item)
         }
         (&Method::Post, &["api", "fleet", id, "fs", "upload"]) => {
             inspect::finder::fs_upload(state, id, query, body_bytes)

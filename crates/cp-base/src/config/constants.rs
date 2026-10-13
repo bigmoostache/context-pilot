@@ -154,6 +154,18 @@ pub fn home_behaviours_dir() -> std::path::PathBuf {
     cp_env::env().core.home.join(".context-pilot").join("behaviours")
 }
 
+/// Shared dir holding system (persona) `.md` files: `behaviours/systems/`.
+///
+/// Falls back to the legacy `behaviours/agents/` (pre-T860) until an agent
+/// binary has run the one-shot rename, so the orchestrator reads the right
+/// files whichever side deploys first.
+#[must_use]
+pub fn home_systems_dir() -> std::path::PathBuf {
+    let root = home_behaviours_dir();
+    let systems = root.join("systems");
+    if systems.exists() { systems } else { root.join("agents") }
+}
+
 /// Ensure the `.context-pilot/shared/` directory exists and is un-gitignored.
 ///
 /// If a `.gitignore` file exists at the project root and contains a rule that

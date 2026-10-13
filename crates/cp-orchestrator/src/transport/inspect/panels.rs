@@ -6,11 +6,11 @@
 //! that back **non-cockpit** surfaces:
 //!
 //! * [`usage`]   — the Usage/Costs page's per-worker cost snapshot.
-//! * [`library`] — the fleet dashboard's prompt-library listing (agents /
+//! * [`library`] — the fleet dashboard's prompt-library listing (systems /
 //!   skills / commands).
 //!
 //! Both read the agent's tier-② persistence (`states/<worker>.json`,
-//! `.context-pilot/{agents,skills,commands}/`) and reshape it to JSON. They
+//! `.context-pilot/{systems,skills,commands}/`) and reshape it to JSON. They
 //! reach the shared [`Backend`](crate::transport::Backend) and
 //! [`HttpReply`](crate::transport::rest::HttpReply) via absolute `crate::` paths.
 
@@ -69,7 +69,7 @@ fn resolve_worker_id(folder_path: &Path, query: &str) -> Result<String, HttpRepl
 
 /// `GET /api/fleet/{id}/library` — prompt library items.
 ///
-/// Scans the agent's `.context-pilot/{agents,skills,commands}/` directories
+/// Scans the agent's `.context-pilot/{systems,skills,commands}/` directories
 /// for `.md` files with YAML frontmatter and returns them as `LibraryItem[]`.
 pub fn library(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
     let folder = match fleet_folder(state, fleet_id) {
@@ -88,7 +88,7 @@ pub fn library(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
             Ok(mut b) => b.inspect_mut().read_config(Path::new(&folder)).ok().and_then(|cfg| {
                 cfg.get("modules")
                     .and_then(|m| m.get("system"))
-                    .and_then(|s| s.get("active_agent_id"))
+                    .and_then(|s| s.get("active_system_id").or_else(|| s.get("active_agent_id")))
                     .and_then(|v| v.as_str())
                     .map(str::to_owned)
             }),
@@ -103,8 +103,12 @@ pub fn library(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
     let cp_dir = cp_base::config::constants::home_behaviours_dir();
     let mut items: Vec<serde_json::Value> = Vec::new();
 
-    for (kind, subdir) in [("agent", "agents"), ("skill", "skills"), ("command", "commands")] {
-        collect_kind_items(kind, &cp_dir.join(subdir), active_system_id.as_deref(), &mut items);
+    for (kind, dir) in [
+        ("system", cp_base::config::constants::home_systems_dir()),
+        ("skill", cp_dir.join("skills")),
+        ("command", cp_dir.join("commands")),
+    ] {
+        collect_kind_items(kind, &dir, active_system_id.as_deref(), &mut items);
     }
 
     HttpReply::ok(&items)
@@ -153,7 +157,7 @@ fn collect_kind_items(kind: &str, dir: &Path, active_system_id: Option<&str>, it
         if disk_ids.contains(&seed.id) {
             continue;
         }
-        let active = (kind == "agent" && active_system_id == Some(seed.id.as_str())).then_some(true);
+        let active = (kind == "system" && active_system_id == Some(seed.id.as_str())).then_some(true);
         let body = (kind == "command").then(|| seed.content.clone());
         items.push(serde_json::json!({
             "id": seed.id,
@@ -167,13 +171,13 @@ fn collect_kind_items(kind: &str, dir: &Path, active_system_id: Option<&str>, it
     }
 }
 
-/// The compiled-in seed entries for a library `kind` (`"agent"`/`"skill"`/
+/// The compiled-in seed entries for a library `kind` (`"system"`/`"skill"`/
 /// `"command"`) — the same `yamls/library.yaml` source the tui loader uses, so
 /// the orchestrator's list mirrors the agent's own built-in set exactly.
 fn seed_entries(kind: &str) -> &'static [cp_base::config::SeedEntry] {
     use cp_base::config::accessors::library;
     match kind {
-        "agent" => library::systems(),
+        "system" => library::systems(),
         "skill" => library::skills(),
         "command" => library::commands(),
         _ => &[],
@@ -184,7 +188,7 @@ fn seed_entries(kind: &str) -> &'static [cp_base::config::SeedEntry] {
 /// the argument-count cap. Built by struct literal at the single call site in
 /// [`collect_kind_items`].
 struct LibraryItemParts<'parts> {
-    /// Library kind (`"agent"` / `"skill"` / `"command"`).
+    /// Library kind (`"system"` / `"skill"` / `"command"`).
     kind: &'parts str,
     /// The item's id (file stem).
     id: &'parts str,
@@ -209,7 +213,7 @@ struct LibraryItemParts<'parts> {
 /// file is a local OVERRIDE of a built-in).
 fn library_item(parts: &LibraryItemParts<'_>) -> serde_json::Value {
     let body = (parts.kind == "command").then(|| parse_command_body(parts.content));
-    let active = (parts.kind == "agent" && parts.active_system_id == Some(parts.id)).then_some(true);
+    let active = (parts.kind == "system" && parts.active_system_id == Some(parts.id)).then_some(true);
     serde_json::json!({
         "id": parts.id,
         "name": parts.name,

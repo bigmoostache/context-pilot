@@ -78,7 +78,7 @@ pub(crate) fn create_command(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]
 /// `PUT /api/fleet/{id}/library/command/{item}` — create or overwrite a
 /// `/command` markdown file (the command bubble row's per-command Edit button).
 ///
-/// The command twin of [`upsert_library_agent`]: unlike [`create_command`]
+/// The command twin of [`upsert_library_system`]: unlike [`create_command`]
 /// (which 409s on an existing slug to guard accidental clobber), this
 /// DELIBERATELY overwrites — editing an existing command is exactly an
 /// overwrite of `commands/<item>.md`. The file id is the URL's `item` (stable
@@ -103,7 +103,7 @@ pub(crate) fn upsert_library_command(state: &Mutex<Backend>, id: &str, item_id: 
     }
 
     // ACL gate only; behaviour files are fleet-shared (HOME-derived), not
-    // folder-relative (T651) — same rule as create_command / upsert_library_agent.
+    // folder-relative (T651) — same rule as create_command / upsert_library_system.
     if let Err(reply) = resolve_entry(state, id) {
         return reply;
     }
@@ -162,7 +162,7 @@ struct CreateCommandReceipt {
 
 // ── Agent library CRUD (T581 footer editor) ─────────────────────────
 
-/// `GET /api/fleet/{id}/library/agent/{itemId}` — one behaviour agent's raw
+/// `GET /api/fleet/{id}/library/system/{itemId}` — one behaviour agent's raw
 /// authoring fields for the footer selector's Export + Edit-prefill.
 ///
 /// Returns `{ name, description, body, builtin }`. Reads the on-disk
@@ -170,11 +170,11 @@ struct CreateCommandReceipt {
 /// built-in); otherwise falls back to the compiled-in seed of that id (a pure
 /// built-in with no local copy — still exportable + editable, editing writes
 /// the first override). `404` only when neither a disk file nor a seed exists.
-pub(crate) fn read_library_agent(state: &Mutex<Backend>, id: &str, item_id: &str) -> HttpReply {
+pub(crate) fn read_library_system(state: &Mutex<Backend>, id: &str, item_id: &str) -> HttpReply {
     if let Err(reply) = resolve_entry(state, id) {
         return reply;
     }
-    let file_path = cp_base::config::constants::home_behaviours_dir().join("agents").join(format!("{item_id}.md"));
+    let file_path = cp_base::config::constants::home_systems_dir().join(format!("{item_id}.md"));
 
     // Disk copy wins (user agent or local override); it also carries the
     // `builtin` flag when its id shadows a compiled-in seed.
@@ -201,7 +201,7 @@ pub(crate) fn read_library_agent(state: &Mutex<Backend>, id: &str, item_id: &str
     )
 }
 
-/// `PUT /api/fleet/{id}/library/agent/{itemId}` — create or overwrite a
+/// `PUT /api/fleet/{id}/library/system/{itemId}` — create or overwrite a
 /// behaviour agent's `.md` (create a user agent, or write a local override of a
 /// built-in).
 ///
@@ -213,7 +213,7 @@ pub(crate) fn read_library_agent(state: &Mutex<Backend>, id: &str, item_id: &str
 ///
 /// Returns `200` `{ id, status }`, `400` for a blank name/body or malformed
 /// JSON, `404` for an unknown agent, `502` if the file cannot be written.
-pub(crate) fn upsert_library_agent(state: &Mutex<Backend>, id: &str, item_id: &str, body_bytes: &[u8]) -> HttpReply {
+pub(crate) fn upsert_library_system(state: &Mutex<Backend>, id: &str, item_id: &str, body_bytes: &[u8]) -> HttpReply {
     let Ok(req) = serde_json::from_slice::<UpsertAgentReq>(body_bytes) else {
         return HttpReply::error(400, "malformed upsert-agent request");
     };
@@ -229,10 +229,10 @@ pub(crate) fn upsert_library_agent(state: &Mutex<Backend>, id: &str, item_id: &s
     if let Err(reply) = resolve_entry(state, id) {
         return reply;
     }
-    let agents_dir = cp_base::config::constants::home_behaviours_dir().join("agents");
-    let file_path = agents_dir.join(format!("{item_id}.md"));
+    let systems_dir = cp_base::config::constants::home_systems_dir();
+    let file_path = systems_dir.join(format!("{item_id}.md"));
 
-    if let Err(e) = std::fs::create_dir_all(&agents_dir) {
+    if let Err(e) = std::fs::create_dir_all(&systems_dir) {
         return HttpReply::error(502, &format!("could not create agents directory: {e}"));
     }
     let markdown = compose_md(name, req.description.trim(), body);
@@ -242,18 +242,18 @@ pub(crate) fn upsert_library_agent(state: &Mutex<Backend>, id: &str, item_id: &s
     HttpReply::json(200, &CreateCommandReceipt { id: item_id.to_owned(), status: "saved" })
 }
 
-/// `DELETE /api/fleet/{id}/library/agent/{itemId}` — remove a behaviour agent's
+/// `DELETE /api/fleet/{id}/library/system/{itemId}` — remove a behaviour agent's
 /// on-disk `.md`.
 ///
 /// If the file was a local override of a built-in, the compiled-in seed
 /// reappears on the next list; if it was a pure user agent, it is gone. A pure
 /// built-in has NO file to delete, so this returns `404` — the frontend hides
 /// Delete on such rows, this is the authoritative backstop.
-pub(crate) fn delete_library_agent(state: &Mutex<Backend>, id: &str, item_id: &str) -> HttpReply {
+pub(crate) fn delete_library_system(state: &Mutex<Backend>, id: &str, item_id: &str) -> HttpReply {
     if let Err(reply) = resolve_entry(state, id) {
         return reply;
     }
-    let file_path = cp_base::config::constants::home_behaviours_dir().join("agents").join(format!("{item_id}.md"));
+    let file_path = cp_base::config::constants::home_systems_dir().join(format!("{item_id}.md"));
     if !file_path.exists() {
         return HttpReply::error(404, "no local agent file to delete (pure built-in)");
     }
@@ -270,7 +270,7 @@ fn seed_fleet(item_id: &str) -> Option<&'static cp_base::config::SeedEntry> {
 }
 
 /// Compose a prompt `.md` — YAML frontmatter (`name`/`description`) + body.
-/// Shared by [`create_command`] and [`upsert_library_agent`] so both emit the
+/// Shared by [`create_command`] and [`upsert_library_system`] so both emit the
 /// exact same on-disk shape the tui loader parses.
 fn compose_md(name: &str, description: &str, body: &str) -> String {
     let mut markdown = String::new();
@@ -312,7 +312,7 @@ fn split_frontmatter(content: &str) -> (String, String, String) {
     (name, description, body.to_owned())
 }
 
-/// The raw authoring fields returned by [`read_library_agent`].
+/// The raw authoring fields returned by [`read_library_system`].
 #[derive(Serialize)]
 struct LibraryAgentRaw {
     /// The behaviour agent's display name (frontmatter `name`).
@@ -325,7 +325,7 @@ struct LibraryAgentRaw {
     builtin: bool,
 }
 
-/// The `PUT /api/fleet/{id}/library/agent/{itemId}` request body.
+/// The `PUT /api/fleet/{id}/library/system/{itemId}` request body.
 #[derive(Deserialize)]
 struct UpsertAgentReq {
     /// The behaviour agent's display name (frontmatter `name`).

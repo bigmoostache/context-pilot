@@ -1,22 +1,22 @@
 import { useEffect, useState } from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { Bot, Loader2, X, CornerDownLeft, TerminalSquare } from "lucide-react"
-import { fetchLibraryAgent } from "@/lib/api"
-import { useUpsertLibraryAgent, useCreateCommand, useUpsertCommand } from "@/lib/live"
+import { fetchLibrarySystem } from "@/lib/api"
+import { useUpsertLibrarySystem, useCreateCommand, useUpsertCommand } from "@/lib/live"
 import { cn } from "@/lib/utils"
 
 /**
- * Which library item this dialog authors. `agent` (default) drives the
- * behaviour-agent upsert (`PUT …/library/agent/{id}`); `command` reuses the
+ * Which library item this dialog authors. `system` (default) drives the
+ * behaviour-system upsert (`PUT …/library/system/{id}`); `command` reuses the
  * exact same UI but wires to the command create (`POST …/library/command`) and
- * swaps the agent-specific wording (system prompt → prompt, file id → `/slug`).
+ * swaps the system-specific wording (system prompt → prompt, file id → `/slug`).
  * The command flow is create-only (no edit/import), so callers pass
  * `mode={{ kind: "create" }}`.
  */
-export type AgentEditorVariant = "agent" | "command"
+export type SystemEditorVariant = "system" | "command"
 
 /**
- * Derive a behaviour-agent file id (slug) from its name — mirrors the
+ * Derive a behaviour-system file id (slug) from its name — mirrors the
  * orchestrator's `slugify` (lowercase, non-alphanumerics → `-`, collapsed +
  * trimmed, never empty). Used only when CREATING (the file id is the slug of
  * the initial name); an EDIT keeps its original `itemId` so a display-name
@@ -32,7 +32,7 @@ function slugify(name: string): string {
 }
 
 /** The editor's working mode — a fresh create, or editing an existing item. */
-export type AgentEditorMode =
+export type SystemEditorMode =
   { kind: "create" } | { kind: "edit"; itemId: string; builtin: boolean }
 
 /** The prefill an Import/Edit flow seeds the editor with. */
@@ -48,9 +48,9 @@ interface Prefill {
  *  NOT an effect) for Create/Import; the Edit path flags `loading` here and
  *  fetches the raw `.md` (or built-in seed) in the effect below, whose setState
  *  runs in async callbacks (after paint) so it never trips set-state-in-effect. */
-function useAgentEditorFields(
+function useSystemEditorFields(
   open: boolean,
-  mode: AgentEditorMode,
+  mode: SystemEditorMode,
   fleetId: string,
   initial?: Prefill,
 ) {
@@ -81,7 +81,7 @@ function useAgentEditorFields(
   useEffect(() => {
     if (!open || mode.kind !== "edit" || initial) return
     let cancelled = false
-    fetchLibraryAgent(fleetId, mode.itemId)
+    fetchLibrarySystem(fleetId, mode.itemId)
       .then((raw) => {
         if (cancelled) return
         setName(raw.name)
@@ -114,10 +114,10 @@ interface EditorCopy {
 }
 
 /** Resolve the {@link EditorCopy} for a variant + mode. `command` is always a
- *  create flow; `agent` distinguishes create / edit / built-in-override. */
+ *  create flow; `system` distinguishes create / edit / built-in-override. */
 function editorCopy(
-  variant: AgentEditorVariant,
-  mode: AgentEditorMode,
+  variant: SystemEditorVariant,
+  mode: SystemEditorMode,
   slug: string,
   isBuiltin: boolean,
 ): EditorCopy {
@@ -140,7 +140,7 @@ function editorCopy(
   const isEdit = mode.kind === "edit"
   return {
     icon: <Bot className="size-2.5" />,
-    namePlaceholder: "Agent name",
+    namePlaceholder: "System name",
     idLine: (
       <>
         File id <span className="font-mono text-(--interactive)">{slug}</span>
@@ -148,9 +148,9 @@ function editorCopy(
       </>
     ),
     sectionLabel: "System prompt",
-    bodyPlaceholder: "The system prompt this behaviour agent loads…",
-    title: isEdit ? (isBuiltin ? "Override built-in" : "Edit agent") : "New agent",
-    submitLabel: isEdit ? "Save agent" : "Create agent",
+    bodyPlaceholder: "The system prompt this system loads…",
+    title: isEdit ? (isBuiltin ? "Override built-in" : "Edit system") : "New system",
+    submitLabel: isEdit ? "Save system" : "Create system",
   }
 }
 
@@ -161,12 +161,12 @@ interface EditorFieldValues {
   body: string
 }
 
-/** What the editor is authoring — the agent id, the item variant, and the
+/** What the editor is authoring — the system id, the item variant, and the
  *  create/edit mode. Bundled so the submit hook stays within the 4-param cap. */
 interface EditorTarget {
   fleetId: string
-  variant: AgentEditorVariant
-  mode: AgentEditorMode
+  variant: SystemEditorVariant
+  mode: SystemEditorMode
 }
 
 /** The save wiring — the three library mutations (all called for Rules of
@@ -174,14 +174,14 @@ interface EditorTarget {
  *  slug/validity/error/built-in flags, and the submit/close callbacks. Extracted
  *  from the component so its branches don't inflate the render's line budget.
  *  `command+edit` → PUT command upsert, `command+create` → POST command create,
- *  `agent` → PUT agent upsert. */
-function useAgentEditorSubmit(
+ *  `system` → PUT system upsert. */
+function useSystemEditorSubmit(
   target: EditorTarget,
   fields: EditorFieldValues,
   onClose: () => void,
 ) {
   const { fleetId, variant, mode } = target
-  const upsert = useUpsertLibraryAgent(fleetId)
+  const upsert = useUpsertLibrarySystem(fleetId)
   const createCmd = useCreateCommand(fleetId)
   const upsertCmd = useUpsertCommand(fleetId)
   const isCommand = variant === "command"
@@ -220,11 +220,11 @@ function useAgentEditorSubmit(
 }
 
 /**
- * Behaviour-agent editor dialog (T581 footer selector). One dialog serves three
+ * Behaviour-system editor dialog (T581 footer selector). One dialog serves three
  * flows — **Create** (empty), **Edit** (prefilled from the on-disk `.md`, or the
  * compiled-in seed for a pure built-in), and **Import** (the parent parses a
  * dropped `.md` and opens this dialog prefilled). All three converge on the SAME
- * `PUT …/library/agent/{itemId}` upsert (via {@link useUpsertLibraryAgent}) so
+ * `PUT …/library/system/{itemId}` upsert (via {@link useUpsertLibrarySystem}) so
  * editing a built-in writes a local override, exactly the tui loader's merge
  * rule. The backend re-validates authoritatively (M141) — this component only
  * renders + calls.
@@ -232,26 +232,26 @@ function useAgentEditorSubmit(
  * Fields: **name** (its slug becomes the file id on create, previewed live),
  * optional one-line **description**, and the **system-prompt body**.
  */
-export function AgentEditorDialog({
+export function SystemEditorDialog({
   open,
   onClose,
   fleetId,
   mode,
   initial,
-  variant = "agent",
+  variant = "system",
 }: {
   open: boolean
   onClose: () => void
   fleetId: string
-  mode: AgentEditorMode
+  mode: SystemEditorMode
   /** Prefill (Import path passes the parsed `.md`; Edit fetches on open). */
   initial?: Prefill | undefined
-  /** Which library item to author — `agent` (default) or `command`. */
-  variant?: AgentEditorVariant
+  /** Which library item to author — `system` (default) or `command`. */
+  variant?: SystemEditorVariant
 }) {
   const { name, setName, description, setDescription, body, setBody, loading } =
-    useAgentEditorFields(open, mode, fleetId, initial)
-  const { mut, slug, canSave, error, isBuiltin, submit, close } = useAgentEditorSubmit(
+    useSystemEditorFields(open, mode, fleetId, initial)
+  const { mut, slug, canSave, error, isBuiltin, submit, close } = useSystemEditorSubmit(
     { fleetId, variant, mode },
     { name, description, body },
     onClose,
