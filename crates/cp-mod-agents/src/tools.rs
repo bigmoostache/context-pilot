@@ -12,7 +12,7 @@ use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::types::roster::yaml_escape;
-use crate::types::{AgentAuthor, AgentMessage, AgentStatus, AgentsState, msgs};
+use crate::types::{AgentAuthor, AgentMessage, AgentStatus, AgentsState, msgs, turn};
 
 /// Truncate `s` to at most `max` bytes on a char boundary (no ellipsis).
 fn clamp_bytes(s: &str, max: usize) -> String {
@@ -40,11 +40,11 @@ fn push_send_message(state: &mut State, tid: &str, msg: AgentMessage, still_my_t
     if agent.archived {
         agent.archived = false;
     }
-    if !still_my_turn {
-        agent.status = AgentStatus::TheirTurn;
-    }
     if let Some(history) = msgs::messages_mut(state, tid) {
         history.push(msg);
+    }
+    if !still_my_turn {
+        turn::end(state, tid);
     }
     unarchived
 }
@@ -140,7 +140,7 @@ fn collect_agent_summaries(state: &State, focused_tid: &str) -> Vec<String> {
             "  {id} \"{name}\" [{status}]: {unack} new{marker}",
             id = t.id,
             name = t.name,
-            status = t.status,
+            status = turn::status(state, &t.id),
         ));
     }
     summaries
@@ -201,7 +201,7 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     let agent_name = target_agent.name.clone();
-    let agent_status = target_agent.status;
+    let agent_status = turn::status(state, tid);
 
     let agent_summaries = collect_agent_summaries(state, tid);
 
@@ -376,7 +376,7 @@ pub(crate) fn build_panel_content(state: &State, focused_tid: &str, _now_ms: u64
     _ = writeln!(output, "\nyou:");
     _ = writeln!(output, "  agent_id: {}", agent.id);
     _ = writeln!(output, "  name: \"{}\"", yaml_escape(&agent.name));
-    _ = writeln!(output, "  status: {}", agent.status);
+    _ = writeln!(output, "  status: {}", turn::status(state, &agent.id));
     _ = writeln!(output, "  human_group_id: {}", agent.human_group_id);
     write_origin(&mut output, agent);
     output

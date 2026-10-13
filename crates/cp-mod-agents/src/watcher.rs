@@ -17,7 +17,7 @@ use cp_base::state::runtime::State;
 use cp_base::state::watchers::Watcher;
 use cp_base::state::watchers::carriers::WatcherResult;
 
-use crate::types::{AgentStatus, AgentsState, FocusState};
+use crate::types::{AgentStatus, AgentsState, FocusState, turn};
 
 /// Watcher id — module-level const so `fn id()` returns a reference rather than
 /// a literal (dodges `unnecessary_literal_bound` without a redundant annotation).
@@ -96,7 +96,9 @@ impl Watcher for IdleMyTurnDetector {
         // behaviourally identical to the former fallback.
         let focused_tid = fs.focused_agent_id.as_deref();
         let agent = focused_tid.and_then(|fid| {
-            ts.agents.iter().find(|t| t.id == fid && !t.archived && !t.paused && t.status == AgentStatus::MyTurn)
+            ts.agents
+                .iter()
+                .find(|t| t.id == fid && !t.archived && !t.paused && turn::status(state, &t.id) == AgentStatus::MyTurn)
         })?;
 
         // Unacknowledged (unseen) messages are the idle **auto-read** hook's job

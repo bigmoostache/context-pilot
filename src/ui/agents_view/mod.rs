@@ -145,10 +145,10 @@ fn push_new_agent_entry(lb: &mut ListBuild<'_>, state: &State, on_virtual: bool)
 /// a turn), yellow/amber = paused. Returned as a raw triple (via
 /// [`Span::rgb`](cp_render::Span::rgb)) because the IR `Semantic` palette has no
 /// distinct orange-vs-amber pair.
-fn agent_circle_rgb(agent: &cp_mod_agents::types::Agent) -> (u8, u8, u8) {
+fn agent_circle_rgb(agent: &cp_mod_agents::types::Agent, groups: &[cp_groups::types::Group]) -> (u8, u8, u8) {
     let color = if agent.paused {
         theme::warning()
-    } else if matches!(agent.status, AgentStatus::MyTurn) {
+    } else if cp_mod_agents::types::turn::status_of(groups, &agent.id) == AgentStatus::MyTurn {
         theme::orange()
     } else {
         theme::success()
@@ -193,7 +193,7 @@ fn has_unread_reply(
 fn leading_slot(lb: &ListBuild<'_>, agent: &cp_mod_agents::types::Agent) -> S {
     if agent_is_working(lb.mirror.exec_state_of(&agent.id)) {
         S::styled(format!("{} ", crate::ui::helpers::spinner()), Semantic::Accent)
-    } else if matches!(agent.status, AgentStatus::MyTurn) {
+    } else if cp_mod_agents::types::turn::status_of(&lb.groups.groups, &agent.id) == AgentStatus::MyTurn {
         S::styled("\u{26a0} ".to_owned(), Semantic::Error)
     } else if has_unread_reply(cp_mod_agents::types::msgs::of(lb.agents, lb.groups, &agent.id), agent, lb.last_read) {
         S::styled("\u{25c6} ".to_owned(), Semantic::Accent)
@@ -256,7 +256,7 @@ fn push_agent_entry(
     worktree: Option<&WorktreeLine>,
 ) {
     let leading = leading_slot(lb, agent);
-    let (cr, cg, cb) = agent_circle_rgb(agent);
+    let (cr, cg, cb) = agent_circle_rgb(agent, &lb.groups.groups);
     // Sub-agents: one column of indent per depth level (tree order comes from
     // `visible_indices`).
     let depth = lb.depth_of.get(&agent.id).copied().unwrap_or(0);

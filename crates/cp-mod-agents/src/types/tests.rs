@@ -33,8 +33,8 @@ fn parent_state() -> (AgentsState, GroupsState) {
         msg(AgentAuthor::User, "q2", 30),
         msg(AgentAuthor::Assistant, "a2", 40),
     ];
+    cp_groups::social::give_turn(gs.find_mut(&gid).unwrap(), "A1");
     let parent = ts.agents.first_mut().unwrap();
-    parent.status = AgentStatus::MyTurn;
     parent.archived = true;
     parent.paused = true;
     (ts, gs)
@@ -70,7 +70,6 @@ fn branch_is_a_fresh_active_agent_and_leaves_the_parent_untouched() {
 
     let branch = ts.agents.iter().find(|t| t.id == id).unwrap();
     assert_eq!(branch.name, "Alt");
-    assert_eq!(branch.status, AgentStatus::TheirTurn);
     assert!(!branch.archived);
     assert!(!branch.paused);
 
@@ -120,4 +119,12 @@ fn migration_seeds_human_groups_once() {
     assert_eq!(msgs::ensure_human_groups(&mut agents, &mut gs, legacy), 0);
     let g = gs.find(&agents.last().unwrap().human_group_id).unwrap();
     assert_eq!((g.owner_agent_id.as_str(), g.messages.len()), ("A2", 1));
+}
+
+#[test]
+fn branch_holds_no_turn_while_the_parent_keeps_its_own() {
+    let (mut ts, mut gs) = parent_state();
+    let id = ts.branch(&mut gs, ("A1", 20), "Alt").unwrap();
+    assert_eq!(turn::status_of(&gs.groups, &id), AgentStatus::TheirTurn);
+    assert_eq!(turn::status_of(&gs.groups, "A1"), AgentStatus::MyTurn);
 }

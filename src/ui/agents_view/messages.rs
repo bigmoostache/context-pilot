@@ -120,7 +120,7 @@ pub(super) fn render_message_area_with_input(frame: &mut Frame<'_>, state: &mut 
         let is_focused = focus.focused_agent_id.as_deref() == Some(agent.id.as_str());
         let (status_label, status_sem) = if is_focused {
             (" [FOCUSED]", Semantic::Accent)
-        } else if matches!(agent.status, AgentStatus::MyTurn) {
+        } else if cp_mod_agents::types::turn::status(state, &agent.id) == AgentStatus::MyTurn {
             (" [MY_TURN]", Semantic::Warning)
         } else {
             (" [THEIR_TURN]", Semantic::Success)

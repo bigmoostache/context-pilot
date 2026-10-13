@@ -11,12 +11,14 @@ pub mod migrate;
 pub mod msgs;
 pub mod roster;
 pub mod tree;
+/// Turn derived from group social state (no stored flag).
+pub mod turn;
 
 // =============================================================================
 // Enums
 // =============================================================================
 
-/// Agent turn status — who needs to act next.
+/// Agent turn status — who needs to act next. Derived, never stored: see [`turn`].
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AgentStatus {
     /// The AI's turn — agent has user input awaiting response.
@@ -63,8 +65,6 @@ pub struct Agent {
     pub id: String,
     /// Free-text label chosen by the user.
     pub name: String,
-    /// Whose turn it is.
-    pub status: AgentStatus,
     /// Group holding this agent's conversation with the human (its messages,
     /// see [`msgs`]). Empty only for pre-groups data, until the boot migration.
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -96,14 +96,13 @@ pub struct Agent {
 }
 
 impl Agent {
-    /// A fresh empty agent: caller's turn is `TheirTurn` (user types first),
-    /// not archived, not paused, stamped now.
+    /// A fresh empty agent: not archived, not paused, stamped now; it
+    /// holds no turn until one is given (the user types first).
     #[must_use]
     pub fn new(id: String, name: String) -> Self {
         Self {
             id,
             name,
-            status: AgentStatus::TheirTurn,
             human_group_id: String::new(),
             created_at: cp_base::panels::now_ms(),
             archived: false,
@@ -163,14 +162,14 @@ impl AgentsState {
         state.ext_mut::<Self>()
     }
 
-    /// Returns true if any *non-archived* agent is in `MyTurn` status.
+    /// Returns true if any *non-archived*, non-paused agent is runnable in `groups`.
     ///
     /// Archived agents are invisible to the LLM (T9): they never trigger
     /// `MY_TURN` idle nudges, never appear in context. Restoring an agent
     /// makes it count again.
     #[must_use]
-    pub fn has_my_turn_agents(&self) -> bool {
-        self.agents.iter().any(|t| !t.archived && !t.paused && t.status == AgentStatus::MyTurn)
+    pub fn has_my_turn_agents(&self, groups: &[cp_groups::types::Group]) -> bool {
+        self.agents.iter().any(|t| !t.archived && !t.paused && turn::status_of(groups, &t.id) == AgentStatus::MyTurn)
     }
 
     /// Indices into [`Self::agents`] of the agents whose `archived` flag
@@ -196,8 +195,8 @@ impl AgentsState {
     ///
     /// Copied messages keep their original timestamps (still unique within the
     /// branch, so `DeleteMessage` works on it) and are all marked acknowledged —
-    /// the branch starts from context the agent has already seen. The branch is
-    /// a plain `TheirTurn` agent (never archived/paused, even if the parent
+    /// the branch starts from context the agent has already seen. The branch
+    /// holds no turn (never archived/paused, even if the parent
     /// is) recording its parent in [`Agent::origin`]. Nothing else the parent
     /// owns (todos, scratchpad) is copied: those only exist as a *current*
     /// snapshot, which would leak whatever happened after the branch point.

@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use cp_base::config::constants::STORE_DIR;
 use serde::Serialize;
 
-use super::{Agent, AgentMessage, AgentOrigin, AgentStatus};
+use super::{Agent, AgentMessage, AgentOrigin};
 
 /// Directory (under the store dir) of the pre-groups agent message files.
 pub const AGENTS_DIR: &str = "agents";
@@ -29,8 +29,6 @@ pub struct AgentMeta<'agent> {
     id: &'agent str,
     /// See [`Agent::name`].
     name: &'agent str,
-    /// See [`Agent::status`].
-    status: AgentStatus,
     /// See [`Agent::human_group_id`].
     #[serde(skip_serializing_if = "str::is_empty")]
     human_group_id: &'agent str,
@@ -56,7 +54,7 @@ impl<'agent> From<&'agent Agent> for AgentMeta<'agent> {
         Self {
             id: &t.id,
             name: &t.name,
-            status: t.status,
+
             human_group_id: &t.human_group_id,
             created_at: t.created_at,
             archived: t.archived,

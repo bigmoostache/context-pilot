@@ -114,8 +114,10 @@ impl Module for AgentsModule {
     // never module state. Rehydrating it into a `FocusState` field would be
     // circular — the focus it names is what that field holds.
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
+        let raw_agents = data.get("agents").or_else(|| data.get("threads"));
+        let legacy_my_turn = raw_agents.map(types::turn::legacy_my_turn_ids).unwrap_or_default();
         let ts = AgentsState::get_mut(state);
-        if let Some(arr) = data.get("agents").or_else(|| data.get("threads"))
+        if let Some(arr) = raw_agents
             && let Ok(v) = serde_json::from_value(arr.clone())
         {
             ts.agents = v;
@@ -128,8 +130,13 @@ impl Module for AgentsModule {
             cp_groups::types::GroupsState::get_mut(state),
             types::persist::read_legacy_messages,
         );
+        AgentsState::get_mut(state).agents = agents;
+        // Pre-T860-D `"status": "MyTurn"` becomes a SimpleTurn in the human
+        // group. The field is no longer written, so this runs once.
+        for id in &legacy_my_turn {
+            types::turn::give(state, id);
+        }
         let store = AgentsState::get_mut(state);
-        store.agents = agents;
         if let Some(v) = data.get("next_id").and_then(serde_json::Value::as_u64) {
             store.next_id = v.to_u32();
         }

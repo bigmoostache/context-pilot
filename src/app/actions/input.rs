@@ -1,7 +1,7 @@
 use crate::state::persistence::message::record_prompt_history;
 use crate::state::persistence::{delete_message, save_message};
 use crate::state::{Kind, Message, State, estimate_tokens};
-use cp_mod_agents::types::{AgentMessage, AgentStatus, AgentsState, FocusState};
+use cp_mod_agents::types::{AgentMessage, AgentsState, FocusState};
 use cp_mod_prompt::types::PromptItem;
 use cp_mod_spine::types::{NotificationType, SpineState};
 
@@ -185,8 +185,8 @@ fn handle_agent_input_submit(state: &mut State) -> ActionResult {
     let Some(agent) = agents_state.agents.get_mut(real_idx) else {
         return ActionResult::Nothing;
     };
-    agent.status = AgentStatus::MyTurn;
     let agent_id = agent.id.clone();
+    cp_mod_agents::types::turn::give(state, &agent_id);
 
     // Create a user message in the agent's human group
     if let Some(history) = cp_mod_agents::types::msgs::messages_mut(state, &agent_id) {

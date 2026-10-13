@@ -201,7 +201,8 @@ fn roster_gate(app: &App) -> (bool, Option<u64>) {
     for t in &AgentsState::get(&app.state).agents {
         t.id.hash(&mut h);
         cp_mod_agents::types::msgs::messages(&app.state, &t.id).len().hash(&mut h);
-        (t.status == cp_mod_agents::types::AgentStatus::MyTurn).hash(&mut h);
+        (cp_mod_agents::types::turn::status(&app.state, &t.id) == cp_mod_agents::types::AgentStatus::MyTurn)
+            .hash(&mut h);
         t.archived.hash(&mut h);
         t.paused.hash(&mut h);
     }

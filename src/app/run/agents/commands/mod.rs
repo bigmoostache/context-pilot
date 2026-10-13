@@ -13,7 +13,7 @@ use cp_base::config::llm::models::{
 use cp_base::config::llm::openrouter_model::OpenRouterModel;
 use cp_base::config::llm::types::LlmProvider;
 use cp_base::state::runtime::State;
-use cp_mod_agents::types::{AgentAuthor, AgentMessage, AgentStatus, AgentsState, FocusState};
+use cp_mod_agents::types::{AgentAuthor, AgentMessage, AgentsState, FocusState};
 use cp_mod_bridge::BridgeState;
 use cp_mod_spine::types::SpineState;
 use cp_wire::types::command::{Command, Kind as CommandKind};
@@ -103,13 +103,12 @@ pub(super) fn apply_command(app: &mut App, cmd: Command) {
 /// would reset the *executing* (focused) agent's counters for a message sent to
 /// a *background* agent.
 fn apply_send_message(state: &mut State, agent_id: &str, content: &str) -> bool {
-    let agents_state = AgentsState::get_mut(state);
-    let Some(agent) = agents_state.agents.iter_mut().find(|t| t.id == agent_id) else {
+    if !AgentsState::get(state).agents.iter().any(|t| t.id == agent_id) {
         log::warn!("bridge: SendMessage for unknown agent {agent_id}");
         return false;
-    };
+    }
 
-    agent.status = AgentStatus::MyTurn;
+    cp_mod_agents::types::turn::give(state, agent_id);
     if let Some(history) = cp_mod_agents::types::msgs::messages_mut(state, agent_id) {
         history.push(AgentMessage::user(content.to_owned()));
     }

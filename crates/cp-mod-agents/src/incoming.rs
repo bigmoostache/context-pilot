@@ -21,7 +21,7 @@ use cp_base::cast::Safe as _;
 use cp_base::state::runtime::State;
 
 use crate::tools::rebuild_agents_panel;
-use crate::types::{AgentStatus, AgentsState, FocusState, msgs};
+use crate::types::{AgentStatus, AgentsState, FocusState, msgs, turn};
 
 /// Branch A of the incoming-message behavior — **idle auto-read** of the focused
 /// agent.
@@ -47,7 +47,7 @@ pub fn take_idle_autoread(state: &mut State) -> Option<StreamingPush> {
     let ts = AgentsState::get(state);
     let agent = ts.agents.iter().find(|t| t.id == tid)?;
     // Paused = parked: leave messages unseen so resuming picks them up.
-    if agent.status != AgentStatus::MyTurn || agent.archived || agent.paused {
+    if turn::status(state, &tid) != AgentStatus::MyTurn || agent.archived || agent.paused {
         return None;
     }
     if !msgs::messages(state, &tid).iter().any(|m| !m.acknowledged) {

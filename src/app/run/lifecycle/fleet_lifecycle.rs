@@ -223,7 +223,10 @@ impl App {
             .agents
             .iter()
             .filter(|t| {
-                !t.archived && !t.paused && t.status == AgentStatus::MyTurn && focused.as_deref() != Some(t.id.as_str())
+                !t.archived
+                    && !t.paused
+                    && cp_mod_agents::types::turn::status(&self.state, &t.id) == AgentStatus::MyTurn
+                    && focused.as_deref() != Some(t.id.as_str())
             })
             .map(|t| (t.id.clone(), t.name.clone()))
             .collect();

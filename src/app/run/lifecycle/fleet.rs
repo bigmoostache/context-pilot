@@ -139,7 +139,7 @@ impl App {
             .agents
             .iter()
             .filter(|t| !t.archived && focused.as_deref() != Some(t.id.as_str()))
-            .map(|t| (t.id.clone(), t.status))
+            .map(|t| (t.id.clone(), cp_mod_agents::types::turn::status(&self.state, &t.id)))
             .collect();
 
         // Drop entries whose agent is gone / archived / now focused. A gone or
@@ -201,7 +201,7 @@ impl App {
             .agents
             .iter()
             .filter(|t| !t.archived && focused.as_deref() != Some(t.id.as_str()))
-            .map(|t| (t.id.clone(), t.status))
+            .map(|t| (t.id.clone(), cp_mod_agents::types::turn::status(&self.state, &t.id)))
             .collect();
 
         let active = self.state.active_modules.clone();
@@ -304,7 +304,11 @@ impl App {
     /// so the step loop and the display mirror cannot drift apart.
     fn post_step_exec_state(&self, id: &str) -> AgentExecState {
         let errs = cp_mod_spine::types::SpineState::get(&self.state).config.consecutive_continuation_errors;
-        let status = AgentsState::get(&self.state).agents.iter().find(|t| t.id == id).map(|t| t.status);
+        let status = AgentsState::get(&self.state)
+            .agents
+            .iter()
+            .find(|t| t.id == id)
+            .map(|t| cp_mod_agents::types::turn::status(&self.state, &t.id));
         Self::exec_state_from_facts(self.state.agent().stream.phase.is_streaming(), errs, status)
     }
 
@@ -360,7 +364,11 @@ impl App {
         let focused = cp_mod_agents::types::FocusState::get(&self.state).focused_agent_id.clone();
         if let Some(id) = focused {
             let errs = cp_mod_spine::types::SpineState::get(&self.state).config.consecutive_continuation_errors;
-            let status = AgentsState::get(&self.state).agents.iter().find(|t| t.id == id).map(|t| t.status);
+            let status = AgentsState::get(&self.state)
+                .agents
+                .iter()
+                .find(|t| t.id == id)
+                .map(|t| cp_mod_agents::types::turn::status(&self.state, &t.id));
             let focused_state =
                 Self::exec_state_from_facts(self.state.agent().stream.phase.is_streaming(), errs, status);
             let _inserted = exec_states.insert(id, focused_state);

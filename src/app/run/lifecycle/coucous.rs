@@ -3,7 +3,7 @@
 //! agent when it sits in the background. Plus the one-shot boot migration of
 //! legacy per-agent `pending_coucous`.
 
-use cp_mod_agents::types::{AgentStatus, AgentsState, FocusState};
+use cp_mod_agents::types::{AgentsState, FocusState};
 use cp_mod_spine::schedule::CoucouRegistry;
 use cp_mod_spine::types::{NotificationType, SpineState};
 
@@ -38,10 +38,10 @@ impl App {
                 SpineState::set_notification_agent(state, &nid, bind);
             });
             if let Some(target) = tid.filter(|t| focused.as_deref() != Some(t.as_str()))
-                && let Some(agent) = AgentsState::get_mut(&mut self.state).agents.iter_mut().find(|t| t.id == target)
+                && let Some(agent) = AgentsState::get(&self.state).agents.iter().find(|t| t.id == target)
                 && !agent.archived
             {
-                agent.status = AgentStatus::MyTurn;
+                cp_mod_agents::types::turn::give(&mut self.state, &target);
             }
         }
         self.state.flags.ui.dirty = true;

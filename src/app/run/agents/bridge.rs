@@ -438,7 +438,7 @@ pub(in crate::app::run) fn emit_agent_status(app: &mut App) {
         ts.agents
             .iter()
             .filter_map(|t| {
-                let turn = wire_turn(t.status);
+                let turn = wire_turn(cp_mod_agents::types::turn::status(&app.state, &t.id));
                 (memo.get(&t.id).copied() != Some(turn)).then(|| (t.id.clone(), turn))
             })
             .collect()
