@@ -19,6 +19,8 @@ pub struct BranchPrInfo {
     pub review_decision: Option<String>,
     /// CI checks status: "SUCCESS", "FAILURE", "PENDING", etc.
     pub checks_status: Option<String>,
+    /// Merge state: "MERGEABLE", "CONFLICTING" or "UNKNOWN" (still computing).
+    pub mergeable: Option<String>,
 }
 
 /// Runtime state for the GitHub module.

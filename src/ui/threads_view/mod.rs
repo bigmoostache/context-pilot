@@ -216,7 +216,7 @@ fn worktree_line(state: &State, thread_id: &str) -> Option<WorktreeLine> {
 }
 
 /// Spans of the muted `⎇ <worktree> #123 ●` line; the `●` is the same dot as
-/// the thread rows, coloured by CI (green pass, yellow pending, red failing).
+/// the thread rows, coloured by state (blue conflicts, red CI failing, yellow CI running, green).
 fn worktree_spans(wt: &WorktreeLine, width: u16) -> Vec<S> {
     use cp_mod_github::pr_badge::CheckColor;
     let label = truncate_str(&wt.name, width.saturating_sub(8).into());
@@ -226,6 +226,7 @@ fn worktree_spans(wt: &WorktreeLine, width: u16) -> Vec<S> {
             CheckColor::Green => theme::success(),
             CheckColor::Yellow => theme::warning(),
             CheckColor::Red => theme::error(),
+            CheckColor::Blue => ratatui::style::Color::Rgb(66, 135, 245),
         };
         let (r, g, bl) = if let ratatui::style::Color::Rgb(r, g, bl) = color { (r, g, bl) } else { (200, 200, 200) };
         spans.push(S::muted(format!(" {} ", b.label())));

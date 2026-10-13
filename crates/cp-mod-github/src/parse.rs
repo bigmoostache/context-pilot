@@ -66,7 +66,7 @@ pub fn poll_branch_pr(
             "view",
             branch,
             "--json",
-            "number,title,state,url,additions,deletions,reviewDecision,statusCheckRollup",
+            "number,title,state,url,additions,deletions,reviewDecision,statusCheckRollup,mergeable",
         ])
         .env("GITHUB_TOKEN", github_token)
         .env("GH_TOKEN", github_token)
@@ -109,7 +109,18 @@ fn parse_pr_json(json_str: &str) -> Option<crate::types::BranchPrInfo> {
     let review_decision = extract_json_string(json_str, "reviewDecision");
     let checks_status = parse_checks_status(json_str);
 
-    Some(crate::types::BranchPrInfo { number, title, state, url, additions, deletions, review_decision, checks_status })
+    let mergeable = extract_json_string(json_str, "mergeable");
+    Some(crate::types::BranchPrInfo {
+        number,
+        title,
+        state,
+        url,
+        additions,
+        deletions,
+        review_decision,
+        checks_status,
+        mergeable,
+    })
 }
 
 /// Extract a string value from JSON by key (simple parser, no serde dependency)

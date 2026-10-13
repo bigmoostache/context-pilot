@@ -19,7 +19,7 @@ const TTL: Duration = Duration::from_mins(1);
 /// Timeout for the `git rev-parse` branch lookup.
 const GIT_TIMEOUT_SECS: u64 = 5;
 
-/// CI verdict of an open PR, rendered as a coloured circle.
+/// State of an open PR, rendered as a coloured circle. Conflicts win over CI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CheckColor {
     /// Checks passing, or no checks at all.
@@ -28,6 +28,8 @@ pub enum CheckColor {
     Yellow,
     /// At least one check failed.
     Red,
+    /// Merge conflicts with the base branch.
+    Blue,
 }
 
 /// Open PR linked to a worktree's branch.
@@ -105,6 +107,7 @@ fn fetch(dir: &Path, token: &str) -> Option<Badge> {
     let (_hash, info) = crate::parse::poll_branch_pr(&branch, token, None)?;
     let pr = info.filter(|p| p.state == "OPEN")?;
     let color = match pr.checks_status.as_deref() {
+        _ if pr.mergeable.as_deref() == Some("CONFLICTING") => CheckColor::Blue,
         Some("failing") => CheckColor::Red,
         Some("pending") => CheckColor::Yellow,
         _ => CheckColor::Green,
