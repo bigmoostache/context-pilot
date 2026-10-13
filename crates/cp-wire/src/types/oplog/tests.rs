@@ -137,7 +137,11 @@ fn agent_created_wire_tag_is_stable() {
         kind: OpEntryKind::AgentArchived { agent_id: "T1".into() },
     };
     let json = serde_json::to_string(&entry).expect("serialize");
-    assert!(json.contains("\"kind\":\"thread_archived\""), "stable tag: {json}");
+    assert!(json.contains("\"kind\":\"agent_archived\""), "stable tag: {json}");
+    // Protocol v1 tag and key still decode (N-1 peers, on-disk oplogs).
+    let v1 = r#"{"schema_version":1,"rev":3,"timestamp_ms":0,"kind":{"kind":"thread_archived","thread_id":"T1"}}"#;
+    let back: OpEntry = serde_json::from_str(v1).expect("v1 decode");
+    assert_eq!(back, entry);
 }
 
 #[test]

@@ -15,6 +15,7 @@ use super::Phase;
 /// I10).  The backend fans these out to N frontend WebSocket subscribers
 /// without touching the agent.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(from = "RawFrame")]
 #[expect(
     clippy::exhaustive_structs,
     reason = "stream-frame contract: Frame is a 7-field ephemeral routing record built cross-crate by the agent's tee path; a constructor would take 6 positional arguments (tripping too_many_arguments) with no natural grouping, so #[non_exhaustive] is impossible and the exhaustive literal is the honest shape"
@@ -23,16 +24,13 @@ pub struct Frame {
     /// Wire-schema revision for this struct.
     pub schema_version: u32,
 
-    /// Originating fleet (one cpilot process). Wire key stays `agent_id`
-    /// until the protocol bump (T860 phase A4).
-    #[serde(rename = "agent_id")]
+    /// Originating fleet (one cpilot process).
     pub fleet_id: String,
 
-    /// Worker within the agent (future multi-worker; single today).
+    /// Worker within the fleet (future multi-worker; single today).
     pub worker_id: String,
 
-    /// Agent context for routing to the correct UI pane.
-    #[serde(rename = "thread_id")]
+    /// Agent the frame belongs to, for routing to the correct UI pane.
     pub agent_id: String,
 
     /// Message being streamed (tokens accumulate under this id).
@@ -43,6 +41,52 @@ pub struct Frame {
 
     /// What this frame carries.
     pub kind: Kind,
+}
+
+/// Decode shape accepting both protocol revisions of [`Frame`].
+///
+/// v1 keyed the fleet as `agent_id` and the agent as `thread_id`; v2 uses
+/// `fleet_id` + `agent_id`. The same `agent_id` key changes meaning between
+/// them, so plain serde aliases can't tell them apart — the presence of
+/// `fleet_id` does.
+#[derive(Deserialize)]
+struct RawFrame {
+    /// See [`Frame::schema_version`].
+    schema_version: u32,
+    /// v2 fleet key; absent on v1 frames.
+    fleet_id: Option<String>,
+    /// v2 agent key, or the v1 fleet key.
+    #[serde(default)]
+    agent_id: String,
+    /// v1 agent key.
+    #[serde(default)]
+    thread_id: String,
+    /// See [`Frame::worker_id`].
+    worker_id: String,
+    /// See [`Frame::message_id`].
+    message_id: String,
+    /// See [`Frame::seq`].
+    seq: u64,
+    /// See [`Frame::kind`].
+    kind: Kind,
+}
+
+impl From<RawFrame> for Frame {
+    fn from(raw: RawFrame) -> Self {
+        let (fleet_id, agent_id) = match raw.fleet_id {
+            Some(fleet) => (fleet, raw.agent_id),
+            None => (raw.agent_id, raw.thread_id),
+        };
+        Self {
+            schema_version: raw.schema_version,
+            fleet_id,
+            worker_id: raw.worker_id,
+            agent_id,
+            message_id: raw.message_id,
+            seq: raw.seq,
+            kind: raw.kind,
+        }
+    }
 }
 
 /// The payload a [`Frame`] delivers.
@@ -141,5 +185,21 @@ mod tests {
         }"#;
         let frame: Frame = serde_json::from_str(json).expect("tolerant decode");
         assert_eq!(frame.kind, Kind::Unknown);
+        assert_eq!((frame.fleet_id.as_str(), frame.agent_id.as_str()), ("a", "T"), "v1 keys map");
+    }
+
+    #[test]
+    fn v2_keys_on_the_wire() {
+        let frame = Frame {
+            schema_version: 1,
+            fleet_id: "f".into(),
+            worker_id: "w".into(),
+            agent_id: "A1".into(),
+            message_id: "m".into(),
+            seq: 0,
+            kind: Kind::Unknown,
+        };
+        let json = serde_json::to_string(&frame).expect("serialize");
+        assert!(json.contains("\"fleet_id\":\"f\"") && json.contains("\"agent_id\":\"A1\""), "{json}");
     }
 }

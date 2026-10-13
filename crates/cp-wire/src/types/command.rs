@@ -60,7 +60,7 @@ pub enum Kind {
     #[serde(rename = "send_message")]
     SendMessage {
         /// Target agent identifier.
-        #[serde(rename = "thread_id")]
+        #[serde(rename = "agent_id", alias = "thread_id")]
         agent_id: String,
         /// Markdown body of the message.
         content: String,
@@ -68,7 +68,7 @@ pub enum Kind {
 
     /// Create a new agent, optionally seeding its first user message and
     /// starting it paused.
-    #[serde(rename = "create_thread")]
+    #[serde(rename = "create_agent", alias = "create_thread")]
     CreateAgent {
         /// Human-readable agent name.
         name: String,
@@ -93,10 +93,10 @@ pub enum Kind {
     /// The agent copies the history from its own state (the payload only names
     /// the branch point). An N-1 agent deserialises this as
     /// [`Unknown`](Self::Unknown) and ignores it.
-    #[serde(rename = "branch_thread")]
+    #[serde(rename = "branch_agent", alias = "branch_thread")]
     BranchAgent {
         /// Agent to branch out of.
-        #[serde(rename = "source_thread_id")]
+        #[serde(rename = "source_agent_id", alias = "source_thread_id")]
         source_agent_id: String,
         /// Epoch-ms timestamp of the last source message to copy (inclusive).
         message_ts: u64,
@@ -112,42 +112,42 @@ pub enum Kind {
     },
 
     /// Archive an existing agent.
-    #[serde(rename = "archive_thread")]
+    #[serde(rename = "archive_agent", alias = "archive_thread")]
     ArchiveAgent {
         /// Agent to archive.
-        #[serde(rename = "thread_id")]
+        #[serde(rename = "agent_id", alias = "thread_id")]
         agent_id: String,
     },
 
     /// Restore a previously archived agent.
-    #[serde(rename = "restore_thread")]
+    #[serde(rename = "restore_agent", alias = "restore_thread")]
     RestoreAgent {
         /// Agent to restore.
-        #[serde(rename = "thread_id")]
+        #[serde(rename = "agent_id", alias = "thread_id")]
         agent_id: String,
     },
 
     /// Pause an agent (suppress `MY_TURN` notifications).
-    #[serde(rename = "pause_thread")]
+    #[serde(rename = "pause_agent", alias = "pause_thread")]
     PauseAgent {
         /// Agent to pause.
-        #[serde(rename = "thread_id")]
+        #[serde(rename = "agent_id", alias = "thread_id")]
         agent_id: String,
     },
 
     /// Resume a previously paused agent.
-    #[serde(rename = "resume_thread")]
+    #[serde(rename = "resume_agent", alias = "resume_thread")]
     ResumeAgent {
         /// Agent to resume.
-        #[serde(rename = "thread_id")]
+        #[serde(rename = "agent_id", alias = "thread_id")]
         agent_id: String,
     },
 
     /// Permanently delete an agent and all its messages.
-    #[serde(rename = "delete_thread")]
+    #[serde(rename = "delete_agent", alias = "delete_thread")]
     DeleteAgent {
         /// Agent to delete.
-        #[serde(rename = "thread_id")]
+        #[serde(rename = "agent_id", alias = "thread_id")]
         agent_id: String,
     },
 
@@ -155,7 +155,7 @@ pub enum Kind {
     #[serde(rename = "delete_message")]
     DeleteMessage {
         /// Agent containing the message.
-        #[serde(rename = "thread_id")]
+        #[serde(rename = "agent_id", alias = "thread_id")]
         agent_id: String,
         /// Epoch-ms timestamp of the message to delete (unique per agent).
         message_ts: u64,

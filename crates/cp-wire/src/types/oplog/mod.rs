@@ -85,7 +85,7 @@ pub enum OpEntryKind {
     #[serde(rename = "message_created")]
     MessageCreated {
         /// Agent the message belongs to.
-        #[serde(rename = "thread_id")]
+        #[serde(rename = "agent_id", alias = "thread_id")]
         agent_id: String,
         /// Unique message identifier.
         message_id: String,
@@ -112,7 +112,7 @@ pub enum OpEntryKind {
     #[serde(rename = "message_deleted")]
     MessageDeleted {
         /// Agent the message was in.
-        #[serde(rename = "thread_id")]
+        #[serde(rename = "agent_id", alias = "thread_id")]
         agent_id: String,
         /// Epoch-ms timestamp identifying the deleted message.
         message_ts: u64,
@@ -127,10 +127,10 @@ pub enum OpEntryKind {
     /// and last-activity are *derived* by folding subsequent
     /// [`MessageCreated`](Self::MessageCreated) entries — they are not repeated
     /// here.
-    #[serde(rename = "thread_created")]
+    #[serde(rename = "agent_created", alias = "thread_created")]
     AgentCreated {
         /// Identifier of the new agent (e.g. `"T7"`).
-        #[serde(rename = "thread_id")]
+        #[serde(rename = "agent_id", alias = "thread_id")]
         agent_id: String,
         /// User-chosen agent label.
         name: String,
@@ -147,53 +147,53 @@ pub enum OpEntryKind {
 
     /// An agent was archived (soft-delete — hidden from the active list, kept
     /// for restore).
-    #[serde(rename = "thread_archived")]
+    #[serde(rename = "agent_archived", alias = "thread_archived")]
     AgentArchived {
         /// The archived agent.
-        #[serde(rename = "thread_id")]
+        #[serde(rename = "agent_id", alias = "thread_id")]
         agent_id: String,
     },
 
     /// A previously-archived agent was restored to the active list.
-    #[serde(rename = "thread_restored")]
+    #[serde(rename = "agent_restored", alias = "thread_restored")]
     AgentRestored {
         /// The restored agent.
-        #[serde(rename = "thread_id")]
+        #[serde(rename = "agent_id", alias = "thread_id")]
         agent_id: String,
     },
 
     /// An agent was paused — its `MY_TURN` status no longer fires idle
     /// notifications, but it remains visible and fully functional.
-    #[serde(rename = "thread_paused")]
+    #[serde(rename = "agent_paused", alias = "thread_paused")]
     AgentPaused {
         /// The paused agent.
-        #[serde(rename = "thread_id")]
+        #[serde(rename = "agent_id", alias = "thread_id")]
         agent_id: String,
     },
 
     /// A previously-paused agent was resumed — its `MY_TURN` status fires
     /// idle notifications again.
-    #[serde(rename = "thread_resumed")]
+    #[serde(rename = "agent_resumed", alias = "thread_resumed")]
     AgentResumed {
         /// The resumed agent.
-        #[serde(rename = "thread_id")]
+        #[serde(rename = "agent_id", alias = "thread_id")]
         agent_id: String,
     },
 
     /// An agent was permanently deleted — removed from the roster and all
     /// its messages discarded. Irreversible.
-    #[serde(rename = "thread_deleted")]
+    #[serde(rename = "agent_deleted", alias = "thread_deleted")]
     AgentDeleted {
         /// The deleted agent.
-        #[serde(rename = "thread_id")]
+        #[serde(rename = "agent_id", alias = "thread_id")]
         agent_id: String,
     },
 
     /// An agent's turn ownership changed (`MyTurn` ↔ `TheirTurn`).
-    #[serde(rename = "thread_status_changed")]
+    #[serde(rename = "agent_status_changed", alias = "thread_status_changed")]
     AgentStatusChanged {
         /// The affected agent.
-        #[serde(rename = "thread_id")]
+        #[serde(rename = "agent_id", alias = "thread_id")]
         agent_id: String,
         /// The agent's new turn ownership.
         status: AgentTurn,
@@ -213,7 +213,7 @@ pub enum OpEntryKind {
     #[serde(rename = "task_list_changed")]
     TaskListChanged {
         /// The agent whose task list changed.
-        #[serde(rename = "thread_id")]
+        #[serde(rename = "agent_id", alias = "thread_id")]
         agent_id: String,
         /// The agent's complete current task list (cancelled excluded).
         tasks: Vec<WireTask>,
@@ -233,7 +233,7 @@ pub enum OpEntryKind {
     #[serde(rename = "notes_changed")]
     NotesChanged {
         /// The agent whose note list changed.
-        #[serde(rename = "thread_id")]
+        #[serde(rename = "agent_id", alias = "thread_id")]
         agent_id: String,
         /// The agent's complete current scratchpad-note list.
         notes: Vec<WireNote>,
@@ -248,12 +248,12 @@ pub enum OpEntryKind {
     /// self-heals — a dropped or post-restart-missing focus is re-served from
     /// the agent's tier-② `FocusState` on the next disk read and re-emitted on
     /// the next focus change.
-    #[serde(rename = "thread_focus_changed")]
+    #[serde(rename = "agent_focus_changed", alias = "thread_focus_changed")]
     AgentFocusChanged {
         /// The newly-focused agent, or `None` when focus was released (the
         /// agent is no longer actively working any single agent).
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        #[serde(rename = "thread_id")]
+        #[serde(rename = "agent_id", alias = "thread_id")]
         agent_id: Option<String>,
     },
 

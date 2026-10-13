@@ -85,7 +85,7 @@ impl Snapshot {
 #[non_exhaustive]
 pub struct RosterAgent {
     /// Agent identifier (e.g. `"T7"`).
-    #[serde(rename = "thread_id")]
+    #[serde(rename = "agent_id", alias = "thread_id")]
     pub agent_id: String,
 
     /// User-chosen agent label.
@@ -282,7 +282,7 @@ pub struct Heads {
     pub schema_version: u32,
 
     /// Per-thread last-message head.
-    #[serde(rename = "threads")]
+    #[serde(rename = "agents", alias = "threads")]
     pub agents: Vec<AgentHead>,
 
     /// Per-panel content head.
@@ -319,7 +319,7 @@ impl Heads {
 #[non_exhaustive]
 pub struct AgentHead {
     /// Agent identifier.
-    #[serde(rename = "thread_id")]
+    #[serde(rename = "agent_id", alias = "thread_id")]
     pub agent_id: String,
 
     /// Content hash of the last message body in this agent.

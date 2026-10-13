@@ -78,7 +78,7 @@ pub enum Kind {
         limit: u32,
         /// Optional single-thread scope (filters on `agent_id`). `None`
         /// searches every agent.
-        #[serde(rename = "thread_id")]
+        #[serde(rename = "agent_id", alias = "thread_id")]
         agent_id: Option<String>,
     },
 
@@ -159,10 +159,10 @@ pub struct HitParts<'src> {
 #[non_exhaustive]
 pub struct ConvHit {
     /// Owning agent id — the navigation target.
-    #[serde(rename = "thread_id")]
+    #[serde(rename = "agent_id", alias = "thread_id")]
     pub agent_id: String,
     /// Owning agent's display name.
-    #[serde(rename = "thread_name")]
+    #[serde(rename = "agent_name", alias = "thread_name")]
     pub agent_name: String,
     /// `"user"` or `"assistant"`.
     pub author: String,
