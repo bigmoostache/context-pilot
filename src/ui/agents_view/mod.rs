@@ -217,12 +217,14 @@ fn worktree_line(state: &State, agent_id: &str) -> Option<WorktreeLine> {
     Some(WorktreeLine { name, badge })
 }
 
-/// Spans of the muted `⎇ <worktree> #123 ●` line; the `●` is the same dot as
-/// the agent rows, coloured by state (blue conflicts, red CI failing, yellow CI running, green).
+/// Spans of the muted `#123 ● ⎇ <worktree>` line. The PR comes first so a
+/// long worktree name truncates without hiding it; the `●` is the same dot as
+/// the agent rows, coloured by state (blue conflicts, red CI failing, yellow
+/// CI running, green).
 fn worktree_spans(wt: &WorktreeLine, width: u16) -> Vec<S> {
     use cp_mod_github::pr_badge::CheckColor;
-    let label = truncate_str(&wt.name, width.saturating_sub(8).into());
-    let mut spans = vec![S::muted(format!("    \u{2387} {label}"))];
+    let mut spans = vec![S::muted("    ".to_owned())];
+    let mut used: usize = 4;
     if let Some(b) = wt.badge {
         let color = match b.color {
             CheckColor::Green => theme::success(),
@@ -231,9 +233,14 @@ fn worktree_spans(wt: &WorktreeLine, width: u16) -> Vec<S> {
             CheckColor::Blue => ratatui::style::Color::Rgb(66, 135, 245),
         };
         let (r, g, bl) = if let ratatui::style::Color::Rgb(r, g, bl) = color { (r, g, bl) } else { (200, 200, 200) };
-        spans.push(S::muted(format!(" {} ", b.label())));
+        let label = format!("{} ", b.label());
+        used = used.saturating_add(label.chars().count()).saturating_add(2);
+        spans.push(S::muted(label));
         spans.push(S::rgb("\u{25cf}".to_owned(), r, g, bl));
+        spans.push(S::muted(" ".to_owned()));
     }
+    let room = usize::from(width).saturating_sub(used.saturating_add(3));
+    spans.push(S::muted(format!("\u{2387} {}", truncate_str(&wt.name, room))));
     spans
 }
 
