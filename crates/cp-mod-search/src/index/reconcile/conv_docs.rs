@@ -23,7 +23,7 @@ pub(crate) fn build_conversation_docs(state: &State) -> Vec<index::reconcile::co
     let agents = &cp_mod_agents::types::AgentsState::get(state).agents;
     let mut docs = Vec::new();
     for agent in agents {
-        for (index, msg) in agent.messages.iter().enumerate() {
+        for (index, msg) in cp_mod_agents::types::msgs::messages(state, &agent.id).iter().enumerate() {
             if msg.auto {
                 continue; // tool-trace — never indexed
             }

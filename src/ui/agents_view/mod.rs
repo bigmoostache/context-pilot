@@ -108,6 +108,10 @@ struct ListBuild<'build> {
     /// Per-thread message count the *human* has seen in the TUI
     /// ([`FocusState::last_read_count`]) — drives the unread marker.
     last_read: &'build std::collections::BTreeMap<String, usize>,
+    /// Agents store, to resolve each agent's human group.
+    agents: &'build AgentsState,
+    /// Groups store holding the agents' messages.
+    groups: &'build cp_groups::types::GroupsState,
     /// Depth of each visible agent in the tree (root = 0), for indentation.
     depth_of: std::collections::HashMap<String, usize>,
 }
@@ -171,16 +175,14 @@ const fn agent_is_working(exec: AgentExecState) -> bool {
 /// [`last_read_count`](FocusState::last_read_count). An agent with no entry
 /// was never tracked and counts as read, so old agents don't all light up.
 fn has_unread_reply(
+    history: &[cp_mod_agents::types::AgentMessage],
     agent: &cp_mod_agents::types::Agent,
     last_read: &std::collections::BTreeMap<String, usize>,
 ) -> bool {
     let Some(&seen) = last_read.get(&agent.id) else {
         return false;
     };
-    agent
-        .messages
-        .get(seen..)
-        .is_some_and(|tail| tail.iter().any(|m| !m.auto && matches!(m.author, AgentAuthor::Assistant)))
+    history.get(seen..).is_some_and(|tail| tail.iter().any(|m| !m.auto && matches!(m.author, AgentAuthor::Assistant)))
 }
 
 /// Leading 2-col slot of an agent row, mirroring the footer:
@@ -193,7 +195,7 @@ fn leading_slot(lb: &ListBuild<'_>, agent: &cp_mod_agents::types::Agent) -> S {
         S::styled(format!("{} ", crate::ui::helpers::spinner()), Semantic::Accent)
     } else if matches!(agent.status, AgentStatus::MyTurn) {
         S::styled("\u{26a0} ".to_owned(), Semantic::Error)
-    } else if has_unread_reply(agent, lb.last_read) {
+    } else if has_unread_reply(cp_mod_agents::types::msgs::of(lb.agents, lb.groups, &agent.id), agent, lb.last_read) {
         S::styled("\u{25c6} ".to_owned(), Semantic::Accent)
     } else {
         S::styled("  ".to_owned(), Semantic::Default)
@@ -380,6 +382,8 @@ fn render_agent_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
         inner_width: inner.width,
         mirror,
         last_read: &focus.last_read_count,
+        agents: ts,
+        groups: cp_groups::types::GroupsState::get(state),
         depth_of: cp_mod_agents::types::tree::preorder(&ts.agents, &visible)
             .into_iter()
             .filter_map(|(i, d)| Some((ts.agents.get(i)?.id.clone(), d)))

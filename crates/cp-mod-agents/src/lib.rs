@@ -98,8 +98,8 @@ impl Module for AgentsModule {
         // same save as the keyed write — the two land together or the boot-side
         // fallback covers the gap.
         let focus_file = FocusState::get(state).focused_agent_id.clone().unwrap_or_default();
-        // Messages are NOT serialized here: they live in `agents/<id>.json`,
-        // written by the save batch only for agents that changed.
+        // Messages are NOT serialized here: they live in the agent's human
+        // group (`groups/<id>.json`, written by the save batch when dirty).
         let agents: Vec<types::persist::AgentMeta<'_>> = ts.agents.iter().map(Into::into).collect();
         json!({
             "agents": agents,
@@ -119,13 +119,22 @@ impl Module for AgentsModule {
             && let Ok(v) = serde_json::from_value(arr.clone())
         {
             ts.agents = v;
-            types::persist::load_agent_messages(&mut ts.agents);
         }
+        // Every agent owns a human group (T860 C). GroupsModule loads first;
+        // agents without one get it here, seeded from their legacy file.
+        let mut agents = std::mem::take(&mut AgentsState::get_mut(state).agents);
+        let _created = types::msgs::ensure_human_groups(
+            &mut agents,
+            cp_groups::types::GroupsState::get_mut(state),
+            types::persist::read_legacy_messages,
+        );
+        let store = AgentsState::get_mut(state);
+        store.agents = agents;
         if let Some(v) = data.get("next_id").and_then(serde_json::Value::as_u64) {
-            ts.next_id = v.to_u32();
+            store.next_id = v.to_u32();
         }
         if let Some(v) = data.get("panel_content").and_then(serde_json::Value::as_str) {
-            v.clone_into(&mut ts.panel_content);
+            v.clone_into(&mut store.panel_content);
         }
         // Register the persistent MY_TURN watcher. Placed here (not init_state)
         // because WatcherRegistry is created by SpineModule's init_state, which

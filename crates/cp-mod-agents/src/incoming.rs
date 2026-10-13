@@ -21,7 +21,7 @@ use cp_base::cast::Safe as _;
 use cp_base::state::runtime::State;
 
 use crate::tools::rebuild_agents_panel;
-use crate::types::{AgentStatus, AgentsState, FocusState};
+use crate::types::{AgentStatus, AgentsState, FocusState, msgs};
 
 /// Branch A of the incoming-message behavior — **idle auto-read** of the focused
 /// agent.
@@ -50,7 +50,7 @@ pub fn take_idle_autoread(state: &mut State) -> Option<StreamingPush> {
     if agent.status != AgentStatus::MyTurn || agent.archived || agent.paused {
         return None;
     }
-    if !agent.messages.iter().any(|m| !m.acknowledged) {
+    if !msgs::messages(state, &tid).iter().any(|m| !m.acknowledged) {
         return None; // nothing unseen — the idle watcher handles the plain nudge
     }
     let name = agent.name.clone();
@@ -58,9 +58,8 @@ pub fn take_idle_autoread(state: &mut State) -> Option<StreamingPush> {
     // Inline + acknowledge every unseen message (the panel now "reaches" them) ...
     let mut messages = Vec::new();
     let mut truncated = false;
-    let ts_mut = AgentsState::get_mut(state);
-    if let Some(t) = ts_mut.agents.iter_mut().find(|t| t.id == tid) {
-        for msg in t.messages.iter_mut().filter(|m| !m.acknowledged) {
+    if let Some(history) = msgs::messages_mut(state, &tid) {
+        for msg in history.iter_mut().filter(|m| !m.acknowledged) {
             msg.acknowledged = true;
             let (text, cut) = inline_text(msg.content.as_deref(), msg.file_path.as_deref());
             truncated |= cut;
@@ -92,17 +91,15 @@ pub fn take_idle_autoread(state: &mut State) -> Option<StreamingPush> {
 /// ends, [`take_idle_autoread`] pulls the full text into context.
 pub fn take_streaming_push(state: &mut State) -> Option<StreamingPush> {
     let tid = FocusState::get(state).focused_agent_id.clone()?;
-    let name = AgentsState::get(state).agents.iter().find(|t| t.id == tid).map(|t| t.name.clone())?;
-
-    let ts_mut = AgentsState::get_mut(state);
-    let agent = ts_mut.agents.iter_mut().find(|t| t.id == tid)?;
+    let agent = AgentsState::get(state).agents.iter().find(|t| t.id == tid)?;
     // Paused = parked: no push; messages stay unseen for the resume auto-read.
     if agent.paused || agent.archived {
         return None;
     }
+    let name = agent.name.clone();
     let mut messages = Vec::new();
     let mut truncated = false;
-    for msg in &mut agent.messages {
+    for msg in msgs::messages_mut(state, &tid)?.iter_mut() {
         if msg.acknowledged || msg.has_been_pushed {
             continue;
         }

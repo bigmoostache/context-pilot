@@ -15,7 +15,7 @@ use crate::state::{Message, State};
 use crate::ui::{ir, theme};
 use cp_base::cast::Safe as _;
 use cp_base::cast::float_math;
-use cp_mod_agents::types::{AgentAuthor, AgentStatus, AgentsState, FocusState};
+use cp_mod_agents::types::{AgentAuthor, AgentMessage, AgentStatus, AgentsState, FocusState};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::hash::{Hash as _, Hasher as _};
@@ -40,7 +40,7 @@ const MSG_CACHE_SLACK: usize = 4096;
 
 /// Key of one message's rendered lines: everything `render_message_blocks`
 /// reads from it, plus width and active theme.
-fn message_key(msg: &cp_mod_agents::types::AgentMessage, viewport_width: u16) -> u64 {
+fn message_key(msg: &AgentMessage, viewport_width: u16) -> u64 {
     let mut h = std::collections::hash_map::DefaultHasher::new();
     viewport_width.hash(&mut h);
     std::ptr::from_ref(cp_base::config::accessors::active_theme()).addr().hash(&mut h);
@@ -57,28 +57,32 @@ fn message_key(msg: &cp_mod_agents::types::AgentMessage, viewport_width: u16) ->
 /// message contributes its content length + heap address, which any append or
 /// replacement changes. The last message (where streaming edits land) is
 /// hashed in full as a guard against same-length in-place edits.
-fn lines_fingerprint(agent: &cp_mod_agents::types::Agent, viewport_width: u16) -> u64 {
+fn lines_fingerprint(agent: &cp_mod_agents::types::Agent, history: &[AgentMessage], viewport_width: u16) -> u64 {
     let _g = crate::profile!("tv_fingerprint");
     let mut h = std::collections::hash_map::DefaultHasher::new();
     agent.id.hash(&mut h);
     viewport_width.hash(&mut h);
     std::ptr::from_ref(cp_base::config::accessors::active_theme()).addr().hash(&mut h);
-    agent.messages.len().hash(&mut h);
-    for msg in &agent.messages {
+    history.len().hash(&mut h);
+    for msg in history {
         msg.auto.hash(&mut h);
         matches!(msg.author, AgentAuthor::Assistant).hash(&mut h);
         msg.timestamp.hash(&mut h);
         msg.content.as_ref().map(|c| (c.len(), c.as_ptr().addr())).hash(&mut h);
     }
-    if let Some(last) = agent.messages.last() {
+    if let Some(last) = history.last() {
         last.content.hash(&mut h);
     }
     h.finish()
 }
 
 /// Message lines for `agent`, rebuilt only when its fingerprint changes.
-fn cached_agent_message_lines(agent: &cp_mod_agents::types::Agent, viewport_width: u16) -> CachedLines {
-    let key = lines_fingerprint(agent, viewport_width);
+fn cached_agent_message_lines(
+    agent: &cp_mod_agents::types::Agent,
+    history: &[AgentMessage],
+    viewport_width: u16,
+) -> CachedLines {
+    let key = lines_fingerprint(agent, history, viewport_width);
     LINE_CACHE.with_borrow_mut(|slot| {
         if let Some(entry) = slot.as_ref()
             && entry.0 == key
@@ -87,7 +91,7 @@ fn cached_agent_message_lines(agent: &cp_mod_agents::types::Agent, viewport_widt
         }
         let lines = {
             let _g = crate::profile!("tv_lines_build");
-            Rc::new(build_agent_message_lines(agent, viewport_width))
+            Rc::new(build_agent_message_lines(history, viewport_width))
         };
         *slot = Some((key, Rc::clone(&lines)));
         lines
@@ -156,7 +160,7 @@ pub(super) fn render_message_area_with_input(frame: &mut Frame<'_>, state: &mut 
             return;
         };
 
-        lines = cached_agent_message_lines(agent, m_area.width);
+        lines = cached_agent_message_lines(agent, cp_mod_agents::types::msgs::messages(state, &agent.id), m_area.width);
         msg_area = m_area;
         let _g = crate::profile!("tv_input");
         render_agent_input(frame, state, input_area);
@@ -174,11 +178,8 @@ pub(super) fn render_message_area_with_input(frame: &mut Frame<'_>, state: &mut 
 /// (same IR path as the main conversation), converts via `blocks_to_lines()`.
 /// Returned lines hold no borrow of `State`, so the caller can take a mutable
 /// borrow afterwards for scroll management.
-fn build_agent_message_lines(
-    agent: &cp_mod_agents::types::Agent,
-    viewport_width: u16,
-) -> Vec<ratatui::text::Line<'static>> {
-    if agent.messages.is_empty() {
+fn build_agent_message_lines(history: &[AgentMessage], viewport_width: u16) -> Vec<ratatui::text::Line<'static>> {
+    if history.is_empty() {
         let ir_blocks =
             vec![IrBlock::Line(vec![S::muted("No messages yet. Type below to start the conversation.".to_owned())])];
         return ir::blocks_to_lines(&ir_blocks);
@@ -201,7 +202,7 @@ fn build_agent_message_lines(
     let mut used: Vec<u64> = Vec::new();
     let mut in_auto_run = false;
     MSG_CACHE.with_borrow_mut(|cache| {
-        for msg in &agent.messages {
+        for msg in history {
             if msg.auto {
                 out.extend(ir::blocks_to_lines(&[IrBlock::Line(auto_trace_spans(msg))]));
                 in_auto_run = true;
@@ -323,7 +324,7 @@ fn render_agent_input(frame: &mut Frame<'_>, state: &State, area: Rect) {
 /// Strip the leading auto-trace marker from an auto message's content for the
 /// compact dim line (the structured `auto` flag already identifies the trace,
 /// so the inline `/⁠* auto *⁠/` marker is redundant in the rendered line).
-fn auto_line(msg: &cp_mod_agents::types::AgentMessage) -> String {
+fn auto_line(msg: &AgentMessage) -> String {
     const MARKER: &str = "/* auto */ ";
     let content = msg.content.as_deref().unwrap_or("");
     content.strip_prefix(MARKER).unwrap_or(content).to_owned()
@@ -343,7 +344,7 @@ fn auto_line(msg: &cp_mod_agents::types::AgentMessage) -> String {
 ///
 /// Parsing is defensive: a missing separator degrades gracefully (the whole
 /// remainder collapses into the tool-name token) rather than dropping content.
-fn auto_trace_spans(msg: &cp_mod_agents::types::AgentMessage) -> Vec<S> {
+fn auto_trace_spans(msg: &AgentMessage) -> Vec<S> {
     let body = auto_line(msg);
     let (verb, rest) = body.split_once(" \u{b7} ").unwrap_or(("", body.as_str()));
     let (tool, intent) = rest.split_once(" \u{2014} ").unwrap_or((rest, ""));
@@ -362,7 +363,7 @@ fn auto_trace_spans(msg: &cp_mod_agents::types::AgentMessage) -> Vec<S> {
 }
 
 /// Convert a `AgentMessage` to a `Message` for the conversation IR renderer.
-fn agent_message_to_message(msg: &cp_mod_agents::types::AgentMessage) -> Message {
+fn agent_message_to_message(msg: &AgentMessage) -> Message {
     let role = if matches!(msg.author, AgentAuthor::Assistant) { "assistant" } else { "user" };
     let content = msg.content.clone().unwrap_or_default();
 

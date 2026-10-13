@@ -6,9 +6,9 @@
 
 /// Group message types (formerly the agents' own message types).
 pub mod chat;
-/// `GroupsModule`: state registration + metadata persistence.
-pub mod wiring;
 /// Per-group message files (`groups/<id>.json`), written only when dirty.
 pub mod persist;
 /// `Group`, `GroupKind`, `GroupsState`.
 pub mod types;
+/// `GroupsModule`: state registration + metadata persistence.
+pub mod wiring;

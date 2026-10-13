@@ -12,7 +12,7 @@ use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::types::roster::yaml_escape;
-use crate::types::{AgentAuthor, AgentMessage, AgentStatus, AgentsState};
+use crate::types::{AgentAuthor, AgentMessage, AgentStatus, AgentsState, msgs};
 
 /// Truncate `s` to at most `max` bytes on a char boundary (no ellipsis).
 fn clamp_bytes(s: &str, max: usize) -> String {
@@ -40,9 +40,11 @@ fn push_send_message(state: &mut State, tid: &str, msg: AgentMessage, still_my_t
     if agent.archived {
         agent.archived = false;
     }
-    agent.messages.push(msg);
     if !still_my_turn {
         agent.status = AgentStatus::TheirTurn;
+    }
+    if let Some(history) = msgs::messages_mut(state, tid) {
+        history.push(msg);
     }
     unarchived
 }
@@ -125,10 +127,11 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
 
 /// Per-thread unacknowledged summary lines (active agents with new messages).
 /// The focused agent is marked. Archived agents are LLM-invisible (T9).
-fn collect_agent_summaries(ts: &AgentsState, focused_tid: &str) -> Vec<String> {
+fn collect_agent_summaries(state: &State, focused_tid: &str) -> Vec<String> {
+    let ts = AgentsState::get(state);
     let mut summaries = Vec::new();
     for t in ts.agents.iter().filter(|t| !t.archived) {
-        let unack = t.messages.iter().filter(|m| !m.acknowledged).count();
+        let unack = msgs::messages(state, &t.id).iter().filter(|m| !m.acknowledged).count();
         if unack == 0 {
             continue;
         }
@@ -200,12 +203,11 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
     let agent_name = target_agent.name.clone();
     let agent_status = target_agent.status;
 
-    let agent_summaries = collect_agent_summaries(ts, tid);
+    let agent_summaries = collect_agent_summaries(state, tid);
 
     // Count + previews of newly acknowledged messages in a single pass.
     let mut new_count: usize = 0;
-    let new_msg_previews: Vec<String> = target_agent
-        .messages
+    let new_msg_previews: Vec<String> = msgs::messages(state, tid)
         .iter()
         .filter(|m| !m.acknowledged)
         .inspect(|_| new_count = new_count.saturating_add(1))
@@ -213,9 +215,8 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
         .collect();
 
     // --- Phase 2: Mark all messages in target agent as acknowledged ---
-    let ts_mut = AgentsState::get_mut(state);
-    if let Some(agent) = ts_mut.agents.iter_mut().find(|t| t.id == tid) {
-        for msg in &mut agent.messages {
+    if let Some(history) = msgs::messages_mut(state, tid) {
+        for msg in history.iter_mut() {
             msg.acknowledged = true;
         }
     }
@@ -276,11 +277,8 @@ fn build_read_result(state: &State, r: &ReadResult<'_>) -> String {
         .find(|c| c.context_type.as_str() == Kind::AGENTS)
         .map_or_else(|| "??".to_owned(), |c| c.id.clone());
 
-    let last_msg_preview = AgentsState::get(state)
-        .agents
-        .iter()
-        .find(|t| t.id == r.tid)
-        .and_then(|t| t.messages.last())
+    let last_msg_preview = msgs::messages(state, r.tid)
+        .last()
         .and_then(|m| m.content.as_deref())
         .map_or_else(|| "[no messages]".to_owned(), |c| preview_ellipsis(c, 80));
 
@@ -396,7 +394,7 @@ pub(crate) fn build_panel_content(state: &State, focused_tid: &str, now_ms: u64)
     // the model should never re-read its own action log (token bloat +
     // self-referential loop risk). They remain visible (collapsed) in
     // the web UI / TUI for the human.
-    let visible: Vec<&AgentMessage> = agent.messages.iter().filter(|m| !m.auto).collect();
+    let visible: Vec<&AgentMessage> = msgs::messages(state, &agent.id).iter().filter(|m| !m.auto).collect();
     let total = visible.len();
     let skip = total.saturating_sub(MAX_PANEL_MESSAGES);
 

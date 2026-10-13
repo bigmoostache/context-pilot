@@ -7,7 +7,7 @@
 //! message-count memo yet, so every copied message becomes a `MessageCreated`).
 
 use cp_base::state::runtime::State;
-use cp_mod_agents::types::{AgentStatus, AgentsState};
+use cp_mod_agents::types::AgentStatus;
 use cp_mod_bridge::BridgeState;
 use cp_wire::types::oplog::OpEntryKind;
 
@@ -46,11 +46,7 @@ pub(super) struct BranchPoint<'point> {
 /// Returns the new agent's id so the caller can route the per-agent
 /// `on_user_message` hook (D4) when a first message was seeded.
 pub(super) fn apply_create_agent(state: &mut State, name: &str, seed: &Seed<'_>) -> String {
-    let ts = AgentsState::get_mut(state);
-    let id = format!("A{}", ts.next_id);
-    ts.next_id = ts.next_id.saturating_add(1);
-
-    ts.agents.push(cp_mod_agents::types::Agent::new(id.clone(), name.to_owned()));
+    let id = cp_mod_agents::types::msgs::create_agent(state, name);
     announce_agent(state, &id, name, None);
     log::info!("bridge: created agent {id} \"{name}\"");
     apply_seed(state, &id, seed);
@@ -75,7 +71,7 @@ pub(super) fn apply_branch_agent(
     seed: &Seed<'_>,
 ) -> Option<String> {
     let source = point.source_agent_id;
-    let id = match AgentsState::get_mut(state).branch(source, point.message_ts, name) {
+    let id = match cp_mod_agents::types::msgs::branch_agent(state, (source, point.message_ts), name) {
         Ok(id) => id,
         Err(e) => {
             log::warn!("bridge: BranchThread rejected: {e}");

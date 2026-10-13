@@ -7,6 +7,8 @@ pub mod persist;
 
 /// One-shot boot migration of the pre-T860 `threads` store layout.
 pub mod migrate;
+/// Agent messages = its human group's messages.
+pub mod msgs;
 pub mod roster;
 pub mod tree;
 
@@ -43,7 +45,6 @@ pub type AgentMessage = cp_groups::chat::GroupMessage;
 // Structs
 // =============================================================================
 
-
 /// Where a branched agent came from: the parent agent and the message it was
 /// cut at (inclusive). Set only on agents created by [`AgentsState::branch`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -64,10 +65,10 @@ pub struct Agent {
     pub name: String,
     /// Whose turn it is.
     pub status: AgentStatus,
-    /// Ordered list of messages. Persisted in `agents/<id>.json`, not in
-    /// `config.json` (see [`persist`]); empty after a slim deserialize.
-    #[serde(default)]
-    pub messages: Vec<AgentMessage>,
+    /// Group holding this agent's conversation with the human (its messages,
+    /// see [`msgs`]). Empty only for pre-groups data, until the boot migration.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub human_group_id: String,
     /// Creation timestamp (epoch ms).
     pub created_at: u64,
     /// Soft-delete flag — archived agents are hidden from the active list
@@ -103,7 +104,7 @@ impl Agent {
             id,
             name,
             status: AgentStatus::TheirTurn,
-            messages: vec![],
+            human_group_id: String::new(),
             created_at: cp_base::panels::now_ms(),
             archived: false,
             paused: false,
@@ -205,28 +206,45 @@ impl AgentsState {
     ///
     /// Returns a human-readable message when the source agent does not exist
     /// or holds no message stamped `at_ts`; the state is left untouched.
-    pub fn branch(&mut self, source_id: &str, at_ts: u64, name: &str) -> Result<String, String> {
-        let source =
-            self.agents.iter().find(|t| t.id == source_id).ok_or_else(|| format!("agent {source_id} not found"))?;
-        let cut = source
-            .messages
+    pub fn branch(
+        &mut self,
+        groups: &mut cp_groups::types::GroupsState,
+        (source_id, at_ts): (&str, u64),
+        name: &str,
+    ) -> Result<String, String> {
+        if !self.agents.iter().any(|t| t.id == source_id) {
+            return Err(format!("agent {source_id} not found"));
+        }
+        let history = msgs::of(self, groups, source_id);
+        let cut = history
             .iter()
             .position(|m| m.timestamp == at_ts)
             .ok_or_else(|| format!("no message with ts={at_ts} in agent {source_id}"))?;
-        let messages: Vec<AgentMessage> = source
-            .messages
+        let messages: Vec<AgentMessage> = history
             .iter()
             .take(cut.saturating_add(1))
             .map(|m| AgentMessage { acknowledged: true, ..m.clone() })
             .collect();
 
+        let id = self.create(groups, name);
+        let gid = msgs::human_group_id(self, &id).unwrap_or_default().to_owned();
+        if let Some(g) = groups.find_mut(&gid) {
+            g.messages = messages;
+        }
+        if let Some(agent) = self.agents.iter_mut().find(|a| a.id == id) {
+            agent.origin = Some(AgentOrigin { agent_id: source_id.to_owned(), message_ts: at_ts });
+        }
+        Ok(id)
+    }
+
+    /// Create a fresh agent named `name` with its human group; returns its id.
+    pub fn create(&mut self, groups: &mut cp_groups::types::GroupsState, name: &str) -> String {
         let id = format!("A{}", self.next_id);
         self.next_id = self.next_id.saturating_add(1);
         let mut agent = Agent::new(id.clone(), name.to_owned());
-        agent.messages = messages;
-        agent.origin = Some(AgentOrigin { agent_id: source_id.to_owned(), message_ts: at_ts });
+        agent.human_group_id = groups.create_human_group(&id, name);
         self.agents.push(agent);
-        Ok(id)
+        id
     }
 }
 
@@ -351,7 +369,7 @@ impl FocusState {
         };
         if let Some(agent) = agents.agents.get(real_idx) {
             let tid = agent.id.clone();
-            let count = agent.messages.len();
+            let count = msgs::messages(state, &tid).len();
             let prev = Self::get_mut(state).last_read_count.insert(tid, count);
             // Surgical repaint: the unread marker may have just cleared with no
             // input event to trigger a draw. Only on an actual change, so the

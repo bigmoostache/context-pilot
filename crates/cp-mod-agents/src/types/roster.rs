@@ -27,8 +27,9 @@ fn agent_line(state: &State, agent: &Agent, focused_id: &str) -> String {
     if let Some(wt) = worktree_name(state, &agent.id) {
         _ = write!(line, " [⎇ {wt}]");
     }
-    _ = write!(line, " · {} · {} msgs", agent.status, agent.messages.len());
-    let unack = agent.messages.iter().filter(|m| !m.acknowledged).count();
+    let history = super::msgs::messages(state, &agent.id);
+    _ = write!(line, " · {} · {} msgs", agent.status, history.len());
+    let unack = history.iter().filter(|m| !m.acknowledged).count();
     if unack > 0 {
         _ = write!(line, " · {unack} unread");
     }

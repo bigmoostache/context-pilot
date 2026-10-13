@@ -105,7 +105,7 @@ impl Watcher for IdleMyTurnDetector {
         // plain "please respond" notification once the agent has ALREADY SEEN
         // everything in the agent and simply went idle without replying — so
         // the two mechanisms never double-nudge the same incoming message.
-        if agent.messages.iter().any(|m| !m.acknowledged) {
+        if crate::types::msgs::messages(state, &agent.id).iter().any(|m| !m.acknowledged) {
             return None;
         }
 

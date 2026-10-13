@@ -185,11 +185,13 @@ fn handle_agent_input_submit(state: &mut State) -> ActionResult {
     let Some(agent) = agents_state.agents.get_mut(real_idx) else {
         return ActionResult::Nothing;
     };
-
-    // Create a user message in the agent
-    let msg = AgentMessage::user(content);
-    agent.messages.push(msg);
     agent.status = AgentStatus::MyTurn;
+    let agent_id = agent.id.clone();
+
+    // Create a user message in the agent's human group
+    if let Some(history) = cp_mod_agents::types::msgs::messages_mut(state, &agent_id) {
+        history.push(AgentMessage::user(content));
+    }
 
     // NO instant spine notification here — the idle MY_TURN watcher
     // (`IdleMyTurnDetector`) fires when the agent finishes its current
@@ -229,12 +231,7 @@ fn handle_agent_create(state: &mut State) -> ActionResult {
     };
 
     // Generate agent ID and create the agent
-    let agents_state = AgentsState::get_mut(state);
-    let id = format!("A{}", agents_state.next_id);
-    agents_state.next_id = agents_state.next_id.saturating_add(1);
-
-    let agent = cp_mod_agents::types::Agent::new(id, name);
-    agents_state.agents.push(agent);
+    let _id = cp_mod_agents::types::msgs::create_agent(state, &name);
 
     // Select the newly created agent — it is the last entry of the active
     // (non-archived) visible slice, so the stored selection is a VISIBLE-list

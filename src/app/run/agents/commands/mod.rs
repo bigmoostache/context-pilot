@@ -109,8 +109,10 @@ fn apply_send_message(state: &mut State, agent_id: &str, content: &str) -> bool 
         return false;
     };
 
-    agent.messages.push(AgentMessage::user(content.to_owned()));
     agent.status = AgentStatus::MyTurn;
+    if let Some(history) = cp_mod_agents::types::msgs::messages_mut(state, agent_id) {
+        history.push(AgentMessage::user(content.to_owned()));
+    }
 
     state.flags.ui.dirty = true;
     log::info!("bridge: applied SendMessage on agent {agent_id}");
@@ -278,24 +280,23 @@ fn apply_delete_agent(state: &mut State, agent_id: &str) {
 /// message. One `MessageDeleted` delta is emitted per removed message so
 /// the frontend reducer handles each independently.
 fn apply_delete_message(state: &mut State, agent_id: &str, message_ts: u64) {
-    let ts = AgentsState::get_mut(state);
-    let Some(agent) = ts.agents.iter_mut().find(|t| t.id == agent_id) else {
+    let Some(history) = cp_mod_agents::types::msgs::messages_mut(state, agent_id) else {
         log::warn!("bridge: DeleteMessage for unknown agent {agent_id}");
         return;
     };
 
     // Find the target message index.
-    let Some(idx) = agent.messages.iter().position(|m| m.timestamp == message_ts) else {
+    let Some(idx) = history.iter().position(|m| m.timestamp == message_ts) else {
         log::warn!("bridge: DeleteMessage no message with ts={message_ts} in agent {agent_id}");
         return;
     };
 
-    let to_delete = collect_delete_timestamps(agent, idx, message_ts);
+    let to_delete = collect_delete_timestamps(history, idx, message_ts);
 
     // Remove all collected messages.
     let delete_set: std::collections::HashSet<u64> = to_delete.iter().copied().collect();
-    agent.messages.retain(|m| !delete_set.contains(&m.timestamp));
-    let new_count = agent.messages.len();
+    history.retain(|m| !delete_set.contains(&m.timestamp));
+    let new_count = history.len();
 
     // Emit one delta per deleted message.
     let tid = agent_id.to_owned();
@@ -317,13 +318,13 @@ fn apply_delete_message(state: &mut State, agent_id: &str, message_ts: u64) {
 /// Timestamps to delete for a `DeleteMessage`: the target plus, when the target
 /// is an assistant message, all *consecutive* `auto:true` messages immediately
 /// *preceding* it (tool-trace cleanup — stops at the first non-auto message).
-fn collect_delete_timestamps(agent: &cp_mod_agents::types::Agent, idx: usize, message_ts: u64) -> Vec<u64> {
+fn collect_delete_timestamps(history: &[AgentMessage], idx: usize, message_ts: u64) -> Vec<u64> {
     let mut to_delete: Vec<u64> = vec![message_ts];
-    let is_assistant = agent.messages.get(idx).is_some_and(|m| m.author == AgentAuthor::Assistant);
+    let is_assistant = history.get(idx).is_some_and(|m| m.author == AgentAuthor::Assistant);
     if !is_assistant {
         return to_delete;
     }
-    if let Some(preceding) = agent.messages.get(..idx) {
+    if let Some(preceding) = history.get(..idx) {
         for msg in preceding.iter().rev() {
             if msg.auto {
                 to_delete.push(msg.timestamp);

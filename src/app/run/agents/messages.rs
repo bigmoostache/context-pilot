@@ -61,8 +61,11 @@ pub(in crate::app::run) fn emit_messages(app: &mut App) {
     // backlog rides the frontend's initial tier-② load, not the delta stream).
     let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.messages());
     if !seeded {
-        let counts: Vec<(String, usize)> =
-            AgentsState::get(&app.state).agents.iter().map(|t| (t.id.clone(), t.messages.len())).collect();
+        let counts: Vec<(String, usize)> = AgentsState::get(&app.state)
+            .agents
+            .iter()
+            .map(|t| (t.id.clone(), cp_mod_agents::types::msgs::messages(&app.state, &t.id).len()))
+            .collect();
         let bs = app.state.ext_mut::<BridgeState>();
         for (id, len) in counts {
             let _prev = bs.agent_msg_counts.insert(id, len);
@@ -79,7 +82,8 @@ pub(in crate::app::run) fn emit_messages(app: &mut App) {
         let mut out = Vec::new();
         for agent in &ts.agents {
             let seen = memo.get(&agent.id).copied().unwrap_or(0);
-            for (idx, msg) in agent.messages.iter().enumerate().skip(seen) {
+            for (idx, msg) in cp_mod_agents::types::msgs::messages(&app.state, &agent.id).iter().enumerate().skip(seen)
+            {
                 out.push(build_pending(&agent.id, msg, idx));
             }
         }
