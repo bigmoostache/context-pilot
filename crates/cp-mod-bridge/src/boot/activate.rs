@@ -141,7 +141,7 @@ pub fn try_recover(state: &mut State) {
 /// chunk to `state.messages.last_mut()`). Carrying that id lets the frontend
 /// route live `Token` frames to the right conversation bubble and reconcile the
 /// streamed text against the durable `MessageCreated` entry (which references
-/// the same `Message::id`). `thread_id` is the **executing** thread (the one
+/// the same `Message::id`). `agent_id` is the **executing** thread (the one
 /// whose conversation is in `state` while these tokens stream), so a background
 /// thread's live frames route to its own UI pane rather than the focused one; it
 /// is empty only before any thread is executing (cold boot).
@@ -153,8 +153,8 @@ pub(crate) fn publish_frame(state: &mut State, kind: StreamKind) {
     // thread during its advancement step — so live frames route to the right UI
     // pane. Empty when no thread is executing yet (cold boot), matching the
     // pre-multi-thread single-conversation behaviour.
-    let message_id = state.thread().messages.last().map(|m| m.id.clone()).unwrap_or_default();
-    let thread_id = state.executing_thread_id().unwrap_or_default().to_owned();
+    let message_id = state.agent().messages.last().map(|m| m.id.clone()).unwrap_or_default();
+    let agent_id = state.executing_agent_id().unwrap_or_default().to_owned();
 
     let bs = state.ext_mut::<BridgeState>();
 
@@ -168,7 +168,7 @@ pub(crate) fn publish_frame(state: &mut State, kind: StreamKind) {
 
     let fleet_id = bs.boot.as_ref().map(|b| b.id().to_owned()).unwrap_or_default();
 
-    let frame = StreamFrame { schema_version: 1, fleet_id, worker_id: String::new(), thread_id, message_id, seq, kind };
+    let frame = StreamFrame { schema_version: 1, fleet_id, worker_id: String::new(), agent_id, message_id, seq, kind };
 
     if let Some(tee) = bs.tee.as_ref() {
         let _outcome = tee.publish(frame);

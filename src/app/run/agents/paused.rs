@@ -1,16 +1,16 @@
 //! Live thread-paused emission for the main event loop.
 //!
-//! The `emit_thread_paused` function is a main-loop **observe-on-change
+//! The `emit_agent_paused` function is a main-loop **observe-on-change
 //! chokepoint**: it diffs each thread's live `paused` flag against the
-//! per-thread snapshot held in [`BridgeState::thread_paused_memo`] and
-//! emits a durable [`ThreadPaused`] / [`ThreadResumed`] delta only on an
+//! per-thread snapshot held in [`BridgeState::agent_paused_memo`] and
+//! emits a durable [`AgentPaused`] / [`AgentResumed`] delta only on an
 //! actual change — capturing mutations from *every* source (web command,
 //! TUI action) with one uniform path.
 //!
-//! Mirrors [`emit_thread_archived`](super::archived) exactly.
+//! Mirrors [`emit_agent_archived`](super::archived) exactly.
 
 use cp_base::state::runtime::State;
-use cp_mod_agents::types::ThreadsState;
+use cp_mod_agents::types::AgentsState;
 use cp_mod_bridge::BridgeState;
 use cp_wire::types::oplog::OpEntryKind;
 
@@ -23,15 +23,15 @@ use crate::app::App;
 /// Returns an empty map when the bridge is OFF or replay fails (degraded:
 /// every live thread looks "new" and has its current paused flag emitted).
 fn oplog_roster_paused(state: &State) -> std::collections::HashMap<String, bool> {
-    super::oplog_roster(state).map(|r| r.iter().map(|t| (t.thread_id.clone(), t.paused)).collect()).unwrap_or_default()
+    super::oplog_roster(state).map(|r| r.iter().map(|t| (t.agent_id.clone(), t.paused)).collect()).unwrap_or_default()
 }
 
-/// Emit [`ThreadPaused`] / [`ThreadResumed`] the instant any thread's
+/// Emit [`AgentPaused`] / [`AgentResumed`] the instant any thread's
 /// paused flag flips, so the backend view (and the web roster) update the
 /// thread's paused state in milliseconds.
 ///
 /// No-op when the bridge is OFF.
-pub(in crate::app::run) fn emit_thread_paused(app: &mut App) {
+pub(in crate::app::run) fn emit_agent_paused(app: &mut App) {
     if !bridge_active(&app.state) {
         return;
     }
@@ -41,7 +41,7 @@ pub(in crate::app::run) fn emit_thread_paused(app: &mut App) {
     if !seeded {
         let oplog_paused = oplog_roster_paused(&app.state);
         let bs = app.state.ext_mut::<BridgeState>();
-        bs.thread_paused_memo.extend(oplog_paused);
+        bs.agent_paused_memo.extend(oplog_paused);
         bs.seeded.seed_paused();
         // Fall through — diff below emits any flip the oplog missed.
     }
@@ -50,14 +50,14 @@ pub(in crate::app::run) fn emit_thread_paused(app: &mut App) {
     //
     // Only emit for threads that ARE in the memo — threads absent from the
     // oplog roster (pre-bridge legacy) are unknown to the view and emitting
-    // `thread_resumed` for them is both pointless (the view ignores it) and
+    // `agent_resumed` for them is both pointless (the view ignores it) and
     // noisy (pollutes the oplog with 20+ spurious entries on every restart).
     // For those threads, the command handler emits the delta directly on the
     // first real pause/resume action.
     let changed: Vec<(String, bool)> = {
-        let ts = ThreadsState::get(&app.state);
-        let memo = &app.state.ext::<BridgeState>().thread_paused_memo;
-        ts.threads
+        let ts = AgentsState::get(&app.state);
+        let memo = &app.state.ext::<BridgeState>().agent_paused_memo;
+        ts.agents
             .iter()
             .filter_map(|t| {
                 let live = t.paused;
@@ -69,13 +69,13 @@ pub(in crate::app::run) fn emit_thread_paused(app: &mut App) {
             .collect()
     };
 
-    for (thread_id, paused) in changed {
+    for (agent_id, paused) in changed {
         let kind = if paused {
-            OpEntryKind::ThreadPaused { thread_id: thread_id.clone() }
+            OpEntryKind::AgentPaused { agent_id: agent_id.clone() }
         } else {
-            OpEntryKind::ThreadResumed { thread_id: thread_id.clone() }
+            OpEntryKind::AgentResumed { agent_id: agent_id.clone() }
         };
         emit_roster_delta(&app.state, kind);
-        let _prev = app.state.ext_mut::<BridgeState>().thread_paused_memo.insert(thread_id, paused);
+        let _prev = app.state.ext_mut::<BridgeState>().agent_paused_memo.insert(agent_id, paused);
     }
 }

@@ -10,12 +10,12 @@ use crate::config::llm::types::LlmProvider;
 impl Default for State {
     // `State` now holds only fleet-shared data plus the executing thread's
     // per-thread bundle; the ~45 per-thread leaf fields moved onto
-    // [`ThreadRuntime`](super::bundle::ThreadRuntime) and are initialized by its
+    // [`AgentRuntime`](super::bundle::AgentRuntime) and are initialized by its
     // own `Default`. This initializer is a short linear literal of the shared
-    // fields + an empty `ThreadStore`.
+    // fields + an empty `AgentStore`.
     fn default() -> Self {
         Self {
-            thread_store: super::threads::ThreadStore::default(),
+            agent_store: super::agents::AgentStore::default(),
             flags: StatusBools {
                 ui: UiState { dirty: true, ..UiState::default() },
                 config: ConfigOverlay { reverie_enabled: true, ..ConfigOverlay::default() },

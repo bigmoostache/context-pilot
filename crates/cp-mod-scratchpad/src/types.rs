@@ -8,11 +8,12 @@ pub struct ScratchpadCell {
     /// Cell ID (C1, C2, ...)
     pub id: String,
     /// Owning thread id (compulsory, thread-owned scratchpad rework — mirrors
-    /// `TodoItem.thread_id`). A cell with no owning thread cannot exist; legacy
+    /// `TodoItem.agent_id`). A cell with no owning thread cannot exist; legacy
     /// cells lacking one are purged on load. Serialized unconditionally (no
     /// skip) — it is a foreign key.
     #[serde(default)]
-    pub thread_id: String,
+    #[serde(rename = "thread_id")]
+    pub agent_id: String,
     /// Cell title
     pub title: String,
     /// Cell content
@@ -29,7 +30,7 @@ pub struct ScratchpadState {
     /// Injected focused-thread id for panel + tool scoping (thread-owned
     /// scratchpad rework, mirrors `TodoState.focus_filter`). The main crate
     /// stamps the current focused thread id here on focus change; the panel
-    /// renders only cells whose `thread_id` matches, and the tools attach /
+    /// renders only cells whose `agent_id` matches, and the tools attach /
     /// edit / wipe cells within that thread. **Transient** — never serialized.
     pub focus_filter: Option<String>,
     /// Change stamp, refreshed on every [`ScratchpadState::get_mut`]. Lets

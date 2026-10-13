@@ -81,7 +81,7 @@ fn check_open_path(path: &str, state: &State, pf: &mut Verdict) {
         pf.errors.push(format!("'{path}' is not a file"));
     } else {
         let canonical = p.canonicalize().map_or_else(|_| path.to_owned(), |cp| cp.to_string_lossy().to_string());
-        if state.thread().context.iter().any(|c| c.get_meta_str("file_path") == Some(&canonical)) {
+        if state.agent().context.iter().any(|c| c.get_meta_str("file_path") == Some(&canonical)) {
             pf.warnings.push(format!("File '{path}' is already open in context"));
         }
     }
@@ -152,7 +152,7 @@ pub(crate) fn preflight_edit(tool: &ToolUse, state: &State) -> Verdict {
     }
     let canonical = p.canonicalize().map_or_else(|_| path_str.to_owned(), |cp| cp.to_string_lossy().to_string());
     let is_open = state
-        .thread()
+        .agent()
         .context
         .iter()
         .any(|c| c.context_type.as_str() == Kind::FILE && c.get_meta_str("file_path") == Some(&canonical));

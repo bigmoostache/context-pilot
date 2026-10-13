@@ -320,7 +320,7 @@ mod tests {
             rev: 43,
             timestamp_ms: 1_718_000_001_000,
             kind: OpEntryKind::MessageCreated {
-                thread_id: "T1".into(),
+                agent_id: "T1".into(),
                 message_id: "m1".into(),
                 head: ContentHash::new([0xAB; 32]),
                 inline_body: None,

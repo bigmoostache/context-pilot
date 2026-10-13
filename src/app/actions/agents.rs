@@ -1,8 +1,8 @@
-//! Thread action handlers — dispatches `Thread*` action variants.
+//! Thread action handlers — dispatches `Agent*` action variants.
 //!
 //! Extracted from `mod.rs` to keep the central dispatch under the 500-line limit.
 
-use cp_mod_agents::types::{FocusState, ThreadsState};
+use cp_mod_agents::types::{AgentsState, FocusState};
 
 use crate::state::State;
 
@@ -10,21 +10,21 @@ use super::{Action, ActionResult};
 
 /// True while the human types a new thread's name: Threads view, active list,
 /// not drilled in, selection on the virtual "+ New Thread" row.
-pub(crate) fn editing_new_thread_title(state: &State) -> bool {
-    if state.view_mode != cp_base::state::data::config::ViewMode::Threads {
+pub(crate) fn editing_new_agent_title(state: &State) -> bool {
+    if state.view_mode != cp_base::state::data::config::ViewMode::Agents {
         return false;
     }
     let focus = FocusState::get(state);
-    if focus.viewing_archived || focus.drilled_thread_id.is_some() {
+    if focus.viewing_archived || focus.drilled_agent_id.is_some() {
         return false;
     }
-    focus.selected_thread_idx >= ThreadsState::get(state).visible_indices(false).len()
+    focus.selected_agent_idx >= AgentsState::get(state).visible_indices(false).len()
 }
 
 /// The textarea keystrokes currently edit: the new-thread title on that row,
 /// otherwise the executing thread's composer.
 pub(crate) fn active_textarea(state: &State) -> &cp_base::state::runtime::textarea::TextArea {
-    if editing_new_thread_title(state) { &FocusState::get(state).new_thread_title } else { &state.thread().composer }
+    if editing_new_agent_title(state) { &FocusState::get(state).new_agent_title } else { &state.agent().composer }
 }
 
 /// Actions that read or mutate the focused textarea (and so must target the
@@ -61,24 +61,24 @@ pub(super) const fn is_title_edit(action: &Action) -> bool {
 /// Run `run` with the new-thread title swapped into `state.composer`, then swap
 /// it back, so the shared editing handlers apply unchanged. Pastes become plain
 /// inserts: a title has no paste-sentinel buffers.
-pub(super) fn with_new_thread_title(
+pub(super) fn with_new_agent_title(
     state: &mut State,
     action: Action,
     run: fn(&mut State, Action) -> ActionResult,
 ) -> ActionResult {
-    let parked_title = core::mem::take(&mut FocusState::get_mut(state).new_thread_title);
-    let draft = core::mem::replace(&mut state.thread_mut().composer, parked_title);
+    let parked_title = core::mem::take(&mut FocusState::get_mut(state).new_agent_title);
+    let draft = core::mem::replace(&mut state.agent_mut().composer, parked_title);
     let edit = if let Action::PasteText(text) = action { Action::InsertText(text) } else { action };
     let result = run(state, edit);
-    let edited_title = core::mem::replace(&mut state.thread_mut().composer, draft);
-    FocusState::get_mut(state).new_thread_title = edited_title;
+    let edited_title = core::mem::replace(&mut state.agent_mut().composer, draft);
+    FocusState::get_mut(state).new_agent_title = edited_title;
     result
 }
 
-/// Dispatch a no-data `Thread*` action variant to its handler.
+/// Dispatch a no-data `Agent*` action variant to its handler.
 ///
-/// Called from the central `apply_action` match for all `Thread*` variants
-/// except `ThreadQuestionChar` (which carries data). Uses equality checks
+/// Called from the central `apply_action` match for all `Agent*` variants
+/// except `AgentQuestionChar` (which carries data). Uses equality checks
 /// rather than an exhaustive `match` so the ~60 non-thread variants need not be
 /// enumerated as a wildcard-free no-op arm.
 pub(super) fn dispatch(state: &mut State, action: &Action) -> ActionResult {
@@ -91,50 +91,50 @@ pub(super) fn dispatch(state: &mut State, action: &Action) -> ActionResult {
     dispatch_archive(state, action)
 }
 
-/// Handle the selection/creation `Thread*` variants (next/prev/create-start/
+/// Handle the selection/creation `Agent*` variants (next/prev/create-start/
 /// create-cancel). Returns `None` when `action` is not one of them, so
 /// [`dispatch`] can fall through to the archive handlers.
 fn dispatch_selection(state: &mut State, action: &Action) -> Option<ActionResult> {
-    if matches!(action, Action::ThreadSelectNext) {
+    if matches!(action, Action::AgentSelectNext) {
         return Some(select_next(state));
     }
-    if matches!(action, Action::ThreadSelectPrev) {
+    if matches!(action, Action::AgentSelectPrev) {
         return Some(select_prev(state));
     }
-    if matches!(action, Action::ThreadCreateStart) {
+    if matches!(action, Action::AgentCreateStart) {
         return Some(create_start(state));
     }
-    if matches!(action, Action::ThreadCreateCancel) {
+    if matches!(action, Action::AgentCreateCancel) {
         return Some(create_cancel(state));
     }
     None
 }
 
-/// Handle the drill-in/out `Thread*` variants (G3). Split from
+/// Handle the drill-in/out `Agent*` variants (G3). Split from
 /// [`dispatch_selection`] to keep each helper under the cognitive-complexity cap.
 fn dispatch_drill(state: &mut State, action: &Action) -> Option<ActionResult> {
-    if matches!(action, Action::ThreadDrillIn) {
+    if matches!(action, Action::AgentDrillIn) {
         return Some(drill_in(state));
     }
-    if matches!(action, Action::ThreadDrillOut) {
+    if matches!(action, Action::AgentDrillOut) {
         return Some(drill_out(state));
     }
     None
 }
 
-/// Handle the archive/restore `Thread*` variants (archive-start/confirm/cancel,
+/// Handle the archive/restore `Agent*` variants (archive-start/confirm/cancel,
 /// toggle-archived-view). Any non-thread variant no-ops (caller pre-filters).
 fn dispatch_archive(state: &mut State, action: &Action) -> ActionResult {
-    if matches!(action, Action::ThreadArchiveStart) {
+    if matches!(action, Action::AgentArchiveStart) {
         return archive_start(state);
     }
-    if matches!(action, Action::ThreadArchiveConfirm) {
+    if matches!(action, Action::AgentArchiveConfirm) {
         return archive_confirm(state);
     }
-    if matches!(action, Action::ThreadArchiveCancel) {
+    if matches!(action, Action::AgentArchiveCancel) {
         return archive_cancel(state);
     }
-    if matches!(action, Action::ThreadToggleArchivedView) {
+    if matches!(action, Action::AgentToggleArchivedView) {
         return toggle_archived_view(state);
     }
     // Non-thread variants never reach here (caller pre-filters); no-op fallback.
@@ -144,41 +144,41 @@ fn dispatch_archive(state: &mut State, action: &Action) -> ActionResult {
 /// User-focus the thread the list cursor now sits on, so the footer (built from
 /// the executing thread) tracks the selection as the human arrows up/down —
 /// without entering the panel-centric view (that is [`drill_in`]'s job on
-/// Right). This sets only [`FocusState::focused_thread_id`]; the loop's
+/// Right). This sets only [`FocusState::focused_agent_id`]; the loop's
 /// `follow_focus` makes that thread executing on the next
 /// tick (an id change), and the status bar then reflects its state.
 ///
 /// This is TUI user-focus, not worker/exec focus — the background scheduler is
 /// unaffected. No-op on the virtual "+ New Thread" entry or an empty selection
 /// (the cursor position does not resolve to a real thread), leaving focus as-is.
-fn focus_selected_thread(state: &mut State) {
+fn focus_selected_agent(state: &mut State) {
     let focus = FocusState::get(state);
-    let (viewing_archived, pos) = (focus.viewing_archived, focus.selected_thread_idx);
-    let visible = ThreadsState::get(state).visible_indices(viewing_archived);
+    let (viewing_archived, pos) = (focus.viewing_archived, focus.selected_agent_idx);
+    let visible = AgentsState::get(state).visible_indices(viewing_archived);
     let Some(&real_idx) = visible.get(pos) else {
         return; // virtual "+ New Thread" or empty selection — keep current focus
     };
-    let Some(id) = ThreadsState::get(state).threads.get(real_idx).map(|t| t.id.clone()) else {
+    let Some(id) = AgentsState::get(state).agents.get(real_idx).map(|t| t.id.clone()) else {
         return;
     };
-    FocusState::get_mut(state).focused_thread_id = Some(id);
+    FocusState::get_mut(state).focused_agent_id = Some(id);
 }
 
 /// Navigate to the next thread (or wrap to first).
 fn select_next(state: &mut State) -> ActionResult {
     let viewing_archived = FocusState::get(state).viewing_archived;
-    let visible_count = ThreadsState::get(state).visible_indices(viewing_archived).len();
+    let visible_count = AgentsState::get(state).visible_indices(viewing_archived).len();
     // Active view has a trailing virtual "+ New Thread" entry; archived view does not.
     let total = if viewing_archived { visible_count } else { visible_count.saturating_add(1) };
     let focus = FocusState::get_mut(state);
-    focus.selected_thread_idx = if focus.selected_thread_idx >= total.saturating_sub(1) {
+    focus.selected_agent_idx = if focus.selected_agent_idx >= total.saturating_sub(1) {
         0
     } else {
-        focus.selected_thread_idx.saturating_add(1)
+        focus.selected_agent_idx.saturating_add(1)
     };
-    focus_selected_thread(state);
-    state.thread_mut().scroll_offset = 0.0;
-    state.thread_mut().stream.user_scrolled = false;
+    focus_selected_agent(state);
+    state.agent_mut().scroll_offset = 0.0;
+    state.agent_mut().stream.user_scrolled = false;
     state.flags.ui.dirty = true;
     ActionResult::Nothing
 }
@@ -186,17 +186,17 @@ fn select_next(state: &mut State) -> ActionResult {
 /// Navigate to the previous thread (or wrap to last).
 fn select_prev(state: &mut State) -> ActionResult {
     let viewing_archived = FocusState::get(state).viewing_archived;
-    let visible_count = ThreadsState::get(state).visible_indices(viewing_archived).len();
+    let visible_count = AgentsState::get(state).visible_indices(viewing_archived).len();
     let total = if viewing_archived { visible_count } else { visible_count.saturating_add(1) };
     let focus = FocusState::get_mut(state);
-    focus.selected_thread_idx = if focus.selected_thread_idx == 0 {
+    focus.selected_agent_idx = if focus.selected_agent_idx == 0 {
         total.saturating_sub(1)
     } else {
-        focus.selected_thread_idx.saturating_sub(1)
+        focus.selected_agent_idx.saturating_sub(1)
     };
-    focus_selected_thread(state);
-    state.thread_mut().scroll_offset = 0.0;
-    state.thread_mut().stream.user_scrolled = false;
+    focus_selected_agent(state);
+    state.agent_mut().scroll_offset = 0.0;
+    state.agent_mut().stream.user_scrolled = false;
     state.flags.ui.dirty = true;
     ActionResult::Nothing
 }
@@ -204,8 +204,8 @@ fn select_prev(state: &mut State) -> ActionResult {
 /// Enter thread creation mode — switches input to naming.
 fn create_start(state: &mut State) -> ActionResult {
     let focus = FocusState::get_mut(state);
-    focus.creating_thread = true;
-    state.thread_mut().composer.reset();
+    focus.creating_agent = true;
+    state.agent_mut().composer.reset();
     state.flags.ui.dirty = true;
     ActionResult::Nothing
 }
@@ -213,8 +213,8 @@ fn create_start(state: &mut State) -> ActionResult {
 /// Cancel thread creation without creating.
 fn create_cancel(state: &mut State) -> ActionResult {
     let focus = FocusState::get_mut(state);
-    focus.creating_thread = false;
-    state.thread_mut().composer.reset();
+    focus.creating_agent = false;
+    state.agent_mut().composer.reset();
     state.flags.ui.dirty = true;
     ActionResult::Nothing
 }
@@ -224,7 +224,7 @@ fn create_cancel(state: &mut State) -> ActionResult {
 /// normal panel-centric view.
 ///
 /// This is a real focus switch, not a read-only glance: it sets
-/// [`FocusState::focused_thread_id`] to the selected thread and flips
+/// [`FocusState::focused_agent_id`] to the selected thread and flips
 /// [`view_mode`](cp_base::state::runtime::State::view_mode) to
 /// [`Normal`](cp_base::state::data::config::ViewMode::Normal). The loop's
 /// `follow_focus` then makes that thread executing on the
@@ -238,26 +238,26 @@ fn create_cancel(state: &mut State) -> ActionResult {
 fn drill_in(state: &mut State) -> ActionResult {
     let focus = FocusState::get(state);
     let viewing_archived = focus.viewing_archived;
-    let pos = focus.selected_thread_idx;
-    let visible = ThreadsState::get(state).visible_indices(viewing_archived);
+    let pos = focus.selected_agent_idx;
+    let visible = AgentsState::get(state).visible_indices(viewing_archived);
     let Some(&real_idx) = visible.get(pos) else {
         return ActionResult::Nothing; // virtual "+ New Thread" or empty selection
     };
-    let Some(id) = ThreadsState::get(state).threads.get(real_idx).map(|t| t.id.clone()) else {
+    let Some(id) = AgentsState::get(state).agents.get(real_idx).map(|t| t.id.clone()) else {
         return ActionResult::Nothing;
     };
     let focus_mut = FocusState::get_mut(state);
-    focus_mut.focused_thread_id = Some(id);
+    focus_mut.focused_agent_id = Some(id);
     // Clear any stale read-only drill pointer (unused by this path, kept inert).
-    focus_mut.drilled_thread_id = None;
+    focus_mut.drilled_agent_id = None;
     state.view_mode = cp_base::state::data::config::ViewMode::Normal;
     // Land on the Conversation panel so the composer is immediately typable —
     // without this the newly-focused thread keeps its own stale
     // `selected_context` (e.g. a File/Todo panel), and Char keys route to that
     // panel and silently no-op ("can't type" bug). Conversation is index 0.
-    state.thread_mut().selected_context = 0;
-    state.thread_mut().scroll_offset = 0.0;
-    state.thread_mut().stream.user_scrolled = false;
+    state.agent_mut().selected_context = 0;
+    state.agent_mut().scroll_offset = 0.0;
+    state.agent_mut().stream.user_scrolled = false;
     state.flags.ui.dirty = true;
     // Persist the focus switch (focused thread is keyed into its own state file).
     ActionResult::Save
@@ -265,9 +265,9 @@ fn drill_in(state: &mut State) -> ActionResult {
 
 /// Exit the drilled panel view back to the thread list (G3 — Left/Esc).
 fn drill_out(state: &mut State) -> ActionResult {
-    FocusState::get_mut(state).drilled_thread_id = None;
-    state.thread_mut().scroll_offset = 0.0;
-    state.thread_mut().stream.user_scrolled = false;
+    FocusState::get_mut(state).drilled_agent_id = None;
+    state.agent_mut().scroll_offset = 0.0;
+    state.agent_mut().stream.user_scrolled = false;
     state.flags.ui.dirty = true;
     ActionResult::Nothing
 }
@@ -278,7 +278,7 @@ fn drill_out(state: &mut State) -> ActionResult {
 /// so the prompt only appears when there is actually a thread to act on.
 fn archive_start(state: &mut State) -> ActionResult {
     let viewing_archived = FocusState::get(state).viewing_archived;
-    let has_visible = !ThreadsState::get(state).visible_indices(viewing_archived).is_empty();
+    let has_visible = !AgentsState::get(state).visible_indices(viewing_archived).is_empty();
     if has_visible {
         let focus = FocusState::get_mut(state);
         focus.confirming_archive = true;
@@ -295,18 +295,18 @@ fn archive_start(state: &mut State) -> ActionResult {
 fn toggle_archived_view(state: &mut State) -> ActionResult {
     let focus = FocusState::get_mut(state);
     focus.viewing_archived = !focus.viewing_archived;
-    focus.selected_thread_idx = 0;
+    focus.selected_agent_idx = 0;
     focus.confirming_archive = false;
-    state.thread_mut().scroll_offset = 0.0;
-    state.thread_mut().stream.user_scrolled = false;
+    state.agent_mut().scroll_offset = 0.0;
+    state.agent_mut().stream.user_scrolled = false;
     state.flags.ui.dirty = true;
     ActionResult::Nothing
 }
 
 /// Confirm thread archive (active view) or restore (archived view).
 ///
-/// `selected_thread_idx` is a position into the *visible* slice
-/// ([`ThreadsState::visible_indices`]) — the active threads in the normal
+/// `selected_agent_idx` is a position into the *visible* slice
+/// ([`AgentsState::visible_indices`]) — the active threads in the normal
 /// view, the archived ones in the archived view. We resolve it to a real
 /// storage index, then **soft-delete** (set `archived = true`) or **restore**
 /// (`archived = false`) instead of removing the thread, so it is retained in
@@ -317,11 +317,11 @@ fn toggle_archived_view(state: &mut State) -> ActionResult {
 fn archive_confirm(state: &mut State) -> ActionResult {
     let focus = FocusState::get(state);
     let viewing_archived = focus.viewing_archived;
-    let selected_pos = focus.selected_thread_idx;
+    let selected_pos = focus.selected_agent_idx;
     FocusState::get_mut(state).confirming_archive = false;
 
     // Resolve the visible position to a real storage index.
-    let visible = ThreadsState::get(state).visible_indices(viewing_archived);
+    let visible = AgentsState::get(state).visible_indices(viewing_archived);
     let Some(&real_idx) = visible.get(selected_pos) else {
         state.flags.ui.dirty = true;
         return ActionResult::Nothing;
@@ -329,27 +329,27 @@ fn archive_confirm(state: &mut State) -> ActionResult {
 
     // Toggle the archived flag (archive in active view, restore in archived view).
     let toggled_id = {
-        let ts = ThreadsState::get_mut(state);
-        ts.threads.get_mut(real_idx).map(|t| {
+        let ts = AgentsState::get_mut(state);
+        ts.agents.get_mut(real_idx).map(|t| {
             t.archived = !viewing_archived;
             t.id.clone()
         })
     };
 
     // Clamp selection to the new visible-list length for the current view.
-    let new_visible_len = ThreadsState::get(state).visible_indices(viewing_archived).len();
+    let new_visible_len = AgentsState::get(state).visible_indices(viewing_archived).len();
     let focus_after = FocusState::get_mut(state);
-    if focus_after.selected_thread_idx >= new_visible_len {
-        focus_after.selected_thread_idx = new_visible_len.saturating_sub(1);
+    if focus_after.selected_agent_idx >= new_visible_len {
+        focus_after.selected_agent_idx = new_visible_len.saturating_sub(1);
     }
 
     // Clean up focus references to a thread leaving the active list (archive only).
     if !viewing_archived && let Some(aid) = toggled_id {
-        if focus_after.focused_thread_id.as_deref() == Some(&aid) {
-            focus_after.focused_thread_id = None;
+        if focus_after.focused_agent_id.as_deref() == Some(&aid) {
+            focus_after.focused_agent_id = None;
         }
         let _prev = focus_after.last_read_count.remove(&aid);
-        if let Some(outcome) = cp_mod_git::worktree::release_thread(state, &aid) {
+        if let Some(outcome) = cp_mod_git::worktree::release_agent(state, &aid) {
             log::info!("archive {aid}: {outcome}");
         }
     }

@@ -303,7 +303,7 @@ impl Watcher for OcrWatcher {
         None
     }
 
-    fn thread_id(&self) -> Option<&str> {
+    fn agent_id(&self) -> Option<&str> {
         None
     }
 

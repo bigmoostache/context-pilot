@@ -15,7 +15,7 @@ use crate::state::{Message, State};
 use crate::ui::{ir, theme};
 use cp_base::cast::Safe as _;
 use cp_base::cast::float_math;
-use cp_mod_agents::types::{FocusState, ThreadAuthor, ThreadStatus, ThreadsState};
+use cp_mod_agents::types::{AgentAuthor, AgentStatus, AgentsState, FocusState};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::hash::{Hash as _, Hasher as _};
@@ -40,45 +40,45 @@ const MSG_CACHE_SLACK: usize = 4096;
 
 /// Key of one message's rendered lines: everything `render_message_blocks`
 /// reads from it, plus width and active theme.
-fn message_key(msg: &cp_mod_agents::types::ThreadMessage, viewport_width: u16) -> u64 {
+fn message_key(msg: &cp_mod_agents::types::AgentMessage, viewport_width: u16) -> u64 {
     let mut h = std::collections::hash_map::DefaultHasher::new();
     viewport_width.hash(&mut h);
     std::ptr::from_ref(cp_base::config::accessors::active_theme()).addr().hash(&mut h);
-    matches!(msg.author, ThreadAuthor::Assistant).hash(&mut h);
+    matches!(msg.author, AgentAuthor::Assistant).hash(&mut h);
     msg.timestamp.hash(&mut h);
     msg.content.hash(&mut h);
     h.finish()
 }
 
-/// Fingerprint of everything [`build_thread_message_lines`] reads: thread id,
+/// Fingerprint of everything [`build_agent_message_lines`] reads: thread id,
 /// width, active theme (colors are resolved at line build time) and each
 /// message's role/auto flag/content. Runs every frame, so content is NOT hashed
 /// byte by byte (that was O(thread text), ~0.3 ms on long threads): each
 /// message contributes its content length + heap address, which any append or
 /// replacement changes. The last message (where streaming edits land) is
 /// hashed in full as a guard against same-length in-place edits.
-fn lines_fingerprint(thread: &cp_mod_agents::types::Thread, viewport_width: u16) -> u64 {
+fn lines_fingerprint(agent: &cp_mod_agents::types::Agent, viewport_width: u16) -> u64 {
     let _g = crate::profile!("tv_fingerprint");
     let mut h = std::collections::hash_map::DefaultHasher::new();
-    thread.id.hash(&mut h);
+    agent.id.hash(&mut h);
     viewport_width.hash(&mut h);
     std::ptr::from_ref(cp_base::config::accessors::active_theme()).addr().hash(&mut h);
-    thread.messages.len().hash(&mut h);
-    for msg in &thread.messages {
+    agent.messages.len().hash(&mut h);
+    for msg in &agent.messages {
         msg.auto.hash(&mut h);
-        matches!(msg.author, ThreadAuthor::Assistant).hash(&mut h);
+        matches!(msg.author, AgentAuthor::Assistant).hash(&mut h);
         msg.timestamp.hash(&mut h);
         msg.content.as_ref().map(|c| (c.len(), c.as_ptr().addr())).hash(&mut h);
     }
-    if let Some(last) = thread.messages.last() {
+    if let Some(last) = agent.messages.last() {
         last.content.hash(&mut h);
     }
     h.finish()
 }
 
-/// Message lines for `thread`, rebuilt only when its fingerprint changes.
-fn cached_thread_message_lines(thread: &cp_mod_agents::types::Thread, viewport_width: u16) -> CachedLines {
-    let key = lines_fingerprint(thread, viewport_width);
+/// Message lines for `agent`, rebuilt only when its fingerprint changes.
+fn cached_agent_message_lines(agent: &cp_mod_agents::types::Agent, viewport_width: u16) -> CachedLines {
+    let key = lines_fingerprint(agent, viewport_width);
     LINE_CACHE.with_borrow_mut(|slot| {
         if let Some(entry) = slot.as_ref()
             && entry.0 == key
@@ -87,7 +87,7 @@ fn cached_thread_message_lines(thread: &cp_mod_agents::types::Thread, viewport_w
         }
         let lines = {
             let _g = crate::profile!("tv_lines_build");
-            Rc::new(build_thread_message_lines(thread, viewport_width))
+            Rc::new(build_agent_message_lines(agent, viewport_width))
         };
         *slot = Some((key, Rc::clone(&lines)));
         lines
@@ -106,24 +106,24 @@ pub(super) fn render_message_area_with_input(frame: &mut Frame<'_>, state: &mut 
     let msg_area: Rect;
     let lines: Rc<Vec<ratatui::text::Line<'static>>>;
     {
-        let ts = ThreadsState::get(state);
-        let Some(thread) = ts.threads.get(selected) else {
+        let ts = AgentsState::get(state);
+        let Some(agent) = ts.agents.get(selected) else {
             return;
         };
 
         // Title: thread name + status — colors via semantic mapping
         let focus = FocusState::get(state);
-        let is_focused = focus.focused_thread_id.as_deref() == Some(thread.id.as_str());
+        let is_focused = focus.focused_agent_id.as_deref() == Some(agent.id.as_str());
         let (status_label, status_sem) = if is_focused {
             (" [FOCUSED]", Semantic::Accent)
-        } else if matches!(thread.status, ThreadStatus::MyTurn) {
+        } else if matches!(agent.status, AgentStatus::MyTurn) {
             (" [MY_TURN]", Semantic::Warning)
         } else {
             (" [THEIR_TURN]", Semantic::Success)
         };
 
         let title = ratatui::text::Line::from(vec![
-            ratatui::text::Span::styled(format!(" {} ", thread.name), ir::semantic_to_style(Semantic::Default)),
+            ratatui::text::Span::styled(format!(" {} ", agent.name), ir::semantic_to_style(Semantic::Default)),
             ratatui::text::Span::styled(status_label, ir::semantic_to_style(status_sem)),
             ratatui::text::Span::raw(" "),
         ]);
@@ -156,29 +156,29 @@ pub(super) fn render_message_area_with_input(frame: &mut Frame<'_>, state: &mut 
             return;
         };
 
-        lines = cached_thread_message_lines(thread, m_area.width);
+        lines = cached_agent_message_lines(agent, m_area.width);
         msg_area = m_area;
         let _g = crate::profile!("tv_input");
-        render_thread_input(frame, state, input_area);
+        render_agent_input(frame, state, input_area);
     }
 
     // ── Phase 2: mutable borrow of `state` — scroll management + paint. ─────
     let _g = crate::profile!("tv_paint");
-    paint_thread_messages(frame, state, &lines, msg_area);
+    paint_agent_messages(frame, state, &lines, msg_area);
 }
 
 /// Build the message lines for a thread (owned, `'static`) via the conversation
 /// IR renderer.
 ///
-/// Converts `ThreadMessage` → `Message`, feeds to `render_message_blocks()`
+/// Converts `AgentMessage` → `Message`, feeds to `render_message_blocks()`
 /// (same IR path as the main conversation), converts via `blocks_to_lines()`.
 /// Returned lines hold no borrow of `State`, so the caller can take a mutable
 /// borrow afterwards for scroll management.
-fn build_thread_message_lines(
-    thread: &cp_mod_agents::types::Thread,
+fn build_agent_message_lines(
+    agent: &cp_mod_agents::types::Agent,
     viewport_width: u16,
 ) -> Vec<ratatui::text::Line<'static>> {
-    if thread.messages.is_empty() {
+    if agent.messages.is_empty() {
         let ir_blocks =
             vec![IrBlock::Line(vec![S::muted("No messages yet. Type below to start the conversation.".to_owned())])];
         return ir::blocks_to_lines(&ir_blocks);
@@ -201,7 +201,7 @@ fn build_thread_message_lines(
     let mut used: Vec<u64> = Vec::new();
     let mut in_auto_run = false;
     MSG_CACHE.with_borrow_mut(|cache| {
-        for msg in &thread.messages {
+        for msg in &agent.messages {
             if msg.auto {
                 out.extend(ir::blocks_to_lines(&[IrBlock::Line(auto_trace_spans(msg))]));
                 in_auto_run = true;
@@ -215,7 +215,7 @@ fn build_thread_message_lines(
             used.push(key);
             let lines = cache.entry(key).or_insert_with(|| {
                 let _g = crate::profile!("tv_msg_render");
-                Rc::new(ir::blocks_to_lines(&render_message_blocks(&thread_message_to_message(msg), &opts)))
+                Rc::new(ir::blocks_to_lines(&render_message_blocks(&agent_message_to_message(msg), &opts)))
             });
             out.extend(lines.iter().cloned());
         }
@@ -244,26 +244,26 @@ fn build_thread_message_lines(
 /// back down to within half a line, and clamp `scroll_offset` into
 /// `[0, max_scroll]` so over-scrolling past the bottom can no longer inflate the
 /// offset and make a later scroll-up feel dead.
-fn paint_thread_messages(frame: &mut Frame<'_>, state: &mut State, lines: &[ratatui::text::Line<'static>], area: Rect) {
+fn paint_agent_messages(frame: &mut Frame<'_>, state: &mut State, lines: &[ratatui::text::Line<'static>], area: Rect) {
     let viewport_height = area.height.to_usize();
     let content_height = lines.len();
     let max_scroll = content_height.saturating_sub(viewport_height).to_f32();
-    state.thread_mut().max_scroll = max_scroll;
+    state.agent_mut().max_scroll = max_scroll;
 
     // Reached the bottom again → resume auto-stick so new content follows.
-    if state.thread().stream.user_scrolled
-        && state.thread().scroll_offset.to_f64() >= float_math::sub(max_scroll.to_f64(), 0.5)
+    if state.agent().stream.user_scrolled
+        && state.agent().scroll_offset.to_f64() >= float_math::sub(max_scroll.to_f64(), 0.5)
     {
-        state.thread_mut().stream.user_scrolled = false;
+        state.agent_mut().stream.user_scrolled = false;
     }
     // Auto-pinned → keep the offset synced to the bottom (prevents the
     // first-scroll teleport by starting any manual scroll from max_scroll).
-    if !state.thread().stream.user_scrolled {
-        state.thread_mut().scroll_offset = max_scroll;
+    if !state.agent().stream.user_scrolled {
+        state.agent_mut().scroll_offset = max_scroll;
     }
-    state.thread_mut().scroll_offset = state.thread_mut().scroll_offset.clamp(0.0, max_scroll);
+    state.agent_mut().scroll_offset = state.agent_mut().scroll_offset.clamp(0.0, max_scroll);
 
-    let offset = state.thread().scroll_offset;
+    let offset = state.agent().scroll_offset;
     // Clone only the visible window (no wrap on this Paragraph, so slicing is
     // identical to `.scroll()` over the full vec, minus the O(total) copy).
     let start = offset.round().to_usize().min(content_height);
@@ -285,7 +285,7 @@ fn paint_thread_messages(frame: &mut Frame<'_>, state: &mut State, lines: &[rata
 /// Render the input area at the bottom of the thread message area.
 ///
 /// Separator line and input content both go through the IR pipeline.
-fn render_thread_input(frame: &mut Frame<'_>, state: &State, area: Rect) {
+fn render_agent_input(frame: &mut Frame<'_>, state: &State, area: Rect) {
     // Separator line via IR (border-colored, dimmed)
     let sep_area = Rect { height: 1, ..area };
     let sep_blocks = vec![IrBlock::Line(vec![S::styled("\u{2500}".repeat(area.width.into()), Semantic::Border).dim()])];
@@ -303,15 +303,15 @@ fn render_thread_input(frame: &mut Frame<'_>, state: &State, area: Rect) {
 
     let ctx = InputBlockCtx {
         command_ids: &command_ids,
-        paste_buffers: &state.thread().paste_buffers,
-        paste_buffer_labels: &state.thread().paste_buffer_labels,
+        paste_buffers: &state.agent().paste_buffers,
+        paste_buffer_labels: &state.agent().paste_buffer_labels,
         viewport_width: input_area.width,
     };
 
     let input_blocks = render_input_blocks(
-        &state.thread().composer.text,
-        state.thread().composer.cursor,
-        state.thread().composer.anchor,
+        &state.agent().composer.text,
+        state.agent().composer.cursor,
+        state.agent().composer.anchor,
         &ctx,
     );
 
@@ -323,7 +323,7 @@ fn render_thread_input(frame: &mut Frame<'_>, state: &State, area: Rect) {
 /// Strip the leading auto-trace marker from an auto message's content for the
 /// compact dim line (the structured `auto` flag already identifies the trace,
 /// so the inline `/⁠* auto *⁠/` marker is redundant in the rendered line).
-fn auto_line(msg: &cp_mod_agents::types::ThreadMessage) -> String {
+fn auto_line(msg: &cp_mod_agents::types::AgentMessage) -> String {
     const MARKER: &str = "/* auto */ ";
     let content = msg.content.as_deref().unwrap_or("");
     content.strip_prefix(MARKER).unwrap_or(content).to_owned()
@@ -343,7 +343,7 @@ fn auto_line(msg: &cp_mod_agents::types::ThreadMessage) -> String {
 ///
 /// Parsing is defensive: a missing separator degrades gracefully (the whole
 /// remainder collapses into the tool-name token) rather than dropping content.
-fn auto_trace_spans(msg: &cp_mod_agents::types::ThreadMessage) -> Vec<S> {
+fn auto_trace_spans(msg: &cp_mod_agents::types::AgentMessage) -> Vec<S> {
     let body = auto_line(msg);
     let (verb, rest) = body.split_once(" \u{b7} ").unwrap_or(("", body.as_str()));
     let (tool, intent) = rest.split_once(" \u{2014} ").unwrap_or((rest, ""));
@@ -361,9 +361,9 @@ fn auto_trace_spans(msg: &cp_mod_agents::types::ThreadMessage) -> Vec<S> {
     spans
 }
 
-/// Convert a `ThreadMessage` to a `Message` for the conversation IR renderer.
-fn thread_message_to_message(msg: &cp_mod_agents::types::ThreadMessage) -> Message {
-    let role = if matches!(msg.author, ThreadAuthor::Assistant) { "assistant" } else { "user" };
+/// Convert a `AgentMessage` to a `Message` for the conversation IR renderer.
+fn agent_message_to_message(msg: &cp_mod_agents::types::AgentMessage) -> Message {
+    let role = if matches!(msg.author, AgentAuthor::Assistant) { "assistant" } else { "user" };
     let content = msg.content.clone().unwrap_or_default();
 
     Message::new_text(String::new(), role, content).at(msg.timestamp)
@@ -374,15 +374,15 @@ fn thread_message_to_message(msg: &cp_mod_agents::types::ThreadMessage) -> Messa
 /// Caps at 50% of the available height so messages remain visible.
 fn calculate_input_height(state: &State, width: u16, available_height: u16) -> u16 {
     let max_input = available_height.saturating_div(2).max(3);
-    if state.thread().composer.text.is_empty() {
+    if state.agent().composer.text.is_empty() {
         // Separator (1) + one line for empty input prompt
         return 3;
     }
-    let line_count = state.thread().composer.text.lines().count().max(1);
+    let line_count = state.agent().composer.text.lines().count().max(1);
     // Account for wrapping
     let wrap_width = usize::from(width).saturating_sub(10).max(20);
     let wrapped_lines: usize = state
-        .thread()
+        .agent()
         .composer
         .text
         .lines()

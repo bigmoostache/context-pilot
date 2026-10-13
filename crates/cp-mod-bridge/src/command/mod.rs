@@ -288,7 +288,7 @@ mod tests {
                 format!("cmd-{dedup}"),
                 1,
                 dedup.to_owned(),
-                Kind::SendMessage { thread_id: "T1".to_owned(), content: "hi".to_owned() },
+                Kind::SendMessage { agent_id: "T1".to_owned(), content: "hi".to_owned() },
             ),
         );
         framing::encode_raw(&serde_json::to_vec(&cf).expect("ser")).expect("frame")

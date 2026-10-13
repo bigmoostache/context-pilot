@@ -43,7 +43,7 @@ pub(super) fn apply_full_freeze(
     let conversation_tokens: usize =
         context_items.iter().find(|i| i.id == "chat").map_or(0, |i| crate::state::estimate_tokens(&i.content));
 
-    state.thread_mut().tick_telemetry = Some(
+    state.agent_mut().tick_telemetry = Some(
         TickTelemetry::start(
             crate::app::panels::now_ms(),
             recent_tool_names(state),
@@ -58,7 +58,7 @@ pub(super) fn apply_full_freeze(
 /// joined by comma — for tick-telemetry culprit context.
 fn recent_tool_names(state: &State) -> String {
     state
-        .thread()
+        .agent()
         .messages
         .iter()
         .rev()
@@ -97,7 +97,7 @@ struct PanelEmit {
 /// cache-broken flag (real break OR past the BP anchor).
 fn freeze_one_panel(state: &mut State, item: &mut ContextItem, cond: FreezeConditions, broken: bool) -> PanelEmit {
     let fresh_hash = hash_content(&item.content);
-    let Some(entry) = state.thread_mut().context.iter_mut().find(|c| c.id == item.id) else {
+    let Some(entry) = state.agent_mut().context.iter_mut().find(|c| c.id == item.id) else {
         // Orphaned item (no Entry) — emit as-is, breaks cache, never emitted before.
         return PanelEmit { emitted_hash: fresh_hash, culprit: Some((item.id.clone(), 0, true)) };
     };
@@ -211,13 +211,13 @@ pub(super) fn run_panel_freeze_pass(state: &mut State, context_items: &mut [Cont
     let PassAcc { cache_broken, new_hash_list, mut culprit, panel_token_counts, .. } = acc;
 
     apply_panel_cache_costs(state, &new_hash_list, hit_price, miss_price);
-    state.thread_mut().previous_panel_hash_list = new_hash_list;
+    state.agent_mut().previous_panel_hash_list = new_hash_list;
 
     let break_kind = classify_break_kind(state, context_items, cache_broken, &mut culprit);
     save_panel_id_types(state, context_items);
     // Persist the final order (including chat, pinned last) as the stable base
     // for next tick's replay in `prepare_stream_context`.
-    state.thread_mut().previous_panel_order = context_items.iter().map(|i| i.id.clone()).collect();
+    state.agent_mut().previous_panel_order = context_items.iter().map(|i| i.id.clone()).collect();
     record_freeze_telemetry(
         state,
         context_items,
@@ -282,7 +282,7 @@ fn panel_rank(state: &State, id: &str) -> usize {
         return usize::MAX;
     }
     state
-        .thread()
+        .agent()
         .context
         .iter()
         .find(|c| c.id == id)
@@ -308,14 +308,14 @@ fn reorder_broken_tail(state: &State, context_items: &mut [ContextItem], reorder
 fn apply_panel_cache_costs(state: &mut State, new_hash_list: &[String], hit_price: f32, miss_price: f32) {
     let prefix_len = new_hash_list
         .iter()
-        .zip(state.thread().previous_panel_hash_list.iter())
+        .zip(state.agent().previous_panel_hash_list.iter())
         .take_while(|entry| entry.0 == entry.1)
         .count();
     for (i, entry_str) in new_hash_list.iter().enumerate() {
         let panel_id = entry_str.split(':').next().unwrap_or("");
         let is_hit = i < prefix_len;
         let price = if is_hit { hit_price } else { miss_price };
-        if let Some(ctx) = state.thread_mut().context.iter_mut().find(|c| c.id == panel_id) {
+        if let Some(ctx) = state.agent_mut().context.iter_mut().find(|c| c.id == panel_id) {
             let cost = cp_base::cast::float_math::cost_usd(ctx.token_count, price);
             ctx.panel_cache_hit = is_hit;
             ctx.panel_total_cost = cp_base::cast::float_math::add(ctx.panel_total_cost, cost);
@@ -338,7 +338,7 @@ fn classify_break_kind(
     let current_ids: std::collections::HashSet<&str> =
         context_items.iter().filter(|item| item.id != "chat").map(|item| item.id.as_str()).collect();
     if let Some(entry) =
-        state.thread().previous_panel_id_types.iter().find(|entry| !current_ids.contains(entry.0.as_str()))
+        state.agent().previous_panel_id_types.iter().find(|entry| !current_ids.contains(entry.0.as_str()))
     {
         culprit.kind = Some(entry.1.clone());
         CacheBreakKind::PanelDisappeared
@@ -349,12 +349,12 @@ fn classify_break_kind(
 
 /// Persist `(panel_id, context_type)` pairs for next tick's disappearance check.
 fn save_panel_id_types(state: &mut State, context_items: &[ContextItem]) {
-    state.thread_mut().previous_panel_id_types = context_items
+    state.agent_mut().previous_panel_id_types = context_items
         .iter()
         .filter(|item| item.id != "chat")
         .map(|item| {
             let ctx_type = state
-                .thread()
+                .agent()
                 .context
                 .iter()
                 .find(|c| c.id == item.id)
@@ -394,7 +394,7 @@ fn record_freeze_telemetry(
             (before, c, after)
         },
     );
-    state.thread_mut().tick_telemetry = Some(
+    state.agent_mut().tick_telemetry = Some(
         TickTelemetry::start(
             crate::app::panels::now_ms(),
             recent_tool_names(state),

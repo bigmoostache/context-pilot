@@ -63,8 +63,9 @@ pub struct TodoItem {
     /// no owning thread cannot exist; legacy items lacking one are purged on
     /// load. Serialized unconditionally (no skip) — it is a foreign key.
     #[serde(default)]
-    pub thread_id: String,
-    /// Parent todo ID (for nesting). Its parent MUST share the same `thread_id`.
+    #[serde(rename = "thread_id")]
+    pub agent_id: String,
+    /// Parent todo ID (for nesting). Its parent MUST share the same `agent_id`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_id: Option<String>,
     /// Todo name/title
@@ -95,14 +96,14 @@ pub struct TodoState {
     pub next_todo_id: usize,
     /// Injected focused-thread id for panel scoping (thread-owned tasks
     /// rework). The main crate stamps the current focused thread id here on
-    /// focus change; the panel renders only items whose `thread_id` matches.
+    /// focus change; the panel renders only items whose `agent_id` matches.
     /// **Transient** — never serialized (see `save_module_data`).
     pub focus_filter: Option<String>,
     /// The thread most recently work-hygiene-nudged (FR11 fire-once tracking).
     /// The main crate sets this after emitting a nudge so it does not re-fire on
     /// every tool call; it clears when the condition clears or focus moves.
     /// **Transient** — never serialized.
-    pub nudged_thread: Option<String>,
+    pub nudged_agent: Option<String>,
     /// Change stamp, refreshed on every [`TodoState::get_mut`]. Lets per-tick
     /// observers skip their diff while it is unchanged. Read-only by
     /// convention — only `get_mut` writes it. **Transient**.
@@ -123,7 +124,7 @@ impl TodoState {
     /// Create an empty todo state with ID counter at 1.
     #[must_use]
     pub const fn new() -> Self {
-        Self { todos: vec![], next_todo_id: 1, focus_filter: None, nudged_thread: None, revision: 0 }
+        Self { todos: vec![], next_todo_id: 1, focus_filter: None, nudged_agent: None, revision: 0 }
     }
 
     /// Get shared ref from State's `TypeMap`.

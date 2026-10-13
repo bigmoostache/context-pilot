@@ -35,7 +35,7 @@ const HIT_SNIPPET_CHARS: usize = 280;
 /// doc per message, so a hot thread would otherwise flood the result list with
 /// its own name repeated. We fetch `limit * OVERFETCH` message-hits from Meili,
 /// then collapse to the best-scored message per thread (see
-/// [`dedupe_by_thread`]) so the caller gets `limit` DISTINCT conversations —
+/// [`dedupe_by_agent`]) so the caller gets `limit` DISTINCT conversations —
 /// the "find the conversation" behaviour the palette wants. Over-fetching is
 /// what makes N distinct threads reachable even when the top hits cluster in a
 /// few threads.
@@ -69,15 +69,15 @@ pub struct SearchConvParams<'src> {
     pub query: &'src str,
     /// Maximum number of hits to return.
     pub limit: u32,
-    /// Optional single-thread scope (`thread_id` filter); `None` searches all.
-    pub thread_id: Option<&'src str>,
+    /// Optional single-thread scope (`agent_id` filter); `None` searches all.
+    pub agent_id: Option<&'src str>,
 }
 
 /// Run a hybrid keyword+semantic search over the conversations index and return
 /// the hits as transport-ready [`ConvHit`]s (best-scored first).
 ///
-/// `thread_id` scopes the search to a single thread when `Some` (a Meilisearch
-/// `thread_id = '…'` filter); `None` searches every thread. The index name is
+/// `agent_id` scopes the search to a single thread when `Some` (a Meilisearch
+/// `agent_id = '…'` filter); `None` searches every thread. The index name is
 /// derived from `project_hash` exactly as the bootstrap/reconcile paths derive
 /// it (`cp_{hash}_conversations`), so this queries the same index the
 /// reconciler fills.
@@ -95,7 +95,7 @@ pub fn search_conversations(p: &SearchConvParams<'_>) -> Result<Vec<ConvHit>, St
     // Single-quote-escape a caller-supplied thread id before splicing it into
     // the Meilisearch filter expression, matching the file-indexer's own
     // escaping (`delete_one_file`) so a stray quote can't malform the filter.
-    let filter = p.thread_id.map(|t| format!("thread_id = '{}'", t.replace('\'', "\\'")));
+    let filter = p.agent_id.map(|t| format!("thread_id = '{}'", t.replace('\'', "\\'")));
 
     // Over-fetch message-hits, then collapse to one (best-scored) per thread so
     // the caller gets `limit` DISTINCT conversations, not every message of a hot
@@ -118,24 +118,24 @@ pub fn search_conversations(p: &SearchConvParams<'_>) -> Result<Vec<ConvHit>, St
     // 16/32/64-bit targets we ship, a u32 limit always fits usize, so the
     // error arm is unreachable and degrades to "no truncation".
     let keep = usize::try_from(p.limit).unwrap_or(usize::MAX);
-    Ok(dedupe_by_thread(hits, keep))
+    Ok(dedupe_by_agent(hits, keep))
 }
 
 /// Collapse message-hits to one per thread, keeping the FIRST occurrence of each
-/// `thread_id` and truncating to `limit` threads.
+/// `agent_id` and truncating to `limit` threads.
 ///
 /// Meili returns hits already sorted by descending `_rankingScore`, so the first
 /// hit seen for a thread is its best-scoring message — the natural representative
 /// for a "find the conversation" result. Insertion order is preserved (highest
 /// overall score first), so the returned list stays score-ranked across threads.
-fn dedupe_by_thread(hits: Vec<ConvHit>, limit: usize) -> Vec<ConvHit> {
+fn dedupe_by_agent(hits: Vec<ConvHit>, limit: usize) -> Vec<ConvHit> {
     let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
     let mut out: Vec<ConvHit> = Vec::new();
     for hit in hits {
         if out.len() >= limit {
             break;
         }
-        if seen.insert(hit.thread_id.clone()) {
+        if seen.insert(hit.agent_id.clone()) {
             out.push(hit);
         }
     }
@@ -162,8 +162,8 @@ fn hit_from_doc(doc: &serde_json::Value) -> ConvHit {
     // whole message; keeps the framed reply small (see HIT_SNIPPET_CHARS).
     let text: String = str_field("text").chars().take(HIT_SNIPPET_CHARS).collect();
     ConvHit::from_parts(&cp_wire::types::payload::query::HitParts {
-        thread_id: &str_field("thread_id"),
-        thread_name: &str_field("thread_name"),
+        agent_id: &str_field("thread_id"),
+        agent_name: &str_field("thread_name"),
         author: &str_field("author"),
         text: &text,
         ts_ms: doc.get("ts_ms").and_then(serde_json::Value::as_u64).unwrap_or(0),
@@ -196,8 +196,8 @@ mod tests {
             } ]
         });
         let h = only_hit(&json);
-        assert_eq!(h.thread_id, "T3");
-        assert_eq!(h.thread_name, "Auth");
+        assert_eq!(h.agent_id, "T3");
+        assert_eq!(h.agent_name, "Auth");
         assert_eq!(h.author, "user");
         assert_eq!(h.text, "the token check");
         assert_eq!(h.ts_ms, 42);
@@ -212,17 +212,17 @@ mod tests {
     #[test]
     fn parse_hits_tolerates_missing_fields() {
         let h = only_hit(&serde_json::json!({ "hits": [ { "thread_id": "T1" } ] }));
-        assert_eq!(h.thread_id, "T1");
+        assert_eq!(h.agent_id, "T1");
         assert_eq!(h.text, "");
         assert_eq!(h.ts_ms, 0);
     }
 
-    /// Build a bare [`ConvHit`] carrying just a `thread_id` + `text` marker for
+    /// Build a bare [`ConvHit`] carrying just a `agent_id` + `text` marker for
     /// the dedupe tests.
-    fn hit(thread_id: &str, text: &str) -> ConvHit {
+    fn hit(agent_id: &str, text: &str) -> ConvHit {
         ConvHit::from_parts(&cp_wire::types::payload::query::HitParts {
-            thread_id,
-            thread_name: "",
+            agent_id,
+            agent_name: "",
             author: "",
             text,
             ts_ms: 0,
@@ -231,12 +231,12 @@ mod tests {
     }
 
     #[test]
-    fn dedupe_keeps_first_per_thread() {
+    fn dedupe_keeps_first_per_agent() {
         // T1 appears twice: only its FIRST (best-scored) message survives; order
         // across threads is preserved.
         let hits = vec![hit("T1", "best"), hit("T2", "a"), hit("T1", "worse"), hit("T3", "b")];
-        let out = dedupe_by_thread(hits, 10);
-        let ids: Vec<&str> = out.iter().map(|h| h.thread_id.as_str()).collect();
+        let out = dedupe_by_agent(hits, 10);
+        let ids: Vec<&str> = out.iter().map(|h| h.agent_id.as_str()).collect();
         assert_eq!(ids, vec!["T1", "T2", "T3"]);
         assert_eq!(out.first().expect("non-empty").text, "best", "kept the first (best-scored) T1 message");
     }
@@ -244,6 +244,6 @@ mod tests {
     #[test]
     fn dedupe_honors_limit() {
         let hits = vec![hit("T1", ""), hit("T2", ""), hit("T3", "")];
-        assert_eq!(dedupe_by_thread(hits, 2).len(), 2);
+        assert_eq!(dedupe_by_agent(hits, 2).len(), 2);
     }
 }

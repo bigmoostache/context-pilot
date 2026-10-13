@@ -31,9 +31,10 @@ pub struct Record {
     /// When the notification should fire (ms since epoch).
     pub fire_at_ms: u64,
     /// Target thread. Stamped with the scheduling thread when the tool call
-    /// omits `thread_id`; `None` only for coucous scheduled outside any thread.
+    /// omits `agent_id`; `None` only for coucous scheduled outside any thread.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub thread_id: Option<String>,
+    #[serde(rename = "thread_id")]
+    pub agent_id: Option<String>,
     /// Repeat interval in milliseconds. 0 = one-shot (no recurrence).
     #[serde(default)]
     pub interval_ms: u64,
@@ -264,12 +265,12 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Unscoped calls target the calling thread, so a background thread's
     // reminder lands back in its own inbox, not whichever thread is focused.
-    let thread_id = tool
+    let agent_id = tool
         .input
         .get("thread_id")
         .and_then(|v| v.as_str())
         .map(String::from)
-        .or_else(|| state.executing_thread_id().map(str::to_owned));
+        .or_else(|| state.executing_agent_id().map(str::to_owned));
 
     let (interval_ms, recurrence_label) = match parse_recurrence(tool) {
         Ok(r) => r,
@@ -290,7 +291,7 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
         message: message.clone(),
         registered_at_ms: now,
         fire_at_ms,
-        thread_id,
+        agent_id,
         interval_ms,
         recurrence_label,
     });

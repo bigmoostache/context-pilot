@@ -1,16 +1,16 @@
 //! Thread-runtime storage, keyed by thread id.
 //!
-//! Every thread's [`ThreadRuntime`] lives here permanently. "Which thread is
-//! executing" is just an id ([`set_executing`](ThreadStore::set_executing));
+//! Every thread's [`AgentRuntime`] lives here permanently. "Which thread is
+//! executing" is just an id ([`set_executing`](AgentStore::set_executing));
 //! nothing is moved when it changes.
 //!
-//! [`State::thread`](super::State::thread) returns [`current`](ThreadStore::current): the
+//! [`State::thread`](super::State::thread) returns [`current`](AgentStore::current): the
 //! executing thread's runtime, or the *unbound* runtime when no stored thread
 //! is executing (cold boot before the first focus, or focus cleared). Boot
 //! assembles the focused thread's data into the unbound runtime;
-//! [`take_unbound`](ThreadStore::take_unbound) hands it to its thread.
+//! [`take_unbound`](AgentStore::take_unbound) hands it to its thread.
 
-use super::bundle::ThreadRuntime;
+use super::bundle::AgentRuntime;
 
 /// One stored thread runtime.
 #[derive(Debug)]
@@ -18,24 +18,24 @@ struct Slot {
     /// Owning thread id.
     id: String,
     /// The thread's whole per-thread context.
-    runtime: ThreadRuntime,
+    runtime: AgentRuntime,
 }
 
-/// Owner of every thread's [`ThreadRuntime`] plus the executing-thread id.
+/// Owner of every thread's [`AgentRuntime`] plus the executing-thread id.
 #[derive(Debug, Default)]
-pub struct ThreadStore {
+pub struct AgentStore {
     /// Stored thread contexts. A `Vec` (not a map): a handful of threads, and
     /// the hot `State::thread()` path is a cached index, not a hash.
     slots: Vec<Slot>,
     /// Cached index into `slots` of the executing thread (`None` = unbound).
     cursor: Option<usize>,
     /// Context used when no stored thread is executing.
-    unbound: ThreadRuntime,
+    unbound: AgentRuntime,
     /// The executing thread's id (see [`executing`](Self::executing)).
     executing: Option<String>,
 }
 
-impl ThreadStore {
+impl AgentStore {
     /// The thread executing right now: owner of every per-thread write.
     /// `None` when no thread is placed (cold boot, focus cleared).
     #[must_use]
@@ -52,7 +52,7 @@ impl ThreadStore {
     }
 
     /// Store `runtime` as thread `id`'s context, replacing any previous one.
-    pub fn insert(&mut self, id: String, runtime: ThreadRuntime) {
+    pub fn insert(&mut self, id: String, runtime: AgentRuntime) {
         if let Some(slot) = self.slots.iter_mut().find(|s| s.id == id) {
             slot.runtime = runtime;
         } else {
@@ -62,7 +62,7 @@ impl ThreadStore {
     }
 
     /// Drop thread `id`'s stored context. Returns it, if any.
-    pub fn remove(&mut self, id: &str) -> Option<ThreadRuntime> {
+    pub fn remove(&mut self, id: &str) -> Option<AgentRuntime> {
         let pos = self.slots.iter().position(|s| s.id == id)?;
         let slot = self.slots.swap_remove(pos);
         self.resolve_cursor();
@@ -83,28 +83,28 @@ impl ThreadStore {
 
     /// Read-only access to a stored thread's context, by id.
     #[must_use]
-    pub fn get(&self, id: &str) -> Option<&ThreadRuntime> {
+    pub fn get(&self, id: &str) -> Option<&AgentRuntime> {
         self.slots.iter().find(|s| s.id == id).map(|s| &s.runtime)
     }
 
     /// Mutable access to a stored thread's context, by id.
-    pub fn get_mut(&mut self, id: &str) -> Option<&mut ThreadRuntime> {
+    pub fn get_mut(&mut self, id: &str) -> Option<&mut AgentRuntime> {
         self.slots.iter_mut().find(|s| s.id == id).map(|s| &mut s.runtime)
     }
 
     /// Take the unbound runtime (boot data or a blank), leaving `replacement`.
-    pub const fn take_unbound(&mut self, replacement: ThreadRuntime) -> ThreadRuntime {
+    pub const fn take_unbound(&mut self, replacement: AgentRuntime) -> AgentRuntime {
         std::mem::replace(&mut self.unbound, replacement)
     }
 
     /// The runtime `State` currently derefs to.
     #[must_use]
-    pub fn current(&self) -> &ThreadRuntime {
+    pub fn current(&self) -> &AgentRuntime {
         self.cursor.and_then(|i| self.slots.get(i)).map_or(&self.unbound, |s| &s.runtime)
     }
 
     /// Mutable twin of [`current`](Self::current).
-    pub fn current_mut(&mut self) -> &mut ThreadRuntime {
+    pub fn current_mut(&mut self) -> &mut AgentRuntime {
         match self.cursor.and_then(|i| self.slots.get_mut(i)) {
             Some(slot) => &mut slot.runtime,
             None => &mut self.unbound,
@@ -123,8 +123,8 @@ mod tests {
 
     #[test]
     fn executing_id_selects_runtime_without_moving_data() {
-        let mut store = ThreadStore::default();
-        let mut a = ThreadRuntime::new();
+        let mut store = AgentStore::default();
+        let mut a = AgentRuntime::new();
         a.next_user_id = 7;
         store.insert("A".to_owned(), a);
         assert_eq!(store.current().next_user_id, 1, "nothing executing means unbound");
@@ -137,9 +137,9 @@ mod tests {
 
     #[test]
     fn cursor_survives_removal_of_other_slot() {
-        let mut store = ThreadStore::default();
-        store.insert("A".to_owned(), ThreadRuntime::new());
-        let mut b = ThreadRuntime::new();
+        let mut store = AgentStore::default();
+        store.insert("A".to_owned(), AgentRuntime::new());
+        let mut b = AgentRuntime::new();
         b.next_user_id = 5;
         store.insert("B".to_owned(), b);
         store.set_executing(Some("B".to_owned()));

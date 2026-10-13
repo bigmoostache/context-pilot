@@ -425,7 +425,7 @@ pub(super) fn transport() -> Value {
                 "name": { "type": "string" },
                 "status": { "type": "string" },
                 "timestamp_ms": { "type": "integer" },
-                // thread_created delta payload: the parent thread id when the new
+                // agent_created delta payload: the parent thread id when the new
                 // thread was branched out of another one (absent otherwise).
                 "branched_from": { "type": "string" },
                 "phase": { "type": "string" },

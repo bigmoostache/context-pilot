@@ -204,7 +204,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     let canonical =
         path.canonicalize().map_or_else(|_| path.to_string_lossy().to_string(), |p| p.to_string_lossy().to_string());
     let is_open = state
-        .thread()
+        .agent()
         .context
         .iter()
         .any(|c| c.context_type.as_str() == Kind::FILE && c.get_meta_str("file_path") == Some(&canonical));
@@ -230,7 +230,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Update the context element's token count
     if let Some(ctx) = state
-        .thread_mut()
+        .agent_mut()
         .context
         .iter_mut()
         .find(|c| c.context_type.as_str() == Kind::FILE && c.get_meta_str("file_path") == Some(&canonical))
@@ -242,7 +242,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     let lines_changed = new_string.lines().count().max(old_string.lines().count());
 
     let panel_ref = state
-        .thread()
+        .agent()
         .context
         .iter()
         .find(|c| c.context_type.as_str() == Kind::FILE && c.get_meta_str("file_path") == Some(&canonical))

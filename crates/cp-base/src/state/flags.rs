@@ -112,7 +112,7 @@ pub struct ModuleOverlays {
 /// `flags.config.reverie_enabled`, `flags.lifecycle.reload_pending`.
 ///
 /// Per-thread stream/scroll state is NOT here — it lives on the thread's own
-/// [`StreamState`](crate::state::runtime::bundle::ThreadRuntime) and is reached
+/// [`StreamState`](crate::state::runtime::bundle::AgentRuntime) and is reached
 /// via `state.stream` (the executing thread), never on the fleet-global flags.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct StatusBools {

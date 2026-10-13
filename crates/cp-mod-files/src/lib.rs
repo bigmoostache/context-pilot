@@ -148,7 +148,7 @@ impl Module for FilesModule {
 
     fn watch_paths(&self, state: &State) -> Vec<cp_base::panels::WatchSpec> {
         state
-            .thread()
+            .agent()
             .context
             .iter()
             .filter(|c| c.context_type.as_str() == Kind::FILE)

@@ -42,7 +42,8 @@ struct SearchRequest {
     limit: Option<u32>,
     /// Optional single-thread scope. `None` searches every thread.
     #[serde(default)]
-    thread_id: Option<String>,
+    #[serde(rename = "thread_id")]
+    agent_id: Option<String>,
 }
 
 /// Response body: the hits the agent returned, best-scored first.
@@ -69,7 +70,7 @@ pub(crate) fn search_conversations(state: &Mutex<Backend>, id: &str, body_bytes:
     let limit = request.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
     let query = Query::new(
         format!("conv-search-{id}"),
-        Kind::SearchConversations { query: request.query, limit, thread_id: request.thread_id },
+        Kind::SearchConversations { query: request.query, limit, agent_id: request.agent_id },
     );
 
     // Blocking agent I/O — performed with no backend lock held (same discipline

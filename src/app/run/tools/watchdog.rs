@@ -80,7 +80,7 @@ pub(crate) enum Step {
     /// Servicing the orchestration bridge socket + self-heal.
     Bridge = 2,
     /// Emitting vitals / messages / thread status over the bridge.
-    ThreadsEmit = 3,
+    AgentsEmit = 3,
     /// Draining LLM stream events + retry + typewriter.
     Stream = 4,
     /// Processing background cache-refresh results.
@@ -108,7 +108,7 @@ impl Step {
             Self::Idle => "Idle (input poll)",
             Self::Input => "Input handling",
             Self::Bridge => "Bridge socket",
-            Self::ThreadsEmit => "Thread/vitals emit",
+            Self::AgentsEmit => "Thread/vitals emit",
             Self::Stream => "Stream event drain",
             Self::Cache => "Cache updates",
             Self::Watchers => "Watcher events",
@@ -128,7 +128,7 @@ impl Step {
             Self::Idle => 0,
             Self::Input => 1,
             Self::Bridge => 2,
-            Self::ThreadsEmit => 3,
+            Self::AgentsEmit => 3,
             Self::Stream => 4,
             Self::Cache => 5,
             Self::Watchers => 6,
@@ -147,7 +147,7 @@ impl Step {
         match v {
             1 => Self::Input,
             2 => Self::Bridge,
-            3 => Self::ThreadsEmit,
+            3 => Self::AgentsEmit,
             4 => Self::Stream,
             5 => Self::Cache,
             6 => Self::Watchers,
@@ -169,7 +169,7 @@ impl Step {
             Self::Idle => "loop.idle",
             Self::Input => "loop.input",
             Self::Bridge => "loop.bridge",
-            Self::ThreadsEmit => "loop.threads_emit",
+            Self::AgentsEmit => "loop.threads_emit",
             Self::Stream => "loop.stream",
             Self::Cache => "loop.cache",
             Self::Watchers => "loop.watchers",
@@ -314,7 +314,7 @@ fn dump_diagnostic(w: &Wedge) {
 
     let kind = if wedged { "HEARTBEAT_STALE (total wedge)" } else { "SLOW_STEP" };
     let pid = std::process::id();
-    let threads = thread_states(&errors_dir, now);
+    let agents = agent_states(&errors_dir, now);
 
     let body = format!(
         "Interactive main-loop watchdog — wedge detected\n\
@@ -329,7 +329,7 @@ fn dump_diagnostic(w: &Wedge) {
          {interpretation}\n\
          \n\
          Per-thread states:\n\
-         {threads}\n",
+         {agents}\n",
         step_name = step.name(),
     );
 
@@ -387,7 +387,7 @@ fn cpu_busy_pct() -> Option<f64> {
 /// backtrace of the wedged thread to a sibling file, and returns the thread
 /// list from `ps -M`.
 #[cfg(target_os = "linux")]
-fn thread_states(_errors_dir: &std::path::Path, _now: u64) -> String {
+fn agent_states(_errors_dir: &std::path::Path, _now: u64) -> String {
     let Ok(entries) = std::fs::read_dir("/proc/self/task") else {
         return "(unavailable)".to_owned();
     };
@@ -412,7 +412,7 @@ fn thread_states(_errors_dir: &std::path::Path, _now: u64) -> String {
 /// macOS variant — see the Linux doc comment. Captures a `sample` backtrace
 /// (works on a wedged process; that's its purpose) and returns `ps -M` output.
 #[cfg(target_os = "macos")]
-fn thread_states(errors_dir: &std::path::Path, now: u64) -> String {
+fn agent_states(errors_dir: &std::path::Path, now: u64) -> String {
     let pid = std::process::id().to_string();
     // Best-effort: a 2-second `sample` writes a full backtrace of every thread —
     // the single most useful artifact for a wedge — to a sibling file.

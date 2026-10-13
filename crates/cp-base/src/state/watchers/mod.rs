@@ -105,7 +105,7 @@ pub trait Watcher: Send + Sync {
 
     /// Optional thread ID this watcher is scoped to (for coucou thread integration).
     /// Used for persistence across reloads.
-    fn thread_id(&self) -> Option<&str> {
+    fn agent_id(&self) -> Option<&str> {
         None
     }
 
@@ -385,7 +385,7 @@ impl Watcher for ChannelWatcher {
         None
     }
 
-    fn thread_id(&self) -> Option<&str> {
+    fn agent_id(&self) -> Option<&str> {
         None
     }
 

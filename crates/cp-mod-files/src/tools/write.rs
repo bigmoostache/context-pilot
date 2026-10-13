@@ -51,7 +51,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         path.canonicalize().map_or_else(|_| path.to_string_lossy().to_string(), |p| p.to_string_lossy().to_string());
 
     // Check if file is already open in context
-    let already_open = state.thread_mut().context.iter_mut().find(|c| {
+    let already_open = state.agent_mut().context.iter_mut().find(|c| {
         c.context_type.as_str() == Kind::FILE
             && matches!(c.get_meta_str("file_path"), Some(p) if p == canonical || p == path_str)
     });
@@ -74,7 +74,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         elem.token_count = token_count;
         elem.cached_content = Some(contents.to_owned());
         elem.set_meta("file_path", &canonical);
-        state.thread_mut().context.push(elem);
+        state.agent_mut().context.push(elem);
 
         // Invalidate tree cache
         cp_base::panels::mark_panels_dirty(state, Kind::TREE);

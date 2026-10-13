@@ -84,7 +84,7 @@ fn create_panel_inner(state: &mut State, title: &str, content: &str, live: Optio
         drop(elem.metadata.insert(META_IS_LIVE.to_owned(), serde_json::Value::Bool(true)));
     }
 
-    state.thread_mut().context.push(elem);
+    state.agent_mut().context.push(elem);
     panel_id
 }
 
@@ -212,9 +212,9 @@ impl Panel for EntityResultPanel {
 
     fn blocks(&self, state: &State) -> Vec<Block> {
         let ctx_opt = state
-            .thread()
+            .agent()
             .context
-            .get(state.thread().selected_context)
+            .get(state.agent().selected_context)
             .filter(|c| c.context_type == Kind::new(ENTITY_RESULT_TYPE));
 
         let Some(ctx) = ctx_opt else {
@@ -230,9 +230,9 @@ impl Panel for EntityResultPanel {
 
     fn title(&self, state: &State) -> String {
         state
-            .thread()
+            .agent()
             .context
-            .get(state.thread().selected_context)
+            .get(state.agent().selected_context)
             .map_or_else(|| "Entity Result".to_owned(), |ctx| ctx.name.clone())
     }
 
@@ -242,7 +242,7 @@ impl Panel for EntityResultPanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         state
-            .thread()
+            .agent()
             .context
             .iter()
             .filter(|c| c.context_type == Kind::new(ENTITY_RESULT_TYPE))

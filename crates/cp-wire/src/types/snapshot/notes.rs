@@ -5,7 +5,7 @@
 //! `cp-mod-scratchpad` to keep the layering one-directional (modules depend on
 //! the wire, never the reverse), exactly like [`WireTask`](super::todo::WireTask).
 //! Carried on the owning thread's
-//! [`RosterThread::notes`](super::RosterThread::notes) and replaced wholesale by
+//! [`RosterAgent::notes`](super::RosterAgent::notes) and replaced wholesale by
 //! each [`NotesChanged`](super::super::oplog::OpEntryKind::NotesChanged) delta
 //! (whole-list snapshot semantics — the twin of `TaskListChanged`).
 //!
@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 /// shape the web thread view renders in its Notes aside.
 ///
 /// A flat list carried on the owning thread's
-/// [`RosterThread::notes`](super::RosterThread::notes); the frontend renders it
+/// [`RosterAgent::notes`](super::RosterAgent::notes); the frontend renders it
 /// as a list that expands on click to show [`content`](Self::content) (the Files
 /// tab interaction pattern).
 ///

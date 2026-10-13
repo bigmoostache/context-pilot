@@ -11,7 +11,7 @@
 //!   message, guarded by the serialized `has_been_pushed` flag.
 //!
 //! The "panel not reached / not seen" proxy for both is the message-level
-//! [`acknowledged`](crate::types::ThreadMessage::acknowledged) flag (the design
+//! [`acknowledged`](crate::types::AgentMessage::acknowledged) flag (the design
 //! decision confirmed for this feature): user messages start `false` and flip
 //! `true` once the agent has read them.
 
@@ -20,8 +20,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use cp_base::cast::Safe as _;
 use cp_base::state::runtime::State;
 
-use crate::tools::rebuild_threads_panel;
-use crate::types::{FocusState, ThreadStatus, ThreadsState};
+use crate::tools::rebuild_agents_panel;
+use crate::types::{AgentStatus, AgentsState, FocusState};
 
 /// Branch A of the incoming-message behavior — **idle auto-read** of the focused
 /// thread.
@@ -31,35 +31,35 @@ use crate::types::{FocusState, ThreadStatus, ThreadsState};
 /// message, this acknowledges every message in that thread and force-refreshes
 /// the Threads panel — the panel's frozen snapshot is rebuilt so the new
 /// content is in the agent's context on the very next stream, with **no** extra
-/// `Read` round-trip. Returns `Some((tid, thread_name))` so the caller can raise
+/// `Read` round-trip. Returns `Some((tid, agent_name))` so the caller can raise
 /// a spine continuation nudge bound to that thread; returns `None` (and mutates
 /// nothing) when there is no unseen incoming message to pull in.
 ///
 /// The "panel not reached / not seen" proxy is the message-level
-/// [`acknowledged`](crate::types::ThreadMessage::acknowledged) flag (user
+/// [`acknowledged`](crate::types::AgentMessage::acknowledged) flag (user
 /// messages start `false`, flip `true` on read) — the design decision confirmed
 /// for this feature.
 ///
 /// Returns the unseen messages' inlined text (same format and cap as the
 /// streaming push) so the caller's notification shows them directly.
 pub fn take_idle_autoread(state: &mut State) -> Option<StreamingPush> {
-    let tid = FocusState::get(state).focused_thread_id.clone()?;
-    let ts = ThreadsState::get(state);
-    let thread = ts.threads.iter().find(|t| t.id == tid)?;
+    let tid = FocusState::get(state).focused_agent_id.clone()?;
+    let ts = AgentsState::get(state);
+    let agent = ts.agents.iter().find(|t| t.id == tid)?;
     // Paused = parked: leave messages unseen so resuming picks them up.
-    if thread.status != ThreadStatus::MyTurn || thread.archived || thread.paused {
+    if agent.status != AgentStatus::MyTurn || agent.archived || agent.paused {
         return None;
     }
-    if !thread.messages.iter().any(|m| !m.acknowledged) {
+    if !agent.messages.iter().any(|m| !m.acknowledged) {
         return None; // nothing unseen — the idle watcher handles the plain nudge
     }
-    let name = thread.name.clone();
+    let name = agent.name.clone();
 
     // Inline + acknowledge every unseen message (the panel now "reaches" them) ...
     let mut messages = Vec::new();
     let mut truncated = false;
-    let ts_mut = ThreadsState::get_mut(state);
-    if let Some(t) = ts_mut.threads.iter_mut().find(|t| t.id == tid) {
+    let ts_mut = AgentsState::get_mut(state);
+    if let Some(t) = ts_mut.agents.iter_mut().find(|t| t.id == tid) {
         for msg in t.messages.iter_mut().filter(|m| !m.acknowledged) {
             msg.acknowledged = true;
             let (text, cut) = inline_text(msg.content.as_deref(), msg.file_path.as_deref());
@@ -69,7 +69,7 @@ pub fn take_idle_autoread(state: &mut State) -> Option<StreamingPush> {
     }
     // ... and force the Threads panel to re-emit fresh this tick.
     let now_ms = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis().to_u64());
-    rebuild_threads_panel(state, &tid, now_ms);
+    rebuild_agents_panel(state, &tid, now_ms);
 
     Some(StreamingPush { tid, name, messages, truncated })
 }
@@ -79,8 +79,8 @@ pub fn take_idle_autoread(state: &mut State) -> Option<StreamingPush> {
 /// The caller guarantees the agent is mid-stream (guard b). For the focused
 /// thread, this marks every message that is still *unacknowledged* (guard c —
 /// not yet seen) **and** not yet pushed (guard a —
-/// [`has_been_pushed`](crate::types::ThreadMessage::has_been_pushed) `== false`)
-/// as pushed, and returns `Some((tid, thread_name, count))` so the caller can
+/// [`has_been_pushed`](crate::types::AgentMessage::has_been_pushed) `== false`)
+/// as pushed, and returns `Some((tid, agent_name, count))` so the caller can
 /// raise one non-interrupting spine notification (think-reminder style). Returns
 /// `None` when there is nothing new to push, so a long stream never re-pushes
 /// the same message on every poll tick.
@@ -91,18 +91,18 @@ pub fn take_idle_autoread(state: &mut State) -> Option<StreamingPush> {
 /// it in full). A truncated one stays unacknowledged so that once the stream
 /// ends, [`take_idle_autoread`] pulls the full text into context.
 pub fn take_streaming_push(state: &mut State) -> Option<StreamingPush> {
-    let tid = FocusState::get(state).focused_thread_id.clone()?;
-    let name = ThreadsState::get(state).threads.iter().find(|t| t.id == tid).map(|t| t.name.clone())?;
+    let tid = FocusState::get(state).focused_agent_id.clone()?;
+    let name = AgentsState::get(state).agents.iter().find(|t| t.id == tid).map(|t| t.name.clone())?;
 
-    let ts_mut = ThreadsState::get_mut(state);
-    let thread = ts_mut.threads.iter_mut().find(|t| t.id == tid)?;
+    let ts_mut = AgentsState::get_mut(state);
+    let agent = ts_mut.agents.iter_mut().find(|t| t.id == tid)?;
     // Paused = parked: no push; messages stay unseen for the resume auto-read.
-    if thread.paused || thread.archived {
+    if agent.paused || agent.archived {
         return None;
     }
     let mut messages = Vec::new();
     let mut truncated = false;
-    for msg in &mut thread.messages {
+    for msg in &mut agent.messages {
         if msg.acknowledged || msg.has_been_pushed {
             continue;
         }

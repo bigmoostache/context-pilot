@@ -42,11 +42,11 @@ mod tests {
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    /// A `MessageCreated` for `thread`, tagged with `byte` so the head hash is
+    /// A `MessageCreated` for `agent`, tagged with `byte` so the head hash is
     /// distinguishable per write.
-    fn msg(thread: &str, byte: u8) -> OpEntryKind {
+    fn msg(agent: &str, byte: u8) -> OpEntryKind {
         OpEntryKind::MessageCreated {
-            thread_id: thread.to_owned(),
+            agent_id: agent.to_owned(),
             message_id: format!("m{byte}"),
             head: ContentHash::new([byte; 32]),
             inline_body: None,
@@ -179,15 +179,15 @@ mod tests {
         let mut expected_tokens: BTreeSet<String> = BTreeSet::new();
 
         let mut writer = OplogWriter::open_with_segment_limit(dir, TINY_LIMIT).expect("open");
-        let threads = ["T1", "T2", "T3"];
-        let mut thread_idx = 0usize;
+        let agents = ["T1", "T2", "T3"];
+        let mut agent_idx = 0usize;
         let mut since_effect = 0u8;
         for step in 0..18u8 {
-            let thread = *threads.get(thread_idx).expect("thread_idx stays in 0..3");
-            thread_idx = if thread_idx == 2 { 0 } else { thread_idx.wrapping_add(1) };
+            let agent = *agents.get(agent_idx).expect("thread_idx stays in 0..3");
+            agent_idx = if agent_idx == 2 { 0 } else { agent_idx.wrapping_add(1) };
 
-            let _msg_rev = writer.append(msg(thread, step)).expect("append");
-            let _prev = expected_last.insert(thread.to_owned(), step);
+            let _msg_rev = writer.append(msg(agent, step)).expect("append");
+            let _prev = expected_last.insert(agent.to_owned(), step);
 
             if since_effect == 0 {
                 let token = format!("tok-{step}");
@@ -205,20 +205,20 @@ mod tests {
     /// it, with no phantom threads. Extracted from the test to keep it under the
     /// cognitive-complexity cap.
     fn assert_recovered_heads(recovered: &Recovered, expected_last: &BTreeMap<String, u8>) {
-        for (thread, byte) in expected_last {
+        for (agent, byte) in expected_last {
             let head = recovered
                 .heads
-                .threads
+                .agents
                 .iter()
-                .find(|h| &h.thread_id == thread)
-                .unwrap_or_else(|| panic!("thread {thread} missing from recovered heads"));
+                .find(|h| &h.agent_id == agent)
+                .unwrap_or_else(|| panic!("thread {agent} missing from recovered heads"));
             assert_eq!(
                 head.last_message_hash,
                 ContentHash::new([*byte; 32]),
-                "thread {thread} head must be its last write",
+                "thread {agent} head must be its last write",
             );
         }
-        assert_eq!(recovered.heads.threads.len(), expected_last.len(), "no phantom threads in recovered heads");
+        assert_eq!(recovered.heads.agents.len(), expected_last.len(), "no phantom threads in recovered heads");
     }
 
     #[test]
@@ -233,9 +233,9 @@ mod tests {
         // session boundary correctly.
         {
             let mut writer = OplogWriter::open_with_segment_limit(dir.path(), TINY_LIMIT).expect("reopen");
-            for (thread, byte) in [("T1", 200u8), ("T2", 201u8), ("T3", 202u8)] {
-                let _rev = writer.append(msg(thread, byte)).expect("append");
-                let _prev = expected_last.insert(thread.to_owned(), byte);
+            for (agent, byte) in [("T1", 200u8), ("T2", 201u8), ("T3", 202u8)] {
+                let _rev = writer.append(msg(agent, byte)).expect("append");
+                let _prev = expected_last.insert(agent.to_owned(), byte);
             }
         }
 

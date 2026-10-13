@@ -203,16 +203,16 @@ pub(crate) fn build_status_bar(state: &State) -> StatusBar {
         queue: build_queue(state),
         think: build_think(state),
         stop_reason: build_stop_reason(state),
-        retry_count: state.thread().api_retry_count.to_u8(),
+        retry_count: state.agent().api_retry_count.to_u8(),
         max_retries: crate::infra::constants::MAX_API_RETRIES.to_u8(),
         loading_count: state
-            .thread()
+            .agent()
             .context
             .iter()
             .filter(|c| c.cached_content.is_none() && c.context_type.needs_cache())
             .count()
             .to_u16(),
-        input_char_count: state.thread().composer.text.chars().count().to_u32(),
+        input_char_count: state.agent().composer.text.chars().count().to_u32(),
     }
 }
 
@@ -227,17 +227,17 @@ fn build_badge(state: &State) -> Badge {
             .is_some_and(|reg| reg.active_watchers().iter().any(|w| w.fire_at_ms().is_some()))
             || state
                 .get_ext::<cp_mod_spine::schedule::CoucouRegistry>()
-                .is_some_and(|reg| reg.has_pending_for(state.executing_thread_id()))
+                .is_some_and(|reg| reg.has_pending_for(state.executing_agent_id()))
     };
 
-    if state.thread().guard_rail_blocked.is_some() {
+    if state.agent().guard_rail_blocked.is_some() {
         Badge {
-            label: format!("BLOCKED: {}", state.thread().guard_rail_blocked.as_deref().unwrap_or("?")),
+            label: format!("BLOCKED: {}", state.agent().guard_rail_blocked.as_deref().unwrap_or("?")),
             semantic: Semantic::Error,
         }
-    } else if state.thread().stream.phase.is_streaming() && !state.thread().stream.phase.is_tooling() {
+    } else if state.agent().stream.phase.is_streaming() && !state.agent().stream.phase.is_tooling() {
         Badge { label: "STREAMING".into(), semantic: Semantic::Success }
-    } else if state.thread().stream.phase.is_streaming() && state.thread().stream.phase.is_tooling() {
+    } else if state.agent().stream.phase.is_streaming() && state.agent().stream.phase.is_tooling() {
         Badge { label: "TOOLING".into(), semantic: Semantic::Info }
     } else if has_timed_watcher {
         Badge { label: "WAITING".into(), semantic: Semantic::AccentDim }
@@ -328,10 +328,10 @@ fn build_queue(state: &State) -> Option<QueueCard> {
 
 /// Build stop reason indicator from last completion.
 fn build_stop_reason(state: &State) -> Option<StopReason> {
-    if state.thread().stream.phase.is_streaming() {
+    if state.agent().stream.phase.is_streaming() {
         return None;
     }
-    let reason = state.thread().last_stop_reason.as_ref()?;
+    let reason = state.agent().last_stop_reason.as_ref()?;
     let semantic = if reason == "max_tokens" { Semantic::Error } else { Semantic::Muted };
     Some(StopReason { reason: reason.clone(), semantic })
 }

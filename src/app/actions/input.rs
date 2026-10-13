@@ -1,7 +1,7 @@
 use crate::state::persistence::message::record_prompt_history;
 use crate::state::persistence::{delete_message, save_message};
 use crate::state::{Kind, Message, State, estimate_tokens};
-use cp_mod_agents::types::{FocusState, ThreadMessage, ThreadStatus, ThreadsState};
+use cp_mod_agents::types::{AgentMessage, AgentStatus, AgentsState, FocusState};
 use cp_mod_prompt::types::PromptItem;
 use cp_mod_spine::types::{NotificationType, SpineState};
 
@@ -11,37 +11,37 @@ use crate::modules::all_modules;
 
 /// Handle `InputSubmit` action — context switching, message creation, stream start.
 pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
-    if state.thread().composer.text.is_empty() {
+    if state.agent().composer.text.is_empty() {
         return ActionResult::Nothing;
     }
 
     // Context switching is always allowed, even during streaming
-    if let Some(id) = parse_context_pattern(&state.thread().composer.text)
+    if let Some(id) = parse_context_pattern(&state.agent().composer.text)
         && let Some(index) = find_context_by_id(state, &id)
     {
         super::switch_to_panel(state, index);
-        state.thread_mut().composer.reset();
+        state.agent_mut().composer.reset();
         return ActionResult::Nothing;
     }
 
     // Threads view: route input to the selected thread instead of conversation
-    if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
-        return handle_thread_input_submit(state);
+    if state.view_mode == cp_base::state::data::config::ViewMode::Agents {
+        return handle_agent_input_submit(state);
     }
 
     let commands = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Command);
-    let commanded = replace_commands(&state.thread().composer.text, &commands);
+    let commanded = replace_commands(&state.agent().composer.text, &commands);
     // Expand paste sentinels: replace \x00{idx}\x00 with actual paste buffer content
-    let content = expand_paste_sentinels(&commanded, &state.thread().paste_buffers);
-    state.thread_mut().composer.reset();
-    state.thread_mut().paste_buffers.clear();
-    state.thread_mut().paste_buffer_labels.clear();
+    let content = expand_paste_sentinels(&commanded, &state.agent().paste_buffers);
+    state.agent_mut().composer.reset();
+    state.agent_mut().paste_buffers.clear();
+    state.agent_mut().paste_buffer_labels.clear();
     let user_token_estimate = estimate_tokens(&content);
 
     // Assign user display ID and UID
-    let user_id = format!("U{}", state.thread().next_user_id);
+    let user_id = format!("U{}", state.agent().next_user_id);
     let user_global_uid = format!("UID_{}_U", state.global_next_uid);
-    state.thread_mut().next_user_id = state.thread_mut().next_user_id.saturating_add(1);
+    state.agent_mut().next_user_id = state.agent_mut().next_user_id.saturating_add(1);
     state.global_next_uid = state.global_next_uid.saturating_add(1);
 
     // Capture info for notification before moving user_msg
@@ -59,7 +59,7 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
     save_message(&user_msg);
 
     // Add user message tokens to Conversation context and update timestamp
-    if let Some(ctx) = state.thread_mut().context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
+    if let Some(ctx) = state.agent_mut().context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
         ctx.token_count = ctx.token_count.saturating_add(user_token_estimate);
         ctx.last_refresh_ms = crate::app::panels::now_ms();
     }
@@ -75,13 +75,13 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
 
     // During streaming: insert BEFORE the streaming assistant message
     // The notification will be picked up when the current stream ends
-    if state.thread().stream.phase.is_streaming() {
-        let insert_pos = state.thread().messages.len().saturating_sub(1);
-        state.thread_mut().messages.insert(insert_pos, user_msg);
+    if state.agent().stream.phase.is_streaming() {
+        let insert_pos = state.agent().messages.len().saturating_sub(1);
+        state.agent_mut().messages.insert(insert_pos, user_msg);
         return ActionResult::Save;
     }
 
-    state.thread_mut().messages.push(user_msg);
+    state.agent_mut().messages.push(user_msg);
 
     reset_stream_and_tick_counters(state);
 
@@ -93,33 +93,33 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
 /// Zero the per-stream and per-tick token + USD telemetry counters ahead of a
 /// new user-initiated stream, so the next stream's stats start from a clean base.
 fn reset_stream_and_tick_counters(state: &mut State) {
-    state.thread_mut().stream_cache_hit_tokens = 0;
-    state.thread_mut().stream_cache_miss_tokens = 0;
-    state.thread_mut().stream_output_tokens = 0;
-    state.thread_mut().stream_uncached_input_tokens = 0;
-    state.thread_mut().stream_cost_hit_usd = 0.0f64;
-    state.thread_mut().stream_cost_miss_usd = 0.0f64;
-    state.thread_mut().stream_cost_output_usd = 0.0f64;
-    state.thread_mut().tick_cache_hit_tokens = 0;
-    state.thread_mut().tick_cache_miss_tokens = 0;
-    state.thread_mut().tick_output_tokens = 0;
-    state.thread_mut().tick_uncached_input_tokens = 0;
-    state.thread_mut().tick_cost_hit_usd = 0.0f64;
-    state.thread_mut().tick_cost_miss_usd = 0.0f64;
-    state.thread_mut().tick_cost_output_usd = 0.0f64;
+    state.agent_mut().stream_cache_hit_tokens = 0;
+    state.agent_mut().stream_cache_miss_tokens = 0;
+    state.agent_mut().stream_output_tokens = 0;
+    state.agent_mut().stream_uncached_input_tokens = 0;
+    state.agent_mut().stream_cost_hit_usd = 0.0f64;
+    state.agent_mut().stream_cost_miss_usd = 0.0f64;
+    state.agent_mut().stream_cost_output_usd = 0.0f64;
+    state.agent_mut().tick_cache_hit_tokens = 0;
+    state.agent_mut().tick_cache_miss_tokens = 0;
+    state.agent_mut().tick_output_tokens = 0;
+    state.agent_mut().tick_uncached_input_tokens = 0;
+    state.agent_mut().tick_cost_hit_usd = 0.0f64;
+    state.agent_mut().tick_cost_miss_usd = 0.0f64;
+    state.agent_mut().tick_cost_output_usd = 0.0f64;
 }
 
 /// Handle `ClearConversation` action.
 pub(crate) fn handle_clear_conversation(state: &mut State) -> ActionResult {
-    for msg in &state.thread().messages {
+    for msg in &state.agent().messages {
         // Delete by UID if available, otherwise by id
         let file_id = msg.uid.as_ref().unwrap_or(&msg.id);
         delete_message(file_id);
     }
-    state.thread_mut().messages.clear();
-    state.thread_mut().composer.reset();
+    state.agent_mut().messages.clear();
+    state.agent_mut().composer.reset();
     // Reset token count for Conversation context and update timestamp
-    if let Some(ctx) = state.thread_mut().context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
+    if let Some(ctx) = state.agent_mut().context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
         ctx.token_count = 0;
         ctx.last_refresh_ms = crate::app::panels::now_ms();
     }
@@ -138,16 +138,16 @@ fn create_user_notification(state: &mut State, user_id: &str, content_preview: &
     );
 }
 
-/// Handle input submission when `ViewMode::Threads` is active.
+/// Handle input submission when `ViewMode::Agents` is active.
 ///
 /// Routes the user's text to the currently selected thread as a
-/// `ThreadMessage(User)`, sets the thread to `MyTurn`, and creates
+/// `AgentMessage(User)`, sets the thread to `MyTurn`, and creates
 /// a spine notification so the AI picks up the new message.
 ///
-/// When `creating_thread` is active, creates a new thread with the
+/// When `creating_agent` is active, creates a new thread with the
 /// input text as the thread name instead.
-fn handle_thread_input_submit(state: &mut State) -> ActionResult {
-    // `selected_thread_idx` indexes into the VISIBLE (view-filtered) thread
+fn handle_agent_input_submit(state: &mut State) -> ActionResult {
+    // `selected_agent_idx` indexes into the VISIBLE (view-filtered) thread
     // slice, not the raw storage vec — resolve it through `visible_indices`
     // for the current view (T9 archive refactor). The virtual "+ New Thread"
     // entry lives only in the active (non-archived) view, positioned just past
@@ -156,11 +156,11 @@ fn handle_thread_input_submit(state: &mut State) -> ActionResult {
     // any thread is archived.
     let (selected_idx, viewing_archived) = {
         let focus = FocusState::get(state);
-        (focus.selected_thread_idx, focus.viewing_archived)
+        (focus.selected_agent_idx, focus.viewing_archived)
     };
-    let visible = ThreadsState::get(state).visible_indices(viewing_archived);
+    let visible = AgentsState::get(state).visible_indices(viewing_archived);
     if !viewing_archived && selected_idx >= visible.len() {
-        return handle_thread_create(state);
+        return handle_agent_create(state);
     }
     // Map the visible-list position back to a real storage index.
     let Some(&real_idx) = visible.get(selected_idx) else {
@@ -168,28 +168,28 @@ fn handle_thread_input_submit(state: &mut State) -> ActionResult {
     };
 
     let commands = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Command);
-    let commanded = replace_commands(&state.thread().composer.text, &commands);
-    let content = expand_paste_sentinels(&commanded, &state.thread().paste_buffers);
+    let commanded = replace_commands(&state.agent().composer.text, &commands);
+    let content = expand_paste_sentinels(&commanded, &state.agent().paste_buffers);
 
     // Clear input state
-    state.thread_mut().composer.reset();
-    state.thread_mut().paste_buffers.clear();
-    state.thread_mut().paste_buffer_labels.clear();
+    state.agent_mut().composer.reset();
+    state.agent_mut().paste_buffers.clear();
+    state.agent_mut().paste_buffer_labels.clear();
 
     // Record to persistent prompt history
     record_prompt_history(&content);
 
     // Find the selected thread (real storage index resolved above)
-    let threads_state = ThreadsState::get_mut(state);
+    let agents_state = AgentsState::get_mut(state);
 
-    let Some(thread) = threads_state.threads.get_mut(real_idx) else {
+    let Some(agent) = agents_state.agents.get_mut(real_idx) else {
         return ActionResult::Nothing;
     };
 
     // Create a user message in the thread
-    let msg = ThreadMessage::user(content);
-    thread.messages.push(msg);
-    thread.status = ThreadStatus::MyTurn;
+    let msg = AgentMessage::user(content);
+    agent.messages.push(msg);
+    agent.status = AgentStatus::MyTurn;
 
     // NO instant spine notification here — the idle MY_TURN watcher
     // (`IdleMyTurnDetector`) fires when the agent finishes its current
@@ -208,39 +208,39 @@ fn handle_thread_input_submit(state: &mut State) -> ActionResult {
 /// Called when the virtual "New Thread" entry is selected and the user
 /// presses Enter. Generates a unique thread ID, creates an empty
 /// `TheirTurn` thread, and selects it.
-fn handle_thread_create(state: &mut State) -> ActionResult {
+fn handle_agent_create(state: &mut State) -> ActionResult {
     /// Maximum thread name length to prevent state bloat.
-    const MAX_THREAD_NAME_LEN: usize = 200;
+    const MAX_AGENT_NAME_LEN: usize = 200;
 
-    let raw_name = state.thread().composer.text.trim().to_owned();
+    let raw_name = state.agent().composer.text.trim().to_owned();
 
     // Clear input regardless of outcome
-    state.thread_mut().composer.reset();
+    state.agent_mut().composer.reset();
 
     if raw_name.is_empty() {
         return ActionResult::Nothing;
     }
 
     // Cap thread name length
-    let name = if raw_name.len() > MAX_THREAD_NAME_LEN {
-        raw_name.get(..raw_name.floor_char_boundary(MAX_THREAD_NAME_LEN)).unwrap_or(&raw_name).to_owned()
+    let name = if raw_name.len() > MAX_AGENT_NAME_LEN {
+        raw_name.get(..raw_name.floor_char_boundary(MAX_AGENT_NAME_LEN)).unwrap_or(&raw_name).to_owned()
     } else {
         raw_name
     };
 
     // Generate thread ID and create the thread
-    let threads_state = ThreadsState::get_mut(state);
-    let id = format!("T{}", threads_state.next_id);
-    threads_state.next_id = threads_state.next_id.saturating_add(1);
+    let agents_state = AgentsState::get_mut(state);
+    let id = format!("T{}", agents_state.next_id);
+    agents_state.next_id = agents_state.next_id.saturating_add(1);
 
-    let thread = cp_mod_agents::types::Thread::new(id, name);
-    threads_state.threads.push(thread);
+    let agent = cp_mod_agents::types::Agent::new(id, name);
+    agents_state.agents.push(agent);
 
     // Select the newly created thread — it is the last entry of the active
     // (non-archived) visible slice, so the stored selection is a VISIBLE-list
-    // position (consistent with `handle_thread_input_submit`), not a raw index.
-    let new_idx = ThreadsState::get(state).visible_indices(false).len().saturating_sub(1);
-    FocusState::get_mut(state).selected_thread_idx = new_idx;
+    // position (consistent with `handle_agent_input_submit`), not a raw index.
+    let new_idx = AgentsState::get(state).visible_indices(false).len().saturating_sub(1);
+    FocusState::get_mut(state).selected_agent_idx = new_idx;
     state.flags.ui.dirty = true;
 
     ActionResult::Save

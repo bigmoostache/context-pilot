@@ -130,7 +130,7 @@ pub(super) fn route_rest(method: &Method, segments: &[&str], ctx: RouteCtx<'_>) 
         (&Method::Get, &["api", "fleet", id, "metrics"]) => inspect::metrics::agent(state, id),
         (&Method::Get, &["api", "fleet", id, "vitals"]) => inspect::vitals::agent(state, id),
         (&Method::Get, &["api", "fleet", id, "body", hash]) => rest::body(state, id, hash),
-        (&Method::Get, &["api", "fleet", id, "threads"]) => rest::threads(state, id),
+        (&Method::Get, &["api", "fleet", id, "threads"]) => rest::agents(state, id),
         (&Method::Get, &["api", "fleet", id, "usage"]) => inspect::panels::usage(state, id, query),
         (&Method::Get, &["api", "fleet", id, "library"]) => inspect::panels::library(state, id),
         (&Method::Get, &["api", "fleet", id, "fs"]) => inspect::finder::fs_list(state, id, query),

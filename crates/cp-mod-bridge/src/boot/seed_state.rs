@@ -41,22 +41,22 @@ impl MemoSeeds {
     pub const fn messages(self) -> bool {
         self.0 & Self::MESSAGES != 0
     }
-    /// Thread-status memo seeded (`emit_thread_status`).
+    /// Thread-status memo seeded (`emit_agent_status`).
     #[must_use]
     pub const fn statuses(self) -> bool {
         self.0 & Self::STATUSES != 0
     }
-    /// Focus memo seeded (`emit_thread_focus`).
+    /// Focus memo seeded (`emit_agent_focus`).
     #[must_use]
     pub const fn focus(self) -> bool {
         self.0 & Self::FOCUS != 0
     }
-    /// Archived memo seeded (`emit_thread_archived`).
+    /// Archived memo seeded (`emit_agent_archived`).
     #[must_use]
     pub const fn archived(self) -> bool {
         self.0 & Self::ARCHIVED != 0
     }
-    /// Paused memo seeded (`emit_thread_paused`).
+    /// Paused memo seeded (`emit_agent_paused`).
     #[must_use]
     pub const fn paused(self) -> bool {
         self.0 & Self::PAUSED != 0

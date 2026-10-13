@@ -12,17 +12,17 @@ mod messages;
 mod observers;
 mod paused;
 mod query;
-pub(super) use archived::emit_thread_archived;
-pub(super) use bridge::{bridge_active, emit_thread_status, emit_vitals, poll_bridge_commands};
+pub(super) use archived::emit_agent_archived;
+pub(super) use bridge::{bridge_active, emit_agent_status, emit_vitals, poll_bridge_commands};
 pub(super) use messages::{emit_messages, emit_notes, emit_task_lists};
-pub(super) use observers::{emit_behaviour, emit_thread_focus};
-pub(super) use paused::emit_thread_paused;
+pub(super) use observers::{emit_agent_focus, emit_behaviour};
+pub(super) use paused::emit_agent_paused;
 
 use crate::app::App;
 use cp_base::state::runtime::State;
 use cp_base::tools::ToolUse;
-use cp_mod_agents::types::{ThreadMessage, ThreadsState};
-use cp_wire::types::snapshot::RosterThread;
+use cp_mod_agents::types::{AgentMessage, AgentsState};
+use cp_wire::types::snapshot::RosterAgent;
 
 /// Branch A + B of the incoming-message behavior, run once per main-loop tick on
 /// the **focused** thread (the executing at rest, per the executing=focused
@@ -76,7 +76,7 @@ pub(super) fn handle_incoming_focused_messages(app: &mut App, was_streaming: boo
                 format!("thread_push:{tid}"),
                 content,
             );
-            SpineState::set_notification_thread(&mut app.state, &nid, Some(tid));
+            SpineState::set_notification_agent(&mut app.state, &nid, Some(tid));
         }
     } else {
         // Branch A — idle auto-read: content is already pulled into the panel.
@@ -98,7 +98,7 @@ pub(super) fn handle_incoming_focused_messages(app: &mut App, was_streaming: boo
                 format!("thread_autoread:{tid}"),
                 content,
             );
-            SpineState::set_notification_thread(&mut app.state, &nid, Some(tid));
+            SpineState::set_notification_agent(&mut app.state, &nid, Some(tid));
         }
     }
 }
@@ -114,18 +114,18 @@ pub(super) fn emit_bridge_deltas(app: &mut App) {
         let _g = crate::profile!("roster_gate");
         roster_gate(app)
     };
-    // Each emitter gets its own level-2 perf row (`loop.threads_emit.<name>`).
+    // Each emitter gets its own level-2 perf row (`loop.agents_emit.<name>`).
     // `true` = roster emitter, skipped while the roster fingerprint is unchanged.
     let emitters: [Emitter; 9] = [
         ("emit_vitals", emit_vitals, false),
         ("emit_messages", emit_messages, true),
         ("emit_task_lists", emit_task_lists, false),
         ("emit_notes", emit_notes, false),
-        ("emit_thread_status", emit_thread_status, true),
-        ("emit_thread_focus", emit_thread_focus, false),
+        ("emit_thread_status", emit_agent_status, true),
+        ("emit_thread_focus", emit_agent_focus, false),
         ("emit_behaviour", emit_behaviour, false),
-        ("emit_thread_archived", emit_thread_archived, true),
-        ("emit_thread_paused", emit_thread_paused, true),
+        ("emit_thread_archived", emit_agent_archived, true),
+        ("emit_thread_paused", emit_agent_paused, true),
     ];
     for (name, emit, roster) in emitters {
         if roster && skip_roster {
@@ -142,7 +142,7 @@ pub(super) fn emit_bridge_deltas(app: &mut App) {
 }
 
 /// Shared, cheaply clonable oplog roster snapshot.
-type RosterRc = std::rc::Rc<[RosterThread]>;
+type RosterRc = std::rc::Rc<[RosterAgent]>;
 
 thread_local! {
     /// Oplog roster replayed at most once per `emit_bridge_deltas` tick.
@@ -198,10 +198,10 @@ fn roster_gate(app: &App) -> (bool, Option<u64>) {
         .get_ext::<cp_mod_bridge::BridgeState>()
         .is_some_and(|bs| bs.seeded.messages() && bs.seeded.statuses() && bs.seeded.archived() && bs.seeded.paused());
     let mut h = std::collections::hash_map::DefaultHasher::new();
-    for t in &ThreadsState::get(&app.state).threads {
+    for t in &AgentsState::get(&app.state).agents {
         t.id.hash(&mut h);
         t.messages.len().hash(&mut h);
-        (t.status == cp_mod_agents::types::ThreadStatus::MyTurn).hash(&mut h);
+        (t.status == cp_mod_agents::types::AgentStatus::MyTurn).hash(&mut h);
         t.archived.hash(&mut h);
         t.paused.hash(&mut h);
     }
@@ -218,11 +218,11 @@ fn roster_gate(app: &App) -> (bool, Option<u64>) {
 ///
 /// Every tool call leaves a lightweight `{verb · tool — intent}` breadcrumb in
 /// the conversation of the thread that is actually executing it — the
-/// **executing** thread (`State::executing_thread_id`), never the human focus. So a human watching a thread sees
+/// **executing** thread (`State::executing_agent_id`), never the human focus. So a human watching a thread sees
 /// that thread's own live work without the agent having to narrate it, even when
 /// several threads run concurrently and the human is looking at a different one.
 /// The message is marked
-/// [`auto`](ThreadMessage::auto): it is **hidden from the agent's own context**
+/// [`auto`](AgentMessage::auto): it is **hidden from the agent's own context**
 /// (skipped in `build_panel_content`) and rendered as a **collapsible run** in
 /// the web UI and TUI rather than as a normal bubble.
 ///
@@ -246,7 +246,7 @@ pub(in crate::app::run) fn maybe_append_tool_activity(state: &mut State, tool: &
     // NOT the human's on-screen focus. With N>1 these differ: a background
     // thread can run tools while the human views another thread, and its
     // breadcrumbs must land in its own conversation.
-    let Some(tid) = state.executing_thread_id().map(str::to_owned) else {
+    let Some(tid) = state.executing_agent_id().map(str::to_owned) else {
         return;
     };
     // Thread-native tools are excluded — see the doc comment.
@@ -258,8 +258,8 @@ pub(in crate::app::run) fn maybe_append_tool_activity(state: &mut State, tool: &
     let intent = tool.input.get("intent").and_then(serde_json::Value::as_str).unwrap_or("");
     let line = format!("/* auto */ {verb} · {tool_name} — {intent}", tool_name = tool.name);
 
-    let ts = ThreadsState::get_mut(state);
-    if let Some(thread) = ts.threads.iter_mut().find(|t| t.id == tid) {
-        thread.messages.push(ThreadMessage::auto_trace(line));
+    let ts = AgentsState::get_mut(state);
+    if let Some(agent) = ts.agents.iter_mut().find(|t| t.id == tid) {
+        agent.messages.push(AgentMessage::auto_trace(line));
     }
 }

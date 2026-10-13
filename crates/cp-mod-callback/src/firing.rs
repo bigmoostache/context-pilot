@@ -25,23 +25,23 @@ pub struct FireResult {
     pub replaced: bool,
 }
 
-/// Dedup key for a callback's active session: `"<thread>\u{1f}<callback_id>"`.
+/// Dedup key for a callback's active session: `"<agent>\u{1f}<callback_id>"`.
 ///
 /// The thread component is the executing (executing) thread at fire time, so two
 /// threads firing the same callback get distinct keys and never kill each
 /// other's in-flight run (§13/H2, S6). The `\u{1f}` (ASCII unit separator) can't
 /// appear in a thread id or callback id, so the join is collision-free. At N=1
-/// `executing_thread_id()` is `None` → the key degrades to the old callback-id-only
+/// `executing_agent_id()` is `None` → the key degrades to the old callback-id-only
 /// behaviour with a constant prefix.
 fn dedup_key(state: &State, callback_id: &str) -> String {
-    let tid = state.executing_thread_id().unwrap_or(constants::DEFAULT_WORKER_ID);
+    let tid = state.executing_agent_id().unwrap_or(constants::DEFAULT_WORKER_ID);
     format!("{tid}\u{1f}{callback_id}")
 }
 
 /// Informational note (§13/H2) appended to a callback *failure* when another
 /// thread is concurrently running the same callback.
 ///
-/// Scans `active_sessions` (keyed `"<thread>\u{1f}<callback_id>"`) for an entry
+/// Scans `active_sessions` (keyed `"<agent>\u{1f}<callback_id>"`) for an entry
 /// with the *same* callback id but a *different* thread whose console session is
 /// still running. Returns `None` at N=1 (no other thread), when the callback is
 /// not `concurrency_friendly`, or when no concurrent run is live — so the note
@@ -220,7 +220,7 @@ pub fn fire_callback(
         deadline_ms,
         desc: watcher_desc,
         matched_files: matched.matched_files.clone(),
-        fired_by_thread: state.executing_thread_id().map(str::to_owned),
+        fired_by_agent: state.executing_agent_id().map(str::to_owned),
         concurrency_friendly: def.concurrency_friendly,
         deferred_panel: DeferredPanel::new(
             session_key.clone(),
@@ -345,7 +345,7 @@ pub struct CallbackWatcher {
     /// Used only to decide whether *another* thread is concurrently running the
     /// same callback when this one fails, so a cross-thread note can be appended
     /// to the failure result (§13/H2, informational).
-    pub fired_by_thread: Option<String>,
+    pub fired_by_agent: Option<String>,
     /// Whether this callback is marked safe to run concurrently (§13/H2). Gates
     /// the informational cross-thread failure note; `false` suppresses it.
     pub concurrency_friendly: bool,
@@ -408,7 +408,7 @@ impl Watcher for CallbackWatcher {
             let mut msg = format!("· {} FAILED (exit {})", self.callback_name, exit_code);
             if self.concurrency_friendly
                 && let Some(cbid) = self.callback_tag.strip_prefix("callback_")
-                && let Some(note) = concurrent_run_note(state, cbid, self.fired_by_thread.as_deref())
+                && let Some(note) = concurrent_run_note(state, cbid, self.fired_by_agent.as_deref())
             {
                 msg.push_str(&note);
             }
@@ -479,7 +479,7 @@ impl Watcher for CallbackWatcher {
         None
     }
 
-    fn thread_id(&self) -> Option<&str> {
+    fn agent_id(&self) -> Option<&str> {
         None
     }
 

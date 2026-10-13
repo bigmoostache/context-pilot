@@ -55,7 +55,7 @@ impl Panel for FilePanel {
     }
 
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
-        let selected = state.thread().context.get(state.thread().selected_context);
+        let selected = state.agent().context.get(state.agent().selected_context);
 
         let (content, file_path) = selected.map_or_else(
             || (String::new(), String::new()),
@@ -101,9 +101,9 @@ impl Panel for FilePanel {
     }
     fn title(&self, state: &State) -> String {
         state
-            .thread()
+            .agent()
             .context
-            .get(state.thread().selected_context)
+            .get(state.agent().selected_context)
             .map_or_else(|| "File".to_owned(), |ctx| ctx.name.clone())
     }
 
@@ -179,7 +179,7 @@ impl Panel for FilePanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         state
-            .thread()
+            .agent()
             .context
             .iter()
             .filter(|c| c.context_type.as_str() == Kind::FILE)

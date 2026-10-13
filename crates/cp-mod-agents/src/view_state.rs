@@ -14,7 +14,7 @@
 use std::collections::HashMap;
 
 use cp_base::state::runtime::State;
-use cp_fleet::ThreadExecState;
+use cp_fleet::AgentExecState;
 use serde::{Deserialize, Serialize};
 
 /// Per-thread execution state for the threads view. Registered as UI-global
@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// A thread absent from the map is not an error — archived threads have no
 /// registry entry, and a freshly created thread has none until the next
-/// reconcile pass. Renderers fall back to [`ThreadExecState::Idle`] rather than
+/// reconcile pass. Renderers fall back to [`AgentExecState::Idle`] rather than
 /// failing.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FleetExecMirror {
@@ -32,13 +32,13 @@ pub struct FleetExecMirror {
     /// [`State`] rather than the registry — the registry deliberately excludes
     /// the focused thread because its context lives flat in `State` (the
     /// executing=focused invariant).
-    pub exec_states: HashMap<String, ThreadExecState>,
+    pub exec_states: HashMap<String, AgentExecState>,
 }
 
 impl FleetExecMirror {
     /// An empty snapshot (no thread has been observed yet).
     ///
-    /// Not `const`: unlike `ThreadsState::new`, this holds a `HashMap`, which
+    /// Not `const`: unlike `AgentsState::new`, this holds a `HashMap`, which
     /// has no const constructor.
     #[must_use]
     pub fn new() -> Self {
@@ -64,14 +64,14 @@ impl FleetExecMirror {
         state.ext_mut::<Self>()
     }
 
-    /// Execution state for `thread_id`, defaulting to `Idle` when absent.
+    /// Execution state for `agent_id`, defaulting to `Idle` when absent.
     ///
     /// Defaulting (rather than `Option`) keeps the caller's match total: a
     /// thread with no registry entry is indistinguishable from one with nothing
     /// to do, which is true for archived and just-created threads alike.
     #[must_use]
-    pub fn exec_state_of(&self, thread_id: &str) -> ThreadExecState {
-        self.exec_states.get(thread_id).copied().unwrap_or_default()
+    pub fn exec_state_of(&self, agent_id: &str) -> AgentExecState {
+        self.exec_states.get(agent_id).copied().unwrap_or_default()
     }
 
     /// Replace the whole snapshot.
@@ -79,7 +79,7 @@ impl FleetExecMirror {
     /// Rebuilding rather than merging matters: a thread deleted or archived
     /// since the last tick must *disappear* from the map, not linger with a
     /// stale state forever.
-    pub fn replace_all(&mut self, exec_states: HashMap<String, ThreadExecState>) {
+    pub fn replace_all(&mut self, exec_states: HashMap<String, AgentExecState>) {
         self.exec_states = exec_states;
     }
 }

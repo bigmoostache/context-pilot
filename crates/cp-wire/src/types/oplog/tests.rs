@@ -26,7 +26,7 @@ fn message_created_round_trip() {
         rev: 42,
         timestamp_ms: 1_718_000_001_000,
         kind: OpEntryKind::MessageCreated {
-            thread_id: "T5".into(),
+            agent_id: "T5".into(),
             message_id: "msg-abc".into(),
             head: hash,
             inline_body: None,
@@ -46,7 +46,7 @@ fn message_created_inline_body_round_trips_and_omits_when_none() {
         rev: 7,
         timestamp_ms: 0,
         kind: OpEntryKind::MessageCreated {
-            thread_id: "T1".into(),
+            agent_id: "T1".into(),
             message_id: "T1-m0".into(),
             head: hash,
             inline_body: Some(r#"{"author":"user","text":"hi"}"#.into()),
@@ -62,7 +62,7 @@ fn message_created_inline_body_round_trips_and_omits_when_none() {
         rev: 8,
         timestamp_ms: 0,
         kind: OpEntryKind::MessageCreated {
-            thread_id: "T1".into(),
+            agent_id: "T1".into(),
             message_id: "T1-m1".into(),
             head: hash,
             inline_body: None,
@@ -86,18 +86,18 @@ fn unknown_opentry_kind_tolerant() {
 }
 
 #[test]
-fn thread_roster_kinds_round_trip() {
+fn agent_roster_kinds_round_trip() {
     let kinds = [
-        OpEntryKind::ThreadCreated {
-            thread_id: "T7".into(),
+        OpEntryKind::AgentCreated {
+            agent_id: "T7".into(),
             name: "Refactor the cache engine".into(),
-            status: ThreadTurn::MyTurn,
+            status: AgentTurn::MyTurn,
             timestamp_ms: 1_718_000_002_000,
             branched_from: Some("T3".into()),
         },
-        OpEntryKind::ThreadArchived { thread_id: "T7".into() },
-        OpEntryKind::ThreadRestored { thread_id: "T7".into() },
-        OpEntryKind::ThreadStatusChanged { thread_id: "T7".into(), status: ThreadTurn::TheirTurn },
+        OpEntryKind::AgentArchived { agent_id: "T7".into() },
+        OpEntryKind::AgentRestored { agent_id: "T7".into() },
+        OpEntryKind::AgentStatusChanged { agent_id: "T7".into(), status: AgentTurn::TheirTurn },
     ];
     for kind in kinds {
         let entry = OpEntry { schema_version: 1, rev: 1, timestamp_ms: 0, kind: kind.clone() };
@@ -128,13 +128,13 @@ fn context_usage_round_trip_and_stable_tag() {
 }
 
 #[test]
-fn thread_created_wire_tag_is_stable() {
+fn agent_created_wire_tag_is_stable() {
     // The internally-tagged discriminant is part of the wire contract.
     let entry = OpEntry {
         schema_version: 1,
         rev: 3,
         timestamp_ms: 0,
-        kind: OpEntryKind::ThreadArchived { thread_id: "T1".into() },
+        kind: OpEntryKind::AgentArchived { agent_id: "T1".into() },
     };
     let json = serde_json::to_string(&entry).expect("serialize");
     assert!(json.contains("\"kind\":\"thread_archived\""), "stable tag: {json}");
@@ -170,7 +170,7 @@ fn task_list_changed_round_trip_and_stable_tag() {
         rev: 21,
         timestamp_ms: 0,
         kind: OpEntryKind::TaskListChanged {
-            thread_id: "T7".into(),
+            agent_id: "T7".into(),
             tasks: vec![
                 WireTask {
                     id: "X1".into(),

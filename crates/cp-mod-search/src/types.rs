@@ -267,7 +267,7 @@ pub(crate) enum IndexerCmd {
     /// The initial full-project scan has finished.
     ScanComplete,
     /// Batch-reconcile the conversations index against a desired doc set
-    /// (T671). Built on a State-bearing thread from the live `ThreadsState`,
+    /// (T671). Built on a State-bearing thread from the live `AgentsState`,
     /// then run on the indexer thread (which owns the Meilisearch client).
     ReconcileConversations(Vec<crate::index::reconcile::conversations::ConversationDoc>),
 }
@@ -418,7 +418,7 @@ pub(crate) fn logs_index_settings() -> serde_json::Value {
 ///
 /// Indexes one document per user/assistant thread message so the thread-search
 /// palette can hybrid-search (keyword + semantic) across everything ever said
-/// in a thread, not just its name. `thread_id` is filterable so the reconciler
+/// in a thread, not just its name. `agent_id` is filterable so the reconciler
 /// can scope per-thread purges; `author` is filterable for future faceting;
 /// `ts_ms` is sortable so recency ties can break toward newer messages.
 pub(crate) fn conversations_index_settings() -> serde_json::Value {

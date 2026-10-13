@@ -1,11 +1,11 @@
 //! Per-thread runtime bundle — the mutable context a single thread owns.
 //!
-//! [`ThreadRuntime`] holds everything that belongs to one thread: conversation,
+//! [`AgentRuntime`] holds everything that belongs to one thread: conversation,
 //! panels, editor/view state, stream phase, token+cost telemetry, the
 //! cache/freeze engine snapshots and per-thread module data. Every thread's
-//! runtime lives permanently in [`ThreadStore`](super::threads::ThreadStore),
+//! runtime lives permanently in [`AgentStore`](super::threads::AgentStore),
 //! keyed by thread id; code reaches the executing one through
-//! [`State::thread`](super::State::thread) / [`State::thread_mut`](super::State::thread_mut).
+//! [`State::thread`](super::State::thread) / [`State::agent_mut`](super::State::agent_mut).
 //! Fleet-shared data (tools, modules, theme, provider/model, shared module
 //! data, `global_next_uid`, reveries) stays on [`State`](super::State).
 
@@ -22,9 +22,9 @@ use crate::ui::render_cache::{FullCache, InputCache, MessageCache};
 
 /// The complete mutable context owned by one thread.
 ///
-/// Stored per thread in [`ThreadStore`](super::threads::ThreadStore); see the
+/// Stored per thread in [`AgentStore`](super::threads::AgentStore); see the
 /// module docs.
-pub struct ThreadRuntime {
+pub struct AgentRuntime {
     // === Conversation + panels ===
     /// Active context panels (dynamic + fixed), ordered for LLM injection.
     pub context: Vec<Entry>,
@@ -164,10 +164,10 @@ pub struct ThreadRuntime {
     // === Per-thread module data ===
     /// This thread's per-thread module `TypeMap` (spine inbox, queue,
     /// console ownership, watcher registry, search/git views, …).
-    pub thread_module_data: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
+    pub agent_module_data: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
 }
 
-impl Default for ThreadRuntime {
+impl Default for AgentRuntime {
     fn default() -> Self {
         // A freshly created thread starts empty, at single-thread defaults.
         Self {
@@ -229,23 +229,23 @@ impl Default for ThreadRuntime {
             input_cache: None,
             full_content_cache: None,
             workdir: None,
-            thread_module_data: HashMap::new(),
+            agent_module_data: HashMap::new(),
         }
     }
 }
 
-impl std::fmt::Debug for ThreadRuntime {
+impl std::fmt::Debug for AgentRuntime {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ThreadRuntime")
             .field("context_len", &self.context.len())
             .field("messages_len", &self.messages.len())
             .field("stream_phase", &self.stream.phase)
-            .field("thread_module_data_keys", &self.thread_module_data.len())
+            .field("thread_module_data_keys", &self.agent_module_data.len())
             .finish_non_exhaustive()
     }
 }
 
-impl ThreadRuntime {
+impl AgentRuntime {
     /// A fresh, empty thread runtime (every field at its single-thread default).
     #[must_use]
     pub fn new() -> Self {

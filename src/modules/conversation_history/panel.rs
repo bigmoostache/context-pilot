@@ -88,7 +88,7 @@ impl Panel for ConversationHistoryPanel {
     }
 
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
-        let ctx = match state.thread().context.get(state.thread().selected_context) {
+        let ctx = match state.agent().context.get(state.agent().selected_context) {
             Some(c) if c.context_type.as_str() == Kind::CONVERSATION_HISTORY => c,
             _ => {
                 return vec![cp_render::Block::Line(vec![
@@ -125,9 +125,9 @@ impl Panel for ConversationHistoryPanel {
     }
     fn title(&self, state: &State) -> String {
         state
-            .thread()
+            .agent()
             .context
-            .get(state.thread().selected_context)
+            .get(state.agent().selected_context)
             .filter(|c| c.context_type.as_str() == Kind::CONVERSATION_HISTORY)
             .map_or_else(|| "Chat History".to_owned(), |c| c.name.clone())
     }
@@ -138,7 +138,7 @@ impl Panel for ConversationHistoryPanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         state
-            .thread()
+            .agent()
             .context
             .iter()
             .filter(|c| c.context_type.as_str() == Kind::CONVERSATION_HISTORY)

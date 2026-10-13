@@ -49,7 +49,7 @@ impl Panel for TreePanel {
         use cp_render::{Block, Semantic, Span as S};
 
         let tree_content = state
-            .thread()
+            .agent()
             .context
             .iter()
             .find(|c| c.context_type.as_str() == Kind::TREE)
@@ -157,7 +157,7 @@ impl Panel for TreePanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         // Find tree context and use cached content
-        for ctx in &state.thread().context {
+        for ctx in &state.agent().context {
             if ctx.context_type.as_str() == Kind::TREE {
                 if let Some(content) = ctx.cached_content.as_ref()
                     && !content.is_empty()

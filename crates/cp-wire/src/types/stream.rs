@@ -32,7 +32,8 @@ pub struct Frame {
     pub worker_id: String,
 
     /// Thread context for routing to the correct UI pane.
-    pub thread_id: String,
+    #[serde(rename = "thread_id")]
+    pub agent_id: String,
 
     /// Message being streamed (tokens accumulate under this id).
     pub message_id: String,
@@ -101,7 +102,7 @@ mod tests {
             schema_version: 1,
             fleet_id: "agent-a".into(),
             worker_id: "w0".into(),
-            thread_id: "T1".into(),
+            agent_id: "T1".into(),
             message_id: "msg-42".into(),
             seq: 7,
             kind: Kind::Token { text: "Hello".into() },
@@ -117,7 +118,7 @@ mod tests {
             schema_version: 1,
             fleet_id: "a".into(),
             worker_id: "w".into(),
-            thread_id: "T".into(),
+            agent_id: "T".into(),
             message_id: "m".into(),
             seq: 0,
             kind: Kind::PhaseHint { phase: Phase::Tooling },

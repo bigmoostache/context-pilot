@@ -1,14 +1,14 @@
 //! Thread-list shaping — pure transforms from agent state + live roster to the
-//! maquette `ThreadDetail` JSON shape.
+//! maquette `AgentDetail` JSON shape.
 //!
-//! The `/threads` handler ([`threads`](super::threads)) combines two
+//! The `/agents` handler ([`agents`](super::threads)) combines two
 //! sources: the agent's on-disk `config.json` (full message logs) and the
 //! in-memory [`MaterializedView`](crate::services::materialized_view::MaterializedView) roster
 //! (the live, up-to-the-millisecond thread list). The functions here perform
 //! the reshaping and the merge, kept separate from the request-handling code so
 //! both stay small and independently testable.
 
-use cp_wire::types::ThreadTurn;
+use cp_wire::types::AgentTurn;
 use cp_wire::types::snapshot::notes::WireNote;
 use cp_wire::types::snapshot::todo::{WireTask, WireTaskStatus};
 
@@ -25,7 +25,7 @@ const fn task_status_str(status: WireTaskStatus) -> &'static str {
     }
 }
 
-/// Reshape one projected [`WireTask`] into the maquette `ThreadTask` JSON shape
+/// Reshape one projected [`WireTask`] into the maquette `AgentTask` JSON shape
 /// (`snake_case` → camelCase `parentId`), the read-only todo item the web aside
 /// renders. Cancelled tasks never reach here (excluded upstream).
 fn reshape_task(task: &WireTask) -> serde_json::Value {
@@ -39,12 +39,12 @@ fn reshape_task(task: &WireTask) -> serde_json::Value {
 }
 
 /// Build the maquette `tasks` array for a roster entry — its projected tasks in
-/// order, each reshaped to the camelCase `ThreadTask` shape.
+/// order, each reshaped to the camelCase `AgentTask` shape.
 fn roster_tasks_value(entry: &RosterEntry) -> serde_json::Value {
     serde_json::Value::Array(entry.tasks.iter().map(reshape_task).collect())
 }
 
-/// Reshape one projected [`WireNote`] into the maquette `ThreadNote` JSON shape,
+/// Reshape one projected [`WireNote`] into the maquette `AgentNote` JSON shape,
 /// the read-only scratchpad cell the web Notes aside renders as a list row that
 /// expands on click. The twin of [`reshape_task`].
 fn reshape_note(note: &WireNote) -> serde_json::Value {
@@ -56,7 +56,7 @@ fn reshape_note(note: &WireNote) -> serde_json::Value {
 }
 
 /// Build the maquette `notes` array for a roster entry — its projected notes in
-/// order, each reshaped to the `ThreadNote` shape. The twin of
+/// order, each reshaped to the `AgentNote` shape. The twin of
 /// [`roster_tasks_value`].
 fn roster_notes_value(entry: &RosterEntry) -> serde_json::Value {
     serde_json::Value::Array(entry.notes.iter().map(reshape_note).collect())
@@ -67,13 +67,13 @@ fn roster_notes_value(entry: &RosterEntry) -> serde_json::Value {
 /// For each roster entry: if a disk thread with that id exists, refresh its
 /// `status`, `archived`, and `lastActivity` from the view (the authoritative,
 /// up-to-the-millisecond source — design doc I5); otherwise synthesise a
-/// log-less `ThreadDetail` so a thread created since the last disk flush still
+/// log-less `AgentDetail` so a thread created since the last disk flush still
 /// appears immediately.
 pub(crate) fn overlay_roster(details: &mut Vec<serde_json::Value>, roster: &[RosterEntry], fleet_id: &str) {
     for entry in roster {
         let existing = details
             .iter_mut()
-            .find(|d| d.get("id").and_then(serde_json::Value::as_str) == Some(entry.thread_id.as_str()));
+            .find(|d| d.get("id").and_then(serde_json::Value::as_str) == Some(entry.agent_id.as_str()));
         match existing {
             Some(detail) => {
                 if let Some(obj) = detail.as_object_mut() {
@@ -100,10 +100,10 @@ pub(crate) fn overlay_roster(details: &mut Vec<serde_json::Value>, roster: &[Ros
     }
 }
 
-/// Build a `ThreadDetail` from a roster entry alone — no message bodies yet.
+/// Build a `AgentDetail` from a roster entry alone — no message bodies yet.
 fn synthesize_from_roster(entry: &RosterEntry, fleet_id: &str) -> serde_json::Value {
     serde_json::json!({
-        "id": entry.thread_id,
+        "id": entry.agent_id,
         "name": entry.name,
         "status": roster_status_value(entry.status),
         "fleetId": fleet_id,
@@ -123,10 +123,10 @@ fn synthesize_from_roster(entry: &RosterEntry, fleet_id: &str) -> serde_json::Va
 /// `config.json` todo module (`modules.todo.todos`).
 ///
 /// Thread-owned todos live **separately** from the thread record in the shared
-/// todo module, so [`reshape_thread`] cannot see them — it defaults `tasks` to
+/// todo module, so [`reshape_agent`] cannot see them — it defaults `tasks` to
 /// empty. This fills that gap for the cold-start / pre-delta window: it groups
-/// the flat todo list by `thread_id`, excludes cancelled items (the projection
-/// contract), reshapes each to the camelCase `ThreadTask` shape, and writes the
+/// the flat todo list by `agent_id`, excludes cancelled items (the projection
+/// contract), reshapes each to the camelCase `AgentTask` shape, and writes the
 /// per-thread array onto the matching detail. The live [`overlay_roster`] then
 /// overrides these with the fresher view-fed task lists where the roster has
 /// them.
@@ -159,7 +159,7 @@ pub(crate) fn attach_disk_tasks(details: &mut [serde_json::Value], config: Optio
     }
 }
 
-/// Reshape one raw `config.json` todo item into the maquette `ThreadTask` shape
+/// Reshape one raw `config.json` todo item into the maquette `AgentTask` shape
 /// (`parent_id` → `parentId`; status kept as its `snake_case` wire string).
 fn disk_task_json(todo: &serde_json::Value) -> serde_json::Value {
     serde_json::json!({
@@ -176,9 +176,9 @@ fn disk_task_json(todo: &serde_json::Value) -> serde_json::Value {
 ///
 /// The twin of [`attach_disk_tasks`] for the thread-owned scratchpad: cells live
 /// **separately** from the thread record in the shared scratchpad module, so
-/// [`reshape_thread`] cannot see them — it defaults `notes` to empty. This fills
+/// [`reshape_agent`] cannot see them — it defaults `notes` to empty. This fills
 /// the cold-start / pre-delta window: it groups the flat cell list by
-/// `thread_id` and writes the per-thread `ThreadNote` array onto the matching
+/// `agent_id` and writes the per-thread `AgentNote` array onto the matching
 /// detail. The live [`overlay_roster`] then overrides these with the fresher
 /// view-fed note lists where the roster has them. Scratchpad cells have no
 /// cancelled/soft-deleted state, so (unlike tasks) there is no exclusion filter.
@@ -210,7 +210,7 @@ pub(crate) fn attach_disk_notes(details: &mut [serde_json::Value], config: Optio
     }
 }
 
-/// Reshape one raw `config.json` scratchpad cell into the maquette `ThreadNote`
+/// Reshape one raw `config.json` scratchpad cell into the maquette `AgentNote`
 /// shape (`id`/`title`/`content`). The twin of [`disk_task_json`].
 fn disk_note_json(cell: &serde_json::Value) -> serde_json::Value {
     serde_json::json!({
@@ -220,20 +220,20 @@ fn disk_note_json(cell: &serde_json::Value) -> serde_json::Value {
     })
 }
 
-/// Map a wire [`ThreadTurn`] to the maquette status string.
-fn roster_status_value(status: ThreadTurn) -> serde_json::Value {
+/// Map a wire [`AgentTurn`] to the maquette status string.
+fn roster_status_value(status: AgentTurn) -> serde_json::Value {
     let s = match status {
-        ThreadTurn::MyTurn => "MY_TURN",
-        ThreadTurn::TheirTurn | ThreadTurn::Unknown => "THEIR_TURN",
+        AgentTurn::MyTurn => "MY_TURN",
+        AgentTurn::TheirTurn | AgentTurn::Unknown => "THEIR_TURN",
     };
     serde_json::Value::String(s.to_owned())
 }
 
-/// Reshape one raw thread from agent state to the maquette `ThreadDetail`
+/// Reshape one raw thread from agent state to the maquette `AgentDetail`
 /// shape: `snake_case` → camelCase, computed fields (`messageCount`, `unread`,
-/// `lastMessage`, `lastActivity`), `origin.thread_id` flattened to
+/// `lastMessage`, `lastActivity`), `origin.agent_id` flattened to
 /// `branchedFrom` (null for a non-branched thread), and messages mapped to `log`.
-pub(crate) fn reshape_thread(raw: &serde_json::Value, fleet_id: &str) -> serde_json::Value {
+pub(crate) fn reshape_agent(raw: &serde_json::Value, fleet_id: &str) -> serde_json::Value {
     let messages = raw.get("messages").and_then(serde_json::Value::as_array);
     let msg_count = messages.map_or(0, Vec::len);
     let unread = messages.map_or(0, |msgs| {
@@ -280,7 +280,7 @@ pub(crate) fn reshape_thread(raw: &serde_json::Value, fleet_id: &str) -> serde_j
     })
 }
 
-/// Reshape one thread message to the maquette `ThreadMsg` shape.
+/// Reshape one thread message to the maquette `AgentMsg` shape.
 fn reshape_message(raw: &serde_json::Value, index: usize) -> serde_json::Value {
     let role = match raw.get("author").and_then(serde_json::Value::as_str).unwrap_or("User") {
         "Assistant" => "assistant",
@@ -328,11 +328,11 @@ mod tests {
     }
 
     #[test]
-    fn overlay_synthesises_view_only_thread() {
+    fn overlay_synthesises_view_only_agent() {
         // A thread present in the roster but absent on disk is appended with an
         // empty log — the instant-appearance path.
         let mut details: Vec<serde_json::Value> = Vec::new();
-        let roster = [RosterEntry::builder("T9", "fresh", ThreadTurn::TheirTurn).last_activity_ms(4_242).build()];
+        let roster = [RosterEntry::builder("T9", "fresh", AgentTurn::TheirTurn).last_activity_ms(4_242).build()];
         overlay_roster(&mut details, &roster, "a1");
         let d = details.first().expect("one synthesised detail");
         assert_eq!(str_at(d, "id"), Some("T9"));
@@ -344,7 +344,7 @@ mod tests {
     }
 
     #[test]
-    fn overlay_refreshes_status_archived_and_activity_on_disk_thread() {
+    fn overlay_refreshes_status_archived_and_activity_on_disk_agent() {
         // A disk thread keeps its log but takes the view's fresher status,
         // archived flag, and (later) activity.
         let mut details = vec![serde_json::json!({
@@ -356,7 +356,7 @@ mod tests {
             "archived": false,
             "log": [{"id": "msg_0", "role": "user", "content": "hi", "timestamp": 100u64}],
         })];
-        let roster = [RosterEntry::builder("T1", "old", ThreadTurn::MyTurn)
+        let roster = [RosterEntry::builder("T1", "old", AgentTurn::MyTurn)
             .archived(true)
             .last_activity_ms(500)
             .msg_count(1)
@@ -370,7 +370,7 @@ mod tests {
     }
 
     #[test]
-    fn reshape_thread_maps_fields_and_messages() {
+    fn reshape_agent_maps_fields_and_messages() {
         let raw = serde_json::json!({
             "id": "T1",
             "name": "Plan",
@@ -381,7 +381,7 @@ mod tests {
                 {"author": "Assistant", "content": "yo", "timestamp": 20u64, "acknowledged": false},
             ],
         });
-        let d = reshape_thread(&raw, "a1");
+        let d = reshape_agent(&raw, "a1");
         assert_eq!(str_at(&d, "id"), Some("T1"));
         assert_eq!(str_at(&d, "status"), Some("MY_TURN"));
         assert_eq!(u64_at(&d, "messageCount"), Some(2));
@@ -392,14 +392,14 @@ mod tests {
     }
 
     #[test]
-    fn reshape_plain_thread_has_null_branched_from() {
+    fn reshape_plain_agent_has_null_branched_from() {
         let raw = serde_json::json!({"id": "T1", "name": "Plan", "status": "TheirTurn", "messages": []});
-        let d = reshape_thread(&raw, "a1");
+        let d = reshape_agent(&raw, "a1");
         assert_eq!(d.get("branchedFrom"), Some(&serde_json::Value::Null));
     }
 
     #[test]
-    fn reshape_branched_thread_exposes_parent_and_creation_activity() {
+    fn reshape_branched_agent_exposes_parent_and_creation_activity() {
         // A branch's copied history keeps the parent's old timestamps; its
         // creation time is what makes it recent.
         let raw = serde_json::json!({
@@ -413,7 +413,7 @@ mod tests {
                 {"author": "Assistant", "content": "yo", "timestamp": 20u64, "acknowledged": true},
             ],
         });
-        let d = reshape_thread(&raw, "a1");
+        let d = reshape_agent(&raw, "a1");
         assert_eq!(str_at(&d, "branchedFrom"), Some("T1"));
         assert_eq!(u64_at(&d, "lastActivity"), Some(900));
         assert_eq!(u64_at(&d, "messageCount"), Some(2));

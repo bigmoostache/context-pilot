@@ -3,9 +3,9 @@
 //!
 //! Defined here in the I/O-free protocol crate rather than imported from
 //! `cp-mod-todo` to keep the layering one-directional (modules depend on the
-//! wire, never the reverse), exactly like [`ThreadTurn`](super::super::ThreadTurn).
+//! wire, never the reverse), exactly like [`AgentTurn`](super::super::AgentTurn).
 //! Carried on the owning thread's
-//! [`RosterThread::tasks`](super::RosterThread::tasks) and replaced wholesale
+//! [`RosterAgent::tasks`](super::RosterAgent::tasks) and replaced wholesale
 //! by each [`TaskListChanged`](super::super::oplog::OpEntryKind::TaskListChanged)
 //! delta.
 
@@ -40,7 +40,7 @@ pub enum WireTaskStatus {
 /// web thread view renders in its todo aside.
 ///
 /// A flat list carried on the owning thread's
-/// [`RosterThread::tasks`](super::RosterThread::tasks); nesting is reconstructed
+/// [`RosterAgent::tasks`](super::RosterAgent::tasks); nesting is reconstructed
 /// frontend-side from [`parent_id`](Self::parent_id) (roots have `None`).
 /// Cancelled tasks are excluded upstream, so every `WireTask` on the wire is
 /// `Planned`, `InProgress`, or `Done`.

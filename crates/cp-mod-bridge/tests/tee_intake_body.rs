@@ -73,7 +73,7 @@ mod tests {
                 format!("cmd-{dedup}"),
                 1,
                 dedup.to_owned(),
-                CommandKind::SendMessage { thread_id: "T1".to_owned(), content: "hi".to_owned() },
+                CommandKind::SendMessage { agent_id: "T1".to_owned(), content: "hi".to_owned() },
             ),
         );
         framing::encode_raw(&serde_json::to_vec(&cf).expect("serialise frame")).expect("frame")
@@ -204,7 +204,7 @@ mod tests {
         assert!(store.get(orphan.hash()).expect("get").is_some(), "the spilled body is durable");
 
         let recovered = replay(dir).expect("replay empty");
-        assert!(recovered.heads.threads.is_empty(), "no entry references the orphan");
+        assert!(recovered.heads.agents.is_empty(), "no entry references the orphan");
         orphan
     }
 
@@ -214,7 +214,7 @@ mod tests {
         let oplog = OplogService::spawn(dir).expect("spawn");
         let _rev = oplog
             .append_durable(OpEntryKind::MessageCreated {
-                thread_id: "T1".to_owned(),
+                agent_id: "T1".to_owned(),
                 message_id: "m1".to_owned(),
                 head,
                 inline_body: None,
@@ -239,7 +239,7 @@ mod tests {
 
         // GC driven by the replayed heads — exactly how the agent reclaims bodies.
         let replayed = replay(dir.path()).expect("replay with reference");
-        let live: HashSet<ContentHash> = replayed.heads.threads.iter().map(|h| h.last_message_hash).collect();
+        let live: HashSet<ContentHash> = replayed.heads.agents.iter().map(|h| h.last_message_hash).collect();
         assert!(live.contains(&referenced.hash()), "the journalled head is in the live set");
 
         let removed = store.gc(&live, Duration::ZERO).expect("gc");
@@ -258,7 +258,7 @@ mod tests {
                 schema_version: 1,
                 fleet_id: "a".to_owned(),
                 worker_id: "w".to_owned(),
-                thread_id: "T1".to_owned(),
+                agent_id: "T1".to_owned(),
                 message_id: "m1".to_owned(),
                 seq,
                 kind: StreamKind::Token { text: format!("tok{seq}") },

@@ -44,14 +44,14 @@ fn in_backoff(state: &State) -> bool {
 /// auto-continuation the assistant hasn't answered yet (double-synthetic guard).
 fn last_synthetic_unanswered(state: &State) -> bool {
     let synthetic_pos = state
-        .thread()
+        .agent()
         .messages
         .iter()
         .rposition(|m| m.role == "user" && m.msg_type != cp_base::state::data::message::MsgKind::ToolResult);
     let Some(pos) = synthetic_pos else {
         return false;
     };
-    let Some(msg) = state.thread().messages.get(pos) else {
+    let Some(msg) = state.agent().messages.get(pos) else {
         return false;
     };
     let content = msg.content.trim();
@@ -62,7 +62,7 @@ fn last_synthetic_unanswered(state: &State) -> bool {
         return false;
     }
     // Assistant responded anywhere after the synthetic message (not just last).
-    let assistant_responded = state.thread().messages.get(pos..).is_some_and(|slice| {
+    let assistant_responded = state.agent().messages.get(pos..).is_some_and(|slice| {
         slice.iter().any(|m| m.role == "assistant" && (!m.content.is_empty() || !m.tool_uses.is_empty()))
     });
     !assistant_responded
@@ -99,7 +99,7 @@ fn check_guard_rails(state: &mut State) -> Option<String> {
 pub fn check_spine(state: &mut State) -> SpineDecision {
     let _fg = cp_base::flame!("check_spine");
     // Never launch if already streaming
-    if state.thread().stream.phase.is_streaming() {
+    if state.agent().stream.phase.is_streaming() {
         return SpineDecision::Idle;
     }
 
@@ -188,7 +188,7 @@ fn build_transparent_continuation(unprocessed: &[&Notification], state: &State) 
     if has_user_message {
         // User sent a message — check if conversation already ends with user turn
         let last_role = state
-            .thread()
+            .agent()
             .messages
             .iter()
             .rev()
@@ -224,7 +224,7 @@ pub fn apply_continuation(state: &mut State, action: ContinuationAction) -> bool
         }
         ContinuationAction::Relaunch => {
             let last_role = state
-                .thread()
+                .agent()
                 .messages
                 .iter()
                 .rev()

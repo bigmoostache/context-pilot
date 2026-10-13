@@ -87,9 +87,9 @@ impl Module for ScratchpadModule {
         if let Some(v) = data.get("next_scratchpad_id").and_then(serde_json::Value::as_u64) {
             ss.next_scratchpad_id = v.to_usize();
         }
-        // Thread-owned rework: forever-purge legacy cells lacking a thread_id
-        // (old schema), mirroring the todo migration's threadless purge.
-        tools::purge_threadless(state);
+        // Thread-owned rework: forever-purge legacy cells lacking a agent_id
+        // (old schema), mirroring the todo migration's agentless purge.
+        tools::purge_agentless(state);
     }
 
     fn fixed_panel_types(&self) -> Vec<Kind> {
@@ -142,12 +142,12 @@ impl Module for ScratchpadModule {
         // Thread-owned: existence checks are scoped to the focused thread's
         // cells. With no focused thread, execute returns the canonical
         // no-focus error, so pre_flight stays silent here.
-        let focus = state.executing_thread_id();
+        let focus = state.executing_agent_id();
         match tool.name.as_str() {
             "scratchpad_edit_cell" => {
                 let mut pf = Verdict::new();
                 if let (Some(f), Some(cell_id)) = (focus, tool.input.get("cell_id").and_then(|v| v.as_str()))
-                    && !ss.scratchpad_cells.iter().any(|c| c.id == cell_id && c.thread_id == f)
+                    && !ss.scratchpad_cells.iter().any(|c| c.id == cell_id && c.agent_id == f)
                 {
                     pf.errors.push(format!("Cell '{cell_id}' not found"));
                 }
@@ -160,7 +160,7 @@ impl Module for ScratchpadModule {
                 {
                     for id_val in ids {
                         if let Some(id) = id_val.as_str()
-                            && !ss.scratchpad_cells.iter().any(|c| c.id == id && c.thread_id == f)
+                            && !ss.scratchpad_cells.iter().any(|c| c.id == id && c.agent_id == f)
                         {
                             pf.warnings.push(format!("Cell '{id}' not found \u{2014} will be skipped"));
                         }

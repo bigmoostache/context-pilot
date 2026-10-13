@@ -342,7 +342,7 @@ impl Module for GitModule {
     }
     fn save_worker_data(&self, state: &State) -> serde_json::Value {
         state
-            .thread()
+            .agent()
             .workdir
             .as_ref()
             .map_or(serde_json::Value::Null, |dir| serde_json::json!({ "workdir": dir.to_string_lossy() }))
@@ -350,9 +350,9 @@ impl Module for GitModule {
     fn load_worker_data(&self, data: &serde_json::Value, state: &mut State) {
         // A worktree removed outside Context Pilot falls back to the project root.
         let dir = data.get("workdir").and_then(serde_json::Value::as_str).map(std::path::PathBuf::from);
-        state.thread_mut().workdir = dir.filter(|d| d.is_dir());
+        state.agent_mut().workdir = dir.filter(|d| d.is_dir());
     }
-    fn worker_data_is_thread_scoped(&self) -> bool {
+    fn worker_data_is_agent_scoped(&self) -> bool {
         true
     }
     fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<cp_base::tools::pre_flight::Verdict> {

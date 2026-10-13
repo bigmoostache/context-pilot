@@ -90,9 +90,9 @@ impl Panel for SearchResultPanel {
         use cp_render::{Block, Semantic, Span};
 
         let ctx_opt = state
-            .thread()
+            .agent()
             .context
-            .get(state.thread().selected_context)
+            .get(state.agent().selected_context)
             .filter(|c| c.context_type == Kind::new(SEARCH_PANEL_TYPE));
 
         let Some(ctx) = ctx_opt else {
@@ -108,9 +108,9 @@ impl Panel for SearchResultPanel {
 
     fn title(&self, state: &State) -> String {
         state
-            .thread()
+            .agent()
             .context
-            .get(state.thread().selected_context)
+            .get(state.agent().selected_context)
             .map_or_else(|| "Search Results".to_owned(), |ctx| ctx.name.clone())
     }
 
@@ -120,7 +120,7 @@ impl Panel for SearchResultPanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         state
-            .thread()
+            .agent()
             .context
             .iter()
             .filter(|c| c.context_type == Kind::new(SEARCH_PANEL_TYPE))

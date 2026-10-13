@@ -1,6 +1,6 @@
 //! Persistent watcher: fires a notification when idle + `MY_TURN` thread exists.
 //!
-//! Replaces the old hand-rolled `check_my_turn_threads` + `notified_my_turn_id`
+//! Replaces the old hand-rolled `check_my_turn_agents` + `notified_my_turn_id`
 //! debounce mechanism with a standard `Watcher` impl on the spine's universal
 //! notification bus — the same path every other watcher (coucou, console,
 //! callback, OCR) already uses.
@@ -17,7 +17,7 @@ use cp_base::state::runtime::State;
 use cp_base::state::watchers::Watcher;
 use cp_base::state::watchers::carriers::WatcherResult;
 
-use crate::types::{FocusState, ThreadStatus, ThreadsState};
+use crate::types::{AgentStatus, AgentsState, FocusState};
 
 /// Watcher id — module-level const so `fn id()` returns a reference rather than
 /// a literal (dodges `unnecessary_literal_bound` without a redundant annotation).
@@ -72,7 +72,7 @@ impl Watcher for IdleMyTurnDetector {
 
     fn check(&self, state: &State) -> Option<WatcherResult> {
         // Only fire when the agent is NOT streaming (i.e. idle).
-        if state.thread().stream.phase.is_streaming() {
+        if state.agent().stream.phase.is_streaming() {
             return None;
         }
 
@@ -83,7 +83,7 @@ impl Watcher for IdleMyTurnDetector {
             return None;
         }
 
-        let ts = ThreadsState::get(state);
+        let ts = AgentsState::get(state);
         let fs = FocusState::get(state);
 
         // FOCUSED-ONLY: nudge the focused thread when it is still MY_TURN (the
@@ -94,9 +94,9 @@ impl Watcher for IdleMyTurnDetector {
         // background thread the dispatcher already handles (hardening S5). At
         // N=1 the focused thread is the only MY_TURN thread, so this is
         // behaviourally identical to the former fallback.
-        let focused_tid = fs.focused_thread_id.as_deref();
-        let thread = focused_tid.and_then(|fid| {
-            ts.threads.iter().find(|t| t.id == fid && !t.archived && !t.paused && t.status == ThreadStatus::MyTurn)
+        let focused_tid = fs.focused_agent_id.as_deref();
+        let agent = focused_tid.and_then(|fid| {
+            ts.agents.iter().find(|t| t.id == fid && !t.archived && !t.paused && t.status == AgentStatus::MyTurn)
         })?;
 
         // Unacknowledged (unseen) messages are the idle **auto-read** hook's job
@@ -105,7 +105,7 @@ impl Watcher for IdleMyTurnDetector {
         // plain "please respond" notification once the agent has ALREADY SEEN
         // everything in the thread and simply went idle without replying — so
         // the two mechanisms never double-nudge the same incoming message.
-        if thread.messages.iter().any(|m| !m.acknowledged) {
+        if agent.messages.iter().any(|m| !m.acknowledged) {
             return None;
         }
 
@@ -116,16 +116,16 @@ impl Watcher for IdleMyTurnDetector {
         // filter, errors). Only fire for normal completion ("end_turn") or
         // mid-tool-use ("tool_use") — those indicate the agent voluntarily
         // stopped and should be nudged.
-        if !is_normal_stop(state.thread().last_stop_reason.as_deref()) {
+        if !is_normal_stop(state.agent().last_stop_reason.as_deref()) {
             return Some(WatcherResult {
                 description: format!(
                     "Thread \"{}\" ({}) is MY_TURN but the last LLM turn ended \
                      abnormally (reason: {}). Send a message in that thread \
                      explaining to the user that a guardrail or error fired, \
                      and suggest changing the model to continue.",
-                    thread.name,
-                    thread.id,
-                    state.thread().last_stop_reason.as_deref().unwrap_or("unknown/error"),
+                    agent.name,
+                    agent.id,
+                    state.agent().last_stop_reason.as_deref().unwrap_or("unknown/error"),
                 ),
                 panel_id: None,
                 tool_use_id: None,
@@ -135,7 +135,7 @@ impl Watcher for IdleMyTurnDetector {
                 kill_session: None,
                 preserves_tempo: true,
                 create_dyn_panel: None,
-                thread_id: Some(thread.id.clone()),
+                agent_id: Some(agent.id.clone()),
             });
         }
 
@@ -143,7 +143,7 @@ impl Watcher for IdleMyTurnDetector {
             description: format!(
                 "Thread \"{}\" ({}) is MY_TURN and needs a response. \
                  Use Read to focus on it, then Send your reply.",
-                thread.name, thread.id,
+                agent.name, agent.id,
             ),
             panel_id: None,
             tool_use_id: None,
@@ -153,7 +153,7 @@ impl Watcher for IdleMyTurnDetector {
             kill_session: None,
             preserves_tempo: true,
             create_dyn_panel: None,
-            thread_id: Some(thread.id.clone()),
+            agent_id: Some(agent.id.clone()),
         })
     }
 

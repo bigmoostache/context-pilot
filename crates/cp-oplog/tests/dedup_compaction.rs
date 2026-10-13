@@ -44,10 +44,10 @@ mod tests {
 
     // ── helpers ────────────────────────────────────────────────────────────────
 
-    /// A `MessageCreated` for `thread`, tagged with `byte`.
-    fn msg(thread: &str, byte: u8) -> OpEntryKind {
+    /// A `MessageCreated` for `agent`, tagged with `byte`.
+    fn msg(agent: &str, byte: u8) -> OpEntryKind {
         OpEntryKind::MessageCreated {
-            thread_id: thread.to_owned(),
+            agent_id: agent.to_owned(),
             message_id: format!("m{byte}"),
             head: ContentHash::new([byte; 32]),
             inline_body: None,
@@ -116,14 +116,14 @@ mod tests {
         // Thread rotation (every 3rd) and effect cadence (every 5th) are tracked with
         // explicit counters rather than `%` — the modulo operator is disallowed in
         // this foundational crate.
-        let threads = ["T1", "T2", "T3"];
-        let mut thread_idx = 0usize;
+        let agents = ["T1", "T2", "T3"];
+        let mut agent_idx = 0usize;
         let mut since_effect = 0u8;
         for step in 0..21u8 {
-            let thread = *threads.get(thread_idx).expect("thread_idx stays in 0..3");
-            thread_idx = if thread_idx == 2 { 0 } else { thread_idx.wrapping_add(1) };
+            let agent = *agents.get(agent_idx).expect("thread_idx stays in 0..3");
+            agent_idx = if agent_idx == 2 { 0 } else { agent_idx.wrapping_add(1) };
 
-            let _msg_rev = writer.append(msg(thread, step)).expect("append msg");
+            let _msg_rev = writer.append(msg(agent, step)).expect("append msg");
 
             if since_effect == 0 {
                 let token = format!("tok-{step}");
@@ -196,7 +196,7 @@ mod tests {
             "the post-compaction append advances rev_head past the compacted base"
         );
         assert_eq!(after.rev_head, Some(new_rev), "replay sees the freshly appended record");
-        let t1 = after.heads.threads.iter().find(|h| h.thread_id == "T1").expect("T1 head present");
+        let t1 = after.heads.agents.iter().find(|h| h.agent_id == "T1").expect("T1 head present");
         assert_eq!(t1.last_message_hash, ContentHash::new([250; 32]), "T1 head is the fresh write");
     }
 

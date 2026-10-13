@@ -17,15 +17,15 @@ use cp_base::state::runtime::State;
 
 use crate::types::{TodoItem, TodoStatus};
 
-/// The canonical YAML for `thread_id`'s task tree.
+/// The canonical YAML for `agent_id`'s task tree.
 ///
 /// Empty string when the thread has no items. Siblings are ordered by
 /// [`TodoItem::order`]; a cancelled item sorts **last** in its group
 /// (soft-delete convention).
 #[must_use]
-pub fn render(state: &State, thread_id: &str) -> String {
+pub fn render(state: &State, agent_id: &str) -> String {
     let ts = crate::types::TodoState::get(state);
-    let items: Vec<&TodoItem> = ts.todos.iter().filter(|t| t.thread_id == thread_id).collect();
+    let items: Vec<&TodoItem> = ts.todos.iter().filter(|t| t.agent_id == agent_id).collect();
     let mut out = String::new();
     render_group(&items, None, 0, &mut out);
     out

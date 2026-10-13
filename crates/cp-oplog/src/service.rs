@@ -101,19 +101,19 @@ impl Durability {
             OpEntryKind::PhaseTransition { .. }
             | OpEntryKind::CostAggregate { .. }
             | OpEntryKind::ContextUsage { .. }
-            | OpEntryKind::ThreadFocusChanged { .. }
+            | OpEntryKind::AgentFocusChanged { .. }
             | OpEntryKind::BehaviourChanged { .. } => Self::BestEffort,
             OpEntryKind::CommandEffect { .. }
             | OpEntryKind::SeenMark { .. }
             | OpEntryKind::MessageCreated { .. }
             | OpEntryKind::MessageDeleted { .. }
-            | OpEntryKind::ThreadCreated { .. }
-            | OpEntryKind::ThreadArchived { .. }
-            | OpEntryKind::ThreadRestored { .. }
-            | OpEntryKind::ThreadPaused { .. }
-            | OpEntryKind::ThreadResumed { .. }
-            | OpEntryKind::ThreadDeleted { .. }
-            | OpEntryKind::ThreadStatusChanged { .. }
+            | OpEntryKind::AgentCreated { .. }
+            | OpEntryKind::AgentArchived { .. }
+            | OpEntryKind::AgentRestored { .. }
+            | OpEntryKind::AgentPaused { .. }
+            | OpEntryKind::AgentResumed { .. }
+            | OpEntryKind::AgentDeleted { .. }
+            | OpEntryKind::AgentStatusChanged { .. }
             | OpEntryKind::TaskListChanged { .. }
             | OpEntryKind::Lifecycle { .. }
             | OpEntryKind::NotesChanged { .. }

@@ -117,7 +117,7 @@ fn check_duplicate_close(tool: &ToolUse, state: &State) -> Option<String> {
 /// - `task_id` matches a todo owned by a DIFFERENT thread — a cross-thread
 ///   reference (the precise "wrong thread" warning the all-todos scope enables).
 fn validate_task_declaration(tool: &ToolUse, state: &State, result: &mut Verdict) {
-    let Some(focused) = state.executing_thread_id().map(str::to_owned) else {
+    let Some(focused) = state.executing_agent_id().map(str::to_owned) else {
         return; // No focused thread → task_id not enforced.
     };
 
@@ -140,10 +140,10 @@ fn validate_task_declaration(tool: &ToolUse, state: &State, result: &mut Verdict
         None => result.warnings.push(format!(
             "Task '{task_id}' does not exist in your Todo list. Declare a real task id, or create it first."
         )),
-        Some(item) if item.thread_id != focused => result.warnings.push(format!(
+        Some(item) if item.agent_id != focused => result.warnings.push(format!(
             "Task '{task_id}' belongs to thread {}, not the focused thread {focused}. \
              Declare a task from the focused thread.",
-            item.thread_id
+            item.agent_id
         )),
         // A finished/cancelled task is a wrong thing to declare work against —
         // warn and do nothing (the pipeline's auto-promote also leaves it be).

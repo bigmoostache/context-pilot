@@ -8,8 +8,7 @@
 mod boot;
 
 pub(crate) use boot::{
-    boot_extract_module_data, boot_init_modules, boot_load_thread_runtime, check_env, fresh_thread_runtime,
-    preflight_env,
+    boot_extract_module_data, boot_init_modules, boot_load_agent_runtime, check_env, fresh_agent_runtime, preflight_env,
 };
 pub(crate) mod config;
 pub(crate) mod message;

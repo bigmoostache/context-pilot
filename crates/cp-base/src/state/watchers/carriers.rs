@@ -34,7 +34,7 @@ pub struct WatcherResult {
     /// Thread this result is bound to (if any). Stamped by thread-aware watchers
     /// (e.g. the idle `MY_TURN` detector) so the resulting spine notification can
     /// be cleared when that thread is `Read`.
-    pub thread_id: Option<String>,
+    pub agent_id: Option<String>,
 }
 
 impl WatcherResult {
@@ -56,7 +56,7 @@ impl WatcherResult {
             kill_session: None,
             preserves_tempo: false,
             create_dyn_panel: None,
-            thread_id: None,
+            agent_id: None,
         }
     }
 
@@ -137,11 +137,11 @@ impl WatcherResult {
     /// Bind this result to a thread, so the spine notification it produces can
     /// be cleared when that thread is `Read`.
     #[must_use]
-    pub fn thread_id<S>(mut self, id: S) -> Self
+    pub fn agent_id<S>(mut self, id: S) -> Self
     where
         S: Into<String>,
     {
-        self.thread_id = Some(id.into());
+        self.agent_id = Some(id.into());
         self
     }
 }

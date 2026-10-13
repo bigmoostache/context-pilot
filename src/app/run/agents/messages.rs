@@ -13,7 +13,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash as _, Hasher as _};
 
 use cp_base::state::runtime::State;
-use cp_mod_agents::types::{ThreadAuthor, ThreadMessage, ThreadsState};
+use cp_mod_agents::types::{AgentAuthor, AgentMessage, AgentsState};
 use cp_mod_bridge::BridgeState;
 use cp_mod_bridge::body::Stored;
 use cp_mod_scratchpad::types::ScratchpadState;
@@ -62,25 +62,25 @@ pub(in crate::app::run) fn emit_messages(app: &mut App) {
     let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.messages());
     if !seeded {
         let counts: Vec<(String, usize)> =
-            ThreadsState::get(&app.state).threads.iter().map(|t| (t.id.clone(), t.messages.len())).collect();
+            AgentsState::get(&app.state).agents.iter().map(|t| (t.id.clone(), t.messages.len())).collect();
         let bs = app.state.ext_mut::<BridgeState>();
         for (id, len) in counts {
-            let _prev = bs.thread_msg_counts.insert(id, len);
+            let _prev = bs.agent_msg_counts.insert(id, len);
         }
         bs.seeded.seed_messages();
         return;
     }
 
     // Collect messages appended since the last pass (owned, so the borrows on
-    // `ThreadsState` and `BridgeState` end before we mutate state below).
+    // `AgentsState` and `BridgeState` end before we mutate state below).
     let pending: Vec<PendingMessage> = {
-        let ts = ThreadsState::get(&app.state);
-        let memo = &app.state.ext::<BridgeState>().thread_msg_counts;
+        let ts = AgentsState::get(&app.state);
+        let memo = &app.state.ext::<BridgeState>().agent_msg_counts;
         let mut out = Vec::new();
-        for thread in &ts.threads {
-            let seen = memo.get(&thread.id).copied().unwrap_or(0);
-            for (idx, msg) in thread.messages.iter().enumerate().skip(seen) {
-                out.push(build_pending(&thread.id, msg, idx));
+        for agent in &ts.agents {
+            let seen = memo.get(&agent.id).copied().unwrap_or(0);
+            for (idx, msg) in agent.messages.iter().enumerate().skip(seen) {
+                out.push(build_pending(&agent.id, msg, idx));
             }
         }
         out
@@ -90,16 +90,16 @@ pub(in crate::app::run) fn emit_messages(app: &mut App) {
     }
 
     for p in pending {
-        emit_one_message(&app.state, &p.thread_id, &p.message_id, &p.body);
-        let _prev = app.state.ext_mut::<BridgeState>().thread_msg_counts.insert(p.thread_id, p.index.saturating_add(1));
+        emit_one_message(&app.state, &p.agent_id, &p.message_id, &p.body);
+        let _prev = app.state.ext_mut::<BridgeState>().agent_msg_counts.insert(p.agent_id, p.index.saturating_add(1));
     }
 }
 
 /// One thread message staged for emission.
 struct PendingMessage {
     /// Owning thread id.
-    thread_id: String,
-    /// Synthesised stable message id (`"{thread_id}-m{index}"`).
+    agent_id: String,
+    /// Synthesised stable message id (`"{agent_id}-m{index}"`).
     message_id: String,
     /// Storage index within the thread's message vector.
     index: usize,
@@ -107,14 +107,14 @@ struct PendingMessage {
     body: String,
 }
 
-/// Build the [`PendingMessage`] for the message at `idx` in `thread_id`.
+/// Build the [`PendingMessage`] for the message at `idx` in `agent_id`.
 ///
 /// The body is the JSON the maquette thread view renders directly — author
 /// (so the bubble lands on the right side), text, timestamp, and any embedded
 /// question / file reference.
-fn build_pending(thread_id: &str, msg: &ThreadMessage, idx: usize) -> PendingMessage {
-    let message_id = format!("{thread_id}-m{idx}");
-    let author = if matches!(msg.author, ThreadAuthor::Assistant) { "assistant" } else { "user" };
+fn build_pending(agent_id: &str, msg: &AgentMessage, idx: usize) -> PendingMessage {
+    let message_id = format!("{agent_id}-m{idx}");
+    let author = if matches!(msg.author, AgentAuthor::Assistant) { "assistant" } else { "user" };
     let body = serde_json::json!({
         "id": message_id,
         "author": author,
@@ -124,7 +124,7 @@ fn build_pending(thread_id: &str, msg: &ThreadMessage, idx: usize) -> PendingMes
         "auto": msg.auto,
     })
     .to_string();
-    PendingMessage { thread_id: thread_id.to_owned(), message_id, index: idx, body }
+    PendingMessage { agent_id: agent_id.to_owned(), message_id, index: idx, body }
 }
 
 /// Stage `body` in the content-addressed store (I13 barrier) and journal the
@@ -133,7 +133,7 @@ fn build_pending(thread_id: &str, msg: &ThreadMessage, idx: usize) -> PendingMes
 /// A small body is carried inline in the delta (zero hydration round-trip); a
 /// large one spills to a durable file (`inline_body = None`) the backend
 /// hydrates by hash. No-op when the bridge is OFF or the store is unavailable.
-fn emit_one_message(state: &State, thread_id: &str, message_id: &str, body: &str) {
+fn emit_one_message(state: &State, agent_id: &str, message_id: &str, body: &str) {
     let Some(bs) = state.get_ext::<BridgeState>() else {
         return;
     };
@@ -150,7 +150,7 @@ fn emit_one_message(state: &State, thread_id: &str, message_id: &str, body: &str
     let head = stored.hash();
     let inline_body = if let Stored::Inline { bytes, .. } = stored { String::from_utf8(bytes).ok() } else { None };
     boot.oplog().submit_durable(OpEntryKind::MessageCreated {
-        thread_id: thread_id.to_owned(),
+        agent_id: agent_id.to_owned(),
         message_id: message_id.to_owned(),
         head,
         inline_body,
@@ -176,7 +176,7 @@ const fn wire_task_status(status: TodoStatus) -> Option<WireTaskStatus> {
 /// aside renders: the thread's own items **sorted by sibling order** (YAML-diff
 /// rework — the backend's `order` int is the single source of truth for sibling
 /// order), cancelled excluded, nesting expressed via [`WireTask::parent_id`].
-fn project_thread_tasks(mut items: Vec<&cp_mod_todo::types::TodoItem>) -> Vec<WireTask> {
+fn project_agent_tasks(mut items: Vec<&cp_mod_todo::types::TodoItem>) -> Vec<WireTask> {
     // Sort by (order, id): within each parent group this yields ascending order,
     // which is all the frontend needs to render siblings correctly (it groups by
     // parent_id and preserves encounter order).
@@ -206,7 +206,7 @@ fn project_thread_tasks(mut items: Vec<&cp_mod_todo::types::TodoItem>) -> Vec<Wi
 /// replay fails.
 fn oplog_roster_tasks(state: &State) -> HashMap<String, Vec<WireTask>> {
     super::oplog_roster(state)
-        .map(|r| r.iter().map(|t| (t.thread_id.clone(), t.tasks.clone())).collect())
+        .map(|r| r.iter().map(|t| (t.agent_id.clone(), t.tasks.clone())).collect())
         .unwrap_or_default()
 }
 
@@ -220,28 +220,28 @@ fn seed_tasks_memo_if_needed(app: &mut App) {
     }
     let oplog_tasks = oplog_roster_tasks(&app.state);
     let bs = app.state.ext_mut::<BridgeState>();
-    bs.thread_tasks.extend(oplog_tasks);
+    bs.agent_tasks.extend(oplog_tasks);
     bs.seeded.seed_tasks();
 }
 
 /// Diff each thread's live task projection against the memo; collect
-/// (`thread_id`, tasks) for every thread whose list changed. A thread absent
+/// (`agent_id`, tasks) for every thread whose list changed. A thread absent
 /// from the memo is treated as having an empty list, so a thread that never had
 /// tasks (and still has none) yields no spurious emission.
 fn collect_task_changes(app: &App) -> Vec<(String, Vec<WireTask>)> {
-    let ts = ThreadsState::get(&app.state);
+    let ts = AgentsState::get(&app.state);
     let todos = TodoState::get(&app.state);
-    let memo = &app.state.ext::<BridgeState>().thread_tasks;
+    let memo = &app.state.ext::<BridgeState>().agent_tasks;
     let empty: Vec<WireTask> = Vec::new();
     // One pass over the todos instead of one per thread.
-    let mut by_thread: HashMap<&str, Vec<&cp_mod_todo::types::TodoItem>> = HashMap::new();
+    let mut by_agent: HashMap<&str, Vec<&cp_mod_todo::types::TodoItem>> = HashMap::new();
     for t in &todos.todos {
-        by_thread.entry(t.thread_id.as_str()).or_default().push(t);
+        by_agent.entry(t.agent_id.as_str()).or_default().push(t);
     }
-    ts.threads
+    ts.agents
         .iter()
         .filter_map(|t| {
-            let live = project_thread_tasks(by_thread.remove(t.id.as_str()).unwrap_or_default());
+            let live = project_agent_tasks(by_agent.remove(t.id.as_str()).unwrap_or_default());
             (memo.get(&t.id).unwrap_or(&empty) != &live).then(|| (t.id.clone(), live))
         })
         .collect()
@@ -252,7 +252,7 @@ fn collect_task_changes(app: &App) -> Vec<(String, Vec<WireTask>)> {
 /// aside) reflect a `Think.todo` / `todo_mark` in milliseconds.
 ///
 /// A main-loop **observe-on-change chokepoint** mirroring
-/// [`emit_thread_archived`](super::archived::emit_thread_archived): it seeds the
+/// [`emit_agent_archived`](super::archived::emit_agent_archived): it seeds the
 /// per-thread task memo from the oplog roster on the first pass (what the view
 /// has folded), then falls through to the diff so any change the oplog missed
 /// while the bridge was down is emitted immediately. Each delta carries the
@@ -275,12 +275,12 @@ pub(in crate::app::run) fn emit_task_lists(app: &mut App) {
         return;
     }
 
-    for (thread_id, tasks) in collect_task_changes(app) {
+    for (agent_id, tasks) in collect_task_changes(app) {
         emit_roster_delta(
             &app.state,
-            OpEntryKind::TaskListChanged { thread_id: thread_id.clone(), tasks: tasks.clone() },
+            OpEntryKind::TaskListChanged { agent_id: agent_id.clone(), tasks: tasks.clone() },
         );
-        let _prev = app.state.ext_mut::<BridgeState>().thread_tasks.insert(thread_id, tasks);
+        let _prev = app.state.ext_mut::<BridgeState>().agent_tasks.insert(agent_id, tasks);
     }
     TASKS_INPUT_HASH.set(Some(hash));
 }
@@ -300,7 +300,7 @@ thread_local! {
 fn tasks_input_hash(app: &App) -> u64 {
     let mut h = DefaultHasher::new();
     TodoState::get(&app.state).revision.hash(&mut h);
-    hash_thread_ids(app, &mut h);
+    hash_agent_ids(app, &mut h);
     h.finish()
 }
 
@@ -309,13 +309,13 @@ fn tasks_input_hash(app: &App) -> u64 {
 fn notes_input_hash(app: &App) -> u64 {
     let mut h = DefaultHasher::new();
     ScratchpadState::get(&app.state).revision.hash(&mut h);
-    hash_thread_ids(app, &mut h);
+    hash_agent_ids(app, &mut h);
     h.finish()
 }
 
 /// Feed every thread id into `h` (thread create/delete changes the diff set).
-fn hash_thread_ids(app: &App, h: &mut DefaultHasher) {
-    for t in &ThreadsState::get(&app.state).threads {
+fn hash_agent_ids(app: &App, h: &mut DefaultHasher) {
+    for t in &AgentsState::get(&app.state).agents {
         t.id.hash(h);
     }
 }
@@ -325,8 +325,8 @@ fn hash_thread_ids(app: &App, h: &mut DefaultHasher) {
 /// Project a thread's scratchpad cells into the read-only [`WireNote`] list the
 /// web Notes aside renders: the thread's own cells in creation order (the
 /// `scratchpad_cells` Vec is already ordered by creation), each mapped to its
-/// `id`/`title`/`content`. The twin of [`project_thread_tasks`].
-fn project_thread_notes(cells: Vec<&cp_mod_scratchpad::types::ScratchpadCell>) -> Vec<WireNote> {
+/// `id`/`title`/`content`. The twin of [`project_agent_tasks`].
+fn project_agent_notes(cells: Vec<&cp_mod_scratchpad::types::ScratchpadCell>) -> Vec<WireNote> {
     cells
         .into_iter()
         .map(|c| WireNote { id: c.id.clone(), title: c.title.clone(), content: c.content.clone() })
@@ -341,7 +341,7 @@ fn project_thread_notes(cells: Vec<&cp_mod_scratchpad::types::ScratchpadCell>) -
 /// or the replay fails.
 fn oplog_roster_notes(state: &State) -> HashMap<String, Vec<WireNote>> {
     super::oplog_roster(state)
-        .map(|r| r.iter().map(|t| (t.thread_id.clone(), t.notes.clone())).collect())
+        .map(|r| r.iter().map(|t| (t.agent_id.clone(), t.notes.clone())).collect())
         .unwrap_or_default()
 }
 
@@ -355,28 +355,28 @@ fn seed_notes_memo_if_needed(app: &mut App) {
     }
     let oplog_notes = oplog_roster_notes(&app.state);
     let bs = app.state.ext_mut::<BridgeState>();
-    bs.thread_notes.extend(oplog_notes);
+    bs.agent_notes.extend(oplog_notes);
     bs.seeded.seed_notes();
 }
 
 /// Diff each thread's live note projection against the memo; collect
-/// (`thread_id`, notes) for every thread whose list changed. A thread absent
+/// (`agent_id`, notes) for every thread whose list changed. A thread absent
 /// from the memo is treated as having an empty list, so a thread that never had
 /// notes (and still has none) yields no spurious emission. Twin of
 /// [`collect_task_changes`].
 fn collect_note_changes(app: &App) -> Vec<(String, Vec<WireNote>)> {
-    let ts = ThreadsState::get(&app.state);
+    let ts = AgentsState::get(&app.state);
     let scratchpad = ScratchpadState::get(&app.state);
-    let memo = &app.state.ext::<BridgeState>().thread_notes;
+    let memo = &app.state.ext::<BridgeState>().agent_notes;
     let empty: Vec<WireNote> = Vec::new();
-    let mut by_thread: HashMap<&str, Vec<&cp_mod_scratchpad::types::ScratchpadCell>> = HashMap::new();
+    let mut by_agent: HashMap<&str, Vec<&cp_mod_scratchpad::types::ScratchpadCell>> = HashMap::new();
     for c in &scratchpad.scratchpad_cells {
-        by_thread.entry(c.thread_id.as_str()).or_default().push(c);
+        by_agent.entry(c.agent_id.as_str()).or_default().push(c);
     }
-    ts.threads
+    ts.agents
         .iter()
         .filter_map(|t| {
-            let live = project_thread_notes(by_thread.remove(t.id.as_str()).unwrap_or_default());
+            let live = project_agent_notes(by_agent.remove(t.id.as_str()).unwrap_or_default());
             (memo.get(&t.id).unwrap_or(&empty) != &live).then(|| (t.id.clone(), live))
         })
         .collect()
@@ -404,9 +404,9 @@ pub(in crate::app::run) fn emit_notes(app: &mut App) {
         return;
     }
 
-    for (thread_id, notes) in collect_note_changes(app) {
-        emit_roster_delta(&app.state, OpEntryKind::NotesChanged { thread_id: thread_id.clone(), notes: notes.clone() });
-        let _prev = app.state.ext_mut::<BridgeState>().thread_notes.insert(thread_id, notes);
+    for (agent_id, notes) in collect_note_changes(app) {
+        emit_roster_delta(&app.state, OpEntryKind::NotesChanged { agent_id: agent_id.clone(), notes: notes.clone() });
+        let _prev = app.state.ext_mut::<BridgeState>().agent_notes.insert(agent_id, notes);
     }
     NOTES_INPUT_HASH.set(Some(hash));
 }

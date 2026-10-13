@@ -30,7 +30,7 @@ fn fixed_panel_badge(ctx_type: &str, state: &State) -> Option<String> {
         "callback" => cp_mod_callback::types::CallbackState::get(state).definitions.len(),
         "scratchpad" => cp_mod_scratchpad::types::ScratchpadState::get(state).scratchpad_cells.len(),
         "queue" => cp_mod_queue::types::QueueState::get(state).queued_calls.len(),
-        "overview" => state.thread().context.len().saturating_add(2),
+        "overview" => state.agent().context.len().saturating_add(2),
         "tools" => state.tools.iter().filter(|t| t.enabled).count(),
         _ => return None,
     };
@@ -40,7 +40,7 @@ fn fixed_panel_badge(ctx_type: &str, state: &State) -> Option<String> {
 /// Build the sidebar region from application state.
 #[must_use]
 pub(crate) fn build_sidebar(state: &State) -> Sidebar {
-    let mode = if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
+    let mode = if state.view_mode == cp_base::state::data::config::ViewMode::Agents {
         SidebarMode::Hidden
     } else {
         SidebarMode::Normal
@@ -71,17 +71,17 @@ pub(crate) fn build_sidebar(state: &State) -> Sidebar {
 /// Build the context element entries list for the sidebar.
 fn build_entries(state: &State) -> Vec<SidebarEntry> {
     // Sort by panel ID numerically
-    let mut sorted_indices: Vec<usize> = (0..state.thread().context.len()).collect();
+    let mut sorted_indices: Vec<usize> = (0..state.agent().context.len()).collect();
     sorted_indices.sort_by(|&a, &b| {
         let id_a = state
-            .thread()
+            .agent()
             .context
             .get(a)
             .and_then(|c| c.id.strip_prefix('P'))
             .and_then(|n| n.parse::<usize>().ok())
             .unwrap_or(usize::MAX);
         let id_b = state
-            .thread()
+            .agent()
             .context
             .get(b)
             .and_then(|c| c.id.strip_prefix('P'))
@@ -93,8 +93,8 @@ fn build_entries(state: &State) -> Vec<SidebarEntry> {
     let mut entries = Vec::new();
 
     // Conversation entry first
-    if let Some(conv_idx) = state.thread().context.iter().position(|c| c.context_type == Kind::new(Kind::CONVERSATION))
-        && let Some(ctx) = state.thread().context.get(conv_idx)
+    if let Some(conv_idx) = state.agent().context.iter().position(|c| c.context_type == Kind::new(Kind::CONVERSATION))
+        && let Some(ctx) = state.agent().context.get(conv_idx)
     {
         entries.push(SidebarEntry {
             id: String::new(),
@@ -102,7 +102,7 @@ fn build_entries(state: &State) -> Vec<SidebarEntry> {
             shortcut: String::new(),
             label: "Conversation".to_owned(),
             tokens: ctx.token_count.to_u32(),
-            active: conv_idx == state.thread().selected_context,
+            active: conv_idx == state.agent().selected_context,
             frozen: false,
             badge: None,
             fixed: true,
@@ -111,11 +111,11 @@ fn build_entries(state: &State) -> Vec<SidebarEntry> {
 
     // Fixed + dynamic entries
     for &i in &sorted_indices {
-        let Some(ctx) = state.thread().context.get(i) else { continue };
+        let Some(ctx) = state.agent().context.get(i) else { continue };
         if ctx.context_type == Kind::new(Kind::CONVERSATION) {
             continue;
         }
-        entries.push(context_to_entry(ctx, state, i == state.thread().selected_context));
+        entries.push(context_to_entry(ctx, state, i == state.agent().selected_context));
     }
 
     entries
@@ -191,7 +191,7 @@ fn build_token_bar(state: &State) -> TokenBar {
         used: total.to_u32(),
         budget: budget.to_u32(),
         threshold: threshold.to_u32(),
-        streaming: state.thread().stream.phase.is_streaming(),
+        streaming: state.agent().stream.phase.is_streaming(),
     }
 }
 
@@ -204,9 +204,9 @@ fn build_token_stats(state: &State) -> Option<TokenStats> {
         (c >= 0.001).then_some(c)
     }
 
-    if state.thread().cache_hit_tokens == 0
-        && state.thread().cache_miss_tokens == 0
-        && state.thread().total_output_tokens == 0
+    if state.agent().cache_hit_tokens == 0
+        && state.agent().cache_miss_tokens == 0
+        && state.agent().total_output_tokens == 0
     {
         return None;
     }
@@ -216,56 +216,56 @@ fn build_token_stats(state: &State) -> Option<TokenStats> {
     // tot row — costs are frozen at consumption-time pricing (not recomputed here).
     rows.push(TokenRow {
         label: "tot".into(),
-        hit: state.thread().cache_hit_tokens.to_u32(),
-        miss: state.thread().cache_miss_tokens.to_u32(),
-        output: state.thread().total_output_tokens.to_u32(),
-        hit_cost: cost_opt(state.thread().cost_hit_usd),
-        miss_cost: cost_opt(state.thread().cost_miss_usd),
-        output_cost: cost_opt(state.thread().cost_output_usd),
+        hit: state.agent().cache_hit_tokens.to_u32(),
+        miss: state.agent().cache_miss_tokens.to_u32(),
+        output: state.agent().total_output_tokens.to_u32(),
+        hit_cost: cost_opt(state.agent().cost_hit_usd),
+        miss_cost: cost_opt(state.agent().cost_miss_usd),
+        output_cost: cost_opt(state.agent().cost_output_usd),
     });
 
     // strm row
-    if state.thread().stream_output_tokens > 0
-        || state.thread().stream_cache_hit_tokens > 0
-        || state.thread().stream_cache_miss_tokens > 0
+    if state.agent().stream_output_tokens > 0
+        || state.agent().stream_cache_hit_tokens > 0
+        || state.agent().stream_cache_miss_tokens > 0
     {
         rows.push(TokenRow {
             label: "strm".into(),
-            hit: state.thread().stream_cache_hit_tokens.to_u32(),
-            miss: state.thread().stream_cache_miss_tokens.to_u32(),
-            output: state.thread().stream_output_tokens.to_u32(),
-            hit_cost: cost_opt(state.thread().stream_cost_hit_usd),
-            miss_cost: cost_opt(state.thread().stream_cost_miss_usd),
-            output_cost: cost_opt(state.thread().stream_cost_output_usd),
+            hit: state.agent().stream_cache_hit_tokens.to_u32(),
+            miss: state.agent().stream_cache_miss_tokens.to_u32(),
+            output: state.agent().stream_output_tokens.to_u32(),
+            hit_cost: cost_opt(state.agent().stream_cost_hit_usd),
+            miss_cost: cost_opt(state.agent().stream_cost_miss_usd),
+            output_cost: cost_opt(state.agent().stream_cost_output_usd),
         });
     }
 
     // tick row
-    if state.thread().tick_output_tokens > 0
-        || state.thread().tick_cache_hit_tokens > 0
-        || state.thread().tick_cache_miss_tokens > 0
+    if state.agent().tick_output_tokens > 0
+        || state.agent().tick_cache_hit_tokens > 0
+        || state.agent().tick_cache_miss_tokens > 0
     {
         rows.push(TokenRow {
             label: "tick".into(),
-            hit: state.thread().tick_cache_hit_tokens.to_u32(),
-            miss: state.thread().tick_cache_miss_tokens.to_u32(),
-            output: state.thread().tick_output_tokens.to_u32(),
-            hit_cost: cost_opt(state.thread().tick_cost_hit_usd),
-            miss_cost: cost_opt(state.thread().tick_cost_miss_usd),
-            output_cost: cost_opt(state.thread().tick_cost_output_usd),
+            hit: state.agent().tick_cache_hit_tokens.to_u32(),
+            miss: state.agent().tick_cache_miss_tokens.to_u32(),
+            output: state.agent().tick_output_tokens.to_u32(),
+            hit_cost: cost_opt(state.agent().tick_cost_hit_usd),
+            miss_cost: cost_opt(state.agent().tick_cost_miss_usd),
+            output_cost: cost_opt(state.agent().tick_cost_output_usd),
         });
     }
 
     // Total cost (sum of frozen legs)
     let total_cost =
-        float_math::sum3(state.thread().cost_hit_usd, state.thread().cost_miss_usd, state.thread().cost_output_usd);
+        float_math::sum3(state.agent().cost_hit_usd, state.agent().cost_miss_usd, state.agent().cost_output_usd);
     let total_cost_opt = (total_cost >= 0.001f64).then_some(total_cost);
 
     Some(TokenStats {
         rows,
-        uncached_input: state.thread().tick_uncached_input_tokens.to_u32(),
-        alive_breakpoints: state.thread().tick_alive_breakpoints.to_u32(),
-        alive_bp_positions: state.thread().tick_alive_bp_positions.clone(),
+        uncached_input: state.agent().tick_uncached_input_tokens.to_u32(),
+        alive_breakpoints: state.agent().tick_alive_breakpoints.to_u32(),
+        alive_bp_positions: state.agent().tick_alive_bp_positions.clone(),
         total_cost: total_cost_opt,
     })
 }

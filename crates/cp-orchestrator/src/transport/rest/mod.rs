@@ -33,12 +33,14 @@ pub mod backend;
 // `pub` (not private `mod`) so the `pub` `Backend::pkce_session` field's type
 // `PkceSession` is nameable through a public path (`rest::claude_oauth::PkceSession`),
 // satisfying `unnameable_types` without a forbidden `pub use` item re-export.
+mod agents;
 pub mod claude_oauth;
 mod config;
 mod create;
 mod lifecycle;
 mod releases;
-mod threads;
+pub(crate) use agents::conversations::search_conversations;
+use agents::{attach_disk_notes, attach_disk_tasks, overlay_roster, reshape_agent};
 pub(crate) use backend::Backend;
 pub(crate) use claude_oauth::accounts::{delete_account, list_accounts, store_account, switch_account};
 pub(crate) use claude_oauth::sweep::spawn as spawn_oauth_refresh;
@@ -59,8 +61,6 @@ pub(crate) use releases::{
     delete_release, deploy_fleet, download_release, list_releases, releases_break_glass, restart_orchestrator,
     select_release, set_arch,
 };
-pub(crate) use threads::conversations::search_conversations;
-use threads::{attach_disk_notes, attach_disk_tasks, overlay_roster, reshape_thread};
 
 /// A transport-agnostic reply: an HTTP status and a JSON body.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -309,7 +309,7 @@ fn ack_status(status: &cp_wire::types::ack::Status) -> String {
     }
 }
 
-/// `GET /api/fleet/{id}/threads` — the thread list, served roster-first.
+/// `GET /api/fleet/{id}/agents` — the thread list, served roster-first.
 ///
 /// The thread **roster** (which threads exist, their turn status, archived
 /// flag, and last activity) comes from the in-memory
@@ -334,20 +334,20 @@ fn ack_status(status: &cp_wire::types::ack::Status) -> String {
 /// This makes thread *appearance* instant (the user's latency complaint) while
 /// keeping conversations intact during the migration to a fully delta-driven
 /// read path.
-pub fn threads(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
+pub fn agents(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
     let entry = match resolve_entry(state, fleet_id) {
         Ok(e) => e,
         Err(reply) => return reply,
     };
     let folder = std::path::Path::new(&entry.folder);
-    let (config, focused_thread_id, roster) = {
+    let (config, focused_agent_id, roster) = {
         let Ok(mut b) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
         };
         let reader = b.inspect_mut();
         let cfg = reader.read_config(folder).ok();
 
-        // Read focused_thread_id from the first worker's FocusState.
+        // Read focused_agent_id from the first worker's FocusState.
         let disk_focus =
             crate::inspect::StateReader::list_workers(folder).unwrap_or_default().into_iter().find_map(|wid| {
                 let w = reader.read_worker(folder, &wid).ok()?;
@@ -359,13 +359,13 @@ pub fn threads(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
             });
         // The `reader` borrow ends with `cfg`/`focused` (both owned); now read
         // the live roster + focused thread from the view under the same lock.
-        // The view's focus (push-fed via `ThreadFocusChanged`) is the fresher
+        // The view's focus (push-fed via `AgentFocusChanged`) is the fresher
         // authority; fall back to the disk `FocusState` only when the view has
         // none yet (a backend cold start before the agent's first focus
         // emission — design doc I5: live reads ride the view, disk is the
         // bounded backstop).
         let (roster, view_focus) =
-            b.view.get(fleet_id).map(|v| (v.roster.clone(), v.focused_thread_id.clone())).unwrap_or_default();
+            b.view.get(fleet_id).map(|v| (v.roster.clone(), v.focused_agent_id.clone())).unwrap_or_default();
         let focused = view_focus.or(disk_focus);
         (cfg, focused, roster)
     };
@@ -373,7 +373,7 @@ pub fn threads(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
     // Disk threads (full logs). Absent config is tolerated: the view roster
     // alone can still render newly-created threads.
     let empty: Vec<serde_json::Value> = Vec::new();
-    let raw_threads = config
+    let raw_agents = config
         .as_ref()
         .and_then(|c| c.get("modules"))
         .and_then(|m| m.get("threads"))
@@ -381,7 +381,7 @@ pub fn threads(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
         .and_then(serde_json::Value::as_array)
         .unwrap_or(&empty);
 
-    let mut details: Vec<serde_json::Value> = raw_threads.iter().map(|t| reshape_thread(t, fleet_id)).collect();
+    let mut details: Vec<serde_json::Value> = raw_agents.iter().map(|t| reshape_agent(t, fleet_id)).collect();
 
     // First-paint tasks from the agent's `config.json` todo module (thread-owned
     // todos live separately from the thread record). The live roster overlay
@@ -394,7 +394,7 @@ pub fn threads(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
     overlay_roster(&mut details, &roster, fleet_id);
 
     HttpReply::ok(&serde_json::json!({
-        "focusedThreadId": focused_thread_id,
+        "focusedThreadId": focused_agent_id,
         "threads": details,
     }))
 }

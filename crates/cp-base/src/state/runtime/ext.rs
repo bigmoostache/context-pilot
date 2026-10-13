@@ -2,7 +2,7 @@
 //! for the 500-line cap).
 //!
 //! Module-owned state is stored in two scope maps on `State`:
-//! `shared_module_data` (fleet-wide, one instance) and `thread_module_data`
+//! `shared_module_data` (fleet-wide, one instance) and `agent_module_data`
 //! (per-thread, the executing thread's). A given `TypeId` lives in
 //! exactly one map, so the `get_ext` family searches both; `set_ext` updates
 //! whichever already holds the type and routes first-inserts by the ambient
@@ -28,7 +28,7 @@ impl State {
     {
         let id = TypeId::of::<T>();
         let boxed =
-            self.thread_store.current().thread_module_data.get(&id).or_else(|| self.shared_module_data.get(&id))?;
+            self.agent_store.current().agent_module_data.get(&id).or_else(|| self.shared_module_data.get(&id))?;
         boxed.downcast_ref()
     }
 
@@ -40,8 +40,8 @@ impl State {
         T: 'static + Send + Sync,
     {
         let id = TypeId::of::<T>();
-        if self.thread_store.current_mut().thread_module_data.contains_key(&id) {
-            let boxed = self.thread_store.current_mut().thread_module_data.get_mut(&id)?;
+        if self.agent_store.current_mut().agent_module_data.contains_key(&id) {
+            let boxed = self.agent_store.current_mut().agent_module_data.get_mut(&id)?;
             boxed.downcast_mut()
         } else {
             let boxed = self.shared_module_data.get_mut(&id)?;
@@ -95,10 +95,10 @@ impl State {
         let id = TypeId::of::<T>();
         if self.shared_module_data.contains_key(&id) {
             drop(self.shared_module_data.insert(id, Box::new(val)));
-        } else if self.thread_store.current_mut().thread_module_data.contains_key(&id)
+        } else if self.agent_store.current_mut().agent_module_data.contains_key(&id)
             || self.init_is_global != Some(true)
         {
-            drop(self.thread_store.current_mut().thread_module_data.insert(id, Box::new(val)));
+            drop(self.agent_store.current_mut().agent_module_data.insert(id, Box::new(val)));
         } else {
             drop(self.shared_module_data.insert(id, Box::new(val)));
         }
@@ -112,20 +112,20 @@ impl State {
         T: 'static + Send + Sync,
     {
         let id = TypeId::of::<T>();
-        let _thread = self.thread_store.current_mut().thread_module_data.remove(&id);
+        let _agent = self.agent_store.current_mut().agent_module_data.remove(&id);
         drop(self.shared_module_data.insert(id, Box::new(val)));
     }
 
     /// Insert per-thread module state, overriding scope routing. Use when a
-    /// value must live in [`thread_module_data`](Self::thread_module_data)
+    /// value must live in [`agent_module_data`](Self::agent_module_data)
     /// (the executing thread's) regardless of ambient init scope.
-    pub fn set_ext_thread<T>(&mut self, val: T)
+    pub fn set_ext_agent<T>(&mut self, val: T)
     where
         T: 'static + Send + Sync,
     {
         let id = TypeId::of::<T>();
         let _shared = self.shared_module_data.remove(&id);
-        drop(self.thread_store.current_mut().thread_module_data.insert(id, Box::new(val)));
+        drop(self.agent_store.current_mut().agent_module_data.insert(id, Box::new(val)));
     }
 
     /// Set the ambient scope used to route the next first-insert via

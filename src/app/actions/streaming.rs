@@ -8,22 +8,22 @@ use super::helpers::clean_llm_id_prefix;
 
 /// Handle `AppendChars` action — append streaming text to assistant message.
 pub(crate) fn handle_append_chars(state: &mut State, text: &str) -> ActionResult {
-    if let Some(msg) = state.thread_mut().messages.last_mut()
+    if let Some(msg) = state.agent_mut().messages.last_mut()
         && msg.role == "assistant"
     {
         msg.content.push_str(text);
 
         // Update estimated token count during streaming
         let new_estimate = estimate_tokens(&msg.content);
-        let added = new_estimate.saturating_sub(state.thread().streaming_estimated_tokens);
+        let added = new_estimate.saturating_sub(state.agent().streaming_estimated_tokens);
 
         if added > 0 {
             if let Some(ctx) =
-                state.thread_mut().context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION)
+                state.agent_mut().context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION)
             {
                 ctx.token_count = ctx.token_count.saturating_add(added);
             }
-            state.thread_mut().streaming_estimated_tokens = new_estimate;
+            state.agent_mut().streaming_estimated_tokens = new_estimate;
         }
     }
     ActionResult::Nothing
@@ -71,8 +71,8 @@ pub(crate) struct StreamDoneEvent<'ev> {
 
 /// Handle `StreamDone` action — finalize streaming, correct token counts.
 pub(crate) fn handle_stream_done(state: &mut State, event: &StreamDoneEvent<'_>) -> ActionResult {
-    state.thread_mut().stream.phase.transition(StreamPhase::Idle);
-    state.thread_mut().last_stop_reason = event.stop_reason.map(str::to_owned);
+    state.agent_mut().stream.phase.transition(StreamPhase::Idle);
+    state.agent_mut().last_stop_reason = event.stop_reason.map(str::to_owned);
 
     let usage = TokenUsage {
         output: event.output_tokens,
@@ -100,16 +100,16 @@ pub(crate) fn handle_stream_done(state: &mut State, event: &StreamDoneEvent<'_>)
     crate::app::run::tools::cost_log::append_cost_tsv(state);
 
     // Correct the estimated tokens with actual output tokens on Conversation context and update timestamp
-    let est = state.thread().streaming_estimated_tokens;
-    if let Some(ctx) = state.thread_mut().context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
+    let est = state.agent().streaming_estimated_tokens;
+    if let Some(ctx) = state.agent_mut().context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
         // Remove our estimate, add actual
         ctx.token_count = ctx.token_count.saturating_sub(est).saturating_add(event.output_tokens);
         ctx.last_refresh_ms = crate::app::panels::now_ms();
     }
-    state.thread_mut().streaming_estimated_tokens = 0;
+    state.agent_mut().streaming_estimated_tokens = 0;
 
     // Store actual token count on message and clean up LLM prefixes
-    if let Some(msg) = state.thread_mut().messages.last_mut()
+    if let Some(msg) = state.agent_mut().messages.last_mut()
         && msg.role == "assistant"
     {
         // Remove any [A##]: prefixes the LLM mistakenly added
@@ -125,54 +125,51 @@ pub(crate) fn handle_stream_done(state: &mut State, event: &StreamDoneEvent<'_>)
 /// Apply token usage and frozen per-stream cost to state counters.
 fn apply_token_usage(app_state: &mut State, usage: &TokenUsage, cost: &StreamCost) {
     // Set tick usage (this tick only)
-    app_state.thread_mut().tick_cache_hit_tokens = usage.cache_hit;
-    app_state.thread_mut().tick_cache_miss_tokens = usage.cache_miss;
-    app_state.thread_mut().tick_output_tokens = usage.output;
-    app_state.thread_mut().tick_uncached_input_tokens = usage.uncached_input;
-    app_state.thread_mut().tick_cost_hit_usd = cost.hit;
-    app_state.thread_mut().tick_cost_miss_usd = cost.miss;
-    app_state.thread_mut().tick_cost_output_usd = cost.output;
+    app_state.agent_mut().tick_cache_hit_tokens = usage.cache_hit;
+    app_state.agent_mut().tick_cache_miss_tokens = usage.cache_miss;
+    app_state.agent_mut().tick_output_tokens = usage.output;
+    app_state.agent_mut().tick_uncached_input_tokens = usage.uncached_input;
+    app_state.agent_mut().tick_cost_hit_usd = cost.hit;
+    app_state.agent_mut().tick_cost_miss_usd = cost.miss;
+    app_state.agent_mut().tick_cost_output_usd = cost.output;
 
     // Accumulate per-stream usage (reset at InputSubmit)
-    app_state.thread_mut().stream_cache_hit_tokens =
-        app_state.thread_mut().stream_cache_hit_tokens.saturating_add(usage.cache_hit);
-    app_state.thread_mut().stream_cache_miss_tokens =
-        app_state.thread_mut().stream_cache_miss_tokens.saturating_add(usage.cache_miss);
-    app_state.thread_mut().stream_output_tokens =
-        app_state.thread_mut().stream_output_tokens.saturating_add(usage.output);
-    app_state.thread_mut().stream_uncached_input_tokens =
-        app_state.thread_mut().stream_uncached_input_tokens.saturating_add(usage.uncached_input);
-    app_state.thread_mut().stream_cost_hit_usd = float_math::add(app_state.thread_mut().stream_cost_hit_usd, cost.hit);
-    app_state.thread_mut().stream_cost_miss_usd =
-        float_math::add(app_state.thread_mut().stream_cost_miss_usd, cost.miss);
-    app_state.thread_mut().stream_cost_output_usd =
-        float_math::add(app_state.thread_mut().stream_cost_output_usd, cost.output);
+    app_state.agent_mut().stream_cache_hit_tokens =
+        app_state.agent_mut().stream_cache_hit_tokens.saturating_add(usage.cache_hit);
+    app_state.agent_mut().stream_cache_miss_tokens =
+        app_state.agent_mut().stream_cache_miss_tokens.saturating_add(usage.cache_miss);
+    app_state.agent_mut().stream_output_tokens =
+        app_state.agent_mut().stream_output_tokens.saturating_add(usage.output);
+    app_state.agent_mut().stream_uncached_input_tokens =
+        app_state.agent_mut().stream_uncached_input_tokens.saturating_add(usage.uncached_input);
+    app_state.agent_mut().stream_cost_hit_usd = float_math::add(app_state.agent_mut().stream_cost_hit_usd, cost.hit);
+    app_state.agent_mut().stream_cost_miss_usd = float_math::add(app_state.agent_mut().stream_cost_miss_usd, cost.miss);
+    app_state.agent_mut().stream_cost_output_usd =
+        float_math::add(app_state.agent_mut().stream_cost_output_usd, cost.output);
 
     // Accumulate total usage
-    app_state.thread_mut().cache_hit_tokens = app_state.thread_mut().cache_hit_tokens.saturating_add(usage.cache_hit);
-    app_state.thread_mut().cache_miss_tokens =
-        app_state.thread_mut().cache_miss_tokens.saturating_add(usage.cache_miss);
-    app_state.thread_mut().total_output_tokens =
-        app_state.thread_mut().total_output_tokens.saturating_add(usage.output);
-    app_state.thread_mut().uncached_input_tokens =
-        app_state.thread_mut().uncached_input_tokens.saturating_add(usage.uncached_input);
-    app_state.thread_mut().cost_hit_usd = float_math::add(app_state.thread_mut().cost_hit_usd, cost.hit);
-    app_state.thread_mut().cost_miss_usd = float_math::add(app_state.thread_mut().cost_miss_usd, cost.miss);
-    app_state.thread_mut().cost_output_usd = float_math::add(app_state.thread_mut().cost_output_usd, cost.output);
+    app_state.agent_mut().cache_hit_tokens = app_state.agent_mut().cache_hit_tokens.saturating_add(usage.cache_hit);
+    app_state.agent_mut().cache_miss_tokens = app_state.agent_mut().cache_miss_tokens.saturating_add(usage.cache_miss);
+    app_state.agent_mut().total_output_tokens = app_state.agent_mut().total_output_tokens.saturating_add(usage.output);
+    app_state.agent_mut().uncached_input_tokens =
+        app_state.agent_mut().uncached_input_tokens.saturating_add(usage.uncached_input);
+    app_state.agent_mut().cost_hit_usd = float_math::add(app_state.agent_mut().cost_hit_usd, cost.hit);
+    app_state.agent_mut().cost_miss_usd = float_math::add(app_state.agent_mut().cost_miss_usd, cost.miss);
+    app_state.agent_mut().cost_output_usd = float_math::add(app_state.agent_mut().cost_output_usd, cost.output);
 }
 
 /// Handle `StreamError` action — clean up streaming state, log error.
 pub(crate) fn handle_stream_error(state: &mut State, error: &str) -> ActionResult {
     const INLINE_LIMIT: usize = 1000;
 
-    state.thread_mut().stream.phase.transition(StreamPhase::Idle);
+    state.agent_mut().stream.phase.transition(StreamPhase::Idle);
 
     // Remove estimated tokens on error from Conversation context
-    let est = state.thread().streaming_estimated_tokens;
-    if let Some(ctx) = state.thread_mut().context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
+    let est = state.agent().streaming_estimated_tokens;
+    if let Some(ctx) = state.agent_mut().context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
         ctx.token_count = ctx.token_count.saturating_sub(est);
     }
-    state.thread_mut().streaming_estimated_tokens = 0;
+    state.agent_mut().streaming_estimated_tokens = 0;
 
     // Log error to file
     let error_file = log_error(error);
@@ -186,7 +183,7 @@ pub(crate) fn handle_stream_error(state: &mut State, error: &str) -> ActionResul
         format!("{}… (truncated)", error.get(..boundary).unwrap_or(error))
     };
 
-    if let Some(msg) = state.thread_mut().messages.last_mut()
+    if let Some(msg) = state.agent_mut().messages.last_mut()
         && msg.role == "assistant"
     {
         msg.content = format!("[Error occurred. Full details in {error_file}]\n\n{preview}");

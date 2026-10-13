@@ -1,7 +1,7 @@
 //! Worker state persistence module
 //!
 //! Handles loading and saving worker state files. One file per thread, named
-//! `states/<thread_id>.json`; an agent with no focused thread keeps the legacy
+//! `states/<agent_id>.json`; an agent with no focused thread keeps the legacy
 //! `states/main_worker.json` (see [`focused_worker_id`]).
 use std::fs;
 use std::path::PathBuf;

@@ -71,7 +71,7 @@ use cp_orchestrator::services::stream_hub::StreamHub;
 
 use cp_wire::types::oplog::OpEntryKind;
 use cp_wire::types::stream::{Frame, Kind as StreamKind};
-use cp_wire::types::{ContentHash, Phase, ThreadTurn};
+use cp_wire::types::{AgentTurn, ContentHash, Phase};
 
 use tempfile::tempdir;
 
@@ -89,22 +89,22 @@ mod tests {
 
     // ── record builders ─────────────────────────────────────────────────────────
 
-    /// A durable `MessageCreated` head for `thread`, keyed by `byte`.
-    fn message(thread: &str, byte: u8) -> OpEntryKind {
+    /// A durable `MessageCreated` head for `agent`, keyed by `byte`.
+    fn message(agent: &str, byte: u8) -> OpEntryKind {
         OpEntryKind::MessageCreated {
-            thread_id: thread.to_owned(),
+            agent_id: agent.to_owned(),
             message_id: format!("m{byte}"),
             head: ContentHash::new([byte; 32]),
             inline_body: None,
         }
     }
 
-    /// A durable `ThreadCreated` roster delta.
-    fn thread_created(thread: &str) -> OpEntryKind {
-        OpEntryKind::ThreadCreated {
-            thread_id: thread.to_owned(),
-            name: format!("thread {thread}"),
-            status: ThreadTurn::TheirTurn,
+    /// A durable `AgentCreated` roster delta.
+    fn agent_created(agent: &str) -> OpEntryKind {
+        OpEntryKind::AgentCreated {
+            agent_id: agent.to_owned(),
+            name: format!("thread {agent}"),
+            status: AgentTurn::TheirTurn,
             timestamp_ms: 0,
             branched_from: None,
         }
@@ -126,7 +126,7 @@ mod tests {
             schema_version: 1,
             fleet_id: agent.to_owned(),
             worker_id: "w0".to_owned(),
-            thread_id: "T1".to_owned(),
+            agent_id: "T1".to_owned(),
             message_id: "m1".to_owned(),
             seq,
             kind: StreamKind::Token { text: format!("t{seq}") },
@@ -145,7 +145,7 @@ mod tests {
     fn run_agent_workload(dir: &Path, _agent_idx: usize) {
         let oplog = OplogService::spawn(dir).expect("spawn agent oplog");
 
-        let _thread_rev = oplog.append_durable(thread_created("T1")).expect("thread durable");
+        let _agent_rev = oplog.append_durable(agent_created("T1")).expect("thread durable");
         for byte in 0..RECORDS_PER_AGENT {
             // A best-effort phase + cost between every durable head — these may be
             // shed under pressure, and that shedding must NOT tear the rev stream.
@@ -202,13 +202,13 @@ mod tests {
         let fleet_id = format!("agent-{idx}");
         let agent = view.get(&fleet_id).unwrap_or_else(|| panic!("{fleet_id} projected"));
         let head =
-            agent.heads.threads.iter().find(|h| h.thread_id == "T1").unwrap_or_else(|| panic!("{fleet_id} T1 head"));
+            agent.heads.agents.iter().find(|h| h.agent_id == "T1").unwrap_or_else(|| panic!("{fleet_id} T1 head"));
         assert_eq!(
             head.last_message_hash,
             ContentHash::new([RECORDS_PER_AGENT.saturating_sub(1); 32]),
             "{fleet_id}: head is this agent's own last message, not a neighbour's",
         );
-        assert!(agent.roster.iter().any(|t| t.thread_id == "T1"), "{fleet_id}: roster carries its own thread");
+        assert!(agent.roster.iter().any(|t| t.agent_id == "T1"), "{fleet_id}: roster carries its own thread");
     }
 
     // ── V10 + V8(scaled): concurrent fleet, gap-free + isolated ─────────────────
@@ -250,7 +250,7 @@ mod tests {
         }
         let mut view = MaterializedView::new();
         view.apply_batch("chaos", &tail_all(dir));
-        view.get("chaos").expect("agent").heads.threads.first().expect("T1 head").last_message_hash
+        view.get("chaos").expect("agent").heads.agents.first().expect("T1 head").last_message_hash
     }
 
     /// Flood the `chaos` subscriber with more out-of-order frames than the hub's

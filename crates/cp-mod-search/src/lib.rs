@@ -450,7 +450,7 @@ pub fn push_task_signal(state: &mut State, content: &str) {
 /// Snapshot the live threads and queue a conversations-index reconcile on the
 /// background indexer thread (T671).
 ///
-/// Doc-building must run here (it needs `ThreadsState` from `State`), but the
+/// Doc-building must run here (it needs `AgentsState` from `State`), but the
 /// Meilisearch writes run off-thread: the desired docs travel over the existing
 /// indexer channel as [`types::IndexerCmd::ReconcileConversations`], so the main
 /// loop never blocks on HTTP. No-op when the indexer channel is absent (server

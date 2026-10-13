@@ -15,14 +15,14 @@ pub mod incoming;
 mod panel;
 /// Tool execution handlers: `Send` and `Read`.
 pub mod tools;
-/// Thread state types: `Thread`, `ThreadMessage`, `ThreadsState`, `FocusState`.
+/// Thread state types: `Agent`, `AgentMessage`, `AgentsState`, `FocusState`.
 pub mod types;
 /// Display-only mirror of per-thread execution state (see the module docs).
 pub mod view_state;
 /// Persistent watcher: fires a notification when idle + `MY_TURN` thread exists.
 pub mod watcher;
 
-use types::{FocusState, ThreadsState};
+use types::{AgentsState, FocusState};
 use view_state::FleetExecMirror;
 
 use serde_json::json;
@@ -39,19 +39,19 @@ use cp_base::tools::{ParamType, ToolDefinition, ToolResult, ToolTexts, ToolUse};
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/threads.yaml")));
 
-use self::panel::ThreadsPanel;
+use self::panel::AgentsPanel;
 
 /// Threads module: parallel discussion and work topics with turn-based focus.
 #[derive(Debug, Clone, Copy)]
-pub struct ThreadsModule;
+pub struct AgentsModule;
 
-impl Default for ThreadsModule {
+impl Default for AgentsModule {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl ThreadsModule {
+impl AgentsModule {
     /// Construct the module marker (funnels cross-crate construction of this
     /// `non_exhaustive` unit struct through an associated fn).
     #[must_use]
@@ -60,7 +60,7 @@ impl ThreadsModule {
     }
 }
 
-impl Module for ThreadsModule {
+impl Module for AgentsModule {
     fn id(&self) -> &'static str {
         "threads"
     }
@@ -72,10 +72,10 @@ impl Module for ThreadsModule {
     }
 
     fn init_state(&self, state: &mut State) {
-        state.set_ext(ThreadsState::new());
+        state.set_ext(AgentsState::new());
         // FocusState is UI-global: "which thread the human is looking at" is one
         // singleton pointer, NOT per-thread state. set_ext_global pins it to the
-        // shared map so it never rides the thread's runtime (`ThreadRuntime`).
+        // shared map so it never rides the thread's runtime (`AgentRuntime`).
         state.set_ext_global(FocusState::new());
         // FleetExecMirror describes EVERY thread, so it too must be shared — a
         // per-thread copy would only ever hold that thread's own state. It is
@@ -85,24 +85,24 @@ impl Module for ThreadsModule {
     }
 
     fn reset_state(&self, state: &mut State) {
-        state.set_ext(ThreadsState::new());
+        state.set_ext(AgentsState::new());
         state.set_ext_global(FocusState::new());
         state.set_ext_global(FleetExecMirror::new());
     }
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {
-        let ts = ThreadsState::get(state);
+        let ts = AgentsState::get(state);
         // `focus_file` records which thread's `states/<id>.json` holds the
         // focused context. It cannot live in that file (boot needs it to
         // choose the file), so it is written here, in the shared config, in the
         // same save as the keyed write — the two land together or the boot-side
         // fallback covers the gap.
-        let focus_file = FocusState::get(state).focused_thread_id.clone().unwrap_or_default();
-        // Messages are NOT serialized here: they live in `threads/<id>.json`,
+        let focus_file = FocusState::get(state).focused_agent_id.clone().unwrap_or_default();
+        // Messages are NOT serialized here: they live in `agents/<id>.json`,
         // written by the save batch only for threads that changed.
-        let threads: Vec<types::persist::ThreadMeta<'_>> = ts.threads.iter().map(Into::into).collect();
+        let agents: Vec<types::persist::AgentMeta<'_>> = ts.agents.iter().map(Into::into).collect();
         json!({
-            "threads": threads,
+            "threads": agents,
             "next_id": ts.next_id,
             "panel_content": ts.panel_content,
             "focus_file": focus_file,
@@ -114,12 +114,12 @@ impl Module for ThreadsModule {
     // never module state. Rehydrating it into a `FocusState` field would be
     // circular — the focus it names is what that field holds.
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
-        let ts = ThreadsState::get_mut(state);
+        let ts = AgentsState::get_mut(state);
         if let Some(arr) = data.get("threads")
             && let Ok(v) = serde_json::from_value(arr.clone())
         {
-            ts.threads = v;
-            types::persist::load_thread_messages(&mut ts.threads);
+            ts.agents = v;
+            types::persist::load_agent_messages(&mut ts.agents);
         }
         if let Some(v) = data.get("next_id").and_then(serde_json::Value::as_u64) {
             ts.next_id = v.to_u32();
@@ -129,7 +129,7 @@ impl Module for ThreadsModule {
         }
         // Register the persistent MY_TURN watcher. Placed here (not init_state)
         // because WatcherRegistry is created by SpineModule's init_state, which
-        // may run after ThreadsModule's init_state. load_module_data runs in a
+        // may run after AgentsModule's init_state. load_module_data runs in a
         // second pass after ALL init_state calls, so the registry exists.
         cp_base::state::watchers::WatcherRegistry::get_mut(state)
             .register(Box::new(watcher::IdleMyTurnDetector::new()));
@@ -148,16 +148,16 @@ impl Module for ThreadsModule {
     }
 
     fn fixed_panel_types(&self) -> Vec<Kind> {
-        vec![Kind::new(Kind::THREADS)]
+        vec![Kind::new(Kind::AGENTS)]
     }
 
     fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
-        vec![(Kind::new(Kind::THREADS), "Threads", false)]
+        vec![(Kind::new(Kind::AGENTS), "Threads", false)]
     }
 
     fn create_panel(&self, context_type: &Kind) -> Option<Box<dyn Panel>> {
         match context_type.as_str() {
-            Kind::THREADS => Some(Box::new(ThreadsPanel)),
+            Kind::AGENTS => Some(Box::new(AgentsPanel)),
             _ => None,
         }
     }
@@ -200,7 +200,7 @@ impl Module for ThreadsModule {
 
     fn context_type_metadata(&self) -> Vec<cp_base::state::context::TypeMeta> {
         vec![cp_base::state::context::TypeMeta {
-            context_type: Kind::THREADS,
+            context_type: Kind::AGENTS,
             icon_id: "threads",
             is_fixed: true,
             needs_cache: false,
@@ -280,8 +280,8 @@ impl Module for ThreadsModule {
 /// Sending to a `THEIR_TURN` thread is allowed — the AI may post follow-ups
 /// without waiting; status simply stays `THEIR_TURN`.
 fn preflight_send(tool: &ToolUse, state: &State, pf: &mut Verdict) {
-    let tid = tools::executing_thread_id_or_empty(state);
-    if !ThreadsState::get(state).threads.iter().any(|t| t.id == tid) {
+    let tid = tools::executing_agent_id_or_empty(state);
+    if !AgentsState::get(state).agents.iter().any(|t| t.id == tid) {
         pf.errors.push(format!("Send has no owning thread (executing thread '{tid}' not found)"));
     }
     let markdown = tool.input.get("markdown").and_then(|v| v.as_str());

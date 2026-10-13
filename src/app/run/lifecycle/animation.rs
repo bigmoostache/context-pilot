@@ -51,7 +51,7 @@ impl App {
     ///
     /// When none hold, the screen is static and no periodic redraw is needed.
     fn has_active_animation(state: &crate::state::State) -> bool {
-        if state.thread().stream.phase.is_streaming() {
+        if state.agent().stream.phase.is_streaming() {
             return true; // STREAMING / TOOLING badge spinner
         }
         // A pending timed watcher renders the animated WAITING badge.
@@ -60,13 +60,13 @@ impl App {
             .is_some_and(|reg| reg.active_watchers().iter().any(|w| w.fire_at_ms().is_some()))
             || state
                 .get_ext::<cp_mod_spine::schedule::CoucouRegistry>()
-                .is_some_and(|reg| reg.has_pending_for(state.executing_thread_id()));
+                .is_some_and(|reg| reg.has_pending_for(state.executing_agent_id()));
         if has_timed_watcher {
             return true;
         }
         // A panel still loading its first content (LOADING badge + sidebar
         // spinner) or a running console (animated sidebar glyph).
-        state.thread().context.iter().any(|c| {
+        state.agent().context.iter().any(|c| {
             (c.cached_content.is_none() && c.context_type.needs_cache())
                 || (c.context_type.as_str() == "console"
                     && c.get_meta_str("console_status").is_some_and(|s| s.starts_with("running")))

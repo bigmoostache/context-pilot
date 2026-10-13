@@ -233,7 +233,7 @@ mod tests {
             schema_version: 1,
             fleet_id: "a1".into(),
             worker_id: "w0".into(),
-            thread_id: "T1".into(),
+            agent_id: "T1".into(),
             message_id: "m1".into(),
             seq,
             kind: Kind::Token { text: text.to_owned() },

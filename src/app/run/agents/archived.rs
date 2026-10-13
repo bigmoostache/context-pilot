@@ -1,14 +1,14 @@
 //! Live thread-archived emission for the main event loop.
 //!
-//! The `emit_thread_archived` function is a main-loop **observe-on-change
+//! The `emit_agent_archived` function is a main-loop **observe-on-change
 //! chokepoint**: it diffs each thread's live `archived` flag against the
-//! per-thread snapshot held in [`BridgeState::thread_archived_memo`] and
-//! emits a durable [`ThreadArchived`] / [`ThreadRestored`] delta only on an
+//! per-thread snapshot held in [`BridgeState::agent_archived_memo`] and
+//! emits a durable [`AgentArchived`] / [`AgentRestored`] delta only on an
 //! actual change — capturing mutations from *every* source (web command, TUI
 //! action, the `Send` tool's auto-unarchive) with one uniform path.
 
 use cp_base::state::runtime::State;
-use cp_mod_agents::types::ThreadsState;
+use cp_mod_agents::types::AgentsState;
 use cp_mod_bridge::BridgeState;
 use cp_wire::types::oplog::OpEntryKind;
 
@@ -19,7 +19,7 @@ use crate::app::App;
 /// the log recorded** — i.e. exactly what the backend's view has folded.
 ///
 /// This is the correct seed for the archived chokepoint on the first pass
-/// after a (re)boot: comparing live `thread.archived` against this (not
+/// after a (re)boot: comparing live `agent.archived` against this (not
 /// against the live flag itself) ensures that any flip that landed on disk
 /// while the bridge was down but was never journaled is emitted on the very
 /// first pass — self-healing disk↔oplog divergence.
@@ -27,16 +27,14 @@ use crate::app::App;
 /// Returns an empty map when the bridge is OFF or replay fails (degraded:
 /// every live thread looks "new" and has its current archived flag emitted).
 fn oplog_roster_archived(state: &State) -> std::collections::HashMap<String, bool> {
-    super::oplog_roster(state)
-        .map(|r| r.iter().map(|t| (t.thread_id.clone(), t.archived)).collect())
-        .unwrap_or_default()
+    super::oplog_roster(state).map(|r| r.iter().map(|t| (t.agent_id.clone(), t.archived)).collect()).unwrap_or_default()
 }
 
-/// Emit [`ThreadArchived`] / [`ThreadRestored`] the instant any thread's
+/// Emit [`AgentArchived`] / [`AgentRestored`] the instant any thread's
 /// archived flag flips, so the backend view (and the web roster) hide or
 /// reveal the thread in milliseconds.
 ///
-/// Mirrors [`emit_thread_status`](super::bridge::emit_thread_status) exactly:
+/// Mirrors [`emit_agent_status`](super::bridge::emit_agent_status) exactly:
 /// seeds from the oplog roster on the first pass (what the view has folded),
 /// then falls through to the diff so any flip the oplog missed while the
 /// bridge was down is emitted immediately. Rides the **durable** path
@@ -44,7 +42,7 @@ fn oplog_roster_archived(state: &State) -> std::collections::HashMap<String, boo
 /// roster state that must never be silently lost.
 ///
 /// No-op when the bridge is OFF.
-pub(in crate::app::run) fn emit_thread_archived(app: &mut App) {
+pub(in crate::app::run) fn emit_agent_archived(app: &mut App) {
     if !bridge_active(&app.state) {
         return;
     }
@@ -56,15 +54,15 @@ pub(in crate::app::run) fn emit_thread_archived(app: &mut App) {
         log::info!("bridge: emit_thread_archived found {} divergence(s)", changed.len());
     }
 
-    for (thread_id, archived) in changed {
-        log::info!("bridge: emit_thread_archived divergence: {thread_id} → archived={archived}");
+    for (agent_id, archived) in changed {
+        log::info!("bridge: emit_thread_archived divergence: {agent_id} → archived={archived}");
         let kind = if archived {
-            OpEntryKind::ThreadArchived { thread_id: thread_id.clone() }
+            OpEntryKind::AgentArchived { agent_id: agent_id.clone() }
         } else {
-            OpEntryKind::ThreadRestored { thread_id: thread_id.clone() }
+            OpEntryKind::AgentRestored { agent_id: agent_id.clone() }
         };
         emit_roster_delta(&app.state, kind);
-        let _prev = app.state.ext_mut::<BridgeState>().thread_archived_memo.insert(thread_id, archived);
+        let _prev = app.state.ext_mut::<BridgeState>().agent_archived_memo.insert(agent_id, archived);
     }
 }
 
@@ -79,16 +77,16 @@ fn seed_archived_memo_if_needed(app: &mut App) {
     let oplog_archived = oplog_roster_archived(&app.state);
     log::info!("bridge: emit_thread_archived seeding from oplog roster ({} entries)", oplog_archived.len());
     let bs = app.state.ext_mut::<BridgeState>();
-    bs.thread_archived_memo.extend(oplog_archived);
+    bs.agent_archived_memo.extend(oplog_archived);
     bs.seeded.seed_archived();
 }
 
-/// Diff live archived flags against the memo; collect (`thread_id`, archived) for
+/// Diff live archived flags against the memo; collect (`agent_id`, archived) for
 /// each thread whose flag changed.
 fn collect_archived_changes(app: &App) -> Vec<(String, bool)> {
-    let ts = ThreadsState::get(&app.state);
-    let memo = &app.state.ext::<BridgeState>().thread_archived_memo;
-    ts.threads
+    let ts = AgentsState::get(&app.state);
+    let memo = &app.state.ext::<BridgeState>().agent_archived_memo;
+    ts.agents
         .iter()
         .filter_map(|t| {
             let live = t.archived;

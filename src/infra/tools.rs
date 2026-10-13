@@ -23,10 +23,10 @@ pub(crate) fn execute_reload_tui(tool: &ToolUse, state: &mut State) -> ToolResul
     // state. Without this, a background thread that calls `system_reload` would
     // have the resume land on whatever thread was focused at boot — the wrong
     // one. When the caller is already focused this is a no-op.
-    if let Some(caller) = state.executing_thread_id().map(str::to_owned) {
+    if let Some(caller) = state.executing_agent_id().map(str::to_owned) {
         let fs = cp_mod_agents::types::FocusState::get_mut(state);
-        if fs.focused_thread_id.as_deref() != Some(caller.as_str()) {
-            fs.focused_thread_id = Some(caller);
+        if fs.focused_agent_id.as_deref() != Some(caller.as_str()) {
+            fs.focused_agent_id = Some(caller);
         }
     }
 

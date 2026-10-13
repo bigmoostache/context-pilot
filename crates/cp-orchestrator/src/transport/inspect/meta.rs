@@ -143,7 +143,7 @@ fn build_fleet_meta(state: &Mutex<Backend>, fleet_id: &str, entry: &Entry) -> se
     );
 
     // Thread count + any-MY_TURN + last activity from config.json.
-    let (threads_count, has_my_turn, last_activity_ms, task) = inspect_threads(state, folder);
+    let (agents_count, has_my_turn, last_activity_ms, task) = inspect_agents(state, folder);
 
     let branch = git_branch(folder);
     // The agent's configured LLM provider id (e.g. "claudecodev2", "claudecode")
@@ -198,7 +198,7 @@ fn build_fleet_meta(state: &Mutex<Backend>, fleet_id: &str, entry: &Entry) -> se
         "contextHit": context.hit,
         "contextMiss": context.miss,
         "task": task,
-        "threads": threads_count,
+        "threads": agents_count,
         "lastActivity": last_activity_ms,
         "accent": accent,
         "hasAvatar": has_avatar,
@@ -207,7 +207,7 @@ fn build_fleet_meta(state: &Mutex<Backend>, fleet_id: &str, entry: &Entry) -> se
 
 /// Inspect an agent's threads from config.json for count, `MY_TURN` status,
 /// last activity, and current task (focused thread name).
-fn inspect_threads(state: &Mutex<Backend>, folder: &str) -> (usize, bool, u64, String) {
+fn inspect_agents(state: &Mutex<Backend>, folder: &str) -> (usize, bool, u64, String) {
     let folder_path = std::path::Path::new(folder);
     let cfg = {
         let Ok(mut b) = state.lock() else {
@@ -219,16 +219,16 @@ fn inspect_threads(state: &Mutex<Backend>, folder: &str) -> (usize, bool, u64, S
         return (0, false, 0, String::new());
     };
     let empty_arr = Vec::new();
-    let threads = config
+    let agents = config
         .get("modules")
         .and_then(|m| m.get("threads"))
         .and_then(|t| t.get("threads"))
         .and_then(serde_json::Value::as_array)
         .unwrap_or(&empty_arr);
 
-    let count = threads.len();
-    let has_my_turn = threads.iter().any(|t| t.get("status").and_then(serde_json::Value::as_str) == Some("MyTurn"));
-    let last_activity = threads
+    let count = agents.len();
+    let has_my_turn = agents.iter().any(|t| t.get("status").and_then(serde_json::Value::as_str) == Some("MyTurn"));
+    let last_activity = agents
         .iter()
         .filter_map(|t| {
             t.get("messages")
@@ -241,7 +241,7 @@ fn inspect_threads(state: &Mutex<Backend>, folder: &str) -> (usize, bool, u64, S
         .unwrap_or(0);
 
     // Task = name of the first MY_TURN thread, or empty.
-    let task = threads
+    let task = agents
         .iter()
         .find(|t| t.get("status").and_then(serde_json::Value::as_str) == Some("MyTurn"))
         .and_then(|t| t.get("name"))

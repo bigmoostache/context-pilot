@@ -128,9 +128,9 @@ pub struct BridgeState {
     /// thread message vectors against this memo each tick and emits only the
     /// newly-appended messages (the same observe-on-change discipline as the
     /// phase/cost vitals).
-    pub thread_msg_counts: std::collections::HashMap<String, usize>,
+    pub agent_msg_counts: std::collections::HashMap<String, usize>,
 
-    /// Last per-thread turn-status emitted as a `ThreadStatusChanged` delta,
+    /// Last per-thread turn-status emitted as a `AgentStatusChanged` delta,
     /// keyed by thread id. The status chokepoint diffs each thread's live
     /// status against this memo every tick and emits only on an actual flip
     /// (the same observe-on-change discipline as the message and vitals
@@ -138,10 +138,10 @@ pub struct BridgeState {
     /// a web `SendMessage`, the agent's `Send` tool, a TUI reply, the agent
     /// finishing a turn — reaches the backend view (and the web roster) in
     /// milliseconds, not on the next disk flush.
-    pub thread_statuses: std::collections::HashMap<String, cp_wire::types::ThreadTurn>,
+    pub agent_statuses: std::collections::HashMap<String, cp_wire::types::AgentTurn>,
 
-    /// Last focused-thread id emitted as a `ThreadFocusChanged` delta. The
-    /// focus chokepoint diffs the live `FocusState.focused_thread_id` against
+    /// Last focused-thread id emitted as a `AgentFocusChanged` delta. The
+    /// focus chokepoint diffs the live `FocusState.focused_agent_id` against
     /// this memo every tick and emits only on an actual change (the same
     /// observe-on-change discipline as the status/message/vitals chokepoints),
     /// so the agent focusing a thread — from *any* source (an idle `MY_TURN`
@@ -164,16 +164,16 @@ pub struct BridgeState {
 
     /// Per-thread archived flag as last emitted/seeded, keyed by thread id.
     /// The archived chokepoint diffs each thread's live `archived` against this
-    /// memo every tick and emits `ThreadArchived`/`ThreadRestored` only on an
+    /// memo every tick and emits `AgentArchived`/`AgentRestored` only on an
     /// actual change — the same observe-on-change discipline as the status and
     /// message chokepoints.
-    pub thread_archived_memo: std::collections::HashMap<String, bool>,
+    pub agent_archived_memo: std::collections::HashMap<String, bool>,
 
     /// Per-thread paused flag as last emitted/seeded, keyed by thread id.
     /// The paused chokepoint diffs each thread's live `paused` against this
-    /// memo every tick and emits `ThreadPaused`/`ThreadResumed` only on an
+    /// memo every tick and emits `AgentPaused`/`AgentResumed` only on an
     /// actual change — mirrors the archived chokepoint (T371).
-    pub thread_paused_memo: std::collections::HashMap<String, bool>,
+    pub agent_paused_memo: std::collections::HashMap<String, bool>,
 
     /// Per-thread projected task list as last emitted/seeded, keyed by thread
     /// id. The task chokepoint ([`emit_task_lists`]) projects each thread's
@@ -188,8 +188,8 @@ pub struct BridgeState {
     /// divergence).
     ///
     /// [`emit_task_lists`]: (the agent-binary chokepoint in
-    /// `src/app/run/threads/messages.rs`)
-    pub thread_tasks: std::collections::HashMap<String, Vec<cp_wire::types::snapshot::todo::WireTask>>,
+    /// `src/app/run/agents/messages.rs`)
+    pub agent_tasks: std::collections::HashMap<String, Vec<cp_wire::types::snapshot::todo::WireTask>>,
 
     /// Per-thread projected scratchpad-note list as last emitted/seeded, keyed
     /// by thread id. The note chokepoint (`emit_notes`) projects each thread's
@@ -197,11 +197,11 @@ pub struct BridgeState {
     /// every tick, and emits a
     /// [`NotesChanged`](cp_wire::types::oplog::OpEntryKind::NotesChanged)
     /// (whole-list snapshot) only when the list actually changes — the twin of
-    /// [`thread_tasks`](Self::thread_tasks). Seeded from the oplog roster on the
+    /// [`agent_tasks`](Self::agent_tasks). Seeded from the oplog roster on the
     /// first post-boot tick so a change that landed on disk while the bridge was
     /// down but was never journaled is emitted on the very first pass
     /// (self-healing disk↔oplog divergence).
-    pub thread_notes: std::collections::HashMap<String, Vec<cp_wire::types::snapshot::notes::WireNote>>,
+    pub agent_notes: std::collections::HashMap<String, Vec<cp_wire::types::snapshot::notes::WireNote>>,
 
     /// Flags tracking which observe-on-change memos have been seeded from the
     /// oplog roster on the first tick after boot. See [`MemoSeeds`].

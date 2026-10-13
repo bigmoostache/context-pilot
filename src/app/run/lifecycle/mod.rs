@@ -72,7 +72,7 @@ impl App {
         // Boot-load every background thread's persisted per-thread context into
         // the fleet registry before the loop starts reconciling (F1 boot half).
         // No-op at N=1 (no per-thread files) — byte-identical boot.
-        self.load_background_threads();
+        self.load_background_agents();
 
         // Kill console sessions on the server that belong to no loaded thread —
         // ONCE over the union of every thread's session keys (the per-thread
@@ -116,7 +116,7 @@ impl App {
             // Check if TUI reload was requested (by system_reload tool)
             if self.state.flags.lifecycle.reload_pending {
                 self.writer.flush();
-                self.save_all_threads();
+                self.save_all_agents();
                 // Write reload flag AFTER save_state — otherwise save_state
                 // overwrites config.json with reload_requested: false.
                 crate::infra::tools::write_reload_flag();
@@ -261,9 +261,9 @@ impl App {
     /// Adaptive poll interval: short while streaming/active or bridge-driven,
     /// long when idle — keeps latency low without pinning a core at rest.
     fn compute_poll_ms(&self) -> u64 {
-        if self.state.thread().stream.phase.is_streaming() || self.state.flags.ui.dirty {
+        if self.state.agent().stream.phase.is_streaming() || self.state.flags.ui.dirty {
             EVENT_POLL_MS // 8ms — responsive during streaming/active updates
-        } else if super::threads::bridge_active(&self.state) {
+        } else if super::agents::bridge_active(&self.state) {
             2 // bridge-active idle — keep web command→apply latency ≤ a few ms
         } else {
             50 // 50ms when idle — still responsive for typing, much less CPU
@@ -274,9 +274,9 @@ impl App {
     /// cache, watchers, tools, spine, reverie. Linear pipeline, no branching.
     fn run_background_phase(&mut self, ch: &EventChannels<'_>, current_ms: u64) {
         super::tools::watchdog::mark(super::tools::watchdog::Step::Bridge);
-        super::threads::poll_bridge_commands(self);
-        super::tools::watchdog::mark(super::tools::watchdog::Step::ThreadsEmit);
-        super::threads::emit_bridge_deltas(self);
+        super::agents::poll_bridge_commands(self);
+        super::tools::watchdog::mark(super::tools::watchdog::Step::AgentsEmit);
+        super::agents::emit_bridge_deltas(self);
         // Make the focused thread the executing one: if focus changed since
         // last tick (agent `Read`, human drill-in), register the old one for
         // background stepping and execute the new one, so the focused pipeline
@@ -313,12 +313,12 @@ impl App {
         // the phase AFTER it (inside the hook) would almost always see `Idle`
         // mid-turn and wrongly take the idle auto-read branch instead of the
         // inline streaming push.
-        let was_streaming = self.state.thread().stream.phase.is_streaming();
+        let was_streaming = self.state.agent().stream.phase.is_streaming();
         super::streaming::finalize_stream(self);
         // Incoming-message behavior on the focused thread: inline push while
         // streaming, idle auto-read otherwise. Runs before the spine check so an
         // idle auto-read's continuation nudge is picked up this same tick.
-        super::threads::handle_incoming_focused_messages(self, was_streaming);
+        super::agents::handle_incoming_focused_messages(self, was_streaming);
         cp_mod_agents::types::FocusState::tick_read_dwell(&mut self.state, current_ms);
         super::tools::watchdog::mark(super::tools::watchdog::Step::Spine);
         self.run_spine_phase(current_ms);
@@ -395,7 +395,7 @@ impl App {
     /// Persist the message with the given display `id` (if it still exists) plus
     /// the full state — the `ActionResult::SaveMessage` side-effect.
     fn save_message_by_id(&self, id: &str) {
-        if let Some(msg) = self.state.thread().messages.iter().find(|m| m.id == id) {
+        if let Some(msg) = self.state.agent().messages.iter().find(|m| m.id == id) {
             self.save_message_async(msg);
         }
         self.save_state_async();
@@ -425,7 +425,7 @@ impl App {
             module.on_stream_stop(&mut self.state);
         }
         self.state.touch_panel(Kind::SPINE);
-        if let Some(msg) = self.state.thread().messages.last()
+        if let Some(msg) = self.state.agent().messages.last()
             && msg.role == "assistant"
         {
             self.save_message_async(msg);
@@ -445,14 +445,14 @@ impl App {
             // Guard rail blocked — notification already created by engine.
             // Only mark dirty and save if this is a NEW block reason, to avoid
             // burning CPU/disk on every tick (~125/sec) when persistently blocked.
-            if self.state.thread().guard_rail_blocked.as_ref() != Some(&reason) {
-                self.state.thread_mut().guard_rail_blocked = Some(reason);
+            if self.state.agent().guard_rail_blocked.as_ref() != Some(&reason) {
+                self.state.agent_mut().guard_rail_blocked = Some(reason);
                 self.state.flags.ui.dirty = true;
                 self.save_state_async();
             }
         } else if let SpineDecision::Continue(action) = decision {
             // Auto-continuation fired — apply it and start streaming
-            self.state.thread_mut().guard_rail_blocked = None;
+            self.state.agent_mut().guard_rail_blocked = None;
             let should_stream = apply_continuation(&mut self.state, action);
             if should_stream {
                 self.stream_rt_mut().typewriter.reset();

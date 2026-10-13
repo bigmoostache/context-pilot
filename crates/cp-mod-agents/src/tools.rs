@@ -11,7 +11,7 @@ use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
-use crate::types::{ThreadAuthor, ThreadMessage, ThreadStatus, ThreadsState};
+use crate::types::{AgentAuthor, AgentMessage, AgentStatus, AgentsState};
 
 /// Truncate `s` to at most `max` bytes on a char boundary (no ellipsis).
 fn clamp_bytes(s: &str, max: usize) -> String {
@@ -29,26 +29,26 @@ fn preview_ellipsis(s: &str, max: usize) -> String {
 
 /// Push `msg` onto thread `tid`, flipping status when the turn is handed back.
 /// Returns whether an archived thread was resurrected by this send.
-fn push_send_message(state: &mut State, tid: &str, msg: ThreadMessage, still_my_turn: bool) -> bool {
-    let ts = ThreadsState::get_mut(state);
-    let Some(thread) = ts.threads.iter_mut().find(|t| t.id == tid) else {
+fn push_send_message(state: &mut State, tid: &str, msg: AgentMessage, still_my_turn: bool) -> bool {
+    let ts = AgentsState::get_mut(state);
+    let Some(agent) = ts.agents.iter_mut().find(|t| t.id == tid) else {
         return false;
     };
     // Sending to an archived thread resurrects it (matches frontend on user send).
-    let unarchived = thread.archived;
-    if thread.archived {
-        thread.archived = false;
+    let unarchived = agent.archived;
+    if agent.archived {
+        agent.archived = false;
     }
-    thread.messages.push(msg);
+    agent.messages.push(msg);
     if !still_my_turn {
-        thread.status = ThreadStatus::TheirTurn;
+        agent.status = AgentStatus::TheirTurn;
     }
     unarchived
 }
 
 /// Post a message to a thread.
 ///
-/// Creates a `ThreadMessage(author=Assistant)` and appends it to the thread.
+/// Creates a `AgentMessage(author=Assistant)` and appends it to the thread.
 /// With `still_my_turn = false` the thread flips to `TheirTurn`; focus stays on
 /// the thread either way (T683).
 pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -56,7 +56,7 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     const MAX_CONTENT_BYTES: usize = 100_000;
 
     // Always the caller's own thread: Send has no target parameter.
-    let owned_tid = executing_thread_id_or_empty(state);
+    let owned_tid = executing_agent_id_or_empty(state);
     let tid = owned_tid.as_str();
 
     let markdown =
@@ -68,8 +68,8 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     // hand the thread back to the user (delivery complete).
     let still_my_turn = tool.input.get("still_my_turn").and_then(serde_json::Value::as_bool).unwrap_or(true);
 
-    let msg = ThreadMessage {
-        author: ThreadAuthor::Assistant,
+    let msg = AgentMessage {
+        author: AgentAuthor::Assistant,
         content: markdown,
         // Attachments ride inline ```file-upload``` blocks in the markdown.
         file_path: None,
@@ -80,10 +80,10 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Build result message before mutating — need thread name.
-    let (thread_name, msg_preview) = {
-        let ts = ThreadsState::get(state);
-        let thread = ts.threads.iter().find(|t| t.id == tid);
-        let name = thread.map_or_else(|| tid.to_owned(), |t| t.name.clone());
+    let (agent_name, msg_preview) = {
+        let ts = AgentsState::get(state);
+        let agent = ts.agents.iter().find(|t| t.id == tid);
+        let name = agent.map_or_else(|| tid.to_owned(), |t| t.name.clone());
         let preview = msg.content.as_deref().unwrap_or_default();
         (name, preview_ellipsis(preview, 80))
     };
@@ -99,11 +99,11 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     // a conversation-less list view. This deliberately does NOT break tempo
     // (`preserves_tempo` stays true below): it updates the panel source + marks
     // it fresh, but never forces a full context refresh the way `Read` does.
-    if ThreadsState::get(state).threads.iter().any(|t| t.id == tid) {
-        rebuild_threads_panel(state, tid, now);
+    if AgentsState::get(state).agents.iter().any(|t| t.id == tid) {
+        rebuild_agents_panel(state, tid, now);
     }
 
-    // NOTE: `Send` deliberately does NOT move `focused_thread_id`. That pointer
+    // NOTE: `Send` deliberately does NOT move `focused_agent_id`. That pointer
     // is the HUMAN's on-screen view selection (UI-global, shared across the
     // fleet, never per-thread). A background thread finishing its turn with
     // `still_my_turn=false` would otherwise yank the human's view onto itself —
@@ -114,7 +114,7 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     let unarchived_note = if unarchived { " [thread was archived \u{2014} automatically unarchived]" } else { "" };
     let mut result = ToolResult::new(
         tool.id.clone(),
-        format!("Sent to {tid} \"{thread_name}\": {msg_preview}{suffix}{unarchived_note}"),
+        format!("Sent to {tid} \"{agent_name}\": {msg_preview}{suffix}{unarchived_note}"),
         false,
     );
     result.preserves_tempo = true;
@@ -123,9 +123,9 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
 
 /// Per-thread unacknowledged summary lines (active threads with new messages).
 /// The focused thread is marked. Archived threads are LLM-invisible (T9).
-fn collect_thread_summaries(ts: &ThreadsState, focused_tid: &str) -> Vec<String> {
+fn collect_agent_summaries(ts: &AgentsState, focused_tid: &str) -> Vec<String> {
     let mut summaries = Vec::new();
-    for t in ts.threads.iter().filter(|t| !t.archived) {
+    for t in ts.agents.iter().filter(|t| !t.archived) {
         let unack = t.messages.iter().filter(|m| !m.acknowledged).count();
         if unack == 0 {
             continue;
@@ -147,9 +147,9 @@ fn collect_thread_summaries(ts: &ThreadsState, focused_tid: &str) -> Vec<String>
 /// the previous snapshot while breath budget lasts. Setting `freeze_count` to
 /// `u8::MAX` forces the Fresh branch (one-shot; Fresh resets it to 0). `u8::MAX`
 /// is also the sanctioned "not frozen" sentinel (excluded by the freeze indicator).
-fn force_refresh_threads_panel(state: &mut State) {
-    for ctx in &mut state.thread_mut().context {
-        if ctx.context_type.as_str() == Kind::THREADS {
+fn force_refresh_agents_panel(state: &mut State) {
+    for ctx in &mut state.agent_mut().context {
+        if ctx.context_type.as_str() == Kind::AGENTS {
             ctx.cache_deprecated = true;
             ctx.freeze_count = u8::MAX;
             break;
@@ -168,41 +168,41 @@ fn force_refresh_threads_panel(state: &mut State) {
 /// `state.tempo` — a caller that preserves tempo (Send) keeps a full cache
 /// refresh from firing; the new content then emits on the next tick the freeze
 /// pass runs fresh (never lost, since `panel_content` is durable).
-pub(crate) fn rebuild_threads_panel(state: &mut State, focused_tid: &str, now_ms: u64) {
+pub(crate) fn rebuild_agents_panel(state: &mut State, focused_tid: &str, now_ms: u64) {
     let panel_content = build_panel_content(state, focused_tid, now_ms);
-    ThreadsState::get_mut(state).panel_content = panel_content;
-    force_refresh_threads_panel(state);
+    AgentsState::get_mut(state).panel_content = panel_content;
+    force_refresh_agents_panel(state);
 }
 
 /// Refresh the Threads panel for the CALLER's own thread.
 ///
-/// Read takes no `thread_id`: it always targets the **executing** thread (the
+/// Read takes no `agent_id`: it always targets the **executing** thread (the
 /// thread whose context is executing this tool), exactly like `Send`. It must
-/// NOT use `FocusState::focused_thread_id` — that is the human's UI-global view
+/// NOT use `FocusState::focused_agent_id` — that is the human's UI-global view
 /// pointer, so at N>1 a background thread would read, acknowledge, and clear
 /// notifications of whatever thread is on screen (T828). For the same reason
 /// Read never writes focus. Marks the thread's messages acknowledged, rebuilds
 /// the panel (thread list + own conversation), and returns a summary.
 pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let owned_tid = executing_thread_id_or_empty(state);
+    let owned_tid = executing_agent_id_or_empty(state);
     let tid = owned_tid.as_str();
 
     let now_ms = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis().to_u64());
 
     // --- Phase 1: Collect summary across ALL threads (before marking) ---
-    let ts = ThreadsState::get(state);
-    let Some(target_thread) = ts.threads.iter().find(|t| t.id == tid) else {
+    let ts = AgentsState::get(state);
+    let Some(target_agent) = ts.agents.iter().find(|t| t.id == tid) else {
         return ToolResult::new(tool.id.clone(), format!("Thread '{tid}' not found"), true);
     };
 
-    let thread_name = target_thread.name.clone();
-    let thread_status = target_thread.status;
+    let agent_name = target_agent.name.clone();
+    let agent_status = target_agent.status;
 
-    let thread_summaries = collect_thread_summaries(ts, tid);
+    let agent_summaries = collect_agent_summaries(ts, tid);
 
     // Count + previews of newly acknowledged messages in a single pass.
     let mut new_count: usize = 0;
-    let new_msg_previews: Vec<String> = target_thread
+    let new_msg_previews: Vec<String> = target_agent
         .messages
         .iter()
         .filter(|m| !m.acknowledged)
@@ -211,28 +211,28 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
         .collect();
 
     // --- Phase 2: Mark all messages in target thread as acknowledged ---
-    let ts_mut = ThreadsState::get_mut(state);
-    if let Some(thread) = ts_mut.threads.iter_mut().find(|t| t.id == tid) {
-        for msg in &mut thread.messages {
+    let ts_mut = AgentsState::get_mut(state);
+    if let Some(agent) = ts_mut.agents.iter_mut().find(|t| t.id == tid) {
+        for msg in &mut agent.messages {
             msg.acknowledged = true;
         }
     }
 
     // Reading a thread clears any spine notifications bound to it — the agent
     // has now read its own thread, so its pending nudges are moot.
-    let _cleared = cp_mod_spine::types::SpineState::delete_notifications_by_thread(state, tid);
+    let _cleared = cp_mod_spine::types::SpineState::delete_notifications_by_agent(state, tid);
 
     // --- Phase 4: Build panel content (thread list + focused conversation) ---
-    rebuild_threads_panel(state, tid, now_ms);
+    rebuild_agents_panel(state, tid, now_ms);
 
     // --- Phase 5: Build lightweight tool result ---
     let result_body = build_read_result(
         state,
         &ReadResult {
             tid,
-            thread_name: &thread_name,
-            thread_status,
-            thread_summaries: &thread_summaries,
+            agent_name: &agent_name,
+            agent_status,
+            agent_summaries: &agent_summaries,
             new_count,
             new_msg_previews: &new_msg_previews,
         },
@@ -251,11 +251,11 @@ struct ReadResult<'read> {
     /// Focused thread id.
     tid: &'read str,
     /// Focused thread display name.
-    thread_name: &'read str,
+    agent_name: &'read str,
     /// Focused thread turn status.
-    thread_status: ThreadStatus,
+    agent_status: AgentStatus,
     /// Cross-thread unacknowledged summary lines.
-    thread_summaries: &'read [String],
+    agent_summaries: &'read [String],
     /// Count of newly acknowledged messages in the focused thread.
     new_count: usize,
     /// Previews of the newly acknowledged messages.
@@ -267,28 +267,28 @@ struct ReadResult<'read> {
 /// pointer at the force-refreshed Threads panel with its last message.
 fn build_read_result(state: &State, r: &ReadResult<'_>) -> String {
     // Find the Threads panel display ID so the result points the LLM at it.
-    let threads_panel_id = state
-        .thread()
+    let agents_panel_id = state
+        .agent()
         .context
         .iter()
-        .find(|c| c.context_type.as_str() == Kind::THREADS)
+        .find(|c| c.context_type.as_str() == Kind::AGENTS)
         .map_or_else(|| "??".to_owned(), |c| c.id.clone());
 
-    let last_msg_preview = ThreadsState::get(state)
-        .threads
+    let last_msg_preview = AgentsState::get(state)
+        .agents
         .iter()
         .find(|t| t.id == r.tid)
         .and_then(|t| t.messages.last())
         .and_then(|m| m.content.as_deref())
         .map_or_else(|| "[no messages]".to_owned(), |c| preview_ellipsis(c, 80));
 
-    let (tid, thread_name, thread_status) = (r.tid, r.thread_name, r.thread_status);
-    let mut lines = vec![format!("Thread {tid} \"{thread_name}\" [{thread_status}] — your thread, refreshed.\n")];
-    if r.thread_summaries.is_empty() {
+    let (tid, agent_name, agent_status) = (r.tid, r.agent_name, r.agent_status);
+    let mut lines = vec![format!("Thread {tid} \"{agent_name}\" [{agent_status}] — your thread, refreshed.\n")];
+    if r.agent_summaries.is_empty() {
         lines.push("No unacknowledged messages across active threads.".to_owned());
     } else {
         lines.push("Unacknowledged messages:".to_owned());
-        lines.extend(r.thread_summaries.iter().cloned());
+        lines.extend(r.agent_summaries.iter().cloned());
     }
 
     if r.new_count > 0 {
@@ -299,21 +299,21 @@ fn build_read_result(state: &State, r: &ReadResult<'_>) -> String {
     }
 
     lines.push(format!(
-        "\n⟳ The Threads panel ({threads_panel_id}) has been FORCE-REFRESHED and now \
+        "\n⟳ The Threads panel ({agents_panel_id}) has been FORCE-REFRESHED and now \
          contains the MOST RECENT conversation for {tid}. Last message: \"{last_msg_preview}\""
     ));
     lines.join("\n")
 }
 
 /// Write the YAML thread-overview list (active threads only) into `output`.
-fn write_thread_list(output: &mut String, ts: &ThreadsState, focused_tid: &str) {
+fn write_agent_list(output: &mut String, ts: &AgentsState, focused_tid: &str) {
     // Archived threads are invisible to the LLM (T9): only active threads
     // appear in the context the model reads. Paused threads are hidden from the
     // panel list too (T663) — a paused thread is deliberately parked, so it
     // should not clutter the roster — EXCEPT the focused one, which stays visible
     // because the conversation section below renders it and hiding what you're
     // actively working would be jarring.
-    for t in ts.threads.iter().filter(|t| !t.archived && (!t.paused || t.id == focused_tid)) {
+    for t in ts.agents.iter().filter(|t| !t.archived && (!t.paused || t.id == focused_tid)) {
         let unack = t.messages.iter().filter(|m| !m.acknowledged).count();
         _ = writeln!(output, "  - id: {}", t.id);
         _ = writeln!(output, "    name: \"{}\"", yaml_escape(&t.name));
@@ -329,7 +329,7 @@ fn write_thread_list(output: &mut String, ts: &ThreadsState, focused_tid: &str) 
             _ = writeln!(output, "    paused: true");
         }
         if let Some(origin) = t.origin.as_ref() {
-            _ = writeln!(output, "    branched_from: {}", origin.thread_id);
+            _ = writeln!(output, "    branched_from: {}", origin.agent_id);
         }
     }
 }
@@ -340,11 +340,11 @@ fn write_thread_list(output: &mut String, ts: &ThreadsState, focused_tid: &str) 
 /// The agent's own LLM conversation is global (not per-thread), so it may still
 /// remember work done in the parent AFTER the branch point; the note asks it to
 /// treat that as belonging to the parent only.
-fn write_origin(output: &mut String, thread: &crate::types::Thread) {
-    let Some(origin) = thread.origin.as_ref() else {
+fn write_origin(output: &mut String, agent: &crate::types::Agent) {
+    let Some(origin) = agent.origin.as_ref() else {
         return;
     };
-    let parent = &origin.thread_id;
+    let parent = &origin.agent_id;
     _ = writeln!(output, "  branched_from: {parent}");
     _ = writeln!(
         output,
@@ -355,7 +355,7 @@ fn write_origin(output: &mut String, thread: &crate::types::Thread) {
 }
 
 /// Write a single YAML message entry (author, age, text block/inline, file) into `output`.
-fn write_message(output: &mut String, msg: &ThreadMessage, now_ms: u64) {
+fn write_message(output: &mut String, msg: &AgentMessage, now_ms: u64) {
     let age = format_age(now_ms, msg.timestamp);
     _ = writeln!(output, "    - author: {}", msg.author);
     _ = writeln!(output, "      ts: \"{age}\"");
@@ -384,16 +384,16 @@ fn write_message(output: &mut String, msg: &ThreadMessage, now_ms: u64) {
 /// the shared roster (design doc §3). Without this, every thread rendered the
 /// single shared `panel_content` baked for the focused thread, so a background
 /// thread's Threads panel showed the focused thread's conversation.
-pub(crate) fn executing_thread_id_or_empty(state: &State) -> String {
-    state.executing_thread_id().unwrap_or_default().to_owned()
+pub(crate) fn executing_agent_id_or_empty(state: &State) -> String {
+    state.executing_agent_id().unwrap_or_default().to_owned()
 }
 
 /// Build the Threads panel content for the **executing** thread (roster list +
 /// that thread's own conversation). This is the per-thread render source used by
-/// [`ThreadsPanel`](crate::panel::ThreadsPanel) in place of the shared, focused-
-/// thread-baked `ThreadsState::panel_content`.
+/// [`AgentsPanel`](crate::panel::AgentsPanel) in place of the shared, focused-
+/// thread-baked `AgentsState::panel_content`.
 pub(crate) fn executing_panel_content(state: &State) -> String {
-    let tid = executing_thread_id_or_empty(state);
+    let tid = executing_agent_id_or_empty(state);
     let now_ms = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis().to_u64());
     build_panel_content(state, &tid, now_ms)
 }
@@ -410,12 +410,12 @@ pub(crate) fn build_panel_content(state: &State, focused_tid: &str, now_ms: u64)
     /// Maximum messages shown in the panel for a single focused thread.
     const MAX_PANEL_MESSAGES: usize = 50;
 
-    let ts = ThreadsState::get(state);
+    let ts = AgentsState::get(state);
     let mut output = String::from("threads:\n");
-    write_thread_list(&mut output, ts, focused_tid);
+    write_agent_list(&mut output, ts, focused_tid);
 
     // Focused thread's conversation (last MAX_PANEL_MESSAGES messages)
-    let Some(thread) = ts.threads.iter().find(|t| t.id == focused_tid) else {
+    let Some(agent) = ts.agents.iter().find(|t| t.id == focused_tid) else {
         return output;
     };
 
@@ -423,15 +423,15 @@ pub(crate) fn build_panel_content(state: &State, focused_tid: &str, now_ms: u64)
     // the model should never re-read its own action log (token bloat +
     // self-referential loop risk). They remain visible (collapsed) in
     // the web UI / TUI for the human.
-    let visible: Vec<&ThreadMessage> = thread.messages.iter().filter(|m| !m.auto).collect();
+    let visible: Vec<&AgentMessage> = agent.messages.iter().filter(|m| !m.auto).collect();
     let total = visible.len();
     let skip = total.saturating_sub(MAX_PANEL_MESSAGES);
 
     _ = writeln!(output, "\nconversation:");
-    _ = writeln!(output, "  thread_id: {}", thread.id);
-    _ = writeln!(output, "  name: \"{}\"", yaml_escape(&thread.name));
-    _ = writeln!(output, "  status: {}", thread.status);
-    write_origin(&mut output, thread);
+    _ = writeln!(output, "  thread_id: {}", agent.id);
+    _ = writeln!(output, "  name: \"{}\"", yaml_escape(&agent.name));
+    _ = writeln!(output, "  status: {}", agent.status);
+    write_origin(&mut output, agent);
     if skip > 0 {
         _ = writeln!(output, "  omitted: {skip}");
     }

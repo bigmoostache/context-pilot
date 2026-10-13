@@ -108,10 +108,10 @@ pub trait Module: Send + Sync {
     fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
 
     /// `true` when [`Self::load_worker_data`] writes ONLY the thread runtime
-    /// (`state.thread_mut()`), never shared state. Background threads skip
+    /// (`state.agent_mut()`), never shared state. Background threads skip
     /// global modules at boot; this opt-in lets their per-thread slice
     /// (e.g. the git workdir) still be restored there.
-    fn worker_data_is_thread_scoped(&self) -> bool {
+    fn worker_data_is_agent_scoped(&self) -> bool {
         false
     }
 

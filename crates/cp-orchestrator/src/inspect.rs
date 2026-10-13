@@ -42,9 +42,9 @@ const CONFIG_FILE: &str = "config.json";
 /// Directory holding per-worker state files (`<worker_id>.json`).
 const STATES_DIR: &str = "states";
 
-/// Directory holding per-thread message files (`<thread_id>.json`). The agent
+/// Directory holding per-thread message files (`<agent_id>.json`). The agent
 /// keeps only slim thread metadata in `config.json`; messages live here.
-const THREADS_DIR: &str = "threads";
+const AGENTS_DIR: &str = "threads";
 
 /// Directory holding large global modules saved outside `config.json`
 /// (`<module_id>.json`, e.g. `tree`, `todo`), rewritten only when they change.
@@ -73,8 +73,8 @@ struct FleetCache {
     /// Cached parses of `states/<worker>.json`, keyed by worker id.
     workers: HashMap<String, CachedJson>,
 
-    /// Cached parses of `threads/<id>.json`, keyed by thread id.
-    threads: HashMap<String, CachedJson>,
+    /// Cached parses of `agents/<id>.json`, keyed by thread id.
+    agents: HashMap<String, CachedJson>,
 
     /// Cached parses of `modules/<id>.json`, keyed by module id.
     modules: HashMap<String, CachedJson>,
@@ -109,7 +109,7 @@ impl StateReader {
     /// # Errors
     ///
     /// Thread entries stored slim (no `messages` key) get their messages
-    /// spliced back from `threads/<id>.json`, so callers see the full shape.
+    /// spliced back from `agents/<id>.json`, so callers see the full shape.
     ///
     /// # Errors
     ///
@@ -119,7 +119,7 @@ impl StateReader {
         let path = folder.join(CP_DIR).join(CONFIG_FILE);
         let cache = self.agents.entry(folder.to_path_buf()).or_default();
         let mut config = read_cached_json(&path, &mut cache.config)?;
-        hydrate_thread_messages(&folder.join(CP_DIR).join(THREADS_DIR), &mut config, &mut cache.threads);
+        hydrate_agent_messages(&folder.join(CP_DIR).join(AGENTS_DIR), &mut config, &mut cache.agents);
         overlay_module_files(&folder.join(CP_DIR).join(MODULES_DIR), &mut config, &mut cache.modules);
         Ok(config)
     }
@@ -179,10 +179,10 @@ fn overlay_module_files(modules_dir: &Path, config: &mut Value, cache: &mut Hash
     }
 }
 
-/// Splice `messages` from `<threads_dir>/<id>.json` into every thread entry of
+/// Splice `messages` from `<agents_dir>/<id>.json` into every thread entry of
 /// `config` lacking them. Legacy configs (inline messages) pass through as-is;
 /// a missing/unreadable file leaves the entry without messages.
-fn hydrate_thread_messages(threads_dir: &Path, config: &mut Value, cache: &mut HashMap<String, CachedJson>) {
+fn hydrate_agent_messages(agents_dir: &Path, config: &mut Value, cache: &mut HashMap<String, CachedJson>) {
     let Some(entries) = config.pointer_mut("/modules/threads/threads").and_then(Value::as_array_mut) else {
         return;
     };
@@ -192,7 +192,7 @@ fn hydrate_thread_messages(threads_dir: &Path, config: &mut Value, cache: &mut H
             continue;
         }
         let Some(id) = obj.get("id").and_then(Value::as_str).map(str::to_owned) else { continue };
-        let path = threads_dir.join(format!("{id}.json"));
+        let path = agents_dir.join(format!("{id}.json"));
         let slot = cache.entry(id).or_insert_with(|| CachedJson { mtime: SystemTime::UNIX_EPOCH, data: Value::Null });
         let Ok(file) = read_cached_json_slot(&path, slot) else { continue };
         if let Some(messages) = file.get("messages") {
@@ -375,7 +375,7 @@ mod tests {
     }
 
     #[test]
-    fn read_config_hydrates_slim_threads_from_files() {
+    fn read_config_hydrates_slim_agents_from_files() {
         let dir = tempdir().expect("dir");
         let folder = dir.path();
         let cfg = serde_json::json!({"modules": {"threads": {"threads": [
@@ -384,7 +384,7 @@ mod tests {
             {"id": "T3", "name": "no file"},
         ]}}});
         write_config(folder, &cfg);
-        let tdir = folder.join(CP_DIR).join(THREADS_DIR);
+        let tdir = folder.join(CP_DIR).join(AGENTS_DIR);
         fs::create_dir_all(&tdir).expect("mkdir");
         let t1 = serde_json::json!({"id": "T1", "messages": [{"content": "from file"}]});
         fs::write(tdir.join("T1.json"), serde_json::to_vec(&t1).expect("ser")).expect("write");

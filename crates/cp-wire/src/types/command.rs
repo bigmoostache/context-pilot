@@ -60,7 +60,8 @@ pub enum Kind {
     #[serde(rename = "send_message")]
     SendMessage {
         /// Target thread identifier.
-        thread_id: String,
+        #[serde(rename = "thread_id")]
+        agent_id: String,
         /// Markdown body of the message.
         content: String,
     },
@@ -68,7 +69,7 @@ pub enum Kind {
     /// Create a new thread, optionally seeding its first user message and
     /// starting it paused.
     #[serde(rename = "create_thread")]
-    CreateThread {
+    CreateAgent {
         /// Human-readable thread name.
         name: String,
         /// Optional first user message, sent atomically right after the thread
@@ -87,15 +88,16 @@ pub enum Kind {
     /// Branch a new thread out of an existing one: the new thread inherits the
     /// source thread's messages up to and including the one stamped
     /// `message_ts`, then (optionally) gets a first user message — same
-    /// create -> pause -> send order as [`CreateThread`](Self::CreateThread).
+    /// create -> pause -> send order as [`CreateAgent`](Self::CreateAgent).
     ///
     /// The agent copies the history from its own state (the payload only names
     /// the branch point). An N-1 agent deserialises this as
     /// [`Unknown`](Self::Unknown) and ignores it.
     #[serde(rename = "branch_thread")]
-    BranchThread {
+    BranchAgent {
         /// Thread to branch out of.
-        source_thread_id: String,
+        #[serde(rename = "source_thread_id")]
+        source_agent_id: String,
         /// Epoch-ms timestamp of the last source message to copy (inclusive).
         message_ts: u64,
         /// Human-readable name of the new thread.
@@ -104,51 +106,57 @@ pub enum Kind {
         /// `file-upload` blocks the frontend composed). `None` = history only.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         initial_message: Option<String>,
-        /// Create the branch already paused (see `CreateThread::paused`).
+        /// Create the branch already paused (see `CreateAgent::paused`).
         #[serde(default)]
         paused: bool,
     },
 
     /// Archive an existing thread.
     #[serde(rename = "archive_thread")]
-    ArchiveThread {
+    ArchiveAgent {
         /// Thread to archive.
-        thread_id: String,
+        #[serde(rename = "thread_id")]
+        agent_id: String,
     },
 
     /// Restore a previously archived thread.
     #[serde(rename = "restore_thread")]
-    RestoreThread {
+    RestoreAgent {
         /// Thread to restore.
-        thread_id: String,
+        #[serde(rename = "thread_id")]
+        agent_id: String,
     },
 
     /// Pause a thread (suppress `MY_TURN` notifications).
     #[serde(rename = "pause_thread")]
-    PauseThread {
+    PauseAgent {
         /// Thread to pause.
-        thread_id: String,
+        #[serde(rename = "thread_id")]
+        agent_id: String,
     },
 
     /// Resume a previously paused thread.
     #[serde(rename = "resume_thread")]
-    ResumeThread {
+    ResumeAgent {
         /// Thread to resume.
-        thread_id: String,
+        #[serde(rename = "thread_id")]
+        agent_id: String,
     },
 
     /// Permanently delete a thread and all its messages.
     #[serde(rename = "delete_thread")]
-    DeleteThread {
+    DeleteAgent {
         /// Thread to delete.
-        thread_id: String,
+        #[serde(rename = "thread_id")]
+        agent_id: String,
     },
 
     /// Delete a specific message from a thread.
     #[serde(rename = "delete_message")]
     DeleteMessage {
         /// Thread containing the message.
-        thread_id: String,
+        #[serde(rename = "thread_id")]
+        agent_id: String,
         /// Epoch-ms timestamp of the message to delete (unique per thread).
         message_ts: u64,
     },
@@ -249,7 +257,7 @@ mod tests {
             id: "cmd-001".into(),
             seq: 42,
             dedup_token: "user-msg-abc".into(),
-            kind: Kind::SendMessage { thread_id: "T1".into(), content: "Hello".into() },
+            kind: Kind::SendMessage { agent_id: "T1".into(), content: "Hello".into() },
         };
         let json = serde_json::to_string(&cmd).expect("serialize");
         let back: Command = serde_json::from_str(&json).expect("deserialize");

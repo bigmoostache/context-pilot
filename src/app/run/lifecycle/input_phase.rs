@@ -58,7 +58,7 @@ impl App {
             // User quit — flush all pending writes and save final state synchronously
             let _guard = crate::profile!("quit_flush");
             self.writer.flush();
-            self.save_all_threads();
+            self.save_all_agents();
             return Ok(InputOutcome::Quit);
         };
 

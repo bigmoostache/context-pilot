@@ -4,7 +4,7 @@
 //!
 //! 1. **Command intake (K7 path).** [`poll_bridge_commands`] accepts inbound
 //!    commands from the backend over the bridge socket and applies them on the
-//!    main loop — `SendMessage`/`CreateThread`/`ArchiveThread`/`RestoreThread`
+//!    main loop — `SendMessage`/`CreateAgent`/`ArchiveAgent`/`RestoreAgent`
 //!    enter the agent exactly as local user input would, and `Stop`/`Interrupt`
 //!    mirror the Esc key.
 //! 2. **Live-state emission (Leg 0 keystone).** The instant a mutation applies,
@@ -15,18 +15,18 @@
 //!    self-healing live vitals (phase + cost) ride the *best-effort* path
 //!    ([`emit_vitals`]).
 //!
-//! Extracted from the parent `threads` module so each file stays under the
+//! Extracted from the parent `agents` module so each file stays under the
 //! 500-line limit.
 
 use std::time::Duration;
 
 use cp_base::state::runtime::State;
-use cp_mod_agents::types::{ThreadStatus, ThreadsState};
+use cp_mod_agents::types::{AgentStatus, AgentsState};
 use cp_mod_bridge::BridgeState;
 use cp_wire::types::command::Command;
 use cp_wire::types::oplog::OpEntryKind;
 use cp_wire::types::payload::query::Query;
-use cp_wire::types::{Phase, ThreadTurn};
+use cp_wire::types::{AgentTurn, Phase};
 
 use crate::app::App;
 
@@ -234,7 +234,7 @@ pub(in crate::app::run) fn emit_vitals(app: &mut App) {
     }
 
     // Phase — emit on transition only.
-    let phase = wire_phase(app.state.thread().stream.phase);
+    let phase = wire_phase(app.state.agent().stream.phase);
     let phase_changed = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.last_phase != Some(phase));
     if phase_changed {
         emit_best_effort(&app.state, OpEntryKind::PhaseTransition { phase });
@@ -243,9 +243,9 @@ pub(in crate::app::run) fn emit_vitals(app: &mut App) {
 
     // Cost — cumulative-since-boot; emit when the dollar total moves.
     let cost_usd = cp_base::cast::float_math::sum3(
-        app.state.thread().cost_hit_usd,
-        app.state.thread().cost_miss_usd,
-        app.state.thread().cost_output_usd,
+        app.state.agent().cost_hit_usd,
+        app.state.agent().cost_miss_usd,
+        app.state.agent().cost_output_usd,
     );
     let cost_changed = app
         .state
@@ -253,8 +253,8 @@ pub(in crate::app::run) fn emit_vitals(app: &mut App) {
         .is_some_and(|bs| cp_base::cast::float_math::abs_diff(bs.last_cost_usd, cost_usd) > f64::EPSILON);
     if cost_changed {
         let input_tokens =
-            app.state.thread().cache_hit_tokens.to_u64().saturating_add(app.state.thread().cache_miss_tokens.to_u64());
-        let output_tokens = app.state.thread().total_output_tokens.to_u64();
+            app.state.agent().cache_hit_tokens.to_u64().saturating_add(app.state.agent().cache_miss_tokens.to_u64());
+        let output_tokens = app.state.agent().total_output_tokens.to_u64();
         emit_best_effort(&app.state, OpEntryKind::CostAggregate { input_tokens, output_tokens, cost_usd });
         app.state.ext_mut::<BridgeState>().last_cost_usd = cost_usd;
     }
@@ -309,7 +309,7 @@ fn context_inputs_changed(state: &State) -> bool {
     for tool in &state.tools {
         (&tool.name, tool.enabled).hash(&mut h);
     }
-    for ctx in &state.thread().context {
+    for ctx in &state.agent().context {
         (ctx.token_count, ctx.panel_cache_hit).hash(&mut h);
     }
     (state.cleaning_threshold_tokens(), state.effective_context_budget()).hash(&mut h);
@@ -324,20 +324,20 @@ fn context_inputs_changed(state: &State) -> bool {
 
 // ── Thread status emission (Phase 1.4 status_changed — design doc I8) ─────
 
-/// Map the agent's [`ThreadStatus`] to the wire [`ThreadTurn`] observers see.
+/// Map the agent's [`AgentStatus`] to the wire [`AgentTurn`] observers see.
 ///
 /// The mapping is **identity by name** — `MyTurn → MyTurn`, `TheirTurn →
 /// TheirTurn` — matching the disk-plane reshape
-/// (`transport/rest/thread_shape.rs`), so a status served from a tier-② disk
+/// (`transport/rest/agent_shape.rs`), so a status served from a tier-② disk
 /// read and one carried by a live delta resolve to the *same* web bucket. (The
 /// wire enum's own doc comments describe the human-centric reading; the data
 /// convention actually in use across both planes is identity-by-name, and this
 /// helper is the single place that conversion lives.)
-pub(super) const fn wire_turn(status: ThreadStatus) -> ThreadTurn {
-    if matches!(status, ThreadStatus::MyTurn) { ThreadTurn::MyTurn } else { ThreadTurn::TheirTurn }
+pub(super) const fn wire_turn(status: AgentStatus) -> AgentTurn {
+    if matches!(status, AgentStatus::MyTurn) { AgentTurn::MyTurn } else { AgentTurn::TheirTurn }
 }
 
-/// Emit a [`ThreadStatusChanged`](OpEntryKind::ThreadStatusChanged) the instant
+/// Emit a [`AgentStatusChanged`](OpEntryKind::AgentStatusChanged) the instant
 /// any thread's turn-status flips, so the backend view (and the web roster)
 /// move the thread to the right bucket in milliseconds instead of waiting on
 /// the debounced tier-② disk write.
@@ -360,22 +360,22 @@ pub(super) const fn wire_turn(status: ThreadStatus) -> ThreadTurn {
 /// Replay the agent's own oplog to recover the **last per-thread status the log
 /// recorded** — i.e. exactly what the backend's view has folded.
 ///
-/// This is the correct seed for [`emit_thread_status`]'s change-memo on the
+/// This is the correct seed for [`emit_agent_status`]'s change-memo on the
 /// first pass after a (re)boot: comparing the live (disk) status against *this*
 /// (not against the live status itself) makes the first diff emit precisely the
 /// transitions that landed on disk while the bridge was down but were never
 /// journaled — self-healing disk↔oplog divergence (see the seed comment in
-/// [`emit_thread_status`]).
+/// [`emit_agent_status`]).
 ///
 /// Returns an empty map when the bridge is OFF or the replay fails: the caller
 /// then seeds nothing, so every live thread looks "new" to the diff and has its
 /// current status emitted — a safe, if chattier, degradation that still
 /// converges the view (it never leaves a thread stale).
-fn oplog_roster_statuses(state: &State) -> std::collections::HashMap<String, ThreadTurn> {
-    super::oplog_roster(state).map(|r| r.iter().map(|t| (t.thread_id.clone(), t.status)).collect()).unwrap_or_default()
+fn oplog_roster_statuses(state: &State) -> std::collections::HashMap<String, AgentTurn> {
+    super::oplog_roster(state).map(|r| r.iter().map(|t| (t.agent_id.clone(), t.status)).collect()).unwrap_or_default()
 }
 
-/// Emit a [`ThreadStatusChanged`](OpEntryKind::ThreadStatusChanged) the instant
+/// Emit a [`AgentStatusChanged`](OpEntryKind::AgentStatusChanged) the instant
 /// any thread's turn-status flips, so the backend view (and the web roster)
 /// move the thread to the right bucket in milliseconds instead of waiting on
 /// the debounced tier-② disk write.
@@ -395,7 +395,7 @@ fn oplog_roster_statuses(state: &State) -> std::collections::HashMap<String, Thr
 /// divergence (see the inline seed comment).
 ///
 /// No-op when the bridge is OFF.
-pub(in crate::app::run) fn emit_thread_status(app: &mut App) {
+pub(in crate::app::run) fn emit_agent_status(app: &mut App) {
     if !bridge_active(&app.state) {
         return;
     }
@@ -408,7 +408,7 @@ pub(in crate::app::run) fn emit_thread_status(app: &mut App) {
     // a turn flip that lands on disk while the bridge is down (e.g. a `Send`
     // immediately before a `system_reload`, or any restart straddling a
     // transition) is saved to tier-② config.json by the normal save path but
-    // never journaled as a `ThreadStatusChanged` delta. If we seeded from the
+    // never journaled as a `AgentStatusChanged` delta. If we seeded from the
     // live status, that post-flip value would become the baseline and the lost
     // transition would be swallowed forever — leaving the backend view (rebuilt
     // from the oplog) permanently stale (the "thread shows under the wrong
@@ -424,7 +424,7 @@ pub(in crate::app::run) fn emit_thread_status(app: &mut App) {
         // `extend` (not an explicit `for` over the map) keeps us off the
         // `iter_over_hash_type` lint; insertion order is irrelevant since each
         // thread id appears once in the roster and the memo is keyed by id.
-        bs.thread_statuses.extend(oplog_statuses);
+        bs.agent_statuses.extend(oplog_statuses);
         bs.seeded.seed_statuses();
         // Intentionally NO early return: fall through so the diff below emits
         // any flip the oplog missed while the bridge was down.
@@ -432,10 +432,10 @@ pub(in crate::app::run) fn emit_thread_status(app: &mut App) {
 
     // Diff live statuses against the memo; collect the flips (owned, so the
     // borrows end before we emit + update the memo below).
-    let changed: Vec<(String, ThreadTurn)> = {
-        let ts = ThreadsState::get(&app.state);
-        let memo = &app.state.ext::<BridgeState>().thread_statuses;
-        ts.threads
+    let changed: Vec<(String, AgentTurn)> = {
+        let ts = AgentsState::get(&app.state);
+        let memo = &app.state.ext::<BridgeState>().agent_statuses;
+        ts.agents
             .iter()
             .filter_map(|t| {
                 let turn = wire_turn(t.status);
@@ -444,8 +444,8 @@ pub(in crate::app::run) fn emit_thread_status(app: &mut App) {
             .collect()
     };
 
-    for (thread_id, status) in changed {
-        emit_roster_delta(&app.state, OpEntryKind::ThreadStatusChanged { thread_id: thread_id.clone(), status });
-        let _prev = app.state.ext_mut::<BridgeState>().thread_statuses.insert(thread_id, status);
+    for (agent_id, status) in changed {
+        emit_roster_delta(&app.state, OpEntryKind::AgentStatusChanged { agent_id: agent_id.clone(), status });
+        let _prev = app.state.ext_mut::<BridgeState>().agent_statuses.insert(agent_id, status);
     }
 }

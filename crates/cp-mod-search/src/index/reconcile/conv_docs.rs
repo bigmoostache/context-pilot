@@ -14,16 +14,16 @@ use crate::index;
 /// non-empty thread message. `auto` (tool-trace) and empty-content messages are
 /// dropped here so they never enter the index — matching the reconcile
 /// contract. The doc `index` is the message's position in its thread, giving a
-/// stable id (`"{thread_id}-{index}"`) for append-only threads. Archived threads
+/// stable id (`"{agent_id}-{index}"`) for append-only threads. Archived threads
 /// are still included (their docs stay searchable); a deleted thread simply
 /// stops appearing, so the reconciler purges its docs.
 pub(crate) fn build_conversation_docs(state: &State) -> Vec<index::reconcile::conversations::ConversationDoc> {
     use index::reconcile::conversations::{ConversationDoc, DocParts};
 
-    let threads = &cp_mod_agents::types::ThreadsState::get(state).threads;
+    let agents = &cp_mod_agents::types::AgentsState::get(state).agents;
     let mut docs = Vec::new();
-    for thread in threads {
-        for (index, msg) in thread.messages.iter().enumerate() {
+    for agent in agents {
+        for (index, msg) in agent.messages.iter().enumerate() {
             if msg.auto {
                 continue; // tool-trace — never indexed
             }
@@ -35,9 +35,9 @@ pub(crate) fn build_conversation_docs(state: &State) -> Vec<index::reconcile::co
             }
             let author = msg.author.to_string(); // "user" / "assistant"
             docs.push(ConversationDoc::from_parts(&DocParts {
-                thread_id: &thread.id,
+                agent_id: &agent.id,
                 index,
-                thread_name: &thread.name,
+                agent_name: &agent.name,
                 author: &author,
                 text,
                 ts_ms: msg.timestamp,

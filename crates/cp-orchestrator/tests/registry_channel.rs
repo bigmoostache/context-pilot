@@ -143,7 +143,7 @@ mod tests {
             format!("cmd-{dedup}"),
             1,
             dedup.to_owned(),
-            CommandKind::SendMessage { thread_id: "T1".to_owned(), content: "hi".to_owned() },
+            CommandKind::SendMessage { agent_id: "T1".to_owned(), content: "hi".to_owned() },
         )
     }
 
@@ -232,7 +232,7 @@ mod tests {
             let oplog = OplogService::spawn(&oplog_dir).expect("spawn");
             let _rev = oplog
                 .append_durable(OpEntryKind::MessageCreated {
-                    thread_id: "T1".to_owned(),
+                    agent_id: "T1".to_owned(),
                     message_id: "m1".to_owned(),
                     head: spilled.hash(),
                     inline_body: None,

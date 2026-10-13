@@ -103,7 +103,7 @@ fn append_reverie_chunk(app: &mut App, system_id: &str, text: &str) {
 /// agent's session (non-critical — reveries are best-effort).
 fn destroy_reverie_on_error(app: &mut App, system_id: &str, err: &str) {
     let session = app.state.reveries.get(system_id);
-    let tid = session.and_then(|r| r.thread_id.clone());
+    let tid = session.and_then(|r| r.agent_id.clone());
     let label = session.map_or_else(|| system_id.to_owned(), |r| r.system_id.clone());
     let nid = cp_mod_spine::types::SpineState::create_notification(
         &mut app.state,
@@ -111,7 +111,7 @@ fn destroy_reverie_on_error(app: &mut App, system_id: &str, err: &str) {
         "Reverie".to_owned(),
         format!("Reverie '{label}' error: {err}. Destroying session."),
     );
-    cp_mod_spine::types::SpineState::set_notification_thread(&mut app.state, &nid, tid);
+    cp_mod_spine::types::SpineState::set_notification_agent(&mut app.state, &nid, tid);
     QueueState::get_mut(&mut app.state).clear();
     drop(app.state.reveries.remove(system_id));
     drop(app.reverie_streams.remove(system_id));
@@ -168,7 +168,7 @@ fn reverie_over_tool_cap(app: &mut App, system_id: &str) -> bool {
         return false;
     }
     let session = app.state.reveries.get(system_id);
-    let tid = session.and_then(|r| r.thread_id.clone());
+    let tid = session.and_then(|r| r.agent_id.clone());
     let label = session.map_or_else(|| system_id.to_owned(), |r| r.system_id.clone());
     let nid = cp_mod_spine::types::SpineState::create_notification(
         &mut app.state,
@@ -176,7 +176,7 @@ fn reverie_over_tool_cap(app: &mut App, system_id: &str) -> bool {
         "Reverie".to_owned(),
         format!("Tool cap ({cap}) reached for '{label}'. Force-stopping."),
     );
-    cp_mod_spine::types::SpineState::set_notification_thread(&mut app.state, &nid, tid);
+    cp_mod_spine::types::SpineState::set_notification_agent(&mut app.state, &nid, tid);
     QueueState::get_mut(&mut app.state).clear();
     drop(app.state.reveries.remove(system_id));
     drop(app.reverie_streams.remove(system_id));
@@ -233,14 +233,14 @@ fn dispatch_one_reverie_tool(
 /// stream reported, clear its queued actions, and destroy the session.
 fn destroy_reverie_on_report(app: &mut App, system_id: &str, content: &str) {
     let summary = content.strip_prefix("REVERIE_REPORT:").unwrap_or("Completed");
-    let tid = app.state.reveries.get(system_id).and_then(|r| r.thread_id.clone());
+    let tid = app.state.reveries.get(system_id).and_then(|r| r.agent_id.clone());
     let nid = cp_mod_spine::types::SpineState::create_notification(
         &mut app.state,
         cp_mod_spine::types::NotificationType::Custom,
         "Reverie".to_owned(),
         summary.to_owned(),
     );
-    cp_mod_spine::types::SpineState::set_notification_thread(&mut app.state, &nid, tid);
+    cp_mod_spine::types::SpineState::set_notification_agent(&mut app.state, &nid, tid);
     if let Some(stream) = app.reverie_streams.get_mut(system_id) {
         stream.report_called = true;
     }
@@ -318,7 +318,7 @@ pub(super) fn check_reverie_end_turn(app: &mut App) {
         if retries >= 1 {
             // Max retries reached — force destroy
             let session = app.state.reveries.get(&system_id);
-            let tid = session.and_then(|r| r.thread_id.clone());
+            let tid = session.and_then(|r| r.agent_id.clone());
             let label = session.map_or_else(|| system_id.clone(), |r| r.system_id.clone());
             let nid = cp_mod_spine::types::SpineState::create_notification(
                 &mut app.state,
@@ -326,7 +326,7 @@ pub(super) fn check_reverie_end_turn(app: &mut App) {
                 "Reverie".to_owned(),
                 format!("Reverie '{label}' ended without Report after retry. Force-destroying."),
             );
-            cp_mod_spine::types::SpineState::set_notification_thread(&mut app.state, &nid, tid);
+            cp_mod_spine::types::SpineState::set_notification_agent(&mut app.state, &nid, tid);
             QueueState::get_mut(&mut app.state).clear();
             drop(app.state.reveries.remove(&system_id));
             drop(app.reverie_streams.remove(&system_id));

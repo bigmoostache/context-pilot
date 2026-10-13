@@ -20,11 +20,11 @@ impl ScratchpadPanel {
         // is being stepped), never the shared focus pointer. Scoping to
         // the shared `focus_filter` alone made every thread's Scratchpad panel
         // show the focused thread's cells (same class as the Threads-panel bug).
-        let Some(focus) = state.executing_thread_id() else {
+        let Some(focus) = state.executing_agent_id() else {
             return "No focused thread".to_owned();
         };
         let cells: Vec<&crate::types::ScratchpadCell> =
-            ss.scratchpad_cells.iter().filter(|c| c.thread_id == focus).collect();
+            ss.scratchpad_cells.iter().filter(|c| c.agent_id == focus).collect();
         if cells.is_empty() {
             return "No scratchpad cells".to_owned();
         }
@@ -51,11 +51,11 @@ impl Panel for ScratchpadPanel {
         let ss = ScratchpadState::get(state);
 
         // Per-thread view: scope to the executing thread (see format_cells_for_context).
-        let Some(focus) = state.executing_thread_id() else {
+        let Some(focus) = state.executing_agent_id() else {
             return vec![Block::Line(vec![S::muted("  No focused thread".into()).italic()])];
         };
         let cells: Vec<&crate::types::ScratchpadCell> =
-            ss.scratchpad_cells.iter().filter(|c| c.thread_id == focus).collect();
+            ss.scratchpad_cells.iter().filter(|c| c.agent_id == focus).collect();
 
         if cells.is_empty() {
             return vec![
@@ -90,7 +90,7 @@ impl Panel for ScratchpadPanel {
         let content = Self::format_cells_for_context(state);
         let token_count = estimate_tokens(&content);
 
-        for ctx in &mut state.thread_mut().context {
+        for ctx in &mut state.agent_mut().context {
             if ctx.context_type.as_str() == Kind::SCRATCHPAD {
                 ctx.token_count = token_count;
                 let _changed = cp_base::panels::update_if_changed(ctx, &content);
@@ -107,7 +107,7 @@ impl Panel for ScratchpadPanel {
         let content = Self::format_cells_for_context(state);
         // Find the Scratchpad context element to get its ID and timestamp
         let (id, last_refresh_ms) = state
-            .thread()
+            .agent()
             .context
             .iter()
             .find(|c| c.context_type.as_str() == Kind::SCRATCHPAD)

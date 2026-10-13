@@ -1,7 +1,7 @@
 //! Todo module — hierarchical, thread-owned task tracking with status management.
 //!
 //! State (`TodoState`) owns all task items; each item carries a compulsory
-//! `thread_id` (thread-owned tasks rework). Structural edits and status marking
+//! `agent_id` (thread-owned tasks rework). Structural edits and status marking
 //! are hosted in the main crate (`Think.todo` + `todo_mark`) which resolves the
 //! focused thread and calls the pure ops in [`tools`]; this module exposes the
 //! pure task operations + the focus-scoped Todo panel and owns **no tools** of
@@ -11,7 +11,7 @@
 mod panel;
 /// Collapsing of superseded task recaps in the live conversation.
 pub mod recap;
-/// Focus-scoping + legacy purge (`set_focus_filter`, `purge_threadless`).
+/// Focus-scoping + legacy purge (`set_focus_filter`, `purge_agentless`).
 pub mod tools;
 /// Synthetic task-tree + in-progress-leaf warning for tool results (T686).
 pub mod tree;
@@ -97,8 +97,8 @@ impl Module for TodoModule {
         if let Some(v) = data.get("next_todo_id").and_then(serde_json::Value::as_u64) {
             ts.next_todo_id = v.to_usize();
         }
-        // FR4: forever-purge legacy items lacking a thread_id (old schema).
-        tools::purge_threadless(state);
+        // FR4: forever-purge legacy items lacking a agent_id (old schema).
+        tools::purge_agentless(state);
     }
 
     fn fixed_panel_types(&self) -> Vec<Kind> {

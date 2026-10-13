@@ -86,8 +86,8 @@ impl TeeReader {
     #[must_use]
     pub fn spawn(fleet_id: String, tee_path: PathBuf, backend: Arc<Mutex<Backend>>) -> Self {
         let stop = Arc::new(AtomicBool::new(false));
-        let stop_thread = Arc::clone(&stop);
-        let handle = thread::spawn(move || read_loop(&fleet_id, &tee_path, &backend, &stop_thread));
+        let stop_agent = Arc::clone(&stop);
+        let handle = thread::spawn(move || read_loop(&fleet_id, &tee_path, &backend, &stop_agent));
         Self { stop, handle: Some(handle) }
     }
 
@@ -231,7 +231,7 @@ mod tests {
             schema_version: 1,
             fleet_id: "a".to_owned(),
             worker_id: "w".to_owned(),
-            thread_id: "T1".to_owned(),
+            agent_id: "T1".to_owned(),
             message_id: "m1".to_owned(),
             seq,
             kind: Kind::Token { text: text.to_owned() },

@@ -7,7 +7,7 @@ pub(crate) use cp_mod_prompt::seed::{ensure_default_system, get_active_system_co
 /// Assign a UID to a panel if it doesn't have one.
 fn assign_panel_uid(state: &mut State, context_type: &str) {
     if let Some(ctx) =
-        state.thread_store.current_mut().context.iter_mut().find(|c| c.context_type.as_str() == context_type)
+        state.agent_store.current_mut().context.iter_mut().find(|c| c.context_type.as_str() == context_type)
         && ctx.uid.is_none()
     {
         ctx.uid = Some(format!("UID_{}_P", state.global_next_uid));
@@ -23,9 +23,9 @@ fn assign_panel_uid(state: &mut State, context_type: &str) {
 /// P6 = Spine, P7 = Logs, P8 = Git, P9 = Scratchpad
 pub(crate) fn ensure_default_contexts(state: &mut State) {
     // Ensure Conversation exists (special: no numbered Px, always first in context list)
-    if !state.thread().context.iter().any(|c| c.context_type.as_str() == Kind::CONVERSATION) {
+    if !state.agent().context.iter().any(|c| c.context_type.as_str() == Kind::CONVERSATION) {
         let elem = modules::make_default_entry("chat", Kind::new(Kind::CONVERSATION), "Chat", true);
-        state.thread_mut().context.insert(0, elem);
+        state.agent_mut().context.insert(0, elem);
     }
 
     let defaults = modules::all_fixed_panel_defaults();
@@ -41,7 +41,7 @@ pub(crate) fn ensure_default_contexts(state: &mut State) {
     // Library panels don't need UIDs (rendered from in-memory state)
     for d in &defaults {
         if d.context_type.as_str() != Kind::LIBRARY
-            && state.thread().context.iter().any(|c| c.context_type == d.context_type)
+            && state.agent().context.iter().any(|c| c.context_type == d.context_type)
         {
             assign_panel_uid(state, d.context_type.as_str());
         }
@@ -58,7 +58,7 @@ fn insert_fixed_panel(state: &mut State, pos: usize, d: &modules::FixedPanelDefa
     }
 
     // Skip if panel already exists
-    if state.thread().context.iter().any(|c| c.context_type == d.context_type) {
+    if state.agent().context.iter().any(|c| c.context_type == d.context_type) {
         return;
     }
 
@@ -67,9 +67,9 @@ fn insert_fixed_panel(state: &mut State, pos: usize, d: &modules::FixedPanelDefa
 
     evict_squatter(state, &id, &d.context_type, d.display_name);
 
-    let insert_pos = pos.saturating_add(1).min(state.thread().context.len()); // +1 for Conversation at index 0
+    let insert_pos = pos.saturating_add(1).min(state.agent().context.len()); // +1 for Conversation at index 0
     let elem = modules::make_default_entry(&id, d.context_type.clone(), d.display_name, d.cache_deprecated);
-    state.thread_mut().context.insert(insert_pos, elem);
+    state.agent_mut().context.insert(insert_pos, elem);
 }
 
 /// Evict any dynamic panel squatting on a fixed panel's `id`, reassigning it a
@@ -82,14 +82,14 @@ fn insert_fixed_panel(state: &mut State, pos: usize, d: &modules::FixedPanelDefa
 /// matching.
 fn evict_squatter(state: &mut State, id: &str, wanted_type: &Kind, display_name: &str) {
     let squatter_new_id = state
-        .thread()
+        .agent()
         .context
         .iter()
         .any(|c| c.id == id && c.context_type != *wanted_type)
         .then(|| state.next_available_context_id());
     if let Some(new_id) = squatter_new_id
         && let Some(squatter) =
-            state.thread_mut().context.iter_mut().find(|c| c.id == id && c.context_type != *wanted_type)
+            state.agent_mut().context.iter_mut().find(|c| c.id == id && c.context_type != *wanted_type)
     {
         log::warn!(
             "Evicting panel '{}' (type={}) from ID {} → {new_id} to make room for fixed panel '{}'",

@@ -4,7 +4,7 @@
 //! `+`, which branch names may not contain, so every branch gets its own
 //! folder). Git's own worktree list is the source of truth for where a
 //! branch's worktree is. Entering one sets the thread's
-//! [`workdir`](cp_base::state::runtime::bundle::ThreadRuntime::workdir), which
+//! [`workdir`](cp_base::state::runtime::bundle::AgentRuntime::workdir), which
 //! every path- or cwd-sensitive module resolves through
 //! [`State::workdir`]. The process cwd never changes, so threads running
 //! concurrently can each sit in a different worktree.
@@ -115,7 +115,7 @@ fn same_dir(a: &Path, b: &Path) -> bool {
 
 /// Point the executing thread at `dir` (`None` = project root) and refresh git panels.
 fn set_workdir(state: &mut State, dir: Option<PathBuf>) {
-    state.thread_mut().workdir = dir;
+    state.agent_mut().workdir = dir;
     cp_base::panels::mark_panels_dirty(state, Kind::GIT_RESULT);
 }
 
@@ -192,10 +192,10 @@ fn ensure_worktrees_dir(root: &Path) -> Result<(), String> {
 /// Return the executing thread to the project root. Refused for the last
 /// thread in a worktree: leaving would strand it, so it must be removed.
 fn leave(state: &mut State) -> Result<String, String> {
-    let Some(dir) = state.thread().workdir.clone() else {
+    let Some(dir) = state.agent().workdir.clone() else {
         return Ok("Already at the project root.".to_owned());
     };
-    let me = state.thread_store.executing().map(str::to_owned);
+    let me = state.agent_store.executing().map(str::to_owned);
     if other_users(state, &dir, me.as_deref()).is_empty() {
         let branch = git(&dir, &["rev-parse", "--abbrev-ref", "HEAD"]).unwrap_or_else(|_| "<branch>".to_owned());
         return Err(format!(
@@ -211,24 +211,24 @@ fn leave(state: &mut State) -> Result<String, String> {
 /// Ids of threads other than `me` whose workdir is `dir`.
 fn other_users(state: &State, dir: &Path, me: Option<&str>) -> Vec<String> {
     state
-        .thread_store
+        .agent_store
         .ids()
         .into_iter()
         .filter(|id| Some(id.as_str()) != me)
-        .filter(|id| state.thread_store.get(id).and_then(|rt| rt.workdir.as_deref()).is_some_and(|w| same_dir(w, dir)))
+        .filter(|id| state.agent_store.get(id).and_then(|rt| rt.workdir.as_deref()).is_some_and(|w| same_dir(w, dir)))
         .collect()
 }
 
-/// Release `thread_id`'s worktree when the thread is archived.
+/// Release `agent_id`'s worktree when the thread is archived.
 ///
 /// Removed when no other thread works there, else simply left. A worktree
 /// that can't be removed (uncommitted changes, running consoles) is kept, and
 /// so is the thread's workdir, so restoring the thread brings it back. Returns
 /// a one-line outcome, `None` when the thread was at the project root.
-pub fn release_thread(state: &mut State, thread_id: &str) -> Option<String> {
-    let dir = state.thread_store.get(thread_id)?.workdir.clone()?;
+pub fn release_agent(state: &mut State, agent_id: &str) -> Option<String> {
+    let dir = state.agent_store.get(agent_id)?.workdir.clone()?;
     let shown = dir.display().to_string();
-    let outcome = if other_users(state, &dir, Some(thread_id)).is_empty() {
+    let outcome = if other_users(state, &dir, Some(agent_id)).is_empty() {
         match remove_dir(state, &dir) {
             Ok(()) => format!("removed worktree {shown}"),
             Err(e) => return Some(format!("kept worktree {shown}: {e}")),
@@ -236,7 +236,7 @@ pub fn release_thread(state: &mut State, thread_id: &str) -> Option<String> {
     } else {
         format!("left worktree {shown} (still used by other threads)")
     };
-    if let Some(rt) = state.thread_store.get_mut(thread_id) {
+    if let Some(rt) = state.agent_store.get_mut(agent_id) {
         rt.workdir = None;
     }
     Some(outcome)
@@ -261,7 +261,7 @@ fn remove(state: &mut State, branch: &str) -> Result<String, String> {
     let path = dir.display().to_string();
     remove_dir(state, &dir)?;
     let mut msg = format!("Removed worktree {path} (branch {branch} kept).");
-    if state.thread().workdir.as_deref().is_some_and(|w| same_dir(w, &dir)) {
+    if state.agent().workdir.as_deref().is_some_and(|w| same_dir(w, &dir)) {
         set_workdir(state, None);
         msg.push_str(" This thread was inside it and is back at the project root.");
     }
@@ -292,15 +292,15 @@ fn remove_dir(state: &State, dir: &Path) -> Result<(), String> {
 }
 
 /// Running console panels, in any thread, whose cwd lies inside `dir`:
-/// `"P21 'bash' (thread T857)"`. Removing the folder would strand them.
+/// `"P21 'bash' (agent T857)"`. Removing the folder would strand them.
 fn live_consoles(state: &State, dir: &Path) -> Vec<String> {
-    let mut threads: Vec<(String, &cp_base::state::runtime::bundle::ThreadRuntime)> =
-        state.thread_store.ids().into_iter().filter_map(|id| state.thread_store.get(&id).map(|rt| (id, rt))).collect();
-    if state.thread_store.executing().is_none_or(|id| !state.thread_store.contains(id)) {
-        threads.push(("unbound".to_owned(), state.thread()));
+    let mut agents: Vec<(String, &cp_base::state::runtime::bundle::AgentRuntime)> =
+        state.agent_store.ids().into_iter().filter_map(|id| state.agent_store.get(&id).map(|rt| (id, rt))).collect();
+    if state.agent_store.executing().is_none_or(|id| !state.agent_store.contains(id)) {
+        agents.push(("unbound".to_owned(), state.agent()));
     }
     let mut live = Vec::new();
-    for (tid, rt) in threads {
+    for (tid, rt) in agents {
         for ctx in rt.context.iter().filter(|c| c.context_type.as_str() == Kind::CONSOLE) {
             let running = ctx.get_meta_str("console_status").is_some_and(|s| s.starts_with("running"));
             let inside = ctx.get_meta_str("console_cwd").is_some_and(|cwd| Path::new(cwd).starts_with(dir));

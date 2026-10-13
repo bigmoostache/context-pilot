@@ -5,16 +5,16 @@
 //! many threads at once, without any knowledge of what a thread's context
 //! actually contains:
 //!
-//! - [`ThreadExecState`] — where a thread sits in the loop.
+//! - [`AgentExecState`] — where a thread sits in the loop.
 //! - [`Role`] — whether a registry entry is a peer thread or a subordinate
 //!   reverie (only peer threads count against the concurrency cap).
 //! - [`FleetRegistry`] — scheduling metadata per thread id. Thread runtimes
-//!   live in `cp-base`'s `ThreadStore`; this crate must not depend on `cp-base`.
+//!   live in `cp-base`'s `AgentStore`; this crate must not depend on `cp-base`.
 //! - [`K`] — the concurrency cap, and [`promote`] — the starvation-free policy
 //!   that fills free active slots from the waiting queue.
 //!
 //! The split is deliberate: the *bundle* of per-thread state (`cp-base`'s
-//! `ThreadRuntime`) holds editor/conversation/cache types that live in
+//! `AgentRuntime`) holds editor/conversation/cache types that live in
 //! `cp-base`; this crate stays dependency-light and holds only the vocabulary
 //! and the scheduling policy.
 
@@ -38,7 +38,7 @@ pub const K: usize = 2;
 /// yields its slot ([`AwaitingTool`](Self::AwaitingTool)) and re-enters the
 /// runnable queue when the result lands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub enum ThreadExecState {
+pub enum AgentExecState {
     /// No work to do — the thread is `THEIR_TURN` or finished. Not scheduled.
     #[default]
     Idle,
@@ -57,7 +57,7 @@ pub enum ThreadExecState {
     Errored,
 }
 
-impl ThreadExecState {
+impl AgentExecState {
     /// Whether this state occupies a concurrency slot (counts against [`K`]).
     ///
     /// Only states with an in-flight LLM turn are active; everything else —
@@ -77,14 +77,15 @@ impl ThreadExecState {
 /// The role a registry entry plays in the fleet.
 ///
 /// There is one execution primitive; `Role` distinguishes its two uses. Only a
-/// [`Thread`](Self::Thread) counts against the concurrency cap [`K`]; a
+/// [`Agent`](Self::Thread) counts against the concurrency cap [`K`]; a
 /// [`Reverie`](Self::Reverie) is a background subordinate scoped to a parent and
 /// is never gated by the cap.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum Role {
     /// A user-facing peer thread. Persistent; counts against [`K`].
     #[default]
-    Thread,
+    #[serde(rename = "Thread")]
+    Agent,
     /// A background subordinate (cleaner, cartographer). Transient; not capped.
     Reverie,
 }
@@ -93,20 +94,20 @@ impl Role {
     /// Whether entries of this role are subject to the concurrency cap [`K`].
     #[must_use]
     pub const fn is_capped(self) -> bool {
-        matches!(self, Self::Thread)
+        matches!(self, Self::Agent)
     }
 }
 
 /// One entry in the [`FleetRegistry`]: a thread's scheduling metadata.
 ///
 /// The thread's runtime is not here: it lives permanently in `cp-base`'s
-/// `ThreadStore`, keyed by the same thread id.
+/// `AgentStore`, keyed by the same thread id.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Entry {
     /// Peer thread or subordinate reverie.
     pub role: Role,
     /// Current position in the cooperative loop.
-    pub exec_state: ThreadExecState,
+    pub exec_state: AgentExecState,
     /// Monotonic timestamp (ms) at which this entry last became `Runnable` while
     /// waiting for a slot. Used by [`promote`] for oldest-waiting-first order.
     /// `None` when the entry is not waiting.
@@ -117,7 +118,7 @@ impl Entry {
     /// A fresh entry with the given `role`, `Idle` and not waiting.
     #[must_use]
     pub const fn new(role: Role) -> Self {
-        Self { role, exec_state: ThreadExecState::Idle, waiting_since_ms: None }
+        Self { role, exec_state: AgentExecState::Idle, waiting_since_ms: None }
     }
 }
 
@@ -144,7 +145,7 @@ impl FleetRegistry {
     }
 
     /// Remove and return the entry for `id`, if present. Scheduling metadata
-    /// only: the thread's runtime is dropped via `ThreadStore::remove`.
+    /// only: the thread's runtime is dropped via `AgentStore::remove`.
     pub fn remove(&mut self, id: &str) -> Option<Entry> {
         self.entries.remove(id)
     }
@@ -235,17 +236,17 @@ mod tests {
 
     #[test]
     fn active_state_classification() {
-        assert!(ThreadExecState::Streaming.is_active());
-        assert!(ThreadExecState::AwaitingLlm.is_active());
-        assert!(!ThreadExecState::AwaitingTool.is_active());
-        assert!(!ThreadExecState::Runnable.is_active());
-        assert!(!ThreadExecState::Idle.is_active());
-        assert!(!ThreadExecState::Errored.is_active());
+        assert!(AgentExecState::Streaming.is_active());
+        assert!(AgentExecState::AwaitingLlm.is_active());
+        assert!(!AgentExecState::AwaitingTool.is_active());
+        assert!(!AgentExecState::Runnable.is_active());
+        assert!(!AgentExecState::Idle.is_active());
+        assert!(!AgentExecState::Errored.is_active());
     }
 
     #[test]
     fn reverie_is_not_capped() {
-        assert!(Role::Thread.is_capped());
+        assert!(Role::Agent.is_capped());
         assert!(!Role::Reverie.is_capped());
     }
 
@@ -253,24 +254,24 @@ mod tests {
     fn registry_basic_ops() {
         let mut reg = FleetRegistry::new();
         assert!(reg.is_empty());
-        reg.insert("T1".to_owned(), Entry::new(Role::Thread));
+        reg.insert("T1".to_owned(), Entry::new(Role::Agent));
         assert_eq!(reg.len(), 1);
         assert!(reg.contains("T1"));
-        assert_eq!(reg.get("T1").map(|e| e.role), Some(Role::Thread));
+        assert_eq!(reg.get("T1").map(|e| e.role), Some(Role::Agent));
         let removed = reg.remove("T1");
-        assert_eq!(removed.map(|e| e.role), Some(Role::Thread));
+        assert_eq!(removed.map(|e| e.role), Some(Role::Agent));
         assert!(reg.is_empty());
     }
 
     #[test]
     fn active_count_ignores_reveries_and_parked() {
         let mut reg = FleetRegistry::new();
-        let mut t1 = Entry::new(Role::Thread);
-        t1.exec_state = ThreadExecState::Streaming;
+        let mut t1 = Entry::new(Role::Agent);
+        t1.exec_state = AgentExecState::Streaming;
         let mut rev = Entry::new(Role::Reverie);
-        rev.exec_state = ThreadExecState::Streaming; // active but not capped
-        let mut t2 = Entry::new(Role::Thread);
-        t2.exec_state = ThreadExecState::AwaitingTool; // parked, not active
+        rev.exec_state = AgentExecState::Streaming; // active but not capped
+        let mut t2 = Entry::new(Role::Agent);
+        t2.exec_state = AgentExecState::AwaitingTool; // parked, not active
         reg.insert("T1".to_owned(), t1);
         reg.insert("R1".to_owned(), rev);
         reg.insert("T2".to_owned(), t2);
@@ -281,15 +282,15 @@ mod tests {
     fn promote_fills_free_slots_oldest_first() {
         let mut reg = FleetRegistry::new();
         // One active thread → one free slot (K=2).
-        let mut active = Entry::new(Role::Thread);
-        active.exec_state = ThreadExecState::Streaming;
+        let mut active = Entry::new(Role::Agent);
+        active.exec_state = AgentExecState::Streaming;
         reg.insert("A".to_owned(), active);
         // Two waiting runnable threads with different wait times.
-        let mut w_new = Entry::new(Role::Thread);
-        w_new.exec_state = ThreadExecState::Runnable;
+        let mut w_new = Entry::new(Role::Agent);
+        w_new.exec_state = AgentExecState::Runnable;
         w_new.waiting_since_ms = Some(200);
-        let mut w_old = Entry::new(Role::Thread);
-        w_old.exec_state = ThreadExecState::Runnable;
+        let mut w_old = Entry::new(Role::Agent);
+        w_old.exec_state = AgentExecState::Runnable;
         w_old.waiting_since_ms = Some(100);
         reg.insert("WNEW".to_owned(), w_new);
         reg.insert("WOLD".to_owned(), w_old);
@@ -302,12 +303,12 @@ mod tests {
     fn promote_none_when_full() {
         let mut reg = FleetRegistry::new();
         for id in ["A", "B"] {
-            let mut e = Entry::new(Role::Thread);
-            e.exec_state = ThreadExecState::Streaming;
+            let mut e = Entry::new(Role::Agent);
+            e.exec_state = AgentExecState::Streaming;
             reg.insert(id.to_owned(), e);
         }
-        let mut waiting = Entry::new(Role::Thread);
-        waiting.exec_state = ThreadExecState::Runnable;
+        let mut waiting = Entry::new(Role::Agent);
+        waiting.exec_state = AgentExecState::Runnable;
         waiting.waiting_since_ms = Some(1);
         reg.insert("W".to_owned(), waiting);
         assert!(promote(&reg).is_empty(), "no free slots at K=2");

@@ -183,10 +183,10 @@ pub enum LifecycleState {
 }
 
 /// Whose turn it is on a thread — the wire mirror of the threads module's
-/// `ThreadStatus`.
+/// `AgentStatus`.
 ///
-/// Carried by [`OpEntryKind::ThreadCreated`](oplog::OpEntryKind::ThreadCreated)
-/// and [`ThreadStatusChanged`](oplog::OpEntryKind::ThreadStatusChanged) so the
+/// Carried by [`OpEntryKind::AgentCreated`](oplog::OpEntryKind::AgentCreated)
+/// and [`AgentStatusChanged`](oplog::OpEntryKind::AgentStatusChanged) so the
 /// backend's materialized roster knows, without a disk read, whether a thread
 /// is waiting on the human (`MyTurn`) or owned by the agent (`TheirTurn`).
 /// Defined here in the I/O-free protocol crate rather than imported from
@@ -199,7 +199,7 @@ pub enum LifecycleState {
     clippy::exhaustive_enums,
     reason = "wire-protocol contract: ThreadTurn already carries an Unknown catch-all for N-1 forward-compat; the variant set is otherwise closed and constructed cross-crate, so #[non_exhaustive] would forbid that construction while adding nothing the Unknown variant does not already provide"
 )]
-pub enum ThreadTurn {
+pub enum AgentTurn {
     /// The thread is waiting on the human — it needs a user response.
     MyTurn,
     /// The agent owns the thread (working it / will respond).
@@ -287,21 +287,21 @@ mod tests {
     }
 
     #[test]
-    fn thread_turn_round_trip() {
-        for turn in [ThreadTurn::MyTurn, ThreadTurn::TheirTurn] {
+    fn agent_turn_round_trip() {
+        for turn in [AgentTurn::MyTurn, AgentTurn::TheirTurn] {
             let json = serde_json::to_string(&turn).expect("serialize");
-            let back: ThreadTurn = serde_json::from_str(&json).expect("deserialize");
+            let back: AgentTurn = serde_json::from_str(&json).expect("deserialize");
             assert_eq!(turn, back);
         }
         // snake_case wire spelling is stable (the frontend depends on it).
-        assert_eq!(serde_json::to_string(&ThreadTurn::MyTurn).expect("ser"), "\"my_turn\"");
-        assert_eq!(serde_json::to_string(&ThreadTurn::TheirTurn).expect("ser"), "\"their_turn\"");
+        assert_eq!(serde_json::to_string(&AgentTurn::MyTurn).expect("ser"), "\"my_turn\"");
+        assert_eq!(serde_json::to_string(&AgentTurn::TheirTurn).expect("ser"), "\"their_turn\"");
     }
 
     #[test]
-    fn thread_turn_unknown_is_tolerant() {
+    fn agent_turn_unknown_is_tolerant() {
         // An N-1 receiver folds a future turn value to Unknown rather than failing.
-        let back: ThreadTurn = serde_json::from_str("\"some_future_turn\"").expect("tolerant decode");
-        assert_eq!(back, ThreadTurn::Unknown);
+        let back: AgentTurn = serde_json::from_str("\"some_future_turn\"").expect("tolerant decode");
+        assert_eq!(back, AgentTurn::Unknown);
     }
 }

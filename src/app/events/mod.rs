@@ -36,7 +36,7 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
     }
     // Mouse wheel → scroll the shown conversation/history pane. In the threads
     // list this scrolls the SELECTED thread's conversation (arrows stay bound to
-    // selection via `handle_threads_nav`); in a panel view it scrolls the active
+    // selection via `handle_agents_nav`); in a panel view it scrolls the active
     // pane exactly as before. Non-scroll mouse events (clicks/drag/move) are
     // ignored. Written as `matches!`/`else` rather than a `match` with a `_` arm
     // to avoid the forbidden `wildcard_enum_match_arm` on crossterm's enum.
@@ -80,13 +80,13 @@ fn handle_key_event(key: &KeyEvent, state: &State) -> Option<Action> {
     }
 
     // Escape stops streaming.
-    if key.code == KeyCode::Esc && state.thread().stream.phase.is_streaming() {
+    if key.code == KeyCode::Esc && state.agent().stream.phase.is_streaming() {
         return Some(Action::StopStreaming);
     }
 
     // Threads view: intercept navigation keys before panel/scroll handling.
-    if state.view_mode == cp_base::state::data::config::ViewMode::Threads
-        && let Dispatch::Act(action) = handle_threads_nav(key, state)
+    if state.view_mode == cp_base::state::data::config::ViewMode::Agents
+        && let Dispatch::Act(action) = handle_agents_nav(key, state)
     {
         return Some(action);
     }
@@ -110,8 +110,8 @@ fn handle_key_event(key: &KeyEvent, state: &State) -> Option<Action> {
 /// Ctrl+key shortcuts. Handles the Threads-view Ctrl+A/Ctrl+U overrides first,
 /// then the global bindings.
 fn handle_ctrl_shortcuts(key: &KeyEvent, state: &State) -> Dispatch {
-    if state.view_mode == cp_base::state::data::config::ViewMode::Threads
-        && let Some(action) = handle_threads_ctrl(key, state)
+    if state.view_mode == cp_base::state::data::config::ViewMode::Agents
+        && let Some(action) = handle_agents_ctrl(key, state)
     {
         return Dispatch::Act(action);
     }
@@ -139,7 +139,7 @@ fn handle_ctrl_shortcuts(key: &KeyEvent, state: &State) -> Dispatch {
         // Selection-priority (T797): when the composer has an active selection,
         // Ctrl+C copies that selection and wins over panel/overlay copy.
         KeyCode::Char('c') => {
-            Dispatch::Act(if crate::app::actions::threads::active_textarea(state).selection_range().is_some() {
+            Dispatch::Act(if crate::app::actions::agents::active_textarea(state).selection_range().is_some() {
                 Action::CopySelection
             } else if state.flags.overlays.index_status {
                 Action::CopyIndexOverlay
@@ -180,18 +180,18 @@ fn handle_ctrl_shortcuts(key: &KeyEvent, state: &State) -> Dispatch {
 /// Threads-view Ctrl overrides: Ctrl+X arms then (within 2s) confirms
 /// archive/restore, Ctrl+U toggles the archived view. `None` = not one of these
 /// (fall through to global Ctrl bindings).
-fn handle_threads_ctrl(key: &KeyEvent, state: &State) -> Option<Action> {
+fn handle_agents_ctrl(key: &KeyEvent, state: &State) -> Option<Action> {
     match key.code {
-        // Ctrl+X: first press arms (ThreadArchiveStart), a second press within
-        // the 2-second window confirms (ThreadArchiveConfirm). A press after the
+        // Ctrl+X: first press arms (AgentArchiveStart), a second press within
+        // the 2-second window confirms (AgentArchiveConfirm). A press after the
         // window lapsed simply re-arms — `archive_start` re-stamps the time.
         KeyCode::Char('x') => {
             let focus = cp_mod_agents::types::FocusState::get(state);
             let within_window = focus.confirming_archive
                 && cp_base::panels::now_ms().saturating_sub(focus.archive_armed_at_ms) <= ARCHIVE_CONFIRM_WINDOW_MS;
-            Some(if within_window { Action::ThreadArchiveConfirm } else { Action::ThreadArchiveStart })
+            Some(if within_window { Action::AgentArchiveConfirm } else { Action::AgentArchiveStart })
         }
-        KeyCode::Char('u') => Some(Action::ThreadToggleArchivedView),
+        KeyCode::Char('u') => Some(Action::AgentToggleArchivedView),
         KeyCode::Backspace
         | KeyCode::Enter
         | KeyCode::Left
@@ -239,9 +239,9 @@ fn handle_index_overlay_key(key: &KeyEvent, state: &State) -> Option<Action> {
 /// one — Model 2 forbids a glance disturbing the agent's thread. Written as an
 /// `if`/`else` on `matches!` rather than a `match` with a `_` arm to avoid the
 /// forbidden `wildcard_enum_match_arm`.
-const fn drilled_threads_nav(key: &KeyEvent) -> Dispatch {
+const fn drilled_agents_nav(key: &KeyEvent) -> Dispatch {
     if matches!(key.code, KeyCode::Left | KeyCode::Esc) {
-        Dispatch::Act(Action::ThreadDrillOut)
+        Dispatch::Act(Action::AgentDrillOut)
     } else {
         Dispatch::Act(Action::None)
     }
@@ -249,41 +249,41 @@ const fn drilled_threads_nav(key: &KeyEvent) -> Dispatch {
 
 /// True when the list cursor sits on a real thread row (not the virtual
 /// "+ New Thread" entry, not an empty list) — i.e. drill-in has a target.
-fn selection_is_real_thread(focus: &cp_mod_agents::types::FocusState, state: &State) -> bool {
-    let visible = cp_mod_agents::types::ThreadsState::get(state).visible_indices(focus.viewing_archived);
-    focus.selected_thread_idx < visible.len()
+fn selection_is_real_agent(focus: &cp_mod_agents::types::FocusState, state: &State) -> bool {
+    let visible = cp_mod_agents::types::AgentsState::get(state).visible_indices(focus.viewing_archived);
+    focus.selected_agent_idx < visible.len()
 }
 
 /// Threads-view navigation (non-Ctrl): archive-confirm y/n, Tab/BackTab select,
 /// Esc exit. `Fallthrough` when the key isn't a threads-nav key.
-fn handle_threads_nav(key: &KeyEvent, state: &State) -> Dispatch {
+fn handle_agents_nav(key: &KeyEvent, state: &State) -> Dispatch {
     let shift = key.modifiers.contains(KeyModifiers::SHIFT);
     let focus = cp_mod_agents::types::FocusState::get(state);
     let confirming = focus.confirming_archive;
 
-    if focus.drilled_thread_id.is_some() {
-        return drilled_threads_nav(key);
+    if focus.drilled_agent_id.is_some() {
+        return drilled_agents_nav(key);
     }
 
     match key.code {
         // While armed, the confirming gesture is a second Ctrl+X (handled in
-        // `handle_threads_ctrl`, which runs first). Any other non-Ctrl key here
+        // `handle_agents_ctrl`, which runs first). Any other non-Ctrl key here
         // cancels the pending arm.
-        _ if confirming => Dispatch::Act(Action::ThreadArchiveCancel),
-        KeyCode::Tab if !shift => Dispatch::Act(Action::ThreadSelectNext),
+        _ if confirming => Dispatch::Act(Action::AgentArchiveCancel),
+        KeyCode::Tab if !shift => Dispatch::Act(Action::AgentSelectNext),
         // Design 9.1: Up/Down move the selection within the list. The threads
         // view IS the list surface, so selection wins over the message pane's
         // scroll; Shift+Up/Down and PageUp/PageDown still scroll that pane.
         KeyCode::Up | KeyCode::Down if shift => Dispatch::Act(scroll_key_action(key).unwrap_or(Action::None)),
-        KeyCode::BackTab | KeyCode::Up => Dispatch::Act(Action::ThreadSelectPrev),
-        KeyCode::Down => Dispatch::Act(Action::ThreadSelectNext),
+        KeyCode::BackTab | KeyCode::Up => Dispatch::Act(Action::AgentSelectPrev),
+        KeyCode::Down => Dispatch::Act(Action::AgentSelectNext),
         // Design 9.1: Esc navigates *out* to the panel view. On a real row it
         // opens the SELECTED thread (drill-in commits the list cursor as
-        // focus), never whatever `focused_thread_id` last held — an agent's
+        // focus), never whatever `focused_agent_id` last held — an agent's
         // Read/Send can move focus after the cursor was placed. On the virtual
         // "+ New Thread" row (or an empty list) it just leaves the list.
-        KeyCode::Esc => Dispatch::Act(if selection_is_real_thread(focus, state) {
-            Action::ThreadDrillIn
+        KeyCode::Esc => Dispatch::Act(if selection_is_real_agent(focus, state) {
+            Action::AgentDrillIn
         } else {
             Action::CycleViewMode
         }),
@@ -291,7 +291,7 @@ fn handle_threads_nav(key: &KeyEvent, state: &State) -> Dispatch {
         KeyCode::Left => Dispatch::Act(Action::None),
         // Right drills into the selected thread's full panel view (G3). The
         // handler no-ops on the virtual "+ New Thread" entry / empty selection.
-        KeyCode::Right => Dispatch::Act(Action::ThreadDrillIn),
+        KeyCode::Right => Dispatch::Act(Action::AgentDrillIn),
         KeyCode::Backspace
         | KeyCode::Enter
         | KeyCode::Home
@@ -324,7 +324,7 @@ fn handle_context_pattern_submit(key: &KeyEvent, state: &State) -> Option<Action
         || key.modifiers.contains(KeyModifiers::ALT);
     let is_submit = (key.code == KeyCode::Enter && !has_modifier) || key.code == KeyCode::Char(' ');
     if is_submit
-        && let Some(id) = parse_context_pattern(&state.thread().composer.text)
+        && let Some(id) = parse_context_pattern(&state.agent().composer.text)
         && find_context_by_id(state, &id).is_some()
     {
         return Some(Action::InputSubmit);
@@ -335,12 +335,11 @@ fn handle_context_pattern_submit(key: &KeyEvent, state: &State) -> Option<Action
 /// Let the active panel handle the key. In Threads view the conversation panel
 /// always owns input routing. `None` when no panel consumes the key.
 fn handle_panel_key(key: &KeyEvent, state: &State) -> Option<Action> {
-    if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
-        let ctx =
-            state.thread().context.iter().find(|c| c.context_type.as_str() == crate::state::Kind::CONVERSATION)?;
+    if state.view_mode == cp_base::state::data::config::ViewMode::Agents {
+        let ctx = state.agent().context.iter().find(|c| c.context_type.as_str() == crate::state::Kind::CONVERSATION)?;
         return get_panel(&ctx.context_type).handle_key(key, state);
     }
-    let ctx = state.thread().context.get(state.thread().selected_context)?;
+    let ctx = state.agent().context.get(state.agent().selected_context)?;
     get_panel(&ctx.context_type).handle_key(key, state)
 }
 

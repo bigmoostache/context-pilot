@@ -358,8 +358,8 @@ mod tests {
             "q-1".to_owned(),
             Outcome::Hits {
                 hits: vec![ConvHit::from_parts(&HitParts {
-                    thread_id: "T3",
-                    thread_name: "Auth",
+                    agent_id: "T3",
+                    agent_name: "Auth",
                     author: "user",
                     text: "the token check",
                     ts_ms: 7,
@@ -376,7 +376,7 @@ mod tests {
     fn test_query() -> Query {
         Query::new(
             "q-1".to_owned(),
-            QueryKind::SearchConversations { query: "auth bug".to_owned(), limit: 5, thread_id: None },
+            QueryKind::SearchConversations { query: "auth bug".to_owned(), limit: 5, agent_id: None },
         )
     }
 

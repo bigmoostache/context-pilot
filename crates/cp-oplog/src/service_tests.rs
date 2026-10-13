@@ -9,9 +9,9 @@ use crate::replay::replay;
 use cp_wire::types::{ContentHash, Phase};
 use tempfile::tempdir;
 
-fn msg(thread: &str, byte: u8) -> OpEntryKind {
+fn msg(agent: &str, byte: u8) -> OpEntryKind {
     OpEntryKind::MessageCreated {
-        thread_id: thread.to_owned(),
+        agent_id: agent.to_owned(),
         message_id: format!("m{byte}"),
         head: ContentHash::new([byte; 32]),
         inline_body: None,
@@ -50,7 +50,7 @@ fn durable_appends_are_monotonic_and_survive_reopen() {
     assert_eq!(state.rev_head, Some(2));
     assert!(state.seen.contains("c0"), "durable command effect survived");
     let mut expected_heads = cp_wire::types::snapshot::Heads::default();
-    expected_heads.set_thread_head("T1", ContentHash::new([0x22; 32]));
+    expected_heads.set_agent_head("T1", ContentHash::new([0x22; 32]));
     assert_eq!(state.heads, expected_heads, "latest head folded through the service");
 }
 
@@ -82,7 +82,7 @@ fn mixed_workload_replays_correctly() {
     assert!(state.seen.contains("cmd-a"));
     assert!(state.seen.contains("cmd-b"));
     let mut expected = cp_wire::types::snapshot::Heads::default();
-    expected.set_thread_head("T7", ContentHash::new([0xAB; 32]));
+    expected.set_agent_head("T7", ContentHash::new([0xAB; 32]));
     assert_eq!(state.heads, expected);
 }
 
@@ -102,7 +102,7 @@ fn group_commit_rolls_segments_and_replays() {
     }
     let state = replay(dir.path()).expect("replay");
     let mut expected = cp_wire::types::snapshot::Heads::default();
-    expected.set_thread_head("T1", ContentHash::new([11; 32]));
+    expected.set_agent_head("T1", ContentHash::new([11; 32]));
     assert_eq!(state.heads, expected, "rolled, group-committed log replays intact");
 }
 
@@ -137,7 +137,7 @@ fn submit_durable_persists_without_awaiting_the_sync() {
     let state = replay(dir.path()).expect("replay");
     assert!(state.seen.contains("fire-and-forget"), "detached-ack record is still durable");
     let mut expected = cp_wire::types::snapshot::Heads::default();
-    expected.set_thread_head("T1", ContentHash::new([0x44; 32]));
+    expected.set_agent_head("T1", ContentHash::new([0x44; 32]));
     assert_eq!(state.heads, expected, "submitted head folded after off-loop commit");
 }
 

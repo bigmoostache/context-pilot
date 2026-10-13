@@ -29,7 +29,7 @@ pub struct FiredCoucou {
     /// Coucou id (`coucou_<n>`), used as the notification source for dedup.
     pub id: String,
     /// Target thread; `None` = whichever thread is focused.
-    pub thread_id: Option<String>,
+    pub agent_id: Option<String>,
     /// Notification text.
     pub description: String,
 }
@@ -72,11 +72,11 @@ impl CoucouRegistry {
         self.pending.len() < before
     }
 
-    /// Whether any coucou targets `thread_id` (or is unscoped). Drives the
+    /// Whether any coucou targets `agent_id` (or is unscoped). Drives the
     /// WAITING badge of the focused thread.
     #[must_use]
-    pub fn has_pending_for(&self, thread_id: Option<&str>) -> bool {
-        self.pending.iter().any(|c| c.thread_id.is_none() || c.thread_id.as_deref() == thread_id)
+    pub fn has_pending_for(&self, agent_id: Option<&str>) -> bool {
+        self.pending.iter().any(|c| c.agent_id.is_none() || c.agent_id.as_deref() == agent_id)
     }
 
     /// Pop every coucou due at `now`: one-shots are removed, recurrent ones are
@@ -89,8 +89,8 @@ impl CoucouRegistry {
             }
             fired.push(FiredCoucou {
                 id: c.watcher_id.clone(),
-                thread_id: c.thread_id.clone(),
-                description: c.thread_id.as_ref().map_or_else(
+                agent_id: c.agent_id.clone(),
+                description: c.agent_id.as_ref().map_or_else(
                     || format!("⏰ Coucou! {}", c.message),
                     |tid| format!("⏰ Coucou (thread {tid})! {}", c.message),
                 ),
@@ -116,7 +116,7 @@ mod tests {
             message: "m".to_owned(),
             registered_at_ms: 0,
             fire_at_ms,
-            thread_id: Some("T1".to_owned()),
+            agent_id: Some("T1".to_owned()),
             interval_ms,
             recurrence_label: None,
         }

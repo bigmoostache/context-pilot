@@ -127,7 +127,7 @@ impl Panel for MemoryPanel {
     fn refresh(&self, state: &mut State) {
         let content = Self::format_for_context(state);
         let token_count = estimate_tokens(&content);
-        for ctx in &mut state.thread_mut().context {
+        for ctx in &mut state.agent_mut().context {
             if ctx.context_type.as_str() == Kind::MEMORY {
                 ctx.token_count = token_count;
                 let _changed = cp_base::panels::update_if_changed(ctx, &content);
@@ -143,7 +143,7 @@ impl Panel for MemoryPanel {
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let content = Self::format_for_context(state);
         let (id, last_refresh_ms) = state
-            .thread()
+            .agent()
             .context
             .iter()
             .find(|c| c.context_type.as_str() == Kind::MEMORY)

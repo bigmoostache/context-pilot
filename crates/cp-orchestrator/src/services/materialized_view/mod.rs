@@ -20,20 +20,20 @@
 use std::collections::HashMap;
 
 use cp_wire::types::oplog::{OpEntry, OpEntryKind};
-use cp_wire::types::snapshot::{Heads, RosterThread};
+use cp_wire::types::snapshot::{Heads, RosterAgent};
 use cp_wire::types::{LifecycleState, Phase};
 
 /// One thread's roster entry — the lightweight per-thread metadata the
-/// `/threads` endpoint serves directly from the view.
+/// `/agents` endpoint serves directly from the view.
 ///
 /// No tier-② disk read (design doc §16 journals thread create/archive/restore;
 /// I5 keeps live reads off disk).
 ///
-/// This is [`cp_wire::types::snapshot::RosterThread`] — the *same* type the
+/// This is [`cp_wire::types::snapshot::RosterAgent`] — the *same* type the
 /// checkpoint carries — so a roster rebuilt by folding live deltas and one
 /// restored wholesale from a checkpoint are byte-identical, and the
 /// checkpoint-restore is a plain clone (see [`FleetView::apply`]).
-pub type RosterEntry = RosterThread;
+pub type RosterEntry = RosterAgent;
 
 /// The latest cumulative cost figures reported by an agent.
 ///
@@ -102,18 +102,19 @@ pub struct FleetView {
     /// Per-thread / per-panel content heads as of `rev`.
     pub heads: Heads,
 
-    /// Thread roster — the live list `/threads` serves from (folded from the
+    /// Thread roster — the live list `/agents` serves from (folded from the
     /// thread-roster deltas; design doc I5).
     pub roster: Vec<RosterEntry>,
 
     /// The thread the agent is currently *focused* on (actively working), or
     /// `None` when focus is released. Folded latest-wins from
-    /// [`ThreadFocusChanged`](OpEntryKind::ThreadFocusChanged) — ephemeral,
+    /// [`AgentFocusChanged`](OpEntryKind::AgentFocusChanged) — ephemeral,
     /// disposable UI state (like [`phase`](Self::phase)): it is **not** carried
     /// in a checkpoint, so after a backend cold start it is `None` until the
-    /// agent emits its next focus change (the `/threads` handler falls back to
+    /// agent emits its next focus change (the `/agents` handler falls back to
     /// the agent's tier-② `FocusState` to cover that window).
-    pub focused_thread_id: Option<String>,
+    #[serde(rename = "focused_thread_id")]
+    pub focused_agent_id: Option<String>,
 
     /// Most recent execution phase, or `None` before any phase transition.
     pub phase: Option<Phase>,
@@ -140,9 +141,9 @@ impl FleetView {
     /// compaction rebuilds the thread list from the checkpoint, not from the
     /// original deltas); a [`MessageCreated`](OpEntryKind::MessageCreated)
     /// updates a single thread head and bumps that thread's roster activity;
-    /// the thread-roster deltas (`ThreadCreated`/`Archived`/`Restored`/
+    /// the thread-roster deltas (`AgentCreated`/`Archived`/`Restored`/
     /// `StatusChanged`) maintain the roster idempotently via the shared
-    /// [`RosterThread`] fold helpers (so this fold and the agent's replay fold
+    /// [`RosterAgent`] fold helpers (so this fold and the agent's replay fold
     /// stay identical); phase, lifecycle, cost, and focus are latest-wins.
     /// Durability-only records (`CommandEffect`, `SeenMark`) and forward-compat
     /// `Unknown` variants do not affect the projected state.
@@ -153,42 +154,42 @@ impl FleetView {
                 self.heads = snapshot.heads.clone();
                 self.roster.clone_from(&snapshot.roster);
             }
-            OpEntryKind::MessageCreated { ref thread_id, head, .. } => {
-                self.heads.set_thread_head(thread_id, head);
-                RosterThread::fold_message(&mut self.roster, thread_id, entry.timestamp_ms);
+            OpEntryKind::MessageCreated { ref agent_id, head, .. } => {
+                self.heads.set_agent_head(agent_id, head);
+                RosterAgent::fold_message(&mut self.roster, agent_id, entry.timestamp_ms);
             }
-            OpEntryKind::ThreadCreated { ref thread_id, ref name, status, timestamp_ms, .. } => {
-                RosterThread::fold_created(
+            OpEntryKind::AgentCreated { ref agent_id, ref name, status, timestamp_ms, .. } => {
+                RosterAgent::fold_created(
                     &mut self.roster,
-                    cp_wire::types::snapshot::ThreadCreation::new(thread_id, name, status, timestamp_ms),
+                    cp_wire::types::snapshot::AgentCreation::new(agent_id, name, status, timestamp_ms),
                 );
             }
-            OpEntryKind::ThreadArchived { ref thread_id } => {
-                RosterThread::fold_archived(&mut self.roster, thread_id, true);
+            OpEntryKind::AgentArchived { ref agent_id } => {
+                RosterAgent::fold_archived(&mut self.roster, agent_id, true);
             }
-            OpEntryKind::ThreadRestored { ref thread_id } => {
-                RosterThread::fold_archived(&mut self.roster, thread_id, false);
+            OpEntryKind::AgentRestored { ref agent_id } => {
+                RosterAgent::fold_archived(&mut self.roster, agent_id, false);
             }
-            OpEntryKind::ThreadPaused { ref thread_id } => {
-                RosterThread::fold_paused(&mut self.roster, thread_id, true);
+            OpEntryKind::AgentPaused { ref agent_id } => {
+                RosterAgent::fold_paused(&mut self.roster, agent_id, true);
             }
-            OpEntryKind::ThreadResumed { ref thread_id } => {
-                RosterThread::fold_paused(&mut self.roster, thread_id, false);
+            OpEntryKind::AgentResumed { ref agent_id } => {
+                RosterAgent::fold_paused(&mut self.roster, agent_id, false);
             }
-            OpEntryKind::ThreadDeleted { ref thread_id } => {
-                RosterThread::fold_deleted(&mut self.roster, thread_id);
+            OpEntryKind::AgentDeleted { ref agent_id } => {
+                RosterAgent::fold_deleted(&mut self.roster, agent_id);
             }
-            OpEntryKind::ThreadStatusChanged { ref thread_id, status } => {
-                RosterThread::fold_status(&mut self.roster, thread_id, status);
+            OpEntryKind::AgentStatusChanged { ref agent_id, status } => {
+                RosterAgent::fold_status(&mut self.roster, agent_id, status);
             }
-            OpEntryKind::TaskListChanged { ref thread_id, ref tasks } => {
-                RosterThread::fold_tasks(&mut self.roster, thread_id, tasks.clone());
+            OpEntryKind::TaskListChanged { ref agent_id, ref tasks } => {
+                RosterAgent::fold_tasks(&mut self.roster, agent_id, tasks.clone());
             }
-            OpEntryKind::NotesChanged { ref thread_id, ref notes } => {
-                RosterThread::fold_notes(&mut self.roster, thread_id, notes.clone());
+            OpEntryKind::NotesChanged { ref agent_id, ref notes } => {
+                RosterAgent::fold_notes(&mut self.roster, agent_id, notes.clone());
             }
-            OpEntryKind::ThreadFocusChanged { ref thread_id } => {
-                self.focused_thread_id.clone_from(thread_id);
+            OpEntryKind::AgentFocusChanged { ref agent_id } => {
+                self.focused_agent_id.clone_from(agent_id);
             }
             OpEntryKind::PhaseTransition { phase } => self.phase = Some(phase),
             OpEntryKind::Lifecycle { state } => self.lifecycle = Some(state),

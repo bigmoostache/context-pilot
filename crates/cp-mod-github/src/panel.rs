@@ -118,9 +118,9 @@ impl Panel for GithubResultPanel {
         use cp_render::{Block, Semantic, Span as S};
 
         let ctx_opt = state
-            .thread()
+            .agent()
             .context
-            .get(state.thread().selected_context)
+            .get(state.agent().selected_context)
             .filter(|c| c.context_type.as_str() == Kind::GITHUB_RESULT);
 
         let Some(ctx) = ctx_opt else {
@@ -162,7 +162,7 @@ impl Panel for GithubResultPanel {
             .collect()
     }
     fn title(&self, state: &State) -> String {
-        if let Some(ctx) = state.thread().context.get(state.thread().selected_context)
+        if let Some(ctx) = state.agent().context.get(state.agent().selected_context)
             && ctx.context_type.as_str() == Kind::GITHUB_RESULT
             && let Some(cmd) = ctx.get_meta_str("result_command")
         {
@@ -182,7 +182,7 @@ impl Panel for GithubResultPanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let mut items = Vec::new();
-        for ctx in &state.thread().context {
+        for ctx in &state.agent().context {
             if ctx.context_type.as_str() != Kind::GITHUB_RESULT {
                 continue;
             }

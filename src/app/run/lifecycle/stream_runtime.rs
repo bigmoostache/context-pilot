@@ -4,7 +4,7 @@
 //! deferred-sleep flags).
 //!
 //! It lives in the thread's own per-thread module data
-//! ([`ThreadRuntime::thread_module_data`](cp_base::state::runtime::bundle::ThreadRuntime)),
+//! ([`AgentRuntime::agent_module_data`](cp_base::state::runtime::bundle::AgentRuntime)),
 //! so it follows the executing thread like the rest of its context: switching
 //! threads moves nothing, and a thread's in-flight stream can never bleed into
 //! another's. Reach it through [`App::stream_rt`] / [`App::stream_rt_mut`].
@@ -70,7 +70,7 @@ impl App {
     /// The executing thread's stream runtime, created on first use.
     pub(crate) fn stream_rt_mut(&mut self) -> &mut StreamRuntime {
         if self.state.get_ext::<StreamRuntime>().is_none() {
-            self.state.set_ext_thread(StreamRuntime::new());
+            self.state.set_ext_agent(StreamRuntime::new());
         }
         self.state.ext_mut::<StreamRuntime>()
     }

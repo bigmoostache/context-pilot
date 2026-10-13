@@ -40,7 +40,7 @@ pub(super) fn answer(creds: Option<&SearchCreds>, query: &Query) -> Outcome {
     // forbidden `clippy::ref_patterns` rejects (and match ergonomics on the
     // reference trips `pattern_type_mismatch`). The clone is one short query
     // string per request — a rounding error next to the HTTP round-trip below.
-    let Kind::SearchConversations { query: text, limit, thread_id } = query.kind.clone() else {
+    let Kind::SearchConversations { query: text, limit, agent_id } = query.kind.clone() else {
         return Outcome::Error { reason: "unsupported query kind".to_owned() };
     };
 
@@ -50,7 +50,7 @@ pub(super) fn answer(creds: Option<&SearchCreds>, query: &Query) -> Outcome {
         project_hash: &resolved.2,
         query: &text,
         limit,
-        thread_id: thread_id.as_deref(),
+        agent_id: agent_id.as_deref(),
     };
     match search_conversations(&params) {
         Ok(hits) => Outcome::Hits { hits },
@@ -63,7 +63,7 @@ mod tests {
     use super::*;
 
     fn search_query() -> Query {
-        Query::new("q-1".to_owned(), Kind::SearchConversations { query: "auth".to_owned(), limit: 5, thread_id: None })
+        Query::new("q-1".to_owned(), Kind::SearchConversations { query: "auth".to_owned(), limit: 5, agent_id: None })
     }
 
     /// The failure reason of an [`Outcome`], or `None` when it carried hits.

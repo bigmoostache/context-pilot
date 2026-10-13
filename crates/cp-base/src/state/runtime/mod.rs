@@ -26,21 +26,21 @@ pub mod textarea;
 /// Everything a thread owns (its messages, its panel/context set, its editor and
 /// scroll state, its token/cost telemetry, its cache/freeze engine snapshots,
 /// its per-thread module data, its stream phase) lives on a
-/// [`ThreadRuntime`](bundle::ThreadRuntime) stored in
-/// [`thread_store`](Self::thread_store), keyed by thread id. Code reaches the
-/// executing thread's data explicitly through [`thread`](Self::thread) /
-/// [`thread_mut`](Self::thread_mut); `State` itself holds only shared data.
+/// [`AgentRuntime`](bundle::AgentRuntime) stored in
+/// [`agent_store`](Self::agent_store), keyed by thread id. Code reaches the
+/// executing thread's data explicitly through [`agent`](Self::thread) /
+/// [`agent_mut`](Self::agent_mut); `State` itself holds only shared data.
 pub struct State {
     /// Every thread's per-thread context (conversation, panels, editor/scroll,
     /// token/cost telemetry, cache/freeze snapshots, stream phase, per-thread
     /// module `TypeMap`), stored permanently by thread id, plus the id of the
     /// thread executing right now. `State` derefs to the executing thread's
     /// runtime; changing it moves no data.
-    pub thread_store: threads::ThreadStore,
+    pub agent_store: agents::AgentStore,
 
     /// Boolean status flags that are fleet-global (UI redraw, config overlay,
     /// reload lifecycle, module overlays). Per-thread stream/scroll state is on
-    /// [`executing.stream`](bundle::ThreadRuntime::stream), reached via deref as
+    /// [`executing.stream`](bundle::AgentRuntime::stream), reached via deref as
     /// `state.stream`.
     pub flags: StatusBools,
     /// Selected bar in config view (0=budget, 1=threshold, 2=target)
@@ -90,7 +90,7 @@ pub struct State {
     // === Module extension data (fleet-shared half; per-thread half on executing) ===
     /// Fleet-shared module-owned state stored by `TypeId` (one instance across
     /// all threads — e.g. memory, logs, entities, the threads registry). The
-    /// per-thread half lives on [`executing.thread_module_data`](bundle::ThreadRuntime::thread_module_data).
+    /// per-thread half lives on [`executing.agent_module_data`](bundle::AgentRuntime::agent_module_data).
     ///
     /// A given `TypeId` lives in exactly ONE of the two maps, so the `get_ext`
     /// family searches both and `set_ext` updates whichever already holds the
@@ -104,14 +104,14 @@ pub struct State {
     pub init_is_global: Option<bool>,
 }
 
-/// Per-thread runtime bundle (`ThreadRuntime`).
+/// Thread-runtime storage keyed by id + the executing-thread id (`AgentStore`).
+pub mod agents;
+/// Per-thread runtime bundle (`AgentRuntime`).
 pub mod bundle;
 /// `Default` for `State` (extracted for the 500-line cap).
 mod default;
 /// Module extension-data accessors (`get_ext`/`ext`/`set_ext`/…), extracted for the cap.
 mod ext;
-/// Thread-runtime storage keyed by id + the executing-thread id (`ThreadStore`).
-pub mod threads;
 
 impl State {
     /// The thread executing right now: owner of every per-thread write (todos,
@@ -119,20 +119,20 @@ impl State {
     /// is UI-only and can point at another thread while this one runs.
     /// `None` when no thread is placed (cold boot, focus cleared).
     #[must_use]
-    pub fn executing_thread_id(&self) -> Option<&str> {
-        self.thread_store.executing()
+    pub fn executing_agent_id(&self) -> Option<&str> {
+        self.agent_store.executing()
     }
 
     /// The executing thread's runtime (conversation, panels, stream, per-thread
     /// module data). The unbound runtime when no thread is executing.
     #[must_use]
-    pub fn thread(&self) -> &bundle::ThreadRuntime {
-        self.thread_store.current()
+    pub fn agent(&self) -> &bundle::AgentRuntime {
+        self.agent_store.current()
     }
 
-    /// Mutable twin of [`thread`](Self::thread).
-    pub fn thread_mut(&mut self) -> &mut bundle::ThreadRuntime {
-        self.thread_store.current_mut()
+    /// Mutable twin of [`agent`](Self::thread).
+    pub fn agent_mut(&mut self) -> &mut bundle::AgentRuntime {
+        self.agent_store.current_mut()
     }
 
     /// Directory the executing thread works in: its worktree, else the
@@ -140,7 +140,7 @@ impl State {
     /// through here; `.context-pilot/` state stays anchored to the root.
     #[must_use]
     pub fn workdir(&self) -> std::path::PathBuf {
-        self.thread().workdir.clone().unwrap_or_else(crate::config::constants::project_root)
+        self.agent().workdir.clone().unwrap_or_else(crate::config::constants::project_root)
     }
 
     /// Resolve a tool-supplied path: absolute kept, relative joined onto
@@ -155,7 +155,7 @@ impl State {
     /// or by another thread); `None` while it exists or at the project root.
     #[must_use]
     pub fn workdir_error(&self) -> Option<String> {
-        let dir = self.thread().workdir.as_ref()?;
+        let dir = self.agent().workdir.as_ref()?;
         (!dir.is_dir()).then(|| {
             format!(
                 "this thread's workdir {} no longer exists (worktree removed?). Run Worktree(action=leave) to return to the project root.",
@@ -183,21 +183,21 @@ impl State {
     /// Set the loaded context panels (builder).
     #[must_use]
     pub fn with_context(mut self, context: Vec<Entry>) -> Self {
-        self.thread_mut().context = context;
+        self.agent_mut().context = context;
         self
     }
 
     /// Set the loaded conversation messages (builder).
     #[must_use]
     pub fn with_messages(mut self, messages: Vec<Message>) -> Self {
-        self.thread_mut().messages = messages;
+        self.agent_mut().messages = messages;
         self
     }
 
     /// Set the selected-panel index (builder).
     #[must_use]
     pub fn with_selected_context(mut self, idx: usize) -> Self {
-        self.thread_mut().selected_context = idx;
+        self.agent_mut().selected_context = idx;
         self
     }
 
@@ -205,18 +205,18 @@ impl State {
     #[must_use]
     pub fn with_id_counters(mut self, counters: (usize, usize, usize, usize)) -> Self {
         let (user, assistant, tool, result) = counters;
-        self.thread_mut().next_user_id = user;
-        self.thread_mut().next_assistant_id = assistant;
-        self.thread_mut().next_tool_id = tool;
-        self.thread_mut().next_result_id = result;
+        self.agent_mut().next_user_id = user;
+        self.agent_mut().next_assistant_id = assistant;
+        self.agent_mut().next_tool_id = tool;
+        self.agent_mut().next_result_id = result;
         self
     }
 
     /// Set the draft input text and cursor byte-offset (builder).
     #[must_use]
     pub fn with_draft(mut self, input: String, cursor: usize) -> Self {
-        self.thread_mut().composer.text = input;
-        self.thread_mut().composer.cursor = cursor;
+        self.agent_mut().composer.text = input;
+        self.agent_mut().composer.cursor = cursor;
         self
     }
 
@@ -237,7 +237,7 @@ impl State {
     /// Set the persisted cache-engine JSON blob (builder).
     #[must_use]
     pub fn with_cache_engine_json(mut self, json: Option<String>) -> Self {
-        self.thread_mut().cache_engine_json = json;
+        self.agent_mut().cache_engine_json = json;
         self
     }
 
@@ -246,7 +246,7 @@ impl State {
 
     /// Update the `last_refresh_ms` timestamp for a panel by its context type.
     pub fn touch_panel(&mut self, context_type: &str) {
-        if let Some(ctx) = self.thread_mut().context.iter_mut().find(|c| c.context_type.as_str() == context_type) {
+        if let Some(ctx) = self.agent_mut().context.iter_mut().find(|c| c.context_type.as_str() == context_type) {
             ctx.last_refresh_ms = crate::panels::now_ms();
             ctx.cache_deprecated = true;
         }
@@ -257,7 +257,7 @@ impl State {
     #[must_use]
     pub fn next_available_context_id(&self) -> String {
         let used_ids: std::collections::HashSet<usize> = self
-            .thread()
+            .agent()
             .context
             .iter()
             .filter_map(|c| {
@@ -273,18 +273,18 @@ impl State {
 
     /// Allocate the next user message ID and UID, returning (id, uid).
     pub fn alloc_user_ids(&mut self) -> (String, String) {
-        let id = format!("U{}", self.thread().next_user_id);
+        let id = format!("U{}", self.agent().next_user_id);
         let uid = format!("UID_{}_U", self.global_next_uid);
-        self.thread_mut().next_user_id = self.thread_mut().next_user_id.saturating_add(1);
+        self.agent_mut().next_user_id = self.agent_mut().next_user_id.saturating_add(1);
         self.global_next_uid = self.global_next_uid.saturating_add(1);
         (id, uid)
     }
 
     /// Allocate the next assistant message ID and UID, returning (id, uid).
     pub fn alloc_assistant_ids(&mut self) -> (String, String) {
-        let id = format!("A{}", self.thread().next_assistant_id);
+        let id = format!("A{}", self.agent().next_assistant_id);
         let uid = format!("UID_{}_A", self.global_next_uid);
-        self.thread_mut().next_assistant_id = self.thread_mut().next_assistant_id.saturating_add(1);
+        self.agent_mut().next_assistant_id = self.agent_mut().next_assistant_id.saturating_add(1);
         self.global_next_uid = self.global_next_uid.saturating_add(1);
         (id, uid)
     }
@@ -297,14 +297,13 @@ impl State {
         let (id, uid) = self.alloc_user_ids();
         let msg = Message::new_user(id, uid, content, token_count);
 
-        if let Some(ctx) = self.thread_mut().context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION)
-        {
+        if let Some(ctx) = self.agent_mut().context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
             ctx.token_count = ctx.token_count.saturating_add(token_count);
             ctx.last_refresh_ms = crate::panels::now_ms();
         }
 
-        self.thread_mut().messages.push(msg);
-        self.thread().messages.len().saturating_sub(1)
+        self.agent_mut().messages.push(msg);
+        self.agent().messages.len().saturating_sub(1)
     }
 
     /// Remove all injected `/* Notification [...] */` user messages from the
@@ -317,46 +316,46 @@ impl State {
     /// from the persisted `message_uids` index, which is regenerated from this
     /// (stripped) message list on the next state save.
     pub fn strip_notification_messages(&mut self) -> usize {
-        let before = self.thread().messages.len();
-        self.thread_mut()
+        let before = self.agent().messages.len();
+        self.agent_mut()
             .messages
             .retain(|m| !(m.role == "user" && m.content.trim_start().starts_with("/* Notification [")));
-        before.saturating_sub(self.thread().messages.len())
+        before.saturating_sub(self.agent().messages.len())
     }
 
     /// Create an empty assistant message for streaming into, add it, return its index.
     pub fn push_empty_assistant(&mut self) -> usize {
         let (id, uid) = self.alloc_assistant_ids();
         let msg = Message::new_assistant(id, uid);
-        self.thread_mut().messages.push(msg);
-        self.thread().messages.len().saturating_sub(1)
+        self.agent_mut().messages.push(msg);
+        self.agent().messages.len().saturating_sub(1)
     }
 
     /// Prepare state for a new stream: transition to [`StreamPhase::Receiving`],
     /// clear stop reason, reset tick counters.
     pub fn begin_streaming(&mut self) {
-        self.thread_mut().stream.phase.transition(StreamPhase::Receiving);
-        self.thread_mut().last_stop_reason = None;
-        self.thread_mut().streaming_estimated_tokens = 0;
-        self.thread_mut().tick_cache_hit_tokens = 0;
-        self.thread_mut().tick_cache_miss_tokens = 0;
-        self.thread_mut().tick_output_tokens = 0;
-        self.thread_mut().tick_uncached_input_tokens = 0;
-        self.thread_mut().tick_cost_hit_usd = 0.0f64;
-        self.thread_mut().tick_cost_miss_usd = 0.0f64;
-        self.thread_mut().tick_cost_output_usd = 0.0f64;
+        self.agent_mut().stream.phase.transition(StreamPhase::Receiving);
+        self.agent_mut().last_stop_reason = None;
+        self.agent_mut().streaming_estimated_tokens = 0;
+        self.agent_mut().tick_cache_hit_tokens = 0;
+        self.agent_mut().tick_cache_miss_tokens = 0;
+        self.agent_mut().tick_output_tokens = 0;
+        self.agent_mut().tick_uncached_input_tokens = 0;
+        self.agent_mut().tick_cost_hit_usd = 0.0f64;
+        self.agent_mut().tick_cost_miss_usd = 0.0f64;
+        self.agent_mut().tick_cost_output_usd = 0.0f64;
     }
 }
 
 impl std::fmt::Debug for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("State")
-            .field("context_len", &self.thread().context.len())
-            .field("messages_len", &self.thread().messages.len())
-            .field("stream_phase", &self.thread().stream.phase)
+            .field("context_len", &self.agent().context.len())
+            .field("messages_len", &self.agent().messages.len())
+            .field("stream_phase", &self.agent().stream.phase)
             .field(
                 "module_data_keys",
-                &self.shared_module_data.len().saturating_add(self.thread().thread_module_data.len()),
+                &self.shared_module_data.len().saturating_add(self.agent().agent_module_data.len()),
             )
             .finish_non_exhaustive()
     }

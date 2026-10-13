@@ -99,7 +99,7 @@ mod tests {
     /// A `MessageCreated` head keyed by `byte`.
     fn message(byte: u8) -> OpEntryKind {
         OpEntryKind::MessageCreated {
-            thread_id: "T1".to_owned(),
+            agent_id: "T1".to_owned(),
             message_id: format!("m{byte}"),
             head: ContentHash::new([byte; 32]),
             inline_body: None,

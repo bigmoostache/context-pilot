@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use cp_base::state::runtime::State;
 
-/// Per-thread message files (`threads/<id>.json`), written only when dirty.
+/// Per-thread message files (`agents/<id>.json`), written only when dirty.
 pub mod persist;
 
 // =============================================================================
@@ -11,7 +11,7 @@ pub mod persist;
 
 /// Thread turn status — who needs to act next.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ThreadStatus {
+pub enum AgentStatus {
     /// The AI's turn — thread has user input awaiting response.
     MyTurn,
     /// The user's turn — AI has responded, waiting for user.
@@ -19,7 +19,7 @@ pub enum ThreadStatus {
     TheirTurn,
 }
 
-impl std::fmt::Display for ThreadStatus {
+impl std::fmt::Display for AgentStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
             Self::MyTurn => write!(f, "MY_TURN"),
@@ -30,7 +30,7 @@ impl std::fmt::Display for ThreadStatus {
 
 /// Who authored a thread message.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ThreadAuthor {
+pub enum AgentAuthor {
     /// Message from the human user.
     #[default]
     User,
@@ -38,7 +38,7 @@ pub enum ThreadAuthor {
     Assistant,
 }
 
-impl std::fmt::Display for ThreadAuthor {
+impl std::fmt::Display for AgentAuthor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
             Self::User => write!(f, "user"),
@@ -58,9 +58,9 @@ const fn default_true() -> bool {
 
 /// A single message within a thread.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ThreadMessage {
+pub struct AgentMessage {
     /// Who wrote this message.
-    pub author: ThreadAuthor,
+    pub author: AgentAuthor,
     /// Markdown text content (if any).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content: Option<String>,
@@ -97,12 +97,12 @@ pub struct ThreadMessage {
     pub has_been_pushed: bool,
 }
 
-impl ThreadMessage {
+impl AgentMessage {
     /// A user-authored text message, unacknowledged, stamped now.
     #[must_use]
     pub fn user(content: String) -> Self {
         Self {
-            author: ThreadAuthor::User,
+            author: AgentAuthor::User,
             content: Some(content),
             file_path: None,
             timestamp: cp_base::panels::now_ms(),
@@ -118,7 +118,7 @@ impl ThreadMessage {
     #[must_use]
     pub fn auto_trace(content: String) -> Self {
         Self {
-            author: ThreadAuthor::Assistant,
+            author: AgentAuthor::Assistant,
             content: Some(content),
             file_path: None,
             timestamp: cp_base::panels::now_ms(),
@@ -130,28 +130,29 @@ impl ThreadMessage {
 }
 
 /// Where a branched thread came from: the parent thread and the message it was
-/// cut at (inclusive). Set only on threads created by [`ThreadsState::branch`].
+/// cut at (inclusive). Set only on threads created by [`AgentsState::branch`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ThreadOrigin {
+pub struct AgentOrigin {
     /// Id of the parent thread at branch time (may since have been deleted).
-    pub thread_id: String,
+    #[serde(rename = "thread_id")]
+    pub agent_id: String,
     /// Epoch-ms timestamp of the last parent message copied into the branch.
     pub message_ts: u64,
 }
 
 /// A parallel discussion/work topic thread.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct Thread {
+pub struct Agent {
     /// Short unique identifier (e.g. "T1", "T2").
     pub id: String,
     /// Free-text label chosen by the user.
     pub name: String,
     /// Whose turn it is.
-    pub status: ThreadStatus,
-    /// Ordered list of messages. Persisted in `threads/<id>.json`, not in
+    pub status: AgentStatus,
+    /// Ordered list of messages. Persisted in `agents/<id>.json`, not in
     /// `config.json` (see [`persist`]); empty after a slim deserialize.
     #[serde(default)]
-    pub messages: Vec<ThreadMessage>,
+    pub messages: Vec<AgentMessage>,
     /// Creation timestamp (epoch ms).
     pub created_at: u64,
     /// Soft-delete flag — archived threads are hidden from the active list
@@ -168,10 +169,10 @@ pub struct Thread {
     /// another one (`None` for a thread created from scratch). Defaults to
     /// `None` (back-compat with pre-feature data).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub origin: Option<ThreadOrigin>,
+    pub origin: Option<AgentOrigin>,
 }
 
-impl Thread {
+impl Agent {
     /// A fresh empty thread: caller's turn is `TheirTurn` (user types first),
     /// not archived, not paused, stamped now.
     #[must_use]
@@ -179,7 +180,7 @@ impl Thread {
         Self {
             id,
             name,
-            status: ThreadStatus::TheirTurn,
+            status: AgentStatus::TheirTurn,
             messages: vec![],
             created_at: cp_base::panels::now_ms(),
             archived: false,
@@ -195,9 +196,9 @@ impl Thread {
 
 /// Shared thread state, persisted via `save_module_data`.
 #[derive(Debug)]
-pub struct ThreadsState {
+pub struct AgentsState {
     /// All active threads.
-    pub threads: Vec<Thread>,
+    pub agents: Vec<Agent>,
     /// Counter for generating unique thread IDs (T1, T2, ...).
     pub next_id: u32,
     /// Pre-rendered panel content for the LLM. Only updated by `Read`.
@@ -205,24 +206,24 @@ pub struct ThreadsState {
     pub panel_content: String,
 }
 
-impl Default for ThreadsState {
+impl Default for AgentsState {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl ThreadsState {
+impl AgentsState {
     /// Create an empty threads state with ID counter at 1.
     #[must_use]
     pub const fn new() -> Self {
-        Self { threads: vec![], next_id: 1, panel_content: String::new() }
+        Self { agents: vec![], next_id: 1, panel_content: String::new() }
     }
 
     /// Get shared ref from State's `TypeMap`.
     ///
     /// # Panics
     ///
-    /// Panics if `ThreadsState` was never inserted into state.
+    /// Panics if `AgentsState` was never inserted into state.
     #[must_use]
     pub fn get(state: &State) -> &Self {
         state.ext::<Self>()
@@ -232,7 +233,7 @@ impl ThreadsState {
     ///
     /// # Panics
     ///
-    /// Panics if `ThreadsState` was never inserted into state.
+    /// Panics if `AgentsState` was never inserted into state.
     pub fn get_mut(state: &mut State) -> &mut Self {
         state.ext_mut::<Self>()
     }
@@ -243,22 +244,22 @@ impl ThreadsState {
     /// `MY_TURN` idle nudges, never appear in context. Restoring a thread
     /// makes it count again.
     #[must_use]
-    pub fn has_my_turn_threads(&self) -> bool {
-        self.threads.iter().any(|t| !t.archived && !t.paused && t.status == ThreadStatus::MyTurn)
+    pub fn has_my_turn_agents(&self) -> bool {
+        self.agents.iter().any(|t| !t.archived && !t.paused && t.status == AgentStatus::MyTurn)
     }
 
-    /// Indices into [`Self::threads`] of the threads whose `archived` flag
+    /// Indices into [`Self::agents`] of the threads whose `archived` flag
     /// matches `archived`, in storage order.
     ///
     /// The TUI thread-centered view shows one subset at a time — the active
     /// list (`archived = false`) or the archived list (`archived = true`,
-    /// toggled by Ctrl+U). Selection (`selected_thread_idx`) is a position
+    /// toggled by Ctrl+U). Selection (`selected_agent_idx`) is a position
     /// **into this filtered slice**, resolved back to a real index here so a
     /// soft-deleted thread keeps its place in storage without polluting the
     /// visible list.
     #[must_use]
     pub fn visible_indices(&self, archived: bool) -> Vec<usize> {
-        self.threads.iter().enumerate().filter(|entry| entry.1.archived == archived).map(|entry| entry.0).collect()
+        self.agents.iter().enumerate().filter(|entry| entry.1.archived == archived).map(|entry| entry.0).collect()
     }
 
     /// Branch a new thread out of `source_id`: a fresh thread named `name`
@@ -269,7 +270,7 @@ impl ThreadsState {
     /// branch, so `DeleteMessage` works on it) and are all marked acknowledged —
     /// the branch starts from context the agent has already seen. The branch is
     /// a plain `TheirTurn` thread (never archived/paused, even if the parent
-    /// is) recording its parent in [`Thread::origin`]. Nothing else the parent
+    /// is) recording its parent in [`Agent::origin`]. Nothing else the parent
     /// owns (todos, scratchpad) is copied: those only exist as a *current*
     /// snapshot, which would leak whatever happened after the branch point.
     ///
@@ -279,25 +280,25 @@ impl ThreadsState {
     /// or holds no message stamped `at_ts`; the state is left untouched.
     pub fn branch(&mut self, source_id: &str, at_ts: u64, name: &str) -> Result<String, String> {
         let source =
-            self.threads.iter().find(|t| t.id == source_id).ok_or_else(|| format!("thread {source_id} not found"))?;
+            self.agents.iter().find(|t| t.id == source_id).ok_or_else(|| format!("thread {source_id} not found"))?;
         let cut = source
             .messages
             .iter()
             .position(|m| m.timestamp == at_ts)
             .ok_or_else(|| format!("no message with ts={at_ts} in thread {source_id}"))?;
-        let messages: Vec<ThreadMessage> = source
+        let messages: Vec<AgentMessage> = source
             .messages
             .iter()
             .take(cut.saturating_add(1))
-            .map(|m| ThreadMessage { acknowledged: true, ..m.clone() })
+            .map(|m| AgentMessage { acknowledged: true, ..m.clone() })
             .collect();
 
         let id = format!("T{}", self.next_id);
         self.next_id = self.next_id.saturating_add(1);
-        let mut thread = Thread::new(id.clone(), name.to_owned());
-        thread.messages = messages;
-        thread.origin = Some(ThreadOrigin { thread_id: source_id.to_owned(), message_ts: at_ts });
-        self.threads.push(thread);
+        let mut agent = Agent::new(id.clone(), name.to_owned());
+        agent.messages = messages;
+        agent.origin = Some(AgentOrigin { agent_id: source_id.to_owned(), message_ts: at_ts });
+        self.agents.push(agent);
         Ok(id)
     }
 }
@@ -310,7 +311,8 @@ impl ThreadsState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FocusState {
     /// Which thread the AI is currently focused on (None = unfocused).
-    pub focused_thread_id: Option<String>,
+    #[serde(rename = "focused_thread_id")]
+    pub focused_agent_id: Option<String>,
     /// Which thread the human has *drilled into* in the TUI (`None` = showing the
     /// thread list). Pure view state (G3): it selects whose full panel view is
     /// painted, and never moves execution — the renderer makes the drilled
@@ -318,15 +320,18 @@ pub struct FocusState {
     /// restores the previous one (Model 2: a human glance must not disturb the
     /// agent's work). Defaults to `None` (back-compat; byte-identical until set).
     #[serde(default)]
-    pub drilled_thread_id: Option<String>,
+    #[serde(rename = "drilled_thread_id")]
+    pub drilled_agent_id: Option<String>,
     /// Index of the currently selected thread in the TUI threads view.
     /// Used for navigation (Tab/Shift+Tab) and message area display.
     #[serde(default)]
-    pub selected_thread_idx: usize,
+    #[serde(rename = "selected_thread_idx")]
+    pub selected_agent_idx: usize,
     /// When true, the input field is being used to name a new thread.
     /// Set by pressing 'n' in Threads view, cleared on Enter or Esc.
     #[serde(default)]
-    pub creating_thread: bool,
+    #[serde(rename = "creating_thread")]
+    pub creating_agent: bool,
     /// When true, an archive/restore is *armed*: a first Ctrl+X was pressed and
     /// the TUI is waiting for a confirming second Ctrl+X. Cleared on confirm, on
     /// any other (non-Ctrl) key, or implicitly once the 2-second window lapses.
@@ -339,14 +344,14 @@ pub struct FocusState {
     pub archive_armed_at_ms: u64,
     /// When true, the TUI thread-centered view shows the *archived* threads
     /// instead of the active ones (toggled by Ctrl+U). Selection indexes into
-    /// the matching filtered slice ([`ThreadsState::visible_indices`]); the
+    /// the matching filtered slice ([`AgentsState::visible_indices`]); the
     /// virtual "+ New Thread" entry only appears in the active (non-archived)
     /// view.
     #[serde(default)]
     pub viewing_archived: bool,
     /// Per-thread last-read message count, keyed by thread ID.
     /// Used for unread indicators — a thread is "unread" when
-    /// `messages.len() > last_read_count[thread_id]`.
+    /// `messages.len() > last_read_count[agent_id]`.
     #[serde(default)]
     pub last_read_count: std::collections::BTreeMap<String, usize>,
     /// Thread currently under the list cursor and the ms it got there. A thread
@@ -357,7 +362,8 @@ pub struct FocusState {
     /// Draft name typed on the virtual "+ New Thread" row. Its own textarea
     /// (not a thread's composer) so it survives navigation and reloads.
     #[serde(default)]
-    pub new_thread_title: cp_base::state::runtime::textarea::TextArea,
+    #[serde(rename = "new_thread_title")]
+    pub new_agent_title: cp_base::state::runtime::textarea::TextArea,
 }
 
 impl Default for FocusState {
@@ -371,16 +377,16 @@ impl FocusState {
     #[must_use]
     pub const fn new() -> Self {
         Self {
-            focused_thread_id: None,
-            drilled_thread_id: None,
-            selected_thread_idx: 0,
-            creating_thread: false,
+            focused_agent_id: None,
+            drilled_agent_id: None,
+            selected_agent_idx: 0,
+            creating_agent: false,
             confirming_archive: false,
             archive_armed_at_ms: 0,
             viewing_archived: false,
             last_read_count: std::collections::BTreeMap::new(),
             read_dwell: None,
-            new_thread_title: cp_base::state::runtime::textarea::TextArea::new(),
+            new_agent_title: cp_base::state::runtime::textarea::TextArea::new(),
         }
     }
 
@@ -406,19 +412,19 @@ impl FocusState {
     /// Mark the currently selected thread as fully read.
     /// Updates `last_read_count` to the thread's current message count.
     ///
-    /// `selected_thread_idx` is a position into the visible slice for the
-    /// current view, so it is resolved through [`ThreadsState::visible_indices`]
+    /// `selected_agent_idx` is a position into the visible slice for the
+    /// current view, so it is resolved through [`AgentsState::visible_indices`]
     /// to the real storage index before marking.
     pub fn mark_selected_read(state: &mut State) {
-        let threads = ThreadsState::get(state);
+        let agents = AgentsState::get(state);
         let focus = Self::get(state);
-        let visible = threads.visible_indices(focus.viewing_archived);
-        let Some(&real_idx) = visible.get(focus.selected_thread_idx) else {
+        let visible = agents.visible_indices(focus.viewing_archived);
+        let Some(&real_idx) = visible.get(focus.selected_agent_idx) else {
             return;
         };
-        if let Some(thread) = threads.threads.get(real_idx) {
-            let tid = thread.id.clone();
-            let count = thread.messages.len();
+        if let Some(agent) = agents.agents.get(real_idx) {
+            let tid = agent.id.clone();
+            let count = agent.messages.len();
             let prev = Self::get_mut(state).last_read_count.insert(tid, count);
             // Surgical repaint: the unread marker may have just cleared with no
             // input event to trigger a draw. Only on an actual change, so the
@@ -434,13 +440,13 @@ impl FocusState {
     /// [`READ_DWELL_MS`], mark it read (and keep doing so while it stays, so
     /// replies arriving under the cursor count as seen).
     pub fn tick_read_dwell(state: &mut State, now_ms: u64) {
-        let selected = (state.view_mode == cp_base::state::data::config::ViewMode::Threads)
+        let selected = (state.view_mode == cp_base::state::data::config::ViewMode::Agents)
             .then(|| {
                 let focus = Self::get(state);
-                let threads = ThreadsState::get(state);
-                let visible = threads.visible_indices(focus.viewing_archived);
-                let real_idx = *visible.get(focus.selected_thread_idx)?;
-                threads.threads.get(real_idx).map(|t| t.id.clone())
+                let agents = AgentsState::get(state);
+                let visible = agents.visible_indices(focus.viewing_archived);
+                let real_idx = *visible.get(focus.selected_agent_idx)?;
+                agents.agents.get(real_idx).map(|t| t.id.clone())
             })
             .flatten();
         let dwell = &mut Self::get_mut(state).read_dwell;

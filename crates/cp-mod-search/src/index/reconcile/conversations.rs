@@ -4,7 +4,7 @@
 //! so every user/assistant thread message is mirrored as one Meilisearch
 //! document in `cp_{hash}_conversations`. Unlike the file indexer (event-driven
 //! off an fs watcher), thread messages have no filesystem to watch — they live
-//! in the agent's in-memory `ThreadsState`. So this runs as a periodic + boot
+//! in the agent's in-memory `AgentsState`. So this runs as a periodic + boot
 //! **batch reconcile**: the caller snapshots the live threads into a
 //! [`ConversationDoc`] list, and this module diffs that desired set against
 //! what's already indexed, embedding only what changed and purging what's gone.
@@ -27,26 +27,28 @@ use crate::meili::tasks;
 
 /// One indexed thread message.
 ///
-/// The `id` is stable per `(thread, position)` so re-running the reconcile on an
+/// The `id` is stable per `(agent, position)` so re-running the reconcile on an
 /// append-only thread upserts in place rather than duplicating. `content_hash`
 /// folds in everything the embedding template reads (author, thread name, text)
 /// so a rename or edit flips the hash and triggers a re-embed, while an
 /// unchanged message hashes identically and is skipped.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub(crate) struct ConversationDoc {
-    /// Meilisearch primary key — `"{thread_id}-{index}"`.
+    /// Meilisearch primary key — `"{agent_id}-{index}"`.
     pub id: String,
     /// Owning thread id (filterable — lets a search scope to one thread).
-    pub thread_id: String,
+    #[serde(rename = "thread_id")]
+    pub agent_id: String,
     /// Owning thread's display name (searchable + embedded for context).
-    pub thread_name: String,
+    #[serde(rename = "thread_name")]
+    pub agent_name: String,
     /// `"user"` or `"assistant"` (filterable).
     pub author: String,
     /// The message body (searchable + embedded).
     pub text: String,
     /// Message timestamp, ms since epoch (sortable — recency tie-break).
     pub ts_ms: u64,
-    /// Hash over `author` + `thread_name` + `text` — the re-embed trigger.
+    /// Hash over `author` + `agent_name` + `text` — the re-embed trigger.
     pub content_hash: String,
 }
 
@@ -57,11 +59,11 @@ pub(crate) struct ConversationDoc {
 /// borrowed — the builder owns copies only for the fields it stores.
 pub(crate) struct DocParts<'src> {
     /// Owning thread id.
-    pub thread_id: &'src str,
+    pub agent_id: &'src str,
     /// Message position in the thread (stable for append-only threads).
     pub index: usize,
     /// Owning thread's display name.
-    pub thread_name: &'src str,
+    pub agent_name: &'src str,
     /// `"user"` or `"assistant"`.
     pub author: &'src str,
     /// The message body.
@@ -72,19 +74,19 @@ pub(crate) struct DocParts<'src> {
 
 impl ConversationDoc {
     /// Build a doc, computing its `content_hash` from the embedding-relevant
-    /// fields. The id is `"{thread_id}-{index}"` where `index` is the message's
+    /// fields. The id is `"{agent_id}-{index}"` where `index` is the message's
     /// position in the thread (stable for append-only threads).
     pub(crate) fn from_parts(p: &DocParts<'_>) -> Self {
         // Everything the embedder template reads goes into the hash, so any
         // change that would alter the embedding (edit, rename, author) forces a
         // re-embed, and nothing else does. `\u{1}` is a field separator that
         // can't occur in the source text.
-        let hash_input = format!("{}\u{1}{}\u{1}{}", p.author, p.thread_name, p.text);
+        let hash_input = format!("{}\u{1}{}\u{1}{}", p.author, p.agent_name, p.text);
         let content_hash = cp_mod_utilities::hash::compute_str(&hash_input);
         Self {
-            id: format!("{}-{}", p.thread_id, p.index),
-            thread_id: p.thread_id.to_owned(),
-            thread_name: p.thread_name.to_owned(),
+            id: format!("{}-{}", p.agent_id, p.index),
+            agent_id: p.agent_id.to_owned(),
+            agent_name: p.agent_name.to_owned(),
             author: p.author.to_owned(),
             text: p.text.to_owned(),
             ts_ms: p.ts_ms,
@@ -188,11 +190,11 @@ pub(crate) fn reconcile(
 mod tests {
     use super::*;
 
-    fn doc(thread: &str, idx: usize, text: &str) -> ConversationDoc {
+    fn doc(agent: &str, idx: usize, text: &str) -> ConversationDoc {
         ConversationDoc::from_parts(&DocParts {
-            thread_id: thread,
+            agent_id: agent,
             index: idx,
-            thread_name: "T",
+            agent_name: "T",
             author: "user",
             text,
             ts_ms: 0,

@@ -39,7 +39,7 @@ pub struct Session {
     /// else focused). Reverie lifecycle notifications (launch / end / error /
     /// cap) are routed back to it, so they land on the launching thread rather
     /// than wherever focus happens to be when the async reverie finishes.
-    pub thread_id: Option<String>,
+    pub agent_id: Option<String>,
 }
 
 impl Session {
@@ -55,7 +55,7 @@ impl Session {
             is_streaming: true,
             report_retries: 0,
             queue_active: false,
-            thread_id: None,
+            agent_id: None,
         }
     }
 }

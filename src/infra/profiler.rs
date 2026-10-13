@@ -73,7 +73,7 @@ type NestedMemo = RefCell<HashMap<(usize, usize, usize), &'static str>>;
 ///
 /// Every guard used to `format!` + lock the global [`intern`] map on creation,
 /// costing several µs per guard and showing up as phantom "uncovered" parent
-/// time (e.g. `threads_emit`, 9 guards per tick). A hit is now one
+/// time (e.g. `agents_emit`, 9 guards per tick). A hit is now one
 /// thread-local hash lookup with no allocation.
 fn nested_name(parent: &'static str, leaf: &'static str) -> &'static str {
     thread_local! {

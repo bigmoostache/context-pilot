@@ -10,9 +10,9 @@ use cp_base::state::runtime::State;
 /// **Static panel**: the LLM-facing content (`panel_content`) is only updated
 /// when `Read` is called. The TUI-facing `blocks()` renders live data for
 /// visual display but this has no token cost.
-pub(crate) struct ThreadsPanel;
+pub(crate) struct AgentsPanel;
 
-impl Panel for ThreadsPanel {
+impl Panel for AgentsPanel {
     fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {
         scroll_key_action(key)
     }
@@ -45,8 +45,8 @@ impl Panel for ThreadsPanel {
         let content = crate::tools::executing_panel_content(state);
         let token_count = estimate_tokens(&content);
 
-        for ctx in &mut state.thread_mut().context {
-            if ctx.context_type.as_str() == Kind::THREADS {
+        for ctx in &mut state.agent_mut().context {
+            if ctx.context_type.as_str() == Kind::AGENTS {
                 ctx.token_count = token_count;
                 let _changed = cp_base::panels::update_if_changed(ctx, &content);
                 break;
@@ -62,10 +62,10 @@ impl Panel for ThreadsPanel {
         // Per-thread view: return THIS thread's content, not the shared string.
         let content = crate::tools::executing_panel_content(state);
         let (id, last_refresh_ms) = state
-            .thread()
+            .agent()
             .context
             .iter()
-            .find(|c| c.context_type.as_str() == Kind::THREADS)
+            .find(|c| c.context_type.as_str() == Kind::AGENTS)
             .map_or(("P?", 0), |c| (c.id.as_str(), c.last_refresh_ms));
         vec![ContextItem::new(id, "Threads", content, last_refresh_ms)]
     }

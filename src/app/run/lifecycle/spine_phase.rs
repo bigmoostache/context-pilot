@@ -20,7 +20,7 @@ impl App {
         // === BACKGROUND THREADS (Phase C) ===
         // After the focused thread has been stepped, advance every OTHER active
         // thread one step by making it executing around the same advancement
-        // core (`step_one_thread`). No-op at N=1. Reconcile first: registry vs
+        // core (`step_one_agent`). No-op at N=1. Reconcile first: registry vs
         // roster + promotion decision.
         {
             let _g = crate::profile!("sp_reconcile_fleet");
@@ -32,7 +32,7 @@ impl App {
         }
         {
             let _g = crate::profile!("sp_advance_bg");
-            self.advance_background_threads();
+            self.advance_background_agents();
         }
         // G2 display mirror: republish AFTER the step loop so it reflects
         // post-step derivations; the loop is at rest, so `state` is the focused

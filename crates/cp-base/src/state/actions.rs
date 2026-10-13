@@ -159,30 +159,30 @@ pub enum Action {
     /// Cycle view mode (Normal → Collapsed → Hidden → Threads → Normal).
     CycleViewMode,
     /// Navigate to next thread in Threads view (↓ / Tab).
-    ThreadSelectNext,
+    AgentSelectNext,
     /// Navigate to previous thread in Threads view (↑ / Shift+Tab).
-    ThreadSelectPrev,
+    AgentSelectPrev,
     /// Start creating a new thread — switches input to thread-naming mode.
-    ThreadCreateStart,
+    AgentCreateStart,
     /// Cancel thread creation — clears naming mode without creating.
-    ThreadCreateCancel,
+    AgentCreateCancel,
     /// Start archiving (deleting) the selected thread — shows confirmation.
-    ThreadArchiveStart,
+    AgentArchiveStart,
     /// Confirm thread archive — removes the selected thread.
-    ThreadArchiveConfirm,
+    AgentArchiveConfirm,
     /// Cancel thread archive — dismisses the confirmation.
-    ThreadArchiveCancel,
+    AgentArchiveCancel,
     /// Toggle between the active and archived thread lists in the
     /// thread-centered view (Ctrl+U). Resets selection to the top.
-    ThreadToggleArchivedView,
+    AgentToggleArchivedView,
     /// Drill into the selected thread's full panel view (G3, read-only
-    /// inspection — Right arrow). Sets `FocusState::drilled_thread_id`; the
+    /// inspection — Right arrow). Sets `FocusState::drilled_agent_id`; the
     /// renderer makes that thread executing for the paint without
     /// moving execution (Model 2).
-    ThreadDrillIn,
+    AgentDrillIn,
     /// Exit the drilled panel view back to the thread list (G3 — Left/Esc).
-    /// Clears `FocusState::drilled_thread_id`.
-    ThreadDrillOut,
+    /// Clears `FocusState::drilled_agent_id`.
+    AgentDrillOut,
     /// Open the Ctrl+P command palette.
     OpenCommandPalette,
     /// Reset the session cost counters to zero.

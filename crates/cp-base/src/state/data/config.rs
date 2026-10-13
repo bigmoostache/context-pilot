@@ -11,12 +11,13 @@ use crate::state::context::Kind;
 /// Controls the current view mode.
 ///
 /// `Normal` shows the standard panel view (sidebar + content panel).
-/// `Threads` replaces the entire layout with a dedicated threads view.
+/// `Agents` replaces the entire layout with a dedicated threads view.
 /// Ctrl+V toggles between them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum ViewMode {
     /// Threads view: dedicated layout for thread management (no panels).
-    Threads,
+    #[serde(rename = "Threads")]
+    Agents,
     #[default]
     #[serde(other)]
     /// Full sidebar with panel names and details.
@@ -28,8 +29,8 @@ impl ViewMode {
     #[must_use]
     pub const fn next(self) -> Self {
         match self {
-            Self::Normal => Self::Threads,
-            Self::Threads => Self::Normal,
+            Self::Normal => Self::Agents,
+            Self::Agents => Self::Normal,
         }
     }
 
@@ -39,7 +40,7 @@ impl ViewMode {
     pub const fn width(self) -> u16 {
         match self {
             Self::Normal => 36,
-            Self::Threads => 0,
+            Self::Agents => 0,
         }
     }
 

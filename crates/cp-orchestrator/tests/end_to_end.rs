@@ -146,7 +146,7 @@ mod tests {
     /// A `MessageCreated` oplog entry keyed by `byte` (a stand-in stream payload).
     fn message_entry(byte: u8) -> OpEntryKind {
         OpEntryKind::MessageCreated {
-            thread_id: "T1".to_owned(),
+            agent_id: "T1".to_owned(),
             message_id: format!("m{byte}"),
             head: ContentHash::new([byte; 32]),
             inline_body: None,
