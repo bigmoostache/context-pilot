@@ -47,6 +47,9 @@ pub(crate) fn resolve_send(tool: &ToolUse, state: &State, sender: &str) -> Resul
     let next = social::parse_next(raw)?;
     let group = GroupsState::get(state).find(gid).ok_or_else(|| format!("group {gid} not found"))?;
     social::validate(group, sender, &next)?;
+    if let Next::GiveRecurringTask { cron, .. } = next.clone() {
+        cp_mod_spine::coucou::validate_cron(&cron)?;
+    }
     Ok((gid.to_owned(), next))
 }
 
@@ -60,6 +63,18 @@ fn push_to_group(state: &mut State, (tid, gid): (&str, &str), msg: AgentMessage,
     group.messages.push(msg);
     let agent = AgentsState::get_mut(state).agents.iter_mut().find(|t| t.id == tid);
     Ok(agent.is_some_and(|a| own_human && std::mem::take(&mut a.archived)))
+}
+
+/// The coucou a `GIVE_RECURRING_TASK` asks for, bound to group `gid`.
+fn recurring_draft(next: &Next, sender: &str, gid: &str) -> Option<cp_mod_spine::coucou::Draft> {
+    let Next::GiveRecurringTask { agent_id: target, cron, message } = next.clone() else { return None };
+    Some(cp_mod_spine::coucou::Draft {
+        creator: Some(sender.to_owned()),
+        target,
+        group_id: Some(gid.to_owned()),
+        message,
+        when: cp_mod_spine::coucou::When::Cron(cron),
+    })
 }
 
 /// Post a message into a group the executing agent belongs to.
@@ -103,9 +118,15 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // `unarchived` records whether this Send resurrected an archived agent,
     // surfaced in the result so the AI knows the agent is live again (T353).
+    let recurring = recurring_draft(&next, tid, &gid);
     let unarchived = match push_to_group(state, (tid, &gid), msg, next) {
         Ok(u) => u,
         Err(e) => return ToolResult::new(tool.id.clone(), e, true),
+    };
+    let scheduled = match recurring.map(|d| cp_mod_spine::coucou::schedule(state, d)) {
+        None => String::new(),
+        Some(Ok(rec)) => format!(" [recurring task scheduled as {}]", rec.watcher_id),
+        Some(Err(e)) => format!(" [recurring task NOT scheduled: {e}]"),
     };
 
     // Refresh the static Agents panel so the just-sent message appears in the
@@ -126,7 +147,7 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     let unarchived_note = if unarchived { " [agent was archived \u{2014} automatically unarchived]" } else { "" };
     let mut result = ToolResult::new(
         tool.id.clone(),
-        format!("Sent to {gid} \"{group_name}\" (next: {next_raw}): {msg_preview}{unarchived_note}"),
+        format!("Sent to {gid} \"{group_name}\" (next: {next_raw}): {msg_preview}{unarchived_note}{scheduled}"),
         false,
     );
     result.preserves_tempo = true;

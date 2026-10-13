@@ -157,6 +157,18 @@ pub fn schedule(state: &mut State, draft: Draft) -> Result<Record, String> {
     Ok(record)
 }
 
+/// Check that `expr` is a valid 5-field cron that fires at least once.
+///
+/// # Errors
+///
+/// Parse error, or a cron with no match in the next ~5 years.
+pub fn validate_cron(expr: &str) -> Result<(), String> {
+    Cron::parse(expr)?
+        .next_after(now_ms(), time::local_utc_offset_secs())
+        .map(|_| ())
+        .ok_or_else(|| format!("cron `{expr}` never fires"))
+}
+
 /// Parse a duration like `30s`, `5m`, `1h30m` or a bare number of seconds.
 fn parse_duration_ms(s: &str) -> Result<u64, String> {
     let trimmed = s.trim();

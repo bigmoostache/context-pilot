@@ -13,6 +13,11 @@ tools:
         GATHER <id>, <id>...        wait for every listed member, then you resume
         DISPATCH <id>, <id>...      the first idle listed member takes it
         OWNER_DONE                  owner closes the exchange (not in human groups)
+        GIVE_RECURRING_TASK(<id>, <cron>, <message>)
+                                    <id> (you or a member) gets <message> here on
+                                    every match of a 5-field POSIX cron (local
+                                    time); same as Coucou(cron=...), stop it with
+                                    Coucou_delete
       Sending replaces your own pending turn in that group with what `next` says.
       Focus never moves.
 
@@ -194,7 +199,7 @@ tools:
 
       group_id: "Group to post into (G<n>). Your human group for the user."
 
-      next: "Who acts next: STILL_MY_TURN | GIVE_TALKING_STICK_TO <id> | GATHER <id>, <id>... | DISPATCH <id>, <id>... | OWNER_DONE. Use GIVE_TALKING_STICK_TO HUMAN when you are done and the user should answer."
+      next: "Who acts next: STILL_MY_TURN | GIVE_TALKING_STICK_TO <id> | GATHER <id>, <id>... | DISPATCH <id>, <id>... | OWNER_DONE | GIVE_RECURRING_TASK(<id>, <cron>, <message>). Use GIVE_TALKING_STICK_TO HUMAN when you are done and the user should answer."
 
   Read:
     description: |

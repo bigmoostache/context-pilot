@@ -65,11 +65,41 @@ pub enum Next {
     Dispatch(Vec<String>),
     /// `OWNER_DONE`: owner closes the exchange; no one is expected to act.
     OwnerDone,
+    /// `GIVE_RECURRING_TASK(<id>, <cron>, <message>)`: `agent_id` (possibly the
+    /// sender) gets `message` in this group on every match of the 5-field
+    /// POSIX `cron`. Scheduled as a coucou by the caller of [`apply_send`].
+    GiveRecurringTask {
+        /// Agent woken on each match.
+        agent_id: String,
+        /// 5-field POSIX cron, host local time.
+        cron: String,
+        /// Reminder text.
+        message: String,
+    },
 }
 
 /// Syntax help returned with every parse error.
 pub const NEXT_SYNTAX: &str = "expected one of: STILL_MY_TURN | GIVE_TALKING_STICK_TO <id> | \
-     GATHER <id>, <id>... | DISPATCH <id>, <id>... | OWNER_DONE";
+     GATHER <id>, <id>... | DISPATCH <id>, <id>... | OWNER_DONE | \
+     GIVE_RECURRING_TASK(<id>, <min hour day month weekday>, <message>)";
+
+/// Keyword of [`Next::GiveRecurringTask`], parsed apart: its cron and message
+/// hold spaces and punctuation the generic id splitter would mangle.
+const RECURRING: &str = "GIVE_RECURRING_TASK";
+
+/// Parse `(<id>, <cron>, <message>)` (parentheses optional).
+fn parse_recurring(args: &str) -> Result<Next, String> {
+    let trimmed = args.trim();
+    let inner = trimmed.strip_prefix('(').and_then(|s| s.strip_suffix(')')).unwrap_or(trimmed);
+    let mut parts = inner.splitn(3, ',').map(str::trim);
+    let (Some(id), Some(cron), Some(message)) = (parts.next(), parts.next(), parts.next()) else {
+        return Err(format!("{RECURRING} takes (<id>, <cron>, <message>); {NEXT_SYNTAX}"));
+    };
+    if id.is_empty() || message.is_empty() || cron.split_whitespace().count() != 5 {
+        return Err(format!("{RECURRING} needs an id, a 5-field cron and a message; {NEXT_SYNTAX}"));
+    }
+    Ok(Next::GiveRecurringTask { agent_id: id.to_owned(), cron: cron.to_owned(), message: message.to_owned() })
+}
 
 /// Parse the `next` DSL. Keyword is case-insensitive; ids may be separated by
 /// spaces or commas and wrapped in `()`, `[]` or `{}`.
@@ -78,6 +108,12 @@ pub const NEXT_SYNTAX: &str = "expected one of: STILL_MY_TURN | GIVE_TALKING_STI
 ///
 /// Unknown keyword, missing ids, or ids given to a keyword that takes none.
 pub fn parse_next(raw: &str) -> Result<Next, String> {
+    let head = raw.trim_start();
+    if let Some(prefix) = head.get(..RECURRING.len())
+        && prefix.eq_ignore_ascii_case(RECURRING)
+    {
+        return parse_recurring(head.get(RECURRING.len()..).unwrap_or_default());
+    }
     let mut words = raw.split(|c: char| c.is_whitespace() || "()[]{},".contains(c)).filter(|w| !w.is_empty());
     let keyword = words.next().unwrap_or_default().to_ascii_uppercase();
     let ids: Vec<String> = words.map(str::to_owned).collect();
@@ -117,9 +153,14 @@ pub fn validate(group: &Group, sender: &str, next: &Next) -> Result<(), String> 
     }
     let targets: &[String] = cp_macros::deref_match!(next, {
         Next::StillMyTurn | Next::OwnerDone => &[],
-        Next::GiveTalkingStickTo(ref id) => std::slice::from_ref(id),
+        Next::GiveTalkingStickTo(ref id) | Next::GiveRecurringTask { agent_id: ref id, .. } => {
+            std::slice::from_ref(id)
+        }
         Next::Gather(ref ids) | Next::Dispatch(ref ids) => ids,
     });
+    if matches!(*next, Next::GiveRecurringTask { .. }) && targets.iter().any(|t| t == HUMAN) {
+        return Err(format!("{RECURRING} cannot target HUMAN"));
+    }
     for t in targets {
         if !is_member(t) {
             return Err(format!("{t} is not a member of {} (members: {})", group.id, group.member_ids.join(", ")));
@@ -197,7 +238,7 @@ pub fn apply_send(group: &mut Group, sender: &str, next: Next) -> Result<(), Str
                 push_unique(group, Substate::Dispatch { candidates });
             }
         }
-        Next::OwnerDone => {}
+        Next::OwnerDone | Next::GiveRecurringTask { .. } => {}
     }
     Ok(())
 }
@@ -301,6 +342,16 @@ mod tests {
         assert_eq!(parse_next("GIVE_TALKING_STICK_TO {A2}"), Ok(Next::GiveTalkingStickTo("A2".into())));
         assert_eq!(parse_next("GATHER(A2, A3)"), Ok(Next::Gather(vec!["A2".into(), "A3".into()])));
         assert_eq!(parse_next("DISPATCH [A2 A3]"), Ok(Next::Dispatch(vec!["A2".into(), "A3".into()])));
+        assert_eq!(
+            parse_next("give_recurring_task(A2, 30 8 * * 1-5, check CI, then report)"),
+            Ok(Next::GiveRecurringTask {
+                agent_id: "A2".into(),
+                cron: "30 8 * * 1-5".into(),
+                message: "check CI, then report".into()
+            })
+        );
+        let bad_cron = parse_next("GIVE_RECURRING_TASK(A2, 0 * *, m)").expect_err("4-field cron");
+        assert!(bad_cron.contains("5-field"), "{bad_cron}");
     }
 
     #[test]
