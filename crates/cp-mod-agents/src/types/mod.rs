@@ -33,106 +33,16 @@ impl std::fmt::Display for AgentStatus {
     }
 }
 
-/// Who authored an agent message.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum AgentAuthor {
-    /// Message from the human user.
-    #[default]
-    User,
-    /// Message from the AI assistant.
-    Assistant,
-}
-
-impl std::fmt::Display for AgentAuthor {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match *self {
-            Self::User => write!(f, "user"),
-            Self::Assistant => write!(f, "assistant"),
-        }
-    }
-}
+// Messages now belong to groups (T860 phase C); the old names stay as aliases.
+/// Alias of [`cp_groups::chat::GroupAuthor`].
+pub type AgentAuthor = cp_groups::chat::GroupAuthor;
+/// Alias of [`cp_groups::chat::GroupMessage`].
+pub type AgentMessage = cp_groups::chat::GroupMessage;
 
 // =============================================================================
 // Structs
 // =============================================================================
 
-/// Serde helper — returns `true`.
-const fn default_true() -> bool {
-    true
-}
-
-/// A single message within an agent.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct AgentMessage {
-    /// Who wrote this message.
-    pub author: AgentAuthor,
-    /// Markdown text content (if any).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub content: Option<String>,
-    /// Attached file path reference (if any).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub file_path: Option<String>,
-    /// Creation timestamp (epoch ms).
-    pub timestamp: u64,
-    /// Whether the AI has acknowledged (seen via `Read`) this message.
-    /// AI-authored messages are acknowledged on creation. User messages
-    /// start unacknowledged and become acknowledged when `Read` is called.
-    #[serde(default = "default_true")]
-    pub acknowledged: bool,
-    /// True when this is an auto-generated **tool-activity trace** — a
-    /// lightweight `{verb · tool — intent}` line appended on every tool call
-    /// while the AI is focused on the agent (see the tool pipeline). Auto
-    /// messages are *hidden from the AI's own context* (skipped in
-    /// [`build_panel_content`](crate::tools)) so the model never re-reads its
-    /// own action log, and are rendered as a **collapsible group** in the web
-    /// UI and TUI rather than as normal bubbles. They never change an agent's
-    /// turn/focus. Defaults to `false` (back-compat with pre-feature data).
-    #[serde(default)]
-    pub auto: bool,
-    /// True once an **inline push notification** has been emitted for this
-    /// message while the agent was mid-stream (Branch B of the incoming-message
-    /// behavior). The push path sets this the first time it nudges the agent
-    /// about the message, so a long-running stream never re-pushes the same
-    /// message on every poll tick. It is message-level and serialized so the
-    /// guard survives reloads. Independent of [`acknowledged`](Self::acknowledged):
-    /// a message can be pushed (agent nudged mid-stream) yet still unacknowledged
-    /// (not pulled into context via `Read`) until the agent actually reads it.
-    /// Defaults to `false` (back-compat with pre-feature data).
-    #[serde(default)]
-    pub has_been_pushed: bool,
-}
-
-impl AgentMessage {
-    /// A user-authored text message, unacknowledged, stamped now.
-    #[must_use]
-    pub fn user(content: String) -> Self {
-        Self {
-            author: AgentAuthor::User,
-            content: Some(content),
-            file_path: None,
-            timestamp: cp_base::panels::now_ms(),
-            acknowledged: false,
-            auto: false,
-            has_been_pushed: false,
-        }
-    }
-
-    /// An assistant-authored auto **tool-activity trace** — acknowledged (so it
-    /// never flips turn/unread) and flagged [`auto`](Self::auto) (hidden from the
-    /// agent's own context, rendered as a collapsible run). Stamped now.
-    #[must_use]
-    pub fn auto_trace(content: String) -> Self {
-        Self {
-            author: AgentAuthor::Assistant,
-            content: Some(content),
-            file_path: None,
-            timestamp: cp_base::panels::now_ms(),
-            acknowledged: true,
-            auto: true,
-            has_been_pushed: false,
-        }
-    }
-}
 
 /// Where a branched agent came from: the parent agent and the message it was
 /// cut at (inclusive). Set only on agents created by [`AgentsState::branch`].

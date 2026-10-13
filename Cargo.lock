@@ -468,6 +468,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cp-groups"
+version = "0.2.13"
+dependencies = [
+ "cp-base",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "cp-macros"
 version = "0.2.13"
 
@@ -477,6 +486,7 @@ version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-fleet",
+ "cp-groups",
  "cp-mod-spine",
  "cp-render",
  "crossterm",
@@ -3833,6 +3843,7 @@ dependencies = [
  "cp-base",
  "cp-env",
  "cp-fleet",
+ "cp-groups",
  "cp-macros",
  "cp-mod-agents",
  "cp-mod-brave",

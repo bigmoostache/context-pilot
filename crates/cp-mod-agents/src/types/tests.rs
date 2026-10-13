@@ -8,6 +8,7 @@ use super::*;
 fn msg(author: AgentAuthor, text: &str, ts: u64) -> AgentMessage {
     AgentMessage {
         author,
+        author_agent_id: None,
         content: Some(text.to_owned()),
         file_path: None,
         timestamp: ts,

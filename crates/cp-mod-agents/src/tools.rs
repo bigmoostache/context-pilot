@@ -71,6 +71,7 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let msg = AgentMessage {
         author: AgentAuthor::Assistant,
+        author_agent_id: None,
         content: markdown,
         // Attachments ride inline ```file-upload``` blocks in the markdown.
         file_path: None,
