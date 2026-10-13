@@ -6,20 +6,20 @@
 // ./taskReducer's `foldTaskList`.
 
 import type { OpEntry } from "../api/generated/types.gen"
-import type { ThreadDetail, AgentNote } from "../types"
+import type { AgentDetail, AgentNote } from "../types"
 
 // The unwrapped delta discriminant (`entry.kind`) — same alias reducers.ts uses.
 type Kind = OpEntry["kind"]
 
 /**
- * notes_changed — replace the target thread's `notes` wholesale (the delta
- * carries the thread's COMPLETE note list, whole-list snapshot semantics, just
- * like task_list_changed). Returns `null` when the thread is unknown (→ hydrate).
+ * notes_changed — replace the target agent's `notes` wholesale (the delta
+ * carries the agent's COMPLETE note list, whole-list snapshot semantics, just
+ * like task_list_changed). Returns `null` when the agent is unknown (→ hydrate).
  * `WireNote` is a flat {id,title,content} value object, so no per-field
  * normalization is needed (contrast foldTaskList's snake→camel parentId fold).
  */
-export function foldNoteList(prev: ThreadDetail[], k: Kind): ThreadDetail[] | null {
-  if (prev.every((t) => t.id !== k.agent_id)) return null // unknown thread → hydrate
+export function foldNoteList(prev: AgentDetail[], k: Kind): AgentDetail[] | null {
+  if (prev.every((t) => t.id !== k.agent_id)) return null // unknown agent → hydrate
   const notes: AgentNote[] = k.notes ?? []
   return prev.map((t) => (t.id === k.agent_id ? { ...t, notes } : t))
 }

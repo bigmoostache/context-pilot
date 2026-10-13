@@ -21,7 +21,7 @@ const memo: { mod: Promise<MermaidApi> | null; theme: "dark" | "light" | null } 
 /**
  * Rendered-SVG cache keyed by `"<theme>:<source>"`. Identical diagrams (repeats)
  * and re-mounts (scrolling a message row in/out) reuse the SVG verbatim instead
- * of re-running the expensive dagre/d3 layout + serialize on the main thread.
+ * of re-running the expensive dagre/d3 layout + serialize on the main agent.
  */
 const svgCache = new Map<string, string>()
 
@@ -50,7 +50,7 @@ async function loadMermaid(dark: boolean): Promise<MermaidApi> {
  *
  * `mermaid` is a heavy dependency (it pulls in d3, dagre, cytoscape), so it is
  * **lazy-loaded** via dynamic `import()` on first mount — the initial bundle
- * never pays for it, only threads that actually contain a mermaid diagram do.
+ * never pays for it, only agents that actually contain a mermaid diagram do.
  *
  * Rendering is async: `mermaid.render(id, code)` returns an SVG string that we
  * inject as inner HTML (the same pattern as the Finder's highlight.js preview).

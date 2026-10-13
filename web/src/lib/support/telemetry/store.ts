@@ -37,7 +37,7 @@ export interface VitalEvent {
   ts: number
 }
 
-/** A Long Animation Frame (LoAF) — a frame that blocked the main thread. */
+/** A Long Animation Frame (LoAF) — a frame that blocked the main agent. */
 export interface LoafEvent {
   kind: "loaf"
   /** Total frame duration in ms. */
@@ -69,7 +69,7 @@ export interface CommitEvent {
   ts: number
 }
 
-/** A main-thread stall — the gap between animation frames exceeded the stall
+/** A main-agent stall — the gap between animation frames exceeded the stall
  *  threshold, i.e. the event loop was blocked (the universal freeze signal). */
 export interface StallEvent {
   kind: "stall"
@@ -78,9 +78,9 @@ export interface StallEvent {
   ts: number
 }
 
-/** A THROTTLE-IMMUNE main-thread block, from the Web-Worker heartbeat. The
- *  worker ticks on its own (never-throttled) thread; a large gap between the
- *  heartbeats the MAIN thread processed means the main thread was genuinely
+/** A THROTTLE-IMMUNE main-agent block, from the Web-Worker heartbeat. The
+ *  worker ticks on its own (never-throttled) agent; a large gap between the
+ *  heartbeats the MAIN agent processed means the main agent was genuinely
  *  blocked. Unlike {@link StallEvent} (rAF-based, fooled by focus-throttling),
  *  a `block` is a REAL freeze — the authoritative headline signal. */
 export interface BlockEvent {
@@ -90,7 +90,7 @@ export interface BlockEvent {
   ts: number
 }
 
-/** A NAMED synchronous main-thread block, timed by an explicit {@link measure}
+/** A NAMED synchronous main-agent block, timed by an explicit {@link measure}
  *  wrapper around a suspected hot path (SSE fold, poll reconcile, JSON parse…).
  *  This is the ATTRIBUTION layer for a stall: on browsers with no Long
  *  Animation Frames API (Firefox/Safari) the rAF stall watchdog says *a* block
@@ -98,7 +98,7 @@ export interface BlockEvent {
  *  burned it. */
 export interface TaskEvent {
   kind: "task"
-  /** Stable label of the instrumented path, e.g. "sse:apply", "threads:merge". */
+  /** Stable label of the instrumented path, e.g. "sse:apply", "agents:merge". */
   label: string
   /** Synchronous wall-time the block took, in ms. */
   duration: number
@@ -122,19 +122,19 @@ export interface TaskAgg {
 export interface TelemetrySnapshot {
   /** Most recent value per Web Vital, keyed by metric name. */
   vitals: Record<string, VitalEvent>
-  /** The worst (longest) THROTTLE-IMMUNE main-thread blocks (worker heartbeat),
+  /** The worst (longest) THROTTLE-IMMUNE main-agent blocks (worker heartbeat),
    *  descending — the AUTHORITATIVE freeze signal (a real block, never a
    *  focus-throttling artifact like a bare rAF stall can be). */
   worstBlocks: BlockEvent[]
-  /** Number of real main-thread blocks observed by the worker heartbeat. */
+  /** Number of real main-agent blocks observed by the worker heartbeat. */
   blockCount: number
-  /** The worst (longest) main-thread stalls seen, descending — THE headline
+  /** The worst (longest) main-agent stalls seen, descending — THE headline
    *  freeze signal (a 2s hang shows here even when nothing else fires). */
   worstStalls: StallEvent[]
   /** Number of stalls observed. */
   stallCount: number
   /** The worst (longest) NAMED tasks seen, descending — the attribution for a
-   *  stall (which labelled hot path burned the main-thread time). */
+   *  stall (which labelled hot path burned the main-agent time). */
   worstTasks: TaskEvent[]
   /** Number of named tasks recorded (≥ threshold). */
   taskCount: number

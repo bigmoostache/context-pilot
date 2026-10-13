@@ -10,7 +10,7 @@ import { cn, clipboard } from "@/lib/utils"
 import { Mermaid } from "./mermaid"
 
 /**
- * Full GitHub-flavored markdown renderer for chat/thread messages.
+ * Full GitHub-flavored markdown renderer for chat/agent messages.
  *
  * Replaces the old hand-rolled inline renderer (bold/code/linebreaks only),
  * which left headings (`#`/`##`), tables, lists, blockquotes and fenced code
@@ -361,7 +361,7 @@ function components(variant: MarkdownVariant): Components {
 
 // ── Pre-processor ─────────────────────────────────────────────────────
 //
-// The thread composer's Tab-nesting (`resolveTab` in listInput.ts) emits Unicode
+// The agent composer's Tab-nesting (`resolveTab` in listInput.ts) emits Unicode
 // bullet characters `• ◦ ▪ ‣` as depth-styled list markers. CommonMark only
 // recognises `-`, `*`, `+` — so the Unicode bullets land as plain inline text
 // and collapse onto a single line (the "bullets on one line" bug, T369).

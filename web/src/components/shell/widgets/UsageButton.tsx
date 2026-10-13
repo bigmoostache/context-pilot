@@ -3,7 +3,7 @@ import { Loader2, ExternalLink, CheckCircle2, XCircle, LogIn } from "lucide-reac
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { Tip } from "@/components/ui/tip"
 import { useClaudeUsage, useClaudeLogin } from "@/lib/live/useClaudeUsage"
-import { ClaudeUsageBody } from "@/components/agents/ClaudeUsagePage"
+import { ClaudeUsageBody } from "@/components/fleets/ClaudeUsagePage"
 
 /** Anthropic "A" logomark (Simple Icons, 24×24 viewBox). */
 function AnthropicMark({ className }: { className?: string }) {

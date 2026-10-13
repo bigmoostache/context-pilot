@@ -4,7 +4,7 @@
 // inspection resource (a disk-read list), but the `behaviour_changed` delta
 // CARRIES the authoritative new active-agent id, so we fold that truth straight
 // into the cached list instead of waiting on a refetch — the same discipline
-// threads use for `message_created`. Folding a server-emitted delta is NOT an
+// agents use for `message_created`. Folding a server-emitted delta is NOT an
 // optimistic guess: the delta is the backend's own confirmation, so the flag it
 // sets is ground truth. This makes the footer chip flip the instant the delta
 // lands, immune to any refetch/disk timing.
@@ -17,7 +17,7 @@
 import type { LibraryItem } from "../types"
 import type { OpEntry } from "./reducers"
 
-// The unwrapped delta discriminant (`entry.kind`) — the same shape the thread /
+// The unwrapped delta discriminant (`entry.kind`) — the same shape the agent /
 // agent folds receive.
 type Kind = OpEntry["kind"]
 

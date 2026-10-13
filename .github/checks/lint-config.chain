@@ -9114,3 +9114,61 @@ index 87a6b469..fecc0ddc 100644
    script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-ts-tests.sh" --callback
    last_edited_ms: 1783511056445
 # --- End entry #113 ---
+114:ade0e13b15cb25a432939d445ffa10bfe39e46f4796487b0dce7671ecebfadeb:e8e8037e3dd01b54f4d101847e542de290682503eab20f7e04c57c020880b45e:c5c974140132f2818fca226ca3b82c8d1ddc950e27f9ff8580e989e01dbbd756
+# --- Diff for entry #114 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index e88097e8..2b7fc800 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,5 +1,5 @@
+ [workspace]
+-members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-fleet", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-threads", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities", "crates/cp-vault", "crates/cp-env", "crates/cp-macros"]
++members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-fleet", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-agents", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities", "crates/cp-vault", "crates/cp-env", "crates/cp-macros"]
+ 
+ [workspace.package]
+ version = "0.2.13"
+@@ -1149,7 +1149,7 @@ cp-mod-logs = { path = "crates/cp-mod-logs" }
+ cp-mod-github = { path = "crates/cp-mod-github" }
+ cp-mod-files = { path = "crates/cp-mod-files" }
+ cp-mod-spine = { path = "crates/cp-mod-spine" }
+-cp-mod-threads = { path = "crates/cp-mod-threads" }
++cp-mod-agents = { path = "crates/cp-mod-agents" }
+ cp-fleet = { path = "crates/cp-fleet" }
+ cp-mod-bridge = { path = "crates/cp-mod-bridge" }
+ cp-wire = { path = "crates/cp-wire" }
+diff --git a/web/eslint.config.ts b/web/eslint.config.ts
+index 4044e463..20e97764 100644
+--- a/web/eslint.config.ts
++++ b/web/eslint.config.ts
+@@ -614,7 +614,7 @@ export default defineConfig([
+     // rule — the config-level analog of the Rust `allowed-lint-exceptions.yaml`
+     // registry (never an inline `eslint-disable`, which the P4 anti-cheat layer
+     // forbids). It is NOT a blanket downgrade: every other rule stays at error.
+-    files: ["src/components/agents/MarkdownEditor.tsx"],
++    files: ["src/components/fleets/MarkdownEditor.tsx"],
+     rules: {
+       "@typescript-eslint/no-deprecated": "off",
+       // The editor SEEDS its contentEditable surface once on mount via
+diff --git a/.github/checks/allowed-eslint-exceptions.yaml b/.github/checks/allowed-eslint-exceptions.yaml
+index 8fb0959d..812b51b1 100644
+--- a/.github/checks/allowed-eslint-exceptions.yaml
++++ b/.github/checks/allowed-eslint-exceptions.yaml
+@@ -51,7 +51,7 @@ exceptions:
+       upstream files are ever restructured to component-only exports.
+ 
+   # ── MarkdownEditor — contentEditable WYSIWYG has no non-deprecated API ────
+-  - path: "web/src/components/agents/MarkdownEditor.tsx"
++  - path: "web/src/components/fleets/MarkdownEditor.tsx"
+     rule: "@typescript-eslint/no-deprecated"
+     reason: >
+       The WYSIWYG editor drives a contentEditable surface through
+@@ -408,7 +408,7 @@ exceptions:
+       the key space; re-evaluate if a type-aware object-injection rule appears.
+ 
+   # ── P7 no-unsanitized — contentEditable seeding is injection-free ─────────
+-  - path: "web/src/components/agents/MarkdownEditor.tsx"
++  - path: "web/src/components/fleets/MarkdownEditor.tsx"
+     rule: "no-unsanitized/property"
+     reason: >
+       The WYSIWYG editor seeds its contentEditable surface once on mount via
+# --- End entry #114 ---

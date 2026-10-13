@@ -14,7 +14,7 @@
 // `ThrowOnError = false`, hence the `as` casts below — they align the
 // compile-time type with the runtime guarantee.
 
-import type { Fleet, ThreadDetail } from "../types"
+import type { Fleet, AgentDetail } from "../types"
 import type {
   FleetMetrics,
   CommandReceipt as GenCommandReceipt,
@@ -284,7 +284,7 @@ export async function mintTicket(): Promise<string> {
   return res.ticket
 }
 
-// ── Threads (SDK + thin presentation wrapper) ────────────────────────
+// ── Agents (SDK + thin presentation wrapper) ────────────────────────
 
 /** Format an epoch-ms timestamp as a relative age string. */
 export function formatAge(epochMs: number): string {
@@ -298,8 +298,8 @@ export function formatAge(epochMs: number): string {
   return `${days}d ago`
 }
 
-export async function fetchThreads(fleetId: string): Promise<ThreadDetail[]> {
-  const res = await sdk<{ focusedAgentId?: string | null; agents: ThreadDetail[] }>(
+export async function fetchAgents(fleetId: string): Promise<AgentDetail[]> {
+  const res = await sdk<{ focusedAgentId?: string | null; agents: AgentDetail[] }>(
     getApiFleetByIdAgents({ path: { id: fleetId } }),
   )
   const focusedId = res.focusedAgentId ?? null
@@ -326,14 +326,14 @@ export async function fetchThreads(fleetId: string): Promise<ThreadDetail[]> {
  * Hybrid (keyword + semantic) search over an agent's conversation index.
  *
  * Forwards to the agent over the bridge; Meilisearch embeds the raw query
- * server-side, so no fabricated semantic query is needed. `threadId` scopes
- * the search to one thread (omit for realm-wide). Returns hits best-scored
+ * server-side, so no fabricated semantic query is needed. `agentId` scopes
+ * the search to one agent (omit for realm-wide). Returns hits best-scored
  * first; an empty array means no match.
  */
 export function searchConversations(
   fleetId: string,
   query: string,
-  opts?: { limit?: number; threadId?: string },
+  opts?: { limit?: number; agentId?: string },
 ): Promise<import("./generated/types.gen").ConvHit[]> {
   return sdk<{ hits: import("./generated/types.gen").ConvHit[] }>(
     postApiFleetByIdConversationsSearch({
@@ -341,7 +341,7 @@ export function searchConversations(
       body: {
         query,
         ...(opts?.limit != null && { limit: opts.limit }),
-        ...(opts?.threadId != null && { agent_id: opts.threadId }),
+        ...(opts?.agentId != null && { agent_id: opts.agentId }),
       },
     }),
   ).then((r) => r.hits)

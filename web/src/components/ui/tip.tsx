@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils"
  *
  * Wraps any single trigger element and shows a small, portaled popup on
  * hover/focus that *names* a control and optionally *explains* it — ideal for
- * the app's jargon buttons (Threads / Cockpit / Finder / Conversation …) and
+ * the app's jargon buttons (Agents / Cockpit / Finder / Conversation …) and
  * the many icon-only controls whose meaning isn't obvious.
  *
  * Composed straight from the Base-UI tooltip primitive (rather than the generic

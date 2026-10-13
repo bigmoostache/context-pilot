@@ -47,7 +47,7 @@ export function ExplorerTree({
   onContext: (node: FinderNode, e: React.MouseEvent) => void
 }) {
   return (
-    // The rail is a deliberate twin of the thread list's: same `--sidebar-w`,
+    // The rail is a deliberate twin of the agent list's: same `--sidebar-w`,
     // same `card-shadow my-2` panel with NO horizontal margin, same
     // `bg-surface-2`. Uniformity was the ask — a second rail vocabulary would
     // make the app feel like two apps.

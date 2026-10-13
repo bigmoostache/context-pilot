@@ -183,7 +183,7 @@ export function useUploadAvatar() {
 // ── Prompt library (T350) ──────────────────────────────────────────────
 
 /**
- * Mutation to create a new `/command` in an agent's prompt library (the thread
+ * Mutation to create a new `/command` in an agent's prompt library (the agent
  * composer's "create command" button). One-shot POST writing a markdown file
  * into the agent's `.context-pilot/commands/`; not a delta-covered resource → a
  * `useMutation`. On success the agent's `useLibrary` query is invalidated so the

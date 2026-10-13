@@ -5,7 +5,7 @@ import type { KeyboardEvent } from "react"
  * Make a non-`<button>` element behave like a button for keyboard users.
  *
  * Some clickable surfaces cannot be a real `<button>` because they already
- * contain their own nested buttons (a Finder tab with a close ✕, a thread row
+ * contain their own nested buttons (a Finder tab with a close ✕, a agent row
  * with archive/pause controls) — nesting a button inside a button is invalid
  * HTML. For those, the ARIA pattern is a `role="button"` element that is
  * focusable (`tabIndex={0}`) and activates on Enter/Space, matching native
@@ -158,13 +158,13 @@ function loopBadges(
  * Loop-navigate a selection list with ⌘/Ctrl+Up / ⌘/Ctrl+Down, and report which
  * neighbours to badge while the modifier is held.
  *
- * Drives the Threads list and the Settings category rail: Up selects the
+ * Drives the Agents list and the Settings category rail: Up selects the
  * previous item, Down the next, and both WRAP at the ends. `orderedIds` must be
  * in the on-screen order so the movement matches what the eye expects; the
  * selection moves through {@link onSelect}.
  *
  * Bound through {@link useModifierShortcuts}, so the listener lives exactly as
- * long as the calling rail is mounted (only one of Threads / Settings is ever
+ * long as the calling rail is mounted (only one of Agents / Settings is ever
  * on screen, so their bindings never overlap). The arrows loop the sidebar even
  * while a text field is focused (T634 — the native caret-to-edge is suppressed
  * by the shortcut's own `preventDefault`), and a selection that is not in the
@@ -204,7 +204,7 @@ export function useLoopNav(
  * THE QUESTION IS "IS ANYTHING SELECTED", NOT "IS FOCUS IN A FIELD". This used
  * to bail on any focused input/textarea/contenteditable, which killed the
  * shortcut for the most common situation there is — a caret parked in the
- * thread composer. A caret with nothing selected copies nothing, so there was
+ * agent composer. A caret with nothing selected copies nothing, so there was
  * no copy to protect and the guard was refusing exactly the case it existed to
  * allow.
  *

@@ -3,7 +3,7 @@
 // A `MessageCreated` oplog delta carries its body **inline** only when small;
 // a large message spills to the content-addressed store and the delta carries
 // just its `head` hash (I13). This module fetches those spilled bytes so the
-// SSE→cache bridge can fold a big message into the live thread log without
+// SSE→cache bridge can fold a big message into the live agent log without
 // waiting for the slow tier-② disk poll (T357). Split from ./index for the
 // 500-line file budget; re-exported there so `@/lib/api` stays the single
 // import surface.

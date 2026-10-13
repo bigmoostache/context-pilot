@@ -19,7 +19,7 @@ const phaseMeta: Record<StreamPhase, { label: string; color: string }> = {
  *   agent — stream phase, agent name, and its running cost.
  * - **At fleet altitude** (`fleet=true`, no agent selected): per-agent vitals
  *   are meaningless, so we show fleet-wide aggregates instead — how many agents
- *   you run, how many threads are in flight across all of them, and the *total*
+ *   you run, how many agents are in flight across all of them, and the *total*
  *   spend (clearly labelled). A "Needs you" count surfaces how many agents are
  *   waiting on input, so the footer doubles as a glanceable fleet pulse.
  */
@@ -65,7 +65,7 @@ export function StatusBar({
 function FleetStatus({ fleets }: { fleets: Fleet[] }) {
   const totalSpend = fleets.reduce((sum, a) => sum + a.costUsd, 0)
   const needsYou = fleets.filter((a) => a.status === "needs-you").length
-  const totalThreads = fleets.reduce((sum, a) => sum + a.agents, 0)
+  const totalAgents = fleets.reduce((sum, a) => sum + a.agents, 0)
 
   return (
     // Bare chrome, like the header rail: no fill, no `border-t`, no margin —
@@ -85,7 +85,7 @@ function FleetStatus({ fleets }: { fleets: Fleet[] }) {
         <Metric icon={Boxes} label="Fleets" value={String(fleets.length)} />
       </Tip>
       <Tip title="Threads" body="Open threads, summed across every fleet." side="top">
-        <Metric icon={MessagesSquare} label="Threads" value={String(totalThreads)} />
+        <Metric icon={MessagesSquare} label="Threads" value={String(totalAgents)} />
       </Tip>
 
       {needsYou > 0 && (

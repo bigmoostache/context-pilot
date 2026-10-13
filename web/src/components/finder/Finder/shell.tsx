@@ -57,7 +57,7 @@ export function FinderShell({
   groups: GroupsState
   /** Whether the explorer rail is expanded. When false the tree slides off the
    *  left edge (the {@link FinderShell} root clips it) and the editor reclaims
-   *  the width — the Finder twin of the Threads/Settings rail collapse. */
+   *  the width — the Finder twin of the Agents/Settings rail collapse. */
   railOpen?: boolean
   disconnected?: boolean | undefined
   onReconnect?: (() => void) | undefined
@@ -95,7 +95,7 @@ export function FinderShell({
 
         {/* Slide wrapper (T624): the tree stays MOUNTED and slides off the left
             edge via a transitioned negative margin when the rail is collapsed —
-            the same mechanism the Threads/Settings rails use, so tree expansion
+            the same mechanism the Agents/Settings rails use, so tree expansion
             state and the lazily-fetched folder listings survive a hide/show. A
             `flex` wrapper (not a plain block) so the aside inside keeps its
             flex-stretch height. `motion-reduce` snaps instead of sliding. */}

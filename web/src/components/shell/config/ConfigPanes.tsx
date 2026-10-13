@@ -2,7 +2,7 @@ import { useState } from "react"
 import type { CatId } from "./categories"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Check, Lock } from "lucide-react"
-import { UsagePage } from "@/components/agents/UsagePage"
+import { UsagePage } from "@/components/fleets/UsagePage"
 import { UpdatePane } from "./UpdatePane"
 import { SecretsPane } from "./SecretsPane"
 import { ItNetworkPane } from "./it/ItNetworkPane"
@@ -331,10 +331,10 @@ function ShowOverlayToggle() {
 }
 
 /**
- * The **thread details rail** default (T677): whether the Files/Tasks aside
+ * The **agent details rail** default (T677): whether the Files/Tasks aside
  * beside a conversation is shown by default. A pure client-side view preference
- * ({@link useAsideDefault}, `localStorage`-backed). Each thread still remembers
- * its own show/hide choice; this only sets the fallback for a thread you haven't
+ * ({@link useAsideDefault}, `localStorage`-backed). Each agent still remembers
+ * its own show/hide choice; this only sets the fallback for a agent you haven't
  * toggled yet. Surfaced as "shown by default" so ON = show (the requested
  * default), OFF = hidden.
  */

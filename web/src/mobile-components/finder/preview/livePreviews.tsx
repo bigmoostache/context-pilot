@@ -9,7 +9,7 @@ import { highlightCode } from "./codeHighlight"
  *  guard forbids reaching back into @/components from a hand-authored mobile
  *  file, and the mobile editor is the touch-sized toolbar variant. */
 const LazyMarkdownEditor = lazy(() =>
-  import("@/mobile-components/agents/MarkdownEditor").then((m) => ({ default: m.MarkdownEditor })),
+  import("@/mobile-components/fleets/MarkdownEditor").then((m) => ({ default: m.MarkdownEditor })),
 )
 import { FileIcon } from "../support/macIcons"
 import { Generic, MarkdownPreview, PreviewStatus, TextPreview, TruncatedNote } from "./previewParts"

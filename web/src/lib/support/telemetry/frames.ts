@@ -10,7 +10,7 @@
 // even though INP never would.
 //
 // We observe LoAF where supported and fall back to Long Tasks otherwise, so
-// every browser yields *some* main-thread-blocking signal.
+// every browser yields *some* main-agent-blocking signal.
 //
 // The LoAF/Long-Task entry shapes are not yet in the TS DOM lib, so we declare
 // the minimal structural subset we read (a downcast from `PerformanceEntry`, a
@@ -87,7 +87,7 @@ function observe(type: string, onEntry: (e: PerformanceEntry) => void): (() => v
 }
 
 /**
- * Start observing main-thread-blocking frames/tasks. Prefers LoAF (rich script
+ * Start observing main-agent-blocking frames/tasks. Prefers LoAF (rich script
  * attribution); always also arms Long Tasks as the broadly-supported floor.
  * Returns a disposer that tears down every active observer.
  */

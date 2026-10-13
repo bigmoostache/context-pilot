@@ -284,7 +284,7 @@ export function SystemEditorDialog({
           )}
         >
           <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
-            {/* breadcrumb + close — mirrors the New Thread sheet chrome */}
+            {/* breadcrumb + close — mirrors the New Agent sheet chrome */}
             <div className="flex items-center gap-2 px-4 pt-3 pb-1">
               <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
                 <span className="flex size-[15px] items-center justify-center rounded-sm bg-(--signal)/15 text-(--signal)">

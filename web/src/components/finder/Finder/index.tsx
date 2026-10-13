@@ -21,7 +21,7 @@ import { FinderShell } from "./shell"
  * This component is the thin seam: {@link Finder} keys the body by agent id so
  * each agent mounts fresh, and {@link FinderBody} owns the two pieces of UI
  * state the explorer + tabs need ({@link useTreeState}, {@link useEditorGroups}
- * — the latter persists its open-tab / split layout per agent), threads the
+ * — the latter persists its open-tab / split layout per agent), agents the
  * "Show in Finder" reveal into the tree, and hands everything to
  * {@link FinderShell} for render.
  */

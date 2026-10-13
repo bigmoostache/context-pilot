@@ -47,7 +47,7 @@ export function useLive<T>(
     // same-origin 127.0.0.1 cockpit the network wait is sub-ms, so a multi-
     // second span is the synchronous payload parse/reshape — the freeze suspect
     // that lands OUTSIDE the SSE fold and React render (both already
-    // instrumented). A `load:*` entry coinciding with a main-thread stall names
+    // instrumented). A `load:*` entry coinciding with a main-agent stall names
     // exactly which endpoint's parse burned it, on every browser.
     queryFn: () => measureAsync(`load:${String(queryKey[0])}`, queryFn),
     enabled,

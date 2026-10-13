@@ -8,7 +8,7 @@ function initialDefaultHidden(): boolean {
   return window.localStorage.getItem(STORAGE_KEY) === "1"
 }
 
-/** Provides the global default-hidden flag for the thread aside and persists it
+/** Provides the global default-hidden flag for the agent aside and persists it
  *  to `localStorage` (`"1"` = hidden by default; default show). */
 export function AsideDefaultProvider({ children }: { children: React.ReactNode }) {
   const [defaultHidden, setDefaultHidden] = useState<boolean>(initialDefaultHidden)

@@ -1,4 +1,4 @@
-// ── Main-thread stall (event-loop lag) monitor ───────────────────────
+// ── Main-agent stall (event-loop lag) monitor ───────────────────────
 //
 // The UNIVERSAL freeze detector — the one signal that cannot miss a multi-second
 // hang. LoAF, Long Tasks and INP are all Chromium-only and (LoAF) accounted
@@ -7,7 +7,7 @@
 // none of those blind spots because it measures the event loop itself.
 //
 // Mechanism: a `requestAnimationFrame` heartbeat. The browser only fires rAF
-// when the main thread is free to produce a frame, so ANY main-thread block —
+// when the main agent is free to produce a frame, so ANY main-agent block —
 // a long synchronous task, a saturating burst of many small tasks, a forced
 // reflow, a big GC pause — DELAYS the next callback by exactly the block's
 // duration. Measuring the gap between successive callbacks yields the true
@@ -35,7 +35,7 @@ export function initStallMonitor(): () => void {
   let stopped = false
 
   // Returning from a backgrounded tab OR regaining window focus produces one
-  // huge (throttled) gap that is NOT a main-thread stall — reset the clock so
+  // huge (throttled) gap that is NOT a main-agent stall — reset the clock so
   // it isn't recorded. Firefox throttles rAF to ~1fps whenever the WINDOW is
   // unfocused, even while the tab stays "visible" (document.hidden === false),
   // so focus transitions matter as much as visibility ones.

@@ -2,8 +2,8 @@ import { ChevronDown, GitBranch, Terminal, Trash2, User } from "lucide-react"
 import type { ChatMessage } from "@/lib/types"
 import { Markdown, type MarkdownVariant } from "@/lib/support/markdown"
 import { CopyButton } from "./CopyButton"
-import { MessageFileChip } from "@/components/threads/fileUpload"
-import { splitMessageSegments, type UploadedFile } from "@/components/threads/fileUpload/helpers"
+import { MessageFileChip } from "@/components/agents/fileUpload"
+import { splitMessageSegments, type UploadedFile } from "@/components/agents/fileUpload/helpers"
 import { cn } from "@/lib/utils"
 
 /**
@@ -24,9 +24,9 @@ interface MessageProps {
   onOpenFile?: ((file: UploadedFile) => void) | undefined
   /** navigate the Finder to a file's parent and select it */
   onShowInFinder?: ((path: string) => void) | undefined
-  /** permanently delete this message from the thread */
+  /** permanently delete this message from the agent */
   onDelete?: (() => void) | undefined
-  /** branch a new thread out of the conversation at this message */
+  /** branch a new agent out of the conversation at this message */
   onBranch?: (() => void) | undefined
 }
 
@@ -113,7 +113,7 @@ function MessageBody({
 
 /**
  * Discrete "branch out" affordance beside copy/delete: opens the Branch dialog
- * to start a new thread inheriting the conversation up to this message. Same
+ * to start a new agent inheriting the conversation up to this message. Same
  * quiet style as the copy button, brightening to the signal colour on hover.
  */
 function BranchButton({ align, onBranch }: { align: "start" | "end"; onBranch: () => void }) {

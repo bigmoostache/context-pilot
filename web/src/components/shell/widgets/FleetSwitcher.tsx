@@ -80,14 +80,14 @@ export function FleetSwitcher({
         aria-label={active ? `Workspace: ${active.name}` : "Select a fleet"}
         className={cn(
           "relative flex h-8 items-center gap-2 rounded-lg px-1.5 text-left transition-colors outline-none",
-          // Exact same hover as a threads-sidebar row (T676): soft card lift.
+          // Exact same hover as a agents-sidebar row (T676): soft card lift.
           "hover:card-shadow hover:bg-card",
         )}
       >
         {/* Single-line trigger: just the workspace name (the folder path was
             redundant noise — it lives in the menu rows + Finder). The fixed
             `h-8` locks the trigger to the exact height of the sibling
-            Threads/Finder/Cockpit view-toggle pill group (also `h-8`).
+            Agents/Finder/Cockpit view-toggle pill group (also `h-8`).
             In `rail` mode only the glyph survives — see the prop's doc. */}
         <TriggerFace active={active} rail={rail} />
         {shortcutHint && <HintBadge label={shortcutHint} shown={hintShown ?? false} />}

@@ -4,13 +4,13 @@
 // every event to the TanStack Query cache:
 //
 //   • `delta`      → parse the rev-numbered OpEntry and FOLD it into the live
-//                    delta-covered caches (`['threads', id]`, `['agent', id]`)
+//                    delta-covered caches (`['agents', id]`, `['agent', id]`)
 //                    via `setQueryData(key, prev => reducer(prev, entry))`.
 //   • `invalidate` → mark the agent's INSPECTION caches stale so they refetch
 //                    (memory/todos/tree/… have no oplog delta to fold).
 //
-// The PURE folds (the OpEntry shape + applyThreadDelta/applyFleetDelta/
-// mergeThreadLogs) live in ./reducers; this module owns only the imperative
+// The PURE folds (the OpEntry shape + applyAgentDelta/applyFleetDelta/
+// mergeAgentLogs) live in ./reducers; this module owns only the imperative
 // bridge — subscription, `setQueryData`, and the async spilled-body hydrate.
 //
 // **Why this kills the T123 class of bug structurally.** A single send emits a
@@ -31,15 +31,15 @@ import type { QueryClient } from "@tanstack/react-query"
 import { getOrCreateSseClient } from "./sse"
 import { queryClient } from "./queryClient"
 import { fetchMessageBody } from "../api"
-import { applyFleetDelta, applyThreadDelta, type OpEntry } from "./reducers"
+import { applyFleetDelta, applyAgentDelta, type OpEntry } from "./reducers"
 import { applyLibraryDelta } from "./library"
 import { measure } from "../support/telemetry"
-import type { Fleet, ThreadDetail, LibraryItem } from "../types"
+import type { Fleet, AgentDetail, LibraryItem } from "../types"
 
 // Re-export the pure folds + delta type so existing `@/lib/query/sync`
 // consumers keep their import surface (the reducers moved to ./reducers for the
 // 500-line file budget).
-export { applyThreadDelta, applyFleetDelta, mergeThreadLogs, type OpEntry } from "./reducers"
+export { applyAgentDelta, applyFleetDelta, mergeAgentLogs, type OpEntry } from "./reducers"
 
 // ── Query keys (the single source of truth for cache identity) ───────
 //
@@ -52,7 +52,7 @@ export const qk = {
   fleetMetrics: () => ["fleet-metrics"] as const,
   retiredFleet: () => ["fleet-retired"] as const,
   agent: (id: string) => ["agent", id] as const,
-  threads: (id: string) => ["threads", id] as const,
+  agents: (id: string) => ["threads", id] as const,
   metrics: (id: string) => ["metrics", id] as const,
   library: (id: string) => ["library", id] as const,
   fs: (id: string, path: string) => ["fs", id, path] as const,
@@ -74,23 +74,23 @@ const lastRev = new Map<string, number>()
 const wired = new Set<string>()
 
 /**
- * Hydrate a SPILLED (large) message body and fold it into the live thread log.
+ * Hydrate a SPILLED (large) message body and fold it into the live agent log.
  *
  * A small message rides its `MessageCreated` delta inline (`inline_body`), so
- * the synchronous {@link applyThreadDelta} reducer appends it at once. A large
+ * the synchronous {@link applyAgentDelta} reducer appends it at once. A large
  * message instead spills to the content-addressed store: its delta carries only
  * the `head` hash and no `inline_body`, so the pure reducer can't render it —
- * it merely bumps the thread's activity. Without this, a big message never
+ * it merely bumps the agent's activity. Without this, a big message never
  * entered the log via the push plane and only surfaced on the 15s backstop poll
  * (the "big messages don't appear until I refresh" bug, T357).
  *
  * Here the bridge fetches the body bytes over `/body/{head}`, then re-folds the
- * delta as if it had arrived inline — reusing {@link applyThreadDelta}'s exact
+ * delta as if it had arrived inline — reusing {@link applyAgentDelta}'s exact
  * append path (positional `msg_{n}` id derivation + dedup), so the hydrated
  * message lands identically to an inline one and the backstop poll dedups it.
  * The body is immutable and stored before the delta is emitted (the I13
  * body-before-reference barrier), so the fetch is race-free. A fetch failure
- * falls back to invalidating the threads query so a refetch still surfaces it.
+ * falls back to invalidating the agents query so a refetch still surfaces it.
  */
 async function hydrateSpilledMessage(
   client: QueryClient,
@@ -99,7 +99,7 @@ async function hydrateSpilledMessage(
 ): Promise<void> {
   const head = entry.kind.head
   if (!head) return
-  const tk = qk.threads(fleetId)
+  const tk = qk.agents(fleetId)
   let bodyStr: string
   try {
     bodyStr = await fetchMessageBody(fleetId, head)
@@ -110,8 +110,8 @@ async function hydrateSpilledMessage(
   // Re-fold as an inline delta against the FRESHEST cache (the append's id is
   // positional, so it must read the current log length at apply time).
   const synthetic: OpEntry = { ...entry, kind: { ...entry.kind, inline_body: bodyStr } }
-  const prev = client.getQueryData<ThreadDetail[]>(tk)
-  const next = applyThreadDelta(prev, synthetic)
+  const prev = client.getQueryData<AgentDetail[]>(tk)
+  const next = applyAgentDelta(prev, synthetic)
   if (next === null) {
     if (prev !== undefined) void client.invalidateQueries({ queryKey: tk })
   } else if (next !== prev) {
@@ -121,7 +121,7 @@ async function hydrateSpilledMessage(
 
 /**
  * Fold a `behaviour_changed` delta into the cached library so the footer chip
- * flips the instant the delta lands (threads' fold discipline, not an optimistic
+ * flips the instant the delta lands (agents' fold discipline, not an optimistic
  * guess — the delta IS the backend's confirmation). When the library isn't
  * cached yet (chip unmounted) the fold returns `null` and we invalidate so the
  * next read hydrates ground truth — the event-driven twin of the config.json
@@ -141,7 +141,7 @@ function foldBehaviourIntoLibrary(client: QueryClient, fleetId: string, km: OpEn
 
 /**
  * Apply one parsed delta to the agent's delta-covered caches. Folds into BOTH
- * the threads and agent-meta caches (each reducer ignores deltas not its own),
+ * the agents and agent-meta caches (each reducer ignores deltas not its own),
  * then advances the rev guard. A reducer verdict of `null` ("can't fold")
  * invalidates that key so the next read hydrates ground truth.
  */
@@ -154,8 +154,8 @@ function applyDelta(client: QueryClient, fleetId: string, entry: OpEntry): void 
 
   // A spilled (large) message has no inline body — its delta carries only the
   // `head` hash. Kick off an async hydrate that fetches the body and folds the
-  // full message in (T357). The synchronous threads fold below still runs and
-  // bumps the thread's activity immediately; the bubble's text lands a moment
+  // full message in (T357). The synchronous agents fold below still runs and
+  // bumps the agent's activity immediately; the bubble's text lands a moment
   // later when the hydrate resolves.
   const km = entry.kind
   if (km.kind === "message_created" && !km.inline_body && km.head) {
@@ -175,10 +175,10 @@ function applyDelta(client: QueryClient, fleetId: string, entry: OpEntry): void 
     foldBehaviourIntoLibrary(client, fleetId, km)
   }
 
-  // Threads cache fold.
-  const tk = qk.threads(fleetId)
-  const tPrev = client.getQueryData<ThreadDetail[]>(tk)
-  const tNext = applyThreadDelta(tPrev, entry)
+  // Agents cache fold.
+  const tk = qk.agents(fleetId)
+  const tPrev = client.getQueryData<AgentDetail[]>(tk)
+  const tNext = applyAgentDelta(tPrev, entry)
   if (tNext === null) {
     if (tPrev !== undefined) void client.invalidateQueries({ queryKey: tk })
   } else if (tNext !== tPrev) {
@@ -218,7 +218,7 @@ function invalidateInspection(client: QueryClient, fleetId: string): void {
 // During active agent work the orchestrator's 2s config.json mtime scan fires
 // an SSE `invalidate` on every cycle, causing ALL inspection resources to
 // refetch. With a large tree (~544 KB) + conversation (~214 KB) + memory
-// (~53 KB), JSON.parse on the main thread takes ~400 ms per burst. At 2–3s
+// (~53 KB), JSON.parse on the main agent takes ~400 ms per burst. At 2–3s
 // cadence this creates a visible freeze.
 //
 // Throttle: allow the FIRST invalidation through immediately (fast first
@@ -257,7 +257,7 @@ export function ensureSync(fleetId: string): void {
       // Instrument the two synchronous suspects on the SSE hot path so a freeze
       // here is NAMED in the HUD (Firefox has no LoAF to name it): the raw
       // frame parse (a big spilled body can be a fat JSON.parse) and the fold
-      // that applies it to the cache (both thread + agent reducers).
+      // that applies it to the cache (both agent + agent reducers).
       entry = measure("sse:parse", () => JSON.parse(event.data) as OpEntry)
     } catch {
       // Malformed frame → fall back to a ground-truth refresh of live caches.
@@ -279,6 +279,6 @@ export function ensureSync(fleetId: string): void {
 /** Refresh the two delta-covered caches from ground truth (used when a frame
  *  can't be folded or a resync is signalled). */
 function invalidateLiveCaches(fleetId: string): void {
-  void queryClient.invalidateQueries({ queryKey: qk.threads(fleetId) })
+  void queryClient.invalidateQueries({ queryKey: qk.agents(fleetId) })
   void queryClient.invalidateQueries({ queryKey: qk.agent(fleetId) })
 }

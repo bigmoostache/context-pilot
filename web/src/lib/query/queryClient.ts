@@ -8,7 +8,7 @@
 // impossible: each delta folds onto the freshest committed cache value.
 //
 // Freshness model (single-mechanism discipline, design doc §8.5):
-//   • Delta-covered resources (threads, agent meta) ride the push plane —
+//   • Delta-covered resources (agents, agent meta) ride the push plane —
 //     SSE deltas applied via `setQueryData` in `sync.ts`. No refetch on delta.
 //   • Inspection resources (memory, todos, tree, …) have no oplog delta to
 //     fold, so they ride the SSE `invalidate` event → `invalidateQueries`.

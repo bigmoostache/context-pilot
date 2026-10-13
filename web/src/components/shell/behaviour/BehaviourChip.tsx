@@ -95,7 +95,7 @@ function parseSystemMd(text: string): { name: string; description: string; body:
  * (T581). Shows the loaded system's name and, on click, a dropdown
  * to switch it, edit/export/delete each entry, and create/import new ones.
  *
- * Switching issues a `load_behaviour` command down the SAME live path threads
+ * Switching issues a `load_behaviour` command down the SAME live path agents
  * use (`sendCommand → POST /command → apply_command → set_active_system`); the
  * active flag comes back through the library query's `behaviour_changed` fold.
  * Editing/creating/importing all converge on the backend's authoritative

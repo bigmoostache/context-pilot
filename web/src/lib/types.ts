@@ -27,8 +27,8 @@ import type {
   AccentToken,
   Fleet as GenFleet,
   FinderNode as GenFinderNode,
-  AgentDetail as GenThreadDetail,
-  AgentMsg as GenThreadMsg,
+  AgentDetail as GenAgentDetail,
+  AgentMsg as GenAgentMsg,
 } from "./api/generated/types.gen"
 
 /**
@@ -43,21 +43,21 @@ export type Fleet = Omit<GenFleet, "status"> & {
 }
 
 /**
- * ThreadMsg with UI-only `streaming` flag (set during active LLM output).
+ * AgentMsg with UI-only `streaming` flag (set during active LLM output).
  *
  * `ts` is widened from the generated `number` (epoch ms from REST) to also
  * accept an ISO string: SSE-appended messages carry their timestamp as an ISO
  * string (see reducers `message_created`), and the mock fixtures use display
  * strings. Consumers normalise both (`typeof ts === "number" ? … : new Date(ts)`).
  */
-export type ThreadMsg = Omit<GenThreadMsg, "ts"> & {
+export type AgentMsg = Omit<GenAgentMsg, "ts"> & {
   ts?: number | string | undefined
   streaming?: boolean | undefined
 }
 
-/** ThreadDetail re-exported as-is (field optionality matches backend). */
-export type ThreadDetail = Omit<GenThreadDetail, "log"> & {
-  log: ThreadMsg[]
+/** AgentDetail re-exported as-is (field optionality matches backend). */
+export type AgentDetail = Omit<GenAgentDetail, "log"> & {
+  log: AgentMsg[]
 }
 
 // ── Derived type aliases (extracted from generated union literals) ────
@@ -68,7 +68,7 @@ export type ThreadDetail = Omit<GenThreadDetail, "log"> & {
  * `Lifecycle::Running` delta naturally clears it back to `"idle"`.
  */
 export type FleetStatus = GenFleet["status"] | "waiting"
-export type ThreadStatus = GenThreadDetail["status"]
+export type AgentStatus = GenAgentDetail["status"]
 
 // ── UI-only types (no backend equivalent) ────────────────────────────
 

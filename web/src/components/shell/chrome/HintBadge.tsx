@@ -7,12 +7,12 @@ import { prefersReducedMotion } from "@/lib/utils"
  * ⌘/Ctrl is held.
  *
  * QUIET ON PURPOSE, in colour and motion: it is metadata about a control, not
- * a control — the reasoning that puts thread rows' idle actions on
+ * a control — the reasoning that puts agent rows' idle actions on
  * `muted-foreground`. A `--signal` pill on a spring was tried: loudest thing in
  * the rail, and a spring overshoots by definition — a boing at 13px.
  *
- * ITS OWN MODULE because two unrelated surfaces show one: the rail's thread
- * actions (New thread · Search) and the theme toggle's two segments. Exporting
+ * ITS OWN MODULE because two unrelated surfaces show one: the rail's agent
+ * actions (New agent · Search) and the theme toggle's two segments. Exporting
  * it from `TopBar` would close an import cycle — `TopBar` already imports
  * `ThemeToggle` — which `import-x/no-cycle` rejects outright.
  *

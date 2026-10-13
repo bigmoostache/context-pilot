@@ -14,11 +14,11 @@ import { ChevronDown, GitBranch, Terminal, Trash2, User } from "lucide-react"
 import type { ChatMessage } from "@/lib/types"
 import { Markdown, type MarkdownVariant } from "@/lib/support/markdown"
 import { CopyButton } from "./CopyButton"
-import { MessageFileChip } from "@/mobile-components/threads/fileUpload"
+import { MessageFileChip } from "@/mobile-components/agents/fileUpload"
 import {
   splitMessageSegments,
   type UploadedFile,
-} from "@/mobile-components/threads/fileUpload/helpers"
+} from "@/mobile-components/agents/fileUpload/helpers"
 import { cn, prefersReducedMotion } from "@/lib/utils"
 
 /**
@@ -39,9 +39,9 @@ interface MessageProps {
   onOpenFile?: ((file: UploadedFile) => void) | undefined
   /** navigate the Finder to a file's parent and select it */
   onShowInFinder?: ((path: string) => void) | undefined
-  /** permanently delete this message from the thread */
+  /** permanently delete this message from the agent */
   onDelete?: (() => void) | undefined
-  /** branch a new thread out of the conversation at this message */
+  /** branch a new agent out of the conversation at this message */
   onBranch?: (() => void) | undefined
   /** true for a message that just APPENDED (not part of the initial load) —
    *  drives the anime.js spring pop that reads as send/receive confirmation. */
@@ -157,7 +157,7 @@ function MessageBody({
 
 /**
  * Discrete "branch out" affordance beside copy/delete: opens the Branch dialog
- * to start a new thread inheriting the conversation up to this message. Touch
+ * to start a new agent inheriting the conversation up to this message. Touch
  * metrics match the delete button (no hover; active-press signal tint).
  */
 function BranchButton({ align, onBranch }: { align: "start" | "end"; onBranch: () => void }) {

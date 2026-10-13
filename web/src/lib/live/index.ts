@@ -5,7 +5,7 @@
 // setData/poll/invalidate that fought itself — T123) is gone; freshness now
 // follows single-mechanism discipline (design doc §8.5):
 //
-//   • Delta-covered resources (threads, agent meta) ride the PUSH plane: the
+//   • Delta-covered resources (agents, agent meta) ride the PUSH plane: the
 //     per-agent SSE→cache bridge in `query/sync.ts` folds rev-numbered oplog
 //     deltas into the cache via `setQueryData`. No refetch on a delta.
 //   • Inspection resources (memory, todos, tree, …) have no oplog delta, so the
@@ -22,14 +22,14 @@
 
 import { useQueryClient } from "@tanstack/react-query"
 import { useCallback, useEffect, useState } from "react"
-import { mergeThreadLogs, qk } from "../query/sync"
+import { mergeAgentLogs, qk } from "../query/sync"
 import { getOrCreateSseClient } from "../query/sse"
 import { useRestartFleet } from "./mutations"
 import { measure } from "../support/telemetry"
 import { useLive, type LiveQueryResult } from "./core"
 import * as api from "../api"
 
-import type { Fleet, ThreadDetail, LibraryItem, FinderNode } from "../types"
+import type { Fleet, AgentDetail, LibraryItem, FinderNode } from "../types"
 
 export * from "./mutations"
 
@@ -135,20 +135,20 @@ export function useFleetMeta(fleetId: string): LiveQueryResult<Fleet> {
   })
 }
 
-export function useThreads(fleetId: string): LiveQueryResult<ThreadDetail[]> {
+export function useAgents(fleetId: string): LiveQueryResult<AgentDetail[]> {
   const client = useQueryClient()
   // Delta-covered: roster + message deltas fold in via the bridge. The backstop
-  // poll merges NON-DESTRUCTIVELY against the current cache (mergeThreadLogs) so
-  // a stale disk snapshot can never drop a delta-applied message/thread (T123).
+  // poll merges NON-DESTRUCTIVELY against the current cache (mergeAgentLogs) so
+  // a stale disk snapshot can never drop a delta-applied message/agent (T123).
   return useLive(
-    qk.threads(fleetId),
+    qk.agents(fleetId),
     async () => {
-      const next = await api.fetchThreads(fleetId)
-      const prev = client.getQueryData<ThreadDetail[]>(qk.threads(fleetId))
-      // The poll reconcile is O(threads × messages) and runs on the main thread
+      const next = await api.fetchAgents(fleetId)
+      const prev = client.getQueryData<AgentDetail[]>(qk.agents(fleetId))
+      // The poll reconcile is O(agents × messages) and runs on the main agent
       // on every backstop tick — a prime periodic-freeze suspect on a huge
       // roster. Name it so the HUD attributes a stall landing here.
-      return measure("threads:merge", () => mergeThreadLogs(prev, next))
+      return measure("threads:merge", () => mergeAgentLogs(prev, next))
     },
     { fleetId, enabled: !!fleetId },
   )

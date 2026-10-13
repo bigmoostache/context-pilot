@@ -6,7 +6,7 @@ import { downloadFile, rawUrl } from "@/lib/api"
 import { highlightCode } from "./codeHighlight"
 /** Lazy-loaded — TipTap + ProseMirror deferred until a markdown file is edited. */
 const LazyMarkdownEditor = lazy(() =>
-  import("@/components/agents/MarkdownEditor").then((m) => ({ default: m.MarkdownEditor })),
+  import("@/components/fleets/MarkdownEditor").then((m) => ({ default: m.MarkdownEditor })),
 )
 import { FileIcon } from "../support/macIcons"
 import { Generic, MarkdownPreview, PreviewStatus, TextPreview, TruncatedNote } from "./previewParts"

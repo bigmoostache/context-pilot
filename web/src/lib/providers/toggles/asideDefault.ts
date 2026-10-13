@@ -1,11 +1,11 @@
 import { createContext, use } from "react"
 
 /**
- * Global **default visibility** preference for the thread right aside (T677).
+ * Global **default visibility** preference for the agent right aside (T677).
  *
- * The Files/Tasks rail beside a conversation can be shown or hidden per-thread
- * (that per-thread choice is persisted by {@link useThreadAside} under its own
- * key). THIS flag is the org-wide *default* a thread with no stored choice
+ * The Files/Tasks rail beside a conversation can be shown or hidden per-agent
+ * (that per-agent choice is persisted by {@link useAgentAside} under its own
+ * key). THIS flag is the org-wide *default* a agent with no stored choice
  * falls back to — configured once in Settings › General.
  *
  * Pure client-side view preference, persisted to `localStorage` only, mirroring
@@ -17,7 +17,7 @@ import { createContext, use } from "react"
  * module exports no component, satisfying the Fast-Refresh purity rule).
  */
 export interface AsideDefaultCtx {
-  /** When true, a thread with no stored per-thread choice starts HIDDEN. */
+  /** When true, a agent with no stored per-agent choice starts HIDDEN. */
   defaultHidden: boolean
   setDefaultHidden: (hidden: boolean) => void
   toggle: () => void

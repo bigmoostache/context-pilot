@@ -28,16 +28,16 @@ interface TopBarProps {
   activeFleetId: string
   onSwitchFleet: (id: string) => void
   fleets: Fleet[]
-  /** Whether the threads view's list rail is open — drives the Threads tab's
+  /** Whether the agents view's list rail is open — drives the Agents tab's
    *  `aria-expanded` and its tooltip wording while that view is active. */
-  threadsRailOpen: boolean
-  /** Collapse ↔ expand the threads list rail. Fired by clicking the Threads
-   *  tab when threads is ALREADY the active view. */
-  onToggleThreadsRail: () => void
-  /** Open the New Thread dialog. Rail-hosted, so shown only on the threads view. */
-  onNewThread: () => void
-  /** Open the thread search palette. Same gating as {@link onNewThread}. */
-  onSearchThreads: () => void
+  agentsRailOpen: boolean
+  /** Collapse ↔ expand the agents list rail. Fired by clicking the Agents
+   *  tab when agents is ALREADY the active view. */
+  onToggleAgentsRail: () => void
+  /** Open the New Agent dialog. Rail-hosted, so shown only on the agents view. */
+  onNewAgent: () => void
+  /** Open the agent search palette. Same gating as {@link onNewAgent}. */
+  onSearchAgents: () => void
   /** Open the focused agent's settings DIALOG. The rail owns the trigger, so
    *  the flag it flips has to live in the shell — see `manageOpen` in Root. */
   onManageFleet: () => void
@@ -50,7 +50,7 @@ interface TopBarProps {
 }
 
 /** Slim macOS-style side rail — app mark (→ fleet), workspace switcher,
- *  per-agent view tabs (Threads · Finder), theme, usage, account. Vertical: it
+ *  per-agent view tabs (Agents · Finder), theme, usage, account. Vertical: it
  *  hugs the window's left edge, full height, account cluster pinned to the floor. */
 export function TopBar({
   view,
@@ -58,10 +58,10 @@ export function TopBar({
   activeFleetId,
   onSwitchFleet,
   fleets,
-  threadsRailOpen,
-  onToggleThreadsRail,
-  onNewThread,
-  onSearchThreads,
+  agentsRailOpen,
+  onToggleAgentsRail,
+  onNewAgent,
+  onSearchAgents,
   onManageFleet,
   finderRailOpen,
   onToggleFinderRail,
@@ -120,18 +120,18 @@ export function TopBar({
             view={view}
             onViewChange={onViewChange}
             devMode={devMode}
-            threadsRailOpen={threadsRailOpen}
-            onToggleThreadsRail={onToggleThreadsRail}
+            agentsRailOpen={agentsRailOpen}
+            onToggleAgentsRail={onToggleAgentsRail}
             finderRailOpen={finderRailOpen}
             onToggleFinderRail={onToggleFinderRail}
           />
         )}
 
-        {/* The threads view's own list actions. Gated on the threads view being
-            SELECTED: they act on the thread list, so on Finder or Costs they
+        {/* The agents view's own list actions. Gated on the agents view being
+            SELECTED: they act on the agent list, so on Finder or Costs they
             would be controls for a surface that is not on screen. */}
         {!inFleet && view === "threads" && (
-          <ThreadActions onNewThread={onNewThread} onSearchThreads={onSearchThreads} />
+          <AgentActions onNewAgent={onNewAgent} onSearchAgents={onSearchAgents} />
         )}
 
         <TopBarActions
@@ -174,7 +174,7 @@ function TopBarActions({
 }) {
   // ⌘/Ctrl+I opens the agent settings dialog. Bound HERE, beside the button, so
   // the key listener's lifetime matches the control it drives — the same
-  // rule {@link ThreadActions} follows for C and P.
+  // rule {@link AgentActions} follows for C and P.
   const modHeld = useModifierShortcuts({ i: onManageFleet })
 
   return (
@@ -206,7 +206,7 @@ function TopBarActions({
 }
 
 /**
- * The threads view's list actions — New thread · Search — as a standalone
+ * The agents view's list actions — New agent · Search — as a standalone
  * cluster under the view tabs.
  *
  * DELIBERATELY UNLIKE {@link ViewTabs} ABOVE IT. That is a segmented selector,
@@ -216,22 +216,22 @@ function TopBarActions({
  * border and no fill — only a hover wash, the same affordance every other bare
  * glyph in the rail uses.
  *
- * They live here rather than in the thread list because the list can be
- * collapsed (the Threads tab hides it), and an action that disappears with the
+ * They live here rather than in the agent list because the list can be
+ * collapsed (the Agents tab hides it), and an action that disappears with the
  * panel it acts on is an action the user has to restore the panel to reach.
  *
  * The ⌘/Ctrl shortcuts are bound HERE rather than in the shell, so the key
  * listener mounts and unmounts with the buttons — see {@link
  * useModifierShortcuts}, which explains why that matters.
  */
-function ThreadActions({
-  onNewThread,
-  onSearchThreads,
+function AgentActions({
+  onNewAgent,
+  onSearchAgents,
 }: {
-  onNewThread: () => void
-  onSearchThreads: () => void
+  onNewAgent: () => void
+  onSearchAgents: () => void
 }) {
-  const modHeld = useModifierShortcuts({ c: onNewThread, p: onSearchThreads })
+  const modHeld = useModifierShortcuts({ c: onNewAgent, p: onSearchAgents })
 
   return (
     <div className="flex w-full flex-col items-center gap-0.5">
@@ -241,7 +241,7 @@ function ThreadActions({
           icon={Plus}
           hint="C"
           hintShown={modHeld}
-          onClick={onNewThread}
+          onClick={onNewAgent}
         />
       </Tip>
       <Tip
@@ -254,7 +254,7 @@ function ThreadActions({
           icon={Search}
           hint="P"
           hintShown={modHeld}
-          onClick={onSearchThreads}
+          onClick={onSearchAgents}
         />
       </Tip>
     </div>
@@ -348,7 +348,7 @@ function ViewTab({
  * definition for both, so a shortcut is "as if you clicked the tab". Each is
  * DUAL-PURPOSE like the tab click: off the view navigate there, on the view
  * toggle that view's rail (L/K stay live on their own view). L not C drives
- * Threads — C is the new-thread shortcut in sibling {@link ThreadActions}.
+ * Agents — C is the new-agent shortcut in sibling {@link AgentActions}.
  * Settings is absent by design: it stopped being a view in T760 and is now the
  * ⌘I dialog trigger in {@link TopBarActions}, so it claims no slot here.
  * Args one object (max-params 4); `useModifierShortcuts` reads the map via
@@ -357,28 +357,27 @@ function ViewTab({
 function useViewShortcuts(a: {
   view: ViewMode
   onViewChange: (v: ViewMode) => void
-  onToggleThreadsRail: () => void
+  onToggleAgentsRail: () => void
   onToggleFinderRail: () => void
 }): {
   modHeld: boolean
-  threadsClick: () => void
+  agentsClick: () => void
   finderClick: () => void
 } {
-  const threadsClick =
-    a.view === "threads" ? a.onToggleThreadsRail : () => a.onViewChange("threads")
+  const agentsClick = a.view === "threads" ? a.onToggleAgentsRail : () => a.onViewChange("threads")
   const finderClick = a.view === "finder" ? a.onToggleFinderRail : () => a.onViewChange("finder")
 
-  const modHeld = useModifierShortcuts({ l: threadsClick, k: finderClick })
+  const modHeld = useModifierShortcuts({ l: agentsClick, k: finderClick })
 
-  return { modHeld, threadsClick, finderClick }
+  return { modHeld, agentsClick, finderClick }
 }
 
-/** Per-agent view switcher (Threads · Finder · Costs). Costs
+/** Per-agent view switcher (Agents · Finder · Costs). Costs
  *  is dev-mode only. Extracted from {@link TopBar} so its tab cluster + the
  *  `devMode` gate don't count against the bar's complexity budget. Each tab
  *  carries a tooltip since the names aren't obvious to a first-time user.
  *
- *  The Threads tab is DUAL-PURPOSE: it switches to the threads view, and once
+ *  The Agents tab is DUAL-PURPOSE: it switches to the agents view, and once
  *  that view is already active, a further click collapses ↔ expands its list
  *  rail. This is the activity-bar idiom (macOS, VS Code) — clicking the icon of
  *  the panel you are already in hides it — and it replaces the two dedicated
@@ -388,29 +387,29 @@ function ViewTabs({
   view,
   onViewChange,
   devMode,
-  threadsRailOpen,
-  onToggleThreadsRail,
+  agentsRailOpen,
+  onToggleAgentsRail,
   finderRailOpen,
   onToggleFinderRail,
 }: {
   view: ViewMode
   onViewChange: (v: ViewMode) => void
   devMode: boolean
-  threadsRailOpen: boolean
-  onToggleThreadsRail: () => void
+  agentsRailOpen: boolean
+  onToggleAgentsRail: () => void
   finderRailOpen: boolean
   onToggleFinderRail: () => void
 }) {
-  const onThreads = view === "threads"
+  const onAgents = view === "threads"
   const onFinder = view === "finder"
 
-  // ⌘/Ctrl shortcuts (L Threads · K Finder) share ONE handler each with the tab
+  // ⌘/Ctrl shortcuts (L Agents · K Finder) share ONE handler each with the tab
   // click — the hook builds them, so a shortcut and a click are the same action.
   // Both stay bound on their own view (toggle the rail).
-  const { modHeld, threadsClick, finderClick } = useViewShortcuts({
+  const { modHeld, agentsClick, finderClick } = useViewShortcuts({
     view,
     onViewChange,
-    onToggleThreadsRail,
+    onToggleAgentsRail,
     onToggleFinderRail,
   })
 
@@ -423,23 +422,23 @@ function ViewTabs({
       <Tip
         title="Threads"
         body={
-          onThreads
-            ? `Click again to ${threadsRailOpen ? "hide" : "show"} the thread list.`
+          onAgents
+            ? `Click again to ${agentsRailOpen ? "hide" : "show"} the thread list.`
             : "Chat with this fleet. Each thread is a separate conversation or task it can run in parallel."
         }
         side="right"
       >
         <ViewTab
-          active={onThreads}
+          active={onAgents}
           // Same handler as the ⌘/Ctrl+L shortcut: navigate here, or toggle the
           // list rail once already here.
-          onClick={threadsClick}
+          onClick={agentsClick}
           // Only meaningful while this tab controls the rail; on the other
           // views the button is a plain navigation control.
-          expanded={onThreads ? threadsRailOpen : undefined}
+          expanded={onAgents ? agentsRailOpen : undefined}
           icon={MessagesSquare}
           label="Threads"
-          // L (not C — C is the new-thread shortcut in ThreadActions).
+          // L (not C — C is the new-agent shortcut in AgentActions).
           hint="L"
           hintShown={modHeld}
         />
