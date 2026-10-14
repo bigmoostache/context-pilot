@@ -253,11 +253,15 @@ fn apply_delete_agent(state: &mut State, agent_id: &str) {
         return;
     }
     ts.agents.retain(|t| t.id != agent_id);
-    // Its messages live in its human group: drop it too (the group file stays
-    // on disk as a backup, like the pre-groups agents/<id>.json).
-    cp_groups::types::GroupsState::get_mut(state)
-        .groups
-        .retain(|g| g.kind != cp_groups::types::GroupKind::Human || g.owner_agent_id != agent_id);
+    // Groups it owns (its human group included) and coordination groups it sat
+    // in go with their files; it leaves every other group.
+    let removed =
+        cp_groups::social::departed::purge(&mut cp_groups::types::GroupsState::get_mut(state).groups, &|m: &str| {
+            m != agent_id
+        });
+    for gid in &removed {
+        cp_groups::persist::remove_group_file(gid);
+    }
 
     // Clean up focus references (mirrors archive path).
     let focus = FocusState::get_mut(state);

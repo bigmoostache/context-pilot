@@ -136,6 +136,18 @@ impl Module for AgentsModule {
         // still stored in human groups by older builds.
         types::activity::load(&mut agents);
         let _moved = types::activity::migrate_out_of_groups(&mut agents, cp_groups::types::GroupsState::get_mut(state));
+        // Groups left behind by agents deleted with older builds (owner gone,
+        // or a coordination member gone). Skipped on an empty roster so a
+        // config that failed to parse never wipes every group.
+        if !agents.is_empty() {
+            let removed = cp_groups::social::departed::purge(
+                &mut cp_groups::types::GroupsState::get_mut(state).groups,
+                &|m: &str| agents.iter().any(|a| a.id == m),
+            );
+            for gid in &removed {
+                cp_groups::persist::remove_group_file(gid);
+            }
+        }
         AgentsState::get_mut(state).agents = agents;
         // Pre-T860-D `"status": "MyTurn"` becomes a SimpleTurn in the human
         // group. The field is no longer written, so this runs once.

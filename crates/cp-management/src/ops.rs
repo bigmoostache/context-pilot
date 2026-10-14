@@ -128,14 +128,16 @@ fn delete(state: &mut State, caller: &str, args: &Args<'_>) -> Result<String, St
         confirm(agents, id, args.key)?;
     }
     let gone = doomed.join(", ");
-    // Their human groups and every coordination group they sat in go too.
-    GroupsState::get_mut(state).groups.retain(|g| match g.kind {
-        GroupKind::Human => !doomed.contains(&g.owner_agent_id),
-        GroupKind::Coordination => !g.member_ids.iter().any(|m| doomed.contains(m)),
-        GroupKind::Custom => true,
+    // Groups they own and coordination groups they sat in go too (files
+    // included); they leave every other group.
+    let removed = cp_groups::social::departed::purge(&mut GroupsState::get_mut(state).groups, &|m: &str| {
+        !doomed.iter().any(|d| d == m)
     });
+    for gid in &removed {
+        cp_groups::persist::remove_group_file(gid);
+    }
     ManagementState::get_mut(state).doomed.extend(doomed);
-    Ok(format!("Deleted {gone} (with their human and coordination groups)."))
+    Ok(format!("Deleted {gone} with the groups they owned or coordinated in: {}.", removed.join(", ")))
 }
 
 /// Spend a valid `key`, or refuse with the subtree listing and a fresh key.

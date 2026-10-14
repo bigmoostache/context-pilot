@@ -2,7 +2,7 @@
 
 use cp_base::state::runtime::State;
 use cp_base::tools::ToolUse;
-use cp_groups::social::{self, Substate};
+use cp_groups::social;
 use cp_groups::types::{Group, GroupKind, GroupsState};
 use cp_mod_agents::types::AgentsState;
 
@@ -146,7 +146,7 @@ pub fn update(tool: &ToolUse, state: &mut State) -> Result<String, String> {
     if let Some(a) = after {
         let old = std::mem::replace(&mut group.member_ids, a.clone());
         for gone in old.iter().filter(|m| !a.contains(m)) {
-            forget_member(group, gone);
+            social::departed::forget_member(group, gone);
         }
     }
     if let Some(n) = name {
@@ -158,8 +158,8 @@ pub fn update(tool: &ToolUse, state: &mut State) -> Result<String, String> {
     Ok(format!("Updated {gid} \"{}\": members [{}].", group.name, group.member_ids.join(", ")))
 }
 
-/// `Group_delete(group_id)`: owner only, never a human group. The messages
-/// file stays on disk as a backup.
+/// `Group_delete(group_id)`: owner only, never a human group. Its messages
+/// file is deleted too.
 ///
 /// # Errors
 ///
@@ -169,37 +169,13 @@ pub fn delete(tool: &ToolUse, state: &mut State) -> Result<String, String> {
     let gid = arg(tool, "group_id").ok_or_else(|| "Group_delete requires a group_id".to_owned())?.to_owned();
     let _group = owned(state, &gid, &me)?;
     GroupsState::get_mut(state).groups.retain(|g| g.id != gid);
+    cp_groups::persist::remove_group_file(&gid);
     Ok(format!("Deleted {gid}."))
 }
 
 /// Same members, any order (both lists are deduped).
 fn same_set(a: &[String], b: &[String]) -> bool {
     a.len() == b.len() && a.iter().all(|x| b.contains(x))
-}
-
-/// Drop every social obligation naming `agent_id` (it left the group). A
-/// dispatch left with no candidate is dropped: empty would mean "everyone".
-fn forget_member(group: &mut Group, agent_id: &str) {
-    social::clear_turn(group, agent_id);
-    group.social = std::mem::take(&mut group.social).into_iter().filter_map(|s| keep_without(s, agent_id)).collect();
-}
-
-/// `s` with `gone` removed, or `None` when nothing is left of it.
-fn keep_without(s: Substate, gone: &str) -> Option<Substate> {
-    match s {
-        Substate::ComingBack { agent_id, at_ms, message, from } => {
-            (agent_id != gone).then_some(Substate::ComingBack { agent_id, at_ms, message, from })
-        }
-        Substate::Recurrent { id, agent_id, creator_agent_id, cron, message } => {
-            (agent_id != gone).then_some(Substate::Recurrent { id, agent_id, creator_agent_id, cron, message })
-        }
-        Substate::Dispatch { mut candidates } => {
-            let had = !candidates.is_empty();
-            candidates.retain(|c| c != gone);
-            (!had || !candidates.is_empty()).then_some(Substate::Dispatch { candidates })
-        }
-        other @ (Substate::SimpleTurn { .. } | Substate::Gather { .. }) => Some(other),
-    }
 }
 
 #[cfg(test)]
@@ -218,20 +194,5 @@ mod tests {
         let v = |s: &[&str]| s.iter().map(|x| (*x).to_owned()).collect::<Vec<_>>();
         assert!(same_set(&v(&["A1", "A2"]), &v(&["A2", "A1"])), "order free");
         assert!(!same_set(&v(&["A1"]), &v(&["A1", "A2"])), "missing member");
-    }
-
-    #[test]
-    fn forget_member_prunes_obligations() {
-        let mut g = Group {
-            social: vec![
-                Substate::SimpleTurn { agent_id: "A2".into() },
-                Substate::ComingBack { agent_id: "A2".into(), at_ms: 1, message: String::new(), from: None },
-                Substate::Dispatch { candidates: vec!["A2".into()] },
-                Substate::Dispatch { candidates: vec!["A2".into(), "A3".into()] },
-            ],
-            ..Group::default()
-        };
-        forget_member(&mut g, "A2");
-        assert_eq!(g.social, vec![Substate::Dispatch { candidates: vec!["A3".into()] }]);
     }
 }

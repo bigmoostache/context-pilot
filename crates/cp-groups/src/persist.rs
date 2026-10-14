@@ -98,6 +98,19 @@ fn clean_map() -> &'static Mutex<HashMap<String, u64>> {
     CLEAN.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+/// Delete a removed group's message file and forget its clean stamp.
+/// A missing file is fine; other I/O errors are logged.
+pub fn remove_group_file(id: &str) {
+    if let Ok(mut clean) = clean_map().lock() {
+        let _prev = clean.remove(id);
+    }
+    match std::fs::remove_file(group_file(id)) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => log::warn!("remove group file {id}: {e}"),
+    }
+}
+
 /// Serialize the message files of groups changed since their last write.
 ///
 /// Marks them clean on return: callers must hand every op to a writer that

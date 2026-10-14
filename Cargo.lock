@@ -488,6 +488,7 @@ dependencies = [
  "cp-mod-utilities",
  "cp-render",
  "crossterm",
+ "log",
  "serde",
  "serde_json",
 ]

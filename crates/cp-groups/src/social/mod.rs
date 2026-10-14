@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::types::{Group, GroupKind, HUMAN};
 
+pub mod departed;
+
 /// One pending obligation inside a group.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
