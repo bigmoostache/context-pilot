@@ -228,7 +228,7 @@ impl App {
             .filter(|t| {
                 !t.archived
                     && !t.paused
-                    && mirror.exec_state_of(&t.id) == AgentExecState::Idle
+                    && is_between_turns(mirror.exec_state_of(&t.id))
                     && cp_mod_agents::types::turn::status(&self.state, &t.id) == AgentStatus::MyTurn
                     && focused.as_deref() != Some(t.id.as_str())
             })
@@ -332,4 +332,12 @@ impl App {
         f(&mut self.state);
         self.state.agent_store.set_executing(prev);
     }
+}
+
+/// Whether a background agent is between turns, so a `MY_TURN` nudge cannot land
+/// after a reply it is still producing. A waiting `MyTurn` agent derives to
+/// `Runnable`, never `Idle`, so only mid-turn (and parked `Errored`) states
+/// are excluded.
+const fn is_between_turns(exec: AgentExecState) -> bool {
+    matches!(exec, AgentExecState::Idle | AgentExecState::Runnable)
 }
