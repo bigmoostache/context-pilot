@@ -322,9 +322,15 @@ impl App {
             return;
         };
         if !self.state.agent_store.contains(tid) {
-            log::warn!("deliver_to_thread: unknown agent {tid}; delivering to the executing agent");
-            f(&mut self.state);
-            return;
+            // Never fall back to the executing agent: its inbox is not the
+            // target's. A roster agent without a runtime yet (cold, not yet
+            // reconciled) gets a fresh one; a gone agent's delivery is dropped.
+            if !AgentsState::get(&self.state).agents.iter().any(|a| a.id == tid) {
+                log::warn!("deliver_to_agent: unknown agent {tid}; delivery dropped");
+                return;
+            }
+            let runtime = self.fresh_runtime();
+            self.state.agent_store.insert(tid.to_owned(), runtime);
         }
         // Background owner: execute it for the duration of `f`, then restore.
         let prev = self.state.executing_agent_id().map(str::to_owned);
