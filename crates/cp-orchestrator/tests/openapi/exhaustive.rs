@@ -136,10 +136,13 @@ mod tests {
 
     /// Classify one comma-split token: a quoted string literal keeps its inner
     /// text, a bare binding (`id`, `name`, …) becomes `{}`, and an empty token
-    /// (trailing comma) is dropped. Extracted from [`extract_bracket_segments`]
-    /// to keep that function under the cognitive-complexity cap.
+    /// (trailing comma) is dropped. An or-pattern (`"agents" | "threads"`)
+    /// keeps its first alternative: the canonical route the spec documents,
+    /// the rest being undocumented back-compat aliases. Extracted from
+    /// [`extract_bracket_segments`] to keep that function under the
+    /// cognitive-complexity cap.
     fn parse_segment(raw: &str) -> Option<String> {
-        let trimmed = raw.trim();
+        let trimmed = raw.split('|').next().unwrap_or(raw).trim();
         if trimmed.is_empty() {
             return None;
         }
@@ -228,6 +231,9 @@ mod tests {
 
         let body = extract_bracket_segments(r#"["api", "fleet", id, "body", hash]"#).unwrap();
         assert_eq!(body, vec!["api", "fleet", "{}", "body", "{}"]);
+
+        let alias = extract_bracket_segments(r#"["api", "fleet", id, "agents" | "threads"]"#).unwrap();
+        assert_eq!(alias, vec!["api", "fleet", "{}", "agents"]);
     }
 
     #[test]

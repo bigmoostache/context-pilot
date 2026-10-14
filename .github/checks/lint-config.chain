@@ -9172,3 +9172,192 @@ index 8fb0959d..812b51b1 100644
      reason: >
        The WYSIWYG editor seeds its contentEditable surface once on mount via
 # --- End entry #114 ---
+115:c5c974140132f2818fca226ca3b82c8d1ddc950e27f9ff8580e989e01dbbd756:6f204eee4b58d7c5567bce8380690634905430a98b7331fc1a59f2b60b660880:817f82685b944003089dc23fd6eedb505dfb7f2549c732b6097938035daa1d32
+# --- Diff for entry #115 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index 2b7fc800..394cfd53 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,5 +1,5 @@
+ [workspace]
+-members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-fleet", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-agents", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities", "crates/cp-vault", "crates/cp-env", "crates/cp-macros"]
++members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-fleet", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-agents", "crates/cp-groups", "crates/cp-management", "crates/cp-coordination", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities", "crates/cp-vault", "crates/cp-env", "crates/cp-macros"]
+ 
+ [workspace.package]
+ version = "0.2.13"
+@@ -16,6 +16,9 @@ cp-env = { path = "crates/cp-env" }
+ cp-macros = { path = "crates/cp-macros" }
+ cp-base = { path = "crates/cp-base" }
+ cp-render = { path = "crates/cp-render" }
++cp-groups = { path = "crates/cp-groups" }
++cp-management = { path = "crates/cp-management" }
++cp-coordination = { path = "crates/cp-coordination" }
+ cp-mod-utilities = { path = "crates/cp-mod-utilities" }
+ ratatui = "0.30"
+ crossterm = "0.29"
+@@ -1150,6 +1153,9 @@ cp-mod-github = { path = "crates/cp-mod-github" }
+ cp-mod-files = { path = "crates/cp-mod-files" }
+ cp-mod-spine = { path = "crates/cp-mod-spine" }
+ cp-mod-agents = { path = "crates/cp-mod-agents" }
++cp-groups = { path = "crates/cp-groups" }
++cp-management = { path = "crates/cp-management" }
++cp-coordination = { path = "crates/cp-coordination" }
+ cp-fleet = { path = "crates/cp-fleet" }
+ cp-mod-bridge = { path = "crates/cp-mod-bridge" }
+ cp-wire = { path = "crates/cp-wire" }
+diff --git a/.github/checks/check-structure.sh b/.github/checks/check-structure.sh
+index 7774364b..73b5191a 100755
+--- a/.github/checks/check-structure.sh
++++ b/.github/checks/check-structure.sh
+@@ -59,6 +59,7 @@ while IFS= read -r f; do
+   fi
+ done < <(find . \
+   \( -type d \( -name target \
++      -o -path './.worktrees' \
+       -o -path './deploy/ansible/.venv' \
+       -o -path './deploy/ansible/.artifacts' \) -prune \) \
+   -o \( -name '*.rs' -print \))
+@@ -76,6 +77,7 @@ while IFS= read -r dir; do
+ done < <(find . -mindepth 1 \
+   \( -type d \( \
+       -path './.git' \
++      -o -path './.worktrees' \
+       -o -path './.context-pilot' \
+       -o -path './docs' \
+       -o -path './jobs' \
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index c7a44457..2e7cb591 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -204,6 +204,17 @@ exceptions:
+       Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
+       would push that file over the limit. The split is the honest shape.
+ 
++  - path: "src/app/run/lifecycle/stream_runtime.rs"
++    match: 'App methods split across run/ submodules for readability'
++    reason: >
++      Per-agent stream-runtime accessors (stream_rt and friends) are their own
++      impl App block, kept beside the StreamRuntime type they expose instead of
++      in lifecycle/mod.rs (500-line cap). multiple_inherent_impl (forbid) fires
++      on this additional block, so it carries the #[expect].
++    strategy: >
++      Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
++      would push that file over the limit. The split is the honest shape.
++
+   - path: "src/app/run/lifecycle/coucous.rs"
+     match: 'App methods split across run/ submodules for readability'
+     reason: >
+diff --git a/.github/checks/check-vault-bypass.sh b/.github/checks/check-vault-bypass.sh
+index 60fa8afa..51d73089 100755
+--- a/.github/checks/check-vault-bypass.sh
++++ b/.github/checks/check-vault-bypass.sh
+@@ -48,10 +48,11 @@ if [ $# -gt 0 ]; then
+     check_file "$file"
+   done
+ else
+-  # CI mode: scan the entire repo.
++  # CI mode: scan the entire repo. .worktrees/ holds other agents' branch
++  # checkouts (gitignored) — each is checked from its own root, never here.
+   while IFS= read -r file; do
+     check_file "$file"
+-  done < <(find . -name '*.rs' -not -path './target/*' -not -path '*/target/*')
++  done < <(find . -type d \( -name target -o -path './.worktrees' \) -prune -o -name '*.rs' -print)
+ fi
+ 
+ if [ $exit_code -ne 0 ]; then
+# --- End entry #115 ---
+116:817f82685b944003089dc23fd6eedb505dfb7f2549c732b6097938035daa1d32:f8c64df3ed5f2cbcb0ca5e1a41a4b969cb620758fe389cb214f43ff1ffbe9c2b:6babe9ad89a882af2bcfd74f10855bb31fbab7b47f95fb6f70a0bd65636f1866
+# --- Diff for entry #116 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index 2b7fc800..394cfd53 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,5 +1,5 @@
+ [workspace]
+-members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-fleet", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-agents", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities", "crates/cp-vault", "crates/cp-env", "crates/cp-macros"]
++members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-fleet", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-agents", "crates/cp-groups", "crates/cp-management", "crates/cp-coordination", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities", "crates/cp-vault", "crates/cp-env", "crates/cp-macros"]
+ 
+ [workspace.package]
+ version = "0.2.13"
+@@ -16,6 +16,9 @@ cp-env = { path = "crates/cp-env" }
+ cp-macros = { path = "crates/cp-macros" }
+ cp-base = { path = "crates/cp-base" }
+ cp-render = { path = "crates/cp-render" }
++cp-groups = { path = "crates/cp-groups" }
++cp-management = { path = "crates/cp-management" }
++cp-coordination = { path = "crates/cp-coordination" }
+ cp-mod-utilities = { path = "crates/cp-mod-utilities" }
+ ratatui = "0.30"
+ crossterm = "0.29"
+@@ -1150,6 +1153,9 @@ cp-mod-github = { path = "crates/cp-mod-github" }
+ cp-mod-files = { path = "crates/cp-mod-files" }
+ cp-mod-spine = { path = "crates/cp-mod-spine" }
+ cp-mod-agents = { path = "crates/cp-mod-agents" }
++cp-groups = { path = "crates/cp-groups" }
++cp-management = { path = "crates/cp-management" }
++cp-coordination = { path = "crates/cp-coordination" }
+ cp-fleet = { path = "crates/cp-fleet" }
+ cp-mod-bridge = { path = "crates/cp-mod-bridge" }
+ cp-wire = { path = "crates/cp-wire" }
+diff --git a/.github/checks/check-structure.sh b/.github/checks/check-structure.sh
+index 7774364b..d21eeecd 100755
+--- a/.github/checks/check-structure.sh
++++ b/.github/checks/check-structure.sh
+@@ -59,6 +59,7 @@ while IFS= read -r f; do
+   fi
+ done < <(find . \
+   \( -type d \( -name target \
++      -o -path './.worktrees' \
+       -o -path './deploy/ansible/.venv' \
+       -o -path './deploy/ansible/.artifacts' \) -prune \) \
+   -o \( -name '*.rs' -print \))
+@@ -76,6 +77,8 @@ while IFS= read -r dir; do
+ done < <(find . -mindepth 1 \
+   \( -type d \( \
+       -path './.git' \
++      -o -path './.worktrees' \
++      -o -path './.playwright-cli' \
+       -o -path './.context-pilot' \
+       -o -path './docs' \
+       -o -path './jobs' \
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index c7a44457..2e7cb591 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -204,6 +204,17 @@ exceptions:
+       Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
+       would push that file over the limit. The split is the honest shape.
+ 
++  - path: "src/app/run/lifecycle/stream_runtime.rs"
++    match: 'App methods split across run/ submodules for readability'
++    reason: >
++      Per-agent stream-runtime accessors (stream_rt and friends) are their own
++      impl App block, kept beside the StreamRuntime type they expose instead of
++      in lifecycle/mod.rs (500-line cap). multiple_inherent_impl (forbid) fires
++      on this additional block, so it carries the #[expect].
++    strategy: >
++      Irreducible under the 500-line cap — folding it back into lifecycle/mod.rs
++      would push that file over the limit. The split is the honest shape.
++
+   - path: "src/app/run/lifecycle/coucous.rs"
+     match: 'App methods split across run/ submodules for readability'
+     reason: >
+diff --git a/.github/checks/check-vault-bypass.sh b/.github/checks/check-vault-bypass.sh
+index 60fa8afa..51d73089 100755
+--- a/.github/checks/check-vault-bypass.sh
++++ b/.github/checks/check-vault-bypass.sh
+@@ -48,10 +48,11 @@ if [ $# -gt 0 ]; then
+     check_file "$file"
+   done
+ else
+-  # CI mode: scan the entire repo.
++  # CI mode: scan the entire repo. .worktrees/ holds other agents' branch
++  # checkouts (gitignored) — each is checked from its own root, never here.
+   while IFS= read -r file; do
+     check_file "$file"
+-  done < <(find . -name '*.rs' -not -path './target/*' -not -path '*/target/*')
++  done < <(find . -type d \( -name target -o -path './.worktrees' \) -prune -o -name '*.rs' -print)
+ fi
+ 
+ if [ $exit_code -ne 0 ]; then
+# --- End entry #116 ---
