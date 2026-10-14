@@ -127,6 +127,9 @@ fn synthesize_from_roster(entry: &RosterEntry, fleet_id: &str) -> serde_json::Va
         "fleetId": fleet_id,
         "lastMessage": "",
         "lastActivity": entry.last_activity_ms,
+        // Not yet flushed to disk = just created; the view's activity bump on
+        // creation is the closest creation time available.
+        "createdAt": entry.last_activity_ms,
         "messageCount": entry.msg_count,
         "unread": 0,
         "archived": entry.archived,
@@ -300,6 +303,7 @@ pub(crate) fn reshape_agent(raw: &serde_json::Value, fleet_id: &str) -> serde_js
         "branchedFrom": raw.pointer("/origin/agent_id").or_else(|| raw.pointer("/origin/thread_id")).and_then(serde_json::Value::as_str),
         "parentAgentId": raw.get("parent_agent_id").and_then(serde_json::Value::as_str),
         "description": raw.get("description").and_then(serde_json::Value::as_str).unwrap_or(""),
+        "createdAt": raw.get("created_at").and_then(serde_json::Value::as_u64).unwrap_or(0),
         "log": log,
         "tasks": serde_json::Value::Array(Vec::new()),
         "notes": serde_json::Value::Array(Vec::new()),

@@ -45,27 +45,14 @@ interface AgentListProps {
   onNewAgent: (name: string) => void
 }
 
-/** Sort by most recent activity first. */
-function byRecent(a: AgentDetail, b: AgentDetail): number {
-  return (b.lastActivityMs ?? 0) - (a.lastActivityMs ?? 0)
-}
-
-/** Focused first, then MY_TURN (agent owes you), then most-recent. */
-function byPriority(a: AgentDetail, b: AgentDetail): number {
-  const rank = (t: AgentDetail) => (t.focused ? 0 : t.status === "MY_TURN" ? 1 : 2)
-  const ra = rank(a)
-  const rb = rank(b)
-  return ra === rb ? byRecent(a, b) : ra - rb
-}
-
 /**
  * Mobile agent roster — an **iOS-Messages-style** conversation list (T620/T625).
  *
  * Rebuilt from the dense desktop sidebar to feel native and put every control in
  * thumb reach: no top title bar; search + compose live in a BOTTOM action bar
  * (safe-area padded); the archived toggle is a top-right {@link CornerButton};
- * tall rows (leading status dot, title + timestamp, 2-line preview) with hairline
- * separators; **swipe-left** reveals archive / pause / delete. All filtering /
+ * one-line rows (status dot, title, unread badge) indented as a tree by
+ * `depth`; **swipe-left** reveals archive / pause / delete. All filtering /
  * search / sort logic is shared with desktop — only the chrome + touch
  * affordances fork.
  */
@@ -98,7 +85,9 @@ export function AgentList({
   const archivedCount = archived.length
 
   const source = showArchived ? archived : live
-  const visible = source.filter((t) => matches(t)).toSorted(showArchived ? byRecent : byPriority)
+  // Backend order = sidebar tree (creation order, sub-agents under their
+  // parent, `depth` per row, T860); render as received.
+  const visible = source.filter((t) => matches(t))
 
   // #3 List cascade (anime.js): stagger the rows in on first mount and whenever
   // the set flips live↔archived. Deliberately keyed ONLY on `showArchived` (not
@@ -263,9 +252,9 @@ function statusTint(t: AgentDetail, archived: boolean): string {
   return "var(--muted-foreground)"
 }
 
-/** iMessage-style conversation row: leading status dot, title + timestamp, a
- *  2-line preview. The coloured dot before the title conveys agent state (T627).
- *  Row content sits above the swipe-revealed action strip ({@link SwipeRow}). */
+/** One-line conversation row: tree indent by `depth` (guide line per level),
+ *  status dot, title, unread badge at the end. Sits above the swipe-revealed
+ *  action strip ({@link SwipeRow}). */
 function AgentRow({
   t,
   selected,
@@ -277,44 +266,59 @@ function AgentRow({
   archived: boolean
   onSelect: (id: string) => void
 }) {
-  const preview = previewOf(t)
-  // Bold the title when the agent owes this agent a turn (or it's focused /
-  // unread) — a subtle emphasis on the rows that want attention.
-  const attention = !archived && ((t.unread ?? 0) > 0 || t.status === "MY_TURN" || t.focused)
-
+  const unread = archived ? 0 : (t.unread ?? 0)
+  const attention = !archived && (unread > 0 || t.status === "MY_TURN" || Boolean(t.focused))
   return (
     <button
       onClick={() => onSelect(t.id)}
       className={cn(
-        "flex w-full items-center gap-3 px-4 py-2.5 text-left",
+        "flex w-full items-stretch px-4 text-left",
         selected ? "bg-muted/50" : "bg-background active:bg-muted/40",
       )}
     >
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex items-baseline gap-2">
-          {/* status dot — inline before the title, coloured by agent state */}
+      <TreeGuides depth={t.depth ?? 0} />
+      <span className="flex min-w-0 flex-1 items-center gap-2 py-3">
+        <span
+          className="size-2.5 shrink-0 rounded-full"
+          style={{ background: statusTint(t, archived) }}
+        />
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate text-[16px] text-foreground",
+            attention ? "font-semibold" : "font-medium",
+          )}
+        >
+          {t.name}
+        </span>
+        {unread > 0 && (
           <span
-            className="size-2.5 shrink-0 translate-y-px rounded-full"
-            style={{ background: statusTint(t, archived) }}
-          />
-          <span
-            className={cn(
-              "truncate text-[16px] text-foreground",
-              attention ? "font-semibold" : "font-medium",
-            )}
+            className="shrink-0 px-1.5 text-[12px] font-semibold text-(--primary-foreground) tabular-nums"
+            style={{ background: "var(--signal)" }}
           >
-            {t.name}
+            {unread}
           </span>
-          <span className="ml-auto shrink-0 text-[12px] text-muted-foreground/55 tabular-nums">
-            {t.lastActivity}
-          </span>
-          <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/30" />
-        </span>
-        <span className="line-clamp-2 min-w-0 text-[14px] leading-snug text-muted-foreground/70">
-          {preview}
-        </span>
+        )}
+        <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/30" />
       </span>
     </button>
+  )
+}
+
+/** Tree indent: one 16px column per depth level with a vertical guide line;
+ *  the last column adds the elbow toward the dot. */
+function TreeGuides({ depth }: { depth: number }) {
+  if (depth <= 0) return null
+  return (
+    <span aria-hidden className="flex shrink-0">
+      {Array.from({ length: depth }, (_, i) => (
+        <span key={i} className="relative w-4">
+          <span className="absolute inset-y-0 left-1.5 w-px bg-muted-foreground/25" />
+          {i === depth - 1 && (
+            <span className="absolute top-1/2 left-1.5 h-px w-2.5 bg-muted-foreground/25" />
+          )}
+        </span>
+      ))}
+    </span>
   )
 }
 

@@ -91,7 +91,10 @@ pub(super) fn core() -> Value {
                 "status": { "type": "string", "enum": ["MY_TURN", "THEIR_TURN", "ACTIVE"] },
                 "fleetId": { "type": "string" },
                 "fleet": { "type": "string" },
-                "createdAt": { "type": "string" },
+                // Creation time, epoch ms.
+                "createdAt": { "type": "integer" },
+                // Tree depth in the ordered agent list (0 = root).
+                "depth": { "type": "integer" },
                 "lastActivity": { "type": "string" },
                 "lastActivityMs": { "type": "integer" },
                 "unread": { "type": "integer" },

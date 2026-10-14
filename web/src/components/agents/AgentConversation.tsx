@@ -161,7 +161,7 @@ function OpenedDivider({
     <div className="mb-3 flex items-center gap-2">
       <span className="h-px flex-1 bg-border/60" />
       <span className="text-[10.5px] text-muted-foreground/50">
-        {agent.createdAt} · {origin}
+        {agent.createdAt == null ? "" : new Date(agent.createdAt).toLocaleString()} · {origin}
       </span>
       <span className="h-px flex-1 bg-border/60" />
     </div>

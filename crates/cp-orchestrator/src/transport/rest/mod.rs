@@ -40,7 +40,7 @@ mod create;
 mod lifecycle;
 mod releases;
 pub(crate) use agents::conversations::search_conversations;
-use agents::{attach_disk_notes, attach_disk_tasks, overlay_roster, reshape_agent};
+use agents::{attach_disk_notes, attach_disk_tasks, order_tree, overlay_roster, reshape_agent};
 pub(crate) use backend::Backend;
 pub(crate) use claude_oauth::accounts::{delete_account, list_accounts, store_account, switch_account};
 pub(crate) use claude_oauth::sweep::spawn as spawn_oauth_refresh;
@@ -396,6 +396,8 @@ pub fn agents(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
     // Overlay the view's fresher roster onto matching disk agents, then append
     // any view-only agents the disk has not yet flushed.
     overlay_roster(&mut details, &roster, fleet_id);
+    // Sidebar tree order: the frontend renders the list as received.
+    order_tree(&mut details);
 
     HttpReply::ok(&serde_json::json!({
         "focusedAgentId": focused_agent_id,

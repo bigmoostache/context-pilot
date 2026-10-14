@@ -59,7 +59,10 @@
             "type": "string"
           },
           "createdAt": {
-            "type": "string"
+            "type": "integer"
+          },
+          "depth": {
+            "type": "integer"
           },
           "description": {
             "type": "string"

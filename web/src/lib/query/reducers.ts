@@ -94,7 +94,7 @@ function foldAgentCreated(prev: AgentDetail[], k: Kind, entry: OpEntry): AgentDe
     status: turnToStatus(k.status),
     fleetId: "",
     fleet: "",
-    createdAt: new Date(ts).toISOString(),
+    createdAt: ts,
     lastActivity: ago(ts),
     lastActivityMs: ts,
     unread: 0,

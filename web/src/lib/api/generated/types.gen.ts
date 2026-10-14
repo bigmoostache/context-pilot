@@ -20,7 +20,8 @@ export type AclEntry = {
 export type AgentDetail = {
     archived?: boolean;
     branchedFrom?: string | null;
-    createdAt?: string;
+    createdAt?: number;
+    depth?: number;
     description?: string;
     fleet?: string;
     fleetId: string;
