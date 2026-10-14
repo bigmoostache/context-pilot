@@ -151,9 +151,13 @@ fn sh_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', "'\\''"))
 }
 
-/// Whether `bin` is an executable file on `PATH`.
+/// Whether `bin` resolves on `PATH`, asked of `sh` so this crate never reads
+/// the environment itself (cp-env `no_raw_env_reads` guard).
 fn on_path(bin: &str) -> bool {
-    std::env::var_os("PATH").is_some_and(|path| std::env::split_paths(&path).any(|dir| dir.join(bin).is_file()))
+    std::process::Command::new("sh")
+        .args(["-c", &format!("command -v {} >/dev/null", sh_quote(bin))])
+        .status()
+        .is_ok_and(|status| status.success())
 }
 
 /// Shell command relaying a websocket to stdout, one message per line.

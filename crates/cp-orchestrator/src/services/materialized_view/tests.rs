@@ -271,9 +271,9 @@ fn sub_agent_keeps_parent_and_delete_leaves_tombstone() {
     assert_eq!(fleet.roster.first().and_then(|e| e.parent_agent_id.as_deref()), Some("A1"));
 
     view.apply("a1", &entry(1, OpEntryKind::AgentDeleted { agent_id: "A2".into() }));
-    let fleet = view.get("a1").expect("agent");
-    assert!(fleet.roster.is_empty());
-    assert!(fleet.deleted.contains("A2"), "a delete must tombstone the id");
+    let after_delete = view.get("a1").expect("agent");
+    assert!(after_delete.roster.is_empty());
+    assert!(after_delete.deleted.contains("A2"), "a delete must tombstone the id");
 
     view.apply("a1", &entry(2, created));
     assert!(view.get("a1").expect("agent").deleted.is_empty(), "a re-creation lifts the tombstone");
