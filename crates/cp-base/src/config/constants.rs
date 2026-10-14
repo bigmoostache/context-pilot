@@ -66,8 +66,9 @@ pub const TYPEWRITER_DEFAULT_DELAY_MS: f64 = 15.0;
 // UI LAYOUT
 // =============================================================================
 
-/// Width of the sidebar in characters
-pub const SIDEBAR_WIDTH: u16 = 36;
+/// Width of the sidebar in characters — shared by the panel-centric sidebar
+/// and the agent-centric agents list so both layouts line up.
+pub const SIDEBAR_WIDTH: u16 = 47;
 
 /// Height of the status bar
 pub const STATUS_BAR_HEIGHT: u16 = 1;

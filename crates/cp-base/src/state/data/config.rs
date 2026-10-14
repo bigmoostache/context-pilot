@@ -39,7 +39,7 @@ impl ViewMode {
     #[must_use]
     pub const fn width(self) -> u16 {
         match self {
-            Self::Normal => 36,
+            Self::Normal => crate::config::constants::SIDEBAR_WIDTH,
             Self::Agents => 0,
         }
     }

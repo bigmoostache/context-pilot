@@ -26,9 +26,8 @@ use cp_mod_agents::view_state::FleetExecMirror;
 
 /// Width of the agent list pane in columns.
 ///
-/// Matched to the panel-centric view's sidebar width ([`ViewMode::width`] for
-/// `Normal` = 36) so the two layouts line up pixel-for-pixel.
-pub(crate) const AGENT_LIST_WIDTH: u16 = 36;
+/// Same as the panel-centric view's sidebar so the two layouts line up.
+pub(crate) const AGENT_LIST_WIDTH: u16 = cp_base::config::constants::SIDEBAR_WIDTH;
 
 /// Render the agents view: agent list + message area.
 pub(crate) fn render_agents_view(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
