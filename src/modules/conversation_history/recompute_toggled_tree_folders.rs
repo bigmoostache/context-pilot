@@ -12,7 +12,7 @@
 //!    that are **still in context** after the close.
 //! 3. The project root (`"."`) is always included.
 //!
-//! The computed set **replaces** [`TreeState::open_folders`] entirely.
+//! The computed set **replaces** [`TreeView::open_folders`] entirely.
 
 use std::collections::HashSet;
 use std::path::Path;
@@ -20,9 +20,9 @@ use std::path::Path;
 use cp_base::state::context::Kind;
 use cp_base::state::data::message::{Message, MsgKind};
 use cp_base::state::runtime::State;
-use cp_mod_tree::types::TreeState;
+use cp_mod_tree::types::TreeView;
 
-/// Rebuild [`TreeState::open_folders`] from the live context + conversation
+/// Rebuild [`TreeView::open_folders`] from the live context + conversation
 /// history. Called by the tool pipeline immediately after
 /// `Close_conversation_history` executes.
 pub(crate) fn recompute_tree_folders(state: &mut State) {
@@ -62,9 +62,9 @@ pub(crate) fn recompute_tree_folders(state: &mut State) {
         }
     }
 
-    // ── Replace the tree's open-folder set ──────────────────────────────
-    let ts = TreeState::get_mut(state);
-    ts.open_folders = folders.into_iter().collect();
+    // ── Replace the tree's open-folder set (per-agent view) ─────────────
+    let tv = TreeView::get_mut(state);
+    tv.open_folders = folders.into_iter().collect();
 }
 
 /// Walk a file's path upward, inserting every ancestor directory (relative to

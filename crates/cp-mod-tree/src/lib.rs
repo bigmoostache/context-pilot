@@ -16,7 +16,7 @@ pub mod tools;
 /// Tree state types: `TreeState`, `TreeFileDescription`.
 pub mod types;
 
-use types::TreeState;
+use types::{TreeState, TreeView};
 
 use serde_json::json;
 
@@ -69,22 +69,23 @@ impl Module for TreeModule {
     /// Fleet-shared (thread-centric model): `TreeState` holds the file/folder
     /// descriptions (persisted to `tree-descriptions.yaml`, fleet-wide knowledge)
     /// and the gitignore filter — both shared. The tree *result* is rendered into
-    /// a per-agent panel (`state.context`). One field, `open_folders` (which
-    /// folders are expanded in the view), is logically per-agent view state; its
-    /// carve-out into the per-agent map is DEFERRED to Phase G (the TUI
-    /// thread-view), where per-agent view polish belongs. Shared is correct and
-    /// behaviourally identical at N=1.
+    /// a per-agent panel (`state.context`). Which folders are expanded is
+    /// per-agent view state and lives in [`TreeView`] (per-agent ext, seeded in
+    /// `init_state`/`reset_state`), so one agent expanding folders never bloats
+    /// another agent's tree.
     fn is_global(&self) -> bool {
         true
     }
 
     fn init_state(&self, state: &mut State) {
         state.set_ext(TreeState::new());
+        state.set_ext_agent(TreeView::new());
         state.set_ext(cp_base::state::autocomplete::Suggestions::new());
     }
 
     fn reset_state(&self, state: &mut State) {
         state.set_ext(TreeState::new());
+        state.set_ext_agent(TreeView::new());
         state.set_ext(cp_base::state::autocomplete::Suggestions::new());
     }
 
@@ -113,10 +114,10 @@ impl Module for TreeModule {
         if let Some(arr) = data.get("tree_open_folders")
             && let Ok(v) = serde_json::from_value::<Vec<String>>(arr.clone())
         {
-            let ts = TreeState::get_mut(state);
-            ts.open_folders = v;
-            if !ts.open_folders.contains(&".".to_owned()) {
-                ts.open_folders.insert(0, ".".to_owned());
+            let tv = TreeView::get_mut(state);
+            tv.open_folders = v;
+            if !tv.open_folders.contains(&".".to_owned()) {
+                tv.open_folders.insert(0, ".".to_owned());
             }
         }
         // YAML backing store: migrate existing descriptions, then populate gaps
@@ -127,7 +128,7 @@ impl Module for TreeModule {
 
     fn save_worker_data(&self, state: &State) -> serde_json::Value {
         json!({
-            "tree_open_folders": TreeState::get(state).open_folders,
+            "tree_open_folders": TreeView::get(state).open_folders,
         })
     }
 
@@ -135,11 +136,11 @@ impl Module for TreeModule {
         if let Some(arr) = data.get("tree_open_folders")
             && let Ok(v) = serde_json::from_value::<Vec<String>>(arr.clone())
         {
-            let ts = TreeState::get_mut(state);
-            ts.open_folders = v;
+            let tv = TreeView::get_mut(state);
+            tv.open_folders = v;
             // Ensure root is always open
-            if !ts.open_folders.contains(&".".to_owned()) {
-                ts.open_folders.insert(0, ".".to_owned());
+            if !tv.open_folders.contains(&".".to_owned()) {
+                tv.open_folders.insert(0, ".".to_owned());
             }
         }
     }
@@ -255,7 +256,7 @@ impl Module for TreeModule {
     }
 
     fn watch_paths(&self, state: &State) -> Vec<cp_base::panels::WatchSpec> {
-        TreeState::get(state).open_folders.iter().map(|f| cp_base::panels::WatchSpec::Dir(f.clone())).collect()
+        TreeView::get(state).open_folders.iter().map(|f| cp_base::panels::WatchSpec::Dir(f.clone())).collect()
     }
 
     fn should_invalidate_on_fs_change(

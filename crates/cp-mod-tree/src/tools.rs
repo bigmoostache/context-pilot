@@ -9,7 +9,7 @@ use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::storage;
-use crate::types::{TreeFileDescription, TreeState};
+use crate::types::{TreeFileDescription, TreeState, TreeView};
 
 /// Whether to show `.context-pilot/` in the tree (opt-in via
 /// `SHOW_CONTEXT_PILOT_IN_TREE`).
@@ -40,15 +40,15 @@ enum ToggleChange {
 
 /// Expand a folder: record it as open.
 fn open_folder(state: &mut State, normalized: &str) {
-    TreeState::get_mut(state).open_folders.push(normalized.to_owned());
+    TreeView::get_mut(state).open_folders.push(normalized.to_owned());
 }
 
 /// Collapse a folder and every descendant folder.
 fn close_folder(state: &mut State, normalized: &str) {
-    let ts = TreeState::get_mut(state);
-    ts.open_folders.retain(|p| p != normalized);
+    let tv = TreeView::get_mut(state);
+    tv.open_folders.retain(|p| p != normalized);
     let prefix = format!("{normalized}/");
-    ts.open_folders.retain(|p| !p.starts_with(&prefix));
+    tv.open_folders.retain(|p| !p.starts_with(&prefix));
 }
 
 /// Collapse `normalized`, rejecting the root and no-op'ing when already closed.
@@ -56,7 +56,7 @@ fn do_close(state: &mut State, normalized: &str) -> Result<Option<ToggleChange>,
     if normalized == "." {
         return Err("Cannot close root folder".to_owned());
     }
-    if !TreeState::get(state).open_folders.contains(&normalized.to_owned()) {
+    if !TreeView::get(state).open_folders.contains(&normalized.to_owned()) {
         return Ok(None);
     }
     close_folder(state, normalized);
@@ -65,7 +65,7 @@ fn do_close(state: &mut State, normalized: &str) -> Result<Option<ToggleChange>,
 
 /// Expand `normalized`, no-op'ing when already open.
 fn do_open(state: &mut State, normalized: &str) -> Option<ToggleChange> {
-    if TreeState::get(state).open_folders.contains(&normalized.to_owned()) {
+    if TreeView::get(state).open_folders.contains(&normalized.to_owned()) {
         return None;
     }
     open_folder(state, normalized);
@@ -78,7 +78,7 @@ fn toggle_path(state: &mut State, path: &Path, normalized: &str, action: &str) -
     if !state.resolve_path(&path.to_string_lossy()).is_dir() && normalized != "." {
         return Err(format!("{normalized}: not a directory"));
     }
-    let is_open = TreeState::get(state).open_folders.contains(&normalized.to_owned());
+    let is_open = TreeView::get(state).open_folders.contains(&normalized.to_owned());
     let want_close = match action {
         "open" => false,
         "close" => true,

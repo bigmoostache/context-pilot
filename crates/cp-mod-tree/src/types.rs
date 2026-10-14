@@ -28,13 +28,17 @@ build/
 .DS_Store
 ";
 
-/// Module-owned state for the Tree module
+/// Fleet-shared module state for the Tree module.
+///
+/// Holds the gitignore filter and the file/folder descriptions — both
+/// genuinely fleet-wide knowledge (descriptions persist to
+/// `tree-descriptions.yaml`). The per-agent *view* state (which folders are
+/// expanded) lives in [`TreeView`], not here, so one agent expanding folders
+/// never bloats another agent's tree.
 #[derive(Debug)]
 pub struct TreeState {
     /// Gitignore-style filter patterns controlling which files/folders are shown.
     pub filter: String,
-    /// Paths of folders currently open (expanded) in the tree view.
-    pub open_folders: Vec<String>,
     /// User-written descriptions attached to files/folders.
     pub descriptions: Vec<TreeFileDescription>,
     /// Change stamp, refreshed on every [`TreeState::get_mut`]. The save path
@@ -58,7 +62,6 @@ impl TreeState {
     pub fn new() -> Self {
         Self {
             filter: DEFAULT_TREE_FILTER.to_owned(),
-            open_folders: vec![".".to_owned()],
             descriptions: vec![],
             revision: REVISION_SOURCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
         }
@@ -83,5 +86,53 @@ impl TreeState {
         let ts = state.ext_mut::<Self>();
         ts.revision = REVISION_SOURCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         ts
+    }
+}
+
+/// Per-agent tree *view* state: which folders are expanded in this agent's
+/// tree panel.
+///
+/// Carved out of [`TreeState`] (which is fleet-shared) so expanded-folder
+/// toggles stay private to the executing agent. Without this split a single
+/// shared `open_folders` meant any agent opening files/folders bloated every
+/// other agent's tree — including freshly created ones. Stored per-agent via
+/// [`State::set_ext_agent`](cp_base::state::runtime::State::set_ext_agent) and
+/// persisted through the module's worker-data hooks.
+#[derive(Debug)]
+pub struct TreeView {
+    /// Paths of folders currently open (expanded) in this agent's tree view.
+    pub open_folders: Vec<String>,
+}
+
+impl Default for TreeView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TreeView {
+    /// Create a default view (only the root folder expanded).
+    #[must_use]
+    pub fn new() -> Self {
+        Self { open_folders: vec![".".to_owned()] }
+    }
+
+    /// Get the per-agent view from `State`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the view was never registered via `set_ext_agent`.
+    #[must_use]
+    pub fn get(state: &State) -> &Self {
+        state.ext::<Self>()
+    }
+
+    /// Get a mutable ref to the per-agent view from `State`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the view was never registered via `set_ext_agent`.
+    pub fn get_mut(state: &mut State) -> &mut Self {
+        state.ext_mut::<Self>()
     }
 }

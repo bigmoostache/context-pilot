@@ -74,15 +74,15 @@ fn open_single_file(path: &str, state: &mut State) -> String {
         && let Ok(cwd) = state.workdir().canonicalize()
         && let Ok(rel) = Path::new(&canonical).strip_prefix(&cwd)
     {
-        let ts = cp_mod_tree::types::TreeState::get_mut(state);
+        let tv = cp_mod_tree::types::TreeView::get_mut(state);
         let mut accumulator = String::new();
         for component in rel.parent().into_iter().flat_map(Path::components) {
             if !accumulator.is_empty() {
                 accumulator.push('/');
             }
             accumulator.push_str(&component.as_os_str().to_string_lossy());
-            if !ts.open_folders.contains(&accumulator) {
-                ts.open_folders.push(accumulator.clone());
+            if !tv.open_folders.contains(&accumulator) {
+                tv.open_folders.push(accumulator.clone());
             }
         }
         cp_base::panels::mark_panels_dirty(state, Kind::TREE);

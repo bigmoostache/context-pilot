@@ -7,7 +7,7 @@ use cp_base::state::context::{Entry, Kind, compute_total_pages, estimate_tokens}
 use cp_base::state::runtime::State;
 use cp_base::ui::{find_children_pattern, find_size_pattern};
 
-use crate::types::TreeState;
+use crate::types::{TreeState, TreeView};
 use cp_base::panels::scroll_key_action;
 
 /// Data payload sent to the background cache worker for tree generation.
@@ -101,7 +101,7 @@ impl Panel for TreePanel {
             Kind::new(Kind::TREE),
             Box::new(TreeCacheRequest {
                 filter: ts.filter.clone(),
-                open_folders: ts.open_folders.clone(),
+                open_folders: TreeView::get(state).open_folders.clone(),
                 descriptions: ts.descriptions.clone(),
                 root: state.workdir(),
             }),
