@@ -142,11 +142,7 @@ impl Watcher for IdleMyTurnDetector {
         }
 
         Some(WatcherResult {
-            description: format!(
-                "Agent \"{}\" ({}) is MY_TURN and needs a response. \
-                 Use Read to focus on it, then Send your reply.",
-                agent.name, agent.id,
-            ),
+            description: turn::nudge(state, &agent.id, &agent.name),
             panel_id: None,
             tool_use_id: None,
             close_panel: false,

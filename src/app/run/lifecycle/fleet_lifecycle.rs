@@ -242,10 +242,7 @@ impl App {
                 if cp_mod_spine::types::SpineState::has_unprocessed_notifications(state) {
                     return;
                 }
-                let content = format!(
-                    "Agent \"{name}\" ({tid_for_bind}) is MY_TURN and needs a response. \
-                     Use Read to focus on it, then Send your reply.",
-                );
+                let content = cp_mod_agents::types::turn::nudge(state, &tid_for_bind, &name);
                 let nid = cp_mod_spine::types::SpineState::create_notification(
                     state,
                     cp_mod_spine::types::NotificationType::Custom,
