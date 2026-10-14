@@ -118,7 +118,7 @@ pub(crate) fn validate_git_command(command: &str) -> Result<Vec<String>, String>
     Ok(args)
 }
 
-/// Refuse `git_execute` calls that would bypass the agent's workdir.
+/// Refuse `Git` calls that would bypass the agent's workdir.
 ///
 /// `-C`, `--git-dir` and `--work-tree` (global options, before the subcommand)
 /// point git at another tree; `worktree add|remove|move|prune` changes

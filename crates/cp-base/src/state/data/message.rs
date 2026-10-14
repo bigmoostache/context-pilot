@@ -31,7 +31,7 @@ pub enum MsgStatus {
 pub struct ToolUseRecord {
     /// Unique tool-use ID assigned by the LLM.
     pub id: String,
-    /// Tool name (e.g., `"Open"`, `"git_execute"`).
+    /// Tool name (e.g., `"Open"`, `"Git"`).
     pub name: String,
     /// JSON parameter object passed to the tool.
     pub input: serde_json::Value,

@@ -54,7 +54,7 @@ pub struct ToolText {
 pub struct ToolUse {
     /// Unique ID assigned by the LLM (used to correlate with [`ToolResult`]).
     pub id: String,
-    /// Tool identifier (e.g., `"Open"`, `"git_execute"`).
+    /// Tool identifier (e.g., `"Open"`, `"Git"`).
     pub name: String,
     /// JSON object of tool parameters.
     pub input: Value,
@@ -204,7 +204,7 @@ impl ToolParam {
 /// Serialized to JSON Schema for the LLM API.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolDefinition {
-    /// Tool identifier (e.g., `"Open"`, `"git_execute"`).
+    /// Tool identifier (e.g., `"Open"`, `"Git"`).
     pub id: String,
     /// Display name (may differ from id for UI).
     pub name: String,

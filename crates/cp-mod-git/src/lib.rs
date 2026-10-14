@@ -1,6 +1,6 @@
 //! Git module — version control integration via the `git` CLI.
 //!
-//! One tool: `git_execute`. Read-only commands (log, diff, status, etc.) create
+//! One tool: `Git`. Read-only commands (log, diff, status, etc.) create
 //! auto-refreshing dynamic panels. Mutating commands (commit, push, merge, etc.)
 //! execute directly and return output. Shell operators are blocked for safety.
 
@@ -10,7 +10,7 @@ pub(crate) mod cache_invalidation;
 mod classify;
 /// Panel implementation for displaying git command results.
 mod result_panel;
-/// Tool execution logic for `git_execute`.
+/// Tool execution logic for `Git`.
 mod tools;
 /// Git state types: `GitState`, `GitFileChange`, `GitChangeType`.
 pub mod types;
@@ -236,7 +236,7 @@ impl Module for GitModule {
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
         let t = &*TOOL_TEXTS;
         vec![
-            ToolDefinition::from_yaml("git_execute", t)
+            ToolDefinition::from_yaml("Git", t)
                 .declares_task()
                 .short_desc("Run git commands")
                 .category("Git")
@@ -248,14 +248,14 @@ impl Module for GitModule {
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
-            "git_execute" => Some(tools::execute_git_command(tool, state)),
+            "Git" => Some(tools::execute_git_command(tool, state)),
             "Worktree" => Some(worktree::execute(tool, state)),
             _ => None,
         }
     }
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
-        vec![("git_execute", visualize_git_output)]
+        vec![("Git", visualize_git_output)]
     }
 
     fn context_type_metadata(&self) -> Vec<cp_base::state::context::TypeMeta> {
@@ -464,7 +464,7 @@ fn git_meta_semantic(line: &str) -> Option<cp_render::Semantic> {
     is_meta.then_some(Semantic::Info)
 }
 
-/// Pick the semantic color for one line of `git_execute` output.
+/// Pick the semantic color for one line of `Git` output.
 fn git_line_semantic(line: &str) -> cp_render::Semantic {
     git_status_semantic(line)
         .or_else(|| git_diff_semantic(line))
@@ -472,7 +472,7 @@ fn git_line_semantic(line: &str) -> cp_render::Semantic {
         .unwrap_or(cp_render::Semantic::Default)
 }
 
-/// Visualizer for `git_execute` tool results.
+/// Visualizer for `Git` tool results.
 /// Color-codes git command output with branch names, status indicators,
 /// diff hunks with +/- in green/red, file names highlighted.
 fn visualize_git_output(content: &str, width: usize) -> Vec<cp_render::Block> {

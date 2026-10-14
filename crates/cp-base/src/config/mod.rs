@@ -140,9 +140,9 @@ pub struct PromptEditorWarningSet {
 /// should have used a dedicated tool (git, gh).
 #[derive(Debug, Deserialize)]
 pub struct ConsoleGuardrails {
-    /// Shown when `git` is run via console instead of `git_execute`.
+    /// Shown when `git` is run via console instead of `Git`.
     pub git: String,
-    /// Shown when `gh` is run via console instead of `gh_execute`.
+    /// Shown when `gh` is run via console instead of `Gh`.
     pub gh: String,
 }
 
