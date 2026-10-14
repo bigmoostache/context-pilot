@@ -134,13 +134,20 @@ impl App {
         let focused = cp_mod_agents::types::FocusState::get(&self.state).focused_agent_id.clone();
 
         // Snapshot the current roster: (id, status, eligible) for every agent
-        // that should own a registry entry (non-focused, non-archived).
+        // that should own a registry entry (non-focused, non-archived). One
+        // pass over the groups builds the MY_TURN set (O(groups + agents)).
+        let runnable = cp_groups::social::index::runnable_set(&cp_groups::types::GroupsState::get(&self.state).groups);
         let roster: Vec<(String, AgentStatus)> = AgentsState::get(&self.state)
             .agents
             .iter()
             .filter(|t| !t.archived && focused.as_deref() != Some(t.id.as_str()))
-            .map(|t| (t.id.clone(), cp_mod_agents::types::turn::status(&self.state, &t.id)))
+            .map(|t| {
+                let status =
+                    if runnable.contains(t.id.as_str()) { AgentStatus::MyTurn } else { AgentStatus::TheirTurn };
+                (t.id.clone(), status)
+            })
             .collect();
+        drop(runnable);
 
         // Drop entries whose agent is gone / archived / now focused. A gone or
         // archived agent also loses its stored runtime; the focused one keeps it.

@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::types::{Group, GroupKind, HUMAN};
 
 pub mod departed;
+pub mod index;
 
 /// One pending obligation inside a group.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

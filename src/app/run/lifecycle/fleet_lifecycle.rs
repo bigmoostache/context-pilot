@@ -317,6 +317,11 @@ impl App {
     /// a dispatch never picks an agent the same tick already relaunches.
     /// "Idle" = active, unpaused, and [`AgentExecState::Idle`] in the exec mirror.
     pub(super) fn tick_social(&mut self, now_ms: u64) {
+        // Nothing time-driven anywhere: `tick` would be a no-op, so skip its
+        // per-group rebuild and the idle-set scan.
+        if !cp_groups::social::index::has_timed(&cp_groups::types::GroupsState::get(&self.state).groups) {
+            return;
+        }
         let mirror = cp_mod_agents::view_state::FleetExecMirror::get(&self.state);
         let idle: std::collections::HashSet<String> = AgentsState::get(&self.state)
             .agents
