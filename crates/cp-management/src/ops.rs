@@ -10,6 +10,8 @@ use std::fmt::Write as _;
 use cp_base::state::runtime::State;
 use cp_base::tools::ToolUse;
 use cp_fleet::AgentExecState;
+use cp_groups::chat::{GroupAuthor, GroupMessage};
+use cp_groups::social::{self, Next};
 use cp_groups::types::{Group, GroupKind, GroupsState};
 use cp_mod_agents::types::roster::yaml_escape;
 use cp_mod_agents::types::{Agent, AgentsState, msgs, tree, turn};
@@ -28,6 +30,8 @@ struct Args<'tool> {
     description: Option<&'tool str>,
     /// Delete confirmation key.
     key: Option<&'tool str>,
+    /// First message to the new child (create only).
+    message: Option<&'tool str>,
 }
 
 /// String argument `key` of `tool`, trimmed; `None` when absent or blank.
@@ -51,8 +55,13 @@ pub fn execute(tool: &ToolUse, state: &mut State) -> Result<String, String> {
         name: arg(tool, "name"),
         description: arg(tool, "description"),
         key: arg(tool, "key"),
+        message: arg(tool, "message"),
     };
-    match arg(tool, "operation").unwrap_or_default() {
+    let operation = arg(tool, "operation").unwrap_or_default();
+    if args.message.is_some() && operation != "create" {
+        return Err(format!("message is only accepted by create (got operation '{operation}')"));
+    }
+    match operation {
         "create" => create(state, &caller, &args),
         "read" => read(state, args.id.unwrap_or(&caller)),
         "update" => update(state, &caller, &args),
@@ -85,10 +94,33 @@ fn create(state: &mut State, caller: &str, args: &Args<'_>) -> Result<String, St
         ..Group::default()
     });
     ManagementState::get_mut(state).created.push(id.clone());
+    if let Some(text) = args.message {
+        brief(state, (caller, &id, &gid), text)?;
+        return Ok(format!(
+            "Created {id} \"{name}\" under {caller}. Coordination group: {gid}. Your message was sent there \
+             and {id} holds the turn (next=GIVE_TALKING_STICK_TO {id})."
+        ));
+    }
     Ok(format!(
         "Created {id} \"{name}\" under {caller}. Coordination group: {gid}. {id} stays idle until you \
          Send in {gid} with next=GIVE_TALKING_STICK_TO {id}."
     ))
+}
+
+/// Post `text` from `caller` into the new coordination group `gid` and hand
+/// the turn to the child, exactly as `Send(next=GIVE_TALKING_STICK_TO child)`.
+fn brief(state: &mut State, (caller, child, gid): (&str, &str, &str), text: &str) -> Result<(), String> {
+    let group = GroupsState::get_mut(state).find_mut(gid).ok_or_else(|| format!("group {gid} not found"))?;
+    social::apply_send(group, caller, Next::GiveTalkingStickTo(child.to_owned()))?;
+    group.messages.push(GroupMessage {
+        author: GroupAuthor::Assistant,
+        author_agent_id: Some(caller.to_owned()),
+        content: Some(text.to_owned()),
+        timestamp: cp_base::panels::now_ms(),
+        ..GroupMessage::default()
+    });
+    group.mark_read(caller);
+    Ok(())
 }
 
 /// Rename / redescribe a direct child of `caller`.
@@ -130,9 +162,8 @@ fn delete(state: &mut State, caller: &str, args: &Args<'_>) -> Result<String, St
     let gone = doomed.join(", ");
     // Groups they own and coordination groups they sat in go too (files
     // included); they leave every other group.
-    let removed = cp_groups::social::departed::purge(&mut GroupsState::get_mut(state).groups, &|m: &str| {
-        !doomed.iter().any(|d| d == m)
-    });
+    let removed =
+        social::departed::purge(&mut GroupsState::get_mut(state).groups, &|m: &str| !doomed.iter().any(|d| d == m));
     for gid in &removed {
         cp_groups::persist::remove_group_file(gid);
     }

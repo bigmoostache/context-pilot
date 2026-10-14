@@ -90,6 +90,7 @@ impl Module for ManagementModule {
                 .param("name", ParamType::String, false)
                 .param("description", ParamType::String, false)
                 .param("key", ParamType::String, false)
+                .param("message", ParamType::String, false)
                 .build(),
         ]
     }

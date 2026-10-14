@@ -2,9 +2,11 @@ tools:
   Agent:
     description: |
       Create and manage your sub-agents. `operation` picks the action:
-        create  name, description?  -> a new direct child of yours plus a 1:1
-                coordination group (returned). The child stays idle until you
-                Send in that group with next=GIVE_TALKING_STICK_TO <child id>.
+        create  name, description?, message?  -> a new direct child of yours
+                plus a 1:1 coordination group (returned). With `message`, it
+                is posted there and the child gets the turn at once (same as
+                Send next=GIVE_TALKING_STICK_TO <child id>). Without it, the
+                child stays idle until you Send in that group.
                 Depth is capped (default 2 below a root). No id allowed.
         read    id? (default: you)  -> stats: parent, children, turn, execution
                 state, groups, messages, open panels, context tokens.
@@ -21,3 +23,4 @@ tools:
       name: "Agent name (create: required; update: optional)."
       description: "One-line purpose shown in the agents tree (create/update)."
       key: "Confirmation key returned by a refused delete."
+      message: "create only: first message to the child, sent in your 1:1 group; the child takes the turn."
