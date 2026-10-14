@@ -207,12 +207,15 @@ fn roster_gate(app: &App) -> (bool, Option<u64>) {
         .state
         .get_ext::<cp_mod_bridge::BridgeState>()
         .is_some_and(|bs| bs.seeded.messages() && bs.seeded.statuses() && bs.seeded.archived() && bs.seeded.paused());
+    let groups = cp_groups::types::GroupsState::get(&app.state);
     let mut h = std::collections::hash_map::DefaultHasher::new();
     for t in &AgentsState::get(&app.state).agents {
         t.id.hash(&mut h);
-        cp_mod_agents::types::activity::timeline(&app.state, &t.id).len().hash(&mut h);
-        (cp_mod_agents::types::turn::status(&app.state, &t.id) == cp_mod_agents::types::AgentStatus::MyTurn)
-            .hash(&mut h);
+        // Timeline length (human-group messages + tool traces) without
+        // building the merged timeline: this runs every loop tick.
+        let msgs = groups.find(&t.human_group_id).map_or(0, |g| g.messages.len());
+        msgs.saturating_add(t.activity.len()).hash(&mut h);
+        cp_groups::social::runnable(&groups.groups, &t.id).hash(&mut h);
         t.archived.hash(&mut h);
         t.paused.hash(&mut h);
     }
