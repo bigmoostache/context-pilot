@@ -61,6 +61,7 @@ fn push_to_group(state: &mut State, (tid, gid): (&str, &str), msg: AgentMessage,
     let group = GroupsState::get_mut(state).find_mut(gid).ok_or_else(|| format!("group {gid} not found"))?;
     social::apply_send(group, tid, next)?;
     group.messages.push(msg);
+    group.mark_read(tid);
     let agent = AgentsState::get_mut(state).agents.iter_mut().find(|t| t.id == tid);
     Ok(agent.is_some_and(|a| own_human && std::mem::take(&mut a.archived)))
 }

@@ -43,7 +43,7 @@ pub const fn kind_label(kind: GroupKind) -> &'static str {
 /// message counts, members, and the social substates naming `me`.
 #[must_use]
 pub fn group_entry(group: &Group, me: &str) -> String {
-    let unread = group.messages.iter().filter(|m| !m.acknowledged).count();
+    let unread = group.unread_for(me);
     let mut out = String::new();
     _ = writeln!(out, "  - id: {}", group.id);
     _ = writeln!(out, "    name: \"{}\"", yaml_escape(&group.name));

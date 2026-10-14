@@ -27,9 +27,12 @@ fn agent_line(state: &State, agent: &Agent, focused_id: &str) -> String {
     if let Some(wt) = worktree_name(state, &agent.id) {
         _ = write!(line, " [⎇ {wt}]");
     }
-    let history = super::msgs::messages(state, &agent.id);
-    _ = write!(line, " · {} · {} msgs", super::turn::status(state, &agent.id), history.len());
-    let unack = history.iter().filter(|m| !m.acknowledged).count();
+    // Messages across every group the agent is in (sub-agents mostly talk in
+    // coordination groups, not their human group).
+    let groups = cp_groups::types::GroupsState::get(state);
+    let total: usize = groups.of_member(&agent.id).map(|g| g.messages.iter().filter(|m| !m.auto).count()).sum();
+    _ = write!(line, " · {} · {total} msgs", super::turn::status(state, &agent.id));
+    let unack: usize = groups.of_member(&agent.id).map(|g| g.unread_for(&agent.id)).sum();
     if unack > 0 {
         _ = write!(line, " · {unack} unread");
     }

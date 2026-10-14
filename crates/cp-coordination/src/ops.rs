@@ -102,11 +102,12 @@ pub fn read(tool: &ToolUse, state: &mut State) -> Result<String, String> {
         return Err(format!("you ({me}) are not a member of {gid}"));
     }
     let name = group.name.clone();
-    let unread = group.messages.iter().filter(|m| !m.acknowledged).count();
-    for m in &mut group.messages {
-        m.acknowledged = true;
-    }
+    let unread = group.unread_for(&me);
+    group.mark_read(&me);
     if group.kind == GroupKind::Human {
+        for m in &mut group.messages {
+            m.acknowledged = true;
+        }
         let _cleared = cp_mod_spine::types::SpineState::delete_notifications_by_agent(state, &me);
     }
     let panel = cp_groups::panels::open_group_panel(state, gid);

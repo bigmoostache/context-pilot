@@ -50,6 +50,31 @@ pub struct Group {
     /// Pending obligations: who must act next (see [`crate::social`]).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub social: Vec<Substate>,
+    /// Per-member read cursor: timestamp of the last message each member has
+    /// seen. Unread is per reader; [`GroupMessage::acknowledged`] is a single
+    /// flag and only means "the agent saw it" in a human group.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub read_upto: std::collections::BTreeMap<String, u64>,
+}
+
+impl Group {
+    /// Messages `reader` has not seen: past its cursor, not tool traces, not
+    /// written by `reader` itself.
+    #[must_use]
+    pub fn unread_for(&self, reader: &str) -> usize {
+        let cursor = self.read_upto.get(reader).copied().unwrap_or(0);
+        self.messages
+            .iter()
+            .filter(|m| !m.auto && m.timestamp > cursor && m.author_agent_id.as_deref() != Some(reader))
+            .count()
+    }
+
+    /// Move `reader`'s cursor to the latest message.
+    pub fn mark_read(&mut self, reader: &str) {
+        if let Some(last) = self.messages.last() {
+            let _prev = self.read_upto.insert(reader.to_owned(), last.timestamp);
+        }
+    }
 }
 
 /// Fleet-shared group store, persisted via the groups module.
