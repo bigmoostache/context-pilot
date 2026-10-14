@@ -248,6 +248,26 @@ pub(in crate::app::run) fn drain_management(app: &mut App) {
     }
 }
 
+/// Delete the files of `removed` groups on a detached thread.
+///
+/// Falls back to inline removal only when the thread cannot be spawned.
+fn remove_group_files_off_loop(removed: &[String]) {
+    if removed.is_empty() {
+        return;
+    }
+    let bg = removed.to_vec();
+    let spawned = std::thread::Builder::new().name("group-file-rm".into()).spawn(move || {
+        for gid in &bg {
+            cp_groups::persist::remove_group_file(gid);
+        }
+    });
+    if spawned.is_err() {
+        for gid in removed {
+            cp_groups::persist::remove_group_file(gid);
+        }
+    }
+}
+
 /// Permanently delete an agent and all its messages.
 fn apply_delete_agent(state: &mut State, agent_id: &str) {
     let ts = AgentsState::get_mut(state);
@@ -263,21 +283,8 @@ fn apply_delete_agent(state: &mut State, agent_id: &str) {
         cp_groups::social::departed::purge(&mut cp_groups::types::GroupsState::get_mut(state).groups, &|m: &str| {
             m != agent_id
         });
-    // File removal is IO the loop must not wait on: hand it to a detached
-    // thread, falling back to inline removal if the spawn fails.
-    if !removed.is_empty() {
-        let bg = removed.clone();
-        let spawned = std::thread::Builder::new().name("group-file-rm".into()).spawn(move || {
-            for gid in &bg {
-                cp_groups::persist::remove_group_file(gid);
-            }
-        });
-        if spawned.is_err() {
-            for gid in &removed {
-                cp_groups::persist::remove_group_file(gid);
-            }
-        }
-    }
+    // File removal is IO the loop must not wait on.
+    remove_group_files_off_loop(&removed);
 
     // Clean up focus references (mirrors archive path).
     let focus = FocusState::get_mut(state);
