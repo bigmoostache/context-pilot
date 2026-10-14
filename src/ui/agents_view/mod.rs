@@ -275,7 +275,7 @@ fn push_agent_entry(
     }
     lb.blocks.push(IrBlock::Line(vec![
         leading,
-        S::styled(guide, Semantic::Border).dim(),
+        S::styled(guide, Semantic::Muted),
         S::rgb("\u{25cf} ".to_owned(), cr, cg, cb),
         S::new(name),
     ]));
