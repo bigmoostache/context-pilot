@@ -12,18 +12,16 @@ pub fn yaml_escape(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
-/// Relative age between two epoch-ms timestamps (`5s ago`, `3m ago`, `1h02m ago`).
+/// Absolute local datetime (`YYYY-MM-DD HH:MM:SS`) of an epoch-ms timestamp.
+///
+/// Raw ms when out of range. Absolute, not relative: the panel text must stay
+/// byte-stable between ticks or its prompt cache breaks.
 #[must_use]
-pub fn format_age(now_ms: u64, ts_ms: u64) -> String {
-    let diff_s = now_ms.saturating_sub(ts_ms).wrapping_div(1000);
-    if diff_s < 60 {
-        return format!("{diff_s}s ago");
-    }
-    let mins = diff_s.wrapping_div(60);
-    if mins < 60 {
-        return format!("{mins}m ago");
-    }
-    format!("{}h{:02}m ago", mins.wrapping_div(60), mins.wrapping_rem(60))
+pub fn local_datetime(ts_ms: u64) -> String {
+    i64::try_from(ts_ms)
+        .ok()
+        .and_then(cp_mod_utilities::time::epoch_ms_to_local_ymd_hms)
+        .unwrap_or_else(|| ts_ms.to_string())
 }
 
 /// Lowercase label of a [`GroupKind`].
@@ -109,7 +107,7 @@ fn social_line(group: &Group, me: &str) -> String {
 /// Full `group` panel body: header, members and EVERY non-auto message, never
 /// truncated (tool traces stay hidden from the LLM).
 #[must_use]
-pub fn group_body(group: &Group, now_ms: u64) -> String {
+pub fn group_body(group: &Group) -> String {
     let mut out = String::new();
     _ = writeln!(out, "group_id: {}", group.id);
     _ = writeln!(out, "name: \"{}\"", yaml_escape(&group.name));
@@ -127,18 +125,18 @@ pub fn group_body(group: &Group, now_ms: u64) -> String {
     }
     _ = writeln!(out, "messages:");
     for msg in visible {
-        write_message(&mut out, msg, now_ms);
+        write_message(&mut out, msg);
     }
     out
 }
 
-/// One YAML message entry (author, age, text block or inline, file).
-fn write_message(out: &mut String, msg: &GroupMessage, now_ms: u64) {
+/// One YAML message entry (author, local datetime, text block or inline, file).
+fn write_message(out: &mut String, msg: &GroupMessage) {
     match msg.author_agent_id.as_deref() {
         Some(agent) => _ = writeln!(out, "  - author: {} ({agent})", msg.author),
         None => _ = writeln!(out, "  - author: {}", msg.author),
     }
-    _ = writeln!(out, "    ts: \"{}\"", format_age(now_ms, msg.timestamp));
+    _ = writeln!(out, "    ts: \"{}\"", local_datetime(msg.timestamp));
     let content = msg.content.as_deref().unwrap_or("[no text]");
     if content.contains('\n') {
         _ = writeln!(out, "    text: |");

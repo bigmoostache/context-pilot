@@ -39,7 +39,7 @@ fn entry_group_id(ctx: &Entry) -> Option<&str> {
 fn group_content(state: &State, gid: &str) -> String {
     GroupsState::get(state).find(gid).map_or_else(
         || format!("group_id: {gid}\nerror: group not found\n"),
-        |g| group_body(g, cp_base::panels::now_ms()),
+        group_body,
     )
 }
 
