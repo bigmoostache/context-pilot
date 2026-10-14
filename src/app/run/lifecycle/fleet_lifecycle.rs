@@ -262,6 +262,52 @@ impl App {
         }
     }
 
+    /// Poll the watchers of every idle background agent and wake the ones whose
+    /// inbox now holds an unprocessed notification.
+    ///
+    /// `advance_background_agents` only steps active or `Runnable` agents, and
+    /// turn status comes from groups alone, so an agent that started a Monitor
+    /// and ended its turn sat `Idle`: its registry was never polled and nothing
+    /// made it runnable until the human focused it. Here each idle agent runs
+    /// [`check_watchers`](super::super::tools::cleanup::check_watchers) as the
+    /// executing agent (no blocking wait can be pending on an idle agent), then
+    /// any unprocessed notification marks its entry `Runnable`, so `promote`
+    /// gives it a slot under the K cap and its step's `check_spine` starts the
+    /// stream. Must run after reconcile (which re-derives `Idle` from the turn)
+    /// and before the step loop.
+    pub(super) fn poll_idle_agents(&mut self, now_ms: u64) {
+        let paused: std::collections::HashSet<String> =
+            AgentsState::get(&self.state).agents.iter().filter(|a| a.paused).map(|a| a.id.clone()).collect();
+        let idle: Vec<String> = self
+            .fleet
+            .iter()
+            .filter(|entry| entry.1.exec_state == AgentExecState::Idle && !paused.contains(entry.0.as_str()))
+            .map(|entry| entry.0.clone())
+            .collect();
+        let prev = self.state.executing_agent_id().map(str::to_owned);
+        for id in idle {
+            if !self.state.agent_store.contains(&id) {
+                continue;
+            }
+            self.stepping_agent = Some(id.clone());
+            self.state.agent_store.set_executing(Some(id.clone()));
+            if self
+                .state
+                .get_ext::<cp_base::state::watchers::WatcherRegistry>()
+                .is_some_and(|reg| !reg.active_watchers().is_empty())
+            {
+                super::super::tools::cleanup::check_watchers(self);
+            }
+            let wake = cp_mod_spine::types::SpineState::has_unprocessed_notifications(&self.state);
+            self.stepping_agent = None;
+            self.state.agent_store.set_executing(prev.clone());
+            if wake && let Some(entry) = self.fleet.get_mut(&id) {
+                entry.exec_state = AgentExecState::Runnable;
+                entry.waiting_since_ms = Some(now_ms);
+            }
+        }
+    }
+
     /// Advance every group's time-driven social substates (T860 D4).
     ///
     /// Due `ComingBack`s become `SimpleTurn`s and their reminder is delivered

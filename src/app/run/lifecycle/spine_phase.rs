@@ -35,6 +35,10 @@ impl App {
             self.dispatch_background_my_turn();
         }
         {
+            let _g = crate::profile!("sp_poll_idle_bg");
+            self.poll_idle_agents(current_ms);
+        }
+        {
             let _g = crate::profile!("sp_advance_bg");
             self.advance_background_agents();
         }
