@@ -45,6 +45,37 @@ async function loadMermaid(dark: boolean): Promise<MermaidApi> {
   return mermaid
 }
 
+/** Tail of the render chain: mermaid's `render` is not reentrant. */
+const queue: { tail: Promise<unknown> } = { tail: Promise.resolve() }
+
+/**
+ * Validate then render one diagram, one at a time.
+ *
+ * On a syntax error `mermaid.render` appends its "Syntax error" SVG inside a
+ * temporary `#d<id>` div on `document.body` and never removes it, so every
+ * invalid or half-streamed fence used to leak a visible bomb below the app.
+ * `parse` with `suppressErrors` rejects bad input without touching the DOM, and
+ * the `finally` sweeps the temp div should `render` itself still fail.
+ */
+function renderSerialized(dark: boolean, id: string, code: string): Promise<string> {
+  const prev = queue.tail
+  const run = (async () => {
+    await prev
+    try {
+      const mermaid = await loadMermaid(dark)
+      if (!(await mermaid.parse(code, { suppressErrors: true }))) {
+        throw new Error("Invalid mermaid syntax")
+      }
+      const { svg } = await mermaid.render(id, code)
+      return svg
+    } finally {
+      document.querySelector(`#d${id}`)?.remove()
+    }
+  })()
+  queue.tail = run.catch(() => null)
+  return run
+}
+
 /**
  * Render a ```mermaid``` fenced block as an actual diagram.
  *
@@ -90,8 +121,7 @@ export function Mermaid({ code, onAccent }: { code: string; onAccent: boolean })
     const alive = { current: true }
     void (async () => {
       try {
-        const mermaid = await loadMermaid(dark)
-        const { svg: out } = await mermaid.render(id, code)
+        const out = await renderSerialized(dark, id, code)
         if (alive.current) {
           svgCache.set(cacheKey, out)
           setSvg(out)
