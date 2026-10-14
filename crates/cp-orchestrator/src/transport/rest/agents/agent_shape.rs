@@ -75,6 +75,9 @@ pub(crate) fn overlay_roster(details: &mut Vec<serde_json::Value>, roster: &[Ros
             d.get("id").and_then(serde_json::Value::as_str).is_some_and(|id| same_agent(id, &entry.agent_id))
         });
         match existing {
+            // A legacy `T<n>` entry no longer receives deltas (the agent now
+            // emits `A<n>`), so its flags are frozen: the disk row wins.
+            Some(detail) if detail.get("id").and_then(serde_json::Value::as_str) != Some(entry.agent_id.as_str()) => {}
             Some(detail) => {
                 if let Some(obj) = detail.as_object_mut() {
                     drop(obj.insert("status".to_owned(), roster_status_value(entry.status)));
