@@ -1,13 +1,15 @@
 //! Agent-list ordering for the web sidebar tree (T860).
 //!
-//! The `/agents` response is returned already ordered: roots by creation
-//! time, each followed by its sub-agents in preorder, every row tagged with its
-//! `depth` (0 = root). The frontend renders the list as received.
+//! The `/agents` response is returned already ordered: roots newest first,
+//! each followed by its sub-agents in preorder (siblings newest first too),
+//! every row tagged with its `depth` (0 = root). The frontend renders the list
+//! as received.
 
 use std::collections::{HashMap, HashSet};
 
 /// Sort key of an agent: creation time, then the `<n>` of its `A<n>` id so
-/// agents created in the same millisecond keep their creation order.
+/// agents created in the same millisecond keep their creation order. Sorted
+/// descending: newest first.
 fn sort_key(detail: &serde_json::Value) -> (u64, u64, String) {
     let created = detail.get("createdAt").and_then(serde_json::Value::as_u64).unwrap_or(0);
     let id = id_of(detail);
@@ -34,13 +36,13 @@ fn parent_of<'list>(detail: &'list serde_json::Value, by_id: &HashMap<&str, &ser
     (parent != id_of(detail) && archived(found) == archived(detail)).then_some(parent)
 }
 
-/// Reorder `details` into creation-ordered preorder and set each row's `depth`.
+/// Reorder `details` into newest-first preorder and set each row's `depth`.
 ///
 /// Rows caught in a parent loop (never reached from a root) are appended as
 /// roots, so no agent is ever dropped.
 pub(crate) fn order_tree(details: &mut Vec<serde_json::Value>) {
     let mut indices: Vec<usize> = (0..details.len()).collect();
-    indices.sort_by_key(|&i| details.get(i).map(sort_key));
+    indices.sort_by_key(|&i| std::cmp::Reverse(details.get(i).map(sort_key)));
     let (roots, children) = link(details, &indices);
     let order = preorder(details, roots.into_iter().chain(indices), &children);
     apply(details, order);
@@ -119,7 +121,7 @@ mod tests {
     }
 
     #[test]
-    fn roots_by_creation_with_children_in_preorder() {
+    fn roots_newest_first_with_children_in_preorder() {
         let mut list = vec![
             agent("A5", 50, Some("A1"), false),
             agent("A2", 20, None, false),
@@ -128,7 +130,7 @@ mod tests {
             agent("A3", 30, Some("A1"), false),
         ];
         order_tree(&mut list);
-        assert_eq!(rows(&list), pairs(&[("A1", 0), ("A3", 1), ("A5", 1), ("A6", 2), ("A2", 0)]));
+        assert_eq!(rows(&list), pairs(&[("A2", 0), ("A1", 0), ("A5", 1), ("A6", 2), ("A3", 1)]));
     }
 
     #[test]
@@ -140,11 +142,11 @@ mod tests {
             agent("A2", 20, Some("A1"), true),
         ];
         order_tree(&mut list);
-        assert_eq!(rows(&list), pairs(&[("A1", 0), ("A2", 1), ("A3", 0), ("A4", 0)]));
+        assert_eq!(rows(&list), pairs(&[("A4", 0), ("A3", 0), ("A1", 0), ("A2", 1)]));
     }
 
     #[test]
-    fn same_millisecond_keeps_id_order_and_loops_are_kept() {
+    fn same_millisecond_newest_id_first_and_loops_are_kept() {
         let mut list = vec![
             agent("A10", 5, None, false),
             agent("A9", 5, None, false),
@@ -152,6 +154,6 @@ mod tests {
             agent("A8", 2, Some("A7"), false),
         ];
         order_tree(&mut list);
-        assert_eq!(rows(&list), pairs(&[("A9", 0), ("A10", 0), ("A7", 0), ("A8", 1)]));
+        assert_eq!(rows(&list), pairs(&[("A10", 0), ("A9", 0), ("A8", 0), ("A7", 1)]));
     }
 }
