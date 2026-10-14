@@ -127,6 +127,18 @@ fn dangling_style_id_keeps_formatting() {
     assert!(ws.style("A1").fill().is_some());
 }
 
+/// Saving the unedited snapshot (e.g. after edit + undo) doesn't touch the file.
+#[test]
+fn unchanged_snapshot_leaves_file_untouched() {
+    let Ok(dir) = tempfile::tempdir() else { panic!("no temp dir") };
+    let path = dir.path().join("save.xlsx");
+    fixture(&path);
+    let Some(out) = convert(&path) else { panic!("convert failed") };
+    let before = std::fs::read(&path).ok();
+    assert_eq!(save(&path, &out.workbook), Ok(0));
+    assert_eq!(std::fs::read(&path).ok(), before);
+}
+
 #[test]
 fn refuses_a_foreign_snapshot() {
     let Ok(dir) = tempfile::tempdir() else { panic!("no temp dir") };

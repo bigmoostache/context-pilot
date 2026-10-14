@@ -42,14 +42,19 @@ pub(in crate::transport::inspect::finder) fn save(path: &Path, snapshot: &Value)
     let base = super::convert_cached(path).ok_or("could not read the original workbook")?;
     let mut book =
         umya_spreadsheet::reader::xlsx::lazy_read(path).map_err(|_err| "could not read the original workbook")?;
-    let patched = patch_book(&mut book, &base.workbook, snapshot)?;
+    let original = book.sheet_count();
+    let (patched, edited_any) = patch_book(&mut book, &base.workbook, snapshot)?;
+    if !edited_any && book.sheet_count() == original {
+        return Ok(0); // nothing to write: leave the file (and its mtime) alone
+    }
     lazy::load_chart_sources(&mut book)?;
     write_atomic(&book, path)?;
     Ok(patched)
 }
 
-/// Apply every sheet's diff to `book`.
-fn patch_book(book: &mut Workbook, base: &Value, new: &Value) -> Result<usize, &'static str> {
+/// Apply every sheet's diff to `book`; returns the cells changed and whether
+/// any sheet was edited, renamed or added (deletions show in the sheet count).
+fn patch_book(book: &mut Workbook, base: &Value, new: &Value) -> Result<(usize, bool), &'static str> {
     let order: Vec<&str> = new
         .get("sheetOrder")
         .and_then(Value::as_array)
@@ -60,6 +65,7 @@ fn patch_book(book: &mut Workbook, base: &Value, new: &Value) -> Result<usize, &
     let styles = Styles { base: table(base, "styles"), new: table(new, "styles") };
     let (base_sheets, new_sheets) = (table(base, "sheets"), table(new, "sheets"));
     let mut patched = 0usize;
+    let mut edited_any = false;
     for (id, idx) in sheet_slots(book, &order, new_sheets)? {
         let old = base_sheets.get(&id).unwrap_or(&NULL);
         let Some(sheet) = new_sheets.get(&id) else {
@@ -68,12 +74,13 @@ fn patch_book(book: &mut Workbook, base: &Value, new: &Value) -> Result<usize, &
         if !edited(old, sheet, &styles) {
             continue; // untouched: stays raw and is written back verbatim
         }
+        edited_any = true;
         let ws = book.sheet_mut(idx).map_err(|_err| "sheet vanished while saving")?;
         rename(ws, old, sheet);
         layout::patch(ws, old, sheet);
         patched = patched.saturating_add(cells::patch(ws, (old, sheet), &styles));
     }
-    Ok(patched)
+    Ok((patched, edited_any))
 }
 
 /// Whether the user changed anything the patch writes.
