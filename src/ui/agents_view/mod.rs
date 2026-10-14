@@ -217,12 +217,19 @@ struct WorktreeLine {
     badge: Option<cp_mod_github::pr_badge::Badge>,
 }
 
-/// The agent's [`WorktreeLine`]; `None` at the project root.
-fn worktree_line(state: &State, agent_id: &str) -> Option<WorktreeLine> {
-    let dir = state.agent_store.get(agent_id)?.workdir.as_deref()?;
+/// The agent's [`WorktreeLine`]; `None` at the project root. The PR badge is
+/// dropped when the parent agent works in the same worktree: the parent's
+/// row already shows it.
+fn worktree_line(state: &State, agent: &cp_mod_agents::types::Agent) -> Option<WorktreeLine> {
+    let dir = state.agent_store.get(&agent.id)?.workdir.as_deref()?;
     let name = dir.file_name()?.to_string_lossy().into_owned();
+    let shares_parent = agent
+        .parent_agent_id
+        .as_deref()
+        .and_then(|p| state.agent_store.get(p)?.workdir.as_deref())
+        .is_some_and(|parent_dir| parent_dir == dir);
     let token = cp_mod_github::types::GithubState::get(state).github_token.as_deref();
-    let badge = token.and_then(|t| cp_mod_github::pr_badge::badge(dir, t));
+    let badge = if shares_parent { None } else { token.and_then(|t| cp_mod_github::pr_badge::badge(dir, t)) };
     Some(WorktreeLine { name, badge })
 }
 
@@ -402,7 +409,7 @@ fn render_agent_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
         let Some(agent) = ts.agents.get(real) else {
             continue;
         };
-        let worktree = worktree_line(state, &agent.id);
+        let worktree = worktree_line(state, agent);
         push_agent_entry(&mut lb, agent, i == selected, worktree.as_ref());
         if confirming && i == selected {
             push_archive_confirm_bubble(lb.blocks, viewing_archived);
