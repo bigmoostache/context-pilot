@@ -181,10 +181,11 @@ impl PerfMetrics {
         if !self.enabled.load(Ordering::Relaxed) {
             return;
         }
-        // Ensure the entry exists (write lock), then immediately release.
-        // The OpStats fields are independently synchronized (atomics + inner RwLock),
-        // so we re-acquire a cheaper read lock for the actual recording.
-        {
+        // Fast path: shared read lock (the OpStats fields are atomics + an inner
+        // RwLock). The exclusive write lock is taken only the first time a name
+        // is seen, not on every guard drop.
+        let known = self.ops.read().unwrap_or_else(std::sync::PoisonError::into_inner).contains_key(name);
+        if !known {
             let mut ops = self.ops.write().unwrap_or_else(std::sync::PoisonError::into_inner);
             let _r = ops.entry(name).or_default();
         }

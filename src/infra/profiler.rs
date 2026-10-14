@@ -145,11 +145,46 @@ impl Drop for ProfileGuard {
         // Always record to in-memory perf system
         crate::ui::perf::PERF.record_op(self.name, us);
 
-        // Log to file only for slow operations
-        if u128::from(ms) >= THRESHOLD_MS
-            && let Ok(mut file) = OpenOptions::new().create(true).append(true).open(LOG_FILE)
-        {
-            let _r = writeln!(file, "{:>6}ms  {}", ms, self.leaf);
+        // Log to file only for slow operations (written by the bg `perf-log` thread)
+        if u128::from(ms) >= THRESHOLD_MS {
+            log_slow(format!("{:>6}ms  {}", ms, self.leaf));
+        }
+    }
+}
+
+/// Size past which `perf.log` is rotated to [`LOG_ROTATED`] (it once grew to
+/// 566 MB with no rotation).
+const LOG_MAX_BYTES: u64 = 32 * 1024 * 1024;
+/// Previous `perf.log` generation, overwritten at each rotation.
+const LOG_ROTATED: &str = ".context-pilot/perf.log.1";
+
+/// Queue a slow-op line for the background `perf-log` writer, so the main loop
+/// never opens or writes the file itself. Dropped if the thread failed to spawn.
+fn log_slow(line: String) {
+    static TX: OnceLock<Option<std::sync::mpsc::Sender<String>>> = OnceLock::new();
+    let tx = TX.get_or_init(|| {
+        let (tx, rx) = std::sync::mpsc::channel::<String>();
+        std::thread::Builder::new().name("perf-log".to_owned()).spawn(move || write_loop(&rx)).ok().map(|_h| tx)
+    });
+    if let Some(sender) = tx.as_ref() {
+        let _r = sender.send(line);
+    }
+}
+
+/// Append queued lines to `perf.log`, keeping the file open between lines and
+/// rotating it once it passes [`LOG_MAX_BYTES`]. No `profile!` here: this runs
+/// off the main thread and must not feed the profiler it serves.
+fn write_loop(rx: &std::sync::mpsc::Receiver<String>) {
+    let mut file: Option<std::fs::File> = None;
+    for line in rx {
+        if file.is_none() {
+            file = OpenOptions::new().create(true).append(true).open(LOG_FILE).ok();
+        }
+        let Some(f) = file.as_mut() else { continue };
+        let _r = writeln!(f, "{line}");
+        if f.metadata().is_ok_and(|m| m.len() > LOG_MAX_BYTES) {
+            file = None;
+            let _r2 = std::fs::rename(LOG_FILE, LOG_ROTATED);
         }
     }
 }
