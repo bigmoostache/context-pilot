@@ -273,7 +273,8 @@ impl App {
         let groups = &mut cp_groups::types::GroupsState::get_mut(&mut self.state).groups;
         let fired = cp_groups::social::tick(groups, now_ms, &|id: &str| idle.contains(id));
         for f in fired {
-            let content = format!("Coming back in {}: {}", f.group_id, f.message);
+            let label = cp_groups::types::GroupsState::get(&self.state).label(&f.group_id);
+            let content = format!("Coming back in {label}: {}", f.message);
             let bind = f.agent_id.clone();
             self.deliver_to_agent(Some(&f.agent_id), move |state| {
                 let nid = cp_mod_spine::types::SpineState::create_notification(

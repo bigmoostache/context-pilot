@@ -4,8 +4,8 @@
 //! across multiple concurrent agents. Each agent has a turn-based status
 //! (`MY_TURN` / `THEIR_TURN`) and its own message history.
 //!
-//! Two tools: `Send` (post a message to an agent) and
-//! `Read` (retrieve agent messages, sets focus).
+//! One tool: `Send` (post a message into a group). `Read(group_id)` lives
+//! in cp-coordination.
 
 /// Send-time validation of agent-authored ` ```form ` blocks.
 mod forms;
@@ -13,7 +13,7 @@ mod forms;
 pub mod incoming;
 /// Panel rendering for the agent list.
 mod panel;
-/// Tool execution handlers: `Send` and `Read`.
+/// Tool execution handler: `Send`.
 pub mod tools;
 /// Agent state types: `Agent`, `AgentMessage`, `AgentsState`, `FocusState`.
 pub mod types;
@@ -191,11 +191,6 @@ impl Module for AgentsModule {
                 .param("group_id", ParamType::String, true)
                 .param("next", ParamType::String, true)
                 .build(),
-            ToolDefinition::from_yaml("Read", t)
-                .short_desc("Refresh the Agents panel")
-                .category("Agents")
-                .reverie_allowed(false)
-                .build(),
         ]
     }
 
@@ -212,7 +207,6 @@ impl Module for AgentsModule {
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
             "Send" => Some(tools::execute_send(tool, state)),
-            "Read" => Some(tools::execute_read(tool, state)),
             _ => None,
         }
     }

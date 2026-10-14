@@ -119,6 +119,12 @@ impl GroupsState {
         self.groups.iter().find(|g| g.id == id)
     }
 
+    /// `G5 "name"` label for notifications; the bare id when the group is gone.
+    #[must_use]
+    pub fn label(&self, id: &str) -> String {
+        self.find(id).map_or_else(|| id.to_owned(), |g| format!("{id} \"{}\"", g.name))
+    }
+
     /// Mutable group with this id.
     pub fn find_mut(&mut self, id: &str) -> Option<&mut Group> {
         self.groups.iter_mut().find(|g| g.id == id)

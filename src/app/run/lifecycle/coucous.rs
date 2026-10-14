@@ -27,7 +27,12 @@ impl App {
             return;
         }
         let focused = FocusState::get(&self.state).focused_agent_id.clone();
-        for coucou in fired {
+        for mut coucou in fired {
+            // Name the group: the record only knows its id.
+            if let Some(gid) = coucou.group_id.as_deref() {
+                let label = cp_groups::types::GroupsState::get(&self.state).label(gid);
+                coucou.description = coucou.description.replacen(&format!(" in {gid}"), &format!(" in {label}"), 1);
+            }
             let tid = coucou.agent_id.clone();
             let bind = tid.clone();
             // Source = coucou id: `create_notification` dedups on (kind, source),

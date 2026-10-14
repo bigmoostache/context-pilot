@@ -7,11 +7,12 @@ tools:
       agent_ids: "Other member agent ids (A<n>)."
       name: "Group name."
       description: "One-line purpose."
-  Group_open:
+  Read:
     description: |
-      Open the panel of a group you belong to (close it with Close_panel).
+      Open the panel of a group you belong to, or refresh it if already open.
+      Marks its messages read. Close it with Close_panel.
     parameters:
-      group_id: "Group id (G<n>)."
+      group_id: "Group id (G<n>); your human group for the user."
   Group_update:
     description: |
       Change a group you own (not a human group). before_agent_ids must list

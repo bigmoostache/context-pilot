@@ -280,11 +280,12 @@ fn try_delete(tool: &ToolUse, state: &mut State) -> Result<String, String> {
     let _removed = registry.cancel(&id);
     if let Some(creator) = record.creator_agent_id.filter(|c| Some(c) != caller.as_ref()) {
         let by = caller.as_deref().unwrap_or("someone");
+        let group = record.group_id.as_deref().map_or_else(String::new, |g| format!(" in {g}"));
         registry.notices.push(FiredCoucou {
             id: format!("{id}_deleted"),
             agent_id: Some(creator),
             group_id: record.group_id,
-            description: format!("🗑 {by} deleted your coucou {id} (\"{}\")", record.message),
+            description: format!("🗑 {by} deleted your coucou {id}{group} (\"{}\")", record.message),
         });
     }
     Ok(format!("Deleted coucou {id}"))

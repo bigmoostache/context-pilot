@@ -33,8 +33,13 @@ pub fn holding_groups(groups: &[Group], agent_id: &str) -> Vec<String> {
 /// its turn: a reply in any other group leaves the turn where it is.
 #[must_use]
 pub fn nudge(state: &State, agent_id: &str, name: &str) -> String {
-    let held = holding_groups(&GroupsState::get(state).groups, agent_id);
-    let groups = if held.is_empty() { "?".to_owned() } else { held.join(", ") };
+    let store = GroupsState::get(state);
+    let held = holding_groups(&store.groups, agent_id);
+    let groups = if held.is_empty() {
+        "?".to_owned()
+    } else {
+        held.iter().map(|g| store.label(g)).collect::<Vec<_>>().join(", ")
+    };
     format!(
         "Agent \"{name}\" ({agent_id}) is MY_TURN: you hold the turn in {groups}. \
          Reply there (Send group_id={groups_first}); sending elsewhere does not release it.",

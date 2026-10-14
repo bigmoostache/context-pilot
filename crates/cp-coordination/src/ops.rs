@@ -87,20 +87,30 @@ pub fn create(tool: &ToolUse, state: &mut State) -> Result<String, String> {
     Ok(format!("Created {gid} \"{name}\" with [{}], panel {panel}.", members.join(", ")))
 }
 
-/// `Group_open(group_id)`: open the group's panel; members only.
+/// `Read(group_id)`: open the group's panel, or refresh it when already
+/// open; members only. Marks the group's messages read and clears the
+/// caller's spine notifications for its human group.
 ///
 /// # Errors
 ///
 /// Unknown group, or the caller is not a member.
-pub fn open(tool: &ToolUse, state: &mut State) -> Result<String, String> {
-    let me = caller(state, "Group_open")?;
-    let gid = arg(tool, "group_id").ok_or_else(|| "Group_open requires a group_id".to_owned())?;
-    let group = GroupsState::get(state).find(gid).ok_or_else(|| format!("group {gid} not found"))?;
+pub fn read(tool: &ToolUse, state: &mut State) -> Result<String, String> {
+    let me = caller(state, "Read")?;
+    let gid = arg(tool, "group_id").ok_or_else(|| "Read requires a group_id".to_owned())?;
+    let group = GroupsState::get_mut(state).find_mut(gid).ok_or_else(|| format!("group {gid} not found"))?;
     if !group.member_ids.contains(&me) {
         return Err(format!("you ({me}) are not a member of {gid}"));
     }
+    let name = group.name.clone();
+    let unread = group.messages.iter().filter(|m| !m.acknowledged).count();
+    for m in &mut group.messages {
+        m.acknowledged = true;
+    }
+    if group.kind == GroupKind::Human {
+        let _cleared = cp_mod_spine::types::SpineState::delete_notifications_by_agent(state, &me);
+    }
     let panel = cp_groups::panels::open_group_panel(state, gid);
-    Ok(format!("{gid} is open in panel {panel}."))
+    Ok(format!("{gid} \"{name}\" is fresh in panel {panel} ({unread} new message(s))."))
 }
 
 /// `Group_update`: change a group the caller owns.

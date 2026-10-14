@@ -61,14 +61,16 @@ pub(super) fn handle_incoming_focused_messages(app: &mut App, was_streaming: boo
         if let Some(push) = cp_mod_agents::incoming::take_streaming_push(&mut app.state) {
             let cp_mod_agents::incoming::StreamingPush { tid, name, messages, truncated } = push;
             let quoted: Vec<String> = messages.iter().map(|m| format!("---\n{m}")).collect();
+            let group = human_group_label(&app.state, &tid);
             let tail = if truncated {
-                "Finish your current step, then respond. Some content was truncated: the full text \
-                 will be in the Agents panel once you are idle."
+                format!(
+                    "Finish your current step, then respond. Some content was truncated: Read(group_id) {group} for the full text."
+                )
             } else {
-                "Finish your current step, then respond (no need to call Read)."
+                "Finish your current step, then respond.".to_owned()
             };
             let content = format!(
-                "New message(s) from the user in the focused agent \"{name}\" while you were working:\n{}\n---\n{tail}",
+                "New message(s) from the user in {group} (agent \"{name}\") while you were working:\n{}\n---\n{tail}",
                 quoted.join("\n")
             );
             let nid = SpineState::create_notification(
@@ -84,13 +86,14 @@ pub(super) fn handle_incoming_focused_messages(app: &mut App, was_streaming: boo
         if let Some(push) = cp_mod_agents::incoming::take_idle_autoread(&mut app.state) {
             let cp_mod_agents::incoming::StreamingPush { tid, name, messages, truncated } = push;
             let quoted: Vec<String> = messages.iter().map(|m| format!("---\n{m}")).collect();
+            let group = human_group_label(&app.state, &tid);
             let tail = if truncated {
-                "Some content was truncated: the full text is in the Agents panel. Respond directly (no need to call Read)."
+                format!("Some content was truncated: Read(group_id) {group} for the full text, then respond there.")
             } else {
-                "Respond directly (no need to call Read)."
+                format!("Respond directly in {group}.")
             };
             let content = format!(
-                "New message(s) from the user in the focused agent \"{name}\":\n{}\n---\n{tail}",
+                "New message(s) from the user in {group} (agent \"{name}\"):\n{}\n---\n{tail}",
                 quoted.join("\n")
             );
             let nid = SpineState::create_notification(
@@ -102,6 +105,12 @@ pub(super) fn handle_incoming_focused_messages(app: &mut App, was_streaming: boo
             SpineState::set_notification_agent(&mut app.state, &nid, Some(tid));
         }
     }
+}
+
+/// `G5 "name"` label of `agent_id`'s human group (`?` when it has none).
+fn human_group_label(state: &State, agent_id: &str) -> String {
+    cp_mod_agents::types::msgs::human_group_id(AgentsState::get(state), agent_id)
+        .map_or_else(|| "?".to_owned(), |gid| cp_groups::types::GroupsState::get(state).label(gid))
 }
 
 /// Run every bridge live-emission chokepoint for one main-loop tick — the

@@ -15,6 +15,7 @@ cp-base.workspace = true
 cp-render.workspace = true
 cp-groups.workspace = true
 cp-mod-agents = { path = "../cp-mod-agents" }
+cp-mod-spine = { path = "../cp-mod-spine" }
 serde_json.workspace = true
 
 [lints]

@@ -55,7 +55,7 @@ impl Panel for AgentsPanel {
     }
 
     fn max_freezes(&self) -> u8 {
-        3
+        5
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {

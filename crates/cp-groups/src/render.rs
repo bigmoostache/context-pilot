@@ -3,6 +3,7 @@
 use std::fmt::Write as _;
 
 use crate::chat::GroupMessage;
+use crate::social::Substate;
 use crate::types::{Group, GroupKind};
 
 /// Maximum messages shown in a `group` panel.
@@ -38,22 +39,49 @@ pub const fn kind_label(kind: GroupKind) -> &'static str {
     }
 }
 
-/// One `groups` panel line: `G3 "name" · human · owner A1 · 12 msgs · 2 unread`.
+/// One `groups` panel YAML entry: id, name, description, kind, owner,
+/// message counts, members, and the social substates naming `me`.
 #[must_use]
-pub fn group_line(group: &Group) -> String {
+pub fn group_entry(group: &Group, me: &str) -> String {
     let unread = group.messages.iter().filter(|m| !m.acknowledged).count();
-    let mut line = format!(
-        "- {} \"{}\" \u{b7} {} \u{b7} owner {} \u{b7} {} msgs",
-        group.id,
-        yaml_escape(&group.name),
-        kind_label(group.kind),
-        group.owner_agent_id,
-        group.messages.len()
-    );
-    if unread > 0 {
-        _ = write!(line, " \u{b7} {unread} unread");
+    let mut out = String::new();
+    _ = writeln!(out, "  - id: {}", group.id);
+    _ = writeln!(out, "    name: \"{}\"", yaml_escape(&group.name));
+    if !group.description.is_empty() {
+        _ = writeln!(out, "    description: \"{}\"", yaml_escape(&group.description));
     }
-    line
+    _ = writeln!(out, "    kind: {}", kind_label(group.kind));
+    _ = writeln!(out, "    owner: {}", group.owner_agent_id);
+    _ = writeln!(out, "    messages: {}", group.messages.len());
+    if unread > 0 {
+        _ = writeln!(out, "    unread: {unread}");
+    }
+    _ = writeln!(out, "    members: [{}]", group.member_ids.join(", "));
+    let mine: Vec<String> = group.social.iter().filter_map(|s| substate_label(s, me)).collect();
+    if !mine.is_empty() {
+        _ = writeln!(out, "    social: [{}]", mine.join(", "));
+    }
+    out
+}
+
+/// Short label of `sub` when it concerns `me`.
+fn substate_label(sub: &Substate, me: &str) -> Option<String> {
+    cp_macros::deref_match!(sub, {
+        Substate::SimpleTurn { ref agent_id } => (agent_id == me).then(|| "my_turn".to_owned()),
+        Substate::ComingBack { ref agent_id, at_ms, .. } => {
+            (agent_id == me).then(|| format!("coming_back_at_ms {at_ms}"))
+        }
+        Substate::Gather { ref pending, ref origin_agent_id } => {
+            if pending.iter().any(|p| p == me) {
+                Some(format!("gather_owed_to {origin_agent_id}"))
+            } else {
+                (origin_agent_id == me).then(|| format!("gathering [{}]", pending.join(" ")))
+            }
+        }
+        Substate::Dispatch { ref candidates } => {
+            candidates.iter().any(|c| c == me).then(|| "dispatch_candidate".to_owned())
+        }
+    })
 }
 
 /// Full `group` panel body: header, members, last [`MAX_PANEL_MESSAGES`]

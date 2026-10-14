@@ -460,6 +460,7 @@ dependencies = [
  "cp-base",
  "cp-groups",
  "cp-mod-agents",
+ "cp-mod-spine",
  "cp-render",
  "serde_json",
 ]

@@ -10,7 +10,7 @@ use cp_base::state::actions::Action;
 use cp_base::state::context::{Entry, Kind, estimate_tokens, make_default_entry};
 use cp_base::state::runtime::State;
 
-use crate::render::{group_body, group_line};
+use crate::render::{group_body, group_entry};
 use crate::types::GroupsState;
 
 /// Fixed panel kind listing the executing agent's groups.
@@ -23,11 +23,11 @@ pub const META_GROUP_ID: &str = "group_id";
 /// `groups` panel body for the executing agent.
 fn groups_content(state: &State) -> String {
     let me = state.executing_agent_id().unwrap_or_default();
-    let lines: Vec<String> = GroupsState::get(state).of_member(me).map(group_line).collect();
-    if lines.is_empty() {
+    let entries: String = GroupsState::get(state).of_member(me).map(|g| group_entry(g, me)).collect();
+    if entries.is_empty() {
         return "groups: []\n".to_owned();
     }
-    format!("groups:\n{}\n", lines.join("\n"))
+    format!("groups:\n{entries}")
 }
 
 /// Group id a `group` panel entry shows.
@@ -52,16 +52,25 @@ fn text_blocks(content: &str) -> Vec<cp_render::Block> {
         .collect()
 }
 
-/// Open (or re-select) the `group` panel for `gid` in the executing agent's
-/// context; returns its panel id. Idempotent: one panel per group.
+/// Open the `group` panel for `gid` in the executing agent's context, or
+/// refresh it when already open (fresh content, emitted this tick); returns
+/// its panel id. One panel per group.
 pub fn open_group_panel(state: &mut State, gid: &str) -> String {
-    if let Some(ctx) =
-        state.agent().context.iter().find(|c| c.context_type.as_str() == GROUP_KIND && entry_group_id(c) == Some(gid))
+    let content = group_content(state, gid);
+    if let Some(ctx) = state
+        .agent_mut()
+        .context
+        .iter_mut()
+        .find(|c| c.context_type.as_str() == GROUP_KIND && entry_group_id(c) == Some(gid))
     {
+        ctx.token_count = estimate_tokens(&content);
+        let _changed = cp_base::panels::update_if_changed(ctx, &content);
+        // Force the Fresh branch of the freeze pass (u8::MAX = "not frozen").
+        ctx.cache_deprecated = true;
+        ctx.freeze_count = u8::MAX;
         return ctx.id.clone();
     }
     let name = GroupsState::get(state).find(gid).map_or_else(|| gid.to_owned(), |g| format!("{gid} {}", g.name));
-    let content = group_content(state, gid);
     let panel_id = state.next_available_context_id();
     let mut elem = make_default_entry(&panel_id, Kind::new(GROUP_KIND), &name, false);
     elem.uid = Some(format!("UID_{}_P", state.global_next_uid));
@@ -164,7 +173,7 @@ impl Panel for GroupPanel {
         }
     }
     fn max_freezes(&self) -> u8 {
-        5
+        8
     }
     fn context(&self, state: &State) -> Vec<ContextItem> {
         state

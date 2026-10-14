@@ -201,12 +201,3 @@ tools:
 
       next: "Who acts next: STILL_MY_TURN | GIVE_TALKING_STICK_TO <id> | GATHER <id>, <id>... | DISPATCH <id>, <id>... | OWNER_DONE | GIVE_RECURRING_TASK(<id>, <cron>, <message>). Use GIVE_TALKING_STICK_TO HUMAN when you are done and the user should answer."
 
-  Read:
-    description: |
-      Refreshes the Agents panel with your most recent conversation (you are the
-      executing agent). Takes no arguments —
-      you do not choose which agent is shown; the panel always reflects the
-      focused agent. Marks that agent's messages as acknowledged.
-
-      Use it to pull the latest state of your agent into the panel after
-      activity you want to re-read.

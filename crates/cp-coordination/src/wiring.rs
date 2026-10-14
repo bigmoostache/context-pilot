@@ -75,8 +75,8 @@ impl Module for CoordinationModule {
                 .param("name", ParamType::String, true)
                 .param("description", ParamType::String, false)
                 .build(),
-            ToolDefinition::from_yaml("Group_open", t)
-                .short_desc("Open a group panel")
+            ToolDefinition::from_yaml("Read", t)
+                .short_desc("Open or refresh a group panel")
                 .category("Coordination")
                 .reverie_allowed(false)
                 .param("group_id", ParamType::String, true)
@@ -105,15 +105,18 @@ impl Module for CoordinationModule {
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         let run = match tool.name.as_str() {
             "Group_create" => crate::ops::create,
-            "Group_open" => crate::ops::open,
+            "Read" => crate::ops::read,
             "Group_update" => crate::ops::update,
             "Group_delete" => crate::ops::delete,
             _ => return None,
         };
-        Some(match run(tool, state) {
+        let mut result = match run(tool, state) {
             Ok(text) => ToolResult::new(tool.id.clone(), text, false),
             Err(e) => ToolResult::new(tool.id.clone(), e, true),
-        })
+        };
+        // Creating a group only adds its panel: no reason to refresh the rest.
+        result.preserves_tempo = tool.name == "Group_create";
+        Some(result)
     }
     fn context_type_metadata(&self) -> Vec<cp_base::state::context::TypeMeta> {
         vec![]

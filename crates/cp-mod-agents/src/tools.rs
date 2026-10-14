@@ -1,7 +1,7 @@
 //! Tool execution handlers for the agents module.
 //!
-//! Two tools: [`execute_send`] posts a message to an agent and
-//! [`execute_read`] retrieves agent messages and sets focus.
+//! [`execute_send`] posts a message into a group. (`Read` moved to
+//! cp-coordination: it opens/refreshes a group panel.)
 
 use std::fmt::Write as _;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -15,7 +15,7 @@ use crate::types::roster::yaml_escape;
 use cp_groups::social::{self, Next};
 use cp_groups::types::GroupsState;
 
-use crate::types::{AgentAuthor, AgentMessage, AgentStatus, AgentsState, msgs, turn};
+use crate::types::{AgentAuthor, AgentMessage, AgentsState, msgs, turn};
 
 /// Truncate `s` to at most `max` bytes on a char boundary (no ellipsis).
 fn clamp_bytes(s: &str, max: usize) -> String {
@@ -154,27 +154,6 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     result
 }
 
-/// Per-thread unacknowledged summary lines (active agents with new messages).
-/// The focused agent is marked. Archived agents are LLM-invisible (T9).
-fn collect_agent_summaries(state: &State, focused_tid: &str) -> Vec<String> {
-    let ts = AgentsState::get(state);
-    let mut summaries = Vec::new();
-    for t in ts.agents.iter().filter(|t| !t.archived) {
-        let unack = msgs::messages(state, &t.id).iter().filter(|m| !m.acknowledged).count();
-        if unack == 0 {
-            continue;
-        }
-        let marker = if t.id == focused_tid { " \u{2190} focused" } else { "" };
-        summaries.push(format!(
-            "  {id} \"{name}\" [{status}]: {unack} new{marker}",
-            id = t.id,
-            name = t.name,
-            status = turn::status(state, &t.id),
-        ));
-    }
-    summaries
-}
-
 /// Force the Agents panel to emit fresh THIS tick after a Read.
 ///
 /// Deprecating the cache alone is insufficient: the freeze pass would restore
@@ -195,8 +174,8 @@ fn force_refresh_agents_panel(state: &mut State) {
 /// panel to emit fresh this tick.
 ///
 /// `panel_content` is the LLM-facing snapshot; it is (re)generated ONLY here.
-/// Shared by [`execute_read`] (read + focus) and [`execute_send`] (so a message
-/// the agent just posted appears in the panel without a follow-up `Read`).
+/// Called by [`execute_send`] so a message the agent just posted appears in
+/// the panel right away.
 ///
 /// This updates the panel's SOURCE and force-refreshes it, but does NOT touch
 /// `state.tempo` — a caller that preserves tempo (Send) keeps a full cache
@@ -206,141 +185,6 @@ pub(crate) fn rebuild_agents_panel(state: &mut State, focused_tid: &str, now_ms:
     let panel_content = build_panel_content(state, focused_tid, now_ms);
     AgentsState::get_mut(state).panel_content = panel_content;
     force_refresh_agents_panel(state);
-}
-
-/// Refresh the Threads panel for the CALLER's own thread.
-///
-/// Read takes no `agent_id`: it always targets the **executing** agent (the
-/// agent whose context is executing this tool), exactly like `Send`. It must
-/// NOT use `FocusState::focused_agent_id` — that is the human's UI-global view
-/// pointer, so at N>1 a background agent would read, acknowledge, and clear
-/// notifications of whatever agent is on screen (T828). For the same reason
-/// Read never writes focus. Marks the agent's messages acknowledged, rebuilds
-/// the panel (agent list + own conversation), and returns a summary.
-pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let owned_tid = executing_agent_id_or_empty(state);
-    let tid = owned_tid.as_str();
-
-    let now_ms = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis().to_u64());
-
-    // --- Phase 1: Collect summary across ALL agents (before marking) ---
-    let ts = AgentsState::get(state);
-    let Some(target_agent) = ts.agents.iter().find(|t| t.id == tid) else {
-        return ToolResult::new(tool.id.clone(), format!("Agent '{tid}' not found"), true);
-    };
-
-    let agent_name = target_agent.name.clone();
-    let agent_status = turn::status(state, tid);
-
-    let agent_summaries = collect_agent_summaries(state, tid);
-
-    // Count + previews of newly acknowledged messages in a single pass.
-    let mut new_count: usize = 0;
-    let new_msg_previews: Vec<String> = msgs::messages(state, tid)
-        .iter()
-        .filter(|m| !m.acknowledged)
-        .inspect(|_| new_count = new_count.saturating_add(1))
-        .map(|m| format!("[{}] {}", m.author, preview_ellipsis(m.content.as_deref().unwrap_or("[no text]"), 60)))
-        .collect();
-
-    // --- Phase 2: Mark all messages in target agent as acknowledged ---
-    if let Some(history) = msgs::messages_mut(state, tid) {
-        for msg in history.iter_mut() {
-            msg.acknowledged = true;
-        }
-    }
-
-    // Reading an agent clears any spine notifications bound to it — the agent
-    // has now read its own thread, so its pending nudges are moot.
-    let _cleared = cp_mod_spine::types::SpineState::delete_notifications_by_agent(state, tid);
-
-    // --- Phase 4: Rebuild the roster panel and open the human group's panel,
-    // which now carries the conversation (closeable, re-opened by each Read).
-    rebuild_agents_panel(state, tid, now_ms);
-    let human_gid = msgs::human_group_id(AgentsState::get(state), tid).unwrap_or_default().to_owned();
-    if !human_gid.is_empty() {
-        let _panel = cp_groups::panels::open_group_panel(state, &human_gid);
-    }
-
-    // --- Phase 5: Build lightweight tool result ---
-    let result_body = build_read_result(
-        state,
-        &ReadResult {
-            tid,
-            agent_name: &agent_name,
-            agent_status,
-            agent_summaries: &agent_summaries,
-            new_count,
-            new_msg_previews: &new_msg_previews,
-        },
-    );
-
-    let mut result = ToolResult::new(tool.id.clone(), result_body, false);
-    // Read must NOT preserve tempo. Preserving it keeps state.tempo = true, which
-    // makes the next freeze pass freeze EVERY panel (tempo short-circuits the
-    // freeze decision) — including the Agents panel we just force-refreshed.
-    result.preserves_tempo = false;
-    result
-}
-
-/// Inputs for [`build_read_result`], bundled to keep the arg count in check.
-struct ReadResult<'read> {
-    /// Focused agent id.
-    tid: &'read str,
-    /// Focused agent display name.
-    agent_name: &'read str,
-    /// Focused agent turn status.
-    agent_status: AgentStatus,
-    /// Cross-thread unacknowledged summary lines.
-    agent_summaries: &'read [String],
-    /// Count of newly acknowledged messages in the focused agent.
-    new_count: usize,
-    /// Previews of the newly acknowledged messages.
-    new_msg_previews: &'read [String],
-}
-
-/// Assemble the lightweight `execute_read` result string: focus line,
-/// cross-thread unacknowledged summary, newly acknowledged previews, and a
-/// pointer at the force-refreshed Agents panel with its last message.
-fn build_read_result(state: &State, r: &ReadResult<'_>) -> String {
-    // Point the LLM at the human group's panel, which holds the conversation.
-    let gid = msgs::human_group_id(AgentsState::get(state), r.tid).unwrap_or_default();
-    let group_panel_id = state
-        .agent()
-        .context
-        .iter()
-        .find(|c| {
-            c.context_type.as_str() == cp_groups::panels::GROUP_KIND
-                && c.metadata.get(cp_groups::panels::META_GROUP_ID).and_then(serde_json::Value::as_str) == Some(gid)
-        })
-        .map_or_else(|| "??".to_owned(), |c| c.id.clone());
-
-    let last_msg_preview = msgs::messages(state, r.tid)
-        .last()
-        .and_then(|m| m.content.as_deref())
-        .map_or_else(|| "[no messages]".to_owned(), |c| preview_ellipsis(c, 80));
-
-    let (tid, agent_name, agent_status) = (r.tid, r.agent_name, r.agent_status);
-    let mut lines = vec![format!("Agent {tid} \"{agent_name}\" [{agent_status}] — your agent, refreshed.\n")];
-    if r.agent_summaries.is_empty() {
-        lines.push("No unacknowledged messages across active agents.".to_owned());
-    } else {
-        lines.push("Unacknowledged messages:".to_owned());
-        lines.extend(r.agent_summaries.iter().cloned());
-    }
-
-    if r.new_count > 0 {
-        lines.push(format!("\n{} new message(s) acknowledged in {tid}:", r.new_count));
-        lines.extend(r.new_msg_previews.iter().map(|p| format!("  • {p}")));
-    } else {
-        lines.push(format!("\nNo new messages in {tid}."));
-    }
-
-    lines.push(format!(
-        "\n⟳ The group panel ({group_panel_id}, human group {gid}) is open and \
-         contains the MOST RECENT conversation for {tid}. Last message: \"{last_msg_preview}\""
-    ));
-    lines.join("\n")
 }
 
 /// Write the focused agent's `branched_from` block: the parent id plus a note
