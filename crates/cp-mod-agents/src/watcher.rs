@@ -94,7 +94,14 @@ impl Watcher for IdleMyTurnDetector {
         // background agent the dispatcher already handles (hardening S5). At
         // N=1 the focused agent is the only MY_TURN agent, so this is
         // behaviourally identical to the former fallback.
-        let focused_tid = fs.focused_agent_id.as_deref();
+        //
+        // This watcher lives in one agent's own registry, polled while THAT
+        // agent executes; focus is the human's UI-global selection. Only the
+        // registry owner may be nudged here, and only while it is focused:
+        // otherwise viewing another agent in the UI would land that agent's
+        // nudge in this agent's inbox.
+        let owner = state.executing_agent_id();
+        let focused_tid = fs.focused_agent_id.as_deref().filter(|fid| owner == Some(*fid));
         let agent = focused_tid.and_then(|fid| {
             ts.agents
                 .iter()
