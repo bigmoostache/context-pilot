@@ -96,15 +96,7 @@ impl Cron {
         let raw_weekdays = parse_field(weekday, (0, 7), "day-of-week")?;
         // 7 is Sunday too: fold it onto 0.
         let weekdays = (raw_weekdays & !bit(7)) | if raw_weekdays & bit(7) == 0 { 0 } else { bit(0) };
-        Ok(Self {
-            minutes,
-            hours,
-            days,
-            months,
-            weekdays,
-            any_day: day == "*",
-            any_weekday: weekday == "*",
-        })
+        Ok(Self { minutes, hours, days, months, weekdays, any_day: day == "*", any_weekday: weekday == "*" })
     }
 
     /// Whether the calendar day (`day` of month, `month`, `weekday` 0=Sunday) matches.
@@ -246,10 +238,10 @@ mod tests {
     #[test]
     fn error_messages_name_the_right_problem() {
         // Reversed range: not "out of range".
-        let e = Cron::parse("5-1 * * * *").unwrap_err();
-        assert!(e.contains("reversed range"), "{e}");
+        let reversed = Cron::parse("5-1 * * * *").unwrap_err();
+        assert!(reversed.contains("reversed range"), "{reversed}");
         // A garbage expression blames the FIRST bad field (minute), not the last.
-        let e = Cron::parse("foo bar baz qux quux").unwrap_err();
-        assert!(e.contains("minute"), "{e}");
+        let garbage = Cron::parse("foo bar baz qux quux").unwrap_err();
+        assert!(garbage.contains("minute"), "{garbage}");
     }
 }

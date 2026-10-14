@@ -37,10 +37,7 @@ fn entry_group_id(ctx: &Entry) -> Option<&str> {
 
 /// `group` panel body for `gid` (a placeholder when the group is gone).
 fn group_content(state: &State, gid: &str) -> String {
-    GroupsState::get(state).find(gid).map_or_else(
-        || format!("group_id: {gid}\nerror: group not found\n"),
-        group_body,
-    )
+    GroupsState::get(state).find(gid).map_or_else(|| format!("group_id: {gid}\nerror: group not found\n"), group_body)
 }
 
 /// Text lines as indented render blocks.
