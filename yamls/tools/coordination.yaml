@@ -3,9 +3,11 @@ tools:
     description: |
       Create a group with other agents. You own it and are always a member.
       Talk in it with Send(group_id=...). Its panel opens for you.
+      Name it after its purpose (e.g. "Auth refactor review"): no ids, no
+      member list like "A12 + A15", members are shown with the group anyway.
     parameters:
       agent_ids: "Other member agent ids (A<n>)."
-      name: "Group name."
+      name: "Short name conveying the group's purpose. No ids or member names."
       description: "One-line purpose."
   Read:
     description: |
@@ -23,7 +25,7 @@ tools:
       group_id: "Group id (G<n>)."
       before_agent_ids: "Current members, exactly."
       after_agent_ids: "New full member list (omit to keep)."
-      name: "New name (optional)."
+      name: "New name conveying the group's purpose, no ids (optional)."
       description: "New description (optional)."
   Group_delete:
     description: |
