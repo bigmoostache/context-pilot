@@ -100,6 +100,21 @@ pub enum Next {
     },
 }
 
+impl Next {
+    /// Agents this `next` expects to act (empty for `STILL_MY_TURN` and
+    /// `OWNER_DONE`).
+    #[must_use]
+    pub fn targets(&self) -> &[String] {
+        cp_macros::deref_match!(self, {
+            Self::StillMyTurn | Self::OwnerDone => &[],
+            Self::GiveTalkingStickTo(ref id) | Self::GiveRecurringTask { agent_id: ref id, .. } => {
+                std::slice::from_ref(id)
+            }
+            Self::Gather(ref ids) | Self::Dispatch(ref ids) => ids,
+        })
+    }
+}
+
 /// Syntax help returned with every parse error.
 pub const NEXT_SYNTAX: &str = "expected one of: STILL_MY_TURN | GIVE_TALKING_STICK_TO <id> | \
      GATHER <id>, <id>... | DISPATCH <id>, <id>... | OWNER_DONE | \
@@ -173,13 +188,7 @@ pub fn validate(group: &Group, sender: &str, next: &Next) -> Result<(), String> 
     if *next == Next::OwnerDone && group.kind == GroupKind::Human {
         return Err("OWNER_DONE is refused in human groups: give the stick to HUMAN instead".to_owned());
     }
-    let targets: &[String] = cp_macros::deref_match!(next, {
-        Next::StillMyTurn | Next::OwnerDone => &[],
-        Next::GiveTalkingStickTo(ref id) | Next::GiveRecurringTask { agent_id: ref id, .. } => {
-            std::slice::from_ref(id)
-        }
-        Next::Gather(ref ids) | Next::Dispatch(ref ids) => ids,
-    });
+    let targets = next.targets();
     if matches!(*next, Next::GiveRecurringTask { .. }) && targets.iter().any(|t| t == HUMAN) {
         return Err(format!("{RECURRING} cannot target HUMAN"));
     }

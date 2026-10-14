@@ -47,6 +47,12 @@ pub(crate) fn resolve_send(tool: &ToolUse, state: &State, sender: &str) -> Resul
     let next = social::parse_next(raw)?;
     let group = GroupsState::get(state).find(gid).ok_or_else(|| format!("group {gid} not found"))?;
     social::validate(group, sender, &next)?;
+    // An archived agent is never scheduled: handing it the turn would stall
+    // the group until someone restores it.
+    let agents = &AgentsState::get(state).agents;
+    if let Some(t) = next.targets().iter().find(|t| agents.iter().any(|a| a.id == **t && a.archived)) {
+        return Err(format!("{t} is archived and will never act: target an active member (or restore {t} first)"));
+    }
     if let Next::GiveRecurringTask { cron, .. } = next.clone() {
         cp_mod_spine::coucou::validate_cron(&cron)?;
     }
