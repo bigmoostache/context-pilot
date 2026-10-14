@@ -111,11 +111,23 @@ fn value(cell: &Value) -> Value {
         .map_or(Value::Null, |s| Value::String(s.trim_end_matches(['\r', '\n']).to_owned()))
 }
 
-/// Value equality where `42` and `42.0` are the same number.
+/// Value equality where `42` and `42.0` are the same number, and a text that
+/// Univer re-typed as a number (`"11.1"` → `11.1`, done when a style is
+/// applied) still matches its original text.
 fn same_value(lhs: &Value, rhs: &Value) -> bool {
-    match (lhs.as_f64(), rhs.as_f64()) {
-        (Some(left), Some(right)) => left.to_bits() == right.to_bits(),
-        _ => lhs == rhs,
+    let text_num = |text: &Value, num: &Value| {
+        text.as_str()
+            .and_then(|t| t.trim().parse::<f64>().ok())
+            .zip(num.as_f64())
+            .is_some_and(|(l, r)| l.to_bits() == r.to_bits())
+    };
+    match (lhs.is_string() && rhs.is_number(), lhs.is_number() && rhs.is_string()) {
+        (true, _) => text_num(lhs, rhs),
+        (_, true) => text_num(rhs, lhs),
+        _ => match (lhs.as_f64(), rhs.as_f64()) {
+            (Some(left), Some(right)) => left.to_bits() == right.to_bits(),
+            _ => lhs == rhs,
+        },
     }
 }
 
