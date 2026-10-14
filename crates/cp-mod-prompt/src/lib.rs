@@ -257,10 +257,11 @@ impl Module for PromptModule {
     fn on_tool_progress(&self, _tool_name: &str, _input_so_far: &str, _state: &mut State) {}
 
     fn on_tool_complete(&self, tool_name: &str, _state: &mut State) {
-        // Edit/Write may have touched a behaviour `.md`: drop the prompt index so
-        // the next read reflects it without waiting for the stat revalidation.
+        // Edit/Write may have touched a behaviour `.md`. Stat-revalidate rather
+        // than invalidate: the index is dropped (and every `.md` re-parsed) only
+        // when a behaviour file actually changed, not after every unrelated edit.
         if matches!(tool_name, "Edit" | "Write") {
-            storage::invalidate_index();
+            let _fp = storage::revalidate_index();
         }
     }
 

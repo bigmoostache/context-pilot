@@ -132,10 +132,12 @@ impl Panel for LibraryPanel {
     fn refresh(&self, state: &mut State) {
         // Skip re-reading every behaviour `.md` when no file changed (stat-only
         // fingerprint) and the active system / loaded skills are the same.
+        // Keyed on `content_hash` (set below by `update_if_changed`): this panel
+        // never fills `cached_content`, so guarding on it rebuilt every refresh.
         let fingerprint = library_fingerprint(state);
         let lib = Kind::new(Kind::LIBRARY);
         let entry = state.agent().context.iter().find(|c| c.context_type == lib);
-        if entry.is_some_and(|c| c.cached_content.is_some() && c.source_hash.as_deref() == Some(fingerprint.as_str())) {
+        if entry.is_some_and(|c| c.content_hash.is_some() && c.source_hash.as_deref() == Some(fingerprint.as_str())) {
             return;
         }
         let items = self.context(state);
