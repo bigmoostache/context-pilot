@@ -256,7 +256,7 @@ fn emission_rank(context_type: &str) -> usize {
         "github_result" => 5,
         "scratchpad" => 6,
         "callback" => 7,
-        "queue" => 8,
+        "queue" | "monitor" => 8,
         "git_result" => 9,
         "memory" => 10,
         "library" => 11,

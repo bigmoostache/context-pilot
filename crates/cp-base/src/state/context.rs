@@ -140,6 +140,8 @@ impl Kind {
     pub const TOOLS: &str = "tools";
     /// Queue status panel.
     pub const QUEUE: &str = "queue";
+    /// Monitor panel (alive + recently ended console monitors).
+    pub const MONITOR: &str = "monitor";
     /// Chat dashboard panel (always-on room list, server status).
     pub const CHAT_DASHBOARD: &str = "chat-dashboard";
     /// Entity database panel.

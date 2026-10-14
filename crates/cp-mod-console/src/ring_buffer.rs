@@ -97,6 +97,31 @@ impl RingBuffer {
         regex::Regex::new(pattern).map_or_else(|_| content.contains(pattern), |re| re.is_match(&content))
     }
 
+    /// Bytes written after the monotonic offset `cursor`, plus the new cursor.
+    ///
+    /// When `cursor` points before the oldest retained byte (output evicted by
+    /// wrap-around), reading resumes at the oldest byte still held.
+    #[must_use]
+    pub fn read_since(&self, cursor: u64) -> (Vec<u8>, u64) {
+        let inner = self.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let total = inner.total_written;
+        let held = if inner.wrapped { RING_BUFFER_CAPACITY } else { inner.write_pos };
+        let wanted = usize::try_from(total.saturating_sub(cursor)).unwrap_or(usize::MAX).min(held);
+        // `wanted` bytes end at write_pos (exclusive), possibly wrapping backwards.
+        let mut out = Vec::with_capacity(wanted);
+        if wanted <= inner.write_pos {
+            out.extend_from_slice(
+                inner.buf.get(inner.write_pos.saturating_sub(wanted)..inner.write_pos).unwrap_or_default(),
+            );
+        } else {
+            let tail = wanted.saturating_sub(inner.write_pos);
+            out.extend_from_slice(inner.buf.get(RING_BUFFER_CAPACITY.saturating_sub(tail)..).unwrap_or_default());
+            out.extend_from_slice(inner.buf.get(..inner.write_pos).unwrap_or_default());
+        }
+        drop(inner);
+        (out, total)
+    }
+
     /// Monotonic counter of total bytes written (for change detection).
     #[must_use]
     pub fn total_written(&self) -> u64 {
