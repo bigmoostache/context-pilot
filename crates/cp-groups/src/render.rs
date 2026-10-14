@@ -6,9 +6,6 @@ use crate::chat::GroupMessage;
 use crate::social::Substate;
 use crate::types::{Group, GroupKind};
 
-/// Maximum messages shown in a `group` panel.
-const MAX_PANEL_MESSAGES: usize = 50;
-
 /// Escape `\` and `"` for a double-quoted YAML scalar.
 #[must_use]
 pub fn yaml_escape(s: &str) -> String {
@@ -109,8 +106,8 @@ fn social_line(group: &Group, me: &str) -> String {
     format!("    social: [{}]\n", labels.join(", "))
 }
 
-/// Full `group` panel body: header, members, last [`MAX_PANEL_MESSAGES`]
-/// non-auto messages (tool traces stay hidden from the LLM).
+/// Full `group` panel body: header, members and EVERY non-auto message, never
+/// truncated (tool traces stay hidden from the LLM).
 #[must_use]
 pub fn group_body(group: &Group, now_ms: u64) -> String {
     let mut out = String::new();
@@ -124,16 +121,12 @@ pub fn group_body(group: &Group, now_ms: u64) -> String {
     _ = writeln!(out, "members: [{}]", group.member_ids.join(", "));
 
     let visible: Vec<&GroupMessage> = group.messages.iter().filter(|m| !m.auto).collect();
-    let skip = visible.len().saturating_sub(MAX_PANEL_MESSAGES);
-    if skip > 0 {
-        _ = writeln!(out, "omitted: {skip}");
-    }
     if visible.is_empty() {
         _ = writeln!(out, "messages: []");
         return out;
     }
     _ = writeln!(out, "messages:");
-    for msg in visible.iter().skip(skip) {
+    for msg in visible {
         write_message(&mut out, msg, now_ms);
     }
     out
