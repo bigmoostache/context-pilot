@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use serde::{Deserialize, Serialize};
 
 use cp_base::state::runtime::State;
@@ -117,22 +119,31 @@ impl TreeView {
         Self { open_folders: vec![".".to_owned()] }
     }
 
-    /// Get the per-agent view from `State`.
+    /// Get the per-agent view from `State`, falling back to a shared empty
+    /// view when this agent has none yet.
     ///
-    /// # Panics
-    ///
-    /// Panics if the view was never registered via `set_ext_agent`.
+    /// The view is seeded per-agent by [`crate::TreeModule::init_state`], but a
+    /// *global* module only runs `init_state` once (for the boot agent), so
+    /// agents created afterwards hold no view until they first toggle a folder.
+    /// Readers (file-watcher sync, panel cache request) run against any agent,
+    /// so this returns a static empty-folder default instead of panicking.
     #[must_use]
     pub fn get(state: &State) -> &Self {
-        state.ext::<Self>()
+        /// Shared fallback for agents whose per-agent view was never seeded:
+        /// no expanded folders (not even root) so nothing is watched/listed
+        /// until the agent explicitly opens one.
+        static EMPTY: LazyLock<TreeView> = LazyLock::new(|| TreeView { open_folders: Vec::new() });
+        state.get_ext::<Self>().unwrap_or(&EMPTY)
     }
 
-    /// Get a mutable ref to the per-agent view from `State`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the view was never registered via `set_ext_agent`.
+    /// Get a mutable ref to the per-agent view from `State`, seeding a default
+    /// view for this agent if it has none yet (see [`Self::get`] for why an
+    /// agent may lack one). Self-healing: every mutation path works on any
+    /// agent, including freshly created ones.
     pub fn get_mut(state: &mut State) -> &mut Self {
+        if state.get_ext::<Self>().is_none() {
+            state.set_ext_agent(Self::new());
+        }
         state.ext_mut::<Self>()
     }
 }
