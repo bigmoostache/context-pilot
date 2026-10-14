@@ -234,9 +234,20 @@ const SELF_MUTATIONS = new Set([
   "sheet.mutation.set-worksheet-row-is-auto-height",
 ])
 
-/** Sheet id a user mutation changed, if any (fed from `CommandExecuted`). */
-export function touchedSheet(event: { id: string; params: unknown }): string | null {
+/**
+ * Sheet id a user mutation changed, if any (fed from `CommandExecuted`).
+ * Mutations flagged `onlyLocal` are Univer's own derived writes (formula
+ * results land this way on every recalculation), not edits to save.
+ */
+export function touchedSheet(event: {
+  id: string
+  params: unknown
+  options?: { onlyLocal?: boolean; fromChangeset?: boolean; fromCollab?: boolean }
+}): string | null {
   if (!event.id.startsWith("sheet.mutation.") || SELF_MUTATIONS.has(event.id)) return null
+  const opts = event.options
+  if (opts?.onlyLocal === true || opts?.fromChangeset === true || opts?.fromCollab === true)
+    return null
   const params = event.params
   if (typeof params !== "object" || params === null) return null
   if ("subUnitId" in params && typeof params.subUnitId === "string") return params.subUnitId
