@@ -52,6 +52,10 @@ pub(crate) struct ReverieStream {
     pub report_called: bool,
 }
 
+/// Last `watch_paths()` specs per agent (`None` = unbound runtime), each spec
+/// as `(kind, path)` with kind 0 = file, 1 = dir, 2 = recursive dir.
+pub(crate) type WatchSpecCache = std::collections::BTreeMap<Option<String>, std::collections::BTreeSet<(u8, String)>>;
+
 /// Top-level application state container for the TUI event loop.
 pub(crate) struct App {
     /// Shared runtime state (context, messages, config, flags).
@@ -64,9 +68,10 @@ pub(crate) struct App {
     pub watched_file_paths: std::collections::HashSet<String>,
     /// Tracks which directory paths are being watched
     pub watched_dir_paths: std::collections::HashSet<String>,
-    /// Fingerprint of every module's `watch_paths()` at the last watcher sync;
-    /// an unchanged fingerprint skips the sync (no watch/unwatch syscalls).
-    pub watch_specs_hash: u64,
+    /// Last `watch_paths()` specs seen per agent (`None` = unbound runtime),
+    /// as `(kind, path)`. The watcher watches their union; an unchanged entry
+    /// for the executing agent skips the sync (no watch/unwatch syscalls).
+    pub watch_specs_by_agent: WatchSpecCache,
     /// Last time we checked timer-based caches
     pub last_timer_check_ms: u64,
     /// Last time we checked ownership

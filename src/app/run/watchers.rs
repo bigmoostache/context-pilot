@@ -330,133 +330,111 @@ pub(super) fn check_timer_based_deprecation(app: &mut App) {
     };
 
     // Mutable pass: send requests, mark in-flight, update poll timestamps
-    for (i, request) in requests {
-        process_cache_request(request, app.cache_tx.clone());
-        if let Some(ctx) = app.state.agent_mut().context.get_mut(i) {
-            ctx.cache_in_flight = true;
-            let _r = app.last_poll_ms.insert(ctx.id.clone(), current_ms);
+    {
+        let _g = crate::profile!("dispatch_requests");
+        for (i, request) in requests {
+            process_cache_request(request, app.cache_tx.clone());
+            if let Some(ctx) = app.state.agent_mut().context.get_mut(i) {
+                ctx.cache_in_flight = true;
+                let _r = app.last_poll_ms.insert(ctx.id.clone(), current_ms);
+            }
         }
     }
 
+    let _g = crate::profile!("remove_suicided");
     remove_suicided_panels(app, &suicide_indices);
 }
 
-/// Gather every path all modules currently want watched, split into files and
-/// dirs. `BTreeSet` (not `HashSet`) for deterministic iteration (dodges the
-/// `iter_over_hash_type` lint).
-fn collect_wanted_paths(app: &App) -> (std::collections::BTreeSet<String>, std::collections::BTreeSet<String>) {
+/// One watch request in comparable form: `(kind, path)` with kind 0 = file,
+/// 1 = dir, 2 = recursive dir (the recursion flag must survive the union).
+type SpecKey = (u8, String);
+
+/// Every watch the executing agent's modules want right now.
+fn executing_agent_specs(app: &App) -> std::collections::BTreeSet<SpecKey> {
     use cp_base::panels::WatchSpec;
-    let mut wanted_files = std::collections::BTreeSet::new();
-    let mut wanted_dirs = std::collections::BTreeSet::new();
+    let mut specs = std::collections::BTreeSet::new();
     for module in &crate::modules::all_modules() {
         for spec in module.watch_paths(&app.state) {
             // `if let` (not exhaustive match) so WatchSpec stays #[non_exhaustive].
             if let WatchSpec::File(path) = spec {
-                let _r = wanted_files.insert(path);
-            } else if let WatchSpec::Dir(path) | WatchSpec::DirRecursive(path) = spec {
-                let _r = wanted_dirs.insert(path);
+                let _r = specs.insert((0, path));
+            } else if let WatchSpec::Dir(path) = spec {
+                let _r = specs.insert((1, path));
+            } else if let WatchSpec::DirRecursive(path) = spec {
+                let _r = specs.insert((2, path));
             } else {
                 // Future non_exhaustive variants: ignored by the watcher sync.
             }
         }
     }
-    (wanted_files, wanted_dirs)
+    specs
 }
 
-/// Unwatch any file/dir no longer wanted (frees kqueue FDs on macOS, where each
-/// watched path costs one FD against the process limit).
-fn remove_stale_watches(
-    app: &mut App,
-    wanted_files: &std::collections::BTreeSet<String>,
-    wanted_dirs: &std::collections::BTreeSet<String>,
-) {
+/// Unwatch every file/dir no agent wants anymore.
+fn remove_stale_watches(app: &mut App, wanted: &std::collections::BTreeSet<SpecKey>) {
     let Some(watcher) = app.file_watcher.as_mut() else { return };
     let stale_files: Vec<String> =
-        app.watched_file_paths.iter().filter(|p| !wanted_files.contains(*p)).cloned().collect();
+        app.watched_file_paths.iter().filter(|p| !wanted.contains(&(0, (*p).clone()))).cloned().collect();
     for path in &stale_files {
         watcher.unwatch_file(path);
         let _r = app.watched_file_paths.remove(path);
     }
-    let stale_dirs: Vec<String> = app.watched_dir_paths.iter().filter(|p| !wanted_dirs.contains(*p)).cloned().collect();
+    let stale_dirs: Vec<String> = app
+        .watched_dir_paths
+        .iter()
+        .filter(|p| !wanted.contains(&(1, (*p).clone())) && !wanted.contains(&(2, (*p).clone())))
+        .cloned()
+        .collect();
     for path in &stale_dirs {
         watcher.unwatch_dir(path);
         let _r = app.watched_dir_paths.remove(path);
     }
 }
 
-/// Add file watches for newly-wanted files not already watched.
-fn add_file_watches(app: &mut App, wanted_files: std::collections::BTreeSet<String>) {
+/// Watch every wanted file/dir not already watched, honoring the recursion flag.
+fn add_new_watches(app: &mut App, wanted: std::collections::BTreeSet<SpecKey>) {
     let Some(watcher) = app.file_watcher.as_mut() else { return };
-    for path in wanted_files {
-        if !app.watched_file_paths.contains(&path) && watcher.watch_file(&path).is_ok() {
-            let _r = app.watched_file_paths.insert(path);
-        }
-    }
-}
-
-/// Add dir watches for newly-wanted dirs, honoring each spec's recursive flag
-/// (re-scans module specs since recursion isn't captured in the wanted set).
-fn add_dir_watches(app: &mut App) {
-    use cp_base::panels::WatchSpec;
-    let Some(watcher) = app.file_watcher.as_mut() else { return };
-    for module in &crate::modules::all_modules() {
-        for spec in module.watch_paths(&app.state) {
-            // File specs are handled by add_file_watches; here we only add dir
-            // watches. `if let` (not exhaustive match) so WatchSpec stays #[non_exhaustive].
-            if let WatchSpec::Dir(path) = spec {
-                if !app.watched_dir_paths.contains(&path) && watcher.watch_dir(&path).is_ok() {
-                    let _r = app.watched_dir_paths.insert(path);
-                }
-            } else if let WatchSpec::DirRecursive(path) = spec
-                && !app.watched_dir_paths.contains(&path)
-                && watcher.watch_dir_recursive(&path).is_ok()
-            {
-                let _r = app.watched_dir_paths.insert(path);
-            } else {
-                // File specs (handled by add_file_watches) + future non_exhaustive variants.
+    for (kind, path) in wanted {
+        let (tracked, result) = if kind == 0 {
+            if app.watched_file_paths.contains(&path) {
+                continue;
             }
+            (&mut app.watched_file_paths, watcher.watch_file(&path))
+        } else {
+            if app.watched_dir_paths.contains(&path) {
+                continue;
+            }
+            let result = if kind == 2 { watcher.watch_dir_recursive(&path) } else { watcher.watch_dir(&path) };
+            (&mut app.watched_dir_paths, result)
+        };
+        if result.is_ok() {
+            let _r = tracked.insert(path);
         }
     }
 }
 
-/// Sync file watchers from all modules' `watch_paths()`.
-/// Adds new watches and **removes stale ones** to prevent FD exhaustion.
-/// On macOS, kqueue uses 1 FD per watched path — without cleanup, opening
-/// hundreds of files over a session will hit the default 256 FD limit.
+/// Sync file watchers to the union of every agent's `watch_paths()`.
+///
+/// `watch_paths` only sees the executing agent, so each agent's last specs are
+/// cached in `watch_specs_by_agent` and refreshed while it executes. Watching
+/// the union (not just the focused agent) makes a focus switch free: on macOS
+/// each `FSEvents` `watch`/`unwatch` stops, joins and respawns the runloop
+/// thread, so swapping one agent's watch set for another's cost up to ~300ms.
+/// Stale watches are still dropped (paths no agent wants) to bound FD use.
 fn sync_file_watchers(app: &mut App) {
     if app.file_watcher.is_none() {
         return;
     }
-    let specs_hash = watch_specs_fingerprint(app);
-    if specs_hash == app.watch_specs_hash {
+    let specs = executing_agent_specs(app);
+    let owner = app.state.executing_agent_id().map(str::to_owned);
+    if app.watch_specs_by_agent.get(&owner) == Some(&specs) {
         return;
     }
-    app.watch_specs_hash = specs_hash;
-    let (wanted_files, wanted_dirs) = collect_wanted_paths(app);
-    remove_stale_watches(app, &wanted_files, &wanted_dirs);
-    add_file_watches(app, wanted_files);
-    add_dir_watches(app);
-}
-
-/// Order-sensitive hash of every module's `watch_paths()` (variant + path).
-/// In-memory only: no filesystem access.
-fn watch_specs_fingerprint(app: &App) -> u64 {
-    use cp_base::panels::WatchSpec;
-    use std::hash::{Hash as _, Hasher as _};
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    for module in &crate::modules::all_modules() {
-        for spec in module.watch_paths(&app.state) {
-            // `if let` (not exhaustive match) so WatchSpec stays #[non_exhaustive].
-            if let WatchSpec::File(path) = spec {
-                (0u8, path).hash(&mut h);
-            } else if let WatchSpec::Dir(path) = spec {
-                (1u8, path).hash(&mut h);
-            } else if let WatchSpec::DirRecursive(path) = spec {
-                (2u8, path).hash(&mut h);
-            } else {
-                // Future non_exhaustive variants: ignored by the watcher sync.
-            }
-        }
-    }
-    h.finish()
+    let _miss = crate::profile!("watch_sync_miss");
+    let _r = app.watch_specs_by_agent.insert(owner, specs);
+    let store = &app.state.agent_store;
+    app.watch_specs_by_agent.retain(|id, _| id.as_deref().is_none_or(|i| store.contains(i)));
+    let wanted: std::collections::BTreeSet<SpecKey> = app.watch_specs_by_agent.values().flatten().cloned().collect();
+    remove_stale_watches(app, &wanted);
+    add_new_watches(app, wanted);
 }

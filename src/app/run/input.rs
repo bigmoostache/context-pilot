@@ -22,7 +22,7 @@ impl App {
             file_watcher,
             watched_file_paths: std::collections::HashSet::new(),
             watched_dir_paths: std::collections::HashSet::new(),
-            watch_specs_hash: 0,
+            watch_specs_by_agent: std::collections::BTreeMap::new(),
             last_timer_check_ms: now_ms(),
             last_ownership_check_ms: now_ms(),
             last_render_ms: 0,
