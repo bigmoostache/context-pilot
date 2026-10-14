@@ -15,6 +15,8 @@ mod snapshot;
 mod sys_stat;
 /// Plain-text dump of the perf snapshot (Ctrl+R clipboard copy).
 pub(crate) mod text;
+/// Buffered, byte-counting stdout writer behind the ratatui terminal.
+pub(crate) mod tty;
 pub(crate) use overlay::render_perf_overlay_from_ir;
 use snapshot::{compute_op_snapshot, ring_std_ms};
 

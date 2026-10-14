@@ -4,7 +4,6 @@ use std::sync::mpsc::Receiver;
 use std::time::Duration;
 
 use crossterm::event;
-use ratatui::prelude::{CrosstermBackend, Terminal};
 
 use crate::app::actions::{Action, ActionResult, apply_action};
 use crate::app::panels::now_ms;
@@ -57,11 +56,7 @@ enum InputOutcome {
 #[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
     /// Main event loop: processes input, stream events, tools, spine, and rendering.
-    pub(crate) fn run(
-        &mut self,
-        terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-        ch: &EventChannels<'_>,
-    ) -> io::Result<()> {
+    pub(crate) fn run(&mut self, terminal: &mut ui::perf::tty::Tty, ch: &EventChannels<'_>) -> io::Result<()> {
         // Initial cache setup - watch files and schedule initial refreshes
         super::watchers::setup_file_watchers(self);
         super::watchers::schedule_initial_cache_refreshes(self);
@@ -178,11 +173,7 @@ impl App {
     /// before the redraw lands, which flickers. Instead the back buffer is
     /// poisoned so ratatui's diff emits every cell, and the write is wrapped in
     /// a synchronized update so the terminal presents it atomically.
-    fn render_if_due(
-        &mut self,
-        terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-        current_ms: u64,
-    ) -> io::Result<()> {
+    fn render_if_due(&mut self, terminal: &mut ui::perf::tty::Tty, current_ms: u64) -> io::Result<()> {
         let full = current_ms.saturating_sub(self.last_full_redraw_ms) >= FULL_REDRAW_MS;
         let throttled_dirty =
             self.state.flags.ui.dirty && current_ms.saturating_sub(self.last_render_ms) >= RENDER_THROTTLE_MS;
@@ -199,16 +190,24 @@ impl App {
             poison_back_buffer(terminal);
         }
         crossterm::execute!(terminal.backend_mut(), crossterm::terminal::BeginSynchronizedUpdate)?;
-        let result = self.render_frame(terminal, current_ms);
+        let result = self.render_frame_as(terminal, current_ms, "term_bytes_full");
         crossterm::execute!(terminal.backend_mut(), crossterm::terminal::EndSynchronizedUpdate)?;
         result
     }
 
+    /// Draw one diff frame (bytes booked under `term_bytes_diff`).
+    fn render_frame(&mut self, terminal: &mut ui::perf::tty::Tty, current_ms: u64) -> io::Result<()> {
+        self.render_frame_as(terminal, current_ms, "term_bytes_diff")
+    }
+
     /// Draw one frame: render the UI + command palette, clear dirty, stamp render time.
-    fn render_frame(
+    /// `bytes_op` names the perf counter that receives the bytes written to the
+    /// terminal (a byte count, not µs), so full repaints and diffs split apart.
+    fn render_frame_as(
         &mut self,
-        terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+        terminal: &mut ui::perf::tty::Tty,
         current_ms: u64,
+        bytes_op: &'static str,
     ) -> io::Result<()> {
         // G3 render-scoped drill-in: if the human has drilled into another
         // agent, make it the executing one just for this paint, then restore.
@@ -219,7 +218,7 @@ impl App {
         };
         let draw_result = {
             let _guard = crate::profile!("terminal_draw");
-            self.draw_timed(terminal)
+            self.draw_timed(terminal, bytes_op)
         };
         {
             let _guard = crate::profile!("drill_restore");
@@ -236,8 +235,9 @@ impl App {
     /// stdout flush — the last two can block on a slow terminal.
     ///
     /// Same steps as ratatui's `try_draw`. The app never sets a frame cursor,
-    /// so the cursor is always hidden, as `draw` does for `None`.
-    fn draw_timed(&mut self, terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> {
+    /// so the cursor is always hidden, as `draw` does for `None`. The diff is
+    /// buffered by `TtyWriter` and reaches the pty in the final flush.
+    fn draw_timed(&mut self, terminal: &mut ui::perf::tty::Tty, bytes_op: &'static str) -> io::Result<()> {
         {
             let _g = crate::profile!("term_autoresize");
             terminal.autoresize()?;
@@ -255,7 +255,10 @@ impl App {
         let _g = crate::profile!("term_stdout_flush");
         terminal.hide_cursor()?;
         terminal.swap_buffers();
-        io::Write::flush(terminal.backend_mut())
+        io::Write::flush(terminal.backend_mut())?;
+        let bytes = ui::perf::tty::take_written();
+        ui::perf::PERF.record_op(bytes_op, bytes);
+        Ok(())
     }
 
     /// Adaptive poll interval: short while streaming/active or bridge-driven,
@@ -475,7 +478,7 @@ impl App {
 ///
 /// Fills the current (about to become previous) buffer with a background no
 /// real frame uses, then swaps: the fresh frame differs from it everywhere.
-fn poison_back_buffer(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) {
+fn poison_back_buffer(terminal: &mut ui::perf::tty::Tty) {
     /// Sentinel background — any value the UI never paints works.
     const POISON: ratatui::style::Color = ratatui::style::Color::Rgb(1, 2, 3);
     for cell in &mut terminal.current_buffer_mut().content {
