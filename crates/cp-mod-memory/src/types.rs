@@ -218,6 +218,18 @@ impl MemorySlot {
 pub struct MemoryState {
     /// All 220 slots, grouped by tier in [`Tier::ALL`] order.
     pub slots: Vec<MemorySlot>,
+    /// Change stamp, refreshed on every [`MemoryState::get_mut`]. The save path
+    /// re-serializes `modules/memory.json` only when it moved. **Transient**.
+    pub revision: u64,
+}
+
+/// Process-wide stamp source: unique across `set_ext` replacements, so a
+/// fresh state never reuses a stamp the save path already recorded.
+static REVISION_SOURCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
+/// A fresh, never-used change stamp.
+fn next_revision() -> u64 {
+    REVISION_SOURCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
 
 impl Default for MemoryState {
@@ -236,7 +248,7 @@ impl MemoryState {
                 slots.push(MemorySlot::empty(tier, n));
             }
         }
-        Self { slots }
+        Self { slots, revision: next_revision() }
     }
 
     /// Locate a slot by id.
@@ -266,12 +278,14 @@ impl MemoryState {
         state.ext::<Self>()
     }
 
-    /// Get mutable ref from State's `TypeMap`.
+    /// Get mutable ref from State's `TypeMap`, refreshing the change stamp.
     ///
     /// # Panics
     ///
     /// Panics if an internal invariant is violated.
     pub fn get_mut(state: &mut State) -> &mut Self {
-        state.ext_mut::<Self>()
+        let ms = state.ext_mut::<Self>();
+        ms.revision = next_revision();
+        ms
     }
 }

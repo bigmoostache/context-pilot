@@ -84,6 +84,18 @@ pub struct GroupsState {
     pub groups: Vec<Group>,
     /// Counter for the next `G<n>` id.
     pub next_id: u32,
+    /// Change stamp, refreshed on every [`GroupsState::get_mut`]. The save path
+    /// re-serializes `modules/groups.json` only when it moved. **Transient**.
+    pub revision: u64,
+}
+
+/// Process-wide stamp source: unique across `set_ext` replacements, so a
+/// fresh state never reuses a stamp the save path already recorded.
+static REVISION_SOURCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
+/// A fresh, never-used change stamp.
+fn next_revision() -> u64 {
+    REVISION_SOURCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
 
 impl Default for GroupsState {
@@ -95,8 +107,8 @@ impl Default for GroupsState {
 impl GroupsState {
     /// Empty store, id counter at 1.
     #[must_use]
-    pub const fn new() -> Self {
-        Self { groups: Vec::new(), next_id: 1 }
+    pub fn new() -> Self {
+        Self { groups: Vec::new(), next_id: 1, revision: next_revision() }
     }
 
     /// Shared ref from State's `TypeMap`.
@@ -109,12 +121,25 @@ impl GroupsState {
         state.ext::<Self>()
     }
 
-    /// Mutable ref from State's `TypeMap`.
+    /// Mutable ref from State's `TypeMap`, refreshing the change stamp.
     ///
     /// # Panics
     ///
     /// Panics if `GroupsState` was never inserted into state.
     pub fn get_mut(state: &mut State) -> &mut Self {
+        let gs = state.ext_mut::<Self>();
+        gs.revision = next_revision();
+        gs
+    }
+
+    /// Mutable ref that leaves the change stamp alone. Only for per-tick
+    /// passes that usually change nothing: they must call [`Self::get_mut`]
+    /// afterwards when they did change something, or the save skips it.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `GroupsState` was never inserted into state.
+    pub fn get_mut_unstamped(state: &mut State) -> &mut Self {
         state.ext_mut::<Self>()
     }
 

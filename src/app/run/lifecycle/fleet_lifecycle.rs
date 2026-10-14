@@ -330,9 +330,7 @@ impl App {
             .filter(|a| !a.archived && !a.paused && mirror.exec_state_of(&a.id) == AgentExecState::Idle)
             .map(|a| a.id.clone())
             .collect();
-        let groups = &mut cp_groups::types::GroupsState::get_mut(&mut self.state).groups;
-        let offset = cp_mod_utilities::time::local_utc_offset_secs();
-        let fired = cp_groups::social::tick(groups, (now_ms, offset), &|id: &str| idle.contains(id));
+        let fired = tick_groups_social(&mut self.state, now_ms, &|id: &str| idle.contains(id));
         for f in fired {
             let label = cp_groups::types::GroupsState::get(&self.state).label(&f.group_id);
             let stop = f
@@ -407,4 +405,26 @@ impl App {
 /// are excluded.
 const fn is_between_turns(exec: AgentExecState) -> bool {
     matches!(exec, AgentExecState::Idle | AgentExecState::Runnable)
+}
+
+/// Run the social tick over every group, stamping `GroupsState` only when it
+/// fired or rewrote a substate. A stamped borrow every tick (timed substates
+/// keep this running) would re-save `modules/groups.json` on each save.
+fn tick_groups_social<Idle>(
+    state: &mut cp_base::state::runtime::State,
+    now_ms: u64,
+    is_idle: &Idle,
+) -> Vec<cp_groups::social::Fired>
+where
+    Idle: Fn(&str) -> bool,
+{
+    let groups = &mut cp_groups::types::GroupsState::get_mut_unstamped(state).groups;
+    let before: Vec<Vec<cp_groups::social::Substate>> = groups.iter().map(|g| g.social.clone()).collect();
+    let offset = cp_mod_utilities::time::local_utc_offset_secs();
+    let fired = cp_groups::social::tick(groups, (now_ms, offset), is_idle);
+    let changed = groups.len() != before.len() || groups.iter().zip(&before).any(|(g, old)| g.social != *old);
+    if changed || !fired.is_empty() {
+        let _stamp = cp_groups::types::GroupsState::get_mut(state);
+    }
+    fired
 }

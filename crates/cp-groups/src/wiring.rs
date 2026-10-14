@@ -54,6 +54,10 @@ impl Module for GroupsModule {
         state.set_ext(GroupsState::new());
     }
 
+    fn save_revision(&self, state: &State) -> Option<u64> {
+        Some(GroupsState::get(state).revision)
+    }
+
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         let gs = GroupsState::get(state);
         let groups: Vec<GroupMeta<'_>> = gs.groups.iter().map(Into::into).collect();
