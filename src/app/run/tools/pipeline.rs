@@ -276,6 +276,7 @@ fn collect_tool_results(app: &mut App) -> Option<ToolBatch> {
     // Create tool call messages and execute tools
     let pipeline_start = std::time::Instant::now();
     for tool in &tools {
+        let _g = crate::infra::profiler::dyn_guard("tool_exec_", &tool.name);
         save_tool_call_message(app, tool);
         let result = execute_one_tool(app, tool, &mut flushed_tools);
         tool_results.push(result);

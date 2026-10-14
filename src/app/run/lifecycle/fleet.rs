@@ -406,17 +406,39 @@ impl App {
     /// data (its `WatcherRegistry` plus its `StreamRuntime` accumulators), so
     /// running them here targets this agent and this agent only.
     fn step_one_agent(&mut self) {
-        super::super::streaming::process_stream_events(self);
-        super::super::streaming::handle_retry(self);
-        super::super::streaming::process_typewriter(self);
+        {
+            let _g = crate::profile!("bg_stream_events");
+            super::super::streaming::process_stream_events(self);
+        }
+        {
+            let _g = crate::profile!("bg_retry");
+            super::super::streaming::handle_retry(self);
+        }
+        {
+            let _g = crate::profile!("bg_typewriter");
+            super::super::streaming::process_typewriter(self);
+        }
         // Resolve this thread's pending blocking waits (panel refresh, deferred
         // tool-sleep, blocking/async watchers) — the fix for the N>1 background
         // console-wait stall. See the doc comment above.
-        super::super::tools::checks::check_waiting_for_panels(self);
-        super::super::tools::checks::check_deferred_sleep(self);
-        super::super::tools::cleanup::check_watchers(self);
+        {
+            let _g = crate::profile!("bg_waiting_for_panels");
+            super::super::tools::checks::check_waiting_for_panels(self);
+        }
+        {
+            let _g = crate::profile!("bg_deferred_sleep");
+            super::super::tools::checks::check_deferred_sleep(self);
+        }
+        {
+            let _g = crate::profile!("bg_watchers");
+            super::super::tools::cleanup::check_watchers(self);
+        }
         super::super::tools::pipeline::handle_tool_execution(self);
-        super::super::streaming::finalize_stream(self);
+        {
+            let _g = crate::profile!("bg_finalize_stream");
+            super::super::streaming::finalize_stream(self);
+        }
+        let _g = crate::profile!("bg_check_spine");
         self.check_spine();
     }
 }
