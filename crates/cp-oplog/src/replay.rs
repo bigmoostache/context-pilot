@@ -82,10 +82,11 @@ pub(crate) fn fold_entry(state: &mut Recovered, entry: &OpEntry) {
         OpEntryKind::CommandEffect { ref dedup_token, .. } | OpEntryKind::SeenMark { ref dedup_token } => {
             state.seen.mark(dedup_token, entry.rev);
         }
-        OpEntryKind::AgentCreated { ref agent_id, ref name, status, timestamp_ms, .. } => {
+        OpEntryKind::AgentCreated { ref agent_id, ref name, status, timestamp_ms, ref parent_agent_id, .. } => {
             RosterAgent::fold_created(
                 &mut state.roster,
-                cp_wire::types::snapshot::AgentCreation::new(agent_id, name, status, timestamp_ms),
+                cp_wire::types::snapshot::AgentCreation::new(agent_id, name, status, timestamp_ms)
+                    .with_parent(parent_agent_id.as_deref()),
             );
         }
         OpEntryKind::AgentArchived { ref agent_id } => {
@@ -348,6 +349,7 @@ mod tests {
                 status: cp_wire::types::AgentTurn::TheirTurn,
                 timestamp_ms: 100,
                 branched_from: None,
+                parent_agent_id: None,
             })
             .expect("create");
         let _m = writer.append(msg("T1", 0x01)).expect("message");
@@ -376,6 +378,7 @@ mod tests {
                 status: cp_wire::types::AgentTurn::MyTurn,
                 timestamp_ms: 1,
                 branched_from: None,
+                parent_agent_id: None,
             })
             .expect("create");
         // Force several rolls so the roster is carried only by a checkpoint.

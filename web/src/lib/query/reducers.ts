@@ -83,29 +83,15 @@ function ago(epochMs: number): string {
 // sharing collapses it), or `null` when the target is unknown and a hydrate is
 // needed. Extracted from applyAgentDelta so the dispatcher stays within budget.
 
-/** agent_created — prepend a synthesized agent (idempotent on id). */
-function foldAgentCreated(prev: AgentDetail[], k: Kind, entry: OpEntry): AgentDetail[] {
+/**
+ * agent_created — a known id is a no-op (idempotent); an unknown one returns
+ * `null` so the bridge refetches `/agents`. The backend owns the row's place in
+ * the tree (parent, depth, order); synthesizing it here put sub-agents at the
+ * top as roots until the next poll.
+ */
+function foldAgentCreated(prev: AgentDetail[], k: Kind): AgentDetail[] | null {
   if (!k.agent_id) return prev
-  if (prev.some((t) => t.id === k.agent_id)) return prev // idempotent
-  const ts = k.timestamp_ms ?? entry.timestamp_ms ?? Date.now()
-  const created: AgentDetail = {
-    id: k.agent_id,
-    name: k.name ?? "Untitled agent",
-    status: turnToStatus(k.status),
-    fleetId: "",
-    fleet: "",
-    createdAt: ts,
-    lastActivity: ago(ts),
-    lastActivityMs: ts,
-    unread: 0,
-    archived: false,
-    paused: false,
-    focused: false,
-    log: [],
-    // A branched agent names its parent (the branch-out lineage marker).
-    ...(k.branched_from && { branchedFrom: k.branched_from }),
-  }
-  return [created, ...prev]
+  return prev.some((t) => t.id === k.agent_id) ? prev : null
 }
 
 /**
@@ -274,7 +260,7 @@ export function applyAgentDelta(
   const k = entry.kind
   switch (k.kind) {
     case "agent_created": {
-      return foldAgentCreated(prev, k, entry)
+      return foldAgentCreated(prev, k)
     }
     case "agent_archived": {
       return foldAgentFlag(prev, k.agent_id, { archived: true })
@@ -452,10 +438,8 @@ export function applyFleetDelta(prev: Fleet | undefined, entry: OpEntry): Fleet 
 // wholesale, a poll firing inside that lag window would serve a stale log
 // without the message and erase the delta-applied bubble — the T123 flicker.
 //
-// `mergeAgentLogs` converges state UPWARD: every message the local cache has
-// that the poll lacks is preserved, and delta-created agents not yet on disk
-// are kept. Once the disk flush lands, the poll's log already contains the
-// message (deduped by id) and the two planes agree. The agents queryFn calls
+// message (deduped by id) and the two planes agree. Agent membership and order
+// always follow the poll. The agents queryFn calls
 // this against the current cache (`getQueryData`) so the poll can never drop a
 // delta-applied message.
 export function mergeAgentLogs(
@@ -478,7 +462,8 @@ export function mergeAgentLogs(
     const extra = p.log.filter((m) => !haveIds.has(m.id) && !haveSigs.has(msgSignature(m)))
     return extra.length > 0 ? { ...t, log: [...t.log, ...extra] } : t
   })
-  const nextIds = new Set(next.map((t) => t.id))
-  const missing = prev.filter((t) => !nextIds.has(t.id))
-  return missing.length > 0 ? [...missing, ...merged] : merged
+  // Membership and order are the poll's: the backend already serves agents
+  // not yet flushed to disk and drops hard-deleted ones, so re-adding agents
+  // the poll lacks only resurrected deleted agents.
+  return merged
 }

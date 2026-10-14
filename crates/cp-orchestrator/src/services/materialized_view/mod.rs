@@ -106,6 +106,12 @@ pub struct FleetView {
     /// thread-roster deltas; design doc I5).
     pub roster: Vec<RosterEntry>,
 
+    /// Agents hard-deleted since this view started folding. The agent's disk
+    /// config flushes on a debounce, so `/agents` would otherwise re-serve a
+    /// deleted agent from the stale disk list; it drops these ids instead.
+    /// Cleared per id by a later `AgentCreated` of the same id.
+    pub deleted: std::collections::BTreeSet<String>,
+
     /// The agent the agent is currently *focused* on (actively working), or
     /// `None` when focus is released. Folded latest-wins from
     /// [`AgentFocusChanged`](OpEntryKind::AgentFocusChanged) — ephemeral,
@@ -133,6 +139,13 @@ pub struct FleetView {
 }
 
 impl FleetView {
+    /// Fold an `AgentCreated` (any other kind is ignored): lift a tombstone of
+    /// the same id, then insert-or-refresh the roster entry with its parent.
+    fn fold_created(&mut self, created: cp_wire::types::snapshot::AgentCreation<'_>) {
+        let _was_deleted = self.deleted.remove(created.agent_id);
+        RosterAgent::fold_created(&mut self.roster, created);
+    }
+
     /// Fold one oplog entry into this view, advancing `rev`.
     ///
     /// A [`Checkpoint`](OpEntryKind::Checkpoint) replaces the heads **and the
@@ -158,10 +171,10 @@ impl FleetView {
                 self.heads.set_agent_head(agent_id, head);
                 RosterAgent::fold_message(&mut self.roster, agent_id, entry.timestamp_ms);
             }
-            OpEntryKind::AgentCreated { ref agent_id, ref name, status, timestamp_ms, .. } => {
-                RosterAgent::fold_created(
-                    &mut self.roster,
-                    cp_wire::types::snapshot::AgentCreation::new(agent_id, name, status, timestamp_ms),
+            OpEntryKind::AgentCreated { ref agent_id, ref name, status, timestamp_ms, ref parent_agent_id, .. } => {
+                self.fold_created(
+                    cp_wire::types::snapshot::AgentCreation::new(agent_id, name, status, timestamp_ms)
+                        .with_parent(parent_agent_id.as_deref()),
                 );
             }
             OpEntryKind::AgentArchived { ref agent_id } => {
@@ -178,6 +191,7 @@ impl FleetView {
             }
             OpEntryKind::AgentDeleted { ref agent_id } => {
                 RosterAgent::fold_deleted(&mut self.roster, agent_id);
+                let _new = self.deleted.insert(agent_id.clone());
             }
             OpEntryKind::AgentStatusChanged { ref agent_id, status } => {
                 RosterAgent::fold_status(&mut self.roster, agent_id, status);

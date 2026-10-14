@@ -340,7 +340,7 @@ pub fn agents(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
         Err(reply) => return reply,
     };
     let folder = std::path::Path::new(&entry.folder);
-    let (config, focused_agent_id, roster) = {
+    let (config, focused_agent_id, (roster, deleted)) = {
         let Ok(mut b) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
         };
@@ -364,14 +364,17 @@ pub fn agents(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
         // none yet (a backend cold start before the agent's first focus
         // emission — design doc I5: live reads ride the view, disk is the
         // bounded backstop).
-        let (roster, view_focus) =
-            b.view.get(fleet_id).map(|v| (v.roster.clone(), v.focused_agent_id.clone())).unwrap_or_default();
+        let (roster, view_focus, deleted) = b
+            .view
+            .get(fleet_id)
+            .map(|v| (v.roster.clone(), v.focused_agent_id.clone(), v.deleted.clone()))
+            .unwrap_or_default();
         // A pre-T860 view focus `T<n>` yields to its migrated disk twin `A<n>`.
         let focused = match (view_focus, disk_focus) {
             (Some(view), Some(disk)) if agents::same_agent(&view, &disk) => Some(disk),
             (view, disk) => view.or(disk),
         };
-        (cfg, focused, roster)
+        (cfg, focused, (roster, deleted))
     };
 
     // Disk agents (full logs). Absent config is tolerated: the view roster
@@ -396,6 +399,13 @@ pub fn agents(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
     // Overlay the view's fresher roster onto matching disk agents, then append
     // any view-only agents the disk has not yet flushed.
     overlay_roster(&mut details, &roster, fleet_id);
+    // The disk config lags a hard delete (debounced flush): never re-serve an
+    // agent the view saw deleted.
+    details.retain(|d| {
+        d.get("id")
+            .and_then(serde_json::Value::as_str)
+            .is_none_or(|id| !deleted.iter().any(|g| agents::same_agent(id, g)))
+    });
     // Sidebar tree order: the frontend renders the list as received.
     order_tree(&mut details);
 

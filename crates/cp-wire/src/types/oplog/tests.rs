@@ -94,6 +94,7 @@ fn agent_roster_kinds_round_trip() {
             status: AgentTurn::MyTurn,
             timestamp_ms: 1_718_000_002_000,
             branched_from: Some("T3".into()),
+            parent_agent_id: Some("T1".into()),
         },
         OpEntryKind::AgentArchived { agent_id: "T7".into() },
         OpEntryKind::AgentRestored { agent_id: "T7".into() },

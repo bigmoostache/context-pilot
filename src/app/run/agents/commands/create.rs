@@ -7,7 +7,7 @@
 //! message-count memo yet, so every copied message becomes a `MessageCreated`).
 
 use cp_base::state::runtime::State;
-use cp_mod_agents::types::AgentStatus;
+use cp_mod_agents::types::{AgentStatus, AgentsState};
 use cp_mod_bridge::BridgeState;
 use cp_wire::types::oplog::OpEntryKind;
 
@@ -93,6 +93,9 @@ pub(super) fn apply_branch_agent(
 /// follow-up `AgentStatusChanged`.
 pub(super) fn announce_agent(state: &mut State, id: &str, name: &str, branched_from: Option<&str>) {
     let created_turn = wire_turn(AgentStatus::TheirTurn);
+    // A sub-agent's parent is set on the record before it is announced.
+    let parent_agent_id =
+        AgentsState::get(state).agents.iter().find(|a| a.id == id).and_then(|a| a.parent_agent_id.clone());
     emit_roster_delta(
         state,
         OpEntryKind::AgentCreated {
@@ -101,6 +104,7 @@ pub(super) fn announce_agent(state: &mut State, id: &str, name: &str, branched_f
             status: created_turn,
             timestamp_ms: now_ms(),
             branched_from: branched_from.map(str::to_owned),
+            parent_agent_id,
         },
     );
     if let Some(bs) = state.get_ext_mut::<BridgeState>() {

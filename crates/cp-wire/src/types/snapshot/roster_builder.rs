@@ -43,6 +43,8 @@ pub struct RosterAgentBuilder {
     tasks: Vec<WireTask>,
     /// The agent's projected scratchpad notes (read-only cells).
     notes: Vec<WireNote>,
+    /// Parent agent of a sub-agent; `None` for a root.
+    parent_agent_id: Option<String>,
 }
 
 impl RosterAgentBuilder {
@@ -64,6 +66,7 @@ impl RosterAgentBuilder {
             msg_count: 0,
             tasks: Vec::new(),
             notes: Vec::new(),
+            parent_agent_id: None,
         }
     }
 
@@ -109,6 +112,13 @@ impl RosterAgentBuilder {
         self
     }
 
+    /// Set the parent of a sub-agent. Default `None` (a root).
+    #[must_use]
+    pub fn parent_agent_id(mut self, parent_agent_id: Option<String>) -> Self {
+        self.parent_agent_id = parent_agent_id;
+        self
+    }
+
     /// Finalise into a [`RosterAgent`]. Total (no fallible field), so it never
     /// panics.
     #[must_use]
@@ -123,6 +133,7 @@ impl RosterAgentBuilder {
             msg_count: self.msg_count,
             tasks: self.tasks,
             notes: self.notes,
+            parent_agent_id: self.parent_agent_id,
         }
     }
 }

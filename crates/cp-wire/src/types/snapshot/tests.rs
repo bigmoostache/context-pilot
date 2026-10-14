@@ -93,6 +93,7 @@ fn snapshot_round_trip_with_roster() {
         msg_count: 3,
         tasks: Vec::new(),
         notes: Vec::new(),
+        parent_agent_id: Some("T0".into()),
     });
     let json = serde_json::to_string(&snapshot).expect("serialize");
     let back: Snapshot = serde_json::from_str(&json).expect("deserialize");
@@ -121,13 +122,25 @@ fn roster_fold_created_is_idempotent_refresh() {
     let mut roster: Vec<RosterAgent> = Vec::new();
     RosterAgent::fold_created(
         &mut roster,
-        AgentCreation { agent_id: "T1", name: "Plan", status: AgentTurn::TheirTurn, timestamp_ms: 100 },
+        AgentCreation {
+            agent_id: "T1",
+            name: "Plan",
+            status: AgentTurn::TheirTurn,
+            timestamp_ms: 100,
+            parent_agent_id: None,
+        },
     );
     assert_eq!(roster.len(), 1);
     // A re-seen creation refreshes, never duplicates.
     RosterAgent::fold_created(
         &mut roster,
-        AgentCreation { agent_id: "T1", name: "Plan v2", status: AgentTurn::MyTurn, timestamp_ms: 100 },
+        AgentCreation {
+            agent_id: "T1",
+            name: "Plan v2",
+            status: AgentTurn::MyTurn,
+            timestamp_ms: 100,
+            parent_agent_id: None,
+        },
     );
     assert_eq!(roster.len(), 1, "duplicate creation folds idempotently");
     assert_eq!(first(&roster).name, "Plan v2");
@@ -139,7 +152,13 @@ fn roster_fold_message_and_archived_accumulate() {
     let mut roster: Vec<RosterAgent> = Vec::new();
     RosterAgent::fold_created(
         &mut roster,
-        AgentCreation { agent_id: "T1", name: "Plan", status: AgentTurn::TheirTurn, timestamp_ms: 100 },
+        AgentCreation {
+            agent_id: "T1",
+            name: "Plan",
+            status: AgentTurn::TheirTurn,
+            timestamp_ms: 100,
+            parent_agent_id: None,
+        },
     );
 
     RosterAgent::fold_message(&mut roster, "T1", 250);

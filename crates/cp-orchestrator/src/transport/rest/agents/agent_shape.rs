@@ -93,6 +93,12 @@ pub(crate) fn overlay_roster(details: &mut Vec<serde_json::Value>, roster: &[Ros
                     drop(obj.insert("tasks".to_owned(), roster_tasks_value(entry)));
                     // Same for the projected note list (twin of tasks).
                     drop(obj.insert("notes".to_owned(), roster_notes_value(entry)));
+                    // A stale disk record may predate the parent link.
+                    if obj.get("parentAgentId").is_none_or(serde_json::Value::is_null)
+                        && let Some(parent) = entry.parent_agent_id.as_ref()
+                    {
+                        drop(obj.insert("parentAgentId".to_owned(), serde_json::Value::from(parent.as_str())));
+                    }
                 }
             }
             None => details.push(synthesize_from_roster(entry, fleet_id)),
@@ -134,6 +140,7 @@ fn synthesize_from_roster(entry: &RosterEntry, fleet_id: &str) -> serde_json::Va
         "unread": 0,
         "archived": entry.archived,
         "paused": entry.paused,
+        "parentAgentId": entry.parent_agent_id,
         "log": serde_json::Value::Array(Vec::new()),
         "tasks": roster_tasks_value(entry),
         "notes": roster_notes_value(entry),

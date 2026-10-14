@@ -132,6 +132,12 @@ pub struct RosterAgent {
     /// ignores the field — N-1 compatible in both directions.
     #[serde(default)]
     pub notes: Vec<WireNote>,
+
+    /// The agent's parent when it is a sub-agent (created by another agent's
+    /// `Agent` tool); `None` for a root. Lets the backend nest an agent the
+    /// disk config has not flushed yet. `#[serde(default)]`: N-1 compatible.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_agent_id: Option<String>,
 }
 
 /// The facts a `AgentCreated` oplog delta carries — the borrowed payload of
@@ -157,6 +163,9 @@ pub struct AgentCreation<'src> {
 
     /// Epoch-ms the agent was created (seeds `last_activity_ms`).
     pub timestamp_ms: u64,
+
+    /// Parent agent id of a sub-agent; `None` for a root.
+    pub parent_agent_id: Option<&'src str>,
 }
 
 impl<'src> AgentCreation<'src> {
@@ -165,7 +174,14 @@ impl<'src> AgentCreation<'src> {
     /// and backend-fold call sites.
     #[must_use]
     pub const fn new(agent_id: &'src str, name: &'src str, status: AgentTurn, timestamp_ms: u64) -> Self {
-        Self { agent_id, name, status, timestamp_ms }
+        Self { agent_id, name, status, timestamp_ms, parent_agent_id: None }
+    }
+
+    /// Set the parent of a sub-agent.
+    #[must_use]
+    pub const fn with_parent(mut self, parent_agent_id: Option<&'src str>) -> Self {
+        self.parent_agent_id = parent_agent_id;
+        self
     }
 }
 
@@ -194,6 +210,9 @@ impl RosterAgent {
             created.name.clone_into(&mut existing.name);
             existing.status = created.status;
             existing.archived = false;
+            if created.parent_agent_id.is_some() {
+                existing.parent_agent_id = created.parent_agent_id.map(str::to_owned);
+            }
         } else {
             roster.push(Self {
                 agent_id: created.agent_id.to_owned(),
@@ -205,6 +224,7 @@ impl RosterAgent {
                 msg_count: 0,
                 tasks: Vec::new(),
                 notes: Vec::new(),
+                parent_agent_id: created.parent_agent_id.map(str::to_owned),
             });
         }
     }

@@ -143,6 +143,10 @@ pub enum OpEntryKind {
         /// (`BranchAgent`); absent for an agent created from scratch.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         branched_from: Option<String>,
+        /// Parent agent id of a sub-agent (created by another agent's `Agent`
+        /// tool); absent for a root. Lets observers nest it immediately.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        parent_agent_id: Option<String>,
     },
 
     /// An agent was archived (soft-delete — hidden from the active list, kept

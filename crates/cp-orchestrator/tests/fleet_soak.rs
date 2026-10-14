@@ -108,6 +108,7 @@ mod tests {
             status: AgentTurn::TheirTurn,
             timestamp_ms: 0,
             branched_from: None,
+            parent_agent_id: None,
         }
     }
 

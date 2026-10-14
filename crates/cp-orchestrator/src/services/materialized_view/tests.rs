@@ -88,6 +88,7 @@ fn checkpoint_restores_roster_wholesale() {
                 status: AgentTurn::TheirTurn,
                 timestamp_ms: 1,
                 branched_from: None,
+                parent_agent_id: None,
             },
         ),
     );
@@ -132,6 +133,7 @@ fn roster_survives_compaction_via_checkpoint_then_folds_tail() {
                 status: AgentTurn::MyTurn,
                 timestamp_ms: 200,
                 branched_from: None,
+                parent_agent_id: None,
             },
         ),
     );
@@ -219,6 +221,7 @@ fn roster_create_archive_restore_cycle() {
                 status: AgentTurn::TheirTurn,
                 timestamp_ms: 1_000,
                 branched_from: None,
+                parent_agent_id: None,
             },
         ),
     );
@@ -245,10 +248,35 @@ fn agent_created_folds_idempotently_on_replay() {
         status: AgentTurn::MyTurn,
         timestamp_ms: 5,
         branched_from: None,
+        parent_agent_id: None,
     };
     view.apply("a1", &entry(0, created.clone()));
     view.apply("a1", &entry(0, created)); // duplicate delivery / replay
     assert_eq!(view.get("a1").expect("agent").roster.len(), 1, "a re-seen creation must refresh, never duplicate");
+}
+
+#[test]
+fn sub_agent_keeps_parent_and_delete_leaves_tombstone() {
+    let mut view = MaterializedView::new();
+    let created = OpEntryKind::AgentCreated {
+        agent_id: "A2".into(),
+        name: "Child".into(),
+        status: AgentTurn::TheirTurn,
+        timestamp_ms: 5,
+        branched_from: None,
+        parent_agent_id: Some("A1".into()),
+    };
+    view.apply("a1", &entry(0, created.clone()));
+    let fleet = view.get("a1").expect("agent");
+    assert_eq!(fleet.roster.first().and_then(|e| e.parent_agent_id.as_deref()), Some("A1"));
+
+    view.apply("a1", &entry(1, OpEntryKind::AgentDeleted { agent_id: "A2".into() }));
+    let fleet = view.get("a1").expect("agent");
+    assert!(fleet.roster.is_empty());
+    assert!(fleet.deleted.contains("A2"), "a delete must tombstone the id");
+
+    view.apply("a1", &entry(2, created));
+    assert!(view.get("a1").expect("agent").deleted.is_empty(), "a re-creation lifts the tombstone");
 }
 
 #[test]
@@ -264,6 +292,7 @@ fn message_created_bumps_roster_count_and_activity() {
                 status: AgentTurn::MyTurn,
                 timestamp_ms: 100,
                 branched_from: None,
+                parent_agent_id: None,
             },
         ),
     );
