@@ -40,7 +40,8 @@ pub const fn kind_label(kind: GroupKind) -> &'static str {
 }
 
 /// One `groups` panel YAML entry: id, name, description, kind, owner,
-/// message counts and members. Social substates go to [`social_footer`].
+/// message counts, members, and `social:` — the substates concerning `me`
+/// in the user's notation, always present (`[]` when none).
 #[must_use]
 pub fn group_entry(group: &Group, me: &str) -> String {
     let unread = group.unread_for(me);
@@ -57,6 +58,7 @@ pub fn group_entry(group: &Group, me: &str) -> String {
         _ = writeln!(out, "    unread: {unread}");
     }
     _ = writeln!(out, "    members: [{}]", group.member_ids.join(", "));
+    out.push_str(&social_line(group, me));
     out
 }
 
@@ -100,20 +102,11 @@ pub fn substate_label(sub: &Substate) -> String {
     })
 }
 
-/// `social:` footer of the `groups` panel: every substate of `groups` that
-/// concerns `me`, as `- G3: simple_turn(A1)`. `social: []` when none.
-#[must_use]
-pub fn social_footer<'group, Groups>(groups: Groups, me: &str) -> String
-where
-    Groups: Iterator<Item = &'group Group>,
-{
-    let mut lines = String::new();
-    for g in groups {
-        for s in g.social.iter().filter(|s| concerns(s, me)) {
-            _ = writeln!(lines, "  - {}: {}", g.id, substate_label(s));
-        }
-    }
-    if lines.is_empty() { "social: []\n".to_owned() } else { format!("social:\n{lines}") }
+/// `    social: [...]` line of one group entry: its substates concerning
+/// `me`, e.g. `social: [simple_turn(A1), dispatch([])]`.
+fn social_line(group: &Group, me: &str) -> String {
+    let labels: Vec<String> = group.social.iter().filter(|s| concerns(s, me)).map(substate_label).collect();
+    format!("    social: [{}]\n", labels.join(", "))
 }
 
 /// Full `group` panel body: header, members, last [`MAX_PANEL_MESSAGES`]
@@ -176,7 +169,7 @@ mod tests {
     }
 
     #[test]
-    fn footer_lists_only_my_substates_in_user_notation() {
+    fn social_lists_only_my_substates_in_user_notation() {
         let g3 = group(
             "G3",
             vec![
@@ -193,17 +186,16 @@ mod tests {
                 },
             ],
         );
-        let footer = social_footer([&g3].into_iter(), "A1");
         assert_eq!(
-            footer,
-            "social:\n  - G3: simple_turn(A1)\n  - G3: gather([A2, A3], A1)\n  - G3: dispatch([])\n  - G3: recurrent(A1, \"0 9 * * 1-5\", \"say \\\"hi\\\"\")\n"
+            social_line(&g3, "A1"),
+            "    social: [simple_turn(A1), gather([A2, A3], A1), dispatch([]), recurrent(A1, \"0 9 * * 1-5\", \"say \\\"hi\\\"\")]\n"
         );
     }
 
     #[test]
-    fn footer_is_empty_list_when_nothing_concerns_me() {
+    fn social_is_empty_list_when_nothing_concerns_me() {
         let g = group("G1", vec![Substate::Dispatch { candidates: vec!["A2".into()] }]);
-        assert_eq!(social_footer([&g].into_iter(), "A1"), "social: []\n");
+        assert!(group_entry(&g, "A1").ends_with("    social: []\n"));
     }
 
     #[test]

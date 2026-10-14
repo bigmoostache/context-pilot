@@ -10,7 +10,7 @@ use cp_base::state::actions::Action;
 use cp_base::state::context::{Entry, Kind, estimate_tokens, make_default_entry};
 use cp_base::state::runtime::State;
 
-use crate::render::{group_body, group_entry, social_footer};
+use crate::render::{group_body, group_entry};
 use crate::types::GroupsState;
 
 /// Fixed panel kind listing the executing agent's groups.
@@ -23,13 +23,11 @@ pub const META_GROUP_ID: &str = "group_id";
 /// `groups` panel body for the executing agent.
 fn groups_content(state: &State) -> String {
     let me = state.executing_agent_id().unwrap_or_default();
-    let groups = GroupsState::get(state);
-    let entries: String = groups.of_member(me).map(|g| group_entry(g, me)).collect();
-    let footer = social_footer(groups.of_member(me), me);
+    let entries: String = GroupsState::get(state).of_member(me).map(|g| group_entry(g, me)).collect();
     if entries.is_empty() {
-        return format!("groups: []\n{footer}");
+        return "groups: []\n".to_owned();
     }
-    format!("groups:\n{entries}{footer}")
+    format!("groups:\n{entries}")
 }
 
 /// Group id a `group` panel entry shows.
