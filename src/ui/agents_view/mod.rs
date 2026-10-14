@@ -111,8 +111,16 @@ struct ListBuild<'build> {
     agents: &'build AgentsState,
     /// Groups store holding the agents' messages.
     groups: &'build cp_groups::types::GroupsState,
-    /// Depth of each visible agent in the tree (root = 0), for indentation.
-    depth_of: std::collections::HashMap<String, usize>,
+    /// Tree-guide prefix of each visible agent (`├─`, `│ `…, empty for roots).
+    guide_of: std::collections::HashMap<String, String>,
+}
+
+/// Agent id → tree-guide prefix, from the preorder walk of the visible agents.
+fn guide_map(ts: &AgentsState, visible: &[usize]) -> std::collections::HashMap<String, String> {
+    use cp_mod_agents::types::tree::{guides, preorder};
+    let walk = preorder(&ts.agents, visible);
+    let depths: Vec<usize> = walk.iter().map(|&(_, d)| d).collect();
+    walk.iter().zip(guides(&depths)).filter_map(|(&(i, _), g)| Some((ts.agents.get(i)?.id.clone(), g))).collect()
 }
 
 /// Push the virtual "+ New Agent" entry (active view only, single-line),
@@ -256,10 +264,10 @@ fn push_agent_entry(
 ) {
     let leading = leading_slot(lb, agent);
     let (cr, cg, cb) = agent_circle_rgb(agent, &lb.groups.groups);
-    // Sub-agents: one column of indent per depth level (tree order comes from
-    // `visible_indices`).
-    let depth = lb.depth_of.get(&agent.id).copied().unwrap_or(0);
-    let room = usize::from(lb.inner_width.saturating_sub(6)).saturating_sub(depth);
+    // Sub-agents: dimmed tree guides, two columns per depth level (tree order
+    // comes from `visible_indices`).
+    let guide = lb.guide_of.get(&agent.id).cloned().unwrap_or_default();
+    let room = usize::from(lb.inner_width.saturating_sub(6)).saturating_sub(guide.chars().count());
     let name = truncate_str(&agent.name, room);
 
     if is_selected {
@@ -267,7 +275,7 @@ fn push_agent_entry(
     }
     lb.blocks.push(IrBlock::Line(vec![
         leading,
-        S::new(" ".repeat(depth)),
+        S::styled(guide, Semantic::Border).dim(),
         S::rgb("\u{25cf} ".to_owned(), cr, cg, cb),
         S::new(name),
     ]));
@@ -383,10 +391,7 @@ fn render_agent_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
         last_read: &focus.last_read_count,
         agents: ts,
         groups: cp_groups::types::GroupsState::get(state),
-        depth_of: cp_mod_agents::types::tree::preorder(&ts.agents, &visible)
-            .into_iter()
-            .filter_map(|(i, d)| Some((ts.agents.get(i)?.id.clone(), d)))
-            .collect(),
+        guide_of: guide_map(ts, &visible),
     };
     if show_new {
         push_new_agent_entry(&mut lb, state, on_virtual);
