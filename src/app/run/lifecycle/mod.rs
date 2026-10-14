@@ -189,9 +189,15 @@ impl App {
             let _guard = crate::profile!("full_redraw_poison");
             poison_back_buffer(terminal);
         }
-        crossterm::execute!(terminal.backend_mut(), crossterm::terminal::BeginSynchronizedUpdate)?;
+        {
+            let _guard = crate::profile!("sync_begin");
+            crossterm::execute!(terminal.backend_mut(), crossterm::terminal::BeginSynchronizedUpdate)?;
+        }
         let result = self.render_frame_as(terminal, current_ms, "term_bytes_full");
-        crossterm::execute!(terminal.backend_mut(), crossterm::terminal::EndSynchronizedUpdate)?;
+        {
+            let _guard = crate::profile!("sync_end");
+            crossterm::execute!(terminal.backend_mut(), crossterm::terminal::EndSynchronizedUpdate)?;
+        }
         result
     }
 
