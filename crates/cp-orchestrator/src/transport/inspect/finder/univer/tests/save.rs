@@ -139,6 +139,41 @@ fn unchanged_snapshot_leaves_file_untouched() {
     assert_eq!(std::fs::read(&path).ok(), before);
 }
 
+/// A row inserted above row 1 is replayed on the file: everything moves down
+/// with its own style, the CF rule and the note follow, no cell is re-styled.
+#[test]
+fn inserted_row_keeps_styles_of_shifted_cells() {
+    let Ok(dir) = tempfile::tempdir() else { panic!("no temp dir") };
+    let path = dir.path().join("save.xlsx");
+    fixture(&path);
+    let Some(out) = convert(&path) else { panic!("convert failed") };
+    let mut snap = out.workbook;
+    let row0 = snap.pointer("/sheets/sheet-0/cellData/0").cloned().unwrap_or_default();
+    *slot(&mut snap, &["sheets", "sheet-0", "cellData"]) = json!({ "1": row0 });
+    *slot(&mut snap, &["ops"]) = json!([{ "sheet": "sheet-0", "kind": "insertRows", "at": 0u8, "count": 1u8 }]);
+    assert_eq!(save(&path, &snap), Ok(0));
+    let Ok(book) = umya_spreadsheet::reader::xlsx::read(&path) else { panic!("re-read failed") };
+    let Ok(ws) = book.sheet(0) else { panic!("no sheet") };
+    check_shifted(ws);
+}
+
+/// The fixture after a row inserted above row 1.
+fn check_shifted(ws: &umya_spreadsheet::Worksheet) {
+    assert_eq!(ws.value("A2"), "Title");
+    assert_eq!(ws.value("B2"), "1");
+    assert_eq!(ws.value("A1"), "");
+    check_shifted_extras(ws);
+}
+
+/// Style, conditional format and note of the fixture moved down one row.
+fn check_shifted_extras(ws: &umya_spreadsheet::Worksheet) {
+    assert!(ws.style("A2").font().is_some_and(umya_spreadsheet::Font::bold));
+    assert!(ws.style("A2").fill().is_some());
+    let sqref = ws.conditional_formatting_collection().first().map(|c| c.sequence_of_references().get_sqref());
+    assert_eq!(sqref.as_deref(), Some("A2:A6"));
+    assert_eq!(ws.comments().first().map(|c| c.coordinate().to_string()).as_deref(), Some("B3"));
+}
+
 #[test]
 fn refuses_a_foreign_snapshot() {
     let Ok(dir) = tempfile::tempdir() else { panic!("no temp dir") };

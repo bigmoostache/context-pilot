@@ -206,12 +206,12 @@ export async function saveToRealm(
   univerAPI: FUniver,
   fleetId: string,
   realmPath: string,
-  touched: ReadonlySet<string>,
+  edits: SheetEdits,
 ): Promise<void> {
   if (/\.xls[xm]$/i.test(realmPath)) {
     const workbook = univerAPI.getActiveWorkbook()
     if (!workbook) throw new Error("No active workbook")
-    await saveSheet(fleetId, realmPath, partialSnapshot(workbook.save(), touched))
+    await saveSheet(fleetId, realmPath, partialSnapshot(workbook.save(), edits))
     return
   }
   const blob = await generateXlsxBlob(univerAPI)
@@ -268,14 +268,90 @@ function sheetIdOf(params: unknown): string | null {
  */
 function partialSnapshot(
   full: IWorkbookData,
-  touched: ReadonlySet<string>,
+  { touched, ops }: SheetEdits,
 ): Record<string, unknown> {
   const keep = (id: string) => touched.has(id) || !/^sheet-\d+$/.test(id)
   const sheets = Object.fromEntries(Object.entries(full.sheets).filter(([id]) => keep(id)))
   const used = new Set<string>()
   for (const sheet of Object.values(sheets)) collectStyleIds(sheet.cellData, used)
   const styles = Object.fromEntries(Object.entries(full.styles).filter(([id]) => used.has(id)))
-  return { id: full.id, sheetOrder: full.sheetOrder, styles, sheets }
+  return { id: full.id, sheetOrder: full.sheetOrder, styles, sheets, ops }
+}
+
+/** What the user changed since the last save. */
+export interface SheetEdits {
+  /** Sheets with an edit: Save uploads only these. */
+  touched: Set<string>
+  /** Row/column inserts and deletes, in order. */
+  ops: SheetOp[]
+}
+
+/** Forget every recorded edit (after a save or a remount). */
+export function clearEdits(edits: SheetEdits): void {
+  edits.touched.clear()
+  edits.ops.length = 0
+}
+
+/**
+ * Record a `CommandExecuted` event into `edits`; `true` when it was a user
+ * edit (the file is now dirty).
+ */
+export function recordEdit(edits: SheetEdits, event: Parameters<typeof touchedSheet>[0]): boolean {
+  const sheetId = touchedSheet(event)
+  if (!sheetId) return false
+  edits.touched.add(sheetId)
+  const op = structuralOp(event)
+  if (op) edits.ops.push(op)
+  return true
+}
+
+/**
+ * Row/column insert or delete, replayed by the server on the original file
+ * before the cell diff so shifted cells keep their own formatting. `at` is
+ * 0-based.
+ */
+export interface SheetOp {
+  sheet: string
+  kind: "insertRows" | "removeRows" | "insertCols" | "removeCols"
+  at: number
+  count: number
+}
+
+/** Univer mutation → op kind, and whether it spans rows. */
+const STRUCTURAL: Record<string, [SheetOp["kind"], boolean]> = {
+  "sheet.mutation.insert-row": ["insertRows", true],
+  "sheet.mutation.remove-rows": ["removeRows", true],
+  "sheet.mutation.insert-col": ["insertCols", false],
+  "sheet.mutation.remove-col": ["removeCols", false],
+}
+
+/**
+ * The structural op a user mutation carries, if any. Undo runs the inverse
+ * mutation, so the recorded list stays in step with the grid.
+ */
+export function structuralOp(event: {
+  id: string
+  params: unknown
+  options?: { onlyLocal?: boolean; fromChangeset?: boolean; fromCollab?: boolean }
+}): SheetOp | null {
+  const entry = STRUCTURAL[event.id]
+  const sheet = touchedSheet(event)
+  if (!entry || !sheet) return null
+  const params = event.params
+  if (typeof params !== "object" || params === null || !("range" in params)) return null
+  const range = params.range
+  if (typeof range !== "object" || range === null) return null
+  const [kind, rows] = entry
+  const start = field(range, rows ? "startRow" : "startColumn")
+  const end = field(range, rows ? "endRow" : "endColumn")
+  if (start === null || end === null || end < start) return null
+  return { sheet, kind, at: start, count: end - start + 1 }
+}
+
+/** A numeric field of an object, or null. */
+function field(o: object, key: string): number | null {
+  const v: unknown = (o as Record<string, unknown>)[key]
+  return typeof v === "number" ? v : null
 }
 
 /** Add every style id referenced by a sheet's cells to `out`. */

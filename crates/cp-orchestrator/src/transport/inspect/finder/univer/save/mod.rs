@@ -18,8 +18,10 @@
 mod cells;
 mod layout;
 mod lazy;
+mod ops;
 mod style;
 
+use std::borrow::Cow;
 use std::path::Path;
 use std::sync::LazyLock;
 
@@ -67,20 +69,37 @@ fn patch_book(book: &mut Workbook, base: &Value, new: &Value) -> Result<(usize, 
     let mut patched = 0usize;
     let mut edited_any = false;
     for (id, idx) in sheet_slots(book, &order, new_sheets)? {
-        let old = base_sheets.get(&id).unwrap_or(&NULL);
         let Some(sheet) = new_sheets.get(&id) else {
             continue; // partial snapshot: the browser only sends the sheets it touched
         };
-        if !edited(old, sheet, &styles) {
+        let base_old = base_sheets.get(&id).unwrap_or(&NULL);
+        let structural = if base_old.is_null() { Vec::new() } else { ops::for_sheet(new, &id) };
+        let old = shifted(base_old, &structural);
+        if structural.is_empty() && !edited(&old, sheet, &styles) {
             continue; // untouched: stays raw and is written back verbatim
         }
         edited_any = true;
         let ws = book.sheet_mut(idx).map_err(|_err| "sheet vanished while saving")?;
-        rename(ws, old, sheet);
-        layout::patch(ws, old, sheet);
-        patched = patched.saturating_add(cells::patch(ws, (old, sheet), &styles));
+        for op in &structural {
+            ops::apply(ws, *op); // before rename: umya matches the file's own sheet name
+        }
+        rename(ws, &old, sheet);
+        layout::patch(ws, &old, sheet);
+        patched = patched.saturating_add(cells::patch(ws, (&old, sheet), &styles));
     }
     Ok((patched, edited_any))
+}
+
+/// The original sheet JSON with the structural ops replayed on it.
+fn shifted<'json>(old: &'json Value, structural: &[ops::Op]) -> Cow<'json, Value> {
+    if structural.is_empty() {
+        return Cow::Borrowed(old);
+    }
+    let mut moved = old.clone();
+    for op in structural {
+        ops::shift(&mut moved, *op);
+    }
+    Cow::Owned(moved)
 }
 
 /// Whether the user changed anything the patch writes.
