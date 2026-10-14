@@ -180,12 +180,7 @@ pub fn fire_callback(
     let replaced = kill_existing_callback(state, &def.id);
 
     // Generate session key via console state
-    let session_key = {
-        let cs = ConsoleState::get_mut(state);
-        let key = format!("cb_{}", cs.next_session_id);
-        cs.next_session_id = cs.next_session_id.saturating_add(1);
-        key
-    };
+    let session_key = ConsoleState::alloc_key(state, "cb");
 
     // Spawn the process off the main loop; a spawn error surfaces as a failed run.
     let handle = {

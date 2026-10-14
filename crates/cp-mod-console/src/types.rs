@@ -108,6 +108,19 @@ impl ConsoleState {
         state.ext_mut::<Self>()
     }
 
+    /// Allocate a session key unique across the whole project: `{prefix}_{agent}_{n}`.
+    ///
+    /// The counter is per agent, but log files and the console server's session map
+    /// are shared by every agent, so the agent id must be part of the key — a bare
+    /// `c_2` from two agents would point at the same log and server session.
+    pub fn alloc_key(state: &mut State, prefix: &str) -> String {
+        let agent = state.executing_agent_id().unwrap_or("root").to_owned();
+        let cs = Self::get_mut(state);
+        let key = format!("{prefix}_{agent}_{}", cs.next_session_id);
+        cs.next_session_id = cs.next_session_id.saturating_add(1);
+        key
+    }
+
     /// Kill a session by name and update its panel metadata.
     pub fn kill_session(state: &mut State, name: &str) {
         let cs = Self::get_mut(state);

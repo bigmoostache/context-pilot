@@ -91,12 +91,7 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let description = tool.input.get("description").and_then(|v| v.as_str()).map(str::to_owned);
 
     // Auto-generate session key
-    let session_key = {
-        let cs = ConsoleState::get_mut(state);
-        let key = format!("c_{}", cs.next_session_id);
-        cs.next_session_id = cs.next_session_id.saturating_add(1);
-        key
-    };
+    let session_key = ConsoleState::alloc_key(state, "c");
 
     // Spawn the process off the main loop; a spawn error lands in the panel output.
     let handle = SessionHandle::spawn_detached(session_key.clone(), command.clone(), cwd.clone());
@@ -374,12 +369,7 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Spawn via the console server (non-blocking to the main loop)
-    let session_key = {
-        let cs = ConsoleState::get_mut(state);
-        let key = format!("c_{}", cs.next_session_id);
-        cs.next_session_id = cs.next_session_id.saturating_add(1);
-        key
-    };
+    let session_key = ConsoleState::alloc_key(state, "c");
 
     // A spawn error flips the status to Failed(-1) with the message in the
     // output buffer, so the exit watcher below reports it.
