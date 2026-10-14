@@ -136,21 +136,22 @@ impl App {
     /// Console sessions are per-agent ([`ConsoleState`](cp_mod_console::types::ConsoleState)
     /// is `is_global() == false`), so
     /// [`deliver_to_agent`](Self::deliver_to_agent) makes the agent executing
-    /// and [`shutdown_all`](cp_mod_console::types::ConsoleState::shutdown_all)
+    /// and [`kill_all`](cp_mod_console::types::ConsoleState::kill_all)
     /// kills exactly *its* sessions (by their own keys, via the existing
-    /// per-session kill — no server protocol change). The in-process watcher
+    /// fire-and-forget per-session kill, so the loop never waits on the
+    /// console server — no server protocol change). The in-process watcher
     /// drop is `Drop` on the removed
     /// [`AgentRuntime`](cp_base::state::runtime::bundle::AgentRuntime): a
     /// [`ChannelWatcher`](cp_base::state::watchers::ChannelWatcher) drops its
     /// receiver so its worker thread's later send fails harmlessly (cancellation);
     /// timer/console watchers are data-only.
     ///
-    /// Deleting the focused agent runs `shutdown_all` directly and
+    /// Deleting the focused agent runs `kill_all` directly and
     /// [`fleet.remove`](cp_fleet::FleetRegistry::remove) is a no-op (the focused
     /// agent is never in the registry). No console key or on-disk path changes.
     pub(crate) fn teardown_agent(&mut self, agent_id: &str) {
         self.deliver_to_agent(Some(agent_id), |state| {
-            cp_mod_console::types::ConsoleState::shutdown_all(state);
+            cp_mod_console::types::ConsoleState::kill_all(state);
         });
         let _removed = self.fleet.remove(agent_id);
         drop(self.state.agent_store.remove(agent_id));

@@ -239,7 +239,11 @@ pub(in crate::app::run) fn drain_management(app: &mut App) {
         create::announce_agent(&mut app.state, id, &name, None);
     }
     for id in &doomed {
-        apply_delete_agent(&mut app.state, id);
+        {
+            let _g = crate::profile!("apply_delete_agent");
+            apply_delete_agent(&mut app.state, id);
+        }
+        let _g = crate::profile!("teardown_agent");
         app.teardown_agent(id);
     }
 }
@@ -259,8 +263,16 @@ fn apply_delete_agent(state: &mut State, agent_id: &str) {
         cp_groups::social::departed::purge(&mut cp_groups::types::GroupsState::get_mut(state).groups, &|m: &str| {
             m != agent_id
         });
-    for gid in &removed {
-        cp_groups::persist::remove_group_file(gid);
+    // File removal is IO the loop must not wait on: hand it to a detached
+    // thread, falling back to inline removal if the spawn fails.
+    if !removed.is_empty() {
+        let bg = removed.clone();
+        let spawned = std::thread::Builder::new()
+            .name("group-file-rm".into())
+            .spawn(move || bg.iter().for_each(|gid| cp_groups::persist::remove_group_file(gid)));
+        if spawned.is_err() {
+            removed.iter().for_each(|gid| cp_groups::persist::remove_group_file(gid));
+        }
     }
 
     // Clean up focus references (mirrors archive path).

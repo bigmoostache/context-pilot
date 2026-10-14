@@ -172,6 +172,22 @@ impl ConsoleState {
         }
     }
 
+    /// Kill every session without waiting for the server (agent teardown).
+    ///
+    /// Each kill runs on a detached thread ([`SessionHandle::kill`]); the
+    /// blocking variant made deleting an agent stall the main loop for one
+    /// server round-trip per console.
+    pub fn kill_all(state: &mut State) {
+        let cs = Self::get_mut(state);
+        let mut keys: Vec<_> = cs.sessions.keys().cloned().collect();
+        keys.sort();
+        for key in keys {
+            if let Some(handle) = cs.sessions.remove(&key) {
+                handle.kill();
+            }
+        }
+    }
+
     /// Shutdown all sessions (called during reset).
     pub fn shutdown_all(state: &mut State) {
         let cs = Self::get_mut(state);

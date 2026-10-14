@@ -120,7 +120,10 @@ impl Panel for TreePanel {
 
         // Stale descriptions were refreshed from the YAML on the worker thread
         // (and already rendered into `content`); only replay the swaps here.
-        let refreshed = crate::storage::apply_patches(&mut TreeState::get_mut(state).descriptions, patches);
+        // `get_mut` bumps the save stamp; with no patches it would re-save the
+        // whole tree for nothing on every refresh.
+        let refreshed =
+            !patches.is_empty() && crate::storage::apply_patches(&mut TreeState::get_mut(state).descriptions, patches);
 
         // Check if content actually changed before updating
         if !refreshed && !cp_base::panels::update_if_changed(ctx, &content) && ctx.cached_content.is_some() {
