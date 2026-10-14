@@ -133,7 +133,7 @@ fn payload_inline_then_spilled() {
     assert!(out.contains("/tmp/cp-monitor/cp_monitor_unit_test.log"), "{out}");
     assert!(out.len() < 600, "tail only");
     let written = std::fs::read_to_string("/tmp/cp-monitor/cp_monitor_unit_test.log").expect("spill file");
-    assert_eq!(written.len(), big.len());
+    assert_eq!(written.len(), big.len() + 1);
     let _r = std::fs::remove_file("/tmp/cp-monitor/cp_monitor_unit_test.log");
 }
 

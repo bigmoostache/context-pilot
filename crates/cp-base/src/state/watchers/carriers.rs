@@ -35,6 +35,10 @@ pub struct WatcherResult {
     /// (e.g. the idle `MY_TURN` detector) so the resulting spine notification can
     /// be cleared when that agent is `Read`.
     pub agent_id: Option<String>,
+    /// Spine notification source. The spine drops a notification whose
+    /// kind+source match a still-unprocessed one, so watchers that fire
+    /// repeatedly (monitors) need a distinct source per event. `None` = "watcher".
+    pub source: Option<String>,
 }
 
 impl WatcherResult {
@@ -57,6 +61,7 @@ impl WatcherResult {
             preserves_tempo: false,
             create_dyn_panel: None,
             agent_id: None,
+            source: None,
         }
     }
 
@@ -142,6 +147,16 @@ impl WatcherResult {
         S: Into<String>,
     {
         self.agent_id = Some(id.into());
+        self
+    }
+
+    /// Spine notification source, distinct per event so none is deduplicated away.
+    #[must_use]
+    pub fn source<S>(mut self, source: S) -> Self
+    where
+        S: Into<String>,
+    {
+        self.source = Some(source.into());
         self
     }
 }

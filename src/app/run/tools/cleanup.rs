@@ -120,8 +120,9 @@ fn process_async_completions(app: &mut App, async_results: &mut [cp_base::state:
         let tid_tag = tid.clone();
         let desc = result.description.clone();
         let processed = result.processed_already;
+        let source = result.source.clone().unwrap_or_else(|| "watcher".to_owned());
         app.deliver_to_agent(tid.as_deref(), |state| {
-            let nid = SpineState::create_notification(state, NotificationType::Custom, "watcher".to_owned(), desc);
+            let nid = SpineState::create_notification(state, NotificationType::Custom, source, desc);
             SpineState::set_notification_agent(state, &nid, tid_tag);
             if processed {
                 let _r = SpineState::mark_notification_processed(state, &nid);

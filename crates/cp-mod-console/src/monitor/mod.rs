@@ -158,9 +158,8 @@ fn on_path(bin: &str) -> bool {
 
 /// Shell command relaying a websocket to stdout, one message per line.
 ///
-/// Without `ws_send` the relay is unidirectional (`-U`), so a closed stdin
-/// does not drop the connection. With it, the frame is written once and
-/// stdin is then held open by `tail -f /dev/null`.
+/// stdin is held open by `tail -f /dev/null`: websocat closes the connection
+/// on stdin EOF. `ws_send`, when given, is written once before that.
 fn ws_command(req: &Request) -> Result<String, String> {
     let url = req.ws_url.as_deref().unwrap_or_default();
     if !(url.starts_with("ws://") || url.starts_with("wss://")) {
@@ -169,9 +168,6 @@ fn ws_command(req: &Request) -> Result<String, String> {
     if !on_path("websocat") {
         return Err("type='ws' needs `websocat` on PATH (e.g. `brew install websocat`)".to_owned());
     }
-    let url_q = sh_quote(url);
-    Ok(req.ws_send.as_deref().map_or_else(
-        || format!("websocat -t -U {url_q}"),
-        |frame| format!("{{ printf '%s\\n' {}; tail -f /dev/null; }} | websocat -t {url_q}", sh_quote(frame)),
-    ))
+    let send = req.ws_send.as_deref().map_or_else(String::new, |frame| format!("printf '%s\\n' {}; ", sh_quote(frame)));
+    Ok(format!("{{ {send}tail -f /dev/null; }} | websocat -t {}", sh_quote(url)))
 }

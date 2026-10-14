@@ -138,6 +138,7 @@ impl Watcher for IdleMyTurnDetector {
                 preserves_tempo: true,
                 create_dyn_panel: None,
                 agent_id: Some(agent.id.clone()),
+                source: None,
             });
         }
 
@@ -152,6 +153,7 @@ impl Watcher for IdleMyTurnDetector {
             preserves_tempo: true,
             create_dyn_panel: None,
             agent_id: Some(agent.id.clone()),
+            source: None,
         })
     }
 

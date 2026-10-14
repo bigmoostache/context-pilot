@@ -130,7 +130,7 @@ pub fn render_payload(content: &str, file_stem: &str) -> String {
         return content.to_owned();
     }
     let path = std::path::Path::new(SPILL_DIR).join(format!("{file_stem}.log"));
-    let written = std::fs::create_dir_all(SPILL_DIR).and_then(|()| std::fs::write(&path, content));
+    let written = std::fs::create_dir_all(SPILL_DIR).and_then(|()| std::fs::write(&path, format!("{content}\n")));
     let where_ = match written {
         Ok(()) => format!("full output ({} bytes) in {}", content.len(), path.display()),
         Err(e) => format!("output too large ({} bytes) and spill to {} failed: {e}", content.len(), path.display()),

@@ -176,7 +176,7 @@ pub const fn type_name(source: Source) -> &'static str {
 
 /// Lifecycle of a monitor, as shown in the Monitor panel.
 #[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "lowercase", tag = "state")]
 pub enum Status {
     /// Watching.
     Alive,

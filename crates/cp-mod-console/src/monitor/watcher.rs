@@ -5,6 +5,7 @@
 //! or its console vanished. Each ending is announced in the last notification.
 
 use std::fmt::Write as _;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use cp_base::panels::now_ms;
@@ -67,6 +68,8 @@ pub struct LiveMonitor {
     registered_at_ms: u64,
     /// Mutable state.
     rt: Mutex<Runtime>,
+    /// Notifications built so far; makes each spine source unique.
+    notified: AtomicU32,
 }
 
 /// Lock ignoring poison: monitor state stays usable after a panic elsewhere.
@@ -95,6 +98,7 @@ impl LiveMonitor {
             agent,
             registered_at_ms: snapshot.started_at_ms,
             rt: Mutex::new(Runtime { cursor, ..Runtime::default() }),
+            notified: AtomicU32::new(0),
         }
     }
 
@@ -121,7 +125,9 @@ impl LiveMonitor {
         if let Some(reason) = ending {
             let _w = write!(text, "\nThis monitor has ended: {reason}.");
         }
-        let res = WatcherResult::new(text).panel_id(self.panel_id.clone());
+        let seq = self.notified.fetch_add(1, Ordering::Relaxed);
+        let res =
+            WatcherResult::new(text).panel_id(self.panel_id.clone()).source(format!("{} #{seq}", self.watcher_id));
         match self.agent.as_ref() {
             Some(a) => res.agent_id(a.clone()),
             None => res,
@@ -151,6 +157,12 @@ impl LiveMonitor {
     /// `mode=exit`: fire once the process is terminal.
     fn check_exit(&self, rt: &mut Runtime, status: ProcessStatus, last: &str) -> Option<WatcherResult> {
         if !status.is_terminal() {
+            return None;
+        }
+        // Let the file poller's final read land before quoting the last output.
+        let now = now_ms();
+        let since = *rt.exited_at_ms.get_or_insert(now);
+        if now.saturating_sub(since) < EXIT_GRACE_MS {
             return None;
         }
         rt.deliveries = 1;
