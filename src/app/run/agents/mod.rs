@@ -207,15 +207,19 @@ fn roster_gate(app: &App) -> (bool, Option<u64>) {
         .state
         .get_ext::<cp_mod_bridge::BridgeState>()
         .is_some_and(|bs| bs.seeded.messages() && bs.seeded.statuses() && bs.seeded.archived() && bs.seeded.paused());
-    let groups = cp_groups::types::GroupsState::get(&app.state);
+    let groups = &cp_groups::types::GroupsState::get(&app.state).groups;
+    // One pass over groups, then O(1) per agent: this runs every loop tick.
+    let runnable = cp_groups::social::index::runnable_set(groups);
+    let msg_counts: std::collections::HashMap<&str, usize> =
+        groups.iter().map(|g| (g.id.as_str(), g.messages.len())).collect();
     let mut h = std::collections::hash_map::DefaultHasher::new();
     for t in &AgentsState::get(&app.state).agents {
         t.id.hash(&mut h);
         // Timeline length (human-group messages + tool traces) without
-        // building the merged timeline: this runs every loop tick.
-        let msgs = groups.find(&t.human_group_id).map_or(0, |g| g.messages.len());
+        // building the merged timeline.
+        let msgs = msg_counts.get(t.human_group_id.as_str()).copied().unwrap_or(0);
         msgs.saturating_add(t.activity.len()).hash(&mut h);
-        cp_groups::social::runnable(&groups.groups, &t.id).hash(&mut h);
+        runnable.contains(t.id.as_str()).hash(&mut h);
         t.archived.hash(&mut h);
         t.paused.hash(&mut h);
     }

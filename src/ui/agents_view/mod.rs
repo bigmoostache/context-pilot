@@ -21,7 +21,7 @@ use crate::state::State;
 use crate::ui::{ir, theme};
 use cp_base::cast::Safe as _;
 use cp_fleet::AgentExecState;
-use cp_mod_agents::types::{AgentAuthor, AgentStatus, AgentsState, FocusState};
+use cp_mod_agents::types::{AgentAuthor, AgentsState, FocusState};
 use cp_mod_agents::view_state::FleetExecMirror;
 
 /// Width of the agent list pane in columns.
@@ -56,7 +56,7 @@ pub(crate) fn render_agents_view(frame: &mut Frame<'_>, state: &mut State, area:
         };
         {
             let _g = crate::profile!("tv_list");
-            render_agent_list(frame, state, list_area);
+            render_agent_list(frame, state, &visible, list_area);
         }
         if on_virtual_new {
             render_new_agent_prompt(frame, state, msg_area);
@@ -67,7 +67,7 @@ pub(crate) fn render_agents_view(frame: &mut Frame<'_>, state: &mut State, area:
         }
     } else {
         // Narrow terminal — show agent list only
-        render_agent_list(frame, state, area);
+        render_agent_list(frame, state, &visible, area);
     }
 }
 
@@ -107,10 +107,11 @@ struct ListBuild<'build> {
     /// Per-thread message count the *human* has seen in the TUI
     /// ([`FocusState::last_read_count`]) — drives the unread marker.
     last_read: &'build std::collections::BTreeMap<String, usize>,
-    /// Agents store, to resolve each agent's human group.
-    agents: &'build AgentsState,
-    /// Groups store holding the agents' messages.
-    groups: &'build cp_groups::types::GroupsState,
+    /// Ids of `MyTurn` agents, built once per frame
+    /// ([`cp_groups::social::index::runnable_set`]).
+    runnable: std::collections::HashSet<&'build str>,
+    /// Group id → its messages, built once per frame (unread marker lookup).
+    msgs_of_group: std::collections::HashMap<&'build str, &'build [cp_mod_agents::types::AgentMessage]>,
     /// Tree-guide prefix of each visible agent (`├─`, `│ `…, empty for roots).
     guide_of: std::collections::HashMap<String, String>,
 }
@@ -152,10 +153,10 @@ fn push_new_agent_entry(lb: &mut ListBuild<'_>, state: &State, on_virtual: bool)
 /// a turn), yellow/amber = paused. Returned as a raw triple (via
 /// [`Span::rgb`](cp_render::Span::rgb)) because the IR `Semantic` palette has no
 /// distinct orange-vs-amber pair.
-fn agent_circle_rgb(agent: &cp_mod_agents::types::Agent, groups: &[cp_groups::types::Group]) -> (u8, u8, u8) {
+fn agent_circle_rgb(agent: &cp_mod_agents::types::Agent, my_turn: bool) -> (u8, u8, u8) {
     let color = if agent.paused {
         theme::warning()
-    } else if cp_mod_agents::types::turn::status_of(groups, &agent.id) == AgentStatus::MyTurn {
+    } else if my_turn {
         theme::orange()
     } else {
         theme::success()
@@ -200,9 +201,13 @@ fn has_unread_reply(
 fn leading_slot(lb: &ListBuild<'_>, agent: &cp_mod_agents::types::Agent) -> S {
     if agent_is_working(lb.mirror.exec_state_of(&agent.id)) {
         S::styled(format!("{} ", crate::ui::helpers::spinner()), Semantic::Accent)
-    } else if cp_mod_agents::types::turn::status_of(&lb.groups.groups, &agent.id) == AgentStatus::MyTurn {
+    } else if lb.runnable.contains(agent.id.as_str()) {
         S::styled("\u{26a0} ".to_owned(), Semantic::Error)
-    } else if has_unread_reply(cp_mod_agents::types::msgs::of(lb.agents, lb.groups, &agent.id), agent, lb.last_read) {
+    } else if has_unread_reply(
+        lb.msgs_of_group.get(agent.human_group_id.as_str()).copied().unwrap_or_default(),
+        agent,
+        lb.last_read,
+    ) {
         S::styled("\u{25c6} ".to_owned(), Semantic::Accent)
     } else {
         S::styled("  ".to_owned(), Semantic::Default)
@@ -270,7 +275,7 @@ fn push_agent_entry(
     worktree: Option<&WorktreeLine>,
 ) {
     let leading = leading_slot(lb, agent);
-    let (cr, cg, cb) = agent_circle_rgb(agent, &lb.groups.groups);
+    let (cr, cg, cb) = agent_circle_rgb(agent, lb.runnable.contains(agent.id.as_str()));
     // Sub-agents: dimmed tree guides, two columns per depth level (tree order
     // comes from `visible_indices`).
     let guide = lb.guide_of.get(&agent.id).cloned().unwrap_or_default();
@@ -363,12 +368,12 @@ fn apply_selection_highlight(lines: &mut [ratatui::text::Line<'static>], sel: &S
 ///
 /// Layout chrome (right border) is direct ratatui. All visible content
 /// (agent entries, indicators, help hints) goes through IR → `blocks_to_lines()`.
-fn render_agent_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
+fn render_agent_list(frame: &mut Frame<'_>, state: &State, visible: &[usize], area: Rect) {
     let ts = AgentsState::get(state);
     let focus = FocusState::get(state);
     let mirror = FleetExecMirror::get(state);
     let viewing_archived = focus.viewing_archived;
-    let visible = ts.visible_indices(viewing_archived);
+    let groups = &cp_groups::types::GroupsState::get(state).groups;
     let show_new = !viewing_archived; // virtual "+ New Agent" only in the active view
     let total_entries = visible.len().saturating_add(usize::from(show_new));
     let selected = focus.selected_agent_idx.min(total_entries.saturating_sub(1));
@@ -396,9 +401,9 @@ fn render_agent_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
         inner_width: inner.width,
         mirror,
         last_read: &focus.last_read_count,
-        agents: ts,
-        groups: cp_groups::types::GroupsState::get(state),
-        guide_of: guide_map(ts, &visible),
+        runnable: cp_groups::social::index::runnable_set(groups),
+        msgs_of_group: groups.iter().map(|g| (g.id.as_str(), g.messages.as_slice())).collect(),
+        guide_of: guide_map(ts, visible),
     };
     if show_new {
         push_new_agent_entry(&mut lb, state, on_virtual);

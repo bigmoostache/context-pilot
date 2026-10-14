@@ -105,19 +105,34 @@ pub fn check_parent(agents: &[Agent], child: &str, parent: Option<&str>, max_dep
 /// An agent whose parent is not visible is shown as a root.
 #[must_use]
 pub fn preorder(agents: &[Agent], visible: &[usize]) -> Vec<(usize, usize)> {
-    let shown = |id: &str| visible.iter().any(|&i| agents.get(i).is_some_and(|a| a.id == id));
+    use std::collections::{HashMap, HashSet};
+    // Indexed once so the walk is O(visible), not O(visible²): it runs per frame.
+    let shown: HashSet<&str> = visible.iter().filter_map(|&i| agents.get(i)).map(|a| a.id.as_str()).collect();
     let parent_at = |i: usize| agents.get(i)?.parent_agent_id.as_deref();
+    // Parent id → visible children, in `visible` order.
+    let mut kids_of: HashMap<&str, Vec<usize>> = HashMap::new();
+    for &k in visible {
+        if let Some(p) = parent_at(k) {
+            kids_of.entry(p).or_default().push(k);
+        }
+    }
     let mut out = Vec::with_capacity(visible.len());
-    let mut stack: Vec<(usize, usize)> =
-        visible.iter().rev().copied().filter(|&i| parent_at(i).is_none_or(|p| !shown(p))).map(|i| (i, 0)).collect();
+    let mut stack: Vec<(usize, usize)> = visible
+        .iter()
+        .rev()
+        .copied()
+        .filter(|&i| parent_at(i).is_none_or(|p| !shown.contains(p)))
+        .map(|i| (i, 0))
+        .collect();
     while let Some((i, d)) = stack.pop() {
         if out.len() > visible.len() {
             break;
         }
         out.push((i, d));
         let Some(id) = agents.get(i).map(|a| a.id.as_str()) else { continue };
-        let kids = visible.iter().rev().copied().filter(|&k| parent_at(k) == Some(id));
-        stack.extend(kids.map(|k| (k, d.saturating_add(1))));
+        if let Some(kids) = kids_of.get(id) {
+            stack.extend(kids.iter().rev().map(|&k| (k, d.saturating_add(1))));
+        }
     }
     out
 }
