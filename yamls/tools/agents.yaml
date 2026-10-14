@@ -6,6 +6,11 @@ tools:
       Agents panel). To attach files, embed ```file-upload``` blocks in markdown
       (see below).
 
+      Send is the ONLY way to reach anyone. Your conversation is STRICTLY
+      CONFIDENTIAL: plain assistant text, thinking, tool calls and tool results
+      never reach the user or other agents, and never can. Whenever you want to
+      tell, answer or ask anything, call Send.
+
       `next` says who acts next in that group:
         STILL_MY_TURN               you keep working (progress update)
         GIVE_TALKING_STICK_TO <id>  hand the turn to one member; HUMAN hands
