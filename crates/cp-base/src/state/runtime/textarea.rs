@@ -197,18 +197,28 @@ impl TextArea {
     }
 }
 
-/// Write `text` to the system clipboard via `pbcopy`. Returns `true` on a
-/// successful spawn+write. Shared helper so copy paths don't duplicate the
-/// process plumbing.
+/// Write `text` to the system clipboard via `pbcopy`, on a detached thread.
+///
+/// Never blocks the caller: spawning `pbcopy`, piping the text and waiting
+/// for it all run off the main loop (a stalled pasteboard once froze the loop
+/// for 36 s). Returns `true` once the worker thread is started; the copy
+/// itself is fire-and-forget. Shared by every copy path in the TUI.
 #[must_use]
 pub fn copy_to_clipboard(text: &str) -> bool {
+    let owned = text.to_owned();
+    std::thread::Builder::new().name("cp-clipboard".to_owned()).spawn(move || pbcopy_blocking(&owned)).is_ok()
+}
+
+/// Blocking `pbcopy` round-trip: spawn, write, close stdin, wait.
+/// Only ever called from the [`copy_to_clipboard`] worker thread.
+fn pbcopy_blocking(text: &str) {
     let Ok(mut child) = std::process::Command::new("pbcopy").stdin(std::process::Stdio::piped()).spawn() else {
-        return false;
+        return;
     };
     if let Some(mut stdin) = child.stdin.take() {
         let _r = stdin.write_all(text.as_bytes());
     }
-    child.wait().is_ok()
+    let _r = child.wait();
 }
 
 /// Read the system clipboard via `pbpaste`. Returns the clipboard text, or an

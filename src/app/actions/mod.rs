@@ -96,13 +96,8 @@ fn reset_session_costs(state: &mut State) {
 fn handle_copy_index_overlay(state: &mut State) {
     let ir = crate::ui::search_overlay::build_search_index_overlay(state);
     let text = crate::ui::search_overlay::text::build_overlay_text(&ir);
-    if let Ok(mut child) = std::process::Command::new("pbcopy").stdin(std::process::Stdio::piped()).spawn() {
-        if let Some(mut stdin) = child.stdin.take() {
-            use std::io::Write as _;
-            let _r = stdin.write_all(text.as_bytes());
-        }
-        let _r = child.wait();
-    }
+    // Copy off the main loop (pbcopy can stall for seconds).
+    let _started = cp_base::state::runtime::textarea::copy_to_clipboard(&text);
     state.flags.overlays.copied_flash_ms = crate::app::panels::now_ms();
     state.flags.ui.dirty = true;
 }

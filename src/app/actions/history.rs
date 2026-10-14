@@ -107,8 +107,6 @@ pub(super) fn handle_history_next(state: &mut State) {
 
 /// Copy the current panel's content to the system clipboard (Ctrl+C).
 pub(super) fn handle_copy_panel_content(state: &mut State) {
-    use std::io::Write as _;
-
     let Some(context_type) = state.agent().context.get(state.agent().selected_context).map(|c| c.context_type.clone())
     else {
         return;
@@ -130,13 +128,8 @@ pub(super) fn handle_copy_panel_content(state: &mut State) {
         return;
     }
 
-    // Copy via pbcopy (macOS)
-    if let Ok(mut child) = std::process::Command::new("pbcopy").stdin(std::process::Stdio::piped()).spawn() {
-        if let Some(mut stdin) = child.stdin.take() {
-            let _r = stdin.write_all(text.as_bytes());
-        }
-        let _r = child.wait();
-    }
+    // Copy off the main loop (pbcopy can stall for seconds).
+    let _started = cp_base::state::runtime::textarea::copy_to_clipboard(&text);
     // Visual feedback via status bar flash
     state.flags.overlays.copied_flash_ms = crate::app::panels::now_ms();
     state.flags.ui.dirty = true;
