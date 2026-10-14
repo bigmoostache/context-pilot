@@ -47,25 +47,32 @@ impl Panel for EntitiesPanel {
             return;
         }
 
-        // Skip the reopen + introspect + sample queries when neither the DB nor
-        // its WAL changed since the last refresh (writes land in `-wal` first).
-        let fingerprint = {
-            let _p = cp_base::perf_span!("ent_fingerprint");
-            db_fingerprint(&db_path)
+        // Skip the introspect + sample queries when no other connection
+        // committed since the last refresh. `data_version` on the held reader
+        // is a microsecond read, immune to our own opens touching -wal/-shm.
+        let probed = {
+            let _p = cp_base::perf_span!("ent_data_version");
+            EntitiesState::get(state).reader.data_version(&db_path)
         };
+        let Some(version) = probed else {
+            return; // Busy or unreadable: keep the cached view, retry next tick.
+        };
+        let fingerprint = format!("dv:{version}");
         let entry = state.agent().context.iter().find(|e| e.context_type.as_str() == Kind::ENTITIES);
         if entry.is_some_and(|e| e.cached_content.is_some() && e.source_hash.as_deref() == Some(fingerprint.as_str())) {
             return;
         }
 
-        let opened = {
-            let _p = cp_base::perf_span!("ent_open");
-            db::open(&db_path)
-        };
-        if let Ok(conn) = opened {
+        let fresh = {
             let _p = cp_base::perf_span!("ent_introspect");
-            let fresh = db::introspect(&conn, &db_path);
-            EntitiesState::get_mut(state).schema_cache = Some(fresh);
+            EntitiesState::get(state)
+                .reader
+                .with(&db_path, |c| (db::introspect(c, &db_path), migrations::migration_count(c)))
+        };
+        if let Some((cache, mig_count)) = fresh {
+            let es = EntitiesState::get_mut(state);
+            es.schema_cache = Some(cache);
+            es.migration_count = mig_count;
         }
 
         // Update context entry
@@ -77,8 +84,6 @@ impl Panel for EntitiesPanel {
             ctx.cached_content = Some(content);
             ctx.token_count = tokens;
             ctx.full_token_count = tokens;
-            // Fingerprint taken before the reopen: our own PRAGMAs may touch the
-            // WAL, which only costs one extra refresh, never a missed change.
             ctx.source_hash = Some(fingerprint);
         }
     }
@@ -131,15 +136,6 @@ impl Panel for EntitiesPanel {
 // Context text (sent to LLM)
 // =============================================================================
 
-/// Size + mtime of the DB file and its `-wal` sidecar: changes on any write,
-/// read with two `stat` calls instead of opening `SQLite`.
-fn db_fingerprint(db_path: &std::path::Path) -> String {
-    let stat = |p: &std::path::Path| std::fs::metadata(p).ok().map(|m| (m.len(), m.modified().ok()));
-    let mut wal = db_path.as_os_str().to_owned();
-    wal.push("-wal");
-    format!("{:?}|{:?}", stat(db_path), stat(std::path::Path::new(&wal)))
-}
-
 /// Build the text sent to the LLM as context for the Entities panel.
 fn build_context_text(es: &EntitiesState) -> String {
     let Some(cache) = es.schema_cache.as_ref() else {
@@ -154,9 +150,6 @@ fn build_context_text(es: &EntitiesState) -> String {
     let kb = cache.db_size_bytes.wrapping_div(1024);
 
     let mut out = format!("Entity Database ({} tables, {} rows, {} KB):\n\n", cache.tables.len(), total_rows, kb);
-
-    // Open connection for sample data
-    let conn = db::open(&es.db_path).ok();
 
     for table in &cache.tables {
         // Table header: name (row_count):
@@ -182,8 +175,7 @@ fn build_context_text(es: &EntitiesState) -> String {
         }
 
         // Sample data (3 rows, 50 char truncation, skip >10 columns)
-        if let Some(c) = conn.as_ref() {
-            let samples = db::sample_rows(c, &table.name, 3);
+        if let Some(samples) = es.reader.with(&es.db_path, |c| db::sample_rows(c, &table.name, 3)) {
             if !samples.is_empty() {
                 for row in &samples {
                     let _sample = writeln!(out, "  Sample: ({})", row.join(", "));
@@ -252,13 +244,12 @@ fn populated_blocks(es: &EntitiesState) -> Vec<Block> {
         Block::empty(),
     ];
 
-    // Get migration count
-    if let Ok(conn) = db::open(&es.db_path) {
-        let mig_count = migrations::migration_count(&conn);
-        if mig_count > 0 {
-            blocks.push(Block::Line(vec![Span::styled(format!("{mig_count} migration(s) tracked"), Semantic::Muted)]));
-            blocks.push(Block::empty());
-        }
+    if es.migration_count > 0 {
+        blocks.push(Block::Line(vec![Span::styled(
+            format!("{} migration(s) tracked", es.migration_count),
+            Semantic::Muted,
+        )]));
+        blocks.push(Block::empty());
     }
 
     for table in &cache.tables {
