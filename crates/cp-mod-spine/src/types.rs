@@ -245,10 +245,22 @@ impl SpineState {
                 // (tool_result hasn't been appended yet).
                 last.role != "assistant" || last.tool_uses.is_empty()
             });
-            let msg = format!("/* Notification [{source}]: {content} */");
+            // Aggregate (T736): one live notification message carrying EVERY
+            // still-unprocessed one plus this. Replacing it with only the newest
+            // lost the earlier ones (later marked processed, never seen).
+            let mut lines: Vec<String> = Self::get(state)
+                .notifications
+                .iter()
+                .filter(|n| {
+                    n.is_unprocessed()
+                        && !matches!(n.kind, NotificationType::UserMessage | NotificationType::ReloadResume)
+                })
+                .map(|n| format!("/* Notification [{}]: {} */", n.source, n.content))
+                .collect();
+            lines.push(format!("/* Notification [{source}]: {content} */"));
+            let msg = lines.join("\n");
             if safe_to_inject {
-                // Aggregate (T736): keep at most one notification message live —
-                // drop any prior injected notification messages before adding this.
+                // Drop the previous aggregate before adding the new one.
                 let _stripped = state.strip_notification_messages();
                 let _idx = state.push_user_message(msg);
             } else {

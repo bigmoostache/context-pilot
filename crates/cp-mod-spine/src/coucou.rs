@@ -111,6 +111,12 @@ fn human_group_of(groups: &GroupsState, agent_id: &str) -> Option<String> {
 /// both be members) or the target's human group (which proves it exists).
 fn resolve_group(groups: &GroupsState, draft: &Draft) -> Result<String, String> {
     let Some(gid) = draft.group_id.as_deref() else {
+        if draft.creator.as_deref().is_some_and(|c| c != draft.target) {
+            return Err(format!(
+                "a coucou for another agent needs group_id: a group both you and {} belong to",
+                draft.target
+            ));
+        }
         return human_group_of(groups, &draft.target)
             .ok_or_else(|| format!("unknown agent {} (it has no human group)", draft.target));
     };

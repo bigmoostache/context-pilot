@@ -60,7 +60,10 @@ fn parse_field(field: &str, (min, max): (u32, u32), name: &str) -> Result<u64, S
             // `5/15` means 5, 20, 35, 50: a lone start with a step runs to max.
             (v, if step > 1 { max } else { v })
         };
-        if lo < min || hi > max || lo > hi {
+        if lo > hi {
+            return Err(format!("{name} `{range}` is a reversed range (write {hi}-{lo})"));
+        }
+        if lo < min || hi > max {
             return Err(format!("{name} `{range}` out of range {min}-{max}"));
         }
         let mut v = lo;
@@ -85,14 +88,19 @@ impl Cron {
                 "cron `{expr}` must have 5 fields: minute hour day-of-month month day-of-week (e.g. `0 9 * * 1-5`)"
             ));
         };
+        // Left to right, so an error names the first bad field.
+        let minutes = parse_field(minute, (0, 59), "minute")?;
+        let hours = parse_field(hour, (0, 23), "hour")?;
+        let days = parse_field(day, (1, 31), "day-of-month")?;
+        let months = parse_field(month, (1, 12), "month")?;
         let raw_weekdays = parse_field(weekday, (0, 7), "day-of-week")?;
         // 7 is Sunday too: fold it onto 0.
         let weekdays = (raw_weekdays & !bit(7)) | if raw_weekdays & bit(7) == 0 { 0 } else { bit(0) };
         Ok(Self {
-            minutes: parse_field(minute, (0, 59), "minute")?,
-            hours: parse_field(hour, (0, 23), "hour")?,
-            days: parse_field(day, (1, 31), "day-of-month")?,
-            months: parse_field(month, (1, 12), "month")?,
+            minutes,
+            hours,
+            days,
+            months,
             weekdays,
             any_day: day == "*",
             any_weekday: weekday == "*",
@@ -233,5 +241,15 @@ mod tests {
         assert_eq!(Cron::parse("0 9 * *").ok(), None);
         assert_eq!(Cron::parse("60 * * * *").ok(), None);
         assert_eq!(Cron::parse("*/0 * * * *").ok(), None);
+    }
+
+    #[test]
+    fn error_messages_name_the_right_problem() {
+        // Reversed range: not "out of range".
+        let e = Cron::parse("5-1 * * * *").unwrap_err();
+        assert!(e.contains("reversed range"), "{e}");
+        // A garbage expression blames the FIRST bad field (minute), not the last.
+        let e = Cron::parse("foo bar baz qux quux").unwrap_err();
+        assert!(e.contains("minute"), "{e}");
     }
 }

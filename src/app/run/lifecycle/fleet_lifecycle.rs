@@ -289,11 +289,15 @@ impl App {
                 .map_or_else(String::new, |id| format!(" [recurring; Coucou_delete {id} stops it]"));
             let content = format!("Coming back in {label}: {}{stop}", f.message);
             let bind = f.agent_id.clone();
+            // Unique source: `create_notification` dedups on (kind, source), so a
+            // shared "social" source swallowed a second comeback firing before
+            // the first was processed.
+            let source = format!("social:{}:{}:{now_ms}", f.group_id, f.recurrent_id.as_deref().unwrap_or(&f.agent_id));
             self.deliver_to_agent(Some(&f.agent_id), move |state| {
                 let nid = cp_mod_spine::types::SpineState::create_notification(
                     state,
                     cp_mod_spine::types::NotificationType::Custom,
-                    "social".to_owned(),
+                    source,
                     content,
                 );
                 cp_mod_spine::types::SpineState::set_notification_agent(state, &nid, Some(bind));

@@ -128,11 +128,14 @@ fn delete(state: &mut State, caller: &str, args: &Args<'_>) -> Result<String, St
         confirm(agents, id, args.key)?;
     }
     let gone = doomed.join(", ");
-    GroupsState::get_mut(state)
-        .groups
-        .retain(|g| g.kind != GroupKind::Coordination || !g.member_ids.iter().any(|m| doomed.contains(m)));
+    // Their human groups and every coordination group they sat in go too.
+    GroupsState::get_mut(state).groups.retain(|g| match g.kind {
+        GroupKind::Human => !doomed.contains(&g.owner_agent_id),
+        GroupKind::Coordination => !g.member_ids.iter().any(|m| doomed.contains(m)),
+        GroupKind::Custom => true,
+    });
     ManagementState::get_mut(state).doomed.extend(doomed);
-    Ok(format!("Deleted {gone} (and their coordination groups)."))
+    Ok(format!("Deleted {gone} (with their human and coordination groups)."))
 }
 
 /// Spend a valid `key`, or refuse with the subtree listing and a fresh key.
