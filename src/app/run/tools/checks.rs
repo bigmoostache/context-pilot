@@ -247,11 +247,15 @@ fn declared_focused_task(app: &App, tool: &cp_base::tools::ToolUse, focused: &st
 /// Flip `task_id` from `Planned` to `InProgress` (owned by `focused`). Returns
 /// whether a change actually occurred (i.e. the task was `Planned`).
 fn flip_planned_to_in_progress(app: &mut App, focused: &str, task_id: &str) -> bool {
-    let ts = cp_mod_todo::types::TodoState::get_mut(&mut app.state);
-    if let Some(item) = ts.todos.iter_mut().find(|t| t.id == task_id && t.agent_id == focused)
-        && item.status == cp_mod_todo::types::TodoStatus::Planned
-    {
-        item.status = cp_mod_todo::types::TodoStatus::InProgress;
+    use cp_mod_todo::types::{TodoState, TodoStatus};
+    let is_target = |t: &cp_mod_todo::types::TodoItem| t.id == task_id && t.agent_id == focused;
+    // Read first: `get_mut` bumps the save stamp, and this runs on every tool
+    // call carrying a task_id, so a non-flip would rewrite todo.json for nothing.
+    if !TodoState::get(&app.state).todos.iter().any(|t| is_target(t) && t.status == TodoStatus::Planned) {
+        return false;
+    }
+    if let Some(item) = TodoState::get_mut(&mut app.state).todos.iter_mut().find(|t| is_target(t)) {
+        item.status = TodoStatus::InProgress;
         return true;
     }
     false
