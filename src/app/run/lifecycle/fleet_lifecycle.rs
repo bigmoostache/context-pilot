@@ -217,14 +217,18 @@ impl App {
     /// single-thread.
     pub(super) fn dispatch_background_my_turn(&mut self) {
         let focused = cp_mod_agents::types::FocusState::get(&self.state).focused_agent_id.clone();
+        let mirror = cp_mod_agents::view_state::FleetExecMirror::get(&self.state);
         // Snapshot (id, name) of eligible background agents before touching the
-        // per-agent state (delivery below borrows `state`).
+        // per-agent state (delivery below borrows `state`). Only truly idle
+        // agents: one awaiting the LLM or running tools is mid-turn and not
+        // streaming, and a nudge there lands after it has already replied.
         let candidates: Vec<(String, String)> = AgentsState::get(&self.state)
             .agents
             .iter()
             .filter(|t| {
                 !t.archived
                     && !t.paused
+                    && mirror.exec_state_of(&t.id) == AgentExecState::Idle
                     && cp_mod_agents::types::turn::status(&self.state, &t.id) == AgentStatus::MyTurn
                     && focused.as_deref() != Some(t.id.as_str())
             })
@@ -240,6 +244,10 @@ impl App {
                     return;
                 }
                 if cp_mod_spine::types::SpineState::has_unprocessed_notifications(state) {
+                    return;
+                }
+                // The turn may have been handed back since the snapshot.
+                if cp_mod_agents::types::turn::status(state, &tid_for_bind) != AgentStatus::MyTurn {
                     return;
                 }
                 let content = cp_mod_agents::types::turn::nudge(state, &tid_for_bind, &name);
