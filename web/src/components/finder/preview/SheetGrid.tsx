@@ -182,14 +182,15 @@ export function SheetGrid({
     // Deferred: avoids synchronous setState in effect (eslint-react/set-state-in-effect).
     const readyFrame = requestAnimationFrame(() => setReady(true))
 
-    // Track edits: set dirty on any command, autosave to localStorage
-    // as crash recovery (not the primary save — that's the explicit Save
-    // button which uploads to the agent realm).
+    // Track edits: only a user mutation of a sheet marks the file dirty
+    // (selections, scrolling and formula results don't), and autosaves to
+    // localStorage as crash recovery (the primary save is the Save button).
     let timer: ReturnType<typeof setTimeout> | null = null
     touchedRef.current.clear()
     const sub = univerAPI.addEvent(univerAPI.Event.CommandExecuted, (event) => {
       const sheetId = touchedSheet(event)
-      if (sheetId) touchedRef.current.add(sheetId)
+      if (!sheetId) return
+      touchedRef.current.add(sheetId)
       setDirty(true)
       if (!backup) return
       if (timer) clearTimeout(timer)

@@ -248,10 +248,16 @@ export function touchedSheet(event: {
   const opts = event.options
   if (opts?.onlyLocal === true || opts?.fromChangeset === true || opts?.fromCollab === true)
     return null
-  const params = event.params
+  return sheetIdOf(event.params)
+}
+
+/** `subUnitId` of a mutation's params, or the new sheet's id for insert-sheet. */
+function sheetIdOf(params: unknown): string | null {
   if (typeof params !== "object" || params === null) return null
   if ("subUnitId" in params && typeof params.subUnitId === "string") return params.subUnitId
-  return null
+  if (!("sheet" in params) || typeof params.sheet !== "object" || params.sheet === null) return null
+  const sheet = params.sheet
+  return "id" in sheet && typeof sheet.id === "string" ? sheet.id : null
 }
 
 /**
