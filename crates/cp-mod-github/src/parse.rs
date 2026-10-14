@@ -161,7 +161,7 @@ fn extract_json_u64(json: &str, key: &str) -> Option<u64> {
 }
 
 /// Parse the overall checks status from statusCheckRollup
-fn parse_checks_status(json: &str) -> Option<String> {
+pub(crate) fn parse_checks_status(json: &str) -> Option<String> {
     if !json.contains("statusCheckRollup") {
         return None;
     }
