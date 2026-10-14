@@ -18,7 +18,8 @@ fn worktree_name(state: &State, agent_id: &str) -> Option<String> {
     Some(dir.file_name()?.to_string_lossy().into_owned())
 }
 
-/// One roster line: `A7 "name" — description [⎇ wt] · STATUS · 12 msgs · …`.
+/// One roster line: `A7 "name" — description [⎇ wt] · 12 msgs · …`. Turn
+/// state is not shown: the groups panel's `social:` footer carries it.
 fn agent_line(state: &State, agent: &Agent, focused_id: &str) -> String {
     let mut line = format!("{} \"{}\"", agent.id, yaml_escape(&agent.name));
     if !agent.description.is_empty() {
@@ -31,7 +32,7 @@ fn agent_line(state: &State, agent: &Agent, focused_id: &str) -> String {
     // coordination groups, not their human group).
     let groups = cp_groups::types::GroupsState::get(state);
     let total: usize = groups.of_member(&agent.id).map(|g| g.messages.iter().filter(|m| !m.auto).count()).sum();
-    _ = write!(line, " · {} · {total} msgs", super::turn::status(state, &agent.id));
+    _ = write!(line, " · {total} msgs");
     let unack: usize = groups.of_member(&agent.id).map(|g| g.unread_for(&agent.id)).sum();
     if unack > 0 {
         _ = write!(line, " · {unack} unread");

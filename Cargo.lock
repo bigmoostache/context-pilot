@@ -485,6 +485,7 @@ version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-macros",
+ "cp-mod-utilities",
  "cp-render",
  "crossterm",
  "serde",
@@ -749,6 +750,7 @@ version = "0.2.13"
 dependencies = [
  "cp-base",
  "cp-groups",
+ "cp-macros",
  "cp-mod-utilities",
  "cp-render",
  "serde",

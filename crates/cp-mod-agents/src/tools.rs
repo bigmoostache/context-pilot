@@ -15,7 +15,7 @@ use crate::types::roster::yaml_escape;
 use cp_groups::social::{self, Next};
 use cp_groups::types::GroupsState;
 
-use crate::types::{AgentAuthor, AgentMessage, AgentsState, msgs, turn};
+use crate::types::{AgentAuthor, AgentMessage, AgentsState, msgs};
 
 /// Truncate `s` to at most `max` bytes on a char boundary (no ellipsis).
 fn clamp_bytes(s: &str, max: usize) -> String {
@@ -250,7 +250,6 @@ pub(crate) fn build_panel_content(state: &State, focused_tid: &str, _now_ms: u64
     _ = writeln!(output, "\nyou:");
     _ = writeln!(output, "  agent_id: {}", agent.id);
     _ = writeln!(output, "  name: \"{}\"", yaml_escape(&agent.name));
-    _ = writeln!(output, "  status: {}", turn::status(state, &agent.id));
     _ = writeln!(output, "  human_group_id: {}", agent.human_group_id);
     write_origin(&mut output, agent);
     output

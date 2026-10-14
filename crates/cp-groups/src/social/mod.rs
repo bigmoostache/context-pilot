@@ -4,6 +4,7 @@
 //! list of [`Substate`]s; an agent is *runnable* when any substate of any
 //! group holds it. `Send` rewrites the sender's substates through [`Next`].
 
+use cp_mod_utilities::cron::Cron;
 use serde::{Deserialize, Serialize};
 
 use crate::types::{Group, GroupKind, HUMAN};
@@ -24,6 +25,25 @@ pub enum Substate {
         /// Due time (epoch ms).
         at_ms: u64,
         /// Message posted into the group when due.
+        message: String,
+        /// Id of the [`Substate::Recurrent`] that armed it, if any.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        from: Option<String>,
+    },
+    /// `agent_id` gets `message` on every match of `cron`: [`tick`] keeps one
+    /// `ComingBack` armed for it. Created by `GIVE_RECURRING_TASK` and
+    /// `Coucou(cron=…)` alike (both go through `coucou::schedule`).
+    Recurrent {
+        /// Coucou id (`coucou_<n>`), the handle `Coucou_delete` takes.
+        id: String,
+        /// Agent woken on each match.
+        agent_id: String,
+        /// Agent that scheduled it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        creator_agent_id: Option<String>,
+        /// 5-field POSIX cron, host local time.
+        cron: String,
+        /// Reminder text.
         message: String,
     },
     /// Every `pending` agent must answer; then `origin_agent_id` takes the stick.
@@ -47,7 +67,7 @@ impl Substate {
         cp_macros::deref_match!(self, {
             Self::SimpleTurn { agent_id: ref a } => a == agent_id,
             Self::Gather { ref pending, .. } => pending.iter().any(|p| p == agent_id),
-            Self::ComingBack { .. } | Self::Dispatch { .. } => false,
+            Self::ComingBack { .. } | Self::Dispatch { .. } | Self::Recurrent { .. } => false,
         })
     }
 }
@@ -187,9 +207,10 @@ pub fn clear_turn(group: &mut Group, agent_id: &str) {
                     Substate::Gather { pending, origin_agent_id }
                 })
             }
-            other @ (Substate::SimpleTurn { .. } | Substate::ComingBack { .. } | Substate::Dispatch { .. }) => {
-                Some(other)
-            }
+            other @ (Substate::SimpleTurn { .. }
+            | Substate::ComingBack { .. }
+            | Substate::Dispatch { .. }
+            | Substate::Recurrent { .. }) => Some(other),
         };
         if let Some(s) = kept {
             push_unique(group, s);
@@ -258,15 +279,19 @@ pub struct Fired {
     pub agent_id: String,
     /// Reminder text.
     pub message: String,
+    /// Id of the [`Substate::Recurrent`] behind it (`Coucou_delete` handle).
+    pub recurrent_id: Option<String>,
 }
 
 /// Advance time-driven substates once.
 ///
-/// Due `ComingBack`s become `SimpleTurn`s
-/// (returned as [`Fired`]); then each `Dispatch` goes to its first candidate
-/// that `is_idle` and is not already runnable anywhere. Dispatch runs last so
-/// every other relaunch decision of the tick is already visible.
-pub fn tick<Idle>(groups: &mut [Group], now_ms: u64, is_idle: &Idle) -> Vec<Fired>
+/// Due `ComingBack`s become `SimpleTurn`s (returned as [`Fired`]); each
+/// `Recurrent` then re-arms its `ComingBack` at the next cron match after
+/// `now_ms` (`offset_secs` = local UTC offset) unless one is still pending;
+/// finally each `Dispatch` goes to its first candidate that `is_idle` and is
+/// not already runnable anywhere. Dispatch runs last so every other relaunch
+/// decision of the tick is already visible.
+pub fn tick<Idle>(groups: &mut [Group], (now_ms, offset_secs): (u64, i32), is_idle: &Idle) -> Vec<Fired>
 where
     Idle: Fn(&str) -> bool,
 {
@@ -275,20 +300,75 @@ where
         let old = std::mem::take(&mut g.social);
         for sub in old {
             let next = match sub {
-                Substate::ComingBack { agent_id, at_ms, message } if at_ms <= now_ms => {
-                    fired.push(Fired { group_id: g.id.clone(), agent_id: agent_id.clone(), message });
+                Substate::ComingBack { agent_id, at_ms, message, from } if at_ms <= now_ms => {
+                    fired.push(Fired {
+                        group_id: g.id.clone(),
+                        agent_id: agent_id.clone(),
+                        message,
+                        recurrent_id: from,
+                    });
                     Substate::SimpleTurn { agent_id }
                 }
                 other @ (Substate::SimpleTurn { .. }
                 | Substate::ComingBack { .. }
                 | Substate::Gather { .. }
-                | Substate::Dispatch { .. }) => other,
+                | Substate::Dispatch { .. }
+                | Substate::Recurrent { .. }) => other,
             };
             push_unique(g, next);
         }
+        arm_recurrents(g, now_ms, offset_secs);
     }
     resolve_dispatch(groups, is_idle);
     fired
+}
+
+/// Arm the next `ComingBack` of every `Recurrent` in `group` that has none
+/// pending. A cron that no longer parses or never fires stays unarmed.
+fn arm_recurrents(group: &mut Group, now_ms: u64, offset_secs: i32) {
+    let armed = |id: &str, social: &[Substate]| {
+        social.iter().any(|s| matches!(s, Substate::ComingBack { from: Some(f), .. } if f == id))
+    };
+    let due: Vec<Substate> = group
+        .social
+        .iter()
+        .filter_map(|s| {
+            let (id, agent_id, cron, message) = cp_macros::deref_match!(s, {
+                Substate::Recurrent { ref id, ref agent_id, ref cron, ref message, .. } => (id, agent_id, cron, message),
+                Substate::SimpleTurn { .. }
+                | Substate::ComingBack { .. }
+                | Substate::Gather { .. }
+                | Substate::Dispatch { .. } => return None,
+            });
+            if armed(id, &group.social) {
+                return None;
+            }
+            let at_ms = Cron::parse(cron).ok()?.next_after(now_ms, offset_secs)?;
+            Some(Substate::ComingBack {
+                agent_id: agent_id.clone(),
+                at_ms,
+                message: message.clone(),
+                from: Some(id.clone()),
+            })
+        })
+        .collect();
+    for sub in due {
+        push_unique(group, sub);
+    }
+}
+
+/// Remove the `Recurrent` with `id` and its armed `ComingBack` from whichever
+/// group holds it. Returns the removed `Recurrent` and its group id.
+pub fn remove_recurrent(groups: &mut [Group], id: &str) -> Option<(String, Substate)> {
+    for g in groups.iter_mut() {
+        let Some(pos) = g.social.iter().position(|s| matches!(s, Substate::Recurrent { id: r, .. } if r == id)) else {
+            continue;
+        };
+        let removed = g.social.remove(pos);
+        g.social.retain(|s| !matches!(s, Substate::ComingBack { from: Some(f), .. } if f == id));
+        return Some((g.id.clone(), removed));
+    }
+    None
 }
 
 /// Hand each `Dispatch` to its first idle, not-yet-runnable candidate.
@@ -304,7 +384,10 @@ where
                 .filter_map(|(k, s)| {
                     cp_macros::deref_match!(s, {
                         Substate::Dispatch { ref candidates } => Some((k, candidates.clone())),
-                        Substate::SimpleTurn { .. } | Substate::ComingBack { .. } | Substate::Gather { .. } => None,
+                        Substate::SimpleTurn { .. }
+                        | Substate::ComingBack { .. }
+                        | Substate::Gather { .. }
+                        | Substate::Recurrent { .. } => None,
                     })
                 })
                 .collect()
@@ -319,84 +402,4 @@ where
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::types::GroupsState;
-
-    /// Custom group G1 owned by A1 with members A1, A2, A3 and HUMAN.
-    fn group() -> Group {
-        let mut s = GroupsState::new();
-        let id = s.create(Group {
-            name: "t".into(),
-            owner_agent_id: "A1".into(),
-            member_ids: ["A1", "A2", "A3", HUMAN].map(String::from).to_vec(),
-            kind: GroupKind::Custom,
-            ..Group::default()
-        });
-        s.find(&id).cloned().expect("created")
-    }
-
-    #[test]
-    fn parses_dsl_forms() {
-        assert_eq!(parse_next("still_my_turn"), Ok(Next::StillMyTurn));
-        assert_eq!(parse_next("GIVE_TALKING_STICK_TO {A2}"), Ok(Next::GiveTalkingStickTo("A2".into())));
-        assert_eq!(parse_next("GATHER(A2, A3)"), Ok(Next::Gather(vec!["A2".into(), "A3".into()])));
-        assert_eq!(parse_next("DISPATCH [A2 A3]"), Ok(Next::Dispatch(vec!["A2".into(), "A3".into()])));
-        assert_eq!(
-            parse_next("give_recurring_task(A2, 30 8 * * 1-5, check CI, then report)"),
-            Ok(Next::GiveRecurringTask {
-                agent_id: "A2".into(),
-                cron: "30 8 * * 1-5".into(),
-                message: "check CI, then report".into()
-            })
-        );
-        let bad_cron = parse_next("GIVE_RECURRING_TASK(A2, 0 * *, m)").expect_err("4-field cron");
-        assert!(bad_cron.contains("5-field"), "{bad_cron}");
-    }
-
-    #[test]
-    fn rejects_bad_dsl() {
-        for bad in ["GATHER", "OWNER_DONE A2", "GIVE_TALKING_STICK_TO A2 A3", "NOPE"] {
-            let err = parse_next(bad).expect_err(bad);
-            assert!(err.contains("expected one of"), "{err}");
-        }
-    }
-
-    #[test]
-    fn gather_resumes_origin_when_all_answered() {
-        let mut g = group();
-        apply_send(&mut g, "A1", Next::Gather(vec!["A2".into(), "A3".into()])).expect("ok");
-        let gs = std::slice::from_ref(&g);
-        assert!(runnable(gs, "A2") && runnable(gs, "A3") && !runnable(gs, "A1"));
-        let err = apply_send(&mut g, "A2", Next::OwnerDone).expect_err("A2 not owner");
-        assert!(err.contains("owner-only"), "{err}");
-        apply_send(&mut g, "A2", Next::GiveTalkingStickTo("A3".into())).expect("ok");
-        apply_send(&mut g, "A3", Next::GiveTalkingStickTo("A1".into())).expect("ok");
-        assert_eq!(g.social, vec![Substate::SimpleTurn { agent_id: "A1".into() }]);
-    }
-
-    #[test]
-    fn human_stick_is_owner_only_and_not_runnable() {
-        let mut g = group();
-        let err = apply_send(&mut g, "A2", Next::GiveTalkingStickTo(HUMAN.into())).expect_err("non-owner");
-        assert!(err.contains("only the owner"), "{err}");
-        apply_send(&mut g, "A1", Next::StillMyTurn).expect("ok");
-        apply_send(&mut g, "A1", Next::GiveTalkingStickTo(HUMAN.into())).expect("ok");
-        assert!(g.social.is_empty());
-        let outsider = apply_send(&mut g, "A9", Next::StillMyTurn).expect_err("non-member");
-        assert!(outsider.contains("not a member"), "{outsider}");
-    }
-
-    #[test]
-    fn tick_fires_coming_back_then_dispatches_to_idle_non_runnable() {
-        let mut g = group();
-        g.social.push(Substate::ComingBack { agent_id: "A2".into(), at_ms: 5, message: "wake".into() });
-        apply_send(&mut g, "A1", Next::Dispatch(vec!["A2".into(), "A3".into()])).expect("ok");
-        let mut gs = vec![g];
-        let fired = tick(&mut gs, 10, &|_: &str| true);
-        assert_eq!(fired.len(), 1);
-        let g0 = gs.first().expect("group");
-        assert!(g0.social.contains(&Substate::SimpleTurn { agent_id: "A2".into() }));
-        assert!(g0.social.contains(&Substate::SimpleTurn { agent_id: "A3".into() }), "A2 busy, so A3");
-    }
-}
+mod tests;

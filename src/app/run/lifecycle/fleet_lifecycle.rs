@@ -279,10 +279,15 @@ impl App {
             .map(|a| a.id.clone())
             .collect();
         let groups = &mut cp_groups::types::GroupsState::get_mut(&mut self.state).groups;
-        let fired = cp_groups::social::tick(groups, now_ms, &|id: &str| idle.contains(id));
+        let offset = cp_mod_utilities::time::local_utc_offset_secs();
+        let fired = cp_groups::social::tick(groups, (now_ms, offset), &|id: &str| idle.contains(id));
         for f in fired {
             let label = cp_groups::types::GroupsState::get(&self.state).label(&f.group_id);
-            let content = format!("Coming back in {label}: {}", f.message);
+            let stop = f
+                .recurrent_id
+                .as_deref()
+                .map_or_else(String::new, |id| format!(" [recurring; Coucou_delete {id} stops it]"));
+            let content = format!("Coming back in {label}: {}{stop}", f.message);
             let bind = f.agent_id.clone();
             self.deliver_to_agent(Some(&f.agent_id), move |state| {
                 let nid = cp_mod_spine::types::SpineState::create_notification(

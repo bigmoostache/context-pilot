@@ -59,6 +59,7 @@ impl App {
     /// per-agent counters all started at `coucou_0`, so the ids collide.
     /// Called once at boot, after background agents are loaded.
     pub(super) fn migrate_legacy_coucous(&mut self) {
+        self.migrate_cron_coucous();
         let focused = FocusState::get(&self.state).focused_agent_id.clone();
         let mut moved = drain_legacy(&mut self.state, focused.as_deref());
 
@@ -74,7 +75,21 @@ impl App {
             coucou.watcher_id = registry.alloc_id();
             registry.pending.push(coucou);
         }
+        self.migrate_cron_coucous();
         self.save_state_async();
+    }
+
+    /// Move cron coucous stored by older builds in the registry into their
+    /// group as `Recurrent` substates (same id). Ones without a live group stay.
+    fn migrate_cron_coucous(&mut self) {
+        let registry = CoucouRegistry::get_mut(&mut self.state);
+        let (cron, rest): (Vec<_>, Vec<_>) =
+            std::mem::take(&mut registry.pending).into_iter().partition(|c| c.cron.is_some());
+        registry.pending = rest;
+        let groups = cp_groups::types::GroupsState::get_mut(&mut self.state);
+        let kept: Vec<_> =
+            cron.into_iter().filter(|c| !cp_mod_spine::coucou::store_recurrent(groups, c.clone())).collect();
+        CoucouRegistry::get_mut(&mut self.state).pending.extend(kept);
     }
 }
 

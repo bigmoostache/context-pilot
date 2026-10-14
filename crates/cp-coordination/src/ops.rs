@@ -187,8 +187,11 @@ fn forget_member(group: &mut Group, agent_id: &str) {
 /// `s` with `gone` removed, or `None` when nothing is left of it.
 fn keep_without(s: Substate, gone: &str) -> Option<Substate> {
     match s {
-        Substate::ComingBack { agent_id, at_ms, message } => {
-            (agent_id != gone).then_some(Substate::ComingBack { agent_id, at_ms, message })
+        Substate::ComingBack { agent_id, at_ms, message, from } => {
+            (agent_id != gone).then_some(Substate::ComingBack { agent_id, at_ms, message, from })
+        }
+        Substate::Recurrent { id, agent_id, creator_agent_id, cron, message } => {
+            (agent_id != gone).then_some(Substate::Recurrent { id, agent_id, creator_agent_id, cron, message })
         }
         Substate::Dispatch { mut candidates } => {
             let had = !candidates.is_empty();
@@ -222,7 +225,7 @@ mod tests {
         let mut g = Group {
             social: vec![
                 Substate::SimpleTurn { agent_id: "A2".into() },
-                Substate::ComingBack { agent_id: "A2".into(), at_ms: 1, message: String::new() },
+                Substate::ComingBack { agent_id: "A2".into(), at_ms: 1, message: String::new(), from: None },
                 Substate::Dispatch { candidates: vec!["A2".into()] },
                 Substate::Dispatch { candidates: vec!["A2".into(), "A3".into()] },
             ],

@@ -15,7 +15,7 @@ use crate::state::{Message, State};
 use crate::ui::{ir, theme};
 use cp_base::cast::Safe as _;
 use cp_base::cast::float_math;
-use cp_mod_agents::types::{AgentAuthor, AgentMessage, AgentStatus, AgentsState, FocusState};
+use cp_mod_agents::types::{AgentAuthor, AgentMessage, AgentsState, FocusState};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::hash::{Hash as _, Hasher as _};
@@ -118,13 +118,8 @@ pub(super) fn render_message_area_with_input(frame: &mut Frame<'_>, state: &mut 
         // Title: agent name + status — colors via semantic mapping
         let focus = FocusState::get(state);
         let is_focused = focus.focused_agent_id.as_deref() == Some(agent.id.as_str());
-        let (status_label, status_sem) = if is_focused {
-            (" [FOCUSED]", Semantic::Accent)
-        } else if cp_mod_agents::types::turn::status(state, &agent.id) == AgentStatus::MyTurn {
-            (" [MY_TURN]", Semantic::Warning)
-        } else {
-            (" [THEIR_TURN]", Semantic::Success)
-        };
+        let (status_label, status_sem) =
+            if is_focused { (" [FOCUSED]", Semantic::Accent) } else { ("", Semantic::Default) };
 
         let title = ratatui::text::Line::from(vec![
             ratatui::text::Span::styled(format!(" {} ", agent.name), ir::semantic_to_style(Semantic::Default)),

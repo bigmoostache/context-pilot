@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use cp_base::panels::now_ms;
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
+use cp_groups::social::Substate;
 use cp_groups::types::{GroupKind, GroupsState};
 use cp_mod_utilities::cron::Cron;
 use cp_mod_utilities::time;
@@ -124,6 +125,11 @@ fn resolve_group(groups: &GroupsState, draft: &Draft) -> Result<String, String> 
 
 /// Validate `draft` and register it; returns the stored record.
 ///
+/// One-shots go to the [`CoucouRegistry`]. Cron coucous become a
+/// [`Substate::Recurrent`] in the bound group: the social tick arms each next
+/// `ComingBack`. This is the single path for `Coucou(cron=…)` and
+/// `GIVE_RECURRING_TASK`.
+///
 /// # Errors
 ///
 /// Unknown target or group, a non-member target/creator, a past time, or an
@@ -153,8 +159,31 @@ pub fn schedule(state: &mut State, draft: Draft) -> Result<Record, String> {
         cron,
         ..Record::default()
     };
-    registry.pending.push(record.clone());
+    if record.cron.is_none() {
+        registry.pending.push(record.clone());
+        return Ok(record);
+    }
+    if !store_recurrent(GroupsState::get_mut(state), record.clone()) {
+        return Err(format!("group of {} vanished while scheduling", record.watcher_id));
+    }
     Ok(record)
+}
+
+/// Store a cron `record` as a [`Substate::Recurrent`] in its group. Returns
+/// `false` (record dropped) when it has no cron, target or existing group.
+pub fn store_recurrent(groups: &mut GroupsState, record: Record) -> bool {
+    let (Some(cron), Some(agent_id), Some(gid)) = (record.cron, record.agent_id, record.group_id) else {
+        return false;
+    };
+    let Some(group) = groups.find_mut(&gid) else { return false };
+    group.social.push(Substate::Recurrent {
+        id: record.watcher_id,
+        agent_id,
+        creator_agent_id: record.creator_agent_id,
+        cron,
+        message: record.message,
+    });
+    true
 }
 
 /// Check that `expr` is a valid 5-field cron that fires at least once.
@@ -256,16 +285,42 @@ fn try_coucou(tool: &ToolUse, state: &mut State) -> Result<String, String> {
     Ok(describe(&record))
 }
 
-/// `Coucou_delete` body; `Ok` = result text.
+/// The group `Recurrent` with `id`, as a [`Record`] (no fire time).
+fn find_recurrent(groups: &GroupsState, id: &str) -> Option<Record> {
+    groups.groups.iter().find_map(|g| {
+        g.social.iter().find_map(|s| {
+            cp_macros::deref_match!(s, {
+                Substate::Recurrent { id: ref r, ref agent_id, ref creator_agent_id, ref cron, ref message } => {
+                    (r == id).then(|| Record {
+                        watcher_id: r.clone(),
+                        message: message.clone(),
+                        agent_id: Some(agent_id.clone()),
+                        creator_agent_id: creator_agent_id.clone(),
+                        group_id: Some(g.id.clone()),
+                        cron: Some(cron.clone()),
+                        ..Record::default()
+                    })
+                }
+                Substate::SimpleTurn { .. }
+                | Substate::ComingBack { .. }
+                | Substate::Gather { .. }
+                | Substate::Dispatch { .. } => None,
+            })
+        })
+    })
+}
+
+/// `Coucou_delete` body; `Ok` = result text. Finds one-shots in the registry
+/// and recurring ones among the groups' `Recurrent` substates.
 fn try_delete(tool: &ToolUse, state: &mut State) -> Result<String, String> {
     let id = str_arg(tool, "coucou_id").ok_or("Coucou_delete requires coucou_id")?.to_owned();
     let caller = state.executing_agent_id().map(str::to_owned);
-    let registry = CoucouRegistry::get_mut(state);
-    let record = registry
+    let record = CoucouRegistry::get(state)
         .pending
         .iter()
         .find(|c| c.watcher_id == id)
         .cloned()
+        .or_else(|| find_recurrent(GroupsState::get(state), &id))
         .ok_or_else(|| format!("coucou {id} not found"))?;
     let is_caller = |who: Option<&String>| who.is_some() && who == caller.as_ref();
     let allowed =
@@ -277,6 +332,10 @@ fn try_delete(tool: &ToolUse, state: &mut State) -> Result<String, String> {
             record.agent_id.as_deref().unwrap_or("none"),
         ));
     }
+    if record.cron.is_some() {
+        let _removed = cp_groups::social::remove_recurrent(&mut GroupsState::get_mut(state).groups, &id);
+    }
+    let registry = CoucouRegistry::get_mut(state);
     let _removed = registry.cancel(&id);
     if let Some(creator) = record.creator_agent_id.filter(|c| Some(c) != caller.as_ref()) {
         let by = caller.as_deref().unwrap_or("someone");
