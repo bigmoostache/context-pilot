@@ -61,42 +61,48 @@ pub(in crate::app::run) fn emit_messages(app: &mut App) {
     // backlog rides the frontend's initial tier-② load, not the delta stream).
     let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.messages());
     if !seeded {
-        let counts: Vec<(String, usize)> = AgentsState::get(&app.state)
-            .agents
-            .iter()
-            .map(|t| (t.id.clone(), cp_mod_agents::types::msgs::messages(&app.state, &t.id).len()))
-            .collect();
-        let bs = app.state.ext_mut::<BridgeState>();
-        for (id, len) in counts {
-            let _prev = bs.agent_msg_counts.insert(id, len);
-        }
-        bs.seeded.seed_messages();
+        seed_counts(&mut app.state);
         return;
     }
 
-    // Collect messages appended since the last pass (owned, so the borrows on
-    // `AgentsState` and `BridgeState` end before we mutate state below).
-    let pending: Vec<PendingMessage> = {
-        let ts = AgentsState::get(&app.state);
-        let memo = &app.state.ext::<BridgeState>().agent_msg_counts;
-        let mut out = Vec::new();
-        for agent in &ts.agents {
-            let seen = memo.get(&agent.id).copied().unwrap_or(0);
-            for (idx, msg) in cp_mod_agents::types::msgs::messages(&app.state, &agent.id).iter().enumerate().skip(seen)
-            {
-                out.push(build_pending(&agent.id, msg, idx));
-            }
-        }
-        out
-    };
-    if pending.is_empty() {
-        return;
-    }
-
-    for p in pending {
+    for p in collect_pending(&app.state) {
         emit_one_message(&app.state, &p.agent_id, &p.message_id, &p.body);
-        let _prev = app.state.ext_mut::<BridgeState>().agent_msg_counts.insert(p.agent_id, p.index.saturating_add(1));
+        let bs = app.state.ext_mut::<BridgeState>();
+        let memo = if p.trace { &mut bs.agent_activity_counts } else { &mut bs.agent_msg_counts };
+        let _prev = memo.insert(p.agent_id, p.index.saturating_add(1));
     }
+}
+
+/// Memoise every agent's current message and trace counts, so only later
+/// appends become deltas.
+fn seed_counts(state: &mut State) {
+    let counts: Vec<(String, usize, usize)> = AgentsState::get(state)
+        .agents
+        .iter()
+        .map(|t| (t.id.clone(), cp_mod_agents::types::msgs::messages(state, &t.id).len(), t.activity.len()))
+        .collect();
+    let bs = state.ext_mut::<BridgeState>();
+    for (id, len, traces) in counts {
+        let _prev_traces = bs.agent_activity_counts.insert(id.clone(), traces);
+        let _prev_msgs = bs.agent_msg_counts.insert(id, len);
+    }
+    bs.seeded.seed_messages();
+}
+
+/// Messages and tool traces appended since the last pass, owned so no borrow
+/// of `State` outlives the scan.
+fn collect_pending(state: &State) -> Vec<PendingMessage> {
+    let bs = state.ext::<BridgeState>();
+    let mut out = Vec::new();
+    for agent in &AgentsState::get(state).agents {
+        let seen_msgs = bs.agent_msg_counts.get(&agent.id).copied().unwrap_or(0);
+        let msgs = cp_mod_agents::types::msgs::messages(state, &agent.id);
+        out.extend(msgs.iter().enumerate().skip(seen_msgs).map(|(idx, msg)| build_pending(&agent.id, msg, idx, false)));
+        let seen_traces = bs.agent_activity_counts.get(&agent.id).copied().unwrap_or(0);
+        let traces = agent.activity.iter().enumerate().skip(seen_traces);
+        out.extend(traces.map(|(idx, msg)| build_pending(&agent.id, msg, idx, true)));
+    }
+    out
 }
 
 /// One agent message staged for emission.
@@ -105,8 +111,10 @@ struct PendingMessage {
     agent_id: String,
     /// Synthesised stable message id (`"{agent_id}-m{index}"`).
     message_id: String,
-    /// Storage index within the agent's message vector.
+    /// Storage index within the agent's message vector (or activity, see `trace`).
     index: usize,
+    /// A tool-call trace from the agent's activity, not a group message.
+    trace: bool,
     /// UTF-8 JSON body the observer renders the bubble from.
     body: String,
 }
@@ -116,8 +124,8 @@ struct PendingMessage {
 /// The body is the JSON the maquette agent view renders directly — author
 /// (so the bubble lands on the right side), text, timestamp, and any embedded
 /// question / file reference.
-fn build_pending(agent_id: &str, msg: &AgentMessage, idx: usize) -> PendingMessage {
-    let message_id = format!("{agent_id}-m{idx}");
+fn build_pending(agent_id: &str, msg: &AgentMessage, idx: usize, trace: bool) -> PendingMessage {
+    let message_id = if trace { format!("{agent_id}-a{idx}") } else { format!("{agent_id}-m{idx}") };
     let author = if matches!(msg.author, AgentAuthor::Assistant) { "assistant" } else { "user" };
     let body = serde_json::json!({
         "id": message_id,
@@ -128,7 +136,7 @@ fn build_pending(agent_id: &str, msg: &AgentMessage, idx: usize) -> PendingMessa
         "auto": msg.auto,
     })
     .to_string();
-    PendingMessage { agent_id: agent_id.to_owned(), message_id, index: idx, body }
+    PendingMessage { agent_id: agent_id.to_owned(), message_id, index: idx, trace, body }
 }
 
 /// Stage `body` in the content-addressed store (I13 barrier) and journal the

@@ -68,7 +68,7 @@ fn saved_focus_pointer(shared: &SharedConfig) -> Option<&str> {
 pub(crate) fn boot_load_config() -> BootConfig {
     // One-shot T860 store migration (threads → agents, T<n> → A<n>); must run
     // before anything reads config.json or the worker files.
-    if let Err(e) = cp_mod_agents::types::migrate::upgrade_store(std::path::Path::new(STORE_DIR)) {
+    if let Err(e) = cp_mod_agents::types::persist::migrate::upgrade_store(std::path::Path::new(STORE_DIR)) {
         log::error!("threads→agents store migration failed, retrying next boot: {e}");
     }
     let shared = config::load_config().unwrap_or_default();

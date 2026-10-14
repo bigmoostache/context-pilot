@@ -210,7 +210,7 @@ fn roster_gate(app: &App) -> (bool, Option<u64>) {
     let mut h = std::collections::hash_map::DefaultHasher::new();
     for t in &AgentsState::get(&app.state).agents {
         t.id.hash(&mut h);
-        cp_mod_agents::types::msgs::messages(&app.state, &t.id).len().hash(&mut h);
+        cp_mod_agents::types::activity::timeline(&app.state, &t.id).len().hash(&mut h);
         (cp_mod_agents::types::turn::status(&app.state, &t.id) == cp_mod_agents::types::AgentStatus::MyTurn)
             .hash(&mut h);
         t.archived.hash(&mut h);
@@ -269,7 +269,5 @@ pub(in crate::app::run) fn maybe_append_tool_activity(state: &mut State, tool: &
     let intent = tool.input.get("intent").and_then(serde_json::Value::as_str).unwrap_or("");
     let line = format!("/* auto */ {verb} · {tool_name} — {intent}", tool_name = tool.name);
 
-    if let Some(history) = cp_mod_agents::types::msgs::messages_mut(state, &tid) {
-        history.push(AgentMessage::auto_trace(line));
-    }
+    cp_mod_agents::types::activity::push(state, &tid, AgentMessage::auto_trace(line));
 }

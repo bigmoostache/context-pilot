@@ -57,7 +57,7 @@ fn message_key(msg: &AgentMessage, viewport_width: u16) -> u64 {
 /// message contributes its content length + heap address, which any append or
 /// replacement changes. The last message (where streaming edits land) is
 /// hashed in full as a guard against same-length in-place edits.
-fn lines_fingerprint(agent: &cp_mod_agents::types::Agent, history: &[AgentMessage], viewport_width: u16) -> u64 {
+fn lines_fingerprint(agent: &cp_mod_agents::types::Agent, history: &[&AgentMessage], viewport_width: u16) -> u64 {
     let _g = crate::profile!("tv_fingerprint");
     let mut h = std::collections::hash_map::DefaultHasher::new();
     agent.id.hash(&mut h);
@@ -79,7 +79,7 @@ fn lines_fingerprint(agent: &cp_mod_agents::types::Agent, history: &[AgentMessag
 /// Message lines for `agent`, rebuilt only when its fingerprint changes.
 fn cached_agent_message_lines(
     agent: &cp_mod_agents::types::Agent,
-    history: &[AgentMessage],
+    history: &[&AgentMessage],
     viewport_width: u16,
 ) -> CachedLines {
     let key = lines_fingerprint(agent, history, viewport_width);
@@ -160,7 +160,11 @@ pub(super) fn render_message_area_with_input(frame: &mut Frame<'_>, state: &mut 
             return;
         };
 
-        lines = cached_agent_message_lines(agent, cp_mod_agents::types::msgs::messages(state, &agent.id), m_area.width);
+        lines = cached_agent_message_lines(
+            agent,
+            &cp_mod_agents::types::activity::timeline(state, &agent.id),
+            m_area.width,
+        );
         msg_area = m_area;
         let _g = crate::profile!("tv_input");
         render_agent_input(frame, state, input_area);
@@ -178,7 +182,7 @@ pub(super) fn render_message_area_with_input(frame: &mut Frame<'_>, state: &mut 
 /// (same IR path as the main conversation), converts via `blocks_to_lines()`.
 /// Returned lines hold no borrow of `State`, so the caller can take a mutable
 /// borrow afterwards for scroll management.
-fn build_agent_message_lines(history: &[AgentMessage], viewport_width: u16) -> Vec<ratatui::text::Line<'static>> {
+fn build_agent_message_lines(history: &[&AgentMessage], viewport_width: u16) -> Vec<ratatui::text::Line<'static>> {
     if history.is_empty() {
         let ir_blocks =
             vec![IrBlock::Line(vec![S::muted("No messages yet. Type below to start the conversation.".to_owned())])];

@@ -5,8 +5,8 @@ use cp_base::state::runtime::State;
 /// Per-thread message files (`agents/<id>.json`), written only when dirty.
 pub mod persist;
 
-/// One-shot boot migration of the pre-T860 `threads` store layout.
-pub mod migrate;
+/// Per-agent tool-call traces, interleaved with the human group for display.
+pub mod activity;
 /// Agent messages = its human group's messages.
 pub mod msgs;
 pub mod roster;
@@ -93,6 +93,10 @@ pub struct Agent {
     /// One-line purpose shown next to the name in the agents tree.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,
+    /// Tool-call traces of this agent (`auto` messages). Persisted in
+    /// `activity/<id>.json`, never in `config.json` (see [`activity`]).
+    #[serde(skip)]
+    pub activity: Vec<AgentMessage>,
 }
 
 impl Agent {
@@ -110,6 +114,7 @@ impl Agent {
             origin: None,
             parent_agent_id: None,
             description: String::new(),
+            activity: Vec::new(),
         }
     }
 }

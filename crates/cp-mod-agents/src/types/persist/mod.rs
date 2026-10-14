@@ -11,7 +11,10 @@ use std::path::PathBuf;
 use cp_base::config::constants::STORE_DIR;
 use serde::Serialize;
 
-use super::{Agent, AgentMessage, AgentOrigin};
+/// One-shot boot migration of the pre-T860 `threads` store layout.
+pub mod migrate;
+
+use crate::types::{Agent, AgentMessage, AgentOrigin};
 
 /// Directory (under the store dir) of the pre-groups agent message files.
 pub const AGENTS_DIR: &str = "agents";
@@ -50,7 +53,7 @@ pub struct AgentMeta<'agent> {
     /// Derived turn, written for outside readers (the orchestrator's fleet
     /// meta) and never read back. Not `status`: that key is the pre-T860-D
     /// stored flag the boot migration consumes.
-    turn: super::AgentStatus,
+    turn: crate::types::AgentStatus,
 }
 
 impl<'agent> AgentMeta<'agent> {
@@ -67,7 +70,7 @@ impl<'agent> AgentMeta<'agent> {
             origin: t.origin.as_ref(),
             parent_agent_id: t.parent_agent_id.as_deref(),
             description: &t.description,
-            turn: super::turn::status_of(groups, &t.id),
+            turn: crate::types::turn::status_of(groups, &t.id),
         }
     }
 }

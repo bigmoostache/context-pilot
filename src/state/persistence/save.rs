@@ -310,15 +310,18 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
         dir.join(cp_mod_console::CONSOLE_DIR),
         dir.join(cp_mod_agents::types::persist::AGENTS_DIR),
         dir.join(cp_groups::persist::GROUPS_DIR),
+        dir.join(cp_mod_agents::types::activity::ACTIVITY_DIR),
         dir.join(MODULES_DIR),
     ];
 
-    // Per-thread message files, only for agents changed since last write.
+    // Group message files + agent activity files, only those changed since last write.
     let mut durable: Vec<WriteOp> = {
         let _g = crate::profile!("thread_files");
         let groups = &cp_groups::types::GroupsState::get(state).groups;
+        let agents = &cp_mod_agents::types::AgentsState::get(state).agents;
         cp_groups::persist::dirty_group_file_ops(groups)
             .into_iter()
+            .chain(cp_mod_agents::types::activity::dirty_file_ops(agents))
             .map(|(path, content)| WriteOp { path, content })
             .collect()
     };

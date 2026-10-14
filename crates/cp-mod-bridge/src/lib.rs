@@ -130,6 +130,10 @@ pub struct BridgeState {
     /// phase/cost vitals).
     pub agent_msg_counts: std::collections::HashMap<String, usize>,
 
+    /// Same as [`Self::agent_msg_counts`] for each agent's tool-call traces,
+    /// which live in the agent's activity rather than its human group.
+    pub agent_activity_counts: std::collections::HashMap<String, usize>,
+
     /// Last per-agent turn-status emitted as a `AgentStatusChanged` delta,
     /// keyed by agent id. The status chokepoint diffs each agent's live
     /// status against this memo every tick and emits only on an actual flip

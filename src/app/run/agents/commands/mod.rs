@@ -280,6 +280,7 @@ fn apply_delete_agent(state: &mut State, agent_id: &str) {
         let _archived = bs.agent_archived_memo.remove(agent_id);
         let _paused = bs.agent_paused_memo.remove(agent_id);
         let _msgs = bs.agent_msg_counts.remove(agent_id);
+        let _activity = bs.agent_activity_counts.remove(agent_id);
         let _tasks = bs.agent_tasks.remove(agent_id);
         let _notes = bs.agent_notes.remove(agent_id);
     }
@@ -300,23 +301,25 @@ fn apply_delete_agent(state: &mut State, agent_id: &str) {
 /// message. One `MessageDeleted` delta is emitted per removed message so
 /// the frontend reducer handles each independently.
 fn apply_delete_message(state: &mut State, agent_id: &str, message_ts: u64) {
+    // Traces live in the agent's activity, messages in its human group: the
+    // cascade runs over the interleaved timeline, then prunes both stores.
+    let timeline: Vec<AgentMessage> =
+        cp_mod_agents::types::activity::timeline(state, agent_id).into_iter().cloned().collect();
+    let Some(idx) = timeline.iter().position(|m| m.timestamp == message_ts) else {
+        log::warn!("bridge: DeleteMessage no message with ts={message_ts} in agent {agent_id}");
+        return;
+    };
+    let to_delete = collect_delete_timestamps(&timeline, idx, message_ts);
+    let delete_set: std::collections::HashSet<u64> = to_delete.iter().copied().collect();
+
     let Some(history) = cp_mod_agents::types::msgs::messages_mut(state, agent_id) else {
         log::warn!("bridge: DeleteMessage for unknown agent {agent_id}");
         return;
     };
-
-    // Find the target message index.
-    let Some(idx) = history.iter().position(|m| m.timestamp == message_ts) else {
-        log::warn!("bridge: DeleteMessage no message with ts={message_ts} in agent {agent_id}");
-        return;
-    };
-
-    let to_delete = collect_delete_timestamps(history, idx, message_ts);
-
-    // Remove all collected messages.
-    let delete_set: std::collections::HashSet<u64> = to_delete.iter().copied().collect();
     history.retain(|m| !delete_set.contains(&m.timestamp));
     let new_count = history.len();
+    let activity_count =
+        cp_mod_agents::types::activity::retain(state, agent_id, |m| !delete_set.contains(&m.timestamp));
 
     // Emit one delta per deleted message.
     let tid = agent_id.to_owned();
@@ -328,7 +331,8 @@ fn apply_delete_message(state: &mut State, agent_id: &str, message_ts: u64) {
     // reduced count and correctly emits `MessageCreated` for any subsequent
     // append (T418 fix).
     if let Some(bs) = state.get_ext_mut::<BridgeState>() {
-        let _prev = bs.agent_msg_counts.insert(tid, new_count);
+        let _prev_traces = bs.agent_activity_counts.insert(tid.clone(), activity_count);
+        let _prev_msgs = bs.agent_msg_counts.insert(tid, new_count);
     }
 
     state.flags.ui.dirty = true;

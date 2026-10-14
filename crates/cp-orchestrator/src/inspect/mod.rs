@@ -50,6 +50,11 @@ const AGENTS_DIR: &str = "agents";
 /// C3 an agent's conversation lives in its human group's file.
 const GROUPS_DIR: &str = "groups";
 
+/// Directory holding per-agent tool-call traces (`<agent_id>.json`). Since
+/// T860 H8 they live here, not in the human group, and are interleaved with
+/// the group's messages by timestamp when served.
+const ACTIVITY_DIR: &str = "activity";
+
 /// Pre-T860 name of [`AGENTS_DIR`], read when the agent binary is older.
 const LEGACY_AGENTS_DIR: &str = "threads";
 
@@ -128,8 +133,9 @@ impl StateReader {
         let mut config = read_cached_json(&path, &mut cache.config)?;
         let legacy = normalize_legacy_agents(&mut config);
         let dir = if legacy { LEGACY_AGENTS_DIR } else { AGENTS_DIR };
+        let cp = folder.join(CP_DIR);
         hydrate_agent_messages(
-            &MessageDirs { groups: &folder.join(CP_DIR).join(GROUPS_DIR), agents: &folder.join(CP_DIR).join(dir) },
+            &MessageDirs { groups: &cp.join(GROUPS_DIR), agents: &cp.join(dir), activity: &cp.join(ACTIVITY_DIR) },
             &mut config,
             &mut cache.agents,
         );
@@ -215,12 +221,15 @@ struct MessageDirs<'dirs> {
     groups: &'dirs Path,
     /// `agents/` (or legacy `threads/`) — pre-groups per-agent files.
     agents: &'dirs Path,
+    /// `activity/` — per-agent tool-call traces (T860 H8).
+    activity: &'dirs Path,
 }
 
 /// Splice `messages` into every agent entry of `config` lacking them: from
 /// `groups/<human_group_id>.json` when the agent has a human group, else from
-/// the pre-groups `agents/<id>.json`. Legacy configs (inline messages) pass
-/// through as-is; a missing/unreadable file leaves the entry without messages.
+/// the pre-groups `agents/<id>.json`, then interleave the agent's
+/// `activity/<id>.json` traces by timestamp. Legacy configs (inline messages)
+/// pass through as-is; a missing/unreadable file contributes nothing.
 fn hydrate_agent_messages(dirs: &MessageDirs<'_>, config: &mut Value, cache: &mut HashMap<String, CachedJson>) {
     let Some(entries) = config.pointer_mut("/modules/agents/agents").and_then(Value::as_array_mut) else {
         return;
@@ -236,12 +245,34 @@ fn hydrate_agent_messages(dirs: &MessageDirs<'_>, config: &mut Value, cache: &mu
             || (id.clone(), dirs.agents.join(format!("{id}.json"))),
             |gid| (format!("group:{gid}"), dirs.groups.join(format!("{gid}.json"))),
         );
-        let slot = cache.entry(key).or_insert_with(|| CachedJson { mtime: SystemTime::UNIX_EPOCH, data: Value::Null });
-        let Ok(file) = read_cached_json_slot(&path, slot) else { continue };
-        if let Some(messages) = file.get("messages") {
-            let _prev = obj.insert("messages".to_owned(), messages.clone());
+        let chat = cached_messages(cache, key, &path);
+        let traces = cached_messages(cache, format!("activity:{id}"), &dirs.activity.join(format!("{id}.json")));
+        if let Some(messages) = interleave(chat, traces) {
+            let _prev = obj.insert("messages".to_owned(), Value::Array(messages));
         }
     }
+}
+
+/// The `messages` array of the JSON file at `path`, through the per-key cache
+/// (`None` when the file is missing, unreadable or has no array).
+fn cached_messages(cache: &mut HashMap<String, CachedJson>, key: String, path: &Path) -> Option<Vec<Value>> {
+    let slot = cache.entry(key).or_insert_with(|| CachedJson { mtime: SystemTime::UNIX_EPOCH, data: Value::Null });
+    let file = read_cached_json_slot(path, slot).ok()?;
+    file.get("messages").and_then(Value::as_array).cloned()
+}
+
+/// Stable merge of chat messages and tool traces by `timestamp`, chat first
+/// on ties. `None` when neither source exists.
+fn interleave(chat: Option<Vec<Value>>, traces: Option<Vec<Value>>) -> Option<Vec<Value>> {
+    let (mut all, extra) = match (chat, traces) {
+        (None, None) => return None,
+        (Some(c), None) => return Some(c),
+        (None, Some(t)) => return Some(t),
+        (Some(c), Some(t)) => (c, t),
+    };
+    all.extend(extra);
+    all.sort_by_key(|m| m.get("timestamp").and_then(Value::as_u64).unwrap_or(0));
+    Some(all)
 }
 
 /// Read and parse a JSON file, returning the cached value on mtime-hit or
@@ -328,165 +359,4 @@ fn list_json_stems(dir: &Path) -> io::Result<Vec<String>> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::tempdir;
-
-    fn write_config(folder: &Path, value: &Value) {
-        let dir = folder.join(CP_DIR);
-        fs::create_dir_all(&dir).expect("mkdir");
-        fs::write(dir.join(CONFIG_FILE), serde_json::to_vec(value).expect("ser")).expect("write");
-    }
-
-    fn write_worker(folder: &Path, worker: &str, value: &Value) {
-        let dir = folder.join(CP_DIR).join(STATES_DIR);
-        fs::create_dir_all(&dir).expect("mkdir");
-        fs::write(dir.join(format!("{worker}.json")), serde_json::to_vec(value).expect("ser")).expect("write");
-    }
-
-    #[test]
-    fn read_config_caches_and_returns_on_mtime_hit() {
-        let dir = tempdir().expect("dir");
-        let folder = dir.path();
-        let val = serde_json::json!({"modules": {"agents": []}});
-        write_config(folder, &val);
-
-        let mut reader = StateReader::new();
-        let first = reader.read_config(folder).expect("read");
-        assert_eq!(first, val);
-
-        // Second read without file change → mtime hit, returns same.
-        let second = reader.read_config(folder).expect("read");
-        assert_eq!(second, val);
-    }
-
-    #[test]
-    fn read_config_re_parses_on_mtime_change() {
-        let dir = tempdir().expect("dir");
-        let folder = dir.path();
-        let v1 = serde_json::json!({"version": 1u32});
-        write_config(folder, &v1);
-
-        let mut reader = StateReader::new();
-        let _first = reader.read_config(folder).expect("read");
-
-        // Mutate the file (mtime changes).
-        let v2 = serde_json::json!({"version": 2u32});
-        // Ensure mtime actually differs (some filesystems have 1s granularity).
-        std::thread::sleep(std::time::Duration::from_millis(50));
-        write_config(folder, &v2);
-
-        let second = reader.read_config(folder).expect("read");
-        assert_eq!(second, v2);
-    }
-
-    #[test]
-    fn read_config_falls_back_on_torn_read() {
-        let dir = tempdir().expect("dir");
-        let folder = dir.path();
-        let good = serde_json::json!({"ok": true});
-        write_config(folder, &good);
-
-        let mut reader = StateReader::new();
-        let _first = reader.read_config(folder).expect("read");
-
-        // Corrupt the file (simulates mid-write torn read).
-        std::thread::sleep(std::time::Duration::from_millis(50));
-        let path = folder.join(CP_DIR).join(CONFIG_FILE);
-        fs::write(&path, b"{{{{not json").expect("write");
-
-        // Should fall back to the last good value.
-        let fallback = reader.read_config(folder).expect("read");
-        assert_eq!(fallback, good);
-    }
-
-    #[test]
-    fn read_worker_and_list_workers() {
-        let dir = tempdir().expect("dir");
-        let folder = dir.path();
-        let w1 = serde_json::json!({"modules": {"todo": {}}});
-        let w2 = serde_json::json!({"modules": {"spine": {}}});
-        write_worker(folder, "abc123", &w1);
-        write_worker(folder, "def456", &w2);
-
-        let mut reader = StateReader::new();
-        let workers = StateReader::list_workers(folder).expect("list");
-        assert_eq!(workers, vec!["abc123", "def456"]);
-
-        let read = reader.read_worker(folder, "abc123").expect("read");
-        assert_eq!(read, w1);
-    }
-
-    #[test]
-    fn read_config_hydrates_legacy_threads_layout() {
-        let dir = tempdir().expect("dir");
-        let folder = dir.path();
-        let cfg = serde_json::json!({"modules": {"threads": {"threads": [
-            {"id": "T1", "name": "slim"},
-            {"id": "T2", "name": "legacy", "messages": [{"content": "inline"}]},
-            {"id": "T3", "name": "no file"},
-        ]}}});
-        write_config(folder, &cfg);
-        let tdir = folder.join(CP_DIR).join(LEGACY_AGENTS_DIR);
-        fs::create_dir_all(&tdir).expect("mkdir");
-        let t1 = serde_json::json!({"id": "T1", "messages": [{"content": "from file"}]});
-        fs::write(tdir.join("T1.json"), serde_json::to_vec(&t1).expect("ser")).expect("write");
-
-        let mut reader = StateReader::new();
-        let read = reader.read_config(folder).expect("read");
-        let at = |i: &str| read.pointer(i).and_then(Value::as_str);
-        assert_eq!(at("/modules/agents/agents/0/messages/0/content"), Some("from file"));
-        assert_eq!(at("/modules/agents/agents/1/messages/0/content"), Some("inline"));
-        assert!(read.pointer("/modules/agents/agents/2/messages").is_none());
-    }
-
-    #[test]
-    fn read_config_hydrates_from_human_group() {
-        let dir = tempdir().expect("dir");
-        let folder = dir.path();
-        let cfg = serde_json::json!({"modules": {"agents": {"agents": [
-            {"id": "A1", "name": "grouped", "human_group_id": "G4"},
-            {"id": "A2", "name": "pre-groups"},
-        ]}}});
-        write_config(folder, &cfg);
-        let gdir = folder.join(CP_DIR).join(GROUPS_DIR);
-        fs::create_dir_all(&gdir).expect("mkdir");
-        fs::write(gdir.join("G4.json"), br#"{"id":"G4","messages":[{"content":"from group"}]}"#).expect("write");
-        let adir = folder.join(CP_DIR).join(AGENTS_DIR);
-        fs::create_dir_all(&adir).expect("mkdir");
-        fs::write(adir.join("A1.json"), br#"{"messages":[{"content":"stale backup"}]}"#).expect("write");
-        fs::write(adir.join("A2.json"), br#"{"messages":[{"content":"from agent file"}]}"#).expect("write");
-
-        let mut reader = StateReader::new();
-        let read = reader.read_config(folder).expect("read");
-        let at = |i: &str| read.pointer(i).and_then(Value::as_str);
-        assert_eq!(at("/modules/agents/agents/0/messages/0/content"), Some("from group"));
-        assert_eq!(at("/modules/agents/agents/1/messages/0/content"), Some("from agent file"));
-    }
-
-    #[test]
-    fn read_config_overlays_module_files() {
-        let dir = tempdir().expect("dir");
-        let folder = dir.path();
-        let cfg = serde_json::json!({"modules": {"todo": {"todos": ["inline"]}, "memory": {"m": 1u64}}});
-        write_config(folder, &cfg);
-        let mdir = folder.join(CP_DIR).join(MODULES_DIR);
-        fs::create_dir_all(&mdir).expect("mkdir");
-        fs::write(mdir.join("todo.json"), br#"{"todos":["file"]}"#).expect("write");
-        fs::write(mdir.join("tree.json"), br#"{"filter":"x"}"#).expect("write");
-
-        let mut reader = StateReader::new();
-        let read = reader.read_config(folder).expect("read");
-        let at = |i: &str| read.pointer(i).and_then(Value::as_str);
-        assert_eq!(at("/modules/todo/todos/0"), Some("file"));
-        assert_eq!(at("/modules/tree/filter"), Some("x"));
-        assert_eq!(read.pointer("/modules/memory/m").and_then(Value::as_u64), Some(1));
-    }
-
-    #[test]
-    fn list_workers_on_missing_dir_returns_empty() {
-        let dir = tempdir().expect("dir");
-        let workers = StateReader::list_workers(dir.path()).expect("list");
-        assert!(workers.is_empty());
-    }
-}
+mod tests;
