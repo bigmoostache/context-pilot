@@ -267,11 +267,15 @@ fn apply_delete_agent(state: &mut State, agent_id: &str) {
     // thread, falling back to inline removal if the spawn fails.
     if !removed.is_empty() {
         let bg = removed.clone();
-        let spawned = std::thread::Builder::new()
-            .name("group-file-rm".into())
-            .spawn(move || bg.iter().for_each(|gid| cp_groups::persist::remove_group_file(gid)));
+        let spawned = std::thread::Builder::new().name("group-file-rm".into()).spawn(move || {
+            for gid in &bg {
+                cp_groups::persist::remove_group_file(gid);
+            }
+        });
         if spawned.is_err() {
-            removed.iter().for_each(|gid| cp_groups::persist::remove_group_file(gid));
+            for gid in &removed {
+                cp_groups::persist::remove_group_file(gid);
+            }
         }
     }
 
