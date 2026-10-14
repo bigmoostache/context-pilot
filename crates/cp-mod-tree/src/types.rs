@@ -15,6 +15,28 @@ pub struct TreeFileDescription {
     pub file_hash: String,
 }
 
+/// The described-file list, shared behind an `Arc`.
+///
+/// A newtype because `Arc<Vec<_>>` is rejected by `clippy::rc_buffer`, while
+/// [`std::sync::Arc::make_mut`] still allows in-place push/retain.
+/// Serializes exactly like the inner `Vec`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Descriptions(pub Vec<TreeFileDescription>);
+
+impl std::ops::Deref for Descriptions {
+    type Target = Vec<TreeFileDescription>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for Descriptions {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 /// Default tree filter (gitignore-style patterns)
 pub const DEFAULT_TREE_FILTER: &str = "# Ignore common non-essential directories
 .git/
@@ -41,8 +63,10 @@ build/
 pub struct TreeState {
     /// Gitignore-style filter patterns controlling which files/folders are shown.
     pub filter: String,
-    /// User-written descriptions attached to files/folders.
-    pub descriptions: Vec<TreeFileDescription>,
+    /// User-written descriptions attached to files/folders. Behind an `Arc` so
+    /// the per-refresh tree cache request shares it instead of deep-cloning
+    /// ~8k entries on the main loop; writers go through [`Arc::make_mut`].
+    pub descriptions: std::sync::Arc<Descriptions>,
     /// Change stamp, refreshed on every [`TreeState::get_mut`]. The save path
     /// rewrites `modules/tree.json` only when it moved. **Transient**.
     pub revision: u64,
@@ -64,7 +88,7 @@ impl TreeState {
     pub fn new() -> Self {
         Self {
             filter: DEFAULT_TREE_FILTER.to_owned(),
-            descriptions: vec![],
+            descriptions: std::sync::Arc::default(),
             revision: REVISION_SOURCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
         }
     }

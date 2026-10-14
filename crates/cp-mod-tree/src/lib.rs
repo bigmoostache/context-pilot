@@ -97,7 +97,7 @@ impl Module for TreeModule {
         let ts = TreeState::get(state);
         json!({
             "tree_filter": ts.filter,
-            "tree_descriptions": ts.descriptions,
+            "tree_descriptions": *ts.descriptions,
         })
     }
 
@@ -108,7 +108,7 @@ impl Module for TreeModule {
         if let Some(arr) = data.get("tree_descriptions")
             && let Ok(v) = serde_json::from_value(arr.clone())
         {
-            TreeState::get_mut(state).descriptions = v;
+            TreeState::get_mut(state).descriptions = std::sync::Arc::new(v);
         }
         // Legacy: load tree_open_folders from global config if present (migration)
         if let Some(arr) = data.get("tree_open_folders")
@@ -123,7 +123,7 @@ impl Module for TreeModule {
         // YAML backing store: migrate existing descriptions, then populate gaps
         let ts = TreeState::get_mut(state);
         storage::migrate_to_yaml(&ts.descriptions);
-        storage::populate_from_yaml(&mut ts.descriptions);
+        storage::populate_from_yaml(&mut std::sync::Arc::make_mut(&mut ts.descriptions).0);
     }
 
     fn save_worker_data(&self, state: &State) -> serde_json::Value {

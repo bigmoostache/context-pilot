@@ -187,13 +187,13 @@ enum UpsertKind {
 
 /// Insert or update a description in state, reporting which happened.
 fn upsert_description(state: &mut State, normalized: &str, description: String, file_hash: String) -> UpsertKind {
-    let ts = TreeState::get_mut(state);
-    if let Some(existing) = ts.descriptions.iter_mut().find(|d| d.path == normalized) {
+    let descriptions = std::sync::Arc::make_mut(&mut TreeState::get_mut(state).descriptions);
+    if let Some(existing) = descriptions.iter_mut().find(|d| d.path == normalized) {
         existing.description = description;
         existing.file_hash = file_hash;
         UpsertKind::Updated
     } else {
-        ts.descriptions.push(TreeFileDescription { path: normalized.to_owned(), description, file_hash });
+        descriptions.push(TreeFileDescription { path: normalized.to_owned(), description, file_hash });
         UpsertKind::Added
     }
 }
@@ -210,7 +210,7 @@ fn try_delete_description(
         return false;
     }
     if TreeState::get(state).descriptions.iter().any(|d| d.path == normalized) {
-        TreeState::get_mut(state).descriptions.retain(|d| d.path != normalized);
+        std::sync::Arc::make_mut(&mut TreeState::get_mut(state).descriptions).retain(|d| d.path != normalized);
         tally.removed.push(normalized.to_owned());
     }
     true
