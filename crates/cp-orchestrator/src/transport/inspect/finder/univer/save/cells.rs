@@ -66,7 +66,15 @@ fn cell_diff(pair: (&Value, &Value), styles: &Styles<'_>) -> (bool, bool) {
     let (old, new) = pair;
     let value = formula(old) != formula(new) || (formula(new).is_none() && !same_value(&value(old), &value(new)));
     let style = resolve(old, styles.base);
+    if dangling(new, styles.new) {
+        return (value, false); // unknown id: never reset a style we can't read
+    }
     (value, !same_json(&Value::Object(style), &Value::Object(resolve(new, styles.new))))
+}
+
+/// The cell names a style id missing from its table (a stale snapshot).
+fn dangling(cell: &Value, table: &Map<String, Value>) -> bool {
+    cell.get("s").and_then(Value::as_str).is_some_and(|id| !table.contains_key(id))
 }
 
 /// Deep JSON equality where numbers compare by value (`10.0` == `10`):

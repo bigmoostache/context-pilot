@@ -173,7 +173,9 @@ export function SheetGrid({
       presets: sheetPresets(el, worker),
     })
 
-    const fWorkbook = univerAPI.createWorkbook(data)
+    // Univer mutates the cells it is given; a clone keeps those edits out of the
+    // react-query cache (a remount would otherwise send style ids from a dead table).
+    const fWorkbook = univerAPI.createWorkbook(structuredClone(data))
     const opening = activeSheet ? fWorkbook.getSheetBySheetId(activeSheet) : null
     if (opening) fWorkbook.setActiveSheet(opening)
     univerRef.current = univerAPI

@@ -108,6 +108,25 @@ fn partial_snapshot_patches_only_sent_sheets() {
     check(&path);
 }
 
+/// A cell naming a style id absent from `styles` (stale browser state) keeps
+/// its formatting instead of being reset to Excel's default.
+#[test]
+fn dangling_style_id_keeps_formatting() {
+    let Ok(dir) = tempfile::tempdir() else { panic!("no temp dir") };
+    let path = dir.path().join("save.xlsx");
+    fixture(&path);
+    let Some(out) = convert(&path) else { panic!("convert failed") };
+    let mut snap = out.workbook;
+    *slot(&mut snap, &["sheets", "sheet-0", "cellData", "0", "0", "s"]) = json!("gone42");
+    *slot(&mut snap, &["sheets", "sheet-0", "cellData", "0", "1"]) = json!({ "v": 99u32, "t": 2u8 });
+    assert_eq!(save(&path, &snap), Ok(1));
+    let Ok(book) = umya_spreadsheet::reader::xlsx::read(&path) else { panic!("re-read failed") };
+    let Ok(ws) = book.sheet(0) else { panic!("no sheet") };
+    assert_eq!(ws.value("B1"), "99");
+    assert!(ws.style("A1").font().is_some_and(umya_spreadsheet::Font::bold));
+    assert!(ws.style("A1").fill().is_some());
+}
+
 #[test]
 fn refuses_a_foreign_snapshot() {
     let Ok(dir) = tempfile::tempdir() else { panic!("no temp dir") };
