@@ -286,13 +286,7 @@ fn apply_delete_agent(state: &mut State, agent_id: &str) {
     // File removal is IO the loop must not wait on.
     remove_group_files_off_loop(&removed);
 
-    // Clean up focus references (mirrors archive path).
-    let focus = FocusState::get_mut(state);
-    if focus.focused_agent_id.as_deref() == Some(agent_id) {
-        focus.focused_agent_id = None;
-    }
-    let _prev = focus.last_read_count.remove(agent_id);
-
+    forget_agent_memos(state, agent_id);
     emit_roster_delta(state, OpEntryKind::AgentDeleted { agent_id: agent_id.to_owned() });
 
     // Thread-owned todos and scratchpad: hard-deleting an agent cascades removal
@@ -301,7 +295,19 @@ fn apply_delete_agent(state: &mut State, agent_id: &str) {
     let _todos = cp_mod_todo::tools::purge_agent_todos(state, agent_id);
     let _cells = cp_mod_scratchpad::tools::purge_agent_cells(state, agent_id);
 
-    // Clean up all bridge memos for the deleted agent.
+    state.flags.ui.dirty = true;
+    log::info!("bridge: permanently deleted agent {agent_id}");
+}
+
+/// Drop the focus references and bridge memos a deleted agent leaves behind
+/// (focus mirrors the archive path).
+fn forget_agent_memos(state: &mut State, agent_id: &str) {
+    let focus = FocusState::get_mut(state);
+    if focus.focused_agent_id.as_deref() == Some(agent_id) {
+        focus.focused_agent_id = None;
+    }
+    let _prev = focus.last_read_count.remove(agent_id);
+
     if let Some(bs) = state.get_ext_mut::<BridgeState>() {
         let _status = bs.agent_statuses.remove(agent_id);
         let _archived = bs.agent_archived_memo.remove(agent_id);
@@ -311,9 +317,6 @@ fn apply_delete_agent(state: &mut State, agent_id: &str) {
         let _tasks = bs.agent_tasks.remove(agent_id);
         let _notes = bs.agent_notes.remove(agent_id);
     }
-
-    state.flags.ui.dirty = true;
-    log::info!("bridge: permanently deleted agent {agent_id}");
 }
 
 // ── DeleteMessage ───────────────────────────────────────────────────
